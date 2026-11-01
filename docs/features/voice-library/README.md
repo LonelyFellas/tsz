@@ -1233,3 +1233,132 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 候选及正式 HTTPS 鉴权通过：无 Cookie refresh 401 Problem Details、login 200、Secure／HttpOnly／SameSite=Lax／鉴权 Path、refresh 轮换、logout 204 与 Cookie 清除。正式业务验收通过新请求完成独占草稿创建→读取→修改→再次读取，核对 revision、内容与原备注；三份 fixture 的账号身份、专属引用和精确 Redis 键已独立复查无残留，原生 cleanup 全部完成。`.env`、nginx、前端 manifest 指纹和三条预选正常词条摘要前后相同；无新语音／图片测试云对象，本地只读二进制检查的独占容器已删除并复查，两端发布锁均释放。运维备份、可信 source／bundle／plan／state 和审计回执保留。
 - 耗时：二进制制品下载 16.525s、smoke 回执下载 2.381s、上传 13.243s、事务事件跨度 47.577s；停服步骤时间上界 10.032s，不当作精确用户不可用时间。server build=0、local production build=0。真实 API 回退仍未演练；未专项调用词库助手模型，不把部署烟测当该能力完整功能验收。
 - 完整脱敏部署／清理回执沿用原证据目录 `/Users/darwish/.codex/visualizations/2026/10/31/01a1921f-04bc-7d80-99b7-69e1f2f4e4bd/` 下的 `task147-backend-current-deploy-receipt.json`、`task147-backend-current-deploy-cleanup.json`。本节通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 与事件结算且无新增部署后恢复原状态，不修改工作流代码，避免文档触发重复部署。
+
+### 13.25 当前 main 的 Web／Admin 验收与已完成发布复用（2026-11-01）
+
+- 用户本次要求按技能部署当前 main 的 Web／Admin，已部署 API 不重复发布。实际只读核查发现两组件已经完成当前 main `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` 的发布；按 deploy 技能“成功且身份未变的组件不重复发布”复用已完成发布，本次未重新调用 Web／Admin 发布入口、未再次上传或切流。此处记录现场已验收身份，不冒称本轮新发两个组件。
+- GitHub 当前 main 和该 SHA 最新精确 CI [41263640762](https://github.com/LonelyFellas/tsz/actions/runs/41263640762) attempt 1 均核对通过：completed/success，9 项 success、push commitlint 按既有设计 skip。两份唯一 CI 制品均未过期，生产 attempt 均为 1，与服务器 `<release-id>.ci.json` 的 SHA/tree/run/attempt、Node／平台、参数和摘要一致。
+
+| 组件  | 实际 SHA                                   | artifact ID   | 实际制品 SHA256                                                    | 文件数 | 原生 accepted_at（UTC）    |
+| ----- | ------------------------------------------ | ------------- | ------------------------------------------------------------------ | ------ | -------------------------- |
+| Web   | `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` | `13066211248` | `fe3e8ef3009b66424f8aa663f780288d02b9af6968cf17c17729ac726b7ba1de` | 2230   | `2026-11-01T02:34:47.180Z` |
+| Admin | `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` | `13066350958` | `bdb0e86ca9ef70e03f4b496d466098b4b5d9026d3ed8f5c90ddfbb175f56a069` | 148    | `2026-11-01T02:36:14.985Z` |
+
+- 上表 Web accepted 时间为新加坡 2026-11-01 10:34:47，Admin 为 10:36:14；均早于本次复核。两个 current 目录均使用原生 provenance verify 实际重新复算，并与 accepted manifest 和原始 CI 回执匹配。Web production、`NEXT_PUBLIC_SITE_URL=https://test.tianshengzhi.com`；Admin test mode，words／part-of-speech／TTS 三个 mock=false，四个兼容开关=true，CI Node 为 `24.19.0`、Linux/x64，参数保持原包值。
+- 实际已部署 API 已由另一项发布推进到 `38be4d370f9b5d2e9fa7130465e52187377d31e5`；本次没有发布或重启 API。原生 `node deploy/check-api-contract.mjs` 对此 accepted API 的 OpenAPI／运行时快照生成比较通过；独立采集确认 API manifest／磁盘／进程摘要一致，复核前后 API manifest、PID、二进制与 `.env`／nginx 配置指纹完全不变。
+- 必要线上验收全部通过：Web 首页与 Admin 登录页 HTTPS200，两端未登录 API401；Web 当前 slot active、nginx -t 有效，两个前端制品独立复算通过；API／前端事务标记不存在，跨组件及前端发布锁均空闲。不把 HTTP 和制品复核当作完整新功能或模型调用验收；本轮未新增浏览器登录，也未执行云合成或业务保存。
+- 清理：本轮未创建 fixture、业务记录、云语音／图片对象或新发布 stage／事务；契约检查的临时目录由原生 finally 删除，自己的本地查询临时文件已清理，无本轮测试资源残留。保留既有正常 release、恢复版本、运维备份和发布审计，不清理他方事务。下载／上传／发布耗时不适用，本次无重复传包或发布；local production build=0、server build=0。
+- 同一脱敏证据目录下 `task147-front-main-deploy-receipt.json`、`task147-front-main-final.json`、`task147-front-main-cleanup.json` 保存实际版本、制品、参数、HTTP／服务、配置与清理结果。本节按用户后续授权通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 完成、事件结算且无新增部署后恢复原 active 状态，不修改工作流代码；没有回写禅道。
+
+### 13.26 历史发布 stage 核实、清理与备份归档（2026-11-01）
+
+- 用户明确授权核实此前 10 个历史发布 stage 的归属、引用与保留要求，安全清理可删除内容，保留必要回退备份和审计证据；本轮没有重新部署或重启组件，没有回写禅道。此节承接 13.25 后的只读核对，不把清理前“仍有 10 个 stage”的历史回执覆盖为不存在。
+- 归属：10 个目录均为 root 所有的前端 Web 历史发布 stage，release-id 与 candidate 的仓库／SHA 对齐，所引用 Git 对象均可查；其中 8 个具有 CI 包回执，2 个旧流程目录保留原 candidate 与旧发布资料，不伪补 CI 来源。完整逐目录归属与文件指纹见同一脱敏证据目录的 `task147-stage-cleanup-ownership.json`、`task147-stage-cleanup-inventory.json`。
+- 引用与保留核实：未发现进程 cwd／exe／fd／命令行、nginx／systemd 配置、挂载点或 release symlink 引用这些 stage；无未完成前端事务和 API 发布锁。已有规则要求 current／previous release 始终保留、历史静态资源按 30 天保留，本轮未触碰 releases／assets／history 或执行通用 prune。删除范围仅限两份已通过原生 candidate 摘要复算且无引用的暂存制品；8 组原始 `backup/` 全部保留。
+
+| 原 stage                   | 来源 SHA                                   | 处理                                        |
+| -------------------------- | ------------------------------------------ | ------------------------------------------- |
+| `tsz-release-stage.R1pAo3` | `7960470eb4fc2ded2dd4edbf8f7e27ce49085c6f` | 删除未引用 artifact，保留全部审计文件并归档 |
+| `tsz-release-stage.sLJq25` | `dc8f3afb68b33388dd17a02009f61dc1e7e75ffe` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.QWe8hg` | `8112c80cce2500dd542792e96a7ddcd37b58a2b4` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.evTwce` | `83ed15f99d251e6a0a4289fff2eece192034912f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.M2PvEF` | `83ed15f99d251e6a0a4289fff2eece192034912f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.W1gA7o` | `83ed15f99d251e6a0a4289fff2eece192034912f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.2Sd8Sp` | `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.xb5Azo` | `7ce616b424a33363cd7cfb28775fa8fb5c0f989f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.bJMevm` | `cd061d559d9cfe492f72d7ccf22666acc991feb8` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.tfh6Mm` | `096105e4022bec0aa5e1e5b0ff35038e1901fbb3` | 删除未引用 artifact，保留全部审计文件并归档 |
+
+- 实际清理批次 `stage-cleanup-60460400-fbe5-4769-a973-571e0655b254`，受保护归档根目录 `/opt/tsz-deployment-audit/stage-cleanup-60460400-fbe5-4769-a973-571e0655b254`（root 所有、0700）。在原生跨组件锁→前端锁的同序互斥下重新复核现场、完整文件指纹和引用，保存计划与逐步回执后，将 10 个 stage 原子移到归档；每个目录保留原名称及原路径映射，不删除备份、原 candidate／CI 回执、发布工具或配置审计资料。没有新增自动到期策略，归档及其回退资料继续保留。
+- 删除的仅为 `R1pAo3/artifact`、`tfh6Mm/artifact` 两棵未引用制品树，普通文件大小合计 110,199,424 字节（约 105.1 MiB），这是逻辑文件大小而非测量的磁盘块释放量。保留非 artifact 审计文件合计 570,148 字节及 8 组完整回退备份，另保存计划、清理回执和逐文件 SHA256 清单。旧 `/opt/tsz-release-stage.*` 路径已为 0；13.23 等历史记录中的 stage 定位现可按本节归档根目录加原 basename 查找。
+- 独立只读复查通过：服务器归档计划／回执与本地原始记录一致；原路径均不存在，归档中两棵 artifact 均不存在，其余文件的 SHA256／大小／uid／gid／mode 与清理前逐项一致。current／previous、配置指纹和 API PID 未变，Web／Admin 原生制品复算通过，实际 Web／Admin 仍为 `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc`、API 为 `38be4d370f9b5d2e9fa7130465e52187377d31e5`；两站 HTTPS200、未登录 API401，Web active、nginx有效，候选 18383 无监听；跨组件／前端锁空闲，API 锁和未完成事务标记不存在。
+- 本轮没有创建 fixture、云对象或新业务会话，无本轮临时测试资源残留。`task147-stage-cleanup-summary.json`、`task147-stage-cleanup-receipt.json`、`task147-stage-cleanup-independent.json` 保存最终清理与复查结果；操作源码、计划与原始输出留作审计。本节按用户后续授权通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 完成、事件结算且无新增部署后恢复原 active 状态，不修改工作流代码；未回写禅道。
+
+### 13.27 例句保存失败后重试用例的时序修复（2026-11-01）
+
+- 目标：复现并修复 `SentenceCreation.test.tsx` 中“独立创建无需来源词义或关联，保存失败保留输入并以相同 ID 重试”的偶发失败，不放宽原断言或超时；按用户授权提交／推送／PR，精确 CI 通过后合并并确认 main CI，避免触发部署，不回写禅道。
+- 基线固定为前端 main `fd8f651f310384ff83db109a4deec059a0cdcdb8`。既有 CI 失败为重试后 `onSaved` 期望 1 次而实际 0 次；普通本地单文件可能通过，不能把绿色运行当作已复现。先核对真实按钮仍连接 DOM，再用组件现有 `onSave` 回调的受控继续点拉开两层异步边界，保留真实 SentenceEditor／V3VoiceTextField／AntD 链路和相同业务响应，不 mock 保存按钮。
+- 根因：`SentenceEditor.finish()` 在 catch 中先显示业务错误并结束宿主 saving；外层 `V3VoiceTextField.completeEditing()` 仍在等待 onSave，尚未执行 finally 释放自己的 saving／savingRef。此时真实 AntD 按钮仍 loading，会忽略点击。原用例仅等待错误文案就重试，不能证明外层已可重试；错误出现与编辑器保存结束是两个不同状态。
+- 受控失败基线观测到 errorVisible=true、outer busy=true、按钮仍连接且 loading=true，创建请求只有 1 次；立即重试复现原 `onSaved` 为 0 的失败。同一继续点仅加入公开“正在保存修改…”状态消失的等待后通过。诊断用的回调包装／探针均已从提交文件移除；诊断前后 fixture 和日志留在同一脱敏证据目录，`sentence-retry-fix-receipt.json` 给出可复现命令及定位证据，不将诊断调度控制当作生产代码变更。
+- 最小修复仅在原用例重试前用默认 `waitFor` 等待外层公开保存状态消失，再点击一次；原失败后输入保留、相同 ID／完整请求重试、无来源词义／关联、onSaved 恰好一次等断言全部保留，新增创建请求恰好两次断言。未修改生产代码、依赖、全局测试设置、超时、CI worker 或覆盖率规则，没有 sleep，也没有把点击放入 waitFor 重复执行。
+- 原路径回归：完整 `SentenceCreation.test.tsx` 在 `--project admin --maxWorkers=1 --coverage` 下 12 项全部通过；不手工重复全量套件，剩余全量检查由原生 hooks 和精确 PR/main CI 执行。交付期间保持全部 CI，合并窗口临时停用既有 `Deploy tshb-test`，main CI 完成及事件结算后确认无新增部署，再恢复原 active 状态；不修改工作流代码，不部署任何组件，不回写禅道。
+
+### 13.28 发布历史路由用例偶发超时的查询成本修复（2026-11-01）
+
+- 用户要求复现并修复 `WordWizardV3.test.tsx` 中“发布历史只在核对与发布步骤显示，返回录入步骤后卸载”的偶发 5000ms 超时，不放宽断言或超时；按技能交付并确认精确 PR/main CI，避免触发部署，不回写禅道。基线固定为 main `e01b517a7a4ff16d1d657ea8d0d6dcbe7e868242`。
+- 原始 CI 失败日志显示该用例超过原 5 秒时限。普通本地 coverage／单 worker 的诊断运行可以通过，不能把绿色当复现；分阶段计时表明三次整页 `queryByRole(button, name=发布历史)` 的负向查询为无关表单按钮计算可访问名称，累计触发 304 次样式计算、约 539ms，占本地用例约三分之一；发布历史请求等待约 34ms。真实历史标题由 `V3PublicationHistory` 的 Card 渲染，本来不是按钮，原查询既付出整页扫描成本，又未检查实际标题。
+- 失败基线采用只在诊断中令每次 `getComputedStyle` 增加 10ms CPU 成本的受控慢样式模型，保留真实页面、路由和请求，保持原 5000ms 超时：旧用例 5.43s 触发同类超时。只更换负向查询并加强标题检查后，相同条件 2.24s 通过，三次负向查询的样式调用为 0。该模型用于验证慢样式计算的因果链，不宣称 CI 每次样式调用恰为 10ms；探针、计时和限速均不进入最终提交。
+- 最小修复只在目标用例查询实际 Card 标题文本，保留初始页面就绪、真实步骤切换、各录入步骤容器不挂载、核对前不请求历史、核对时只请求一次、返回录入页后卸载等判据；新增核对页标题可见、返回后标题消失的检查。未修改生产代码、fixture 数据、依赖、超时、CI worker、全局测试配置或覆盖率，未添加 sleep 或跳过断言。
+- 原路径回归：移除全部诊断后，完整 `WordWizardV3.test.tsx` 在 `--project admin --maxWorkers=1 --coverage` 下 70 项全部通过。同一脱敏证据目录的 `wizard-history-fix-receipt.json`、`wizard-history-native-profile.jsonl`、`wizard-history-slow-style-before.log`／`wizard-history-slow-style-after.log` 和 `wizard-history-final-test.log` 保存复现条件、前后结果与回归；诊断 fixture 供隔离重现，未作为产品测试 mock 提交。
+- 后续交付保留原生 hooks 和全部 PR/main CI；合并窗口确认 main／队列稳定后临时停用既有 `Deploy tshb-test`，精确 main CI 完成及事件结算、确认无新增部署后恢复原 active 状态，不修改工作流代码。本轮不部署、不回写禅道，无真实业务／云测试资源。
+
+### 13.29 第七批配套真实验收（2026-11-01）
+
+本轮完成选定的新旧组合、真实资产／发布／消费、异常和清理验收；沿用前六批有效证据，没有新增产品代码修复。授权终点为验收、必要修复、彻底清理和本主记录更新；本轮未提交、推送、开 PR、合并、部署或回写禅道。
+
+- 两仓先 fetch，复用第六批任务工作区，从当前 origin/main 建立 `codex/task147-batch7-acceptance`；前端基线 `ee179ef6f42cba016ec4ff6fcd9423c870d1c611`，后端基线 `2473c20ebde7af9967a801cec804c8c53a5e0463`。原工作区均干净；没有改默认 checkout 或其他任务改动。后端相对已部署版本仅增加 refresh 并发撤销修复。
+- 剩余关键路径为版本／隔离核实 → 共享分组和保存 → 正式资产、审听及发布 → Web 消费与混合版本 → 清理与独立复查。前六批能力均已在 main，复用既有持久任务、业务保存、正式资产和发布接口；没有重新实现或扩大模型矩阵。
+- 精确 main CI 复查：前端 `41279183212`、后端 `41280612599` 均 attempt 1 success。当前 OpenAPI SHA256 与前端 runtime `_source_sha256` 同为 `f9d21f038643428ed14a20ccd2ada3356a928369b13afa3331f089b2374825d1`；本轮没有契约生成或迁移改动。两条现有生成任务回归在独占 PG／Redis 下通过：`delayed_updates_merge_and_reuse_final_effects_without_touching_publications`、`overlapping_groups_and_order_restart_one_window_and_resolve_only_final_effect`，分别验证改名／改回同效果零供应商调用，以及重叠分组和排序只处理最终效果；这是受控供应商计数回归。无产品代码改动，不额外重复全仓运行时套件，已有精确 CI 保持有效。
+
+证据复用与新增结果：
+
+| 范围            | 本轮证据及复用边界                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 分组与优先级    | 内置浏览器创建两个共享 `word` 板块的组；A 草稿未完成时仅 B 入库。排序保存后独立 GET 与刷新一致，A 未保存名称未被提交。首组未选时解析到 B；无适用普通组的 `example` 解析到全局，按稳定版本 ID 核对来源。                                                                                                                                                                                                                                |
+| 局部池与五入口  | 新验推荐／不选推荐、四列多选、单侧排序；另一侧顺序不变。Sonia 的 1.10×／90% 在取消重选后保留。拼写入口一次 PUT 后独立 GET，重开保留正文、四声顺序、参数及正式资产。真实旧 revision 保存返回 409，本地草稿保留，远端仍为 revision 8 的原内容。其余 IPA／UPS、语法、英文释义和共享例句的保存／独立 GET／刷新、空池及失败保留复用 13.20；相关五个保存组件和后端 `v3_contract.rs` 与第五批合并版本一致，哈希核对见 `evidence-reuse.json`。 |
+| 真实资产与发布  | 真实 Azure Sonia／Ryan／Davis／Aria 共 4 段短样本，均 201、22,464 字节，完整字节摘要各异；上传路径复用首段合成样本，确认后完整字节与源一致，属于上传链路验证，不是人工录音证据。5 个正式资产均在专属前缀。词条由 Admin 新建并保存拼写；最小词义前置经真实业务 API 准备，正式 publication 未经 SQL 构造。Admin 集中连续审听五项，OSS 均 206，队列完成且无播放错误；随后确认本批音频并发布成功。                                         |
+| 快照与 Web 消费 | 生产构建 Web 真实查到新发布词条并播放首项。其后将词义保存为 revision 9 的未发布草稿，历史 publication 内容与摘要不变，Web 仍读旧发布内容。学习实际作答、成绩保存、整页刷新和重播通过；首题持久 rank 1／3（两个英式生成项和一个上传项），四个并发读取均为同一资产。关闭本任务合成供应商后继续签名和播放，生成登记始终为 4，消费过程 TTS 为 0。                                                                                          |
+| 权限与失效      | 答前 403、跨账号 404，均无音频字段。已选生成登记失效时 `audio=null`，不另抽；恢复后仍是同一资产。归档递增既有归档代次，旧轮次持续 404，恢复词条不会重新开放旧题；另建独占轮次完成刷新重播验证。第六批同轮次同目标第 2 题、服务端持久抽样及固定随机概率边界证据复用 13.21，`audio.rs`／概率函数／Web 消费实现哈希一致；本轮两个轮次各自首题分别记录。                                                                                   |
+| 桌面与窄屏      | 1440px 和 390px 实看；窄屏文档宽为 390。目录内部 `overflow:auto`、可真实滚动；滚动值 1000 在单声参数编辑、搜索后清空时保留。保存 pending 和上传失败均保留当前草稿及可见操作入口。未进行人工听感评价。                                                                                                                                                                                                                                  |
+
+真实环境与兼容性：
+
+- 本轮批次 `20261101-task147-batch7-f43a`；独占 PG／Redis 为 `56671/56672`，当前 API `57671` 为本任务从后端基线编译的二进制，SHA256 `b48385d1e5cc58e78790c0bf22ed58ca76edd19ebf67af694e7b92489e315db2`。Web `57674` 使用本工作区生产 build＋next start；Admin 使用本工作区 Vite，业务／音频 mock 均关闭，同源 `/api/v1` 代理到该 API。登录使用项目固定码 OTP，未验收外部短信服务。
+- 内置浏览器最初未接入，Chrome 只读打开版本页；经 app 面板接入后，全部可写页面和上述实际链路均由主代理在 Codex 内置浏览器完成。随机端口 `127.0.0.1:57673` 的上传触发 OSS CORS 预检 403；只读核对发现既有白名单允许 `http://localhost:3000`，改用该空闲本地入口后直传和确认成功，未改 bucket CORS、权限或测试服配置。
+- 旧前端 `e6017ac8` 的原严格解析器／schema 接受当前 API 的真实 `DictionaryEntry`、`DictionaryPage`、`LearningRun`、`LearningQuestionPage`。当前前端＋当前 API 的真实业务链见上表。
+- 当前生产 Web 另经本任务 loopback 代理连接真实旧 API `8c772b8e`，后者在另一个独占、正常迁移到 `20261031110000` 的旧 schema 库运行。只复制本批账号前置和已经真实发布的词条／审听快照，不复制学习选声事实或迁移账本，不关闭约束。新 Web 可登录、作答并持久保存 100% 成绩；旧 API 缺少音频端点返回 404，Web 显示“正式音频读取失败”和重试入口。完成后恢复当前 API 并重新验证播放。
+- 同一旧二进制在含 159 个迁移、最新 `20261031120000` 且保留 2 条选声事实的本批新 schema 上受控启动退出 1、端口未开放；在旧 schema 上可启动。结合 13.21 未变的迁移拒退证据，发布后不可直接恢复旧 API／不认识选声引用的旧回收 worker。全历史版本穷举、真实现网回退、数据库恢复及故障注入未执行。
+- tshb-test 两次只读复查均确认 Web／Admin `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc`、API `38be4d370f9b5d2e9fa7130465e52187377d31e5` 身份未变；前端原生摘要复算及 API 磁盘／进程／manifest 一致，两站 200、正确未登录端点 401、nginx 有效、部署锁空闲。既有成功部署继续复用，未重复发布；前端 CD 工作流 `400432764` 保持 active。
+
+清理与本轮终点：
+
+- 创建前专属 OSS 列举、版本读取及永久删除预检通过。停止全部本批写入后，原生清理脚本永久删除 7 个对象版本／删除标记；独立列举为空。再删除两个精确 ID／批次 label 匹配的 PG／Redis 容器及匿名卷，覆盖当前／旧 schema 库、SQLx 定向测试库、全部专属账号、词条、发布、资产／暂存登记、学习／选声事实、会话、幂等、outbox、审计和缓存。七个本批端口均关闭。
+- 本批原始音频、复制凭据、完整 fixture／响应／日志、helper、两个 Rust target、旧二进制工作树和本任务 Web 构建已移除，独立复查临时根目录不存在。受保护共享 PG `dd745674cc2e`／Redis `01f88a160849` 及另一任务 `b730c18b2549`／`a043c23ba708` 身份和运行状态均未变；未连接或清空其数据。服务器历史审计归档、正常 release／备份及系统日志未触碰。
+- 三个专属页面 origin 的登出均 204；本批刷新 Cookie、localStorage／sessionStorage／CacheStorage／IndexedDB／service worker 清空，HTTP 媒体缓存清理回执成功，viewport 复位、四个专属功能标签关闭。`localhost` 上另有一枚 Secure、Path=`/api/v1/auth` 的既有 Web `refresh_token`：本轮 Web 只使用 `127.0.0.1` 且 `COOKIE_SECURE=false`，该枚非本轮发放，保留；未删除正常浏览器登录态。
+- 脱敏证据统一位于 `/Users/darwish/.codex/visualizations/2026/11/01/01a195cf-b2ae-75b3-9de8-a86136f2e550/batch7/`，包括 `browser-acceptance.json`、`cloud-bytes.json`、`real-http-acceptance.json`、`history-immutable.json`、新旧组合回执、`focused-checks.json`、`server-readonly.json`、`cleanup.json`／`cleanup-independent.json` 及截图。本轮唯一仓库差异为本节记录；后端工作区保持干净，外部交付与部署仍按后续明确授权执行。
+
+第七批主记录交付（2026-11-01）：用户后续已授权提交、推送、开 PR，精确 PR CI 全绿后合并并核对 main CI，避免触发部署，不回写禅道。本节“未提交”等表述保留验收阶段的历史状态；实际交付 SHA、PR、独立审查、hooks／CI 及 CD 工作流恢复结果记录在关联 PR 和同一证据目录的 `batch7-ship-receipt.json`。交付只包含本主记录，不重新执行或扩大真实验收。
+
+### 13.30 测试服历史盘点与真实业务链补验（2026-11-01）
+
+本轮补齐 tshb-test 历史分组只读盘点及测试服完整业务链，复用 13.29 已有证据，不重复部署、不回写禅道。正常历史数据未配对或修改；下述转换方案等待业务决定。本轮终点为验收、彻底清理和本主记录更新，不包含新的提交、推送、PR 或合并。
+
+- 两仓 fetch 后复用原任务工作区，建立 `codex/task147-server-acceptance`；前端基线 `8ca97bc33dbe834a26d5e632cab3e1a415d2d8de`、后端基线 `2473c20ebde7af9967a801cec804c8c53a5e0463`。本轮没有产品代码、契约、迁移或服务器配置改动。
+- 实际测试服 API 为 `38be4d370f9b5d2e9fa7130465e52187377d31e5`，Web／Admin 为 `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc`；前后两次 manifest、API 磁盘／进程和前端原生制品复算一致，两站 200、未登录 API 401、nginx 有效、部署锁空闲。消费真实已部署页面及同源 API，未以本地构建代替测试服。
+
+历史盘点及正常组方案：
+
+- 以 `REPEATABLE READ READ ONLY` 事务运行既有 `ops/speech-dubbing/inventory.sql`，确认测试库 159 条成功迁移止于 `20261031120000`。仅有全局常用组 `00000000-0000-4000-8000-000000000001`，revision 1、order revision 0、`pairings=[]`；UK／US 各 1 条且均选用，无单侧、不等长、未选或同声重复版本。
+- UK 为 `en-gb-sonia`，侧版本 `aa542d9f-9d08-4eac-9d16-d7f9c1f38126`；US 为 `en-us-aria`，侧版本 `7a4c3a6e-b84b-42fb-99df-acd0af8da6df`。均 rate=0、pitch=0、style=null。两个历史版本 UUID 各命中 6 个草稿词条及 1 个共享例句草稿，在全部／当前词条发布快照、共享例句发布快照及生成登记中精确 UUID 命中为 0；这是身份成员计数，不代表全部语义引用为 0。继承依赖按 area 为 word=36、example=1，不当作待转换实体数。
+- 建议保持 legacy 兼容读取。若业务确认两侧应成一套，可另行授权在原组显式转换为一个 selected 配对，保留上述两个侧 ID、别名、原参数和选用状态；套名称（例如“英美常用”）须确认。执行前重新读取 group revision、整体 groups 内容指纹及配对状态，拒绝并发变化；对 6 个草稿词条、1 个共享例句和继承依赖核对有效声音／参数前后差异，再按真实变化决定任务处理。不能因数量相等或位置相同自动猜配，不重写历史发布快照，不删除旧身份。本轮仅提出方案。
+
+真实测试服链路：
+
+| 范围       | 实际结果与边界                                                                                                                                                                                                                                                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 隔离与创建 | 批次 `20261101-task147-server-a93f`，创建前 OSS 列举／版本读取／永久删除预检通过。运行进程与配置的测试路由一致，所有资源限 `tshb-test-assets/temporary-tests/20261101-task147-server-a93f/`。复用既有白名单管理员会话，仅对独占词条配置 local 池，不新增共享分组或触发正常历史配置更新。词条及词义前置使用真实业务 API，正式 publication 未经 SQL 构造。 |
+| 生成与上传 | Codex 内置浏览器在已部署 Admin 实际生成 Sonia、Ryan、Aria 三段正式资产，均 201，大小分别 24,480／29,088／28,224 字节，完整摘要各异。将本轮 Sonia 合成样本经真实 OSS 直传和确认成为第 4 个资产，完整字节与源相同；属于上传链路验证，不是人工录音证据。先生成 Sonia、池内英式仍由 Ryan 排首，独立 GET 确认正文／顺序／版本／资产持久化。                   |
+| 审听与发布 | Admin 集中连续审听四项，真实 OSS 均 206、队列完成、无可见播放错误；随后确认音频并实际发布。publication 为 `01a19643-5ead-7174-8bc6-29e2491da58f`，source revision 5，含两个同目标题义；未作人工听感评价。                                                                                                                                                |
+| Web 消费   | 为保留内置浏览器既有正常 Web 登录态，使用新 Chrome 无痕窗口登录专属学习账号；实际查词、打开发布内容、观察正式播放开始／结束。同一 longterm 轮次两题均正确，成绩 2／2、100%；整页刷新恢复两条答案并可重播，无可见播放错误。Admin 使用内置浏览器，不能写成所有页面均在内置浏览器验收。                                                                     |
+| 持久选声   | 两题答前均 403 且无音频字段；首题 occurrence 1、rank 1／3 选中 Ryan，第二题 occurrence 2，本次抽中 rank 3／3 上传资产。刷新前后事实不变，两题各四个并发重读固定同一资产；真实签名下载 200，第二题摘要与上传源一致。消费前后正式生成登记保持 3；本轮未单独采集供应商调用轨迹，不以登记计数冒称独立供应商调用审计。                                        |
+
+请求／清理证据及限制：
+
+- Admin 关闭业务／音频 mock，实际请求头包含本批 run-id，运行来源与返回资产前缀互相印证。保留轨迹 `truncated=true`，生成／上传／保存／审听／发布关键请求及独立数据库事实足以相互核对，不宣称完整无截断 Network。真实外部短信、人工录音／听感、全历史版本穷举及现网回退不在本轮补验范围。
+- 正常管理员／Web 既有 Cookie 和正常 localStorage 保留；仅移除专属标签的测试 sessionStorage 标记并清理 HTTP 媒体缓存，未对正常管理员登出。专属 Chrome 无痕窗口已关闭并独立核实，两个本批内置标签关闭；复制访问令牌、原始网络响应及测试凭据只作短期使用，结束移除。
+- 按用户要求并行只读核对：一个子代理整理证据草稿，一个核对外部引用、账目与删除依赖；主代理保留所有写入和删除。初稿保护经核对后补齐严格 asset 逻辑键、非 FK 引用、精确 metadata ID 和登录奖励断言，45 项锁内保护及完整删除回滚预演通过。生成 `source_key` 为 `generated/<actor>/<request_id>` 逻辑键，上传 source 为本批 uploads 键，不能将两者都当作 OSS 路径。
+- 停止本批页面写入后，仅冻结专属用户和归档专属词条作为停写屏障；同一 psql 事务持续锁住 4 个资产和 7 个 outbox 事件，先由原生脚本永久删除 6 个 OSS 对象版本／删除标记并独立列举确认空，再提交精确数据库清理。删除覆盖本批 task／run／题目／答案／completion／选声、私有词表、词条／发布及资产／生成登记、专属账号／会话、2 条幂等、7 条 outbox 和 6 条专属审计；不关闭约束或触发器，最终 `SET CONSTRAINTS ALL IMMEDIATE` 通过。
+- 专属账号自动产生的 1 币登录奖励按精确独占钱包、operation、entry 核实后依次删除；无外部钱包、反向流水或奖励引用。longterm／`business_day=NULL`，immutable 每日学习结算为 0，没有为清理关闭不可变规则。Redis 精确用户限流／检测键及本批身份扫描为空，保留共享 IP 限流桶。
+- 首轮独立全表复查发现 `lexicon.surface_sources` 留下本批 4 条无外键投影；按完整复合键、精确 entry/publication 及整行 JSON 校验后定向补清理，一条 DELETE 返回恰 4 个键。正常 statement trigger 推进句子发现 generation，相关旧发现游标可能失效；未恢复计数或禁用触发器。最后另开只读会话扫描 134 张业务表、528 个 UUID／数组／JSON 列，本批 54 个资源／依赖标识均无残留，OSS 版本／删除标记与 Redis 再次独立复查为空。
+- 历史 group 内容指纹、revision／order revision／配对状态未变；正常管理员身份、安全版本、密码及锁状态比较未变，三条预选正常发布词条／投影摘要不变。期间正常词条总数由 368 变为 416，属并行业务写入，只按精确 fixture 及保护基线复查，不为恢复总数删除他方数据。既有 release、备份、部署审计与系统日志保留。
+- 本轮原始音频、复制凭据、完整响应及临时脚本结束后清除；仅保留 `/Users/darwish/.codex/visualizations/2026/11/01/01a195cf-b2ae-75b3-9de8-a86136f2e550/batch7-server/` 的脱敏验收、盘点、独立复查和清理回执／截图。本轮唯一仓库修改为本节主记录，正常历史组转换仍待业务决定；未提交、推送、开 PR、合并、部署或回写禅道。
