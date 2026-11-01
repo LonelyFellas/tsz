@@ -1,5 +1,6 @@
 import {
   fireEvent,
+  isInaccessible,
   render,
   screen,
   waitFor,
@@ -110,14 +111,26 @@ function names(container: HTMLElement) {
     container.querySelectorAll("tbody button[aria-label^='试听 ']")
   ).map((node) => node.getAttribute("aria-label")!.slice(3));
 }
+// AntD 为测量列宽复制了隐藏表头；只检查已命中的控件，避免全表计算角色名称。
+function visibleControl(label: string) {
+  const matches = screen
+    .getAllByLabelText(label)
+    .filter((node) => !isInaccessible(node));
+  expect(matches).toHaveLength(1);
+  return matches[0]!;
+}
+function resetFilters() {
+  const header = screen.getByRole("columnheader", { name: /^操作/ });
+  fireEvent.click(within(header).getByRole("button", { name: "清除筛选" }));
+}
 async function select(label: string, option: string) {
   if (
     label === "音色排序" &&
-    !screen.queryByRole("combobox", { name: label })
+    !screen.queryAllByLabelText(label).some((node) => !isInaccessible(node))
   ) {
-    fireEvent.click(screen.getByRole("button", { name: "音色筛选和排序" }));
+    fireEvent.click(visibleControl("音色筛选和排序"));
   }
-  const input = await screen.findByRole("combobox", { name: label });
+  const input = await waitFor(() => visibleControl(label));
   fireEvent.mouseDown(input);
   const content = await waitFor(() => {
     const match = Array.from(
@@ -186,7 +199,7 @@ describe("音色目录表格", () => {
     }
     fireEvent.change(search, { target: { value: "missing" } });
     expect(screen.getByText("未找到符合条件的数据")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    resetFilters();
     expect(names(container)).toHaveLength(4);
   });
 
@@ -223,7 +236,7 @@ describe("音色目录表格", () => {
     expect(screen.getByRole("combobox", { name: "模型" })).toBeVisible();
     await select("模型", "Multilingual");
     expect(names(container)).toEqual(["Ava"]);
-    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    resetFilters();
     expect(names(container)).toHaveLength(4);
   });
 
@@ -237,17 +250,17 @@ describe("音色目录表格", () => {
     await select("模型", "Multilingual");
     await select("可选风格", "愉快");
     expect(names(container)).toEqual(["Ava"]);
-    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    resetFilters();
     await select("可选角色", "无");
     expect(names(container)).toEqual(["Sonia", "Ana"]);
-    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    resetFilters();
     await select("可选角色", "未提供");
     expect(names(container)).toEqual(["Unknown"]);
   });
 
   it("统一排序可切换名称与年龄，两个年龄方向的未知项都在末尾", async () => {
     const { container } = mount();
-    fireEvent.click(screen.getByRole("button", { name: "音色筛选和排序" }));
+    fireEvent.click(visibleControl("音色筛选和排序"));
     await select("音色排序", "名称倒序");
     expect(names(container)).toEqual(["Unknown", "Sonia", "Ava", "Ana"]);
     await select("音色排序", "年龄升序");
