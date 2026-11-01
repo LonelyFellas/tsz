@@ -148,18 +148,22 @@ describe("ConsoleSidebar", () => {
     ["sentences.access"],
     ["speech.global_dubbing"]
   ] as [string][])(
-    "配音中心是可直接点击的一级菜单，目录权限为 %s",
+    "配音中心的二级菜单和独立地址复用目录权限 %s",
     async (permission) => {
       setLevel("admin", [permission]);
-      renderAt("/voices");
-      const entry = screen.getByRole("menuitem", { name: /配音中心/ });
-      expect(entry).toHaveClass("ant-menu-item-selected");
-      fireEvent.click(entry);
+      renderAt("/voices/library");
+      const library = screen.getByRole("menuitem", { name: "音色库" });
+      const groups = screen.getByRole("menuitem", { name: "分组配音" });
+      expect(library).toHaveClass("ant-menu-item-selected");
+      expect(groups).not.toHaveClass("ant-menu-item-selected");
+      fireEvent.click(library);
+      expect(mockNavigate).toHaveBeenCalledWith("/voices/library");
+      fireEvent.click(groups);
       expect(mockNavigate).toHaveBeenCalledWith("/voices");
       const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
-      expect(
-        canVisitAdminRoute(useAuthStore.getState().profile, "/voices")
-      ).toBe(true);
+      const profile = useAuthStore.getState().profile;
+      expect(canVisitAdminRoute(profile, "/voices")).toBe(true);
+      expect(canVisitAdminRoute(profile, "/voices/library")).toBe(true);
     }
   );
 
@@ -171,6 +175,9 @@ describe("ConsoleSidebar", () => {
     expect(canVisitAdminRoute(useAuthStore.getState().profile, "/voices")).toBe(
       false
     );
+    expect(
+      canVisitAdminRoute(useAuthStore.getState().profile, "/voices/library")
+    ).toBe(false);
   });
 
   it("super_admin 即便 permissions 为空也可见全部委派菜单", () => {

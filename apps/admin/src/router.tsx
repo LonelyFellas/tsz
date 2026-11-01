@@ -107,6 +107,12 @@ export const router = createBrowserRouter([
             })
           },
           {
+            ...ADMIN_PAGE_ROUTES.voiceLibrary,
+            lazy: async () => ({
+              Component: (await import("@/pages/Voices")).VoicesPage
+            })
+          },
+          {
             ...ADMIN_PAGE_ROUTES.wordlists,
             lazy: async () => ({
               Component: (await import("@/pages/WordLists")).WordListsPage

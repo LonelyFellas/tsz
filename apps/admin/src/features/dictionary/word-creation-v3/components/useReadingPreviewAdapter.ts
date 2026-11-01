@@ -3,13 +3,18 @@ import { expandFormContents } from "@tsz/shared";
 import type { DraftFormsStepContentV3, GrammarFormLinkV3 } from "@tsz/types";
 import { createV3WordRequests } from "../api";
 import { adminVoicePreviewAdapter } from "../../voice-editor/dataSource";
-import { createGrammarFormPreviewAdapter } from "./grammarFormPreview";
+import {
+  createGrammarFormPreviewAdapter,
+  type ReadingPreviewOptions
+} from "./grammarFormPreview";
 
 export function useReadingPreviewAdapter(
   wordId?: string,
-  forms?: DraftFormsStepContentV3
+  forms?: DraftFormsStepContentV3,
+  options: ReadingPreviewOptions = {}
 ) {
   const requests = useMemo(() => createV3WordRequests(), []);
+  const preserveDirectPhonemes = options.preserveDirectPhonemes ?? false;
   return useCallback(
     (links: GrammarFormLinkV3[]) =>
       createGrammarFormPreviewAdapter(
@@ -70,8 +75,9 @@ export function useReadingPreviewAdapter(
             })
           );
         },
-        links
+        links,
+        { preserveDirectPhonemes }
       ),
-    [requests, wordId, forms]
+    [requests, wordId, forms, preserveDirectPhonemes]
   );
 }

@@ -1,5 +1,6 @@
 import {
   fireEvent,
+  isInaccessible,
   render,
   screen,
   waitFor,
@@ -8,7 +9,7 @@ import {
 import { ConfigProvider } from "antd";
 import type { AdminSpeechVoice, AdminSpeechVoiceMetadata } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
-import { VoiceCatalogDetails, VoiceCatalogTable } from "./VoiceCatalogTable";
+import { VoiceCatalogTable } from "./VoiceCatalogTable";
 
 const metadata: AdminSpeechVoiceMetadata = {
   provider_voice_id: "en-GB-SoniaNeural",
@@ -107,11 +108,29 @@ function mount(items = voices) {
 }
 function names(container: HTMLElement) {
   return Array.from(
-    container.querySelectorAll("li button[aria-label^='试听 ']")
+    container.querySelectorAll("tbody button[aria-label^='试听 ']")
   ).map((node) => node.getAttribute("aria-label")!.slice(3));
 }
+// AntD 为测量列宽复制了隐藏表头；只检查已命中的控件，避免全表计算角色名称。
+function visibleControl(label: string) {
+  const matches = screen
+    .getAllByLabelText(label)
+    .filter((node) => !isInaccessible(node));
+  expect(matches).toHaveLength(1);
+  return matches[0]!;
+}
+function resetFilters() {
+  const header = screen.getByRole("columnheader", { name: /^操作/ });
+  fireEvent.click(within(header).getByRole("button", { name: "清除筛选" }));
+}
 async function select(label: string, option: string) {
-  const input = screen.getByLabelText(label);
+  if (
+    label === "音色排序" &&
+    !screen.queryAllByLabelText(label).some((node) => !isInaccessible(node))
+  ) {
+    fireEvent.click(visibleControl("音色筛选和排序"));
+  }
+  const input = await waitFor(() => visibleControl(label));
   fireEvent.mouseDown(input);
   const content = await waitFor(() => {
     const match = Array.from(
@@ -126,17 +145,61 @@ async function select(label: string, option: string) {
   fireEvent.keyDown(input, { key: "Escape" });
 }
 
-describe("紧凑音色目录", () => {
+describe("音色目录表格", () => {
+  it("编辑期间固定分页结果，目录刷新仍更新单元格，结束编辑后恢复排序", () => {
+    const items = Array.from({ length: 12 }, (_, index) => ({
+      ...sonia,
+      alias: `voice-${index + 1}`,
+      display_name: `Voice ${index + 1}`
+    }));
+    const table = (current: AdminSpeechVoice[], editing: boolean) => (
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <VoiceCatalogTable
+          voices={current}
+          metadata={new Map()}
+          metadataEditing={editing}
+          loading={false}
+          settingsPending={false}
+          canGenerate
+          validText
+          pendingVoice={null}
+          onAudition={vi.fn()}
+          onDetails={vi.fn()}
+        />
+      </ConfigProvider>
+    );
+    const { container, rerender } = render(table(items, false));
+    fireEvent.click(screen.getByTitle("2"));
+    expect(names(container)).toEqual(["Voice 11", "Voice 12"]);
+    rerender(table(items, true));
+    const refreshed = [
+      { ...sonia, alias: "new-voice", display_name: "Voice 0" },
+      ...items.map((voice) =>
+        voice.alias === "voice-12"
+          ? { ...voice, display_name: "Aardvark" }
+          : voice
+      )
+    ];
+    rerender(table(refreshed, true));
+    expect(names(container)).toEqual(["Voice 11", "Aardvark"]);
+    expect(screen.getByRole("searchbox", { name: "搜索音色" })).toBeDisabled();
+    expect(screen.getByText("共 12 个音色")).toBeVisible();
+    rerender(table(refreshed, false));
+    expect(names(container)).toEqual(["Voice 9", "Voice 10", "Voice 11"]);
+    expect(screen.getByRole("searchbox", { name: "搜索音色" })).toBeEnabled();
+    expect(screen.getByText("共 13 个音色")).toBeVisible();
+  });
+
   it("一个搜索入口查找名称、官方特征、共享介绍和听感，清除后恢复", () => {
     const { container } = mount();
-    const search = screen.getByLabelText("搜索音色");
+    const search = screen.getByRole("searchbox", { name: "搜索音色" });
     for (const value of ["sonia", "gentle", "慢读", "共享介绍"]) {
       fireEvent.change(search, { target: { value } });
       expect(names(container)).toContain("Sonia");
     }
     fireEvent.change(search, { target: { value: "missing" } });
     expect(screen.getByText("未找到符合条件的数据")).toBeVisible();
-    fireEvent.click(screen.getAllByText("清除筛选")[0]!);
+    resetFilters();
     expect(names(container)).toHaveLength(4);
   });
 
@@ -158,7 +221,7 @@ describe("紧凑音色目录", () => {
       }
     ]);
     for (const text of ["英语", "English", "en-SG"]) {
-      fireEvent.change(screen.getByLabelText("搜索音色"), {
+      fireEvent.change(screen.getByRole("searchbox", { name: "搜索音色" }), {
         target: { value: text }
       });
       expect(names(container)).toHaveLength(2);
@@ -168,25 +231,17 @@ describe("紧凑音色目录", () => {
     expect(names(container)).toEqual(["Luna"]);
   });
 
-  it("更多筛选收起后仍应用选项并显示数量，清除时一并重置", async () => {
+  it("表头模型筛选直接应用，清除时重置", async () => {
     const { container } = mount();
-    const toggle = screen.getByRole("button", { name: "更多筛选" });
-    expect(screen.getByLabelText("模型")).not.toBeVisible();
-    fireEvent.click(toggle);
+    expect(screen.getByRole("combobox", { name: "模型" })).toBeVisible();
     await select("模型", "Multilingual");
     expect(names(container)).toEqual(["Ava"]);
-    fireEvent.click(toggle);
-    expect(screen.getByLabelText("模型")).not.toBeVisible();
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveTextContent("更多筛选（1）");
-    fireEvent.click(screen.getByText("清除筛选"));
+    resetFilters();
     expect(names(container)).toHaveLength(4);
-    expect(toggle).toHaveTextContent("更多筛选");
   });
 
-  it("场景多选取并集，与地区、模型及风格交叉筛选；角色无与未知分别筛选", async () => {
+  it("场景多选取并集，与地区、模型及风格交叉筛选", async () => {
     const { container } = mount();
-    fireEvent.click(screen.getByRole("button", { name: "更多筛选" }));
     await select("推荐场景", "新闻");
     await select("推荐场景", "有声书");
     expect(names(container)).toEqual(["Ava", "Sonia", "Ana"]);
@@ -195,34 +250,41 @@ describe("紧凑音色目录", () => {
     await select("模型", "Multilingual");
     await select("可选风格", "愉快");
     expect(names(container)).toEqual(["Ava"]);
-    fireEvent.click(screen.getByText("清除筛选"));
+  });
+
+  it("角色无与未知分别筛选，清除后可切换", async () => {
+    const { container } = mount();
     await select("可选角色", "无");
     expect(names(container)).toEqual(["Sonia", "Ana"]);
-    fireEvent.click(screen.getByText("清除筛选"));
+    resetFilters();
     await select("可选角色", "未提供");
     expect(names(container)).toEqual(["Unknown"]);
   });
 
-  it("统一排序可切换名称与年龄，两个年龄方向的未知项都在末尾", async () => {
+  it("名称排序可切换方向，并与年龄筛选联动", async () => {
     const { container } = mount();
+    fireEvent.click(visibleControl("音色筛选和排序"));
     await select("音色排序", "名称倒序");
     expect(names(container)).toEqual(["Unknown", "Sonia", "Ava", "Ana"]);
-    await select("音色排序", "年龄升序");
-    expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
-    await select("音色排序", "年龄倒序");
-    expect(names(container)).toEqual(["Sonia", "Ava", "Ana", "Unknown"]);
     await select("音色排序", "名称升序");
     expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
     await select("年龄组", "儿童");
     expect(names(container)).toEqual(["Ana"]);
   });
 
+  it("年龄排序可切换方向，未知项都在末尾", async () => {
+    const { container } = mount();
+    await select("音色排序", "年龄升序");
+    expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
+    await select("音色排序", "年龄倒序");
+    expect(names(container)).toEqual(["Sonia", "Ava", "Ana", "Unknown"]);
+  });
+
   it("旧 API 缺资料时仍可试听，只展示真实模型选项，并区分官方原文和人工资料", async () => {
     const { container } = mount();
-    const unknown = screen.getByLabelText("试听 Unknown").closest("li")!;
+    const unknown = screen.getByLabelText("试听 Unknown").closest("tr")!;
     expect(within(unknown).getByText("年龄未提供")).toBeVisible();
     expect(screen.getByLabelText("试听 Unknown")).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "更多筛选" }));
     await select("模型", "Neural");
     expect(screen.queryByText("HD Omni")).toBeNull();
     expect(screen.queryByText("Neural HD")).toBeNull();
@@ -230,17 +292,5 @@ describe("紧凑音色目录", () => {
     expect(names(container)).toEqual(["Sonia", "Ana"]);
     expect(screen.getByText("共享介绍")).toBeVisible();
     expect(screen.getByText("我的听感：适合慢读")).toBeVisible();
-    render(<VoiceCatalogDetails voice={sonia} />);
-    const details = screen.getByRole("region", { name: "音色资料" });
-    expect(within(details).queryByText(metadata.description!)).toBeNull();
-    fireEvent.click(
-      within(details).getByRole("button", { name: "官方原文与来源" })
-    );
-    await waitFor(() =>
-      expect(within(details).getByText(metadata.description!)).toBeVisible()
-    );
-    expect(
-      within(details).getByRole("link", { name: /官方资料/ })
-    ).toHaveAttribute("href", metadata.source_url);
   });
 });

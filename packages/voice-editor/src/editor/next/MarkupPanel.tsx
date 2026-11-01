@@ -25,6 +25,7 @@ export interface DropdownTool {
   placement?: "bottomLeft" | "topLeft";
   active?: boolean;
   disabled?: boolean;
+  disabledReason?: string;
   stayOpen?: boolean;
 }
 
@@ -117,14 +118,17 @@ export function MarkupPanel({
     associationMode ||
     mode === "spelling" ||
     mode === "actual-pron" ||
-    mode === "phoneme-settings";
+    mode === "phoneme-settings" ||
+    mode === "voice-trial";
   const selectionToolsLabel = grammarMode
     ? "“语法结构”和“连读符号”"
     : associationMode
       ? "“文本格式”和“连读符号”"
       : mode === "spelling"
         ? "“斜体”和“连读符号”"
-        : "“连读符号”";
+        : mode === "voice-trial"
+          ? "音标、关联读法或特殊读法"
+          : "“连读符号”";
   const [voicesExpanded, setVoicesExpanded] = useState(true);
   const voicesPanelId = useId();
   const headerTools = selectionMode
@@ -134,21 +138,26 @@ export function MarkupPanel({
           tool.key === "bold" ||
           tool.key === "italic" ||
           tool.key === "underline" ||
+          tool.key === "phoneme" ||
+          (mode === "voice-trial" && tool.key === "pause") ||
           tool.key === "reading" ||
           tool.key === "reading-link" ||
           tool.key.startsWith("association-")
       )
     : [];
-  const formatOrder = [
-    "text",
-    "bold",
-    "italic",
-    "underline",
-    "reading",
-    "reading-link",
-    "association-word",
-    "association-phrase"
-  ];
+  const formatOrder =
+    mode === "voice-trial"
+      ? ["phoneme", "reading-link", "reading", "pause"]
+      : [
+          "text",
+          "bold",
+          "italic",
+          "underline",
+          "reading",
+          "reading-link",
+          "association-word",
+          "association-phrase"
+        ];
   headerTools.sort(
     (left, right) =>
       formatOrder.indexOf(left.key) - formatOrder.indexOf(right.key)
@@ -157,7 +166,8 @@ export function MarkupPanel({
     (tool) => tool.key === "roles" || tool.key === "liaison"
   );
   const bottomTools = tools.filter(
-    (tool) => tool.key === "pause" || tool.key === "voices"
+    (tool) =>
+      (tool.key === "pause" && mode !== "voice-trial") || tool.key === "voices"
   );
   const uploadTool = selectionMode
     ? tools.find((tool) => tool.key === "uploads")
@@ -178,9 +188,12 @@ export function MarkupPanel({
       (annotation) =>
         annotation.type === "italic" ||
         annotation.type === "bold" ||
-        annotation.type === "underline"
+        annotation.type === "underline" ||
+        (mode === "voice-trial" &&
+          ["phoneme", "say_as", "sub"].includes(annotation.type))
     ).length +
-    Object.keys(marks.pauses).length;
+    Object.keys(marks.pauses).length +
+    (mode === "voice-trial" ? (linkedRanges?.length ?? 0) : 0);
   const trigger = (tool: DropdownTool, inline: boolean) => {
     const isVoices = inline && tool.key === "voices";
     const button = (
@@ -226,7 +239,9 @@ export function MarkupPanel({
       </Button>
     );
     const shortcut = FORMAT_SHORTCUTS[tool.key];
-    const hint = shortcut ? <ShortcutHint shortcut={shortcut} /> : undefined;
+    const hint =
+      tool.disabledReason ??
+      (shortcut ? <ShortcutHint shortcut={shortcut} /> : undefined);
     return hint ? <Tooltip title={hint}>{button}</Tooltip> : button;
   };
   const renderTool = (tool: DropdownTool) =>
@@ -322,36 +337,49 @@ export function MarkupPanel({
             </Tooltip>
           </div>
         )}
-        {selectionMode && (
-          <div className="tsz-ve-selection-status" role="status">
-            {contentReadOnly ? (
-              "正文只读，请选择单词或短语编辑关联。"
-            ) : brush.kind === "erase" ? (
-              composedMode || mode === "spelling" ? (
-                "清除模式：点击已有连读或停顿即可取消。"
+        {selectionMode &&
+          (mode !== "voice-trial" ||
+            tools.some((tool) => !tool.disabledReason)) && (
+            <div className="tsz-ve-selection-status" role="status">
+              {contentReadOnly ? (
+                "正文只读，请选择单词或短语编辑关联。"
+              ) : brush.kind === "erase" ? (
+                composedMode || mode === "spelling" ? (
+                  "清除模式：点击已有连读或停顿即可取消。"
+                ) : (
+                  "清除模式：点击已有连读即可取消。"
+                )
+              ) : mode === "voice-trial" ? (
+                selectionText ? (
+                  <>
+                    已选 <strong>{selectionText}</strong>
+                  </>
+                ) : (
+                  "选中文字设置读法"
+                )
+              ) : selectionText ? (
+                <>
+                  已选中 <strong>{selectionText}</strong>
+                  ，可配置{selectionToolsLabel}。
+                </>
               ) : (
-                "清除模式：点击已有连读即可取消。"
-              )
-            ) : selectionText ? (
-              <>
-                已选中 <strong>{selectionText}</strong>
-                ，可配置{selectionToolsLabel}。
-              </>
-            ) : (
-              `选中文字，可配置${selectionToolsLabel}。`
-            )}
-          </div>
-        )}
-        {topTools.length === 0 && !contentReadOnly && (
-          <div className="tsz-ve-top-hint">
-            {mode === "phoneme-settings"
-              ? "选择词形拼写的词缝设置停顿；音素正文在外部输入框编辑"
-              : "直接编辑正文；光标停在词间可插入停顿"}
-          </div>
-        )}
+                `选中文字，可配置${selectionToolsLabel}。`
+              )}
+            </div>
+          )}
+        {topTools.length === 0 &&
+          !contentReadOnly &&
+          mode !== "voice-trial" && (
+            <div className="tsz-ve-top-hint">
+              {mode === "phoneme-settings"
+                ? "选择词形拼写的词缝设置停顿；音素正文在外部输入框编辑"
+                : "直接编辑正文；光标停在词间可插入停顿"}
+            </div>
+          )}
       </div>
       <div className="tsz-ve-editing-area">
         <AnnotationStrip
+          showSpeechMarks={mode === "voice-trial"}
           associationContent={associationContent}
           associationAnchor={associationAnchor}
           selectedLinkRanges={selectedLinkRanges}

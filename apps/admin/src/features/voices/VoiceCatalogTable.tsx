@@ -1,4 +1,8 @@
 import { VoiceName } from "./VoiceDisplay";
+import {
+  VoiceMetadataEditor,
+  type MetadataEditorState
+} from "./VoiceMetadataEditor";
 import { speechAccentGroup } from "@tsz/shared";
 import {
   CaretRightOutlined,
@@ -11,17 +15,14 @@ import type { AdminSpeechVoice, AdminVoiceLibraryItem } from "@tsz/types";
 import {
   Button,
   Checkbox,
-  Collapse,
-  Descriptions,
-  Form,
   Input,
   Pagination,
+  Popover,
   Select,
   Space,
-  Spin,
+  Table,
   Tag,
-  Tooltip,
-  Typography
+  Tooltip
 } from "antd";
 import { useState, type ReactNode } from "react";
 import { GatedButton } from "@/components/GatedButton";
@@ -87,171 +88,28 @@ function list(
       : "未提供";
 }
 
-export function VoiceCatalogDetails({
-  voice,
-  description
-}: {
-  voice: AdminSpeechVoice;
-  description?: ReactNode;
-}) {
-  const info = voice.metadata;
+function preview(text: string) {
   return (
-    <section className="voice-library-details" aria-label="音色资料">
-      <Descriptions
-        bordered
-        size="small"
-        column={{ xs: 1, sm: 2 }}
-        styles={{ label: { width: 84, whiteSpace: "nowrap" } }}
-        items={[
-          ...(description
-            ? [
-                {
-                  key: "description",
-                  label: "中文介绍",
-                  span: "filled" as const,
-                  children: description
-                }
-              ]
-            : []),
-          {
-            key: "age",
-            label: "年龄",
-            children:
-              ageNames[info?.age_group ?? ""] ?? info?.age_group ?? "未提供"
-          },
-          {
-            key: "model",
-            label: "模型",
-            children:
-              modelNames[
-                info?.model ?? voice.capability_evidence?.model ?? ""
-              ] ??
-              info?.model ??
-              "未提供"
-          },
-          {
-            key: "personalities",
-            label: "声音特征",
-            span: "filled",
-            children: list(info?.personalities, personalityNames)
-          },
-          {
-            key: "scenarios",
-            label: "推荐场景",
-            span: "filled",
-            children: list(info?.scenarios, scenarioNames)
-          },
-          {
-            key: "styles",
-            label: "可选风格",
-            span: "filled",
-            children: [
-              "自然",
-              ...voice.capabilities.styles.map(
-                (value) => styleNames[value] ?? value
-              )
-            ].join("、")
-          },
-          {
-            key: "roles",
-            label: "可选角色",
-            span: "filled",
-            children: list(
-              voice.capability_evidence
-                ? voice.capability_evidence.roles
-                : info?.roles
-            )
-          },
-          {
-            key: "supported-locales",
-            label: "支持语言",
-            span: "filled",
-            children: voice.capability_evidence?.supported_locales
-              ? voice.capability_evidence.supported_locales
-                  .map(
-                    (locale) =>
-                      `${languages.of(locale.split("-")[0]!)} (${locale})`
-                  )
-                  .join("、")
-              : "待验证：当前资源未提供完整语言清单"
-          },
-          {
-            key: "degree",
-            label: "风格强度",
-            span: "filled",
-            children:
-              voice.capability_evidence?.supports_style_degree === true
-                ? "0.01–2.00"
-                : "待验证：未确认该音色支持"
-          },
-          {
-            key: "generation",
-            label: "合成状态",
-            span: "filled",
-            children:
-              voice.synthesis_available === false
-                ? "当前音色或语种尚未开放合成"
-                : "已开放；以实际参数校验为准"
-          }
-        ]}
-      />
-      <Collapse
-        ghost
-        items={[
-          {
-            key: "source",
-            label: "官方原文与来源",
-            children: (
-              <>
-                <Typography.Paragraph className="voice-library-official-description">
-                  {info?.description || "未提供"}
-                </Typography.Paragraph>
-                {voice.capability_evidence && (
-                  <Typography.Paragraph>
-                    <Typography.Link
-                      href={voice.capability_evidence.source_url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      资源能力来源（
-                      {voice.capability_evidence.checked_at.slice(0, 10)}）
-                    </Typography.Link>
-                  </Typography.Paragraph>
-                )}
-                {info?.source_url && (
-                  <Typography.Link
-                    href={info.source_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    官方资料（{info.checked_at.slice(0, 10)}）
-                  </Typography.Link>
-                )}
-                <Typography.Paragraph
-                  type="secondary"
-                  className="voice-library-id"
-                >
-                  <Typography.Text code copyable>
-                    {info?.provider_voice_id ??
-                      voice.capability_evidence?.provider_voice_id ??
-                      voice.alias}
-                  </Typography.Text>
-                </Typography.Paragraph>
-              </>
-            )
-          }
-        ]}
-      />
-    </section>
+    <Tooltip title={text}>
+      <span className="voice-catalog-cell-preview">{text}</span>
+    </Tooltip>
   );
 }
 
 interface Props {
+  canEditMetadata?: boolean;
+  metadataEditing?: boolean;
+  onMetadataEditorChange?: (
+    id: string,
+    state: MetadataEditorState | null
+  ) => void;
   voices: AdminSpeechVoice[];
   metadata: Map<string, AdminVoiceLibraryItem>;
   loading: boolean;
   settingsPending: boolean;
   canGenerate: boolean;
+  isVoiceTextValid?: (voice: AdminSpeechVoice) => boolean;
+  trialVoiceAliases?: ReadonlySet<string>;
   validText: boolean;
   activeVoice?: string;
   pendingVoice: string | null;
@@ -310,11 +168,16 @@ const filterValues = (voice: AdminSpeechVoice, key: FilterKey): string[] => {
 };
 
 export function VoiceCatalogTable({
+  canEditMetadata = false,
+  metadataEditing = false,
+  onMetadataEditorChange,
   voices,
   metadata,
   loading,
   settingsPending,
   canGenerate,
+  isVoiceTextValid,
+  trialVoiceAliases,
   validText,
   activeVoice,
   pendingVoice,
@@ -325,9 +188,11 @@ export function VoiceCatalogTable({
   const [commonOnly, setCommonOnly] = useState(false);
   const [sort, setSort] = useState("recommended");
   const [filters, setFilters] = useState<Filters>({});
-  const [moreFilters, setMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [editingRows, setEditingRows] = useState<AdminSpeechVoice[] | null>(
+    null
+  );
   const rows = (() => {
     const search = query.trim().toLowerCase();
     return voices
@@ -384,18 +249,22 @@ export function VoiceCatalogTable({
         );
       });
   })();
+  // 编辑期间固定结果集与顺序，避免异步资料更新卸载未保存的行内草稿。
+  if (metadataEditing && editingRows === null) setEditingRows(rows);
+  if (!metadataEditing && editingRows !== null) setEditingRows(null);
+  const latestVoices = new Map(voices.map((voice) => [voice.alias, voice]));
+  const displayedRows =
+    metadataEditing && editingRows
+      ? editingRows.map((voice) => latestVoices.get(voice.alias) ?? voice)
+      : rows;
   const hasFilters =
     !!query ||
     commonOnly ||
     Object.values(filters).some((value) => value.length) ||
     sort !== "recommended";
-  const advancedCount = ["scenario", "model", "style", "role"].reduce(
-    (count, key) => count + (filters[key as FilterKey]?.length ?? 0),
-    0
-  );
   const currentPage = Math.min(
     page,
-    Math.max(1, Math.ceil(rows.length / pageSize))
+    Math.max(1, Math.ceil(displayedRows.length / pageSize))
   );
   function reset() {
     setQuery("");
@@ -435,9 +304,11 @@ export function VoiceCatalogTable({
     labels?: Record<string, string>
   ) {
     return (
-      <Form.Item label={label}>
+      <div className="voice-catalog-heading">
+        <span>{label}</span>
         <Select
           mode="multiple"
+          disabled={metadataEditing}
           aria-label={label}
           placeholder="全部"
           allowClear
@@ -450,231 +321,353 @@ export function VoiceCatalogTable({
             setPage(1);
           }}
         />
-      </Form.Item>
+      </div>
     );
   }
   return (
     <section className="voice-catalog" aria-label="音色库">
-      <Form layout="vertical" className="voice-catalog-filters">
-        <div className="voice-catalog-search">
-          <Input
-            type="search"
-            prefix={<SearchOutlined />}
-            aria-label="搜索音色"
-            placeholder="搜索名称、介绍或听感"
-            value={query}
-            allowClear
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setPage(1);
-            }}
-          />
-          <Checkbox
-            checked={commonOnly}
-            onChange={(event) => {
-              setCommonOnly(event.target.checked);
-              setPage(1);
-            }}
-          >
-            只看常用
-          </Checkbox>
-        </div>
-        <div className="voice-catalog-filter-grid">
-          {filter("language", "语言")}
-          {filter("region", "官方地区")}
-          {filter("accent", "口音归属", accentNames)}
-          {filter("gender", "性别", genderNames)}
-          {filter("age", "年龄组", ageNames)}
-          <Button
-            icon={<FilterOutlined aria-hidden />}
-            aria-expanded={moreFilters}
-            aria-controls="voice-catalog-more-filters"
-            onClick={() => setMoreFilters(!moreFilters)}
-          >
-            更多筛选{advancedCount ? `（${advancedCount}）` : ""}
-          </Button>
-        </div>
-        <div id="voice-catalog-more-filters" hidden={!moreFilters}>
-          <div className="voice-catalog-advanced-grid">
-            {filter("scenario", "推荐场景")}
-            {filter("model", "模型", modelNames)}
-            {filter("style", "可选风格", { ...styleNames, neutral: "默认" })}
-            {filter("role", "可选角色")}
-          </div>
-        </div>
-      </Form>
-      <div className="voice-catalog-toolbar">
-        <Space size={12} wrap>
-          <Typography.Text strong>音色列表</Typography.Text>
-          <Typography.Text type="secondary">
-            {hasFilters
-              ? `${rows.length} / ${voices.length} 个音色`
-              : `共 ${voices.length} 个音色`}
-          </Typography.Text>
-          {hasFilters && (
-            <Button type="link" size="small" onClick={reset}>
-              清除筛选
-            </Button>
-          )}
-        </Space>
-        <Select
-          aria-label="音色排序"
-          variant="borderless"
-          className="voice-catalog-sort"
-          value={sort}
-          options={[
-            { value: "recommended", label: "常用优先" },
-            { value: "name-asc", label: "名称升序" },
-            { value: "name-desc", label: "名称倒序" },
-            { value: "age-asc", label: "年龄升序" },
-            { value: "age-desc", label: "年龄倒序" }
-          ]}
-          onChange={(value) => {
-            setSort(value);
-            setPage(1);
-          }}
-        />
-      </div>
-      {voices.some((voice) => !voice.metadata) && (
-        <Typography.Paragraph type="secondary" className="voice-catalog-notice">
-          部分音色暂无详细资料；合成状态以各音色的已验证能力为准。
-        </Typography.Paragraph>
-      )}
-      <Spin spinning={loading}>
-        {rows.length ? (
-          <ul className="voice-catalog-list" aria-label="音色列表">
-            {rows
-              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-              .map((voice) => {
-                const info = metadata.get(voice.alias);
-                const active = voice.alias === activeVoice;
-                const gender = voice.gender.toLowerCase();
-                return (
-                  <li
-                    key={voice.alias}
-                    className={`voice-catalog-item${active ? " voice-catalog-item-active" : ""}`}
-                  >
-                    <GatedButton
-                      className="voice-catalog-play"
-                      shape="circle"
-                      classNames={{
-                        root: `voice-accent-${voiceAccent(voice)}`
-                      }}
-                      color="default"
-                      variant={active ? "solid" : "outlined"}
-                      icon={<CaretRightOutlined />}
-                      aria-label={`试听 ${voice.display_name}`}
-                      disabled={
-                        !canGenerate ||
-                        !validText ||
-                        settingsPending ||
-                        voice.synthesis_available === false
-                      }
-                      reason={
-                        voice.synthesis_available === false
-                          ? "当前音色或语种尚未开放合成，能力需验证"
-                          : !canGenerate
-                            ? "需要词库查看和语音生成权限"
-                            : settingsPending
-                              ? "正在加载个人音色设置"
-                              : "请输入 1–500 个字符的试听文本"
-                      }
-                      loading={pendingVoice === voice.alias}
-                      onClick={() => onAudition(voice)}
-                    />
-                    <div className="voice-catalog-identity">
-                      <Space size={8} wrap>
-                        <span
-                          className={`voice-accent-dot voice-accent-${voiceAccent(voice)}`}
-                          aria-label={`${accentNames[voiceAccent(voice)]}口音`}
-                        />
-                        <Tooltip
-                          title={
-                            voice.metadata?.provider_voice_id ?? voice.alias
-                          }
-                        >
-                          <span className="voice-catalog-name">
-                            <VoiceName voice={voice} />
-                          </span>
-                        </Tooltip>
-                        {voice.is_common && (
-                          <Tag color="blue" variant="filled">
-                            常用
-                          </Tag>
-                        )}
-                      </Space>
-                      <div className="voice-catalog-attributes">
-                        <span>{language(voice)}</span>
-                        <span>{region(voice)}</span>
-                        <span>{accentNames[voiceAccent(voice)]}</span>
-                        {!genderIcons[gender] && (
-                          <span>{genderNames[gender] ?? "性别未提供"}</span>
-                        )}
-                        <span>
-                          {ageNames[voice.metadata?.age_group ?? ""] ??
-                            voice.metadata?.age_group ??
-                            "年龄未提供"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="voice-catalog-summary">
-                      <p>
-                        {info?.description_zh ||
-                          voice.metadata?.description ||
-                          "暂无介绍，可试听了解声音。"}
-                      </p>
-                      <div className="voice-catalog-characteristics">
-                        {!!voice.metadata?.personalities?.length && (
-                          <span>
-                            {list(
-                              voice.metadata.personalities,
-                              personalityNames
-                            )}
-                          </span>
-                        )}
-                        {!!info?.notes && (
-                          <span className="voice-catalog-notes">
-                            我的听感：{info.notes}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="voice-catalog-settings">
-                      <Button
-                        type="text"
-                        aria-label={`查看 ${voice.display_name} 详情`}
-                        disabled={settingsPending}
-                        onClick={() => onDetails(voice)}
-                      >
-                        详情
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-          </ul>
-        ) : (
-          <TableEmptyState
-            filtered={hasFilters && !!voices.length}
-            onResetFilters={reset}
-            message="暂无可用音色，请联系管理员检查语音服务配置。"
-          />
+      <Table<AdminSpeechVoice>
+        className="voice-catalog-table"
+        aria-label="音色列表"
+        rowKey="alias"
+        size="small"
+        tableLayout="fixed"
+        scroll={{ x: 1900 }}
+        loading={loading}
+        pagination={false}
+        dataSource={displayedRows.slice(
+          (currentPage - 1) * pageSize,
+          currentPage * pageSize
         )}
-      </Spin>
-      {!!rows.length && (
-        <Pagination
-          className="voice-catalog-pagination"
-          current={currentPage}
-          pageSize={pageSize}
-          total={rows.length}
-          onChange={(next, size) => {
-            setPage(size === pageSize ? next : 1);
-            setPageSize(size);
-          }}
-          showSizeChanger
-          pageSizeOptions={[10, 20, 50]}
-          showTotal={(total) => `共 ${total} 个音色`}
-        />
+        rowClassName={(voice) =>
+          voice.alias === activeVoice ? "voice-catalog-row-active" : ""
+        }
+        locale={{
+          emptyText: (
+            <TableEmptyState
+              filtered={hasFilters && !!voices.length}
+              onResetFilters={reset}
+              message="暂无可用音色，请联系管理员检查语音服务配置。"
+            />
+          )
+        }}
+        columns={[
+          {
+            key: "actions",
+            title: (
+              <div className="voice-catalog-heading">
+                <span>操作</span>
+                {hasFilters && (
+                  <Button
+                    className="voice-catalog-reset"
+                    type="link"
+                    size="small"
+                    disabled={metadataEditing}
+                    onClick={reset}
+                  >
+                    清除筛选
+                  </Button>
+                )}
+              </div>
+            ),
+            width: 112,
+            fixed: "left",
+            render: (_, voice) => (
+              <Space size={4} className="voice-catalog-actions">
+                <GatedButton
+                  className="voice-catalog-play"
+                  shape="circle"
+                  classNames={{ root: `voice-accent-${voiceAccent(voice)}` }}
+                  color="default"
+                  variant={voice.alias === activeVoice ? "solid" : "outlined"}
+                  icon={<CaretRightOutlined />}
+                  aria-label={`试听 ${voice.display_name}`}
+                  disabled={
+                    !canGenerate ||
+                    !(isVoiceTextValid?.(voice) ?? validText) ||
+                    settingsPending ||
+                    voice.synthesis_available === false
+                  }
+                  reason={
+                    voice.synthesis_available === false
+                      ? "当前音色或语种尚未开放合成，能力需验证"
+                      : !canGenerate
+                        ? "需要词库查看和语音生成权限"
+                        : settingsPending
+                          ? "正在加载个人音色设置"
+                          : "请输入 1–500 个字符的试听文本"
+                  }
+                  loading={pendingVoice === voice.alias}
+                  onClick={() => onAudition(voice)}
+                />
+                <Button
+                  size="small"
+                  aria-label={`调节 ${voice.display_name} 声音`}
+                  disabled={settingsPending}
+                  onClick={() => onDetails(voice)}
+                >
+                  调节
+                </Button>
+              </Space>
+            )
+          },
+          {
+            key: "voice",
+            title: (
+              <div className="voice-catalog-heading">
+                <div className="voice-catalog-heading-label">
+                  <span>音色</span>
+                  <Popover
+                    trigger="click"
+                    placement="bottomLeft"
+                    content={
+                      <div className="voice-catalog-controls">
+                        <Checkbox
+                          checked={commonOnly}
+                          disabled={metadataEditing}
+                          onChange={(event) => {
+                            setCommonOnly(event.target.checked);
+                            setPage(1);
+                          }}
+                        >
+                          只看常用
+                        </Checkbox>
+                        <Select
+                          aria-label="音色排序"
+                          disabled={metadataEditing}
+                          value={sort}
+                          options={[
+                            { value: "recommended", label: "常用优先" },
+                            { value: "name-asc", label: "名称升序" },
+                            { value: "name-desc", label: "名称倒序" },
+                            { value: "age-asc", label: "年龄升序" },
+                            { value: "age-desc", label: "年龄倒序" }
+                          ]}
+                          onChange={(value) => {
+                            setSort(value);
+                            setPage(1);
+                          }}
+                        />
+                      </div>
+                    }
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<FilterOutlined />}
+                      aria-label="音色筛选和排序"
+                    />
+                  </Popover>
+                </div>
+                <Input
+                  type="search"
+                  prefix={<SearchOutlined />}
+                  aria-label="搜索音色"
+                  disabled={metadataEditing}
+                  placeholder="搜索名称、介绍或听感"
+                  value={query}
+                  allowClear
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            ),
+            width: 184,
+            fixed: "left",
+            render: (_, voice) => (
+              <div className="voice-catalog-identity">
+                <Tooltip
+                  title={voice.metadata?.provider_voice_id ?? voice.alias}
+                >
+                  <span className="voice-catalog-name">
+                    <VoiceName voice={voice} />
+                  </span>
+                </Tooltip>
+                <Space size={4} wrap>
+                  {voice.is_common && (
+                    <Tag color="blue" variant="filled">
+                      常用
+                    </Tag>
+                  )}
+                  {trialVoiceAliases?.has(voice.alias) && (
+                    <Tooltip title="已保留该音色本次页面的试听草稿">
+                      <Tag>本次试听</Tag>
+                    </Tooltip>
+                  )}
+                </Space>
+              </div>
+            )
+          },
+          {
+            key: "language",
+            title: filter("language", "语言"),
+            width: 112,
+            render: (_, voice) => language(voice)
+          },
+          {
+            key: "region",
+            title: filter("region", "官方地区"),
+            width: 128,
+            render: (_, voice) => region(voice)
+          },
+          {
+            key: "accent",
+            title: filter("accent", "口音归属", accentNames),
+            width: 112,
+            render: (_, voice) => {
+              const content = (
+                <Space size={6}>
+                  <span
+                    className={`voice-accent-dot voice-accent-${voiceAccent(voice)}`}
+                    aria-hidden
+                  />
+                  {accentNames[voiceAccent(voice)]}
+                </Space>
+              );
+              return canEditMetadata ? (
+                <VoiceMetadataEditor
+                  voice={voice}
+                  item={metadata.get(voice.alias)}
+                  field="accent"
+                  disabled={settingsPending}
+                  onStateChange={onMetadataEditorChange}
+                >
+                  {content}
+                </VoiceMetadataEditor>
+              ) : (
+                content
+              );
+            }
+          },
+          {
+            key: "gender",
+            title: filter("gender", "性别", genderNames),
+            width: 100,
+            render: (_, voice) => (
+              <Space size={4}>
+                {genderIcons[voice.gender.toLowerCase()]}
+                {genderNames[voice.gender.toLowerCase()] ?? "性别未提供"}
+              </Space>
+            )
+          },
+          {
+            key: "age",
+            title: filter("age", "年龄组", ageNames),
+            width: 112,
+            render: (_, voice) =>
+              ageNames[voice.metadata?.age_group ?? ""] ??
+              voice.metadata?.age_group ??
+              "年龄未提供"
+          },
+          {
+            key: "description",
+            title: "介绍",
+            width: 300,
+            render: (_, voice) => {
+              const info = metadata.get(voice.alias);
+              const description =
+                info?.description_zh ??
+                voice.metadata?.description ??
+                "暂无介绍，可试听了解声音。";
+              return (
+                <div className="voice-catalog-summary">
+                  {!!voice.metadata?.personalities?.length && (
+                    <div className="voice-catalog-tags">
+                      {voice.metadata.personalities.map((value) => (
+                        <Tag key={value}>
+                          {personalityNames[value.toLowerCase()] ?? value}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+                  {canEditMetadata ? (
+                    <VoiceMetadataEditor
+                      voice={voice}
+                      item={info}
+                      field="description"
+                      disabled={settingsPending}
+                      onStateChange={onMetadataEditorChange}
+                    >
+                      {preview(description || "介绍已清空")}
+                    </VoiceMetadataEditor>
+                  ) : (
+                    preview(description || "介绍已清空")
+                  )}
+                  {!!info?.notes && (
+                    <p className="voice-catalog-notes">
+                      {preview(`我的听感：${info.notes}`)}
+                    </p>
+                  )}
+                </div>
+              );
+            }
+          },
+          {
+            key: "scenario",
+            title: filter("scenario", "推荐场景"),
+            width: 160,
+            render: (_, voice) =>
+              preview(list(voice.metadata?.scenarios, scenarioNames))
+          },
+          {
+            key: "model",
+            title: filter("model", "模型", modelNames),
+            width: 160,
+            render: (_, voice) => {
+              const model =
+                voice.metadata?.model ?? voice.capability_evidence?.model;
+              return model ? (modelNames[model] ?? model) : "未提供";
+            }
+          },
+          {
+            key: "style",
+            title: filter("style", "可选风格", {
+              ...styleNames,
+              neutral: "默认"
+            }),
+            width: 160,
+            render: (_, voice) =>
+              preview(
+                list(["neutral", ...voice.capabilities.styles], {
+                  ...styleNames,
+                  neutral: "默认"
+                })
+              )
+          },
+          {
+            key: "role",
+            title: filter("role", "可选角色"),
+            width: 160,
+            render: (_, voice) =>
+              preview(
+                list(
+                  voice.capability_evidence
+                    ? voice.capability_evidence.roles
+                    : voice.metadata?.roles
+                )
+              )
+          }
+        ]}
+      />
+      {!!displayedRows.length && (
+        <div className="voice-catalog-footer">
+          <Pagination
+            disabled={metadataEditing}
+            className="voice-catalog-pagination"
+            current={currentPage}
+            pageSize={pageSize}
+            total={displayedRows.length}
+            onChange={(next, size) => {
+              setPage(size === pageSize ? next : 1);
+              setPageSize(size);
+            }}
+            showSizeChanger
+            pageSizeOptions={[10, 20, 50]}
+            showTotal={(total) => `共 ${total} 个音色`}
+          />
+        </div>
       )}
     </section>
   );
