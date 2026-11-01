@@ -2,6 +2,7 @@ import { Alert, Button, Flex, Popconfirm } from "antd";
 import type {
   AdminWordV3,
   PartOfSpeechCatalogItem,
+  PartOfSpeechCatalogResponse,
   FormsStepRepresentationV3,
   DraftMeaningsStepContentWritableV3,
   V3DraftValidationIssue,
@@ -11,6 +12,7 @@ import { expandFormContents } from "@tsz/shared";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { DraftComparison } from "../DraftComparison";
+import { LexiconAssistant } from "../assistant/LexiconAssistant";
 import { toWritableMeanings } from "./meaningsModel";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
@@ -45,6 +47,11 @@ interface Props {
   word: AdminWordV3;
   sharedSentenceCount?: number;
   partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
+  assistantCatalog?: PartOfSpeechCatalogResponse;
+  onAssistantFormsApply?: (
+    forms: FormsStepRepresentationV3,
+    expected: string
+  ) => boolean;
   activeStep: WordCreationStep;
   reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
@@ -151,6 +158,8 @@ function DiscardLocalChangesButton({
 function V3WordCreationLayoutContent({
   word,
   partOfSpeechCatalog,
+  assistantCatalog,
+  onAssistantFormsApply,
   activeStep,
   reachableSteps,
   readOnly = false,
@@ -424,6 +433,24 @@ function V3WordCreationLayoutContent({
           />
         )}
         {children}
+        <LexiconAssistant
+          context={{
+            word,
+            catalog: assistantCatalog,
+            applyForms:
+              !readOnly && !conflict && !remoteUpdate && !retrying
+                ? onAssistantFormsApply
+                : undefined,
+            step: activeStep,
+            forms: draftForms ?? word.forms,
+            meanings: draftMeanings ?? toWritableMeanings(word.meanings),
+            dirtySteps,
+            progress: progressRows.map(({ label, completed }) => ({
+              label,
+              completed
+            }))
+          }}
+        />
       </Flex>
     </WordCreationLayout>
   );

@@ -641,7 +641,7 @@ export function unifyUkUsSpelling(
   return { ok: true, value: { ...form, regional_variants: regionalVariants } };
 }
 
-function applyVariantSpelling(
+export function applyVariantSpelling(
   variant: {
     spelling: string;
     spelling_rich?: RichTextV2V3;

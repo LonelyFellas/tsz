@@ -69,6 +69,7 @@ export * from "./learning-rewards";
 export * from "./related-suggestions";
 
 export * from "./dictionary";
+export * from "./lexicon-assistant";
 
 export * from "./wordlist-library";
 
