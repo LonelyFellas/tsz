@@ -58,6 +58,10 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "LexiconAssistantCapability",
+  "LexiconAssistantResponse",
+  "LexiconAssistantEvent",
+  "LexiconFormCandidatesResponse",
   "DubbingGroupsV3Response",
   "LearningCapabilities",
   "AiLedgerPage",

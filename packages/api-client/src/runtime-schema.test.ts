@@ -35,6 +35,10 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "LexiconAssistantCapability",
+  "LexiconAssistantResponse",
+  "LexiconAssistantEvent",
+  "LexiconFormCandidatesResponse",
   "DubbingGroupsV3Response",
   "LearningCapabilities",
   "AiLedgerPage",

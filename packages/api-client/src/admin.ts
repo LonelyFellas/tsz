@@ -1,5 +1,6 @@
 import { createDubbingGroupsV3Endpoints } from "./dubbing-groups-v3";
 import { createAiLedgerEndpoints } from "./ai-ledger";
+import { createLexiconAssistantEndpoints } from "./lexicon-assistant";
 import { createOpenCodeEndpoints } from "./opencode";
 import { createChatGPTEndpoints } from "./chatgpt";
 import { createPublicationAudioEndpoints } from "./publication-audio";
@@ -257,6 +258,7 @@ function requireLifecycleBatchIdentity<
 export function createAdminEndpoints(http: HttpClient) {
   return {
     aiLedger: createAiLedgerEndpoints(http),
+    lexiconAssistant: createLexiconAssistantEndpoints(http),
     opencode: createOpenCodeEndpoints(http),
     chatgpt: createChatGPTEndpoints(http),
     dashboard: {
