@@ -79,6 +79,7 @@ export interface AnnotationStripProps {
   textReadOnly?: boolean;
   /** 文本框的无障碍名；同一页面上多个编辑器靠它区分。 */
   inputLabel: string;
+  showSpeechMarks?: boolean;
   /** 宿主用于错误定位的 data-* 属性；必须落在可聚焦的输入框上。 */
   inputDataAttributes?: Record<string, string>;
   inputPlaceholder?: string;
@@ -121,6 +122,7 @@ export function AnnotationStrip({
   readOnly,
   textReadOnly,
   inputLabel,
+  showSpeechMarks = false,
   inputDataAttributes,
   inputPlaceholder,
   onTextChange,
@@ -559,6 +561,18 @@ export function AnnotationStrip({
                       )
                       .map((type) => ` is-${type}`)
                       .join("");
+                    const speechClass =
+                      showSpeechMarks &&
+                      marks.passthrough.some(
+                        (mark) =>
+                          (mark.type === "phoneme" ||
+                            mark.type === "say_as" ||
+                            mark.type === "sub") &&
+                          mark.start <= start &&
+                          mark.end >= end
+                      )
+                        ? " is-speech-mark"
+                        : "";
                     // 注意与 unit 的 level（语法分类）区分：这里是连读草稿的端别。
                     const anchorRole = draftRole(draft, start);
                     const selectedClass = covers(selectedRange, start, end)
@@ -586,7 +600,7 @@ export function AnnotationStrip({
                       <span
                         key={offset}
                         ref={registerLetter(start)}
-                        className={`tsz-ve-letter${roleClass}${formatClass}${textSelectedClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
+                        className={`tsz-ve-letter${roleClass}${formatClass}${speechClass}${textSelectedClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
                         role="button"
                         aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
                         aria-pressed={Boolean(anchorRole)}

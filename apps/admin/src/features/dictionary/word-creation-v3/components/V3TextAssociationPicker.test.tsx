@@ -25,6 +25,7 @@ import { V3GrammarFormPicker } from "./V3GrammarFormPicker";
 const search = vi.fn();
 const get = vi.fn();
 const getPublication = vi.fn();
+const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
 const testReading = {
   id: "reading-give",
   dict_phonetic: "",
@@ -51,6 +52,7 @@ function ukUsFormFixture(
   return form;
 }
 beforeEach(() => {
+  dialectPreference.value = "uk";
   const word = {
     id: "entry-give",
     presentation: { label: "give" },
@@ -103,7 +105,7 @@ vi.mock("../api", () => ({
   })
 }));
 vi.mock("@/features/settings/useDialectPreference", () => ({
-  useDialectPreference: () => ({ preference: "uk" })
+  useDialectPreference: () => ({ preference: dialectPreference.value })
 }));
 function giveEntryResponse() {
   return {
@@ -410,6 +412,89 @@ it("同拼写、不同音标的 job/Job 各显示一条英美通用，关联沿�
     })
   );
 });
+
+it.each([
+  ["en-US", "uk", "us"],
+  ["en-GB", "us", "uk"]
+] as const)(
+  "固定 %s 试听时，同拼写词形采用音色口音而非账号 %s 偏好",
+  async (locale, preference, dialect) => {
+    dialectPreference.value = preference;
+    const form = ukUsFormFixture({
+      id: "form-give",
+      uk: { id: "give-uk", spelling: "give" },
+      us: { id: "give-us", spelling: "give" }
+    });
+    form.regional_variants.uk.pronunciations = [
+      { ...testReading, id: "reading-uk" }
+    ];
+    form.regional_variants.us.pronunciations = [
+      { ...testReading, id: "reading-us" }
+    ];
+    getPublication.mockResolvedValue({
+      publication: {
+        word: {
+          forms: formsFixture({ pos_id: "pos-give", forms: [form] }),
+          meanings: { pos: [], sense_groups: [] }
+        }
+      }
+    });
+    const response = giveEntryResponse();
+    const candidate: PublishedSentenceTargetCandidateV3 = response.matches[0]!;
+    const base = candidate.forms[0]!;
+    candidate.forms = [
+      { ...base, variant_id: "give-uk", dialect: "uk" },
+      { ...base, variant_id: "give-us", dialect: "us" }
+    ];
+    search.mockResolvedValue(response);
+    const onSelect = vi.fn();
+    render(
+      <V3GrammarFormPicker
+        kind="word"
+        locale={locale}
+        segments={[segments[0]!]}
+        onSelect={onSelect}
+      />
+    );
+    await waitFor(() => {
+      fireEvent.click(
+        document.querySelector(".ant-cascader-menu-item-content")!
+      );
+      expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
+    });
+    fireEvent.click(screen.getByText("原形 give · 英美通用"));
+    const label = dialect === "uk" ? "英式具体读法" : "美式具体读法";
+    const otherLabel = dialect === "uk" ? "美式具体读法" : "英式具体读法";
+    await waitFor(() => {
+      fireEvent.mouseDown(screen.getByLabelText(label));
+      expect(
+        document.querySelector(
+          '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+        )
+      ).not.toBeNull();
+    });
+    fireEvent.click(
+      document.querySelector(
+        '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+      )!
+    );
+    expect(screen.queryByLabelText(otherLabel)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target_variant_id: `give-${dialect}`,
+        target_dialect: dialect,
+        reading_reference: {
+          [dialect]: expect.objectContaining({
+            pronunciation_id: `reading-${dialect}`,
+            locale,
+            alphabet: "ipa"
+          })
+        }
+      })
+    );
+  }
+);
 
 it("远端同拼写词形合并回显，保留已关联的美式变体；不同拼写仍区分", async () => {
   const published = giveEntryResponse().matches[0]!;

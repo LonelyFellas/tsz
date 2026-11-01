@@ -277,7 +277,14 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
     | "actual-pron"
     | "spelling"
     | "synthesis"
-    | "phoneme-settings";
+    | "phoneme-settings"
+    | "voice-trial";
+  /** 固定音色的本次试听，仅开放已确认支持的发音工具。 */
+  speechCapabilities?: Pick<
+    VoiceOption,
+    "supportsPhoneme" | "supportsPause" | "supportsSayAs" | "supportsSub"
+  >;
+  onValidationChange?: (ready: boolean) => void;
   /**
    * 这段正文所属的语种。宿主按英美分栏时传进来，音色清单和录音归属都只留这一侧；
    * 不分英美（通用栏）的字段不传，此时不做筛选。

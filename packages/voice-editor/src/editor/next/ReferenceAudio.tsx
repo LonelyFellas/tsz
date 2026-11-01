@@ -60,7 +60,11 @@ export function ReferenceAudio({
         }}
       />
       <Space wrap>
-        <Button size="small" onClick={() => input.current?.click()}>
+        <Button
+          size="small"
+          title="仅本次使用，关闭后清除"
+          onClick={() => input.current?.click()}
+        >
           导入参考音频
         </Button>
         {media && (
@@ -68,9 +72,6 @@ export function ReferenceAudio({
             移除参考音频
           </Button>
         )}
-        <Typography.Text type="secondary">
-          仅本次对照审听，关闭后清除。
-        </Typography.Text>
       </Space>
       {error && <Typography.Text type="danger">{error}</Typography.Text>}
       {media && (

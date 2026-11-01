@@ -59,9 +59,11 @@ export function V3GrammarFormPicker({
   onPendingChange,
   wordId,
   forms,
-  meanings
+  meanings,
+  locale
 }: AssociationPickerProps<GrammarFormLinkV3> & {
   wordId?: string;
+  locale?: "en-GB" | "en-US";
   forms?: DraftFormsStepContentV3;
   meanings?: DraftMeaningsStepContentWritableV3 | DraftMeaningsStepContentV3;
 }) {
@@ -311,10 +313,14 @@ export function V3GrammarFormPicker({
         !group.some((form) => form.dialect === "us")
       )
         return group.map((form) => ({ form, displayDialect: form.dialect }));
-      // 只合并同一词形的相同拼写；引用保留已选变体，新关联沿用后台方言偏好。
+      // 保留已有引用；新关联优先匹配试听音色，未固定口音时沿用账号偏好。
       const form =
         group.find((form) => form.variant_id === selectedVariantId) ??
-        group.find((form) => form.dialect === preference)!;
+        group.find(
+          (form) =>
+            form.dialect ===
+            (locale === "en-GB" ? "uk" : locale === "en-US" ? "us" : preference)
+        )!;
       return [{ form, displayDialect: "common" }];
     });
   };
@@ -533,89 +539,101 @@ export function V3GrammarFormPicker({
               )
             }
           />
-          {(["en-GB", "en-US"] as const).map((locale) => {
-            const key = locale === "en-GB" ? "uk" : "us";
-            const selection = selected.reading_reference?.[key];
-            const choices = readings.flatMap((row, index) =>
-              row.synthesis
-                ? (["ipa", "ups"] as const).flatMap((alphabet) => {
-                    const value = synthesisForLocale(
-                      row.synthesis!,
-                      locale,
-                      selected.target_dialect
-                    );
-                    const natural =
-                      alphabet === "ipa"
-                        ? [
-                            {
-                              value: `${row.id}:spelling`,
-                              label: `读法 ${index + 1} · 按拼写自然朗读`,
-                              row,
-                              alphabet,
-                              use_spelling: true
-                            }
-                          ]
-                        : [];
-                    if (synthesisInputIssue(alphabet, value[alphabet]))
-                      return natural;
-                    return [
-                      ...natural,
-                      {
-                        value: `${row.id}:${alphabet}`,
-                        label: `读法 ${index + 1} · ${alphabet.toUpperCase()} · ${value[alphabet]}`,
-                        row,
-                        alphabet,
-                        use_spelling: false
-                      }
-                    ];
-                  })
-                : []
-            );
-            return (
-              <Select
-                key={locale}
-                aria-label={`${locale === "en-GB" ? "英式" : "美式"}具体读法`}
-                placeholder="明确选择读法"
-                loading={readingPending}
-                value={
-                  selection
-                    ? `${selection.pronunciation_id}:${selection.use_spelling ? "spelling" : selection.alphabet}`
-                    : undefined
-                }
-                options={choices}
-                onChange={(value) => {
-                  const choice = choices.find(
-                    (choice) => choice.value === value
-                  );
-                  if (!choice?.row.synthesis) return;
-                  setSelected(
-                    (current) =>
-                      current && {
-                        ...current,
-                        reading_reference: {
-                          ...current.reading_reference,
-                          [key]: {
-                            pronunciation_id: choice.row.id,
-                            alphabet: choice.alphabet,
-                            use_spelling: choice.use_spelling,
-                            locale,
-                            revision: readingRevision(
+          {(["en-GB", "en-US"] as const)
+            .filter((value) => !locale || value === locale)
+            .map((locale) => {
+              const key = locale === "en-GB" ? "uk" : "us";
+              const selection = selected.reading_reference?.[key];
+              const choices = readings.flatMap((row, index) =>
+                row.synthesis
+                  ? (["ipa", "ups"] as const).flatMap((alphabet) => {
+                      const value = synthesisForLocale(
+                        row.synthesis!,
+                        locale,
+                        selected.target_dialect
+                      );
+                      const natural =
+                        alphabet === "ipa"
+                          ? [
                               {
-                                ...choice.row.synthesis!,
-                                use_spelling: choice.use_spelling
-                              },
+                                value: `${row.id}:spelling`,
+                                label: `读法 ${index + 1} · 按拼写自然朗读`,
+                                row,
+                                alphabet,
+                                use_spelling: true
+                              }
+                            ]
+                          : [];
+                      if (synthesisInputIssue(alphabet, value[alphabet]))
+                        return natural;
+                      return [
+                        ...natural,
+                        {
+                          value: `${row.id}:${alphabet}`,
+                          label: `读法 ${index + 1} · ${alphabet.toUpperCase()} · ${value[alphabet]}`,
+                          row,
+                          alphabet,
+                          use_spelling: false
+                        }
+                      ];
+                    })
+                  : []
+              );
+              return (
+                <Select
+                  key={locale}
+                  aria-label={`${locale === "en-GB" ? "英式" : "美式"}具体读法`}
+                  placeholder="明确选择读法"
+                  loading={readingPending}
+                  value={
+                    selection
+                      ? `${selection.pronunciation_id}:${selection.use_spelling ? "spelling" : selection.alphabet}`
+                      : undefined
+                  }
+                  options={choices}
+                  onChange={(value) => {
+                    const choice = choices.find(
+                      (choice) => choice.value === value
+                    );
+                    if (!choice?.row.synthesis) return;
+                    setSelected(
+                      (current) =>
+                        current && {
+                          ...current,
+                          reading_reference: {
+                            ...current.reading_reference,
+                            [key]: {
+                              pronunciation_id: choice.row.id,
+                              alphabet: choice.alphabet,
+                              use_spelling: choice.use_spelling,
                               locale,
-                              current.target_dialect,
-                              choice.alphabet
-                            )
+                              revision: readingRevision(
+                                {
+                                  ...choice.row.synthesis!,
+                                  use_spelling: choice.use_spelling
+                                },
+                                locale,
+                                current.target_dialect,
+                                choice.alphabet
+                              )
+                            }
                           }
                         }
-                      }
-                  );
-                }}
+                    );
+                  }}
+                />
+              );
+            })}
+          {locale &&
+            !readingPending &&
+            !readingError &&
+            !readings.some((row) => row.synthesis) && (
+              <Alert
+                type="info"
+                showIcon
+                title="所选词形暂无可用的发音数据，请先完善词形读法或选择其他词形。"
               />
-            );
-          })}
+            )}
           {readingError && <Alert type="warning" title={readingError} />}
         </Flex>
       )}
@@ -680,8 +698,12 @@ export function V3GrammarFormPicker({
             (!selected && !initialSelected) ||
             (!!selected &&
               !sameTarget(selected, initialSelected) &&
-              !selected.reading_reference?.uk &&
-              !selected.reading_reference?.us)
+              (locale
+                ? !selected.reading_reference?.[
+                    locale === "en-GB" ? "uk" : "us"
+                  ]
+                : !selected.reading_reference?.uk &&
+                  !selected.reading_reference?.us))
           }
           onClick={() => {
             if (draftPending) onSelect(selected);
