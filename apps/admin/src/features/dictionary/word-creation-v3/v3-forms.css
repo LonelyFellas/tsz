@@ -125,13 +125,12 @@
   width: 100%;
 }
 .v3-overview-phonetic {
-  display: flex;
-  align-items: baseline;
   min-width: 0;
   padding-top: 3px;
 }
-.v3-overview-phonetic .tsz-ve-readonly {
-  min-width: 0;
+.v3-overview-phonetic.has-slashes .tsz-ve-readonly::before,
+.v3-overview-phonetic.has-slashes .tsz-ve-readonly::after {
+  content: "/";
 }
 .v3-overview-phonetic,
 .v3-overview-phonetic .tsz-ve-readonly {
