@@ -1282,3 +1282,12 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 受控失败基线观测到 errorVisible=true、outer busy=true、按钮仍连接且 loading=true，创建请求只有 1 次；立即重试复现原 `onSaved` 为 0 的失败。同一继续点仅加入公开“正在保存修改…”状态消失的等待后通过。诊断用的回调包装／探针均已从提交文件移除；诊断前后 fixture 和日志留在同一脱敏证据目录，`sentence-retry-fix-receipt.json` 给出可复现命令及定位证据，不将诊断调度控制当作生产代码变更。
 - 最小修复仅在原用例重试前用默认 `waitFor` 等待外层公开保存状态消失，再点击一次；原失败后输入保留、相同 ID／完整请求重试、无来源词义／关联、onSaved 恰好一次等断言全部保留，新增创建请求恰好两次断言。未修改生产代码、依赖、全局测试设置、超时、CI worker 或覆盖率规则，没有 sleep，也没有把点击放入 waitFor 重复执行。
 - 原路径回归：完整 `SentenceCreation.test.tsx` 在 `--project admin --maxWorkers=1 --coverage` 下 12 项全部通过；不手工重复全量套件，剩余全量检查由原生 hooks 和精确 PR/main CI 执行。交付期间保持全部 CI，合并窗口临时停用既有 `Deploy tshb-test`，main CI 完成及事件结算后确认无新增部署，再恢复原 active 状态；不修改工作流代码，不部署任何组件，不回写禅道。
+
+### 13.28 发布历史路由用例偶发超时的查询成本修复（2026-11-01）
+
+- 用户要求复现并修复 `WordWizardV3.test.tsx` 中“发布历史只在核对与发布步骤显示，返回录入步骤后卸载”的偶发 5000ms 超时，不放宽断言或超时；按技能交付并确认精确 PR/main CI，避免触发部署，不回写禅道。基线固定为 main `e01b517a7a4ff16d1d657ea8d0d6dcbe7e868242`。
+- 原始 CI 失败日志显示该用例超过原 5 秒时限。普通本地 coverage／单 worker 的诊断运行可以通过，不能把绿色当复现；分阶段计时表明三次整页 `queryByRole(button, name=发布历史)` 的负向查询为无关表单按钮计算可访问名称，累计触发 304 次样式计算、约 539ms，占本地用例约三分之一；发布历史请求等待约 34ms。真实历史标题由 `V3PublicationHistory` 的 Card 渲染，本来不是按钮，原查询既付出整页扫描成本，又未检查实际标题。
+- 失败基线采用只在诊断中令每次 `getComputedStyle` 增加 10ms CPU 成本的受控慢样式模型，保留真实页面、路由和请求，保持原 5000ms 超时：旧用例 5.43s 触发同类超时。只更换负向查询并加强标题检查后，相同条件 2.24s 通过，三次负向查询的样式调用为 0。该模型用于验证慢样式计算的因果链，不宣称 CI 每次样式调用恰为 10ms；探针、计时和限速均不进入最终提交。
+- 最小修复只在目标用例查询实际 Card 标题文本，保留初始页面就绪、真实步骤切换、各录入步骤容器不挂载、核对前不请求历史、核对时只请求一次、返回录入页后卸载等判据；新增核对页标题可见、返回后标题消失的检查。未修改生产代码、fixture 数据、依赖、超时、CI worker、全局测试配置或覆盖率，未添加 sleep 或跳过断言。
+- 原路径回归：移除全部诊断后，完整 `WordWizardV3.test.tsx` 在 `--project admin --maxWorkers=1 --coverage` 下 70 项全部通过。同一脱敏证据目录的 `wizard-history-fix-receipt.json`、`wizard-history-native-profile.jsonl`、`wizard-history-slow-style-before.log`／`wizard-history-slow-style-after.log` 和 `wizard-history-final-test.log` 保存复现条件、前后结果与回归；诊断 fixture 供隔离重现，未作为产品测试 mock 提交。
+- 后续交付保留原生 hooks 和全部 PR/main CI；合并窗口确认 main／队列稳定后临时停用既有 `Deploy tshb-test`，精确 main CI 完成及事件结算、确认无新增部署后恢复原 active 状态，不修改工作流代码。本轮不部署、不回写禅道，无真实业务／云测试资源。

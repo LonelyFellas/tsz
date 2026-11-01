@@ -1912,9 +1912,10 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
     await screen.findByRole("button", { name: "进入词形与发音" });
+    // 发布历史是 Card 标题；避免为不存在的按钮扫描整页可访问名称。
     expect(document.querySelector(".v3-publication-history")).toBeNull();
     expect(
-      screen.queryByRole("button", { name: "发布历史" })
+      screen.queryByText("发布历史", { exact: true })
     ).not.toBeInTheDocument();
     for (const step of ["词形与发音", "词义与例句"]) {
       fireEvent.click(
@@ -1922,12 +1923,13 @@ describe("WordWizardV3Page", () => {
       );
       expect(document.querySelector(".v3-publication-history")).toBeNull();
       expect(
-        screen.queryByRole("button", { name: "发布历史" })
+        screen.queryByText("发布历史", { exact: true })
       ).not.toBeInTheDocument();
       expect(endpoints.listPublications).not.toHaveBeenCalled();
     }
     fireEvent.click(screen.getByText("预览并生效"));
     expect(await screen.findByText("暂无发布记录")).toBeInTheDocument();
+    expect(screen.getByText("发布历史", { exact: true })).toBeVisible();
     expect(endpoints.listPublications).toHaveBeenCalledTimes(1);
     fireEvent.click(
       within(document.querySelector(".word-creation-steps")!).getByText(
@@ -1936,6 +1938,9 @@ describe("WordWizardV3Page", () => {
     );
     await contentEditButton();
     expect(document.querySelector(".v3-publication-history")).toBeNull();
+    expect(
+      screen.queryByText("发布历史", { exact: true })
+    ).not.toBeInTheDocument();
   });
 
   it("makes immutable publication history and detail reachable from the real preview route", async () => {
