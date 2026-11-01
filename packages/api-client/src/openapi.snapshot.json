@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-readonly-agent-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-10-31T16:12:09.803Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-assistant-p1/docs/openapi.json",
+  "_generatedAt": "2026-11-01T08:35:32.291Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -7691,6 +7691,18 @@
       "additionalProperties": false
     },
     "LearningTaskType": { "type": "string", "enum": ["daily", "longterm"] },
+    "LexiconAssistantDraft": {
+      "type": "object",
+      "description": "Structured unsaved editor content, in the same shapes the step save endpoints accept.",
+      "required": ["forms", "meanings"],
+      "properties": {
+        "forms": { "$ref": "#/components/schemas/FormsStepRepresentationV3" },
+        "meanings": {
+          "$ref": "#/components/schemas/DraftMeaningsStepContentWritableV3"
+        }
+      },
+      "additionalProperties": false
+    },
     "LexiconAssistantHistory": {
       "type": "object",
       "required": ["role", "content"],
@@ -7716,7 +7728,12 @@
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "context_id": { "type": "string", "format": "uuid" },
         "context_truncated": { "type": "boolean" },
+        "draft": {
+          "$ref": "#/components/schemas/LexiconAssistantDraft",
+          "description": "Newer editors send structured content; the server validates and projects it."
+        },
         "entry_id": { "type": "string", "format": "uuid" },
+        "extensions": { "type": "boolean" },
         "history": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/LexiconAssistantHistory" },

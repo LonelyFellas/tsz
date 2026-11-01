@@ -1,15 +1,18 @@
 /** 超管 AI 账本；nullable 表示未取得观测，不能视为零。 */
 export interface AiCallMetrics {
-  phase: "generate" | "review";
+  phase: "generate" | "review" | "assistant" | "form_candidates";
   outcome: "response" | "error" | "cancelled";
   duration_ms: number;
   cache_hit_tokens: number | null;
   cache_miss_tokens: number | null;
 }
+export type AiCallPurpose =
+  "question_generation" | "assistant" | "form_candidates" | "reference_extract";
 export interface AiLedgerItem {
   call_id: string;
-  run_id: string;
-  external_request_id: string;
+  purpose?: AiCallPurpose;
+  run_id: string | null;
+  external_request_id: string | null;
   model: string;
   created_at: string;
   input_tokens: number | null;
@@ -35,11 +38,13 @@ export interface AiLedgerPage {
   page: number;
   page_size: number;
   summary: AiLedgerSummary;
+  purpose_filter_supported?: boolean;
 }
 export interface AiLedgerQuery {
   page?: number;
   page_size?: number;
   run_id?: string;
+  purpose?: AiCallPurpose;
 }
 
 export interface AiModelPricing {
@@ -77,6 +82,7 @@ export interface AiCostOverview {
   today: AiCostPeriod;
   week: AiCostPeriod;
   month: AiCostPeriod;
+  by_purpose?: { purpose: AiCallPurpose; total: AiCostTotals }[];
 }
 export interface AiCostLedgerPage {
   ledger: AiLedgerPage;

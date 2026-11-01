@@ -31,7 +31,9 @@ it("费用概览保留十进制字符串与未知值，币种与时间范围有�
   const get = vi.fn().mockResolvedValue(value);
   const api = createAiLedgerEndpoints({ get } as unknown as HttpClient);
   expect(await api.costOverview()).toEqual(value);
-  expect(get).toHaveBeenCalledWith("/ai-ledger/cost-overview", undefined);
+  expect(get).toHaveBeenCalledWith("/ai-ledger/cost-overview", {
+    headers: { "x-tsz-ledger-version": "2" }
+  });
   expect(snapshot.paths["/admin/ai-ledger/cost-overview"]).toEqual(["get"]);
   expect(snapshot.paths["/admin/ai-ledger/costs"]).toEqual(["get"]);
   for (const invalid of [
@@ -44,6 +46,52 @@ it("费用概览保留十进制字符串与未知值，币种与时间范围有�
       "AI 账本响应不符合接口契约"
     );
   }
+});
+
+it("旧后端未声明用途筛选时不发送未知查询字段", async () => {
+  const value = {
+    ledger: {
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 20,
+      summary: {
+        observed_calls: 0,
+        usage_observed_calls: 0,
+        cache_observed_calls: 0,
+        input_tokens: null,
+        output_tokens: null,
+        cache_hit_tokens: null,
+        cache_miss_tokens: null,
+        cache_hit_rate: null,
+        total_duration_ms: null,
+        average_duration_ms: null
+      }
+    },
+    costs: [],
+    cost_summary: {
+      estimated_cost_cny: "0",
+      total_calls: 0,
+      priced_calls: 0,
+      unknown_calls: 0
+    }
+  };
+  const get = vi.fn().mockResolvedValue(value);
+  const api = createAiLedgerEndpoints({ get } as unknown as HttpClient);
+  await expect(api.costs({ purpose: "assistant" })).rejects.toThrow(
+    "当前服务不支持用途筛选"
+  );
+  expect(get).toHaveBeenCalledExactlyOnceWith("/ai-ledger/costs", {
+    headers: { "x-tsz-ledger-version": "2" }
+  });
+  get.mockResolvedValue({
+    ...value,
+    ledger: { ...value.ledger, purpose_filter_supported: true }
+  });
+  await api.costs({ purpose: "assistant" });
+  expect(get).toHaveBeenLastCalledWith("/ai-ledger/costs?purpose=assistant", {
+    headers: { "x-tsz-ledger-version": "2" }
+  });
 });
 
 it("AI 账本路径与权威契约一致，保留未知值并拒绝不完整或多余字段", async () => {
@@ -74,7 +122,7 @@ it("AI 账本路径与权威契约一致，保留未知值并拒绝不完整或�
   ).toEqual(value);
   expect(get).toHaveBeenCalledExactlyOnceWith(
     `/ai-ledger?page=1&page_size=20&run_id=${runId}`,
-    { signal }
+    { signal, headers: { "x-tsz-ledger-version": "2" } }
   );
   expect(snapshot.paths["/admin/ai-ledger"]).toEqual(["get"]);
   for (const invalid of [

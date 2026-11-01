@@ -14,7 +14,10 @@ import {
 import { ReloadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { api, useAuthStore } from "@/lib/auth";
-import { formatEstimatedCost } from "@/features/ai-ledger/cost";
+import {
+  callPurposeLabels,
+  formatEstimatedCost
+} from "@/features/ai-ledger/cost";
 
 export function AiCostOverview() {
   const profile = useAuthStore((state) => state.profile);
@@ -105,6 +108,20 @@ function CostOverview({ adminId }: { adminId: string }) {
               );
             })}
           </Row>
+          {data?.by_purpose && (
+            <Space wrap style={{ marginTop: 12 }}>
+              {data.by_purpose.map(({ purpose, total }) => (
+                <Typography.Text key={purpose} type="secondary">
+                  {callPurposeLabels[purpose]}：
+                  {formatEstimatedCost(total.estimated_cost_cny)} ·{" "}
+                  {total.total_calls} 次
+                  {total.unknown_calls
+                    ? `（${total.unknown_calls} 次费用未知）`
+                    : ""}
+                </Typography.Text>
+              ))}
+            </Space>
+          )}
           <Typography.Paragraph
             type="secondary"
             style={{ fontSize: 12, margin: "12px 0 0" }}

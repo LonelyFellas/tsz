@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-01",
+  "scope": "P1/P4 fixes; local working trees; no commit, push, PR, merge or deployment",
+  "branch": "codex/lexicon-assistant-p1",
+  "heads": {
+    "frontend": "ee179ef6f42cba016ec4ff6fcd9423c870d1c611",
+    "backend": "38be4d370f9b5d2e9fa7130465e52187377d31e5",
+    "agent": "35ed227aeda68c73734ba0fae55dc31a0bda2dfb"
+  },
+  "source_state": "HEAD plus modified and untracked task files",
+  "contracts": {
+    "rust_openapi_sha256": "0e973ef8589c40bc14ce51f0df0a178ad7af6e5d6b67cadbf9605b962a33ce78",
+    "agent_openapi_sha256": "77a9aa647895871ff62e884166f68663bc9be61f4377559c49fd1492f6131dda",
+    "frontend_snapshot_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-assistant-p1/docs/openapi.json",
+    "runtime_bundle_source_hash_matches": true,
+    "agent_export_check": "passed"
+  },
+  "checks": {
+    "api_client": { "files": 36, "passed": 668 },
+    "admin_wizard_and_layout": { "files": 2, "passed": 145 },
+    "admin_assistant_and_navigation_final": { "files": 2, "passed": 9 },
+    "admin_assistant_ledger_dashboard_prior": { "files": 4, "passed": 13 },
+    "frontend_workspace_typecheck": "passed; seven tasks",
+    "admin_final_typecheck": "passed",
+    "admin_production_build": "passed",
+    "admin_affected_eslint": "passed",
+    "frontend_format": "passed",
+    "rust_assistant_integration": { "passed": 9 },
+    "rust_final_dual_spelling_regression": { "passed": 1 },
+    "rust_ledger_integration": { "passed": 3 },
+    "rust_assistant_unit": { "passed": 4 },
+    "rust_clippy_all_targets_all_features": "passed; warnings denied",
+    "rust_fmt": "passed",
+    "agent_full": { "passed": 226, "skipped": 4 },
+    "agent_final_assistant_candidates": { "passed": 22 },
+    "agent_ruff_format_mypy_build": "passed",
+    "agent_rules_in_built_wheel": true,
+    "git_diff_check_all_repositories": "passed"
+  },
+  "real_acceptance": {
+    "environment": "new dedicated PostgreSQL 16 and Redis containers, current task Rust/Agent, Admin Vite same-origin proxy; mocks disabled",
+    "paid_provider": "actual DeepSeek; two question responses",
+    "provider_input_output_tokens": [
+      [1406, 199],
+      [1781, 261]
+    ],
+    "provider_duration_ms": [2110, 2270],
+    "rounds": "one model call, no tool round for each observed question",
+    "unsaved_snapshot_recognized": true,
+    "semantic_group_issue_observed": true,
+    "initial_headword_tomorrow_observed": true,
+    "field_reference_click_navigated_to_meanings": true,
+    "model_receipts_persisted": true,
+    "ledger_rows_display_service_calls_without_run": true,
+    "ledger_purpose_filter": "four records to three assistant records; totals updated",
+    "unknown_cost_display": "unknown, never zero",
+    "synthetic_ledger_receipts": "separate test fixtures; displayed values are not all real provider spend",
+    "canonical_word_revision_before_after": [1, 1],
+    "canonical_content_nodes_before_after": [0, 0],
+    "desktop_screenshot": "p1-ledger-desktop.jpg",
+    "mobile_screenshot": "p1-ledger-mobile.jpg",
+    "mobile_viewport_width": 375,
+    "mobile_document_width": 375
+  },
+  "migration": {
+    "upgrade_empty_isolated_database_to_0007": "passed",
+    "ready_on_0007": "passed",
+    "downgrade_with_service_receipts": "refused as expected: assistant call receipts exist; preserve them before rollback",
+    "revision_after_refused_downgrade": "0007",
+    "empty_0007_to_0006_roundtrip": "passed during PR preparation in a new PostgreSQL 18 database; alembic check reported no drift"
+  },
+  "limitations": [
+    "The later fifteen-question benchmark and rules-v3 targeted rechecks are recorded separately in p1-benchmark.json; this file preserves the initial fix verification.",
+    "Shared pure local publish checks are used; cross-entry publication/reference checks remain with actual publish validation.",
+    "Three-second permission throttling has implementation and final authorization regression, but no query-count/time-control benchmark.",
+    "Mixed-version request compatibility is covered by capability and legacy-shape tests; no deployed old/new release matrix was exercised.",
+    "The two real model questions used a dedicated empty draft; no broad dictionary coverage or model-answer quality claim.",
+    "P2 reference extraction and P3 reference/dictionary-based candidates, meaning import and sentence reuse remain out of scope."
+  ],
+  "cleanup": {
+    "run": "tsz-p1-fix-20261101",
+    "preview_services_stopped": true,
+    "dedicated_containers_removed": [
+      "tsz-p1-fix-20261101-pg",
+      "tsz-p1-fix-20261101-redis"
+    ],
+    "dedicated_postgres_anonymous_volume_removed": true,
+    "temporary_database_accounts_entries_sessions_and_receipts_removed_with_volume": true,
+    "browser_local_storage": 0,
+    "browser_session_storage": 0,
+    "browser_cache_names": [],
+    "private_credentials_and_raw_responses_removed": true,
+    "temporary_scripts_and_launch_entries_removed": true,
+    "accidental_container_level_openapi_export_removed": true,
+    "oss_created": false,
+    "independent_no_container_or_listener_check": "passed",
+    "existing_task_and_retained_user_preview_containers_preserved": true,
+    "retained_user_admin_listener_62487": "still running"
+  }
+}

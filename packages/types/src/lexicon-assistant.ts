@@ -1,4 +1,8 @@
 import type { WordCreationStep } from "./admin-word-v2";
+import type {
+  DraftMeaningsStepContentWritableV3,
+  FormsStepRepresentationV3
+} from "./admin-word-v3";
 
 export interface LexiconAssistantHistory {
   role: "user" | "assistant";
@@ -14,6 +18,14 @@ export interface LexiconAssistantInput {
   context_truncated: boolean;
   question: string;
   history: LexiconAssistantHistory[];
+  /** Structured unsaved content; the server validates it with publish rules. */
+  draft?: LexiconAssistantDraft;
+  extensions?: boolean;
+}
+
+export interface LexiconAssistantDraft {
+  forms: FormsStepRepresentationV3;
+  meanings: DraftMeaningsStepContentWritableV3;
 }
 
 export interface LexiconAssistantSource {
@@ -39,10 +51,13 @@ export interface LexiconAssistantResponse {
   sources: LexiconAssistantSource[];
   usage: LexiconAssistantUsage;
   requires_human_review: boolean;
+  context_summary?: string;
+  field_refs?: { path: string; label: string }[];
 }
 
 export interface LexiconAssistantCapability {
   available: boolean;
+  features?: { structured_draft: boolean; history_summary: boolean };
 }
 
 export interface LexiconFormCandidatesInput {

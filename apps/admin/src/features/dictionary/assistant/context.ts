@@ -6,6 +6,12 @@ import type {
   WordCreationStep
 } from "@tsz/types";
 import { expandFormContents } from "@tsz/shared";
+import {
+  dropEmptySentenceTranslations,
+  stripBlankRelations,
+  prepareTextLinksForSave,
+  stripSenseComponentUsages
+} from "../word-creation-v3/meaningsModel";
 
 export interface AssistantEditorContext {
   word: AdminWordV3;
@@ -15,6 +21,7 @@ export interface AssistantEditorContext {
   dirtySteps: Readonly<{ forms: boolean; meanings: boolean }>;
   progress: readonly { label: string; completed: boolean }[];
   catalog?: PartOfSpeechCatalogResponse;
+  navigateField?: (path: string) => void;
   applyForms?: (
     forms: FormsStepRepresentationV3,
     expectedSnapshot: string
@@ -68,6 +75,25 @@ export function assistantSnapshot(context: AssistantEditorContext) {
   return {
     local_content,
     context_truncated: characters.length > 24000,
-    fingerprint: `${word.revision}:${step}:${local_content}`
+    // Same shapes the step saves send; the server strips internal fields for the model.
+    draft: {
+      forms,
+      meanings: prepareTextLinksForSave(
+        stripBlankRelations(
+          dropEmptySentenceTranslations(
+            word.capabilities.sense_component_usages === true
+              ? meanings
+              : stripSenseComponentUsages(meanings)
+          )
+        ),
+        word.capabilities.text_links === true
+      )
+    },
+    fingerprint: JSON.stringify({
+      revision: word.revision,
+      step,
+      forms,
+      meanings
+    })
   };
 }
