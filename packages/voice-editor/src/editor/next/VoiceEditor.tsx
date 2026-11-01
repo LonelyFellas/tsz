@@ -169,6 +169,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   renderReadingPicker,
   onAssociationPendingChange,
   renderActions,
+  speechCapabilities,
+  onValidationChange,
   language = "en",
   contextLabel = "语音编辑器",
   previewAdapter,
@@ -277,6 +279,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [spellingNotice, setSpellingNotice] = useState("");
   const [readingKind, setReadingKind] = useState("characters");
   const [readingAlias, setReadingAlias] = useState("");
+  const [phonemeAlphabet, setPhonemeAlphabet] = useState<"ipa" | "ups">("ipa");
+  const [phonemeText, setPhonemeText] = useState("");
   const [caretPosition, setCaretPosition] = useState<number>();
   const [pauseGap, setPauseGap] = useState<number>();
   const [pendingConflict, setPendingConflict] = useState<
@@ -1260,6 +1264,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         changeBrush({ kind: "association", targetKind });
       return;
     }
+    if (key === "phoneme") {
+      const existing = marks.passthrough.find(
+        (mark) =>
+          mark.type === "phoneme" &&
+          textSelection &&
+          mark.start === textSelection.start &&
+          mark.end === textSelection.end
+      );
+      setPhonemeAlphabet(
+        existing?.type === "phoneme" ? existing.alphabet : "ipa"
+      );
+      setPhonemeText(existing?.type === "phoneme" ? existing.phoneme : "");
+      setOpenTool(key);
+      return;
+    }
     if (key === "text") {
       setOpenTool(undefined);
       changeBrush({ kind: "none" });
@@ -1914,7 +1933,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const requestPause = (gap: number, durationMs: number) => {
-    if (readOnly) return;
+    if (readOnly || speechCapabilities?.supportsPause === false) return;
     const links = marks.liaisons.flatMap((link, index) =>
       crossesGap(link, gap) ? [index] : []
     );
@@ -1972,7 +1991,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const applyPause = (durationMs: number) => {
-    if (readOnly || !pauseActive) return;
+    if (readOnly || !pauseActive || speechCapabilities?.supportsPause === false)
+      return;
     if (brush.kind === "pause" || pauseGap === undefined) {
       changeBrush({ kind: "pause", durationMs });
       setOpenTool(undefined);
@@ -2108,20 +2128,24 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const clearAll = () => {
-    // 历史音标、高亮原样保留；文本格式是本编辑器设置的视觉标注，随其他标注清空。
+    // 正文编辑保留历史音标；试听模式明确清除本次标注和临时读法关联。
     commit((current) => ({
       ...current,
+      ...(mode === "voice-trial" ? { readingLinks: [] } : {}),
       marks: {
         ...current.marks,
         roles: [],
         liaisons: [],
         pauses: {},
-        passthrough: current.marks.passthrough.filter(
-          (annotation) =>
-            annotation.type !== "italic" &&
-            annotation.type !== "bold" &&
-            annotation.type !== "underline"
-        )
+        passthrough:
+          mode === "voice-trial"
+            ? []
+            : current.marks.passthrough.filter(
+                (annotation) =>
+                  annotation.type !== "italic" &&
+                  annotation.type !== "bold" &&
+                  annotation.type !== "underline"
+              )
       }
     }));
     resetDraft();
@@ -2415,14 +2439,147 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     speechLinks.find((link) =>
       rangesOverlap(link.source_segments, [readingSegment])
     );
+  const speechRangeOverlaps = (
+    mark: RichTextV2["annotations"][number],
+    range: { start: number; end: number }
+  ) =>
+    (mark.type === "phoneme" ||
+      mark.type === "say_as" ||
+      mark.type === "sub") &&
+    mark.start < range.end &&
+    mark.end > range.start;
+  const withoutReadingLinks = (
+    current: EditorSnapshot<TLink>,
+    range: { start: number; end: number }
+  ) =>
+    mode === "voice-trial"
+      ? (current.readingLinks ?? []).filter(
+          (link) =>
+            !link.source_segments.some(
+              (segment) =>
+                segment.start < range.end && segment.end > range.start
+            )
+        )
+      : current.readingLinks;
   const tools = [
+    ...(mode === "voice-trial"
+      ? [
+          {
+            key: "phoneme",
+            label: "输入音标",
+            disabled:
+              !textSelection || speechCapabilities?.supportsPhoneme === false,
+            disabledReason:
+              speechCapabilities?.supportsPhoneme === false
+                ? "当前音色暂未开放指定音标"
+                : undefined,
+            content: (
+              <Space orientation="vertical" size={8}>
+                <Select
+                  aria-label="标音系统"
+                  value={phonemeAlphabet}
+                  options={[
+                    { value: "ipa", label: "IPA · 国际音标" },
+                    { value: "ups", label: "UPS · 通用音素集" }
+                  ]}
+                  onChange={setPhonemeAlphabet}
+                />
+                <Input.TextArea
+                  aria-label="指定音标"
+                  value={phonemeText}
+                  onChange={(event) => setPhonemeText(event.target.value)}
+                  autoSize={{ minRows: 2, maxRows: 5 }}
+                />
+                <Space>
+                  <Button
+                    disabled={
+                      readOnly ||
+                      !textSelection ||
+                      !phonemeText.trim() ||
+                      speechCapabilities?.supportsPhoneme === false
+                    }
+                    onClick={() => {
+                      if (
+                        !textSelection ||
+                        speechCapabilities?.supportsPhoneme === false
+                      )
+                        return;
+                      const range = { ...textSelection };
+                      const nextMarks = {
+                        ...marks,
+                        passthrough: [
+                          ...marks.passthrough.filter(
+                            (mark) => !speechRangeOverlaps(mark, range)
+                          ),
+                          {
+                            type: "phoneme" as const,
+                            ...range,
+                            alphabet: phonemeAlphabet,
+                            phoneme: phonemeText.trim()
+                          }
+                        ]
+                      };
+                      const issue = validateRichTextV2({
+                        version: 2,
+                        text,
+                        annotations: marksToAnnotations(text, nextMarks)
+                      })[0];
+                      if (issue) {
+                        setValidationMessage(issue.message);
+                        return;
+                      }
+                      commit((current) => ({
+                        ...current,
+                        marks: nextMarks,
+                        readingLinks: withoutReadingLinks(current, range)
+                      }));
+                      setValidationMessage("");
+                      setOpenTool(undefined);
+                    }}
+                  >
+                    应用音标
+                  </Button>
+                  <Button
+                    disabled={readOnly || !textSelection}
+                    onClick={() => {
+                      if (!textSelection) return;
+                      commit((current) => ({
+                        ...current,
+                        marks: {
+                          ...current.marks,
+                          passthrough: current.marks.passthrough.filter(
+                            (mark) =>
+                              mark.type !== "phoneme" ||
+                              !speechRangeOverlaps(mark, textSelection)
+                          )
+                        }
+                      }));
+                      setValidationMessage("");
+                      setOpenTool(undefined);
+                    }}
+                  >
+                    删除音标
+                  </Button>
+                </Space>
+              </Space>
+            )
+          }
+        ]
+      : []),
     ...(renderReadingPicker
       ? [
           {
             key: "reading-link",
             label: "关联单词读法",
             icon: <LinkOutlined aria-hidden />,
-            disabled: readOnly || !readingSegment,
+            disabled:
+              readOnly ||
+              !readingSegment ||
+              speechCapabilities?.supportsPhoneme === false,
+            disabledReason:
+              speechCapabilities?.supportsPhoneme === false
+                ? "当前音色暂未开放关联单词读法"
+                : undefined,
             content:
               readingSegment && openTool === "reading-link"
                 ? renderReadingPicker({
@@ -2437,9 +2594,26 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                       setAssociationDraftPending(false);
                     },
                     onSelect: (next) => {
-                      if (readOnly) return;
+                      if (
+                        readOnly ||
+                        speechCapabilities?.supportsPhoneme === false
+                      )
+                        return;
                       commit((current) => ({
                         ...current,
+                        ...(mode === "voice-trial" && next
+                          ? {
+                              marks: {
+                                ...current.marks,
+                                passthrough: current.marks.passthrough.filter(
+                                  (mark) =>
+                                    !next.source_segments.some((segment) =>
+                                      speechRangeOverlaps(mark, segment)
+                                    )
+                                )
+                              }
+                            }
+                          : {}),
                         readingLinks: [
                           ...(current.readingLinks ?? []).filter(
                             (link) => link.id !== selectedReading?.id
@@ -2457,7 +2631,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       key: "reading",
       label: "特殊读法",
       icon: <SoundOutlined aria-hidden />,
-      disabled: readOnly || !textSelection,
+      disabled:
+        readOnly ||
+        !textSelection ||
+        (speechCapabilities?.supportsSayAs === false &&
+          speechCapabilities?.supportsSub === false),
+      disabledReason:
+        speechCapabilities?.supportsSayAs === false &&
+        speechCapabilities?.supportsSub === false
+          ? "当前音色暂未开放特殊读法"
+          : undefined,
       content: (
         <Space orientation="vertical" size={8}>
           <Select
@@ -2465,14 +2648,46 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             value={readingKind}
             onChange={setReadingKind}
             options={[
-              { value: "characters", label: "逐字母" },
-              { value: "cardinal", label: "基数" },
-              { value: "ordinal", label: "序数" },
-              { value: "digits", label: "逐位数字" },
-              { value: "date", label: "日期" },
-              { value: "time", label: "时间" },
-              { value: "telephone", label: "电话号码" },
-              { value: "sub", label: "替换文字读" }
+              {
+                value: "characters",
+                disabled: speechCapabilities?.supportsSayAs === false,
+                label: "逐字母"
+              },
+              {
+                value: "cardinal",
+                disabled: speechCapabilities?.supportsSayAs === false,
+                label: "基数"
+              },
+              {
+                value: "ordinal",
+                disabled: speechCapabilities?.supportsSayAs === false,
+                label: "序数"
+              },
+              {
+                value: "digits",
+                disabled: speechCapabilities?.supportsSayAs === false,
+                label: "逐位数字"
+              },
+              {
+                value: "date",
+                disabled: speechCapabilities?.supportsSayAs === false,
+                label: "日期"
+              },
+              {
+                value: "time",
+                disabled: speechCapabilities?.supportsSayAs === false,
+                label: "时间"
+              },
+              {
+                value: "telephone",
+                disabled: speechCapabilities?.supportsSayAs === false,
+                label: "电话号码"
+              },
+              {
+                value: "sub",
+                disabled: speechCapabilities?.supportsSub === false,
+                label: "替换文字读"
+              }
             ]}
           />
           {readingKind === "sub" && (
@@ -2487,10 +2702,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             disabled={
               !textSelection ||
               readOnly ||
-              (readingKind === "sub" && !readingAlias.trim())
+              (readingKind === "sub"
+                ? !readingAlias.trim() ||
+                  speechCapabilities?.supportsSub === false
+                : speechCapabilities?.supportsSayAs === false)
             }
             onClick={() => {
-              if (!textSelection) return;
+              if (
+                !textSelection ||
+                (readingKind === "sub"
+                  ? speechCapabilities?.supportsSub === false
+                  : speechCapabilities?.supportsSayAs === false)
+              )
+                return;
               const range = { ...textSelection };
               const annotation =
                 readingKind === "sub"
@@ -2502,12 +2726,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     };
               commit((current) => ({
                 ...current,
+                readingLinks: withoutReadingLinks(current, range),
                 marks: {
                   ...current.marks,
                   passthrough: [
                     ...current.marks.passthrough.filter(
                       (mark) =>
-                        !(mark.type === "say_as" || mark.type === "sub") ||
+                        !(
+                          mark.type === "say_as" ||
+                          mark.type === "sub" ||
+                          (mode === "voice-trial" && mark.type === "phoneme")
+                        ) ||
                         mark.end <= range.start ||
                         mark.start >= range.end
                     ),
@@ -2720,7 +2949,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         brush.kind === "pause" ? formatPauseLabel(pauseDuration) : undefined,
       className: "tsz-ve-pause-button",
       active: pauseActive,
-      disabled: tokens.length < 2,
+      disabled:
+        tokens.length < 2 || speechCapabilities?.supportsPause === false,
+      disabledReason:
+        speechCapabilities?.supportsPause === false
+          ? "当前音色暂未开放停顿"
+          : undefined,
       placement: "topLeft" as const,
       stayOpen: true,
       content: (
@@ -3027,6 +3261,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       )
     }
   ].filter((tool) => {
+    if (mode === "voice-trial")
+      return ["phoneme", "reading-link", "reading", "pause"].includes(tool.key);
     if (contentReadOnly) return tool.key === "roles" || tool.key === "text";
     if (textReadOnly && tool.key === "text") return false;
     // 字典音标只负责喂语音合成，连读是展示用的标注，归实际发音那一侧。
@@ -3172,6 +3408,35 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       />
     ) : undefined;
 
+  const unsupportedSpeech =
+    workingValue.annotations.some(
+      (mark) =>
+        (mark.type === "phoneme" &&
+          speechCapabilities?.supportsPhoneme === false) ||
+        (mark.type === "pause" &&
+          speechCapabilities?.supportsPause === false) ||
+        (mark.type === "say_as" &&
+          speechCapabilities?.supportsSayAs === false) ||
+        (mark.type === "sub" && speechCapabilities?.supportsSub === false)
+    ) ||
+    (speechLinks.length > 0 && speechCapabilities?.supportsPhoneme === false);
+  const editorReady =
+    !blockingError &&
+    !unsupportedSpeech &&
+    pendingText === undefined &&
+    !pendingConflict &&
+    conflictCount === 0 &&
+    !associationPickerOpen &&
+    !associationDraftPending &&
+    linkWords.length === 0 &&
+    !draft.start &&
+    !draft.end &&
+    !generatingVersion &&
+    !pendingUploads.some((item) => !item.error);
+  useEffect(
+    () => onValidationChange?.(editorReady),
+    [editorReady, onValidationChange]
+  );
   if (mode === "synthesis") {
     return (
       <section
@@ -3339,6 +3604,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       )}
       {spellingNotice && <Alert type="info" title={spellingNotice} showIcon />}
       {blockingError && <Alert type="error" title={blockingError} showIcon />}
+      {unsupportedSpeech && (
+        <Alert
+          type="warning"
+          title="当前音色暂未开放已有的发音标注，请清空标注或选择支持的音色。"
+          showIcon
+        />
+      )}
       {linkNotice && <Alert type="warning" title={linkNotice} showIcon />}
 
       <div className="tsz-ve-badge-row">
@@ -3369,7 +3641,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         associationContent={associationContent || undefined}
         associationAnchor={linkAnchor}
         selectedLinkRanges={selectedLink?.source_segments ?? linkSegments}
-        linkedRanges={links.flatMap((link) => link.source_segments)}
+        linkedRanges={(mode === "voice-trial" ? speechLinks : links).flatMap(
+          (link) => link.source_segments
+        )}
         onWordRange={selectWord}
         text={text}
         marks={marks}

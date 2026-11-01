@@ -111,6 +111,15 @@ const GROUPS: Group[] = [
     ]
   },
   {
+    key: "grp-voices",
+    icon: <SoundOutlined />,
+    label: "配音中心",
+    leaves: [
+      pageLeaf(ADMIN_PAGE_ROUTES.voices, "分组配音"),
+      pageLeaf(ADMIN_PAGE_ROUTES.voiceLibrary, "音色库")
+    ]
+  },
+  {
     key: "grp-sentences",
     icon: <ReadOutlined />,
     label: "例句管理",
@@ -203,16 +212,6 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
     if (children.length > 0) {
       items.push({ key: g.key, icon: g.icon, label: g.label, children });
     }
-    if (
-      g.key === "grp-dict" &&
-      visible(pageLeaf(ADMIN_PAGE_ROUTES.voices, "配音中心"))
-    ) {
-      items.push({
-        key: `/${ADMIN_PAGE_ROUTES.voices.path}`,
-        icon: <SoundOutlined />,
-        label: "配音中心"
-      });
-    }
   }
   return items;
 }
@@ -277,8 +276,8 @@ export function ConsoleSidebar({
         mode="inline"
         inlineCollapsed={collapsed}
         selectedKeys={[selectedKey]}
-        // 分类分组默认收起（不设 defaultOpenKeys）：初始只见顶层分类，按需点开。
-        // 收起态下 antd 改用悬浮弹层展示子菜单，不受此影响。
+        // 配音直链展开所属分组，其他分类仍按需点开。
+        defaultOpenKeys={pathname.startsWith("/voices") ? ["grp-voices"] : []}
         onClick={onClick}
         items={nav}
         style={{ borderInlineEnd: 0, flex: 1 }}

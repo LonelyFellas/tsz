@@ -2,6 +2,10 @@ import { matchRoutes } from "react-router-dom";
 import type { AdminProfile } from "@tsz/types";
 import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 
+const voiceRouteHandle = {
+  anyPermission: ["words.access", "sentences.access", "speech.global_dubbing"]
+} as const;
+
 /** Router、直链守卫与已落地菜单共用路径及页面权限。匹配采用 Router 默认语义。 */
 export const ADMIN_PAGE_ROUTES = {
   aiLedger: { path: "ai-ledger", handle: { superOnly: true } },
@@ -25,16 +29,8 @@ export const ADMIN_PAGE_ROUTES = {
     path: "sentences",
     handle: { anyPermission: ["sentences.access", "sentences.read_published"] }
   },
-  voices: {
-    path: "voices",
-    handle: {
-      anyPermission: [
-        "words.access",
-        "sentences.access",
-        "speech.global_dubbing"
-      ]
-    }
-  },
+  voices: { path: "voices", handle: voiceRouteHandle },
+  voiceLibrary: { path: "voices/library", handle: voiceRouteHandle },
   users: { path: "users", handle: { permission: "users.access" } },
   teacherApplications: {
     path: "teacher-applications",

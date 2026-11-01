@@ -27,7 +27,7 @@ export function VoiceRate({
   return (
     <span className="voice-shared-number">
       {((parameters.rate_percent + 100) / 100).toFixed(2)}
-      <span className="voice-shared-times">✗</span>
+      <span className="voice-shared-times">×</span>
     </span>
   );
 }

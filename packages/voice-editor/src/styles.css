@@ -1155,6 +1155,10 @@
   border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
 }
 
+.tsz-ve-reference-audio > input[type="file"][hidden] {
+  display: none;
+}
+
 .tsz-ve-waveform {
   display: block;
   width: 100%;
@@ -1195,4 +1199,11 @@
   .tsz-ve-voice-columns {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.tsz-ve-editor[data-mode="voice-trial"]
+  .tsz-ve-letter.is-speech-mark
+  .tsz-ve-letter-text {
+  text-decoration: underline dotted var(--ant-color-primary, #2053ff);
+  text-underline-offset: 3px;
 }

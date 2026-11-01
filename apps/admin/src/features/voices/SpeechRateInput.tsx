@@ -1,4 +1,12 @@
-import { InputNumber, Select, Space, type InputNumberProps } from "antd";
+import { DownOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Dropdown,
+  InputNumber,
+  Select,
+  Space,
+  type InputNumberProps
+} from "antd";
 
 const presets = [
   -70,
@@ -11,6 +19,7 @@ type Props = Omit<
   InputNumberProps<number>,
   "value" | "onChange" | "min" | "max"
 > & {
+  compact?: boolean;
   value?: number | null;
   min: number;
   max: number;
@@ -18,12 +27,57 @@ type Props = Omit<
 };
 
 export function SpeechRateInput({
+  compact = false,
   value,
   min,
   max,
   onChange,
   ...props
 }: Props) {
+  const input = (
+    <InputNumber<number>
+      {...props}
+      style={compact ? { ...props.style, flex: 1, minWidth: 0 } : props.style}
+      value={
+        value != null && Number.isFinite(value) ? (value + 100) / 100 : null
+      }
+      min={(Math.max(min, -70) + 100) / 100}
+      max={(Math.min(max, 70) + 100) / 100}
+      step={0.05}
+      precision={2}
+      suffix={<span className="voice-shared-times">×</span>}
+      onChange={(rate) =>
+        onChange?.(rate == null ? null : Math.round((rate - 1) * 100))
+      }
+    />
+  );
+  if (compact)
+    return (
+      <Space.Compact style={{ width: "100%" }}>
+        {input}
+        <Dropdown
+          trigger={["click"]}
+          menu={{
+            selectedKeys: [String(value)],
+            style: { maxHeight: 280, overflowY: "auto" },
+            items: presets
+              .filter((percent) => percent >= min && percent <= max)
+              .map((percent) => ({
+                key: String(percent),
+                label: `${((percent + 100) / 100).toFixed(2)}×`
+              })),
+            onClick: ({ key }) => onChange?.(Number(key))
+          }}
+          disabled={props.disabled || min === max}
+        >
+          <Button
+            aria-label="语速常用值"
+            icon={<DownOutlined />}
+            disabled={props.disabled || min === max}
+          />
+        </Dropdown>
+      </Space.Compact>
+    );
   return (
     <Space
       orientation="vertical"
@@ -42,7 +96,7 @@ export function SpeechRateInput({
             label: (
               <span>
                 {((percent + 100) / 100).toFixed(2)}
-                <span className="voice-shared-times">✗</span>
+                <span className="voice-shared-times">×</span>
               </span>
             ),
             disabled: percent < min || percent > max
@@ -53,20 +107,7 @@ export function SpeechRateInput({
         }
         style={{ width: "100%" }}
       />
-      <InputNumber<number>
-        {...props}
-        value={
-          value != null && Number.isFinite(value) ? (value + 100) / 100 : null
-        }
-        min={(Math.max(min, -70) + 100) / 100}
-        max={(Math.min(max, 70) + 100) / 100}
-        step={0.05}
-        precision={2}
-        suffix={<span className="voice-shared-times">✗</span>}
-        onChange={(rate) =>
-          onChange?.(rate == null ? null : Math.round((rate - 1) * 100))
-        }
-      />
+      {input}
     </Space>
   );
 }

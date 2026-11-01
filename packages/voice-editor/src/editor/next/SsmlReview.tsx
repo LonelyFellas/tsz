@@ -15,16 +15,19 @@ export function SsmlReview({
   settings,
   onPlay,
   registerStop,
-  singleVoice
+  singleVoice,
+  expanded
 }: {
   singleVoice?: boolean;
+  expanded?: boolean;
   adapter: VoicePreviewAdapter;
   content: RichTextV2;
   settings: VoiceSetting[];
   onPlay: () => void;
   registerStop?: (stop: () => void) => () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setOpen] = useState(false);
+  const open = expanded ?? internalOpen;
   const [version, setVersion] = useState<string>();
   const selected =
     settings.find((setting) => voiceSettingKey(setting) === version) ??
@@ -121,6 +124,7 @@ export function SsmlReview({
       }
     }
   }
+  if (!open && expanded !== undefined) return null;
   if (!open)
     return (
       <Button size="small" onClick={() => setOpen(true)}>
@@ -167,17 +171,19 @@ export function SsmlReview({
         >
           恢复自动生成
         </Button>
-        <Button
-          size="small"
-          onClick={() => {
-            stop();
-            setManual(false);
-            setRaw("");
-            setOpen(false);
-          }}
-        >
-          收起 SSML
-        </Button>
+        {expanded === undefined && (
+          <Button
+            size="small"
+            onClick={() => {
+              stop();
+              setManual(false);
+              setRaw("");
+              setOpen(false);
+            }}
+          >
+            收起 SSML
+          </Button>
+        )}
       </Space>
       <Input.TextArea
         aria-label="SSML 原文"
@@ -224,7 +230,7 @@ export function SsmlReview({
         </Button>
       </Space>
       <Typography.Text type="secondary">
-        手动 SSML 仅用于本次试听，完成编辑时不写入正文配音配置。
+        手动修改仅用于本次 SSML 试听。
       </Typography.Text>
       {loading && (
         <Typography.Text type="secondary">正在生成 SSML…</Typography.Text>
