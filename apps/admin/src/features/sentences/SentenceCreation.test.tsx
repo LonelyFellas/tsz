@@ -531,8 +531,13 @@ describe("按词条关联反查共享多维例句", () => {
     expect(screen.getByLabelText("例句正文")).toHaveValue(
       "We make up stories."
     );
+    // 宿主错误可先显示，外层保存仍未结束；等待编辑器恢复可重试状态。
+    await waitFor(() =>
+      expect(screen.queryByText("正在保存修改…")).not.toBeInTheDocument()
+    );
     fireEvent.click(save);
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+    expect(api.sentences.create).toHaveBeenCalledTimes(2);
     const [first, retry] = vi.mocked(api.sentences.create).mock.calls;
     expect(first![0]).toEqual(retry![0]);
     expect(first![0]).not.toHaveProperty("source_entry_id");
