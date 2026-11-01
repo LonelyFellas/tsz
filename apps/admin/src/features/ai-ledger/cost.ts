@@ -1,3 +1,10 @@
+export const callPurposeLabels = {
+  question_generation: "命题",
+  assistant: "词库问答",
+  form_candidates: "词形候选",
+  reference_extract: "参考整理"
+} as const;
+
 /** Format decimal wire amounts without binary floating-point rounding or hiding tiny costs. */
 export function formatEstimatedCost(value: string | null | undefined): string {
   if (value == null || !/^\d+(\.\d+)?$/.test(value)) return "未知";

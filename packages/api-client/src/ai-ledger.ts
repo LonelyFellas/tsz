@@ -23,7 +23,7 @@ export function createAiLedgerEndpoints(http: HttpClient) {
     }
     const result = await http.get<unknown>(
       `${path}${params.size ? `?${params}` : ""}`,
-      options
+      { ...options, headers: { "x-tsz-ledger-version": "2" } }
     );
     if (!validateRuntimeSchema(root, result).valid)
       throw new Error("AI 账本响应不符合接口契约");

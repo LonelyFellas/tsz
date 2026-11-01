@@ -1,3 +1,5 @@
+import { assistantFieldTarget } from "../assistant/fieldNavigation";
+import { LexiconAssistant } from "../assistant/LexiconAssistant";
 import { VoiceSaveContext } from "./voiceSaveContext";
 import { onlyTextAssociationsChanged } from "../contentEditPermissions";
 import { revealTableColumns } from "@/components/useColumnSettings";
@@ -2041,7 +2043,22 @@ function V3WordCreationSession({
     </>
   );
   if (!sessionReadOnly && activeStep === "basics") {
-    return renderedStep;
+    return (
+      <>
+        {renderedStep}
+        <LexiconAssistant
+          context={{
+            word,
+            step: activeStep,
+            forms: draftForms,
+            meanings: draftMeanings,
+            dirtySteps,
+            catalog: partOfSpeechCatalog,
+            progress: []
+          }}
+        />
+      </>
+    );
   }
 
   return (
@@ -2050,6 +2067,14 @@ function V3WordCreationSession({
       word={word}
       partOfSpeechCatalog={partOfSpeechCatalog?.items}
       assistantCatalog={partOfSpeechCatalog}
+      onAssistantNavigate={(path) => {
+        const target = assistantFieldTarget(
+          path,
+          draftFormsRef.current,
+          draftMeaningsRef.current
+        );
+        if (target) void navigateTarget(target);
+      }}
       onAssistantFormsApply={
         contentEditing && !sessionReadOnly
           ? (next, expected) => {

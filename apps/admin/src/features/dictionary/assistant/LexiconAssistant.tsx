@@ -18,7 +18,8 @@ import type { TextAreaRef } from "antd/es/input/TextArea";
 import { HttpError } from "@tsz/api-client";
 import type {
   LexiconAssistantHistory,
-  LexiconAssistantResponse
+  LexiconAssistantResponse,
+  WordCreationStep
 } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { newWordNodeId } from "../word-model/primitives";
@@ -33,7 +34,10 @@ import { FormCandidates } from "./FormCandidates";
 interface Turn {
   id: string;
   question: string;
-  response: Pick<LexiconAssistantResponse, "answer" | "sources">;
+  response: Pick<
+    LexiconAssistantResponse,
+    "answer" | "sources" | "context_summary" | "field_refs"
+  >;
   interrupted?: boolean;
   fingerprint: string;
   step: string;
@@ -51,11 +55,24 @@ function errorMessage(error: unknown): string {
   return "这次未能完成回答，请重试。问题和当前编辑已保留。";
 }
 
-const STARTERS = [
-  "这个步骤应该怎么填写？",
-  "检查当前词条还缺什么",
-  "结合内置词典给我一些填写建议"
-];
+const STARTERS: Record<WordCreationStep, string[]> = {
+  basics: [
+    "这个词应该拆几个词性？",
+    "库里有没有同拼写的词条？",
+    "结合内置词典给我一些填写建议"
+  ],
+  forms: [
+    "检查词形和发音还缺什么",
+    "这些词形的英美拼写和音标对吗？",
+    "库里有没有同拼写的词条？"
+  ],
+  meanings: [
+    "检查词义和例句还缺什么",
+    "义项划分和 CEFR 合理吗？",
+    "结合内置词典看看漏了哪些义项"
+  ],
+  preview: ["发布前还差什么？", "整体检查一遍有没有前后矛盾的地方"]
+};
 
 export function LexiconAssistant({
   context
@@ -66,6 +83,7 @@ export function LexiconAssistant({
   const [availability, setAvailability] = useState<
     "checking" | "ready" | "unavailable"
   >("checking");
+  const [structuredDraft, setStructuredDraft] = useState(false);
   const [question, setQuestion] = useState("");
   const [candidateBusy, setCandidateBusy] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -88,8 +106,10 @@ export function LexiconAssistant({
     setChecking(true);
     try {
       const result = await api.lexiconAssistant.capability(controller.signal);
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted) {
         setAvailability(result.available ? "ready" : "unavailable");
+        setStructuredDraft(result.features?.structured_draft === true);
+      }
     } catch {
       if (!controller.signal.aborted) setAvailability("unavailable");
     } finally {
@@ -156,7 +176,11 @@ export function LexiconAssistant({
         },
         {
           role: "assistant" as const,
-          content: Array.from(turn.response.answer).slice(0, 4000).join("")
+          content: Array.from(
+            `${turn.response.context_summary ? `资料摘要：${turn.response.context_summary}\n` : ""}${turn.response.answer}\n查询依据：${turn.response.sources.map((source) => `${source.label}${source.version ? `（${source.version}）` : ""}`).join("；")}`
+          )
+            .slice(0, 4000)
+            .join("")
         }
       ]);
     try {
@@ -169,7 +193,10 @@ export function LexiconAssistant({
           local_content: captured.local_content,
           context_truncated: captured.context_truncated,
           question: value,
-          history
+          history,
+          ...(structuredDraft
+            ? { draft: captured.draft, extensions: true }
+            : {})
         },
         (event) => {
           if (request.current !== controller || controller.signal.aborted)
@@ -304,7 +331,7 @@ export function LexiconAssistant({
                 }
               />
               <Flex vertical gap={8}>
-                {STARTERS.map((starter) => (
+                {STARTERS[context.step].map((starter) => (
                   <Button
                     key={starter}
                     className="lexicon-assistant-starter"
@@ -336,6 +363,24 @@ export function LexiconAssistant({
                 <Typography.Paragraph className="lexicon-assistant-answer-text">
                   {turn.response.answer}
                 </Typography.Paragraph>
+                {turn.fingerprint === snapshot.fingerprint &&
+                context.navigateField &&
+                turn.response.field_refs?.length ? (
+                  <Space wrap>
+                    {turn.response.field_refs.map((ref) => (
+                      <Button
+                        key={ref.path}
+                        size="small"
+                        onClick={() => {
+                          setOpen(false);
+                          context.navigateField?.(ref.path);
+                        }}
+                      >
+                        定位：{ref.label}
+                      </Button>
+                    ))}
+                  </Space>
+                ) : null}
                 {turn.response.sources.length > 0 && (
                   <details className="lexicon-assistant-sources">
                     <summary>

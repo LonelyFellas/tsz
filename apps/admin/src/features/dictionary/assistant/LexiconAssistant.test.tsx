@@ -12,6 +12,13 @@ import type {
   LexiconAssistantInput,
   LexiconAssistantResponse
 } from "@tsz/types";
+import {
+  dropEmptySentenceTranslations,
+  prepareTextLinksForSave,
+  stripBlankRelations,
+  stripSenseComponentUsages,
+  newSentenceTranslations
+} from "../word-creation-v3/meaningsModel";
 import { formsFixture } from "../word-creation-v3/fixtures";
 import { LexiconAssistant } from "./LexiconAssistant";
 import { assistantSnapshot, type AssistantEditorContext } from "./context";
@@ -113,7 +120,10 @@ async function openAndAsk(question = "请核对这个词义") {
 
 beforeEach(() => {
   requests.askStream.mockReset();
-  requests.capability.mockReset().mockResolvedValue({ available: true });
+  requests.capability.mockReset().mockResolvedValue({
+    available: true,
+    features: { structured_draft: true, history_summary: true }
+  });
 });
 
 describe("词库只读助手", () => {
@@ -162,6 +172,8 @@ describe("词库只读助手", () => {
     await screen.findByText("建议把金融机构和河岸拆分为两个词义。");
     const sent = requests.askStream.mock.calls[0]![0] as LexiconAssistantInput;
     expect(sent.local_content).toContain("unsaved-bank");
+    expect(sent.draft?.forms).toBe(forms);
+    expect(sent.draft?.meanings).toEqual(value.meanings);
     expect(sent.step).toBe("meanings");
     expect(sent.base_revision).toBe(2);
     expect(sent.history).toEqual([]);
@@ -219,6 +231,47 @@ describe("词库只读助手", () => {
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
+  it("旧后端不发送扩展字段，新后端保留资料摘要与字段定位", async () => {
+    requests.capability.mockResolvedValueOnce({ available: true });
+    requests.askStream.mockImplementation(
+      async (input: LexiconAssistantInput) => response(input)
+    );
+    const view = render(surface(context()));
+    await openAndAsk();
+    await screen.findByText("建议把金融机构和河岸拆分为两个词义。");
+    expect(requests.askStream.mock.calls[0]![0]).not.toHaveProperty("draft");
+    expect(requests.askStream.mock.calls[0]![0]).not.toHaveProperty(
+      "extensions"
+    );
+    view.unmount();
+    const value = context();
+    value.navigateField = vi.fn();
+    requests.askStream.mockImplementation(
+      async (input: LexiconAssistantInput) => ({
+        ...response(input),
+        context_summary: "内置词典英音 /bæŋk/",
+        field_refs: [
+          {
+            path: "meanings.pos[0].senses[0].level",
+            label: "名词 · 义项 1 · 等级"
+          }
+        ]
+      })
+    );
+    render(surface(value));
+    await openAndAsk();
+    await screen.findByRole("button", { name: "定位：名词 · 义项 1 · 等级" });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "向词库小精灵提问" }),
+      { target: { value: "那美音呢" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: /发送/ }));
+    await waitFor(() => expect(requests.askStream).toHaveBeenCalledTimes(3));
+    expect(requests.askStream.mock.calls[2]![0].history[1].content).toContain(
+      "内置词典英音 /bæŋk/"
+    );
+  });
+
   it("服务不可用时允许继续编辑并重试连接", async () => {
     requests.capability.mockResolvedValueOnce({ available: false });
     render(surface(context()));
@@ -234,6 +287,61 @@ describe("词库只读助手", () => {
   });
 });
 
+it("助手校验清除空译文录入位并保留实际译文身份", () => {
+  const value = context();
+  let id = 0;
+  const rows = newSentenceTranslations(() => `translation-${++id}`);
+  rows[1]!.content.text = "明天见。";
+  value.meanings = {
+    sense_groups: [],
+    pos: [
+      {
+        pos_id: value.forms.pos[0]!.pos_id,
+        grammar_structures: [],
+        senses: [
+          {
+            id: "sense",
+            sub_pos: "",
+            level: "A1",
+            depends_on_context: false,
+            definitions: [],
+            relations: [],
+            sentences: [
+              {
+                id: "sentence",
+                level: "A1",
+                en_text: {
+                  mode: "unified",
+                  common: {
+                    id: "en",
+                    origin: "manual",
+                    value: {
+                      version: 2,
+                      text: "See you tomorrow.",
+                      annotations: []
+                    }
+                  }
+                },
+                zh_text_id: rows[0]!.id,
+                zh_text: rows[0]!.content,
+                zh_translations: rows,
+                links: []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  const sent =
+    assistantSnapshot(value).draft.meanings.pos[0]!.senses[0]!.sentences[0]!;
+  expect(sent.zh_translations).toEqual([rows[1]]);
+  expect(sent.zh_text_id).toBe(rows[1]!.id);
+  expect(
+    value.meanings.pos[0]!.senses[0]!.sentences[0]!.zh_translations
+  ).toHaveLength(4);
+});
+
 it("上下文去除对象地址和音频资料，超长文本明确标记截断", () => {
   const value = context();
   const projected = assistantSnapshot({
@@ -243,4 +351,22 @@ it("上下文去除对象地址和音频资料，超长文本明确标记截断"
   expect(projected.context_truncated).toBe(true);
   expect(Array.from(projected.local_content)).toHaveLength(24000);
   expect(projected.local_content).not.toContain("created_by");
+  expect(projected.draft.meanings).toEqual(
+    prepareTextLinksForSave(
+      stripBlankRelations(
+        dropEmptySentenceTranslations(stripSenseComponentUsages(value.meanings))
+      ),
+      false
+    )
+  );
+  const changed = assistantSnapshot({
+    ...value,
+    progress: [{ label: "词义".repeat(14000), completed: false }],
+    meanings: {
+      ...value.meanings,
+      sense_groups: [{ id: "group", name_zh: "新内容", name_en: "new" }]
+    }
+  });
+  expect(changed.local_content).toBe(projected.local_content);
+  expect(changed.fingerprint).not.toBe(projected.fingerprint);
 });

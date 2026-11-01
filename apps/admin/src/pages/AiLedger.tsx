@@ -13,6 +13,7 @@ import {
   Popover,
   Progress,
   Result,
+  Select,
   Space,
   Statistic,
   Table,
@@ -22,8 +23,11 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
-import type { AiCallCost, AiLedgerItem } from "@tsz/types";
-import { formatEstimatedCost } from "@/features/ai-ledger/cost";
+import type { AiCallCost, AiCallPurpose, AiLedgerItem } from "@tsz/types";
+import {
+  callPurposeLabels,
+  formatEstimatedCost
+} from "@/features/ai-ledger/cost";
 import { api, useAuthStore, useIsSuperAdmin } from "@/lib/auth";
 import "./ai-ledger.css";
 
@@ -57,6 +61,11 @@ const columns = (
     )
   },
   {
+    title: "用途",
+    width: 100,
+    render: (_, row) => callPurposeLabels[row.purpose ?? "question_generation"]
+  },
+  {
     title: "模型 / 阶段",
     width: 150,
     render: (_, row) => (
@@ -66,7 +75,9 @@ const columns = (
           {row.metrics
             ? row.metrics.phase === "generate"
               ? "生成"
-              : "复查"
+              : row.metrics.phase === "review"
+                ? "复查"
+                : callPurposeLabels[row.metrics.phase]
             : "阶段未记录"}
         </span>
       </div>
@@ -172,15 +183,16 @@ export function AiLedgerPage() {
 }
 
 function Ledger({ adminId }: { adminId: string }) {
-  const [form] = Form.useForm<{ run_id?: string }>();
+  const [form] = Form.useForm<{ run_id?: string; purpose?: AiCallPurpose }>();
+  const [purpose, setPurpose] = useState<AiCallPurpose>();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [runId, setRunId] = useState<string>();
   const ledger = useQuery({
-    queryKey: ["ai-ledger-costs", adminId, page, pageSize, runId],
+    queryKey: ["ai-ledger-costs", adminId, page, pageSize, runId, purpose],
     queryFn: ({ signal }) =>
       api.aiLedger.costs(
-        { page, page_size: pageSize, run_id: runId },
+        { page, page_size: pageSize, run_id: runId, purpose },
         { signal }
       ),
     retry: false,
@@ -300,7 +312,7 @@ function Ledger({ adminId }: { adminId: string }) {
           <div className="ai-ledger-table-title">
             <Typography.Text strong>调用明细</Typography.Text>
             <Typography.Text type="secondary">
-              {runId ? "已按任务筛选" : "全部任务"}
+              {runId || purpose ? "已筛选" : "全部调用"}
             </Typography.Text>
           </div>
           <Form
@@ -308,10 +320,21 @@ function Ledger({ adminId }: { adminId: string }) {
             layout="inline"
             onFinish={(values) => {
               setRunId(values.run_id?.trim() || undefined);
+              setPurpose(values.purpose);
               setPage(1);
             }}
             className="ai-ledger-filter"
           >
+            <Form.Item name="purpose" label="用途">
+              <Select
+                allowClear
+                placeholder="全部用途"
+                style={{ width: 140 }}
+                options={Object.entries(callPurposeLabels).map(
+                  ([value, label]) => ({ value, label })
+                )}
+              />
+            </Form.Item>
             <Form.Item
               name="run_id"
               label="任务 ID"
@@ -337,6 +360,7 @@ function Ledger({ adminId }: { adminId: string }) {
                 onClick={() => {
                   form.resetFields();
                   setRunId(undefined);
+                  setPurpose(undefined);
                   setPage(1);
                 }}
               >
@@ -383,7 +407,9 @@ function Ledger({ adminId }: { adminId: string }) {
                       key: "run",
                       label: "任务 ID",
                       children: (
-                        <Typography.Text copyable>{row.run_id}</Typography.Text>
+                        <Typography.Text copyable={Boolean(row.run_id)}>
+                          {row.run_id ?? "不关联命题任务"}
+                        </Typography.Text>
                       )
                     },
                     {
@@ -391,7 +417,7 @@ function Ledger({ adminId }: { adminId: string }) {
                       label: "委托 ID",
                       children: (
                         <Typography.Text copyable>
-                          {row.external_request_id}
+                          {row.external_request_id ?? "—"}
                         </Typography.Text>
                       )
                     },

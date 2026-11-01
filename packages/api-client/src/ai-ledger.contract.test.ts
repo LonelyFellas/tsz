@@ -31,7 +31,9 @@ it("费用概览保留十进制字符串与未知值，币种与时间范围有�
   const get = vi.fn().mockResolvedValue(value);
   const api = createAiLedgerEndpoints({ get } as unknown as HttpClient);
   expect(await api.costOverview()).toEqual(value);
-  expect(get).toHaveBeenCalledWith("/ai-ledger/cost-overview", undefined);
+  expect(get).toHaveBeenCalledWith("/ai-ledger/cost-overview", {
+    headers: { "x-tsz-ledger-version": "2" }
+  });
   expect(snapshot.paths["/admin/ai-ledger/cost-overview"]).toEqual(["get"]);
   expect(snapshot.paths["/admin/ai-ledger/costs"]).toEqual(["get"]);
   for (const invalid of [
@@ -74,7 +76,7 @@ it("AI 账本路径与权威契约一致，保留未知值并拒绝不完整或�
   ).toEqual(value);
   expect(get).toHaveBeenCalledExactlyOnceWith(
     `/ai-ledger?page=1&page_size=20&run_id=${runId}`,
-    { signal }
+    { signal, headers: { "x-tsz-ledger-version": "2" } }
   );
   expect(snapshot.paths["/admin/ai-ledger"]).toEqual(["get"]);
   for (const invalid of [

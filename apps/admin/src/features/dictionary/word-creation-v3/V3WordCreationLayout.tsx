@@ -48,6 +48,7 @@ interface Props {
   sharedSentenceCount?: number;
   partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
   assistantCatalog?: PartOfSpeechCatalogResponse;
+  onAssistantNavigate?: (path: string) => void;
   onAssistantFormsApply?: (
     forms: FormsStepRepresentationV3,
     expected: string
@@ -159,6 +160,7 @@ function V3WordCreationLayoutContent({
   word,
   partOfSpeechCatalog,
   assistantCatalog,
+  onAssistantNavigate,
   onAssistantFormsApply,
   activeStep,
   reachableSteps,
@@ -437,6 +439,7 @@ function V3WordCreationLayoutContent({
           context={{
             word,
             catalog: assistantCatalog,
+            navigateField: onAssistantNavigate,
             applyForms:
               !readOnly && !conflict && !remoteUpdate && !retrying
                 ? onAssistantFormsApply

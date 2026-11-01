@@ -106,7 +106,10 @@ export function createLexiconAssistantEndpoints(http: HttpClient) {
       ),
     capability: (signal?: AbortSignal) =>
       http
-        .get<unknown>("/lexicon/assistant/capability", { signal })
+        .get<unknown>("/lexicon/assistant/capability", {
+          signal,
+          headers: { "x-tsz-assistant-version": "2" }
+        })
         .then((value) =>
           decode<LexiconAssistantCapability>(
             "LexiconAssistantCapability",

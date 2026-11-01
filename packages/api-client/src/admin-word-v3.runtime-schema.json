@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-readonly-agent-backend/tsz-rust/docs/openapi.json",
-  "_source_sha256": "f9d21f038643428ed14a20ccd2ada3356a928369b13afa3331f089b2374825d1",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-assistant-p1/docs/openapi.json",
+  "_source_sha256": "0e973ef8589c40bc14ce51f0df0a178ad7af6e5d6b67cadbf9605b962a33ce78",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
@@ -532,7 +532,19 @@
       "type": "string",
       "enum": ["response", "error", "cancelled"]
     },
-    "AiCallPhase": { "type": "string", "enum": ["generate", "review"] },
+    "AiCallPhase": {
+      "type": "string",
+      "enum": ["generate", "review", "assistant", "form_candidates"]
+    },
+    "AiCallPurpose": {
+      "type": "string",
+      "enum": [
+        "question_generation",
+        "assistant",
+        "form_candidates",
+        "reference_extract"
+      ]
+    },
     "AiCostCurrency": { "type": "string", "enum": ["CNY"] },
     "AiCostLedgerPage": {
       "type": "object",
@@ -558,6 +570,10 @@
         "month"
       ],
       "properties": {
+        "by_purpose": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/AiPurposeCosts" }
+        },
         "currency": { "$ref": "#/$defs/AiCostCurrency" },
         "generated_at": { "type": "string", "format": "date-time" },
         "month": { "$ref": "#/$defs/AiCostPeriod" },
@@ -624,14 +640,17 @@
         "call_id": { "type": "string", "format": "uuid" },
         "cost": { "type": ["string", "null"] },
         "created_at": { "type": "string", "format": "date-time" },
-        "external_request_id": { "type": "string", "format": "uuid" },
+        "external_request_id": { "type": ["string", "null"], "format": "uuid" },
         "input_tokens": { "type": ["integer", "null"], "minimum": 0 },
         "metrics": {
           "oneOf": [{ "$ref": "#/$defs/AiCallMetrics" }, { "type": "null" }]
         },
         "model": { "type": "string" },
         "output_tokens": { "type": ["integer", "null"], "minimum": 0 },
-        "run_id": { "type": "string", "format": "uuid" }
+        "purpose": {
+          "oneOf": [{ "$ref": "#/$defs/AiCallPurpose" }, { "type": "null" }]
+        },
+        "run_id": { "type": ["string", "null"], "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -703,6 +722,15 @@
       "additionalProperties": false
     },
     "AiPricingTariff": { "type": "string", "enum": ["peak", "off_peak"] },
+    "AiPurposeCosts": {
+      "type": "object",
+      "required": ["purpose", "total"],
+      "properties": {
+        "purpose": { "$ref": "#/$defs/AiCallPurpose" },
+        "total": { "$ref": "#/$defs/AiCostTotals" }
+      },
+      "additionalProperties": false
+    },
     "AssistantCandidateForm": {
       "type": "object",
       "required": ["form_type", "is_regular", "uk", "us"],
@@ -2947,7 +2975,15 @@
     "LexiconAssistantCapability": {
       "type": "object",
       "required": ["available"],
-      "properties": { "available": { "type": "boolean" } },
+      "properties": {
+        "available": { "type": "boolean" },
+        "features": {
+          "oneOf": [
+            { "$ref": "#/$defs/LexiconAssistantFeatureSet" },
+            { "type": "null" }
+          ]
+        }
+      },
       "additionalProperties": false
     },
     "LexiconAssistantEvent": {
@@ -2991,6 +3027,24 @@
         }
       ]
     },
+    "LexiconAssistantFeatureSet": {
+      "type": "object",
+      "required": ["structured_draft", "history_summary"],
+      "properties": {
+        "history_summary": { "type": "boolean" },
+        "structured_draft": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "LexiconAssistantFieldRef": {
+      "type": "object",
+      "required": ["path", "label"],
+      "properties": {
+        "label": { "type": "string" },
+        "path": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "LexiconAssistantResponse": {
       "type": "object",
       "required": [
@@ -3004,7 +3058,12 @@
       "properties": {
         "answer": { "type": "string" },
         "context_id": { "type": "string", "format": "uuid" },
+        "context_summary": { "type": ["string", "null"] },
         "entry_id": { "type": "string", "format": "uuid" },
+        "field_refs": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/LexiconAssistantFieldRef" }
+        },
         "requires_human_review": { "type": "boolean" },
         "sources": {
           "type": "array",
