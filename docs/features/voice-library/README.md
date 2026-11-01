@@ -1233,3 +1233,19 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 候选及正式 HTTPS 鉴权通过：无 Cookie refresh 401 Problem Details、login 200、Secure／HttpOnly／SameSite=Lax／鉴权 Path、refresh 轮换、logout 204 与 Cookie 清除。正式业务验收通过新请求完成独占草稿创建→读取→修改→再次读取，核对 revision、内容与原备注；三份 fixture 的账号身份、专属引用和精确 Redis 键已独立复查无残留，原生 cleanup 全部完成。`.env`、nginx、前端 manifest 指纹和三条预选正常词条摘要前后相同；无新语音／图片测试云对象，本地只读二进制检查的独占容器已删除并复查，两端发布锁均释放。运维备份、可信 source／bundle／plan／state 和审计回执保留。
 - 耗时：二进制制品下载 16.525s、smoke 回执下载 2.381s、上传 13.243s、事务事件跨度 47.577s；停服步骤时间上界 10.032s，不当作精确用户不可用时间。server build=0、local production build=0。真实 API 回退仍未演练；未专项调用词库助手模型，不把部署烟测当该能力完整功能验收。
 - 完整脱敏部署／清理回执沿用原证据目录 `/Users/darwish/.codex/visualizations/2026/10/31/01a1921f-04bc-7d80-99b7-69e1f2f4e4bd/` 下的 `task147-backend-current-deploy-receipt.json`、`task147-backend-current-deploy-cleanup.json`。本节通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 与事件结算且无新增部署后恢复原状态，不修改工作流代码，避免文档触发重复部署。
+
+### 13.25 当前 main 的 Web／Admin 验收与已完成发布复用（2026-11-01）
+
+- 用户本次要求按技能部署当前 main 的 Web／Admin，已部署 API 不重复发布。实际只读核查发现两组件已经完成当前 main `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` 的发布；按 deploy 技能“成功且身份未变的组件不重复发布”复用已完成发布，本次未重新调用 Web／Admin 发布入口、未再次上传或切流。此处记录现场已验收身份，不冒称本轮新发两个组件。
+- GitHub 当前 main 和该 SHA 最新精确 CI [41263640762](https://github.com/LonelyFellas/tsz/actions/runs/41263640762) attempt 1 均核对通过：completed/success，9 项 success、push commitlint 按既有设计 skip。两份唯一 CI 制品均未过期，生产 attempt 均为 1，与服务器 `<release-id>.ci.json` 的 SHA/tree/run/attempt、Node／平台、参数和摘要一致。
+
+| 组件  | 实际 SHA                                   | artifact ID   | 实际制品 SHA256                                                    | 文件数 | 原生 accepted_at（UTC）    |
+| ----- | ------------------------------------------ | ------------- | ------------------------------------------------------------------ | ------ | -------------------------- |
+| Web   | `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` | `13066211248` | `fe3e8ef3009b66424f8aa663f780288d02b9af6968cf17c17729ac726b7ba1de` | 2230   | `2026-11-01T02:34:47.180Z` |
+| Admin | `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` | `13066350958` | `bdb0e86ca9ef70e03f4b496d466098b4b5d9026d3ed8f5c90ddfbb175f56a069` | 148    | `2026-11-01T02:36:14.985Z` |
+
+- 上表 Web accepted 时间为新加坡 2026-11-01 10:34:47，Admin 为 10:36:14；均早于本次复核。两个 current 目录均使用原生 provenance verify 实际重新复算，并与 accepted manifest 和原始 CI 回执匹配。Web production、`NEXT_PUBLIC_SITE_URL=https://test.tianshengzhi.com`；Admin test mode，words／part-of-speech／TTS 三个 mock=false，四个兼容开关=true，CI Node 为 `24.19.0`、Linux/x64，参数保持原包值。
+- 实际已部署 API 已由另一项发布推进到 `38be4d370f9b5d2e9fa7130465e52187377d31e5`；本次没有发布或重启 API。原生 `node deploy/check-api-contract.mjs` 对此 accepted API 的 OpenAPI／运行时快照生成比较通过；独立采集确认 API manifest／磁盘／进程摘要一致，复核前后 API manifest、PID、二进制与 `.env`／nginx 配置指纹完全不变。
+- 必要线上验收全部通过：Web 首页与 Admin 登录页 HTTPS200，两端未登录 API401；Web 当前 slot active、nginx -t 有效，两个前端制品独立复算通过；API／前端事务标记不存在，跨组件及前端发布锁均空闲。不把 HTTP 和制品复核当作完整新功能或模型调用验收；本轮未新增浏览器登录，也未执行云合成或业务保存。
+- 清理：本轮未创建 fixture、业务记录、云语音／图片对象或新发布 stage／事务；契约检查的临时目录由原生 finally 删除，自己的本地查询临时文件已清理，无本轮测试资源残留。保留既有正常 release、恢复版本、运维备份和发布审计，不清理他方事务。下载／上传／发布耗时不适用，本次无重复传包或发布；local production build=0、server build=0。
+- 同一脱敏证据目录下 `task147-front-main-deploy-receipt.json`、`task147-front-main-final.json`、`task147-front-main-cleanup.json` 保存实际版本、制品、参数、HTTP／服务、配置与清理结果。本节按用户后续授权通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 完成、事件结算且无新增部署后恢复原 active 状态，不修改工作流代码；没有回写禅道。
