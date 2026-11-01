@@ -108,12 +108,10 @@ function PronunciationCell({
             />
             {actualPron.text.trim() ? (
               <span
-                className="v3-overview-phonetic tsz-phonetics"
+                className={`v3-overview-phonetic tsz-phonetics${addSlashes ? " has-slashes" : ""}`}
                 title={actualPron.text}
               >
-                {addSlashes ? "/" : null}
                 <RichTextReadOnly value={actualPron} />
-                {addSlashes ? "/" : null}
               </span>
             ) : (
               <Typography.Text type="secondary">未填写</Typography.Text>
@@ -189,7 +187,7 @@ export function V3FormContentOverview({
         pagination={false}
         rowKey="key"
         tableLayout="fixed"
-        scroll={{ x: 840 }}
+        scroll={{ x: 1000 }}
         rowHoverable={false}
         dataSource={readings}
         onRow={(row) => ({
@@ -367,6 +365,7 @@ export function V3FormContentOverview({
           {
             title: <Space>实际发音{copy && <V3FormCopyHelp />}</Space>,
             key: "pronunciation",
+            width: 200,
             onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
             render: (_, row) => (
               <div className="v3-form-copy-content">
