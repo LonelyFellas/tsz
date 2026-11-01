@@ -108,6 +108,122 @@ function speech(text: string, voice: VoiceProfileV3) {
 }
 
 describe("词形内容定向复制", () => {
+  it("拼写来源缺少独立音色时不复制残留读法profile", () => {
+    const { forms, sourceId, targetId } = setup();
+    const source = variant(forms.contents[0]!).pronunciations[0]!;
+    source.synthesis = {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      use_spelling: true
+    };
+    source.voice_profile = profile("stale-row");
+    const original = structuredClone(forms);
+    expect(() =>
+      applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
+    ).toThrow("未配置");
+    expect(forms).toEqual(original);
+  });
+
+  it("单侧复制到未配置的拼写来源，不将跳过侧的残留读法profile启用", () => {
+    const { forms, sourceId, targetId } = setup();
+    variant(forms.contents[0]!).pronunciations[0]!.voice_profile =
+      profile("new-uk");
+    const to = variant(forms.contents[1]!);
+    const target = to.pronunciations[0]!;
+    target.synthesis = {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      use_spelling: true
+    };
+    target.voice_profile = profile("stale-us");
+    target.voice_profile.voices.forEach((voice) => {
+      voice.locale = "en-US";
+    });
+    const next = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "voices", {
+        us: { [target.id]: null }
+      })
+    );
+    expect(
+      variant(next.contents[1]!).spelling_speech!.voice_profile.voices.map(
+        (voice) => voice.voice_id
+      )
+    ).toEqual(["new-uk", "new-uk-disabled"]);
+    expect(to.spelling_speech).toBeUndefined();
+  });
+
+  it.each(["skip", "different", "same"] as const)(
+    "共享拼写音色按整个variant核对读法映射（%s）",
+    (mapping) => {
+      const { forms, sourceId, targetId } = setup(
+        commonFormFixture({
+          pronunciations: [
+            pronunciationFixture({
+              id: uuidFromInt(501),
+              voice_profile: profile("first")
+            }),
+            pronunciationFixture({
+              id: uuidFromInt(502),
+              voice_profile: profile(mapping === "same" ? "first" : "second")
+            })
+          ]
+        }),
+        commonFormFixture({
+          id: uuidFromInt(700),
+          pronunciations: [
+            pronunciationFixture({
+              id: uuidFromInt(701),
+              synthesis: {
+                alphabet: "ipa",
+                ipa: "",
+                ups: "",
+                use_spelling: true
+              }
+            }),
+            pronunciationFixture({
+              id: uuidFromInt(702),
+              synthesis: {
+                alphabet: "ipa",
+                ipa: "",
+                ups: "",
+                use_spelling: true
+              }
+            })
+          ]
+        })
+      );
+      const to = variant(forms.contents[1]!);
+      to.spelling_speech = speech(to.spelling, profile("original"));
+      const skipped = to.pronunciations[1]!.id;
+      const plan = planFormCopy(
+        forms,
+        sourceId,
+        targetId,
+        "voices",
+        mapping === "skip"
+          ? { uk: { [skipped]: null }, us: { [skipped]: null } }
+          : {}
+      );
+      const original = structuredClone(forms);
+      if (mapping === "same") {
+        const next = applyFormCopy(forms, plan);
+        expect(
+          variant(next.contents[1]!).spelling_speech!.voice_profile.voices[0]!
+            .voice_id
+        ).toBe("first");
+        expect(variant(next.contents[1]!).spelling_speech!.content).toEqual(
+          to.spelling_speech.content
+        );
+      } else {
+        expect(() => applyFormCopy(forms, plan)).toThrow("共用");
+      }
+      expect(forms).toEqual(original);
+    }
+  );
+
   it.each(["uk", "us"] as const)(
     "单侧复制%s音色保留跳过侧的无locale旧格式合成",
     (side) => {

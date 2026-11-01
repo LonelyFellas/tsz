@@ -576,7 +576,8 @@ function copyVoices(
   matches: FormCopyPlan["matches"],
   source: FormContentV3,
   resolved: readonly ResolvedFormCopyProfile[],
-  versions: Map<string, string>
+  versions: Map<string, string>,
+  spellingCopies: Map<string, VoiceProfileV3>
 ): boolean {
   let copied = false;
   const before = structuredClone(target);
@@ -591,7 +592,7 @@ function copyVoices(
     const fromVariant = variantForSide(source, match.side).variant;
     const fallback = copiedProfile(
       from.synthesis?.use_spelling
-        ? (fromVariant.spelling_speech?.voice_profile ?? from.voice_profile)
+        ? fromVariant.spelling_speech?.voice_profile
         : from.voice_profile,
       match,
       "fallback",
@@ -670,21 +671,13 @@ function copyVoices(
   if (fallbacks.length) {
     target.voice_profile = mergeFallbacks(
       before.synthesis?.use_spelling
-        ? (targetVariant.spelling_speech?.voice_profile ?? before.voice_profile)
+        ? targetVariant.spelling_speech?.voice_profile
         : before.voice_profile,
       matches,
       fallbacks
     );
     if (before.synthesis?.use_spelling) {
-      targetVariant.spelling_speech = {
-        ...targetVariant.spelling_speech,
-        content: targetVariant.spelling_speech?.content ?? {
-          version: 2,
-          text: targetVariant.spelling,
-          annotations: []
-        },
-        voice_profile: structuredClone(target.voice_profile)
-      };
+      spellingCopies.set(target.id, target.voice_profile);
     }
     copied = true;
   }
@@ -717,6 +710,7 @@ export function applyFormCopy(
   }
   let copiedVoices = false;
   const versions = new Map<string, string>();
+  const spellingCopies = new Map<string, VoiceProfileV3>();
   for (const matches of grouped.values()) {
     if (!matches.some((match) => match.source)) continue;
     const row = pronunciationAt(target, matches[0]!.target);
@@ -730,11 +724,44 @@ export function applyFormCopy(
           matches,
           plan.source.contentSnapshot,
           resolvedProfiles,
-          versions
+          versions,
+          spellingCopies
         ) || copiedVoices;
   }
   if (plan.kind === "voices" && !copiedVoices)
     throw new Error("来源未配置可复制的音色，请先配置来源音色");
+  const regions = target.regional_variants;
+  for (const variant of regions.mode === "common"
+    ? [regions.common]
+    : [regions.uk, regions.us]) {
+    if (!variant.pronunciations.some((row) => spellingCopies.has(row.id)))
+      continue;
+    const profiles = variant.pronunciations
+      .filter((row) => row.synthesis?.use_spelling)
+      .map(
+        (row) =>
+          spellingCopies.get(row.id) ?? variant.spelling_speech?.voice_profile
+      );
+    const profile = profiles[0];
+    if (
+      !profile ||
+      profiles.some(
+        (value) => JSON.stringify(value) !== JSON.stringify(profile)
+      )
+    )
+      throw new Error(
+        "同一词形的拼写音色由多个读法共用，所选映射或跳过项无法同时保留，请统一选择后再复制"
+      );
+    variant.spelling_speech = {
+      ...variant.spelling_speech,
+      content: variant.spelling_speech?.content ?? {
+        version: 2,
+        text: variant.spelling,
+        annotations: []
+      },
+      voice_profile: structuredClone(profile)
+    };
+  }
   return {
     ...forms,
     contents: forms.contents.map((content) =>

@@ -20,7 +20,7 @@ export async function resolveFormCopyProfiles(
       (item) => item.id === match.source!.pronunciationId
     )!;
     if (row.synthesis?.use_spelling)
-      return variant.spelling_speech?.voice_profile ?? row.voice_profile;
+      return variant.spelling_speech?.voice_profile;
     return (
       row.voice_profile ||
       row.synthesis?.uk?.ipa_speech ||
@@ -116,7 +116,9 @@ export async function resolveFormCopyProfiles(
       : undefined;
     add(
       "fallback",
-      spellingSpeech?.voice_profile ?? pronunciation.voice_profile,
+      synthesis?.use_spelling
+        ? spellingSpeech?.voice_profile
+        : pronunciation.voice_profile,
       {
         kind: "text",
         content: synthesis?.use_spelling

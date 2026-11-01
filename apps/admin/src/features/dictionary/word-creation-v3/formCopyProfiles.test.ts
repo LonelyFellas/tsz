@@ -87,6 +87,24 @@ beforeEach(() => {
 });
 
 describe("复制前解析完整音色配置", () => {
+  it("独立拼写音色未配置时不请求解析残留读法配置", async () => {
+    const forms = fixture(profile);
+    const regions = forms.contents[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("fixture");
+    regions.common.pronunciations[0]!.synthesis!.use_spelling = true;
+    const plan = planFormCopy(
+      forms,
+      forms.pos[0]!.forms[0]!.id,
+      forms.pos[0]!.forms[1]!.id,
+      "voices"
+    );
+    expect(
+      await resolveFormCopyProfiles(plan, new AbortController().signal)
+    ).toEqual([]);
+    expect(voices).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])(
     "按拼写正文解析独立音色并忽略旧读法配置（残留=%s）",
     async (stale) => {
