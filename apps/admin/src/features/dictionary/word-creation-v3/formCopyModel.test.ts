@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { synthesisForLocale } from "@tsz/shared";
 import type {
   AudioAssetV3,
   FormContentV3,
@@ -107,6 +108,177 @@ function speech(text: string, voice: VoiceProfileV3) {
 }
 
 describe("词形内容定向复制", () => {
+  it.each(["uk", "us"] as const)(
+    "单侧复制%s音色保留跳过侧的无locale旧格式合成",
+    (side) => {
+      const { forms, sourceId, targetId } = setup(
+        commonFormFixture({ spelling: "cat" }),
+        commonFormFixture({ id: uuidFromInt(700), spelling: "cats" })
+      );
+      const source = variant(forms.contents[0]!).pronunciations[0]!;
+      const to = variant(forms.contents[1]!);
+      const target = to.pronunciations[0]!;
+      source.voice_profile = profile("new-voice");
+      target.synthesis = {
+        alphabet: "ipa",
+        ipa: "kæts",
+        ups: "K AE T S",
+        use_spelling: false
+      };
+      Object.assign(target.synthesis, {
+        ipa_speech: speech(to.spelling, profile("old-ipa")),
+        ups_speech: speech(to.spelling, profile("old-ups"))
+      });
+      const skipped = side === "uk" ? "us" : "uk";
+      const skippedLocale = skipped === "uk" ? "en-GB" : "en-US";
+      const before = synthesisForLocale(target.synthesis, skippedLocale);
+      const original = structuredClone(forms);
+      const next = applyFormCopy(
+        forms,
+        planFormCopy(forms, sourceId, targetId, "voices", {
+          [skipped]: { [target.id]: null }
+        })
+      );
+      const copied = variant(next.contents[1]!).pronunciations[0]!;
+      expect(synthesisForLocale(copied.synthesis!, skippedLocale)).toEqual({
+        ...before,
+        ipa_locale: skippedLocale,
+        ups_locale: skippedLocale
+      });
+      expect(
+        copied.synthesis![side]!.ipa_speech!.voice_profile.voices[0]!.voice_id
+      ).toBe("new-voice");
+      expect(forms).toEqual(original);
+    }
+  );
+
+  it.each([false, true])(
+    "复制独立拼写音色而不使用残留profile（残留=%s）",
+    (stale) => {
+      const { forms, sourceId, targetId } = setup();
+      const from = variant(forms.contents[0]!);
+      const to = variant(forms.contents[1]!);
+      const source = from.pronunciations[0]!;
+      const target = to.pronunciations[0]!;
+      source.synthesis = {
+        alphabet: "ipa",
+        ipa: "",
+        ups: "",
+        use_spelling: true
+      };
+      from.spelling_speech = {
+        ...speech(from.spelling, profile("spelling-source")),
+        audio_assets: [recording("source")]
+      };
+      if (stale) {
+        source.voice_profile = profile("stale-row");
+        source.synthesis.uk = {
+          ipa: "inactive",
+          ups: "",
+          ipa_speech: speech(from.spelling, profile("stale-ipa"))
+        };
+      }
+      target.synthesis = {
+        alphabet: "ups",
+        ipa: "",
+        ups: "",
+        use_spelling: true
+      };
+      to.spelling_speech = {
+        ...speech(to.spelling, profile("target")),
+        content: {
+          version: 2,
+          text: to.spelling,
+          annotations: [{ type: "pause", at: 6, duration_ms: 100 }]
+        },
+        audio_assets: [recording("target")]
+      };
+      const original = structuredClone(forms);
+      const next = applyFormCopy(
+        forms,
+        planFormCopy(forms, sourceId, targetId, "voices")
+      );
+      const copied = variant(next.contents[1]!);
+      expect(copied.spelling_speech!.voice_profile.voices[0]!.voice_id).toBe(
+        "spelling-source"
+      );
+      expect(
+        copied.spelling_speech!.voice_profile.voices[0]!.version_id
+      ).not.toBe(from.spelling_speech.voice_profile.voices[0]!.version_id);
+      expect(
+        JSON.stringify(copied.spelling_speech!.voice_profile)
+      ).not.toContain("audio_asset_id");
+      expect(copied.spelling_speech!.content).toEqual(
+        to.spelling_speech.content
+      );
+      expect(copied.spelling_speech!.audio_assets).toEqual(
+        to.spelling_speech.audio_assets
+      );
+      expect(copied.pronunciations[0]!.synthesis).toMatchObject({
+        alphabet: "ups",
+        use_spelling: true
+      });
+      expect(forms).toEqual(original);
+    }
+  );
+
+  it.each(["cat", "𐐀cat"])(
+    "音标复制映射%s正文首尾停顿，偏移按码点计算",
+    (spelling) => {
+      const { forms, sourceId, targetId } = setup(
+        commonFormFixture({ spelling }),
+        commonFormFixture({ id: uuidFromInt(700), spelling: `${spelling}s` })
+      );
+      const from = variant(forms.contents[0]!);
+      const source = from.pronunciations[0]!;
+      source.synthesis = {
+        alphabet: "ipa",
+        ipa: "",
+        ups: "",
+        uk: {
+          ipa: "kæt",
+          ups: "",
+          ipa_speech: {
+            ...speech(spelling, profile("source")),
+            content: {
+              version: 2,
+              text: spelling,
+              annotations: [
+                { type: "pause", at: 0, duration_ms: 100 },
+                {
+                  type: "pause",
+                  at: Array.from(spelling).length,
+                  duration_ms: 200
+                }
+              ]
+            }
+          }
+        }
+      };
+      const original = structuredClone(forms);
+      const next = applyFormCopy(
+        forms,
+        planFormCopy(forms, sourceId, targetId, "phonetics")
+      );
+      expect(
+        variant(next.contents[1]!).pronunciations[0]!.synthesis!.uk!.ipa_speech!
+          .content
+      ).toEqual({
+        version: 2,
+        text: `${spelling}s`,
+        annotations: [
+          { type: "pause", at: 0, duration_ms: 100 },
+          {
+            type: "pause",
+            at: Array.from(spelling).length + 1,
+            duration_ms: 200
+          }
+        ]
+      });
+      expect(forms).toEqual(original);
+    }
+  );
+
   it("复制音标保留目标身份、读法、拼写、继承音色与真人录音，并重建词界和清理全部正式音频", () => {
     const { forms, sourceId, targetId } = setup();
     const from = variant(forms.contents[0]!);
@@ -745,6 +917,19 @@ describe("词形内容定向复制", () => {
       expect(row.voice_profile!.voices[0]!.voice_id).toBe(`ups-${side}`);
       expect(row.synthesis!.use_spelling).toBe(true);
       expect(row.synthesis!.alphabet).toBe("ipa");
+      expect(variant(next.contents[1]!, side).spelling_speech).toMatchObject({
+        content: {
+          version: 2,
+          text: variant(forms.contents[1]!, side).spelling,
+          annotations: []
+        },
+        voice_profile: {
+          voices: [
+            { voice_id: `ups-${side}`, enabled: true },
+            { voice_id: `ups-${side}-disabled`, enabled: false }
+          ]
+        }
+      });
     }
   });
 

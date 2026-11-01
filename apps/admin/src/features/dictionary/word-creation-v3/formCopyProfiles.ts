@@ -19,6 +19,8 @@ export async function resolveFormCopyProfiles(
     const row = variant.pronunciations.find(
       (item) => item.id === match.source!.pronunciationId
     )!;
+    if (row.synthesis?.use_spelling)
+      return variant.spelling_speech?.voice_profile ?? row.voice_profile;
     return (
       row.voice_profile ||
       row.synthesis?.uk?.ipa_speech ||
@@ -109,16 +111,30 @@ export async function resolveFormCopyProfiles(
         })
       );
     };
-    add("fallback", pronunciation.voice_profile, {
-      kind: "text",
-      content: toRichTextV2(
-        pronunciation.dict_phonetic_rich ?? {
-          version: 2,
-          text: pronunciation.dict_phonetic || variant.spelling,
-          annotations: []
-        }
-      )
-    });
+    const spellingSpeech = synthesis?.use_spelling
+      ? variant.spelling_speech
+      : undefined;
+    add(
+      "fallback",
+      spellingSpeech?.voice_profile ?? pronunciation.voice_profile,
+      {
+        kind: "text",
+        content: synthesis?.use_spelling
+          ? (spellingSpeech?.content ?? {
+              version: 2,
+              text: variant.spelling,
+              annotations: []
+            })
+          : toRichTextV2(
+              pronunciation.dict_phonetic_rich ?? {
+                version: 2,
+                text: pronunciation.dict_phonetic || variant.spelling,
+                annotations: []
+              }
+            )
+      }
+    );
+    if (synthesis?.use_spelling) continue;
     for (const alphabet of ["ipa", "ups"] as const) {
       const speech = synthesis?.[`${alphabet}_speech`];
       if (!speech) continue;

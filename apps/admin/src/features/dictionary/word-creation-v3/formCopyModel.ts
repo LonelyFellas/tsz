@@ -256,8 +256,11 @@ function rebindSpeechContent(
   const annotations = content.annotations.map((mark) => {
     if (!["pause", "say_as", "sub"].includes(mark.type)) throw fail();
     if (mark.type === "pause") {
+      if (mark.at === 0) return { ...mark, at: 0 };
+      if (mark.at === Array.from(source).length)
+        return { ...mark, at: Array.from(target).length };
       const index = from.findIndex((word) => word.end === mark.at);
-      if (index < 0 || index >= from.length - 1) throw fail();
+      if (index < 0) throw fail();
       return { ...mark, at: to[index]!.end };
     }
     if (mark.type !== "say_as" && mark.type !== "sub") throw fail();
@@ -569,6 +572,7 @@ function mergeFallbacks(
 
 function copyVoices(
   target: WordPronunciationV3,
+  targetVariant: FormContentVariantV3,
   matches: FormCopyPlan["matches"],
   source: FormContentV3,
   resolved: readonly ResolvedFormCopyProfile[],
@@ -584,8 +588,11 @@ function copyVoices(
   for (const match of matches) {
     if (!match.source) continue;
     const from = pronunciationAt(source, match.source);
+    const fromVariant = variantForSide(source, match.side).variant;
     const fallback = copiedProfile(
-      from.voice_profile,
+      from.synthesis?.use_spelling
+        ? (fromVariant.spelling_speech?.voice_profile ?? from.voice_profile)
+        : from.voice_profile,
       match,
       "fallback",
       resolved,
@@ -629,7 +636,9 @@ function copyVoices(
     const previous = candidateForSide(before, match.target.region, match.side);
     for (const alphabet of ALPHABETS) {
       const key = `${alphabet}_speech` as const;
-      const ownProfile = fromCandidate?.[key]?.voice_profile;
+      const ownProfile = from.synthesis?.use_spelling
+        ? undefined
+        : fromCandidate?.[key]?.voice_profile;
       const profile =
         copiedProfile(ownProfile, match, alphabet, resolved, versions) ??
         (!ownProfile ? fallback : undefined);
@@ -644,6 +653,13 @@ function copyVoices(
       if (content.text !== match.target.spelling)
         throw new Error("目标合成正文与拼写不一致，请先修正后再复制音色");
       target.synthesis ??= emptySynthesis();
+      // 写入首个分侧候选前，保留旧格式在两侧实际可用的内容。
+      if (!target.synthesis.uk && !target.synthesis.us) {
+        for (const side of SIDES) {
+          const candidate = candidateForSide(before, match.target.region, side);
+          if (candidate) target.synthesis[side] = candidate;
+        }
+      }
       target.synthesis[match.side] = {
         ...candidate,
         [key]: { content: structuredClone(content), voice_profile: profile }
@@ -653,10 +669,23 @@ function copyVoices(
   }
   if (fallbacks.length) {
     target.voice_profile = mergeFallbacks(
-      before.voice_profile,
+      before.synthesis?.use_spelling
+        ? (targetVariant.spelling_speech?.voice_profile ?? before.voice_profile)
+        : before.voice_profile,
       matches,
       fallbacks
     );
+    if (before.synthesis?.use_spelling) {
+      targetVariant.spelling_speech = {
+        ...targetVariant.spelling_speech,
+        content: targetVariant.spelling_speech?.content ?? {
+          version: 2,
+          text: targetVariant.spelling,
+          annotations: []
+        },
+        voice_profile: structuredClone(target.voice_profile)
+      };
+    }
     copied = true;
   }
   return copied;
@@ -697,6 +726,7 @@ export function applyFormCopy(
       copiedVoices =
         copyVoices(
           row,
+          variantForSide(target, matches[0]!.side).variant,
           matches,
           plan.source.contentSnapshot,
           resolvedProfiles,
