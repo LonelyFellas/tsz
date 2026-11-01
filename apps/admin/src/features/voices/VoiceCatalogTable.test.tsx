@@ -240,7 +240,7 @@ describe("音色目录表格", () => {
     expect(names(container)).toHaveLength(4);
   });
 
-  it("场景多选取并集，与地区、模型及风格交叉筛选；角色无与未知分别筛选", async () => {
+  it("场景多选取并集，与地区、模型及风格交叉筛选", async () => {
     const { container } = mount();
     await select("推荐场景", "新闻");
     await select("推荐场景", "有声书");
@@ -250,7 +250,10 @@ describe("音色目录表格", () => {
     await select("模型", "Multilingual");
     await select("可选风格", "愉快");
     expect(names(container)).toEqual(["Ava"]);
-    resetFilters();
+  });
+
+  it("角色无与未知分别筛选，清除后可切换", async () => {
+    const { container } = mount();
     await select("可选角色", "无");
     expect(names(container)).toEqual(["Sonia", "Ana"]);
     resetFilters();
@@ -258,19 +261,23 @@ describe("音色目录表格", () => {
     expect(names(container)).toEqual(["Unknown"]);
   });
 
-  it("统一排序可切换名称与年龄，两个年龄方向的未知项都在末尾", async () => {
+  it("名称排序可切换方向，并与年龄筛选联动", async () => {
     const { container } = mount();
     fireEvent.click(visibleControl("音色筛选和排序"));
     await select("音色排序", "名称倒序");
     expect(names(container)).toEqual(["Unknown", "Sonia", "Ava", "Ana"]);
-    await select("音色排序", "年龄升序");
-    expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
-    await select("音色排序", "年龄倒序");
-    expect(names(container)).toEqual(["Sonia", "Ava", "Ana", "Unknown"]);
     await select("音色排序", "名称升序");
     expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
     await select("年龄组", "儿童");
     expect(names(container)).toEqual(["Ana"]);
+  });
+
+  it("年龄排序可切换方向，未知项都在末尾", async () => {
+    const { container } = mount();
+    await select("音色排序", "年龄升序");
+    expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
+    await select("音色排序", "年龄倒序");
+    expect(names(container)).toEqual(["Sonia", "Ava", "Ana", "Unknown"]);
   });
 
   it("旧 API 缺资料时仍可试听，只展示真实模型选项，并区分官方原文和人工资料", async () => {
