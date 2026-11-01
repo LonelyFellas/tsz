@@ -1273,3 +1273,12 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 删除的仅为 `R1pAo3/artifact`、`tfh6Mm/artifact` 两棵未引用制品树，普通文件大小合计 110,199,424 字节（约 105.1 MiB），这是逻辑文件大小而非测量的磁盘块释放量。保留非 artifact 审计文件合计 570,148 字节及 8 组完整回退备份，另保存计划、清理回执和逐文件 SHA256 清单。旧 `/opt/tsz-release-stage.*` 路径已为 0；13.23 等历史记录中的 stage 定位现可按本节归档根目录加原 basename 查找。
 - 独立只读复查通过：服务器归档计划／回执与本地原始记录一致；原路径均不存在，归档中两棵 artifact 均不存在，其余文件的 SHA256／大小／uid／gid／mode 与清理前逐项一致。current／previous、配置指纹和 API PID 未变，Web／Admin 原生制品复算通过，实际 Web／Admin 仍为 `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc`、API 为 `38be4d370f9b5d2e9fa7130465e52187377d31e5`；两站 HTTPS200、未登录 API401，Web active、nginx有效，候选 18383 无监听；跨组件／前端锁空闲，API 锁和未完成事务标记不存在。
 - 本轮没有创建 fixture、云对象或新业务会话，无本轮临时测试资源残留。`task147-stage-cleanup-summary.json`、`task147-stage-cleanup-receipt.json`、`task147-stage-cleanup-independent.json` 保存最终清理与复查结果；操作源码、计划与原始输出留作审计。本节按用户后续授权通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 完成、事件结算且无新增部署后恢复原 active 状态，不修改工作流代码；未回写禅道。
+
+### 13.27 例句保存失败后重试用例的时序修复（2026-11-01）
+
+- 目标：复现并修复 `SentenceCreation.test.tsx` 中“独立创建无需来源词义或关联，保存失败保留输入并以相同 ID 重试”的偶发失败，不放宽原断言或超时；按用户授权提交／推送／PR，精确 CI 通过后合并并确认 main CI，避免触发部署，不回写禅道。
+- 基线固定为前端 main `fd8f651f310384ff83db109a4deec059a0cdcdb8`。既有 CI 失败为重试后 `onSaved` 期望 1 次而实际 0 次；普通本地单文件可能通过，不能把绿色运行当作已复现。先核对真实按钮仍连接 DOM，再用组件现有 `onSave` 回调的受控继续点拉开两层异步边界，保留真实 SentenceEditor／V3VoiceTextField／AntD 链路和相同业务响应，不 mock 保存按钮。
+- 根因：`SentenceEditor.finish()` 在 catch 中先显示业务错误并结束宿主 saving；外层 `V3VoiceTextField.completeEditing()` 仍在等待 onSave，尚未执行 finally 释放自己的 saving／savingRef。此时真实 AntD 按钮仍 loading，会忽略点击。原用例仅等待错误文案就重试，不能证明外层已可重试；错误出现与编辑器保存结束是两个不同状态。
+- 受控失败基线观测到 errorVisible=true、outer busy=true、按钮仍连接且 loading=true，创建请求只有 1 次；立即重试复现原 `onSaved` 为 0 的失败。同一继续点仅加入公开“正在保存修改…”状态消失的等待后通过。诊断用的回调包装／探针均已从提交文件移除；诊断前后 fixture 和日志留在同一脱敏证据目录，`sentence-retry-fix-receipt.json` 给出可复现命令及定位证据，不将诊断调度控制当作生产代码变更。
+- 最小修复仅在原用例重试前用默认 `waitFor` 等待外层公开保存状态消失，再点击一次；原失败后输入保留、相同 ID／完整请求重试、无来源词义／关联、onSaved 恰好一次等断言全部保留，新增创建请求恰好两次断言。未修改生产代码、依赖、全局测试设置、超时、CI worker 或覆盖率规则，没有 sleep，也没有把点击放入 waitFor 重复执行。
+- 原路径回归：完整 `SentenceCreation.test.tsx` 在 `--project admin --maxWorkers=1 --coverage` 下 12 项全部通过；不手工重复全量套件，剩余全量检查由原生 hooks 和精确 PR/main CI 执行。交付期间保持全部 CI，合并窗口临时停用既有 `Deploy tshb-test`，main CI 完成及事件结算后确认无新增部署，再恢复原 active 状态；不修改工作流代码，不部署任何组件，不回写禅道。
