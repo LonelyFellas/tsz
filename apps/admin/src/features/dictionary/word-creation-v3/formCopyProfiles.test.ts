@@ -87,6 +87,88 @@ beforeEach(() => {
 });
 
 describe("复制前解析完整音色配置", () => {
+  it("独立拼写音色未配置时不请求解析残留读法配置", async () => {
+    const forms = fixture(profile);
+    const regions = forms.contents[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("fixture");
+    regions.common.pronunciations[0]!.synthesis!.use_spelling = true;
+    const plan = planFormCopy(
+      forms,
+      forms.pos[0]!.forms[0]!.id,
+      forms.pos[0]!.forms[1]!.id,
+      "voices"
+    );
+    expect(
+      await resolveFormCopyProfiles(plan, new AbortController().signal)
+    ).toEqual([]);
+    expect(voices).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "按拼写正文解析独立音色并忽略旧读法配置（残留=%s）",
+    async (stale) => {
+      const forms = fixture({
+        voices: [{ voice_id: "stale", enabled: true, rate_percent: 0 }],
+        dubbing: { mode: "inherit", area: "azure" }
+      });
+      const fromRegions = forms.contents[0]!.regional_variants;
+      const toRegions = forms.contents[1]!.regional_variants;
+      if (fromRegions.mode !== "common" || toRegions.mode !== "common")
+        throw new Error("fixture");
+      const from = fromRegions.common;
+      const to = toRegions.common;
+      const row = from.pronunciations[0]!;
+      row.synthesis!.use_spelling = true;
+      from.spelling_speech = {
+        content: {
+          version: 2,
+          text: from.spelling,
+          annotations: [{ type: "pause", at: 0, duration_ms: 100 }]
+        },
+        voice_profile: structuredClone(profile)
+      };
+      if (!stale) {
+        delete row.voice_profile;
+        delete row.synthesis!.uk;
+      }
+      to.pronunciations[0]!.synthesis = {
+        alphabet: "ipa",
+        ipa: "",
+        ups: "",
+        use_spelling: true
+      };
+      const plan = planFormCopy(
+        forms,
+        forms.pos[0]!.forms[0]!.id,
+        forms.pos[0]!.forms[1]!.id,
+        "voices",
+        { us: { [to.pronunciations[0]!.id]: null } }
+      );
+      const signal = new AbortController().signal;
+      const resolved = await resolveFormCopyProfiles(plan, signal);
+      expect(resolve).toHaveBeenCalledExactlyOnceWith(
+        {
+          profile: from.spelling_speech.voice_profile,
+          source: { kind: "text", content: from.spelling_speech.content },
+          accent: "gb"
+        },
+        signal
+      );
+      const next = applyFormCopy(forms, plan, resolved).contents[1]!
+        .regional_variants;
+      if (next.mode !== "common") throw new Error("fixture");
+      expect(
+        next.common.spelling_speech!.voice_profile.voices.map(
+          (setting) => setting.voice_id
+        )
+      ).toEqual(["stored", "resolved"]);
+      expect(next.common.spelling_speech!.voice_profile.dubbing!.mode).toBe(
+        "local"
+      );
+    }
+  );
+
   it("解析继承配音，保留未启用配置，并按口音和正文类型请求", async () => {
     const forms = fixture(profile);
     const plan = planFormCopy(
