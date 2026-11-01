@@ -1249,3 +1249,27 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 - 必要线上验收全部通过：Web 首页与 Admin 登录页 HTTPS200，两端未登录 API401；Web 当前 slot active、nginx -t 有效，两个前端制品独立复算通过；API／前端事务标记不存在，跨组件及前端发布锁均空闲。不把 HTTP 和制品复核当作完整新功能或模型调用验收；本轮未新增浏览器登录，也未执行云合成或业务保存。
 - 清理：本轮未创建 fixture、业务记录、云语音／图片对象或新发布 stage／事务；契约检查的临时目录由原生 finally 删除，自己的本地查询临时文件已清理，无本轮测试资源残留。保留既有正常 release、恢复版本、运维备份和发布审计，不清理他方事务。下载／上传／发布耗时不适用，本次无重复传包或发布；local production build=0、server build=0。
 - 同一脱敏证据目录下 `task147-front-main-deploy-receipt.json`、`task147-front-main-final.json`、`task147-front-main-cleanup.json` 保存实际版本、制品、参数、HTTP／服务、配置与清理结果。本节按用户后续授权通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 完成、事件结算且无新增部署后恢复原 active 状态，不修改工作流代码；没有回写禅道。
+
+### 13.26 历史发布 stage 核实、清理与备份归档（2026-11-01）
+
+- 用户明确授权核实此前 10 个历史发布 stage 的归属、引用与保留要求，安全清理可删除内容，保留必要回退备份和审计证据；本轮没有重新部署或重启组件，没有回写禅道。此节承接 13.25 后的只读核对，不把清理前“仍有 10 个 stage”的历史回执覆盖为不存在。
+- 归属：10 个目录均为 root 所有的前端 Web 历史发布 stage，release-id 与 candidate 的仓库／SHA 对齐，所引用 Git 对象均可查；其中 8 个具有 CI 包回执，2 个旧流程目录保留原 candidate 与旧发布资料，不伪补 CI 来源。完整逐目录归属与文件指纹见同一脱敏证据目录的 `task147-stage-cleanup-ownership.json`、`task147-stage-cleanup-inventory.json`。
+- 引用与保留核实：未发现进程 cwd／exe／fd／命令行、nginx／systemd 配置、挂载点或 release symlink 引用这些 stage；无未完成前端事务和 API 发布锁。已有规则要求 current／previous release 始终保留、历史静态资源按 30 天保留，本轮未触碰 releases／assets／history 或执行通用 prune。删除范围仅限两份已通过原生 candidate 摘要复算且无引用的暂存制品；8 组原始 `backup/` 全部保留。
+
+| 原 stage                   | 来源 SHA                                   | 处理                                        |
+| -------------------------- | ------------------------------------------ | ------------------------------------------- |
+| `tsz-release-stage.R1pAo3` | `7960470eb4fc2ded2dd4edbf8f7e27ce49085c6f` | 删除未引用 artifact，保留全部审计文件并归档 |
+| `tsz-release-stage.sLJq25` | `dc8f3afb68b33388dd17a02009f61dc1e7e75ffe` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.QWe8hg` | `8112c80cce2500dd542792e96a7ddcd37b58a2b4` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.evTwce` | `83ed15f99d251e6a0a4289fff2eece192034912f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.M2PvEF` | `83ed15f99d251e6a0a4289fff2eece192034912f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.W1gA7o` | `83ed15f99d251e6a0a4289fff2eece192034912f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.2Sd8Sp` | `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.xb5Azo` | `7ce616b424a33363cd7cfb28775fa8fb5c0f989f` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.bJMevm` | `cd061d559d9cfe492f72d7ccf22666acc991feb8` | 保留备份与全部审计文件，原子移入归档        |
+| `tsz-release-stage.tfh6Mm` | `096105e4022bec0aa5e1e5b0ff35038e1901fbb3` | 删除未引用 artifact，保留全部审计文件并归档 |
+
+- 实际清理批次 `stage-cleanup-60460400-fbe5-4769-a973-571e0655b254`，受保护归档根目录 `/opt/tsz-deployment-audit/stage-cleanup-60460400-fbe5-4769-a973-571e0655b254`（root 所有、0700）。在原生跨组件锁→前端锁的同序互斥下重新复核现场、完整文件指纹和引用，保存计划与逐步回执后，将 10 个 stage 原子移到归档；每个目录保留原名称及原路径映射，不删除备份、原 candidate／CI 回执、发布工具或配置审计资料。没有新增自动到期策略，归档及其回退资料继续保留。
+- 删除的仅为 `R1pAo3/artifact`、`tfh6Mm/artifact` 两棵未引用制品树，普通文件大小合计 110,199,424 字节（约 105.1 MiB），这是逻辑文件大小而非测量的磁盘块释放量。保留非 artifact 审计文件合计 570,148 字节及 8 组完整回退备份，另保存计划、清理回执和逐文件 SHA256 清单。旧 `/opt/tsz-release-stage.*` 路径已为 0；13.23 等历史记录中的 stage 定位现可按本节归档根目录加原 basename 查找。
+- 独立只读复查通过：服务器归档计划／回执与本地原始记录一致；原路径均不存在，归档中两棵 artifact 均不存在，其余文件的 SHA256／大小／uid／gid／mode 与清理前逐项一致。current／previous、配置指纹和 API PID 未变，Web／Admin 原生制品复算通过，实际 Web／Admin 仍为 `5f42d8e2c1d22e9eefc10f375cb0de276b368dfc`、API 为 `38be4d370f9b5d2e9fa7130465e52187377d31e5`；两站 HTTPS200、未登录 API401，Web active、nginx有效，候选 18383 无监听；跨组件／前端锁空闲，API 锁和未完成事务标记不存在。
+- 本轮没有创建 fixture、云对象或新业务会话，无本轮临时测试资源残留。`task147-stage-cleanup-summary.json`、`task147-stage-cleanup-receipt.json`、`task147-stage-cleanup-independent.json` 保存最终清理与复查结果；操作源码、计划与原始输出留作审计。本节按用户后续授权通过独立文档 PR 交付，保留全部 PR/main CI；合并窗口临时停用既有 `Deploy tshb-test`，确认本次 main CI 完成、事件结算且无新增部署后恢复原 active 状态，不修改工作流代码；未回写禅道。
