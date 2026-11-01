@@ -142,19 +142,47 @@ const verifiedSonia: AdminSpeechVoice = {
     checked_at: "2026-10-25"
   }
 };
+// AntD 测量表头带 aria-hidden；直接排除隐藏副本，避免 jsdom 对整张表计算样式。
+function labelledControl(
+  label: string,
+  container: HTMLElement = document.body
+) {
+  const matches = within(container)
+    .getAllByLabelText(label)
+    .filter((node) => !node.closest('[aria-hidden="true"], [hidden], [inert]'));
+  expect(matches).toHaveLength(1);
+  return matches[0]!;
+}
+function namedButton(
+  name: string | RegExp,
+  container: HTMLElement = document.body
+) {
+  const view = within(container);
+  const labelled = view
+    .queryAllByLabelText(name)
+    .filter((node) => node.matches('button, [role="button"]'));
+  const matches = [
+    ...new Set(
+      (labelled.length ? labelled : view.getAllByText(name))
+        .map((node) => node.closest<HTMLElement>('button, [role="button"]'))
+        .filter(
+          (node): node is HTMLElement =>
+            !!node && !node.closest('[aria-hidden="true"], [hidden], [inert]')
+        )
+    )
+  ];
+  expect(matches).toHaveLength(1);
+  return matches[0]!;
+}
 async function selectTrialText(value: string) {
-  const input = screen.getByRole("textbox", {
-    name: "本次试听文本"
-  }) as HTMLTextAreaElement;
+  const input = screen.getByLabelText("本次试听文本") as HTMLTextAreaElement;
   const start = input.value.indexOf(value);
   fireEvent.mouseDown(input);
   act(() => input.focus());
   input.setSelectionRange(start, start + value.length);
   fireEvent.mouseUp(input);
   fireEvent.select(input);
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "输入音标" })).toBeEnabled()
-  );
+  await waitFor(() => expect(namedButton("输入音标")).toBeEnabled());
 }
 const clients: QueryClient[] = [];
 const routers: ReturnType<typeof createMemoryRouter>[] = [];
@@ -196,15 +224,15 @@ function mount(openLibrary = true) {
 }
 function editDescription() {
   if (!screen.queryByLabelText("中文介绍")) {
-    fireEvent.click(screen.getByRole("button", { name: "编辑 Sonia 介绍" }));
+    fireEvent.click(labelledControl("编辑 Sonia 介绍"));
   }
 }
 
 function notesInput(container?: HTMLElement) {
   const view = container ? within(container) : screen;
-  const toggle = view.getByRole("button", { name: /我的听感/ });
+  const toggle = namedButton("我的听感", container);
   if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
-  return view.getByRole("textbox", { name: "我的听感" });
+  return view.getByLabelText("我的听感");
 }
 
 function result(name: string): AdminSpeechPreviewResponse {
@@ -292,7 +320,7 @@ describe("配音中心", () => {
   it("分组与音色库可通过独立地址访问，页面不再重复显示入口页签", async () => {
     const { router } = mount(false);
     await screen.findByText("尚未设置分组推荐");
-    expect(screen.queryByRole("searchbox", { name: "搜索音色" })).toBeNull();
+    expect(screen.queryByLabelText("搜索音色")).toBeNull();
     expect(screen.queryByRole("tab", { name: "分组配音" })).toBeNull();
     await act(() => router.navigate("/voices/library"));
     expect(await screen.findByLabelText("试听 Sonia")).toBeVisible();
@@ -311,10 +339,10 @@ describe("配音中心", () => {
       expect(screen.getByText("还有未保存的音色设置")).toBeVisible()
     );
     expect(router.state.location.pathname).toBe("/voices/library");
-    fireEvent.click(screen.getByRole("button", { name: "继续编辑" }));
+    fireEvent.click(namedButton("继续编辑"));
     expect(notesInput()).toHaveValue("尚未保存的听感");
     await act(() => router.navigate("/voices"));
-    fireEvent.click(await screen.findByRole("button", { name: "放弃并离开" }));
+    fireEvent.click(await waitFor(() => namedButton("放弃并离开")));
     await screen.findByText("尚未设置分组推荐");
     expect(router.state.location.pathname).toBe("/voices");
   });
@@ -322,10 +350,10 @@ describe("配音中心", () => {
   it("清空音量后输入框与控件组关联表单错误", async () => {
     mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
-    const input = screen.getByRole("spinbutton", { name: "合成音量" });
+    const input = labelledControl("合成音量");
     expect(input).toHaveAttribute("aria-required", "true");
     fireEvent.change(input, { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
+    fireEvent.click(namedButton("试听当前参数"));
     await screen.findByText("请输入 0 至 100 的整数");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAccessibleDescription("请输入 0 至 100 的整数");
@@ -348,19 +376,18 @@ describe("配音中心", () => {
     const open = await screen.findByLabelText("调节 Sonia 声音");
     fireEvent.click(open);
     const drawer = document.querySelector<HTMLElement>('[role="dialog"]')!;
-    const button = (text: string) =>
-      within(drawer).getByRole("button", { name: text });
+    const drawerButton = (text: string) => namedButton(text, drawer);
     const volume = within(drawer).getByDisplayValue("100");
     expect(volume).toHaveAttribute("aria-label", "合成音量");
     expect(volume).toHaveValue("100");
-    await waitFor(() => expect(button("恢复默认参数")).toBeDisabled());
+    await waitFor(() => expect(drawerButton("恢复默认参数")).toBeDisabled());
     fireEvent.change(volume, { target: { value: "65" } });
-    await waitFor(() => expect(button("恢复默认参数")).toBeEnabled());
+    await waitFor(() => expect(drawerButton("恢复默认参数")).toBeEnabled());
     expect(within(drawer).getByLabelText("合成音量滑块")).toHaveAttribute(
       "aria-valuenow",
       "65"
     );
-    fireEvent.click(button("试听当前参数"));
+    fireEvent.click(drawerButton("试听当前参数"));
     await waitFor(() =>
       expect(api.speech.preview).toHaveBeenLastCalledWith(
         expect.objectContaining({ volume_percent: 65 }),
@@ -369,7 +396,7 @@ describe("配音中心", () => {
     );
     await screen.findByLabelText("Sonia 试听播放器");
     notesInput(drawer);
-    fireEvent.click(button("保存听感"));
+    fireEvent.click(drawerButton("保存听感"));
     await screen.findByText("听感已保存，仅你可见。");
     expect(api.speech.saveSettings).toHaveBeenLastCalledWith(
       sonia.alias,
@@ -383,9 +410,7 @@ describe("配音中心", () => {
     );
     fireEvent.click(open);
     const reopened = document.querySelector<HTMLElement>('[role="dialog"]')!;
-    const reset = within(reopened).getByRole("button", {
-      name: "恢复默认参数"
-    });
+    const reset = labelledControl("恢复默认参数", reopened);
     const reopenedVolume = within(reopened).getByDisplayValue("65");
     expect(reopenedVolume).toHaveAttribute("aria-label", "合成音量");
     expect(reopenedVolume).toHaveValue("65");
@@ -739,25 +764,24 @@ describe("配音中心", () => {
     await waitFor(() => expect(open).toBeEnabled());
     fireEvent.click(open);
     const dialog = await screen.findByRole("dialog");
-    fireEvent.change(
-      within(dialog).getByRole("spinbutton", { name: "合成语速" }),
-      { target: { value: "0.75" } }
-    );
+    fireEvent.change(within(dialog).getByLabelText("合成语速"), {
+      target: { value: "0.75" }
+    });
     fireEvent.change(notesInput(dialog), { target: { value: "清晰慢读" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "保存听感" }));
+    fireEvent.click(namedButton("保存听感", dialog));
     await screen.findByText("听感已保存，仅你可见。");
     expect(api.speech.saveSettings).toHaveBeenCalledWith(sonia.alias, {
       parameters: saved.parameters,
       notes: "清晰慢读",
       base_revision: 0
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    fireEvent.click(namedButton("Close", dialog));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(open);
     const reopened = await screen.findByRole("dialog");
     expect(notesInput(reopened)).toHaveValue("清晰慢读");
     fireEvent.change(notesInput(reopened), { target: { value: "我的新笔记" } });
-    fireEvent.click(within(reopened).getByRole("button", { name: "保存听感" }));
+    fireEvent.click(namedButton("保存听感", reopened));
     await screen.findByText(
       "设置已在其他页面修改。当前输入已保留，请重新载入最新设置后再编辑。"
     );
@@ -774,18 +798,18 @@ describe("配音中心", () => {
   it("从服务目录筛选，清空条件恢复完整列表", async () => {
     mount();
     await screen.findByLabelText("试听 Sonia");
-    const list = screen.getByRole("table", { name: "音色列表" });
+    const list = labelledControl("音色列表");
     expect(within(list).getByLabelText("试听 Sonia")).toBeVisible();
     expect(within(list).getByLabelText("试听 Guy")).toBeVisible();
-    fireEvent.change(screen.getByRole("searchbox", { name: "搜索音色" }), {
+    fireEvent.change(labelledControl("搜索音色"), {
       target: { value: "guy" }
     });
     expect(screen.queryByLabelText("试听 Sonia")).toBeNull();
     expect(screen.getByLabelText("试听 Guy")).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "音色筛选和排序" }));
+    fireEvent.click(namedButton("音色筛选和排序"));
     fireEvent.click(screen.getByLabelText("只看常用"));
     expect(screen.getByText("未找到符合条件的数据")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    fireEvent.click(namedButton("清除筛选"));
     expect(screen.getByLabelText("试听 Sonia")).toBeVisible();
     expect(screen.getByLabelText("试听 Guy")).toBeVisible();
   }, 10_000);
@@ -803,11 +827,11 @@ describe("配音中心", () => {
     fireEvent.click(screen.getByTitle("2"));
     expect(screen.getByLabelText("试听 Voice 11")).toBeVisible();
     expect(screen.queryByLabelText("试听 Voice 1")).toBeNull();
-    fireEvent.change(screen.getByRole("searchbox", { name: "搜索音色" }), {
+    fireEvent.change(labelledControl("搜索音色"), {
       target: { value: "Voice 12" }
     });
     expect(screen.getByLabelText("试听 Voice 12")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    fireEvent.click(namedButton("清除筛选"));
     expect(screen.getByLabelText("试听 Voice 1")).toBeVisible();
     expect(screen.queryByLabelText("试听 Voice 12")).toBeNull();
   });
@@ -838,14 +862,14 @@ describe("配音中心", () => {
     fireEvent.change(screen.getByLabelText("中文介绍"), {
       target: { value: "新介绍" }
     });
-    expect(screen.getByRole("searchbox", { name: "搜索音色" })).toBeDisabled();
+    expect(labelledControl("搜索音色")).toBeDisabled();
     act(() => {
       void router.navigate("/voices");
     });
     await waitFor(() =>
       expect(screen.getByText("还有未保存的音色设置")).toBeVisible()
     );
-    fireEvent.click(screen.getByRole("button", { name: "继续编辑" }));
+    fireEvent.click(namedButton("继续编辑"));
     expect(screen.getByLabelText("中文介绍")).toHaveValue("新介绍");
     expect(router.state.location.pathname).toBe("/voices/library");
   });
@@ -875,15 +899,11 @@ describe("配音中心", () => {
     act(() => {
       void router.navigate("/voices");
     });
-    expect(
-      await screen.findByRole("button", { name: "放弃并离开" })
-    ).toBeDisabled();
+    expect(await waitFor(() => namedButton("放弃并离开"))).toBeDisabled();
     await act(async () => pending.resolve(saved));
-    fireEvent.click(screen.getByRole("button", { name: "继续编辑" }));
+    fireEvent.click(namedButton("继续编辑"));
     await waitFor(() => expect(screen.queryByLabelText("中文介绍")).toBeNull());
-    await waitFor(() =>
-      expect(screen.getByRole("searchbox", { name: "搜索音色" })).toBeEnabled()
-    );
+    await waitFor(() => expect(labelledControl("搜索音色")).toBeEnabled());
   });
 
   it("取消生成后，迟到的音频不会重新出现", async () => {
@@ -892,7 +912,7 @@ describe("配音中心", () => {
     mount();
     fireEvent.click(await screen.findByLabelText("试听 Sonia"));
     const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
-    fireEvent.click(screen.getByRole("button", { name: /取\s*消/ }));
+    fireEvent.click(namedButton(/取\s*消/));
     expect(signal.aborted).toBe(true);
     await act(async () => pending.resolve(result("cancelled")));
     expect(screen.queryByLabelText("Sonia 试听播放器")).toBeNull();
@@ -992,7 +1012,7 @@ describe("配音中心", () => {
     mount();
     await screen.findByLabelText("调节 Sonia 声音");
     await screen.findByText("我的听感：独有旧听感");
-    fireEvent.change(screen.getByRole("searchbox", { name: "搜索音色" }), {
+    fireEvent.change(labelledControl("搜索音色"), {
       target: { value: "独有旧听感" }
     });
     editDescription();
@@ -1012,11 +1032,11 @@ describe("配音中心", () => {
     fireEvent.click(within(drawer).getByLabelText("Close"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByLabelText("中文介绍")).toHaveValue("清晰自然");
-    fireEvent.click(screen.getByRole("button", { name: /^取\s*消$/ }));
+    fireEvent.click(namedButton(/^取\s*消$/));
     await waitFor(() =>
       expect(screen.queryByLabelText("调节 Sonia 声音")).toBeNull()
     );
-    fireEvent.change(screen.getByRole("searchbox", { name: "搜索音色" }), {
+    fireEvent.change(labelledControl("搜索音色"), {
       target: { value: "" }
     });
     expect(await screen.findByText("我的听感：新听感")).toBeVisible();
@@ -1045,10 +1065,8 @@ describe("配音中心", () => {
       accent_revision: 3
     });
     mount();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "编辑 Sonia 口音" })
-    );
-    const select = screen.getByRole("combobox", { name: "当前口音归属" });
+    fireEvent.click(await screen.findByLabelText("编辑 Sonia 口音"));
+    const select = labelledControl("当前口音归属");
     fireEvent.mouseDown(select);
     const choice = await waitFor(() => {
       const match = Array.from(
@@ -1178,12 +1196,12 @@ describe("配音中心", () => {
     mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
     expect(screen.queryByRole("combobox", { name: "语速常用值" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "语速常用值" }));
+    fireEvent.click(namedButton("语速常用值"));
     expect(screen.queryByRole("menuitem", { name: "0.30×" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "1.70×" })).toBeNull();
     fireEvent.click(await screen.findByRole("menuitem", { name: "0.75×" }));
     expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
-    fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
+    fireEvent.click(namedButton("试听当前参数"));
     await waitFor(() =>
       expect(api.speech.preview).toHaveBeenCalledWith(
         expect.objectContaining({ rate_percent: -25 }),
@@ -1203,24 +1221,22 @@ describe("配音中心", () => {
       .mockImplementation(() => pending.promise);
     mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
-    expect(screen.queryByRole("button", { name: "查看 SSML" })).toBeNull();
+    expect(screen.queryByText("查看 SSML")).toBeNull();
     expect(renderSsml).not.toHaveBeenCalled();
-    const tools = screen.getByRole("button", { name: /SSML/ });
+    const tools = namedButton("SSML");
     fireEvent.click(tools);
-    expect(screen.queryByRole("button", { name: "查看 SSML" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "收起 SSML" })).toBeNull();
+    expect(screen.queryByText("查看 SSML")).toBeNull();
+    expect(screen.queryByText("收起 SSML")).toBeNull();
     await waitFor(() =>
       expect(screen.getByLabelText("SSML 原文")).toHaveValue(automatic)
     );
-    expect(
-      screen.queryByRole("combobox", { name: "SSML 配音版本" })
-    ).toBeNull();
+    expect(screen.queryByLabelText("SSML 配音版本")).toBeNull();
     fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
     const manual = '<speak><voice name="Sonia">kitten</voice></speak>';
     fireEvent.change(screen.getByLabelText("SSML 原文"), {
       target: { value: manual }
     });
-    fireEvent.click(screen.getByRole("button", { name: "试听 SSML" }));
+    fireEvent.click(namedButton("试听 SSML"));
     await waitFor(() => expect(manualPreview).toHaveBeenCalled());
     const signal = manualPreview.mock.calls[0]![1]!;
     fireEvent.click(tools);
@@ -1240,21 +1256,21 @@ describe("配音中心", () => {
     });
     mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
-    fireEvent.change(screen.getByRole("textbox", { name: "本次试听文本" }), {
+    fireEvent.change(labelledControl("本次试听文本"), {
       target: { value: "record again" }
     });
     await selectTrialText("record");
-    fireEvent.click(screen.getByRole("button", { name: "输入音标" }));
+    fireEvent.click(namedButton("输入音标"));
     fireEvent.change(screen.getByLabelText("指定音标"), {
       target: { value: "rɪˈkɔːd" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "应用音标" }));
+    fireEvent.click(namedButton("应用音标"));
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.75" }
     });
-    fireEvent.mouseDown(screen.getByRole("combobox", { name: "试听输出格式" }));
+    fireEvent.mouseDown(labelledControl("试听输出格式"));
     fireEvent.click(await screen.findByText("WAV"));
-    fireEvent.click(screen.getByRole("button", { name: "保留本次试听" }));
+    fireEvent.click(namedButton("保留本次试听"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.change(screen.getByLabelText("共用试听文本"), {
       target: { value: " " }
@@ -1288,16 +1304,12 @@ describe("配音中心", () => {
       )
     );
     fireEvent.click(screen.getByLabelText("调节 Guy 声音"));
-    expect(screen.getByRole("textbox", { name: "本次试听文本" })).toHaveValue(
-      "new shared text"
-    );
+    expect(labelledControl("本次试听文本")).toHaveValue("new shared text");
     expect(screen.getByLabelText("合成语速")).toHaveValue("1.00");
     fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByLabelText("调节 Sonia 声音"));
-    expect(screen.getByRole("textbox", { name: "本次试听文本" })).toHaveValue(
-      "record again"
-    );
+    expect(labelledControl("本次试听文本")).toHaveValue("record again");
     expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
   }, 15000);
 
@@ -1314,17 +1326,15 @@ describe("配音中心", () => {
     mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
     await selectTrialText("Please");
-    fireEvent.click(screen.getByRole("button", { name: "输入音标" }));
+    fireEvent.click(namedButton("输入音标"));
     fireEvent.change(screen.getByLabelText("指定音标"), {
       target: { value: "pliːz" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "应用音标" }));
+    fireEvent.click(namedButton("应用音标"));
     await selectTrialText("record");
-    fireEvent.click(screen.getByRole("button", { name: "关联单词读法" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "确认测试关联词形" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
+    fireEvent.click(namedButton("关联单词读法"));
+    fireEvent.click(await screen.findByText("确认测试关联词形"));
+    fireEvent.click(namedButton("试听当前参数"));
     await waitFor(() =>
       expect(manualPreview).toHaveBeenCalledWith(
         { voice_alias: sonia.alias, ssml, output_format: "mp3" },
@@ -1379,14 +1389,12 @@ describe("配音中心", () => {
     mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
     await selectTrialText("record");
-    fireEvent.click(screen.getByRole("button", { name: "关联单词读法" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "确认测试关联词形" })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
+    fireEvent.click(namedButton("关联单词读法"));
+    fireEvent.click(await screen.findByText("确认测试关联词形"));
+    fireEvent.click(namedButton("试听当前参数"));
     await waitFor(() => expect(renderSsml).toHaveBeenCalled());
     const signal = renderSsml.mock.calls[0]![1]!;
-    fireEvent.change(screen.getByRole("textbox", { name: "本次试听文本" }), {
+    fireEvent.change(labelledControl("本次试听文本"), {
       target: { value: "Please record again." }
     });
     expect(signal.aborted).toBe(true);
@@ -1511,7 +1519,7 @@ describe("配音中心", () => {
     vi.mocked(api.speech.voices).mockRejectedValueOnce(new Error("offline"));
     mount();
     expect(await screen.findByText("音色列表加载失败，请重试。")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /重\s*试/ }));
+    fireEvent.click(namedButton(/重\s*试/));
     fireEvent.click(await screen.findByLabelText("试听 Sonia"));
     fireEvent.error(await screen.findByLabelText("Sonia 试听播放器"));
     expect(
