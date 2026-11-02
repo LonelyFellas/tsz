@@ -144,6 +144,10 @@ export function SentenceEditor({
       afterSave?.();
     };
     try {
+      if (env.VOICE_EDITOR && !saveActionRef.current) {
+        setError("正文或配音仍在准备，请稍后重试保存。");
+        return false;
+      }
       // 成功回调可能立即卸载编辑器；离开结果以业务保存成功为准。
       const saved = env.VOICE_EDITOR
         ? await saveActionRef.current?.()

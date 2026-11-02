@@ -1519,7 +1519,9 @@ describe("V3MeaningsAndExamplesStep", () => {
         within(detail).getByRole("button", { name: "保存配音设置" })
       );
       fireEvent.click(within(editor).getByLabelText("选用 Sonia"));
-      fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
+      const complete = screen.getByLabelText("完成语法结构 1 英美通用内容编辑");
+      await waitFor(() => expect(complete).toBeEnabled());
+      fireEvent.click(complete);
       expect(variant().voice_profile).toEqual({
         dubbing: {
           mode: "local",

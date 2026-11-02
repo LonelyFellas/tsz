@@ -56,6 +56,7 @@ import {
   syncFormGroupBindings,
   ensureV3MeaningsForForms,
   fillDefaultSenseGroups,
+  meaningsRequireFormsSave,
   prepareTextLinksForSave,
   stripBlankRelations,
   stripSenseComponentUsages,
@@ -606,8 +607,28 @@ function V3WordCreationSession({
   const newDraftPrefilledRef = useRef(false);
 
   const setFormContents = useCallback(
-    (content: FormsStepRepresentationV3) => {
+    (content: FormsStepRepresentationV3, initializeFirstPos = false) => {
       if (!contentEditing) return;
+      // 空白草稿首次添加词性时，沿用创建时已确认的单一主词。恢复备份不走此初始化。
+      if (
+        initializeFirstPos &&
+        word.forms.pos.length === 0 &&
+        draftFormsRef.current.pos.length === 0 &&
+        content.pos.length > 0 &&
+        word.presentation.matched_surfaces.length === 1
+      ) {
+        const initialized = structuredClone(expandFormContents(content));
+        for (const pos of initialized.pos)
+          for (const form of pos.forms)
+            if (
+              form.form_type === "base" &&
+              form.regional_variants.mode === "common" &&
+              !form.regional_variants.common.spelling.trim()
+            )
+              form.regional_variants.common.spelling =
+                word.presentation.matched_surfaces[0]!;
+        content = applyFormsStructure(draftFormsRef.current, initialized);
+      }
       supersede();
       setDraftFormsState(content);
       const nextMeanings = ensureV3MeaningsForForms(
@@ -647,13 +668,18 @@ function V3WordCreationSession({
       draftMeanings,
       supersede,
       updateDirty,
+      word.forms.pos.length,
+      word.presentation.matched_surfaces,
       word.id
     ]
   );
 
   const setDraftForms = useCallback(
     (content: DraftFormsStepContentV3) =>
-      setFormContents(applyFormsStructure(draftFormsRef.current, content)),
+      setFormContents(
+        applyFormsStructure(draftFormsRef.current, content),
+        true
+      ),
     [setFormContents]
   );
 
@@ -1362,7 +1388,11 @@ function V3WordCreationSession({
         if (classifyV3Problem(error, "impact").kind === "entry_archived") {
           await handleEntryArchived(error);
         } else if (scope === scopeRef.current) {
-          await handleError(error, "impact", retry);
+          await handleError(error, "impact", retry, {
+            step: "forms",
+            baseRevision,
+            localForms: content
+          });
         }
         return undefined;
       } finally {
@@ -1395,7 +1425,14 @@ function V3WordCreationSession({
         return;
       }
       if (
-        (saveFormsFirst && dirtyRef.current.forms) ||
+        (saveFormsFirst &&
+          dirtyRef.current.forms &&
+          (intent === "complete" ||
+            meaningsRequireFormsSave(
+              flow.canonical(),
+              content,
+              draftFormsRef.current
+            ))) ||
         (intent === "complete" &&
           !flow.canonical().completed_steps.includes("forms"))
       ) {
@@ -1955,7 +1992,7 @@ function V3WordCreationSession({
     requestSentenceLeave,
     word,
     formContents: draftForms,
-    setFormContents,
+    setFormContents: (content) => setFormContents(content, true),
     retiredContentSlots,
     partOfSpeechCatalog,
     partOfSpeechCatalogError,
@@ -2004,6 +2041,7 @@ function V3WordCreationSession({
   const recovery = useDraftRecovery({
     entity: `word-v3:${word.id}`,
     revision: word.revision,
+    savedRevision: ownRevisionRef.current,
     value: { forms: draftForms, meanings: draftMeanings },
     dirty: dirtySteps.forms || dirtySteps.meanings,
     busy: pending.size > 0,
