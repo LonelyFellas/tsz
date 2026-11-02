@@ -29,24 +29,36 @@ export function ChoiceScopePreview({
           <summary className="cursor-pointer text-sm font-medium">
             查看暂不可用内容与原因
           </summary>
-          <ul className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-2 text-sm">
-            {preview.unavailable_items.map((item) => (
-              <li key={item.unit_key} className="break-words">
-                <p className="font-medium">
-                  {item.spelling} · {item.definition}
-                </p>
-                <p className="text-foreground-muted">{reasons[item.reason]}</p>
-              </li>
-            ))}
-          </ul>
-          {preview.unavailable_truncated && (
-            <p className="mt-3 text-xs text-foreground-muted">
-              当前列出前 {preview.unavailable_items.length} 项，共{" "}
-              {preview.unavailable_count} 项暂不可用。
-            </p>
-          )}
+          <ChoiceUnavailableItems preview={preview} />
         </details>
       )}
     </div>
+  );
+}
+
+export function ChoiceUnavailableItems({
+  preview
+}: {
+  preview: ChoicePlanPreview;
+}) {
+  return (
+    <>
+      <ul className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-2 text-sm">
+        {preview.unavailable_items.map((item) => (
+          <li key={item.unit_key} className="break-words">
+            <p className="font-medium">
+              {item.spelling} · {item.definition}
+            </p>
+            <p className="text-foreground-muted">{reasons[item.reason]}</p>
+          </li>
+        ))}
+      </ul>
+      {preview.unavailable_truncated && (
+        <p className="mt-3 text-xs text-foreground-muted">
+          当前列出前 {preview.unavailable_items.length} 项，共{" "}
+          {preview.unavailable_count} 项暂不可用。
+        </p>
+      )}
+    </>
   );
 }

@@ -13,7 +13,7 @@ export interface LearningSchedule {
   end_date: string;
 }
 export interface PreviewLearningPlan {
-  choice_policy?: "strict_tiered_v1";
+  choice_policy?: "strict_tiered_v1" | "mixed_tiered_v1";
   practice_mode?: "mastery_v1";
   question_type?: LearningQuestionType;
   task_type: LearningTaskType;
@@ -22,6 +22,7 @@ export interface PreviewLearningPlan {
   schedule: LearningSchedule | null;
 }
 export interface CreateLearningPlan extends PreviewLearningPlan {
+  reuse_active?: boolean;
   accept_partial_choice?: boolean;
   idempotency_key: string;
   name: string;
@@ -107,6 +108,7 @@ export interface LearningPlanSource {
   item_count: number | null;
 }
 export interface LearningPlan extends Omit<LearningTaskDetail, "task"> {
+  question_types?: LearningQuestionType[];
   task: LearningTask;
   mode: "legacy_v1" | "coverage_v1" | "mastery_v1";
   mastery?: {

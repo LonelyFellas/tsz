@@ -3,6 +3,21 @@ import type { HttpClient } from "./http";
 import { createLearningTaskEndpoints } from "./learning-tasks";
 import { validateRuntimeSchema } from "./runtime-schema";
 const id = "0199bd15-8100-7000-8000-000000000001";
+it("accepts negotiated practice configuration features without requiring them from old servers", () => {
+  expect(
+    validateRuntimeSchema("LearningCapabilities", {
+      question_types: ["spelling_zh_to_en", "choice_zh_to_en"],
+      choice_policies: ["strict_tiered_v1", "mixed_tiered_v1"],
+      practice_features: ["mixed_types_v1", "resume_wordlist_v1"],
+      practice_modes: ["mastery_v1"]
+    }).valid
+  ).toBe(true);
+  expect(
+    validateRuntimeSchema("LearningCapabilities", {
+      question_types: ["spelling_zh_to_en"]
+    }).valid
+  ).toBe(true);
+});
 const source = {
   entry_id: id,
   publication_id: id,
@@ -37,7 +52,7 @@ it("choice capability is explicit and legacy spelling tasks remain valid", async
   expect(http.get).toHaveBeenCalledWith("/me/learning-capabilities", {
     headers: {
       "X-TSZ-Learning-Capabilities":
-        "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1"
+        "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1,practice-config-v1"
     }
   });
   const task = {

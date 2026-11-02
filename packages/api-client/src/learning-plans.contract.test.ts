@@ -4,6 +4,77 @@ import type { HttpClient } from "./http";
 import { validateRuntimeSchema } from "./runtime-schema";
 import spec from "./openapi.snapshot.json";
 const id = "0199bd15-8100-7000-8000-000000000001";
+it("decodes persisted question-type combinations and preserves atomic reuse requests", async () => {
+  const value = {
+    question_types: ["spelling_zh_to_en", "choice_zh_to_en"],
+    task: {
+      id,
+      name: "词表续练",
+      task_type: "longterm",
+      question_type: "choice_zh_to_en",
+      wordlist_ids: [id],
+      daily_question_count: null,
+      ends_at: null,
+      state: "active",
+      revision: 1,
+      created_at: "2026-11-02T00:00:00Z"
+    },
+    mode: "mastery_v1",
+    schedule: null,
+    sources: [],
+    current_cycle: null,
+    current_run: null,
+    today_available_count: 2,
+    estimated_learning_days: null,
+    estimate_from_day: null,
+    schedule_at_risk: false,
+    status: "ready",
+    can_start: true,
+    can_start_next_cycle: false,
+    can_restart_blocked_cycle: false,
+    reasons: [],
+    server_time: "2026-11-02T00:00:00Z",
+    business_day: "2026-11-02",
+    next_day_at: "2026-11-02T20:00:00Z",
+    timezone: "Asia/Shanghai"
+  };
+  const http = {
+    post: vi.fn().mockResolvedValue(value)
+  } as unknown as HttpClient;
+  const data = {
+    idempotency_key: id,
+    name: "词表续练",
+    task_type: "longterm" as const,
+    wordlist_ids: [id],
+    daily_question_count: null,
+    schedule: null,
+    preview_fingerprint: "fingerprint",
+    practice_mode: "mastery_v1" as const,
+    question_type: "choice_zh_to_en" as const,
+    choice_policy: "mixed_tiered_v1" as const,
+    reuse_active: true
+  };
+  const plan = await createLearningPlanEndpoints(http).create(data);
+  expect(plan.question_types).toEqual(["spelling_zh_to_en", "choice_zh_to_en"]);
+  expect(http.post).toHaveBeenCalledWith(
+    "/me/learning-plans",
+    data,
+    expect.objectContaining({
+      headers: expect.objectContaining({
+        "X-TSZ-Learning-Capabilities":
+          expect.stringContaining("practice-config-v1")
+      })
+    })
+  );
+  const { question_types: _types, ...legacy } = value;
+  expect(validateRuntimeSchema("LearningPlan", legacy).valid).toBe(true);
+  expect(
+    validateRuntimeSchema("LearningPlan", {
+      ...value,
+      question_types: "choice_zh_to_en"
+    }).valid
+  ).toBe(false);
+});
 it("new plan operations are declared separately while shared run and answer shapes remain frozen", () => {
   expect(spec.paths["/me/learning-plans"]).toEqual(["get", "post"]);
   expect(spec.paths["/me/learning-plans/{id}/cycles"]).toEqual(["get", "post"]);
@@ -48,7 +119,7 @@ it("plan creation preserves fingerprint, optional schedule and cancellation with
       signal: controller.signal,
       headers: {
         "X-TSZ-Learning-Capabilities":
-          "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1"
+          "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1,practice-config-v1"
       }
     }
   );
@@ -104,7 +175,7 @@ it("source refresh uses the cycle protocol with typed recovery counts", async ()
     {
       headers: {
         "X-TSZ-Learning-Capabilities":
-          "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1"
+          "choice-v1,mastery-v1,wordlist-spelling-v1,strict-choice-v1,practice-config-v1"
       }
     }
   );
