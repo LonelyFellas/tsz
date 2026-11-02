@@ -104,6 +104,7 @@
 }
 
 .voice-trial-editor .tsz-ve-editor .tsz-ve-markup {
+  box-sizing: border-box;
   border-color: var(--voice-border, #e5e7eb);
   border-radius: var(--voice-radius, 8px);
 }
