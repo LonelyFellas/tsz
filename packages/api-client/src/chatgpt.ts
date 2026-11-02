@@ -2,9 +2,10 @@ import type {
   ChatGPTAccounts,
   ChatGPTLogin,
   ChatGPTLoginStatus,
-  ChatGPTLogout
+  ChatGPTLogout,
+  ChatGPTSetup
 } from "@tsz/types";
-import type { HttpClient } from "./http";
+import { HttpError, type HttpClient } from "./http";
 import {
   validateRuntimeSchema,
   type RuntimeSchemaRoot
@@ -51,6 +52,20 @@ export function createChatGPTEndpoints(http: HttpClient) {
     return value;
   }
   return {
+    setup: async (options?: {
+      signal?: AbortSignal;
+    }): Promise<ChatGPTSetup> => {
+      try {
+        return decode<ChatGPTSetup>(
+          "ChatGPTSetup",
+          await http.get<unknown>("/chatgpt/setup", options)
+        );
+      } catch (error) {
+        if (error instanceof HttpError && error.status === 404)
+          return { login_method: "local" };
+        throw error;
+      }
+    },
     accounts: async (options?: {
       signal?: AbortSignal;
     }): Promise<ChatGPTAccounts> => {

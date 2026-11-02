@@ -109,7 +109,7 @@ describe("DialectPreference", () => {
     );
     act(() => signIn("new-admin", "uk"));
     release({ preferences: { dialect: "us" } });
-    await screen.findByText(/方言偏好未能保存/);
+    await screen.findByText(/保存失败/);
     expect(useAuthStore.getState().profile?.id).toBe("new-admin");
     expect(ukRadio()).toBeChecked();
     expect(
@@ -138,9 +138,7 @@ describe("DialectPreference", () => {
     expect(
       localStorage.getItem(dialectPreferenceStorageKey("admin-switch"))
     ).toBe("us");
-    expect(
-      await screen.findByText(/已保存英语方言偏好：美式（AmE）/)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/^已保存$/)).toBeInTheDocument();
   });
 
   it("回填的是服务端落库值而不是提交值——默认与取值都由后端说了算", async () => {
@@ -199,7 +197,7 @@ describe("DialectPreference", () => {
     fireEvent.click(usRadio());
 
     expect(
-      await screen.findByText(/方言偏好未能保存：dialect 不合法/)
+      await screen.findByText(/保存失败：dialect 不合法/)
     ).toBeInTheDocument();
     expect(ukRadio()).toBeChecked();
     expect(
@@ -214,7 +212,7 @@ describe("DialectPreference", () => {
 
     fireEvent.click(usRadio());
 
-    expect(await screen.findByText("方言偏好未能保存")).toBeInTheDocument();
+    expect(await screen.findByText("保存失败，请重试")).toBeInTheDocument();
     expect(ukRadio()).toBeChecked();
   });
 
@@ -227,9 +225,7 @@ describe("DialectPreference", () => {
 
     fireEvent.click(usRadio());
 
-    expect(
-      await screen.findByText(/已保存英语方言偏好：美式（AmE）/)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/^已保存$/)).toBeInTheDocument();
     expect(screen.queryByText(/QuotaExceededError/)).not.toBeInTheDocument();
     await waitFor(() => expect(usRadio()).toBeChecked());
   });
@@ -240,7 +236,7 @@ describe("DialectPreference", () => {
     fireEvent.click(usRadio());
 
     expect(
-      await screen.findByText(/方言偏好未能保存：当前会话已失效/)
+      await screen.findByText(/保存失败：当前会话已失效/)
     ).toBeInTheDocument();
     expect(updateProfilePreferences).not.toHaveBeenCalled();
     expect(localStorage.length).toBe(0);

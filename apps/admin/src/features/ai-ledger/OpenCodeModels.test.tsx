@@ -4,7 +4,8 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { App, ConfigProvider } from "antd";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -14,6 +15,7 @@ import type {
 } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { OpenCodeModels } from "./OpenCodeModels";
+import { OpenCodeKeyForm } from "./OpenCodeKeyForm";
 
 vi.mock("@/lib/auth", () => ({
   api: {
@@ -82,7 +84,7 @@ beforeEach(() => {
   vi.mocked(api.opencode.selectModel).mockResolvedValue(target);
   vi.mocked(api.opencode.connectKey).mockResolvedValue(undefined);
 });
-function mount() {
+function mount(withKey = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
@@ -90,33 +92,38 @@ function mount() {
     <ConfigProvider>
       <App>
         <QueryClientProvider client={client}>
-          <OpenCodeModels adminId="super-test" configured />
+          <OpenCodeModels adminId="super-test" />
+          {withKey && <OpenCodeKeyForm adminId="super-test" />}
         </QueryClientProvider>
       </App>
     </ConfigProvider>
   );
   return client;
 }
-async function chooseModel() {
-  await screen.findByText("当前出题模型：deepseek / deepseek-flash（直连）");
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "出题模型" }));
-  fireEvent.click(
-    await screen.findByText(/test-provider \/ Paid model \(paid-model\)/)
+async function ready(name = "deepseek-flash") {
+  const region = await screen.findByRole("region", { name: "当前出题模型" });
+  await within(region).findByText(name);
+  await waitFor(() =>
+    expect(screen.getByRole("combobox", { name: "出题模型" })).toBeEnabled()
   );
+  return region;
 }
-it("展示当前模型，切换后独立重读服务端持久化结果", async () => {
+async function chooseModel() {
+  await ready();
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "出题模型" }));
+  fireEvent.click(await screen.findByText("Paid model（test-provider）"));
+}
+it("模型保存后独立重读服务端结果", async () => {
   mount();
   await chooseModel();
   expect(api.opencode.selectModel).not.toHaveBeenCalled();
   vi.mocked(api.opencode.currentModel).mockResolvedValue(target);
   fireEvent.click(screen.getByRole("button", { name: "保存模型" }));
-  await screen.findByText(
-    "当前出题模型：test-provider / paid-model（OpenCode）"
-  );
+  await ready("Paid model");
   expect(api.opencode.selectModel).toHaveBeenCalledExactlyOnceWith(target);
   expect(api.opencode.currentModel).toHaveBeenCalledTimes(2);
 });
-it("ChatGPT 模型使用相同探针门禁，保存后重读并标明套餐来源", async () => {
+it("ChatGPT 使用相同可用性限制，保存后重读并保留用量入口", async () => {
   const chatgpt: OpenCodeModelSelection = {
     source: "chatgpt",
     provider_id: "oaiapp_fixture",
@@ -127,7 +134,7 @@ it("ChatGPT 模型使用相同探针门禁，保存后重读并标明套餐来�
     models: [
       {
         ...chatgpt,
-        name: "ChatGPT fixture",
+        name: "ChatGPT fixture（ChatGPT）",
         enabled: true,
         status: "available",
         cost: null
@@ -136,49 +143,44 @@ it("ChatGPT 模型使用相同探针门禁，保存后重读并标明套餐来�
   });
   vi.mocked(api.opencode.selectModel).mockResolvedValue(chatgpt);
   mount();
-  await screen.findByText("当前出题模型：deepseek / deepseek-flash（直连）");
+  await ready("deepseek-flash");
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "出题模型" }));
-  fireEvent.click(await screen.findByText(/ChatGPT \/ ChatGPT fixture/));
+  fireEvent.click(await screen.findByText("ChatGPT fixture（ChatGPT）"));
   vi.mocked(api.opencode.currentModel).mockResolvedValue(chatgpt);
   fireEvent.click(screen.getByRole("button", { name: "保存模型" }));
-  await screen.findByText(
-    "当前出题模型：ChatGPT / fixture-model（ChatGPT 套餐）"
-  );
+  await ready("ChatGPT fixture");
   expect(api.opencode.selectModel).toHaveBeenCalledExactlyOnceWith(chatgpt);
   expect(api.opencode.currentModel).toHaveBeenCalledTimes(2);
   expect(
     screen.getByRole("link", { name: "管理 ChatGPT 用量" })
   ).toHaveAttribute("href", "https://chatgpt.com/settings/usage");
 });
-
-it("切换失败保留原模型和选择，列表失败允许刷新", async () => {
+it("保存失败保留当前模型和选择，目录失败可刷新", async () => {
   vi.mocked(api.opencode.selectModel).mockRejectedValue(
     new Error("unavailable")
   );
   mount();
   await chooseModel();
   fireEvent.click(screen.getByRole("button", { name: "保存模型" }));
-  await screen.findByText("模型保存失败，请刷新并确认所选模型已通过探针。");
-  expect(
-    screen.getByText("当前出题模型：deepseek / deepseek-flash（直连）")
-  ).toBeVisible();
+  await screen.findByText("模型保存失败，请刷新后重试。");
+  expect(within(await ready()).getByText("deepseek-flash")).toBeVisible();
   expect(screen.getByRole("button", { name: "保存模型" })).toBeEnabled();
   vi.mocked(api.opencode.probeReport).mockRejectedValueOnce(
     new Error("unavailable")
   );
   fireEvent.click(screen.getByRole("button", { name: "刷新模型" }));
-  await screen.findByText("无法获取模型及探针结果，请刷新模型重试。");
+  await screen.findByText("模型列表读取失败，请刷新。");
 });
-it("添加 Key 后清空输入并刷新目录，不把密钥放进 mutation 变量或自动切换", async () => {
-  const client = mount();
-  await screen.findByText("当前出题模型：deepseek / deepseek-flash（直连）");
+it("Key 表单保存后清空输入并刷新目录，不把密钥放入 mutation 变量或自动切换", async () => {
+  const client = mount(true);
+  await ready();
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "模型服务商" }));
   fireEvent.click(await screen.findByText("Test provider"));
   fireEvent.change(screen.getByLabelText("API Key"), {
     target: { value: "synthetic-test-key" }
   });
   fireEvent.click(screen.getByRole("button", { name: "保存 API Key" }));
-  await screen.findByText("API Key 已保存，请从模型列表中选择要使用的模型。");
+  await screen.findByText("API Key 已保存。");
   expect(api.opencode.connectKey).toHaveBeenCalledExactlyOnceWith({
     provider_id: "test-provider",
     api_key: "synthetic-test-key"
@@ -194,65 +196,56 @@ it("添加 Key 后清空输入并刷新目录，不把密钥放进 mutation 变�
       .every((m) => m.state.variables === undefined)
   ).toBe(true);
 });
-it("当前模型未知时禁止保存，不能将旧缓存当成当前模型", async () => {
+it("当前模型未知时不能保存", async () => {
   vi.mocked(api.opencode.currentModel).mockRejectedValue(
     new Error("unavailable")
   );
   mount();
-  await screen.findByText("无法读取当前出题模型，请刷新模型重试。");
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "保存模型" })).toBeDisabled()
-  );
+  await screen.findByText("当前模型读取失败，请刷新。");
+  expect(screen.getByRole("button", { name: "保存模型" })).toBeDisabled();
   expect(api.opencode.selectModel).not.toHaveBeenCalled();
 });
-
-it("加载全部模型但拒绝选择未验证项，探测全部只运行一次并保留当前模型", async () => {
+it("未经测试的模型不可选，测试仅由明确点击触发", async () => {
   const pending = report();
   pending.state = "idle";
   pending.batch_id = null;
-  pending.models = pending.models.map((m) => ({ ...m, status: "unverified" }));
+  pending.models = pending.models.map((model) => ({
+    ...model,
+    status: "unverified"
+  }));
   vi.mocked(api.opencode.probeReport).mockResolvedValue(pending);
   mount();
-  await screen.findByText("当前出题模型：deepseek / deepseek-flash（直连）");
+  await ready();
   expect(api.opencode.probeAll).not.toHaveBeenCalled();
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "出题模型" }));
-  fireEvent.click(
-    await screen.findByText(/待探测 · test-provider \/ Paid model/)
-  );
+  fireEvent.click(await screen.findByText("Paid model（test-provider）"));
   expect(screen.getByRole("button", { name: "保存模型" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: /探测全部/ }));
+  fireEvent.click(screen.getByRole("button", { name: "测试模型" }));
   await waitFor(() => expect(api.opencode.probeAll).toHaveBeenCalledTimes(1));
-  await screen.findByText("通过 2");
   expect(api.opencode.selectModel).not.toHaveBeenCalled();
-  expect(
-    screen.getByText("当前出题模型：deepseek / deepseek-flash（直连）")
-  ).toBeVisible();
+  expect(within(await ready()).getByText("deepseek-flash")).toBeVisible();
 });
-
-it("目录 enabled 为 true 但探针失败的模型保持禁选", async () => {
+it("enabled 为 true 但测试失败的模型保持禁选", async () => {
   const failed = report();
-  failed.models = failed.models.map((m) =>
-    m.model_id === "paid-model"
+  failed.models = failed.models.map((model) =>
+    model.model_id === "paid-model"
       ? {
-          ...m,
+          ...model,
           status: "unavailable",
           http_status: 503,
           error: "request_failed"
         }
-      : m
+      : model
   );
   vi.mocked(api.opencode.probeReport).mockResolvedValue(failed);
   mount();
-  await screen.findByText("当前出题模型：deepseek / deepseek-flash（直连）");
+  await ready();
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "出题模型" }));
-  fireEvent.click(
-    await screen.findByText(/不可用（HTTP 503） · test-provider \/ Paid model/)
-  );
+  fireEvent.click(await screen.findByText("Paid model（test-provider）"));
   expect(screen.getByRole("button", { name: "保存模型" })).toBeDisabled();
   expect(api.opencode.selectModel).not.toHaveBeenCalled();
 });
-
-it("较早的目录请求返回后仍保留新探针批次并继续轮询", async () => {
+it("早发目录请求不能覆盖新测试批次，运行中继续轮询", async () => {
   let resolveOld!: (value: OpenCodeModelProbeReport) => void;
   const oldRequest = new Promise<OpenCodeModelProbeReport>((resolve) => {
     resolveOld = resolve;
@@ -260,20 +253,23 @@ it("较早的目录请求返回后仍保留新探针批次并继续轮询", asyn
   const next = report();
   next.batch_id = "00000000-0000-0000-0000-000000000002";
   next.state = "running";
-  next.models = next.models.map((m) => ({ ...m, status: "unverified" }));
+  next.models = next.models.map((model) => ({
+    ...model,
+    status: "unverified"
+  }));
   vi.mocked(api.opencode.probeReport)
     .mockResolvedValueOnce(report())
     .mockReturnValueOnce(oldRequest)
     .mockResolvedValue(next);
   vi.mocked(api.opencode.probeAll).mockResolvedValue(next);
   const client = mount();
-  await screen.findByText("通过 2");
+  await ready();
   fireEvent.click(screen.getByRole("button", { name: "刷新模型" }));
   await waitFor(() =>
     expect(api.opencode.probeReport).toHaveBeenCalledTimes(2)
   );
-  fireEvent.click(screen.getByRole("button", { name: /探测全部/ }));
-  await screen.findByRole("button", { name: /探测中/ });
+  fireEvent.click(screen.getByRole("button", { name: "测试模型" }));
+  await screen.findByRole("button", { name: /测试中/ });
   await act(async () => {
     resolveOld(report());
     await oldRequest;
@@ -285,5 +281,5 @@ it("较早的目录请求返回后仍保留新探针批次并继续轮询", asyn
       "super-test"
     ])?.batch_id
   ).toBe(next.batch_id);
-  expect(screen.getByRole("button", { name: /探测中/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: /测试中/ })).toBeVisible();
 });

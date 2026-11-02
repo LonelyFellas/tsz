@@ -7,6 +7,7 @@ import {
   within
 } from "@testing-library/react";
 import { App, ConfigProvider } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
 import { ChatGPTConnection } from "./ChatGPTConnection";
@@ -14,6 +15,7 @@ import { ChatGPTConnection } from "./ChatGPTConnection";
 vi.mock("@/lib/auth", () => ({
   api: {
     chatgpt: {
+      setup: vi.fn(),
       accounts: vi.fn(),
       login: vi.fn(),
       loginStatus: vi.fn(),
@@ -50,6 +52,7 @@ const loggedIn = {
 beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
+  vi.mocked(api.chatgpt.setup).mockResolvedValue({ login_method: "local" });
   vi.mocked(api.chatgpt.accounts).mockResolvedValue(empty);
   vi.mocked(api.chatgpt.login).mockResolvedValue(attempt);
   vi.mocked(api.chatgpt.loginStatus).mockResolvedValue({
@@ -68,7 +71,7 @@ function mount() {
     defaultOptions: { queries: { retry: false } }
   });
   return render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
+    <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
       <App>
         <QueryClientProvider client={client}>
           <ChatGPTConnection adminId="fixture-admin" />
@@ -77,13 +80,15 @@ function mount() {
     </ConfigProvider>
   );
 }
+const summary = () =>
+  within(screen.getByRole("region", { name: "ChatGPT 账号", hidden: true }));
+const drawer = () => screen.getByRole("dialog", { name: "ChatGPT 账号" });
 
-it("发起官方授权，取消失败保留入口且不显示上游敏感错误", async () => {
+it("账号列表保持简洁，点击登录才打开授权；取消失败保留入口", async () => {
   mount();
-  await screen.findByText("未登录");
-  fireEvent.click(
-    screen.getByRole("button", { name: /Continue with ChatGPT/ })
-  );
+  await summary().findByText("未登录");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
   const link = await screen.findByRole("link", { name: "前往 ChatGPT 授权" });
   expect(link).toHaveAttribute("href", attempt.authorization_url);
   expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -103,31 +108,25 @@ it("发起官方授权，取消失败保留入口且不显示上游敏感错误"
     ).not.toBeInTheDocument()
   );
 });
-
-it("授权完成后读取账号，首次说明套餐用途；退出保留远端撤销提示", async () => {
+it("授权完成后重读账号，首次说明套餐用途，退出保留撤销提示", async () => {
   vi.mocked(api.chatgpt.loginStatus).mockResolvedValue({
     status: "complete",
     expires_at: attempt.expires_at,
     error: null
   });
   mount();
-  await screen.findByText("未登录");
+  await summary().findByText("未登录");
   vi.mocked(api.chatgpt.accounts).mockResolvedValue(loggedIn);
-  fireEvent.click(
-    screen.getByRole("button", { name: /Continue with ChatGPT/ })
-  );
-  await screen.findByText("已授权套餐");
-  expect(
-    within(await screen.findByRole("dialog")).getByText(
-      "你正在使用 ChatGPT 套餐"
-    )
-  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
+  await waitFor(() => expect(api.chatgpt.login).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(api.chatgpt.loginStatus).toHaveBeenCalled());
+  const notice = await screen.findByText("使用 ChatGPT 套餐", {
+    selector: ".ant-modal-title"
+  });
   fireEvent.click(screen.getByRole("button", { name: "知道了" }));
-  await waitFor(() =>
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
-  );
+  await waitFor(() => expect(notice).not.toBeVisible());
   expect(
-    screen.getByRole("combobox", { name: "ChatGPT 账号" })
+    within(drawer()).getByRole("combobox", { name: "ChatGPT 账号" })
   ).toBeInTheDocument();
   vi.mocked(api.chatgpt.logout).mockResolvedValue({ remote_revoked: false });
   vi.mocked(api.chatgpt.accounts).mockResolvedValue({
@@ -143,10 +142,9 @@ it("授权完成后读取账号，首次说明套餐用途；退出保留远端�
     "本地已退出，远端撤销未确认。请前往 ChatGPT 用量设置断开此应用。"
   );
   expect(api.chatgpt.logout).toHaveBeenCalledWith("oaiapp_test");
-  await screen.findByText("未登录");
+  await summary().findByText("未登录");
 });
-
-it("重开页面能恢复待完成授权；未配置或状态失败不能发起登录", async () => {
+it("重开页面恢复待完成授权，未启用或账号状态失败时不能登录", async () => {
   vi.mocked(api.chatgpt.accounts).mockResolvedValue({
     ...empty,
     pending_login: attempt
@@ -160,20 +158,67 @@ it("重开页面能恢复待完成授权；未配置或状态失败不能发起�
     configured: false
   });
   mount();
-  await screen.findByText(
-    "此 Agent 尚未启用 ChatGPT 登录，请先在本机启用后刷新。"
-  );
-  expect(
-    screen.getByRole("button", { name: /Continue with ChatGPT/ })
-  ).toBeDisabled();
+  await summary().findByText("未启用");
+  expect(screen.getByRole("button", { name: "登录 ChatGPT" })).toBeDisabled();
   vi.mocked(api.chatgpt.accounts).mockRejectedValue(
     new Error("private-server-details")
   );
   fireEvent.click(
     screen.getByRole("button", { name: "刷新 ChatGPT 账号状态" })
   );
-  await screen.findByText("无法读取 ChatGPT 账号状态，请刷新重试。");
-  expect(
-    screen.getByRole("button", { name: /Continue with ChatGPT/ })
-  ).toBeDisabled();
+  await summary().findByText("状态不可用");
+  expect(screen.getByRole("button", { name: "登录 ChatGPT" })).toBeDisabled();
+  expect(screen.queryByText("private-server-details")).not.toBeInTheDocument();
+});
+it("服务器命令只在抽屉内显示，刷新账号后支持重授权与新增", async () => {
+  vi.mocked(api.chatgpt.setup).mockResolvedValue({ login_method: "ssh" });
+  mount();
+  await summary().findByText("未登录");
+  expect(screen.queryByText("在电脑上登录")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
+  await screen.findByText("在电脑上登录");
+  fireEvent.change(screen.getByRole("textbox", { name: "SSH 主机" }), {
+    target: { value: "fixture-host" }
+  });
+  const command =
+    "uv run python -m tsz_agent.auth login chatgpt --ssh-host 'fixture-host'";
+  await screen.findByText(command);
+  expect(api.chatgpt.login).not.toHaveBeenCalled();
+  vi.mocked(api.chatgpt.accounts).mockResolvedValue(loggedIn);
+  fireEvent.click(screen.getByRole("button", { name: "刷新账号" }));
+  fireEvent.click(await screen.findByRole("button", { name: "知道了" }));
+  expect(screen.queryByText("在电脑上登录")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "重新登录" }));
+  expect(screen.getByRole("textbox", { name: "SSH 主机" })).toHaveValue(
+    "fixture-host"
+  );
+  await screen.findByText(command + " --account 'oaiapp_test'");
+  fireEvent.click(screen.getByRole("button", { name: "添加其他账号" }));
+  await screen.findByText(command);
+  expect(api.chatgpt.login).not.toHaveBeenCalled();
+});
+it("登录方式未知时不启动回调", async () => {
+  vi.mocked(api.chatgpt.setup).mockRejectedValue(
+    new Error("private-config-error")
+  );
+  mount();
+  await summary().findByText("登录暂不可用");
+  expect(screen.getByRole("button", { name: "登录 ChatGPT" })).toBeDisabled();
+  expect(screen.queryByText("private-config-error")).not.toBeInTheDocument();
+});
+it("关闭抽屉不取消授权，再打开可继续且不重复发起", async () => {
+  mount();
+  await summary().findByText("未登录");
+  fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
+  await screen.findByRole("link", { name: "前往 ChatGPT 授权" });
+  fireEvent.click(within(drawer()).getByRole("button", { name: "关闭" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "ChatGPT 账号" })
+    ).not.toBeInTheDocument()
+  );
+  expect(api.chatgpt.cancelLogin).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "继续登录 ChatGPT" }));
+  await screen.findByRole("link", { name: "前往 ChatGPT 授权" });
+  expect(api.chatgpt.login).toHaveBeenCalledTimes(1);
 });

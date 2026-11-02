@@ -1,25 +1,17 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinkOutlined, ReloadOutlined } from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Card,
-  Divider,
-  Flex,
-  Space,
-  Tag,
-  Typography
-} from "antd";
+import { Alert, Badge, Button, Drawer, Space, Typography } from "antd";
 import type { OpenCodeLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { OpenCodeProviders } from "./OpenCodeProviders";
-import { OpenCodeModels } from "./OpenCodeModels";
-import { ChatGPTConnection } from "./ChatGPTConnection";
+import { OpenCodeKeyForm } from "./OpenCodeKeyForm";
 
 export function OpenCodeConnection({ adminId }: { adminId: string }) {
   const client = useQueryClient();
   const [attempt, setAttempt] = useState<OpenCodeLogin>();
+  const [open, setOpen] = useState(false);
+  const [showKey, setShowKey] = useState(false);
   const connectionKey = ["opencode-connection", adminId];
   const connection = useQuery({
     queryKey: connectionKey,
@@ -29,7 +21,9 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
   });
   const login = useMutation({
     mutationFn: () => api.opencode.login(),
-    onSuccess: setAttempt
+    onSuccess: (value) => {
+      setAttempt(value);
+    }
   });
   const status = useQuery({
     queryKey: ["opencode-login", adminId, attempt?.attempt_id],
@@ -63,173 +57,217 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
         ].map((key) => client.invalidateQueries({ queryKey: [key, adminId] }))
       );
   }, [status.data?.status, client, adminId]);
-
   const pending =
     !!attempt && (!status.data || status.data.status === "pending");
   const data = connection.isError ? undefined : connection.data;
   const connected = data?.connected;
+  const manageOnly = connected || (data?.configured && !data.login_available);
   const state = connection.isError
-    ? "连接状态不可用"
+    ? "状态不可用"
     : connection.isPending
-      ? "正在检查"
-      : connected
-        ? "已连接"
-        : "未连接";
-  const failed = status.data?.status === "failed";
-  const expired = status.data?.status === "expired";
+      ? "正在读取"
+      : !data?.configured
+        ? "未配置"
+        : pending
+          ? "等待授权"
+          : connected
+            ? "已连接"
+            : "未连接";
+  const refresh = () => {
+    void connection.refetch();
+    void client.invalidateQueries({
+      queryKey: ["opencode-connections", adminId]
+    });
+  };
 
   return (
-    <Card title="模型与账号">
-      <Flex vertical gap={12}>
-        <Space>
-          <Typography.Text strong>OpenCode</Typography.Text>
-          <Tag color={connected ? "success" : "default"}>{state}</Tag>
-        </Space>
-        <Flex justify="space-between" align="center" wrap gap={12}>
-          <Typography.Text type="secondary">
-            登录 OpenCode Console，将账号连接到服务器，选择要使用的出题模型。
-          </Typography.Text>
-          <Space wrap>
+    <section className="settings-provider" aria-label="OpenCode 账号">
+      <div className="settings-provider__summary">
+        <span className="settings-provider__icon">
+          <LinkOutlined />
+        </span>
+        <div className="settings-provider__identity">
+          <div className="settings-provider__name">
+            OpenCode{" "}
+            <Badge
+              status={
+                connection.isError
+                  ? "error"
+                  : pending
+                    ? "processing"
+                    : connected
+                      ? "success"
+                      : "default"
+              }
+              text={state}
+            />
+          </div>
+          <div className="settings-provider__description">
+            登录授权或 API Key
+          </div>
+        </div>
+        <div className="settings-provider__actions">
+          <Button
+            type="text"
+            icon={<ReloadOutlined />}
+            aria-label="刷新 OpenCode 连接状态"
+            loading={connection.isFetching}
+            onClick={refresh}
+          />
+          <Button
+            aria-label={
+              pending
+                ? "继续登录 OpenCode"
+                : manageOnly
+                  ? "管理 OpenCode"
+                  : "连接 OpenCode"
+            }
+            loading={login.isPending}
+            disabled={!data?.configured || connection.isError}
+            onClick={() => {
+              setOpen(true);
+              if (!connected && data?.login_available && !pending) {
+                cancel.reset();
+                login.mutate();
+              }
+            }}
+          >
+            {pending ? "继续登录" : manageOnly ? "管理" : "连接"}
+          </Button>
+        </div>
+      </div>
+      <Drawer
+        rootClassName="profile-settings-dialog"
+        closable={{ "aria-label": "关闭" }}
+        title="OpenCode"
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setShowKey(false);
+        }}
+        size={480}
+        destroyOnHidden={false}
+      >
+        <div className="settings-dialog-content">
+          {connection.isError && (
+            <Alert type="error" showIcon title="连接状态读取失败，请刷新。" />
+          )}
+          {data && !data.configured && (
+            <Alert type="info" showIcon title="OpenCode 服务未配置。" />
+          )}
+          {data?.configured && !data.login_available && (
+            <Alert
+              type="warning"
+              showIcon
+              title="此服务不支持登录授权，可添加 API Key。"
+            />
+          )}
+          {!pending && data?.login_available && (
             <Button
-              icon={<ReloadOutlined />}
-              aria-label="刷新 OpenCode 连接状态"
-              loading={connection.isFetching}
               onClick={() => {
-                void connection.refetch();
-                void client.invalidateQueries({
-                  queryKey: ["opencode-connections", adminId]
-                });
+                cancel.reset();
+                login.mutate();
               }}
+              loading={login.isPending}
             >
-              刷新状态
+              {connected ? "重新登录" : "登录授权"}
             </Button>
-            {!pending && (
-              <Button
-                type="primary"
-                icon={<LinkOutlined />}
-                loading={login.isPending}
-                disabled={!data?.configured || !data.login_available}
-                onClick={() => {
-                  cancel.reset();
-                  login.mutate();
+          )}
+          {login.isError && (
+            <Alert type="error" showIcon title="登录未能开始，请重试。" />
+          )}
+          {pending && (
+            <Alert
+              type="info"
+              showIcon
+              title="等待你完成 OpenCode 授权"
+              description={
+                <div className="settings-dialog-content">
+                  <Typography.Text>
+                    链接于{" "}
+                    {new Date(attempt.expires_at).toLocaleTimeString("zh-CN")}{" "}
+                    过期。
+                  </Typography.Text>
+                  <Space wrap>
+                    <Button
+                      type="primary"
+                      href={attempt.authorization_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      referrerPolicy="no-referrer"
+                    >
+                      前往 OpenCode 登录
+                    </Button>
+                    <Button
+                      loading={cancel.isPending}
+                      onClick={() => cancel.mutate()}
+                    >
+                      取消登录
+                    </Button>
+                  </Space>
+                </div>
+              }
+            />
+          )}
+          {status.isError && (
+            <Alert
+              type="error"
+              showIcon
+              title="授权结果读取失败"
+              action={
+                <Button onClick={() => void status.refetch()}>
+                  刷新授权结果
+                </Button>
+              }
+            />
+          )}
+          {cancel.isError && (
+            <Alert type="error" showIcon title="取消登录失败，请重试。" />
+          )}
+          {status.data?.status === "failed" && (
+            <Alert
+              type="error"
+              showIcon
+              title="OpenCode 授权失败，请重新连接。"
+            />
+          )}
+          {status.data?.status === "expired" && (
+            <Alert
+              type="warning"
+              showIcon
+              title="登录链接已过期，请重新连接。"
+            />
+          )}
+          {status.data?.status === "complete" && (
+            <Alert type="success" showIcon title="OpenCode 授权已完成。" />
+          )}
+          {data?.configured && (
+            <>
+              <OpenCodeProviders
+                adminId={adminId}
+                disabled={pending || login.isPending}
+                onDisconnected={() => {
+                  setAttempt(undefined);
+                  login.reset();
                 }}
-              >
-                {connected ? "重新连接 OpenCode" : "连接 OpenCode"}
-              </Button>
-            )}
-          </Space>
-        </Flex>
-        {connection.isError && (
-          <Alert
-            type="error"
-            showIcon
-            title="无法读取 OpenCode 连接状态，请刷新重试。"
-          />
-        )}
-        {data && !data.configured && (
-          <Alert
-            type="info"
-            showIcon
-            title="服务器尚未配置 OpenCode 服务，配置完成后即可在这里登录。"
-          />
-        )}
-        {data?.configured && !data.login_available && (
-          <Alert
-            type="warning"
-            showIcon
-            title="当前 OpenCode 服务不支持账号授权，请检查服务版本和连接配置。"
-          />
-        )}
-        {login.isError && (
-          <Alert
-            type="error"
-            showIcon
-            title="未能发起 OpenCode 登录，请重试。"
-          />
-        )}
-        {pending && (
-          <Alert
-            type="info"
-            showIcon
-            title="等待你完成 OpenCode 授权"
-            description={
-              <Flex vertical gap={8}>
-                <Typography.Text>
-                  在官方页面登录并授权，完成后这里会自动更新。链接有效至{" "}
-                  {new Date(attempt.expires_at).toLocaleTimeString("zh-CN")}。
-                </Typography.Text>
-                <Space wrap>
-                  <Button
-                    type="primary"
-                    href={attempt.authorization_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    referrerPolicy="no-referrer"
-                  >
-                    前往 OpenCode 登录
-                  </Button>
-                  <Button
-                    loading={cancel.isPending}
-                    onClick={() => cancel.mutate()}
-                  >
-                    取消登录
-                  </Button>
-                </Space>
-              </Flex>
-            }
-          />
-        )}
-        {status.isError && (
-          <Alert
-            type="error"
-            showIcon
-            title="暂时无法确认授权结果"
-            description="可以刷新授权结果；请勿重复授权。"
-            action={
-              <Button
-                size="small"
-                loading={status.isFetching}
-                onClick={() => void status.refetch()}
-              >
-                刷新授权结果
-              </Button>
-            }
-          />
-        )}
-        {cancel.isError && (
-          <Alert type="error" showIcon title="取消登录失败，请重试。" />
-        )}
-        {failed && (
-          <Alert
-            type="error"
-            showIcon
-            title="OpenCode 授权失败，请重新连接。"
-          />
-        )}
-        {expired && (
-          <Alert type="warning" showIcon title="登录链接已过期，请重新连接。" />
-        )}
-        {status.data?.status === "complete" && (
-          <Alert type="success" showIcon title="OpenCode 授权已完成。" />
-        )}
-      </Flex>
-      {data?.configured && (
-        <OpenCodeProviders
-          adminId={adminId}
-          disabled={pending || login.isPending}
-          onDisconnected={() => {
-            setAttempt(undefined);
-            login.reset();
-          }}
-        />
-      )}
-      <Divider />
-      <ChatGPTConnection key={adminId} adminId={adminId} />
-      <OpenCodeModels
-        key={adminId}
-        adminId={adminId}
-        configured={!!data?.configured}
-      />
-    </Card>
+              />
+              {showKey ? (
+                <OpenCodeKeyForm
+                  adminId={adminId}
+                  disabled={pending || login.isPending}
+                />
+              ) : (
+                <Button
+                  disabled={pending || login.isPending}
+                  onClick={() => setShowKey(true)}
+                >
+                  添加 API Key
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </Drawer>
+    </section>
   );
 }
