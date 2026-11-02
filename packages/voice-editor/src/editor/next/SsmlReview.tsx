@@ -4,7 +4,8 @@ import type { RichTextV2 } from "@tsz/types";
 import type {
   VoicePreviewAdapter,
   VoicePreviewResult,
-  VoiceSetting
+  VoiceSetting,
+  SsmlDraft
 } from "../../types";
 import { voiceSettingKey } from "../../core";
 import { AudioReview, downloadBlob, type ReviewAudio } from "./AudioReview";
@@ -16,10 +17,14 @@ export function SsmlReview({
   onPlay,
   registerStop,
   singleVoice,
-  expanded
+  expanded,
+  draft,
+  onDraftChange
 }: {
   singleVoice?: boolean;
   expanded?: boolean;
+  draft?: SsmlDraft;
+  onDraftChange?: (draft: SsmlDraft) => void;
   adapter: VoicePreviewAdapter;
   content: RichTextV2;
   settings: VoiceSetting[];
@@ -34,8 +39,14 @@ export function SsmlReview({
     settings.find((setting) => setting.enabled) ??
     settings[0];
   const [automatic, setAutomatic] = useState("");
-  const [manual, setManual] = useState(false);
-  const [raw, setRaw] = useState("");
+  const [internalDraft, setInternalDraft] = useState<SsmlDraft>({
+    manual: false
+  });
+  const { manual, raw } = draft ?? internalDraft;
+  function changeDraft(next: SsmlDraft) {
+    setInternalDraft(next);
+    onDraftChange?.(next);
+  }
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -81,7 +92,7 @@ export function SsmlReview({
     // The serialized key captures the actual source and selected version, not object identity.
   }, [open, inputKey, adapter, stop]);
 
-  const value = manual ? raw : automatic;
+  const value = manual ? (raw ?? "") : automatic;
   async function preview() {
     if (!adapter.synthesizeSsml || !selected || !value) return;
     stop();
@@ -145,8 +156,7 @@ export function SsmlReview({
             onChange={(value) => {
               stop();
               setVersion(value);
-              setManual(false);
-              setRaw("");
+              changeDraft({ manual: false });
             }}
           />
         )}
@@ -155,8 +165,10 @@ export function SsmlReview({
           disabled={!automatic || loading}
           onChange={(checked) => {
             stop();
-            if (checked) setRaw(automatic);
-            setManual(checked);
+            changeDraft({
+              manual: checked,
+              raw: checked ? (raw ?? automatic) : raw
+            });
           }}
           aria-label="手动编辑 SSML"
         />
@@ -165,8 +177,7 @@ export function SsmlReview({
           size="small"
           onClick={() => {
             stop();
-            setManual(false);
-            setRaw("");
+            changeDraft({ manual: false });
           }}
         >
           恢复自动生成
@@ -176,8 +187,7 @@ export function SsmlReview({
             size="small"
             onClick={() => {
               stop();
-              setManual(false);
-              setRaw("");
+              changeDraft({ manual: false });
               setOpen(false);
             }}
           >
@@ -193,7 +203,7 @@ export function SsmlReview({
         maxLength={32000}
         onChange={(event) => {
           stop();
-          setRaw(event.target.value);
+          changeDraft({ manual: true, raw: event.target.value });
         }}
       />
       <Space wrap>

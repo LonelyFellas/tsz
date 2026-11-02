@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
 import { VoicesPage } from "@/pages/Voices";
 import { readingRevision } from "@tsz/shared";
+import * as trialEditor from "./VoiceTrialEditor";
 
 const linkedSynthesis = {
   alphabet: "ipa" as const,
@@ -318,16 +319,80 @@ describe("配音中心", () => {
     ).toBeVisible();
   });
   it("分组与音色库可通过独立地址访问，页面不再重复显示入口页签", async () => {
+    setPermissions([
+      "words.access",
+      "speech.generate",
+      "speech.global_dubbing"
+    ]);
     const { router } = mount(false);
     await screen.findByText("尚未设置分组推荐");
+    expect(namedButton("新增分组")).toBeVisible();
+    expect(screen.queryByLabelText("共用试听文本")).toBeNull();
+    expect(screen.queryByRole("button", { name: /刷新音色/ })).toBeNull();
+    expect(api.speech.audioUpdateSettings).not.toHaveBeenCalled();
+    expect(api.speech.allAudioUpdates).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("搜索音色")).toBeNull();
     expect(screen.queryByRole("tab", { name: "分组配音" })).toBeNull();
     await act(() => router.navigate("/voices/library"));
     expect(await screen.findByLabelText("试听 Sonia")).toBeVisible();
+    expect(screen.getByLabelText("共用试听文本")).toBeVisible();
+    expect(namedButton(/刷新音色/)).toBeVisible();
     expect(screen.queryByRole("tab", { name: "音色库" })).toBeNull();
     expect(screen.queryByText("尚未设置分组推荐")).toBeNull();
   });
 
+  it("音色库加入推荐后切回工作台，完整草稿仍在且没有提前写入服务器", async () => {
+    // 本例验证跨入口草稿；富文本输入与标注由下方完整试听用例覆盖。
+    vi.spyOn(trialEditor, "VoiceTrialEditor").mockImplementation(() => <></>);
+    setPermissions([
+      "words.access",
+      "speech.generate",
+      "speech.global_dubbing"
+    ]);
+    vi.mocked(api.speech.groupsV3).mockResolvedValue({
+      revision: 1,
+      order_revision: 1,
+      groups: [
+        {
+          id: "transfer-group",
+          name: "测试推荐组",
+          revision: 1,
+          is_global: false,
+          areas: ["word"],
+          recommendations: { format: "paired", pairs: [] }
+        }
+      ]
+    });
+    const save = vi.spyOn(api.speech, "savePairedGroup");
+    const { router } = mount();
+    fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
+    fireEvent.click(namedButton("加入分组推荐"));
+    fireEvent.mouseDown(await screen.findByLabelText("推荐分组"));
+    fireEvent.click(
+      await screen.findByText("测试推荐组", {
+        selector: ".ant-select-item-option-content"
+      })
+    );
+    fireEvent.click(namedButton("创建整套推荐"));
+    fireEvent.click(
+      within(await screen.findByLabelText("美式音色滚动列表")).getByRole(
+        "radio",
+        { name: "Guy 男声" }
+      )
+    );
+    fireEvent.click(namedButton("保存整套推荐"));
+    await screen.findByText(/已应用到分组草稿/);
+    fireEvent.click(namedButton(/^完\s*成$/));
+    await act(() => router.navigate("/voices"));
+    const panel = await screen.findByRole("region", {
+      name: "测试推荐组 分组配置"
+    });
+    expect(within(panel).getByLabelText("推荐名称 1")).toHaveValue("Sonia");
+    expect(
+      within(panel).getByRole("button", { name: /保存当前组/ })
+    ).toBeEnabled();
+    expect(save).not.toHaveBeenCalled();
+  });
   it("音色库切换到分组菜单前确认未保存的听感，取消保留输入", async () => {
     const { router } = mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
@@ -844,7 +909,8 @@ describe("配音中心", () => {
     expect(details.queryByRole("tab")).toBeNull();
     expect(details.queryByRole("region", { name: "音色资料" })).toBeNull();
     expect(details.queryByText("英国")).toBeNull();
-    const rate = details.getByDisplayValue("1.00");
+    const rate = details.getByLabelText("合成语速");
+    expect(rate).toHaveValue("1.00");
     expect(rate).toHaveAttribute("aria-label", "合成语速");
     expect(rate).toBeVisible();
     fireEvent.change(rate, { target: { value: "0.75" } });
@@ -1208,6 +1274,12 @@ describe("配音中心", () => {
         expect.any(AbortSignal)
       )
     );
+    fireEvent.click(namedButton("试听原参数"));
+    await waitFor(() => expect(api.speech.preview).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.speech.preview).mock.calls[1]![0]).toMatchObject({
+      rate_percent: 0
+    });
+    expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
   });
 
   it("展开直接显示 SSML，折叠时中止试听但保留手动原文", async () => {
@@ -1249,6 +1321,40 @@ describe("配音中心", () => {
     await act(async () => pending.resolve(result("late-ssml")));
     expect(screen.queryByLabelText(/审听 .*SSML/)).toBeNull();
   }, 15000);
+  it("切换音色或关闭后重开，保留本页各声音的手动 SSML", async () => {
+    // 本例验证宿主暂存 SSML，富文本组件不参与原文的编辑与恢复。
+    vi.spyOn(trialEditor, "VoiceTrialEditor").mockImplementation(() => <></>);
+    vi.spyOn(api.speech, "renderSsml").mockResolvedValue({
+      ssml: "<speak>automatic</speak>"
+    });
+    mount();
+    for (const [name, raw] of [
+      ["Sonia", "<speak>Sonia draft</speak>"],
+      ["Guy", "<speak>Guy draft</speak>"]
+    ]) {
+      fireEvent.click(await screen.findByLabelText(`调节 ${name} 声音`));
+      fireEvent.click(namedButton("SSML"));
+      await waitFor(() =>
+        expect(screen.getByLabelText("SSML 原文")).toHaveValue(
+          "<speak>automatic</speak>"
+        )
+      );
+      fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
+      fireEvent.change(screen.getByLabelText("SSML 原文"), {
+        target: { value: raw }
+      });
+      fireEvent.click(screen.getByLabelText("Close"));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    }
+    fireEvent.click(screen.getByLabelText("调节 Sonia 声音"));
+    fireEvent.click(namedButton("SSML"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("SSML 原文")).toHaveValue(
+        "<speak>Sonia draft</speak>"
+      )
+    );
+    expect(screen.getByLabelText("手动编辑 SSML")).toBeChecked();
+  });
 
   it("每个音色保留独立试听文本、标注、格式与参数，列表使用保留草稿", async () => {
     vi.mocked(api.speech.voices).mockResolvedValue({
