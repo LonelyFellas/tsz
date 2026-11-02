@@ -9,6 +9,15 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { useUserStore } from "@/stores/user";
 import { WordlistLibrary } from "./WordlistLibrary";
+import { LibraryTree } from "./LibraryTree";
+vi.mock("./WordListDetail", () => ({
+  WordListDetail: ({ id }: { id: string }) => (
+    <article aria-label="词表内容">词条内容 {id}</article>
+  )
+}));
+vi.mock("./WordListCreator", () => ({
+  WordListCreator: () => <input aria-label="草稿名称" defaultValue="" />
+}));
 import type { LibraryItem, LibraryPage } from "@tsz/types";
 const navigation = vi.hoisted(() => ({ params: "", push: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -85,7 +94,9 @@ beforeEach(() => {
       roles: ["student"]
     }
   });
-  vi.mocked(api.wordList.library.list).mockResolvedValue(page([folder, file]));
+  vi.mocked(api.wordList.library.list).mockImplementation(
+    async (_space, query) => page(query?.parent_id ? [] : [folder, file])
+  );
   vi.mocked(api.wordList.library.preview).mockResolvedValue({
     version: "v1",
     folder_count: 2,
@@ -97,11 +108,83 @@ beforeEach(() => {
     wordlist_count: 7
   });
 });
-it("previews recursive deletion and submits the confirmed snapshot only after confirmation", async () => {
+
+it("shows a selection hint instead of a duplicate file list until a wordlist is opened", async () => {
   renderWithProviders(<WordlistLibrary />);
-  await screen.findAllByText("英语");
-  fireEvent.click(screen.getByLabelText("选择当前页全部项目"));
-  fireEvent.click(screen.getAllByRole("button", { name: "删除" })[0]!);
+  const content = screen.getByRole("region", { name: "内容区域" });
+  expect(
+    within(content).getByRole("heading", { name: "从左侧选择词表" })
+  ).toBeInTheDocument();
+  expect(within(content).queryByRole("list")).toBeNull();
+  expect(within(content).queryByRole("searchbox")).toBeNull();
+  expect(
+    within(content).queryByRole("button", { name: "新建文件夹" })
+  ).toBeNull();
+  const tree = screen.getByRole("navigation", { name: "工程目录" });
+  const fileButton = await within(tree).findByRole("button", {
+    name: "我的备注"
+  });
+  expect(fileButton).toHaveAttribute("data-leaves-page");
+  fireEvent.click(fileButton);
+  expect(navigation.push).toHaveBeenCalledWith(
+    "/account/wordlists?space=owned&wordlist=wordlist"
+  );
+});
+
+it.each(["read", "edit", "new"])(
+  "keeps the %s content open when navigating folders or root in the explorer",
+  async (mode) => {
+    navigation.params =
+      mode === "new" ? "mode=new" : `wordlist=wordlist&mode=${mode}`;
+    const available = {
+      ...file,
+      wordlist: {
+        id: "wordlist",
+        owner_user_id: "reader",
+        owner_name: "读者",
+        name: "阅读生词",
+        state: "draft" as const,
+        revision: 1,
+        item_count: 1,
+        created_at: "",
+        updated_at: ""
+      }
+    };
+    vi.mocked(api.wordList.library.list).mockImplementation(
+      async (_space, query) => page(query?.parent_id ? [] : [folder, available])
+    );
+    renderWithProviders(<WordlistLibrary />);
+    const content = screen.getByRole("region", { name: "内容区域" });
+    const editor =
+      mode === "read"
+        ? await within(content).findByRole("article", { name: "词表内容" })
+        : await within(content).findByRole("textbox", { name: "草稿名称" });
+    if (mode !== "read")
+      fireEvent.change(editor, { target: { value: "尚未保存的草稿" } });
+    const tree = screen.getByRole("navigation", { name: "工程目录" });
+    const folderButton = await within(tree).findByRole("button", {
+      name: "英语"
+    });
+    const rootButton = within(tree).getByRole("button", { name: "创建" });
+    expect(folderButton).not.toHaveAttribute("data-leaves-page");
+    expect(rootButton).not.toHaveAttribute("data-leaves-page");
+    fireEvent.click(folderButton);
+    await within(tree).findByText("空文件夹");
+    fireEvent.click(rootButton);
+    expect(navigation.push).not.toHaveBeenCalled();
+    expect(editor).toBeInTheDocument();
+    if (mode !== "read") expect(editor).toHaveValue("尚未保存的草稿");
+    expect(within(content).queryByRole("list")).toBeNull();
+  }
+);
+
+it("keeps recursive folder deletion in the explorer with its confirmation snapshot", async () => {
+  renderWithProviders(<WordlistLibrary />);
+  const tree = screen.getByRole("navigation", { name: "工程目录" });
+  fireEvent.contextMenu(
+    await within(tree).findByRole("button", { name: "英语" })
+  );
+  fireEvent.click(await screen.findByRole("menuitem", { name: "移入回收站" }));
   const dialog = await screen.findByRole("dialog", { name: "移入回收站" });
   expect(dialog).toHaveTextContent("2 个文件夹和 7 份词表");
   expect(api.wordList.library.operate).not.toHaveBeenCalled();
@@ -112,162 +195,129 @@ it("previews recursive deletion and submits the confirmed snapshot only after co
       expect.objectContaining({
         expected_version: "v1",
         action: "trash",
-        ids: ["folder", "file"]
+        ids: ["folder"]
       })
     )
   );
-  expect(await screen.findByRole("status")).toHaveTextContent("已移入回收站");
 });
-it("separates systems and restores unavailable favorites at their original location", async () => {
+
+it("keeps clearing trash on the left and disables it when the whole trash is empty", async () => {
+  navigation.params = "trash=true";
+  const view = renderWithProviders(<WordlistLibrary />);
+  const sidebar = screen.getByRole("complementary", { name: "目录区域" });
+  const empty = within(sidebar).getByRole("button", { name: "清空回收站" });
+  await waitFor(() => expect(empty).toBeEnabled());
+  expect(
+    within(screen.getByRole("region", { name: "内容区域" })).queryByRole(
+      "button",
+      { name: "清空回收站" }
+    )
+  ).toBeNull();
+  vi.mocked(api.wordList.library.list).mockResolvedValue(page([]));
   navigation.params = "space=favorites&trash=true";
-  vi.mocked(api.wordList.library.list).mockResolvedValue(
-    page([{ ...file, trashed_at: "2026-10-16T00:00:00Z" }])
-  );
-  renderWithProviders(<WordlistLibrary />);
-  expect(
-    await within(screen.getByRole("region", { name: "内容区域" })).findByText(
-      "原词表不可用"
-    )
-  ).toBeInTheDocument();
-  expect(api.wordList.library.list).toHaveBeenCalledWith(
-    "favorites",
-    expect.objectContaining({ trash: true }),
-    expect.anything()
-  );
-  fireEvent.pointerDown(
-    screen.getByRole("button", { name: "我的备注的更多操作" }),
-    { button: 0, ctrlKey: false }
-  );
-  fireEvent.click(await screen.findByRole("menuitem", { name: "恢复" }));
-  const dialog = await screen.findByRole("dialog", { name: "恢复到" });
-  fireEvent.click(within(dialog).getByRole("button", { name: "恢复到原位置" }));
+  view.rerender(<WordlistLibrary />);
   await waitFor(() =>
-    expect(api.wordList.library.operate).toHaveBeenCalledWith(
-      "favorites",
-      expect.objectContaining({
-        action: "restore",
-        ids: ["file"],
-        original_location: true
-      })
-    )
+    expect(
+      within(sidebar).getByRole("button", { name: "清空回收站" })
+    ).toBeDisabled()
   );
-});
-it("keeps failed deletion recoverable and never claims success", async () => {
-  vi.mocked(api.wordList.library.operate).mockRejectedValue(
-    new Error("目录已改变")
-  );
-  renderWithProviders(<WordlistLibrary />);
-  await screen.findAllByText("英语");
-  fireEvent.pointerDown(
-    screen.getByRole("button", { name: "我的备注的更多操作" }),
-    { button: 0, ctrlKey: false }
-  );
-  fireEvent.click(await screen.findByRole("menuitem", { name: "移入回收站" }));
-  fireEvent.click(await screen.findByRole("button", { name: "确认删除" }));
-  await waitFor(() =>
-    expect(screen.getAllByRole("alert")[0]).toHaveTextContent("目录已改变")
-  );
-  expect(screen.queryByRole("status")).toBeNull();
-  expect(screen.getByRole("dialog")).toBeInTheDocument();
-});
-it("does not deliver results from an old account into the new account", async () => {
-  let finish!: (value: {
-    version: string;
-    folder_count: number;
-    wordlist_count: number;
-  }) => void;
-  vi.mocked(api.wordList.library.operate).mockImplementation(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      })
-  );
-  renderWithProviders(<WordlistLibrary />);
-  await screen.findAllByText("英语");
-  fireEvent.pointerDown(
-    screen.getByRole("button", { name: "我的备注的更多操作" }),
-    { button: 0, ctrlKey: false }
-  );
-  fireEvent.click(await screen.findByRole("menuitem", { name: "移入回收站" }));
-  fireEvent.click(await screen.findByRole("button", { name: "确认删除" }));
-  await waitFor(() => expect(api.wordList.library.operate).toHaveBeenCalled());
-  act(() => useUserStore.setState({ user: null }));
-  await act(async () =>
-    finish({ version: "v1", folder_count: 1, wordlist_count: 0 })
-  );
-  expect(screen.queryByRole("status")).toBeNull();
 });
 
-it("keeps the directory beside the selected wordlist and links editing into the same workspace", async () => {
-  const wordlist = {
-    id: "wordlist",
-    owner_user_id: "reader",
-    owner_name: "读者",
-    name: "阅读生词",
-    state: "draft" as const,
-    revision: 1,
-    item_count: 1,
-    created_at: "",
-    updated_at: ""
-  };
-  vi.mocked(api.wordList.library.list).mockResolvedValue(
-    page([{ ...file, wordlist, name: wordlist.name }])
+it("highlights the destination subtree and moves drops on files into their containing folder", async () => {
+  const child = { ...folder, id: "child", parent_id: "folder", name: "雅思" };
+  vi.mocked(api.wordList.library.list).mockImplementation(async (_, query) =>
+    page(
+      query?.parent_id === "child"
+        ? [{ ...file, parent_id: "child" }]
+        : query?.parent_id === "folder"
+          ? [child]
+          : [folder, { ...file, id: "source", name: "待移动" }]
+    )
   );
   renderWithProviders(<WordlistLibrary />);
-  const content = screen.getByRole("region", { name: "内容区域" });
-  const link = await within(content).findByRole("link", { name: "阅读生词" });
-  expect(link).toHaveAttribute(
-    "href",
-    "/account/wordlists?space=owned&wordlist=wordlist"
-  );
   const tree = screen.getByRole("navigation", { name: "工程目录" });
-  const treeFile = await within(tree).findByRole("button", {
-    name: "阅读生词"
-  });
-  expect(treeFile).toHaveAttribute("data-leaves-page");
-  fireEvent.click(treeFile);
-  expect(navigation.push).toHaveBeenCalledWith(
-    "/account/wordlists?space=owned&wordlist=wordlist"
-  );
-  expect(
-    screen.getByRole("complementary", { name: "目录区域" })
-  ).toBeInTheDocument();
-});
-
-it("moves a selection from the content pane into the tree and rejects another system's drag", async () => {
-  renderWithProviders(<WordlistLibrary />);
-  await screen.findAllByText("英语");
-  const tree = screen.getByRole("navigation", { name: "工程目录" });
-  const target = within(tree).getByRole("button", {
+  const parentButton = await within(tree).findByRole("button", {
     name: "英语"
-  }).parentElement!;
-  fireEvent.drop(target, {
-    dataTransfer: {
-      getData: () => JSON.stringify({ space: "favorites", ids: ["file"] })
-    }
   });
-  expect(api.wordList.library.operate).not.toHaveBeenCalled();
-  const payload = new Map<string, string>();
+  fireEvent.keyDown(parentButton, { key: "ArrowRight" });
+  const childButton = await within(tree).findByRole("button", { name: "雅思" });
+  fireEvent.keyDown(childButton, { key: "ArrowRight" });
+  const nestedFile = await within(tree).findByRole("button", {
+    name: "我的备注"
+  });
+  const parentScope = parentButton.closest("li")!;
+  const childScope = childButton.closest("li")!;
   const dataTransfer = {
-    setData: (key: string, value: string) => payload.set(key, value),
-    getData: (key: string) => payload.get(key) ?? ""
+    types: ["application/x-tsz-library"],
+    getData: () => JSON.stringify({ space: "owned", ids: ["source"] })
   };
-  const content = screen.getByRole("region", { name: "内容区域" });
-  fireEvent.dragStart(within(content).getByLabelText("拖动 我的备注"), {
-    dataTransfer
-  });
-  fireEvent.drop(target, { dataTransfer });
+  fireEvent.dragOver(parentButton, { dataTransfer });
+  expect(parentScope).toHaveAttribute("data-drop-target");
+  expect(parentScope).toContainElement(nestedFile);
+  fireEvent(
+    parentButton,
+    new MouseEvent("dragleave", { bubbles: true, relatedTarget: nestedFile })
+  );
+  expect(parentScope).toHaveAttribute("data-drop-target");
+  fireEvent.dragOver(nestedFile, { dataTransfer });
+  expect(parentScope).not.toHaveAttribute("data-drop-target");
+  expect(childScope).toHaveAttribute("data-drop-target");
+  fireEvent.dragLeave(childScope, { relatedTarget: null });
+  expect(childScope).not.toHaveAttribute("data-drop-target");
+  fireEvent.dragOver(nestedFile, { dataTransfer });
+  fireEvent.dragEnd(document);
+  expect(childScope).not.toHaveAttribute("data-drop-target");
+  fireEvent.dragOver(nestedFile, { dataTransfer });
+  fireEvent.drop(nestedFile, { dataTransfer });
+  expect(childScope).not.toHaveAttribute("data-drop-target");
   await waitFor(() =>
-    expect(api.wordList.library.operate).toHaveBeenCalledWith(
+    expect(api.wordList.library.operate).toHaveBeenCalledExactlyOnceWith(
       "owned",
       expect.objectContaining({
         action: "move",
-        ids: ["file"],
-        target_id: "folder"
+        ids: ["source"],
+        target_id: "child"
       })
     )
   );
 });
+
+it.each(["disabled", "trash", "external"] as const)(
+  "does not advertise a folder destination for %s drags",
+  async (condition) => {
+    const onMove = vi.fn();
+    renderWithProviders(
+      <LibraryTree
+        userId="reader"
+        space="owned"
+        trash={condition === "trash"}
+        disabled={condition === "disabled"}
+        ancestorIds={[]}
+        onFolder={vi.fn()}
+        onWordlist={vi.fn()}
+        onMove={onMove}
+        onCreateFolder={vi.fn()}
+        onCreateWordlist={vi.fn()}
+        onAction={vi.fn()}
+        onRefresh={vi.fn()}
+      />
+    );
+    const target = await screen.findByRole("button", { name: "英语" });
+    const dataTransfer = {
+      types: [
+        condition === "external" ? "text/plain" : "application/x-tsz-library"
+      ],
+      getData: () =>
+        condition === "external"
+          ? ""
+          : JSON.stringify({ space: "owned", ids: ["file"] })
+    };
+    expect(fireEvent.dragOver(target, { dataTransfer })).toBe(true);
+    expect(target.closest("li")).not.toHaveAttribute("data-drop-target");
+    fireEvent.drop(target, { dataTransfer });
+    expect(onMove).not.toHaveBeenCalled();
+  }
+);
 
 it.each(["owned", "favorites"] as const)(
   "moves a nested item to %s root through the blank tree area",
@@ -420,66 +470,6 @@ it("shows failed tree moves while a wordlist is open in the content pane", async
   ).toHaveTextContent("目录版本冲突");
 });
 
-it("shows partial selection and clears it without changing any items", async () => {
-  renderWithProviders(<WordlistLibrary />);
-  const content = screen.getByRole("region", { name: "内容区域" });
-  fireEvent.click(await within(content).findByLabelText("选择 我的备注"));
-  const selectAll = within(content).getByLabelText("选择当前页全部项目");
-  expect(selectAll).toBePartiallyChecked();
-  expect(within(content).getByText("已选 1 项")).toBeInTheDocument();
-  fireEvent.click(within(content).getByRole("button", { name: "取消选择" }));
-  expect(selectAll).not.toBePartiallyChecked();
-  expect(within(content).getByLabelText("选择 我的备注")).not.toBeChecked();
-  expect(api.wordList.library.operate).not.toHaveBeenCalled();
-});
-
-it("searches all folders in the current space and clears search with focus restored", async () => {
-  navigation.params = "space=owned&folder=folder";
-  vi.mocked(api.wordList.library.list).mockImplementation(
-    async (_space, query) => page(query?.q ? [] : [folder, file])
-  );
-  renderWithProviders(<WordlistLibrary />);
-  const content = screen.getByRole("region", { name: "内容区域" });
-  const search = within(content).getByRole("searchbox", {
-    name: "搜索词表和文件夹"
-  });
-  fireEvent.change(search, { target: { value: "不存在" } });
-  await within(content).findByText("未找到匹配项目");
-  expect(
-    within(content).getByText("在「创建」全部目录中搜索")
-  ).toBeInTheDocument();
-  expect(api.wordList.library.list).toHaveBeenCalledWith(
-    "owned",
-    expect.objectContaining({ q: "不存在", parent_id: "folder", page: 1 }),
-    expect.anything()
-  );
-  fireEvent.click(within(content).getByRole("button", { name: "清除搜索" }));
-  expect(search).toHaveValue("");
-  expect(search).toHaveFocus();
-  await within(content).findByRole("list", { name: "目录项目" });
-  fireEvent.change(search, { target: { value: "词表" } });
-  fireEvent.keyDown(search, { key: "Escape" });
-  expect(search).toHaveValue("");
-});
-
-it("keeps public browsing available and prevents clearing an empty trash", async () => {
-  navigation.params = "space=favorites";
-  vi.mocked(api.wordList.library.list).mockResolvedValue(page([]));
-  const view = renderWithProviders(<WordlistLibrary />);
-  const content = screen.getByRole("region", { name: "内容区域" });
-  await within(content).findByText("暂无收藏");
-  expect(screen.getByRole("link", { name: "浏览公开词表" })).toHaveAttribute(
-    "href",
-    "/wordlists"
-  );
-  navigation.params = "space=favorites&trash=true";
-  view.rerender(<WordlistLibrary />);
-  await within(content).findByText("回收站为空");
-  expect(
-    within(content).getByRole("button", { name: "清空回收站" })
-  ).toBeDisabled();
-});
-
 it("手机进入回收站后收起目录，返回时保留词表分类", async () => {
   vi.stubGlobal(
     "matchMedia",
@@ -519,14 +509,96 @@ it("手机进入回收站后收起目录，返回时保留词表分类", async (
   ).not.toBeInTheDocument();
 });
 
+it("separates systems and restores unavailable favorites at their original location", async () => {
+  navigation.params = "space=favorites&trash=true";
+  vi.mocked(api.wordList.library.list).mockResolvedValue(
+    page([{ ...file, trashed_at: "2026-10-16T00:00:00Z" }])
+  );
+  renderWithProviders(<WordlistLibrary />);
+  await within(screen.getByRole("navigation", { name: "工程目录" })).findByRole(
+    "button",
+    { name: "我的备注" }
+  );
+  expect(api.wordList.library.list).toHaveBeenCalledWith(
+    "favorites",
+    expect.objectContaining({ trash: true }),
+    expect.anything()
+  );
+  fireEvent.contextMenu(
+    await within(
+      screen.getByRole("navigation", { name: "工程目录" })
+    ).findByRole("button", { name: "我的备注" })
+  );
+  fireEvent.click(await screen.findByRole("menuitem", { name: "恢复…" }));
+  const dialog = await screen.findByRole("dialog", { name: "恢复到" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "恢复到原位置" }));
+  await waitFor(() =>
+    expect(api.wordList.library.operate).toHaveBeenCalledWith(
+      "favorites",
+      expect.objectContaining({
+        action: "restore",
+        ids: ["file"],
+        original_location: true
+      })
+    )
+  );
+});
+it("keeps failed deletion recoverable and never claims success", async () => {
+  vi.mocked(api.wordList.library.operate).mockRejectedValue(
+    new Error("目录已改变")
+  );
+  renderWithProviders(<WordlistLibrary />);
+  await screen.findAllByText("英语");
+  fireEvent.contextMenu(
+    await within(
+      screen.getByRole("navigation", { name: "工程目录" })
+    ).findByRole("button", { name: "我的备注" })
+  );
+  fireEvent.click(await screen.findByRole("menuitem", { name: "移入回收站" }));
+  fireEvent.click(await screen.findByRole("button", { name: "确认删除" }));
+  await waitFor(() =>
+    expect(screen.getAllByRole("alert")[0]).toHaveTextContent("目录已改变")
+  );
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+});
+it("does not deliver results from an old account into the new account", async () => {
+  let finish!: (value: {
+    version: string;
+    folder_count: number;
+    wordlist_count: number;
+  }) => void;
+  vi.mocked(api.wordList.library.operate).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  renderWithProviders(<WordlistLibrary />);
+  await screen.findAllByText("英语");
+  fireEvent.contextMenu(
+    await within(
+      screen.getByRole("navigation", { name: "工程目录" })
+    ).findByRole("button", { name: "我的备注" })
+  );
+  fireEvent.click(await screen.findByRole("menuitem", { name: "移入回收站" }));
+  fireEvent.click(await screen.findByRole("button", { name: "确认删除" }));
+  await waitFor(() => expect(api.wordList.library.operate).toHaveBeenCalled());
+  act(() => useUserStore.setState({ user: null }));
+  await act(async () =>
+    finish({ version: "v1", folder_count: 1, wordlist_count: 0 })
+  );
+  expect(screen.queryByRole("status")).toBeNull();
+});
+
 it("renames a row from its menu and preserves its version and identity", async () => {
   renderWithProviders(<WordlistLibrary />);
-  const content = screen.getByRole("region", { name: "内容区域" });
-  fireEvent.pointerDown(
-    await within(content).findByRole("button", { name: "我的备注的更多操作" }),
-    { button: 0, ctrlKey: false }
+  fireEvent.contextMenu(
+    await within(
+      screen.getByRole("navigation", { name: "工程目录" })
+    ).findByRole("button", { name: "我的备注" })
   );
-  fireEvent.click(await screen.findByRole("menuitem", { name: "重命名" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "重命名…" }));
   const dialog = await screen.findByRole("dialog", { name: "修改名称" });
   expect(within(dialog).getByLabelText("名称")).toHaveValue("我的备注");
   await waitFor(() =>
@@ -554,11 +626,12 @@ it("keeps a failed save in one dialog and locks its draft during the request", a
       })
   );
   renderWithProviders(<WordlistLibrary />);
-  fireEvent.pointerDown(
-    await screen.findByRole("button", { name: "我的备注的更多操作" }),
-    { button: 0, ctrlKey: false }
+  fireEvent.contextMenu(
+    await within(
+      screen.getByRole("navigation", { name: "工程目录" })
+    ).findByRole("button", { name: "我的备注" })
   );
-  fireEvent.click(await screen.findByRole("menuitem", { name: "重命名" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "重命名…" }));
   const dialog = await screen.findByRole("dialog", { name: "修改名称" });
   const input = within(dialog).getByLabelText("名称");
   fireEvent.change(input, { target: { value: "阅读积累" } });
@@ -573,77 +646,4 @@ it("keeps a failed save in one dialog and locks its draft during the request", a
     "操作未完成：名称已存在。"
   );
   expect(input).toHaveFocus();
-});
-
-it("keeps the old list visible but unavailable until the searched result arrives", async () => {
-  let finish!: (value: LibraryPage) => void;
-  vi.mocked(api.wordList.library.list).mockImplementation(
-    async (_space, query) =>
-      query?.q
-        ? new Promise((resolve) => {
-            finish = resolve;
-          })
-        : page([folder, file])
-  );
-  renderWithProviders(<WordlistLibrary />);
-  const content = screen.getByRole("region", { name: "内容区域" });
-  const list = await within(content).findByRole("list", { name: "目录项目" });
-  const search = within(content).getByRole("searchbox", {
-    name: "搜索词表和文件夹"
-  });
-  fireEvent.change(search, { target: { value: "备注" } });
-  expect(list).toHaveAttribute("inert");
-  await waitFor(() =>
-    expect(api.wordList.library.list).toHaveBeenCalledWith(
-      "owned",
-      expect.objectContaining({ q: "备注" }),
-      expect.anything()
-    )
-  );
-  expect(list).toBeInTheDocument();
-  expect(list).toHaveAttribute("inert");
-  expect(within(content).queryByText("正在加载目录…")).toBeNull();
-  await act(async () => finish(page([file])));
-  await waitFor(() => expect(list).not.toHaveAttribute("inert"));
-  expect(within(list).queryByLabelText("选择 英语")).toBeNull();
-});
-
-it("does not search unfinished Chinese input and returns focus after cancelling a menu action", async () => {
-  renderWithProviders(<WordlistLibrary />);
-  const content = screen.getByRole("region", { name: "内容区域" });
-  await within(content).findByRole("list", { name: "目录项目" });
-  const search = within(content).getByRole("searchbox", {
-    name: "搜索词表和文件夹"
-  });
-  fireEvent.compositionStart(search);
-  fireEvent.change(search, { target: { value: "ying" } });
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  });
-  expect(api.wordList.library.list).not.toHaveBeenCalledWith(
-    "owned",
-    expect.objectContaining({ q: "ying" }),
-    expect.anything()
-  );
-  fireEvent.change(search, { target: { value: "英语" } });
-  fireEvent.compositionEnd(search);
-  await waitFor(() =>
-    expect(api.wordList.library.list).toHaveBeenCalledWith(
-      "owned",
-      expect.objectContaining({ q: "英语" }),
-      expect.anything()
-    )
-  );
-  const trigger = within(content).getByRole("button", {
-    name: "我的备注的更多操作"
-  });
-  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
-  fireEvent.click(await screen.findByRole("menuitem", { name: "重命名" }));
-  const dialog = await screen.findByRole("dialog", { name: "修改名称" });
-  await waitFor(() =>
-    expect(within(dialog).getByLabelText("名称")).toHaveFocus()
-  );
-  fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
-  await waitFor(() => expect(trigger).toHaveFocus());
-  expect(api.wordList.library.rename).not.toHaveBeenCalled();
 });
