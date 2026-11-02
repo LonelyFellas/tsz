@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-assistant-p1/docs/openapi.json",
-  "_source_sha256": "9c3f786d17e7985ac4eb8ad3bbbd94581acb739b06c055ba8fc397a2b3e5c539",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-chinese-prompts/docs/openapi.json",
+  "_source_sha256": "b13d21834e3bfbc6d34bd2b1b787e4d6fb36f41e1488df70077fb0377fbe412f",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
@@ -2442,6 +2442,7 @@
       "required": ["question_types"],
       "properties": {
         "choice_policies": { "type": "array", "items": { "type": "string" } },
+        "practice_features": { "type": "array", "items": { "type": "string" } },
         "practice_modes": { "type": "array", "items": { "type": "string" } },
         "question_types": { "type": "array", "items": { "type": "string" } }
       },
@@ -2587,6 +2588,7 @@
         "mastery": { "$ref": "#/$defs/MasterySummary" },
         "mode": { "$ref": "#/$defs/LearningPlanMode" },
         "next_day_at": { "type": "string", "format": "date-time" },
+        "question_types": { "type": "array", "items": { "type": "string" } },
         "reasons": { "type": "array", "items": { "type": "string" } },
         "schedule": {
           "oneOf": [{ "$ref": "#/$defs/LearningSchedule" }, { "type": "null" }]

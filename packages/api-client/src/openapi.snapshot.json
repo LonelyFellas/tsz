@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-assistant-p1/docs/openapi.json",
-  "_generatedAt": "2026-11-01T08:35:32.291Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-chinese-prompts/docs/openapi.json",
+  "_generatedAt": "2026-11-02T02:32:50.079Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -7136,6 +7136,7 @@
         "practice_mode": { "type": "string" },
         "preview_fingerprint": { "type": "string" },
         "question_type": { "type": "string" },
+        "reuse_active": { "type": "boolean" },
         "schedule": {
           "oneOf": [
             { "$ref": "#/components/schemas/LearningSchedule" },

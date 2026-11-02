@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { HttpError } from "@tsz/api-client";
 import type {
   LearningRunState,
+  LearningQuestionType,
   StartLearningRun,
   SubmitLearningAnswer
 } from "@tsz/types";
@@ -37,7 +38,9 @@ const alertText = "text-sm text-danger";
 const hintText = "text-sm leading-6 text-foreground-muted";
 const retryLink =
   "ml-1 font-medium text-primary underline-offset-4 hover:underline";
-function questionTypeLabel(type?: string) {
+function questionTypeLabel(type?: string, types?: LearningQuestionType[]) {
+  if (types?.includes("choice_zh_to_en") && types.includes("spelling_zh_to_en"))
+    return "中文释义单选与拼写";
   return type === "choice_zh_to_en" ? "中文释义单选" : "中文释义拼写";
 }
 
@@ -168,7 +171,10 @@ function TaskList({ userId }: { userId: string }) {
                               ? "每日任务"
                               : "长期任务"}
                             {" · "}
-                            {questionTypeLabel(task.question_type)}
+                            {questionTypeLabel(
+                              task.question_type,
+                              plan.question_types
+                            )}
                             {" · "}
                             {task.wordlist_ids.length} 个词表
                           </p>
@@ -242,19 +248,22 @@ function TaskList({ userId }: { userId: string }) {
 }
 export function LearningTaskCreator({
   wordlistId,
-  owned = false
+  owned = false,
+  directPractice = false
 }: {
   wordlistId?: string;
   owned?: boolean;
+  directPractice?: boolean;
 } = {}) {
   return (
     <Student>
       {(id) => (
         <LearningPlanCreator
-          key={`${id}:${wordlistId ?? "manual"}:${owned}`}
+          key={`${id}:${wordlistId ?? "manual"}:${owned}:${directPractice}`}
           userId={id}
           wordlistId={wordlistId}
           owned={owned}
+          directPractice={directPractice}
         />
       )}
     </Student>
@@ -368,7 +377,7 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
     <PageShell>
       <PageHeader
         back={{ href: "/student/practice", label: "我的任务" }}
-        eyebrow={`${task.task_type === "daily" ? "每日任务" : "长期任务"} · ${questionTypeLabel(task.question_type)}`}
+        eyebrow={`${task.task_type === "daily" ? "每日任务" : "长期任务"} · ${questionTypeLabel(task.question_type, q.data.question_types)}`}
         title={task.name}
         description={
           <>
@@ -733,6 +742,10 @@ function Practice({ userId, id }: { userId: string; id: string }) {
   const r = run.data;
   const choice = !!next?.options;
   const choiceTask = r.question_type === "choice_zh_to_en";
+  const includesSpelling =
+    !choiceTask ||
+    plan.data?.question_types?.includes("spelling_zh_to_en") === true ||
+    qs.data.items.some((q) => q.answered && q.content_available && !q.options);
   const records = qs.data.items.filter(
     (q) => q.answered || !q.content_available
   );
@@ -774,7 +787,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         }
       />
       <div className="space-y-6">
-        {r.state === "completed" && !choiceTask && (
+        {r.state === "completed" && includesSpelling && (
           <Link className={buttonClass} href="/student/review">
             查看待巩固内容与复习安排
           </Link>
