@@ -168,6 +168,105 @@ describe("新建例句保存与恢复", () => {
     ).toMatchObject({ common: { value: { text: "We write stories." } } });
   });
 
+  it("只有新建权限的账号能恢复已成功创建的例句，无需编辑权限", async () => {
+    sessionStorage.clear();
+    speech.editor = false;
+    testActor.profile = {
+      id: "creator",
+      role: "admin",
+      permissions: [
+        "sentences.create",
+        "sentences.access",
+        "words.edit",
+        "words.access"
+      ]
+    };
+    let created: SharedSentence;
+    vi.mocked(api.sentences.create)
+      .mockImplementationOnce(async (input) => {
+        created = {
+          ...example(),
+          id: input.content.sentence.id,
+          content: structuredClone(input.content),
+          revision: 1,
+          created_by_admin_id: "creator"
+        };
+        throw new Error("创建响应丢失");
+      })
+      .mockImplementationOnce(async () => created);
+    vi.mocked(api.sentences.get).mockImplementation(async () => created);
+    vi.mocked(api.sentences.update).mockRejectedValue(
+      new HttpError(403, "没有编辑权限")
+    );
+    const onSaved = vi.fn();
+    show(<SentenceEditor onClose={vi.fn()} onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText("例句正文"), {
+      target: { value: "A recoverable example." }
+    });
+    fireEvent.change(
+      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+      { target: { value: "可恢复的例句。" } }
+    );
+    fireEvent.click(screen.getByLabelText("保存例句"));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+    expect(api.sentences.update).not.toHaveBeenCalled();
+    const calls = vi.mocked(api.sentences.create).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1]![0]).toEqual(calls[0]![0]);
+  });
+
+  it("只有新建权限时保留已创建草稿之外的新输入，仍可重试原创建请求", async () => {
+    sessionStorage.clear();
+    speech.editor = false;
+    testActor.profile = {
+      id: "creator",
+      role: "admin",
+      permissions: [
+        "sentences.create",
+        "sentences.access",
+        "words.edit",
+        "words.access"
+      ]
+    };
+    let created: SharedSentence;
+    vi.mocked(api.sentences.create).mockImplementation(async (input) => {
+      created = {
+        ...example(),
+        id: input.content.sentence.id,
+        content: structuredClone(input.content),
+        revision: 1,
+        created_by_admin_id: "creator"
+      };
+      created.content.sentence.zh_translations[0]!.content.text =
+        "之前已创建的译文";
+      throw new HttpError(
+        409,
+        "此创建 ID 已用于其他内容",
+        [],
+        "idempotency_conflict"
+      );
+    });
+    vi.mocked(api.sentences.get).mockImplementation(async () => created);
+    show(<SentenceEditor onClose={vi.fn()} onSaved={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("例句正文"), {
+      target: { value: "A recoverable example." }
+    });
+    fireEvent.change(
+      screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
+      { target: { value: "未保存的新译文" } }
+    );
+    fireEvent.click(screen.getByLabelText("保存例句"));
+    await screen.findByText(
+      "例句已创建，但当前账号没有修改例句的权限。新的输入已保留。"
+    );
+    expect(api.sentences.update).not.toHaveBeenCalled();
+    expect(api.sentences.create).toHaveBeenCalledOnce();
+    expect(screen.getByDisplayValue("未保存的新译文")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByLabelText("保存例句")).toBeEnabled()
+    );
+  });
+
   it("首次创建响应丢失后修改译文，再次保存应能接续已创建草稿", async () => {
     sessionStorage.clear();
     speech.preview = true;

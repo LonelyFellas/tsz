@@ -241,16 +241,14 @@ export function SentenceEditor({
           content: next
         });
       else {
+        const createInput = {
+          ...(sourceEntryId && sourceSenseId
+            ? { source_entry_id: sourceEntryId, source_sense_id: sourceSenseId }
+            : {}),
+          content: next
+        };
         try {
-          saved = await api.sentences.create({
-            ...(sourceEntryId && sourceSenseId
-              ? {
-                  source_entry_id: sourceEntryId,
-                  source_sense_id: sourceSenseId
-                }
-              : {}),
-            content: next
-          });
+          saved = await api.sentences.create(createInput);
         } catch (createError) {
           if (
             createError instanceof HttpError &&
@@ -266,30 +264,69 @@ export function SentenceEditor({
             throw createError;
           }
           if (!existing) throw createError;
-          setRecoveredCreation(existing);
-          setBaseRevision(existing.revision);
-          initialContent.current = JSON.stringify(existing.content);
-          if (
-            existing.revision !== 1 ||
-            existing.created_by_admin_id !== profile?.id
-          ) {
-            setConflict(true);
-            setLatest(existing);
-            setError(
-              "例句已创建且内容已变化，请比较草稿后再保存。本地输入已保留。"
+          const canUpdate =
+            canAdminResourceAction(
+              profile,
+              "sentences",
+              "edit",
+              existing.created_by_admin_id
+            ) ||
+            canAdminResourceAction(
+              profile,
+              "sentences",
+              "associate",
+              existing.created_by_admin_id
             );
-            return false;
+          if (
+            existing.revision === 1 &&
+            existing.created_by_admin_id === profile?.id &&
+            !canUpdate
+          ) {
+            const cannotUpdate = new Error(
+              "例句已创建，但当前账号没有修改例句的权限。新的输入已保留。"
+            );
+            if (
+              createError instanceof HttpError &&
+              createError.code === "idempotency_conflict"
+            )
+              throw cannotUpdate;
+            // 用原创建请求确认服务端结果，不把创建权限升级为编辑权限。
+            try {
+              saved = await api.sentences.create(createInput);
+            } catch (retryError) {
+              if (
+                retryError instanceof HttpError &&
+                retryError.code === "idempotency_conflict"
+              )
+                throw cannotUpdate;
+              throw retryError;
+            }
+          } else {
+            setRecoveredCreation(existing);
+            setBaseRevision(existing.revision);
+            initialContent.current = JSON.stringify(existing.content);
+            if (
+              existing.revision !== 1 ||
+              existing.created_by_admin_id !== profile?.id
+            ) {
+              setConflict(true);
+              setLatest(existing);
+              setError(
+                "例句已创建且内容已变化，请比较草稿后再保存。本地输入已保留。"
+              );
+              return false;
+            }
+            saved = await api.sentences.update(existing.id, {
+              base_revision: existing.revision,
+              ...(sourceEntryId
+                ? {
+                    context_entry_id: sourceEntryId,
+                    context_sense_id: sourceSenseId
+                  }
+                : {}),
+              content: next
+            });
           }
-          saved = await api.sentences.update(existing.id, {
-            base_revision: existing.revision,
-            ...(sourceEntryId
-              ? {
-                  context_entry_id: sourceEntryId,
-                  context_sense_id: sourceSenseId
-                }
-              : {}),
-            content: next
-          });
         }
       }
       recovery.discard();
