@@ -1,9 +1,11 @@
 import type {
+  AdminWordV3,
   CefrLevel,
   SenseFormGroupBindingV3,
   Dialect,
   DialectModeV3,
   DraftFormsStepContentV3,
+  FormsStepRepresentationV3,
   DraftMeaningsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   EnglishTextV3,
@@ -19,6 +21,93 @@ import type {
   TranslationLanguageV3,
   WordSentenceTranslationV3
 } from "@tsz/types";
+import { expandFormContents } from "@tsz/shared";
+
+/** 普通词义草稿只在引用尚未保存的结构或本词条读法时，才需要先保存词形。 */
+export function meaningsRequireFormsSave(
+  word: Pick<AdminWordV3, "id" | "forms">,
+  content: DraftMeaningsStepContentWritableV3,
+  forms: FormsStepRepresentationV3
+): boolean {
+  // 词性增删和排序由两步共用；只存词义会在回显时按旧词性重新铺出已删除的录入位。
+  if (
+    word.forms.pos.length !== forms.pos.length ||
+    word.forms.pos.some((pos, index) => pos.pos_id !== forms.pos[index]?.pos_id)
+  )
+    return true;
+  const savedForms = expandFormContents(word.forms);
+  const draftForms = expandFormContents(forms);
+  const referencesOwnDraft = (link: {
+    target_word_id: string;
+    target_publication_id?: string;
+    target_pos_id: string;
+    target_form_id: string;
+    target_base_form_id?: string;
+  }) => {
+    if (link.target_word_id !== word.id || link.target_publication_id)
+      return false;
+    return [link.target_form_id, link.target_base_form_id].some((id) => {
+      if (!id) return false;
+      const formIn = (value: DraftFormsStepContentV3) =>
+        value.pos
+          .find((pos) => pos.pos_id === link.target_pos_id)
+          ?.forms.find((form) => form.id === id);
+      return (
+        JSON.stringify(formIn(savedForms)) !==
+        JSON.stringify(formIn(draftForms))
+      );
+    });
+  };
+  for (const pos of content.pos) {
+    const savedPos = word.forms.pos.find((row) => row.pos_id === pos.pos_id);
+    if (!savedPos) return true;
+    if (
+      pos.grammar_structures.some((grammar) =>
+        grammar.variants.some((variant) =>
+          variant.form_links?.some(referencesOwnDraft)
+        )
+      )
+    )
+      return true;
+    for (const sense of pos.senses) {
+      if (
+        boundFormGroupIds(sense).some(
+          (id) =>
+            !savedPos.form_groups.some(
+              (group) => group.id === id && group.scope === "dedicated"
+            )
+        )
+      )
+        return true;
+      const texts = [
+        ...sense.definitions.flatMap((definition) =>
+          definition.definition_mode === "en_definition" ||
+          definition.definition_mode === "en_sentence"
+            ? [definition.content]
+            : []
+        ),
+        ...sense.sentences.map((sentence) => sentence.en_text)
+      ];
+      for (const text of texts) {
+        const variants =
+          text.mode === "unified"
+            ? [text.common]
+            : [text.uk, text.us].flatMap((slot) =>
+                slot.state === "ready" ? [slot.variant] : []
+              );
+        if (
+          variants.some(
+            (variant) =>
+              variant.text_links?.some(referencesOwnDraft) ||
+              variant.reading_links?.some(referencesOwnDraft)
+          )
+        )
+          return true;
+      }
+    }
+  }
+  return false;
+}
 
 export function definitionSummary(sense: {
   definitions: readonly WordDefinitionV3[];

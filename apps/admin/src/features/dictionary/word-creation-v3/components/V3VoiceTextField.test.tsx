@@ -3,6 +3,7 @@ import { PronunciationPreviewProvider } from "../../word-creation/PronunciationP
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  act,
   fireEvent,
   render as rtlRender,
   screen,
@@ -17,7 +18,7 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 import { useState } from "react";
-import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
+import type { AudioUploadAdapter, VoiceSetting } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
   canUpload: true,
@@ -120,6 +121,65 @@ beforeEach(() => {
   state.flags.VOICE_AUDIO_UPLOAD = true;
   state.upload.mockReset();
   state.resolveUrl.mockReset();
+});
+
+it("配音校验只阻止保存，不将例句关联编辑标记为未完成", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const setting: VoiceSetting = {
+    voice_id: "sonia",
+    version_id: "11111111-1111-4111-8111-111111111111",
+    locale: "en-GB",
+    enabled: true,
+    rate_percent: 0
+  };
+  let finish!: (voices: VoiceSetting[]) => void;
+  const resolveVoices = vi.fn(
+    () =>
+      new Promise<VoiceSetting[]>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const pending = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="association"
+      presentation="editor"
+      showDone={false}
+      value={VALUE}
+      nodeId="sentence-pending"
+      field="value"
+      ariaLabel="关联例句"
+      dialect="uk"
+      voiceProfile={{
+        voices: [setting],
+        dubbing: {
+          mode: "local",
+          area: "example",
+          pool_version: "provider_id_v1"
+        }
+      }}
+      previewAdapter={{
+        listVoices: state.listVoices,
+        synthesize: state.synthesize,
+        resolveVoices
+      }}
+      onChange={vi.fn()}
+      onSave={vi.fn(async () => true)}
+      onDraftPendingChange={pending}
+    />
+  );
+  await waitFor(() => expect(resolveVoices).toHaveBeenCalled());
+  expect(
+    screen.getByRole("button", { name: "保存关联例句修改" })
+  ).toBeDisabled();
+  expect(pending).toHaveBeenLastCalledWith(false);
+  await act(async () => finish([setting]));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "保存关联例句修改" })
+    ).toBeEnabled()
+  );
+  expect(pending).toHaveBeenLastCalledWith(false);
 });
 
 it("先在折叠字段输入再打开编辑器，保留已应用的首次推荐", async () => {

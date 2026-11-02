@@ -2,6 +2,8 @@ import { expandFormContents, isSharedForms } from "@tsz/shared";
 import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
 import { wordKeys } from "@/features/dictionary/api";
+import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
+import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import {
   QueryClient,
   QueryClientProvider,
@@ -314,6 +316,55 @@ async function editContentSpelling(value: string) {
 }
 
 describe("WordWizardV3Page", () => {
+  it("新建后直接输入词义可独立保存，不被自动补齐词形的同形确认拦截", async () => {
+    const current = word({ meanings: { sense_groups: [], pos: [] } });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValue({
+      schema_version: 3,
+      base_revision: 1,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: impactSurfacePage(null)
+    });
+    vi.mocked(endpoints.saveMeaningsStepV3).mockImplementation(
+      async (_wordId, input) => ({
+        word: {
+          ...current,
+          revision: 2,
+          meanings: canonicalMeaningsFromWritable(input.content)
+        }
+      })
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+    client.setQueryData(partOfSpeechKeys.catalog(), partOfSpeechCatalogFixture);
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints),
+      undefined,
+      { creationSource: "dictionary" },
+      client
+    );
+    await screen.findByText("有未保存的草稿");
+    fireEvent.click(screen.getByText("词义与例句"));
+    fireEvent.change(await screen.findByLabelText("定义 1 内容"), {
+      target: { value: "博客；网络日志" }
+    });
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
+    await waitFor(() =>
+      expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledTimes(1)
+    );
+    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(screen.queryByText("词形变更需要在上一步确认")).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByText("保存草稿").closest("button")).toBeDisabled()
+    );
+    expect(screen.getByLabelText("定义 1 内容")).toHaveValue("博客；网络日志");
+    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+  });
+
   it.each([
     ["content", false],
     ["form_type", false],
@@ -1806,24 +1857,24 @@ describe("WordWizardV3Page", () => {
     }
   );
 
-  it("saves an unsaved forms draft before meanings and keeps the accepted form", async () => {
+  it("saves meanings without confirming unrelated dirty forms and keeps the local forms draft", async () => {
     const current = word({
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview"
     });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
-    let formsCanonical: AdminWordV3 | undefined;
-    vi.mocked(endpoints.saveFormsStepV3).mockImplementationOnce(
-      async (_wordId, input) => {
-        formsCanonical = { ...current, revision: 2, forms: input.content };
-        return { word: formsCanonical };
-      }
-    );
+    vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValueOnce({
+      schema_version: 3,
+      base_revision: 1,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: impactSurfacePage(null)
+    });
     vi.mocked(endpoints.saveMeaningsStepV3).mockImplementationOnce(
       async (_wordId, input) => ({
         word: {
-          ...formsCanonical!,
-          revision: 3,
+          ...current,
+          revision: 2,
           meanings: canonicalMeaningsFromWritable(input.content)
         }
       })
@@ -1846,16 +1897,18 @@ describe("WordWizardV3Page", () => {
     await waitFor(() =>
       expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledTimes(1)
     );
-    expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1);
-    expect(
-      vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]
-    ).toMatchObject({ base_revision: 1, intent: "save" });
+    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
     expect(
       vi.mocked(endpoints.saveMeaningsStepV3).mock.calls[0]![1].base_revision
-    ).toBe(2);
+    ).toBe(1);
+    expect(screen.queryByText("词形变更需要在上一步确认")).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByText("保存草稿").closest("button")).toBeDisabled()
+    );
     fireEvent.click(screen.getByText("词形与发音"));
     expect(await openContentEditor()).toHaveValue("centre-unsaved-forms");
-    expect(screen.queryByText("有未保存的草稿")).toBeNull();
+    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
   });
 
   it("publishes an eligible draft and immediately transitions the live page to read-only", async () => {

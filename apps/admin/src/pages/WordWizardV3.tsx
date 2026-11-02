@@ -54,6 +54,7 @@ import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v
 import {
   countFormGroupBindings,
   formGroupBindingsChanged,
+  meaningsRequireFormsSave,
   relationDisplaySnapshots
 } from "@/features/dictionary/word-creation-v3/meaningsModel";
 import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
@@ -509,9 +510,7 @@ function V3MeaningsSlot({
     return true;
   };
 
-  // 词义步里的成分用词卡片会改词形内容，保存时向导要先存脏词形。删除已有成分属于
-  // 下游变更，后端要 confirmed_impact_token，直接 PUT 会 409 downstream_confirmation_required
-  // 而整次保存中止。所以这里和词形步一样：先预览影响，需要确认就把保存挂起等确认。
+  // 普通草稿独立保存；新增词性、专用组或本词条读法关联依赖脏词形时，才预览并确认影响。
   // 只记 intent：确认时用当时的 draftMeanings，快照 content 会把确认期间的编辑丢掉。
   const [pendingIntent, setPendingIntent] = useState<StepSaveIntent>();
   const [surfaceBlocked, setSurfaceBlocked] = useState(false);
@@ -526,7 +525,11 @@ function V3MeaningsSlot({
     setSurfaceBlocked(false);
     setPendingIntent(undefined);
     try {
-      if (context.dirtySteps.forms) {
+      if (
+        context.dirtySteps.forms &&
+        (intent === "complete" ||
+          meaningsRequireFormsSave(context.word, content, context.formContents))
+      ) {
         const impact = await context.actions.previewFormsSaveImpact();
         if (!impact) return;
         if (impact.surface_match_page) {
@@ -708,7 +711,15 @@ function V3MeaningsSlot({
           }}
           onPrevious={() => context.setActiveStep("forms")}
           onSave={saveMeanings}
-          canSave={context.hasUnsavedChanges}
+          canSave={
+            context.dirtySteps.meanings ||
+            (context.dirtySteps.forms &&
+              meaningsRequireFormsSave(
+                context.word,
+                context.draftMeanings,
+                context.formContents
+              ))
+          }
           partOfSpeechCatalog={context.partOfSpeechCatalog}
           partOfSpeechCatalogError={context.partOfSpeechCatalogError}
           partOfSpeechCatalogPending={context.partOfSpeechCatalogPending}
@@ -1142,6 +1153,7 @@ export function WordWizardV3Page({
     isSharedForms(word.forms);
   const forcePreview = stepAccess.readOnly || !sharedFormsReady;
   const legalStep = stepAccess.effective;
+  const creationSource = creationSourceFromState(location.state);
   return (
     <Flex vertical gap="middle">
       {step !== legalStep ? (
@@ -1158,7 +1170,13 @@ export function WordWizardV3Page({
           description="当前服务尚未提供共享词形内容，请在服务更新后刷新页面。现有内容仍可查看。"
         />
       )}
-      <CreationSourceNotice source={creationSourceFromState(location.state)} />
+      <CreationSourceNotice
+        source={
+          creationSource === "dictionary-empty" && word.forms.pos.length > 0
+            ? undefined
+            : creationSource
+        }
+      />
       {searchParams.get("focus_node") &&
         !locateV3Node(word, searchParams.get("focus_node")!) && (
           <Alert
@@ -1182,9 +1200,7 @@ export function WordWizardV3Page({
             initialWord={word}
             sharedSentenceCount={sharedSentences.data?.total ?? 0}
             partOfSpeechCatalog={partOfSpeechCatalog.data}
-            prefillNewDraft={
-              creationSourceFromState(location.state) !== undefined
-            }
+            prefillNewDraft={creationSource !== undefined}
             partOfSpeechCatalogError={partOfSpeechCatalog.isError}
             partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
             retiredStableNodes={detail.data.retired_stable_nodes}
