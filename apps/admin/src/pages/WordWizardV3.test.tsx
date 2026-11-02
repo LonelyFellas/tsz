@@ -1047,7 +1047,7 @@ describe("WordWizardV3Page", () => {
     expect(endpoints.get).toHaveBeenCalledWith(WORD_ID);
   }, 20_000);
 
-  it("previews every surface page and saves forms through the wizard flow with both confirmation tokens", async () => {
+  it("loads every surface page and saves the draft with both tokens without a second confirmation", async () => {
     const current = word();
     const firstPage = impactSurfacePage("cursor-2");
     const terminalPage = impactSurfacePage(null);
@@ -1065,8 +1065,12 @@ describe("WordWizardV3Page", () => {
       ],
       surface_match_page: firstPage
     });
-    vi.mocked(endpoints.surfaceMatchSnapshotPage).mockResolvedValueOnce(
-      terminalPage
+    let finishSurface!: (page: SurfaceMatchPageV3) => void;
+    vi.mocked(endpoints.surfaceMatchSnapshotPage).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSurface = resolve;
+        })
     );
     vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
       word: { ...current, revision: 2 }
@@ -1098,22 +1102,11 @@ describe("WordWizardV3Page", () => {
         expect.any(AbortSignal)
       )
     );
-    expect(
-      screen.getByText(/关联内容将随本次调整受到影响。/)
-    ).toBeInTheDocument();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
-
-    await waitFor(() =>
-      expect(
-        screen.getByText("确认影响并保存草稿").closest("button")
-      ).toBeEnabled()
-    );
-    await waitFor(() =>
-      expect(screen.getByText("保存草稿").closest("button")).not.toHaveClass(
-        "ant-btn-loading"
-      )
-    );
-    fireEvent.click(screen.getByText("确认影响并保存草稿").closest("button")!);
+    expect(screen.queryByText("保存前请确认影响")).toBeNull();
+    expect(screen.queryByText("确认影响并保存草稿")).toBeNull();
+    expect(screen.getByText("保存草稿").closest("button")).toBeDisabled();
+    await act(async () => finishSurface(terminalPage));
 
     await waitFor(() =>
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledWith(WORD_ID, {
@@ -1125,6 +1118,47 @@ describe("WordWizardV3Page", () => {
         confirmed_impact_token: "impact-terminal-token"
       })
     );
+  });
+
+  it("automatically includes an impact-only token when saving a forms draft", async () => {
+    const current = word();
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValueOnce({
+      schema_version: 3,
+      base_revision: 1,
+      requires_confirmation: true,
+      affected: [
+        {
+          node_id: UUIDS.form,
+          node_type: "form",
+          reason: "referenced by an existing sense"
+        }
+      ],
+      confirmation_token: "impact-only-token"
+    });
+    vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
+      word: { ...current, revision: 2 }
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+    await editContentSpelling("centre-updated");
+    fireEvent.click(screen.getByText("保存草稿"));
+    await waitFor(() =>
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledWith(
+        WORD_ID,
+        expect.objectContaining({
+          intent: "save",
+          confirmed_impact_token: "impact-only-token"
+        })
+      )
+    );
+    expect(endpoints.surfaceMatchSnapshotPage).not.toHaveBeenCalled();
+    expect(screen.queryByText("确认影响并保存草稿")).toBeNull();
+    expect(
+      vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]
+    ).not.toHaveProperty("confirmed_surface_match_token");
   });
 
   it("saves immediately after an impact preview that needs no confirmation", async () => {
@@ -1483,7 +1517,7 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("invalidates a prepared confirmation when the exact forms draft changes", async () => {
+  it("re-previews after a failed draft save and never reuses a token for changed forms", async () => {
     const current = word();
     const formId = current.forms.pos[0]!.forms[0]!.id;
     const endpoints = source({ word: current, retired_stable_nodes: [] });
@@ -1492,14 +1526,14 @@ describe("WordWizardV3Page", () => {
         schema_version: 3,
         base_revision: 1,
         requires_confirmation: true,
-        confirmation_token: "stale-impact-token",
         affected: [
           {
             node_id: formId,
             node_type: "form",
             reason: "referenced by an existing relation"
           }
-        ]
+        ],
+        surface_match_page: impactSurfacePage(null)
       })
       .mockResolvedValueOnce({
         schema_version: 3,
@@ -1507,33 +1541,36 @@ describe("WordWizardV3Page", () => {
         requires_confirmation: false,
         affected: []
       });
-    vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
-      word: { ...current, revision: 2 }
-    });
+    vi.mocked(endpoints.saveFormsStepV3)
+      .mockRejectedValueOnce(new TypeError("network unavailable"))
+      .mockResolvedValueOnce({ word: { ...current, revision: 2 } });
     renderPage(
       `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints)
     );
 
-    const editedForms = structuredClone(current.forms);
-    const firstVariant = editedForms.contents[0]!.regional_variants;
-    if (firstVariant.mode !== "common")
-      throw new Error("expected common fixture");
-    firstVariant.common.spelling = "centre-edited";
     await editContentSpelling("centre-edited");
     fireEvent.click(await screen.findByText("保存草稿"));
-    expect(await screen.findByText("确认影响并保存草稿")).toBeInTheDocument();
-
-    await editContentSpelling("center-updated");
-    await waitFor(() =>
-      expect(screen.queryByText("确认影响并保存草稿")).toBeNull()
-    );
-    fireEvent.click(screen.getByText("保存草稿"));
-
     await waitFor(() =>
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
     );
-    const request = vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1];
+    expect(vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]).toEqual(
+      expect.objectContaining({
+        confirmed_impact_token: "impact-terminal-token",
+        confirmed_surface_match_token: "surface-terminal-token"
+      })
+    );
+    await waitFor(() =>
+      expect(screen.getByText("保存草稿").closest("button")).toBeEnabled()
+    );
+    await editContentSpelling("center-updated");
+    fireEvent.click(screen.getByText("保存草稿"));
+
+    await waitFor(() =>
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(2)
+    );
+    expect(endpoints.previewFormsImpactV3).toHaveBeenCalledTimes(2);
+    const request = vi.mocked(endpoints.saveFormsStepV3).mock.calls[1]![1];
     const variants = expandFormContents(request.content).pos[0]!.forms[0]!
       .regional_variants;
     expect(
@@ -1541,6 +1578,45 @@ describe("WordWizardV3Page", () => {
     ).toBe("center-updated");
     expect(request).not.toHaveProperty("confirmed_impact_token");
     expect(request).not.toHaveProperty("confirmed_surface_match_token");
+  });
+
+  it("keeps the draft when surface loading fails and retries the full check before saving", async () => {
+    const current = word();
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValue({
+      schema_version: 3,
+      base_revision: 1,
+      requires_confirmation: true,
+      affected: [],
+      surface_match_page: impactSurfacePage("cursor-2")
+    });
+    vi.mocked(endpoints.surfaceMatchSnapshotPage)
+      .mockRejectedValueOnce(new TypeError("network unavailable"))
+      .mockResolvedValueOnce(impactSurfacePage(null));
+    vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
+      word: { ...current, revision: 2 }
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+    await editContentSpelling("centre-preserved");
+    fireEvent.click(await screen.findByText("保存草稿"));
+    expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(screen.getByText("centre-preserved")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("重 试").closest("button")!);
+    await waitFor(() =>
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
+    );
+    expect(endpoints.previewFormsImpactV3).toHaveBeenCalledTimes(2);
+    expect(endpoints.surfaceMatchSnapshotPage).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]).toEqual(
+      expect.objectContaining({
+        confirmed_impact_token: "impact-terminal-token",
+        confirmed_surface_match_token: "surface-terminal-token"
+      })
+    );
   });
 
   it("fails closed when get is not schema V3", async () => {
@@ -3141,6 +3217,8 @@ it.each([false, true])(
       }
     });
     if (failFirst) expect(save.mock.calls[1]![1]).toEqual(payload);
-    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+    expect(endpoints.previewFormsImpactV3).toHaveBeenCalledTimes(
+      failFirst ? 2 : 1
+    );
   }
 );
