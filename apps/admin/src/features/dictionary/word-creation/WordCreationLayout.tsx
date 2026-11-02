@@ -95,9 +95,10 @@ export function WordCreationLayout({
         : completed.has(step)
           ? ("finish" as const)
           : ("wait" as const),
-    // 只有「草稿还没创建」才禁用：完成度不再决定导航权限，四步随时可进。
+    // 创建完成后不能返回创建步骤；后续步骤按可达范围导航。
     disabled:
       !presentation.wordExists ||
+      step === "basics" ||
       Boolean(readOnly) ||
       Boolean(reachableSteps && !reachableSteps.has(step))
   }));

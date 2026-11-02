@@ -104,7 +104,7 @@ describe("WordCreationLayout", () => {
     expect(onStepChange).not.toHaveBeenCalled();
   });
 
-  it("草稿已创建后四步都可点，不受完成进度限制", () => {
+  it("草稿已创建后不能返回创建步骤，后续步骤不受完成进度限制", () => {
     const onStepChange = vi.fn();
     renderLayout({
       currentStep: "forms",
@@ -113,8 +113,13 @@ describe("WordCreationLayout", () => {
     });
 
     expect(document.querySelectorAll(".ant-steps-item-disabled")).toHaveLength(
-      0
+      1
     );
+    expect(screen.getByText("创建词条").closest(".ant-steps-item")).toHaveClass(
+      "ant-steps-item-disabled"
+    );
+    fireEvent.click(screen.getByText("创建词条"));
+    expect(onStepChange).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("词义与例句"));
     expect(onStepChange).toHaveBeenNthCalledWith(1, "meanings");
     // 进度只到 forms，preview 越过当前进度——门禁取消后照样点得动。
