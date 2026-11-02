@@ -557,7 +557,10 @@ describe("新版局部主页和唯一声音草稿", () => {
     });
     fireEvent.click(generate);
     await within(dialog).findByText("存储暂不可用");
-    await waitFor(() => expect(generate).toBeEnabled());
+    await waitFor(() => {
+      expect(generate).toBeEnabled();
+      expect(generate).not.toHaveClass("ant-btn-loading");
+    });
     fireEvent.click(generate);
     await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
     await within(dialog).findByRole("button", { name: "播放正式音频" });

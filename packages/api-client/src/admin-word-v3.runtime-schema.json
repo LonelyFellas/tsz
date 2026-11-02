@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/chatgpt-selfhosted-login/docs/openapi.json",
-  "_source_sha256": "a591a4082d603e9ffcf2fa1510a84a20bc41142900623ee04c1594da62cc0c6e",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/multidim-sentence-create-audit/docs/openapi.json",
+  "_source_sha256": "fe856757d0f198a560758587f74f5287563b4a0993374bc56d89d12f2a685def",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",

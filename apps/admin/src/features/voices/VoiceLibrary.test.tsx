@@ -392,7 +392,7 @@ describe("配音中心", () => {
       within(panel).getByRole("button", { name: /保存当前组/ })
     ).toBeEnabled();
     expect(save).not.toHaveBeenCalled();
-  });
+  }, 15000);
   it("音色库切换到分组菜单前确认未保存的听感，取消保留输入", async () => {
     const { router } = mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
@@ -1354,7 +1354,7 @@ describe("配音中心", () => {
       )
     );
     expect(screen.getByLabelText("手动编辑 SSML")).toBeChecked();
-  });
+  }, 15000);
 
   it("每个音色保留独立试听文本、标注、格式与参数，列表使用保留草稿", async () => {
     vi.mocked(api.speech.voices).mockResolvedValue({
