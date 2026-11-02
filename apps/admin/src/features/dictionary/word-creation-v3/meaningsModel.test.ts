@@ -22,6 +22,7 @@ import {
   syncFormGroupBindings,
   dropEmptySentenceTranslations,
   formGroupLabel,
+  meaningsRequireFormsSave,
   spellingModeForPos,
   editableEnglishText,
   newSentenceTranslations,
@@ -222,6 +223,75 @@ it("语义区间英文富文本和发音配置在编辑转换中保留且不共�
 });
 
 describe("V3 meanings writable model", () => {
+  it("词义仅在新增词性或未保存的专用组上依赖词形保存", () => {
+    const forms = formsFixture({ pos_id: "pos-1" });
+    const word = { id: "word-1", forms };
+    const content = toWritableMeanings(meaningsCanonicalFixture);
+    expect(meaningsRequireFormsSave(word, content, word.forms)).toBe(false);
+    content.pos[0]!.senses[0]!.form_group_ids = ["new-dedicated-group"];
+    expect(meaningsRequireFormsSave(word, content, word.forms)).toBe(true);
+    forms.pos[0]!.form_groups.push({
+      ...structuredClone(forms.pos[0]!.form_groups[0]!),
+      id: "new-dedicated-group",
+      scope: "dedicated"
+    });
+    expect(meaningsRequireFormsSave(word, content, word.forms)).toBe(false);
+    content.pos[0]!.pos_id = "new-pos";
+    expect(meaningsRequireFormsSave(word, content, word.forms)).toBe(true);
+  });
+
+  it("本词条草稿的语法读法关联保留词形确认，已发布版和其他词条不受影响", () => {
+    const word = { id: "word-1", forms: formsFixture({ pos_id: "pos-1" }) };
+    const content = toWritableMeanings(meaningsCanonicalFixture);
+    const variant = content.pos[0]!.grammar_structures[0]!.variants[0]!;
+    const draftForms = structuredClone(word.forms);
+    const form = draftForms.pos[0]!.forms[0]!;
+    if (form.regional_variants.mode !== "common") throw new Error("fixture");
+    form.regional_variants.common.spelling = "edited";
+    const link = {
+      id: "reading-link",
+      source_segments: [{ start: 0, end: 1, surface: "a" }],
+      target_word_id: word.id,
+      target_pos_id: "pos-1",
+      target_form_id: form.id,
+      target_variant_id: "variant-1",
+      target_dialect: "common" as const
+    };
+    variant.form_links = [link];
+    expect(meaningsRequireFormsSave(word, content, word.forms)).toBe(false);
+    expect(meaningsRequireFormsSave(word, content, draftForms)).toBe(true);
+    variant.form_links = [{ ...link, target_publication_id: "published" }];
+    expect(meaningsRequireFormsSave(word, content, draftForms)).toBe(false);
+    variant.form_links = [{ ...link, target_word_id: "another-word" }];
+    expect(meaningsRequireFormsSave(word, content, draftForms)).toBe(false);
+    variant.form_links = [];
+    const text = content.pos[0]!.senses[0]!.sentences[0]!.en_text;
+    if (text.mode !== "unified") throw new Error("fixture");
+    text.common.reading_links = [link];
+    expect(meaningsRequireFormsSave(word, content, draftForms)).toBe(true);
+    text.common.reading_links = [];
+    text.common.text_links = [
+      {
+        ...link,
+        target_base_form_id: form.id,
+        target_sense_id: "sense-1"
+      }
+    ];
+    expect(meaningsRequireFormsSave(word, content, draftForms)).toBe(true);
+  });
+
+  it("删改或排序共享词性时先保存词形，避免回显恢复旧词性", () => {
+    const forms = formsFixture({ pos_id: "pos-1" });
+    forms.pos.push(formsFixture({ pos_id: "pos-2", pos: "verb" }).pos[0]!);
+    const word = { id: "word-1", forms };
+    const content = toWritableMeanings(meaningsCanonicalFixture);
+    expect(meaningsRequireFormsSave(word, content, forms)).toBe(false);
+    const removed = { pos: [forms.pos[0]!] };
+    expect(meaningsRequireFormsSave(word, content, removed)).toBe(true);
+    const reordered = { pos: [...forms.pos].reverse() };
+    expect(meaningsRequireFormsSave(word, content, reordered)).toBe(true);
+  });
+
   it("initializes native V3 POS templates sharing one word-level sense group", () => {
     let nextId = 0;
     const idFactory = vi.fn(() => `new-node-${++nextId}`);

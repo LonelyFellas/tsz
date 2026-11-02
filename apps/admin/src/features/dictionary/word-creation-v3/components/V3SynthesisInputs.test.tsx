@@ -287,7 +287,9 @@ describe("双口音真实试听控件", () => {
       fireEvent.click(
         within(detail).getByRole("button", { name: "保存配音设置" })
       );
-      fireEvent.click(within(editor).getByLabelText(`完成${label}设置`));
+      const complete = within(editor).getByLabelText(`完成${label}设置`);
+      await waitFor(() => expect(complete).toBeEnabled());
+      fireEvent.click(complete);
       const saved = JSON.parse(
         screen.getByTestId("pronunciation-wire").textContent!
       );

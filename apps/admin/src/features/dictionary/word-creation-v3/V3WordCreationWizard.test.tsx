@@ -1,6 +1,7 @@
 import { useVoiceSave } from "./voiceSaveContext";
 import { confirmedPublicationAudioFixture } from "../PublicationAudioReviewPanel.test-helper";
 import { expandFormContents } from "@tsz/shared";
+import { snapshotKey } from "@tsz/shared/recovery";
 import {
   applyFormsStructure,
   contentEditorForms,
@@ -227,6 +228,21 @@ function editedForms(context: V3WizardSlotContext) {
   const variants = next.pos[0]!.forms[0]!.regional_variants;
   if (variants.mode === "common") variants.common.spelling = "local edit";
   return next;
+}
+
+function editedDedicatedForms(context: V3WizardSlotContext) {
+  const forms = editedForms(context);
+  forms.pos[0]!.form_groups[0]!.scope = "dedicated";
+  return forms;
+}
+
+function bindFirstSense(content: DraftMeaningsStepContentWritableV3) {
+  content.pos = toWritableMeanings(canonicalMeanings(UUIDS.pos)).pos;
+  content.pos[0]!.senses[0]!.sense_group_id = content.sense_groups[0]!.id;
+  content.pos[0]!.senses[0]!.form_group_ids = [
+    word().forms.pos[0]!.form_groups[0]!.id
+  ];
+  return content;
 }
 
 function Slot({ context }: { context: V3WizardSlotContext }) {
@@ -1488,7 +1504,7 @@ describe("V3WordCreationWizard", () => {
   it("词义保存先补存词形期间收到别处的新版本：词形存完后不再发出词义保存", async () => {
     let resolveForms!: (value: AdminWordV3Envelope) => void;
     const initial = word(1, "centre");
-    const localMeanings = toWritableMeanings(initial.meanings);
+    const localMeanings = bindFirstSense(toWritableMeanings(initial.meanings));
     localMeanings.sense_groups[0]!.name_zh = "本地改的区间";
     const source = requests({
       saveForms: vi.fn(
@@ -1502,7 +1518,7 @@ describe("V3WordCreationWizard", () => {
       <>
         <button
           type="button"
-          onClick={() => context.setDraftForms(editedForms(context))}
+          onClick={() => context.setDraftForms(editedDedicatedForms(context))}
         >
           编辑词形
         </button>
@@ -1926,6 +1942,74 @@ describe("V3WordCreationWizard", () => {
     expect(comparison).toHaveTextContent("local edit");
   });
 
+  it("词形影响预览的版本冲突可以刷新比较并保留两步草稿后重试", async () => {
+    const impact = vi
+      .fn<V3WordRequests["impact"]>()
+      .mockRejectedValueOnce(
+        new HttpError(409, "stale", [], "revision_conflict")
+      )
+      .mockResolvedValue({
+        schema_version: 3,
+        base_revision: 4,
+        requires_confirmation: false,
+        affected: []
+      });
+    const source = requests({
+      impact,
+      get: vi.fn(async () => draftEnvelope(4, "server latest"))
+    });
+    renderWizard(source, {
+      renderStep: (context) => (
+        <>
+          <output data-testid="impact-conflict-revision">
+            {context.word.revision}
+          </output>
+          <output data-testid="impact-conflict-form">
+            {spellingOf(context)}
+          </output>
+          <output data-testid="impact-conflict-meaning">
+            {context.draftMeanings.sense_groups[0]?.name_zh}
+          </output>
+          <button
+            onClick={() => {
+              context.setDraftForms(editedForms(context));
+              const meanings = structuredClone(context.draftMeanings);
+              meanings.sense_groups[0]!.name_zh = "本地词义";
+              context.setDraftMeanings(meanings);
+            }}
+          >
+            编辑影响预览草稿
+          </button>
+          <button onClick={() => void context.actions.previewFormsSaveImpact()}>
+            预览保存影响
+          </button>
+        </>
+      )
+    });
+    fireEvent.click(screen.getByText("编辑影响预览草稿"));
+    fireEvent.click(screen.getByText("预览保存影响"));
+    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("impact-conflict-revision")).toHaveTextContent(
+        "4"
+      )
+    );
+    expect(screen.getByTestId("impact-conflict-form")).toHaveTextContent(
+      "local edit"
+    );
+    expect(screen.getByTestId("impact-conflict-meaning")).toHaveTextContent(
+      "本地词义"
+    );
+    expect(screen.getByRole("region", { name: "草稿差异" })).toHaveTextContent(
+      "server latest"
+    );
+    fireEvent.click(screen.getByText("预览保存影响"));
+    await waitFor(() => expect(impact).toHaveBeenCalledTimes(2));
+    expect(impact.mock.calls.map(([, input]) => input.base_revision)).toEqual([
+      1, 4
+    ]);
+  });
+
   it("比较请求在途期间的继续输入不会被旧的失败请求覆盖", async () => {
     let resolve!: (value: ReturnType<typeof draftEnvelope>) => void;
     const response = new Promise<ReturnType<typeof draftEnvelope>>((done) => {
@@ -2008,13 +2092,15 @@ describe("V3WordCreationWizard", () => {
           </output>
           <button
             type="button"
-            onClick={() => context.setDraftForms(editedForms(context))}
+            onClick={() => context.setDraftForms(editedDedicatedForms(context))}
           >
             同时编辑词形
           </button>
           <button
             type="button"
-            onClick={() => context.setDraftMeanings(localMeanings)}
+            onClick={() =>
+              context.setDraftMeanings(bindFirstSense(localMeanings))
+            }
           >
             编辑释义
           </button>
@@ -5794,8 +5880,8 @@ describe("V3WordCreationWizard", () => {
           <button
             type="button"
             onClick={() => {
-              context.setDraftForms(editedForms(context));
-              context.setDraftMeanings(localMeanings);
+              context.setDraftForms(editedDedicatedForms(context));
+              context.setDraftMeanings(bindFirstSense(localMeanings));
             }}
           >
             编辑词形和释义
@@ -5857,10 +5943,10 @@ describe("V3WordCreationWizard", () => {
           <button
             type="button"
             onClick={() => {
-              context.setDraftForms(editedForms(context));
+              context.setDraftForms(editedDedicatedForms(context));
               const meanings = structuredClone(context.draftMeanings);
               meanings.sense_groups[0]!.name_zh = "普通保存仍需保留";
-              context.setDraftMeanings(meanings);
+              context.setDraftMeanings(bindFirstSense(meanings));
             }}
           >
             编辑普通保存草稿
@@ -6896,6 +6982,118 @@ describe("新草稿默认录入位", () => {
       }
     };
   };
+
+  it.each(["setDraftForms", "setFormContents"] as const)(
+    "%s 首次新增词性继承已确认的主词，随后手动清空不回填",
+    async (setter) => {
+      const initialWord: AdminWordV3 = word();
+      initialWord.id = `initial-pos-${setter}`;
+      initialWord.forms = { forms_format: "shared_v1", contents: [], pos: [] };
+      initialWord.meanings = { sense_groups: [], pos: [] };
+      const key = snapshotKey("admin-1", `word-v3:${initialWord.id}`);
+      onTestFinished(() => sessionStorage.removeItem(key));
+      const { seen, renderStep } = capture();
+      const view = renderWizard(requests(), { initialWord, renderStep });
+      const added = formsFixture();
+      const variant = added.pos[0]!.forms[0]!.regional_variants;
+      if (variant.mode !== "common") throw new Error("fixture");
+      variant.common.spelling = "";
+      act(() =>
+        setter === "setFormContents"
+          ? seen.context!.setFormContents(
+              applyFormsStructure(initialWord.forms, added)
+            )
+          : seen.context!.setDraftForms(added)
+      );
+      expect(spellingOf(seen.context!)).toBe("centre");
+      const cleared = structuredClone(seen.context!.formContents);
+      if (!("contents" in cleared)) throw new Error("fixture");
+      const clearedVariant = cleared.contents[0]!.regional_variants;
+      if (clearedVariant.mode !== "common") throw new Error("fixture");
+      clearedVariant.common.spelling = "";
+      act(() => seen.context!.setFormContents(cleared));
+      expect(spellingOf(seen.context!)).toBe("");
+      view.unmount();
+      const reopened = capture();
+      renderWizard(requests(), {
+        initialWord,
+        renderStep: reopened.renderStep
+      });
+      fireEvent.click(screen.getByRole("button", { name: "恢复编辑" }));
+      expect(reopened.seen.context!.draftForms.pos).toHaveLength(1);
+      expect(spellingOf(reopened.seen.context!)).toBe("");
+    }
+  );
+
+  it("词义草稿跳过自动补齐的词形，连续保存后保留词形模板和未保存状态", async () => {
+    const key = snapshotKey("admin-1", "word-v3:word-1");
+    const previousSnapshot = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    onTestFinished(() => {
+      if (previousSnapshot === null) sessionStorage.removeItem(key);
+      else sessionStorage.setItem(key, previousSnapshot);
+    });
+    const initialWord = word();
+    let canonical: AdminWordV3 = initialWord;
+    const saveMeanings = vi.fn<V3WordRequests["saveMeanings"]>(
+      async (_wordId, input) => {
+        canonical = {
+          ...canonical,
+          revision: canonical.revision + 1,
+          meanings: {
+            ...canonical.meanings,
+            sense_groups: input.content.sense_groups
+          }
+        };
+        return { word: canonical };
+      }
+    );
+    const source = requests({ saveMeanings });
+    const { seen, renderStep } = capture();
+    const view = renderWizard(source, {
+      initialWord,
+      initialStep: "meanings",
+      partOfSpeechCatalog: partOfSpeechCatalogFixture,
+      prefillNewDraft: true,
+      renderStep
+    });
+    await waitFor(() =>
+      expect(seen.context!.draftForms.pos[0]!.forms.length).toBeGreaterThan(1)
+    );
+    const filledForms = structuredClone(seen.context!.draftForms);
+    for (const name of ["第一版词义", "第二版词义"]) {
+      act(() => {
+        const content = structuredClone(seen.context!.draftMeanings);
+        content.sense_groups[0]!.name_zh = name;
+        seen.context!.setDraftMeanings(content);
+      });
+      await act(() =>
+        seen.context!.actions.saveMeanings(seen.context!.draftMeanings, "save")
+      );
+      expect(seen.context!.draftMeanings.sense_groups[0]!.name_zh).toBe(name);
+      expect(seen.context!.draftForms).toEqual(filledForms);
+      expect(seen.context!.dirtySteps).toEqual({
+        forms: true,
+        meanings: false
+      });
+    }
+    expect(source.saveForms).not.toHaveBeenCalled();
+    expect(
+      saveMeanings.mock.calls.map(([, input]) => input.base_revision)
+    ).toEqual([1, 2]);
+    view.unmount();
+    const reopened = capture();
+    renderWizard(source, {
+      initialWord: canonical,
+      initialStep: "forms",
+      renderStep: reopened.renderStep
+    });
+    fireEvent.click(screen.getByRole("button", { name: "恢复编辑" }));
+    expect(reopened.seen.context!.draftForms).toEqual(filledForms);
+    expect(reopened.seen.context!.draftMeanings.sense_groups[0]!.name_zh).toBe(
+      "第二版词义"
+    );
+  });
 
   it("刚创建时铺出词形模板并把语义区间摆够默认条数", async () => {
     const { seen, renderStep } = capture();

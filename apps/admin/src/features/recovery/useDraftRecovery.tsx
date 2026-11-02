@@ -12,6 +12,7 @@ import { useAuthStore } from "@/lib/auth";
 export function useDraftRecovery<T>({
   entity,
   revision,
+  savedRevision,
   value,
   dirty,
   busy,
@@ -20,6 +21,8 @@ export function useDraftRecovery<T>({
 }: {
   entity: string;
   revision: number;
+  /** 本编辑器已确认写入的版本；部分保存后，剩余本地草稿可以安全基于该版本恢复。 */
+  savedRevision?: number;
   value: T;
   dirty: boolean;
   busy: boolean;
@@ -29,7 +32,7 @@ export function useDraftRecovery<T>({
   const userId = useAuthStore((state) => state.profile?.id);
   const key = userId ? snapshotKey(userId, entity) : null;
   const baseRevision = useRef(revision);
-  if (!dirty) baseRevision.current = revision;
+  if (!dirty || savedRevision === revision) baseRevision.current = revision;
   const [saved, setSaved] = useState<{
     key: string;
     snapshot: DraftSnapshot<T>;
@@ -60,7 +63,7 @@ export function useDraftRecovery<T>({
         "编辑备份不可用（存储空间不足或含未上传媒体）。请先保存或导出内容，再刷新。"
       );
     }
-  }, [key, loaded, saved, error, dirty, revision, value]);
+  }, [key, loaded, saved, error, dirty, revision, savedRevision, value]);
   useEffect(() => {
     const notify = (active: boolean) =>
       window.dispatchEvent(

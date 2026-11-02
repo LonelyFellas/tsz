@@ -1433,6 +1433,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setSpellingNotice("");
   };
 
+  const voiceSavePending =
+    !contentReadOnly &&
+    mode !== "actual-pron" &&
+    Boolean(voiceProfile?.dubbing?.pool_version) &&
+    (voicesLoading ||
+      (Boolean(previewAdapter?.resolveVoices) &&
+        resolvedVoices?.key !== resolutionKey));
+
   const captureResult = (forSave = false) => {
     let profile = voiceProfile;
     if (
@@ -1452,11 +1460,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       mode !== "actual-pron" &&
       profile?.dubbing?.pool_version
     ) {
-      if (
-        voicesLoading ||
-        (previewAdapter?.resolveVoices && resolvedVoices?.key !== resolutionKey)
-      )
-        throw new Error("正在校验有效配音，请稍后保存");
+      if (voiceSavePending) throw new Error("正在校验有效配音，请稍后保存");
       const required = locale ? [speechAccentGroup(locale)] : ["uk", "us"];
       for (const accent of required) {
         if (
@@ -3497,7 +3501,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         {renderActions && (
           <div className="tsz-ve-editor-actions">
             {renderActions(
-              !generatingVersion && !pendingUploads.some((item) => !item.error),
+              !voiceSavePending &&
+                !generatingVersion &&
+                !pendingUploads.some((item) => !item.error),
               prepareComplete,
               captureResult
             )}
@@ -3691,6 +3697,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         selectedPauseGap={pauseGap}
         actions={renderActions?.(
           !blockingError &&
+            !voiceSavePending &&
             pendingText === undefined &&
             !pendingConflict &&
             conflictCount === 0 &&

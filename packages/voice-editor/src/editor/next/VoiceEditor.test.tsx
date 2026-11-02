@@ -2522,6 +2522,57 @@ describe("VoiceEditor 发音区", () => {
     });
   });
 
+  it.each(["grammar", "synthesis"] as const)(
+    "%s 在有效配音校验完成前禁用保存",
+    async (mode) => {
+      const setting: VoiceSetting = {
+        version_id: "11111111-1111-4111-8111-111111111111",
+        locale: "en-GB",
+        voice_id: "sonia",
+        enabled: true,
+        rate_percent: 0
+      };
+      let finish!: (voices: VoiceSetting[]) => void;
+      const resolveVoices = vi.fn(
+        () =>
+          new Promise<VoiceSetting[]>((resolve) => {
+            finish = resolve;
+          })
+      );
+      render(
+        <VoiceEditor
+          {...props({
+            mode,
+            locale: "en-GB",
+            autoRecommend: false,
+            voiceProfile: {
+              voices: [setting],
+              dubbing: {
+                mode: "local",
+                area: "grammar",
+                pool_version: "provider_id_v1"
+              }
+            },
+            previewAdapter: { ...adapter(), resolveVoices },
+            renderActions: (canComplete: boolean) => (
+              <button disabled={!canComplete}>保存配音编辑</button>
+            )
+          })}
+        />
+      );
+      await waitFor(() => expect(resolveVoices).toHaveBeenCalled());
+      expect(
+        screen.getByRole("button", { name: "保存配音编辑" })
+      ).toBeDisabled();
+      await act(async () => finish([setting]));
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "保存配音编辑" })
+        ).toBeEnabled()
+      );
+    }
+  );
+
   it("正式生成期间不能完成编辑，改字后迟到音频不能绑定到新正文", async () => {
     const onVoiceProfileChange = vi.fn();
     let resolve!: (value: AudioAsset) => void;
