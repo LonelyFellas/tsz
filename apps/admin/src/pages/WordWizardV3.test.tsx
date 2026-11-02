@@ -1193,11 +1193,7 @@ describe("WordWizardV3Page", () => {
     );
     // TASK#58：被引用不再锁英美结构开关（引用按语义坐标重解析）。
     const spelling = await openContentEditor();
-    expect(
-      document.querySelector(
-        '.v3-content-modal .ant-radio-group input[value="distinguish"]'
-      )
-    ).not.toBeDisabled();
+    expect(screen.getByLabelText("拼写有英美区别")).not.toBeDisabled();
     await changeVoiceText(spelling, { target: { value: "center" } });
     confirmContentEditor();
     expect(screen.getByText("保存草稿").closest("button")).toBeEnabled();
@@ -2215,10 +2211,7 @@ describe("WordWizardV3Page", () => {
     );
     fireEvent.click(screen.getByText("词形与发音"));
     await openContentEditor();
-    const spellingRules = document.querySelector(
-      ".v3-content-modal .ant-radio-group"
-    )!;
-    fireEvent.click(spellingRules.querySelector('input[value="distinguish"]')!);
+    fireEvent.click(screen.getByLabelText("拼写有英美区别"));
     confirmContentEditor();
     fireEvent.click(screen.getByText("保存草稿").closest("button")!);
     await waitFor(() => expect(endpoints.saveFormsStepV3).toHaveBeenCalled());

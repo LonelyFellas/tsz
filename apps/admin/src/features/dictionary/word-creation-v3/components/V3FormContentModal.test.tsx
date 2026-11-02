@@ -24,6 +24,7 @@ import { createStableVariantIdFactory } from "../operations";
 import {
   commonFormFixture,
   formsFixture,
+  pronunciationFixture,
   ukUsFormFixture,
   uuidFromInt
 } from "../fixtures";
@@ -171,11 +172,141 @@ function setup({
       </ConfigProvider>
     );
   }
-  render(<Host />);
-  return { forms, onConfirm, onCancel, leave: () => leaveGuard!() };
+  const { unmount } = render(<Host />);
+  return { forms, onConfirm, onCancel, leave: () => leaveGuard!(), unmount };
 }
 
 describe("词形内容弹窗的草稿边界", () => {
+  it.each([
+    ["unified", "unified", true],
+    ["unified", "distinguish", false],
+    ["distinguish", "distinguish", true]
+  ] as const)(
+    "已有设置 %s/%s/is_regular=%s 原样回显并确认，不套用默认值",
+    (spelling_mode, phonetic_mode, is_regular) => {
+      const expanded = formsFixture({
+        forms: [
+          spelling_mode === "distinguish"
+            ? ukUsFormFixture()
+            : commonFormFixture()
+        ],
+        dialect_rules: { spelling_mode, phonetic_mode }
+      });
+      const initial = applyFormsStructure(
+        { forms_format: "shared_v1", contents: [], pos: [] },
+        expanded
+      ) as SharedFormsStepContentV3;
+      const regions = initial.pos[0]!.forms[0]!.regional_bindings;
+      if (regions.mode === "common") regions.common.is_regular = is_regular;
+      else {
+        regions.uk.is_regular = is_regular;
+        regions.us.is_regular = is_regular;
+      }
+      const { onConfirm } = setup({ initialForms: initial, baseOnly: true });
+      expect(
+        screen.getByRole("switch", { name: "拼写有英美区别" })
+      ).toHaveAttribute(
+        "aria-checked",
+        String(spelling_mode === "distinguish")
+      );
+      expect(
+        screen.getByRole("switch", { name: "音标有英美区别" })
+      ).toHaveAttribute(
+        "aria-checked",
+        String(phonetic_mode === "distinguish")
+      );
+      expect(
+        screen.getByRole("switch", { name: "词形不规则变化" })
+      ).toHaveAttribute("aria-checked", String(!is_regular));
+      fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+      expect(onConfirm).toHaveBeenCalledWith(initial);
+    }
+  );
+
+  it("拼写开关联动音标，不规则开关双向映射，确认后重新打开回显", () => {
+    const { forms, onConfirm, unmount } = setup({ baseOnly: true });
+    const before = structuredClone(forms);
+    const spelling = screen.getByRole("switch", { name: "拼写有英美区别" });
+    const phonetics = screen.getByRole("switch", { name: "音标有英美区别" });
+    const irregularity = screen.getByRole("switch", { name: "词形不规则变化" });
+    expect(spelling).not.toBeChecked();
+    expect(phonetics).not.toBeChecked();
+    expect(irregularity).not.toBeChecked();
+    fireEvent.click(spelling);
+    expect(spelling).toBeChecked();
+    expect(phonetics).toBeChecked();
+    expect(phonetics).toBeDisabled();
+    fireEvent.click(phonetics);
+    expect(phonetics).toBeChecked();
+    fireEvent.click(spelling);
+    expect(spelling).not.toBeChecked();
+    expect(phonetics).toBeChecked();
+    expect(phonetics).toBeEnabled();
+    fireEvent.click(phonetics);
+    expect(phonetics).not.toBeChecked();
+    fireEvent.click(phonetics);
+    fireEvent.click(irregularity);
+    expect(irregularity).toBeChecked();
+    fireEvent.click(irregularity);
+    expect(irregularity).not.toBeChecked();
+    expect(forms).toEqual(before);
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+    expect(next.contents[0]!.dialect_rules).toEqual({
+      spelling_mode: "unified",
+      phonetic_mode: "distinguish"
+    });
+    expect(next.pos[0]!.forms[0]!.regional_bindings).toMatchObject({
+      uk: { is_regular: true },
+      us: { is_regular: true }
+    });
+    unmount();
+    setup({ initialForms: next, baseOnly: true });
+    expect(
+      screen.getByRole("switch", { name: "拼写有英美区别" })
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("switch", { name: "音标有英美区别" })
+    ).toBeChecked();
+    expect(
+      screen.getByRole("switch", { name: "词形不规则变化" })
+    ).not.toBeChecked();
+  });
+
+  it("英美发音不同时关闭音标开关仍拦截合并，原值和旧数据保持不变", () => {
+    const expanded = formsFixture({
+      dialect_rules: { spelling_mode: "unified", phonetic_mode: "distinguish" },
+      forms: [
+        ukUsFormFixture({
+          us: {
+            spelling: "centre",
+            pronunciations: [
+              pronunciationFixture({
+                id: uuidFromInt(951),
+                actual_pron: "different"
+              })
+            ]
+          }
+        })
+      ]
+    });
+    const initial = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    const { onConfirm } = setup({ initialForms: initial, baseOnly: true });
+    fireEvent.click(screen.getByRole("switch", { name: "音标有英美区别" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("英美内容或配置不同");
+    expect(
+      screen.getByRole("switch", { name: "拼写有英美区别" })
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("switch", { name: "音标有英美区别" })
+    ).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    expect(onConfirm).toHaveBeenCalledWith(initial);
+  });
+
   it("统一修改规则变化只应用到当前内容的全部标签和英美侧", () => {
     const expanded = formsFixture({
       forms: [
@@ -199,19 +330,25 @@ describe("词形内容弹窗的草稿边界", () => {
     if (regions.mode !== "uk_us") throw new Error("fixture");
     regions.uk.is_regular = false;
     regions.us.is_regular = true;
+    const untouched = setup({ initialForms: initial, baseOnly: true });
+    expect(
+      screen.getByRole("switch", { name: "词形不规则变化" })
+    ).toHaveTextContent("未统一");
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    expect(untouched.onConfirm).toHaveBeenCalledWith(initial);
+    untouched.unmount();
     const { forms, onConfirm } = setup({
       initialForms: initial,
       editFormId: initial.pos[0]!.forms[0]!.id
     });
-    const regularity = screen.getByRole("radiogroup", {
-      name: "是否规则变化"
+    const regularity = screen.getByRole("switch", {
+      name: "词形不规则变化"
     });
-    expect(
-      within(regularity)
-        .getAllByRole("radio")
-        .every((input) => !(input as HTMLInputElement).checked)
-    ).toBe(true);
-    fireEvent.click(within(regularity).getByRole("radio", { name: "否" }));
+    expect(regularity).toHaveAccessibleDescription("各标签设置不同");
+    expect(regularity).toHaveTextContent("未统一");
+    fireEvent.click(regularity);
+    expect(regularity).toBeChecked();
+    expect(screen.queryByText("各标签设置不同")).not.toBeInTheDocument();
     expect(forms).toEqual(initial);
     fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
     const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
@@ -268,11 +405,7 @@ describe("词形内容弹窗的草稿边界", () => {
 
   it("替换内容保留目标词形自己的规则变化设置", async () => {
     const { forms, onConfirm } = setup();
-    fireEvent.click(
-      within(
-        screen.getByRole("radiogroup", { name: "是否规则变化" })
-      ).getByRole("radio", { name: "否" })
-    );
+    fireEvent.click(screen.getByRole("switch", { name: "词形不规则变化" }));
     fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
     const picker = screen
       .getByText(/这种拼写形式 指派词形标签$/)
@@ -597,11 +730,7 @@ describe("词形内容弹窗的草稿边界", () => {
     await waitFor(() => expect(picker).not.toBeInTheDocument());
     expect(onConfirm).not.toHaveBeenCalled();
     expect(forms.pos[0]!.form_groups[1]!.members).toHaveLength(0);
-    fireEvent.click(
-      within(
-        screen.getByRole("radiogroup", { name: "是否规则变化" })
-      ).getByRole("radio", { name: /^否$/ })
-    );
+    fireEvent.click(screen.getByRole("switch", { name: "词形不规则变化" }));
     expect(forms.pos[0]!.forms[1]!.regional_bindings).toMatchObject({
       common: { is_regular: true }
     });
