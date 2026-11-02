@@ -1,6 +1,6 @@
 "use client";
 import { LIBRARY_DRAG_TYPE, libraryDragIds } from "../library-drag";
-import { useState, type DragEvent, type KeyboardEvent } from "react";
+import { useEffect, useState, type DragEvent, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
@@ -46,12 +46,20 @@ type Props = {
 type TreeProps = Props & {
   expanded: Set<string>;
   toggle: (id: string, open?: boolean) => void;
+  dropTarget: string | null | undefined;
+  onDropTarget: (id: string | null | undefined) => void;
 };
 const iconButton =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-xl lg:size-7 lg:rounded-lg text-foreground-muted hover:bg-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40";
 export function LibraryTree(props: Props) {
   const [expansion, setExpansion] = useState(() => new Map<string, boolean>());
-  const [rootDragOver, setRootDragOver] = useState(false);
+  const [dropTarget, setDropTarget] = useState<string | null>();
+  const rootDragOver = dropTarget === null;
+  useEffect(() => {
+    const clear = () => setDropTarget(undefined);
+    document.addEventListener("dragend", clear);
+    return () => document.removeEventListener("dragend", clear);
+  }, []);
   function dragOverRoot(event: DragEvent<HTMLElement>) {
     if (
       props.trash ||
@@ -61,15 +69,15 @@ export function LibraryTree(props: Props) {
       return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    setRootDragOver(true);
+    setDropTarget(null);
   }
   function leaveRoot(event: DragEvent<HTMLElement>) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-      setRootDragOver(false);
+      setDropTarget(undefined);
   }
   function dropAtRoot(event: DragEvent<HTMLElement>) {
     event.preventDefault();
-    setRootDragOver(false);
+    setDropTarget(undefined);
     if (props.trash || props.disabled) return;
     const ids = libraryDragIds(event.dataTransfer, props.space);
     if (ids.length) props.onMove(ids, null);
@@ -113,19 +121,18 @@ export function LibraryTree(props: Props) {
   return (
     <nav
       aria-label="工程目录"
-      className="flex min-h-full min-w-0 flex-col"
+      className={`flex min-h-full min-w-0 flex-col ${rootDragOver ? "bg-primary-muted outline outline-1 -outline-offset-1 outline-primary" : ""}`}
       onKeyDown={navigate}
-      onDragEnd={() => setRootDragOver(false)}
+      onDragOver={dragOverRoot}
+      onDragLeave={leaveRoot}
+      onDrop={dropAtRoot}
+      onDropCapture={() => setDropTarget(undefined)}
     >
       <div className="flex min-h-11 shrink-0 items-center border-y border-border/60 bg-muted/60 pl-2 pr-1">
         <button
-          data-leaves-page
           data-explorer-item
           disabled={props.disabled}
           onClick={() => props.onFolder()}
-          onDragOver={dragOverRoot}
-          onDragLeave={leaveRoot}
-          onDrop={dropAtRoot}
           className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-xs font-semibold focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
         >
           <ChevronDown className="size-3.5 shrink-0" aria-hidden />
@@ -165,15 +172,19 @@ export function LibraryTree(props: Props) {
         </button>
       </div>
       <div className="shrink-0 overflow-x-auto py-1">
-        <TreeLevel {...props} expanded={expanded} toggle={toggle} depth={0} />
+        <TreeLevel
+          {...props}
+          expanded={expanded}
+          toggle={toggle}
+          dropTarget={dropTarget}
+          onDropTarget={setDropTarget}
+          depth={0}
+        />
       </div>
       <div
         role="region"
         aria-label="根目录放置区域"
-        onDragOver={dragOverRoot}
-        onDragLeave={leaveRoot}
-        onDrop={dropAtRoot}
-        className={`min-h-32 flex-1 px-3 py-4 text-center text-xs ${rootDragOver ? "bg-primary-muted text-primary outline-2 -outline-offset-2 outline-primary" : ""}`}
+        className={`min-h-32 flex-1 px-3 py-4 text-center text-xs ${rootDragOver ? "text-primary" : ""}`}
       >
         {rootDragOver && "松开以移到根目录"}
       </div>
@@ -250,7 +261,41 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const action = (kind: LibraryTreeAction) => props.onAction(kind, item);
   return (
-    <li>
+    <li
+      data-drop-target={folder && props.dropTarget === item.id ? "" : undefined}
+      className={
+        folder && props.dropTarget === item.id
+          ? "bg-primary-muted outline outline-1 -outline-offset-1 outline-primary"
+          : undefined
+      }
+      onDragOver={(event) => {
+        if (
+          !folder ||
+          props.trash ||
+          props.disabled ||
+          !Array.from(event.dataTransfer.types).includes(LIBRARY_DRAG_TYPE)
+        )
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = "move";
+        props.onDropTarget(item.id);
+      }}
+      onDragLeave={(event) => {
+        if (
+          folder &&
+          !event.currentTarget.contains(event.relatedTarget as Node | null)
+        )
+          props.onDropTarget(undefined);
+      }}
+      onDrop={(event) => {
+        if (!folder || props.trash || props.disabled) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const ids = libraryDragIds(event.dataTransfer, props.space);
+        if (ids.length) props.onMove(ids, item.id);
+      }}
+    >
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <div
           className={`group relative flex min-h-11 items-center border-l-2 pr-1 lg:min-h-9 ${selected ? "border-primary bg-primary/12 text-foreground" : "border-transparent hover:bg-foreground/5"} ${menuOpen ? "bg-foreground/5" : ""}`}
@@ -265,15 +310,6 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
               JSON.stringify({ space: props.space, ids: [item.id] })
             )
           }
-          onDragOver={(event) => {
-            if (folder && !props.trash) event.preventDefault();
-          }}
-          onDrop={(event) => {
-            if (!folder || props.trash) return;
-            event.preventDefault();
-            const ids = libraryDragIds(event.dataTransfer, props.space);
-            if (ids.length) props.onMove(ids, item.id);
-          }}
         >
           {folder ? (
             <button
@@ -293,7 +329,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
             <span className="w-11 shrink-0 lg:w-7" />
           )}
           <button
-            data-leaves-page
+            data-leaves-page={folder ? undefined : true}
             data-explorer-item
             aria-current={selected ? "page" : undefined}
             title={item.name}

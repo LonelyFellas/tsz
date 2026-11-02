@@ -8,32 +8,11 @@ import {
   BookOpen,
   CheckCircle2,
   LoaderCircle,
-  ChevronRight,
-  FolderInput,
-  FilePenLine,
-  MoreHorizontal,
-  Pencil,
   Plus,
-  RotateCcw,
-  Search,
   X,
-  Folder,
-  FolderPlus,
-  GripVertical,
   Trash2
 } from "lucide-react";
-import {
-  Button,
-  Input,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from "@tsz/ui/components";
-import { cn } from "@tsz/ui/lib/cn";
-import { SearchField } from "@/features/shell/SearchField";
-import { STATE_LABEL } from "../reading";
+import { Button, Input } from "@tsz/ui/components";
 import type {
   LibraryAction,
   LibraryImpact,
@@ -43,14 +22,8 @@ import type {
 } from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
-import {
-  PageHeader,
-  PageNotice,
-  Pager,
-  Segmented
-} from "@/features/shell/Page";
+import { PageHeader, PageNotice, Segmented } from "@/features/shell/Page";
 import { wordListKeys } from "../hooks/useWordLists";
-import { LIBRARY_DRAG_TYPE, libraryDragIds } from "../library-drag";
 import { LibraryTree, type LibraryTreeAction } from "./LibraryTree";
 import { WordListDetail } from "./WordListDetail";
 import { WordListCreator } from "./WordListCreator";
@@ -82,18 +55,6 @@ function Library({ userId }: { userId: string }) {
   const location = `${space}:${parent ?? "root"}:${trash}:${locateId ?? ""}:${mode}`;
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const resizeOrigin = useRef({ x: 0, width: 260 });
-  const [query, setQuery] = useState(params.get("q") ?? "");
-  const [searchTerm, setSearchTerm] = useState(query.trim());
-  const [composing, setComposing] = useState(false);
-  useEffect(() => {
-    if (composing) return;
-    const timer = setTimeout(() => setSearchTerm(query.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [query, composing]);
-  const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const searchInput = useRef<HTMLInputElement>(null);
   const [modal, setModal] = useState<Modal | null>(null);
   const dialogOpener = useRef<HTMLElement | null>(null);
   function rememberOpener(target: EventTarget | null) {
@@ -130,9 +91,7 @@ function Library({ userId }: { userId: string }) {
       locateId,
       space,
       parent,
-      trash,
-      searchTerm,
-      page
+      trash
     ],
     queryFn: ({ signal }) =>
       api.wordList.library.list(
@@ -140,40 +99,36 @@ function Library({ userId }: { userId: string }) {
         {
           parent_id: parent,
           wordlist_id: locateId,
-          trash,
-          q: searchTerm,
-          page
+          trash
         },
         { signal }
       ),
-    refetchOnMount: "always",
-    meta: { libraryLocation: location },
-    placeholderData: (previous, previousQuery) =>
-      previousQuery?.meta?.libraryLocation === location ? previous : undefined
+    refetchOnMount: "always"
   });
-  const searchPending =
-    composing || query.trim() !== searchTerm || result.isPlaceholderData;
+  const trashRoot = useQuery({
+    queryKey: [
+      ...wordListKeys.mine(userId),
+      "library-tree",
+      space,
+      true,
+      undefined,
+      1
+    ],
+    queryFn: ({ signal }) =>
+      api.wordList.library.list(space, { trash: true, page: 1 }, { signal }),
+    enabled: trash
+  });
   const current = useRef(location);
   useEffect(() => {
     if (current.current === location) return;
     current.current = location;
-    setSelected([]);
     setModal(null);
-    setQuery("");
-    setSearchTerm("");
-    setComposing(false);
-    setPage(1);
     setError("");
     setNotice("");
   }, [location]);
   function go(folder?: string, targetTrash = trash, targetSpace = space) {
     if (working.current) return;
-    setSelected([]);
     setModal(null);
-    setQuery("");
-    setSearchTerm("");
-    setComposing(false);
-    setPage(1);
     setNotice("");
     const p = new URLSearchParams({ space: targetSpace });
     if (folder) p.set("folder", folder);
@@ -197,7 +152,6 @@ function Library({ userId }: { userId: string }) {
       if (!alive()) return;
       if (close) {
         setModal(null);
-        setSelected([]);
       }
       setNotice(message);
       await client.invalidateQueries({ queryKey: wordListKeys.all });
@@ -252,30 +206,7 @@ function Library({ userId }: { userId: string }) {
       "已移动"
     );
   }
-  function toggle(id: string) {
-    setSelected((s) =>
-      s.includes(id) ? s.filter((x) => x !== id) : [...s, id]
-    );
-  }
-  function onDrop(data: DataTransfer, target: string | null) {
-    const ids = libraryDragIds(data, space);
-    if (!trash && ids.length) move(ids, target);
-  }
   const items = result.data?.items ?? [];
-  const allSelected =
-    items.length > 0 && items.every((item) => selected.includes(item.id));
-  const partlySelected =
-    !allSelected && items.some((item) => selected.includes(item.id));
-  const spaceLabel = space === "owned" ? "创建" : "收藏";
-  const folderName = result.data?.ancestors.at(-1)?.name;
-  function clearSearch() {
-    setQuery("");
-    setSearchTerm("");
-    setComposing(false);
-    setPage(1);
-    setSelected([]);
-    searchInput.current?.focus();
-  }
   const activeItem = locateId
     ? items.find((item) => item.wordlist_id === locateId)
     : undefined;
@@ -375,7 +306,7 @@ function Library({ userId }: { userId: string }) {
                   ).map((p) => p.id)}
                   disabled={busy}
                   onFolder={(id) => {
-                    go(id);
+                    if (!locateId && mode !== "new") go(id);
                     closeDrawer();
                   }}
                   onWordlist={(item) => {
@@ -434,6 +365,20 @@ function Library({ userId }: { userId: string }) {
                   )}
                   {trash ? "返回词表" : "回收站"}
                 </button>
+                {trash && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 min-h-11 w-full justify-start px-3 text-foreground-muted"
+                    disabled={
+                      busy || !result.data || !trashRoot.data?.pagination.total
+                    }
+                    onClick={() => void confirm("purge", [], true)}
+                  >
+                    <Trash2 className="size-4 shrink-0" aria-hidden />
+                    清空回收站
+                  </Button>
+                )}
               </div>
               <div
                 role="separator"
@@ -592,603 +537,28 @@ function Library({ userId }: { userId: string }) {
               )}
             </>
           ) : (
-            <>
-              {(parent || trash) && (
-                <nav
-                  aria-label="当前文件夹路径"
-                  className="-ml-2 mb-3 flex flex-wrap items-center gap-1 text-sm"
-                >
-                  <button
-                    disabled={busy}
-                    className="min-h-10 rounded-lg px-2 text-foreground-muted transition-colors hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-                    aria-current={!parent ? "page" : undefined}
-                    onClick={() => go()}
-                    onDragOver={(e) => {
-                      if (!trash) e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      onDrop(e.dataTransfer, null);
-                    }}
-                  >
-                    {space === "owned" ? "创建" : "收藏"}
-                    {trash ? " / 回收站" : ""}
-                  </button>
-                  {result.data?.ancestors.map((p) => (
-                    <span
-                      key={p.id}
-                      className="flex min-w-0 items-center gap-1"
-                    >
-                      <ChevronRight
-                        className="size-3.5 shrink-0 text-foreground-subtle"
-                        aria-hidden
-                      />
-                      <button
-                        disabled={busy}
-                        aria-current={p.id === parent ? "page" : undefined}
-                        className="min-h-10 min-w-0 break-words rounded-lg px-2 text-left text-foreground-muted transition-colors hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary aria-[current=page]:text-foreground"
-                        onClick={() => go(p.id)}
-                        onDragOver={(e) => {
-                          if (!trash) e.preventDefault();
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          onDrop(e.dataTransfer, p.id);
-                        }}
-                      >
-                        {p.name}
-                      </button>
-                    </span>
-                  ))}
-                </nav>
-              )}
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="break-words text-xl font-semibold tracking-tight">
-                    {query
-                      ? "搜索结果"
-                      : trash
-                        ? "回收站"
-                        : (folderName ?? spaceLabel)}
-                  </h2>
-                  {(query || trash || space === "favorites") && (
-                    <p className="mt-1 text-xs leading-5 text-foreground-muted">
-                      {query
-                        ? `在${trash ? "回收站" : `「${spaceLabel}」全部目录`}中搜索`
-                        : trash
-                          ? "移入回收站的项目可以恢复；彻底删除后无法找回。"
-                          : space === "favorites"
-                            ? "收藏的内容随原作者更新，备注名仅自己可见。"
-                            : null}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {!trash && (
-                    <>
-                      <Button
-                        disabled={busy || !result.data}
-                        variant="outline"
-                        size="sm"
-                        className="min-h-11 px-3 sm:min-h-10 sm:px-4"
-                        onClick={() => {
-                          setName("");
-                          setError("");
-                          setModal({
-                            expectedVersion: result.data!.version,
-                            kind: "create"
-                          });
-                        }}
-                      >
-                        <FolderPlus className="size-4" aria-hidden />
-                        新建文件夹
-                      </Button>
-                      {space === "owned" && (
-                        <Button
-                          asChild
-                          size="sm"
-                          className="min-h-11 px-3 sm:min-h-10 sm:px-4"
-                        >
-                          <Link
-                            href={workspaceHref(undefined, "new")}
-                            aria-disabled={busy}
-                            onClick={(event) => {
-                              if (busy) event.preventDefault();
-                            }}
-                          >
-                            <Plus className="size-4" aria-hidden />
-                            创建词表
-                          </Link>
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  {trash && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="min-h-11 sm:min-h-10"
-                      disabled={
-                        busy ||
-                        !result.data ||
-                        (!query && !result.data.pagination.total)
-                      }
-                      onClick={() => void confirm("purge", [], true)}
-                    >
-                      清空回收站
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <SearchField
-                ref={searchInput}
-                className="mb-4 w-full sm:max-w-sm"
-                maxLength={100}
-                aria-label="搜索词表和文件夹"
-                placeholder={trash ? "搜索回收站" : "搜索词表和文件夹"}
-                value={query}
-                disabled={busy}
-                onValueChange={(value) => {
-                  setQuery(value);
-                  setPage(1);
-                  setSelected([]);
-                }}
-                onClear={clearSearch}
-                onCompositionStart={() => setComposing(true)}
-                onCompositionEnd={(event) => {
-                  setQuery(event.currentTarget.value);
-                  setComposing(false);
-                }}
+            <div className="flex min-h-80 flex-col items-center justify-center px-6 py-12 text-center">
+              <BookOpen
+                className="mb-4 size-8 text-foreground-muted"
+                aria-hidden
               />
-              {items.length > 0 && (
-                <div
-                  className={cn(
-                    "mb-2 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-transparent px-2 py-1",
-                    selected.length > 0 &&
-                      "sticky top-20 z-20 border-primary/20 bg-surface/95 shadow-glass backdrop-blur-xl"
-                  )}
-                >
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2 px-2 text-sm sm:min-h-9">
-                    <input
-                      type="checkbox"
-                      aria-label="选择当前页全部项目"
-                      disabled={busy || searchPending || !items.length}
-                      className="size-4 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                      ref={(element) => {
-                        if (element) element.indeterminate = partlySelected;
-                      }}
-                      checked={allSelected}
-                      onChange={(e) =>
-                        setSelected(
-                          e.target.checked ? items.map((i) => i.id) : []
-                        )
-                      }
-                    />
-                    全选本页
-                  </label>
-                  {selected.length > 0 && (
-                    <>
-                      <span className="text-sm text-foreground-muted">
-                        已选 {selected.length} 项
-                      </span>
-                      <Button
-                        size="compact"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => setSelected([])}
-                      >
-                        取消选择
-                      </Button>
-                      {trash ? (
-                        <>
-                          <Button
-                            disabled={busy}
-                            variant="outline"
-                            size="compact"
-                            onClick={() =>
-                              setModal({
-                                expectedVersion: result.data!.version,
-                                kind: "restore",
-                                ids: selected
-                              })
-                            }
-                          >
-                            恢复
-                          </Button>
-                          <Button
-                            disabled={busy}
-                            variant="ghost"
-                            size="compact"
-                            onClick={() => void confirm("purge", selected)}
-                          >
-                            彻底删除
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            disabled={busy}
-                            variant="outline"
-                            size="compact"
-                            onClick={() =>
-                              setModal({
-                                expectedVersion: result.data!.version,
-                                kind: "move",
-                                ids: selected
-                              })
-                            }
-                          >
-                            移动到…
-                          </Button>
-                          <Button
-                            disabled={busy}
-                            variant="ghost"
-                            size="compact"
-                            onClick={() => void confirm("trash", selected)}
-                          >
-                            删除
-                          </Button>
-                        </>
-                      )}
-                    </>
-                  )}
-                  {!selected.length && result.data && (
-                    <span
-                      aria-live="polite"
-                      className="ml-auto flex items-center gap-2 pr-2 text-xs tabular-nums text-foreground-muted"
-                    >
-                      {searchPending || result.isFetching ? (
-                        <>
-                          <LoaderCircle
-                            className="size-3.5 animate-spin motion-reduce:animate-none"
-                            aria-hidden
-                          />
-                          正在更新…
-                        </>
-                      ) : (
-                        <>
-                          {query ? "找到" : "共"} {result.data.pagination.total}{" "}
-                          项
-                        </>
-                      )}
-                    </span>
-                  )}
-                </div>
+              <h2 className="text-lg font-semibold">从左侧选择词表</h2>
+              <p className="mt-2 text-sm leading-6 text-foreground-muted">
+                {trash
+                  ? "恢复词表后即可查看内容。"
+                  : space === "favorites"
+                    ? "打开词表后，在这里查看词条内容。"
+                    : "打开词表后，在这里查看和编辑词条内容。"}
+              </p>
+              {!trash && space === "owned" && (
+                <Button asChild className="mt-6" size="sm">
+                  <Link href={workspaceHref(undefined, "new")}>
+                    <Plus className="size-4" aria-hidden />
+                    创建词表
+                  </Link>
+                </Button>
               )}
-              {!items.length &&
-                !result.isPending &&
-                (searchPending || result.isFetching) && (
-                  <p
-                    role="status"
-                    className="my-4 text-sm text-foreground-muted"
-                  >
-                    正在更新…
-                  </p>
-                )}
-              {result.isError ? (
-                <PageNotice tone="error">
-                  目录读取失败。
-                  <Button variant="ghost" onClick={() => void result.refetch()}>
-                    重试
-                  </Button>
-                  <Button variant="ghost" onClick={() => go()}>
-                    返回根目录
-                  </Button>
-                </PageNotice>
-              ) : result.isPending ? (
-                <PageNotice>正在加载目录…</PageNotice>
-              ) : !items.length ? (
-                <div className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
-                  <span className="mb-3 text-foreground-subtle">
-                    {query ? (
-                      <Search className="size-6" aria-hidden />
-                    ) : trash ? (
-                      <Trash2 className="size-6" aria-hidden />
-                    ) : (
-                      <BookOpen className="size-6" aria-hidden />
-                    )}
-                  </span>
-                  <h3 className="text-sm font-medium text-foreground-muted">
-                    {query
-                      ? "未找到匹配项目"
-                      : trash
-                        ? "回收站为空"
-                        : parent
-                          ? "此文件夹为空"
-                          : space === "favorites"
-                            ? "暂无收藏"
-                            : "暂无词表"}
-                  </h3>
-                  {query ? (
-                    <Button
-                      className="mt-5"
-                      variant="outline"
-                      onClick={clearSearch}
-                    >
-                      清空搜索
-                    </Button>
-                  ) : null}
-                </div>
-              ) : (
-                <ul
-                  className={cn(
-                    "divide-y divide-border/60 transition-opacity",
-                    searchPending && "opacity-50"
-                  )}
-                  inert={busy || searchPending}
-                  aria-label="目录项目"
-                  aria-busy={searchPending || result.isFetching}
-                >
-                  {items.map((item) => (
-                    <li
-                      key={item.id}
-                      draggable={!trash && !busy && !searchPending}
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData(
-                          LIBRARY_DRAG_TYPE,
-                          JSON.stringify({
-                            space,
-                            ids: selected.includes(item.id)
-                              ? selected
-                              : [item.id]
-                          })
-                        );
-                      }}
-                      onDragOver={(e) => {
-                        if (
-                          !trash &&
-                          !busy &&
-                          !item.wordlist_id &&
-                          Array.from(e.dataTransfer.types).includes(
-                            LIBRARY_DRAG_TYPE
-                          )
-                        ) {
-                          e.preventDefault();
-                          setDropTarget(item.id);
-                        }
-                      }}
-                      onDragLeave={(e) => {
-                        if (
-                          !e.currentTarget.contains(
-                            e.relatedTarget as Node | null
-                          )
-                        )
-                          setDropTarget(null);
-                      }}
-                      onDragEnd={() => setDropTarget(null)}
-                      onDrop={(e) => {
-                        setDropTarget(null);
-                        if (!item.wordlist_id && !busy) {
-                          e.preventDefault();
-                          onDrop(e.dataTransfer, item.id);
-                        }
-                      }}
-                      className={cn(
-                        "group flex items-center gap-2 rounded-xl px-1 py-2 transition-colors sm:gap-3 sm:px-3",
-                        selected.includes(item.id)
-                          ? "bg-primary-muted/70"
-                          : "hover:bg-muted/60 focus-within:bg-muted/60",
-                        dropTarget === item.id &&
-                          "bg-primary-muted outline-2 -outline-offset-2 outline-primary"
-                      )}
-                    >
-                      {!trash && (
-                        <span
-                          draggable={!busy}
-                          aria-label={`拖动 ${item.name}`}
-                          title="拖动到左侧文件夹"
-                          className="hidden cursor-grab text-foreground-subtle opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 sm:block active:cursor-grabbing"
-                        >
-                          <GripVertical className="size-4" aria-hidden />
-                        </span>
-                      )}
-                      <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center">
-                        <input
-                          className="size-4 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                          type="checkbox"
-                          aria-label={`选择 ${item.name}`}
-                          disabled={busy}
-                          checked={selected.includes(item.id)}
-                          onChange={() => toggle(item.id)}
-                        />
-                      </label>
-                      <span
-                        className={cn(
-                          "flex size-6 shrink-0 items-center justify-center sm:size-8",
-                          item.wordlist_id
-                            ? "text-foreground-muted"
-                            : "text-primary"
-                        )}
-                      >
-                        {item.wordlist_id ? (
-                          <BookOpen className="size-5" aria-hidden />
-                        ) : (
-                          <Folder className="size-5" aria-hidden />
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        {!item.wordlist_id ? (
-                          <button
-                            disabled={busy}
-                            onClick={() => go(item.id)}
-                            className="flex min-h-11 w-full items-center gap-2 break-words rounded-lg text-left text-sm font-medium hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-                          >
-                            <span className="min-w-0 flex-1 break-words">
-                              {item.name}
-                            </span>
-                            <ChevronRight
-                              className="size-4 shrink-0 text-foreground-subtle"
-                              aria-hidden
-                            />
-                          </button>
-                        ) : !trash && item.wordlist ? (
-                          <Link
-                            aria-disabled={busy || searchPending}
-                            onClick={(event) => {
-                              if (busy || searchPending) event.preventDefault();
-                            }}
-                            title={item.name}
-                            className="line-clamp-2 min-h-8 break-words rounded-lg py-1 text-sm font-medium leading-6 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-                            draggable={false}
-                            href={workspaceHref(
-                              item.wordlist_id,
-                              "read",
-                              item.parent_id
-                            )}
-                          >
-                            {item.name}
-                          </Link>
-                        ) : (
-                          <span className="break-words text-sm font-medium">
-                            {item.name}
-                          </span>
-                        )}
-                        {item.wordlist_id && (
-                          <p className="mt-1 break-words text-xs leading-5 text-foreground-muted">
-                            {item.wordlist
-                              ? `${space === "favorites" ? `${item.wordlist.name} · ${item.wordlist.owner_name} · ` : ""}${item.wordlist.item_count} 个词条`
-                              : "原词表不可用"}
-                            {space === "owned" && item.wordlist && (
-                              <span> · {STATE_LABEL[item.wordlist.state]}</span>
-                            )}
-                          </p>
-                        )}
-                        {(query || locateId) && (
-                          <button
-                            disabled={busy}
-                            className="mt-1 block min-h-8 max-w-full break-words rounded text-left text-xs text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
-                            onClick={() =>
-                              go(
-                                trash
-                                  ? item.path.at(-1)?.id
-                                  : (item.parent_id ?? undefined)
-                              )
-                            }
-                          >
-                            {item.path.map((p) => p.name).join(" / ") ||
-                              "根目录"}{" "}
-                            · 打开所在位置
-                          </button>
-                        )}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled={busy}
-                            className="size-11 shrink-0"
-                            aria-label={`${item.name}的更多操作`}
-                          >
-                            <MoreHorizontal className="size-5" aria-hidden />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="min-w-44"
-                          onCloseAutoFocus={(event) => {
-                            const dialog =
-                              document.querySelector<HTMLDialogElement>(
-                                "dialog[open]"
-                              );
-                            if (dialog) {
-                              event.preventDefault();
-                              (
-                                dialog.querySelector<HTMLElement>(
-                                  "input:not(:disabled)"
-                                ) ?? dialog
-                              ).focus();
-                            }
-                          }}
-                        >
-                          {trash ? (
-                            <>
-                              <DropdownMenuItem
-                                onSelect={() => treeAction("restore", item)}
-                              >
-                                <RotateCcw
-                                  className="mr-2 size-4"
-                                  aria-hidden
-                                />
-                                恢复
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-danger data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"
-                                onSelect={() => treeAction("purge", item)}
-                              >
-                                <Trash2 className="mr-2 size-4" aria-hidden />
-                                彻底删除
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <>
-                              {space === "owned" &&
-                                item.wordlist_id &&
-                                item.wordlist && (
-                                  <>
-                                    <DropdownMenuItem asChild>
-                                      <Link
-                                        href={workspaceHref(
-                                          item.wordlist_id,
-                                          "edit",
-                                          item.parent_id
-                                        )}
-                                      >
-                                        <FilePenLine
-                                          className="mr-2 size-4"
-                                          aria-hidden
-                                        />
-                                        编辑词表
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                  </>
-                                )}
-                              <DropdownMenuItem
-                                onSelect={() => treeAction("rename", item)}
-                              >
-                                <Pencil className="mr-2 size-4" aria-hidden />
-                                {space === "favorites" && item.wordlist_id
-                                  ? "备注名"
-                                  : "重命名"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => treeAction("move", item)}
-                              >
-                                <FolderInput
-                                  className="mr-2 size-4"
-                                  aria-hidden
-                                />
-                                移动
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-danger data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"
-                                onSelect={() => treeAction("trash", item)}
-                              >
-                                <Trash2 className="mr-2 size-4" aria-hidden />
-                                移入回收站
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {result.data && (
-                <Pager
-                  page={page}
-                  total={result.data.pagination.total_pages}
-                  onChange={(v) => {
-                    setPage(v);
-                    setSelected([]);
-                  }}
-                />
-              )}
-            </>
+            </div>
           )}
         </section>
       </div>
