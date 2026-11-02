@@ -1869,7 +1869,7 @@ describe("V3WordCreationWizard", () => {
       base_revision: 2,
       content: savedWord.forms
     });
-    expect(impact).toHaveBeenCalledTimes(1);
+    expect(impact).toHaveBeenCalledTimes(2);
 
     fireEvent.click(screen.getByText("StrictMode 发布"));
     await waitFor(() =>
@@ -6278,20 +6278,51 @@ describe("V3WordCreationWizard", () => {
     renderWizard(requests({ saveForms, impact, publish }));
 
     fireEvent.click(screen.getByText("双击保存"));
-    expect(saveForms).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(1));
+    expect(impact).toHaveBeenCalledTimes(1);
     await act(async () => resolve(envelope(2, "saved")));
     fireEvent.click(screen.getByText("保存"));
-    expect(saveForms).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(screen.getByTestId("revision")).toHaveTextContent("2")
     );
 
     fireEvent.click(screen.getByText("双击影响预览"));
-    expect(impact).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(impact).toHaveBeenCalledTimes(1));
+    expect(impact).toHaveBeenCalledTimes(3);
+    await waitFor(() => expect(impact).toHaveBeenCalledTimes(3));
 
     fireEvent.click(screen.getByText("双击发布"));
     expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not submit a draft after its surface check is superseded or unmounted", async () => {
+    const resolvers: Array<(page: SurfaceMatchPageV3) => void> = [];
+    const source = requests({
+      impact: vi.fn(async () => ({
+        schema_version: 3 as const,
+        base_revision: 1,
+        requires_confirmation: true,
+        affected: [],
+        surface_match_page: impactSurfacePage("cursor-2")
+      })),
+      surfacePage: vi.fn(
+        () =>
+          new Promise<SurfaceMatchPageV3>((resolve) => resolvers.push(resolve))
+      )
+    });
+    const onWordChange = vi.fn();
+    const view = renderWizard(source, { onWordChange });
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(source.surfacePage).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("切换词性"));
+    await act(async () => resolvers[0]!(impactSurfacePage(null)));
+    expect(source.saveForms).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(source.surfacePage).toHaveBeenCalledTimes(2));
+    view.unmount();
+    await act(async () => resolvers[1]!(impactSurfacePage(null)));
+    expect(source.saveForms).not.toHaveBeenCalled();
+    expect(onWordChange).not.toHaveBeenCalled();
   });
 
   it("does not write a pending response after POS supersede or unmount", async () => {
@@ -6306,12 +6337,14 @@ describe("V3WordCreationWizard", () => {
     const view = renderWizard(requests({ saveForms }), { onWordChange });
 
     fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByText("切换词性"));
     await act(async () => resolvers[0]!(envelope(2, "stale")));
     expect(screen.getByTestId("revision")).toHaveTextContent("1");
     expect(onWordChange).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(2));
     view.unmount();
     await act(async () => resolvers[1]!(envelope(3, "after unmount")));
     expect(onWordChange).not.toHaveBeenCalled();

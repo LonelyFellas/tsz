@@ -25,8 +25,6 @@ import type {
   InboundReferenceV3,
   SharedSentence,
   StepSaveIntent,
-  SurfaceMatchEnabledTerminalPageV3,
-  SurfaceMatchPageV3,
   WordCreationStep
 } from "@tsz/types";
 import { isSharedForms } from "@tsz/shared";
@@ -43,11 +41,6 @@ import {
   createV3WordRequests,
   type V3WordRequests
 } from "@/features/dictionary/word-creation-v3/api";
-import {
-  canAcknowledgeSurfaceSnapshot,
-  type SurfaceSnapshotState
-} from "@/features/dictionary/surfaceSnapshot";
-import { useSurfaceSnapshot } from "@/features/dictionary/useSurfaceSnapshot";
 import { V3FormsAndPronunciationStep } from "@/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep";
 import { V3BasicsStep } from "@/features/dictionary/word-creation-v3/V3BasicsStep";
 import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
@@ -109,38 +102,6 @@ export type V3MeaningsStepRenderer = (
 
 function isStep(value: unknown): value is WordCreationStep {
   return STEPS.has(value as WordCreationStep);
-}
-
-function terminalSurfacePage(
-  state: SurfaceSnapshotState<SurfaceMatchPageV3>
-): SurfaceMatchEnabledTerminalPageV3 | undefined {
-  if (
-    state.schema_version !== 3 ||
-    !canAcknowledgeSurfaceSnapshot(state) ||
-    !state.snapshot_id ||
-    !state.policy_name ||
-    state.policy_epoch === undefined ||
-    !state.surface_confirmation_token
-  ) {
-    return undefined;
-  }
-  return {
-    schema_version: 3,
-    snapshot_id: state.snapshot_id,
-    items: state.items as SurfaceMatchPageV3["items"],
-    total: state.total,
-    matched_entry_contexts:
-      state.matched_entry_contexts as SurfaceMatchPageV3["matched_entry_contexts"],
-    confirmation_reasons: state.confirmation_reasons,
-    policy_name: state.policy_name,
-    policy_epoch: state.policy_epoch,
-    continuation_policy: "enabled",
-    next_cursor: null,
-    surface_confirmation_token: state.surface_confirmation_token,
-    ...(state.impact_confirmation_token
-      ? { impact_confirmation_token: state.impact_confirmation_token }
-      : {})
-  };
 }
 
 /** 引用索引不可用 / 已失效引用的顶部提示，词形步与词义步共用。 */
@@ -222,19 +183,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     (reference) => !staleReferenceIds.has(reference.id)
   );
   const blockedReferences = context.impact?.blocked_references ?? [];
-  const [pendingIntent, setPendingIntent] = useState<StepSaveIntent>();
   const preparingRef = useRef(false);
-  const impactPage = context.impactSurfacePage;
-  const snapshot = useSurfaceSnapshot(
-    impactPage,
-    `${context.word.id}:${context.word.revision}:forms-impact:${impactPage?.snapshot_id ?? "none"}`,
-    context.actions.fetchSurfacePage
-  );
-  const terminalPage = terminalSurfacePage(snapshot);
-  const requiresConfirmation = Boolean(
-    context.impact &&
-    (context.impact.requires_confirmation || context.impactSurfacePage)
-  );
   const bindingsDirty =
     context.word.capabilities.atomic_form_sense_bindings === true &&
     formGroupBindingsChanged(context.draftMeanings, context.word.meanings);
@@ -243,66 +192,16 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     context.isPending("save_forms") ||
     context.isPending("save_meanings");
 
-  const prepareSave = async (intent: StepSaveIntent) => {
+  const saveDraft = async () => {
     if (preparingRef.current) return;
     preparingRef.current = true;
-    setPendingIntent(intent);
     try {
-      if (intent === "save" && !context.dirtySteps.forms && !bindingsDirty) {
-        await context.actions.saveDraft();
-        setPendingIntent(undefined);
-        return;
-      }
-      const impact = await context.actions.previewFormsSaveImpact();
-      if (!impact) {
-        setPendingIntent(undefined);
-        return;
-      }
-      if (!impact.requires_confirmation && !impact.surface_match_page) {
-        setPendingIntent(undefined);
-        if (intent === "save") await context.actions.saveDraft();
-        else await context.actions.saveForms(intent);
-      }
+      await context.actions.saveDraft();
     } finally {
       preparingRef.current = false;
     }
   };
 
-  const confirmAndSave = async () => {
-    if (!pendingIntent || preparingRef.current || busy) return;
-    let confirmed = false;
-    let confirmationContext:
-      | {
-          snapshot_id: string;
-          policy_name: SurfaceMatchPageV3["policy_name"];
-          policy_epoch: number;
-        }
-      | undefined;
-    if (impactPage) {
-      if (!terminalPage) return;
-      confirmed = context.actions.confirmImpactSurface(terminalPage);
-      confirmationContext = {
-        snapshot_id: terminalPage.snapshot_id,
-        policy_name: terminalPage.policy_name,
-        policy_epoch: terminalPage.policy_epoch
-      };
-    } else {
-      confirmed = context.actions.confirmImpact();
-    }
-    if (!confirmed) return;
-    const intent = pendingIntent;
-    preparingRef.current = true;
-    setPendingIntent(undefined);
-    try {
-      if (intent === "save")
-        await context.actions.saveDraft(confirmationContext);
-      else await context.actions.saveForms(intent, confirmationContext);
-    } finally {
-      preparingRef.current = false;
-    }
-  };
-
-  const resetConfirmation = () => setPendingIntent(undefined);
   return (
     <Flex vertical gap="middle">
       <V3ReferenceNotices />
@@ -331,7 +230,6 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
                 : undefined
             }
             onSharedFormsChange={(content) => {
-              resetConfirmation();
               context.setFormContents(content);
             }}
             contentReassignmentAvailable={
@@ -364,7 +262,6 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
               )
             }
             onMeaningsChange={(meanings) => {
-              resetConfirmation();
               context.setDraftMeanings(meanings);
             }}
             onGoToMeanings={(posId) => {
@@ -375,11 +272,9 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
               (issue) => issue.step === "forms"
             )}
             onActivePosChange={(posId) => {
-              resetConfirmation();
               context.setActivePosId(posId);
             }}
             onChange={(content) => {
-              resetConfirmation();
               context.setDraftForms(content);
             }}
             stableVariantIds={context.stableVariantIds}
@@ -388,72 +283,18 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           />
         </div>
       </ConfigProvider>
-      {pendingIntent && context.impact && requiresConfirmation ? (
-        <Alert
-          showIcon
-          type="warning"
-          title="保存前请确认影响"
-          description={
-            <Flex vertical gap={4}>
-              <span>
-                {impactPage
-                  ? `正在核对同形匹配：已加载 ${snapshot.items.length}/${snapshot.total}`
-                  : `本次修改会影响 ${context.impact.affected.length} 项关联内容。`}
-              </span>
-              {summarizeFormsImpact(context.impact.affected).map((group) => (
-                <Typography.Text key={group.reason} type="secondary">
-                  {group.reasonLabel}：
-                  {group.parts
-                    .map((part) => `${part.label} ${part.count}`)
-                    .join("、")}
-                </Typography.Text>
-              ))}
-            </Flex>
-          }
-          action={
-            <Flex gap="small">
-              {impactPage &&
-              (snapshot.phase === "error" || snapshot.phase === "expired") ? (
-                <Button onClick={snapshot.retry}>重新加载影响</Button>
-              ) : null}
-              <Button onClick={resetConfirmation}>取消</Button>
-              <Button
-                disabled={Boolean(impactPage) && !terminalPage}
-                loading={snapshot.phase === "loading"}
-                onClick={() => void confirmAndSave()}
-              >
-                {pendingIntent === "complete"
-                  ? "确认影响并完成词形"
-                  : "确认影响并保存草稿"}
-              </Button>
-            </Flex>
-          }
-        />
-      ) : null}
       <V3StepActions>
         <Button
-          type="text"
-          disabled={Boolean(pendingIntent) || busy}
-          onClick={() => context.setActiveStep("basics")}
-        >
-          上一步
-        </Button>
-        <Button
-          disabled={
-            Boolean(pendingIntent) ||
-            (!context.hasUnsavedChanges && !bindingsDirty) ||
-            busy
-          }
-          loading={busy && pendingIntent === "save"}
-          onClick={() => void prepareSave("save")}
+          disabled={(!context.hasUnsavedChanges && !bindingsDirty) || busy}
+          loading={busy}
+          onClick={() => void saveDraft()}
         >
           保存草稿
         </Button>
         <Button
           type="primary"
-          disabled={Boolean(pendingIntent) || busy}
+          disabled={busy}
           onClick={() => {
-            resetConfirmation();
             context.setActiveStep("meanings");
           }}
         >
@@ -510,9 +351,9 @@ function V3MeaningsSlot({
     return true;
   };
 
-  // 普通草稿独立保存；新增词性、专用组或本词条读法关联依赖脏词形时，才预览并确认影响。
+  // 草稿自动核对依赖词形的影响；完成步骤仍保留显式确认。
   // 只记 intent：确认时用当时的 draftMeanings，快照 content 会把确认期间的编辑丢掉。
-  const [pendingIntent, setPendingIntent] = useState<StepSaveIntent>();
+  const [pendingIntent, setPendingIntent] = useState<"complete">();
   const [surfaceBlocked, setSurfaceBlocked] = useState(false);
   const preparingRef = useRef(false);
   const saveMeanings = async (
@@ -525,11 +366,7 @@ function V3MeaningsSlot({
     setSurfaceBlocked(false);
     setPendingIntent(undefined);
     try {
-      if (
-        context.dirtySteps.forms &&
-        (intent === "complete" ||
-          meaningsRequireFormsSave(context.word, content, context.formContents))
-      ) {
+      if (intent === "complete" && context.dirtySteps.forms) {
         const impact = await context.actions.previewFormsSaveImpact();
         if (!impact) return;
         if (impact.surface_match_page) {
@@ -578,8 +415,8 @@ function V3MeaningsSlot({
         <Alert
           showIcon
           type="warning"
-          title="词形变更需要在上一步确认"
-          description="本次词形改动触发了同形匹配核对，请回到「词形与发音」保存一次并确认，再回来保存词义。"
+          title="请先保存词形变更"
+          description="本次词形改动触发了同形匹配核对，请回到「词形与发音」保存一次，再回来完成词义。"
           action={
             <Flex gap="small">
               <Button onClick={() => setSurfaceBlocked(false)}>知道了</Button>
@@ -617,9 +454,7 @@ function V3MeaningsSlot({
             <Flex gap="small">
               <Button onClick={() => setPendingIntent(undefined)}>取 消</Button>
               <Button onClick={() => void confirmAndSave()}>
-                {pendingIntent === "complete"
-                  ? "确认影响并完成"
-                  : "确认影响并保存草稿"}
+                确认影响并完成
               </Button>
             </Flex>
           }
