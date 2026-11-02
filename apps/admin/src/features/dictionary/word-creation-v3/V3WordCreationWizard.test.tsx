@@ -6633,13 +6633,19 @@ it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份"
     renderStep: (context) => <ContentHost context={context} />
   });
   fireEvent.click(screen.getByText("打开内容弹窗"));
-  fireEvent.click(screen.getAllByRole("radio", { name: "是" })[1]!);
+  const splitPhonetics = screen.getByLabelText("音标有英美区别");
+  expect(splitPhonetics).not.toBeChecked();
+  fireEvent.click(splitPhonetics);
+  expect(splitPhonetics).toBeChecked();
   fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   );
   fireEvent.click(screen.getByText("打开内容弹窗"));
-  fireEvent.click(screen.getAllByRole("radio", { name: "否" })[1]!);
+  const mergePhonetics = screen.getByLabelText("音标有英美区别");
+  expect(mergePhonetics).toBeChecked();
+  fireEvent.click(mergePhonetics);
+  expect(mergePhonetics).not.toBeChecked();
   fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
