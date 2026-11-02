@@ -50,6 +50,7 @@ const ROOTS = [
   "OpenCodeConnectedProviderList",
   "OpenCodeModelSelection",
   "OpenCodeConnection",
+  "ChatGPTSetup",
   "ChatGPTAccounts",
   "ChatGPTLogin",
   "ChatGPTLoginStatus",

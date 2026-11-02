@@ -18,6 +18,7 @@
     "OpenCodeConnectedProviderList",
     "OpenCodeModelSelection",
     "OpenCodeConnection",
+    "ChatGPTSetup",
     "ChatGPTAccounts",
     "ChatGPTLogin",
     "ChatGPTLoginStatus",
@@ -997,6 +998,7 @@
       "type": "string",
       "enum": ["denied", "identity_invalid", "unavailable"]
     },
+    "ChatGPTLoginMethod": { "type": "string", "enum": ["local", "ssh"] },
     "ChatGPTLoginState": {
       "type": "string",
       "enum": ["pending", "complete", "failed", "expired", "cancelled"]
@@ -1017,6 +1019,14 @@
       "type": "object",
       "required": ["remote_revoked"],
       "properties": { "remote_revoked": { "type": "boolean" } },
+      "additionalProperties": false
+    },
+    "ChatGPTSetup": {
+      "type": "object",
+      "required": ["login_method"],
+      "properties": {
+        "login_method": { "$ref": "#/$defs/ChatGPTLoginMethod" }
+      },
       "additionalProperties": false
     },
     "ChoicePlanPreview": {

@@ -573,7 +573,7 @@ it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
     Array.from(
       document.querySelectorAll(".ant-select-item-option-content")
     ).map((item) => item.textContent)
-  ).toEqual(["语流连读", "逐字正音", "强读", "弱读"]);
+  ).toEqual(["逐字正音", "语流连读", "强读", "弱读"]);
   fireEvent.click(screen.getByText("逐字正音"));
   const wire = JSON.parse(screen.getByTestId("form-state").textContent!);
   expect(
