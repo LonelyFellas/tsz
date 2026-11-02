@@ -784,3 +784,51 @@ describe("英美独立多条拼写", () => {
     ).toHaveLength(2);
   });
 });
+
+it("删除原首条拼写后可统一拼写，并保留历史发音对应关系供后端校验", () => {
+  const initial = sharedFormsFixture();
+  const normalizer = createSharedContentDialectNormalizer(
+    initial.contents[0]!,
+    []
+  );
+  const split = normalizer(
+    contentEditorForms(initial.contents[0]!),
+    { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
+    "uk"
+  );
+  if (!split.ok) throw new Error(split.reason);
+  const original = split.value.pos[0]!.forms[0]!.regional_variants;
+  if (original.mode !== "uk_us") throw new Error("fixture");
+  let editor = editSpellingList(split.value, initial.contents[0]!.id, "uk", {
+    type: "add",
+    afterId: original.uk.id
+  });
+  editor = editSpellingList(editor, initial.contents[0]!.id, "uk", {
+    type: "remove",
+    id: original.uk.id
+  });
+  regionalVariants(
+    editor.pos[0]!.forms[0]!.regional_variants,
+    "uk"
+  )[0]!.spelling = original.us.spelling;
+  const content = {
+    ...contentFromEditor(editor),
+    pronunciation_slots: contentFromEditor(split.value).pronunciation_slots
+  };
+  const result = createSharedContentDialectNormalizer(content, [])(
+    contentEditorForms(content),
+    { spelling_mode: "unified", phonetic_mode: "distinguish" },
+    "uk"
+  );
+  if (!result.ok) throw new Error(result.reason);
+  const merged = contentFromEditor(result.value);
+  expect(merged.regional_variants.mode).toBe("uk_us");
+  expect(merged.dialect_rules.spelling_mode).toBe("unified");
+  expect(merged.pronunciation_slots).toEqual(content.pronunciation_slots);
+  expect(regionalVariants(merged.regional_variants, "uk")[0]!.id).not.toBe(
+    original.uk.id
+  );
+  expect(merged.pronunciation_slots?.[0]?.uk?.variant_slot_id).toBe(
+    original.uk.id
+  );
+});
