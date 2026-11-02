@@ -267,6 +267,129 @@ describe("新建例句保存与恢复", () => {
     );
   });
 
+  it.each(["sentences.associate", "sentences.edit"])(
+    "创建恢复被拒绝后仍可修正无权修改的内容：%s",
+    async (grant) => {
+      sessionStorage.clear();
+      speech.preview = true;
+      speech.recommendations.mockResolvedValue([
+        {
+          id: "r-uk",
+          name: "英式",
+          groupName: "例句",
+          locale: "en-GB",
+          setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
+        },
+        {
+          id: "r-us",
+          name: "美式",
+          groupName: "例句",
+          locale: "en-US",
+          setting: { voice_id: "jenny", enabled: true, rate_percent: -20 }
+        }
+      ]);
+      testActor.profile = {
+        id: "creator",
+        role: "admin",
+        permissions: [
+          "sentences.create",
+          "sentences.access",
+          "words.edit",
+          "words.access",
+          grant
+        ]
+      };
+      let created: SharedSentence;
+      let attempts = 0;
+      vi.mocked(api.sentences.create).mockImplementation(async (input) => {
+        if (attempts++ === 0) {
+          created = {
+            ...example(),
+            id: input.content.sentence.id,
+            content: structuredClone(input.content),
+            revision: 1,
+            created_by_admin_id: "creator"
+          };
+          throw new Error("创建响应丢失");
+        }
+        if (JSON.stringify(input.content) === JSON.stringify(created.content))
+          return created;
+        throw new HttpError(
+          409,
+          "此创建 ID 已用于其他内容",
+          [],
+          "idempotency_conflict"
+        );
+      });
+      vi.mocked(api.sentences.get)
+        .mockRejectedValueOnce(new Error("网络仍不可用"))
+        .mockImplementation(async () => created);
+      vi.mocked(api.sentences.update).mockRejectedValue(
+        new HttpError(403, "本次修改缺少权限")
+      );
+      const onSaved = vi.fn();
+      show(<SentenceEditor onClose={vi.fn()} onSaved={onSaved} />);
+      fireEvent.change(await screen.findByLabelText("例句正文"), {
+        target: { value: "A new story." }
+      });
+      const translation =
+        screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!;
+      fireEvent.change(translation, { target: { value: "原来的译文" } });
+      await waitFor(() =>
+        expect(screen.getByLabelText("保存例句")).toBeEnabled()
+      );
+      fireEvent.click(screen.getByLabelText("保存例句"));
+      await screen.findByText("创建响应丢失");
+      if (grant === "sentences.associate") {
+        fireEvent.change(translation, {
+          target: { value: "没有权限改的译文" }
+        });
+      } else {
+        fireEvent.click(screen.getByLabelText("关联单词"));
+        fireEvent.mouseDown(screen.getByLabelText("关联 story.（3）"), {
+          button: 0
+        });
+        const picker = await screen.findByRole("group", {
+          name: "关联单词：story"
+        });
+        fireEvent.click(
+          within(picker).getByLabelText("词条未创建，记为待关联")
+        );
+        fireEvent.click(
+          within(picker).getByText("确认关联", { selector: "button span" })
+        );
+      }
+      await waitFor(() =>
+        expect(screen.getByLabelText("保存例句")).toBeEnabled()
+      );
+      fireEvent.click(screen.getByLabelText("保存例句"));
+      await screen.findByText("本次修改缺少权限");
+      expect(onSaved).not.toHaveBeenCalled();
+      if (grant === "sentences.associate") {
+        expect(translation).not.toBeDisabled();
+        fireEvent.change(translation, { target: { value: "原来的译文" } });
+      } else {
+        expect(screen.getByLabelText("关联单词")).toBeEnabled();
+        fireEvent.click(screen.getByLabelText("关联单词"));
+        fireEvent.mouseDown(screen.getByLabelText("关联 story.（3）"), {
+          button: 0
+        });
+        fireEvent.click(
+          await screen.findByText("清除关联", { selector: "button span" })
+        );
+      }
+      await waitFor(() =>
+        expect(screen.getByLabelText("保存例句")).toBeEnabled()
+      );
+      fireEvent.click(screen.getByLabelText("保存例句"));
+      await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+      expect(api.sentences.update).toHaveBeenCalledOnce();
+      const calls = vi.mocked(api.sentences.create).mock.calls;
+      expect(calls).toHaveLength(3);
+      expect(calls[2]![0]).toEqual(calls[0]![0]);
+    }
+  );
+
   it("首次创建响应丢失后修改译文，再次保存应能接续已创建草稿", async () => {
     sessionStorage.clear();
     speech.preview = true;

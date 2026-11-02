@@ -302,13 +302,13 @@ export function SentenceEditor({
               throw retryError;
             }
           } else {
-            setRecoveredCreation(existing);
-            setBaseRevision(existing.revision);
-            initialContent.current = JSON.stringify(existing.content);
             if (
               existing.revision !== 1 ||
               existing.created_by_admin_id !== profile?.id
             ) {
+              setRecoveredCreation(existing);
+              setBaseRevision(existing.revision);
+              initialContent.current = JSON.stringify(existing.content);
               setConflict(true);
               setLatest(existing);
               setError(
@@ -316,16 +316,28 @@ export function SentenceEditor({
               );
               return false;
             }
-            saved = await api.sentences.update(existing.id, {
-              base_revision: existing.revision,
-              ...(sourceEntryId
-                ? {
-                    context_entry_id: sourceEntryId,
-                    context_sense_id: sourceSenseId
-                  }
-                : {}),
-              content: next
-            });
+            try {
+              saved = await api.sentences.update(existing.id, {
+                base_revision: existing.revision,
+                ...(sourceEntryId
+                  ? {
+                      context_entry_id: sourceEntryId,
+                      context_sense_id: sourceSenseId
+                    }
+                  : {}),
+                content: next
+              });
+            } catch (updateError) {
+              if (
+                updateError instanceof HttpError &&
+                updateError.code === "revision_conflict"
+              ) {
+                setRecoveredCreation(existing);
+                setBaseRevision(existing.revision);
+                initialContent.current = JSON.stringify(existing.content);
+              }
+              throw updateError;
+            }
           }
         }
       }
@@ -334,6 +346,10 @@ export function SentenceEditor({
       onSaved(saved);
       return true;
     } catch (e) {
+      if (!sentence && e instanceof HttpError && e.status === 403) {
+        // 拒绝保存不应锁住新建时的输入；仍可恢复原请求或修正无权修改的字段。
+        setRecoveredCreation(undefined);
+      }
       if (
         e instanceof HttpError &&
         e.status === 409 &&
