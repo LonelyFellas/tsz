@@ -46,3 +46,11 @@
 验收后已注销临时账号并关闭浏览器页，停止本任务 Vite/Rust/PostgreSQL/Redis 进程，删除整个专属 PostgreSQL 集群（含账号、词典、词条、会话和测试库）。Redis 未启用持久化，进程退出后键全部消失；独立复查四个端口均不监听、数据目录不存在。未接触共享服务，不使用 OSS。保留脱敏测试结果和页面截图；浏览器持久化 UI 偏好未作清除验证。
 
 截图位于本次 Codex 可视化目录的 `task160/`，包含开关刷新回显、新建词条仅原形及手动词形保存后回读。
+
+## PR CI 跟进
+
+关联 PR：前端 [#661](https://github.com/LonelyFellas/tsz/pull/661)，后端 [#375](https://github.com/LonelyFellas/tsz-rust/pull/375)。后端 CI 已通过。
+
+前端提交 `30485f56` 的 [CI run 41465339020](https://github.com/LonelyFellas/tsz/actions/runs/41465339020) 中，仅 `admin-2` 两个新组件用例超时（10 秒/5 秒），其余质量、构建及分片通过。本地原版本的单文件覆盖率运行仍通过（9 项、用例总耗时 9.27 秒），未把本地成功当作已复现 CI 超时。
+
+失败重试场景会等待 `message.error` 返回的 thenable，而 AntD 通知默认展示 3 秒。补丁仅在测试 provider 将通知设为 0.1 秒，并把成功保存/重开回显与失败保留/重试分开；两段各沿用原场景 10 秒上限，不修改生产代码、断言或覆盖率规则。使用 CI shard 配置、coverage、单 worker 验证 10 项通过；原 `admin-2` 完整覆盖率分片验证也已通过（56 文件、767 项，单 worker）；最终 CI 结果以 PR 最新 head 对应 run 为准。

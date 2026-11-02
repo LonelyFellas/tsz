@@ -94,7 +94,7 @@ function setup() {
   return render(
     <QueryClientProvider client={client}>
       <ConfigProvider theme={{ token: { motion: false } }}>
-        <AntApp>
+        <AntApp message={{ duration: 0.1 }}>
           <FormTypeSettings />
         </AntApp>
       </ConfigProvider>
@@ -287,7 +287,7 @@ it.each(["lexicon_settings.edit_forms", "lexicon_settings.delete"])(
   }
 );
 
-it("关闭默认模版后失败保留设置，重试保存并重新打开回显", async () => {
+function setupRareFormType() {
   mock.items.push({
     ...base,
     id: "rare-id",
@@ -296,17 +296,47 @@ it("关闭默认模版后失败保留设置，重试保存并重新打开回显"
     name_zh: "罕见词形",
     revision: 4
   });
-  mock.update.mockRejectedValueOnce(new Error("保存失败"));
-  mock.update.mockImplementationOnce(async (id, input) => {
+  mock.update.mockImplementation(async (id, input) => {
     mock.items = mock.items.map((item) =>
       item.id === id ? { ...item, ...input, revision: 5 } : item
     );
     return mock.items.find((item) => item.id === id);
   });
   setup();
+}
+
+it("关闭默认模版后保存，并在重新打开时回显", async () => {
+  setupRareFormType();
   const row = (await screen.findByText("罕见词形")).closest("tr")!;
   fireEvent.click(within(row).getByRole("button", { name: /^修\s*改$/ }));
-  let dialog = await screen.findByRole("dialog");
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("switch", { name: "默认模版" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: /保\s*存$/ }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(mock.update).toHaveBeenCalledWith(
+    "rare-id",
+    expect.objectContaining({
+      base_revision: 4,
+      is_default: false
+    })
+  );
+  fireEvent.click(
+    within(screen.getByText("罕见词形").closest("tr")!).getByRole("button", {
+      name: /^修\s*改$/
+    })
+  );
+  const reopened = await screen.findByRole("dialog");
+  expect(
+    within(reopened).getByRole("switch", { name: "默认模版" })
+  ).not.toBeChecked();
+}, 10000);
+
+it("关闭默认模版后失败保留设置，并可重试保存", async () => {
+  mock.update.mockRejectedValueOnce(new Error("保存失败"));
+  setupRareFormType();
+  const row = (await screen.findByText("罕见词形")).closest("tr")!;
+  fireEvent.click(within(row).getByRole("button", { name: /^修\s*改$/ }));
+  const dialog = await screen.findByRole("dialog");
   const toggle = within(dialog).getByRole("switch", { name: "默认模版" });
   expect(toggle).toBeChecked();
   fireEvent.click(toggle);
@@ -335,15 +365,6 @@ it("关闭默认模版后失败保留设置，重试保存并重新打开回显"
       is_default: false
     })
   );
-  fireEvent.click(
-    within(screen.getByText("罕见词形").closest("tr")!).getByRole("button", {
-      name: /^修\s*改$/
-    })
-  );
-  dialog = await screen.findByRole("dialog");
-  expect(
-    within(dialog).getByRole("switch", { name: "默认模版" })
-  ).not.toBeChecked();
 }, 10000);
 
 it("旧服务没有开关字段时禁用设置，保存不发送不受支持的字段", async () => {
