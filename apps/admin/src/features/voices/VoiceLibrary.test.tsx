@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
 import { VoicesPage } from "@/pages/Voices";
 import { readingRevision } from "@tsz/shared";
+import * as trialEditor from "./VoiceTrialEditor";
 
 const linkedSynthesis = {
   alphabet: "ipa" as const,
@@ -325,7 +326,7 @@ describe("配音中心", () => {
     ]);
     const { router } = mount(false);
     await screen.findByText("尚未设置分组推荐");
-    expect(screen.getByRole("button", { name: "新增分组" })).toBeVisible();
+    expect(namedButton("新增分组")).toBeVisible();
     expect(screen.queryByLabelText("共用试听文本")).toBeNull();
     expect(screen.queryByRole("button", { name: /刷新音色/ })).toBeNull();
     expect(api.speech.audioUpdateSettings).not.toHaveBeenCalled();
@@ -335,12 +336,14 @@ describe("配音中心", () => {
     await act(() => router.navigate("/voices/library"));
     expect(await screen.findByLabelText("试听 Sonia")).toBeVisible();
     expect(screen.getByLabelText("共用试听文本")).toBeVisible();
-    expect(screen.getByRole("button", { name: /刷新音色/ })).toBeVisible();
+    expect(namedButton(/刷新音色/)).toBeVisible();
     expect(screen.queryByRole("tab", { name: "音色库" })).toBeNull();
     expect(screen.queryByText("尚未设置分组推荐")).toBeNull();
   });
 
   it("音色库加入推荐后切回工作台，完整草稿仍在且没有提前写入服务器", async () => {
+    // 本例验证跨入口草稿；富文本输入与标注由下方完整试听用例覆盖。
+    vi.spyOn(trialEditor, "VoiceTrialEditor").mockImplementation(() => <></>);
     setPermissions([
       "words.access",
       "speech.generate",
@@ -371,7 +374,12 @@ describe("配音中心", () => {
       })
     );
     fireEvent.click(namedButton("创建整套推荐"));
-    fireEvent.click(await screen.findByRole("radio", { name: "Guy 男声" }));
+    fireEvent.click(
+      within(await screen.findByLabelText("美式音色滚动列表")).getByRole(
+        "radio",
+        { name: "Guy 男声" }
+      )
+    );
     fireEvent.click(namedButton("保存整套推荐"));
     await screen.findByText(/已应用到分组草稿/);
     fireEvent.click(namedButton(/^完\s*成$/));
@@ -1314,6 +1322,8 @@ describe("配音中心", () => {
     expect(screen.queryByLabelText(/审听 .*SSML/)).toBeNull();
   }, 15000);
   it("切换音色或关闭后重开，保留本页各声音的手动 SSML", async () => {
+    // 本例验证宿主暂存 SSML，富文本组件不参与原文的编辑与恢复。
+    vi.spyOn(trialEditor, "VoiceTrialEditor").mockImplementation(() => <></>);
     vi.spyOn(api.speech, "renderSsml").mockResolvedValue({
       ssml: "<speak>automatic</speak>"
     });
@@ -1333,9 +1343,7 @@ describe("配音中心", () => {
       fireEvent.change(screen.getByLabelText("SSML 原文"), {
         target: { value: raw }
       });
-      fireEvent.click(
-        within(screen.getByRole("dialog")).getByLabelText("Close")
-      );
+      fireEvent.click(screen.getByLabelText("Close"));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     }
     fireEvent.click(screen.getByLabelText("调节 Sonia 声音"));

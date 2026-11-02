@@ -163,10 +163,11 @@ it("高级参数收展、英美往返及试听均保留参数与各自文本、�
     target: { value: "65" }
   });
   fireEvent.click(screen.getByText("高级参数", { exact: true }));
-  fireEvent.change(
-    await screen.findByRole("spinbutton", { name: "风格强度" }),
-    { target: { value: "1.40" } }
-  );
+  const degree = await screen.findByLabelText("风格强度");
+  expect(degree).toBeVisible();
+  fireEvent.change(degree, {
+    target: { value: "1.40" }
+  });
   fireEvent.change(screen.getByLabelText("本次试听文本"), {
     target: { value: "UK draft" }
   });
@@ -179,7 +180,7 @@ it("高级参数收展、英美往返及试听均保留参数与各自文本、�
       selector: ".ant-select-item-option-content"
     })
   );
-  fireEvent.click(screen.getByRole("button", { name: "配置美式声音" }));
+  fireEvent.click(screen.getByLabelText("配置美式声音"));
   expect(
     screen.getByLabelText("试听输出格式").closest(".ant-select")
   ).toHaveTextContent("MP3");
@@ -189,7 +190,7 @@ it("高级参数收展、英美往返及试听均保留参数与各自文本、�
   fireEvent.change(screen.getByLabelText("本次试听文本"), {
     target: { value: "US draft" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "配置英式声音" }));
+  fireEvent.click(screen.getByLabelText("配置英式声音"));
   expect(screen.getByLabelText("合成语速")).toHaveValue("0.73");
   expect(screen.getByLabelText("合成音量")).toHaveValue("65");
   expect(screen.getByLabelText("本次试听文本")).toHaveValue("UK draft");
@@ -197,7 +198,7 @@ it("高级参数收展、英美往返及试听均保留参数与各自文本、�
   expect(
     screen.getByLabelText("试听输出格式").closest(".ant-select")
   ).toHaveTextContent("WAV");
-  fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
+  fireEvent.click(screen.getByLabelText("试听当前参数"));
   await screen.findByLabelText("Sonia 试听播放器");
   expect(api.speech.preview).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -212,7 +213,7 @@ it("高级参数收展、英美往返及试听均保留参数与各自文本、�
     expect.any(AbortSignal)
   );
   expect(screen.getByLabelText("合成语速")).toHaveValue("0.73");
-  fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+  fireEvent.click(screen.getByText("保存整套推荐").closest("button")!);
   await waitFor(() =>
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -277,7 +278,7 @@ it("英美切换保留手动 SSML 草稿，切回可继续编辑", async () => {
   fireEvent.change(screen.getByLabelText("SSML 原文"), {
     target: { value: "<speak>UK manual</speak>" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "配置美式声音" }));
+  fireEvent.click(screen.getByLabelText("配置美式声音"));
   fireEvent.click(screen.getByText("SSML", { exact: true }));
   await waitFor(() =>
     expect(screen.getByLabelText("SSML 原文")).toHaveValue(
@@ -288,7 +289,7 @@ it("英美切换保留手动 SSML 草稿，切回可继续编辑", async () => {
   fireEvent.change(screen.getByLabelText("SSML 原文"), {
     target: { value: "<speak>US manual</speak>" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "配置英式声音" }));
+  fireEvent.click(screen.getByLabelText("配置英式声音"));
   fireEvent.click(screen.getByText("SSML", { exact: true }));
   await waitFor(() =>
     expect(screen.getByLabelText("SSML 原文")).toHaveValue(
@@ -306,9 +307,9 @@ it("生成中切换英美会取消旧请求，迟到结果不能回到新侧", a
       })
   );
   mount();
-  fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
+  fireEvent.click(screen.getByLabelText("试听当前参数"));
   const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
-  fireEvent.click(screen.getByRole("button", { name: "配置美式声音" }));
+  fireEvent.click(screen.getByLabelText("配置美式声音"));
   expect(signal.aborted).toBe(true);
   await act(async () =>
     complete({
@@ -319,7 +320,7 @@ it("生成中切换英美会取消旧请求，迟到结果不能回到新侧", a
     })
   );
   expect(screen.queryByLabelText("Sonia 试听播放器")).toBeNull();
-  expect(screen.getByRole("button", { name: "配置美式声音" })).toHaveAttribute(
+  expect(screen.getByLabelText("配置美式声音")).toHaveAttribute(
     "aria-pressed",
     "true"
   );

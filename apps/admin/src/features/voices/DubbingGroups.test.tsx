@@ -161,12 +161,29 @@ function mount(initial = data(), voices = [uk, us]) {
   return { client, router, onAudition, onDirtyChange, ...view };
 }
 function choose(name: string) {
-  fireEvent.click(screen.getByRole("button", { name: `选择分组 ${name}` }));
-  return screen.getByRole("region", { name: `${name} 分组配置` });
+  fireEvent.click(screen.getByLabelText(`选择分组 ${name}`));
+  const panel = screen.getByLabelText(`${name} 分组配置`);
+  expect(panel).toBeVisible();
+  return panel;
 }
 function button(name: string | RegExp, container?: HTMLElement) {
   const view = container ? within(container) : screen;
-  return view.getByRole("button", { name });
+  // 工作台保留隐藏分组；按公开标签/文字定位，再排除隐藏面板，避免逐个计算整页按钮样式。
+  const labelled = view
+    .queryAllByLabelText(name)
+    .filter((node) => node.matches('button, [role="button"]'));
+  const matches = [
+    ...new Set(
+      (labelled.length ? labelled : view.getAllByText(name))
+        .map((node) => node.closest<HTMLElement>('button, [role="button"]'))
+        .filter(
+          (node): node is HTMLElement =>
+            !!node && !node.closest('[aria-hidden="true"], [hidden], [inert]')
+        )
+    )
+  ];
+  expect(matches).toHaveLength(1);
+  return matches[0]!;
 }
 function closeDialog() {
   fireEvent.click(button(/^取\s*消$/, screen.getByRole("dialog")));
@@ -233,7 +250,11 @@ function selectVoice(name: string) {
     button(`配置${name.startsWith("Guy") ? "美式" : "英式"}声音`)
   );
   fireEvent.click(
-    within(screen.getByRole("dialog")).getByRole("radio", { name })
+    within(
+      screen.getByLabelText(
+        `${name.startsWith("Guy") ? "美式" : "英式"}音色滚动列表`
+      )
+    ).getByRole("radio", { name })
   );
 }
 
@@ -260,7 +281,7 @@ describe("分组工作台与逐组草稿", () => {
         .name
     ).toBe("A");
     fireEvent.click(button("取消修改", choose("A草稿")));
-    expect(screen.getByRole("button", { name: "选择分组 A" })).toBeVisible();
+    expect(screen.getByLabelText("选择分组 A")).toBeVisible();
     expect(api.speech.saveGroup).not.toHaveBeenCalled();
   });
   it("单侧抽屉只调整本侧，应用后仍须保存当前组，保留双侧身份", async () => {
@@ -433,12 +454,8 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.click(button("新增分组"));
     closeDialog();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(
-      screen.queryByRole("button", { name: "选择分组 新分组" })
-    ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "选择分组 A草稿" })
-    ).toBeVisible();
+    expect(screen.queryByLabelText("选择分组 新分组")).toBeNull();
+    expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
   });
   it.each(["cancel", "failure"])(
     "删除分组 %s 后仍保留编辑表单和其他组草稿",
@@ -470,12 +487,8 @@ describe("分组工作台与逐组草稿", () => {
       expect(screen.getByLabelText("分组名称")).toHaveValue("B尚未应用");
       fireEvent.click(button("应用到本组", screen.getByRole("dialog")));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      expect(
-        screen.getByRole("button", { name: "选择分组 B尚未应用" })
-      ).toBeVisible();
-      expect(
-        screen.getByRole("button", { name: "选择分组 A草稿" })
-      ).toBeVisible();
+      expect(screen.getByLabelText("选择分组 B尚未应用")).toBeVisible();
+      expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
       if (action === "cancel")
         expect(api.speech.deleteGroupV3).not.toHaveBeenCalled();
     }
@@ -495,7 +508,7 @@ describe("分组工作台与逐组草稿", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(api.speech.deleteGroupV3).toHaveBeenCalledWith("b", 1);
     expect(button("保存当前组", choose("A草稿"))).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "选择分组 B" })).toBeNull();
+    expect(screen.queryByLabelText("选择分组 B")).toBeNull();
   });
   it.each(["cancel", "close"])(
     "未保存分组重新管理板块后 %s 只取消本次表单，不删除整组草稿",
@@ -522,9 +535,7 @@ describe("分组工作台与逐组草稿", () => {
       if (action === "cancel") closeDialog();
       else fireEvent.click(button("Close", screen.getByRole("dialog")));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      expect(
-        screen.getByRole("button", { name: "选择分组 未保存分组" })
-      ).toBeVisible();
+      expect(screen.getByLabelText("选择分组 未保存分组")).toBeVisible();
       const panel = choose("未保存分组");
       expect(within(panel).getByLabelText("推荐名称 1")).toHaveValue(
         "保留推荐"
@@ -551,12 +562,8 @@ describe("分组工作台与逐组草稿", () => {
       base_revision: 8
     });
     fireEvent.click(button("取消修改", choose("临时组")));
-    expect(
-      screen.queryByRole("button", { name: "选择分组 临时组" })
-    ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "选择分组 A草稿" })
-    ).toBeVisible();
+    expect(screen.queryByLabelText("选择分组 临时组")).toBeNull();
+    expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
   });
   it.each(["save", "order"])(
     "%s 的真实版本冲突保留各组草稿与参数",
@@ -579,9 +586,7 @@ describe("分组工作台与逐组草稿", () => {
           ? /本组已被修改或名称已被使用/
           : /分组集合或顺序已变化/
       );
-      expect(
-        screen.getByRole("button", { name: "选择分组 A保留" })
-      ).toBeVisible();
+      expect(screen.getByLabelText("选择分组 A保留")).toBeVisible();
       expect(within(b).getByLabelText("选用 B推荐")).not.toBeChecked();
       expect(button("保存当前组", b)).toBeEnabled();
     }
@@ -613,9 +618,7 @@ describe("分组工作台与逐组草稿", () => {
     expect(vi.mocked(api.speech.savePairedGroup).mock.calls[1]![0]).toEqual(
       input
     );
-    expect(
-      screen.getByRole("button", { name: "选择分组 A草稿" })
-    ).toBeVisible();
+    expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
   });
   it("保存时取消旧分组 GET，迟到结果不能覆盖新配置；撤销权限仍能取消草稿", async () => {
     const late = deferred<AdminDubbingGroupsV3Response>();
@@ -695,7 +698,7 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.click(button("保存当前组", panel));
     await screen.findByText(/本组已被修改或名称已被使用/);
     fireEvent.click(button("取消修改", panel));
-    await screen.findByRole("button", { name: "选择分组 远端A" });
+    await screen.findByLabelText("选择分组 远端A");
     expect(screen.queryByText(/本组已被修改或名称已被使用/)).toBeNull();
   });
   it("全局不能改名、删除、绑定板块或排序，清空推荐可保存", async () => {
@@ -922,9 +925,7 @@ describe("分组工作台与逐组草稿", () => {
       target: { value: "" }
     });
     expect(screen.getByLabelText("合成音量")).toHaveValue("");
-    expect(
-      screen.getByRole("button", { name: "配置英式声音" }).textContent
-    ).not.toContain("NaN");
+    expect(button("配置英式声音").textContent).not.toContain("NaN");
     fireEvent.click(button("保存整套推荐", screen.getByRole("dialog")));
     await screen.findByText(/音量需为 0 到 100 之间的整数/);
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
