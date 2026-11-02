@@ -197,7 +197,7 @@ it.each([false, true])(
       await screen.findByRole("link", { name: "开始练习" })
     ).toHaveAttribute(
       "href",
-      `/student/tasks/new?wordlist=list&source=${mine ? "owned" : "public"}`
+      `/student/practice/new?wordlist=list&source=${mine ? "owned" : "public"}`
     );
     expect(api.wordList.publish).not.toHaveBeenCalled();
   }

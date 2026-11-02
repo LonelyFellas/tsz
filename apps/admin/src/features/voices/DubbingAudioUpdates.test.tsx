@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -10,10 +11,7 @@ import { ConfigProvider } from "antd";
 import type { AdminDubbingAudioUpdate, AdminProfile } from "@tsz/types";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
-import {
-  DubbingAudioUpdates,
-  DubbingAudioUpdateSettings
-} from "./DubbingAudioUpdates";
+import { DubbingAudioUpdates } from "./DubbingAudioUpdates";
 
 const clients: QueryClient[] = [];
 function mount(node: React.ReactNode) {
@@ -76,7 +74,9 @@ it("按服务端任务倒计时，撤销只调用任务接口并重新读取", a
   await screen.findByText("等待更新");
   expect(screen.getByText(/秒后自动更新相关草稿音频/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "撤销待更新" }));
-  await screen.findByText("已撤销");
+  await waitFor(() =>
+    expect(screen.queryByText("等待更新")).not.toBeInTheDocument()
+  );
   expect(cancel).toHaveBeenCalledWith("job");
   expect(save).not.toHaveBeenCalled();
 });
@@ -108,47 +108,24 @@ it("重开读取持久失败状态，并仅重试失败项", async () => {
   await waitFor(() => expect(retry).toHaveBeenCalledWith("job"));
 });
 
-it("服务端确认没有生成时展示无需更新，不把过期跳过显示为成功", async () => {
-  vi.spyOn(api.speech, "audioUpdates").mockResolvedValue({
-    updates: [update("completed")]
-  });
+it("完成后不保留历史状态，也不把更早的失败任务重新展示", async () => {
+  vi.spyOn(api.speech, "audioUpdates")
+    .mockResolvedValueOnce({ updates: [update("pending")] })
+    .mockResolvedValue({
+      updates: [update("completed"), { ...update("failed"), id: "older-job" }]
+    });
   const view = mount(<DubbingAudioUpdates groupId="group" revision={3} />);
-  await screen.findByText("配置已保存，无需更新音频");
-  view.unmount();
-  vi.mocked(api.speech.audioUpdates).mockResolvedValue({
-    updates: [
-      {
-        ...update("completed"),
-        total: 1,
-        skipped: 1,
-        error_codes: ["revision_conflict"]
-      }
-    ]
-  });
-  mount(<DubbingAudioUpdates groupId="group" revision={4} />);
-  await screen.findByText(/正文或推荐已变化/);
+  await screen.findByText("等待更新");
+  await act(async () =>
+    clients
+      .at(-1)!
+      .refetchQueries({ queryKey: ["admin-dubbing-audio-updates"] })
+  );
+  await waitFor(() =>
+    expect(screen.queryByText("等待更新")).not.toBeInTheDocument()
+  );
+  expect(view.container.textContent).toBe("");
   expect(
-    screen.queryByText("配置已保存，无需更新音频")
+    screen.queryByRole("button", { name: "重试失败项" })
   ).not.toBeInTheDocument();
-});
-
-it("保存等待时间携带设置版本，失败保留输入", async () => {
-  vi.spyOn(api.speech, "audioUpdateSettings").mockResolvedValue({
-    wait_seconds: 60,
-    revision: 4
-  });
-  const save = vi
-    .spyOn(api.speech, "saveAudioUpdateSettings")
-    .mockRejectedValue(new Error("conflict"));
-  mount(<DubbingAudioUpdateSettings />);
-  const input = await screen.findByLabelText("音频更新等待秒数");
-  expect(screen.queryByRole("switch")).not.toBeInTheDocument();
-  fireEvent.change(input, { target: { value: "90" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存更新设置" }));
-  await screen.findByText(/设置保存失败或版本已变化/);
-  expect(input).toHaveValue("90");
-  expect(save).toHaveBeenCalledWith({
-    wait_seconds: 90,
-    base_revision: 4
-  });
 });

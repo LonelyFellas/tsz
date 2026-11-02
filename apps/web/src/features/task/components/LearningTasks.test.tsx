@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   plansList: vi.fn(),
   plansDetail: vi.fn(),
+  plansHistory: vi.fn(),
   cyclePreview: vi.fn(),
   cycleCreate: vi.fn(),
   cycles: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/lib/request", () => ({
     learningPlans: {
       list: mocks.plansList,
       detail: mocks.plansDetail,
+      history: mocks.plansHistory,
       cyclePreview: mocks.cyclePreview,
       cycleCreate: mocks.cycleCreate,
       cycles: mocks.cycles
@@ -38,7 +40,11 @@ vi.mock("@/stores/user", () => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 import { PlanCoverage } from "./PlanCoverage";
 import type { LearningPlan } from "@tsz/types";
-import { LearningPractice, LearningTaskList } from "./LearningTasks";
+import {
+  LearningPractice,
+  LearningTaskList,
+  LearningTaskPage
+} from "./LearningTasks";
 const run = {
   id: "run",
   task_id: "task",
@@ -69,6 +75,10 @@ beforeEach(() => {
   mocks.cycles.mockReset();
   mocks.plansList.mockRejectedValue(new HttpError(404, "API missing"));
   mocks.plansDetail.mockRejectedValue(new HttpError(404, "API missing"));
+  mocks.plansHistory.mockResolvedValue({
+    items: [],
+    pagination: { total_pages: 1 }
+  });
   mocks.user = { id: "learner-a", roles: ["student"] };
   mocks.day.mockResolvedValue({
     status: "reward_disabled",
@@ -80,6 +90,23 @@ beforeEach(() => {
     pagination: { total_pages: 1 }
   });
 });
+it.each(["list", "detail"])(
+  "shows persisted combined question types in the %s view",
+  async (view) => {
+    const plan = sourceRepairPlan();
+    plan.question_types = ["spelling_zh_to_en", "choice_zh_to_en"];
+    plan.task.question_type = "choice_zh_to_en";
+    mocks.plansList.mockResolvedValue({
+      items: [plan],
+      pagination: { total_pages: 1 }
+    });
+    mocks.plansDetail.mockResolvedValue(plan);
+    renderWithProviders(
+      view === "list" ? <LearningTaskList /> : <LearningTaskPage id="task" />
+    );
+    expect(await screen.findByText(/中文释义单选与拼写/)).toBeInTheDocument();
+  }
+);
 it("invalidated practice explains withdrawal, preserves progress and links to restarting without an answer form", async () => {
   mocks.run.mockResolvedValue({
     ...run,
@@ -447,6 +474,7 @@ it("a choice task falls back to spelling for a question without options", async 
   mocks.run.mockResolvedValue({ ...run, question_type: "choice_zh_to_en" });
   renderWithProviders(<LearningPractice id="run" />);
   const input = await screen.findByLabelText("英文拼写");
+  expect(screen.getByRole("heading", { name: /苹果/ })).toBeInTheDocument();
   expect(screen.getByText(/已自动改为拼写练习/)).toBeInTheDocument();
   expect(screen.queryByRole("radio")).not.toBeInTheDocument();
   fireEvent.change(input, { target: { value: "apple" } });
@@ -456,6 +484,56 @@ it("a choice task falls back to spelling for a question without options", async 
     question_id: "q1",
     answer: "apple"
   });
+});
+it("a completed mixed batch keeps the spelling review entry available", async () => {
+  mocks.run.mockResolvedValue({
+    ...run,
+    question_type: "choice_zh_to_en",
+    state: "completed",
+    answered_count: 2,
+    correct_count: 2
+  });
+  const feedback = {
+    answer_id: "answer",
+    submitted_answer: "a",
+    is_correct: true,
+    accepted_answers: ["apple"],
+    correct_option_id: "a"
+  };
+  mocks.questions.mockResolvedValue({
+    items: [
+      {
+        ...question,
+        answered: true,
+        options: [
+          { option_id: "a", spelling: "apple" },
+          { option_id: "b", spelling: "banana" },
+          { option_id: "c", spelling: "orange" },
+          { option_id: "d", spelling: "tomato" }
+        ],
+        feedback
+      },
+      {
+        ...question,
+        id: "spelling",
+        position: 1,
+        answered: true,
+        prompt: { definition: "教；教授", part_of_speech: "verb" },
+        feedback: {
+          ...feedback,
+          answer_id: "spelling-answer",
+          submitted_answer: "teach",
+          accepted_answers: ["teach"],
+          correct_option_id: undefined
+        }
+      }
+    ],
+    pagination: { total_pages: 1 }
+  });
+  renderWithProviders(<LearningPractice id="run" />);
+  expect(
+    await screen.findByRole("link", { name: "查看待巩固内容与复习安排" })
+  ).toHaveAttribute("href", "/student/review");
 });
 it("choice selection waits for explicit submission and renders only server-owned feedback", async () => {
   const options = [
@@ -508,6 +586,15 @@ it("choice selection waits for explicit submission and renders only server-owned
   );
   renderWithProviders(<LearningPractice id="run" />);
   const banana = await screen.findByRole("radio", { name: "banana" });
+  const form = banana.closest("form")!;
+  expect(
+    within(form).getByRole("heading", { name: /苹果/ })
+  ).toBeInTheDocument();
+  for (const option of options) {
+    expect(
+      within(form).getByRole("radio", { name: option.spelling })
+    ).toBeInTheDocument();
+  }
   expect(screen.queryByLabelText("英文拼写")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "提交答案" })).toBeDisabled();
   fireEvent.click(banana);

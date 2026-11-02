@@ -13,6 +13,8 @@ import type {
   VoiceSetting
 } from "../../types";
 import { SsmlReview } from "./SsmlReview";
+import { useState } from "react";
+import type { SsmlDraft } from "../../types";
 
 const settings: VoiceSetting[] = [
   {
@@ -144,4 +146,63 @@ it("正文变化中止手动试听并释放迟到结果", async () => {
   );
   expect(dispose).toHaveBeenCalledOnce();
   expect(screen.queryByLabelText(/审听 .*SSML/)).not.toBeInTheDocument();
+});
+
+it("宿主暂存草稿，开关手动模式及卸载重挂都不丢原文，明确恢复自动才清除", async () => {
+  const adapter: VoicePreviewAdapter = {
+    listVoices: vi.fn(),
+    synthesize: vi.fn(),
+    renderSsml: vi.fn().mockResolvedValue(automatic)
+  };
+  function Harness() {
+    const [mounted, setMounted] = useState(true);
+    const [draft, setDraft] = useState<SsmlDraft>();
+    return (
+      <>
+        <button onClick={() => setMounted((value) => !value)}>切换挂载</button>
+        {mounted && (
+          <SsmlReview
+            expanded
+            singleVoice
+            adapter={adapter}
+            content={content}
+            settings={settings}
+            onPlay={vi.fn()}
+            draft={draft}
+            onDraftChange={setDraft}
+          />
+        )}
+      </>
+    );
+  }
+  render(<Harness />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("SSML 原文")).toHaveValue(automatic)
+  );
+  fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
+  const raw = "<speak>local draft</speak>";
+  fireEvent.change(screen.getByLabelText("SSML 原文"), {
+    target: { value: raw }
+  });
+  fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
+  fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
+  expect(screen.getByLabelText("SSML 原文")).toHaveValue(raw);
+  fireEvent.click(screen.getByRole("button", { name: "切换挂载" }));
+  expect(screen.queryByLabelText("SSML 原文")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "切换挂载" }));
+  await waitFor(() =>
+    expect(screen.getByLabelText("SSML 原文")).toHaveValue(raw)
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText("手动编辑 SSML")).toBeEnabled()
+  );
+  fireEvent.change(screen.getByLabelText("SSML 原文"), {
+    target: { value: "" }
+  });
+  fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
+  fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
+  expect(screen.getByLabelText("SSML 原文")).toHaveValue("");
+  fireEvent.click(screen.getByRole("button", { name: "恢复自动生成" }));
+  expect(screen.getByLabelText("SSML 原文")).toHaveValue(automatic);
+  expect(screen.getByLabelText("手动编辑 SSML")).not.toBeChecked();
 });

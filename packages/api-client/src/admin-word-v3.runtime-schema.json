@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/chatgpt-selfhosted-login/docs/openapi.json",
-  "_source_sha256": "5122e0edbc781aa89d46df8014baf365e670fabefd31423a71308a0dac6bef2d",
+  "_source_sha256": "a591a4082d603e9ffcf2fa1510a84a20bc41142900623ee04c1594da62cc0c6e",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
@@ -2452,6 +2452,7 @@
       "required": ["question_types"],
       "properties": {
         "choice_policies": { "type": "array", "items": { "type": "string" } },
+        "practice_features": { "type": "array", "items": { "type": "string" } },
         "practice_modes": { "type": "array", "items": { "type": "string" } },
         "question_types": { "type": "array", "items": { "type": "string" } }
       },
@@ -2597,6 +2598,7 @@
         "mastery": { "$ref": "#/$defs/MasterySummary" },
         "mode": { "$ref": "#/$defs/LearningPlanMode" },
         "next_day_at": { "type": "string", "format": "date-time" },
+        "question_types": { "type": "array", "items": { "type": "string" } },
         "reasons": { "type": "array", "items": { "type": "string" } },
         "schedule": {
           "oneOf": [{ "$ref": "#/$defs/LearningSchedule" }, { "type": "null" }]

@@ -23,7 +23,7 @@ export function SpeechVolumeInput({
     <Flex
       className="voice-library-volume-control"
       align="center"
-      gap={12}
+      gap={8}
       role="group"
       aria-label="音量"
       aria-describedby={aria["aria-describedby"]}
@@ -54,7 +54,7 @@ export function SpeechVolumeInput({
         onChange={onChange}
         disabled={disabled}
         suffix={<small className="voice-shared-unit">%</small>}
-        style={{ width: 96 }}
+        style={{ width: 88 }}
       />
     </Flex>
   );

@@ -185,6 +185,99 @@ async function detail(name = "a") {
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
+  it.each([false, true])(
+    "全局推荐仅在没有适用分组时展示（仅兜底：%s）",
+    async (fallbackOnly) => {
+      const global = ["a", "us"].map((id) => ({
+        ...recommendation(id, "全局兜底"),
+        groupId: "global",
+        groupName: "全局常用",
+        fallbackOnly
+      }));
+      render(
+        <Harness
+          recommendations={[
+            ...(fallbackOnly
+              ? [
+                  recommendation("a", "板块推荐"),
+                  recommendation("us", "板块推荐")
+                ]
+              : []),
+            ...global,
+            {
+              ...global[0]!,
+              id: "legacy-global",
+              pairId: undefined,
+              name: "历史全局兜底"
+            }
+          ]}
+        />
+      );
+      await screen.findByRole("checkbox", { name: "选用 Alpha 阿尔法" });
+      if (fallbackOnly) {
+        expect(
+          (await screen.findByRole("radio", { name: /板块推荐/ })).closest(
+            "label"
+          )
+        ).toBeVisible();
+        expect(screen.queryByRole("radio", { name: /全局兜底/ })).toBeNull();
+        expect(
+          screen.queryByRole("region", { name: "历史未配对推荐" })
+        ).toBeNull();
+      } else {
+        expect(
+          (await screen.findByRole("radio", { name: /全局兜底/ })).closest(
+            "label"
+          )
+        ).toBeVisible();
+        expect(await screen.findByText("历史全局兜底")).toBeVisible();
+      }
+    }
+  );
+  it.each(["focus", "restore"] as const)(
+    "继承分组时 %s 重新解析最近保存配置，不把旧参数继续作为默认",
+    async (trigger) => {
+      let latestRate = 0;
+      const resolveVoices = vi.fn(async ({ accent }: { accent: string }) => [
+        {
+          ...version(accent === "gb" ? "a" : "us"),
+          rate_percent: accent === "gb" ? latestRate : 0
+        }
+      ]);
+      const onProfile = vi.fn();
+      render(
+        <Harness
+          initial={{
+            voices: [],
+            dubbing: {
+              mode: "inherit",
+              area: "meaning",
+              pool_version: "provider_id_v1",
+              recommendation_order: []
+            }
+          }}
+          preview={{ ...adapter(), resolveVoices }}
+          onProfile={onProfile}
+        />
+      );
+      await waitFor(() => expect(resolveVoices).toHaveBeenCalledTimes(2));
+      await screen.findByLabelText("英式池 a");
+      latestRate = -27;
+      if (trigger === "focus") fireEvent(window, new Event("focus"));
+      else
+        fireEvent.click(screen.getByRole("button", { name: "恢复默认推荐" }));
+      await waitFor(() => expect(resolveVoices).toHaveBeenCalledTimes(4));
+      expect(screen.getByLabelText("英式池 a").textContent).toContain("0.73");
+      if (trigger === "focus") expect(onProfile).not.toHaveBeenCalled();
+      else
+        expect(onProfile).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            voices: [],
+            dubbing: expect.objectContaining({ mode: "inherit" })
+          })
+        );
+    }
+  );
   it("推荐单选及不选保留额外音色，取消再选恢复参数，四列不重挂且保留各自滚动", async () => {
     const onProfile = vi.fn();
     render(

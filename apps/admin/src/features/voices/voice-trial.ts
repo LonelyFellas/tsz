@@ -1,5 +1,6 @@
 import type {
   AdminSpeechVoice,
+  AdminVoiceParameters,
   GrammarFormLinkV3,
   RichTextV2
 } from "@tsz/types";
@@ -74,10 +75,16 @@ export function voiceTrialSetting(
   voice: AdminSpeechVoice,
   parameters: Pick<
     import("@tsz/types").AdminVoiceParameters,
-    "rate_percent" | "pitch_semitones" | "volume_percent" | "style"
+    | "rate_percent"
+    | "pitch_semitones"
+    | "volume_percent"
+    | "style"
+    | "style_degree"
+    | "role"
   >,
   outputFormat: "mp3" | "wav"
 ): VoiceSetting {
+  const effective = effectiveVoiceParameters(voice, parameters);
   return {
     voice_id: voice.alias,
     version_id: "00000000-0000-4000-8000-000000000002",
@@ -86,10 +93,41 @@ export function voiceTrialSetting(
       ? { locale: voice.locale as `en-${string}` }
       : {}),
     enabled: true,
-    rate_percent: parameters.rate_percent,
-    pitch_semitones: parameters.pitch_semitones,
-    volume_percent: parameters.volume_percent ?? 100,
-    ...(parameters.style ? { style: parameters.style } : {}),
+    rate_percent: effective.rate_percent,
+    pitch_semitones: effective.pitch_semitones,
+    volume_percent: effective.volume_percent ?? 100,
+    ...(effective.style ? { style: effective.style } : {}),
+    ...(effective.style_degree != null
+      ? { style_degree: effective.style_degree }
+      : {}),
+    ...(effective.role ? { role: effective.role } : {}),
     output_format: outputFormat
+  };
+}
+
+export function effectiveVoiceParameters(
+  target: AdminSpeechVoice,
+  raw: AdminVoiceParameters
+) {
+  const caps = target.capabilities,
+    evidence = target.capability_evidence;
+  const style = raw.style && caps.styles.includes(raw.style) ? raw.style : null;
+  return {
+    ...raw,
+    rate_percent:
+      caps.min_rate_percent === caps.max_rate_percent
+        ? caps.min_rate_percent
+        : raw.rate_percent,
+    pitch_semitones:
+      caps.min_pitch_semitones === caps.max_pitch_semitones
+        ? caps.min_pitch_semitones
+        : raw.pitch_semitones,
+    volume_percent:
+      caps.supports_volume_percent === false ? 100 : raw.volume_percent,
+    style,
+    style_degree:
+      evidence?.supports_style_degree && style ? raw.style_degree : undefined,
+    role:
+      evidence?.roles?.includes(raw.role ?? "") && style ? raw.role : undefined
   };
 }

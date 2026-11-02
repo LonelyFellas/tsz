@@ -251,6 +251,8 @@ export interface VoiceRecommendation {
   groupId?: string;
   pairId?: string;
   selected?: boolean;
+  /** 仅供自动兜底解析，不在手动推荐列表中展示。 */
+  fallbackOnly?: boolean;
   setting: VoiceSetting;
 }
 
@@ -360,4 +362,10 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
     textLinks?: TLink[],
     readingLinks?: import("@tsz/types").GrammarFormLinkV3[]
   ) => void;
+}
+
+/** 本次手动 SSML 的编辑草稿；由宿主按声音暂存，不属于后端配置。 */
+export interface SsmlDraft {
+  manual: boolean;
+  raw?: string;
 }

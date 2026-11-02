@@ -407,7 +407,7 @@ function Detail({
           <>
             <Button asChild>
               <Link
-                href={`/student/tasks/new?${new URLSearchParams({ wordlist: id, source: mine ? "owned" : "public" })}`}
+                href={`/student/practice/new?${new URLSearchParams({ wordlist: id, source: mine ? "owned" : "public" })}`}
               >
                 开始练习
               </Link>
