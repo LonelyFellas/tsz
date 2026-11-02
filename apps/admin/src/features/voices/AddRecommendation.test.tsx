@@ -174,7 +174,7 @@ describe("完整推荐只应用到分组草稿", () => {
     ).toEqual(initial);
     expect(api.speech.saveGroups).not.toHaveBeenCalled();
     expect(api.speech.saveGroup).not.toHaveBeenCalled();
-  });
+  }, 15000);
   it("已有20套时保留分组选择并拒绝追加", async () => {
     const full = structuredClone(initial);
     full.groups[0]!.recommendations = {

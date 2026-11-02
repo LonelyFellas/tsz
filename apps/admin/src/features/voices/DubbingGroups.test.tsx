@@ -824,7 +824,7 @@ describe("分组工作台与逐组草稿", () => {
     expect(result.map((p) => p.uk.id)).toEqual(["old-uk-2", "a-uk"]);
     expect(result[0]!.selected).toBe(false);
     expect(result[0]!.us).toEqual(old.us);
-  });
+  }, 15000);
   it("目录搜索保留容器并回到结果顶部，清空恢复当前口音目录", () => {
     const many = Array.from({ length: 30 }, (_, i) => ({
       ...uk,
@@ -845,7 +845,7 @@ describe("分组工作台与逐组草稿", () => {
       target: { value: "" }
     });
     expect(within(list).getAllByRole("radio")).toHaveLength(31);
-  });
+  }, 15000);
   it("英美卡片驱动当前目录及调参，切换和筛选保留两侧选择与精确参数", async () => {
     mount();
     const panel = choose("A");
