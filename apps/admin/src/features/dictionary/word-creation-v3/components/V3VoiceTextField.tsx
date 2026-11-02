@@ -359,6 +359,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     ]
   );
   const draftPending = JSON.stringify(draftState) !== incomingKey;
+  const reportEditorReady = useCallback(
+    (ready: boolean) => onDraftPendingChange?.(!ready),
+    [onDraftPendingChange]
+  );
   useEffect(() => {
     if (!showDone) return;
     onDraftPendingChange?.(draftPending);
@@ -784,7 +788,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {!showDone && (
           <EditorPendingState
             pending={!canComplete}
-            onChange={onDraftPendingChange}
             saveActionRef={saveActionRef}
             save={async () =>
               canComplete && prepareComplete()
@@ -823,10 +826,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         </Space>
       </>
     ) : (
-      <EditorPendingState
-        pending={!canComplete}
-        onChange={onDraftPendingChange}
-      />
+      <EditorPendingState pending={!canComplete} />
     );
   const editor = (
     <ConfigProvider
@@ -845,6 +845,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           <VoiceEditor<TLink>
             key={`${nodeId}:${editorSession}`}
             renderActions={renderActions}
+            onValidationChange={showDone ? undefined : reportEditorReady}
             onAssociationPendingChange={onAssociationPendingChange}
             textReadOnly={contentReadOnly}
             contentReadOnly={contentReadOnly}
@@ -950,26 +951,20 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 // renderActions 在子编辑器渲染时调用，提交限制通过 effect 通知宿主。
 function EditorPendingState({
   pending,
-  onChange,
   saveActionRef,
   save
 }: {
   pending: boolean;
-  onChange?: (pending: boolean) => void;
   saveActionRef?: RefObject<(() => Promise<boolean>) | null>;
   save?: () => Promise<boolean>;
 }) {
   useLayoutEffect(() => {
     if (!saveActionRef) return;
-    saveActionRef.current = save ?? null;
+    saveActionRef.current = pending ? null : (save ?? null);
     return () => {
       saveActionRef.current = null;
     };
-  }, [save, saveActionRef]);
-  useEffect(() => {
-    onChange?.(pending);
-    return () => onChange?.(false);
-  }, [pending, onChange]);
+  }, [pending, save, saveActionRef]);
   return null;
 }
 

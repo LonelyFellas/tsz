@@ -24,15 +24,18 @@ beforeEach(() => {
 });
 function Editor({
   revision = 1,
+  savedRevision,
   entity = "word:1"
 }: {
   revision?: number;
+  savedRevision?: number;
   entity?: string;
 }) {
   const [text, setText] = useState("");
   const recovery = useDraftRecovery({
     entity,
     revision,
+    savedRevision,
     value: text,
     dirty: !!text,
     busy: false,
@@ -67,6 +70,29 @@ it("does not restore a stale revision over server changes", () => {
   expect(screen.queryByText("恢复编辑")).toBeNull();
   expect(screen.getByLabelText("内容")).toHaveValue("");
 });
+it.each([true, false])(
+  "部分保存只为本编辑器已确认的版本更新备份基线：%s",
+  (ownSave) => {
+    const view = render(<Editor />);
+    fireEvent.change(screen.getByLabelText("内容"), {
+      target: { value: "仍未保存的词形" }
+    });
+    view.rerender(
+      <Editor revision={2} savedRevision={ownSave ? 2 : undefined} />
+    );
+    view.unmount();
+    render(<Editor revision={2} />);
+    if (ownSave) {
+      fireEvent.click(screen.getByText("恢复编辑"));
+      expect(screen.getByLabelText("内容")).toHaveValue("仍未保存的词形");
+    } else {
+      expect(screen.queryByText("恢复编辑")).toBeNull();
+      expect(
+        screen.getByText("发现编辑备份，但服务器内容已更新")
+      ).toBeVisible();
+    }
+  }
+);
 it("同词条换账号不读另一人的未保存备份，也不读取或迁移未标身份的旧备份", () => {
   const entity = "word-v3:shared-entry";
   const legacy = "word-v3:shared-entry";
