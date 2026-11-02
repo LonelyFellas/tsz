@@ -1,3 +1,7 @@
+export interface ChatGPTSetup {
+  login_method: "local" | "ssh";
+}
+
 export interface ChatGPTAccount {
   client_id: string;
   email: string;

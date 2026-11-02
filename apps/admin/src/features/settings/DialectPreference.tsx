@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { App, Card, Radio, Space, Typography } from "antd";
+import { App, Radio } from "antd";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "./useDialectPreference";
 
@@ -8,11 +8,6 @@ const OPTION_LABEL: Record<AdminDialectPreference, string> = {
   us: "美式（AmE）"
 };
 
-/**
- * 个人设置 → 英语方言偏好（A1）。偏好持久化在服务端（`PATCH /admin/profile/preferences`），
- * 因此换浏览器、换设备都还在。显示值取服务端落库后的那个值，保存失败时不更新，
- * 界面自动停在原值——不做乐观更新，避免「看着改了其实没存」。
- */
 export function DialectPreference() {
   const { preference, savePreference } = useDialectPreference();
   const { message } = App.useApp();
@@ -23,12 +18,12 @@ export function DialectPreference() {
     setSaving(true);
     try {
       await savePreference(value);
-      message.success(`已保存英语方言偏好：${OPTION_LABEL[value]}`);
+      message.success("已保存");
     } catch (error) {
       message.error(
         error instanceof Error
-          ? `方言偏好未能保存：${error.message}`
-          : "方言偏好未能保存"
+          ? `保存失败：${error.message}`
+          : "保存失败，请重试"
       );
     } finally {
       setSaving(false);
@@ -36,23 +31,32 @@ export function DialectPreference() {
   };
 
   return (
-    <Card size="small" title="英语方言偏好" style={{ maxWidth: 720 }}>
-      <Space orientation="vertical" size={12} style={{ width: "100%" }}>
-        <Typography.Text type="secondary">
-          决定你录入与查看英文内容的默认口径，试听发音人也按此选择。
-          词条自身的英美拼写由内置词典决定，不受影响。
-        </Typography.Text>
-        <Radio.Group
-          value={preference}
-          disabled={saving}
-          onChange={(event) => {
-            void change(event.target.value as AdminDialectPreference);
-          }}
-        >
-          <Radio value="uk">{OPTION_LABEL.uk}</Radio>
-          <Radio value="us">{OPTION_LABEL.us}</Radio>
-        </Radio.Group>
-      </Space>
-    </Card>
+    <div className="settings-row settings-dialect">
+      <div>
+        <div className="settings-row__label">英语偏好</div>
+        <p className="settings-row__hint">用于录入、查看和试听。</p>
+      </div>
+      <Radio.Group
+        aria-label="英语偏好"
+        value={preference}
+        disabled={saving}
+        onChange={(event) =>
+          void change(event.target.value as AdminDialectPreference)
+        }
+      >
+        <Radio.Button value="uk" aria-label={OPTION_LABEL.uk}>
+          <span className="settings-dialect__option">
+            <span>英式英语</span>
+            <small>BrE</small>
+          </span>
+        </Radio.Button>
+        <Radio.Button value="us" aria-label={OPTION_LABEL.us}>
+          <span className="settings-dialect__option">
+            <span>美式英语</span>
+            <small>AmE</small>
+          </span>
+        </Radio.Button>
+      </Radio.Group>
+    </div>
   );
 }

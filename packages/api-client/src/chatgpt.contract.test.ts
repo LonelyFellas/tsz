@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import type { HttpClient } from "./http";
+import { HttpError, type HttpClient } from "./http";
 import { createChatGPTEndpoints } from "./chatgpt";
 import snapshot from "./openapi.snapshot.json";
 
@@ -96,4 +96,23 @@ it("拒绝凭据字段、未知状态、不可信授权和回调地址，包括�
     post.mockResolvedValue({ ...attempt, authorization_url: url });
     await expect(api.login()).rejects.toThrow();
   }
+});
+
+it("登录方式使用独立严格契约，仅对旧端点 404 回退本机模式", async () => {
+  const get = vi.fn().mockResolvedValue({ login_method: "ssh" });
+  const api = createChatGPTEndpoints({ get } as unknown as HttpClient);
+  const signal = new AbortController().signal;
+  expect(await api.setup({ signal })).toEqual({ login_method: "ssh" });
+  expect(get).toHaveBeenCalledWith("/chatgpt/setup", { signal });
+  for (const value of [
+    { login_method: "unknown" },
+    { login_method: "ssh", refresh_token: "private" }
+  ]) {
+    get.mockResolvedValue(value);
+    await expect(api.setup()).rejects.toThrow();
+  }
+  get.mockRejectedValue(new HttpError(404, "old backend"));
+  expect(await api.setup()).toEqual({ login_method: "local" });
+  get.mockRejectedValue(new HttpError(503, "unavailable"));
+  await expect(api.setup()).rejects.toThrow();
 });
