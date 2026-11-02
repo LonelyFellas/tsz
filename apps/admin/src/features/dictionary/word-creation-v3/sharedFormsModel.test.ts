@@ -832,3 +832,76 @@ it("删除原首条拼写后可统一拼写，并保留历史发音对应关系�
     original.uk.id
   );
 });
+
+function legacyRegionalBindingsFixture() {
+  const initial = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    formsFixture({ forms: [ukUsFormFixture()] })
+  ) as SharedFormsStepContentV3;
+  const binding = initial.pos[0]!.forms[0]!.regional_bindings;
+  if (binding.mode !== "uk_us") throw new Error("fixture");
+  binding.uk.is_regular = true;
+  binding.us.is_regular = false;
+  binding.uk.component_usages = [
+    { id: uuidFromInt(990), state: "unresolved", literal: "centre" }
+  ];
+  return initial;
+}
+
+it("新增两侧拼写保持各侧规则性，不复制既有词形成分身份", () => {
+  const initial = legacyRegionalBindingsFixture();
+  const before = structuredClone(initial.pos[0]!.forms[0]!.regional_bindings);
+  let editor = contentEditorForms(initial.contents[0]!);
+  for (const side of ["uk", "us"] as const) {
+    const first = regionalVariants(
+      editor.pos[0]!.forms[0]!.regional_variants,
+      side
+    )[0]!;
+    editor = editSpellingList(editor, initial.contents[0]!.id, side, {
+      type: "add",
+      afterId: first.id
+    });
+  }
+  const saved = replaceSharedContent(
+    initial,
+    contentFromEditor(editor),
+    stableIds(initial)
+  );
+  const binding = saved.pos[0]!.forms[0]!.regional_bindings;
+  if (binding.mode !== "uk_us_many" || before.mode !== "uk_us")
+    throw new Error("fixture");
+  const ids = regionalVariants(binding).flatMap((row) => [
+    row.id,
+    ...row.pronunciations.map((item) => item.id),
+    ...(row.component_usages ?? []).map((item) => item.id)
+  ]);
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(binding.uk[0]).toEqual(before.uk);
+  expect(binding.us[0]).toEqual(before.us);
+  expect(binding.uk[1]!.is_regular).toBe(true);
+  expect(binding.us[1]!.is_regular).toBe(false);
+  expect(binding.uk[1]!.component_usages ?? []).toEqual([]);
+  expect(binding.us[1]!.component_usages ?? []).toEqual([]);
+});
+
+it("移除仍持有旧版词形成分的拼写时保留原绑定并明确拒绝", () => {
+  const initial = legacyRegionalBindingsFixture();
+  const before = structuredClone(initial);
+  let editor = contentEditorForms(initial.contents[0]!);
+  const source = regionalVariants(
+    editor.pos[0]!.forms[0]!.regional_variants,
+    "uk"
+  )[0]!;
+  editor = editSpellingList(editor, initial.contents[0]!.id, "uk", {
+    type: "add",
+    afterId: source.id
+  });
+  editor = editSpellingList(editor, initial.contents[0]!.id, "uk", {
+    type: "remove",
+    id: source.id
+  });
+  expect(() =>
+    replaceSharedContent(initial, contentFromEditor(editor), stableIds(initial))
+  ).toThrow("旧版词形成分");
+  expect(initial).toEqual(before);
+});
