@@ -1,0 +1,108 @@
+.voice-parameter-panel {
+  container-type: inline-size;
+  container-name: voice-parameters;
+  min-width: 0;
+}
+.voice-parameter-heading {
+  min-height: 28px;
+  margin-bottom: 6px;
+}
+.voice-parameter-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 16px;
+}
+.voice-parameter-fields > .voice-parameter-grid {
+  display: contents;
+}
+.voice-parameter-panel .ant-form-item {
+  margin-bottom: 0;
+  min-width: 0;
+}
+.voice-parameter-panel .ant-form-item-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+.voice-parameter-panel .ant-form-item .ant-form-item-label {
+  min-width: 0;
+  align-self: flex-start;
+  padding: 0;
+  text-align: left;
+}
+.voice-parameter-panel .ant-form-item-label > label {
+  height: 32px;
+  font-size: 14px;
+}
+.voice-parameter-panel .ant-form-item-control {
+  min-width: 0;
+  width: 100%;
+}
+.voice-parameter-panel .voice-parameter-number .ant-form-item-control {
+  max-width: 160px;
+  margin-inline-start: auto;
+}
+.voice-parameter-panel .ant-input-number-input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.voice-parameter-panel .ant-input-number-suffix {
+  color: #606b7b;
+}
+.voice-library-volume-control .ant-slider {
+  min-width: 0;
+}
+.voice-library-volume-control .ant-input-number {
+  flex: 0 0 88px;
+}
+.voice-library-volume-icon {
+  display: flex;
+  color: #606b7b;
+  font-size: 16px;
+}
+.voice-parameter-muted-status {
+  color: #606b7b;
+  font-size: 12px;
+  font-weight: normal;
+}
+.voice-parameter-advanced.ant-collapse {
+  margin-top: 10px;
+  border-top: 1px solid var(--voice-border, #e5e7eb);
+  border-radius: 0;
+}
+.voice-parameter-advanced .ant-collapse-header {
+  align-items: center;
+  font-size: 13px;
+}
+.voice-parameter-advanced-status.ant-typography {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #606b7b;
+}
+.voice-parameter-advanced .voice-parameter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 16px;
+}
+.voice-parameter-hint.ant-typography {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #606b7b;
+}
+@container voice-parameters (min-width: 640px) {
+  .voice-parameter-fields,
+  .voice-parameter-advanced .voice-parameter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.voice-parameter-advanced .ant-input-number-disabled .ant-input-number-input,
+.voice-parameter-advanced .ant-select-disabled .ant-select-selection-item {
+  color: #606b7b;
+}

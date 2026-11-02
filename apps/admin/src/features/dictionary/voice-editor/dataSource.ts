@@ -38,8 +38,7 @@ async function resolveAdapter(): Promise<VoicePreviewAdapter> {
 export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   area,
   locale,
-  signal,
-  refresh
+  signal
 }) => {
   if (voicePreviewIsMock) return [];
   signal?.throwIfAborted();
@@ -47,14 +46,16 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   const response = await queryClient.fetchQuery({
     queryKey: ["admin-dubbing-groups-v3", actor],
     queryFn: ({ signal }) => api.speech.groupsV3(signal),
-    staleTime: refresh ? 0 : 60_000
+    // 每次打开或刷新都读取当前保存值；并发读取仍由 QueryClient 合并。
+    staleTime: 0
   });
   signal?.throwIfAborted();
   if (useAuthStore.getState().profile?.id !== actor) return [];
+  const areaGroups = response.groups.filter(
+    (item) => !item.is_global && item.areas.includes(area)
+  );
   const applicable = [
-    ...response.groups.filter(
-      (item) => !item.is_global && item.areas.includes(area)
-    ),
+    ...areaGroups,
     ...response.groups.filter((item) => item.is_global)
   ];
   return applicable.flatMap((source) =>
@@ -85,6 +86,9 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
           locale: value,
           groupName: source.name,
           groupId: source.id,
+          ...(source.is_global && areaGroups.length
+            ? { fallbackOnly: true }
+            : {}),
           ...(item.pairId ? { pairId: item.pairId } : {}),
           ...(item.selected !== undefined ? { selected: item.selected } : {}),
           setting: {

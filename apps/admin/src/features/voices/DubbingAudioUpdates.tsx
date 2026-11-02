@@ -1,114 +1,15 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { AdminDubbingAudioUpdate } from "@tsz/types";
-import { Alert, Button, Flex, InputNumber, Space, Tag, Typography } from "antd";
+import { Button, Flex, Space, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { api, useAuthStore } from "@/lib/auth";
-import { useUnsavedChanges } from "@tsz/shared/recovery";
 
 const labels: Record<string, string> = {
   pending: "等待更新",
   running: "生成中",
-  completed: "已完成",
   failed: "失败",
-  partial: "部分成功",
-  cancelled: "已撤销",
-  superseded: "已由新配置替代"
+  partial: "部分成功"
 };
-
-export function DubbingAudioUpdateSettings({
-  onDirtyChange
-}: {
-  onDirtyChange?: (dirty: boolean) => void;
-}) {
-  const accountId = useAuthStore((state) => state.profile?.id);
-  const client = useQueryClient();
-  const key = ["admin-dubbing-update-settings", accountId];
-  const settings = useQuery({
-    queryKey: key,
-    queryFn: ({ signal }) => api.speech.audioUpdateSettings(signal),
-    retry: false
-  });
-  const [draft, setDraft] = useState<{ wait_seconds: number }>();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(false);
-  const value = draft ?? settings.data;
-  useUnsavedChanges("dubbing-update-settings", !!draft || saving);
-  useEffect(() => {
-    onDirtyChange?.(!!draft || saving);
-    return () => onDirtyChange?.(false);
-  }, [draft, saving, onDirtyChange]);
-  async function save() {
-    if (!value || !settings.data) return;
-    setSaving(true);
-    setError(false);
-    try {
-      const result = await api.speech.saveAudioUpdateSettings({
-        wait_seconds: value.wait_seconds,
-        base_revision: settings.data.revision
-      });
-      if (useAuthStore.getState().profile?.id !== accountId) return;
-      client.setQueryData(key, result);
-      setDraft(undefined);
-    } catch {
-      setError(true);
-    } finally {
-      setSaving(false);
-    }
-  }
-  if (settings.isError)
-    return (
-      <Alert
-        type="warning"
-        title="音频更新设置加载失败"
-        action={<Button onClick={() => void settings.refetch()}>重试</Button>}
-      />
-    );
-  if (!value) return null;
-  return (
-    <Flex vertical gap={8}>
-      <Space wrap>
-        <Typography.Text>分组完成后等待</Typography.Text>
-        <InputNumber
-          aria-label="音频更新等待秒数"
-          min={0}
-          max={3600}
-          precision={0}
-          value={value.wait_seconds}
-          disabled={saving}
-          onChange={(seconds) => {
-            if (seconds !== null) setDraft({ ...value, wait_seconds: seconds });
-          }}
-          suffix="秒"
-          style={{ width: 144 }}
-        />
-        <Button
-          disabled={!draft || saving}
-          loading={saving}
-          onClick={() => void save()}
-        >
-          保存更新设置
-        </Button>
-        {draft && (
-          <Button disabled={saving} onClick={() => setDraft(undefined)}>
-            取消设置修改
-          </Button>
-        )}
-      </Space>
-      <Typography.Text type="secondary">
-        仅用于之后提交的更新；共享板块的分组再次完成或调整优先级会重新计时，已提交任务可在分组内撤销。
-      </Typography.Text>
-      {error && (
-        <Alert
-          type="error"
-          title="设置保存失败或版本已变化，当前输入已保留。"
-          action={
-            <Button onClick={() => void settings.refetch()}>重新载入</Button>
-          }
-        />
-      )}
-    </Flex>
-  );
-}
 
 function Update({
   update,
@@ -148,22 +49,13 @@ function Update({
       <Space wrap>
         <Tag
           color={
-            update.state === "failed"
+            update.state === "failed" || update.state === "partial"
               ? "error"
-              : update.state === "completed"
-                ? "success"
-                : "default"
+              : "default"
           }
         >
-          {update.state === "completed" &&
-          update.completed === 0 &&
-          !update.error_codes.length
-            ? "配置已保存，无需更新音频"
-            : (labels[update.state] ?? update.state)}
+          {labels[update.state] ?? update.state}
         </Tag>
-        <Typography.Text type="secondary">
-          {update.group_name} · 配置版本 {update.group_revision}
-        </Typography.Text>
         {update.state === "pending" && (
           <Typography.Text>
             {seconds > 0
@@ -223,38 +115,33 @@ export function DubbingAudioUpdates({
   groupId,
   revision
 }: {
-  groupId?: string;
+  groupId: string;
   revision: number;
 }) {
   const accountId = useAuthStore((state) => state.profile?.id);
   const updates = useQuery({
     queryKey: ["admin-dubbing-audio-updates", accountId, groupId, revision],
-    queryFn: ({ signal }) =>
-      groupId
-        ? api.speech.audioUpdates(groupId, signal)
-        : api.speech.allAudioUpdates(signal),
+    queryFn: ({ signal }) => api.speech.audioUpdates(groupId, signal),
     retry: false,
     refetchInterval: (query) =>
-      query.state.data?.updates.some((update) =>
-        ["pending", "running"].includes(update.state)
-      )
+      ["pending", "running"].includes(query.state.data?.updates[0]?.state ?? "")
         ? 3000
         : false
   });
   if (updates.isError)
     return (
       <Typography.Text type="secondary">
-        音频任务加载失败{" "}
+        音频更新状态暂不可用{" "}
         <Button size="small" onClick={() => void updates.refetch()}>
           重试
         </Button>
       </Typography.Text>
     );
-  return (
-    <Flex vertical gap={8}>
-      {updates.data?.updates.slice(0, groupId ? 3 : 20).map((update) => (
-        <Update key={update.id} update={update} refresh={updates.refetch} />
-      ))}
-    </Flex>
-  );
+  const current = updates.data?.updates[0];
+  if (
+    !current ||
+    !["pending", "running", "failed", "partial"].includes(current.state)
+  )
+    return null;
+  return <Update key={current.id} update={current} refresh={updates.refetch} />;
 }
