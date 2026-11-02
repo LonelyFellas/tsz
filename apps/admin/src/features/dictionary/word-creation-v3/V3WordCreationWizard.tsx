@@ -1,6 +1,11 @@
 import { assistantFieldTarget } from "../assistant/fieldNavigation";
 import { LexiconAssistant } from "../assistant/LexiconAssistant";
 import { VoiceSaveContext } from "./voiceSaveContext";
+import {
+  canAcknowledgeSurfaceSnapshot,
+  createEmptySurfaceSnapshotState,
+  surfaceSnapshotReducer
+} from "../surfaceSnapshot";
 import { onlyTextAssociationsChanged } from "../contentEditPermissions";
 import { revealTableColumns } from "@/components/useColumnSettings";
 import { UNSAFE_DataRouterContext } from "react-router-dom";
@@ -1271,11 +1276,61 @@ function V3WordCreationSession({
       };
       savesInFlightRef.current += 1;
       try {
+        let saveConfirmationContext = confirmationContext;
+        // 草稿保存自动核对影响；发布仍由预览页显式确认。
+        if (intent === "save" && !confirmationContext) {
+          const preview = await flow.runRequest("impact", () =>
+            requests.impact(flow.canonical().id, {
+              schema_version: 3,
+              base_revision: baseRevision,
+              content,
+              ...(senseBindings.length ? { sense_bindings: senseBindings } : {})
+            })
+          );
+          if (!preview.accepted || scope !== scopeRef.current) return false;
+          const impact = preview.value;
+          flow.bindImpactConfirmation(impact, content, senseBindings);
+          setImpact(impact);
+          setImpactConfirmed(false);
+          let page = impact.surface_match_page;
+          if (page) {
+            let snapshot = surfaceSnapshotReducer(
+              createEmptySurfaceSnapshotState(),
+              { type: "start", generation: 0, page }
+            );
+            while (snapshot.phase === "loading" && snapshot.next_cursor) {
+              const cursor = snapshot.next_cursor;
+              page = await requests.surfacePage(
+                page.snapshot_id,
+                cursor,
+                new AbortController().signal
+              );
+              if (scope !== scopeRef.current) return false;
+              snapshot = surfaceSnapshotReducer(snapshot, {
+                type: "page_loaded",
+                generation: 0,
+                requested_cursor: cursor,
+                page
+              });
+            }
+            if (
+              !canAcknowledgeSurfaceSnapshot(snapshot) ||
+              !flow.bindImpactSurfaceConfirmation(page)
+            ) {
+              throw new Error("无法完成同形匹配核对");
+            }
+            saveConfirmationContext = {
+              snapshot_id: page.snapshot_id,
+              policy_name: page.policy_name,
+              policy_epoch: page.policy_epoch
+            };
+          }
+        }
         const tokens = flow.confirmations({
           base_revision: baseRevision,
           impact_content: content,
           sense_bindings: senseBindings,
-          ...confirmationContext
+          ...saveConfirmationContext
         });
         const result = await flow.runCanonical("save_forms", () =>
           requests.saveForms(flow.canonical().id, {
