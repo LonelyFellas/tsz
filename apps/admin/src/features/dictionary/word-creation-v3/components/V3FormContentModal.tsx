@@ -1,6 +1,13 @@
 import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
 import { flushSync } from "react-dom";
-import { type ContextType, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ContextType,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   Alert,
@@ -10,8 +17,8 @@ import {
   Drawer,
   Flex,
   Modal,
-  Radio,
   Space,
+  Switch,
   Tag,
   Tooltip,
   Typography
@@ -406,6 +413,7 @@ export function V3FormContentModal({
     }
   };
   const rules = current.dialect_rules;
+  const regularityHintId = useId();
   const regularities = rows.flatMap(({ binding }) =>
     binding.regional_bindings.mode === "common"
       ? [binding.regional_bindings.common.is_regular]
@@ -540,64 +548,57 @@ export function V3FormContentModal({
         {rows.length > 0 && (
           <div className="v3-content-rules">
             <div className="v3-content-rule-row">
-              <Typography.Text strong>英美拼写是否有区别？</Typography.Text>
-              <Radio.Group
-                aria-label="英美拼写是否有区别"
-                value={rules.spelling_mode}
-                onChange={(event) =>
+              <Typography.Text strong>拼写有英美区别？</Typography.Text>
+              <Switch
+                aria-label="拼写有英美区别"
+                checked={rules.spelling_mode === "distinguish"}
+                onChange={(checked) =>
                   changeRules({
-                    spelling_mode: event.target.value,
+                    spelling_mode: checked ? "distinguish" : "unified",
                     phonetic_mode: "distinguish"
                   })
                 }
-              >
-                <Radio value="distinguish">是</Radio>
-                <Radio value="unified">否</Radio>
-              </Radio.Group>
+              />
             </div>
             <div className="v3-content-rule-row">
-              <Typography.Text strong>英美音标是否有区别？</Typography.Text>
+              <Typography.Text strong>音标有英美区别？</Typography.Text>
               <Space wrap>
                 <V3ReferenceBadge
                   nodeIds={referenceForms.flatMap(formNodeIds)}
                   label="词形发音"
                 />
-                <Radio.Group
-                  aria-label="英美音标是否有区别"
-                  value={rules.phonetic_mode}
-                  onChange={(event) =>
+                <Switch
+                  aria-label="音标有英美区别"
+                  checked={rules.phonetic_mode === "distinguish"}
+                  disabled={rules.spelling_mode === "distinguish"}
+                  onChange={(checked) =>
                     changeRules({
                       ...rules,
-                      phonetic_mode: event.target.value
+                      phonetic_mode: checked ? "distinguish" : "unified"
                     })
                   }
-                >
-                  <Radio value="distinguish">是</Radio>
-                  <Radio
-                    value="unified"
-                    disabled={rules.spelling_mode === "distinguish"}
-                  >
-                    否
-                  </Radio>
-                </Radio.Group>
+                />
               </Space>
             </div>
             <div className="v3-content-rule-row">
-              <Typography.Text strong>是否规则变化？</Typography.Text>
+              <Typography.Text strong>词形不规则变化？</Typography.Text>
               <Space wrap>
                 {regularity === undefined && (
-                  <Typography.Text type="secondary">
+                  <Typography.Text id={regularityHintId} type="secondary">
                     各标签设置不同
                   </Typography.Text>
                 )}
-                <Radio.Group
-                  aria-label="是否规则变化"
-                  value={regularity ?? null}
-                  onChange={(event) => changeRegularity(event.target.value)}
-                >
-                  <Radio value>是</Radio>
-                  <Radio value={false}>否</Radio>
-                </Radio.Group>
+                <Switch
+                  aria-label="词形不规则变化"
+                  aria-describedby={
+                    regularity === undefined ? regularityHintId : undefined
+                  }
+                  checked={regularity === false}
+                  unCheckedChildren={
+                    regularity === undefined ? "未统一" : undefined
+                  }
+                  onChange={(checked) => changeRegularity(!checked)}
+                />
               </Space>
             </div>
           </div>
