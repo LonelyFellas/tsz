@@ -188,7 +188,47 @@ describe("admin voice preview data source", () => {
       )
     ).toBe(true);
   });
-  it("分组按账号共享缓存，选择音色不带入历史个人参数", async () => {
+  it("重新读取推荐不能在一分钟内继续使用上次保存前的配置", async () => {
+    const response = (rate: number) =>
+      legacyResponse({
+        revision: rate === 0 ? 1 : 2,
+        groups: [
+          {
+            id: "g",
+            name: "当前组",
+            areas: ["word"],
+            uk: [
+              {
+                id: "current-uk",
+                name: "当前英式",
+                voice_alias: "sonia",
+                selected: true,
+                parameters: {
+                  rate_percent: rate,
+                  pitch_semitones: 0,
+                  style: null
+                }
+              }
+            ],
+            us: []
+          }
+        ]
+      });
+    state.groupsV3
+      .mockResolvedValueOnce(response(0))
+      .mockResolvedValueOnce(response(-27));
+    const { loadAdminVoiceRecommendations } = await import("./dataSource");
+    expect(
+      (await loadAdminVoiceRecommendations({ area: "word" }))[0]!.setting
+        .rate_percent
+    ).toBe(0);
+    expect(
+      (await loadAdminVoiceRecommendations({ area: "word" }))[0]!.setting
+        .rate_percent
+    ).toBe(-27);
+    expect(state.groupsV3).toHaveBeenCalledTimes(2);
+  });
+  it("分组并发读取按账号合并，选择音色不带入历史个人参数", async () => {
     state.library.mockResolvedValue({
       items: [
         {
@@ -199,8 +239,10 @@ describe("admin voice preview data source", () => {
     });
     const { loadAdminVoiceRecommendations, adminVoicePreviewAdapter } =
       await import("./dataSource");
-    await loadAdminVoiceRecommendations({ area: "word" });
-    await loadAdminVoiceRecommendations({ area: "meaning" });
+    await Promise.all([
+      loadAdminVoiceRecommendations({ area: "word" }),
+      loadAdminVoiceRecommendations({ area: "meaning" })
+    ]);
     expect(state.groupsV3).toHaveBeenCalledTimes(1);
     const voices = await adminVoicePreviewAdapter.listVoices({
       language: "en"
@@ -275,7 +317,7 @@ describe("admin voice preview data source", () => {
       []
     );
   });
-  it("按提交组顺序返回完整候选及选用状态，保留末尾全局供解析方过滤回退", async () => {
+  it("有适用分组时全局仅供自动兜底，无适用分组时才展示全局推荐", async () => {
     const recommendation = (id: string, selected: boolean) => ({
       id,
       name: id,
@@ -315,9 +357,14 @@ describe("admin voice preview data source", () => {
       (await loadAdminVoiceRecommendations({ area: "word" }))[0]
     ).toMatchObject({ id: "unselected", selected: false });
     expect(
-      (await loadAdminVoiceRecommendations({ area: "grammar" })).map(
-        (item) => item.id
-      )
+      (await loadAdminVoiceRecommendations({ area: "word" }))
+        .filter((item) => !item.fallbackOnly)
+        .map((item) => item.id)
+    ).toEqual(["unselected", "local-us"]);
+    expect(
+      (await loadAdminVoiceRecommendations({ area: "grammar" }))
+        .filter((item) => !item.fallbackOnly)
+        .map((item) => item.id)
     ).toEqual(["global-uk", "global-us"]);
   });
   it("delegates both methods to the real API when mock is disabled", async () => {

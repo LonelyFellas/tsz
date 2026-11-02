@@ -1,10 +1,6 @@
+import type { SsmlDraft } from "@tsz/voice-editor/types";
 import { speechAccentGroup } from "@tsz/shared";
-import {
-  PlayCircleOutlined,
-  ReloadOutlined,
-  SoundOutlined,
-  UndoOutlined
-} from "@ant-design/icons";
+import { ReloadOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -23,10 +19,8 @@ import {
   Flex,
   Form,
   Input,
-  InputNumber,
   Modal,
   Result,
-  Select,
   Space,
   Tag,
   Typography,
@@ -50,36 +44,34 @@ import {
   VoiceCatalogTable
 } from "./VoiceCatalogTable";
 import { DubbingGroups } from "./DubbingGroups";
-import { DubbingDrafts } from "./DubbingDrafts";
-import { VoiceName, VoiceRate, VoiceVolume } from "./VoiceDisplay";
+import { DubbingDrafts, useDubbingDrafts } from "./DubbingDrafts";
+import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
+import { VoiceName } from "./VoiceDisplay";
 import type { MetadataEditorState } from "./VoiceMetadataEditor";
 import { AddRecommendation } from "./AddRecommendation";
-import { SpeechRateInput } from "./SpeechRateInput";
-import { SpeechVolumeInput } from "./SpeechVolumeInput";
-import { styleNames } from "./voice-labels";
-import { VoiceTrialEditor } from "./VoiceTrialEditor";
+import {
+  VoiceParameterFields,
+  defaultVoiceParameters as initialParameters,
+  type VoiceParameterValues
+} from "./VoiceParameterFields";
+import { VoiceAuditionPanel } from "./VoiceAuditionPanel";
+import { VoiceConfigurationPanel } from "./VoiceConfigurationPanel";
+import { VoicePreviewResult } from "./VoicePreviewResult";
 import {
   newVoiceTrial,
   voiceTrialIssue,
   voiceTrialSetting,
+  effectiveVoiceParameters,
   type VoiceTrialSource
 } from "./voice-trial";
 import { useReadingPreviewAdapter } from "@/features/dictionary/word-creation-v3/components/useReadingPreviewAdapter";
-import {
-  AudioReview,
-  SsmlReview,
-  ReferenceAudio,
-  type ReviewAudio
-} from "@tsz/voice-editor/editor";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import "@tsz/voice-editor/styles.css";
 import "./voice-library.css";
 
-interface Parameters {
-  rate_percent: number;
-  pitch_semitones: number;
-  volume_percent: number;
-  style: string;
+interface Parameters extends VoiceParameterValues {
+  style_degree?: number;
+  role?: string;
 }
 
 interface VoiceForm extends Parameters {
@@ -89,24 +81,7 @@ interface VoiceForm extends Parameters {
 interface Preview extends AdminSpeechPreviewResponse {
   voice: AdminSpeechVoice;
   parameters: Parameters;
-}
-
-const localeNames: Record<string, string> = {
-  "en-GB": "英式英语",
-  "en-US": "美式英语"
-};
-
-function initialParameters(voice: AdminSpeechVoice): Parameters {
-  const c = voice.capabilities;
-  return {
-    rate_percent: Math.max(c.min_rate_percent, Math.min(0, c.max_rate_percent)),
-    pitch_semitones: Math.max(
-      c.min_pitch_semitones,
-      Math.min(0, c.max_pitch_semitones)
-    ),
-    volume_percent: 100,
-    style: ""
-  };
+  comparison?: string;
 }
 
 function previewError(error: unknown): string {
@@ -129,7 +104,13 @@ function VoiceSettingsNavigationGuard({
   dirty: boolean;
   busy: boolean;
 }) {
-  const blocker = useBlocker(dirty || busy);
+  const [drafts, setDrafts] = useDubbingDrafts();
+  const groupsPath = `/${ADMIN_PAGE_ROUTES.voices.path}`;
+  const hasGroupDrafts = Object.keys(drafts).length > 0;
+  const blocker = useBlocker(
+    ({ nextLocation }) =>
+      dirty || busy || (hasGroupDrafts && nextLocation.pathname !== groupsPath)
+  );
   return blocker.state === "blocked" ? (
     <Modal
       open
@@ -138,13 +119,21 @@ function VoiceSettingsNavigationGuard({
       footer={
         <Space>
           <Button onClick={() => blocker.reset()}>继续编辑</Button>
-          <Button disabled={busy} onClick={() => blocker.proceed()}>
+          <Button
+            disabled={busy}
+            onClick={() => {
+              if (blocker.location?.pathname !== groupsPath) setDrafts({});
+              blocker.proceed();
+            }}
+          >
             放弃并离开
           </Button>
         </Space>
       }
     >
-      离开后将丢弃尚未保存的音色修改。
+      {hasGroupDrafts && blocker.location?.pathname === groupsPath
+        ? "当前音色的未保存修改将丢弃，已添加的分组草稿会保留。"
+        : "离开后将丢弃尚未保存的音色修改和分组草稿。"}
     </Modal>
   ) : null;
 }
@@ -154,8 +143,8 @@ type VoiceView = "groups" | "library";
 export function VoiceLibrary({ view = "groups" }: { view?: VoiceView }) {
   const accountId = useAuthStore((state) => state.profile?.id);
   return (
-    <DubbingDrafts key={`${accountId}:${view}`}>
-      <VoiceLibraryContent view={view} />
+    <DubbingDrafts key={accountId}>
+      <VoiceLibraryContent key={view} view={view} />
     </DubbingDrafts>
   );
 }
@@ -181,6 +170,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   const accountId = useAuthStore((s) => s.profile?.id);
   const { modal } = App.useApp();
   const [, setGroupsDirty] = useState(false);
+  const [groupDrafts] = useDubbingDrafts();
   const [text, setText] = useState(
     "Please record the interview before the meeting starts."
   );
@@ -200,13 +190,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [audioError, setAudioError] = useState(false);
-  const [reviewAudio, setReviewAudio] = useState<ReviewAudio>();
   const [trialSources, setTrialSources] = useState<
     Record<string, VoiceTrialSource>
   >({});
+  const [ssmlDrafts, setSsmlDrafts] = useState<Record<string, SsmlDraft>>({});
   const [trialReady, setTrialReady] = useState(true);
-  const [ssmlExpanded, setSsmlExpanded] = useState(false);
   const createReadingAdapter = useReadingPreviewAdapter(undefined, undefined, {
     preserveDirectPhonemes: true
   });
@@ -228,18 +216,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
       new Set([...Object.keys(trialSources), ...Object.keys(trialParameters)]),
     [trialSources, trialParameters]
   );
-  const stopSsml = useRef<(() => void) | undefined>(undefined);
-  const stopReference = useRef<(() => void) | undefined>(undefined);
-  const registerSsmlStop = useCallback((stop: () => void) => {
-    stopSsml.current = stop;
+  const stopTrialTools = useRef<(() => void) | undefined>(undefined);
+  const registerTrialToolsStop = useCallback((stop: () => void) => {
+    stopTrialTools.current = stop;
     return () => {
-      if (stopSsml.current === stop) stopSsml.current = undefined;
-    };
-  }, []);
-  const registerReferenceStop = useCallback((stop: () => void) => {
-    stopReference.current = stop;
-    return () => {
-      if (stopReference.current === stop) stopReference.current = undefined;
+      if (stopTrialTools.current === stop) stopTrialTools.current = undefined;
     };
   }, []);
   const controller = useRef<AbortController | null>(null);
@@ -284,7 +265,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   );
   useUnsavedChanges(
     "voice-library-settings",
-    settingsDirty || settingsBusy || metadataDirty || metadataBusy
+    settingsDirty ||
+      settingsBusy ||
+      metadataDirty ||
+      metadataBusy ||
+      Object.keys(groupDrafts).length > 0
   );
   function updateDirty(values: VoiceForm) {
     const baseline = settingsBaseline.current;
@@ -319,13 +304,10 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     controller.current?.abort();
     controller.current = null;
     player.current?.pause();
-    stopSsml.current?.();
-    stopReference.current?.();
-    setReviewAudio(undefined);
+    stopTrialTools.current?.();
     setPendingVoice(null);
     setPreview(null);
     setError(null);
-    setAudioError(false);
   }
 
   useEffect(() => {
@@ -347,7 +329,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     }
   }, [canGenerate]);
 
-  async function audition(voice: AdminSpeechVoice, parameters?: Parameters) {
+  async function audition(
+    voice: AdminSpeechVoice,
+    parameters?: Parameters,
+    comparison?: string
+  ) {
     const source = voiceTrial(voice);
     if (
       !canGenerate ||
@@ -356,7 +342,17 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
       (!parameters && library.isPending)
     )
       return;
-    parameters ??= voiceParameters(voice);
+    const effective = effectiveVoiceParameters(
+      voice,
+      parameters ?? voiceParameters(voice)
+    );
+    parameters = {
+      ...effective,
+      volume_percent: effective.volume_percent ?? 100,
+      style: effective.style ?? "",
+      style_degree: effective.style_degree ?? undefined,
+      role: effective.role ?? undefined
+    };
     cancelPreview();
     const request = new AbortController();
     controller.current = request;
@@ -398,12 +394,16 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
               ...(parameters.volume_percent === 100
                 ? {}
                 : { volume_percent: parameters.volume_percent }),
-              ...(parameters.style ? { style: parameters.style } : {})
+              ...(parameters.style ? { style: parameters.style } : {}),
+              ...(parameters.style_degree != null
+                ? { style_degree: parameters.style_degree }
+                : {}),
+              ...(parameters.role ? { role: parameters.role } : {})
             },
             request.signal
           );
       if (controller.current !== request || request.signal.aborted) return;
-      setPreview({ ...result, voice, parameters });
+      setPreview({ ...result, voice, parameters, comparison });
     } catch (cause) {
       if (controller.current === request && !request.signal.aborted)
         setError(
@@ -426,7 +426,6 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     editSession.current += 1;
     cancelPreview();
     setSelected(voice);
-    setSsmlExpanded(false);
     setTrialReady(false);
     setAddingRecommendation(false);
     setSaveError(null);
@@ -457,10 +456,12 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         "rate_percent",
         "pitch_semitones",
         "volume_percent",
-        "style"
+        "style",
+        "style_degree",
+        "role"
       ]);
       if (session !== editSession.current) return;
-      await audition(selected, parameters);
+      await audition(selected, parameters, "当前参数");
     } catch {
       // Form keeps invalid values visible beside the corresponding fields.
     }
@@ -480,7 +481,9 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         "rate_percent",
         "pitch_semitones",
         "volume_percent",
-        "style"
+        "style",
+        "style_degree",
+        "role"
       ]);
       if (session === editSession.current) closeSettings();
     } catch {
@@ -524,9 +527,14 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         "rate_percent",
         "pitch_semitones",
         "volume_percent",
-        "style"
+        "style",
+        "style_degree",
+        "role"
       ]);
-      if (session === editSession.current) setAddingRecommendation(true);
+      if (session === editSession.current) {
+        cancelPreview();
+        setAddingRecommendation(true);
+      }
     } catch {
       // Keep parameter validation visible in the drawer before opening the dialog.
     }
@@ -669,103 +677,23 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
 
   function previewView() {
     return (
-      <div className="voice-library-preview" aria-live="polite">
-        {pendingVoice && (
-          <Space>
-            <SoundOutlined />
-            <Typography.Text type="secondary">正在生成试听…</Typography.Text>
-            <Button type="link" size="small" onClick={cancelPreview}>
-              取消
-            </Button>
-          </Space>
-        )}
-        {error && <Alert type="error" showIcon title={error} />}
-        {selected && !pendingVoice && !error && !preview && (
-          <div className="voice-library-preview-empty">
-            <SoundOutlined />
-            <Typography.Text type="secondary">暂无试听音频</Typography.Text>
-          </div>
-        )}
-        {preview && (
-          <div className="voice-library-player">
-            <Flex vertical gap={8}>
-              <Space wrap>
-                <VoiceName voice={preview.voice} />
-                <Tag>
-                  {localeNames[preview.voice.locale] ?? preview.voice.locale}
-                </Tag>
-                <Typography.Text type="secondary">
-                  本次试听：音量 <VoiceVolume parameters={preview.parameters} />
-                  ，<VoiceRate parameters={preview.parameters} />
-                  {preview.parameters.style
-                    ? `，${styleNames[preview.parameters.style] ?? preview.parameters.style}`
-                    : "，默认"}
-                </Typography.Text>
-              </Space>
-              <audio
-                key={preview.audio_url}
-                ref={player}
-                controls
-                autoPlay
-                aria-label={`${preview.voice.display_name} 试听播放器`}
-                src={preview.audio_url}
-                onLoadedMetadata={(event) => {
-                  const snapshot = preview;
-                  setReviewAudio({
-                    audio: event.currentTarget,
-                    name: snapshot.voice.display_name,
-                    result: {
-                      audioUrl: snapshot.audio_url,
-                      expiresAt: snapshot.expires_at,
-                      cached: snapshot.cache_status === "hit",
-                      ...(snapshot.content_path
-                        ? {
-                            loadAudio: (options?: { signal?: AbortSignal }) =>
-                              api.speech.previewContent(
-                                snapshot.content_path!,
-                                options?.signal
-                              )
-                          }
-                        : {})
-                    }
-                  });
-                }}
-                onPlay={() => {
-                  stopSsml.current?.();
-                  stopReference.current?.();
-                  if (Date.parse(preview.expires_at) <= Date.now()) {
-                    player.current?.pause();
-                    setAudioError(true);
-                  }
-                }}
-                onError={() => setAudioError(true)}
-              />
-              {reviewAudio && (
-                <AudioReview
-                  key={reviewAudio.result.audioUrl}
-                  media={reviewAudio}
-                  onPlay={() => {
-                    stopSsml.current?.();
-                    stopReference.current?.();
-                  }}
-                />
-              )}
-              {audioError && (
-                <Alert
-                  type="warning"
-                  showIcon
-                  title="音频加载失败或链接已过期，请重新生成试听。"
-                />
-              )}
-              <Typography.Text type="secondary">
-                {audioError
-                  ? "请重新点击试听。"
-                  : "若未自动播放，请点击播放按钮。"}
-              </Typography.Text>
-            </Flex>
-          </div>
-        )}
-      </div>
+      <VoicePreviewResult
+        preview={
+          preview
+            ? {
+                result: preview,
+                voice: preview.voice,
+                parameters: preview.parameters,
+                comparison: preview.comparison
+              }
+            : null
+        }
+        pending={!!pendingVoice}
+        error={error}
+        onCancel={cancelPreview}
+        player={player}
+        onPlay={() => stopTrialTools.current?.()}
+      />
     );
   }
 
@@ -783,7 +711,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   const parametersAreDefault =
     !!defaults &&
     !!formValues &&
-    (Object.keys(defaults) as (keyof Parameters)[]).every(
+    (Object.keys(defaults) as (keyof VoiceParameterValues)[]).every(
       (key) => formValues[key] === defaults[key]
     );
   const refreshButton = (
@@ -879,11 +807,12 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
       )}
       <Card
         size="small"
-        className="voice-library-content"
-        title={tab === "groups" ? "分组配音" : undefined}
-        extra={tab === "groups" ? refreshButton : undefined}
+        className={`voice-library-content${tab === "groups" ? " voice-library-group-content" : ""}`}
       >
-        {tab === "groups" && auditionPanel}
+        {tab === "groups" &&
+          !selected &&
+          (pendingVoice || error || preview) &&
+          previewView()}
         {tab === "groups" && (
           <DubbingGroups
             onDirtyChange={setGroupsDirty}
@@ -975,22 +904,6 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
               )}
               <div className="voice-library-footer-actions">
                 <Button
-                  type="primary"
-                  aria-label="试听当前参数"
-                  icon={<PlayCircleOutlined />}
-                  disabled={
-                    settingsBusy ||
-                    !canGenerate ||
-                    !trialReady ||
-                    !!voiceTrialIssue(selected, voiceTrial(selected)) ||
-                    selected.synthesis_available === false
-                  }
-                  loading={pendingVoice === selected.alias}
-                  onClick={() => void auditionDraft()}
-                >
-                  试听当前参数
-                </Button>
-                <Button
                   title="仅本页有效，刷新后重置"
                   disabled={
                     settingsBusy ||
@@ -1060,7 +973,9 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                   "rate_percent" in changed ||
                   "pitch_semitones" in changed ||
                   "volume_percent" in changed ||
-                  "style" in changed
+                  "style" in changed ||
+                  "style_degree" in changed ||
+                  "role" in changed
                 ) {
                   cancelPreview();
                   if (
@@ -1075,6 +990,10 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                     Number.isInteger(values.volume_percent) &&
                     values.volume_percent >= 0 &&
                     values.volume_percent <= 100 &&
+                    (values.style_degree == null ||
+                      (Number.isFinite(values.style_degree) &&
+                        values.style_degree >= 0.01 &&
+                        values.style_degree <= 2)) &&
                     (!values.style ||
                       capabilities.styles.includes(values.style))
                   )
@@ -1084,7 +1003,9 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                         rate_percent: values.rate_percent,
                         pitch_semitones: values.pitch_semitones,
                         volume_percent: values.volume_percent,
-                        style: values.style
+                        style: values.style,
+                        style_degree: values.style_degree,
+                        role: values.role
                       }
                     }));
                 }
@@ -1092,163 +1013,28 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                 setSaveMessage(null);
               }}
             >
-              <section
-                className="voice-library-settings-section voice-trial-workbench"
-                aria-label="调节声音"
-              >
-                <section
-                  className="voice-trial-parameter-column"
-                  aria-label="声音参数"
-                >
-                  <Flex
-                    className="voice-library-parameters-heading"
-                    justify="space-between"
-                    align="center"
-                    gap={8}
-                  >
-                    <Typography.Text strong>声音参数</Typography.Text>
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<UndoOutlined />}
-                      aria-label="恢复默认参数"
-                      disabled={settingsBusy || parametersAreDefault}
-                      onClick={() => {
-                        cancelPreview();
-                        const defaults = initialParameters(selected);
-                        form.setFieldsValue(defaults);
-                        setTrialParameters((current) => ({
-                          ...current,
-                          [selected.alias]: defaults
-                        }));
-                        updateDirty(form.getFieldsValue());
-                        setSaveMessage(null);
-                      }}
-                    >
-                      重置
-                    </Button>
-                  </Flex>
-                  {capabilities.supports_volume_percent === false && (
-                    <Alert type="info" showIcon title="此音色使用固定参数" />
-                  )}
-                  <div className="voice-library-parameters">
-                    <Form.Item
-                      name="volume_percent"
-                      label={
-                        <span className="voice-library-volume-label">
-                          音量
-                          <span
-                            className="voice-library-muted-status"
-                            role="status"
-                          >
-                            {formValues?.volume_percent === 0 ? "已静音" : ""}
-                          </span>
-                        </span>
-                      }
-                      tooltip="100% 为原音量，0% 为静音。"
-                      rules={[
-                        {
-                          required: true,
-                          type: "integer",
-                          min:
-                            capabilities.supports_volume_percent === false
-                              ? 100
-                              : 0,
-                          max: 100,
-                          message:
-                            capabilities.supports_volume_percent === false
-                              ? "该模型仅支持原音量，请明确恢复默认参数"
-                              : "请输入 0 至 100 的整数"
-                        }
-                      ]}
-                    >
-                      <SpeechVolumeInput
-                        disabled={
-                          settingsBusy ||
-                          capabilities.supports_volume_percent === false
-                        }
-                      />
-                    </Form.Item>
-                    <div className="voice-library-parameter-grid">
-                      <Form.Item
-                        name="rate_percent"
-                        label="语速"
-                        rules={[
-                          {
-                            required: true,
-                            type: "integer",
-                            min: Math.max(-70, capabilities.min_rate_percent),
-                            max: Math.min(70, capabilities.max_rate_percent),
-                            message: `请输入 ${((100 + Math.max(-70, capabilities.min_rate_percent)) / 100).toFixed(2)} 至 ${((100 + Math.min(70, capabilities.max_rate_percent)) / 100).toFixed(2)} 倍速`
-                          }
-                        ]}
-                        tooltip={
-                          capabilities.min_rate_percent ===
-                          capabilities.max_rate_percent
-                            ? "该音色使用固定语速。"
-                            : "1.00× 为标准语速。"
-                        }
-                      >
-                        <SpeechRateInput
-                          compact
-                          aria-label="合成语速"
-                          min={capabilities.min_rate_percent}
-                          max={capabilities.max_rate_percent}
-                          disabled={
-                            settingsBusy ||
-                            capabilities.min_rate_percent ===
-                              capabilities.max_rate_percent
-                          }
-                          style={{ width: "100%" }}
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        name="pitch_semitones"
-                        label="音调"
-                        rules={[
-                          {
-                            required: true,
-                            type: "integer",
-                            min: capabilities.min_pitch_semitones,
-                            max: capabilities.max_pitch_semitones,
-                            message: `请输入 ${capabilities.min_pitch_semitones} 至 ${capabilities.max_pitch_semitones} 的整数`
-                          }
-                        ]}
-                        tooltip={
-                          capabilities.min_pitch_semitones ===
-                          capabilities.max_pitch_semitones
-                            ? "该音色使用固定音调。"
-                            : "0 保持原音调，正数升高，负数降低。"
-                        }
-                      >
-                        <InputNumber
-                          aria-label="音调"
-                          suffix="半音"
-                          min={capabilities.min_pitch_semitones}
-                          max={capabilities.max_pitch_semitones}
-                          disabled={
-                            settingsBusy ||
-                            capabilities.min_pitch_semitones ===
-                              capabilities.max_pitch_semitones
-                          }
-                          style={{ width: "100%" }}
-                        />
-                      </Form.Item>
-                    </div>
-                    <Form.Item name="style" label="说话风格">
-                      <Select
-                        aria-label="说话风格"
-                        disabled={settingsBusy}
-                        options={[
-                          { value: "", label: "默认" },
-                          ...capabilities.styles.map((style) => ({
-                            value: style,
-                            label: styleNames[style] ?? style
-                          }))
-                        ]}
-                      />
-                    </Form.Item>
-                  </div>
+              <VoiceConfigurationPanel
+                parameters={
+                  <VoiceParameterFields
+                    voice={selected}
+                    disabled={settingsBusy}
+                    volume={formValues?.volume_percent}
+                    style={formValues?.style}
+                    resetDisabled={parametersAreDefault}
+                    onReset={() => {
+                      cancelPreview();
+                      const defaults = initialParameters(selected);
+                      form.setFieldsValue(defaults);
+                      setTrialParameters((current) => ({
+                        ...current,
+                        [selected.alias]: defaults
+                      }));
+                      updateDirty(form.getFieldsValue());
+                      setSaveMessage(null);
+                    }}
+                  />
+                }
+                personal={
                   <Collapse
                     ghost
                     className="voice-library-notes"
@@ -1298,131 +1084,93 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                       }
                     ]}
                   />
-                </section>
-                <div className="voice-trial-audition-column">
-                  <Flex
-                    className="voice-trial-editor-heading"
-                    align="center"
-                    justify="space-between"
-                    gap={12}
-                  >
-                    <Typography.Text strong>发音标注</Typography.Text>
-                    {trialSources[selected.alias] && (
-                      <Button
-                        type="link"
-                        size="small"
-                        disabled={settingsBusy}
-                        onClick={restoreCommonText}
-                      >
-                        恢复共用文本
-                      </Button>
-                    )}
-                  </Flex>
-                  <VoiceTrialEditor
+                }
+                audition={
+                  <VoiceAuditionPanel
                     key={selected.alias}
                     voice={selected}
                     source={selectedTrial!}
                     canReadWords={canViewWords}
                     readOnly={settingsBusy}
                     onValidationChange={setTrialReady}
-                    onChange={(source) => {
+                    onSourceChange={(source) => {
                       cancelPreview();
                       setTrialSources((current) => ({
                         ...current,
                         [selected.alias]: source
                       }));
                     }}
+                    canGenerate={canGenerate}
+                    canAudition={
+                      canGenerate &&
+                      trialReady &&
+                      selected.synthesis_available !== false
+                    }
+                    pending={pendingVoice === selected.alias}
+                    onAudition={() => void auditionDraft()}
+                    onCancelPreview={cancelPreview}
+                    preview={
+                      preview
+                        ? {
+                            result: preview,
+                            voice: preview.voice,
+                            parameters: preview.parameters,
+                            comparison: preview.comparison
+                          }
+                        : null
+                    }
+                    error={error}
+                    player={player}
+                    adapter={selectedTrialAdapter}
+                    setting={voiceTrialSetting(
+                      selected,
+                      voiceParameters(selected),
+                      outputFormat
+                    )}
+                    registerStop={registerTrialToolsStop}
+                    ssmlDraft={ssmlDrafts[selected.alias]}
+                    onSsmlDraftChange={(draft) =>
+                      setSsmlDrafts((current) => ({
+                        ...current,
+                        [selected.alias]: draft
+                      }))
+                    }
+                    comparisonAction={
+                      <Button
+                        disabled={
+                          settingsBusy ||
+                          !canGenerate ||
+                          !trialReady ||
+                          !!voiceTrialIssue(selected, selectedTrial!) ||
+                          selected.synthesis_available === false
+                        }
+                        onClick={() =>
+                          void audition(
+                            selected,
+                            settingsBaseline.current ??
+                              initialParameters(selected),
+                            "原参数"
+                          )
+                        }
+                      >
+                        试听原参数
+                      </Button>
+                    }
+                    sourceAction={
+                      trialSources[selected.alias] && (
+                        <Button
+                          type="link"
+                          size="small"
+                          disabled={settingsBusy}
+                          onClick={restoreCommonText}
+                        >
+                          恢复共用文本
+                        </Button>
+                      )
+                    }
                   />
-                  {voiceTrialIssue(selected, selectedTrial!) && (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      title={voiceTrialIssue(selected, selectedTrial!)}
-                    />
-                  )}
-                  <div className="voice-library-settings-preview">
-                    <Flex
-                      className="voice-library-preview-heading"
-                      align="center"
-                      justify="space-between"
-                      gap={12}
-                    >
-                      <Typography.Text strong>音频审听</Typography.Text>
-                      <Select
-                        className="voice-library-output-format"
-                        aria-label="试听输出格式"
-                        value={outputFormat}
-                        options={[
-                          { value: "mp3", label: "MP3" },
-                          { value: "wav", label: "WAV" }
-                        ]}
-                        onChange={(value) => {
-                          cancelPreview();
-                          setTrialSources((current) => ({
-                            ...current,
-                            [selected.alias]: {
-                              ...voiceTrial(selected),
-                              output_format: value
-                            }
-                          }));
-                        }}
-                      />
-                    </Flex>
-                    {previewView()}
-                    <ReferenceAudio
-                      registerStop={registerReferenceStop}
-                      onPlay={() => {
-                        player.current?.pause();
-                        stopSsml.current?.();
-                      }}
-                    />
-                  </div>
-                  <Collapse
-                    ghost
-                    className="voice-library-tools"
-                    styles={{ body: { padding: "0 0 8px" } }}
-                    activeKey={ssmlExpanded ? ["tools"] : []}
-                    onChange={(keys) => {
-                      setSsmlExpanded(keys.includes("tools"));
-                      if (!keys.includes("tools")) {
-                        stopSsml.current?.();
-                      }
-                    }}
-                    items={[
-                      {
-                        key: "tools",
-                        label: "SSML",
-                        forceRender: true,
-                        children: (
-                          <>
-                            {canGenerate && (
-                              <SsmlReview
-                                key={selected.alias}
-                                singleVoice
-                                expanded={ssmlExpanded}
-                                adapter={selectedTrialAdapter}
-                                content={selectedTrial!.content}
-                                settings={[
-                                  voiceTrialSetting(
-                                    selected,
-                                    voiceParameters(selected),
-                                    outputFormat
-                                  )
-                                ]}
-                                onPlay={() => {
-                                  player.current?.pause();
-                                  stopReference.current?.();
-                                }}
-                                registerStop={registerSsmlStop}
-                              />
-                            )}
-                          </>
-                        )
-                      }
-                    ]}
-                  />
-                </div>
-              </section>
+                }
+              />
             </Form>
             {canEditDescription && (
               <Modal
@@ -1450,7 +1198,9 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                       "rate_percent",
                       "pitch_semitones",
                       "volume_percent",
-                      "style"
+                      "style",
+                      "style_degree",
+                      "role"
                     ]);
                     return {
                       rate_percent: values.rate_percent,
@@ -1458,7 +1208,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                       ...(values.volume_percent === 100
                         ? {}
                         : { volume_percent: values.volume_percent }),
-                      style: values.style || null
+                      style: values.style || null,
+                      ...(values.style_degree != null
+                        ? { style_degree: values.style_degree }
+                        : {}),
+                      ...(values.role ? { role: values.role } : {})
                     };
                   }}
                 />

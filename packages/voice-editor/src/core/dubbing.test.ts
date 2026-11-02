@@ -133,7 +133,12 @@ describe("文本配音模式", () => {
         setting: { voice_id: "missing", enabled: true, rate_percent: 0 }
       },
       { ...recommendations[1]!, groupName: "B" },
-      { ...recommendations[0]!, id: "global", groupName: "全局常用" }
+      {
+        ...recommendations[0]!,
+        id: "global",
+        groupName: "全局常用",
+        fallbackOnly: true
+      }
     ];
     expect(
       resolveRecommendedVoices(
