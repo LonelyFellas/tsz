@@ -2,7 +2,11 @@ import { api } from "@/lib/auth";
 import { speechAccentGroup, synthesisForLocale } from "@tsz/shared";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import type { GeneratedSpeechSource, VoiceProfileV3 } from "@tsz/types";
-import type { FormCopyPlan, ResolvedFormCopyProfile } from "./formCopyModel";
+import {
+  variantForCopyReference,
+  type FormCopyPlan,
+  type ResolvedFormCopyProfile
+} from "./formCopyModel";
 
 /** 将当前有效配音取成局部快照；不生成音频，也不沿用来源的音频引用。 */
 export async function resolveFormCopyProfiles(
@@ -13,9 +17,10 @@ export async function resolveFormCopyProfiles(
   const profiles = new Map<string, Promise<ResolvedFormCopyProfile>>();
   const hasProfiles = plan.matches.some((match) => {
     if (!match.source) return false;
-    const regions = plan.source.contentSnapshot.regional_variants;
-    const variant =
-      regions.mode === "common" ? regions.common : regions[match.side];
+    const variant = variantForCopyReference(
+      plan.source.contentSnapshot,
+      match.source
+    );
     const row = variant.pronunciations.find(
       (item) => item.id === match.source!.pronunciationId
     )!;
@@ -35,9 +40,10 @@ export async function resolveFormCopyProfiles(
   for (const match of plan.matches) {
     if (!match.source) continue;
     const reference = match.source;
-    const regions = plan.source.contentSnapshot.regional_variants;
-    const variant =
-      regions.mode === "common" ? regions.common : regions[match.side];
+    const variant = variantForCopyReference(
+      plan.source.contentSnapshot,
+      match.source
+    );
     const pronunciation = variant.pronunciations.find(
       (row) => row.id === reference.pronunciationId
     )!;

@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { useVoiceSave } from "./voiceSaveContext";
 import { confirmedPublicationAudioFixture } from "../PublicationAudioReviewPanel.test-helper";
 import { expandFormContents } from "@tsz/shared";
@@ -6585,9 +6586,8 @@ it.each([commonFormFixture(), ukUsFormFixture()])(
                 if (!("forms_format" in forms)) throw new Error("fixture");
                 const editor = contentEditorForms(forms.contents[0]!);
                 const regions = editor.pos[0]!.forms[0]!.regional_variants;
-                for (const [index, variant] of (regions.mode === "common"
-                  ? [regions.common]
-                  : [regions.uk, regions.us]
+                for (const [index, variant] of regionalVariants(
+                  regions
                 ).entries()) {
                   variant.spelling_rich = {
                     version: 2,

@@ -1,3 +1,4 @@
+import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { env } from "../../../lib/env";
 import { spellingSpeechEqual } from "./spellingSpeech";
 import type {
@@ -300,17 +301,29 @@ describe("V3 forms operations", () => {
         id: form.id,
         regional_variants: {
           mode: "uk_us",
-          uk: { id: form.regional_variants.uk.id, spelling: "center" },
-          us: { id: form.regional_variants.us.id, spelling: "center" }
+          uk: {
+            id: primaryRegionalVariant(form.regional_variants, "uk").id,
+            spelling: "center"
+          },
+          us: {
+            id: primaryRegionalVariant(form.regional_variants, "us").id,
+            spelling: "center"
+          }
         }
       }
     });
     if (!unified.ok || unified.value.regional_variants.mode !== "uk_us") return;
-    expect(unified.value.regional_variants.uk.pronunciations).toEqual(
-      form.regional_variants.uk.pronunciations
+    expect(
+      primaryRegionalVariant(unified.value.regional_variants, "uk")
+        .pronunciations
+    ).toEqual(
+      primaryRegionalVariant(form.regional_variants, "uk").pronunciations
     );
-    expect(unified.value.regional_variants.us.pronunciations).toEqual(
-      form.regional_variants.us.pronunciations
+    expect(
+      primaryRegionalVariant(unified.value.regional_variants, "us")
+        .pronunciations
+    ).toEqual(
+      primaryRegionalVariant(form.regional_variants, "us").pronunciations
     );
   });
 
@@ -420,11 +433,13 @@ describe("V3 forms operations", () => {
                 regional_variants: {
                   mode: "uk_us",
                   uk: {
-                    id: regional.regional_variants.uk.id,
+                    id: primaryRegionalVariant(regional.regional_variants, "uk")
+                      .id,
                     spelling: "center"
                   },
                   us: {
-                    id: regional.regional_variants.us.id,
+                    id: primaryRegionalVariant(regional.regional_variants, "us")
+                      .id,
                     spelling: "center"
                   }
                 }
@@ -588,8 +603,14 @@ describe("V3 forms operations", () => {
                 id: regional.id,
                 regional_variants: {
                   mode: "uk_us",
-                  uk: { id: regional.regional_variants.uk.id },
-                  us: { id: regional.regional_variants.us.id }
+                  uk: {
+                    id: primaryRegionalVariant(regional.regional_variants, "uk")
+                      .id
+                  },
+                  us: {
+                    id: primaryRegionalVariant(regional.regional_variants, "us")
+                      .id
+                  }
                 }
               }
             ]
@@ -1497,10 +1518,7 @@ describe("V3 forms operations", () => {
         { id: tailMembershipId, form_id: tail.id },
         { id: generated[mode === "common" ? 2 : 3], form_id: generated[0] }
       ]);
-      const variants =
-        newForm.regional_variants.mode === "common"
-          ? [newForm.regional_variants.common]
-          : [newForm.regional_variants.uk, newForm.regional_variants.us];
+      const variants = regionalVariants(newForm.regional_variants);
       expect(variants).toHaveLength(mode === "common" ? 1 : 2);
       for (const variant of variants) {
         expect(variant.spelling).toBe("");
@@ -1962,7 +1980,9 @@ it("规则标记按拼写独立保存，统一拼写同步英美且转换不丢�
     uk: { is_regular: false },
     us: { spelling: "center" }
   });
-  expect(form.regional_variants.uk.is_regular).toBeUndefined();
+  expect(
+    primaryRegionalVariant(form.regional_variants, "uk").is_regular
+  ).toBeUndefined();
   const blocked = normalizeGroupDialectRules(content, UUIDS.pos, UUIDS.group, {
     spelling_mode: "unified",
     phonetic_mode: "distinguish"
@@ -2067,9 +2087,7 @@ it("兼容发布不向旧 API 生成规则标记：新增、编辑和英美转�
       for (const pos of serialized.pos) {
         for (const form of pos.forms) {
           const regional = form.regional_variants;
-          for (const variant of regional.mode === "common"
-            ? [regional.common]
-            : [regional.uk, regional.us]) {
+          for (const variant of regionalVariants(regional)) {
             expect(variant).not.toHaveProperty("is_regular");
           }
         }
@@ -2235,8 +2253,12 @@ it("方言显式拆合携带拼写标注，统一拼写同步两侧，规则合�
   });
   if (!split.ok || split.value.regional_variants.mode !== "uk_us")
     throw new Error("expected split");
-  expect(split.value.regional_variants.uk.spelling_rich).toEqual(rich);
-  expect(split.value.regional_variants.us.spelling_rich).toEqual(rich);
+  expect(
+    primaryRegionalVariant(split.value.regional_variants, "uk").spelling_rich
+  ).toEqual(rich);
+  expect(
+    primaryRegionalVariant(split.value.regional_variants, "us").spelling_rich
+  ).toEqual(rich);
   const merged = convertUkUsToCommon(split.value, {
     confirmed: true,
     common: mapping
@@ -2250,9 +2272,16 @@ it("方言显式拆合携带拼写标注，统一拼写同步两侧，规则合�
   const unified = unifyUkUsSpelling(split.value, next);
   if (!unified.ok || unified.value.regional_variants.mode !== "uk_us")
     throw new Error("expected unified");
-  expect(unified.value.regional_variants.uk.spelling_rich).toEqual(next);
-  expect(unified.value.regional_variants.us.spelling_rich).toEqual(next);
-  split.value.regional_variants.us.spelling_rich = { ...rich, annotations: [] };
+  expect(
+    primaryRegionalVariant(unified.value.regional_variants, "uk").spelling_rich
+  ).toEqual(next);
+  expect(
+    primaryRegionalVariant(unified.value.regional_variants, "us").spelling_rich
+  ).toEqual(next);
+  primaryRegionalVariant(split.value.regional_variants, "us").spelling_rich = {
+    ...rich,
+    annotations: []
+  };
   const content = formsFixture({ forms: [split.value] });
   expect(
     normalizeGroupDialectRules(
@@ -2311,7 +2340,9 @@ it("英美相同连读的省略与显式默认端宽不阻止统一拼写", () =
   expect(merged.uk.spelling_rich).toEqual(edited);
   expect(merged.us.spelling_rich).toEqual(edited);
   expect(unifyUkUsSpelling(form, loaded.text).ok).toBe(true);
-  expect(form.regional_variants.uk.spelling_rich).toEqual(loaded);
+  expect(
+    primaryRegionalVariant(form.regional_variants, "uk").spelling_rich
+  ).toEqual(loaded);
 });
 
 it("方言显式拆合保留逐字正音", () => {
@@ -2330,12 +2361,14 @@ it("方言显式拆合保留逐字正音", () => {
   });
   if (!split.ok || split.value.regional_variants.mode !== "uk_us")
     throw new Error("expected split");
-  expect(split.value.regional_variants.uk.pronunciations[0]?.style).toBe(
-    "citation"
-  );
-  expect(split.value.regional_variants.us.pronunciations[0]?.style).toBe(
-    "citation"
-  );
+  expect(
+    primaryRegionalVariant(split.value.regional_variants, "uk")
+      .pronunciations[0]?.style
+  ).toBe("citation");
+  expect(
+    primaryRegionalVariant(split.value.regional_variants, "us")
+      .pronunciations[0]?.style
+  ).toBe("citation");
   const merged = convertUkUsToCommon(split.value, {
     confirmed: true,
     common: mapping
@@ -2420,13 +2453,18 @@ it("方言拆合携带独立拼写试听，统一编辑同步两侧且不静默�
   const form = split.value.pos[0]!.forms[0]!;
   if (form.regional_variants.mode !== "uk_us")
     throw new Error("expected regions");
-  expect(form.regional_variants.uk.spelling_speech).toEqual(
-    commonVariant(content.pos[0]!.forms[0]!).spelling_speech
+  expect(
+    primaryRegionalVariant(form.regional_variants, "uk").spelling_speech
+  ).toEqual(commonVariant(content.pos[0]!.forms[0]!).spelling_speech);
+  expect(
+    primaryRegionalVariant(form.regional_variants, "us").spelling_speech
+  ).toEqual(
+    primaryRegionalVariant(form.regional_variants, "uk").spelling_speech
   );
-  expect(form.regional_variants.us.spelling_speech).toEqual(
-    form.regional_variants.uk.spelling_speech
-  );
-  const ids = [form.regional_variants.uk.id, form.regional_variants.us.id];
+  const ids = [
+    primaryRegionalVariant(form.regional_variants, "uk").id,
+    primaryRegionalVariant(form.regional_variants, "us").id
+  ];
   for (const patch of [{ style: "cheerful" }, { pitch_semitones: 2 }]) {
     const differentParameters = updateSpellingVoiceProfile(
       split.value,

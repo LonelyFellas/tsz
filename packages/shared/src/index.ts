@@ -12,3 +12,4 @@ export { ipaWordToUps, UPS_RULE_SOURCE } from "./ipa-ups";
 export * from "./voice-display";
 
 export * from "./playback";
+export { regionalVariants, primaryRegionalVariant } from "./regional-variants";

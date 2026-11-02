@@ -542,6 +542,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         "X-TSZ-Voice-Models": "v1",
         "X-TSZ-Form-Contents": "v1",
         "X-TSZ-Form-Content-Reassignment": "v1",
+        "X-TSZ-Multiple-Spellings": "v1",
         "X-TSZ-Sentence-Formatting": "v1"
       }
     });
@@ -560,7 +561,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       {
         headers: expect.objectContaining({
           "X-TSZ-Form-Contents": "v1",
-          "X-TSZ-Form-Content-Reassignment": "v1"
+          "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1"
         })
       }
     );
@@ -600,6 +602,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": `${method}-key`
         }
@@ -629,6 +632,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": `${method}-key`
         }
@@ -931,6 +935,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "create-v3-key"
         }
@@ -946,6 +951,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         "X-TSZ-Voice-Models": "v1",
         "X-TSZ-Form-Contents": "v1",
         "X-TSZ-Form-Content-Reassignment": "v1",
+        "X-TSZ-Multiple-Spellings": "v1",
         "X-TSZ-Sentence-Formatting": "v1"
       }
     });
@@ -962,7 +968,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "X-TSZ-Form-Contents": "v1",
-          "X-TSZ-Form-Content-Reassignment": "v1"
+          "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1"
         }
       }
     );
@@ -984,6 +991,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1"
         }
       }
@@ -1006,6 +1014,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1"
         }
       }
@@ -1024,6 +1033,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         "X-TSZ-Voice-Models": "v1",
         "X-TSZ-Form-Contents": "v1",
         "X-TSZ-Form-Content-Reassignment": "v1",
+        "X-TSZ-Multiple-Spellings": "v1",
         "X-TSZ-Sentence-Formatting": "v1"
       }
     });
@@ -1039,6 +1049,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1"
         }
       }
@@ -1061,6 +1072,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "batch-publish-key"
         }
@@ -1079,6 +1091,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "publish-v3-key"
         }
@@ -1097,6 +1110,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "activate-v3-key"
         }
@@ -1115,6 +1129,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "archive-any-key"
         }
@@ -1133,6 +1148,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "restore-any-key"
         }
@@ -1151,6 +1167,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "archive-batch-any-key"
         }
@@ -1169,6 +1186,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "restore-batch-any-key"
         }
@@ -1192,6 +1210,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
           "X-TSZ-Voice-Models": "v1",
           "X-TSZ-Form-Contents": "v1",
           "X-TSZ-Form-Content-Reassignment": "v1",
+          "X-TSZ-Multiple-Spellings": "v1",
           "X-TSZ-Sentence-Formatting": "v1",
           "Idempotency-Key": "batch-publication-key"
         }

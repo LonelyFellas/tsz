@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { PlusOutlined } from "@ant-design/icons";
 import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
 import type {
@@ -38,7 +39,8 @@ function formMatchesDialectRules(
   if (form.regional_variants.mode !== "uk_us") return false;
   if (rules.spelling_mode === "distinguish") return true;
   return (
-    form.regional_variants.uk.spelling === form.regional_variants.us.spelling
+    primaryRegionalVariant(form.regional_variants, "uk").spelling ===
+    primaryRegionalVariant(form.regional_variants, "us").spelling
   );
 }
 

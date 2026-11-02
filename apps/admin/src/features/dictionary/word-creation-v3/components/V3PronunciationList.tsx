@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { env } from "@/lib/env";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
 import { V3ActualPronunciationCopy } from "./V3ActualPronunciationCopy";
@@ -46,10 +47,7 @@ function updateVariantPronunciations(
   const next = structuredClone(content);
   for (const pos of next.pos) {
     for (const form of pos.forms) {
-      const variants =
-        form.regional_variants.mode === "common"
-          ? [form.regional_variants.common]
-          : [form.regional_variants.uk, form.regional_variants.us];
+      const variants = regionalVariants(form.regional_variants);
       const variant = variants.find((item) => item.id === variantId);
       if (variant) {
         variant.pronunciations = update(variant.pronunciations);

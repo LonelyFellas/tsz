@@ -232,6 +232,9 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
             onSharedFormsChange={(content) => {
               context.setFormContents(content);
             }}
+            multipleSpellingsAvailable={
+              context.word.capabilities.multiple_form_spellings === true
+            }
             contentReassignmentAvailable={
               context.word.capabilities.form_content_reassignment === true
             }

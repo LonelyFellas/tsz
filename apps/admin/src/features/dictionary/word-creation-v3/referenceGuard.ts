@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import type {
   AdminWordV3,
   DraftFormsStepContentV3,
@@ -140,17 +141,12 @@ export function nodesBlockingReferenceCount(
 }
 
 export function variantIdsOf(form: WordConcreteFormV3): string[] {
-  return form.regional_variants.mode === "common"
-    ? [form.regional_variants.common.id]
-    : [form.regional_variants.uk.id, form.regional_variants.us.id];
+  return regionalVariants(form.regional_variants).map((row) => row.id);
 }
 
 /** 词形当前全部变体拼写的归一形式；结构漂移后判定「与任何一侧都对不上」用。 */
 function variantSpellings(form: WordConcreteFormV3): string[] {
-  const variants =
-    form.regional_variants.mode === "common"
-      ? [form.regional_variants.common]
-      : [form.regional_variants.uk, form.regional_variants.us];
+  const variants = regionalVariants(form.regional_variants);
   return variants.map((variant) => normalizeSpelling(variant.spelling));
 }
 
@@ -276,10 +272,7 @@ export function spellingConflicts(
   const conflicts: V3SpellingConflict[] = [];
   for (const pos of forms.pos) {
     for (const form of pos.forms) {
-      const variants =
-        form.regional_variants.mode === "common"
-          ? [form.regional_variants.common]
-          : [form.regional_variants.uk, form.regional_variants.us];
+      const variants = regionalVariants(form.regional_variants);
       for (const variant of variants) {
         const references = spellingConflictReferences(
           index,
@@ -408,10 +401,7 @@ export function locateV3Node(
           ...scope
         };
       }
-      const variants =
-        form.regional_variants.mode === "common"
-          ? [form.regional_variants.common]
-          : [form.regional_variants.uk, form.regional_variants.us];
+      const variants = regionalVariants(form.regional_variants);
       for (const variant of variants) {
         if (variant.id === nodeId || containsNodeId(variant, nodeId)) {
           return {

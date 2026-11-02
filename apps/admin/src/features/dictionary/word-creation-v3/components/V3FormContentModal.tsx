@@ -1,3 +1,4 @@
+import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
 import { flushSync } from "react-dom";
 import {
@@ -47,13 +48,18 @@ import type { V3StableVariantIdFactory } from "../operations";
 import { partOfSpeechLabel } from "../presentation";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
-import { formNodeIds, formReferenceCount } from "../referenceGuard";
+import {
+  formNodeIds,
+  formReferenceCount,
+  nodesBlockingReferenceCount
+} from "../referenceGuard";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { expandFormContents } from "@tsz/shared";
 
 export function V3FormContentModal({
   forms,
   contentReassignmentAvailable = false,
+  multipleSpellingsAvailable = false,
   savedContentIds,
   formId,
   issues,
@@ -68,6 +74,7 @@ export function V3FormContentModal({
 }: {
   forms: SharedFormsStepContentV3;
   contentReassignmentAvailable?: boolean;
+  multipleSpellingsAvailable?: boolean;
   savedContentIds?: ReadonlySet<string>;
   formId: string;
   issues: readonly V3DraftValidationIssue[];
@@ -153,7 +160,10 @@ export function V3FormContentModal({
                 ...new Set(
                   regions.mode === "common"
                     ? [regions.common.spelling]
-                    : [regions.uk.spelling, regions.us.spelling]
+                    : [
+                        primaryRegionalVariant(regions, "uk").spelling,
+                        primaryRegionalVariant(regions, "us").spelling
+                      ]
                 )
               ]
                 .filter(Boolean)
@@ -283,10 +293,21 @@ export function V3FormContentModal({
   }, [registerLeaveGuard]);
 
   const changeRules = (rules: DialectRulesV3) => {
+    const stored = content.regional_variants;
+    if (
+      rules.spelling_mode === "unified" &&
+      stored.mode === "uk_us_many" &&
+      (stored.uk.length > 1 || stored.us.length > 1)
+    ) {
+      setError("请先确认并保存删减后的拼写，再合并英美内容。");
+      return;
+    }
     const result = normalizeDialect(editor, rules, preference);
     if (!result.ok) {
       setError(
-        "英美内容或配置不同，请先统一要保留的拼写、发音及设置，再合并。"
+        editor.pos[0]!.forms[0]!.regional_variants.mode === "uk_us_many"
+          ? "请先将英式和美式各整理为一条拼写，再合并。"
+          : "英美内容或配置不同，请先统一要保留的拼写、发音及设置，再合并。"
       );
       return;
     }
@@ -415,12 +436,7 @@ export function V3FormContentModal({
   const rules = current.dialect_rules;
   const regularityHintId = useId();
   const regularities = rows.flatMap(({ binding }) =>
-    binding.regional_bindings.mode === "common"
-      ? [binding.regional_bindings.common.is_regular]
-      : [
-          binding.regional_bindings.uk.is_regular,
-          binding.regional_bindings.us.is_regular
-        ]
+    regionalVariants(binding.regional_bindings).map((row) => row.is_regular)
   );
   const regularity = regularities.every((value) => value === regularities[0])
     ? regularities[0]
@@ -431,18 +447,15 @@ export function V3FormContentModal({
       for (const binding of pos.forms) {
         if (binding.content_id !== content.id) continue;
         const regions = binding.regional_bindings;
-        if (regions.mode === "common") regions.common.is_regular = value;
-        else {
-          regions.uk.is_regular = value;
-          regions.us.is_regular = value;
-        }
+        for (const region of regionalVariants(regions))
+          region.is_regular = value;
       }
     setLabels(next);
   };
   const previewSpelling =
     current.regional_variants.mode === "common"
       ? current.regional_variants.common.spelling
-      : current.regional_variants.uk.spelling;
+      : primaryRegionalVariant(current.regional_variants, "uk").spelling;
   const localIssues = issues
     .filter((issue) =>
       issue.node_location.content_id
@@ -455,19 +468,13 @@ export function V3FormContentModal({
         ({ binding }) => binding.id === location.form_id
       )?.binding;
       const refs = binding?.regional_bindings;
-      const variant =
-        refs?.mode === "common"
-          ? refs.common
-          : refs
-            ? [refs.uk, refs.us].find((row) => row.id === location.variant_id)
-            : undefined;
+      const variant = refs
+        ? regionalVariants(refs).find((row) => row.id === location.variant_id)
+        : undefined;
       const pronunciation = variant?.pronunciations.find(
         (row) => row.id === location.pronunciation_id
       );
-      const slots =
-        current.regional_variants.mode === "common"
-          ? [current.regional_variants.common]
-          : [current.regional_variants.uk, current.regional_variants.us];
+      const slots = regionalVariants(current.regional_variants);
       const slot = slots.find(
         (row) =>
           row.id === location.content_slot_id ||
@@ -673,6 +680,44 @@ export function V3FormContentModal({
                 showRegularity={false}
                 presentation="content"
                 referenceForms={referenceForms}
+                referenceVariantIds={
+                  current.regional_variants.mode === "uk_us_many"
+                    ? new Map(
+                        regionalVariants(current.regional_variants).map(
+                          (slot) => [
+                            slot.id,
+                            rows.flatMap(({ binding }) =>
+                              regionalVariants(binding.regional_bindings)
+                                .filter(
+                                  (row) => row.content_slot_id === slot.id
+                                )
+                                .map((row) => row.id)
+                            )
+                          ]
+                        )
+                      )
+                    : undefined
+                }
+                multipleSpellingsAvailable={multipleSpellingsAvailable}
+                spellingRemovalReason={(slotId) => {
+                  const nodeIds = rows.flatMap(({ binding }) =>
+                    regionalVariants(binding.regional_bindings)
+                      .filter((row) => row.content_slot_id === slotId)
+                      .flatMap((row) => [
+                        row.id,
+                        ...row.pronunciations.map((item) => item.id)
+                      ])
+                  );
+                  if (!nodeIds.length) return undefined;
+                  if (referenceGuard.index.status !== "loaded")
+                    return "请先加载关联信息，再删除拼写";
+                  return nodesBlockingReferenceCount(
+                    referenceGuard.index,
+                    nodeIds
+                  )
+                    ? "请先解除这条拼写及发音的关联，再删除"
+                    : undefined;
+                }}
                 formTypeDisabled
                 formTypeOptions={["base"]}
                 membershipCount={1}

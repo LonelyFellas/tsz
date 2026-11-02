@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 // 释义卡内的「成分用词」区块（多维释义与多维例句之间，仅短语渲染，可选内容）。
 // 交互（2026-09-02 定稿三层级联；2026-09-04 前端临时收成单选）：点击短语中的单词 →
 // Popover 级联（词条 → 词形 → 词义）**单选（radio）**，点词义即关联、经「清除关联」解除；
@@ -31,7 +32,7 @@ export function baseSpellingForPos(
   if (!base) return undefined;
   return base.regional_variants.mode === "common"
     ? base.regional_variants.common.spelling
-    : base.regional_variants.uk.spelling;
+    : primaryRegionalVariant(base.regional_variants, "uk").spelling;
 }
 
 /**

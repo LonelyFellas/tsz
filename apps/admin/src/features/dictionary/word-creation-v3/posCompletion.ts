@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import type {
   DraftMeaningsStepContentV3,
   DraftMeaningsStepContentWritableV3,
@@ -8,10 +9,7 @@ import type {
 } from "@tsz/types";
 
 export function isV3FormComplete(form: WordConcreteFormV3) {
-  const variants =
-    form.regional_variants.mode === "common"
-      ? [form.regional_variants.common]
-      : [form.regional_variants.uk, form.regional_variants.us];
+  const variants = regionalVariants(form.regional_variants);
   return variants.every(
     (variant) =>
       variant.spelling.trim() !== "" &&

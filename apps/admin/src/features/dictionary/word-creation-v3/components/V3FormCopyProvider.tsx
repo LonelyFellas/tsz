@@ -1,3 +1,4 @@
+import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import {
   CopyOutlined,
   QuestionCircleOutlined,
@@ -161,7 +162,9 @@ export function V3FormCopyProvider({
     const spelling =
       regions?.mode === "common"
         ? regions.common.spelling
-        : regions?.uk.spelling;
+        : regions
+          ? primaryRegionalVariant(regions, "uk").spelling
+          : undefined;
     return `${binding ? formTypeLabel(binding.form_type) : "词形"}${spelling ? ` · ${spelling}` : ""}`;
   };
   const cancel = () => {
@@ -541,16 +544,16 @@ export function V3FormCopyProvider({
                 {pending.matches.map((match) => {
                   const regions =
                     pending.source.contentSnapshot.regional_variants;
-                  const sourceVariant =
-                    regions.mode === "common"
-                      ? regions.common
-                      : regions[match.side];
+                  const sourcePronunciations = regionalVariants(
+                    regions,
+                    match.side
+                  ).flatMap((variant) => variant.pronunciations);
                   const targetRegions =
                     pending.target.contentSnapshot.regional_variants;
-                  const targetVariant =
-                    targetRegions.mode === "common"
-                      ? targetRegions.common
-                      : targetRegions[match.side];
+                  const targetVariant = regionalVariants(
+                    targetRegions,
+                    match.side
+                  ).find((variant) => variant.id === match.target.variantId)!;
                   const row = targetVariant.pronunciations.find(
                     (item) => item.id === match.target.pronunciationId
                   )!;
@@ -571,12 +574,10 @@ export function V3FormCopyProvider({
                         }
                         options={[
                           { value: "", label: "跳过，保留目标内容" },
-                          ...sourceVariant.pronunciations.map(
-                            (item, index) => ({
-                              value: item.id,
-                              label: `来源读法 ${index + 1}${item.style ? ` · ${pronunciationStyleLabel(item.style)}` : ""}${item.actual_pron ? ` · ${item.actual_pron}` : ""}`
-                            })
-                          )
+                          ...sourcePronunciations.map((item, index) => ({
+                            value: item.id,
+                            label: `来源读法 ${index + 1}${item.style ? ` · ${pronunciationStyleLabel(item.style)}` : ""}${item.actual_pron ? ` · ${item.actual_pron}` : ""}`
+                          }))
                         ]}
                         onChange={(id) =>
                           setMapping((current) => ({

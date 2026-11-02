@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { useCallback, useMemo } from "react";
 import { expandFormContents } from "@tsz/shared";
 import type { DraftFormsStepContentV3, GrammarFormLinkV3 } from "@tsz/types";
@@ -54,11 +55,7 @@ export function useReadingPreviewAdapter(
                 .find((pos) => pos.pos_id === link.target_pos_id)
                 ?.forms.find((form) => form.id === link.target_form_id);
               const regional = form?.regional_variants;
-              const variants = regional
-                ? regional.mode === "common"
-                  ? [regional.common]
-                  : [regional.uk, regional.us]
-                : [];
+              const variants = regional ? regionalVariants(regional) : [];
               const variant = variants.find(
                 (variant) => variant.id === link.target_variant_id
               );

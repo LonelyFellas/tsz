@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import type {
   AssistantCandidateForm,
   AssistantCandidatePos,
@@ -131,7 +132,10 @@ function spellings(form: WordConcreteFormV3) {
   const value = form.regional_variants;
   return value.mode === "common"
     ? [value.common.spelling, value.common.spelling]
-    : [value.uk.spelling, value.us.spelling];
+    : [
+        primaryRegionalVariant(value, "uk").spelling,
+        primaryRegionalVariant(value, "us").spelling
+      ];
 }
 
 function fillVariant(
@@ -307,6 +311,10 @@ export function planFormCandidates(
           result.contents.find((value) => value.id === binding.content_id)!
         );
         const before = JSON.stringify(content);
+        if (content.regional_variants.mode === "uk_us_many") {
+          row.message = "已有多条拼写，保留原内容";
+          continue;
+        }
         if (content.regional_variants.mode === "common")
           fillVariant(content.regional_variants.common, proposal.uk, "common");
         else {
@@ -325,8 +333,8 @@ export function planFormCandidates(
             createPronunciationReferenceIds(result)
           );
         const regions = content.regional_variants;
-        const uk = regions.mode === "common" ? regions.common : regions.uk;
-        const us = regions.mode === "common" ? regions.common : regions.us;
+        const uk = primaryRegionalVariant(regions, "uk");
+        const us = primaryRegionalVariant(regions, "us");
         row.uk = {
           spelling: uk.spelling,
           dict_phonetic: uk.pronunciations[0]?.dict_phonetic ?? ""

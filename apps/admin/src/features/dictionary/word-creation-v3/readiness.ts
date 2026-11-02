@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import type {
   WordConcreteFormV3,
   DraftFormsStepContentV3,
@@ -60,7 +61,7 @@ function formIdentity(form: WordConcreteFormV3): string {
   const variants =
     form.regional_variants.mode === "common"
       ? [form.regional_variants.common, form.regional_variants.common]
-      : [form.regional_variants.uk, form.regional_variants.us];
+      : regionalVariants(form.regional_variants);
   if (
     variants.some(
       (variant) =>
@@ -76,6 +77,9 @@ function formIdentity(form: WordConcreteFormV3): string {
   }
   return JSON.stringify([
     form.form_type,
+    ...(form.regional_variants.mode === "uk_us_many"
+      ? [form.regional_variants.uk.length]
+      : []),
     variants.map((variant) => [
       variant.spelling.trim(),
       [
