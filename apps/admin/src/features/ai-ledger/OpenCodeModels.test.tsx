@@ -283,3 +283,51 @@ it("早发目录请求不能覆盖新测试批次，运行中继续轮询", asyn
   ).toBe(next.batch_id);
   expect(screen.getByRole("button", { name: /测试中/ })).toBeVisible();
 });
+
+it("同名模型按 ID 区分并可按 ID 搜索和保存", async () => {
+  const first = {
+    ...report().models[1]!,
+    name: "Shared name",
+    model_id: "model-one"
+  };
+  const second = { ...first, model_id: "model-two" };
+  vi.mocked(api.opencode.probeReport).mockResolvedValue({
+    ...report(),
+    models: [report().models[0]!, first, second]
+  });
+  mount();
+  await ready();
+  const picker = screen.getByRole("combobox", { name: "出题模型" });
+  fireEvent.mouseDown(picker);
+  await screen.findByText("Shared name（test-provider） / model-one");
+  fireEvent.change(picker, { target: { value: "model-two" } });
+  const option = await screen.findByText(
+    "Shared name（test-provider） / model-two"
+  );
+  expect(
+    screen.queryByText("Shared name（test-provider） / model-one")
+  ).not.toBeInTheDocument();
+  fireEvent.click(option);
+  vi.mocked(api.opencode.currentModel).mockResolvedValue(second);
+  fireEvent.click(screen.getByRole("button", { name: "保存模型" }));
+  await ready("Shared name");
+  expect(api.opencode.selectModel).toHaveBeenCalledExactlyOnceWith({
+    source: second.source,
+    provider_id: second.provider_id,
+    model_id: second.model_id
+  });
+});
+
+it("模型从目录消失时不将其诊断为账号退出", async () => {
+  vi.mocked(api.opencode.currentModel).mockResolvedValue(target);
+  vi.mocked(api.opencode.probeReport).mockResolvedValue({
+    ...report(),
+    models: []
+  });
+  mount();
+  await ready("paid-model");
+  expect(
+    screen.queryByText("当前模型的账号未连接，请到模型账号检查。")
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("当前模型不可用，请重新测试或选择。")).toBeVisible();
+});

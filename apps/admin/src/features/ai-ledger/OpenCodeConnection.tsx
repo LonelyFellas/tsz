@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient
+} from "@tanstack/react-query";
 import { LinkOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Alert, Badge, Button, Drawer, Space, Typography } from "antd";
 import type { OpenCodeLogin } from "@tsz/types";
@@ -12,6 +17,8 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
   const [attempt, setAttempt] = useState<OpenCodeLogin>();
   const [open, setOpen] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const keyPending =
+    useIsMutating({ mutationKey: ["opencode-connect-key", adminId] }) > 0;
   const connectionKey = ["opencode-connection", adminId];
   const connection = useQuery({
     queryKey: connectionKey,
@@ -122,15 +129,7 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
                   ? "管理 OpenCode"
                   : "连接 OpenCode"
             }
-            loading={login.isPending}
-            disabled={!data?.configured || connection.isError}
-            onClick={() => {
-              setOpen(true);
-              if (!connected && data?.login_available && !pending) {
-                cancel.reset();
-                login.mutate();
-              }
-            }}
+            onClick={() => setOpen(true)}
           >
             {pending ? "继续登录" : manageOnly ? "管理" : "连接"}
           </Button>
@@ -143,7 +142,12 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
         open={open}
         onClose={() => {
           setOpen(false);
-          setShowKey(false);
+          if (
+            !client.isMutating({
+              mutationKey: ["opencode-connect-key", adminId]
+            })
+          )
+            setShowKey(false);
         }}
         size={480}
         destroyOnHidden={false}
@@ -169,6 +173,7 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
                 login.mutate();
               }}
               loading={login.isPending}
+              disabled={keyPending || cancel.isPending}
             >
               {connected ? "重新登录" : "登录授权"}
             </Button>
@@ -242,29 +247,31 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
             <Alert type="success" showIcon title="OpenCode 授权已完成。" />
           )}
           {data?.configured && (
-            <>
-              <OpenCodeProviders
-                adminId={adminId}
-                disabled={pending || login.isPending}
-                onDisconnected={() => {
-                  setAttempt(undefined);
-                  login.reset();
-                }}
-              />
-              {showKey ? (
-                <OpenCodeKeyForm
-                  adminId={adminId}
-                  disabled={pending || login.isPending}
-                />
-              ) : (
-                <Button
-                  disabled={pending || login.isPending}
-                  onClick={() => setShowKey(true)}
-                >
-                  添加 API Key
-                </Button>
-              )}
-            </>
+            <OpenCodeProviders
+              adminId={adminId}
+              disabled={pending || login.isPending || keyPending}
+              onDisconnected={() => {
+                setAttempt(undefined);
+                login.reset();
+              }}
+            />
+          )}
+          {showKey ? (
+            <OpenCodeKeyForm
+              adminId={adminId}
+              disabled={
+                !data?.configured || pending || login.isPending || keyPending
+              }
+            />
+          ) : (
+            data?.configured && (
+              <Button
+                disabled={pending || login.isPending || keyPending}
+                onClick={() => setShowKey(true)}
+              >
+                添加 API Key
+              </Button>
+            )
           )}
         </div>
       </Drawer>

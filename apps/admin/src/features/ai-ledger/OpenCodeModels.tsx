@@ -70,11 +70,23 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
     }
   });
   const models = catalog.isError ? [] : (catalog.data?.models ?? []);
-  const options = models.map((model) => ({
-    value: encode(model),
-    label: `${displayName(model)}（${sourceName(model)}）`,
-    disabled: !model.enabled || model.status !== "available"
-  }));
+  const labelCounts = new Map<string, number>();
+  for (const model of models) {
+    const label = `${displayName(model)}（${sourceName(model)}）`;
+    labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+  }
+  const options = models.map((model) => {
+    const label = `${displayName(model)}（${sourceName(model)}）`;
+    return {
+      value: encode(model),
+      label:
+        (labelCounts.get(label) ?? 0) > 1
+          ? `${label} / ${model.model_id}`
+          : label,
+      searchLabel: `${label} ${model.model_id}`,
+      disabled: !model.enabled || model.status !== "available"
+    };
+  });
   const passed = models.filter((model) => model.status === "available").length;
   const failed = models.filter(
     (model) => model.status === "unavailable"
@@ -89,6 +101,7 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
     options.push({
       value: selected,
       label: `${modelId}（${providerId}，不可用）`,
+      searchLabel: `${modelId} ${providerId}`,
       disabled: true
     });
   }
@@ -119,7 +132,7 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
         <Select
           aria-label="出题模型"
           showSearch
-          optionFilterProp="label"
+          optionFilterProp="searchLabel"
           placeholder="选择模型"
           options={options}
           value={selected}
@@ -214,28 +227,18 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
       {catalog.data?.state === "interrupted" && (
         <Alert type="warning" showIcon title="测试已中断，请重试。" />
       )}
-      {currentProbe?.status === "unavailable" && (
-        <Alert
-          type="warning"
-          showIcon
-          title="当前模型不可用，请重新测试或选择。"
-        />
-      )}
-      {catalog.isSuccess && !models.length && (
-        <Alert type="info" showIcon title="还没有模型，请先连接账号。" />
-      )}
       {current.data &&
-        current.data.source !== "direct" &&
         catalog.isSuccess &&
-        !models.some(
-          (model) => model.enabled && encode(model) === encode(current.data!)
-        ) && (
+        (!currentProbe?.enabled || currentProbe.status === "unavailable") && (
           <Alert
             type="warning"
             showIcon
-            title="当前模型的账号未连接，请到模型账号检查。"
+            title="当前模型不可用，请重新测试或选择。"
           />
         )}
+      {catalog.isSuccess && !models.length && (
+        <Alert type="info" showIcon title="没有可选模型，请刷新。" />
+      )}
       <details className="settings-model-details">
         <summary>查看测试结果（{models.length}）</summary>
         <div className="settings-model-results">

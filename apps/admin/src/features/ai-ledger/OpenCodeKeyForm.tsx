@@ -19,6 +19,7 @@ export function OpenCodeKeyForm({
     gcTime: 0
   });
   const connect = useMutation({
+    mutationKey: ["opencode-connect-key", adminId],
     mutationFn: async () => api.opencode.connectKey(form.getFieldsValue()),
     onSuccess: async () => {
       form.setFieldValue("api_key", "");

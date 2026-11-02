@@ -107,7 +107,6 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
       accounts.data?.pending_login
     ) {
       setAttempt(accounts.data.pending_login);
-      setOpen(true);
     }
   }, [setup.data?.login_method, attempt, accounts.data?.pending_login]);
   useEffect(() => {
@@ -226,15 +225,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                   ? "管理 ChatGPT"
                   : "登录 ChatGPT"
             }
-            loading={login.isPending}
-            disabled={setup.isPending || setup.isError || !available}
-            onClick={() => {
-              setOpen(true);
-              if (!remote && !active?.signed_in && !pending) {
-                cancel.reset();
-                login.mutate(active?.client_id ?? null);
-              }
-            }}
+            onClick={() => setOpen(true)}
           >
             {pending ? "继续登录" : active?.signed_in ? "管理" : "登录"}
           </Button>
@@ -251,7 +242,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
       >
         <div className="settings-dialog-content">
           <Tag>{label}</Tag>
-          {!remote && (
+          {setup.data?.login_method === "local" && (
             <Typography.Text>请在运行 Agent 的电脑上登录。</Typography.Text>
           )}
           {!!accounts.data?.accounts.length && !accounts.isError && (
@@ -293,7 +284,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
             )}
             {remote && active?.signed_in && (
               <Button
-                disabled={busy}
+                disabled={busy || setup.isPending || setup.isError}
                 onClick={() => setRemoteIntent("current")}
               >
                 重新登录
@@ -301,7 +292,13 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
             )}
             {active && (
               <Button
-                disabled={!available || pending || busy}
+                disabled={
+                  !available ||
+                  setup.isPending ||
+                  setup.isError ||
+                  pending ||
+                  busy
+                }
                 onClick={() =>
                   remote ? setRemoteIntent("new") : login.mutate(null)
                 }

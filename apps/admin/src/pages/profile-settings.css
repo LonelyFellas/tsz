@@ -74,6 +74,7 @@
 
 .settings-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
@@ -94,6 +95,8 @@
 
 .settings-dialect .ant-radio-group {
   display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 12px;
   flex-shrink: 0;
 }
