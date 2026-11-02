@@ -58,6 +58,7 @@ export function SharedSentenceAssociationPicker({
           literal={literal}
           targetKind={kind}
           phraseSelection="entry"
+          draftOnly
           sourceDialect={dialect}
           prioritizedEntryId={sourceEntryId}
           prioritizedSenseId={sourceSenseId}
@@ -116,6 +117,7 @@ export function SharedSentenceAssociationPicker({
           literal={literal}
           targetKind={kind}
           phraseSelection="entry"
+          draftOnly
           sourceDialect={dialect}
           prioritizedEntryId={sourceEntryId}
           prioritizedSenseId={sourceSenseId}

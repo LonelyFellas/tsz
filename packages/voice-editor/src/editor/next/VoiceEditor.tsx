@@ -169,6 +169,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   renderReadingPicker,
   onAssociationPendingChange,
   renderActions,
+  afterText,
+  collapseVoiceSettings = false,
   speechCapabilities,
   onValidationChange,
   language = "en",
@@ -3801,7 +3803,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         openTool={openTool}
         onOpenToolChange={openToolAndArm}
       />
-      {localPool}
+      {afterText}
+      {localPool &&
+        (collapseVoiceSettings ? (
+          <details className="tsz-ve-voice-settings">
+            <summary>配音设置</summary>
+            {localPool}
+          </details>
+        ) : (
+          localPool
+        ))}
     </section>
   );
 }
