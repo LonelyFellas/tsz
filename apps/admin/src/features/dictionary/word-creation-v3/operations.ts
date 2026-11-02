@@ -959,7 +959,7 @@ export function addPartOfSpeech(
 /**
  * 新建词条、手动添加词性时把该词性名下的词形类型铺成真实空行写进草稿，也就是产品说的
  * 「新建模板」：只摆这一次，之后录入者删掉哪行就是哪行，再进草稿不会补回来（禅道 TASK#7）。
- * 只铺配置里挂在这个词性下的类型，名词不摆三单、比较级。
+ * 只铺配置里开启默认模版的类型；关闭的类型仍可手动添加。
  */
 export function fillFormTypeTemplate(
   content: DraftFormsStepContentV3,
@@ -975,7 +975,11 @@ export function fillFormTypeTemplate(
     // 目录里没有这个词性就不铺，跟着目录 fail closed；短语没有词形变化，后端的
     // 词形类型也只挂在单词词性下。
     if (!catalogItem || catalogItem.kind === "phrase") continue;
-    const template = catalogItem.allowed_form_types ?? [];
+    const template = (
+      catalogItem.default_form_types ??
+      catalogItem.allowed_form_types ??
+      []
+    ).filter((type) => catalogItem.allowed_form_types?.includes(type));
     if (template.length === 0) continue;
     // 每轮都从最新结果里取：上一条补齐已经换过这个词性的对象。
     const current = next.pos.find((item) => item.pos_id === pos.pos_id);

@@ -1683,6 +1683,7 @@ describe("createAdminEndpoints — 角色治理 roles", () => {
 it("词形配置CRUD发送稳定路径及版本，不转换wire字段", () => {
   const api = createAdminEndpoints(http).partOfSpeechSettings;
   const input = {
+    is_default: false,
     part_of_speech_id: "pos-verb",
     code: "custom_variant",
     name_zh: "自定义",

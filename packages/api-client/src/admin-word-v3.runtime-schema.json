@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/multidim-sentence-create-audit/docs/openapi.json",
-  "_source_sha256": "fe856757d0f198a560758587f74f5287563b4a0993374bc56d89d12f2a685def",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-160-default-form-template/docs/openapi.json",
+  "_source_sha256": "daa6abc63ee1adfd47905e256afc9457a9924e35db6795e190edc38bf42c56c4",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",

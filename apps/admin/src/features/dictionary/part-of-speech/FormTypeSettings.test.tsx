@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -60,6 +60,7 @@ vi.mock("../dataSource", () => ({
 const base: FormTypeConfig = {
   id: "base-id",
   code: "base",
+  is_default: true,
   name_zh: "原形",
   name_en: "Base form",
   short_name_zh: "原形",
@@ -92,9 +93,11 @@ function setup() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AntApp>
-        <FormTypeSettings />
-      </AntApp>
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <AntApp>
+          <FormTypeSettings />
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>
   );
 }
@@ -146,7 +149,8 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
       short_name_zh: "自定义词形",
       abbreviation: "custom",
       full_name_en: "custom variant",
-      sort_order: 12
+      sort_order: 12,
+      is_default: true
     })
   );
   await waitFor(() =>
@@ -182,6 +186,12 @@ it("编辑原形时不给归属选择，也不把归属发给后端", async () =
   await within(dialog).findByText("原形对所有基本词性通用，不归属某一个词性。");
   // 筛选栏也叫「所属基本词性」，这里只看弹窗里有没有。
   expect(within(dialog).queryByLabelText("所属基本词性")).toBeNull();
+  expect(
+    within(dialog).getByRole("switch", { name: "默认模版" })
+  ).toBeChecked();
+  expect(
+    within(dialog).getByRole("switch", { name: "默认模版" })
+  ).toBeDisabled();
   fireEvent.change(screen.getByLabelText("正式中文"), {
     target: { value: "原形改名" }
   });
@@ -276,3 +286,81 @@ it.each(["lexicon_settings.edit_forms", "lexicon_settings.delete"])(
     }
   }
 );
+
+it("关闭默认模版后失败保留设置，重试保存并重新打开回显", async () => {
+  mock.items.push({
+    ...base,
+    id: "rare-id",
+    code: "rare",
+    part_of_speech_id: "pos-verb",
+    name_zh: "罕见词形",
+    revision: 4
+  });
+  mock.update.mockRejectedValueOnce(new Error("保存失败"));
+  mock.update.mockImplementationOnce(async (id, input) => {
+    mock.items = mock.items.map((item) =>
+      item.id === id ? { ...item, ...input, revision: 5 } : item
+    );
+    return mock.items.find((item) => item.id === id);
+  });
+  setup();
+  const row = (await screen.findByText("罕见词形")).closest("tr")!;
+  fireEvent.click(within(row).getByRole("button", { name: /^修\s*改$/ }));
+  let dialog = await screen.findByRole("dialog");
+  const toggle = within(dialog).getByRole("switch", { name: "默认模版" });
+  expect(toggle).toBeChecked();
+  fireEvent.click(toggle);
+  fireEvent.click(
+    await within(dialog).findByRole("button", { name: /保\s*存$/ })
+  );
+  await screen.findByText("保存失败");
+  expect(toggle).not.toBeChecked();
+  // AntD message 的 thenable 结束前，现有 mutation 会保持 pending。
+  await waitFor(
+    () =>
+      expect(
+        within(dialog).getByRole("switch", { name: "默认模版" })
+      ).not.toBeDisabled(),
+    { timeout: 5000 }
+  );
+  const retry = within(dialog).getByRole("button", { name: /保\s*存$/ });
+  await waitFor(() => expect(retry).not.toHaveClass("ant-btn-loading"));
+  fireEvent.click(retry);
+  await waitFor(() => expect(mock.update).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(mock.update).toHaveBeenLastCalledWith(
+    "rare-id",
+    expect.objectContaining({
+      base_revision: 4,
+      is_default: false
+    })
+  );
+  fireEvent.click(
+    within(screen.getByText("罕见词形").closest("tr")!).getByRole("button", {
+      name: /^修\s*改$/
+    })
+  );
+  dialog = await screen.findByRole("dialog");
+  expect(
+    within(dialog).getByRole("switch", { name: "默认模版" })
+  ).not.toBeChecked();
+}, 10000);
+
+it("旧服务没有开关字段时禁用设置，保存不发送不受支持的字段", async () => {
+  delete mock.items[0]!.is_default;
+  mock.update.mockResolvedValue(base);
+  setup();
+  const row = (
+    await screen.findAllByText("原形", { selector: "td" })
+  )[0]!.closest("tr")!;
+  fireEvent.click(within(row).getByRole("button", { name: /^修\s*改$/ }));
+  const dialog = await screen.findByRole("dialog");
+  expect(
+    within(dialog).getByRole("switch", { name: "默认模版" })
+  ).toBeDisabled();
+  fireEvent.click(
+    await within(dialog).findByRole("button", { name: /保\s*存$/ })
+  );
+  await waitFor(() => expect(mock.update).toHaveBeenCalledTimes(1));
+  expect(mock.update.mock.calls[0]![1]).not.toHaveProperty("is_default");
+});

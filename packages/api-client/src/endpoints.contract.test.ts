@@ -833,7 +833,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "fe856757d0f198a560758587f74f5287563b4a0993374bc56d89d12f2a685def"
+      "daa6abc63ee1adfd47905e256afc9457a9924e35db6795e190edc38bf42c56c4"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1731,6 +1731,7 @@ it("词形配置契约包含增删改、必填revision与统一目录名称", ()
       "name_en",
       "abbreviation",
       "full_name_en",
+      "is_default",
       "revision",
       "usage_count"
     ])
@@ -1738,6 +1739,16 @@ it("词形配置契约包含增删改、必填revision与统一目录名称", ()
   expect(
     snapshot.schemas.CatalogResponse.properties.form_types.items.$ref
   ).toBe("#/components/schemas/FormTypeCatalogItem");
+  expect(snapshot.schemas.FormTypeCatalogItem.required).toContain("is_default");
+  expect(
+    snapshot.schemas.CreateFormTypeRequest.properties.is_default.type
+  ).toBe("boolean");
+  expect(snapshot.schemas.CreateFormTypeRequest.required).not.toContain(
+    "is_default"
+  );
+  expect(snapshot.schemas.UpdateFormTypeRequest.required).not.toContain(
+    "is_default"
+  );
   // 词形变化有自己的请求体：新建必须指定所属基本词性，修改可改挂但不改编码。
   expect(snapshot.schemas.CreateFormTypeRequest.required).toContain(
     "part_of_speech_id"
