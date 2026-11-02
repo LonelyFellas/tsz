@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-chinese-prompts/docs/openapi.json",
-  "_generatedAt": "2026-11-02T02:32:50.079Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/multidim-sentence-create-audit/docs/openapi.json",
+  "_generatedAt": "2026-11-02T08:03:31.435Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -24,6 +24,7 @@
     "/admin/chatgpt/accounts/{client_id}": ["delete"],
     "/admin/chatgpt/login": ["post"],
     "/admin/chatgpt/login/{attempt_id}": ["delete", "get"],
+    "/admin/chatgpt/setup": ["get"],
     "/admin/coins/accounts": ["get"],
     "/admin/coins/accounts/{owner_type}/{owner_id}/entries": ["get"],
     "/admin/coins/manual-credits": ["post"],
@@ -6526,6 +6527,10 @@
         "cursor": {
           "type": "string",
           "description": "上一页返回的 `next_cursor`。绑定 `q` / `kind` / `match` / `entry_id` / `include_drafts`\n及最后返回的稳定节点排序键；查询条件改变或游标无效返回 400 `invalid_query`。\n无关保存、发布及归档不会使游标失效；并发修改下搜索弱一致，保存/发布仍严格验证。"
+        },
+        "draft_only": {
+          "type": "boolean",
+          "description": "仅查询当前已保存草稿，供共享例句选择可保存的词形和词义。"
         },
         "entry_id": {
           "type": "string",

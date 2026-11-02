@@ -462,6 +462,7 @@ export function V3TargetCascader({
   prioritizedForms,
   targetKind,
   phraseSelection = "components",
+  draftOnly = false,
   sourceDialect,
   readOnly = false,
   selectedTarget,
@@ -487,6 +488,7 @@ export function V3TargetCascader({
   prioritizedForms?: AdminWordV3["forms"];
   targetKind?: "word" | "phrase";
   phraseSelection?: "components" | "entry";
+  draftOnly?: boolean;
   sourceDialect?: "common" | "uk" | "us";
 }) {
   const formTypeLabel = useFormTypeLabel();
@@ -545,6 +547,7 @@ export function V3TargetCascader({
             q: literal,
             match: "exact",
             ...(phraseSelection === "entry" ? { include_drafts: true } : {}),
+            ...(draftOnly ? { draft_only: true } : {}),
             ...(targetKind ? { kind: targetKind } : {}),
             page_size: 50,
             ...(cursor ? { cursor } : {})
@@ -597,7 +600,7 @@ export function V3TargetCascader({
       searchActions.current = null;
       controller.abort();
     };
-  }, [literal, targetKind, phraseSelection, requests]);
+  }, [literal, targetKind, phraseSelection, draftOnly, requests]);
 
   const state = {
     ...searchState,
