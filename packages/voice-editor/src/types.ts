@@ -303,6 +303,9 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
     props: AssociationPickerProps<import("@tsz/types").GrammarFormLinkV3>
   ) => ReactNode;
   onAssociationPendingChange?: (pending: boolean) => void;
+  /** 宿主正文相关字段放在配音设置之前。 */
+  afterText?: ReactNode;
+  collapseVoiceSettings?: boolean;
   /** prepareComplete normalizes spelling through the editor history; false asks the user to review. */
   renderActions?: (
     canComplete: boolean,

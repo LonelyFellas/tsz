@@ -88,6 +88,27 @@ describe("voice-editor 目标查询契约", () => {
     expect(words.searchComponentTargetsV3).toBeTypeOf("function");
   });
 
+  it("共享例句可请求仅查询当前已保存草稿，旧请求保持兼容", () => {
+    const request = dereference(operationSchemas[operationKey]?.request);
+    expect(property(request, "draft_only")).toBeDefined();
+    expect(request.required).not.toContain("draft_only");
+    const http = {
+      post: vi.fn(() => new Promise(() => {}))
+    } as unknown as HttpClient;
+    const input = {
+      schema_version: 3 as const,
+      q: "make",
+      match: "exact" as const,
+      include_drafts: true,
+      draft_only: true
+    };
+    createAdminEndpoints(http).words.searchComponentTargetsV3(input);
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/entries/component-targets/search",
+      input
+    );
+  });
+
   it("节点身份结构保留既有草稿引用的读取兼容", () => {
     const baseCandidate = schemaByRequiredProperties(
       "entry_id",

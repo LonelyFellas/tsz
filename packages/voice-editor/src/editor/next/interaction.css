@@ -1,3 +1,19 @@
+.tsz-ve-voice-settings {
+  margin-top: 16px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-radius: 8px;
+}
+
+.tsz-ve-voice-settings > summary {
+  padding: 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.tsz-ve-voice-settings .tsz-ve-local-pool {
+  margin: 0;
+}
+
 .tsz-ve-shortcut-hint {
   white-space: nowrap;
   text-align: left;

@@ -1,3 +1,7 @@
+.sentence-editor .word-sentence-translation-list {
+  margin-top: 16px;
+}
+
 .sentence-editor .tsz-ve-toolbar {
   gap: 4px;
   padding: 8px;

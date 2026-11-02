@@ -78,6 +78,9 @@ export interface V3VoiceTextFieldProps<
   doneDisabled?: boolean;
   /** 隐藏内部操作时，改动直接交给宿主草稿，由宿主统一保存或取消。 */
   showDone?: boolean;
+  showSaveButton?: boolean;
+  afterText?: ReactNode;
+  collapseVoiceSettings?: boolean;
   onEditingChange?: (editing: boolean) => void;
   onDraftPendingChange?: (pending: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
@@ -138,6 +141,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   doneLoading,
   doneDisabled,
   showDone = true,
+  showSaveButton = true,
+  afterText,
+  collapseVoiceSettings,
   onEditingChange,
   onDraftPendingChange,
   onAssociationPendingChange,
@@ -745,6 +751,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         ) : (
           fallback
         )}
+        {afterText}
       </>
     );
 
@@ -793,34 +800,36 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             }
           />
         )}
-        <Space className="v3-voice-text-editor-done" size={6}>
-          {showDone && (
+        {showSaveButton && (
+          <Space className="v3-voice-text-editor-done" size={6}>
+            {showDone && (
+              <Button
+                size="small"
+                aria-label={`取消${ariaLabel}编辑`}
+                disabled={doneLoading || saving}
+                onClick={cancelEditing}
+              >
+                取消
+              </Button>
+            )}
             <Button
+              type="primary"
               size="small"
-              aria-label={`取消${ariaLabel}编辑`}
-              disabled={doneLoading || saving}
-              onClick={cancelEditing}
+              aria-label={
+                businessSave || onSave
+                  ? `保存${ariaLabel}修改`
+                  : `完成${ariaLabel}编辑`
+              }
+              loading={doneLoading || saving}
+              disabled={doneDisabled || readOnly || !canComplete}
+              onClick={() => {
+                if (prepareComplete()) void completeEditing(captureResult);
+              }}
             >
-              取消
+              {businessSave || onSave ? "保存修改" : "完成"}
             </Button>
-          )}
-          <Button
-            type="primary"
-            size="small"
-            aria-label={
-              businessSave || onSave
-                ? `保存${ariaLabel}修改`
-                : `完成${ariaLabel}编辑`
-            }
-            loading={doneLoading || saving}
-            disabled={doneDisabled || readOnly || !canComplete}
-            onClick={() => {
-              if (prepareComplete()) void completeEditing(captureResult);
-            }}
-          >
-            {businessSave || onSave ? "保存修改" : "完成"}
-          </Button>
-        </Space>
+          </Space>
+        )}
       </>
     ) : (
       <EditorPendingState
@@ -845,6 +854,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           <VoiceEditor<TLink>
             key={`${nodeId}:${editorSession}`}
             renderActions={renderActions}
+            afterText={afterText}
+            collapseVoiceSettings={collapseVoiceSettings}
             onAssociationPendingChange={onAssociationPendingChange}
             textReadOnly={contentReadOnly}
             contentReadOnly={contentReadOnly}
