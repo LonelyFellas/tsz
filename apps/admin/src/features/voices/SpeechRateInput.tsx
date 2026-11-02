@@ -32,6 +32,7 @@ export function SpeechRateInput({
   min,
   max,
   onChange,
+  step = 0.05,
   ...props
 }: Props) {
   const input = (
@@ -43,7 +44,7 @@ export function SpeechRateInput({
       }
       min={(Math.max(min, -70) + 100) / 100}
       max={(Math.min(max, 70) + 100) / 100}
-      step={0.05}
+      step={step}
       precision={2}
       suffix={<span className="voice-shared-times">×</span>}
       onChange={(rate) =>

@@ -3,7 +3,8 @@ import type { AdminSpeechVoice } from "@tsz/types";
 import {
   newVoiceTrial,
   voiceTrialCapabilities,
-  voiceTrialIssue
+  voiceTrialIssue,
+  voiceTrialSetting
 } from "./voice-trial";
 
 const voice: AdminSpeechVoice = {
@@ -84,5 +85,44 @@ describe("音色试听能力", () => {
         source
       )
     ).toMatch(/读法或停顿/);
+  });
+  it("试听和 SSML 设置共用能力过滤，保留输入的旧参数不变", () => {
+    const parameters = {
+      rate_percent: -27,
+      pitch_semitones: 2,
+      volume_percent: 65,
+      style: "cheerful",
+      style_degree: 1.3,
+      role: "Girl"
+    };
+    const locked = {
+      ...voice,
+      capabilities: {
+        ...voice.capabilities,
+        min_rate_percent: 0,
+        max_rate_percent: 0,
+        min_pitch_semitones: 0,
+        max_pitch_semitones: 0,
+        supports_volume_percent: false
+      }
+    };
+    const setting = voiceTrialSetting(locked, parameters, "wav");
+    expect(setting).toMatchObject({
+      voice_id: "sonia",
+      rate_percent: 0,
+      pitch_semitones: 0,
+      volume_percent: 100,
+      output_format: "wav"
+    });
+    expect(setting).not.toHaveProperty("style");
+    expect(setting).not.toHaveProperty("style_degree");
+    expect(setting).not.toHaveProperty("role");
+    expect(parameters).toMatchObject({
+      rate_percent: -27,
+      pitch_semitones: 2,
+      volume_percent: 65,
+      style_degree: 1.3,
+      role: "Girl"
+    });
   });
 });

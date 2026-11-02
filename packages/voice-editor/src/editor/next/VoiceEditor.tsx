@@ -198,6 +198,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     []
   );
   const [recommendationsLoaded, setRecommendationsLoaded] = useState(false);
+  const [recommendationRefresh, setRecommendationRefresh] = useState(0);
+  const visibleRecommendations = recommendations.filter(
+    (item) => !item.fallbackOnly
+  );
   const [recommendationId, setRecommendationId] = useState<string>();
   const [recommendationError, setRecommendationError] = useState("");
   const [editingVersionKey, setEditingVersionKey] = useState<string>();
@@ -228,7 +232,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     loadRecommendations({
       area: recommendationArea,
       locale,
-      signal: controller.signal
+      signal: controller.signal,
+      ...(recommendationRefresh ? { refresh: true } : {})
     })
       .then((items) => {
         if (!controller.signal.aborted) {
@@ -241,7 +246,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           setRecommendationError("分组推荐加载失败，仍可选择下方音色。");
       });
     return () => controller.abort();
-  }, [recommendationArea, locale, loadRecommendations]);
+  }, [recommendationArea, locale, loadRecommendations, recommendationRefresh]);
   const readOnly = fullyReadOnly || contentReadOnly;
   const linksReadOnly = fullyReadOnly || associationsReadOnly;
   /*
@@ -679,11 +684,32 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           }
         : workingValue;
   const inherited = voiceProfile?.dubbing?.mode === "inherit";
+  const refreshSavedRecommendations = useCallback(() => {
+    if (inherited) {
+      stopAudition();
+      generationRequest.current?.abort();
+      generationRequest.current = null;
+      setGeneratingVersion(undefined);
+    }
+    setRecommendationRefresh((value) => value + 1);
+  }, [inherited, stopAudition]);
+  useEffect(() => {
+    if (!recommendationArea || !loadRecommendations || readOnly) return;
+    window.addEventListener("focus", refreshSavedRecommendations);
+    return () =>
+      window.removeEventListener("focus", refreshSavedRecommendations);
+  }, [
+    recommendationArea,
+    loadRecommendations,
+    readOnly,
+    refreshSavedRecommendations
+  ]);
   const resolutionKey = JSON.stringify([
     voiceProfile,
     generationContent,
     previewAdapter?.audioSourceKey,
-    locale
+    locale,
+    inherited ? recommendationRefresh : 0
   ]);
   const [resolvedVoices, setResolvedVoices] = useState<{
     key: string;
@@ -833,6 +859,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     restoreInheritance.current = true;
     if (!recommendationArea || readOnly || !onVoiceProfileChange) return;
     stopAudition();
+    generationRequest.current?.abort();
+    generationRequest.current = null;
+    setGeneratingVersion(undefined);
+    setRecommendationRefresh((value) => value + 1);
     const profile = {
       voices: [],
       dubbing: {
@@ -3023,7 +3053,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                   title="已启用的失效音色口音未知，请先取消启用，再应用替代推荐。"
                 />
               )}
-            {recommendations.length > 0 && (
+            {visibleRecommendations.length > 0 && (
               <Space wrap style={{ marginBottom: 12 }}>
                 <Select
                   aria-label="分组推荐"
@@ -3031,7 +3061,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                   value={recommendationId}
                   style={{ minWidth: 220 }}
                   onChange={setRecommendationId}
-                  options={recommendations.map((item) => ({
+                  options={visibleRecommendations.map((item) => ({
                     value: item.id,
                     label: `${item.groupName} / ${item.locale === "en-GB" ? "英式" : "美式"} / ${item.name}`,
                     disabled: !recommendationAvailable(item)

@@ -580,8 +580,18 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await screen.findByText("网络暂时不可用");
     expect(text).toHaveValue("We make up stories.");
+    // 与独立创建入口一样，宿主错误可早于外层保存结束；恢复后再重试。
+    await waitFor(() =>
+      expect(screen.queryByText("正在保存修改…")).not.toBeInTheDocument()
+    );
     fireEvent.click(screen.getByLabelText("保存例句正文修改"));
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText("保存例句正文修改")
+      ).not.toBeInTheDocument()
+    );
     await screen.findByText("We make up stories.");
+    expect(api.sentences.create).toHaveBeenCalledTimes(2);
     const [first, retry] = vi.mocked(api.sentences.create).mock.calls;
     expect(first![0]).toEqual(retry![0]);
     expect(retry![0]).toHaveProperty("source_sense_id", "sense");

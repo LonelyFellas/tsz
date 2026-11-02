@@ -99,7 +99,7 @@ export function AddRecommendation({
       <Alert
         type="success"
         showIcon
-        title="已应用到分组草稿，请回到该组点击“完成”后保存。"
+        title="已应用到分组草稿，请回到工作台保存当前组后生效。"
         action={<Button onClick={onClose}>完成</Button>}
       />
     );

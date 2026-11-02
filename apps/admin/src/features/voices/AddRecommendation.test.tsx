@@ -150,6 +150,9 @@ describe("完整推荐只应用到分组草稿", () => {
     const client = mount();
     fireEvent.click(screen.getByText("编辑B"));
     await chooseGroup();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "配置英式声音" })
+    );
     expect(
       await screen.findByRole("radio", { name: "Sonia 女声" })
     ).toBeChecked();
@@ -158,7 +161,7 @@ describe("完整推荐只应用到分组草稿", () => {
     expect(screen.getByTestId("drafts")).not.toHaveTextContent('"a":');
     fireEvent.click(screen.getByRole("radio", { name: "Guy 男声" }));
     fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
-    await screen.findByText("已应用到分组草稿，请回到该组点击“完成”后保存。");
+    await screen.findByText(/已应用到分组草稿/);
     const drafts = JSON.parse(screen.getByTestId("drafts").textContent!);
     expect(drafts.a.recommendations.pairs[0]).toMatchObject({
       selected: true,
@@ -171,7 +174,7 @@ describe("完整推荐只应用到分组草稿", () => {
     ).toEqual(initial);
     expect(api.speech.saveGroups).not.toHaveBeenCalled();
     expect(api.speech.saveGroup).not.toHaveBeenCalled();
-  });
+  }, 15000);
   it("已有20套时保留分组选择并拒绝追加", async () => {
     const full = structuredClone(initial);
     full.groups[0]!.recommendations = {

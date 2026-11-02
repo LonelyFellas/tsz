@@ -3,7 +3,8 @@ import { speechAccentGroup } from "@tsz/shared";
 import type {
   AdminDubbingRecommendationPair,
   AdminSpeechVoice,
-  AdminDubbingRecommendation
+  AdminDubbingRecommendation,
+  AdminVoiceParameters
 } from "@tsz/types";
 import {
   Alert,
@@ -12,10 +13,11 @@ import {
   Flex,
   Form,
   Input,
-  InputNumber,
-  Modal,
+  Drawer,
   Radio,
   Select,
+  Segmented,
+  Empty,
   Space,
   Typography
 } from "antd";
@@ -27,13 +29,23 @@ import {
   sideName,
   type DubbingSide
 } from "./dubbing-model";
-import { SpeechRateInput } from "./SpeechRateInput";
-import { styleNames } from "./voice-labels";
 import { VoiceName } from "./VoiceDisplay";
+import { DubbingAudition, DEFAULT_DUBBING_TRIAL_TEXT } from "./DubbingAudition";
+import { VoiceConfigurationPanel } from "./VoiceConfigurationPanel";
+import { newVoiceTrial, type VoiceTrialSource } from "./voice-trial";
+import type { SsmlDraft } from "@tsz/voice-editor/types";
+import {
+  VoiceParameterFields,
+  defaultVoiceParameters,
+  type VoiceParameterValues
+} from "./VoiceParameterFields";
 
 export type RecommendationSeed = Partial<
   Pick<AdminDubbingRecommendationPair, "uk" | "us">
 > & { id?: string; name?: string; selected?: boolean };
+type ParameterFormValues = {
+  [Key in keyof VoiceParameterValues]: VoiceParameterValues[Key] | null;
+};
 
 export function RecommendationEditor({
   voices,
@@ -41,6 +53,7 @@ export function RecommendationEditor({
   side,
   legacy,
   disabled,
+  onBeforeAudition,
   onSave,
   onCancel
 }: {
@@ -52,40 +65,64 @@ export function RecommendationEditor({
     us: AdminDubbingRecommendation[];
   };
   disabled: boolean;
+  onBeforeAudition?: () => void;
   onSave: (pair: AdminDubbingRecommendationPair) => void;
   onCancel: () => void;
 }) {
+  const [parameterForm] = Form.useForm<ParameterFormValues>();
+  const controlsPanel = useRef<HTMLElement>(null);
   const [value, setValue] = useState<RecommendationSeed>(() =>
     structuredClone(initial)
   );
+  const [trialSources, setTrialSources] = useState<
+    Record<string, VoiceTrialSource>
+  >({});
+  const [ssmlDrafts, setSsmlDrafts] = useState<Record<string, SsmlDraft>>({});
+  const voiceDrafts = useRef(new Map<string, AdminVoiceParameters>());
   const [search, setSearch] = useState("");
-  const columns = useRef(new Map<string, HTMLDivElement>());
-  const positions = useRef(new Map<string, { top: number; height: number }>());
-  function searchVoices(next: string) {
-    if (!search && next)
-      columns.current.forEach((list, key) =>
-        positions.current.set(key, {
-          top: list.scrollTop,
-          height: list.scrollHeight
-        })
-      );
-    setSearch(next);
-  }
-  useLayoutEffect(() => {
-    columns.current.forEach((list, key) => {
-      const saved = positions.current.get(key);
-      if (saved) list.scrollTop = saved.top;
-    });
-  }, [search]);
-
-  const [activeSide, setActiveSide] = useState<DubbingSide>(side ?? "uk");
+  const [gender, setGender] = useState("all");
+  const catalog = useRef<HTMLDivElement>(null);
+  const [activeSide, setActiveSide] = useState<DubbingSide>(
+    side ?? (initial.uk && !initial.us ? "us" : "uk")
+  );
   const [error, setError] = useState<string>();
-  const visibleSides = side ? [side] : sides;
+  useLayoutEffect(() => {
+    if (catalog.current) catalog.current.scrollTop = 0;
+  }, [activeSide, search, gender]);
+  const candidates = voices
+    .filter(
+      (voice) => speechAccentGroup(voice.locale, voice.accent) === activeSide
+    )
+    .filter(
+      (voice) => gender === "all" || voice.gender.toLowerCase() === gender
+    )
+    .filter((voice) =>
+      `${voice.display_name} ${voice.metadata?.provider_voice_id ?? voice.alias}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase())
+    )
+    .sort((a, b) => Number(b.is_common) - Number(a.is_common));
+  function chooseVoice(chosen: AdminSpeechVoice) {
+    const current = value[activeSide];
+    if (current?.voice_alias === chosen.alias) return;
+    // 原有声音组合以原条目身份为准；普通编辑在本次抽屉内暂存每个候选声音。
+    if (!legacy && current)
+      voiceDrafts.current.set(
+        `${activeSide}:${current.voice_alias}`,
+        structuredClone(current.parameters)
+      );
+    const next = newPairVoice(chosen);
+    const saved =
+      !legacy && voiceDrafts.current.get(`${activeSide}:${chosen.alias}`);
+    if (saved) next.parameters = structuredClone(saved);
+    if (current) next.id = current.id;
+    setValue((previous) => ({ ...previous, [activeSide]: next }));
+    setError(undefined);
+  }
   const item = value[activeSide];
   const voice = voices.find((v) => v.alias === item?.voice_alias);
-  const caps = voice?.capabilities;
-  const evidence = voice?.capability_evidence;
   function parameters(update: Partial<NonNullable<typeof item>["parameters"]>) {
+    setError(undefined);
     setValue((v) =>
       v[activeSide]
         ? {
@@ -111,6 +148,8 @@ export function RecommendationEditor({
     for (const key of sides) {
       const next = value[key];
       if (!next) {
+        setActiveSide(key);
+        setSearch("");
         setError(`请明确选择${sideName(key)}音色，每套必须包含英美各一项。`);
         return;
       }
@@ -122,6 +161,7 @@ export function RecommendationEditor({
           voices.find((v) => v.alias === next.voice_alias)
         );
         if (issue) {
+          setActiveSide(key);
           setError(issue);
           return;
         }
@@ -135,378 +175,443 @@ export function RecommendationEditor({
       us: value.us!
     });
   }
-  return (
-    <Modal
-      open
-      title={
-        side
-          ? `修改${sideName(side)}配音设置`
-          : legacy
-            ? "人工配对／补齐历史推荐"
-            : "新建／复制整套推荐"
+  // 只在切换声音或口音时回填，避免逐字输入时重设表单打断编辑。
+  const parameterSource = useRef(item);
+  parameterSource.current = item;
+  useLayoutEffect(() => {
+    if (!parameterSource.current) return;
+    const fields = parameterSource.current.parameters;
+    parameterForm.setFieldsValue({
+      rate_percent: Number.isFinite(fields.rate_percent)
+        ? fields.rate_percent
+        : null,
+      pitch_semitones: Number.isFinite(fields.pitch_semitones)
+        ? fields.pitch_semitones
+        : null,
+      volume_percent:
+        fields.volume_percent === undefined
+          ? 100
+          : Number.isFinite(fields.volume_percent)
+            ? fields.volume_percent
+            : null,
+      style: fields.style ?? "",
+      style_degree:
+        fields.style_degree == null
+          ? undefined
+          : Number.isFinite(fields.style_degree)
+            ? fields.style_degree
+            : null,
+      role: fields.role ?? ""
+    });
+  }, [parameterForm, activeSide, item?.id, item?.voice_alias]);
+  useLayoutEffect(() => {
+    if (controlsPanel.current) controlsPanel.current.scrollTop = 0;
+  }, [activeSide, item?.voice_alias, item?.id]);
+  const defaults = voice ? defaultVoiceParameters(voice) : undefined;
+  const parametersAreDefault =
+    !!item &&
+    !!defaults &&
+    item.parameters.rate_percent === defaults.rate_percent &&
+    item.parameters.pitch_semitones === defaults.pitch_semitones &&
+    (item.parameters.volume_percent ?? 100) === defaults.volume_percent &&
+    !item.parameters.style &&
+    item.parameters.style_degree == null &&
+    item.parameters.role == null;
+  const controls =
+    voice && item ? (
+      <VoiceConfigurationPanel
+        parameters={
+          <>
+            <VoiceParameterFields
+              voice={voice}
+              disabled={disabled}
+              volume={item.parameters.volume_percent ?? 100}
+              style={item.parameters.style}
+              resetDisabled={parametersAreDefault}
+              onReset={() => {
+                parameterForm.setFieldsValue(defaultVoiceParameters(voice));
+                parameters({
+                  ...defaultVoiceParameters(voice),
+                  style: null,
+                  style_degree: undefined,
+                  role: undefined
+                });
+              }}
+            />
+            {side && error && <Alert type="error" showIcon title={error} />}
+          </>
+        }
+        audition={
+          <DubbingAudition
+            key={activeSide}
+            voice={voice}
+            parameters={item.parameters}
+            originalVoice={voices.find(
+              (candidate) =>
+                candidate.alias === initial[activeSide]?.voice_alias
+            )}
+            originalParameters={initial[activeSide]?.parameters}
+            side={activeSide}
+            disabled={disabled}
+            source={
+              trialSources[voice.alias] ??
+              newVoiceTrial(DEFAULT_DUBBING_TRIAL_TEXT)
+            }
+            onSourceChange={(source) =>
+              setTrialSources((current) => ({
+                ...current,
+                [voice.alias]: source
+              }))
+            }
+            onBeforeAudition={onBeforeAudition}
+            ssmlDraft={ssmlDrafts[voice.alias]}
+            onSsmlDraftChange={(draft) =>
+              setSsmlDrafts((current) => ({ ...current, [voice.alias]: draft }))
+            }
+          />
+        }
+      />
+    ) : (
+      <div className="dubbing-parameter-empty">
+        <Typography.Title level={5}>
+          {sideName(activeSide)}声音参数
+        </Typography.Title>
+        <Typography.Paragraph type="secondary">
+          先从目录选择声音，即可调节参数并试听。
+        </Typography.Paragraph>
+      </div>
+    );
+  const content = (
+    <Form
+      component="div"
+      form={parameterForm}
+      onValuesChange={(_, fields: ParameterFormValues) =>
+        parameters({
+          rate_percent: fields.rate_percent ?? Number.NaN,
+          pitch_semitones: fields.pitch_semitones ?? Number.NaN,
+          volume_percent: fields.volume_percent ?? Number.NaN,
+          style: fields.style || null,
+          style_degree:
+            fields.style_degree === null ? Number.NaN : fields.style_degree,
+          role: fields.role || undefined
+        })
       }
-      width={1040}
-      footer={null}
-      onCancel={onCancel}
-      destroyOnHidden
+      layout="vertical"
+      requiredMark={false}
+      disabled={disabled}
+      className={
+        side ? undefined : `dubbing-pair-form${legacy ? " is-legacy" : ""}`
+      }
     >
-      <Form component="div" layout="vertical" disabled={disabled}>
-        {!side && (
-          <Form.Item label="推荐名称">
-            <Input
-              aria-label="推荐名称"
-              maxLength={40}
-              value={value.name ?? ""}
-              onChange={(e) =>
-                setValue((v) => ({ ...v, name: e.target.value }))
+      {side ? (
+        <>
+          <Form.Item label={`${sideName(side)}音色`}>
+            <Select
+              aria-label={`${sideName(side)}音色`}
+              showSearch
+              value={item?.voice_alias}
+              options={voices
+                .filter((v) => speechAccentGroup(v.locale, v.accent) === side)
+                .map((v) => ({
+                  value: v.alias,
+                  label: v.display_name,
+                  searchText: `${v.display_name} ${v.metadata?.provider_voice_id ?? v.alias}`,
+                  disabled: v.synthesis_available === false
+                }))}
+              filterOption={(input, option) =>
+                (option?.searchText ?? "")
+                  .toLowerCase()
+                  .includes(input.trim().toLowerCase())
               }
+              onChange={(alias) => {
+                const chosen = voices.find((v) => v.alias === alias);
+                if (chosen) chooseVoice(chosen);
+              }}
             />
           </Form.Item>
-        )}
-        {!side && (
-          <Form.Item>
+          {controls}
+        </>
+      ) : (
+        <>
+          <div className="dubbing-pair-metadata">
+            <Form.Item label="推荐名称" layout="horizontal" colon={false}>
+              <Input
+                aria-label="推荐名称"
+                placeholder="例如：自然朗读、慢速跟读"
+                maxLength={40}
+                value={value.name ?? ""}
+                onChange={(event) =>
+                  setValue((current) => ({
+                    ...current,
+                    name: event.target.value
+                  }))
+                }
+              />
+            </Form.Item>
             <Checkbox
               checked={value.selected ?? !legacy}
-              onChange={(e) =>
-                setValue((v) => ({ ...v, selected: e.target.checked }))
+              onChange={(event) =>
+                setValue((current) => ({
+                  ...current,
+                  selected: event.target.checked
+                }))
               }
             >
               选用整套推荐
             </Checkbox>
-          </Form.Item>
-        )}
-        {legacy && (
-          <Alert
-            type="info"
-            showIcon
-            title="请明确选择旧版本身份或新音色补齐；每个旧侧 ID 均须保留，不能按位置猜配。选定旧身份后更换音色仍保留该 ID。"
-          />
-        )}
-        {legacy && (
-          <Flex gap={16} wrap>
-            {sides.map((key) => (
-              <Form.Item key={key} label={`${sideName(key)}历史版本`}>
-                <Select
-                  aria-label={`${sideName(key)}历史版本`}
-                  value={
-                    legacy[key].some((i) => i.id === value[key]?.id)
-                      ? value[key]?.id
-                      : undefined
-                  }
-                  placeholder="选择旧版本，或在下方选择新音色"
-                  style={{ width: 300 }}
-                  options={[
-                    { value: "__new__", label: "新身份（下方选择音色）" },
-                    ...legacy[key].map((i) => ({
-                      value: i.id,
-                      label: `${i.name} · ${i.voice_alias} · ${i.id}`
-                    }))
-                  ]}
-                  onChange={(id) => {
-                    if (id === "__new__") {
-                      setValue((v) => ({ ...v, [key]: undefined }));
-                      setActiveSide(key);
-                      return;
-                    }
-                    const selected = legacy[key].find((i) => i.id === id)!;
-                    setValue((v) => ({
-                      ...v,
-                      [key]: {
-                        id: selected.id,
-                        voice_alias: selected.voice_alias,
-                        parameters: structuredClone(selected.parameters)
-                      }
-                    }));
-                    setActiveSide(key);
-                  }}
-                />
-              </Form.Item>
-            ))}
-          </Flex>
-        )}
-        <Input.Search
-          aria-label="搜索推荐音色"
-          placeholder="搜索音色名称或官方 ID"
-          value={search}
-          onChange={(e) => searchVoices(e.target.value)}
-          allowClear
-        />
-        <div className="dubbing-catalog-scroll">
-          <div
-            className={`dubbing-catalog-columns${side ? " is-single-side" : ""}`}
-          >
-            {visibleSides.flatMap((key) =>
-              ["female", "male"].map((gender) => (
-                <section
-                  key={`${key}-${gender}`}
-                  className="dubbing-catalog-column"
-                  aria-label={`${sideName(key)}${gender === "female" ? "女声" : "男声"}目录`}
-                >
-                  <Typography.Text
-                    className={`dubbing-catalog-title voice-accent-${key}`}
-                  >
-                    {sideName(key)} · {gender === "female" ? "女声" : "男声"}
-                  </Typography.Text>
-                  <div
-                    ref={(node) => {
-                      const columnId = `${key}-${gender}`;
-                      if (node) columns.current.set(columnId, node);
-                      else columns.current.delete(columnId);
-                    }}
-                    className="dubbing-catalog-list"
-                    tabIndex={0}
-                    aria-label={`${sideName(key)}${gender === "female" ? "女声" : "男声"}滚动列表`}
-                  >
-                    <div
-                      className="dubbing-catalog-content"
-                      style={
-                        search
-                          ? {
-                              paddingTop:
-                                positions.current.get(`${key}-${gender}`)
-                                  ?.top ?? 0,
-                              minHeight: positions.current.get(
-                                `${key}-${gender}`
-                              )?.height
-                            }
-                          : undefined
-                      }
-                    >
-                      {voices
-                        .filter(
-                          (v) =>
-                            v.gender.toLowerCase() === gender &&
-                            speechAccentGroup(v.locale, v.accent) === key
-                        )
-                        .map((v) => (
-                          <div
-                            key={v.alias}
-                            hidden={
-                              !`${v.display_name} ${v.metadata?.provider_voice_id ?? v.alias}`
-                                .toLowerCase()
-                                .includes(search.trim().toLowerCase())
-                            }
-                          >
-                            <Radio
-                              checked={value[key]?.voice_alias === v.alias}
-                              disabled={
-                                disabled || v.synthesis_available === false
-                              }
-                              onChange={() => {
-                                setActiveSide(key);
-                                setValue((current) =>
-                                  current[key]?.voice_alias === v.alias
-                                    ? current
-                                    : {
-                                        ...current,
-                                        [key]: {
-                                          ...newPairVoice(v),
-                                          ...(current[key]
-                                            ? { id: current[key]!.id }
-                                            : {})
-                                        }
-                                      }
-                                );
-                              }}
-                            >
-                              <VoiceName voice={v} />
-                            </Radio>
-                            <Typography.Text
-                              type="secondary"
-                              code
-                              className="dubbing-provider-id"
-                              copyable
-                            >
-                              {v.metadata?.provider_voice_id ?? v.alias}
-                            </Typography.Text>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </section>
-              ))
-            )}
           </div>
-        </div>
-        {!side && (
-          <Radio.Group
-            aria-label="当前调参口音"
-            value={activeSide}
-            onChange={(e) => setActiveSide(e.target.value)}
-            className="dubbing-side-switch"
-          >
-            {sides.map((key) => (
-              <Radio.Button
-                key={key}
-                value={key}
-                className={`dubbing-side-${key}`}
-              >
-                {sideName(key)}
-                {value[key] ? "（已选）" : "（待选）"}
-              </Radio.Button>
-            ))}
-          </Radio.Group>
-        )}
-        <section className="dubbing-parameter-panel">
-          <Typography.Title level={5}>常用参数</Typography.Title>
-          {!item ? (
-            <Typography.Paragraph type="secondary">
-              请先选择{sideName(activeSide)}音色。
-            </Typography.Paragraph>
-          ) : (
-            <>
-              <Typography.Paragraph>
-                {voice ? <VoiceName voice={voice} /> : item.voice_alias}
-              </Typography.Paragraph>
-              <Flex gap={16} wrap>
-                <Form.Item label="语速（倍速）">
-                  <SpeechRateInput
-                    aria-label="推荐语速"
-                    value={item.parameters.rate_percent}
-                    min={caps?.min_rate_percent ?? 0}
-                    max={caps?.max_rate_percent ?? 0}
-                    disabled={
-                      !caps || caps.min_rate_percent === caps.max_rate_percent
-                    }
-                    onChange={(rate_percent) =>
-                      parameters({ rate_percent: rate_percent ?? Number.NaN })
-                    }
-                  />
-                </Form.Item>
-                <Form.Item label="音量">
-                  <InputNumber
-                    aria-label="推荐音量"
-                    min={0}
-                    max={100}
-                    precision={0}
-                    suffix={<small className="voice-shared-unit">%</small>}
-                    value={item.parameters.volume_percent ?? 100}
-                    disabled={!caps || caps.supports_volume_percent === false}
-                    onChange={(v) =>
-                      parameters({ volume_percent: v ?? Number.NaN })
-                    }
-                  />
-                </Form.Item>
-              </Flex>
-              {caps?.supports_volume_percent === false && (
-                <Typography.Paragraph type="secondary">
-                  该模型仅支持原音量；旧值保留。
-                  {(item.parameters.volume_percent ?? 100) !== 100 && (
-                    <Button onClick={() => parameters({ volume_percent: 100 })}>
-                      恢复原音量
-                    </Button>
-                  )}
-                </Typography.Paragraph>
-              )}
-            </>
+          {legacy && (
+            <Alert
+              type="info"
+              title="请选择要组成一套的原有声音，也可以补充缺少的一侧。现有声音设置会全部保留。"
+            />
           )}
-        </section>
-        <section className="dubbing-parameter-panel">
-          <Typography.Title level={5}>其他参数</Typography.Title>
-          {item && (
+          {legacy && (
             <Flex gap={16} wrap>
-              <Form.Item label="说话风格">
-                <Select
-                  aria-label="推荐风格"
-                  style={{ width: 160 }}
-                  value={item.parameters.style ?? ""}
-                  disabled={!caps?.styles.length}
-                  options={[
-                    { value: "", label: "默认" },
-                    ...(caps?.styles ?? []).map((style) => ({
-                      value: style,
-                      label: styleNames[style] ?? style
-                    }))
-                  ]}
-                  onChange={(style) => parameters({ style: style || null })}
-                />
-              </Form.Item>
-              <Form.Item label="风格强度">
-                <InputNumber
-                  aria-label="推荐风格强度"
-                  min={0.01}
-                  max={2}
-                  step={0.1}
-                  precision={2}
-                  value={item.parameters.style_degree ?? 1}
-                  disabled={
-                    !evidence?.supports_style_degree || !item.parameters.style
-                  }
-                  onChange={(v) =>
-                    parameters({ style_degree: v ?? Number.NaN })
-                  }
-                />
-              </Form.Item>
-              <Form.Item label="角色">
-                <Select
-                  aria-label="推荐角色"
-                  style={{ width: 150 }}
-                  value={item.parameters.role ?? ""}
-                  disabled={!evidence?.roles?.length}
-                  options={[
-                    { value: "", label: "默认" },
-                    ...(evidence?.roles ?? []).map((role) => ({
-                      value: role,
-                      label: role
-                    }))
-                  ]}
-                  onChange={(role) => parameters({ role: role || undefined })}
-                />
-              </Form.Item>
-              <Form.Item label="音调（半音）">
-                <InputNumber
-                  aria-label="推荐音调"
-                  min={caps?.min_pitch_semitones ?? 0}
-                  max={caps?.max_pitch_semitones ?? 0}
-                  precision={0}
-                  value={item.parameters.pitch_semitones}
-                  disabled={
-                    !caps ||
-                    caps.min_pitch_semitones === caps.max_pitch_semitones
-                  }
-                  onChange={(v) =>
-                    parameters({ pitch_semitones: v ?? Number.NaN })
-                  }
-                />
-              </Form.Item>
+              {sides.map((key) => (
+                <Form.Item key={key} label={`${sideName(key)}原有声音`}>
+                  <Select
+                    aria-label={`选择${sideName(key)}原有声音`}
+                    value={
+                      legacy[key].some((i) => i.id === value[key]?.id)
+                        ? value[key]?.id
+                        : undefined
+                    }
+                    placeholder="选择现有声音，或在下方补充音色"
+                    style={{ width: 300 }}
+                    options={[
+                      { value: "__new__", label: "补充音色（下方选择）" },
+                      ...legacy[key].map((i) => ({
+                        value: i.id,
+                        label: `${i.name} · ${voices.find((v) => v.alias === i.voice_alias)?.display_name ?? i.voice_alias} · ${((i.parameters.rate_percent + 100) / 100).toFixed(2)}× / ${i.parameters.volume_percent ?? 100}%`
+                      }))
+                    ]}
+                    onChange={(id) => {
+                      if (id === "__new__") {
+                        setValue((v) => ({ ...v, [key]: undefined }));
+                        setActiveSide(key);
+                        return;
+                      }
+                      const selected = legacy[key].find((i) => i.id === id)!;
+                      setValue((v) => ({
+                        ...v,
+                        [key]: {
+                          id: selected.id,
+                          voice_alias: selected.voice_alias,
+                          parameters: structuredClone(selected.parameters)
+                        }
+                      }));
+                      setActiveSide(key);
+                    }}
+                  />
+                </Form.Item>
+              ))}
             </Flex>
           )}
-          <Typography.Paragraph type="secondary">
-            参数范围以真实能力为准；不支持的参数不可调整，已有值保留并在保存时校验。
-          </Typography.Paragraph>
-        </section>
-        {error && <Alert type="error" showIcon title={error} />}
-        {item && (
-          <Button
-            type="link"
-            disabled={disabled}
-            onClick={() =>
-              parameters({
-                style: null,
-                style_degree: undefined,
-                role: undefined,
-                pitch_semitones: caps
-                  ? Math.max(
-                      caps.min_pitch_semitones,
-                      Math.min(0, caps.max_pitch_semitones)
-                    )
-                  : item.parameters.pitch_semitones
-              })
-            }
+
+          <div
+            className="dubbing-pair-selection"
+            role="group"
+            aria-label="英美声音组合"
           >
-            恢复其他参数默认值
-          </Button>
+            {sides.map((key) => {
+              const selected = value[key];
+              const chosen = voices.find(
+                (voice) => voice.alias === selected?.voice_alias
+              );
+              const rate = selected?.parameters.rate_percent;
+              const volume = selected?.parameters.volume_percent ?? 100;
+              return (
+                <Button
+                  key={key}
+                  className={`dubbing-selection-side${activeSide === key ? " is-active" : ""}`}
+                  aria-label={`配置${sideName(key)}声音`}
+                  aria-pressed={activeSide === key}
+                  onClick={() => {
+                    setActiveSide(key);
+                    setSearch("");
+                  }}
+                >
+                  <span className="dubbing-selection-label">
+                    {sideName(key)}声音
+                  </span>
+                  <span className="dubbing-selection-name">
+                    {chosen ? (
+                      <VoiceName voice={chosen} />
+                    ) : selected ? (
+                      selected.voice_alias
+                    ) : (
+                      "待选音色"
+                    )}
+                  </span>
+                  <span className="dubbing-selection-parameters">
+                    {selected
+                      ? `${Number.isFinite(rate) ? ((rate! + 100) / 100).toFixed(2) : "—"}× · ${Number.isFinite(volume) ? volume : "—"}%`
+                      : "从目录选择"}
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
+          <div className="dubbing-pair-workspace">
+            <section
+              className="dubbing-voice-picker"
+              aria-label={`${sideName(activeSide)}音色目录`}
+            >
+              <div className="dubbing-picker-heading">
+                <Typography.Title level={5}>
+                  选择{sideName(activeSide)}声音
+                </Typography.Title>
+                <Typography.Text type="secondary">
+                  {candidates.length} 个音色
+                </Typography.Text>
+              </div>
+              <div className="dubbing-picker-filters">
+                <Input.Search
+                  aria-label="搜索推荐音色"
+                  placeholder="搜索名称或官方 ID"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  allowClear
+                />
+                <Segmented
+                  aria-label="音色性别"
+                  value={gender}
+                  onChange={setGender}
+                  options={[
+                    { value: "all", label: "全部" },
+                    { value: "female", label: "女声" },
+                    { value: "male", label: "男声" }
+                  ]}
+                />
+              </div>
+              <div
+                className="dubbing-picker-list"
+                ref={catalog}
+                tabIndex={0}
+                aria-label={`${sideName(activeSide)}音色滚动列表`}
+              >
+                {candidates.length ? (
+                  candidates.map((candidate) => (
+                    <div
+                      key={candidate.alias}
+                      className={`dubbing-picker-option${item?.voice_alias === candidate.alias ? " is-selected" : ""}`}
+                    >
+                      <Radio
+                        checked={item?.voice_alias === candidate.alias}
+                        disabled={
+                          disabled || candidate.synthesis_available === false
+                        }
+                        onChange={() => chooseVoice(candidate)}
+                      >
+                        <VoiceName voice={candidate} />
+                        <span className="dubbing-picker-badge" aria-hidden>
+                          {candidate.synthesis_available === false
+                            ? "暂不可用"
+                            : candidate.is_common
+                              ? "常用"
+                              : ""}
+                        </span>
+                      </Radio>
+                      <Typography.Text
+                        className="dubbing-picker-id"
+                        copyable={{
+                          text:
+                            candidate.metadata?.provider_voice_id ??
+                            candidate.alias
+                        }}
+                      >
+                        <span
+                          title={
+                            candidate.metadata?.provider_voice_id ??
+                            candidate.alias
+                          }
+                        >
+                          {candidate.metadata?.provider_voice_id ??
+                            candidate.alias}
+                        </span>
+                      </Typography.Text>
+                    </div>
+                  ))
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="没有符合条件的音色，请调整搜索或筛选"
+                  />
+                )}
+              </div>
+            </section>
+            <section
+              className="dubbing-pair-controls-panel"
+              ref={controlsPanel}
+              aria-label={`${sideName(activeSide)}参数与试听`}
+            >
+              {controls}
+            </section>
+          </div>
+        </>
+      )}
+    </Form>
+  );
+
+  const footer = (
+    <div className="dubbing-editor-footer">
+      <div className="dubbing-editor-footer-status">
+        <Typography.Text type="secondary">
+          {side
+            ? "调整先存入本组草稿"
+            : !value.uk || !value.us
+              ? `还需选择${!value.uk ? "英式" : "美式"}声音`
+              : "英美声音已选齐"}
+          ，保存当前组后生效。
+        </Typography.Text>
+        {!side && error && (
+          <Typography.Text type="danger" role="alert">
+            {error}
+          </Typography.Text>
         )}
-        <Space>
-          <Button type="primary" disabled={disabled} onClick={save}>
-            {side ? "保存配音设置" : "保存整套推荐"}
-          </Button>
-          <Button onClick={onCancel}>取消</Button>
-        </Space>
-        <Typography.Paragraph type="secondary">
-          此处只更新本组草稿，回到分组点击“完成”才持久保存。
-        </Typography.Paragraph>
-      </Form>
-    </Modal>
+      </div>
+      <Space>
+        <Button onClick={onCancel}>取消</Button>
+        <Button type="primary" disabled={disabled} onClick={save}>
+          {side ? "保存到本组" : "保存整套推荐"}
+        </Button>
+      </Space>
+    </div>
+  );
+  return (
+    <Drawer
+      open
+      title={
+        side ? (
+          <div className="dubbing-editor-title">
+            <Typography.Text type="secondary">
+              {sideName(side)}声音 · {initial.name}
+            </Typography.Text>
+            <Typography.Title level={4}>配音设置</Typography.Title>
+          </div>
+        ) : (
+          <div className="dubbing-pair-editor-title">
+            <Typography.Title level={4}>
+              {legacy
+                ? "组合原有声音"
+                : initial.uk && initial.us
+                  ? "复制整套推荐"
+                  : "新建整套推荐"}
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              分别选择英美声音，组成一套适用于本组的配音推荐。
+            </Typography.Text>
+          </div>
+        )
+      }
+      size={side ? 560 : 1120}
+      onClose={onCancel}
+      destroyOnHidden
+      className={side ? "dubbing-editor-drawer" : "dubbing-pair-editor"}
+      footer={footer}
+    >
+      {content}
+    </Drawer>
   );
 }

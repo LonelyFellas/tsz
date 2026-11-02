@@ -153,6 +153,10 @@ export function LocalVoicePool({
       else groups.push([item]);
       return groups;
     }, []);
+  const visiblePairs = pairs.filter((pair) => !pair[0]!.fallbackOnly);
+  const legacyRecommendations = recommendations.filter(
+    (item) => !item.pairId && !item.fallbackOnly
+  );
   const inheritedPair = inherited
     ? pairs.find((pair) =>
         pair
@@ -630,7 +634,7 @@ export function LocalVoicePool({
               </div>
             ))}
           </div>
-          {pairs.map((pair) => (
+          {visiblePairs.map((pair) => (
             <div
               className="tsz-ve-pool-pair"
               key={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
@@ -682,7 +686,7 @@ export function LocalVoicePool({
           ))}
         </Radio.Group>
       </div>
-      {recommendations.some((item) => !item.pairId) && (
+      {legacyRecommendations.length > 0 && (
         <section aria-label="历史未配对推荐">
           <Typography.Paragraph type="secondary">
             历史未配对分组仅保留默认解析；请在分组页明确整理后选用整套推荐。
@@ -698,35 +702,33 @@ export function LocalVoicePool({
                   <span>音量</span>
                 </div>
               </div>
-              {recommendations
-                .filter((item) => !item.pairId)
-                .map((item) => (
-                  <div className="tsz-ve-pool-pair" key={item.id}>
-                    <span>
-                      {item.name}
-                      <small>
-                        {item.groupName} ·{" "}
-                        {item.locale === "en-GB" ? "英式" : "美式"} · 未配对
-                        {item.selected === false ? " · 组内未选" : ""}
-                      </small>
-                    </span>
-                    <div className="tsz-ve-pool-pair-side">
-                      {renderIdentity(
-                        {
-                          ...item.setting,
-                          version_name: item.name,
-                          version_id: item.id
-                        },
-                        item.locale
-                      )}
-                    </div>
+              {legacyRecommendations.map((item) => (
+                <div className="tsz-ve-pool-pair" key={item.id}>
+                  <span>
+                    {item.name}
+                    <small>
+                      {item.groupName} ·{" "}
+                      {item.locale === "en-GB" ? "英式" : "美式"} · 未配对
+                      {item.selected === false ? " · 组内未选" : ""}
+                    </small>
+                  </span>
+                  <div className="tsz-ve-pool-pair-side">
+                    {renderIdentity(
+                      {
+                        ...item.setting,
+                        version_name: item.name,
+                        version_id: item.id
+                      },
+                      item.locale
+                    )}
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           </div>
         </section>
       )}
-      {!pairs.length && !loading && (
+      {!visiblePairs.length && !loading && (
         <Typography.Paragraph type="secondary">
           尚无适用的配对推荐，可直接从目录多选。
         </Typography.Paragraph>

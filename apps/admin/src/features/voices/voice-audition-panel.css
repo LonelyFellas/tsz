@@ -1,0 +1,142 @@
+.voice-configuration-panel {
+  container-type: inline-size;
+  container-name: voice-configuration;
+  min-width: 0;
+}
+.voice-configuration-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.voice-configuration-parameters {
+  min-width: 0;
+}
+@container voice-configuration (min-width: 900px) {
+  .voice-configuration-layout {
+    grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
+  }
+}
+.voice-audition-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.voice-audition-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--ant-color-bg-container, #fff);
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--voice-border, #e5e7eb);
+}
+.voice-audition-toolbar .ant-select {
+  min-width: 82px;
+}
+.voice-audition-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--voice-fill, #f7f8fa);
+}
+.voice-audition-panel .voice-library-preview-empty {
+  justify-content: flex-start;
+  min-height: 32px;
+  font-size: 12px;
+}
+.voice-audition-panel .voice-library-preview-empty > .anticon {
+  font-size: 18px;
+}
+.voice-audition-panel .voice-library-player audio {
+  width: 100%;
+}
+.voice-audition-panel .voice-library-player .ant-space {
+  row-gap: 4px;
+}
+.voice-audition-panel .voice-library-player .ant-typography {
+  font-size: 12px;
+}
+.voice-audition-panel .voice-library-tools {
+  border-top: 1px solid var(--voice-border, #e5e7eb);
+}
+.voice-audition-panel .tsz-ve-ssml-review {
+  min-width: 0;
+}
+@media (max-width: 700px) {
+  .voice-audition-toolbar > .ant-flex {
+    align-items: flex-start;
+  }
+  .voice-audition-toolbar .ant-space {
+    row-gap: 8px;
+  }
+}
+
+.voice-trial-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.voice-trial-counter {
+  align-self: flex-end;
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.voice-trial-editor .tsz-ve-editor {
+  min-width: 0;
+}
+
+.voice-trial-editor .tsz-ve-canvas {
+  min-height: 144px;
+}
+
+.voice-trial-editor .tsz-ve-top-tools {
+  gap: 8px;
+}
+
+.voice-trial-editor .tsz-ve-selection-status {
+  font-size: 12px;
+}
+
+.voice-trial-editor .tsz-ve-editor .tsz-ve-markup {
+  box-sizing: border-box;
+  border-color: var(--voice-border, #e5e7eb);
+  border-radius: var(--voice-radius, 8px);
+}
+
+.voice-trial-editor .tsz-ve-top-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  background: var(--voice-fill, #f7f8fa);
+}
+
+.voice-trial-editor .tsz-ve-primary-tools {
+  grid-column: 1;
+  margin: 0;
+  padding: 0;
+}
+
+.voice-trial-editor .tsz-ve-toolbar-actions {
+  position: static;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+}
+
+.voice-trial-editor .tsz-ve-selection-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--voice-muted, #606b7b);
+}
+
+.voice-trial-editor .tsz-ve-editor .tsz-ve-strip,
+.voice-trial-editor .tsz-ve-editor .tsz-ve-canvas-input {
+  padding: 16px 12px;
+  font-size: 16px;
+  line-height: 1.8;
+}
