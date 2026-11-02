@@ -301,12 +301,12 @@ export function V3PronunciationList({
                             }
                             options={[
                               {
-                                value: "normal",
-                                label: pronunciationStyleLabel("normal")
-                              },
-                              {
                                 value: "citation",
                                 label: pronunciationStyleLabel("citation")
+                              },
+                              {
+                                value: "normal",
+                                label: pronunciationStyleLabel("normal")
                               },
                               {
                                 value: "strong",
