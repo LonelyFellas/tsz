@@ -86,38 +86,34 @@ function PronunciationCell({
           column={settings}
         />
       ) : (
-        <Tooltip
-          title={`${dialect === "uk" ? "英式" : "美式"} · 读法 ${pronunciationIndex + 1}${row.style ? ` · ${pronunciationStyleLabel(row.style)}` : ""}`}
-        >
-          <div className="v3-overview-pronunciation">
-            <PronunciationPreviewControls
-              pronunciationId={row.id}
-              dialect={dialect}
-              content={content}
-              voiceProfile={profile}
-              spelling={variant.spelling}
-              audioAssetId={assetId}
-              disabled={!content && !assetId}
-              disabledReason={
-                content || !row.synthesis
-                  ? "尚未保存正式音频，请返回编辑补齐"
-                  : "请先填写当前口音的 Azure IPA/UPS 或选择拼写来源"
-              }
-              ariaLabelPrefix={`读法 ${pronunciationIndex + 1}${dialect === "uk" ? "英式" : "美式"}`}
-              playbackOnly
-            />
-            {actualPron.text.trim() ? (
-              <span
-                className={`v3-overview-phonetic tsz-phonetics${addSlashes ? " has-slashes" : ""}`}
-                title={actualPron.text}
-              >
-                <RichTextReadOnly value={actualPron} />
-              </span>
-            ) : (
-              <Typography.Text type="secondary">未填写</Typography.Text>
-            )}
-          </div>
-        </Tooltip>
+        <div className="v3-overview-pronunciation">
+          <PronunciationPreviewControls
+            pronunciationId={row.id}
+            dialect={dialect}
+            content={content}
+            voiceProfile={profile}
+            spelling={variant.spelling}
+            audioAssetId={assetId}
+            disabled={!content && !assetId}
+            disabledReason={
+              content || !row.synthesis
+                ? "尚未保存正式音频，请返回编辑补齐"
+                : "请先填写当前口音的 Azure IPA/UPS 或选择拼写来源"
+            }
+            ariaLabelPrefix={`读法 ${pronunciationIndex + 1}${dialect === "uk" ? "英式" : "美式"}`}
+            playbackOnly
+          />
+          {actualPron.text.trim() ? (
+            <span
+              className={`v3-overview-phonetic tsz-phonetics${addSlashes ? " has-slashes" : ""}`}
+              title={actualPron.text}
+            >
+              <RichTextReadOnly value={actualPron} />
+            </span>
+          ) : (
+            <Typography.Text type="secondary">未填写</Typography.Text>
+          )}
+        </div>
       )}
     </div>
   );
