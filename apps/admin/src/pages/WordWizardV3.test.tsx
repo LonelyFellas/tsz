@@ -707,7 +707,7 @@ describe("WordWizardV3Page", () => {
     }
   });
 
-  it("未保存摘要实时更新并在返回第一步时保留，期间不调用保存或校验", async () => {
+  it("未保存摘要实时更新并在返回词形步骤时保留，期间不调用保存或校验", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });
     const router = renderPage(
@@ -727,12 +727,11 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(
       within(
         document.querySelector<HTMLElement>(".word-creation-stepper")!
-      ).getByText("创建词条")
+      ).getByText("词形与发音")
     );
     await waitFor(() =>
-      expect(router.state.location.pathname).toContain("/basics")
+      expect(router.state.location.pathname).toContain("/forms")
     );
-    fireEvent.click(screen.getByRole("button", { name: "展开语义区间" }));
     expect(
       within(screen.getByRole("region", { name: "语义区间摘要" })).getByText(
         "即时语义区间"
@@ -1039,7 +1038,7 @@ describe("WordWizardV3Page", () => {
     expect(document.querySelector(".word-creation-stepper")).not.toBeNull();
     expect(document.querySelector(".word-creation-summary")).not.toBeNull();
     expect(screen.getByRole("tab", { name: /名词/u })).toBeInTheDocument();
-    expect(screen.getByText("上一步").closest("button")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "上一步" })).toBeNull();
     expect(
       screen.getByText("保存草稿", { exact: true }).closest("button")!
     ).toBeInTheDocument();

@@ -432,13 +432,6 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
       ) : null}
       <V3StepActions>
         <Button
-          type="text"
-          disabled={Boolean(pendingIntent) || busy}
-          onClick={() => context.setActiveStep("basics")}
-        >
-          上一步
-        </Button>
-        <Button
           disabled={
             Boolean(pendingIntent) ||
             (!context.hasUnsavedChanges && !bindingsDirty) ||
