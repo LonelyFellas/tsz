@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { ColumnSettings } from "@/components/ColumnSettings";
 import { useColumnSettings } from "@/components/useColumnSettings";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
@@ -181,10 +182,9 @@ function FormsReview({
                 <span className="v3-review-form-chain">
                   {group.members.map((member, i) => {
                     const form = pos.forms.find((f) => f.id === member.form_id);
-                    const variant =
-                      form?.regional_variants.mode === "common"
-                        ? form.regional_variants.common
-                        : form?.regional_variants.uk;
+                    const variant = form
+                      ? regionalVariants(form.regional_variants)[0]
+                      : undefined;
                     return (
                       <span
                         data-testid={`preview-membership-${member.id}`}
@@ -236,10 +236,7 @@ function FormsReview({
                 </tr>
               </thead>
               {pos.forms.map((form) => {
-                const variants =
-                  form.regional_variants.mode === "common"
-                    ? [form.regional_variants.common]
-                    : [form.regional_variants.uk, form.regional_variants.us];
+                const variants = regionalVariants(form.regional_variants);
                 return (
                   <tbody key={form.id} data-testid={`preview-form-${form.id}`}>
                     {variants.flatMap((variant) =>

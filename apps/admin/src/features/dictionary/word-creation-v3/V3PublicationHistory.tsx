@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { useAuthStore } from "@/lib/auth";
 import { canAdminResourceAction } from "@tsz/shared/auth";
 import { expandFormContents, pronunciationSynthesisLabel } from "@tsz/shared";
@@ -169,10 +170,7 @@ function snapshotBody(publication: AdminWordPublicationAny): {
   return {
     forms: expandFormContents(publication.word.forms).pos.flatMap((pos) =>
       pos.forms.flatMap((form) => {
-        const variants =
-          form.regional_variants.mode === "common"
-            ? [form.regional_variants.common]
-            : [form.regional_variants.uk, form.regional_variants.us];
+        const variants = regionalVariants(form.regional_variants);
         return variants.map((variant) => ({
           id: variant.id,
           pos: pos.pos,

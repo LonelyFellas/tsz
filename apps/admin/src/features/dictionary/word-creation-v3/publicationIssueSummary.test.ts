@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import type { AdminWordV3, V3DraftValidationIssue } from "@tsz/types";
 import { applyFormsStructure } from "./sharedFormsModel";
 import type { ExpandedAdminWordV3 } from "@tsz/shared";
@@ -245,7 +246,9 @@ describe("buildV3PublicationIssueSummary", () => {
       "variant",
       (current: ExpandedAdminWordV3) => {
         const variants = current.forms.pos[0]!.forms[0]!.regional_variants;
-        return variants.mode === "common" ? variants.common.id : variants.uk.id;
+        return variants.mode === "common"
+          ? variants.common.id
+          : primaryRegionalVariant(variants, "uk").id;
       }
     ],
     [
@@ -254,7 +257,7 @@ describe("buildV3PublicationIssueSummary", () => {
         const variants = current.forms.pos[0]!.forms[0]!.regional_variants;
         return variants.mode === "common"
           ? variants.common.pronunciations[0]!.id
-          : variants.uk.pronunciations[0]!.id;
+          : primaryRegionalVariant(variants, "uk").pronunciations[0]!.id;
       }
     ]
   ])("resolves forms POS ownership from a %s ancestor", (_label, nodeId) => {

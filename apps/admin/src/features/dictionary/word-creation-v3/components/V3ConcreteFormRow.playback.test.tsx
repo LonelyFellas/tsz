@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App } from "antd";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -198,4 +199,112 @@ it("独立英美拼写保持各自口音和图标颜色", async () => {
     );
   }
   view.unmount();
+});
+
+it("英美独立增删拼写并用键盘排序，移动保持拼写、发音和身份", () => {
+  const form = ukUsFormFixture({
+    uk: { spelling: "centre" },
+    us: { spelling: "center" }
+  });
+  const rules: DialectRulesV3 = {
+    spelling_mode: "distinguish",
+    phonetic_mode: "distinguish"
+  };
+  let latest = formsFixture({ forms: [form], dialect_rules: rules });
+  function ListHarness() {
+    const [content, setContent] = useState(latest);
+    return (
+      <App>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={content}
+            form={content.pos[0]!.forms[0]!}
+            dialectRules={rules}
+            formLabel="原形"
+            presentation="content"
+            showRegularity={false}
+            issues={[]}
+            membershipCount={1}
+            multipleSpellingsAvailable
+            idFactory={() => crypto.randomUUID()}
+            spellingRemovalReason={(id) =>
+              id === form.regional_variants.uk.id ? "请先解除关联" : undefined
+            }
+            onChange={(next) => {
+              latest = next;
+              setContent(next);
+            }}
+          />
+        </PronunciationPreviewProvider>
+      </App>
+    );
+  }
+  render(<ListHarness />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "在英式第 1 条拼写后新增拼写" })
+  );
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "原形第 2 条英式拼写" }),
+    { target: { value: "alternate" } }
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "在美式第 1 条拼写后新增拼写" })
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "在美式第 2 条拼写后新增拼写" })
+  );
+  const before = latest.pos[0]!.forms[0]!.regional_variants;
+  if (before.mode !== "uk_us_many") throw new Error("fixture");
+  expect(before.uk).toHaveLength(2);
+  expect(before.us).toHaveLength(3);
+  const moved = structuredClone(before.uk[1]!);
+  fireEvent.keyDown(
+    screen.getByRole("button", { name: "移动英式第 2 条拼写" }),
+    { key: "ArrowUp" }
+  );
+  const sorted = latest.pos[0]!.forms[0]!.regional_variants;
+  if (sorted.mode !== "uk_us_many") throw new Error("fixture");
+  expect(sorted.uk[0]).toEqual(moved);
+  expect(
+    screen.getByRole("button", { name: "删除英式第 2 条拼写" })
+  ).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "删除英式第 1 条拼写" }));
+  const deleted = latest.pos[0]!.forms[0]!.regional_variants;
+  if (deleted.mode !== "uk_us_many") throw new Error("fixture");
+  expect(deleted.uk).toEqual([form.regional_variants.uk]);
+  expect(deleted.us).toEqual(before.us);
+});
+
+it("旧服务未声明多条拼写能力时保留单条编辑并禁用新增", () => {
+  const form = ukUsFormFixture();
+  const rules: DialectRulesV3 = {
+    spelling_mode: "distinguish",
+    phonetic_mode: "distinguish"
+  };
+  const onChange = vi.fn();
+  render(
+    <App>
+      <PronunciationPreviewProvider>
+        <V3ConcreteFormRow
+          content={formsFixture({ forms: [form], dialect_rules: rules })}
+          form={form}
+          dialectRules={rules}
+          presentation="content"
+          issues={[]}
+          membershipCount={1}
+          idFactory={() => crypto.randomUUID()}
+          onChange={onChange}
+        />
+      </PronunciationPreviewProvider>
+    </App>
+  );
+  const add = screen.getByRole("button", {
+    name: "在英式第 1 条拼写后新增拼写"
+  });
+  expect(add).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "在美式第 1 条拼写后新增拼写" })
+  ).toBeDisabled();
+  fireEvent.click(add);
+  expect(onChange).not.toHaveBeenCalled();
 });

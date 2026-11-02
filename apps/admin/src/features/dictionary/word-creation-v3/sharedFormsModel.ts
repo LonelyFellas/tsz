@@ -1,3 +1,4 @@
+import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import type {
   DraftFormsStepContentV3,
   FormContentBindingV3,
@@ -51,11 +52,17 @@ function newContent(
     regional_variants:
       source.mode === "common"
         ? { mode: "common", common: contentVariant(source.common) }
-        : {
-            mode: "uk_us",
-            uk: contentVariant(source.uk),
-            us: contentVariant(source.us)
-          }
+        : source.mode === "uk_us_many"
+          ? {
+              mode: "uk_us_many",
+              uk: source.uk.map(contentVariant),
+              us: source.us.map(contentVariant)
+            }
+          : {
+              mode: "uk_us",
+              uk: contentVariant(source.uk),
+              us: contentVariant(source.us)
+            }
   };
 }
 
@@ -96,6 +103,12 @@ function initialBinding(
       mode: "uk_us",
       uk: variant(source.uk, target.uk),
       us: variant(source.us, target.us)
+    };
+  } else if (source.mode === "uk_us_many" && target.mode === "uk_us_many") {
+    regional_bindings = {
+      mode: "uk_us_many",
+      uk: source.uk.map((row, index) => variant(row, target.uk[index]!)),
+      us: source.us.map((row, index) => variant(row, target.us[index]!))
     };
   } else throw new Error("Inconsistent new content shape");
   return {
@@ -150,6 +163,16 @@ export function applyFormsStructure(
         else if (bindings.mode === "uk_us" && projected.mode === "uk_us") {
           update(bindings.uk, projected.uk);
           update(bindings.us, projected.us);
+        } else if (
+          bindings.mode === "uk_us_many" &&
+          projected.mode === "uk_us_many"
+        ) {
+          for (const reference of regionalVariants(bindings)) {
+            const row = regionalVariants(projected).find(
+              (row) => row.id === reference.id
+            );
+            if (row) update(reference, row);
+          }
         } else throw new Error("Regional changes must edit the shared content");
         return {
           ...previous,
@@ -193,28 +216,42 @@ export function contentEditorForms(content: FormContentV3): FormContentEditor {
             id: content.id,
             form_type: "base",
             regional_variants:
-              regions.mode === "common"
+              regions.mode === "uk_us_many"
                 ? {
-                    mode: "common",
-                    common: {
-                      ...structuredClone(regions.common),
-                      dialect: "common",
+                    mode: "uk_us_many",
+                    uk: regions.uk.map((row) => ({
+                      ...structuredClone(row),
+                      dialect: "uk" as const,
                       is_regular: true
-                    }
+                    })),
+                    us: regions.us.map((row) => ({
+                      ...structuredClone(row),
+                      dialect: "us" as const,
+                      is_regular: true
+                    }))
                   }
-                : {
-                    mode: "uk_us",
-                    uk: {
-                      ...structuredClone(regions.uk),
-                      dialect: "uk",
-                      is_regular: true
-                    },
-                    us: {
-                      ...structuredClone(regions.us),
-                      dialect: "us",
-                      is_regular: true
+                : regions.mode === "common"
+                  ? {
+                      mode: "common",
+                      common: {
+                        ...structuredClone(regions.common),
+                        dialect: "common",
+                        is_regular: true
+                      }
                     }
-                  }
+                  : {
+                      mode: "uk_us",
+                      uk: {
+                        ...structuredClone(regions.uk),
+                        dialect: "uk",
+                        is_regular: true
+                      },
+                      us: {
+                        ...structuredClone(regions.us),
+                        dialect: "us",
+                        is_regular: true
+                      }
+                    }
           }
         ],
         form_groups: [
@@ -251,7 +288,13 @@ export function contentFromEditor(editor: FormContentEditor): FormContentV3 {
     regional_variants:
       source.mode === "common"
         ? { mode: "common", common: value(source.common) }
-        : { mode: "uk_us", uk: value(source.uk), us: value(source.us) }
+        : source.mode === "uk_us_many"
+          ? {
+              mode: "uk_us_many",
+              uk: source.uk.map(value),
+              us: source.us.map(value)
+            }
+          : { mode: "uk_us", uk: value(source.uk), us: value(source.us) }
   };
 }
 
@@ -271,7 +314,10 @@ export function createSharedContentDialectNormalizer(
   const original = content.regional_variants;
   for (const [role, variant] of original.mode === "common"
     ? [["common", original.common] as const]
-    : [["uk", original.uk] as const, ["us", original.us] as const])
+    : [
+        ["uk", primaryRegionalVariant(original, "uk")] as const,
+        ["us", primaryRegionalVariant(original, "us")] as const
+      ])
     regions.set(role, variant.id);
   for (const mapping of content.pronunciation_slots ?? []) {
     for (const side of ["common", "uk", "us"] as const) {
@@ -299,6 +345,25 @@ export function createSharedContentDialectNormalizer(
     rules: DialectRulesV3,
     preference: "uk" | "us"
   ) => {
+    const source = editor.pos[0]!.forms[0]!.regional_variants;
+    if (source.mode === "uk_us_many") {
+      if (
+        rules.spelling_mode === "distinguish" &&
+        rules.phonetic_mode === "distinguish"
+      )
+        return { ok: true as const, value: editor };
+      if (source.uk.length !== 1 || source.us.length !== 1)
+        return {
+          ok: false as const,
+          reason: "spelling_merge_required" as const
+        };
+      editor = structuredClone(editor);
+      editor.pos[0]!.forms[0]!.regional_variants = {
+        mode: "uk_us",
+        uk: source.uk[0]!,
+        us: source.us[0]!
+      };
+    }
     const result = normalizeGroupDialectRules(
       editor,
       content.id,
@@ -420,7 +485,12 @@ export function createPronunciationReferenceIds(
   ) => {
     for (const node of retired) {
       if (
-        node.node_role === "pronunciation" &&
+        [
+          "pronunciation",
+          "uk_variant",
+          "us_variant",
+          "common_variant"
+        ].includes(node.node_role) &&
         node.parent_node_id &&
         node.content_slot_id
       )
@@ -430,11 +500,11 @@ export function createPronunciationReferenceIds(
     for (const pos of current.pos)
       for (const form of pos.forms) {
         const refs = form.regional_bindings;
-        for (const variant of refs.mode === "common"
-          ? [refs.common]
-          : [refs.uk, refs.us])
+        for (const variant of regionalVariants(refs)) {
+          ids.set(`${form.id}:${variant.content_slot_id}`, variant.id);
           for (const row of variant.pronunciations)
             ids.set(`${variant.id}:${row.content_slot_id}`, row.id);
+        }
       }
   };
   seed(forms, retiredNodes);
@@ -445,6 +515,8 @@ export function createPronunciationReferenceIds(
     return id;
   };
   factory.seed = seed;
+  factory.existing = (parentId: string, slotId: string) =>
+    ids.get(`${parentId}:${slotId}`);
   return factory;
 }
 
@@ -474,9 +546,10 @@ function replaceSharedContentInPlace(
     for (const binding of pos.forms) {
       if (binding.content_id !== content.id) continue;
       const old = binding.regional_bindings;
-      const variants = old.mode === "common" ? [old.common] : [old.uk, old.us];
+      const variants = regionalVariants(old);
       if (
-        old.mode !== content.regional_variants.mode &&
+        (old.mode === "common") !==
+          (content.regional_variants.mode === "common") &&
         variants.some((row) => row.component_usages?.length)
       )
         throw new Error(
@@ -497,23 +570,32 @@ function replaceSharedContentInPlace(
       }
       const reference = (
         slot: FormContentVariantV3,
-        dialect: "common" | "uk" | "us"
+        dialect: "common" | "uk" | "us",
+        multiple = false
       ): FormVariantBindingV3 => {
         const previous =
-          old.mode === "common"
-            ? dialect === "common"
-              ? old.common
-              : undefined
-            : dialect === "common"
-              ? undefined
-              : old[dialect];
-        const source =
-          previous ?? (old.mode === "common" ? old.common : old.uk);
+          variants.find((row) => row.content_slot_id === slot.id) ??
+          (multiple
+            ? undefined
+            : old.mode === "common"
+              ? dialect === "common"
+                ? old.common
+                : undefined
+              : dialect === "common"
+                ? undefined
+                : old.mode === "uk_us"
+                  ? old[dialect]
+                  : undefined);
+        const source = previous ?? variants[0]!;
         const mappings = new Map(
           previous?.pronunciations.map((row) => [row.content_slot_id, row.id])
         );
         const variantId =
-          previous?.id ?? stableIds(binding.id, `${dialect}_variant`);
+          previous?.id ??
+          pronunciationIds.existing(binding.id, slot.id) ??
+          (multiple
+            ? pronunciationIds(binding.id, slot.id)
+            : stableIds(binding.id, `${dialect}_variant`));
         return {
           id: variantId,
           content_slot_id: slot.id,
@@ -531,11 +613,17 @@ function replaceSharedContentInPlace(
       binding.regional_bindings =
         regions.mode === "common"
           ? { mode: "common", common: reference(regions.common, "common") }
-          : {
-              mode: "uk_us",
-              uk: reference(regions.uk, "uk"),
-              us: reference(regions.us, "us")
-            };
+          : regions.mode === "uk_us_many"
+            ? {
+                mode: "uk_us_many",
+                uk: regions.uk.map((row) => reference(row, "uk", true)),
+                us: regions.us.map((row) => reference(row, "us", true))
+              }
+            : {
+                mode: "uk_us",
+                uk: reference(regions.uk, "uk"),
+                us: reference(regions.us, "us")
+              };
     }
   next.contents[index] = content;
   return next;

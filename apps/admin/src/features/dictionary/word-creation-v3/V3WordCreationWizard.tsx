@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { assistantFieldTarget } from "../assistant/fieldNavigation";
 import { LexiconAssistant } from "../assistant/LexiconAssistant";
 import { VoiceSaveContext } from "./voiceSaveContext";
@@ -475,8 +476,7 @@ function V3WordCreationSession({
       !["form_id", "form_type", "scope"].includes(pendingFocusTarget.field)
     ) {
       const refs = binding.regional_bindings;
-      const variants =
-        refs.mode === "common" ? [refs.common] : [refs.uk, refs.us];
+      const variants = regionalVariants(refs);
       const variant = variants.find(
         (row) =>
           row.id === pendingFocusTarget.variant_id ||

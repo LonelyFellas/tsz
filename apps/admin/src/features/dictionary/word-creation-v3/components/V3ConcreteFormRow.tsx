@@ -1,8 +1,14 @@
+import { regionalVariants } from "@tsz/shared";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { WarningOutlined } from "@ant-design/icons";
-import { Flex, Radio, Select, Tooltip, Typography } from "antd";
+import {
+  HolderOutlined,
+  MinusCircleOutlined,
+  PlusCircleOutlined,
+  WarningOutlined
+} from "@ant-design/icons";
+import { Button, Flex, Radio, Select, Tooltip, Typography } from "antd";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import type {
   DialectRulesV3,
@@ -14,8 +20,9 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
-import { useId, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import {
+  editSpellingList,
   unifyUkUsSpelling,
   updateConcreteFormType,
   updateVariantSpelling,
@@ -67,18 +74,24 @@ function spellingReferences(
   form: WordConcreteFormV3,
   referenceForms: readonly WordConcreteFormV3[] | undefined,
   dialects: readonly ("common" | "uk" | "us")[],
-  spelling: string
+  spelling: string,
+  currentSlotIds: readonly string[] = [],
+  referenceVariantIds?: ReadonlyMap<string, readonly string[]>
 ) {
   return (referenceForms ?? [form]).flatMap((binding) => {
     const regions = binding.regional_variants;
-    const ids =
-      regions.mode === "common"
-        ? [regions.common.id]
-        : dialects.flatMap((side) =>
-            side === "common"
-              ? [regions.uk.id, regions.us.id]
-              : [regions[side].id]
-          );
+    const ids = referenceVariantIds
+      ? currentSlotIds
+          .flatMap((id) => referenceVariantIds.get(id) ?? [])
+          .filter((id) =>
+            regionalVariants(regions).some((row) => row.id === id)
+          )
+      : dialects.flatMap((side) =>
+          regionalVariants(regions, side === "common" ? undefined : side).map(
+            (row) => row.id
+          )
+        );
+    if (referenceVariantIds && !ids.length) return [];
     return spellingConflictReferences(index, binding, ids, spelling);
   });
 }
@@ -115,8 +128,11 @@ export interface V3ConcreteFormRowProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   showMatrixHeader?: boolean;
   presentation?: "matrix" | "content";
+  multipleSpellingsAvailable?: boolean;
+  spellingRemovalReason?: (slotId: string) => string | undefined;
   showRegularity?: boolean;
   referenceForms?: readonly WordConcreteFormV3[];
+  referenceVariantIds?: ReadonlyMap<string, readonly string[]>;
   lastRow?: boolean;
   actions?: ReactNode;
   /** 类型下拉上方的引用徽标，占的是与右侧「词形拼写」标签对齐的那一行。 */
@@ -287,11 +303,15 @@ interface V3DialectFormCellProps {
   issues: readonly V3DraftValidationIssue[];
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
+  variantId?: string;
+  spellingActions?: ReactNode;
+  spellingLabel?: string;
   dialect: "uk" | "us";
   lastRow?: boolean;
   narrowGridRow?: number;
   showRegularity?: boolean;
   referenceForms?: readonly WordConcreteFormV3[];
+  referenceVariantIds?: ReadonlyMap<string, readonly string[]>;
 }
 
 function V3DialectFormCell({
@@ -306,18 +326,27 @@ function V3DialectFormCell({
   lastRow,
   narrowGridRow,
   showRegularity = true,
-  referenceForms
+  referenceForms,
+  referenceVariantIds,
+  variantId,
+  spellingActions,
+  spellingLabel
 }: V3DialectFormCellProps) {
   const referenceGuard = useV3ReferenceGuard();
-  if (form.regional_variants.mode !== "uk_us") return null;
-  const variant = form.regional_variants[dialect];
+  if (form.regional_variants.mode === "common") return null;
+  const variant = regionalVariants(form.regional_variants, dialect).find(
+    (row) => !variantId || row.id === variantId
+  );
+  if (!variant) return null;
   const conflictLiteralList = conflictLiterals(
     spellingReferences(
       referenceGuard.index,
       form,
       referenceForms,
       [dialect],
-      variant.spelling
+      variant.spelling,
+      [variant.id],
+      referenceVariantIds
     )
   );
   const spellingInvalid =
@@ -340,7 +369,12 @@ function V3DialectFormCell({
     >
       <Flex vertical gap="small">
         <Flex align="center" justify="space-between" gap="small" wrap>
-          <Typography.Text strong>{dialectLabel(dialect)}拼写</Typography.Text>
+          <Flex align="center" gap="small">
+            <Typography.Text strong>
+              {spellingLabel ?? `${dialectLabel(dialect)}拼写`}
+            </Typography.Text>
+            {spellingActions}
+          </Flex>
           <SpellingRegularity
             visible={showRegularity}
             content={content}
@@ -451,6 +485,185 @@ function V3DialectFormCell({
   );
 }
 
+const SPELLING_DRAG_TYPE = "application/x-tsz-spelling";
+
+function V3DialectSpellingList({
+  multipleSpellingsAvailable,
+  spellingRemovalReason,
+  ...props
+}: V3DialectFormCellProps & {
+  multipleSpellingsAvailable: boolean;
+  spellingRemovalReason?: (slotId: string) => string | undefined;
+}) {
+  const [draggingId, setDraggingId] = useState<string>();
+  const [dragOverId, setDragOverId] = useState<string>();
+  const { form, dialect, content, onChange, idFactory } = props;
+  const rows = regionalVariants(form.regional_variants, dialect);
+  const scope = `${form.id}:${dialect}`;
+  const move = (id: string, toIndex: number) =>
+    onChange(
+      editSpellingList(
+        content,
+        form.id,
+        dialect,
+        { type: "move", id, toIndex },
+        idFactory
+      )
+    );
+  return (
+    <div className={`v3-spelling-list v3-spelling-list-${dialect}`}>
+      {rows.map((variant, index) => {
+        const removalReason =
+          rows.length <= 1
+            ? "每侧至少保留一条拼写"
+            : spellingRemovalReason?.(variant.id);
+        const label = `${dialectLabel(dialect)}第 ${index + 1} 条拼写`;
+        return (
+          <div
+            key={variant.id}
+            className={`v3-spelling-item${draggingId === variant.id ? " is-dragging" : ""}${dragOverId === variant.id ? " is-drag-over" : ""}`}
+            data-spelling-id={variant.id}
+            onDragOver={(event) => {
+              if (
+                draggingId &&
+                event.dataTransfer.types.includes(SPELLING_DRAG_TYPE)
+              ) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDragOverId(variant.id);
+              }
+            }}
+            onDragLeave={() => setDragOverId(undefined)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragOverId(undefined);
+              const raw = event.dataTransfer.getData(SPELLING_DRAG_TYPE);
+              if (!raw) return;
+              try {
+                const source = JSON.parse(raw) as {
+                  scope?: string;
+                  id?: string;
+                };
+                if (
+                  source.scope === scope &&
+                  source.id &&
+                  rows.some((row) => row.id === source.id)
+                )
+                  move(source.id, index);
+              } catch {
+                /* Ignore unrelated drag data. */
+              }
+            }}
+          >
+            <V3DialectFormCell
+              {...props}
+              formLabel={
+                rows.length > 1
+                  ? `${props.formLabel}第 ${index + 1} 条`
+                  : props.formLabel
+              }
+              variantId={variant.id}
+              spellingLabel="词形拼写"
+              spellingActions={
+                <Flex gap={2}>
+                  <Tooltip
+                    title={
+                      rows.length > 1
+                        ? "拖动排序，也可使用上下方向键"
+                        : "仅一条拼写"
+                    }
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<HolderOutlined />}
+                      aria-label={`移动${label}`}
+                      disabled={rows.length < 2}
+                      draggable={rows.length > 1}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData(
+                          SPELLING_DRAG_TYPE,
+                          JSON.stringify({ scope, id: variant.id })
+                        );
+                        setDraggingId(variant.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingId(undefined);
+                        setDragOverId(undefined);
+                      }}
+                      onKeyDown={(event) => {
+                        const next =
+                          event.key === "ArrowUp"
+                            ? index - 1
+                            : event.key === "ArrowDown"
+                              ? index + 1
+                              : -1;
+                        if (next >= 0 && next < rows.length) {
+                          event.preventDefault();
+                          move(variant.id, next);
+                        }
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    title={
+                      multipleSpellingsAvailable
+                        ? "在此条后新增拼写"
+                        : "当前服务暂不支持多条拼写，请更新后重试"
+                    }
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<PlusCircleOutlined />}
+                      aria-label={`在${label}后新增拼写`}
+                      disabled={
+                        !multipleSpellingsAvailable || rows.length >= 2000
+                      }
+                      onClick={() =>
+                        onChange(
+                          editSpellingList(
+                            content,
+                            form.id,
+                            dialect,
+                            { type: "add", afterId: variant.id },
+                            idFactory
+                          )
+                        )
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip title={removalReason ?? "删除拼写及其发音"}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<MinusCircleOutlined />}
+                      aria-label={`删除${label}`}
+                      disabled={Boolean(removalReason)}
+                      onClick={() =>
+                        onChange(
+                          editSpellingList(
+                            content,
+                            form.id,
+                            dialect,
+                            { type: "remove", id: variant.id },
+                            idFactory
+                          )
+                        )
+                      }
+                    />
+                  </Tooltip>
+                </Flex>
+              }
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function V3ConcreteFormRow({
   content,
   dialectRules,
@@ -468,6 +681,9 @@ export function V3ConcreteFormRow({
   showMatrixHeader = true,
   presentation = "matrix",
   showRegularity = true,
+  multipleSpellingsAvailable = false,
+  spellingRemovalReason,
+  referenceVariantIds,
   referenceForms,
   lastRow = true,
   actions,
@@ -476,10 +692,7 @@ export function V3ConcreteFormRow({
   const referenceGuard = useV3ReferenceGuard();
   const variants: Array<
     WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3
-  > =
-    form.regional_variants.mode === "common"
-      ? [form.regional_variants.common]
-      : [form.regional_variants.uk, form.regional_variants.us];
+  > = regionalVariants(form.regional_variants);
   const commonVariant =
     form.regional_variants.mode === "common"
       ? form.regional_variants.common
@@ -499,7 +712,9 @@ export function V3ConcreteFormRow({
           form,
           referenceForms,
           ["uk", "us"],
-          unifiedSpellingVariants.uk.spelling
+          unifiedSpellingVariants.uk.spelling,
+          unifiedSpellingVariantIds,
+          referenceVariantIds
         )
       )
     : [];
@@ -520,7 +735,9 @@ export function V3ConcreteFormRow({
           form,
           referenceForms,
           ["common"],
-          commonVariant.spelling
+          commonVariant.spelling,
+          [commonVariant.id],
+          referenceVariantIds
         )
       )
     : [];
@@ -811,6 +1028,26 @@ export function V3ConcreteFormRow({
               )}
             </div>
           </div>
+        ) : presentation === "content" &&
+          dialectRules.spelling_mode === "distinguish" ? (
+          (["uk", "us"] as const).map((dialect) => (
+            <V3DialectSpellingList
+              key={dialect}
+              content={content}
+              dialectRules={dialectRules}
+              form={form}
+              formLabel={formLabel}
+              issues={issues}
+              idFactory={idFactory}
+              onChange={onChange}
+              dialect={dialect}
+              showRegularity={showRegularity}
+              referenceForms={referenceForms}
+              referenceVariantIds={referenceVariantIds}
+              multipleSpellingsAvailable={multipleSpellingsAvailable}
+              spellingRemovalReason={spellingRemovalReason}
+            />
+          ))
         ) : (
           variants.map((variant) => (
             <V3DialectFormCell

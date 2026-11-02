@@ -133,7 +133,8 @@ const SPELLING_MARKUP_HEADERS = {
   "X-TSZ-Voice-Locales": "v1",
   "X-TSZ-Voice-Models": "v1",
   "X-TSZ-Form-Contents": "v1",
-  "X-TSZ-Form-Content-Reassignment": "v1"
+  "X-TSZ-Form-Content-Reassignment": "v1",
+  "X-TSZ-Multiple-Spellings": "v1"
 };
 
 // admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，

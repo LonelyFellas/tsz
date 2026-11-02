@@ -1,3 +1,4 @@
+import { primaryRegionalVariant, regionalVariants } from "@tsz/shared";
 import type { AdminWordV3, WordConcreteFormV3 } from "@tsz/types";
 import { expandFormContents } from "@tsz/shared";
 
@@ -32,6 +33,11 @@ export interface V3ReviewModel {
  * 身份，跟着后端 presentation 投影的口径一并跳过。
  */
 function baseSpellingKey(form: WordConcreteFormV3): string | undefined {
+  if (form.regional_variants.mode === "uk_us_many")
+    return JSON.stringify([
+      form.regional_variants.uk.map((row) => row.spelling.trim().toLowerCase()),
+      form.regional_variants.us.map((row) => row.spelling.trim().toLowerCase())
+    ]);
   const spellings =
     form.regional_variants.mode === "common"
       ? [
@@ -39,8 +45,8 @@ function baseSpellingKey(form: WordConcreteFormV3): string | undefined {
           form.regional_variants.common.spelling
         ]
       : [
-          form.regional_variants.uk.spelling,
-          form.regional_variants.us.spelling
+          primaryRegionalVariant(form.regional_variants, "uk").spelling,
+          primaryRegionalVariant(form.regional_variants, "us").spelling
         ];
   const key = spellings
     .map((spelling) => spelling.trim().toLowerCase())
@@ -51,12 +57,9 @@ function baseSpellingKey(form: WordConcreteFormV3): string | undefined {
 export function buildV3ReviewModel(word: AdminWordV3): V3ReviewModel {
   const forms = expandFormContents(word.forms).pos.flatMap((pos) => pos.forms);
   const pronunciations = forms.flatMap((form) =>
-    form.regional_variants.mode === "common"
-      ? form.regional_variants.common.pronunciations
-      : [
-          ...form.regional_variants.uk.pronunciations,
-          ...form.regional_variants.us.pronunciations
-        ]
+    regionalVariants(form.regional_variants).flatMap(
+      (row) => row.pronunciations
+    )
   );
   const senses = word.meanings.pos.flatMap((pos) => pos.senses);
   const status: V3ReviewStatus =

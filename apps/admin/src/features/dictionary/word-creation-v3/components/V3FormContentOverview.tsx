@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { EditOutlined } from "@ant-design/icons";
 import {
@@ -8,6 +9,9 @@ import {
 import { Button, Dropdown, Space, Tooltip, Typography } from "antd";
 import type {
   WordConcreteFormV3,
+  WordCommonFormVariantV3,
+  WordUkFormVariantV3,
+  WordUsFormVariantV3,
   WordFormGroupV3,
   WordPronunciationV3,
   V3DraftValidationIssue
@@ -25,6 +29,7 @@ import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
 type OverviewReading = V3DialectSeparatedFormRow & {
   key: string;
   dialect: "uk" | "us";
+  variant: WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3;
   pronunciation?: WordPronunciationV3;
   pronunciationIndex: number;
   formRowSpan: number;
@@ -39,7 +44,7 @@ function PronunciationCell({
   reading: OverviewReading;
   settings?: "voice" | "rate" | "volume";
 }) {
-  const { form, dialect, pronunciation: row, pronunciationIndex } = reading;
+  const { dialect, pronunciation: row, pronunciationIndex } = reading;
   if (!row) {
     return (
       <div className="v3-overview-reading">
@@ -49,10 +54,7 @@ function PronunciationCell({
       </div>
     );
   }
-  const variant =
-    form.regional_variants.mode === "common"
-      ? form.regional_variants.common
-      : form.regional_variants[dialect];
+  const variant = reading.variant;
   const locale = dialect === "uk" ? "en-GB" : "en-US";
   const {
     content,
@@ -141,40 +143,48 @@ export function V3FormContentOverview({
   const copy = useV3FormCopy();
   const readings = rows.flatMap((row): OverviewReading[] => {
     const regions = row.form.regional_variants;
-    const uk = regions.mode === "common" ? regions.common : regions.uk;
-    const us = regions.mode === "common" ? regions.common : regions.us;
+    const uk = regionalVariants(regions, "uk");
+    const us = regionalVariants(regions, "us");
     const sameSpelling =
-      regions.mode === "common" ||
-      (uk.spelling.trim().length > 0 && uk.spelling === us.spelling);
-    const total =
-      Math.max(1, uk.pronunciations.length) +
-      Math.max(1, us.pronunciations.length);
-    return (["uk", "us"] as const).flatMap((dialect) => {
-      const variant = dialect === "uk" ? uk : us;
-      const pronunciations = variant.pronunciations.length
-        ? variant.pronunciations
-        : [undefined];
-      return pronunciations.map((pronunciation, pronunciationIndex) => {
-        const first = dialect === "uk" && pronunciationIndex === 0;
-        return {
-          ...row,
-          key: `${row.membershipId}:${dialect}:${pronunciation?.id ?? "empty"}`,
-          dialect,
-          pronunciation,
-          pronunciationIndex,
-          formRowSpan: first ? total : 0,
-          spellingRowSpan: sameSpelling
-            ? first
-              ? total
-              : 0
-            : pronunciationIndex === 0
-              ? pronunciations.length
-              : 0,
-          spellingDialect: sameSpelling ? "common" : dialect
-        };
-      });
-    });
+      uk.length === 1 &&
+      us.length === 1 &&
+      (regions.mode === "common" ||
+        (uk[0]!.spelling.trim().length > 0 &&
+          uk[0]!.spelling === us[0]!.spelling));
+    const total = [...uk, ...us].reduce(
+      (sum, variant) => sum + Math.max(1, variant.pronunciations.length),
+      0
+    );
+    let emitted = 0;
+    return (["uk", "us"] as const).flatMap((dialect) =>
+      regionalVariants(regions, dialect).flatMap((variant) => {
+        const pronunciations = variant.pronunciations.length
+          ? variant.pronunciations
+          : [undefined];
+        return pronunciations.map((pronunciation, pronunciationIndex) => {
+          const first = emitted++ === 0;
+          return {
+            ...row,
+            key: `${row.membershipId}:${dialect}:${variant.id}:${pronunciation?.id ?? "empty"}`,
+            dialect,
+            variant,
+            pronunciation,
+            pronunciationIndex,
+            formRowSpan: first ? total : 0,
+            spellingRowSpan: sameSpelling
+              ? first
+                ? total
+                : 0
+              : pronunciationIndex === 0
+                ? pronunciations.length
+                : 0,
+            spellingDialect: sameSpelling ? "common" : dialect
+          };
+        });
+      })
+    );
   });
+
   return (
     <div className="v3-form-overview">
       <Table<OverviewReading>
@@ -304,10 +314,7 @@ export function V3FormContentOverview({
             key: "spelling",
             width: "18%",
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
-            render: (_, { form, dialect, spellingDialect }) => {
-              const regions = form.regional_variants;
-              const variant =
-                regions.mode === "common" ? regions.common : regions[dialect];
+            render: (_, { variant, spellingDialect }) => {
               const dialectLabel =
                 spellingDialect === "common"
                   ? "英美通用拼写"

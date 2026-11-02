@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import type { AdminWordV3 } from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import { commonFormFixture, formsFixture, ukUsFormFixture } from "./fixtures";
@@ -27,7 +28,7 @@ const base = pos.forms[0]!;
 const baseVariantId =
   base.regional_variants.mode === "common"
     ? base.regional_variants.common.id
-    : base.regional_variants.uk.id;
+    : primaryRegionalVariant(base.regional_variants, "uk").id;
 const group = pos.form_groups[0]!;
 const target = {
   pos_id: pos.pos_id,

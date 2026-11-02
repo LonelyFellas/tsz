@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import type {
   FormContentV3,
   FormContentVariantV3,
@@ -73,11 +74,15 @@ export interface ResolvedFormCopyProfile {
 const SIDES = ["uk", "us"] as const;
 const ALPHABETS = ["ipa", "ups"] as const;
 
-function variantForSide(content: FormContentV3, side: FormCopySide) {
-  const regions = content.regional_variants;
-  return regions.mode === "common"
-    ? { region: "common" as const, variant: regions.common }
-    : { region: side, variant: regions[side] };
+export function variantForCopyReference(
+  content: FormContentV3,
+  ref: FormCopyPronunciationReference
+) {
+  const variant = regionalVariants(content.regional_variants).find(
+    (row) => row.id === ref.variantId
+  );
+  if (!variant) throw new Error("拼写版本已变化，请重新发起复制");
+  return variant;
 }
 
 function reference(
@@ -107,21 +112,27 @@ export function planFormCopy(
   const matches: FormCopyPlan["matches"] = [];
   let sourceCount = 0;
   for (const side of SIDES) {
-    const from = variantForSide(source, side);
-    const to = variantForSide(target, side);
-    sourceCount += from.variant.pronunciations.length;
-    for (const [index, pronunciation] of to.variant.pronunciations.entries()) {
-      const explicit = mapping[side]?.[pronunciation.id];
-      const needsChoice =
-        from.variant.pronunciations.length > 0 &&
-        from.variant.pronunciations.length !== to.variant.pronunciations.length;
+    const references = (content: FormContentV3) =>
+      regionalVariants(content.regional_variants, side).flatMap((variant) =>
+        variant.pronunciations.map((_, index) =>
+          reference(
+            content.regional_variants.mode === "common" ? "common" : side,
+            variant,
+            index
+          )
+        )
+      );
+    const from = references(source);
+    const to = references(target);
+    sourceCount += from.length;
+    for (const [index, pronunciation] of to.entries()) {
+      const explicit = mapping[side]?.[pronunciation.pronunciationId];
+      const needsChoice = from.length > 0 && from.length !== to.length;
       const sourceIndex =
         explicit === null
           ? -1
           : explicit !== undefined
-            ? from.variant.pronunciations.findIndex(
-                (row) => row.id === explicit
-              )
+            ? from.findIndex((row) => row.pronunciationId === explicit)
             : needsChoice
               ? -1
               : index;
@@ -129,17 +140,16 @@ export function planFormCopy(
         throw new Error("所选来源发音已不存在，请重新选择");
       matches.push({
         side,
-        source: from.variant.pronunciations[sourceIndex]
-          ? reference(from.region, from.variant, sourceIndex)
-          : null,
-        target: reference(to.region, to.variant, index),
+        source: from[sourceIndex] ?? null,
+        target: pronunciation,
         requiresMapping: needsChoice && explicit === undefined
       });
     }
   }
+
   const sameContent = source.id === target.id;
   const hasRecordings = matches.some((match) => {
-    const variant = variantForSide(target, match.side).variant;
+    const variant = variantForCopyReference(target, match.target);
     return (
       match.source &&
       variant.pronunciations[match.target.index]?.audio_assets?.length
@@ -180,13 +190,7 @@ function pronunciationAt(
   content: FormContentV3,
   ref: FormCopyPronunciationReference
 ) {
-  const variants = content.regional_variants;
-  const variant =
-    variants.mode === "common"
-      ? variants.common
-      : ref.region === "common"
-        ? undefined
-        : variants[ref.region];
+  const variant = variantForCopyReference(content, ref);
   const row = variant?.pronunciations.find(
     (item) => item.id === ref.pronunciationId
   );
@@ -589,7 +593,7 @@ function copyVoices(
   for (const match of matches) {
     if (!match.source) continue;
     const from = pronunciationAt(source, match.source);
-    const fromVariant = variantForSide(source, match.side).variant;
+    const fromVariant = variantForCopyReference(source, match.source);
     const fallback = copiedProfile(
       from.synthesis?.use_spelling
         ? fromVariant.spelling_speech?.voice_profile
@@ -720,7 +724,7 @@ export function applyFormCopy(
       copiedVoices =
         copyVoices(
           row,
-          variantForSide(target, matches[0]!.side).variant,
+          variantForCopyReference(target, matches[0]!.target),
           matches,
           plan.source.contentSnapshot,
           resolvedProfiles,
@@ -731,9 +735,7 @@ export function applyFormCopy(
   if (plan.kind === "voices" && !copiedVoices)
     throw new Error("来源未配置可复制的音色，请先配置来源音色");
   const regions = target.regional_variants;
-  for (const variant of regions.mode === "common"
-    ? [regions.common]
-    : [regions.uk, regions.us]) {
+  for (const variant of regionalVariants(regions)) {
     if (!variant.pronunciations.some((row) => spellingCopies.has(row.id)))
       continue;
     const profiles = variant.pronunciations

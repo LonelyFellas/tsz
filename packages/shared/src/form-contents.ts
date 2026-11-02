@@ -79,6 +79,34 @@ export function expandFormContents(
             }
           };
         }
+        if (source.mode === "uk_us_many" && refs.mode === "uk_us_many") {
+          const side = <D extends "uk" | "us">(dialect: D) => {
+            const references = new Map(
+              refs[dialect].map((row) => [row.content_slot_id, row])
+            );
+            if (
+              !source[dialect].length ||
+              references.size !== source[dialect].length ||
+              refs[dialect].length !== source[dialect].length
+            )
+              throw new Error(`Incomplete spelling mapping: ${binding.id}`);
+            return source[dialect].map((row) => {
+              const reference = references.get(row.id);
+              if (!reference)
+                throw new Error(`Missing spelling binding: ${row.id}`);
+              return { ...expand(row, reference, dialect), dialect };
+            });
+          };
+          return {
+            id: binding.id,
+            form_type: binding.form_type,
+            regional_variants: {
+              mode: "uk_us_many" as const,
+              uk: side("uk"),
+              us: side("us")
+            }
+          };
+        }
         if (source.mode !== "uk_us" || refs.mode !== "uk_us")
           throw new Error(`Inconsistent regional binding: ${binding.id}`);
         return {

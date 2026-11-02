@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "../../../../lib/env";
 import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
@@ -389,7 +390,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     const variantId =
       base.regional_variants.mode === "common"
         ? base.regional_variants.common.id
-        : base.regional_variants.uk.id;
+        : primaryRegionalVariant(base.regional_variants, "uk").id;
     const reference = sharedSentenceReference(
       {
         pos_id: pos.pos_id,
@@ -465,7 +466,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     const variantId =
       secondBase.regional_variants.mode === "common"
         ? secondBase.regional_variants.common.id
-        : secondBase.regional_variants.uk.id;
+        : primaryRegionalVariant(secondBase.regional_variants, "uk").id;
     const reference = sharedSentenceReference(
       {
         pos_id: pos.pos_id,
@@ -523,7 +524,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     const variantId =
       base.regional_variants.mode === "common"
         ? base.regional_variants.common.id
-        : base.regional_variants.uk.id;
+        : primaryRegionalVariant(base.regional_variants, "uk").id;
     render(
       <V3ReferenceGuardProvider
         value={guardFor(
@@ -850,12 +851,12 @@ describe("V3FormsAndPronunciationStep", () => {
       regional_variants: {
         mode: "uk_us",
         uk: {
-          id: form.regional_variants.uk.id,
+          id: primaryRegionalVariant(form.regional_variants, "uk").id,
           spelling: "harbour",
           pronunciations: [ukPronunciation]
         },
         us: {
-          id: form.regional_variants.us.id,
+          id: primaryRegionalVariant(form.regional_variants, "us").id,
           spelling: "harbour",
           pronunciations: [usPronunciation]
         }
@@ -1061,11 +1062,15 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(onEdit).toHaveBeenCalledWith(form.id);
     expect(form).toEqual(original);
 
-    form.regional_variants.us.spelling = "traveled";
-    delete form.regional_variants.us.spelling_rich;
-    form.regional_variants.us.pronunciations = [];
-    form.regional_variants.uk.pronunciations[0]!.style = "normal";
-    delete form.regional_variants.uk.pronunciations[1]!.style;
+    primaryRegionalVariant(form.regional_variants, "us").spelling = "traveled";
+    delete primaryRegionalVariant(form.regional_variants, "us").spelling_rich;
+    primaryRegionalVariant(form.regional_variants, "us").pronunciations = [];
+    primaryRegionalVariant(
+      form.regional_variants,
+      "uk"
+    ).pronunciations[0]!.style = "normal";
+    delete primaryRegionalVariant(form.regional_variants, "uk")
+      .pronunciations[1]!.style;
     rerender(view());
     const updatedRows = container.querySelectorAll("tr[data-overview-dialect]");
     expect(
@@ -1484,8 +1489,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("centred");
     const updated = formById(canonicalValue(), form.id);
     if (updated.regional_variants.mode !== "uk_us") throw new Error("fixture");
-    expect(updated.regional_variants.uk.spelling).toBe("centred");
-    expect(updated.regional_variants.us.spelling).toBe("centred");
+    expect(
+      primaryRegionalVariant(updated.regional_variants, "uk").spelling
+    ).toBe("centred");
+    expect(
+      primaryRegionalVariant(updated.regional_variants, "us").spelling
+    ).toBe("centred");
   });
 
   it("组级 UU 切换 DD 并逐条显式映射唯一词形", async () => {
@@ -2402,7 +2411,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const ukIssue: V3DraftValidationIssue = {
       schema_version: 3,
       step: "forms",
-      node_id: form.regional_variants.uk.id,
+      node_id: primaryRegionalVariant(form.regional_variants, "uk").id,
       field: "spelling",
       code: "variant_spelling_required",
       message: "UK 拼写待补充",
@@ -2411,7 +2420,7 @@ describe("V3FormsAndPronunciationStep", () => {
         ancestor_node_ids: [content.pos[0]!.pos_id, form.id],
         pos_id: content.pos[0]!.pos_id,
         form_id: form.id,
-        variant_id: form.regional_variants.uk.id,
+        variant_id: primaryRegionalVariant(form.regional_variants, "uk").id,
         dialect: "uk"
       }
     };
@@ -2477,11 +2486,11 @@ describe("V3FormsAndPronunciationStep", () => {
         ancestor_node_ids: [
           content.pos[0]!.pos_id,
           form.id,
-          form.regional_variants.uk.id
+          primaryRegionalVariant(form.regional_variants, "uk").id
         ],
         pos_id: content.pos[0]!.pos_id,
         form_id: form.id,
-        variant_id: form.regional_variants.uk.id,
+        variant_id: primaryRegionalVariant(form.regional_variants, "uk").id,
         dialect: "uk",
         pronunciation_id: first.id
       }
@@ -2496,7 +2505,7 @@ describe("V3FormsAndPronunciationStep", () => {
             idFactory={() => addedId}
             issues={[issue]}
             onChange={onChange}
-            variant={form.regional_variants.uk}
+            variant={primaryRegionalVariant(form.regional_variants, "uk")}
           />
         </PronunciationPreviewProvider>
       </AntApp>
@@ -2532,7 +2541,12 @@ describe("V3FormsAndPronunciationStep", () => {
     const addedForm = added.pos[0]!.forms[0]!;
     if (addedForm.regional_variants.mode !== "uk_us")
       throw new Error("fixture");
-    expect(addedForm.regional_variants.uk.pronunciations.at(-1)).toEqual({
+    expect(
+      primaryRegionalVariant(
+        addedForm.regional_variants,
+        "uk"
+      ).pronunciations.at(-1)
+    ).toEqual({
       id: addedId,
       dict_phonetic: "",
       actual_pron: "",
@@ -2543,9 +2557,10 @@ describe("V3FormsAndPronunciationStep", () => {
     if (removedForm.regional_variants.mode !== "uk_us")
       throw new Error("fixture");
     expect(
-      removedForm.regional_variants.uk.pronunciations.some(
-        (item) => item.id === second.id
-      )
+      primaryRegionalVariant(
+        removedForm.regional_variants,
+        "uk"
+      ).pronunciations.some((item) => item.id === second.id)
     ).toBe(false);
   });
 
@@ -2642,7 +2657,7 @@ describe("V3FormsAndPronunciationStep", () => {
             idFactory={() => uuidFromInt(924)}
             issues={[]}
             onChange={onChange}
-            variant={form.regional_variants.uk}
+            variant={primaryRegionalVariant(form.regional_variants, "uk")}
           />
         </PronunciationPreviewProvider>
       </AntApp>
@@ -2685,7 +2700,10 @@ describe("V3FormsAndPronunciationStep", () => {
       throw new Error("fixture");
     }
     expect(
-      reorderedForm.regional_variants.uk.pronunciations.map((item) => item.id)
+      primaryRegionalVariant(
+        reorderedForm.regional_variants,
+        "uk"
+      ).pronunciations.map((item) => item.id)
     ).toEqual([second.id, first.id]);
 
     const callsAfterDrag = onChange.mock.calls.length;
@@ -2737,7 +2755,10 @@ describe("V3FormsAndPronunciationStep", () => {
       dataTransfer: {
         ...dataTransfer,
         getData: () =>
-          JSON.stringify({ scope: form.regional_variants.uk.id, index: -1 })
+          JSON.stringify({
+            scope: primaryRegionalVariant(form.regional_variants, "uk").id,
+            index: -1
+          })
       }
     });
     expect(onChange.mock.calls.length).toBe(callsAfterKeyboard);
@@ -2832,17 +2853,21 @@ describe("V3FormsAndPronunciationStep", () => {
 
     const updated = canonicalValue().pos[0]!.forms[0]!;
     if (updated.regional_variants.mode !== "uk_us") throw new Error("fixture");
-    expect(updated.regional_variants.uk.pronunciations[0]!.dict_phonetic).toBe(
-      "sent-uk"
-    );
-    expect(updated.regional_variants.us.pronunciations[0]!.dict_phonetic).toBe(
-      "sent-us"
-    );
     expect(
-      updated.regional_variants.uk.pronunciations[0]!.dict_phonetic_rich
+      primaryRegionalVariant(updated.regional_variants, "uk").pronunciations[0]!
+        .dict_phonetic
+    ).toBe("sent-uk");
+    expect(
+      primaryRegionalVariant(updated.regional_variants, "us").pronunciations[0]!
+        .dict_phonetic
+    ).toBe("sent-us");
+    expect(
+      primaryRegionalVariant(updated.regional_variants, "uk").pronunciations[0]!
+        .dict_phonetic_rich
     ).toBeUndefined();
     expect(
-      updated.regional_variants.us.pronunciations[0]!.dict_phonetic_rich
+      primaryRegionalVariant(updated.regional_variants, "us").pronunciations[0]!
+        .dict_phonetic_rich
     ).toBeUndefined();
   });
 
@@ -3355,8 +3380,8 @@ describe("V3FormsAndPronunciationStep", () => {
         throw new Error("added form must inherit uk_us");
       }
       for (const variant of [
-        addedForm.regional_variants.uk,
-        addedForm.regional_variants.us
+        primaryRegionalVariant(addedForm.regional_variants, "uk"),
+        primaryRegionalVariant(addedForm.regional_variants, "us")
       ]) {
         const addedCell = document.querySelector<HTMLElement>(
           `[data-v3-node-id="${variant.id}"]`

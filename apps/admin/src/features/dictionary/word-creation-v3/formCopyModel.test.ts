@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { describe, expect, it } from "vitest";
 import { synthesisForLocale } from "@tsz/shared";
 import type {
@@ -87,9 +88,7 @@ function variant(
   content: FormContentV3,
   side: "uk" | "us" = "uk"
 ): FormContentVariantV3 {
-  return content.regional_variants.mode === "common"
-    ? content.regional_variants.common
-    : content.regional_variants[side];
+  return primaryRegionalVariant(content.regional_variants, side);
 }
 
 function rich(text: string) {

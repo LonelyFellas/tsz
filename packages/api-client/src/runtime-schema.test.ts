@@ -1064,3 +1064,24 @@ it("新 reader 接受缺省旧记录和新 synthesis，同时仍拒绝未知格�
   row.synthesis = { alphabet: "sapi", ipa: "kæt", ups: "K AE T" };
   expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
 });
+
+it("independent UK/US spelling lists accept different lengths and reject missing or malformed sides", () => {
+  for (const [schema, item] of [
+    ["FormContentRegionalVariantsV3", "FormContentVariantV3"],
+    ["FormRegionalBindingsV3", "FormVariantBindingV3"]
+  ] as const) {
+    const uk = [validFixture(item), validFixture(item)];
+    const us = [validFixture(item), validFixture(item), validFixture(item)];
+    expect(
+      validateRuntimeSchema(schema, { mode: "uk_us_many", uk, us })
+    ).toEqual({ valid: true });
+    for (const invalid of [
+      { mode: "uk_us_many", uk: [], us },
+      { mode: "uk_us_many", uk, us: [] },
+      { mode: "uk_us_many", uk, us: null },
+      { mode: "uk_us_many", uk, us: us[0] },
+      { mode: "uk_us_many", uk }
+    ])
+      expect(validateRuntimeSchema(schema, invalid).valid).toBe(false);
+  }
+});

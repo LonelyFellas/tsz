@@ -1,6 +1,7 @@
+import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { describe, expect, it } from "vitest";
 import type { SharedFormsStepContentV3 } from "@tsz/types";
-import { createStableVariantIdFactory } from "./operations";
+import { createStableVariantIdFactory, editSpellingList } from "./operations";
 import {
   commonFormFixture,
   formsFixture,
@@ -308,7 +309,10 @@ describe("共享词形内容", () => {
     ).toEqual(forms.pos);
     const regions = split.value.pos[0]!.forms[0]!.regional_variants;
     if (regions.mode !== "uk_us") throw new Error("fixture");
-    for (const [index, side] of [regions.uk, regions.us].entries()) {
+    for (const [index, side] of [
+      primaryRegionalVariant(regions, "uk"),
+      primaryRegionalVariant(regions, "us")
+    ].entries()) {
       side.pronunciations.unshift(
         pronunciationFixture({ id: uuidFromInt(810 + index) })
       );
@@ -554,10 +558,7 @@ describe("共享词形内容", () => {
         expanded
       ) as SharedFormsStepContentV3;
       const bindings = forms.pos[0]!.forms[0]!.regional_bindings;
-      const variants =
-        bindings.mode === "common"
-          ? [bindings.common]
-          : [bindings.uk, bindings.us];
+      const variants = regionalVariants(bindings);
       for (const [index, variant] of variants.entries())
         variant.component_usages = [
           {
@@ -601,9 +602,7 @@ describe("共享词形内容", () => {
       ) as SharedFormsStepContentV3;
       const original = forms.contents[0]!;
       const source = original.regional_variants;
-      for (const variant of source.mode === "common"
-        ? [source.common]
-        : [source.uk, source.us]) {
+      for (const variant of regionalVariants(source)) {
         variant.spelling_rich = {
           version: 2,
           text: variant.spelling,
@@ -656,9 +655,7 @@ describe("共享词形内容", () => {
       Object.assign(editor.pos[0]!, { sort_order: 1 });
       Object.assign(editor.pos[0]!.forms[0]!, { sort_order: 2 });
       const regions = editor.pos[0]!.forms[0]!.regional_variants;
-      for (const variant of regions.mode === "common"
-        ? [regions.common]
-        : [regions.uk, regions.us]) {
+      for (const variant of regionalVariants(regions)) {
         variant.is_regular = false;
         variant.component_usages = [
           { id: uuidFromInt(840), state: "unresolved", literal: "centre" }
@@ -674,4 +671,116 @@ describe("共享词形内容", () => {
       );
     }
   );
+});
+
+describe("英美独立多条拼写", () => {
+  it("保存 2:3 拼写、排序和重开保留共享标签各自的引用与语音设置", () => {
+    const first = ukUsFormFixture();
+    const expanded = formsFixture({
+      forms: [
+        first,
+        ukUsFormFixture({ id: uuidFromInt(940), form_type: "plural" })
+      ]
+    });
+    let forms = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    const ids = stableIds(forms);
+    const references = createPronunciationReferenceIds(forms);
+    forms = assignSharedFormContent(
+      forms,
+      forms.contents[0]!.id,
+      forms.pos[0]!.forms[1]!.id,
+      ids,
+      references
+    );
+    const before = structuredClone(forms);
+    let editor = contentEditorForms(forms.contents[0]!);
+    for (const side of ["uk", "us", "us"] as const) {
+      const source = regionalVariants(
+        editor.pos[0]!.forms[0]!.regional_variants,
+        side
+      )[0]!;
+      editor = editSpellingList(editor, forms.contents[0]!.id, side, {
+        type: "add",
+        afterId: source.id
+      });
+    }
+    const regions = editor.pos[0]!.forms[0]!.regional_variants;
+    if (regions.mode !== "uk_us_many") throw new Error("fixture");
+    regions.uk[1]!.spelling = "alternative";
+    regions.uk[1]!.spelling_speech = {
+      content: { version: 2, text: "alternative", annotations: [] },
+      voice_profile: { voices: [] }
+    };
+    const alternative = structuredClone(regions.uk[1]!);
+    editor = editSpellingList(editor, forms.contents[0]!.id, "uk", {
+      type: "move",
+      id: alternative.id,
+      toIndex: 0
+    });
+    const saved = replaceSharedContent(
+      forms,
+      contentFromEditor(editor),
+      ids,
+      references
+    );
+    const reopened = expandFormContents(
+      JSON.parse(JSON.stringify(saved)) as SharedFormsStepContentV3
+    );
+    const canonical = saved.contents[0]!.regional_variants;
+    if (canonical.mode !== "uk_us_many") throw new Error("fixture");
+    expect(canonical.uk).toHaveLength(2);
+    expect(canonical.us).toHaveLength(3);
+    expect(canonical.uk[0]).toEqual({
+      id: alternative.id,
+      spelling: alternative.spelling,
+      origin: alternative.origin,
+      spelling_speech: alternative.spelling_speech,
+      pronunciations: alternative.pronunciations
+    });
+    expect(contentFromEditor(contentEditorForms(saved.contents[0]!))).toEqual(
+      saved.contents[0]
+    );
+    for (const [index, binding] of saved.pos[0]!.forms.entries()) {
+      const previous = regionalVariants(
+        before.pos[0]!.forms[index]!.regional_bindings
+      );
+      const current = regionalVariants(binding.regional_bindings);
+      for (const ref of previous)
+        expect(
+          current.find((row) => row.content_slot_id === ref.content_slot_id)
+        ).toEqual(ref);
+      expect(
+        regionalVariants(
+          reopened.pos[0]!.forms[index]!.regional_variants,
+          "uk"
+        )[0]
+      ).toMatchObject({
+        spelling: "alternative",
+        spelling_speech: alternative.spelling_speech
+      });
+      expect(new Set(current.map((row) => row.id)).size).toBe(5);
+    }
+    expect(
+      regionalVariants(saved.pos[0]!.forms[0]!.regional_bindings).map(
+        (row) => row.id
+      )
+    ).not.toEqual(
+      regionalVariants(saved.pos[0]!.forms[1]!.regional_bindings).map(
+        (row) => row.id
+      )
+    );
+    const deleted = editSpellingList(editor, forms.contents[0]!.id, "us", {
+      type: "remove",
+      id: canonical.us[1]!.id
+    });
+    expect(
+      regionalVariants(deleted.pos[0]!.forms[0]!.regional_variants, "uk")
+    ).toEqual([...regions.uk].reverse());
+    expect(
+      regionalVariants(deleted.pos[0]!.forms[0]!.regional_variants, "us")
+    ).toHaveLength(2);
+  });
 });

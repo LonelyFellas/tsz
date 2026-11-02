@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import type {
   AdminWordV3,
   PersistedWordStep,
@@ -72,10 +73,7 @@ function formPosOwnsIssue(
   }
   return pos.forms.some((form) => {
     if (nodeIds.has(form.id)) return true;
-    const variants =
-      form.regional_variants.mode === "common"
-        ? [form.regional_variants.common]
-        : [form.regional_variants.uk, form.regional_variants.us];
+    const variants = regionalVariants(form.regional_variants);
     return variants.some(
       (variant) =>
         nodeIds.has(variant.id) ||

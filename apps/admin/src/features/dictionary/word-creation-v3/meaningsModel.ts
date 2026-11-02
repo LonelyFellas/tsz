@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import type {
   AdminWordV3,
   CefrLevel,
@@ -553,8 +554,8 @@ export function formGroupLabel(
     : base.regional_variants.mode === "common"
       ? [base.regional_variants.common.spelling]
       : [
-          base.regional_variants.uk.spelling,
-          base.regional_variants.us.spelling
+          primaryRegionalVariant(base.regional_variants, "uk").spelling,
+          primaryRegionalVariant(base.regional_variants, "us").spelling
         ];
   const spelling = [
     ...new Set(spellings.map((value) => value.trim()).filter(Boolean))

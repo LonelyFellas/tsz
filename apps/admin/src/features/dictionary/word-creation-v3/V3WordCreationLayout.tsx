@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { Alert, Button, Flex, Popconfirm } from "antd";
 import type {
   AdminWordV3,
@@ -122,8 +123,14 @@ function firstBaseFormSummary(
       const common = base.regional_variants.common.spelling.trim();
       return common ? { mode: "common", common } : undefined;
     }
-    const uk = base.regional_variants.uk.spelling.trim();
-    const us = base.regional_variants.us.spelling.trim();
+    const uk = primaryRegionalVariant(
+      base.regional_variants,
+      "uk"
+    ).spelling.trim();
+    const us = primaryRegionalVariant(
+      base.regional_variants,
+      "us"
+    ).spelling.trim();
     return uk || us ? { mode: "uk_us", uk, us } : undefined;
   }
   return undefined;

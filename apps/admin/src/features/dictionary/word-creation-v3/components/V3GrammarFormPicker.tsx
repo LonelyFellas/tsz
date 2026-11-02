@@ -1,3 +1,4 @@
+import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import {
   Alert,
   Button,
@@ -128,11 +129,7 @@ export function V3GrammarFormPicker({
         .find((pos) => pos.pos_id === target.target_pos_id)
         ?.forms.find((form) => form.id === target.target_form_id);
       const regional = form?.regional_variants;
-      const variants = regional
-        ? regional.mode === "common"
-          ? [regional.common]
-          : [regional.uk, regional.us]
-        : [];
+      const variants = regional ? regionalVariants(regional) : [];
       const variant = variants.find(
         (variant) => variant.id === target.target_variant_id
       );
@@ -215,11 +212,7 @@ export function V3GrammarFormPicker({
         );
         const form = pos?.forms.find((form) => form.id === link.target_form_id);
         const regional = form?.regional_variants;
-        const variants = regional
-          ? regional.mode === "common"
-            ? [regional.common]
-            : [regional.uk, regional.us]
-          : [];
+        const variants = regional ? regionalVariants(regional) : [];
         const variant = variants.find(
           (variant) => variant.id === link.target_variant_id
         );
@@ -234,7 +227,8 @@ export function V3GrammarFormPicker({
             spelling: variant.spelling,
             displayDialect:
               regional?.mode === "uk_us" &&
-              regional.uk.spelling === regional.us.spelling
+              primaryRegionalVariant(regional, "uk").spelling ===
+                primaryRegionalVariant(regional, "us").spelling
                 ? "common"
                 : variant.dialect
           });
@@ -383,10 +377,7 @@ export function V3GrammarFormPicker({
     const localOptions = forms.pos.flatMap((pos) => {
       const children = pos.forms.flatMap((form) => {
         const regional = form.regional_variants;
-        const variants =
-          regional.mode === "common"
-            ? [regional.common]
-            : [regional.uk, regional.us];
+        const variants = regionalVariants(regional);
         return formChoices(
           variants.map((variant) => ({
             form_id: form.id,
