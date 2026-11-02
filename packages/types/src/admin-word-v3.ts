@@ -648,6 +648,8 @@ export interface SearchComponentTargetsV3Input {
    */
   match?: "contains" | "exact";
   include_drafts?: boolean;
+  /** 仅查询当前已保存草稿，避免选择共享例句无法保存的历史节点。 */
+  draft_only?: boolean;
 }
 
 export interface SearchComponentTargetsV3Response {

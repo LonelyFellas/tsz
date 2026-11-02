@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/wordlist-chinese-prompts/docs/openapi.json",
-  "_source_sha256": "b13d21834e3bfbc6d34bd2b1b787e4d6fb36f41e1488df70077fb0377fbe412f",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/multidim-sentence-create-audit/docs/openapi.json",
+  "_source_sha256": "9f2c128aab2b8ab979a7990a01bbade96db7abf0624ad6569f04a07f1b767c21",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",

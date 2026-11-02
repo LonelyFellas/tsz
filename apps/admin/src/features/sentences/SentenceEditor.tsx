@@ -31,9 +31,9 @@ import { HttpError } from "@tsz/api-client";
 import { DraftComparison } from "../dictionary/DraftComparison";
 import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
+import { env } from "@/lib/env";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { V3VoiceTextField } from "../dictionary/word-creation-v3/components/V3VoiceTextField";
-import { V3GrammarFormPicker } from "../dictionary/word-creation-v3/components/V3GrammarFormPicker";
 import { useReadingPreviewAdapter } from "../dictionary/word-creation-v3/components/useReadingPreviewAdapter";
 import { V3SentenceTranslationsField } from "../dictionary/word-creation-v3/components/V3SentenceTranslationsField";
 import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
@@ -76,20 +76,22 @@ export function SentenceEditor({
     readingForms
   );
   const profile = useAuthStore((state) => state.profile);
-  const canEdit = sentence
+  const [recoveredCreation, setRecoveredCreation] = useState<SharedSentence>();
+  const storedSentence = sentence ?? recoveredCreation;
+  const canEdit = storedSentence
     ? canAdminResourceAction(
         profile,
         "sentences",
         "edit",
-        sentence.created_by_admin_id
+        storedSentence.created_by_admin_id
       )
     : hasAdminPermission(profile, "sentences.create");
-  const canAssociate = sentence
+  const canAssociate = storedSentence
     ? canAdminResourceAction(
         profile,
         "sentences",
         "associate",
-        sentence.created_by_admin_id
+        storedSentence.created_by_admin_id
       )
     : hasAdminPermission(profile, "sentences.create");
   const allowed = canEdit || canAssociate;
@@ -143,7 +145,10 @@ export function SentenceEditor({
     };
     try {
       // 成功回调可能立即卸载编辑器；离开结果以业务保存成功为准。
-      return ((await saveActionRef.current?.()) ?? false) || accepted;
+      const saved = env.VOICE_EDITOR
+        ? await saveActionRef.current?.()
+        : await finish(afterLeaveSave.current);
+      return saved === true || accepted;
     } finally {
       afterLeaveSave.current = undefined;
     }
@@ -163,10 +168,10 @@ export function SentenceEditor({
     restore: setContent
   });
   const refreshConflict = async () => {
-    if (!sentence || saving) return;
+    if (!storedSentence || saving) return;
     setSaving(true);
     try {
-      setLatest(await api.sentences.get(sentence.id, "draft"));
+      setLatest(await api.sentences.get(storedSentence.id, "draft"));
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "获取最新草稿失败，请重试");
@@ -224,8 +229,8 @@ export function SentenceEditor({
         next.sentence.zh_text = alias.content;
       }
       let saved: SharedSentence;
-      if (sentence)
-        saved = await api.sentences.update(sentence.id, {
+      if (storedSentence)
+        saved = await api.sentences.update(storedSentence.id, {
           base_revision: baseRevision,
           ...(sourceEntryId
             ? {
@@ -235,13 +240,58 @@ export function SentenceEditor({
             : {}),
           content: next
         });
-      else
-        saved = await api.sentences.create({
-          ...(sourceEntryId && sourceSenseId
-            ? { source_entry_id: sourceEntryId, source_sense_id: sourceSenseId }
-            : {}),
-          content: next
-        });
+      else {
+        try {
+          saved = await api.sentences.create({
+            ...(sourceEntryId && sourceSenseId
+              ? {
+                  source_entry_id: sourceEntryId,
+                  source_sense_id: sourceSenseId
+                }
+              : {}),
+            content: next
+          });
+        } catch (createError) {
+          if (
+            createError instanceof HttpError &&
+            createError.status >= 400 &&
+            createError.status < 500 &&
+            createError.code !== "idempotency_conflict"
+          )
+            throw createError;
+          let existing: SharedSentence;
+          try {
+            existing = await api.sentences.get(next.sentence.id, "draft");
+          } catch {
+            throw createError;
+          }
+          if (!existing) throw createError;
+          setRecoveredCreation(existing);
+          setBaseRevision(existing.revision);
+          initialContent.current = JSON.stringify(existing.content);
+          if (
+            existing.revision !== 1 ||
+            existing.created_by_admin_id !== profile?.id
+          ) {
+            setConflict(true);
+            setLatest(existing);
+            setError(
+              "例句已创建且内容已变化，请比较草稿后再保存。本地输入已保留。"
+            );
+            return false;
+          }
+          saved = await api.sentences.update(existing.id, {
+            base_revision: existing.revision,
+            ...(sourceEntryId
+              ? {
+                  context_entry_id: sourceEntryId,
+                  context_sense_id: sourceSenseId
+                }
+              : {}),
+            content: next
+          });
+        }
+      }
       recovery.discard();
       afterSave?.();
       onSaved(saved);
@@ -263,7 +313,7 @@ export function SentenceEditor({
   const close = () =>
     modal.confirm({
       title: "放弃本次未完成的例句编辑？",
-      content: "尚未点完成的修改不会保存。此前已经完成的例句不受影响。",
+      content: "尚未保存的修改和本地备份会被丢弃。此前已保存的例句不受影响。",
       onOk: () => {
         recovery.discard();
         onClose();
@@ -343,6 +393,7 @@ export function SentenceEditor({
                     <Button
                       disabled={saving}
                       onClick={() => {
+                        recovery.discard();
                         dialog.destroy();
                         resolve(true);
                       }}
@@ -445,6 +496,15 @@ export function SentenceEditor({
             <Button aria-label="取消例句编辑" disabled={saving} onClick={close}>
               取消
             </Button>
+            <Button
+              type="primary"
+              aria-label="保存例句"
+              loading={saving}
+              disabled={conflict || !allowed || !canSave}
+              onClick={() => void saveBeforeLeave()}
+            >
+              保存草稿
+            </Button>
           </Flex>
         }
         onCancel={close}
@@ -458,6 +518,7 @@ export function SentenceEditor({
               dirty={dirty}
               saving={saving}
               canSave={canSave}
+              discard={recovery.discard}
               save={saveBeforeLeave}
             />
           )}
@@ -617,6 +678,21 @@ export function SentenceEditor({
               mode="association"
               presentation="editor"
               showDone={false}
+              showSaveButton={false}
+              collapseVoiceSettings
+              afterText={
+                <V3SentenceTranslationsField
+                  sentence={content.sentence}
+                  index={0}
+                  disabled={saving || !canEdit}
+                  onChange={(zh_translations) =>
+                    setContent((current) => ({
+                      ...current,
+                      sentence: { ...current.sentence, zh_translations }
+                    }))
+                  }
+                />
+              }
               saveActionRef={saveActionRef}
               onSave={() =>
                 finish(afterLeaveSave.current).then((value) => value === true)
@@ -642,14 +718,6 @@ export function SentenceEditor({
               )}
               readingLinks={variant.reading_links}
               createReadingPreviewAdapter={createReadingPreviewAdapter}
-              renderReadingPicker={(props) => (
-                <V3GrammarFormPicker
-                  {...props}
-                  wordId={sourceWord?.id}
-                  forms={readingForms}
-                  meanings={sourceWord?.meanings}
-                />
-              )}
               ariaLabel="例句正文"
               nodeId={row.variant_id}
               field="value"
@@ -698,17 +766,6 @@ export function SentenceEditor({
               )}
             />
           )}
-          <V3SentenceTranslationsField
-            sentence={content.sentence}
-            index={0}
-            disabled={saving || !canEdit}
-            onChange={(zh_translations) =>
-              setContent((current) => ({
-                ...current,
-                sentence: { ...current.sentence, zh_translations }
-              }))
-            }
-          />
         </Flex>
       </VoiceEditorModal>
     </PronunciationPreviewProvider>
@@ -719,11 +776,13 @@ function SentenceNavigationGuard({
   dirty,
   saving,
   canSave,
+  discard,
   save
 }: {
   dirty: boolean;
   saving: boolean;
   canSave: boolean;
+  discard: () => void;
   save: (afterSave?: () => void) => Promise<boolean | undefined>;
 }) {
   const blocker = useBlocker(dirty);
@@ -738,7 +797,13 @@ function SentenceNavigationGuard({
           <Button disabled={saving} onClick={() => blocker.reset()}>
             继续编辑
           </Button>
-          <Button disabled={saving} onClick={() => blocker.proceed()}>
+          <Button
+            disabled={saving}
+            onClick={() => {
+              discard();
+              blocker.proceed();
+            }}
+          >
             放弃修改
           </Button>
           <Button
