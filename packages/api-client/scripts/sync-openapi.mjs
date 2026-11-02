@@ -73,6 +73,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "OpenCodeConnectedProviderList",
   "OpenCodeModelSelection",
   "OpenCodeConnection",
+  "ChatGPTSetup",
   "ChatGPTAccounts",
   "ChatGPTLogin",
   "ChatGPTLoginStatus",

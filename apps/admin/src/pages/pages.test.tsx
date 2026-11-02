@@ -310,16 +310,20 @@ describe("admin 页面烟雾测试", () => {
   });
 
   it("个人设置页渲染方言偏好，默认英式", () => {
-    // 依赖 antd App context（切换时用 message 反馈）。
+    // 依赖路由与 antd App context。
     render(
-      <AntApp>
-        <ProfileSettingsPage />
-      </AntApp>
+      <MemoryRouter>
+        <AntApp>
+          <ProfileSettingsPage />
+        </AntApp>
+      </MemoryRouter>
     );
     expect(
       screen.getByRole("heading", { name: "个人设置" })
     ).toBeInTheDocument();
-    expect(screen.getByText("英语方言偏好")).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "英语偏好" })
+    ).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "英式（BrE）" })).toBeChecked();
   });
 
