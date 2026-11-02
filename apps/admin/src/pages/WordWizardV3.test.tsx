@@ -1038,7 +1038,10 @@ describe("WordWizardV3Page", () => {
     expect(document.querySelector(".word-creation-stepper")).not.toBeNull();
     expect(document.querySelector(".word-creation-summary")).not.toBeNull();
     expect(screen.getByRole("tab", { name: /名词/u })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "上一步" })).toBeNull();
+    const actions = within(
+      document.querySelector<HTMLElement>(".word-step-actions")!
+    );
+    expect(actions.queryByRole("button", { name: "上一步" })).toBeNull();
     expect(
       screen.getByText("保存草稿", { exact: true }).closest("button")!
     ).toBeInTheDocument();
