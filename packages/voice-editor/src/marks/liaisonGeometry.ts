@@ -88,8 +88,8 @@ export type GlyphMeasurer = (
   element?: Element
 ) => GlyphMetrics | undefined;
 
-/** 端点比墨迹顶端再抬高一点，弧线不压在字上；沿用参考实现的 0.06em。 */
-const TIP_GAP_EM = 0.06;
+/** 端点与墨迹留白；扣除半个笔画后仍有 0.125em，避免小字号音标与弧线粘连。 */
+const TIP_GAP_EM = 0.16;
 
 /** 两端内容盒顶端相差不到半个字号就算同一行：粗体等变体的上伸高度会差个把像素。 */
 const SAME_LINE_TOLERANCE_EM = 0.5;

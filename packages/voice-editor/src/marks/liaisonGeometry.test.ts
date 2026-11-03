@@ -6,7 +6,11 @@ import {
   createGlyphMeasurer,
   type LiaisonLinkElements
 } from "./liaisonGeometry";
-import { liaisonHalfPaths, liaisonPath } from "./liaisonPath";
+import {
+  liaisonHalfPaths,
+  liaisonPath,
+  liaisonStrokeWidth
+} from "./liaisonPath";
 
 function rect(left: number, top: number, width: number, height: number) {
   return {
@@ -35,14 +39,28 @@ function anchor(box: DOMRect, text = "w") {
 }
 
 describe("anchorTip", () => {
+  it.each([14, 56 / 3, 26, 72])(
+    "%spx 连读端点扣除笔画后仍与音标墨迹保持可见间距",
+    (fontSize) => {
+      const inkTop = 100 + fontSize * 0.3;
+      const tip = anchorTip(
+        { left: 10, right: 30, top: 100, bottom: 100 + fontSize },
+        fontSize,
+        { fontAscent: fontSize, inkAscent: fontSize * 0.7 }
+      );
+      const strokeBottom = tip.tipY + liaisonStrokeWidth(fontSize) / 2;
+      expect(inkTop - strokeBottom).toBeGreaterThanOrEqual(fontSize * 0.12);
+    }
+  );
+
   it("starts a hair above the ink top, not at the box top, when metrics are known", () => {
-    // 26px 下 w 的墨迹上伸 13.44、字体上伸 28：字盒顶 100 → 100 + 14.56 − 0.06em
+    // 26px 下 w 的墨迹上伸 13.44、字体上伸 28：字盒顶 100 → 100 + 14.56 − 0.16em
     const tip = anchorTip({ left: 10, right: 30, top: 100, bottom: 137 }, 26, {
       fontAscent: 28,
       inkAscent: 13.44
     });
     expect(tip.x).toBe(20);
-    expect(tip.tipY).toBeCloseTo(113, 5);
+    expect(tip.tipY).toBeCloseTo(110.4, 5);
   });
 
   it("falls back to the box top without metrics", () => {
@@ -61,7 +79,7 @@ describe("buildLiaisonArcs", () => {
     paddingRight: "10px"
   } as CSSStyleDeclaration;
   const measure = () => ({ fontAscent: 20, inkAscent: 10 });
-  const tipY = 50 + 10 - 1.2;
+  const tipY = 50 + 10 - 3.2;
 
   afterEach(() => {
     container.replaceChildren();
@@ -173,7 +191,7 @@ describe("buildLiaisonArcs", () => {
     });
     const [arc] = buildLiaisonArcs(container, [link], measured).arcs;
     expect(arc?.d).toBe(
-      liaisonPath({ x: 33, tipY: 58.8 }, { x: 125, tipY: 50.8 }, 20)
+      liaisonPath({ x: 33, tipY: 56.8 }, { x: 125, tipY: 48.8 }, 20)
     );
   });
 
