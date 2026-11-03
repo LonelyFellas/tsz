@@ -83,21 +83,15 @@ const fieldCss = readFileSync(
 );
 
 async function openVoiceAudioDetail(voice = "Sonia") {
-  const checkbox = await screen.findByRole("checkbox", {
-    name: `选用 ${voice}`
-  });
+  const checkbox = await screen.findByLabelText(`选用 ${voice}`);
   if (!(checkbox as HTMLInputElement).checked) fireEvent.click(checkbox);
-  fireEvent.click(await screen.findByRole("button", { name: `修改 ${voice}` }));
-  await screen.findByRole("region", { name: "当前文本口音录音" });
+  fireEvent.click(await screen.findByLabelText(`修改 ${voice}`));
+  return screen.findByLabelText("当前文本口音录音");
 }
 async function openAudioPanel(voice = "Sonia") {
-  fireEvent.click(screen.getByRole("button", { name: /^打开.*编辑器$/ }));
-  await screen.findByRole(
-    "toolbar",
-    { name: "标注工具栏" },
-    { timeout: 10_000 }
-  );
-  await openVoiceAudioDetail(voice);
+  fireEvent.click(screen.getByLabelText(/^打开.*编辑器$/));
+  await screen.findByLabelText("标注工具栏", {}, { timeout: 10_000 });
+  return openVoiceAudioDetail(voice);
 }
 
 beforeEach(() => {
@@ -839,9 +833,9 @@ describe("V3VoiceTextField 上传音频", () => {
         onChange={vi.fn()}
       />
     );
-    await openAudioPanel();
-    expect(screen.getByLabelText("上传音频")).toBeDisabled();
-    expect(screen.getByText("没有上传音频的权限")).toBeInTheDocument();
+    const panel = within(await openAudioPanel());
+    expect(panel.getByLabelText("上传音频")).toBeDisabled();
+    expect(panel.getByText("没有上传音频的权限")).toBeInTheDocument();
     expect(state.upload).not.toHaveBeenCalled();
   });
 
@@ -857,8 +851,8 @@ describe("V3VoiceTextField 上传音频", () => {
         onAudioAssetsChange={vi.fn()}
       />
     );
-    await openAudioPanel();
-    expect(screen.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
+    const panel = within(await openAudioPanel());
+    expect(panel.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
     expect(state.upload).not.toHaveBeenCalled();
   });
   it.each([true, false])(
@@ -889,17 +883,22 @@ describe("V3VoiceTextField 上传音频", () => {
           value={VALUE}
         />
       );
-      if (showDone) await openAudioPanel();
-      else await openVoiceAudioDetail();
-      fireEvent.change(screen.getByLabelText("上传音频"), {
+      const recording = showDone
+        ? await openAudioPanel()
+        : await openVoiceAudioDetail();
+      const panel = within(recording);
+      fireEvent.change(panel.getByLabelText("上传音频"), {
         target: {
           files: [
             new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" })
           ]
         }
       });
-      await screen.findByLabelText("试听 a.mp3");
-      fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
+      await panel.findByLabelText("试听 a.mp3");
+      const detail = recording.closest<HTMLElement>('[role="dialog"]')!;
+      fireEvent.click(
+        within(detail).getByRole("button", { name: "保存配音设置" })
+      );
       if (showDone) {
         expect(onAudioAssetsChange).not.toHaveBeenCalled();
         fireEvent.click(screen.getByLabelText("完成语法结构 1 通用内容编辑"));
@@ -957,10 +956,10 @@ describe("V3VoiceTextField 上传音频", () => {
         value={VALUE}
       />
     );
-    await openAudioPanel("Aria");
-    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
-    expect(screen.getByText("音频上传未启用")).toBeInTheDocument();
+    const panel = within(await openAudioPanel("Aria"));
+    expect(panel.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+    expect(panel.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
+    expect(panel.getByText("音频上传未启用")).toBeInTheDocument();
   });
 });
 
