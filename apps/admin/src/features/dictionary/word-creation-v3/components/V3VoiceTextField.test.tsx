@@ -1087,9 +1087,9 @@ it("页面只读、弹窗编辑；多行正文、关联和设置往返不丢失"
   const voiceDetail = (await screen.findByLabelText("当前音色语速")).closest(
     '[role="dialog"]'
   ) as HTMLElement;
-  expect(
-    await within(voiceDetail).findByLabelText("设置 Sonia 的语速")
-  ).toHaveTextContent("1.25×");
+  expect(await within(voiceDetail).findByLabelText("当前音色语速")).toHaveValue(
+    "1.25"
+  );
   expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
 });
 
@@ -2306,6 +2306,9 @@ it("业务保存以一次完整快照合并正文和参数，失败保留且连�
   fireEvent.change(screen.getByLabelText("当前音色语速"), {
     target: { value: "0.73" }
   });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存配音设置" })).toBeEnabled()
+  );
   fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
   fireEvent.change(screen.getByLabelText("原子正文"), {
     target: { value: "hello changed" }

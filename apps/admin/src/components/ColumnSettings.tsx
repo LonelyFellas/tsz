@@ -4,7 +4,13 @@ import {
   SettingOutlined
 } from "@ant-design/icons";
 import { Button, Checkbox, Popover, Segmented, Typography } from "antd";
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 import type { ConfigurableColumn } from "./column-settings";
 import "./ColumnSettings.css";
 
@@ -19,16 +25,27 @@ export function ColumnSettings({
   onChange,
   onReset,
   fixedOverflow = false,
-  buttonSize = "small"
+  buttonSize = "small",
+  open: controlledOpen,
+  onOpenChange,
+  children
 }: {
   columns: ConfigurableColumn[];
   onChange: (columns: ConfigurableColumn[]) => void;
   onReset: () => void;
   fixedOverflow?: boolean;
   buttonSize?: "small" | "middle";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: ReactNode;
 }) {
   const controlId = useId();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (value: boolean) => {
+    setInternalOpen(value);
+    onOpenChange?.(value);
+  };
   const [draggingKey, setDraggingKey] = useState<string>();
   const [dragOverKey, setDragOverKey] = useState<string>();
   const fixedFocusKey = useRef<string | undefined>(undefined);
@@ -66,7 +83,9 @@ export function ColumnSettings({
     setDragOverKey(undefined);
   };
   return (
-    <div className="admin-column-settings-toolbar">
+    <div
+      className={`admin-column-settings-toolbar${children ? " admin-column-settings-custom-trigger" : ""}`}
+    >
       <Popover
         trigger="click"
         placement="bottomRight"
@@ -78,6 +97,7 @@ export function ColumnSettings({
         open={open}
         styles={{ root: { paddingBlock: 8 }, container: { padding: 0 } }}
         onOpenChange={(next) => {
+          if (children && next) return;
           setOpen(next);
           if (!next) finishDrag();
         }}
@@ -285,13 +305,17 @@ export function ColumnSettings({
           </section>
         }
       >
-        <Button
-          size={buttonSize}
-          icon={<SettingOutlined />}
-          aria-expanded={open}
-        >
-          列设置
-        </Button>
+        {children ? (
+          <span className="admin-column-settings-anchor">{children}</span>
+        ) : (
+          <Button
+            size={buttonSize}
+            icon={<SettingOutlined />}
+            aria-expanded={open}
+          >
+            列设置
+          </Button>
+        )}
       </Popover>
     </div>
   );

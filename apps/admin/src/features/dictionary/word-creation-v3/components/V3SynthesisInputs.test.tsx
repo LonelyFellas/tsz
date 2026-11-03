@@ -245,6 +245,33 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
 };
 
 describe("双口音真实试听控件", () => {
+  it("空音标目录试听使用普通示例文本，不经过音素转换或修改草稿", async () => {
+    renderWithUps(<Harness dialect="uk" empty />);
+    const before = screen.getByTestId("pronunciation-wire").textContent;
+    const label = "第 1 条发音 英式 Azure IPA";
+    fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+    await screen.findByLabelText(`${label}音标编辑`);
+    fireEvent.click(screen.getByText("完整音色目录"));
+    const preview = await screen.findByRole("button", {
+      name: "试听目录音色 Sonia"
+    });
+    await waitFor(() => expect(preview).toBeEnabled());
+    fireEvent.click(preview);
+    await waitFor(() =>
+      expect(speech.synthesize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voiceId: "en-gb-sonia",
+          content: {
+            version: 2,
+            text: "Hello, this is a voice preview.",
+            annotations: []
+          }
+        }),
+        expect.anything()
+      )
+    );
+    expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
+  });
   it.each(["ipa", "ups"] as const)(
     "%s 弹窗改音素后生成并完成，保留新音频绑定",
     async (alphabet) => {
@@ -937,7 +964,7 @@ it("未配置的音素设置器采用首位推荐，完成时保存参数", asyn
     expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
   );
   fireEvent.click(await screen.findByRole("button", { name: "修改 慢读" }));
-  expect(screen.getByLabelText("设置 Sonia 的语速")).toHaveTextContent("0.75");
+  expect(screen.getByLabelText("当前音色语速")).toHaveValue("0.75");
 });
 
 it.each([

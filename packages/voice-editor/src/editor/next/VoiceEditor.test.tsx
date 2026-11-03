@@ -2943,6 +2943,11 @@ describe("VoiceEditor 发音区", () => {
       within(dialog).getByRole("spinbutton", { name: "当前音色音量" }),
       { target: { value: "65" } }
     );
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole("button", { name: "保存配音设置" })
+      ).toBeEnabled()
+    );
     fireEvent.click(
       within(dialog).getByRole("button", { name: "保存配音设置" })
     );

@@ -179,6 +179,8 @@ export function V3PhonemeSpeechSettings({
   const adapter = useMemo<VoicePreviewAdapter>(
     () => ({
       listVoices: (input) => adminVoicePreviewAdapter.listVoices(input),
+      synthesizeSample: (input, options) =>
+        adminVoicePreviewAdapter.synthesize(input, options),
       resolveAudio: adminVoicePreviewAdapter.resolveAudio,
       synthesizeSsml: adminVoicePreviewAdapter.synthesizeSsml,
       async renderSsml(input, options) {

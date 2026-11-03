@@ -149,6 +149,11 @@ export interface VoicePreviewAdapter {
     input: VoicePreviewRequest,
     options?: { signal?: AbortSignal }
   ): Promise<VoicePreviewResult>;
+  /** 独立示例试听，绕过宿主的音素转换；缺省复用普通 synthesize。 */
+  synthesizeSample?(
+    input: VoicePreviewRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<VoicePreviewResult>;
 }
 
 /**

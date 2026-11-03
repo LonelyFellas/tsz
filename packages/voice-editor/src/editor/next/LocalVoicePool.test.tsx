@@ -185,6 +185,133 @@ async function detail(name = "a") {
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
+  it("未选音色时显示简短说明，隐藏空表头", () => {
+    render(<Harness initial={pool([])} />);
+    const side = screen.getByRole("region", { name: "英式已获取音色" });
+    expect(within(side).getByText("暂无已选音色")).toBeVisible();
+    expect(within(side).queryByText("排序")).toBeNull();
+  });
+  it("完整音色目录默认收起，展开后可选音色，收起再展开保留选择", async () => {
+    render(<Harness initial={pool([])} />);
+    const disclosure = screen.getByText("完整音色目录");
+    const catalog = disclosure.closest("details")!;
+    expect(catalog).not.toHaveAttribute("open");
+    fireEvent.click(disclosure);
+    expect(catalog).toHaveAttribute("open");
+    const voice = await screen.findByRole("checkbox", { name: "选用 Beta" });
+    fireEvent.click(voice);
+    expect(voice).toBeChecked();
+    fireEvent.click(disclosure);
+    expect(catalog).not.toHaveAttribute("open");
+    fireEvent.click(disclosure);
+    expect(voice).toBeChecked();
+  });
+  it("目录试听使用该音色的默认参数，不改变已选音色", async () => {
+    const synthesize = vi.fn().mockResolvedValue({
+      audioUrl: "blob:audio",
+      expiresAt: "2099-01-01",
+      cached: false
+    });
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([])}
+        preview={adapter(synthesize)}
+        onProfile={onProfile}
+      />
+    );
+    fireEvent.click(screen.getByText("完整音色目录"));
+    const audition = await screen.findByRole("button", {
+      name: "试听目录音色 Beta"
+    });
+    await waitFor(() => expect(audition).toBeEnabled());
+    fireEvent.click(audition);
+    await waitFor(() => expect(synthesize).toHaveBeenCalled());
+    expect(
+      screen.getByRole("checkbox", { name: "选用 Beta" })
+    ).not.toBeChecked();
+    expect(onProfile).not.toHaveBeenCalled();
+  });
+  it("目录试听失败会显示原因，重新试听成功后可以停止", async () => {
+    const synthesize = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("试听服务暂不可用"))
+      .mockResolvedValue({
+        audioUrl: "blob:audio",
+        expiresAt: "2099-01-01",
+        cached: false
+      });
+    render(<Harness initial={pool([])} preview={adapter(synthesize)} />);
+    fireEvent.click(screen.getByText("完整音色目录"));
+    const audition = await screen.findByRole("button", {
+      name: "试听目录音色 Beta"
+    });
+    fireEvent.click(audition);
+    expect(await screen.findByText("试听服务暂不可用")).toBeVisible();
+    fireEvent.click(audition);
+    const stop = await screen.findByRole("button", { name: "停止试听" });
+    await waitFor(() =>
+      expect(AudioMock.instances.at(-1)?.play).toHaveBeenCalled()
+    );
+    fireEvent.click(stop);
+    expect(AudioMock.instances.at(-1)?.pause).toHaveBeenCalled();
+    expect(screen.queryAllByText(/^播放中/)).toHaveLength(0);
+  });
+  it("目录搜索无结果时显示提示，清空后恢复音色", async () => {
+    render(<Harness initial={pool([])} />);
+    fireEvent.click(screen.getByText("完整音色目录"));
+    await screen.findByRole("checkbox", { name: "选用 Beta" });
+    const search = screen.getByRole("searchbox", { name: "英式女声目录搜索" });
+    expect(screen.getAllByRole("searchbox")).toHaveLength(4);
+    fireEvent.change(search, { target: { value: "不存在的音色" } });
+    expect(screen.getAllByText("没有匹配的音色")).toHaveLength(1);
+    expect(
+      screen.getByRole("checkbox", { name: "选用 American" }).closest("label")
+    ).toBeVisible();
+    fireEvent.change(search, { target: { value: "" } });
+    expect(
+      screen.getByRole("checkbox", { name: "选用 Beta" }).closest("label")
+    ).toBeVisible();
+  });
+  it("正文为空时目录试听使用示例文本，不修改正文和音色配置", async () => {
+    const synthesize = vi.fn().mockResolvedValue({
+      audioUrl: "blob:audio",
+      expiresAt: "2099-01-01",
+      cached: false
+    });
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([])}
+        content={{ version: 2, text: "", annotations: [] }}
+        preview={adapter(synthesize)}
+        onProfile={onProfile}
+      />
+    );
+    fireEvent.click(screen.getByText("完整音色目录"));
+    const audition = await screen.findByRole("button", {
+      name: "试听目录音色 Beta"
+    });
+    await waitFor(() => expect(audition).toBeEnabled());
+    fireEvent.click(audition);
+    await waitFor(() =>
+      expect(synthesize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voiceId: "b",
+          content: {
+            version: 2,
+            text: "Hello, this is a voice preview.",
+            annotations: []
+          }
+        }),
+        expect.anything()
+      )
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "选用 Beta" })
+    ).not.toBeChecked();
+    expect(onProfile).not.toHaveBeenCalled();
+  });
   it.each([false, true])(
     "全局推荐仅在没有适用分组时展示（仅兜底：%s）",
     async (fallbackOnly) => {
@@ -213,6 +340,7 @@ describe("新版局部主页和唯一声音草稿", () => {
           ]}
         />
       );
+      fireEvent.click(screen.getByText("完整音色目录"));
       await screen.findByRole("checkbox", { name: "选用 Alpha 阿尔法" });
       if (fallbackOnly) {
         expect(
@@ -294,6 +422,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
     const first = await screen.findByRole("radio", { name: /第一套/ });
     await waitFor(() => expect(first).toBeEnabled());
+    fireEvent.click(screen.getByText("完整音色目录"));
     const columns = [
       ...document.querySelectorAll<HTMLElement>(".tsz-ve-pool-catalog-list")
     ];
@@ -315,7 +444,9 @@ describe("新版局部主页和唯一声音草稿", () => {
         .at(-1)![0]
         .voices.find((item: VoiceSetting) => item.voice_id === "b").rate_percent
     ).toBe(-27);
-    fireEvent.click(screen.getByRole("radio", { name: "不选择推荐" }));
+    expect(screen.getByText("来源分组")).toBeVisible();
+    expect(screen.getAllByText("释义组")[0]).toBeVisible();
+    fireEvent.click(screen.getByRole("radio", { name: "不使用推荐配音" }));
     expect(
       onProfile.mock.calls
         .at(-1)![0]
@@ -334,7 +465,7 @@ describe("新版局部主页和唯一声音草稿", () => {
       rate_percent: -27,
       version_id: "b-version"
     });
-    const search = screen.getByRole("searchbox", { name: "搜索局部音色目录" });
+    const search = screen.getByRole("searchbox", { name: "英式女声目录搜索" });
     fireEvent.change(search, { target: { value: "Alpha" } });
     fireEvent.change(search, { target: { value: "" } });
     expect([...document.querySelectorAll(".tsz-ve-pool-catalog-list")]).toEqual(
@@ -362,11 +493,9 @@ describe("新版局部主页和唯一声音草稿", () => {
       within(dialog).queryByRole("combobox", { name: "SSML 配音版本" })
     ).not.toBeInTheDocument();
     expect(
-      within(dialog).getByRole("region", { name: "常用参数" })
+      within(dialog).getByRole("region", { name: "声音参数" })
     ).toBeVisible();
-    expect(
-      within(dialog).getByRole("region", { name: "其他参数" })
-    ).toBeVisible();
+    expect(within(dialog).getByText("高级参数")).toBeVisible();
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "当前音色音量" }),
       { target: { value: "65" } }
@@ -393,6 +522,11 @@ describe("新版局部主页和唯一声音草稿", () => {
         selector: ".ant-select-item-option-content"
       })
     );
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole("button", { name: "保存配音设置" })
+      ).toBeEnabled()
+    );
     fireEvent.click(
       within(dialog).getByRole("button", { name: "保存配音设置" })
     );
@@ -411,6 +545,38 @@ describe("新版局部主页和唯一声音草稿", () => {
       4
     );
   });
+  it("共用参数表单清空必填值时禁止保存，修正后保留其他字段及原语速上限", async () => {
+    const onProfile = vi.fn();
+    render(<Harness initial={pool([version("a")])} onProfile={onProfile} />);
+    const dialog = await detail();
+    const rate = within(dialog).getByRole("spinbutton", {
+      name: "当前音色语速"
+    });
+    const save = within(dialog).getByRole("button", { name: "保存配音设置" });
+    fireEvent.change(rate, { target: { value: "" } });
+    await waitFor(() => expect(save).toBeDisabled());
+    fireEvent.change(
+      within(dialog).getByRole("spinbutton", { name: "当前音色音量" }),
+      { target: { value: "65" } }
+    );
+    expect(rate).toHaveValue("");
+    expect(save).toBeDisabled();
+    fireEvent.change(rate, { target: { value: "2.00" } });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    expect(onProfile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        voices: [
+          expect.objectContaining({
+            voice_id: "a",
+            rate_percent: 100,
+            volume_percent: 65
+          })
+        ]
+      })
+    );
+  });
+
   it("相同正文换目标会卸载旧草稿并中止试听，迟到结果释放且不会串到新对象", async () => {
     let finish!: (result: VoicePreviewResult) => void;
     const synthesize = vi.fn<VoicePreviewAdapter["synthesize"]>(

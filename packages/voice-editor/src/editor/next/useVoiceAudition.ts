@@ -77,7 +77,11 @@ export interface VoiceAudition {
   pendingVoiceId?: string;
   /** 正在播放的音色。 */
   playingVoiceId?: string;
-  audition: (voice: VoiceOption, setting?: VoiceSetting) => void;
+  audition: (
+    voice: VoiceOption,
+    setting?: VoiceSetting,
+    fallback?: RichTextV2
+  ) => void;
   stop: () => void;
 }
 
@@ -115,6 +119,7 @@ export function useVoiceAudition({
   const activeVoiceRef = useRef<VoiceOption | undefined>(undefined);
   const activeVersionRef = useRef<string | undefined>(undefined);
   const activeAssetRef = useRef<string | undefined>(undefined);
+  const fallbackRef = useRef<RichTextV2 | undefined>(undefined);
 
   const stopMedia = useCallback(() => {
     audioRef.current?.pause();
@@ -129,7 +134,9 @@ export function useVoiceAudition({
     abortRef.current?.abort();
     abortRef.current = null;
     activeVoiceRef.current = undefined;
+    fallbackRef.current = undefined;
     setPendingVoiceId(undefined);
+    setStatus("");
     stopMedia();
   }, [stopMedia]);
 
@@ -154,7 +161,7 @@ export function useVoiceAudition({
           ?.audio_asset_id &&
       requestHashRef.current ===
         canonicalVoiceHash(
-          content,
+          content.text.trim() ? content : (fallbackRef.current ?? content),
           settingsForVoice(settings, voice, activeVersionRef.current)
         )
     )
@@ -191,14 +198,18 @@ export function useVoiceAudition({
   }, [language, open, previewAdapter, catalog]);
 
   const audition = useCallback(
-    (voice: VoiceOption, setting?: VoiceSetting) => {
-      if (!previewAdapter || !content.text.trim()) return;
+    (voice: VoiceOption, setting?: VoiceSetting, fallback?: RichTextV2) => {
+      const previewContent = content.text.trim()
+        ? content
+        : (fallback ?? content);
+      if (!previewAdapter || !previewContent.text.trim()) return;
       stop();
+      fallbackRef.current = content.text.trim() ? undefined : fallback;
 
       const existing = setting ?? voiceSettingFor(settings, voice.id);
       if (
         !existing?.audio_asset_id &&
-        content.annotations.some(
+        previewContent.annotations.some(
           (mark) =>
             (mark.type === "pause" && voice.supportsPause === false) ||
             (mark.type === "phoneme" && voice.supportsPhoneme === false) ||
@@ -220,7 +231,7 @@ export function useVoiceAudition({
         voice,
         activeVersionRef.current
       );
-      const requestHash = canonicalVoiceHash(content, voiceSettings);
+      const requestHash = canonicalVoiceHash(previewContent, voiceSettings);
       requestHashRef.current = requestHash;
       setPendingVoiceId(voice.id);
       const stored = setting ?? voiceSettingFor(settings, voice.id);
@@ -235,8 +246,10 @@ export function useVoiceAudition({
           ? previewAdapter.resolveAudio(stored.audio_asset_id, {
               signal: controller.signal
             })
-          : previewAdapter.synthesize(
-              { language, content, ...voiceSettings },
+          : (!content.text.trim() && fallback && previewAdapter.synthesizeSample
+              ? previewAdapter.synthesizeSample.bind(previewAdapter)
+              : previewAdapter.synthesize.bind(previewAdapter))(
+              { language, content: previewContent, ...voiceSettings },
               { signal: controller.signal }
             );
       void result
