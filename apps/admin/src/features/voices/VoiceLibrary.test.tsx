@@ -1261,25 +1261,32 @@ describe("配音中心", () => {
   it("合并后的语速预设只提供服务支持的值，并原样提交百分比", async () => {
     mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
-    expect(screen.queryByRole("combobox", { name: "语速常用值" })).toBeNull();
-    fireEvent.click(namedButton("语速常用值"));
-    expect(screen.queryByRole("menuitem", { name: "0.30×" })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: "1.70×" })).toBeNull();
-    fireEvent.click(await screen.findByRole("menuitem", { name: "0.75×" }));
-    expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
-    fireEvent.click(namedButton("试听当前参数"));
+    const dialog = (
+      await screen.findByLabelText("合成语速")
+    ).closest<HTMLElement>('[role="dialog"]')!;
+    const view = within(dialog);
+    expect(view.queryByRole("combobox", { name: "语速常用值" })).toBeNull();
+    fireEvent.click(namedButton("语速常用值", dialog));
+    const menu = within(
+      (await screen.findByText("0.75×")).closest<HTMLElement>('[role="menu"]')!
+    );
+    expect(menu.queryByRole("menuitem", { name: "0.30×" })).toBeNull();
+    expect(menu.queryByRole("menuitem", { name: "1.70×" })).toBeNull();
+    fireEvent.click(menu.getByRole("menuitem", { name: "0.75×" }));
+    expect(view.getByLabelText("合成语速")).toHaveValue("0.75");
+    fireEvent.click(namedButton("试听当前参数", dialog));
     await waitFor(() =>
       expect(api.speech.preview).toHaveBeenCalledWith(
         expect.objectContaining({ rate_percent: -25 }),
         expect.any(AbortSignal)
       )
     );
-    fireEvent.click(namedButton("试听原参数"));
+    fireEvent.click(namedButton("试听原参数", dialog));
     await waitFor(() => expect(api.speech.preview).toHaveBeenCalledTimes(2));
     expect(vi.mocked(api.speech.preview).mock.calls[1]![0]).toMatchObject({
       rate_percent: 0
     });
-    expect(screen.getByLabelText("合成语速")).toHaveValue("0.75");
+    expect(view.getByLabelText("合成语速")).toHaveValue("0.75");
   });
 
   it("展开直接显示 SSML，折叠时中止试听但保留手动原文", async () => {
