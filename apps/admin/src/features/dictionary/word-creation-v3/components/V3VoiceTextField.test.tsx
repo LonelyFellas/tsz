@@ -18,6 +18,7 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 import { useState } from "react";
+import { ConfigProvider } from "antd";
 import type { AudioUploadAdapter, VoiceSetting } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
@@ -2295,21 +2296,37 @@ it("业务保存以一次完整快照合并正文和参数，失败保留且连�
       </VoiceSaveContext.Provider>
     );
   }
-  render(<Host />);
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <Host />
+    </ConfigProvider>
+  );
   fireEvent.click(screen.getByLabelText("打开原子正文编辑器"));
   await screen.findByRole("toolbar", { name: "标注工具栏" });
-  fireEvent.click(
-    within(
-      await screen.findByRole("region", { name: "英式已获取音色" })
-    ).getByRole("button", { name: /^修改 / })
+  await waitFor(() =>
+    expect(screen.getByLabelText("英式已获取音色")).toBeVisible()
   );
-  fireEvent.change(screen.getByLabelText("当前音色语速"), {
+  const side = screen.getByLabelText("英式已获取音色");
+  const edit = within(side).getByLabelText(/^修改 /);
+  expect(edit).toBeVisible();
+  expect(edit).toBeEnabled();
+  fireEvent.click(edit);
+  await waitFor(() =>
+    expect(screen.getByLabelText("当前音色语速")).toBeVisible()
+  );
+  const rate = screen.getByLabelText("当前音色语速");
+  fireEvent.change(rate, {
     target: { value: "0.73" }
   });
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "保存配音设置" })).toBeEnabled()
-  );
-  fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
+  const detail = rate.closest<HTMLElement>('[role="dialog"]')!;
+  const save = within(detail)
+    .getByText("保存配音设置")
+    .closest<HTMLButtonElement>("button")!;
+  await waitFor(() => {
+    expect(save).toBeVisible();
+    expect(save).toBeEnabled();
+  });
+  fireEvent.click(save);
   fireEvent.change(screen.getByLabelText("原子正文"), {
     target: { value: "hello changed" }
   });
