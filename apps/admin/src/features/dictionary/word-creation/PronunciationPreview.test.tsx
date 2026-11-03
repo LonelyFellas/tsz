@@ -3,7 +3,8 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { VoicePreviewResult } from "@tsz/voice-editor/types";
@@ -206,9 +207,158 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("PronunciationPreview", () => {
+  it("已启用音色浮层成对展示语速和音量，并直接播放各版本的已生成音频", async () => {
+    vi.stubGlobal("Audio", AudioMock);
+    render(
+      <PronunciationPreviewProvider>
+        <PronunciationPreviewVoiceSummary
+          dialect="uk"
+          pronunciationId="pronunciation-stable-id"
+          content={{ version: 2, text: "tomato", annotations: [] }}
+          voiceProfile={{
+            voices: [
+              {
+                voice_id: "british-voice",
+                version_id: "slow",
+                enabled: true,
+                rate_percent: -15,
+                volume_percent: 65,
+                audio_asset_id: "slow-audio"
+              },
+              {
+                voice_id: "british-voice",
+                version_id: "normal",
+                enabled: true,
+                rate_percent: 0,
+                audio_asset_id: "normal-audio"
+              }
+            ]
+          }}
+        />
+      </PronunciationPreviewProvider>
+    );
+    await screen.findByText("British");
+    fireEvent.click(
+      screen.getByRole("button", { name: "查看英式全部 2 个音色" })
+    );
+    const list = await screen.findByRole("list", { name: "已启用音色" });
+    const rows = within(list).getAllByRole("listitem");
+    expect(within(rows[0]!).getByText("0.85×")).toBeInTheDocument();
+    expect(within(rows[0]!).getByText("65%")).toBeInTheDocument();
+    expect(within(rows[1]!).getByText("1.00×")).toBeInTheDocument();
+    expect(within(rows[1]!).getByText("100%")).toBeInTheDocument();
+    for (const [index, asset] of ["slow-audio", "normal-audio"].entries()) {
+      const play = within(rows[index]!).getByRole("button", {
+        name: "British 播放语音"
+      });
+      expect(play).toBeEnabled();
+      fireEvent.click(play);
+      await waitFor(() =>
+        expect(preview.resolveAudio).toHaveBeenLastCalledWith(
+          asset,
+          expect.anything()
+        )
+      );
+      await waitFor(() =>
+        expect(AudioMock.instances[index]?.play).toHaveBeenCalled()
+      );
+    }
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  });
+
+  it("局部合成回写后可直接播放，参数变更清除绑定后禁止复用旧音频", async () => {
+    const setting = {
+      voice_id: "british-voice",
+      enabled: true,
+      rate_percent: 0
+    };
+    const view = render(
+      <PreviewHarness voiceProfile={{ voices: [setting] }} />
+    );
+    const play = screen.getByLabelText("播放语音");
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+    expect(play).toBeDisabled();
+    view.rerender(
+      <PreviewHarness
+        voiceProfile={{
+          voices: [{ ...setting, audio_asset_id: "local-audio" }]
+        }}
+      />
+    );
+    expect(play).toBeEnabled();
+    fireEvent.click(play);
+    await waitFor(() =>
+      expect(AudioMock.instances[0]?.play).toHaveBeenCalled()
+    );
+    expect(preview.resolveAudio).toHaveBeenCalledWith(
+      "local-audio",
+      expect.anything()
+    );
+    expect(preview.synthesize).not.toHaveBeenCalled();
+    view.rerender(
+      <PreviewHarness
+        voiceProfile={{ voices: [{ ...setting, volume_percent: 65 }] }}
+      />
+    );
+    expect(play).toBeDisabled();
+    expect(AudioMock.instances[0]?.pause).toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    await waitFor(() =>
+      expect(preview.synthesize).toHaveBeenCalledWith(
+        expect.objectContaining({ volumePercent: 65 }),
+        expect.anything()
+      )
+    );
+    expect(preview.resolveAudio).toHaveBeenCalledOnce();
+  });
+
+  it("已有音频读取失败或地址过期时重新读取，不再次合成", async () => {
+    vi.useFakeTimers();
+    const dispose = vi.fn();
+    preview.resolveAudio
+      .mockRejectedValueOnce(new Error("正式音频暂不可用"))
+      .mockResolvedValueOnce(
+        result({
+          expiresAt: new Date(Date.now() + 1_000).toISOString(),
+          dispose
+        })
+      );
+    render(
+      <PreviewHarness
+        voiceProfile={{
+          voices: [
+            {
+              voice_id: "british-voice",
+              enabled: true,
+              rate_percent: 0,
+              audio_asset_id: "local-audio"
+            }
+          ]
+        }}
+      />
+    );
+    await act(async () => Promise.resolve());
+    const play = screen.getByLabelText("播放语音");
+    expect(play).toBeEnabled();
+    await act(async () => fireEvent.click(play));
+    expect(message.error).toHaveBeenCalledWith("正式音频暂不可用");
+    expect(play).toBeEnabled();
+    await act(async () => fireEvent.click(play));
+    expect(AudioMock.instances[0]?.play).toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(play).toBeEnabled();
+    await act(async () => fireEvent.click(play));
+    expect(preview.resolveAudio).toHaveBeenCalledTimes(3);
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  });
+
   it.each([
     [undefined, "100%"],
     [65, "65%"],

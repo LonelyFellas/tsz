@@ -1038,7 +1038,7 @@
   font-variant-numeric: tabular-nums;
 }
 .word-pronunciation-voice-list {
-  width: 268px;
+  width: 328px;
   max-width: calc(100vw - 60px);
   max-height: 300px;
   margin: 0;
@@ -1048,7 +1048,7 @@
 }
 .word-pronunciation-voice-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 48px auto;
+  grid-template-columns: minmax(0, 1fr) 48px 48px auto;
   align-items: center;
   gap: 12px;
   padding-block: 10px;
@@ -1076,7 +1076,8 @@
   font-size: 11px;
   line-height: 16px;
 }
-.word-pronunciation-voice-rate {
+.word-pronunciation-voice-rate,
+.word-pronunciation-voice-volume {
   color: #717986;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
