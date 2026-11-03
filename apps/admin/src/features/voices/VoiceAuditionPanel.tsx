@@ -1,4 +1,4 @@
-import { PlayCircleOutlined } from "@ant-design/icons";
+import { SoundOutlined } from "@ant-design/icons";
 import { Alert, Button, Collapse, Flex, Select, Space, Typography } from "antd";
 import {
   useCallback,
@@ -116,7 +116,7 @@ export function VoiceAuditionPanel({
             />
             <Button
               type="primary"
-              icon={<PlayCircleOutlined />}
+              icon={<SoundOutlined />}
               aria-label="试听当前参数"
               loading={pending}
               disabled={readOnly || !canAudition || !!issue}

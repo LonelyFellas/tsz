@@ -5,7 +5,7 @@ import {
 } from "./VoiceMetadataEditor";
 import { speechAccentGroup } from "@tsz/shared";
 import {
-  CaretRightOutlined,
+  SoundOutlined,
   FilterOutlined,
   ManOutlined,
   SearchOutlined,
@@ -385,7 +385,7 @@ export function VoiceCatalogTable({
                   classNames={{ root: `voice-accent-${voiceAccent(voice)}` }}
                   color="default"
                   variant={voice.alias === activeVoice ? "solid" : "outlined"}
-                  icon={<CaretRightOutlined />}
+                  icon={<SoundOutlined />}
                   aria-label={`试听 ${voice.display_name}`}
                   disabled={
                     !canGenerate ||
