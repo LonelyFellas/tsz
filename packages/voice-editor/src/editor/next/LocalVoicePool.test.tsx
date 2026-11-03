@@ -17,7 +17,8 @@ import type {
   VoicePreviewResult,
   VoiceProfile,
   VoiceRecommendation,
-  VoiceSetting
+  VoiceSetting,
+  VoiceEditorProps
 } from "../../types";
 import { VoiceEditor } from "./VoiceEditor";
 
@@ -131,7 +132,9 @@ function Harness({
   target = "target-a",
   content = { version: 2 as const, text: "hello", annotations: [] },
   audioAssets,
-  audioAdapter
+  audioAdapter,
+  mode,
+  locale
 }: {
   initial?: VoiceProfile;
   preview?: VoicePreviewAdapter;
@@ -142,6 +145,8 @@ function Harness({
   content?: { version: 2; text: string; annotations: [] };
   audioAssets?: AudioAsset[];
   audioAdapter?: AudioUploadAdapter;
+  mode?: VoiceEditorProps["mode"];
+  locale?: `en-${string}`;
 }) {
   const [profile, setProfile] = useState(initial);
   const loadRecommendations = useCallback(
@@ -152,6 +157,8 @@ function Harness({
     <ConfigProvider theme={{ token: { motion: false } }}>
       <App>
         <VoiceEditor
+          mode={mode}
+          locale={locale}
           value={content}
           onChange={vi.fn()}
           voiceProfile={profile}
@@ -185,6 +192,53 @@ async function detail(name = "a") {
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
+  it.each(["spelling", "phoneme-settings"] as const)(
+    "%s 目录试听遵循普通文本与音素的原生地区边界",
+    async (mode) => {
+      const australian: VoiceOption = {
+        ...options[0]!,
+        id: "au",
+        label: "Australian",
+        displayName: "Australian",
+        locale: "en-AU",
+        providerVoiceId: "en-AU-ANeural"
+      };
+      const synthesize = vi.fn().mockResolvedValue({
+        audioUrl: "blob:audio",
+        expiresAt: "2099-01-01",
+        cached: false
+      });
+      render(
+        <Harness
+          mode={mode}
+          locale="en-GB"
+          initial={pool([])}
+          preview={{
+            ...adapter(synthesize),
+            listVoices: vi.fn().mockResolvedValue([australian])
+          }}
+        />
+      );
+      fireEvent.click(screen.getByText("完整音色目录"));
+      const preview = await screen.findByRole("button", {
+        name: "试听目录音色 Australian"
+      });
+      if (mode === "phoneme-settings") {
+        expect(preview).toBeDisabled();
+        fireEvent.click(preview);
+        expect(synthesize).not.toHaveBeenCalled();
+      } else {
+        expect(preview).toBeEnabled();
+        fireEvent.click(preview);
+        await waitFor(() =>
+          expect(synthesize).toHaveBeenCalledWith(
+            expect.objectContaining({ voiceId: "au" }),
+            expect.anything()
+          )
+        );
+      }
+    }
+  );
   it("未选音色时显示简短说明，隐藏空表头", () => {
     render(<Harness initial={pool([])} />);
     const side = screen.getByRole("region", { name: "英式已获取音色" });
@@ -547,7 +601,15 @@ describe("新版局部主页和唯一声音草稿", () => {
   });
   it("共用参数表单清空必填值时禁止保存，修正后保留其他字段及原语速上限", async () => {
     const onProfile = vi.fn();
-    render(<Harness initial={pool([version("a")])} onProfile={onProfile} />);
+    const synthesize = vi.fn();
+    const generateAudio = vi.fn();
+    render(
+      <Harness
+        initial={pool([version("a")])}
+        onProfile={onProfile}
+        preview={{ ...adapter(synthesize), generateAudio }}
+      />
+    );
     const dialog = await detail();
     const rate = within(dialog).getByRole("spinbutton", {
       name: "当前音色语速"
@@ -555,6 +617,18 @@ describe("新版局部主页和唯一声音草稿", () => {
     const save = within(dialog).getByRole("button", { name: "保存配音设置" });
     fireEvent.change(rate, { target: { value: "" } });
     await waitFor(() => expect(save).toBeDisabled());
+    const preview = within(dialog).getByRole("button", {
+      name: "试听当前音色"
+    });
+    const generate = within(dialog).getByRole("button", {
+      name: "生成正式音频"
+    });
+    expect(preview).toBeDisabled();
+    expect(generate).toBeDisabled();
+    fireEvent.click(preview);
+    fireEvent.click(generate);
+    expect(synthesize).not.toHaveBeenCalled();
+    expect(generateAudio).not.toHaveBeenCalled();
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "当前音色音量" }),
       { target: { value: "65" } }

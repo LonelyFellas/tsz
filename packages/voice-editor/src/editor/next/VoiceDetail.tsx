@@ -111,7 +111,8 @@ export function VoiceDetail({
   const effectRef = useRef(currentEffect);
   effectRef.current = currentEffect;
   async function generate() {
-    if (!adapter?.generateAudio || !available || readOnly) return;
+    if (!adapter?.generateAudio || !available || readOnly || !parametersValid)
+      return;
     stop();
     request.current?.abort();
     const controller = new AbortController();
@@ -245,9 +246,14 @@ export function VoiceDetail({
                 onChange={(output_format) => patch({ output_format })}
               />
               <Button
-                disabled={!canAudition || (!available && !draft.audio_asset_id)}
+                disabled={
+                  !parametersValid ||
+                  !canAudition ||
+                  (!available && !draft.audio_asset_id)
+                }
                 loading={!!preview.pendingVoiceId}
                 onClick={() => {
+                  if (!parametersValid) return;
                   stopExternalAudio();
                   ssmlStop.current?.();
                   preview.audition(voice, draft);
@@ -257,7 +263,9 @@ export function VoiceDetail({
               </Button>
               {adapter?.generateAudio && (
                 <Button
-                  disabled={readOnly || !available || generating}
+                  disabled={
+                    readOnly || !parametersValid || !available || generating
+                  }
                   aria-busy={generating}
                   loading={generating}
                   onClick={() => void generate()}
@@ -301,6 +309,7 @@ export function VoiceDetail({
             )}
             {adapter?.renderSsml && (
               <SsmlReview
+                automaticAvailable={parametersValid}
                 adapter={adapter}
                 content={content}
                 settings={[effective]}

@@ -65,6 +65,7 @@ export function LocalVoicePool({
   recommendations,
   area,
   locale,
+  nativeAuditionLocale,
   content,
   sourceKey,
   adapter,
@@ -92,6 +93,7 @@ export function LocalVoicePool({
   recommendations: VoiceRecommendation[];
   area: VoiceRecommendationArea;
   locale?: AudioAssetLocale;
+  nativeAuditionLocale?: AudioAssetLocale;
   content: RichTextV2;
   sourceKey: string;
   adapter?: VoicePreviewAdapter;
@@ -324,9 +326,8 @@ export function LocalVoicePool({
       !(catalog ? canAuditionCatalog : canAudition) ||
       !!(locale && accent && locale !== accent) ||
       !!(
-        catalog &&
-        locale &&
-        voice.locale.toLowerCase() !== locale.toLowerCase()
+        nativeAuditionLocale &&
+        voice.locale.toLowerCase() !== nativeAuditionLocale.toLowerCase()
       ) ||
       (!item.audio_asset_id && !available);
     return (
@@ -843,7 +844,8 @@ export function LocalVoicePool({
                   {locale && (
                     <Typography.Paragraph type="secondary">
                       当前正文仅编辑{locale === "en-GB" ? "英式" : "美式"}
-                      局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。试听还需符合当前语言地区。
+                      局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。
+                      {nativeAuditionLocale && "试听还需符合当前语言地区。"}
                     </Typography.Paragraph>
                   )}
                 </div>

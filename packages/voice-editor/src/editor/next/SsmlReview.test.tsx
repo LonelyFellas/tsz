@@ -34,6 +34,45 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("参数无效时阻止自动SSML，但保留并允许独立手动原文试听", async () => {
+  const synthesizeSsml = vi
+    .fn()
+    .mockRejectedValue(new Error("manual preview reached"));
+  const adapter: VoicePreviewAdapter = {
+    listVoices: vi.fn(),
+    synthesize: vi.fn(),
+    renderSsml: vi.fn().mockResolvedValue(automatic),
+    synthesizeSsml
+  };
+  const props = { adapter, content, settings, onPlay: vi.fn(), expanded: true };
+  const view = render(<SsmlReview {...props} automaticAvailable />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("SSML 原文")).toHaveValue(automatic)
+  );
+  view.rerender(<SsmlReview {...props} automaticAvailable={false} />);
+  expect(screen.getByLabelText("SSML 原文")).toHaveValue("");
+  expect(screen.getByRole("button", { name: "试听 SSML" })).toBeDisabled();
+  view.rerender(<SsmlReview {...props} automaticAvailable />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("SSML 原文")).toHaveValue(automatic)
+  );
+  fireEvent.click(screen.getByLabelText("手动编辑 SSML"));
+  const raw = '<speak><voice name="Sonia">manual text</voice></speak>';
+  fireEvent.change(screen.getByLabelText("SSML 原文"), {
+    target: { value: raw }
+  });
+  view.rerender(<SsmlReview {...props} automaticAvailable={false} />);
+  expect(screen.getByLabelText("SSML 原文")).toHaveValue(raw);
+  expect(screen.getByRole("button", { name: "试听 SSML" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "试听 SSML" }));
+  await waitFor(() =>
+    expect(synthesizeSsml).toHaveBeenCalledWith(
+      expect.objectContaining({ ssml: raw }),
+      expect.anything()
+    )
+  );
+});
+
 it("手动试听、复制、下载使用同一原文，恢复自动生成且不修改版本配置", async () => {
   const writeText = vi.fn(async () => {});
   Object.defineProperty(navigator, "clipboard", {

@@ -3379,6 +3379,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         area={recommendationArea}
         locale={locale}
         content={generationContent}
+        nativeAuditionLocale={
+          mode === "synthesis" || mode === "phoneme-settings"
+            ? locale
+            : undefined
+        }
         sourceKey={audioContentKey}
         adapter={
           previewIsMock || !previewEnabled

@@ -105,30 +105,34 @@ function Cells({ forms }: { forms: SharedFormsStepContentV3 }) {
   );
 }
 function Harness({
-  initial = fixture()
+  initial = fixture(),
+  disabled = false
 }: {
   initial?: SharedFormsStepContentV3;
+  disabled?: boolean;
 }) {
   const [forms, setForms] = useState(initial);
   return (
     <ConfigProvider theme={{ token: { motion: false } }}>
       <App>
-        <V3FormCopyProvider forms={forms} onChange={setForms}>
-          <Cells forms={forms} />
-          <EditProbe />
-          <button
-            onClick={() => {
-              const next = structuredClone(forms);
-              const region = next.contents[1]!.regional_variants;
-              if (region.mode === "common")
-                region.common.pronunciations[0]!.actual_pron = "later-edit";
-              setForms(next);
-            }}
-          >
-            随后编辑目标
-          </button>
-        </V3FormCopyProvider>
-        <output data-testid="forms">{JSON.stringify(forms)}</output>
+        <ConfigProvider componentDisabled={disabled}>
+          <V3FormCopyProvider forms={forms} onChange={setForms}>
+            <Cells forms={forms} />
+            <EditProbe />
+            <button
+              onClick={() => {
+                const next = structuredClone(forms);
+                const region = next.contents[1]!.regional_variants;
+                if (region.mode === "common")
+                  region.common.pronunciations[0]!.actual_pron = "later-edit";
+                setForms(next);
+              }}
+            >
+              随后编辑目标
+            </button>
+          </V3FormCopyProvider>
+          <output data-testid="forms">{JSON.stringify(forms)}</output>
+        </ConfigProvider>
       </App>
     </ConfigProvider>
   );
@@ -365,6 +369,26 @@ describe("词形复制交互", () => {
     );
     expect(targetPronunciation().actual_pron).toBe("source");
   }, 15000);
+
+  it("通知出现后页面锁定时不可撤销，解锁后才允许改回草稿", async () => {
+    const initial = fixture();
+    const view = render(<Harness initial={initial} />);
+    begin();
+    fireEvent.click(screen.getByTestId("phonetics-1"));
+    await screen.findByRole("button", { name: "撤销" });
+    view.rerender(<Harness initial={initial} disabled />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "撤销" })).toBeDisabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
+    expect(targetPronunciation().actual_pron).toBe("source");
+    view.rerender(<Harness initial={initial} />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "撤销" })).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
+    expect(current()).toEqual(initial);
+  });
 
   it("后续编辑阻止撤销覆盖新值", async () => {
     render(<Harness />);

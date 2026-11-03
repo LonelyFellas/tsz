@@ -19,12 +19,14 @@ export function SsmlReview({
   singleVoice,
   expanded,
   draft,
-  onDraftChange
+  onDraftChange,
+  automaticAvailable = true
 }: {
   singleVoice?: boolean;
   expanded?: boolean;
   draft?: SsmlDraft;
   onDraftChange?: (draft: SsmlDraft) => void;
+  automaticAvailable?: boolean;
   adapter: VoicePreviewAdapter;
   content: RichTextV2;
   settings: VoiceSetting[];
@@ -71,7 +73,10 @@ export function SsmlReview({
   useEffect(() => stop, [stop]);
   useEffect(() => {
     stop();
-    if (!open || !selected || !adapter.renderSsml) return;
+    setLoading(false);
+    setAutomatic("");
+    if (!open || !selected || !adapter.renderSsml || !automaticAvailable)
+      return;
     const controller = new AbortController();
     setLoading(true);
     setAutomatic("");
@@ -90,11 +95,17 @@ export function SsmlReview({
       });
     return () => controller.abort();
     // The serialized key captures the actual source and selected version, not object identity.
-  }, [open, inputKey, adapter, stop]);
+  }, [open, inputKey, adapter, stop, automaticAvailable]);
 
   const value = manual ? (raw ?? "") : automatic;
   async function preview() {
-    if (!adapter.synthesizeSsml || !selected || !value) return;
+    if (
+      !adapter.synthesizeSsml ||
+      !selected ||
+      !value ||
+      (!manual && !automaticAvailable)
+    )
+      return;
     stop();
     onPlay();
     const controller = new AbortController();
@@ -162,7 +173,7 @@ export function SsmlReview({
         )}
         <Switch
           checked={manual}
-          disabled={!automatic || loading}
+          disabled={!manual && ((!automatic && raw == null) || loading)}
           onChange={(checked) => {
             stop();
             changeDraft({
@@ -206,10 +217,20 @@ export function SsmlReview({
           changeDraft({ manual: true, raw: event.target.value });
         }}
       />
+      {!manual && !automaticAvailable && (
+        <Typography.Text type="secondary">
+          请先填写有效参数，再自动生成 SSML。
+        </Typography.Text>
+      )}
       <Space wrap>
         <Button
           size="small"
-          disabled={!value || loading || !adapter.synthesizeSsml}
+          disabled={
+            !value ||
+            loading ||
+            !adapter.synthesizeSsml ||
+            (!manual && !automaticAvailable)
+          }
           loading={pending}
           onClick={() => void preview()}
         >
