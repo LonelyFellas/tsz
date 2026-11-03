@@ -940,16 +940,18 @@ it("未配置的音素设置器采用首位推荐，完成时保存参数", asyn
   expect(screen.getByLabelText("设置 Sonia 的语速")).toHaveTextContent("0.75");
 });
 
-it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保存；取消不影响字段试听", async () => {
-  renderWithUps(<Harness dialect="common" settingsPhrase />);
-  const wire = () =>
-    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
-  for (const [accent, side, alphabet, duration, voice, voiceId] of [
-    ["英式", "uk", "IPA", 500, "Sonia", "en-gb-sonia"],
-    ["美式", "us", "IPA", 1000, "Aria", "en-us-aria"],
-    ["英式", "uk", "UPS", 2000, "Sonia", "en-gb-sonia"],
-    ["美式", "us", "UPS", 3000, "Aria", "en-us-aria"]
-  ] as const) {
+it.each([
+  ["英式", "uk", "IPA", 500, "Sonia", "en-gb-sonia"],
+  ["美式", "us", "IPA", 1000, "Aria", "en-us-aria"],
+  ["英式", "uk", "UPS", 2000, "Sonia", "en-gb-sonia"],
+  ["美式", "us", "UPS", 3000, "Aria", "en-us-aria"]
+] as const)(
+  "%s %s %s TTS 设置器完成后独立保存，取消不影响字段试听",
+  async (accent, side, alphabet, duration, voice, voiceId) => {
+    renderWithUps(<Harness dialect="common" settingsPhrase />);
+    const wire = () =>
+      JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+    const initial = wire();
     const label = `第 1 条发音 ${accent} Azure ${alphabet}`;
     fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
     const dialog = await screen.findByRole("dialog", {
@@ -974,7 +976,7 @@ it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保�
     fireEvent.mouseDown(
       dialog.querySelectorAll(".tsz-ve-gap")[alphabet === "UPS" ? 2 : 0]!
     );
-    const poolPreview = await screen.findByRole("button", {
+    const poolPreview = await within(dialog).findByRole("button", {
       name: `试听 ${voice}`
     });
     fireEvent.click(poolPreview);
@@ -1001,31 +1003,29 @@ it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保�
       wire().synthesis[side][`${alphabet.toLowerCase()}_speech`].content
         .annotations
     ).toEqual([{ type: "pause", at: 3, duration_ms: duration }]);
-  }
-  const saved = wire();
-  const label = "第 1 条发音 英式 Azure IPA";
-  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
-  const dialog = await screen.findByRole("dialog", {
-    name: `${label} · 音标、停顿与音色`
-  });
-  const sonia = () =>
-    dialog.querySelector<HTMLElement>('[aria-label="选用 Sonia"]')!;
-  await waitFor(() => expect(sonia()).not.toBeNull());
-  expect(sonia()).toBeChecked();
-  fireEvent.click(sonia());
-  fireEvent.click(
-    dialog.querySelector<HTMLElement>(`[aria-label="取消${label}设置"]`)!
-  );
-  await waitFor(() => expect(dialog).not.toBeInTheDocument());
-  expect(wire()).toEqual(saved);
-  for (const [accent, duration] of [
-    ["英式", 500],
-    ["美式", 1000]
-  ] as const) {
-    const play = screen.getByLabelText(
-      `第 1 条发音 ${accent} Azure IPA 最终读音 播放语音`
-    );
+    const saved = wire();
+    const field = `${alphabet.toLowerCase()}_speech`;
+    expect(saved.synthesis).toEqual({
+      ...initial.synthesis,
+      [side]: {
+        ...initial.synthesis[side],
+        [field]: saved.synthesis[side][field]
+      }
+    });
+    fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+    const reopened = await screen.findByRole("dialog", {
+      name: `${label} · 音标、停顿与音色`
+    });
+    const selectedVoice = () =>
+      within(reopened).getByLabelText(`选用 ${voice}`);
+    await waitFor(() => expect(selectedVoice()).toBeChecked());
+    fireEvent.click(selectedVoice());
+    fireEvent.click(within(reopened).getByLabelText(`取消${label}设置`));
+    await waitFor(() => expect(reopened).not.toBeInTheDocument());
+    expect(wire()).toEqual(saved);
+    const play = screen.getByLabelText(`${label} 最终读音 播放语音`);
     await waitFor(() => expect(play).toBeEnabled());
+    speech.synthesize.mockClear();
     fireEvent.click(play);
     await waitFor(() =>
       expect(speech.synthesize).toHaveBeenLastCalledWith(
@@ -1040,4 +1040,4 @@ it("四个 TTS 设置器提供音标编辑、停顿和音色，完成各自保�
       )
     );
   }
-}, 20000);
+);
