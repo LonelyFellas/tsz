@@ -252,13 +252,37 @@ describe("音色目录表格", () => {
     expect(names(container)).toEqual(["Ava"]);
   });
 
-  it("角色无与未知分别筛选，清除后可切换", async () => {
+  it("角色单选切换会替换旧条件，并区分无与未知", async () => {
     const { container } = mount();
     await select("可选角色", "无");
     expect(names(container)).toEqual(["Sonia", "Ana"]);
-    resetFilters();
     await select("可选角色", "未提供");
     expect(names(container)).toEqual(["Unknown"]);
+  });
+
+  it("风格单选替换旧条件，与角色组合，分别清空恢复全部", async () => {
+    const { container } = mount([
+      sonia,
+      { ...voices[1]!, capabilities: { ...sonia.capabilities, styles: [] } },
+      {
+        ...voices[2]!,
+        capabilities: { ...sonia.capabilities, styles: ["sad"] }
+      }
+    ]);
+    await select("可选风格", "愉快");
+    expect(names(container)).toEqual(["Sonia"]);
+    await select("可选风格", "悲伤");
+    expect(names(container)).toEqual(["Ava"]);
+    await select("可选角色", "无");
+    expect(names(container)).toEqual([]);
+    const clear = (label: string) => {
+      const control = visibleControl(label).closest(".ant-select")!;
+      fireEvent.click(control.querySelector(".ant-select-clear")!);
+    };
+    clear("可选风格");
+    expect(names(container)).toEqual(["Sonia", "Ana"]);
+    clear("可选角色");
+    expect(names(container)).toEqual(["Ava", "Sonia", "Ana"]);
   });
 
   it("名称排序可切换方向，并与年龄筛选联动", async () => {

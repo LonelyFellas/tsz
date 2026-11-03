@@ -303,21 +303,26 @@ export function VoiceCatalogTable({
     label: string,
     labels?: Record<string, string>
   ) {
+    const single = key === "style" || key === "role";
     return (
       <div className="voice-catalog-heading">
         <span>{label}</span>
         <Select
-          mode="multiple"
+          mode={single ? undefined : "multiple"}
           disabled={metadataEditing}
           aria-label={label}
           placeholder="全部"
           allowClear
+          showSearch
           maxTagCount="responsive"
-          value={filters[key] ?? []}
+          value={single ? filters[key]?.[0] : (filters[key] ?? [])}
           options={options(key, labels)}
           optionFilterProp="searchText"
           onChange={(value) => {
-            setFilters((old) => ({ ...old, [key]: value }));
+            setFilters((old) => ({
+              ...old,
+              [key]: typeof value === "string" ? [value] : (value ?? [])
+            }));
             setPage(1);
           }}
         />
