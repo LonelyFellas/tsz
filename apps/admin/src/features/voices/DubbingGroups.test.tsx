@@ -160,15 +160,14 @@ function mount(initial = data(), voices = [uk, us]) {
   );
   return { client, router, onAudition, onDirtyChange, ...view };
 }
-function choose(name: string) {
-  fireEvent.click(screen.getByLabelText(`选择分组 ${name}`));
+function groupPanel(name: string) {
   const panel = screen.getByLabelText(`${name} 分组配置`);
   expect(panel).toBeVisible();
   return panel;
 }
 function button(name: string | RegExp, container?: HTMLElement) {
   const view = container ? within(container) : screen;
-  // 工作台保留隐藏分组；按公开标签/文字定位，再排除隐藏面板，避免逐个计算整页按钮样式。
+  // 按公开标签/文字定位，避免逐个计算整页按钮样式。
   const labelled = view
     .queryAllByLabelText(name)
     .filter((node) => node.matches('button, [role="button"]'));
@@ -189,7 +188,7 @@ function closeDialog() {
   fireEvent.click(button(/^取\s*消$/, screen.getByRole("dialog")));
 }
 async function rename(name: string, next: string) {
-  const panel = choose(name);
+  const panel = groupPanel(name);
   fireEvent.click(button("编辑分组", panel));
   fireEvent.change(screen.getByLabelText("分组名称"), {
     target: { value: next }
@@ -259,15 +258,26 @@ function selectVoice(name: string) {
 }
 
 describe("分组工作台与逐组草稿", () => {
-  it("默认打开全局兜底，只显示一个组；切组保留草稿，保存 B 不提交 A", async () => {
+  it("多组表格按优先级同时展示，全局兜底固定末位；保存 B 不提交 A", async () => {
     const { client } = mount();
     expect(
       screen.getByRole("region", { name: "全局常用 分组配置" })
     ).toBeVisible();
-    expect(screen.queryByRole("region", { name: "A 分组配置" })).toBeNull();
+    expect(
+      screen
+        .getAllByRole("region")
+        .map((node) => node.getAttribute("aria-label"))
+    ).toEqual(["A 分组配置", "B 分组配置", "全局常用 分组配置"]);
+    for (const name of ["A", "B", "全局常用"]) {
+      expect(
+        screen.getByRole("table", { name: `${name}英美推荐` })
+      ).toBeVisible();
+    }
+    expect(screen.getByLabelText("上移分组 A")).toBeDisabled();
+    expect(screen.getByLabelText("下移分组 B")).toBeDisabled();
     await rename("A", "A草稿");
     await rename("B", "B已完成");
-    fireEvent.click(button("保存当前组", choose("B已完成")));
+    fireEvent.click(button("保存当前组", groupPanel("B已完成")));
     await screen.findByText(/配音已保存。/);
     expect(api.speech.savePairedGroup).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -280,13 +290,37 @@ describe("分组工作台与逐组草稿", () => {
       (client.getQueryData(queryKey) as AdminDubbingGroupsV3Response).groups[0]!
         .name
     ).toBe("A");
-    fireEvent.click(button("取消修改", choose("A草稿")));
-    expect(screen.getByLabelText("选择分组 A")).toBeVisible();
+    fireEvent.click(button("取消修改", groupPanel("A草稿")));
+    expect(screen.getByLabelText("A 分组配置")).toBeVisible();
     expect(api.speech.saveGroup).not.toHaveBeenCalled();
+  });
+  it("删除推荐须二次确认，取消保留原套，确认只修改本组草稿", async () => {
+    mount();
+    const a = groupPanel("A"),
+      b = groupPanel("B");
+    fireEvent.click(button("移除推荐 A推荐", a));
+    await waitFor(() =>
+      expect(screen.getByText("删除推荐「A推荐」？")).toBeVisible()
+    );
+    expect(within(a).getByLabelText("推荐名称 1")).toHaveValue("A推荐");
+    expect(button("保存当前组", a)).toBeDisabled();
+    fireEvent.click(button(/^取\s*消$/, screen.getByRole("tooltip")));
+    await waitFor(() =>
+      expect(screen.queryByText("删除推荐「A推荐」？")).toBeNull()
+    );
+    expect(within(a).getByLabelText("推荐名称 1")).toHaveValue("A推荐");
+    expect(button("保存当前组", a)).toBeDisabled();
+    fireEvent.click(button("移除推荐 A推荐", a));
+    fireEvent.click(button(/^删\s*除$/, screen.getByRole("tooltip")));
+    expect(within(a).queryByLabelText("推荐名称 1")).toBeNull();
+    expect(button("保存当前组", a)).toBeEnabled();
+    expect(within(b).getByLabelText("推荐名称 1")).toHaveValue("B推荐");
+    expect(button("保存当前组", b)).toBeDisabled();
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
   });
   it("单侧抽屉只调整本侧，应用后仍须保存当前组，保留双侧身份", async () => {
     mount();
-    const panel = choose("A");
+    const panel = groupPanel("A");
     fireEvent.click(button("修改英式 A推荐", panel));
     expect(screen.getByRole("dialog", { name: /英式声音/ })).toBeVisible();
     expect(screen.getByLabelText("英式音色")).toBeInTheDocument();
@@ -315,7 +349,7 @@ describe("分组工作台与逐组草稿", () => {
   });
   it("打开或取消声音抽屉不制造草稿，取消参数不污染原配置", () => {
     mount();
-    const panel = choose("A");
+    const panel = groupPanel("A");
     fireEvent.click(button("修改英式 A推荐", panel));
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.73" }
@@ -324,9 +358,9 @@ describe("分组工作台与逐组草稿", () => {
     expect(button("保存当前组", panel)).toBeDisabled();
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
   });
-  it("推荐弹窗取消或关闭、往返切组及取消当前组，都保留其他组已应用的草稿", async () => {
+  it("推荐弹窗取消或关闭、跨组编辑及取消当前组，都保留其他组已应用的草稿", async () => {
     mount();
-    const a = choose("A");
+    const a = groupPanel("A");
     fireEvent.change(within(a).getByLabelText("推荐名称 1"), {
       target: { value: "A推荐草稿" }
     });
@@ -336,14 +370,17 @@ describe("分组工作台与逐组草稿", () => {
     });
     fireEvent.click(button("保存到本组", screen.getByRole("dialog")));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    fireEvent.change(within(choose("全局常用")).getByLabelText("推荐名称 1"), {
-      target: { value: "全局推荐草稿" }
-    });
-    const b = choose("B");
+    fireEvent.change(
+      within(groupPanel("全局常用")).getByLabelText("推荐名称 1"),
+      {
+        target: { value: "全局推荐草稿" }
+      }
+    );
+    const b = groupPanel("B");
     fireEvent.change(within(b).getByLabelText("推荐名称 1"), {
       target: { value: "B推荐草稿" }
     });
-    fireEvent.click(button("新增整套推荐", b));
+    fireEvent.click(button("新增推荐", b));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "取消的新推荐" }
     });
@@ -367,13 +404,13 @@ describe("分组工作台与逐组草稿", () => {
     expect(b.textContent).toContain("0.80");
     fireEvent.click(button("取消修改", b));
     expect(within(b).getByLabelText("推荐名称 1")).toHaveValue("B推荐");
-    expect(within(choose("A")).getByLabelText("推荐名称 1")).toHaveValue(
+    expect(within(groupPanel("A")).getByLabelText("推荐名称 1")).toHaveValue(
       "A推荐草稿"
     );
     expect(a.textContent).toContain("0.73");
-    expect(within(choose("全局常用")).getByLabelText("推荐名称 1")).toHaveValue(
-      "全局推荐草稿"
-    );
+    expect(
+      within(groupPanel("全局常用")).getByLabelText("推荐名称 1")
+    ).toHaveValue("全局推荐草稿");
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
   });
   it("离开确认的关闭和继续编辑都保留各组草稿", async () => {
@@ -388,15 +425,15 @@ describe("分组工作台与逐组草稿", () => {
       fireEvent.click(button(action, dialog));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(router.state.location.pathname).toBe("/");
-      expect(button("保存当前组", choose("A草稿"))).toBeEnabled();
-      expect(button("保存当前组", choose("B草稿"))).toBeEnabled();
+      expect(button("保存当前组", groupPanel("A草稿"))).toBeEnabled();
+      expect(button("保存当前组", groupPanel("B草稿"))).toBeEnabled();
     }
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
   });
   it("完整英美套须人工选齐；复制保留参数但生成新的套及侧身份", async () => {
     mount();
-    const panel = choose("A");
-    fireEvent.click(button("新增整套推荐", panel));
+    const panel = groupPanel("A");
+    fireEvent.click(button("新增推荐", panel));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "新套" }
     });
@@ -435,7 +472,7 @@ describe("分组工作台与逐组草稿", () => {
       us: { ...rec[0]!.us, id: "second-us" }
     });
     mount(initial);
-    const panel = choose("A");
+    const panel = groupPanel("A");
     fireEvent.click(button("上移推荐 第二套", panel));
     fireEvent.click(button("保存当前组", panel));
     await screen.findByText(/配音已保存。/);
@@ -454,8 +491,8 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.click(button("新增分组"));
     closeDialog();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.queryByLabelText("选择分组 新分组")).toBeNull();
-    expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
+    expect(screen.queryByLabelText("新分组 分组配置")).toBeNull();
+    expect(screen.getByLabelText("A草稿 分组配置")).toBeVisible();
   });
   it.each(["cancel", "failure"])(
     "删除分组 %s 后仍保留编辑表单和其他组草稿",
@@ -466,7 +503,7 @@ describe("分组工作台与逐组草稿", () => {
         );
       mount();
       await rename("A", "A草稿");
-      fireEvent.click(button("编辑分组", choose("B")));
+      fireEvent.click(button("编辑分组", groupPanel("B")));
       fireEvent.change(screen.getByLabelText("分组名称"), {
         target: { value: "B尚未应用" }
       });
@@ -487,8 +524,8 @@ describe("分组工作台与逐组草稿", () => {
       expect(screen.getByLabelText("分组名称")).toHaveValue("B尚未应用");
       fireEvent.click(button("应用到本组", screen.getByRole("dialog")));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      expect(screen.getByLabelText("选择分组 B尚未应用")).toBeVisible();
-      expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
+      expect(screen.getByLabelText("B尚未应用 分组配置")).toBeVisible();
+      expect(screen.getByLabelText("A草稿 分组配置")).toBeVisible();
       if (action === "cancel")
         expect(api.speech.deleteGroupV3).not.toHaveBeenCalled();
     }
@@ -496,7 +533,7 @@ describe("分组工作台与逐组草稿", () => {
   it("删除成功才关闭编辑表单，其他分组草稿继续保留", async () => {
     mount();
     await rename("A", "A草稿");
-    fireEvent.click(button("编辑分组", choose("B")));
+    fireEvent.click(button("编辑分组", groupPanel("B")));
     fireEvent.change(screen.getByLabelText("分组名称"), {
       target: { value: "B未应用修改" }
     });
@@ -507,11 +544,11 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.click(button("删除分组", confirmation));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(api.speech.deleteGroupV3).toHaveBeenCalledWith("b", 1);
-    expect(button("保存当前组", choose("A草稿"))).toBeEnabled();
-    expect(screen.queryByLabelText("选择分组 B")).toBeNull();
+    expect(button("保存当前组", groupPanel("A草稿"))).toBeEnabled();
+    expect(screen.queryByLabelText("B 分组配置")).toBeNull();
   });
   it.each(["cancel", "close"])(
-    "未保存分组重新管理板块后 %s 只取消本次表单，不删除整组草稿",
+    "未保存分组重新编辑分组后 %s 只取消本次表单，不删除整组草稿",
     async (action) => {
       mount();
       fireEvent.click(button("新增分组"));
@@ -520,7 +557,7 @@ describe("分组工作台与逐组草稿", () => {
       });
       fireEvent.click(button("应用到本组", screen.getByRole("dialog")));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      fireEvent.click(button("新增整套推荐", choose("未保存分组")));
+      fireEvent.click(button("新增推荐", groupPanel("未保存分组")));
       fireEvent.change(screen.getByLabelText("推荐名称"), {
         target: { value: "保留推荐" }
       });
@@ -528,15 +565,15 @@ describe("分组工作台与逐组草稿", () => {
       selectVoice("Guy 男声");
       fireEvent.click(button("保存整套推荐", screen.getByRole("dialog")));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      fireEvent.click(button("管理板块", choose("未保存分组")));
+      fireEvent.click(button("编辑分组", groupPanel("未保存分组")));
       fireEvent.change(screen.getByLabelText("分组名称"), {
         target: { value: "不要应用的名称" }
       });
       if (action === "cancel") closeDialog();
       else fireEvent.click(button("Close", screen.getByRole("dialog")));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      expect(screen.getByLabelText("选择分组 未保存分组")).toBeVisible();
-      const panel = choose("未保存分组");
+      expect(screen.getByLabelText("未保存分组 分组配置")).toBeVisible();
+      const panel = groupPanel("未保存分组");
       expect(within(panel).getByLabelText("推荐名称 1")).toHaveValue(
         "保留推荐"
       );
@@ -553,7 +590,6 @@ describe("分组工作台与逐组草稿", () => {
     });
     fireEvent.click(button("应用到本组", screen.getByRole("dialog")));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    fireEvent.click(button("调整顺序"));
     expect(screen.getByLabelText("上移分组 临时组")).toBeDisabled();
     fireEvent.click(screen.getByLabelText("上移分组 B"));
     await screen.findByText("分组顺序已保存，未完成内容仍保留在各组草稿。");
@@ -561,9 +597,9 @@ describe("分组工作台与逐组草稿", () => {
       group_ids: ["b", "a", "global"],
       base_revision: 8
     });
-    fireEvent.click(button("取消修改", choose("临时组")));
-    expect(screen.queryByLabelText("选择分组 临时组")).toBeNull();
-    expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
+    fireEvent.click(button("取消修改", groupPanel("临时组")));
+    expect(screen.queryByLabelText("临时组 分组配置")).toBeNull();
+    expect(screen.getByLabelText("A草稿 分组配置")).toBeVisible();
   });
   it.each(["save", "order"])(
     "%s 的真实版本冲突保留各组草稿与参数",
@@ -574,11 +610,10 @@ describe("分组工作台与逐组草稿", () => {
       else vi.mocked(api.speech.saveGroupOrder).mockRejectedValueOnce(conflict);
       mount();
       await rename("A", "A保留");
-      const b = choose("B");
+      const b = groupPanel("B");
       fireEvent.click(within(b).getByLabelText("选用 B推荐"));
       if (command === "save") fireEvent.click(button("保存当前组", b));
       else {
-        fireEvent.click(button("调整顺序"));
         fireEvent.click(screen.getByLabelText("上移分组 B"));
       }
       await screen.findByText(
@@ -586,7 +621,7 @@ describe("分组工作台与逐组草稿", () => {
           ? /本组已被修改或名称已被使用/
           : /分组集合或顺序已变化/
       );
-      expect(screen.getByLabelText("选择分组 A保留")).toBeVisible();
+      expect(screen.getByLabelText("A保留 分组配置")).toBeVisible();
       expect(within(b).getByLabelText("选用 B推荐")).not.toBeChecked();
       expect(button("保存当前组", b)).toBeEnabled();
     }
@@ -597,7 +632,7 @@ describe("分组工作台与逐组草稿", () => {
     );
     mount();
     await rename("A", "A草稿");
-    const b = choose("B");
+    const b = groupPanel("B");
     fireEvent.click(button("编辑分组", b));
     fireEvent.mouseDown(screen.getByLabelText("使用板块"));
     fireEvent.click(
@@ -609,7 +644,7 @@ describe("分组工作台与逐组草稿", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(within(b).getByLabelText("选用 B推荐"));
     fireEvent.click(button("保存当前组", b));
-    await screen.findByText("保存失败，本组全部草稿已保留，请重试。");
+    await within(b).findByText("保存失败，本组全部草稿已保留，请重试。");
     const input = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0];
     expect(input.group.areas).toEqual(["example", "word"]);
     expect(input.group.pairs[0]!.selected).toBe(false);
@@ -618,7 +653,29 @@ describe("分组工作台与逐组草稿", () => {
     expect(vi.mocked(api.speech.savePairedGroup).mock.calls[1]![0]).toEqual(
       input
     );
-    expect(screen.getByLabelText("选择分组 A草稿")).toBeVisible();
+    expect(screen.getByLabelText("A草稿 分组配置")).toBeVisible();
+  });
+  it("各组保存校验错误独立显示，取消一组不清除另一组的错误", async () => {
+    mount();
+    const a = groupPanel("A"),
+      b = groupPanel("B");
+    for (const panel of [a, b]) {
+      fireEvent.change(within(panel).getByLabelText("推荐名称 1"), {
+        target: { value: "" }
+      });
+      fireEvent.click(button("保存当前组", panel));
+      expect(within(panel).getByText("请填写推荐名称。")).toBeVisible();
+    }
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
+    fireEvent.click(button("取消修改", a));
+    expect(within(a).queryByText("请填写推荐名称。")).toBeNull();
+    expect(within(b).getByText("请填写推荐名称。")).toBeVisible();
+    fireEvent.change(within(b).getByLabelText("推荐名称 1"), {
+      target: { value: "B推荐" }
+    });
+    fireEvent.click(button("保存当前组", b));
+    await screen.findByText(/配音已保存。/);
+    expect(within(b).queryByText("请填写推荐名称。")).toBeNull();
   });
   it("保存时取消旧分组 GET，迟到结果不能覆盖新配置；撤销权限仍能取消草稿", async () => {
     const late = deferred<AdminDubbingGroupsV3Response>();
@@ -626,12 +683,12 @@ describe("分组工作台与逐组草稿", () => {
     vi.mocked(api.speech.groupsV3).mockReturnValue(late.promise);
     vi.mocked(api.speech.savePairedGroup).mockReturnValue(saved.promise);
     const { client } = mount();
-    const a = choose("A");
+    const a = groupPanel("A");
     fireEvent.click(within(a).getByLabelText("选用 A推荐"));
-    const b = choose("B");
+    const b = groupPanel("B");
     fireEvent.click(within(b).getByLabelText("选用 B推荐"));
     void client.refetchQueries({ queryKey });
-    fireEvent.click(button("保存当前组", choose("A")));
+    fireEvent.click(button("保存当前组", groupPanel("A")));
     const fresh = data();
     fresh.revision = 9;
     fresh.groups[0]!.revision = 2;
@@ -640,7 +697,7 @@ describe("分组工作台与逐组草稿", () => {
     await act(async () => late.resolve(data()));
     expect(client.getQueryData(queryKey)).toEqual(fresh);
     act(() => setPermissions(["words.access"]));
-    choose("B");
+    groupPanel("B");
     expect(button("保存当前组", b)).toBeDisabled();
     fireEvent.click(button("取消修改", b));
     expect(within(b).queryByRole("button", { name: "保存当前组" })).toBeNull();
@@ -667,7 +724,7 @@ describe("分组工作台与逐组草稿", () => {
         }
       })
       .catch(() => undefined);
-    const panel = choose("A");
+    const panel = groupPanel("A");
     fireEvent.click(within(panel).getByLabelText("选用 A推荐"));
     fireEvent.click(button("保存当前组", panel));
     await screen.findByText(/配音已保存。/);
@@ -693,24 +750,24 @@ describe("分组工作台与逐组草稿", () => {
     );
     vi.mocked(api.speech.groupsV3).mockResolvedValue(fresh);
     mount();
-    const panel = choose("A");
+    const panel = groupPanel("A");
     fireEvent.click(within(panel).getByLabelText("选用 A推荐"));
     fireEvent.click(button("保存当前组", panel));
     await screen.findByText(/本组已被修改或名称已被使用/);
     fireEvent.click(button("取消修改", panel));
-    await screen.findByLabelText("选择分组 远端A");
+    await screen.findByLabelText("远端A 分组配置");
     expect(screen.queryByText(/本组已被修改或名称已被使用/)).toBeNull();
   });
   it("全局不能改名、删除、绑定板块或排序，清空推荐可保存", async () => {
     mount();
-    const panel = choose("全局常用");
+    const panel = groupPanel("全局常用");
     expect(
       within(panel).queryByRole("button", { name: "编辑分组" })
     ).toBeNull();
     expect(screen.queryByRole("button", { name: /删除分组/ })).toBeNull();
-    fireEvent.click(button("调整顺序"));
     expect(screen.queryByLabelText("上移分组 全局常用")).toBeNull();
     fireEvent.click(button("移除推荐 全局常用推荐", panel));
+    fireEvent.click(button(/^删\s*除$/, screen.getByRole("tooltip")));
     fireEvent.click(button("保存当前组", panel));
     await screen.findByText(/配音已保存。/);
     expect(
@@ -731,7 +788,7 @@ describe("分组工作台与逐组草稿", () => {
       us: [{ ...old.us, name: "原美式", selected: true }]
     };
     mount(initial);
-    const panel = choose("全局常用");
+    const panel = groupPanel("全局常用");
     expect(within(panel).queryByText(old.uk.id)).toBeNull();
     fireEvent.click(button("核对声音", panel));
     expect(button("确认组合", screen.getByRole("dialog"))).toBeDisabled();
@@ -765,7 +822,7 @@ describe("分组工作台与逐组草稿", () => {
       us: [{ ...old.us, name: "旧美", selected: true }]
     };
     mount(initial);
-    const panel = choose("A");
+    const panel = groupPanel("A");
     fireEvent.click(button("核对声音", panel));
     fireEvent.click(button("新增一套组合", screen.getByRole("dialog")));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
@@ -787,7 +844,7 @@ describe("分组工作台与逐组草稿", () => {
     closeDialog();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await rename("B", "B草稿");
-    choose("A");
+    groupPanel("A");
     fireEvent.click(button("核对声音", panel));
     await waitFor(() =>
       expect(
@@ -832,7 +889,7 @@ describe("分组工作台与逐组草稿", () => {
       display_name: `Female${i}`
     }));
     mount(data(), [...many, uk, us]);
-    fireEvent.click(button("新增整套推荐", choose("A")));
+    fireEvent.click(button("新增推荐", groupPanel("A")));
     const list = screen.getByLabelText("英式音色滚动列表");
     list.scrollTop = 170;
     selectVoice("Female20 女声");
@@ -848,8 +905,8 @@ describe("分组工作台与逐组草稿", () => {
   }, 15000);
   it("英美卡片驱动当前目录及调参，切换和筛选保留两侧选择与精确参数", async () => {
     mount();
-    const panel = choose("A");
-    fireEvent.click(button("新增整套推荐", panel));
+    const panel = groupPanel("A");
+    fireEvent.click(button("新增推荐", panel));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "双侧独立参数" }
     });
@@ -905,7 +962,7 @@ describe("分组工作台与逐组草稿", () => {
   it("声音试听与写权限独立，无编辑权限的页面不会提供写入口", () => {
     setPermissions(["words.access", "speech.generate"]);
     const { onAudition } = mount();
-    const panel = choose("A");
+    const panel = groupPanel("A");
     expect(screen.queryByRole("button", { name: "新增分组" })).toBeNull();
     expect(
       within(panel).queryByRole("button", { name: "保存当前组" })
@@ -919,7 +976,7 @@ describe("分组工作台与逐组草稿", () => {
   });
   it("共用调参表单清空不会伪造默认值，重置只作用当前侧并同步草稿", async () => {
     mount();
-    const panel = choose("A");
+    const panel = groupPanel("A");
     fireEvent.click(button("复制整套 A推荐", panel));
     fireEvent.change(screen.getByLabelText("合成音量"), {
       target: { value: "" }
@@ -957,7 +1014,7 @@ describe("分组工作台与逐组草稿", () => {
   });
   it("词库预览读取已保存配置，有适用组不展示全局，无适用组展示全局", async () => {
     mount();
-    fireEvent.click(button("词库中怎么看"));
+    fireEvent.click(button("词库预览"));
     const dialog = screen.getByRole("dialog");
     await waitFor(() =>
       expect(
