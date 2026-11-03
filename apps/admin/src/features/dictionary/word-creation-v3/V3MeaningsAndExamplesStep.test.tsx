@@ -2,6 +2,7 @@ import type { RelatedWordResultAny } from "@tsz/types";
 import type { RelatedWordChoice } from "../relatedSuggestions";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
+import { api } from "@/lib/auth";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import {
   fireEvent,
@@ -1400,6 +1401,24 @@ describe("V3MeaningsAndExamplesStep", () => {
   }, 15_000);
 
   it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
+    const resolving = vi
+      .spyOn(api.speech, "resolve")
+      .mockImplementation(async ({ profile, accent }) => ({
+        voices: profile.voices.filter(
+          (setting) => setting.locale === (accent === "gb" ? "en-GB" : "en-US")
+        )
+      }));
+    const generating = vi.spyOn(api.speech, "generateAudio").mockResolvedValue({
+      asset: {
+        id: "formal-grammar-audio",
+        locale: "en-GB",
+        gender: "female",
+        content_type: "audio/mpeg",
+        size_bytes: 3,
+        original_name: "generated.mp3",
+        created_at: "2026-11-03T00:00:00Z"
+      }
+    });
     const listing = vi
       .spyOn(adminVoicePreviewAdapter, "listVoices")
       .mockResolvedValue([
@@ -1438,7 +1457,10 @@ describe("V3MeaningsAndExamplesStep", () => {
         .getByLabelText("标注工具栏")
         .closest('[role="dialog"]') as HTMLElement;
       fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
-      fireEvent.click(await within(editor).findByLabelText("修改 Sonia"));
+      await within(editor).findByText("正式音频已就绪");
+      const editVoice = await within(editor).findByLabelText("修改 Sonia");
+      await waitFor(() => expect(editVoice).toBeEnabled());
+      fireEvent.click(editVoice);
       expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
 
       fireEvent.click(screen.getByLabelText("移除 old.mp3"));
@@ -1462,12 +1484,20 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.click(
         within(detail).getByRole("button", { name: "保存配音设置" })
       );
-      fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
+      const complete = screen.getByLabelText("完成语法结构 1 英美通用内容编辑");
+      await waitFor(() => expect(complete).toBeEnabled());
+      fireEvent.click(complete);
       expect(
         value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
       ).toEqual([]);
+      expect(
+        value().pos[0]!.grammar_structures[0]!.variants[0]!.voice_profile!
+          .voices[0]!.audio_asset_id
+      ).toBe("formal-grammar-audio");
     } finally {
       listing.mockRestore();
+      resolving.mockRestore();
+      generating.mockRestore();
     }
   }, 30_000);
 
