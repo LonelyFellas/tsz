@@ -29,7 +29,7 @@ export interface PartOfSpeechConfig {
   sub_part_count: number;
   /** 该词性名下的非原形词形变化编码，按 sort_order 有序；删除前可据此预判。 */
   allowed_form_types?: WordFormType[];
-  /** “添加派生词形”的默认补齐顺序，必须是 allowed_form_types 子集。 */
+  /** 新建词条/新增词性的默认模版，必须是 allowed_form_types 子集；空数组表示不默认生成派生词形。 */
   default_form_types?: WordFormType[];
   /** 任意基本词性都可以扩展细分词性，恒为 true。 */
   sub_parts_extensible: boolean;
@@ -84,7 +84,7 @@ export interface PartOfSpeechCatalogItem {
   sort_order: number;
   /** 词条创编允许的派生词形；缺省时客户端保留已有数据，不提供新增候选。 */
   allowed_form_types?: WordFormType[];
-  /** “添加派生词形”的默认补齐顺序，必须是 allowed_form_types 子集。 */
+  /** 新建词条/新增词性的默认模版，必须是 allowed_form_types 子集；空数组表示不默认生成派生词形。 */
   default_form_types?: WordFormType[];
   /** 与 PartOfSpeechConfig.sub_parts_extensible 同源，恒为 true。 */
   sub_parts_extensible: boolean;
@@ -167,6 +167,8 @@ export interface SubPartOfSpeechListResponse {
 }
 
 export interface FormTypeCatalogItem {
+  /** 旧服务缺省。 */
+  is_default?: boolean;
   id: string;
   /** 所属基本词性；原形对所有词性通用，catalog 侧省略该键，管理侧为 null。 */
   part_of_speech_id?: string | null;
@@ -196,9 +198,13 @@ export interface FormTypeConfigListQuery extends PartOfSpeechConfigListQuery {
 export interface CreateFormTypeInput extends CreatePartOfSpeechInput {
   /** 词形变化必须挂在某个基本词性下。 */
   part_of_speech_id: string;
+  /** 省略时默认开启。 */
+  is_default?: boolean;
 }
 
 export interface UpdateFormTypeInput extends UpdatePartOfSpeechInput {
+  /** 省略时保持原值；原形不能关闭。 */
+  is_default?: boolean;
   /** 改挂到另一个基本词性；原形不接受该字段。 */
   part_of_speech_id?: string;
 }
