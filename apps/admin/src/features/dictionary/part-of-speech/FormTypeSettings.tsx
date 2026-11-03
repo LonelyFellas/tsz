@@ -12,6 +12,7 @@ import {
   Modal,
   Select,
   Space,
+  Switch,
   Tooltip,
   Typography
 } from "antd";
@@ -31,6 +32,7 @@ import { errorMessage } from "./PartOfSpeechSettings";
 type Values = Omit<CreatePartOfSpeechInput, "code"> & {
   /** 原形没有归属，wire 上是 null；表单里按未选处理。 */
   part_of_speech_id?: string | null;
+  is_default?: boolean;
 };
 
 /**
@@ -49,6 +51,10 @@ export function FormTypeSettings() {
   const client = useQueryClient();
   const catalog = usePartOfSpeechCatalog();
   const ready = !catalog.isError && !!catalog.data?.form_types;
+  const supportsDefaultTemplate =
+    catalog.data?.form_types?.every(
+      (item) => typeof item.is_default === "boolean"
+    ) === true;
   const [query, setQuery] = useState<{
     part_of_speech_id?: string;
     page: number;
@@ -75,7 +81,15 @@ export function FormTypeSettings() {
   const refresh = () =>
     client.invalidateQueries({ queryKey: partOfSpeechKeys.all });
   const save = useMutation({
-    mutationFn: ({ part_of_speech_id: partId, ...values }: Values) => {
+    mutationFn: ({
+      part_of_speech_id: partId,
+      is_default,
+      ...fields
+    }: Values) => {
+      const values = {
+        ...fields,
+        ...(supportsDefaultTemplate ? { is_default } : {})
+      };
       if (editing) {
         return partOfSpeechDataSource.updateFormType(editing.id, {
           ...values,
@@ -105,10 +119,14 @@ export function FormTypeSettings() {
   useEffect(() => {
     if (!open) return;
     if (editing) {
-      form.setFieldsValue(editing);
+      form.setFieldsValue({
+        ...editing,
+        is_default: editing.is_default ?? true
+      });
       return;
     }
     form.resetFields();
+    form.setFieldValue("is_default", true);
     form.setFieldValue("sort_order", nextSortOrderRef.current);
     // 「全部」视图下留空由管理员选；已经筛到某个词性时直接带上，少点一次。
     if (query.part_of_speech_id) {
@@ -337,6 +355,35 @@ export function FormTypeSettings() {
             if (canEdit) save.mutate(values);
           }}
         >
+          <Flex justify="flex-end" style={{ marginBottom: 16 }}>
+            <Tooltip
+              title={
+                editing?.code === "base"
+                  ? "原形始终作为默认模版"
+                  : !supportsDefaultTemplate
+                    ? "当前服务暂不支持默认模版设置"
+                    : "开启后，新建词条或新增词性时自动生成此词形的录入框"
+              }
+            >
+              <Form.Item
+                name="is_default"
+                label="默认模版"
+                valuePropName="checked"
+                layout="horizontal"
+                style={{ marginBottom: 0 }}
+              >
+                <Switch
+                  aria-label="默认模版"
+                  disabled={
+                    !canEdit ||
+                    !supportsDefaultTemplate ||
+                    editing?.code === "base" ||
+                    save.isPending
+                  }
+                />
+              </Form.Item>
+            </Tooltip>
+          </Flex>
           {editing?.code === "base" ? (
             <Alert
               type="info"
