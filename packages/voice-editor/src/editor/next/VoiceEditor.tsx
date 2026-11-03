@@ -10,7 +10,17 @@ import {
   PauseOutlined,
   SoundOutlined
 } from "@ant-design/icons";
-import { Alert, Button, Input, Modal, Select, Space, Tag, Tooltip } from "antd";
+import {
+  Alert,
+  Button,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+  Typography
+} from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GrammarFormLinkV3,
@@ -2266,7 +2276,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ).length;
 
   // TTS 试听与资产试听同一时间只响一路；历史冲突保留数据，先由编辑者处理。
-  const handleAudition = (voice: VoiceOption, setting?: VoiceSetting) => {
+  const handleAudition = (
+    voice: VoiceOption,
+    setting?: VoiceSetting,
+    catalog = false
+  ) => {
     if (!previewEnabled) return;
     if (
       conflictCount > 0 ||
@@ -2280,7 +2294,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     stopReferenceRef.current?.();
     audition(
       voice,
-      setting ?? voiceSettingFor(displayedSettings, voice.id, editingVersionKey)
+      setting ??
+        voiceSettingFor(displayedSettings, voice.id, editingVersionKey),
+      catalog
+        ? {
+            version: 2,
+            text: "Hello, this is a voice preview.",
+            annotations: []
+          }
+        : undefined
     );
   };
 
@@ -3357,6 +3379,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         area={recommendationArea}
         locale={locale}
         content={generationContent}
+        nativeAuditionLocale={
+          mode === "synthesis" || mode === "phoneme-settings"
+            ? locale
+            : undefined
+        }
         sourceKey={audioContentKey}
         adapter={
           previewIsMock || !previewEnabled
@@ -3374,6 +3401,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           !!text.trim() &&
           conflictCount === 0
         }
+        canAuditionCatalog={
+          previewEnabled && !!previewAdapter && conflictCount === 0
+        }
+        auditionStatus={auditionStatus}
+        auditionActive={!!(pendingVoiceId || playingVoiceId)}
+        onStopAudition={stopAudition}
         error={recommendationError}
         pendingUpload={pendingUploads.some((item) => !item.error)}
         onChange={(profile) => {
@@ -3394,8 +3427,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         onCloseDetail={stopAssetPlayback}
         audioTools={(dialect, stopDetailPlayback) => (
           <section aria-label="当前文本口音录音">
+            <Typography.Title level={5}>真人录音</Typography.Title>
             <p>
-              真人录音属于当前文本／口音，沿用原资产保存边界，不属于当前音色版本。
+              录音用于当前正文的{dialect === "en-GB" ? "英式" : "美式"}
+              发音，与合成音色分开保存。
             </p>
             <UploadPanel
               uploadAllowed={audioUploadAllowed}

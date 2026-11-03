@@ -105,30 +105,34 @@ function Cells({ forms }: { forms: SharedFormsStepContentV3 }) {
   );
 }
 function Harness({
-  initial = fixture()
+  initial = fixture(),
+  disabled = false
 }: {
   initial?: SharedFormsStepContentV3;
+  disabled?: boolean;
 }) {
   const [forms, setForms] = useState(initial);
   return (
-    <ConfigProvider>
+    <ConfigProvider theme={{ token: { motion: false } }}>
       <App>
-        <V3FormCopyProvider forms={forms} onChange={setForms}>
-          <Cells forms={forms} />
-          <EditProbe />
-          <button
-            onClick={() => {
-              const next = structuredClone(forms);
-              const region = next.contents[1]!.regional_variants;
-              if (region.mode === "common")
-                region.common.pronunciations[0]!.actual_pron = "later-edit";
-              setForms(next);
-            }}
-          >
-            随后编辑目标
-          </button>
-        </V3FormCopyProvider>
-        <output data-testid="forms">{JSON.stringify(forms)}</output>
+        <ConfigProvider componentDisabled={disabled}>
+          <V3FormCopyProvider forms={forms} onChange={setForms}>
+            <Cells forms={forms} />
+            <EditProbe />
+            <button
+              onClick={() => {
+                const next = structuredClone(forms);
+                const region = next.contents[1]!.regional_variants;
+                if (region.mode === "common")
+                  region.common.pronunciations[0]!.actual_pron = "later-edit";
+                setForms(next);
+              }}
+            >
+              随后编辑目标
+            </button>
+          </V3FormCopyProvider>
+          <output data-testid="forms">{JSON.stringify(forms)}</output>
+        </ConfigProvider>
       </App>
     </ConfigProvider>
   );
@@ -254,7 +258,7 @@ describe("词形复制交互", () => {
       expect(targetPronunciation().actual_pron).toBe("source")
     );
     expect(current().contents[0]).toEqual(initial.contents[0]);
-    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
+    fireEvent.click(await screen.findByRole("button", { name: "撤销" }));
     expect(current()).toEqual(initial);
   });
 
@@ -327,6 +331,63 @@ describe("词形复制交互", () => {
       expect(targetPronunciation().actual_pron).toBe("source")
     );
     expect(current().pos).toEqual(initial.pos);
+  });
+
+  it("同名目标用序号区分，通知精简展示目标和生效方式", async () => {
+    const initial = fixture();
+    initial.pos[0]!.forms[1]!.form_type = "base";
+    const regions = initial.contents[1]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("fixture");
+    regions.common.spelling = "read";
+    render(<Harness initial={initial} />);
+    begin();
+    expect(screen.getByText(/正在复制“原形 1 · read”/)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("phonetics-1"));
+    expect(
+      await screen.findByText(
+        "目标：原形 2 · read。保存草稿后生效，请重新试听。"
+      )
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
+    expect(current()).toEqual(initial);
+  });
+
+  it("复制成功通知在 10 秒后关闭，复制结果保留", async () => {
+    render(<Harness />);
+    begin();
+    fireEvent.click(screen.getByTestId("phonetics-1"));
+    await screen.findByRole("button", { name: "撤销" });
+    expect(
+      screen.getByText("英美音标已复制").closest(".ant-notification-notice")
+    ).not.toBeNull();
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByRole("button", { name: "撤销" })
+        ).not.toBeInTheDocument(),
+      { timeout: 12000 }
+    );
+    expect(targetPronunciation().actual_pron).toBe("source");
+  }, 15000);
+
+  it("通知出现后页面锁定时不可撤销，解锁后才允许改回草稿", async () => {
+    const initial = fixture();
+    const view = render(<Harness initial={initial} />);
+    begin();
+    fireEvent.click(screen.getByTestId("phonetics-1"));
+    await screen.findByRole("button", { name: "撤销" });
+    view.rerender(<Harness initial={initial} disabled />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "撤销" })).toBeDisabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
+    expect(targetPronunciation().actual_pron).toBe("source");
+    view.rerender(<Harness initial={initial} />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "撤销" })).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
+    expect(current()).toEqual(initial);
   });
 
   it("后续编辑阻止撤销覆盖新值", async () => {

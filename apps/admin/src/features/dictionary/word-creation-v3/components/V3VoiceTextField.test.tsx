@@ -18,6 +18,7 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 import { useState } from "react";
+import { ConfigProvider } from "antd";
 import type { AudioUploadAdapter, VoiceSetting } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
@@ -1087,9 +1088,9 @@ it("页面只读、弹窗编辑；多行正文、关联和设置往返不丢失"
   const voiceDetail = (await screen.findByLabelText("当前音色语速")).closest(
     '[role="dialog"]'
   ) as HTMLElement;
-  expect(
-    await within(voiceDetail).findByLabelText("设置 Sonia 的语速")
-  ).toHaveTextContent("1.25×");
+  expect(await within(voiceDetail).findByLabelText("当前音色语速")).toHaveValue(
+    "1.25"
+  );
   expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
 });
 
@@ -2295,18 +2296,37 @@ it("业务保存以一次完整快照合并正文和参数，失败保留且连�
       </VoiceSaveContext.Provider>
     );
   }
-  render(<Host />);
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <Host />
+    </ConfigProvider>
+  );
   fireEvent.click(screen.getByLabelText("打开原子正文编辑器"));
   await screen.findByRole("toolbar", { name: "标注工具栏" });
-  fireEvent.click(
-    within(
-      await screen.findByRole("region", { name: "英式已获取音色" })
-    ).getByRole("button", { name: /^修改 / })
+  await waitFor(() =>
+    expect(screen.getByLabelText("英式已获取音色")).toBeVisible()
   );
-  fireEvent.change(screen.getByLabelText("当前音色语速"), {
+  const side = screen.getByLabelText("英式已获取音色");
+  const edit = within(side).getByLabelText(/^修改 /);
+  expect(edit).toBeVisible();
+  expect(edit).toBeEnabled();
+  fireEvent.click(edit);
+  await waitFor(() =>
+    expect(screen.getByLabelText("当前音色语速")).toBeVisible()
+  );
+  const rate = screen.getByLabelText("当前音色语速");
+  fireEvent.change(rate, {
     target: { value: "0.73" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "保存配音设置" }));
+  const detail = rate.closest<HTMLElement>('[role="dialog"]')!;
+  const save = within(detail)
+    .getByText("保存配音设置")
+    .closest<HTMLButtonElement>("button")!;
+  await waitFor(() => {
+    expect(save).toBeVisible();
+    expect(save).toBeEnabled();
+  });
+  fireEvent.click(save);
   fireEvent.change(screen.getByLabelText("原子正文"), {
     target: { value: "hello changed" }
   });

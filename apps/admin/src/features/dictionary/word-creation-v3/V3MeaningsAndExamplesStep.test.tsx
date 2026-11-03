@@ -1508,13 +1508,17 @@ describe("V3MeaningsAndExamplesStep", () => {
         .closest('[role="dialog"]') as HTMLElement;
       fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
       fireEvent.click(await within(editor).findByLabelText("修改 Sonia"));
-      const rateButtons = await screen.findAllByLabelText(/^设置 .* 的语速$/);
-      fireEvent.click(rateButtons[0]!);
-      fireEvent.click(await screen.findByLabelText("语速 1.20 倍"));
+      const rate = await screen.findByLabelText("当前音色语速");
+      fireEvent.change(rate, { target: { value: "1.20" } });
       expect(variant().voice_profile).toBeUndefined();
       const detail = screen
         .getByLabelText("当前音色语速")
         .closest('[role="dialog"]') as HTMLElement;
+      await waitFor(() =>
+        expect(
+          within(detail).getByRole("button", { name: "保存配音设置" })
+        ).toBeEnabled()
+      );
       fireEvent.click(
         within(detail).getByRole("button", { name: "保存配音设置" })
       );

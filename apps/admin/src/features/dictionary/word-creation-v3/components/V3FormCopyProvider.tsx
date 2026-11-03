@@ -21,6 +21,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type PointerEvent,
@@ -117,11 +118,16 @@ export function V3FormCopyProvider({
   onChange: (next: SharedFormsStepContentV3) => void;
   children: ReactNode;
 }) {
-  const { message } = App.useApp();
+  const { message, notification } = App.useApp();
+  const noticeKey = useId();
+  useEffect(
+    () => () => {
+      notification.destroy(noticeKey);
+    },
+    [notification, noticeKey]
+  );
   const { componentDisabled } = ConfigProvider.useConfig();
   const formTypeLabel = useFormTypeLabel();
-  const latest = useRef({ forms, onChange });
-  latest.current = { forms, onChange };
   const root = useRef<HTMLDivElement>(null);
   const request = useRef<AbortController | undefined>(undefined);
   const pointer = useRef<
@@ -146,26 +152,98 @@ export function V3FormCopyProvider({
   const [pending, setPending] = useState<FormCopyPlan>();
   const [mapping, setMapping] = useState<FormCopyMapping>({});
   const [error, setError] = useState<string>();
-  const [notice, setNotice] = useState<string>();
-  const [undo, setUndo] = useState<{
-    formId: string;
-    before: FormContentV3;
-    after: FormContentV3;
+  const [copyResult, setCopyResult] = useState<{
+    title: string;
+    description: string;
+    undo: { formId: string; before: FormContentV3; after: FormContentV3 };
   }>();
+  const disabled = busy || Boolean(componentDisabled);
+  const latest = useRef({ forms, onChange, disabled, copyResult });
+  latest.current = { forms, onChange, disabled, copyResult };
+  useEffect(() => {
+    if (!copyResult) return;
+    const timer = setTimeout(
+      () =>
+        setCopyResult((current) =>
+          current === copyResult ? undefined : current
+        ),
+      10000
+    );
+    return () => clearTimeout(timer);
+  }, [copyResult]);
+  useEffect(() => {
+    if (!copyResult) {
+      notification.destroy(noticeKey);
+      return;
+    }
+    const { undo } = copyResult;
+    notification.success({
+      key: noticeKey,
+      title: copyResult.title,
+      description: copyResult.description,
+      duration: 0,
+      onClose: () =>
+        setCopyResult((current) =>
+          current === copyResult ? undefined : current
+        ),
+      actions: (
+        <Button
+          size="small"
+          aria-label="撤销"
+          icon={<UndoOutlined />}
+          disabled={disabled}
+          onClick={() => {
+            if (
+              latest.current.disabled ||
+              latest.current.copyResult !== copyResult
+            )
+              return;
+            const current = latest.current.forms;
+            if (!same(contentFor(current, undo.formId), undo.after)) {
+              setError("目标在复制后又被修改，不能撤销覆盖这些修改");
+              setCopyResult(undefined);
+              return;
+            }
+            latest.current.onChange({
+              ...current,
+              contents: current.contents.map((content) =>
+                content.id === undo.before.id
+                  ? structuredClone(undo.before)
+                  : content
+              )
+            });
+            setCopyResult(undefined);
+            void message.success("已撤销刚才的复制，请保存草稿。");
+          }}
+        >
+          撤销
+        </Button>
+      )
+    });
+  }, [copyResult, disabled, notification, noticeKey, message]);
   useEffect(() => () => request.current?.abort(), []);
   const labelFor = (formId: string) => {
-    const binding = forms.pos
-      .flatMap((pos) => pos.forms)
-      .find((form) => form.id === formId);
-    const content = contentFor(forms, formId);
-    const regions = content?.regional_variants;
-    const spelling =
-      regions?.mode === "common"
+    const bindings = forms.pos.flatMap((pos) => pos.forms);
+    const binding = bindings.find((form) => form.id === formId);
+    const spellingFor = (id: string) => {
+      const regions = contentFor(forms, id)?.regional_variants;
+      return regions?.mode === "common"
         ? regions.common.spelling
         : regions
           ? primaryRegionalVariant(regions, "uk").spelling
           : undefined;
-    return `${binding ? formTypeLabel(binding.form_type) : "词形"}${spelling ? ` · ${spelling}` : ""}`;
+    };
+    const spelling = spellingFor(formId);
+    const matches = bindings.filter(
+      (form) =>
+        form.form_type === binding?.form_type &&
+        spellingFor(form.id) === spelling
+    );
+    const suffix =
+      matches.length > 1
+        ? ` ${matches.findIndex((form) => form.id === formId) + 1}`
+        : "";
+    return `${binding ? formTypeLabel(binding.form_type) : "词形"}${suffix}${spelling ? ` · ${spelling}` : ""}`;
   };
   const cancel = () => {
     pointer.current = undefined;
@@ -214,14 +292,16 @@ export function V3FormCopyProvider({
         return;
       }
       latest.current.onChange(next);
-      setUndo({
+      const undo = {
         formId: plan.target.formId,
         before: structuredClone(plan.target.contentSnapshot),
         after: structuredClone(after)
+      };
+      setCopyResult({
+        title: `${copyName(plan.kind)}已复制`,
+        description: `目标：${labelFor(plan.target.formId)}。保存草稿后生效，请重新试听。${plan.warnings.join("；")}`,
+        undo
       });
-      setNotice(
-        `已将${copyName(plan.kind)}复制到“${labelFor(plan.target.formId)}”，请保存草稿。${plan.warnings.join("；")}${plan.kind === "phonetics" ? " 复制后请按目标拼写和读法审听。" : ""}`
-      );
     } catch (cause) {
       if (!controller.signal.aborted)
         setError(cause instanceof Error ? cause.message : "复制失败，请重试");
@@ -442,43 +522,6 @@ export function V3FormCopyProvider({
               title={error}
               closable
               onClose={() => setError(undefined)}
-            />
-          )}
-          {notice && (
-            <Alert
-              type="success"
-              showIcon
-              title={notice}
-              closable
-              onClose={() => setNotice(undefined)}
-              action={
-                undo && (
-                  <Button
-                    size="small"
-                    icon={<UndoOutlined />}
-                    aria-label="撤销"
-                    onClick={() => {
-                      const current = latest.current.forms;
-                      if (!same(contentFor(current, undo.formId), undo.after)) {
-                        setError("目标在复制后又被修改，不能撤销覆盖这些修改");
-                        return;
-                      }
-                      latest.current.onChange({
-                        ...current,
-                        contents: current.contents.map((content) =>
-                          content.id === undo.before.id
-                            ? structuredClone(undo.before)
-                            : content
-                        )
-                      });
-                      setUndo(undefined);
-                      setNotice("已撤销刚才的复制，请保存草稿。");
-                    }}
-                  >
-                    撤销
-                  </Button>
-                )
-              }
             />
           )}
         </Flex>

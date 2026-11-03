@@ -10,7 +10,7 @@ import {
   replaceSharedContent
 } from "./sharedFormsModel";
 import { V3FormContentOverview } from "./components/V3FormContentOverview";
-import { ConfigProvider } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import { V3FormContentModal } from "./components/V3FormContentModal";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
@@ -6892,7 +6892,7 @@ it.each([
     renderWizard(requests(), {
       initialWord,
       renderStep: (context) => (
-        <>
+        <AntApp>
           <V3FormsAndPronunciationStep
             sharedForms={shared}
             onSharedFormsChange={context.setFormContents}
@@ -6906,7 +6906,7 @@ it.each([
           <button onClick={() => void context.actions.navigateIssue(issue)}>
             定位共享内容槽位
           </button>
-        </>
+        </AntApp>
       )
     });
     expect(screen.getByText("有待填写项")).toBeInTheDocument();

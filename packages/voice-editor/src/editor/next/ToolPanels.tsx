@@ -6,6 +6,7 @@ import {
 import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
 import {
   Button,
+  Form,
   Input,
   InputNumber,
   Popconfirm,
@@ -18,10 +19,15 @@ import {
   Typography
 } from "antd";
 import { SelectionPanel } from "./SelectionPanel";
-import { PoolVoiceName } from "./VoiceDisplay";
+import {
+  VoiceParameterFields,
+  defaultVoiceParameters,
+  type VoiceParameterValues,
+  type ParameterVoice
+} from "./VoiceParameterFields";
 import { voiceSettingFor, voiceSettingKey } from "../../core";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   AudioAsset,
   AudioAssetGender,
@@ -1070,165 +1076,137 @@ export function VoiceParameters({
   voice,
   setting,
   readOnly,
-  onChange
+  onChange,
+  onValidationChange
 }: {
   voice: VoiceOption;
   setting: VoiceSetting;
   readOnly?: boolean;
   onChange: (patch: Partial<VoiceSetting>) => void;
+  onValidationChange?: (valid: boolean) => void;
 }) {
+  const [form] = Form.useForm<VoiceParameterValues>();
+  const parameterVoice: ParameterVoice = {
+    capabilities: {
+      supports_volume_percent: voice.supportsVolume,
+      styles: voice.styles,
+      min_rate_percent: voice.supportsRate
+        ? (voice.rateRange?.min ?? -50)
+        : (voice.rateRange?.min ?? 0),
+      max_rate_percent: voice.supportsRate
+        ? (voice.rateRange?.max ?? 100)
+        : (voice.rateRange?.min ?? 0),
+      min_pitch_semitones: voice.supportsPitch
+        ? (voice.pitchRange?.min ?? -12)
+        : (voice.pitchRange?.min ?? 0),
+      max_pitch_semitones: voice.supportsPitch
+        ? (voice.pitchRange?.max ?? 12)
+        : (voice.pitchRange?.min ?? 0)
+    },
+    capability_evidence: {
+      roles: voice.roles ?? null,
+      supports_style_degree: voice.supportsStyleDegree ?? null
+    }
+  };
+  const values = {
+    rate_percent: setting.rate_percent,
+    pitch_semitones: setting.pitch_semitones ?? 0,
+    volume_percent: setting.volume_percent ?? 100,
+    style: setting.style ?? "",
+    style_degree: setting.style_degree,
+    role: setting.role
+  };
+  const serialized = JSON.stringify(values);
+  const emitted = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (serialized === emitted.current) return;
+    form.setFieldsValue({
+      style_degree: undefined,
+      role: undefined,
+      ...JSON.parse(serialized)
+    });
+    onValidationChange?.(true);
+  }, [serialized, form, onValidationChange]);
+  const emit = (next: VoiceParameterValues) =>
+    onChange({
+      ...next,
+      style: next.style || undefined,
+      role: next.role || undefined,
+      style_degree: next.style_degree ?? undefined
+    });
+  const defaults = defaultVoiceParameters(parameterVoice);
+  const resetDisabled = Object.entries(defaults).every(
+    ([key, value]) => values[key as keyof typeof values] === value
+  );
   return (
-    <div className="tsz-ve-voice-parameters">
-      <section aria-label="常用参数">
-        <Typography.Title level={5}>常用参数</Typography.Title>
-        <PoolVoiceName voice={voice} fallback={voice.id} />
-        <Typography.Paragraph>
-          <Typography.Text code copyable>
-            {voice.providerVoiceId ?? voice.id}
-          </Typography.Text>
-        </Typography.Paragraph>
-        <Space wrap align="start">
-          <div>
-            <Typography.Text>语速</Typography.Text>
-            <VoiceRateControl
-              voice={voice}
-              ratePercent={setting.rate_percent}
-              readOnly={readOnly}
-              onChange={(rate_percent) => onChange({ rate_percent })}
-            />
-            <div>
-              <InputNumber
-                aria-label="当前音色语速"
-                min={(100 + (voice.rateRange?.min ?? -50)) / 100}
-                max={(100 + (voice.rateRange?.max ?? 100)) / 100}
-                step={0.01}
-                precision={2}
-                value={(100 + setting.rate_percent) / 100}
-                disabled={readOnly || !voice.supportsRate}
-                onChange={(rate) => {
-                  if (rate != null)
-                    onChange({ rate_percent: Math.round((rate - 1) * 100) });
-                }}
-              />
-            </div>
-            <Typography.Text type="secondary">
-              支持 {((100 + (voice.rateRange?.min ?? -50)) / 100).toFixed(2)}–
-              {((100 + (voice.rateRange?.max ?? 100)) / 100).toFixed(2)} 倍
-            </Typography.Text>
-          </div>
-          <label>
-            音量
-            <InputNumber
-              aria-label="当前音色音量"
-              min={0}
-              max={100}
-              precision={0}
-              suffix="%"
-              value={setting.volume_percent ?? 100}
-              disabled={readOnly || voice.supportsVolume === false}
-              onChange={(volume_percent) => {
-                if (volume_percent != null) onChange({ volume_percent });
-              }}
-            />
-          </label>
-        </Space>
-        {(!voice.supportsRate || voice.supportsVolume === false) && (
-          <Typography.Paragraph type="secondary">
-            不支持的参数保留原值，仅在有效请求中忽略。
-          </Typography.Paragraph>
-        )}
-      </section>
-      <section aria-label="其他参数">
-        <Typography.Title level={5}>其他参数</Typography.Title>
-        <Space wrap align="start">
-          <label>
-            说话风格
-            <Select
-              aria-label="当前音色风格"
-              value={setting.style ?? ""}
-              disabled={readOnly || !voice.styles.length}
-              style={{ width: 160 }}
-              options={[
-                { value: "", label: "默认" },
-                ...voice.styles.map((style) => ({
-                  value: style,
-                  label: style === "neutral" ? "默认" : style
-                })),
-                ...(setting.style && !voice.styles.includes(setting.style)
-                  ? [
-                      {
-                        value: setting.style,
-                        label: `${setting.style}（不支持，保留）`,
-                        disabled: true
-                      }
-                    ]
-                  : [])
-              ]}
-              onChange={(style) => onChange({ style: style || undefined })}
-            />
-          </label>
-          <label>
-            风格强度
-            <InputNumber
-              aria-label="当前音色风格强度"
-              min={0.01}
-              max={2}
-              step={0.01}
-              precision={2}
-              value={setting.style_degree}
-              disabled={
-                readOnly || voice.supportsStyleDegree !== true || !setting.style
-              }
-              onChange={(value) =>
-                onChange({ style_degree: value ?? undefined })
-              }
-            />
-          </label>
-          <label>
-            角色
-            <Select
-              aria-label="当前音色角色"
-              allowClear
-              value={setting.role}
-              style={{ width: 160 }}
-              disabled={readOnly || !voice.roles?.length || !setting.style}
-              options={[
-                ...(voice.roles ?? []).map((role) => ({
-                  value: role,
-                  label: role
-                })),
-                ...(setting.role && !voice.roles?.includes(setting.role)
-                  ? [
-                      {
-                        value: setting.role,
-                        label: `${setting.role}（保留）`,
-                        disabled: true
-                      }
-                    ]
-                  : [])
-              ]}
-              onChange={(role) => onChange({ role })}
-            />
-          </label>
-          <label>
-            音调（半音）
-            <InputNumber
-              aria-label="当前音色音调"
-              min={voice.pitchRange?.min ?? -12}
-              max={voice.pitchRange?.max ?? 12}
-              precision={0}
-              value={setting.pitch_semitones ?? 0}
-              disabled={readOnly || !voice.supportsPitch}
-              onChange={(pitch_semitones) => {
-                if (pitch_semitones != null) onChange({ pitch_semitones });
-              }}
-            />
-          </label>
-        </Space>
-        <Typography.Paragraph type="secondary">
-          参数能力未确认时不能合成；指定读法和停顿始终严格校验，正文标注不会被删除。
-        </Typography.Paragraph>
-      </section>
-    </div>
+    <Form
+      component="div"
+      form={form}
+      layout="vertical"
+      requiredMark={false}
+      initialValues={values}
+      disabled={readOnly}
+      className="tsz-ve-voice-parameters"
+      onFieldsChange={() =>
+        onValidationChange?.(
+          !form.isFieldsValidating() &&
+            !form.getFieldsError().some((field) => field.errors.length)
+        )
+      }
+      onValuesChange={(changed: Partial<VoiceParameterValues>) => {
+        onValidationChange?.(false);
+        const patch: Partial<VoiceSetting> = {};
+        for (const [key, value] of Object.entries(changed)) {
+          if (
+            ["rate_percent", "pitch_semitones", "volume_percent"].includes(
+              key
+            ) &&
+            (value == null || !Number.isFinite(value))
+          )
+            continue;
+          Object.assign(patch, {
+            [key]:
+              key === "style" || key === "role"
+                ? value || undefined
+                : (value ?? undefined)
+          });
+        }
+        const next = { ...setting, ...patch };
+        emitted.current = JSON.stringify({
+          rate_percent: next.rate_percent,
+          pitch_semitones: next.pitch_semitones ?? 0,
+          volume_percent: next.volume_percent ?? 100,
+          style: next.style ?? "",
+          style_degree: next.style_degree,
+          role: next.role
+        });
+        onChange(patch);
+      }}
+    >
+      <VoiceParameterFields
+        voice={parameterVoice}
+        disabled={!!readOnly}
+        volume={values.volume_percent}
+        style={values.style}
+        resetDisabled={resetDisabled}
+        rateBounds={{
+          min: parameterVoice.capabilities.min_rate_percent,
+          max: parameterVoice.capabilities.max_rate_percent
+        }}
+        labels={{
+          rate: "当前音色语速",
+          volume: "当前音色音量",
+          pitch: "当前音色音调",
+          style: "当前音色风格",
+          degree: "当前音色风格强度",
+          role: "当前音色角色"
+        }}
+        onReset={() => {
+          form.setFieldsValue(defaults);
+          emit(defaults);
+          onValidationChange?.(true);
+        }}
+      />
+    </Form>
   );
 }

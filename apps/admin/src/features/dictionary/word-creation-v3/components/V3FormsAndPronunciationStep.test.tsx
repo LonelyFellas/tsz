@@ -1176,6 +1176,53 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(formById(canonicalValue(), base.id)).toEqual(base);
   });
 
+  it("列设置收进组头部菜单，修改后同步到表格并保存偏好", async () => {
+    const key = "tsz:admin:table-columns:v1:form-content-overview";
+    const previous = localStorage.getItem(key);
+    localStorage.removeItem(key);
+    try {
+      const content = formsFixture({ forms: [commonFormFixture()] });
+      const pos = content.pos[0]!;
+      render(
+        <AntApp>
+          <PronunciationPreviewProvider>
+            <V3FormGroupCard
+              content={content}
+              group={pos.form_groups[0]!}
+              groupIndex={0}
+              pos={pos}
+              issues={[]}
+              idFactory={uuidSequence()}
+              membershipCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+              sharedCounts={new Map(pos.forms.map((form) => [form.id, 1]))}
+              onChange={vi.fn()}
+              onEditContent={vi.fn()}
+            />
+          </PronunciationPreviewProvider>
+        </AntApp>
+      );
+      expect(screen.queryByRole("button", { name: /列设置/ })).toBeNull();
+      expect(
+        screen.getByRole("columnheader", { name: "音量" })
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText("管理第 1 组词形变化"));
+      fireEvent.click(await screen.findByRole("menuitem", { name: /列设置/ }));
+      const panel = await screen.findByRole("region", { name: "表格列设置" });
+      fireEvent.click(within(panel).getByRole("checkbox", { name: "音量" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("columnheader", { name: "音量" })).toBeNull()
+      );
+      expect(
+        JSON.parse(localStorage.getItem(key)!).find(
+          (column: { key: string }) => column.key === "volume"
+        ).visible
+      ).toBe(false);
+    } finally {
+      if (previous === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, previous);
+    }
+  });
+
   it("组顶部增加词形可在收起时使用，新增后展开并按类型归位", async () => {
     const base = commonFormFixture({
       id: uuidFromInt(2161),

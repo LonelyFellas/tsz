@@ -3,6 +3,13 @@
   justify-content: flex-end;
   margin-bottom: 8px;
 }
+.admin-column-settings-custom-trigger {
+  display: inline-flex;
+  margin-bottom: 0;
+}
+.admin-column-settings-anchor {
+  display: inline-flex;
+}
 
 .admin-column-settings {
   width: min(416px, calc(100vw - 48px));

@@ -1,7 +1,10 @@
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
+  CaretDownFilled,
+  CaretUpFilled,
   EditOutlined,
+  QuestionCircleOutlined,
   SoundOutlined
 } from "@ant-design/icons";
 import {
@@ -9,10 +12,11 @@ import {
   Button,
   Checkbox,
   Input,
+  Popover,
   Radio,
   Space,
   Spin,
-  Tag,
+  Tooltip,
   Typography
 } from "antd";
 import { speechAccentGroup } from "@tsz/shared";
@@ -61,11 +65,16 @@ export function LocalVoicePool({
   recommendations,
   area,
   locale,
+  nativeAuditionLocale,
   content,
   sourceKey,
   adapter,
   readOnly,
   canAudition,
+  canAuditionCatalog,
+  auditionStatus,
+  auditionActive,
+  onStopAudition,
   pendingUpload,
   onChange,
   onAudition,
@@ -84,14 +93,23 @@ export function LocalVoicePool({
   recommendations: VoiceRecommendation[];
   area: VoiceRecommendationArea;
   locale?: AudioAssetLocale;
+  nativeAuditionLocale?: AudioAssetLocale;
   content: RichTextV2;
   sourceKey: string;
   adapter?: VoicePreviewAdapter;
   readOnly: boolean;
   canAudition: boolean;
+  canAuditionCatalog: boolean;
+  auditionStatus?: string;
+  auditionActive: boolean;
+  onStopAudition: () => void;
   pendingUpload: boolean;
   onChange: (profile: VoiceProfile) => void;
-  onAudition: (voice: VoiceOption, setting?: VoiceSetting) => void;
+  onAudition: (
+    voice: VoiceOption,
+    setting?: VoiceSetting,
+    catalog?: boolean
+  ) => void;
   onRestore: () => void;
   onOpenDetail: (dialect: "en-GB" | "en-US") => void;
   onCloseDetail: () => void;
@@ -104,7 +122,7 @@ export function LocalVoicePool({
   previousAudio?: VoiceSetting[];
 }) {
   const [notice, setNotice] = useState("");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState<Record<string, string>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<{
     setting: VoiceSetting;
@@ -126,14 +144,17 @@ export function LocalVoicePool({
   const columns = useRef(new Map<string, HTMLDivElement>());
   const positions = useRef(new Map<string, number>());
   const unfilteredPositions = useRef(new Map<string, number>());
-  const previousSearch = useRef("");
+  const previousSearch = useRef<Record<string, string>>({});
   useLayoutEffect(() => {
     columns.current.forEach((list, key) => {
       const saved =
-        !search && previousSearch.current
+        !search[key] && previousSearch.current[key]
           ? unfilteredPositions.current.get(key)
           : positions.current.get(key);
-      if (saved !== undefined) list.scrollTop = saved;
+      if (saved !== undefined) {
+        list.scrollTop = saved;
+        positions.current.set(key, saved);
+      }
     });
     previousSearch.current = search;
   }, [search, settings, recommendations]);
@@ -265,7 +286,11 @@ export function LocalVoicePool({
       dialect
     });
   }
-  function preview(item: VoiceSetting, accent?: AudioAssetLocale) {
+  function preview(
+    item: VoiceSetting,
+    accent?: AudioAssetLocale,
+    catalog = false
+  ) {
     const catalogVoice = voices.find((v) => v.id === item.voice_id);
     const voice =
       catalogVoice ??
@@ -297,27 +322,35 @@ export function LocalVoicePool({
       accent,
       content
     );
+    const disabled =
+      !(catalog ? canAuditionCatalog : canAudition) ||
+      !!(locale && accent && locale !== accent) ||
+      !!(
+        nativeAuditionLocale &&
+        voice.locale.toLowerCase() !== nativeAuditionLocale.toLowerCase()
+      ) ||
+      (!item.audio_asset_id && !available);
     return (
       <Button
         size="small"
         type="text"
         icon={<SoundOutlined />}
         data-accent={currentAccent ?? "other"}
-        style={{
-          color:
-            currentAccent === "uk"
-              ? "#2053FF"
-              : currentAccent === "us"
-                ? "#FC007A"
-                : "#8c8c8c"
-        }}
-        aria-label={`试听 ${voice.displayName ?? voice.label}${!accent && item.version_name ? ` · ${item.version_name}` : ""}`}
-        disabled={
-          !canAudition ||
-          !!(locale && accent && locale !== accent) ||
-          (!item.audio_asset_id && !available)
+        style={
+          disabled
+            ? undefined
+            : {
+                color:
+                  currentAccent === "uk"
+                    ? "#2053FF"
+                    : currentAccent === "us"
+                      ? "#FC007A"
+                      : "#8c8c8c"
+              }
         }
-        onClick={() => onAudition(voice, item)}
+        aria-label={`${catalog ? "试听目录音色" : "试听"} ${voice.displayName ?? voice.label}${!accent && item.version_name ? ` · ${item.version_name}` : ""}`}
+        disabled={disabled}
+        onClick={() => onAudition(voice, item, catalog)}
       />
     );
   }
@@ -334,20 +367,6 @@ export function LocalVoicePool({
   }
   return (
     <section className="tsz-ve-local-pool" aria-label="局部配音音色池">
-      <Space wrap>
-        <Tag>
-          {inherited
-            ? "动态继承"
-            : converted
-              ? source
-                ? "推荐局部副本"
-                : "不选推荐 · 自定义池"
-              : "历史独立配置"}
-        </Tag>
-        <Button disabled={readOnly} onClick={onRestore}>
-          恢复默认推荐
-        </Button>
-      </Space>
       {(error || notice) && (
         <Alert
           type={error ? "warning" : "info"}
@@ -410,12 +429,55 @@ export function LocalVoicePool({
           </Button>
         </section>
       )}
-      <Typography.Title level={5}>已获取的配音设置</Typography.Title>
-      <Typography.Paragraph type="secondary">
-        概率为本侧合格已选池的第 2 题起预览；正文或音色失效的项不参与计算。
-      </Typography.Paragraph>
+      <div className="tsz-ve-pool-current-header">
+        <div className="tsz-ve-pool-heading">
+          <Typography.Title level={5}>已获取的配音设置</Typography.Title>
+          <Popover
+            title="配音与播放规则"
+            placement="bottomLeft"
+            trigger={["hover", "focus"]}
+            content={
+              <div className="tsz-ve-pool-help-content">
+                <Typography.Paragraph>
+                  下方列出当前正文已选的音色，可试听、调整顺序或修改参数。
+                </Typography.Paragraph>
+                <Typography.Paragraph>
+                  概率表示从第 2
+                  题起，各音色被播放的机会，英式和美式分别计算。正文或音色不可用时，不参与概率计算。
+                </Typography.Paragraph>
+              </div>
+            }
+          >
+            <Button
+              type="text"
+              icon={<QuestionCircleOutlined />}
+              aria-label="配音与播放规则"
+            />
+          </Popover>
+        </div>
+        <Tooltip title="清除当前正文的自定义音色配置，重新使用默认推荐；保存后生效。">
+          <Button
+            className="tsz-ve-pool-restore"
+            type="link"
+            disabled={readOnly}
+            onClick={onRestore}
+          >
+            恢复默认推荐
+          </Button>
+        </Tooltip>
+      </div>
+      {auditionStatus && (
+        <Space wrap role="status" aria-live="polite">
+          <Typography.Text type="secondary">{auditionStatus}</Typography.Text>
+          {auditionActive && (
+            <Button size="small" type="link" onClick={onStopAudition}>
+              停止试听
+            </Button>
+          )}
+        </Space>
+      )}
       <div className="tsz-ve-pool-scroll">
-        <div className="tsz-ve-pool-sides">
+        <div className="tsz-ve-pool-sides" data-single={!!locale}>
           {sides
             .filter((side) => !locale || locale === side.locale)
             .map((side) => {
@@ -438,20 +500,27 @@ export function LocalVoicePool({
                   >
                     {side.label}
                   </Typography.Text>
-                  <div className="tsz-ve-pool-row tsz-ve-pool-head">
-                    <span>序号</span>
-                    <span>概率</span>
-                    <span>排序</span>
-                    <span>试听</span>
-                    <span>音色</span>
-                    <span>语速</span>
-                    <span>音量</span>
-                    <span>修改</span>
-                  </div>
+                  {!!selected.length && (
+                    <div className="tsz-ve-pool-row tsz-ve-pool-head">
+                      <span>序号</span>
+                      <span>概率</span>
+                      <span>排序</span>
+                      <span>试听</span>
+                      <span>音色</span>
+                      <span>语速</span>
+                      <span>音量</span>
+                      <span>修改</span>
+                    </div>
+                  )}
                   {!selected.length && (
-                    <Typography.Paragraph type="secondary">
-                      尚无已选音色，请选择推荐或勾选目录。
-                    </Typography.Paragraph>
+                    <div className="tsz-ve-pool-empty">
+                      <div className="tsz-ve-pool-empty-copy">
+                        <Typography.Text strong>暂无已选音色</Typography.Text>
+                        <Typography.Text type="secondary">
+                          选择下方推荐配音，或从完整目录添加音色。
+                        </Typography.Text>
+                      </div>
+                    </div>
                   )}
                   {selected.map((setting, rank) => {
                     const key = voiceSettingKey(setting);
@@ -596,96 +665,111 @@ export function LocalVoicePool({
             </Button>
           </div>
         ))}
-      <Typography.Title level={5}>适用分组推荐</Typography.Title>
-      <div className="tsz-ve-pool-scroll">
-        <Radio.Group
-          className="tsz-ve-pool-recommendations"
-          aria-label="局部推荐"
-          value={
-            selectedPair
-              ? `${selectedPair[0]!.groupId}/${selectedPair[0]!.pairId}`
-              : !inherited && converted && !source
-                ? "none"
-                : undefined
-          }
-          onChange={(event) =>
-            selectRecommendation(
-              event.target.value === "none"
-                ? []
-                : (pairs.find(
-                    (pair) =>
-                      `${pair[0]!.groupId}/${pair[0]!.pairId}` ===
-                      event.target.value
-                  ) ?? [])
-            )
-          }
-        >
+      <Radio.Group
+        className="tsz-ve-pool-recommendation-section"
+        aria-label="局部推荐"
+        value={
+          selectedPair
+            ? `${selectedPair[0]!.groupId}/${selectedPair[0]!.pairId}`
+            : !inherited && converted && !source
+              ? "none"
+              : undefined
+        }
+        onChange={(event) =>
+          selectRecommendation(
+            event.target.value === "none"
+              ? []
+              : (pairs.find(
+                  (pair) =>
+                    `${pair[0]!.groupId}/${pair[0]!.pairId}` ===
+                    event.target.value
+                ) ?? [])
+          )
+        }
+      >
+        <div className="tsz-ve-pool-recommendation-header">
+          <Typography.Title level={5}>推荐配音</Typography.Title>
           <Radio value="none" disabled={readOnly}>
-            不选择推荐
+            不使用推荐配音
           </Radio>
-          <div className="tsz-ve-pool-pair tsz-ve-pool-head">
-            <span>推荐／来源</span>
-            {sides.map((side) => (
-              <div key={side.key} className="tsz-ve-pool-pair-side">
-                <span>试听</span>
-                <span>{side.label}音色</span>
-                <span>语速</span>
-                <span>音量</span>
-              </div>
-            ))}
-          </div>
-          {visiblePairs.map((pair) => (
-            <div
-              className="tsz-ve-pool-pair"
-              key={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
-            >
-              <Radio
-                value={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
-                disabled={
-                  readOnly ||
-                  pair
-                    .filter((item) => !locale || item.locale === locale)
-                    .some(
-                      (item) =>
-                        !isVoiceRecommendationAvailable(
-                          {
-                            ...item,
-                            setting: effectiveVoiceSetting(
-                              item.setting,
-                              voices.find((v) => v.id === item.setting.voice_id)
-                            )
-                          },
-                          voices,
-                          item.locale,
-                          content
-                        )
-                    )
-                }
-              >
-                <span>
-                  {pair[0]!.name}
-                  <small>
-                    {pair[0]!.groupName}
-                    {pair[0]!.selected === false ? "（组内未选）" : ""}
-                  </small>
-                </span>
-              </Radio>
-              {pair.map((item) => (
-                <div className="tsz-ve-pool-pair-side" key={item.id}>
-                  {renderIdentity(
-                    {
-                      ...item.setting,
-                      version_name: item.name,
-                      version_id: item.id
-                    },
-                    item.locale
-                  )}
+        </div>
+        <div className="tsz-ve-pool-scroll">
+          <div className="tsz-ve-pool-recommendations tsz-ve-pool-paired-recommendations">
+            <div className="tsz-ve-pool-pair tsz-ve-pool-head">
+              <span>推荐配音</span>
+              <span>来源分组</span>
+              {sides.map((side) => (
+                <div key={side.key} className="tsz-ve-pool-pair-side">
+                  <span>试听</span>
+                  <span>{side.label}音色</span>
+                  <span>语速</span>
+                  <span>音量</span>
                 </div>
               ))}
             </div>
-          ))}
-        </Radio.Group>
-      </div>
+            {visiblePairs.map((pair) => (
+              <div
+                className="tsz-ve-pool-pair"
+                data-selected={
+                  selectedPair?.[0]?.groupId === pair[0]!.groupId &&
+                  selectedPair?.[0]?.pairId === pair[0]!.pairId
+                }
+                key={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
+              >
+                <Radio
+                  value={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
+                  disabled={
+                    readOnly ||
+                    pair
+                      .filter((item) => !locale || item.locale === locale)
+                      .some(
+                        (item) =>
+                          !isVoiceRecommendationAvailable(
+                            {
+                              ...item,
+                              setting: effectiveVoiceSetting(
+                                item.setting,
+                                voices.find(
+                                  (v) => v.id === item.setting.voice_id
+                                )
+                              )
+                            },
+                            voices,
+                            item.locale,
+                            content
+                          )
+                      )
+                  }
+                >
+                  {pair[0]!.name}
+                </Radio>
+                <span className="tsz-ve-pool-group-name">
+                  {pair[0]!.groupName}
+                  {pair[0]!.selected === false ? "（组内未选）" : ""}
+                </span>
+                {pair.map((item) => (
+                  <div
+                    className="tsz-ve-pool-pair-side"
+                    data-label={
+                      item.locale === "en-GB" ? "英式音色" : "美式音色"
+                    }
+                    key={item.id}
+                  >
+                    {renderIdentity(
+                      {
+                        ...item.setting,
+                        version_name: item.name,
+                        version_id: item.id
+                      },
+                      item.locale
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Radio.Group>
       {legacyRecommendations.length > 0 && (
         <section aria-label="历史未配对推荐">
           <Typography.Paragraph type="secondary">
@@ -738,106 +822,191 @@ export function LocalVoicePool({
           来源推荐已变更或删除；已采用的局部副本仍保留。
         </Typography.Paragraph>
       )}
-      <Typography.Title level={5}>完整音色目录</Typography.Title>
-      {locale && (
-        <Typography.Paragraph type="secondary">
-          当前正文仅编辑{locale === "en-GB" ? "英式" : "美式"}
-          局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。
-        </Typography.Paragraph>
-      )}
-      <Input.Search
-        aria-label="搜索局部音色目录"
-        placeholder="搜索音色名称或官方 ID"
-        value={search}
-        onChange={(event) => {
-          if (!search && event.target.value)
-            columns.current.forEach((list, key) =>
-              unfilteredPositions.current.set(key, list.scrollTop)
-            );
-          columns.current.forEach((list, key) =>
-            positions.current.set(key, list.scrollTop)
-          );
-          setSearch(event.target.value);
-        }}
-        allowClear
-      />
-      {loading && <Spin aria-label="正在加载音色目录" />}
-      <div className="tsz-ve-pool-scroll">
-        <div className="tsz-ve-pool-catalog">
-          {sides.flatMap((side) =>
-            ["female", "male"].map((gender) => {
-              const key = `${side.key}-${gender}`;
-              return (
-                <section
-                  key={key}
-                  aria-label={`${side.label}${gender === "female" ? "女声" : "男声"}目录`}
-                >
-                  <Typography.Text
-                    className="tsz-ve-pool-side-title"
-                    data-accent={side.key}
-                    strong
-                  >
-                    {side.label} · {gender === "female" ? "女声" : "男声"}
-                  </Typography.Text>
-                  <div
-                    className="tsz-ve-pool-catalog-list"
-                    ref={(element) => {
-                      if (element) columns.current.set(key, element);
-                      else columns.current.delete(key);
-                    }}
-                    onScroll={(event) =>
-                      positions.current.set(key, event.currentTarget.scrollTop)
-                    }
-                  >
-                    {voices
-                      .filter(
-                        (voice) =>
-                          speechAccentGroup(voice.locale, voice.accent) ===
-                            side.key &&
-                          (voice.gender === gender ||
-                            (gender === "male" && voice.gender === "neutral"))
-                      )
-                      .map((voice) => (
-                        <div
-                          key={voice.id}
-                          hidden={
-                            excluded.has(providerVoiceKey(voice.id, voices)) ||
-                            !`${voice.displayName ?? voice.label} ${voice.providerVoiceId ?? voice.id}`
-                              .toLowerCase()
-                              .includes(search.toLowerCase())
-                          }
+      <details className="tsz-ve-pool-catalog-disclosure">
+        <summary>
+          <span className="tsz-ve-pool-heading">
+            <span>完整音色目录</span>
+            <Popover
+              title="选择与试听说明"
+              placement="bottomLeft"
+              trigger={["hover", "focus"]}
+              content={
+                <div className="tsz-ve-pool-help-content">
+                  <Typography.Paragraph type="secondary">
+                    勾选音色用于当前正文；试听不会改变已选音色。
+                  </Typography.Paragraph>
+                  {!content.text.trim() && (
+                    <Typography.Paragraph type="secondary">
+                      正文为空时，试听使用示例文本“Hello, this is a voice
+                      preview.”，不会写入正文。
+                    </Typography.Paragraph>
+                  )}
+                  {locale && (
+                    <Typography.Paragraph type="secondary">
+                      当前正文仅编辑{locale === "en-GB" ? "英式" : "美式"}
+                      局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。
+                      {nativeAuditionLocale && "试听还需符合当前语言地区。"}
+                    </Typography.Paragraph>
+                  )}
+                </div>
+              }
+            >
+              <Button
+                type="text"
+                icon={<QuestionCircleOutlined />}
+                aria-label="选择与试听说明"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+              />
+            </Popover>
+          </span>
+          <span className="tsz-ve-pool-catalog-toggle">
+            <span className="tsz-ve-pool-catalog-expand">
+              展开 <CaretDownFilled />
+            </span>
+            <span className="tsz-ve-pool-catalog-collapse">
+              收起 <CaretUpFilled />
+            </span>
+          </span>
+        </summary>
+        <div className="tsz-ve-pool-catalog-body">
+          {loading && <Spin aria-label="正在加载音色目录" />}
+          <div className="tsz-ve-pool-scroll">
+            <div className="tsz-ve-pool-catalog">
+              {sides.flatMap((side) =>
+                ["female", "male"].map((gender) => {
+                  const key = `${side.key}-${gender}`;
+                  const columnVoices = voices.filter(
+                    (voice) =>
+                      speechAccentGroup(voice.locale, voice.accent) ===
+                        side.key &&
+                      (voice.gender === gender ||
+                        (gender === "male" && voice.gender === "neutral"))
+                  );
+                  const isVisible = (voice: VoiceOption) =>
+                    !excluded.has(providerVoiceKey(voice.id, voices)) &&
+                    `${voice.displayName ?? voice.label} ${voice.providerVoiceId ?? voice.id}`
+                      .toLowerCase()
+                      .includes((search[key] ?? "").trim().toLowerCase());
+                  return (
+                    <section
+                      key={key}
+                      aria-label={`${side.label}${gender === "female" ? "女声" : "男声"}目录`}
+                    >
+                      <div className="tsz-ve-pool-catalog-column-head">
+                        <Typography.Text
+                          className="tsz-ve-pool-side-title"
+                          data-accent={side.key}
+                          strong
                         >
-                          <Checkbox
-                            aria-label={`选用 ${voice.displayName ?? voice.label}`}
-                            disabled={
-                              readOnly || !!(locale && locale !== side.locale)
+                          {side.label} · {gender === "female" ? "女声" : "男声"}
+                        </Typography.Text>
+                        <Input.Search
+                          size="small"
+                          aria-label={`${side.label}${gender === "female" ? "女声" : "男声"}目录搜索`}
+                          placeholder="搜索音色"
+                          value={search[key] ?? ""}
+                          allowClear
+                          onChange={(event) => {
+                            const list = columns.current.get(key);
+                            if (list) {
+                              if (!search[key] && event.target.value)
+                                unfilteredPositions.current.set(
+                                  key,
+                                  list.scrollTop
+                                );
+                              positions.current.set(key, list.scrollTop);
                             }
-                            checked={current.some(
-                              (setting) =>
-                                setting.enabled &&
-                                providerVoiceKey(setting.voice_id, voices) ===
-                                  providerVoiceKey(voice.id, voices)
-                            )}
-                            onChange={() => toggle(voice)}
-                          >
-                            <PoolVoiceName voice={voice} fallback={voice.id} />
-                          </Checkbox>
+                            setSearch((previous) => ({
+                              ...previous,
+                              [key]: event.target.value
+                            }));
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="tsz-ve-pool-catalog-list"
+                        ref={(element) => {
+                          if (element) columns.current.set(key, element);
+                          else columns.current.delete(key);
+                        }}
+                        onScroll={(event) =>
+                          positions.current.set(
+                            key,
+                            event.currentTarget.scrollTop
+                          )
+                        }
+                      >
+                        {!loading && !columnVoices.some(isVisible) && (
                           <Typography.Text
-                            code
-                            className="tsz-ve-pool-provider-id"
-                            copyable
+                            type="secondary"
+                            className="tsz-ve-pool-catalog-empty"
                           >
-                            {voice.providerVoiceId ?? voice.id}
+                            {search[key]?.trim()
+                              ? "没有匹配的音色"
+                              : "暂无可选音色"}
                           </Typography.Text>
-                        </div>
-                      ))}
-                  </div>
-                </section>
-              );
-            })
-          )}
+                        )}
+                        {columnVoices.map((voice) => (
+                          <div key={voice.id} hidden={!isVisible(voice)}>
+                            <div className="tsz-ve-pool-catalog-item-head">
+                              <Checkbox
+                                aria-label={`选用 ${voice.displayName ?? voice.label}`}
+                                disabled={
+                                  readOnly ||
+                                  !!(locale && locale !== side.locale)
+                                }
+                                checked={current.some(
+                                  (setting) =>
+                                    setting.enabled &&
+                                    providerVoiceKey(
+                                      setting.voice_id,
+                                      voices
+                                    ) === providerVoiceKey(voice.id, voices)
+                                )}
+                                onChange={() => toggle(voice)}
+                              >
+                                <PoolVoiceName
+                                  voice={voice}
+                                  fallback={voice.id}
+                                />
+                              </Checkbox>
+                              {preview(
+                                {
+                                  voice_id: voice.id,
+                                  enabled: true,
+                                  rate_percent: 0,
+                                  ...voice.defaultSettings
+                                },
+                                side.locale,
+                                true
+                              )}
+                            </div>
+                            <Typography.Text
+                              code
+                              title={voice.providerVoiceId ?? voice.id}
+                              className="tsz-ve-pool-provider-id"
+                              copyable={{
+                                text: voice.providerVoiceId ?? voice.id
+                              }}
+                            >
+                              <span className="tsz-ve-pool-provider-value">
+                                {voice.providerVoiceId ?? voice.id}
+                              </span>
+                            </Typography.Text>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      </details>
       {detail &&
         detail.sourceKey === sourceKey &&
         detail.baseline === JSON.stringify(profile ?? null) &&

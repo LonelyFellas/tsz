@@ -15,6 +15,7 @@ import {
   voiceSettingKey
 } from "../../core";
 import { VoiceParameters } from "./ToolPanels";
+import { VoiceConfigurationPanel } from "./VoiceConfigurationPanel";
 import { useVoiceAudition } from "./useVoiceAudition";
 import { AudioReview } from "./AudioReview";
 import { SsmlReview } from "./SsmlReview";
@@ -57,6 +58,7 @@ export function VoiceDetail({
   const [draft, setDraft] = useState(() => structuredClone(setting));
   const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [parametersValid, setParametersValid] = useState(true);
   const generationId = useRef<{ key: string; id: string } | undefined>(
     undefined
   );
@@ -109,7 +111,8 @@ export function VoiceDetail({
   const effectRef = useRef(currentEffect);
   effectRef.current = currentEffect;
   async function generate() {
-    if (!adapter?.generateAudio || !available || readOnly) return;
+    if (!adapter?.generateAudio || !available || readOnly || !parametersValid)
+      return;
     stop();
     request.current?.abort();
     const controller = new AbortController();
@@ -172,7 +175,7 @@ export function VoiceDetail({
       className="tsz-ve-voice-detail"
       open
       title={`修改${dialect === "en-GB" ? "英式" : "美式"}配音设置 · ${voice.displayName ?? voice.label}`}
-      width={880}
+      width={1200}
       destroyOnHidden
       mask={{ closable: false }}
       onCancel={() => {
@@ -195,7 +198,9 @@ export function VoiceDetail({
           </Button>
           <Button
             type="primary"
-            disabled={readOnly || generating || pendingUpload}
+            disabled={
+              readOnly || generating || pendingUpload || !parametersValid
+            }
             onClick={() => {
               stop();
               onSave(draft);
@@ -207,102 +212,131 @@ export function VoiceDetail({
       }
     >
       <Typography.Paragraph type="secondary">
-        只修改当前声音的局部草稿；保存后仍须按宿主原有流程保存正文。
+        仅修改当前音色；保存配音设置后，请继续保存正文修改。
       </Typography.Paragraph>
-      <VoiceParameters
-        voice={voice}
-        setting={draft}
-        readOnly={readOnly || generating}
-        onChange={patch}
+      <VoiceConfigurationPanel
+        parameters={
+          <>
+            {" "}
+            <Typography.Paragraph>
+              <Typography.Text code copyable>
+                {voice.providerVoiceId ?? voice.id}
+              </Typography.Text>
+            </Typography.Paragraph>
+            <VoiceParameters
+              voice={voice}
+              setting={draft}
+              readOnly={readOnly || generating}
+              onChange={patch}
+              onValidationChange={setParametersValid}
+            />
+          </>
+        }
+        audition={
+          <div className="tsz-ve-detail-audition">
+            <Space wrap className="tsz-ve-detail-actions">
+              <Select
+                aria-label="当前音色输出格式"
+                value={draft.output_format ?? "mp3"}
+                disabled={readOnly || generating}
+                options={[
+                  { value: "mp3", label: "MP3" },
+                  { value: "wav", label: "WAV" }
+                ]}
+                onChange={(output_format) => patch({ output_format })}
+              />
+              <Button
+                disabled={
+                  !parametersValid ||
+                  !canAudition ||
+                  (!available && !draft.audio_asset_id)
+                }
+                loading={!!preview.pendingVoiceId}
+                onClick={() => {
+                  if (!parametersValid) return;
+                  stopExternalAudio();
+                  ssmlStop.current?.();
+                  preview.audition(voice, draft);
+                }}
+              >
+                {draft.audio_asset_id ? "播放正式音频" : "试听当前音色"}
+              </Button>
+              {adapter?.generateAudio && (
+                <Button
+                  disabled={
+                    readOnly || !parametersValid || !available || generating
+                  }
+                  aria-busy={generating}
+                  loading={generating}
+                  onClick={() => void generate()}
+                >
+                  生成正式音频
+                </Button>
+              )}
+            </Space>
+            {!available && (
+              <Alert
+                type="warning"
+                title="当前音色或正文读法不可用，请修复；原参数和标注已保留。"
+              />
+            )}
+            {(preview.status || error) && (
+              <Typography.Paragraph role="status">
+                {error || preview.status}
+              </Typography.Paragraph>
+            )}
+            {previousAudio.map((item) => (
+              <Button
+                key={item.audio_asset_id}
+                disabled={!adapter?.resolveAudio}
+                onClick={() => {
+                  stopExternalAudio();
+                  ssmlStop.current?.();
+                  preview.audition(voice, item);
+                }}
+              >
+                播放旧音频 · {item.version_name ?? item.voice_id}
+              </Button>
+            ))}
+            {preview.media && (
+              <AudioReview
+                media={preview.media}
+                onPlay={() => {
+                  stopExternalAudio();
+                  ssmlStop.current?.();
+                }}
+              />
+            )}
+            {adapter?.renderSsml && (
+              <SsmlReview
+                automaticAvailable={parametersValid}
+                adapter={adapter}
+                content={content}
+                settings={[effective]}
+                singleVoice
+                registerStop={(fn) => {
+                  ssmlStop.current = fn;
+                  return () => {
+                    ssmlStop.current = undefined;
+                  };
+                }}
+                onPlay={() => {
+                  preview.stop();
+                  stopExternalAudio();
+                }}
+              />
+            )}
+            {audioTools && (
+              <div className="tsz-ve-detail-recordings">
+                {audioTools(() => {
+                  preview.stop();
+                  ssmlStop.current?.();
+                })}
+              </div>
+            )}
+          </div>
+        }
       />
-      <Space wrap>
-        <Select
-          aria-label="当前音色输出格式"
-          value={draft.output_format ?? "mp3"}
-          disabled={readOnly || generating}
-          options={[
-            { value: "mp3", label: "MP3" },
-            { value: "wav", label: "WAV" }
-          ]}
-          onChange={(output_format) => patch({ output_format })}
-        />
-        <Button
-          disabled={!canAudition || (!available && !draft.audio_asset_id)}
-          loading={!!preview.pendingVoiceId}
-          onClick={() => {
-            stopExternalAudio();
-            ssmlStop.current?.();
-            preview.audition(voice, draft);
-          }}
-        >
-          {draft.audio_asset_id ? "播放正式音频" : "试听当前音色"}
-        </Button>
-        {adapter?.generateAudio && (
-          <Button
-            disabled={readOnly || !available || generating}
-            aria-busy={generating}
-            loading={generating}
-            onClick={() => void generate()}
-          >
-            生成正式音频
-          </Button>
-        )}
-      </Space>
-      {!available && (
-        <Alert
-          type="warning"
-          title="当前音色或正文读法不可用，请修复；原参数和标注已保留。"
-        />
-      )}
-      {(preview.status || error) && (
-        <Typography.Paragraph role="status">
-          {error || preview.status}
-        </Typography.Paragraph>
-      )}
-      {previousAudio.map((item) => (
-        <Button
-          key={item.audio_asset_id}
-          disabled={!adapter?.resolveAudio}
-          onClick={() => {
-            stopExternalAudio();
-            ssmlStop.current?.();
-            preview.audition(voice, item);
-          }}
-        >
-          播放旧音频 · {item.version_name ?? item.voice_id}
-        </Button>
-      ))}
-      {preview.media && (
-        <AudioReview
-          media={preview.media}
-          onPlay={() => {
-            stopExternalAudio();
-            ssmlStop.current?.();
-          }}
-        />
-      )}
-      {adapter?.renderSsml && (
-        <SsmlReview
-          adapter={adapter}
-          content={content}
-          settings={[effective]}
-          singleVoice
-          registerStop={(fn) => {
-            ssmlStop.current = fn;
-            return () => {
-              ssmlStop.current = undefined;
-            };
-          }}
-          onPlay={() => {
-            preview.stop();
-            stopExternalAudio();
-          }}
-        />
-      )}
-      {audioTools?.(() => {
-        preview.stop();
-        ssmlStop.current?.();
-      })}
     </Modal>
   );
 }

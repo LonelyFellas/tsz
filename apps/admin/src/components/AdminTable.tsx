@@ -27,6 +27,8 @@ export type AdminTableProps<T extends object> = TableProps<T> & {
   tableId: string;
   toolbar?: ReactNode;
   toolbarExtra?: ReactNode;
+  showColumnSettings?: boolean;
+  onFixedOverflowChange?: (overflow: boolean) => void;
 };
 
 export function AdminTableToolbar({
@@ -65,6 +67,8 @@ function ConfiguredTable<T extends object>({
   className,
   toolbar,
   toolbarExtra,
+  showColumnSettings = true,
+  onFixedOverflowChange,
   ...props
 }: AdminTableProps<T>) {
   const definitions = columns.map((column, index) => {
@@ -108,14 +112,16 @@ function ConfiguredTable<T extends object>({
       const fixedWidth = [...header.children]
         .filter((cell) => cell.classList.contains("ant-table-cell-fix"))
         .reduce((width, cell) => width + cell.getBoundingClientRect().width, 0);
-      setFixedOverflow(root.clientWidth > 0 && fixedWidth > root.clientWidth);
+      const overflow = root.clientWidth > 0 && fixedWidth > root.clientWidth;
+      setFixedOverflow(overflow);
+      onFixedOverflowChange?.(overflow);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
     observer.observe(header);
     return () => observer.disconnect();
-  }, [columns, layoutKey]);
+  }, [columns, layoutKey, onFixedOverflowChange]);
   const columnSettings = (
     <ColumnSettings
       columns={settings.columns}
@@ -127,7 +133,10 @@ function ConfiguredTable<T extends object>({
   );
   return (
     <>
-      <AdminTableToolbar extra={toolbarExtra} columnSettings={columnSettings}>
+      <AdminTableToolbar
+        extra={toolbarExtra}
+        columnSettings={showColumnSettings ? columnSettings : undefined}
+      >
         {toolbar}
       </AdminTableToolbar>
       <Table<T>

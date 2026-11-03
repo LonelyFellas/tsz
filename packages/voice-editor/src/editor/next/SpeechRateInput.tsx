@@ -42,8 +42,8 @@ export function SpeechRateInput({
       value={
         value != null && Number.isFinite(value) ? (value + 100) / 100 : null
       }
-      min={(Math.max(min, -70) + 100) / 100}
-      max={(Math.min(max, 70) + 100) / 100}
+      min={(min + 100) / 100}
+      max={(max + 100) / 100}
       step={step}
       precision={2}
       suffix={<span className="voice-shared-times">×</span>}

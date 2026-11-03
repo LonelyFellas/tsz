@@ -13,3 +13,11 @@ export type {
   VoicePreviewAdapter,
   VoiceSettings
 } from "../types";
+
+export {
+  VoiceParameterFields,
+  defaultVoiceParameters
+} from "./next/VoiceParameterFields";
+export type { VoiceParameterValues } from "./next/VoiceParameterFields";
+export { VoiceConfigurationPanel } from "./next/VoiceConfigurationPanel";
+export { styleNames } from "./next/voice-style-labels";

@@ -6,6 +6,7 @@ interface SpeechVolumeInputProps extends Pick<
   AriaAttributes,
   "aria-invalid" | "aria-describedby" | "aria-required"
 > {
+  ariaLabel?: string;
   value?: number | null;
   onChange?: (value: number | null) => void;
   disabled?: boolean;
@@ -14,6 +15,7 @@ interface SpeechVolumeInputProps extends Pick<
 
 export function SpeechVolumeInput({
   value,
+  ariaLabel,
   onChange,
   disabled,
   id,
@@ -45,7 +47,7 @@ export function SpeechVolumeInput({
       <InputNumber
         {...aria}
         id={id}
-        aria-label="合成音量"
+        aria-label={ariaLabel ?? "合成音量"}
         min={0}
         max={100}
         step={1}

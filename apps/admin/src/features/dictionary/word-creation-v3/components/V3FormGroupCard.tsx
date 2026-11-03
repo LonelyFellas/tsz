@@ -7,6 +7,7 @@ import {
   EllipsisOutlined,
   MinusCircleOutlined,
   PlusCircleOutlined,
+  SettingOutlined,
   UpOutlined
 } from "@ant-design/icons";
 import {
@@ -46,7 +47,13 @@ import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { formNodeIds, formReferenceCount } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
 
-import { V3FormContentOverview } from "./V3FormContentOverview";
+import {
+  V3FormContentOverview,
+  formOverviewTableId,
+  formOverviewColumnSettings
+} from "./V3FormContentOverview";
+import { ColumnSettings } from "@/components/ColumnSettings";
+import { useColumnSettings } from "@/components/useColumnSettings";
 
 const BASE_REQUIRED_HINT = "第 1 组词形变化至少保留一个原形";
 
@@ -107,6 +114,13 @@ export function V3FormGroupCard({
   const formTypeLabel = useFormTypeLabel();
   const [blockedFormId, setBlockedFormId] = useState<string>();
   const [collapsed, setCollapsed] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [columnsOverflow, setColumnsOverflow] = useState(false);
+  const columns = useColumnSettings(
+    formOverviewTableId,
+    formOverviewColumnSettings
+  );
+  const hasOverview = !!(onEditContent && sharedCounts);
   const configuredTypes = formTypes?.length
     ? [...formTypes]
         .sort((a, b) => a.sort_order - b.sort_order)
@@ -393,52 +407,76 @@ export function V3FormGroupCard({
             {collapsed ? "展开" : "收起"}
             {collapsed ? <CaretDownFilled /> : <CaretUpFilled />}
           </Button>
-          {onDelete ? (
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: "move-up",
-                    icon: <UpOutlined />,
-                    label: "上移本组",
-                    disabled: groupIndex === 0 || !onMove
-                  },
-                  {
-                    key: "move-down",
-                    icon: <DownOutlined />,
-                    label: "下移本组",
-                    disabled: groupIndex === groupCount - 1 || !onMove
-                  },
-                  { type: "divider" },
-                  {
-                    key: "delete",
-                    icon: <DeleteOutlined />,
-                    label:
-                      deleteBlockedByReferences > 0
-                        ? "删除草稿词形组（发布前需处理受影响的关联）"
-                        : deleteDisabled
-                          ? "至少保留一个词形"
-                          : "删除本组",
-                    danger: true,
-                    disabled: deleteDisabled || !onDelete
-                  }
-                ],
-                onClick: ({ key }) => {
-                  if (key === "move-up") onMove?.(-1);
-                  if (key === "move-down") onMove?.(1);
-                  if (key === "delete") onDelete?.();
-                }
-              }}
-              placement="bottomRight"
-              trigger={["click"]}
+          {onDelete || hasOverview ? (
+            <ColumnSettings
+              columns={columns.columns}
+              onChange={columns.update}
+              onReset={columns.reset}
+              fixedOverflow={columnsOverflow}
+              open={columnsOpen}
+              onOpenChange={setColumnsOpen}
             >
-              <Button
-                aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
-                className="v3-form-group-menu"
-                icon={<EllipsisOutlined />}
-                type="text"
-              />
-            </Dropdown>
+              <Dropdown
+                menu={{
+                  items: [
+                    ...(hasOverview
+                      ? [
+                          {
+                            key: "columns",
+                            label: "列设置",
+                            icon: <SettingOutlined />
+                          },
+                          { type: "divider" as const }
+                        ]
+                      : []),
+                    ...(onDelete
+                      ? [
+                          {
+                            key: "move-up",
+                            icon: <UpOutlined />,
+                            label: "上移本组",
+                            disabled: groupIndex === 0 || !onMove
+                          },
+                          {
+                            key: "move-down",
+                            icon: <DownOutlined />,
+                            label: "下移本组",
+                            disabled: groupIndex === groupCount - 1 || !onMove
+                          },
+                          { type: "divider" as const },
+                          {
+                            key: "delete",
+                            icon: <DeleteOutlined />,
+                            label:
+                              deleteBlockedByReferences > 0
+                                ? "删除草稿词形组（发布前需处理受影响的关联）"
+                                : deleteDisabled
+                                  ? "至少保留一个词形"
+                                  : "删除本组",
+                            danger: true,
+                            disabled: deleteDisabled || !onDelete
+                          }
+                        ]
+                      : [])
+                  ],
+                  onClick: ({ key }) => {
+                    if (key === "columns") setColumnsOpen(true);
+                    if (key === "move-up") onMove?.(-1);
+                    if (key === "move-down") onMove?.(1);
+                    if (key === "delete") onDelete?.();
+                  }
+                }}
+                placement="bottomRight"
+                trigger={["click"]}
+              >
+                <Button
+                  aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
+                  className="v3-form-group-menu"
+                  icon={<EllipsisOutlined />}
+                  type="text"
+                />
+              </Dropdown>
+            </ColumnSettings>
           ) : null}
         </Flex>
       }
@@ -455,6 +493,8 @@ export function V3FormGroupCard({
           {onEditContent && sharedCounts ? (
             <V3FormContentOverview
               group={group}
+              showColumnSettings={false}
+              onFixedOverflowChange={setColumnsOverflow}
               issues={issues}
               sharedCounts={sharedCounts}
               onEdit={onEditContent}

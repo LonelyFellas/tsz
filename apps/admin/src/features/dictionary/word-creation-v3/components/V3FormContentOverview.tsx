@@ -26,6 +26,27 @@ import {
 import { pronunciationStyleLabel } from "../presentation";
 import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
 
+export const formOverviewTableId = "form-content-overview";
+const overviewColumnLabels = {
+  edit: "操作",
+  label: "词形名称",
+  spelling: "词形拼写",
+  style: "读法",
+  pronunciation: "实际发音",
+  voice: "音色",
+  rate: "语速",
+  volume: "音量"
+};
+export const formOverviewColumnSettings = Object.entries(
+  overviewColumnLabels
+).map(([key, label]) => ({
+  key,
+  label,
+  visible: true,
+  fixed:
+    key === "edit" || key === "label" ? ("left" as const) : (false as const)
+}));
+
 type OverviewReading = V3DialectSeparatedFormRow & {
   key: string;
   dialect: "uk" | "us";
@@ -127,7 +148,9 @@ export function V3FormContentOverview({
   sharedCounts,
   onEdit,
   onFormTypeChange,
-  issues
+  issues,
+  showColumnSettings = true,
+  onFixedOverflowChange
 }: {
   rows: readonly V3DialectSeparatedFormRow[];
   group: WordFormGroupV3;
@@ -138,6 +161,8 @@ export function V3FormContentOverview({
     type: WordConcreteFormV3["form_type"]
   ) => void;
   issues: readonly V3DraftValidationIssue[];
+  showColumnSettings?: boolean;
+  onFixedOverflowChange?: (overflow: boolean) => void;
 }) {
   const label = useFormTypeLabel();
   const copy = useV3FormCopy();
@@ -188,7 +213,9 @@ export function V3FormContentOverview({
   return (
     <div className="v3-form-overview">
       <Table<OverviewReading>
-        tableId="form-content-overview"
+        tableId={formOverviewTableId}
+        showColumnSettings={showColumnSettings}
+        onFixedOverflowChange={onFixedOverflowChange}
         size="small"
         pagination={false}
         rowKey="key"
@@ -203,7 +230,7 @@ export function V3FormContentOverview({
         })}
         columns={[
           {
-            title: "操作",
+            title: overviewColumnLabels.edit,
             key: "edit",
             className: "v3-overview-action-cell",
             width: 80,
@@ -229,7 +256,7 @@ export function V3FormContentOverview({
             )
           },
           {
-            title: "词形名称",
+            title: overviewColumnLabels.label,
             key: "label",
             width: 104,
             fixed: "left",
@@ -310,7 +337,7 @@ export function V3FormContentOverview({
             }
           },
           {
-            title: "词形拼写",
+            title: overviewColumnLabels.spelling,
             key: "spelling",
             width: "18%",
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
@@ -350,7 +377,7 @@ export function V3FormContentOverview({
             }
           },
           {
-            title: "读法",
+            title: overviewColumnLabels.style,
             key: "style",
             width: 96,
             render: (_, { pronunciation }) => (
@@ -366,7 +393,12 @@ export function V3FormContentOverview({
             )
           },
           {
-            title: <Space>实际发音{copy && <V3FormCopyHelp />}</Space>,
+            title: (
+              <Space>
+                {overviewColumnLabels.pronunciation}
+                {copy && <V3FormCopyHelp />}
+              </Space>
+            ),
             key: "pronunciation",
             width: 200,
             onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
@@ -380,7 +412,7 @@ export function V3FormContentOverview({
             )
           },
           {
-            title: "音色",
+            title: overviewColumnLabels.voice,
             key: "voice",
             width: 144,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
@@ -394,7 +426,7 @@ export function V3FormContentOverview({
             )
           },
           {
-            title: "语速",
+            title: overviewColumnLabels.rate,
             key: "rate",
             width: 76,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
@@ -403,7 +435,7 @@ export function V3FormContentOverview({
             )
           },
           {
-            title: "音量",
+            title: overviewColumnLabels.volume,
             key: "volume",
             width: 76,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
