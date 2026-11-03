@@ -205,9 +205,7 @@ export function convertDictionaryToUnified(
       }
     }
     if (style !== "normal" && !styleApplied)
-      notices.add(
-        "文档未明确此词的该读法，仅规范已有音标；请核对强弱读、喉塞音及鼻音闪音，不自动猜测或新增读法。"
-      );
+      notices.add("仅规范已有音标，请核对读法。");
     if (
       dialect === "common" &&
       [
@@ -221,9 +219,7 @@ export function convertDictionaryToUnified(
         "literature"
       ].includes(word)
     )
-      notices.add(
-        "此词的规则涉及英美差异；当前为英美通用，仅转换通用符号，请在对应口音下转换差异读音。"
-      );
+      notices.add("仅转换通用音标；英美差异读音请切换口音后转换。");
     values.push(value);
   }
   return { ok: true, value: values.join(" "), notices: [...notices] };
