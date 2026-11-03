@@ -1854,6 +1854,55 @@ describe("fillFormTypeTemplate", () => {
     ).toBe(filled);
   });
 
+  it("只铺默认子集，关闭项仍可手动添加且已有内容不删除", () => {
+    let seq = 1500;
+    const content = onlyBase("verb");
+    const allowed = byCode("verb").allowed_form_types!;
+    const enabled = allowed[0]!;
+    const disabled = allowed[1]!;
+    const items = catalogItems.map((item) =>
+      item.code === "verb" ? { ...item, default_form_types: [enabled] } : item
+    );
+    const filled = fillFormTypeTemplate(content, items, () =>
+      uuidFromInt(seq++)
+    );
+    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
+      "base",
+      enabled
+    ]);
+    const manual = addConcreteForm(
+      filled,
+      filled.pos[0]!.pos_id,
+      filled.pos[0]!.form_groups[0]!.id,
+      disabled,
+      () => uuidFromInt(seq++)
+    );
+    expect(manual.ok).toBe(true);
+    if (!manual.ok) return;
+    expect(fillFormTypeTemplate(manual.value, items)).toBe(manual.value);
+    expect(manual.value.pos[0]!.forms.map((form) => form.form_type)).toContain(
+      disabled
+    );
+  });
+
+  it("默认列表明确为空时只保留原形，旧目录缺字段时沿用全部可用词形", () => {
+    const content = onlyBase("verb");
+    const empty = catalogItems.map((item) => ({
+      ...item,
+      default_form_types: []
+    }));
+    expect(fillFormTypeTemplate(content, empty)).toBe(content);
+    let seq = 1600;
+    const legacy = catalogItems.map(
+      ({ default_form_types: _defaults, ...item }) => item
+    );
+    expect(
+      fillFormTypeTemplate(content, legacy, () =>
+        uuidFromInt(seq++)
+      ).pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(expectedTemplate("verb"));
+  });
+
   it("词性名下没有派生词形时不铺", () => {
     let seq = 520;
     const content = onlyBase("adverb");
