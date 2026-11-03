@@ -798,6 +798,61 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.queryByText("词典音标：ˈsentə")).toBeNull();
   });
 
+  it.each(["builtin", "input"] as const)(
+    "垃圾桶原形不覆盖 %s 主词，保留大小写并允许确认创建",
+    async (source) => {
+      const supplied = requests();
+      const page = v3BaseFormPage();
+      for (const item of page.items) {
+        item.match.status = "archived";
+        item.match.spelling = "guinea";
+      }
+      page.matched_entry_contexts[0]!.presentation.label = "guinea";
+      const detection =
+        source === "builtin"
+          ? matchedV3Detection("Guinea")
+          : v3Detection("Guinea");
+      if (detection.builtin_dictionary.status === "matched") {
+        detection.builtin_dictionary.suggested_forms[0]!.regional_variants = {
+          mode: "common",
+          common: { dialect: "common", spelling: "Guinea", pronunciations: [] }
+        };
+      }
+      Object.assign(detection, {
+        normalized_surface: "guinea",
+        requires_acknowledgement: true,
+        surface_match_page: page
+      });
+      vi.mocked(supplied.detectV3).mockResolvedValue(detection);
+      vi.mocked(supplied.getWord).mockResolvedValue({ word: existingV3Word() });
+      vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
+      const created = renderStep(supplied);
+
+      fireEvent.change(input(), { target: { value: "Guinea" } });
+      fireEvent.click(screen.getByText("词典检测"));
+
+      expect(await screen.findByText("垃圾桶")).toBeVisible();
+      expect(await screen.findByLabelText("英美通用主词")).toHaveValue(
+        "Guinea"
+      );
+      expect(supplied.getWord).not.toHaveBeenCalled();
+      const button = screen.getByRole("button", {
+        name: "确认并创建，进入词形与发音"
+      });
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+      fireEvent.click(await screen.findByRole("button", { name: "继续创建" }));
+      await waitFor(() => expect(created).toHaveBeenCalledOnce());
+      expect(supplied.createV3).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headwords: { mode: "unified", common: "Guinea" },
+          confirmed_surface_match_token: "surface-token"
+        })
+      );
+    }
+  );
+
   it("命中已有原形时先经独立词条二次确认，再由创建事务判定是否需要标注", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue({

@@ -233,7 +233,7 @@ function builtinRegionalValue(pending: PendingCreation): {
   }
   return {
     source: "input",
-    value: { mode: "unified", common: pending.detection.normalized_surface }
+    value: { mode: "unified", common: pending.detection.request.surface }
   };
 }
 
@@ -849,7 +849,9 @@ export function UnifiedCreateEntryStep({
       setRegionalDisplay({ status: "ready", ...preferredFallback });
       return;
     }
-    const first = baseCandidates[0];
+    const first = baseCandidates.find(
+      (candidate) => candidate.status !== "archived"
+    );
     if (!first) {
       setRegionalDisplay({ status: "ready", ...preferredFallback });
       return;
