@@ -123,6 +123,8 @@ function adapter(
 ): VoicePreviewAdapter {
   return { listVoices: vi.fn().mockResolvedValue(options), synthesize };
 }
+const testTheme = { token: { motion: false } };
+
 function Harness({
   initial = pool([version("a"), version("us")]),
   preview = adapter(),
@@ -154,7 +156,7 @@ function Harness({
     [recommendations]
   );
   return (
-    <ConfigProvider theme={{ token: { motion: false } }}>
+    <ConfigProvider theme={testTheme}>
       <App>
         <VoiceEditor
           mode={mode}
@@ -183,12 +185,30 @@ function Harness({
   );
 }
 async function detail(name = "a") {
-  const button = await screen.findByRole("button", { name: `修改 ${name}` });
-  await waitFor(() => expect(button).toBeEnabled());
+  const button = await screen.findByLabelText(`修改 ${name}`);
+  await waitFor(() => {
+    expect(button).toBeEnabled();
+    expect(button).toBeVisible();
+    expect(button.closest('[aria-hidden="true"], [inert]')).toBeNull();
+  });
   fireEvent.click(button);
   const dialog = await screen.findByRole("dialog");
   await waitFor(() => expect(dialog).toBeVisible());
   return dialog;
+}
+
+function dialogButton(dialog: HTMLElement, text: string | RegExp) {
+  const button = within(dialog)
+    .getByText(text)
+    .closest<HTMLButtonElement>("button")!;
+  expect(button).toBeVisible();
+  return button;
+}
+
+function dialogField(dialog: HTMLElement, label: string) {
+  const input = within(dialog).getByLabelText(label);
+  expect(input).toBeVisible();
+  return input;
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
@@ -550,40 +570,29 @@ describe("新版局部主页和唯一声音草稿", () => {
       within(dialog).getByRole("region", { name: "声音参数" })
     ).toBeVisible();
     expect(within(dialog).getByText("高级参数")).toBeVisible();
-    fireEvent.change(
-      within(dialog).getByRole("spinbutton", { name: "当前音色音量" }),
-      { target: { value: "65" } }
-    );
+    fireEvent.change(dialogField(dialog, "当前音色音量"), {
+      target: { value: "65" }
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: /^取\s*消$/ }));
     expect(onProfile).not.toHaveBeenCalled();
     dialog = await detail();
-    expect(
-      within(dialog).getByRole("spinbutton", { name: "当前音色音量" })
-    ).toHaveValue("100");
-    fireEvent.change(
-      within(dialog).getByRole("spinbutton", { name: "当前音色语速" }),
-      { target: { value: "0.73" } }
-    );
-    fireEvent.change(
-      within(dialog).getByRole("spinbutton", { name: "当前音色音量" }),
-      { target: { value: "65" } }
-    );
-    fireEvent.mouseDown(
-      within(dialog).getByRole("combobox", { name: "当前音色输出格式" })
-    );
+    expect(dialogField(dialog, "当前音色音量")).toHaveValue("100");
+    fireEvent.change(dialogField(dialog, "当前音色语速"), {
+      target: { value: "0.73" }
+    });
+    fireEvent.change(dialogField(dialog, "当前音色音量"), {
+      target: { value: "65" }
+    });
+    fireEvent.mouseDown(dialogField(dialog, "当前音色输出格式"));
     fireEvent.click(
       await screen.findByText("WAV", {
         selector: ".ant-select-item-option-content"
       })
     );
     await waitFor(() =>
-      expect(
-        within(dialog).getByRole("button", { name: "保存配音设置" })
-      ).toBeEnabled()
+      expect(dialogButton(dialog, "保存配音设置")).toBeEnabled()
     );
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "保存配音设置" })
-    );
+    fireEvent.click(dialogButton(dialog, "保存配音设置"));
     expect(onProfile).toHaveBeenCalledTimes(1);
     expect(onProfile.mock.calls[0]![0].voices).toEqual([
       {
@@ -611,28 +620,21 @@ describe("新版局部主页和唯一声音草稿", () => {
       />
     );
     const dialog = await detail();
-    const rate = within(dialog).getByRole("spinbutton", {
-      name: "当前音色语速"
-    });
-    const save = within(dialog).getByRole("button", { name: "保存配音设置" });
+    const rate = dialogField(dialog, "当前音色语速");
+    const save = dialogButton(dialog, "保存配音设置");
     fireEvent.change(rate, { target: { value: "" } });
     await waitFor(() => expect(save).toBeDisabled());
-    const preview = within(dialog).getByRole("button", {
-      name: "试听当前音色"
-    });
-    const generate = within(dialog).getByRole("button", {
-      name: "生成正式音频"
-    });
+    const preview = dialogButton(dialog, "试听当前音色");
+    const generate = dialogButton(dialog, "生成正式音频");
     expect(preview).toBeDisabled();
     expect(generate).toBeDisabled();
     fireEvent.click(preview);
     fireEvent.click(generate);
     expect(synthesize).not.toHaveBeenCalled();
     expect(generateAudio).not.toHaveBeenCalled();
-    fireEvent.change(
-      within(dialog).getByRole("spinbutton", { name: "当前音色音量" }),
-      { target: { value: "65" } }
-    );
+    fireEvent.change(dialogField(dialog, "当前音色音量"), {
+      target: { value: "65" }
+    });
     expect(rate).toHaveValue("");
     expect(save).toBeDisabled();
     fireEvent.change(rate, { target: { value: "2.00" } });
@@ -792,9 +794,7 @@ describe("新版局部主页和唯一声音草稿", () => {
       />
     );
     const dialog = await detail();
-    const generate = within(dialog).getByRole("button", {
-      name: "生成正式音频"
-    });
+    const generate = dialogButton(dialog, "生成正式音频");
     fireEvent.click(generate);
     await within(dialog).findByText("存储暂不可用");
     await waitFor(() => {
@@ -803,7 +803,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     });
     fireEvent.click(generate);
     await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
-    await within(dialog).findByRole("button", { name: "播放正式音频" });
+    await within(dialog).findByText("播放正式音频");
     expect(generateAudio.mock.calls[0]![0].requestId).toBe(
       generateAudio.mock.calls[1]![0].requestId
     );
@@ -813,9 +813,7 @@ describe("新版局部主页和唯一声音草稿", () => {
       )
     ).toEqual(["a-version", "us-version"]);
     expect(onProfile).not.toHaveBeenCalled();
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "保存配音设置" })
-    );
+    fireEvent.click(dialogButton(dialog, "保存配音设置"));
     expect(onProfile.mock.calls.at(-1)![0].voices).toEqual([
       { ...version("a"), audio_asset_id: "asset-a" },
       version("us")

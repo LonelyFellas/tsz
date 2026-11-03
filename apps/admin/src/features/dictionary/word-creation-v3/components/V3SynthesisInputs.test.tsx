@@ -252,10 +252,9 @@ describe("双口音真实试听控件", () => {
     fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
     await screen.findByLabelText(`${label}音标编辑`);
     fireEvent.click(screen.getByText("完整音色目录"));
-    const preview = await screen.findByRole("button", {
-      name: "试听目录音色 Sonia"
-    });
+    const preview = await screen.findByLabelText("试听目录音色 Sonia");
     await waitFor(() => expect(preview).toBeEnabled());
+    expect(preview).toBeVisible();
     fireEvent.click(preview);
     await waitFor(() =>
       expect(speech.synthesize).toHaveBeenCalledWith(
