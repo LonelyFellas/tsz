@@ -364,8 +364,11 @@ export function PronunciationPreviewVoiceSummary({
                     {option?.locale ?? "不可用"}
                   </span>
                 </div>
-                <span className="word-pronunciation-voice-rate">
+                <span className="word-pronunciation-voice-rate" title="语速">
                   {(1 + setting.rate_percent / 100).toFixed(2)}×
+                </span>
+                <span className="word-pronunciation-voice-volume" title="音量">
+                  {setting.volume_percent ?? 100}%
                 </span>
                 {pronunciationId && (
                   <div className="word-pronunciation-voice-controls">
@@ -480,6 +483,8 @@ export function PronunciationPreviewControls({
     (assetOnly
       ? savedVoiceAudioAsset(playbackProfile, targetLocale)
       : selectedSetting?.audio_asset_id);
+  const canReadSavedAudio =
+    !!savedAssetId && !!(previewAdapter ?? context.adapter).resolveAudio;
   const contentKey = JSON.stringify(
     assetOnly
       ? [savedAssetId, targetLocale]
@@ -748,7 +753,7 @@ export function PronunciationPreviewControls({
           title={
             (disabled ? disabledReason : undefined) ||
             status ||
-            (result
+            (result || canReadSavedAudio
               ? "播放语音"
               : assetOnly
                 ? savedAssetId
@@ -770,7 +775,7 @@ export function PronunciationPreviewControls({
                 (assetOnly
                   ? !savedAssetId ||
                     !(previewAdapter ?? context.adapter).resolveAudio
-                  : !playbackOnly ||
+                  : (!playbackOnly && !canReadSavedAudio) ||
                     context.voicesLoading ||
                     resolved.pending ||
                     !voice ||
