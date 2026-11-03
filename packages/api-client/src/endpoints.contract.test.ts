@@ -1738,6 +1738,7 @@ it("词形配置契约包含增删改、必填revision与统一目录名称", ()
       "name_en",
       "abbreviation",
       "full_name_en",
+      "is_default",
       "revision",
       "usage_count"
     ])
@@ -1745,6 +1746,16 @@ it("词形配置契约包含增删改、必填revision与统一目录名称", ()
   expect(
     snapshot.schemas.CatalogResponse.properties.form_types.items.$ref
   ).toBe("#/components/schemas/FormTypeCatalogItem");
+  expect(snapshot.schemas.FormTypeCatalogItem.required).toContain("is_default");
+  expect(
+    snapshot.schemas.CreateFormTypeRequest.properties.is_default.type
+  ).toBe("boolean");
+  expect(snapshot.schemas.CreateFormTypeRequest.required).not.toContain(
+    "is_default"
+  );
+  expect(snapshot.schemas.UpdateFormTypeRequest.required).not.toContain(
+    "is_default"
+  );
   // 词形变化有自己的请求体：新建必须指定所属基本词性，修改可改挂但不改编码。
   expect(snapshot.schemas.CreateFormTypeRequest.required).toContain(
     "part_of_speech_id"

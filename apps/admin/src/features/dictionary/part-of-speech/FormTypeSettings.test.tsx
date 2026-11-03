@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -60,6 +60,7 @@ vi.mock("../dataSource", () => ({
 const base: FormTypeConfig = {
   id: "base-id",
   code: "base",
+  is_default: true,
   name_zh: "原形",
   name_en: "Base form",
   short_name_zh: "原形",
@@ -92,9 +93,11 @@ function setup() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AntApp>
-        <FormTypeSettings />
-      </AntApp>
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <AntApp message={{ duration: 0.1 }}>
+          <FormTypeSettings />
+        </AntApp>
+      </ConfigProvider>
     </QueryClientProvider>
   );
 }
@@ -146,7 +149,8 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
       short_name_zh: "自定义词形",
       abbreviation: "custom",
       full_name_en: "custom variant",
-      sort_order: 12
+      sort_order: 12,
+      is_default: true
     })
   );
   await waitFor(() =>
@@ -182,6 +186,12 @@ it("编辑原形时不给归属选择，也不把归属发给后端", async () =
   await within(dialog).findByText("原形对所有基本词性通用，不归属某一个词性。");
   // 筛选栏也叫「所属基本词性」，这里只看弹窗里有没有。
   expect(within(dialog).queryByLabelText("所属基本词性")).toBeNull();
+  expect(
+    within(dialog).getByRole("switch", { name: "默认模版" })
+  ).toBeChecked();
+  expect(
+    within(dialog).getByRole("switch", { name: "默认模版" })
+  ).toBeDisabled();
   fireEvent.change(screen.getByLabelText("正式中文"), {
     target: { value: "原形改名" }
   });
@@ -276,3 +286,107 @@ it.each(["lexicon_settings.edit_forms", "lexicon_settings.delete"])(
     }
   }
 );
+
+function setupRareFormType() {
+  mock.items.push({
+    ...base,
+    id: "rare-id",
+    code: "rare",
+    part_of_speech_id: "pos-verb",
+    name_zh: "罕见词形",
+    revision: 4
+  });
+  mock.update.mockImplementation(async (id, input) => {
+    mock.items = mock.items.map((item) =>
+      item.id === id ? { ...item, ...input, revision: 5 } : item
+    );
+    return mock.items.find((item) => item.id === id);
+  });
+  setup();
+}
+
+// 避免整页角色查询在 jsdom 中反复计算继承样式，仍等待弹窗实际可见。
+async function openFormType(name: string) {
+  const [cell] = await screen.findAllByText(name, { selector: "td" });
+  const row = cell!.closest("tr")!;
+  fireEvent.click(
+    within(row)
+      .getByText(/^修\s*改$/)
+      .closest("button")!
+  );
+  const title = await screen.findByText("修改词形变化", { exact: true });
+  const dialog = title.closest<HTMLElement>('[role="dialog"]')!;
+  await waitFor(() => expect(dialog).toBeVisible());
+  return dialog;
+}
+
+it("关闭默认模版后保存，并在重新打开时回显", async () => {
+  setupRareFormType();
+  const dialog = await openFormType("罕见词形");
+  fireEvent.click(within(dialog).getByLabelText("默认模版"));
+  fireEvent.click(
+    within(dialog)
+      .getByText(/^保\s*存$/)
+      .closest("button")!
+  );
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  expect(mock.update).toHaveBeenCalledWith(
+    "rare-id",
+    expect.objectContaining({
+      base_revision: 4,
+      is_default: false
+    })
+  );
+  const reopened = await openFormType("罕见词形");
+  expect(within(reopened).getByLabelText("默认模版")).not.toBeChecked();
+}, 10000);
+
+it("关闭默认模版后失败保留设置，并可重试保存", async () => {
+  mock.update.mockRejectedValueOnce(new Error("保存失败"));
+  setupRareFormType();
+  const dialog = await openFormType("罕见词形");
+  const toggle = within(dialog).getByLabelText("默认模版");
+  expect(toggle).toBeChecked();
+  fireEvent.click(toggle);
+  fireEvent.click(
+    within(dialog)
+      .getByText(/^保\s*存$/)
+      .closest("button")!
+  );
+  await screen.findByText("保存失败");
+  expect(toggle).not.toBeChecked();
+  // AntD message 的 thenable 结束前，现有 mutation 会保持 pending。
+  await waitFor(
+    () => expect(within(dialog).getByLabelText("默认模版")).not.toBeDisabled(),
+    { timeout: 5000 }
+  );
+  const retry = within(dialog)
+    .getByText(/^保\s*存$/)
+    .closest("button")!;
+  await waitFor(() => expect(retry).not.toHaveClass("ant-btn-loading"));
+  fireEvent.click(retry);
+  await waitFor(() => expect(mock.update).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  expect(mock.update).toHaveBeenLastCalledWith(
+    "rare-id",
+    expect.objectContaining({
+      base_revision: 4,
+      is_default: false
+    })
+  );
+}, 10000);
+
+it("旧服务没有开关字段时禁用设置，保存不发送不受支持的字段", async () => {
+  delete mock.items[0]!.is_default;
+  mock.update.mockResolvedValue(base);
+  setup();
+  const dialog = await openFormType("原形");
+  expect(within(dialog).getByLabelText("默认模版")).toBeDisabled();
+  fireEvent.click(
+    within(dialog)
+      .getByText(/^保\s*存$/)
+      .closest("button")!
+  );
+  await waitFor(() => expect(mock.update).toHaveBeenCalledTimes(1));
+  expect(mock.update.mock.calls[0]![1]).not.toHaveProperty("is_default");
+});
