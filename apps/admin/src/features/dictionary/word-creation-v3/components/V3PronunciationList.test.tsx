@@ -450,11 +450,11 @@ it("关闭音素输入时旧 UPS 记录原样保留且不显示旧设置", () =>
     env.AZURE_PRONUNCIATION_INPUTS = true;
   }
 });
-it("实际发音填入需确认并保留可撤销快照", async () => {
+it("实际发音一键填入并保留可撤销快照", async () => {
   renderWithUps(<Harness />);
   await change("实际发音", "dɔg");
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
-  fireEvent.click(screen.getByText(/^应\s*用$/));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(field("实际发音")).toHaveValue("kæt");
   fireEvent.click(screen.getByLabelText("撤销实际发音填入"));
   expect(field("实际发音")).toHaveValue("dɔg");
@@ -462,8 +462,7 @@ it("实际发音填入需确认并保留可撤销快照", async () => {
 it("字典独立生成实际发音和英美 IPA，UPS 从各自 IPA 转换", () => {
   renderWithUps(<Harness word="school" phonetic="/skuːl/" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
-  expect(screen.getByText("sguːl")).toBeInTheDocument();
-  fireEvent.click(screen.getByText(/^应\s*用$/));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(field("实际发音")).toHaveValue("sguːl");
   for (const [accent, ipa, ups] of [
     ["英式", "sguːl", "S G U lng L"],
@@ -550,7 +549,7 @@ it("r 规范化后仍有不支持音素时保持严格拒绝，不改写 IPA 或
   expect(field("Azure IPA")).toHaveValue("frɑː");
   expect(field("Azure UPS")).toHaveValue("H U M");
 });
-it("字典转换失败保留目标，确认期间编辑目标会阻止覆盖", async () => {
+it("字典转换失败保留目标，转换后继续编辑不被旧快照覆盖", async () => {
   const view = renderWithUps(<Harness phonetic="kæt😀" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   expect(screen.getByText(/第 1 个词包含未支持的音标/)).toBeInTheDocument();
@@ -558,12 +557,10 @@ it("字典转换失败保留目标，确认期间编辑目标会阻止覆盖", a
   view.unmount();
   renderWithUps(<Harness word="school" phonetic="skuːl" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
+  expect(field("实际发音")).toHaveValue("sguːl");
   await change("实际发音", "dɒg");
-  fireEvent.click(screen.getByText(/^应\s*用$/));
   expect(field("实际发音")).toHaveValue("dɒg");
-  expect(
-    screen.getByText(/来源、口音、读法或目标内容已变化/)
-  ).toBeInTheDocument();
+  expect(screen.queryByLabelText("撤销实际发音填入")).not.toBeInTheDocument();
 });
 
 it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
