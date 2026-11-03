@@ -568,6 +568,20 @@ function replaceSharedContentInPlace(
         if (values(old.uk) !== values(old.us))
           throw new Error("请先统一标签的英美成分用词，再合并内容。");
       }
+      if (content.regional_variants.mode === "uk_us_many") {
+        const slots = new Set(
+          regionalVariants(content.regional_variants).map((row) => row.id)
+        );
+        if (
+          variants.some(
+            (row) =>
+              row.component_usages?.length && !slots.has(row.content_slot_id)
+          )
+        )
+          throw new Error(
+            "这个标签保留了旧版词形成分，请先处理成分用词，再移除或替换这条拼写。"
+          );
+      }
       const reference = (
         slot: FormContentVariantV3,
         dialect: "common" | "uk" | "us",
@@ -586,7 +600,9 @@ function replaceSharedContentInPlace(
                 : old.mode === "uk_us"
                   ? old[dialect]
                   : undefined);
-        const source = previous ?? variants[0]!;
+        const source =
+          previous ??
+          primaryRegionalVariant(old, dialect === "us" ? "us" : "uk");
         const mappings = new Map(
           previous?.pronunciations.map((row) => [row.content_slot_id, row.id])
         );
@@ -600,7 +616,7 @@ function replaceSharedContentInPlace(
           id: variantId,
           content_slot_id: slot.id,
           is_regular: source.is_regular,
-          ...(source.component_usages === undefined
+          ...(source.component_usages === undefined || (multiple && !previous)
             ? {}
             : { component_usages: source.component_usages }),
           pronunciations: slot.pronunciations.map((row) => ({
