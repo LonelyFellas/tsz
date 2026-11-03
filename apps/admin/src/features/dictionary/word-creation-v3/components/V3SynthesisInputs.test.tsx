@@ -101,6 +101,8 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 });
+const testTheme = { token: { motion: false } };
+
 function Harness({
   dialect,
   legacy = false,
@@ -212,7 +214,7 @@ function Harness({
       : {})
   });
   return (
-    <ConfigProvider theme={{ token: { motion: false } }}>
+    <ConfigProvider theme={testTheme}>
       <App>
         <PronunciationPreviewProvider>
           <V3SynthesisInputs
@@ -243,6 +245,25 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
     fireEvent.click(toggle);
   return view;
 };
+
+async function dialogButton(dialog: HTMLElement, text: string) {
+  const button = within(dialog)
+    .getByText(text)
+    .closest<HTMLButtonElement>("button")!;
+  await waitFor(() => expect(button).toBeVisible());
+  return button;
+}
+
+async function phonemeDialog(label: string) {
+  const input = await screen.findByLabelText(`${label}音标编辑`);
+  const dialog = input.closest<HTMLElement>('[role="dialog"]')!;
+  await waitFor(() => {
+    expect(input).toBeVisible();
+    expect(dialog).toBeVisible();
+    expect(dialog).toHaveAccessibleName(`${label} · 音标、停顿与音色`);
+  });
+  return dialog;
+}
 
 describe("双口音真实试听控件", () => {
   it("空音标目录试听使用普通示例文本，不经过音素转换或修改草稿", async () => {
@@ -304,15 +325,11 @@ describe("双口音真实试听控件", () => {
       const detail = (await screen.findByLabelText("当前音色语速")).closest(
         '[role="dialog"]'
       ) as HTMLElement;
-      const generate = within(detail).getByRole("button", {
-        name: "生成正式音频"
-      });
+      const generate = await dialogButton(detail, "生成正式音频");
       await waitFor(() => expect(generate).toBeEnabled());
       fireEvent.click(generate);
-      await within(detail).findByRole("button", { name: "播放正式音频" });
-      fireEvent.click(
-        within(detail).getByRole("button", { name: "保存配音设置" })
-      );
+      expect(await within(detail).findByText("播放正式音频")).toBeVisible();
+      fireEvent.click(await dialogButton(detail, "保存配音设置"));
       const complete = within(editor).getByLabelText(`完成${label}设置`);
       await waitFor(() => expect(complete).toBeEnabled());
       fireEvent.click(complete);
@@ -980,9 +997,7 @@ it.each([
     const initial = wire();
     const label = `第 1 条发音 ${accent} Azure ${alphabet}`;
     fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
-    const dialog = await screen.findByRole("dialog", {
-      name: `${label} · 音标、停顿与音色`
-    });
+    const dialog = await phonemeDialog(label);
     const control = (label: string) =>
       dialog.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
     await waitFor(() => expect(control(`选用 ${voice}`)).not.toBeNull());
@@ -1002,9 +1017,8 @@ it.each([
     fireEvent.mouseDown(
       dialog.querySelectorAll(".tsz-ve-gap")[alphabet === "UPS" ? 2 : 0]!
     );
-    const poolPreview = await within(dialog).findByRole("button", {
-      name: `试听 ${voice}`
-    });
+    const poolPreview = await within(dialog).findByLabelText(`试听 ${voice}`);
+    expect(poolPreview).toBeVisible();
     fireEvent.click(poolPreview);
     await waitFor(() =>
       expect(speech.synthesize).toHaveBeenLastCalledWith(
@@ -1039,9 +1053,7 @@ it.each([
       }
     });
     fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
-    const reopened = await screen.findByRole("dialog", {
-      name: `${label} · 音标、停顿与音色`
-    });
+    const reopened = await phonemeDialog(label);
     const selectedVoice = () =>
       within(reopened).getByLabelText(`选用 ${voice}`);
     await waitFor(() => expect(selectedVoice()).toBeChecked());
