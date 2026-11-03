@@ -136,7 +136,8 @@ function Harness({
   audioAssets,
   audioAdapter,
   mode,
-  locale
+  locale,
+  renderActions
 }: {
   initial?: VoiceProfile;
   preview?: VoicePreviewAdapter;
@@ -149,6 +150,7 @@ function Harness({
   audioAdapter?: AudioUploadAdapter;
   mode?: VoiceEditorProps["mode"];
   locale?: `en-${string}`;
+  renderActions?: VoiceEditorProps["renderActions"];
 }) {
   const [profile, setProfile] = useState(initial);
   const loadRecommendations = useCallback(
@@ -160,6 +162,7 @@ function Harness({
       <App>
         <VoiceEditor
           mode={mode}
+          renderActions={renderActions}
           locale={locale}
           value={content}
           onChange={vi.fn()}
@@ -211,7 +214,207 @@ function dialogField(dialog: HTMLElement, label: string) {
   return input;
 }
 
+function generatedAsset(id: string): AudioAsset {
+  return {
+    id,
+    locale: "en-GB",
+    gender: "female",
+    content_type: "audio/mpeg",
+    size_bytes: 128,
+    original_name: `${id}.mp3`,
+    created_at: "2026-11-03T00:00:00Z"
+  };
+}
+
 describe("新版局部主页和唯一声音草稿", () => {
+  it("勾选英美音色后串行生成正式音频，完成前禁止保存，保存结果保留资产", async () => {
+    const preview = adapter();
+    const pending: Array<(asset: AudioAsset) => void> = [];
+    const generateAudio = vi.fn<
+      NonNullable<VoicePreviewAdapter["generateAudio"]>
+    >(() => new Promise((resolve) => pending.push(resolve)));
+    const saved = vi.fn();
+    function Reproduction() {
+      const [profile, setProfile] = useState(pool([]));
+      return (
+        <ConfigProvider theme={testTheme}>
+          <App>
+            <VoiceEditor
+              mode="synthesis"
+              value={{ version: 2, text: "hello", annotations: [] }}
+              onChange={vi.fn()}
+              voiceProfile={profile}
+              onVoiceProfileChange={setProfile}
+              previewAdapter={{ ...preview, generateAudio }}
+              recommendationArea="meaning"
+              renderActions={(canComplete, _prepare, capture) => (
+                <button
+                  disabled={!canComplete}
+                  onClick={() => saved(capture?.(true))}
+                >
+                  保存复现草稿
+                </button>
+              )}
+            />
+          </App>
+        </ConfigProvider>
+      );
+    }
+    render(<Reproduction />);
+    fireEvent.click(screen.getByText("完整音色目录"));
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "选用 Alpha 阿尔法" })
+    );
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选用 American" }));
+    const save = screen.getByRole("button", { name: "保存复现草稿" });
+    expect(save).toBeDisabled();
+    expect(generateAudio).toHaveBeenCalledTimes(1);
+    await act(async () => pending[0]!(generatedAsset("formal-uk")));
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
+    expect(save).toBeDisabled();
+    await act(async () => pending[1]!(generatedAsset("formal-us")));
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    expect(saved).toHaveBeenCalledTimes(1);
+    expect(saved.mock.calls[0]![0].voiceProfile.voices).toEqual([
+      expect.objectContaining({
+        voice_id: "a",
+        enabled: true,
+        audio_asset_id: "formal-uk"
+      }),
+      expect.objectContaining({
+        voice_id: "us",
+        enabled: true,
+        audio_asset_id: "formal-us"
+      })
+    ]);
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  });
+
+  it("自动生成失败保留选择并阻止保存，显式重试复用请求身份", async () => {
+    const generateAudio = vi
+      .fn<NonNullable<VoicePreviewAdapter["generateAudio"]>>()
+      .mockRejectedValueOnce(new Error("存储暂不可用"))
+      .mockResolvedValueOnce(generatedAsset("retried"));
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        mode="synthesis"
+        locale="en-GB"
+        initial={pool([])}
+        preview={{ ...adapter(), generateAudio }}
+        onProfile={onProfile}
+        renderActions={(ready) => (
+          <button disabled={!ready}>保存自动配音</button>
+        )}
+      />
+    );
+    fireEvent.click(screen.getByText("完整音色目录"));
+    const selected = await screen.findByRole("checkbox", { name: "选用 Beta" });
+    fireEvent.click(selected);
+    await screen.findByText("存储暂不可用");
+    expect(selected).toBeChecked();
+    expect(screen.getByRole("button", { name: "保存自动配音" })).toBeDisabled();
+    expect(generateAudio).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "重试生成正式音频" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存自动配音" })).toBeEnabled()
+    );
+    expect(generateAudio).toHaveBeenCalledTimes(2);
+    expect(generateAudio.mock.calls[1]![0].requestId).toBe(
+      generateAudio.mock.calls[0]![0].requestId
+    );
+    expect(onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id).toBe(
+      "retried"
+    );
+  });
+
+  it("生成中取消勾选会中止请求，迟到结果不绑定，再选用可重试", async () => {
+    let finish!: (asset: AudioAsset) => void;
+    const generateAudio = vi
+      .fn<NonNullable<VoicePreviewAdapter["generateAudio"]>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+      )
+      .mockResolvedValueOnce(generatedAsset("reselected"));
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([])}
+        preview={{ ...adapter(), generateAudio }}
+        onProfile={onProfile}
+      />
+    );
+    fireEvent.click(screen.getByText("完整音色目录"));
+    const selected = await screen.findByRole("checkbox", { name: "选用 Beta" });
+    fireEvent.click(selected);
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
+    const signal = generateAudio.mock.calls[0]![1]!.signal!;
+    fireEvent.click(selected);
+    expect(signal.aborted).toBe(true);
+    await act(async () => finish(generatedAsset("cancelled")));
+    expect(onProfile.mock.calls.at(-1)![0].voices[0]).toMatchObject({
+      enabled: false
+    });
+    expect(
+      onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id
+    ).toBeUndefined();
+    fireEvent.click(selected);
+    await waitFor(() =>
+      expect(onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id).toBe(
+        "reselected"
+      )
+    );
+    expect(generateAudio).toHaveBeenCalledTimes(2);
+  });
+
+  it("生成期间改正文会重新生成，旧正文的迟到结果不会保存", async () => {
+    const pending: Array<(asset: AudioAsset) => void> = [];
+    const generateAudio = vi.fn<
+      NonNullable<VoicePreviewAdapter["generateAudio"]>
+    >(() => new Promise((resolve) => pending.push(resolve)));
+    const preview = { ...adapter(), generateAudio };
+    const onProfile = vi.fn();
+    const view = render(
+      <Harness
+        mode="synthesis"
+        initial={pool([])}
+        preview={preview}
+        onProfile={onProfile}
+      />
+    );
+    fireEvent.click(screen.getByText("完整音色目录"));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "选用 Beta" }));
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
+    const signal = generateAudio.mock.calls[0]![1]!.signal!;
+    view.rerender(
+      <Harness
+        mode="synthesis"
+        initial={pool([])}
+        preview={preview}
+        onProfile={onProfile}
+        content={{ version: 2, text: "changed", annotations: [] }}
+      />
+    );
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
+    expect(signal.aborted).toBe(true);
+    expect(generateAudio.mock.calls[1]![0].content.text).toBe("changed");
+    await act(async () => pending[0]!(generatedAsset("old-content")));
+    expect(
+      onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id
+    ).toBeUndefined();
+    await act(async () => pending[1]!(generatedAsset("new-content")));
+    await waitFor(() =>
+      expect(onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id).toBe(
+        "new-content"
+      )
+    );
+  });
+
   it.each(["spelling", "phoneme-settings"] as const)(
     "%s 目录试听遵循普通文本与音素的原生地区边界",
     async (mode) => {

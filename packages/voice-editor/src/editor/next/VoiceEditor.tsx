@@ -218,6 +218,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [recommendationError, setRecommendationError] = useState("");
   const [editingVersionKey, setEditingVersionKey] = useState<string>();
   const [generatingVersion, setGeneratingVersion] = useState<string>();
+  const [automaticAudioKeys, setAutomaticAudioKeys] = useState<string[]>([]);
+  const automaticAudioAttempts = useRef(new Map<string, string>());
   const generationRequest = useRef<AbortController | null>(null);
   const generationKeys = useRef(
     new Map<string, { input: string; id: string }>()
@@ -927,7 +929,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     }
   }, [audioContentKey, onVoiceProfileChange]);
 
-  async function generateVersionAudio(setting: VoiceSetting) {
+  async function generateVersionAudio(
+    setting: VoiceSetting,
+    automatic = false
+  ) {
     if (
       !previewAdapter?.generateAudio ||
       readOnly ||
@@ -994,6 +999,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         baseline !== audioContentRef.current ||
         modeBaseline !== JSON.stringify(currentDubbing.current.mode) ||
         !current ||
+        (automatic && !current.enabled) ||
         latestReadOnly.current
       )
         return;
@@ -1451,7 +1457,51 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       (Boolean(previewAdapter?.resolveVoices) &&
         resolvedVoices?.key !== resolutionKey));
 
+  const automaticAudio = displayedSettings.filter(
+    (setting) =>
+      automaticAudioKeys.includes(voiceSettingKey(setting)) &&
+      setting.enabled &&
+      !setting.audio_asset_id
+  );
+  const automaticAudioPending =
+    !!previewAdapter?.generateAudio &&
+    previewEnabled &&
+    !previewIsMock &&
+    automaticAudio.length > 0;
+  // Read the current controlled draft each render: another selection can join
+  // the queue while a request is running, without replacing that request.
+  useEffect(() => {
+    if (readOnly || !previewEnabled || previewIsMock) {
+      generationRequest.current?.abort();
+      if (generatingVersion) setGeneratingVersion(undefined);
+      return;
+    }
+    if (!automaticAudioPending || generatingVersion || voiceSavePending) return;
+    const setting = automaticAudio.find((item) => {
+      const input = JSON.stringify([
+        audioContentKey,
+        voiceEffectKey(item),
+        voiceProfile?.dubbing
+      ]);
+      return (
+        automaticAudioAttempts.current.get(voiceSettingKey(item)) !== input
+      );
+    });
+    if (!setting) return;
+    automaticAudioAttempts.current.set(
+      voiceSettingKey(setting),
+      JSON.stringify([
+        audioContentKey,
+        voiceEffectKey(setting),
+        voiceProfile?.dubbing
+      ])
+    );
+    void generateVersionAudio(setting, true);
+  });
+
   const captureResult = (forSave = false) => {
+    if (forSave && automaticAudioPending)
+      throw new Error("已选音色的正式音频尚未生成完成，请等待或重试");
     let profile = voiceProfile;
     if (
       forSave &&
@@ -3409,10 +3459,29 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         onStopAudition={stopAudition}
         error={recommendationError}
         pendingUpload={pendingUploads.some((item) => !item.error)}
+        generatingVersion={generatingVersion}
+        audioPending={automaticAudioPending}
+        onRetryAudio={() => {
+          automaticAudioAttempts.current.clear();
+          setAutomaticAudioKeys([...automaticAudioKeys]);
+          setRecommendationError("");
+        }}
         onChange={(profile) => {
           if (readOnly || !onVoiceProfileChange) return;
           initialRecommendationPending.current = false;
           stopAudition();
+          const pending = profile.voices
+            .filter((setting) => setting.enabled && !setting.audio_asset_id)
+            .map(voiceSettingKey);
+          for (const key of automaticAudioAttempts.current.keys()) {
+            if (!pending.includes(key))
+              automaticAudioAttempts.current.delete(key);
+          }
+          if (generatingVersion && !pending.includes(generatingVersion)) {
+            generationRequest.current?.abort();
+            setGeneratingVersion(undefined);
+          }
+          setAutomaticAudioKeys(pending);
           setVoiceSettings(profile.voices);
           emittedProfileRef.current = JSON.stringify(profile);
           onVoiceProfileChange(profile);
@@ -3503,6 +3572,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     !draft.start &&
     !draft.end &&
     !generatingVersion &&
+    !automaticAudioPending &&
     !pendingUploads.some((item) => !item.error);
   useEffect(
     () => onValidationChange?.(editorReady),
@@ -3537,6 +3607,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           <div className="tsz-ve-editor-actions">
             {renderActions(
               !voiceSavePending &&
+                !automaticAudioPending &&
                 !generatingVersion &&
                 !pendingUploads.some((item) => !item.error),
               prepareComplete,
@@ -3733,6 +3804,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         actions={renderActions?.(
           !blockingError &&
             !voiceSavePending &&
+            !automaticAudioPending &&
             pendingText === undefined &&
             !pendingConflict &&
             conflictCount === 0 &&
