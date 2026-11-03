@@ -76,6 +76,9 @@ export function LocalVoicePool({
   auditionActive,
   onStopAudition,
   pendingUpload,
+  generatingVersion,
+  audioPending,
+  onRetryAudio,
   onChange,
   onAudition,
   onRestore,
@@ -104,6 +107,9 @@ export function LocalVoicePool({
   auditionActive: boolean;
   onStopAudition: () => void;
   pendingUpload: boolean;
+  generatingVersion?: string;
+  audioPending: boolean;
+  onRetryAudio: () => void;
   onChange: (profile: VoiceProfile) => void;
   onAudition: (
     voice: VoiceOption,
@@ -367,6 +373,26 @@ export function LocalVoicePool({
   }
   return (
     <section className="tsz-ve-local-pool" aria-label="局部配音音色池">
+      {audioPending && (
+        <Alert
+          type={generatingVersion ? "info" : "warning"}
+          showIcon
+          title={
+            generatingVersion
+              ? "正在生成已选音色的正式音频，请稍候"
+              : "仍有正式音频待完成，请重试或取消选用对应音色"
+          }
+          action={
+            <Button
+              size="small"
+              disabled={readOnly || !!generatingVersion}
+              onClick={onRetryAudio}
+            >
+              重试生成正式音频
+            </Button>
+          }
+        />
+      )}
       {(error || notice) && (
         <Alert
           type={error ? "warning" : "info"}
@@ -581,11 +607,25 @@ export function LocalVoicePool({
                             aria-label={`修改 ${setting.version_name ?? setting.voice_id}`}
                             disabled={
                               readOnly ||
+                              !!generatingVersion ||
                               !voices.some((v) => v.id === setting.voice_id)
                             }
                             onClick={() => edit(setting)}
                           />
                         </div>
+                        {adapter?.generateAudio && (
+                          <Typography.Text
+                            type={
+                              setting.audio_asset_id ? "success" : "secondary"
+                            }
+                          >
+                            {setting.audio_asset_id
+                              ? "正式音频已就绪"
+                              : generatingVersion === key
+                                ? "正在生成正式音频"
+                                : "待生成正式音频"}
+                          </Typography.Text>
+                        )}
                         {probability === undefined && (
                           <Typography.Text type="warning">
                             当前声音、参数或正文读法不可用，保留配置，不参与概率。

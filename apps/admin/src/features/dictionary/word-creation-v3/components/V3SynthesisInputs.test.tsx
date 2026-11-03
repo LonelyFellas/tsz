@@ -932,7 +932,9 @@ it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位�
       { signal: expect.any(AbortSignal) }
     )
   );
-  fireEvent.click(screen.getByLabelText(`完成${label}设置`));
+  const complete = screen.getByLabelText(`完成${label}设置`);
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
   await waitFor(() => expect(input).not.toBeInTheDocument());
   const saved = JSON.parse(
     screen.getByTestId("pronunciation-wire").textContent!
@@ -944,6 +946,9 @@ it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位�
   expect(saved.ups_speech.content.annotations).toEqual([
     { type: "pause", at: 3, duration_ms: 500 }
   ]);
+  expect(saved.ups_speech.voice_profile.voices[0].audio_asset_id).toBe(
+    "new-audio"
+  );
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   expect(await screen.findByLabelText(`${label}音标编辑`)).toHaveValue(
     saved.ups
