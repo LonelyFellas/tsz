@@ -1064,3 +1064,40 @@ it("新 reader 接受缺省旧记录和新 synthesis，同时仍拒绝未知格�
   row.synthesis = { alphabet: "sapi", ipa: "kæt", ups: "K AE T" };
   expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
 });
+
+it("independent UK/US spelling lists accept different lengths and reject missing or malformed sides", () => {
+  for (const [target, item] of [
+    ["content", "FormContentVariantV3"],
+    ["binding", "FormVariantBindingV3"]
+  ] as const) {
+    const word = validFixture("AdminWordV3") as Record<string, unknown>;
+    const content = buildValidValue(
+      runtimeSchemaBundle.$defs.FormContentV3!
+    ) as Record<string, unknown>;
+    const binding = buildValidValue(
+      runtimeSchemaBundle.$defs.FormContentBindingV3!
+    ) as Record<string, unknown>;
+    const pos = buildValidValue(
+      runtimeSchemaBundle.$defs.SharedPosFormsV3!
+    ) as Record<string, unknown>;
+    pos.forms = [binding];
+    word.forms = { forms_format: "shared_v1", contents: [content], pos: [pos] };
+    const fixture = () => buildValidValue(runtimeSchemaBundle.$defs[item]!);
+    const uk = [fixture(), fixture()];
+    const us = [fixture(), fixture(), fixture()];
+    const validate = (regions: unknown) => {
+      if (target === "content") content.regional_variants = regions;
+      else binding.regional_bindings = regions;
+      return validateRuntimeSchema("AdminWordV3", word);
+    };
+    expect(validate({ mode: "uk_us_many", uk, us })).toEqual({ valid: true });
+    for (const invalid of [
+      { mode: "uk_us_many", uk: [], us },
+      { mode: "uk_us_many", uk, us: [] },
+      { mode: "uk_us_many", uk, us: null },
+      { mode: "uk_us_many", uk, us: us[0] },
+      { mode: "uk_us_many", uk }
+    ])
+      expect(validate(invalid).valid).toBe(false);
+  }
+});

@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
 import { MinusCircleOutlined } from "@ant-design/icons";
 import {
@@ -69,6 +70,7 @@ const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 export interface V3FormsAndPronunciationStepProps {
   sharedForms?: SharedFormsStepContentV3;
   contentReassignmentAvailable?: boolean;
+  multipleSpellingsAvailable?: boolean;
   savedContentIds?: ReadonlySet<string>;
   onSharedFormsChange?: (next: SharedFormsStepContentV3) => void;
   retiredContentSlots?: readonly RetiredContentSlotV3[];
@@ -100,12 +102,7 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
     new Set<Dialect>(
       value.pos.flatMap((pos) =>
         pos.forms.flatMap((form) =>
-          form.regional_variants.mode === "common"
-            ? [form.regional_variants.common.dialect]
-            : [
-                form.regional_variants.uk.dialect,
-                form.regional_variants.us.dialect
-              ]
+          regionalVariants(form.regional_variants).map((row) => row.dialect)
         )
       )
     )
@@ -124,6 +121,7 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
 export function V3FormsAndPronunciationStep({
   sharedForms,
   contentReassignmentAvailable = false,
+  multipleSpellingsAvailable = false,
   savedContentIds,
   onSharedFormsChange,
   retiredContentSlots = [],
@@ -467,6 +465,7 @@ export function V3FormsAndPronunciationStep({
             key={editingFormId}
             forms={sharedForms}
             contentReassignmentAvailable={contentReassignmentAvailable}
+            multipleSpellingsAvailable={multipleSpellingsAvailable}
             savedContentIds={savedContentIds}
             formId={editingFormId}
             issues={issues}

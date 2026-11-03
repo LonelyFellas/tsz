@@ -138,10 +138,15 @@ export type WordCommonFormVariantV3 = WordFormVariantBaseV3<CommonDialectV3>;
 export type WordUkFormVariantV3 = WordFormVariantBaseV3<UkDialectV3>;
 export type WordUsFormVariantV3 = WordFormVariantBaseV3<UsDialectV3>;
 
-/** A concrete form owns either one common variant or the complete UK/US pair. */
+/** A concrete form owns a common variant, a legacy UK/US pair, or independent ordered UK/US lists. */
 export type WordRegionalVariantsV3 =
   | { mode: "common"; common: WordCommonFormVariantV3 }
-  | { mode: "uk_us"; uk: WordUkFormVariantV3; us: WordUsFormVariantV3 };
+  | { mode: "uk_us"; uk: WordUkFormVariantV3; us: WordUsFormVariantV3 }
+  | {
+      mode: "uk_us_many";
+      uk: WordUkFormVariantV3[];
+      us: WordUsFormVariantV3[];
+    };
 
 export interface WordConcreteFormV3 {
   id: string;
@@ -186,7 +191,12 @@ export interface FormContentVariantV3 {
 
 export type FormContentRegionalVariantsV3 =
   | { mode: "common"; common: FormContentVariantV3 }
-  | { mode: "uk_us"; uk: FormContentVariantV3; us: FormContentVariantV3 };
+  | { mode: "uk_us"; uk: FormContentVariantV3; us: FormContentVariantV3 }
+  | {
+      mode: "uk_us_many";
+      uk: FormContentVariantV3[];
+      us: FormContentVariantV3[];
+    };
 
 export interface FormPronunciationSlotV3 {
   id: string;
@@ -222,7 +232,12 @@ export interface FormVariantBindingV3 {
 
 export type FormRegionalBindingsV3 =
   | { mode: "common"; common: FormVariantBindingV3 }
-  | { mode: "uk_us"; uk: FormVariantBindingV3; us: FormVariantBindingV3 };
+  | { mode: "uk_us"; uk: FormVariantBindingV3; us: FormVariantBindingV3 }
+  | {
+      mode: "uk_us_many";
+      uk: FormVariantBindingV3[];
+      us: FormVariantBindingV3[];
+    };
 
 export interface FormContentBindingV3 {
   id: string;
@@ -804,6 +819,7 @@ export interface AdminWordV3Capabilities {
   sense_component_usages?: boolean;
   shared_form_contents?: boolean;
   form_content_reassignment?: boolean;
+  multiple_form_spellings?: boolean;
 }
 
 export interface AdminWordV3 {

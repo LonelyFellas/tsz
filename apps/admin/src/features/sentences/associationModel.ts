@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { expandFormContents } from "@tsz/shared";
 import type {
   AdminWordV3,
@@ -165,10 +166,7 @@ export function savedSenseTargets(word: AdminWordV3, senseId: string) {
                   group.members.some((member) => member.form_id === form.id)
               )
           );
-    const variants =
-      form.regional_variants.mode === "common"
-        ? [form.regional_variants.common]
-        : [form.regional_variants.uk, form.regional_variants.us];
+    const variants = regionalVariants(form.regional_variants);
     return bases.flatMap((base) =>
       variants.map((variant) => ({
         target: {

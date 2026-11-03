@@ -829,11 +829,11 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     ).toEqual(["display_name", "id"]);
   });
 
-  it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
+  it("generated runtime closure 固定无主词、平级 concrete forms 与独立英美拼写列表", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "daa6abc63ee1adfd47905e256afc9457a9924e35db6795e190edc38bf42c56c4"
+      "d51eab1fe83602563e66b5ed1efd52e63f3abee69bd26a3de7076576f77fb50e"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -958,7 +958,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       }))
     ).toEqual([
       { mode: "common", required: ["common", "mode"] },
-      { mode: "uk_us", required: ["uk", "us", "mode"] }
+      { mode: "uk_us", required: ["uk", "us", "mode"] },
+      { mode: "uk_us_many", required: ["uk", "us", "mode"] }
     ]);
     expect(defs.WordConcreteFormV3.properties.form_type).toMatchObject({
       type: "string",
@@ -1274,6 +1275,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
                   },
                   {
                     name: "X-TSZ-Form-Contents",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  },
+                  {
+                    name: "X-TSZ-Multiple-Spellings",
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }

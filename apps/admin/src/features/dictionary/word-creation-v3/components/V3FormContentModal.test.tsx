@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
 import { useState } from "react";
 import {
@@ -199,8 +200,8 @@ describe("词形内容弹窗的草稿边界", () => {
       const regions = initial.pos[0]!.forms[0]!.regional_bindings;
       if (regions.mode === "common") regions.common.is_regular = is_regular;
       else {
-        regions.uk.is_regular = is_regular;
-        regions.us.is_regular = is_regular;
+        primaryRegionalVariant(regions, "uk").is_regular = is_regular;
+        primaryRegionalVariant(regions, "us").is_regular = is_regular;
       }
       const { onConfirm } = setup({ initialForms: initial, baseOnly: true });
       expect(
@@ -328,8 +329,8 @@ describe("词形内容弹窗的草稿边界", () => {
     );
     const regions = initial.pos[0]!.forms[0]!.regional_bindings;
     if (regions.mode !== "uk_us") throw new Error("fixture");
-    regions.uk.is_regular = false;
-    regions.us.is_regular = true;
+    primaryRegionalVariant(regions, "uk").is_regular = false;
+    primaryRegionalVariant(regions, "us").is_regular = true;
     const untouched = setup({ initialForms: initial, baseOnly: true });
     expect(
       screen.getByRole("switch", { name: "词形不规则变化" })

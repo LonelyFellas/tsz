@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -78,7 +79,8 @@ export function FormCandidates({
     const baseSpelling = base
       ? base.mode === "common"
         ? base.common.spelling
-        : base.us.spelling.trim() || base.uk.spelling
+        : primaryRegionalVariant(base, "us").spelling.trim() ||
+          primaryRegionalVariant(base, "uk").spelling
       : "";
     const headword = (
       baseSpelling.trim() ||

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-160-default-form-template/docs/openapi.json",
-  "_source_sha256": "daa6abc63ee1adfd47905e256afc9457a9924e35db6795e190edc38bf42c56c4",
+  "_source": "/Users/darwish/.codex/worktrees/1d45/tsz-rust/docs/openapi.json",
+  "_source_sha256": "d51eab1fe83602563e66b5ed1efd52e63f3abee69bd26a3de7076576f77fb50e",
   "roots": [
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
@@ -482,6 +482,7 @@
         "draft_relation_prebinding": { "type": "boolean" },
         "form_content_reassignment": { "type": "boolean" },
         "multi_group_sense_bindings": { "type": "boolean" },
+        "multiple_form_spellings": { "type": "boolean" },
         "pronunciation_normalization_version": {
           "$ref": "#/$defs/PronunciationNormalizationVersionV3"
         },
@@ -1904,6 +1905,26 @@
             "us": { "$ref": "#/$defs/FormContentVariantV3" }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us_many"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/FormContentVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/FormContentVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -1987,6 +2008,26 @@
             "mode": { "type": "string", "enum": ["uk_us"] },
             "uk": { "$ref": "#/$defs/FormVariantBindingV3" },
             "us": { "$ref": "#/$defs/FormVariantBindingV3" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us_many"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/FormVariantBindingV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/FormVariantBindingV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            }
           },
           "additionalProperties": false
         }
@@ -6384,6 +6425,26 @@
             "mode": { "type": "string", "enum": ["uk_us"] },
             "uk": { "$ref": "#/$defs/WordUkFormVariantV3" },
             "us": { "$ref": "#/$defs/WordUsFormVariantV3" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us_many"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/WordUkFormVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/WordUsFormVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            }
           },
           "additionalProperties": false
         }

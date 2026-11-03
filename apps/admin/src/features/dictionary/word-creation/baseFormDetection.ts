@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { expandFormContents } from "@tsz/shared";
 import type {
   AdminWordV3,
@@ -93,8 +94,8 @@ export function resolveDetectedBaseForm(
       }
     : {
         mode: "distinguish",
-        uk: form.regional_variants.uk.spelling,
-        us: form.regional_variants.us.spelling,
+        uk: primaryRegionalVariant(form.regional_variants, "uk").spelling,
+        us: primaryRegionalVariant(form.regional_variants, "us").spelling,
         source_dialect: "us"
       };
 }

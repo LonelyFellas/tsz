@@ -49,8 +49,16 @@
 
 ## PR CI 跟进
 
-关联 PR：前端 [#661](https://github.com/LonelyFellas/tsz/pull/661)，后端 [#375](https://github.com/LonelyFellas/tsz-rust/pull/375)。后端 CI 已通过。
+关联 PR：前端 [#661](https://github.com/LonelyFellas/tsz/pull/661)，后端 [#375](https://github.com/LonelyFellas/tsz-rust/pull/375)。后端 CI 已通过并已合并。
 
 前端提交 `30485f56` 的 [CI run 41465339020](https://github.com/LonelyFellas/tsz/actions/runs/41465339020) 中，仅 `admin-2` 两个新组件用例超时（10 秒/5 秒），其余质量、构建及分片通过。本地原版本的单文件覆盖率运行仍通过（9 项、用例总耗时 9.27 秒），未把本地成功当作已复现 CI 超时。
 
 失败重试场景会等待 `message.error` 返回的 thenable，而 AntD 通知默认展示 3 秒。补丁仅在测试 provider 将通知设为 0.1 秒，并把成功保存/重开回显与失败保留/重试分开；两段各沿用原场景 10 秒上限，不修改生产代码、断言或覆盖率规则。使用 CI shard 配置、coverage、单 worker 验证 10 项通过；原 `admin-2` 完整覆盖率分片验证也已通过（56 文件、767 项，单 worker）；最终 CI 结果以 PR 最新 head 对应 run 为准。
+
+### 后续超时与主线冲突修复
+
+用户已明确授权修复前端 #661 的测试超时与合并冲突、正常推送并继续跟踪 CI；未授权合并或部署。失败基线为 `1a2df8b0` 的 CI run `41475400548`：两个配置页用例分别 10 秒/5 秒超时。本地相同 coverage/单 worker 路径通过，不能声称在本机重现 Linux 超时。
+
+前一次缩短通知/拆分场景未彻底解决慢机开销。本轮临时探针保留原始 `getComputedStyle` 行为，测得两项用例共 219 次样式计算、约 3960ms；改为表格行内文字、弹窗标题与控件 label 定位，并等待实际弹窗可见/DOM 移除后，为 40 次、约 88ms。两项原路径测试总耗时由约 4.84s 降至 0.94s。生产行为、业务断言、可见性验证及超时上限保留；探针已移除。
+
+同步前端 `origin/main=6204eb7c`，保留其多拼写功能及当前默认模版行为。三个冲突文件均属于生成契约/哈希：复用已在主线生成的完整快照与 runtime bundle，保留默认模版新增契约断言，哈希更新为 `d51eab1fe83602563e66b5ed1efd52e63f3abee69bd26a3de7076576f77fb50e`。该值与后端 `origin/main=282d7e8` 的已提交 `docs/openapi.json` 及所选 `1d45/tsz-rust` 源文件一致；没有手工拼接 schema，也没有改写后端。API-client 36 文件、675 项测试通过，合并后的词形操作测试 58 项通过。完整 admin-2 覆盖率分片通过（56 文件、772 项，192.95s；目标保存重开/失败重试用例约 336ms/450ms）。推送后 CI 结果继续在关联 PR 中记录。

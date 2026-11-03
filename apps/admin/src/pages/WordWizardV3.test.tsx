@@ -1,3 +1,4 @@
+import { primaryRegionalVariant } from "@tsz/shared";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
 import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
@@ -388,7 +389,7 @@ describe("WordWizardV3Page", () => {
       const variant =
         form.regional_variants.mode === "common"
           ? form.regional_variants.common
-          : form.regional_variants.uk;
+          : primaryRegionalVariant(form.regional_variants, "uk");
       const entry = `/words/${WORD_ID}/v3/wizard/forms`;
       const focusedEntry = `${entry}?focus_node=${target === "content" ? variant.id : form.id}`;
       // 先完成异步词条加载及深链 effect，再开始等待目标控件。
@@ -1225,7 +1226,7 @@ describe("WordWizardV3Page", () => {
     const variantId =
       base.regional_bindings.mode === "common"
         ? base.regional_bindings.common.id
-        : base.regional_bindings.uk.id;
+        : primaryRegionalVariant(base.regional_bindings, "uk").id;
     const reference = {
       id: "shared_sentence:annotation-1",
       kind: "shared_sentence" as const,
@@ -1349,7 +1350,7 @@ describe("WordWizardV3Page", () => {
     const variantId =
       base.regional_bindings.mode === "common"
         ? base.regional_bindings.common.id
-        : base.regional_bindings.uk.id;
+        : primaryRegionalVariant(base.regional_bindings, "uk").id;
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     vi.mocked(endpoints.inboundReferencesV3).mockResolvedValue({
       entry_id: WORD_ID,

@@ -794,3 +794,20 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
+
+.v3-spelling-list {
+  min-width: 0;
+}
+.v3-spelling-item + .v3-spelling-item {
+  border-top: 1px solid var(--ant-color-border-secondary);
+}
+.v3-spelling-item.is-dragging {
+  opacity: 0.5;
+}
+.v3-spelling-item.is-drag-over {
+  outline: 2px solid var(--ant-color-primary);
+  outline-offset: -2px;
+}
+.v3-spelling-list .v3-dialect-form-cell {
+  height: auto;
+}

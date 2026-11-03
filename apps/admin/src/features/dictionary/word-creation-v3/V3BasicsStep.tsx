@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { expandFormContents } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
@@ -59,13 +60,10 @@ function visibleEntryLabel(word: AdminWordV3): string {
   if (matchedSurface) return matchedSurface;
   for (const pos of expandFormContents(word.forms).pos) {
     for (const form of pos.forms) {
-      const variant =
-        form.regional_variants.mode === "common"
-          ? form.regional_variants.common
-          : form.regional_variants[
-              form.regional_variants.uk.spelling.trim() ? "uk" : "us"
-            ];
-      if (variant.spelling.trim()) return variant.spelling;
+      const variant = regionalVariants(form.regional_variants).find((row) =>
+        row.spelling.trim()
+      );
+      if (variant?.spelling.trim()) return variant.spelling;
     }
   }
   return "";
@@ -201,20 +199,26 @@ function SuggestedForm({
       ) : (
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
-            <VariantPanel
-              className="dialect-panel-uk"
-              label="英式英语 · BrE"
-              spelling={form.regional_variants.uk.spelling}
-              pronunciations={form.regional_variants.uk.pronunciations}
-            />
+            {regionalVariants(form.regional_variants, "uk").map((variant) => (
+              <VariantPanel
+                key={variant.id}
+                className="dialect-panel-uk"
+                label="英式英语 · BrE"
+                spelling={variant.spelling}
+                pronunciations={variant.pronunciations}
+              />
+            ))}
           </Col>
           <Col xs={24} md={12}>
-            <VariantPanel
-              className="dialect-panel-us"
-              label="美式英语 · AmE"
-              spelling={form.regional_variants.us.spelling}
-              pronunciations={form.regional_variants.us.pronunciations}
-            />
+            {regionalVariants(form.regional_variants, "us").map((variant) => (
+              <VariantPanel
+                key={variant.id}
+                className="dialect-panel-us"
+                label="美式英语 · AmE"
+                spelling={variant.spelling}
+                pronunciations={variant.pronunciations}
+              />
+            ))}
           </Col>
         </Row>
       )}

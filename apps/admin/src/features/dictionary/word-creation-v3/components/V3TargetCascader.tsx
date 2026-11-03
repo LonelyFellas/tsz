@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
 import {
@@ -665,11 +666,7 @@ export function V3TargetCascader({
                   );
                   if (!current) return [];
                   const variants = current.regional_variants;
-                  const variant = (
-                    variants.mode === "common"
-                      ? [variants.common]
-                      : [variants.uk, variants.us]
-                  ).find(
+                  const variant = regionalVariants(variants).find(
                     (item) =>
                       item.id === form.variant_id &&
                       item.spelling === form.spelling

@@ -1,3 +1,4 @@
+import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { env } from "../../../lib/env";
 import type {
   AudioAssetV3,
@@ -148,10 +149,7 @@ function explicitMapping(value: unknown): value is VariantMapping {
 }
 
 function formNodeIds(form: WordConcreteFormV3): string[] {
-  const variants =
-    form.regional_variants.mode === "common"
-      ? [form.regional_variants.common]
-      : [form.regional_variants.uk, form.regional_variants.us];
+  const variants = regionalVariants(form.regional_variants);
   return [
     form.id,
     ...variants.flatMap((variant) => [
@@ -195,8 +193,14 @@ export function createStableVariantIdFactory(
             form.regional_variants.common.id
           );
         } else {
-          ids.set(key(form.id, "uk_variant"), form.regional_variants.uk.id);
-          ids.set(key(form.id, "us_variant"), form.regional_variants.us.id);
+          ids.set(
+            key(form.id, "uk_variant"),
+            primaryRegionalVariant(form.regional_variants, "uk").id
+          );
+          ids.set(
+            key(form.id, "us_variant"),
+            primaryRegionalVariant(form.regional_variants, "us").id
+          );
         }
       }
     }
@@ -530,10 +534,20 @@ export function normalizeGroupDialectRules(
   for (let index = 0; index < pos.forms.length; index += 1) {
     const form = pos.forms[index]!;
     if (!memberFormIds.has(form.id)) continue;
-    const variants =
-      form.regional_variants.mode === "common"
-        ? [form.regional_variants.common]
-        : [form.regional_variants.uk, form.regional_variants.us];
+    if (form.regional_variants.mode === "uk_us_many") {
+      if (rules.spelling_mode === "distinguish") continue;
+      if (
+        form.regional_variants.uk.length !== 1 ||
+        form.regional_variants.us.length !== 1
+      )
+        return { ok: false, reason: "spelling_marks_merge_required" };
+      form.regional_variants = {
+        mode: "uk_us",
+        uk: form.regional_variants.uk[0]!,
+        us: form.regional_variants.us[0]!
+      };
+    }
+    const variants = regionalVariants(form.regional_variants);
     for (const variant of variants) {
       if (env.FORM_SPELLING_REGULARITY) {
         variant.is_regular = variantRegularity(content, form.id, variant);
@@ -704,10 +718,7 @@ function mutateVariant(
   const next = clone(content);
   for (const pos of next.pos) {
     for (const form of pos.forms) {
-      const variants =
-        form.regional_variants.mode === "common"
-          ? [form.regional_variants.common]
-          : [form.regional_variants.uk, form.regional_variants.us];
+      const variants = regionalVariants(form.regional_variants);
       const variant = variants.find((item) => item.id === variantId);
       if (variant) {
         mutate(variant);
@@ -732,10 +743,7 @@ export function updateFormRegularity(
     if (form.regional_variants.mode === "common") {
       form.regional_variants.common.is_regular = isRegular;
     } else {
-      for (const variant of [
-        form.regional_variants.uk,
-        form.regional_variants.us
-      ]) {
+      for (const variant of regionalVariants(form.regional_variants)) {
         if (spellingMode === "unified" || variant.dialect === dialect)
           variant.is_regular = isRegular;
       }
@@ -821,10 +829,7 @@ export function updatePronunciation(
   const next = clone(content);
   for (const pos of next.pos) {
     for (const form of pos.forms) {
-      const variants =
-        form.regional_variants.mode === "common"
-          ? [form.regional_variants.common]
-          : [form.regional_variants.uk, form.regional_variants.us];
+      const variants = regionalVariants(form.regional_variants);
       for (const variant of variants) {
         const pronunciation = variant.pronunciations.find(
           (item) => item.id === pronunciationId
@@ -851,8 +856,8 @@ function baseSpellings(form: WordConcreteFormV3 | undefined): {
         us: form.regional_variants.common.spelling
       }
     : {
-        uk: form.regional_variants.uk.spelling,
-        us: form.regional_variants.us.spelling
+        uk: primaryRegionalVariant(form.regional_variants, "uk").spelling,
+        us: primaryRegionalVariant(form.regional_variants, "us").spelling
       };
 }
 
@@ -1069,9 +1074,10 @@ export function addFormGroup(
     if (created.regional_variants.mode === "common") {
       created.regional_variants.common.spelling = spelling.uk;
     } else {
-      created.regional_variants.uk.spelling = spelling.uk;
+      primaryRegionalVariant(created.regional_variants, "uk").spelling =
+        spelling.uk;
       // 拼写统一的组两侧必须同拼写；退回的模板可能来自拼写区分英美的组。
-      created.regional_variants.us.spelling =
+      primaryRegionalVariant(created.regional_variants, "us").spelling =
         previousRules?.spelling_mode === "unified" ? spelling.uk : spelling.us;
     }
   }
@@ -1327,10 +1333,7 @@ export function reorderPronunciations(
   const next = clone(content);
   for (const pos of next.pos) {
     for (const form of pos.forms) {
-      const variants =
-        form.regional_variants.mode === "common"
-          ? [form.regional_variants.common]
-          : [form.regional_variants.uk, form.regional_variants.us];
+      const variants = regionalVariants(form.regional_variants);
       const variant = variants.find((item) => item.id === variantId);
       if (variant) {
         variant.pronunciations = reorderByIds(
@@ -1343,4 +1346,83 @@ export function reorderPronunciations(
     }
   }
   throw new Error(`variant not found: ${variantId}`);
+}
+
+/** List edits keep every surviving spelling and pronunciation identity intact. */
+export function editSpellingList(
+  content: DraftFormsStepContentV3,
+  formId: string,
+  dialect: "uk" | "us",
+  action:
+    | { type: "add"; afterId: string }
+    | { type: "remove"; id: string }
+    | { type: "move"; id: string; toIndex: number },
+  idFactory: V3IdFactory = defaultIdFactory
+): DraftFormsStepContentV3 {
+  const next = clone(content);
+  const form = next.pos
+    .flatMap((pos) => pos.forms)
+    .find((row) => row.id === formId);
+  if (!form || form.regional_variants.mode === "common")
+    throw new Error("请先开启英美拼写区别");
+  if (form.regional_variants.mode === "uk_us")
+    form.regional_variants = {
+      mode: "uk_us_many",
+      uk: [form.regional_variants.uk],
+      us: [form.regional_variants.us]
+    };
+  const rows = form.regional_variants[dialect];
+  if (action.type === "add") {
+    if (rows.length >= 2000) throw new Error("拼写数量已达上限");
+    const index = rows.findIndex((row) => row.id === action.afterId);
+    if (index < 0) throw new Error("拼写已不存在");
+    const row = {
+      id: idFactory(),
+      dialect,
+      spelling: "",
+      origin: "manual" as const,
+      is_regular: rows[index]!.is_regular,
+      pronunciations: [
+        {
+          id: idFactory(),
+          dict_phonetic: "",
+          actual_pron: "",
+          style: "normal" as const
+        }
+      ]
+    };
+    if (dialect === "uk")
+      form.regional_variants.uk.splice(index + 1, 0, { ...row, dialect: "uk" });
+    else
+      form.regional_variants.us.splice(index + 1, 0, { ...row, dialect: "us" });
+  } else {
+    const index = rows.findIndex((row) => row.id === action.id);
+    if (index < 0) throw new Error("拼写已不存在");
+    if (action.type === "remove") {
+      if (rows.length <= 1) throw new Error("每侧至少保留一条拼写");
+      rows.splice(index, 1);
+    } else {
+      if (
+        !Number.isInteger(action.toIndex) ||
+        action.toIndex < 0 ||
+        action.toIndex >= rows.length
+      )
+        throw new Error("拼写排序位置无效");
+      const [moved] = rows.splice(index, 1);
+      // Separate arrays carry literal dialect types; the source row belongs to this side.
+      if (dialect === "uk")
+        form.regional_variants.uk.splice(
+          action.toIndex,
+          0,
+          moved as WordUkFormVariantV3
+        );
+      else
+        form.regional_variants.us.splice(
+          action.toIndex,
+          0,
+          moved as WordUsFormVariantV3
+        );
+    }
+  }
+  return next;
 }

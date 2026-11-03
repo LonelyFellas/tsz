@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-160-default-form-template/docs/openapi.json",
-  "_generatedAt": "2026-11-02T14:08:07.840Z",
+  "_source": "/Users/darwish/.codex/worktrees/1d45/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-02T15:36:38.561Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -338,6 +338,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
         "required": false,
@@ -389,6 +395,12 @@
       },
       {
         "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -458,6 +470,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
         "required": false,
@@ -514,6 +532,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
         "required": false,
@@ -559,6 +583,12 @@
       },
       {
         "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -620,6 +650,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
         "required": false,
@@ -665,6 +701,12 @@
       },
       {
         "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -726,6 +768,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
         "required": false,
@@ -771,6 +819,12 @@
       },
       {
         "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -832,6 +886,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
         "required": false,
@@ -883,6 +943,12 @@
       },
       {
         "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -944,6 +1010,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Phoneme-Speech",
         "in": "header",
         "required": false,
@@ -989,6 +1061,12 @@
       },
       {
         "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -1042,6 +1120,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "put /admin/lexicon/entries/{id}/steps/meanings": [
@@ -1053,6 +1137,12 @@
       },
       {
         "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -7446,6 +7536,26 @@
             "us": { "$ref": "#/components/schemas/FormContentVariantV3" }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us_many"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/FormContentVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/FormContentVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            }
+          },
+          "additionalProperties": false
         }
       ],
       "discriminator": { "propertyName": "mode" }
@@ -7538,6 +7648,26 @@
             "mode": { "type": "string", "enum": ["uk_us"] },
             "uk": { "$ref": "#/components/schemas/FormVariantBindingV3" },
             "us": { "$ref": "#/components/schemas/FormVariantBindingV3" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us_many"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/FormVariantBindingV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/FormVariantBindingV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            }
           },
           "additionalProperties": false
         }
@@ -9442,6 +9572,27 @@
             "mode": { "type": "string", "enum": ["uk_us"] },
             "uk": { "$ref": "#/components/schemas/WordUkFormVariantV3" },
             "us": { "$ref": "#/components/schemas/WordUsFormVariantV3" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Independent ordered spelling lists. IDs follow spellings when reordered.",
+          "required": ["uk", "us", "mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["uk_us_many"] },
+            "uk": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/WordUkFormVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            },
+            "us": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/WordUsFormVariantV3" },
+              "maxItems": 2000,
+              "minItems": 1
+            }
           },
           "additionalProperties": false
         }
