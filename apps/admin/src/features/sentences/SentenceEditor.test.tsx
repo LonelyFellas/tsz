@@ -329,16 +329,14 @@ describe("新建例句保存与恢复", () => {
       );
       const onSaved = vi.fn();
       show(<SentenceEditor onClose={vi.fn()} onSaved={onSaved} />);
-      fireEvent.change(await screen.findByLabelText("例句正文"), {
-        target: { value: "A new story." }
-      });
+      const content = await screen.findByLabelText("例句正文");
+      const save = screen.getByLabelText("保存例句");
+      fireEvent.change(content, { target: { value: "A new story." } });
       const translation =
         screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!;
       fireEvent.change(translation, { target: { value: "原来的译文" } });
-      await waitFor(() =>
-        expect(screen.getByLabelText("保存例句")).toBeEnabled()
-      );
-      fireEvent.click(screen.getByLabelText("保存例句"));
+      await waitFor(() => expect(save).toBeEnabled());
+      fireEvent.click(save);
       await screen.findByText("创建响应丢失");
       if (grant === "sentences.associate") {
         fireEvent.change(translation, {
@@ -349,9 +347,7 @@ describe("新建例句保存与恢复", () => {
         fireEvent.mouseDown(screen.getByLabelText("关联 story.（3）"), {
           button: 0
         });
-        const picker = await screen.findByRole("group", {
-          name: "关联单词：story"
-        });
+        const picker = await screen.findByLabelText("关联单词：story");
         fireEvent.click(
           within(picker).getByLabelText("词条未创建，记为待关联")
         );
@@ -359,10 +355,8 @@ describe("新建例句保存与恢复", () => {
           within(picker).getByText("确认关联", { selector: "button span" })
         );
       }
-      await waitFor(() =>
-        expect(screen.getByLabelText("保存例句")).toBeEnabled()
-      );
-      fireEvent.click(screen.getByLabelText("保存例句"));
+      await waitFor(() => expect(save).toBeEnabled());
+      fireEvent.click(save);
       await screen.findByText("本次修改缺少权限");
       expect(onSaved).not.toHaveBeenCalled();
       if (grant === "sentences.associate") {
@@ -378,10 +372,8 @@ describe("新建例句保存与恢复", () => {
           await screen.findByText("清除关联", { selector: "button span" })
         );
       }
-      await waitFor(() =>
-        expect(screen.getByLabelText("保存例句")).toBeEnabled()
-      );
-      fireEvent.click(screen.getByLabelText("保存例句"));
+      await waitFor(() => expect(save).toBeEnabled());
+      fireEvent.click(save);
       await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
       expect(api.sentences.update).toHaveBeenCalledOnce();
       const calls = vi.mocked(api.sentences.create).mock.calls;
