@@ -5,7 +5,7 @@ import {
   CopyOutlined,
   DeleteOutlined,
   EditOutlined,
-  PlayCircleOutlined,
+  SoundOutlined,
   PlusOutlined,
   SaveOutlined,
   CheckOutlined
@@ -23,11 +23,11 @@ import {
   App,
   Button,
   Card,
-  Badge,
   Checkbox,
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Tag,
@@ -99,10 +99,9 @@ export function DubbingGroups({
   const [drafts, setDrafts] = useDubbingDrafts();
   const [savingId, setSavingId] = useState<string>();
   const [error, setError] = useState<string>();
+  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string>();
   const [editing, setEditing] = useState<Editing>();
-  const [selectedId, setSelectedId] = useState<string>();
-  const [ordering, setOrdering] = useState(false);
   const [settingsId, setSettingsId] = useState<string>();
   const [settingsCreating, setSettingsCreating] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
@@ -141,9 +140,18 @@ export function DubbingGroups({
     );
     setSaved(undefined);
   }
+  function setGroupSaveError(id: string, message?: string) {
+    setSaveErrors((value) => {
+      const next = { ...value };
+      if (message) next[id] = message;
+      else delete next[id];
+      return next;
+    });
+  }
   function discard(id: string) {
     onInvalidatePreview();
     setError(undefined);
+    setGroupSaveError(id);
     setDrafts((value) => {
       const next = { ...value };
       delete next[id];
@@ -174,21 +182,21 @@ export function DubbingGroups({
     const draft = drafts[id];
     if (!draft || !canEdit || saving) return;
     if (!draft.name.trim()) {
-      setError("请填写分组名称。");
+      setGroupSaveError(id, "请填写分组名称。");
       return;
     }
     if (draft.recommendations.format !== "paired") {
-      setError("请先确认本组原有英美声音的组合，再保存。");
+      setGroupSaveError(id, "请先确认本组原有英美声音的组合，再保存。");
       return;
     }
     const original = groups.data?.groups.find((g) => g.id === id);
     for (const pair of draft.recommendations.pairs) {
       if (!pair.name.trim()) {
-        setError("请填写推荐名称。");
+        setGroupSaveError(id, "请填写推荐名称。");
         return;
       }
       if (Array.from(pair.name).length > 40) {
-        setError("推荐名称最多 40 字。");
+        setGroupSaveError(id, "推荐名称最多 40 字。");
         return;
       }
       for (const side of sides) {
@@ -217,13 +225,14 @@ export function DubbingGroups({
               parameters: stored.parameters
             }) !== JSON.stringify(pair[side]))
         ) {
-          setError(issue);
+          setGroupSaveError(id, issue);
           return;
         }
       }
     }
     setSavingId(id);
     setError(undefined);
+    setGroupSaveError(id);
     setSaved(undefined);
     try {
       const result = await api.speech.savePairedGroup(
@@ -244,7 +253,8 @@ export function DubbingGroups({
         setSaved(`「${draft.name.trim()}」配音已保存。`);
       }
     } catch (cause) {
-      setError(
+      setGroupSaveError(
+        id,
         cause instanceof HttpError && cause.status === 409
           ? "本组已被修改或名称已被使用，全部草稿已保留。请重新载入；取消本组后可按最新配置编辑。"
           : "保存失败，本组全部草稿已保留，请重试。"
@@ -304,7 +314,6 @@ export function DubbingGroups({
       is_global: false
     };
     setDrafts((v) => ({ ...v, [group.id]: group }));
-    setSelectedId(group.id);
     settingsForm.setFieldsValue({ name: group.name, areas: group.areas });
     setSettingsDirty(false);
     setSettingsCreating(true);
@@ -401,7 +410,7 @@ export function DubbingGroups({
             type="text"
             aria-label={`试听${sideName(side)} ${item.name}`}
             className={`voice-accent-${accent}`}
-            icon={<PlayCircleOutlined aria-hidden />}
+            icon={<SoundOutlined aria-hidden />}
             disabled={!auditionAllowed || !canAudition || !!issue}
             onClick={() => voice && onAudition(voice, item)}
           />
@@ -440,10 +449,6 @@ export function DubbingGroups({
       </div>
     );
   }
-  const active =
-    current.find((group) => group.id === selectedId) ??
-    current.find((group) => group.is_global) ??
-    current[0];
   const editingGroup =
     editing && current.find((group) => group.id === editing.groupId);
   const reviewGroup = current.find((group) => group.id === reviewId);
@@ -484,7 +489,7 @@ export function DubbingGroups({
           <>
             <div className="dubbing-legacy-notice">
               <Typography.Text type="secondary">
-                原有英美声音已保留，确认组合后即可维护推荐套。
+                原有声音已保留，请先核对英美组合。
               </Typography.Text>
               {editable && (
                 <Button onClick={() => setReviewId(group.id)}>核对声音</Button>
@@ -525,165 +530,200 @@ export function DubbingGroups({
           </>
         )}
         {rec.format === "paired" && (
-          <div className="dubbing-pairs-scroll">
-            <div className="dubbing-pairs" aria-label={`${group.name}英美推荐`}>
-              <div className="dubbing-pair-row dubbing-pair-head">
-                <span>推荐套</span>
-                {sides.map((side) => (
-                  <div
-                    key={side}
-                    className={`dubbing-locale-heading voice-accent-${side}`}
-                  >
-                    <span>{sideName(side)}</span>
-                    <span>声音 / 参数</span>
-                  </div>
-                ))}
-              </div>
-              {pairs.map((pair, pairIndex) => (
-                <div
-                  key={pair.id}
-                  className="dubbing-pair-row"
-                  data-pair-id={pair.id}
-                >
-                  <div className="dubbing-pair-controls">
-                    <div className="dubbing-pair-choice">
-                      <Checkbox
-                        aria-label={`选用 ${pair.name}`}
-                        disabled={!editable}
-                        checked={pair.selected}
-                        onChange={(event) =>
-                          updatePairs(group.id, (items) =>
-                            items.map((p) =>
-                              p.id === pair.id
-                                ? { ...p, selected: event.target.checked }
-                                : p
-                            )
-                          )
-                        }
-                      />
-                      <div>
-                        <Input
-                          variant="borderless"
-                          className="dubbing-pair-name"
-                          aria-label={`推荐名称 ${pairIndex + 1}`}
-                          maxLength={40}
-                          value={pair.name}
-                          disabled={!editable}
-                          onChange={(event) =>
-                            updatePairs(group.id, (items) =>
-                              items.map((p) =>
-                                p.id === pair.id
-                                  ? { ...p, name: event.target.value }
-                                  : p
+          <>
+            {pairs.length > 0 && (
+              <Typography.Text
+                className="dubbing-table-scroll-hint"
+                type="secondary"
+              >
+                左右滑动查看完整配音
+              </Typography.Text>
+            )}
+            <div
+              className="dubbing-pairs-scroll"
+              tabIndex={pairs.length ? 0 : undefined}
+            >
+              <table
+                className={`dubbing-pairs${pairs.length ? "" : " is-empty"}`}
+                aria-label={`${group.name}英美推荐`}
+              >
+                {pairs.length > 0 && (
+                  <thead>
+                    <tr className="dubbing-pair-head">
+                      <th scope="col">推荐套</th>
+                      {sides.map((side) => (
+                        <th key={side} scope="col">
+                          <div
+                            className={`dubbing-locale-heading voice-accent-${side}`}
+                          >
+                            <span>{sideName(side)}</span>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                )}
+                <tbody>
+                  {pairs.map((pair, pairIndex) => (
+                    <tr
+                      key={pair.id}
+                      className="dubbing-pair-row"
+                      data-pair-id={pair.id}
+                    >
+                      <td className="dubbing-pair-controls">
+                        <div className="dubbing-pair-choice">
+                          <Checkbox
+                            aria-label={`选用 ${pair.name}`}
+                            disabled={!editable}
+                            checked={pair.selected}
+                            onChange={(event) =>
+                              updatePairs(group.id, (items) =>
+                                items.map((p) =>
+                                  p.id === pair.id
+                                    ? { ...p, selected: event.target.checked }
+                                    : p
+                                )
                               )
-                            )
-                          }
-                        />
-                        <Typography.Text
-                          type="secondary"
-                          className="dubbing-pair-status"
-                        >
-                          {pair.selected
-                            ? pairIndex === pairs.findIndex((p) => p.selected)
-                              ? "优先使用"
-                              : "已选用"
-                            : "未选用"}
-                        </Typography.Text>
-                      </div>
-                    </div>
-                    {editable && (
-                      <Space size={0} className="dubbing-pair-actions">
-                        {[-1, 1].map((direction) => (
-                          <Button
-                            key={direction}
-                            size="small"
-                            type="text"
-                            aria-label={`${direction < 0 ? "上移" : "下移"}推荐 ${pair.name}`}
-                            icon={
-                              direction < 0 ? (
-                                <ArrowUpOutlined aria-hidden />
-                              ) : (
-                                <ArrowDownOutlined aria-hidden />
-                              )
-                            }
-                            disabled={
-                              pairIndex + direction < 0 ||
-                              pairIndex + direction >= pairs.length
-                            }
-                            onClick={() =>
-                              updatePairs(group.id, (items) => {
-                                const next = [...items];
-                                [next[pairIndex], next[pairIndex + direction]] =
-                                  [
-                                    next[pairIndex + direction]!,
-                                    next[pairIndex]!
-                                  ];
-                                return next;
-                              })
                             }
                           />
-                        ))}
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<CopyOutlined aria-hidden />}
-                          aria-label={`复制整套 ${pair.name}`}
-                          disabled={pairs.length >= 20}
-                          onClick={() =>
-                            setEditing({
-                              groupId: group.id,
-                              initial: {
-                                ...structuredClone(pair),
-                                id: newWordNodeId(),
-                                name: `${Array.from(pair.name).slice(0, 37).join("")} 副本`,
-                                uk: {
-                                  ...structuredClone(pair.uk),
-                                  id: newWordNodeId()
-                                },
-                                us: {
-                                  ...structuredClone(pair.us),
-                                  id: newWordNodeId()
-                                }
+                          <div>
+                            <Input
+                              variant="borderless"
+                              className="dubbing-pair-name"
+                              aria-label={`推荐名称 ${pairIndex + 1}`}
+                              maxLength={40}
+                              value={pair.name}
+                              disabled={!editable}
+                              onChange={(event) =>
+                                updatePairs(group.id, (items) =>
+                                  items.map((p) =>
+                                    p.id === pair.id
+                                      ? { ...p, name: event.target.value }
+                                      : p
+                                  )
+                                )
                               }
-                            })
-                          }
-                        />
-                        <Button
-                          danger
-                          type="text"
-                          size="small"
-                          icon={<DeleteOutlined aria-hidden />}
-                          aria-label={`移除推荐 ${pair.name}`}
-                          onClick={() =>
-                            updatePairs(group.id, (items) =>
-                              items.filter((p) => p.id !== pair.id)
-                            )
-                          }
-                        />
-                      </Space>
-                    )}
-                  </div>
-                  {sides.map((side) => (
-                    <div key={side}>
-                      {sideRow(pair, side, group, editable, auditionAllowed)}
-                    </div>
+                            />
+                            <Typography.Text
+                              type="secondary"
+                              className="dubbing-pair-status"
+                            >
+                              {pair.selected
+                                ? pairIndex ===
+                                  pairs.findIndex((p) => p.selected)
+                                  ? "优先使用"
+                                  : "已选用"
+                                : "未选用"}
+                            </Typography.Text>
+                          </div>
+                        </div>
+                        {editable && (
+                          <Space size={0} className="dubbing-pair-actions">
+                            {[-1, 1].map((direction) => (
+                              <Button
+                                key={direction}
+                                size="small"
+                                type="text"
+                                aria-label={`${direction < 0 ? "上移" : "下移"}推荐 ${pair.name}`}
+                                icon={
+                                  direction < 0 ? (
+                                    <ArrowUpOutlined aria-hidden />
+                                  ) : (
+                                    <ArrowDownOutlined aria-hidden />
+                                  )
+                                }
+                                disabled={
+                                  pairIndex + direction < 0 ||
+                                  pairIndex + direction >= pairs.length
+                                }
+                                onClick={() =>
+                                  updatePairs(group.id, (items) => {
+                                    const next = [...items];
+                                    [
+                                      next[pairIndex],
+                                      next[pairIndex + direction]
+                                    ] = [
+                                      next[pairIndex + direction]!,
+                                      next[pairIndex]!
+                                    ];
+                                    return next;
+                                  })
+                                }
+                              />
+                            ))}
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CopyOutlined aria-hidden />}
+                              aria-label={`复制整套 ${pair.name}`}
+                              disabled={pairs.length >= 20}
+                              onClick={() =>
+                                setEditing({
+                                  groupId: group.id,
+                                  initial: {
+                                    ...structuredClone(pair),
+                                    id: newWordNodeId(),
+                                    name: `${Array.from(pair.name).slice(0, 37).join("")} 副本`,
+                                    uk: {
+                                      ...structuredClone(pair.uk),
+                                      id: newWordNodeId()
+                                    },
+                                    us: {
+                                      ...structuredClone(pair.us),
+                                      id: newWordNodeId()
+                                    }
+                                  }
+                                })
+                              }
+                            />
+                            <Popconfirm
+                              title={`删除推荐「${pair.name}」？`}
+                              description="将移除本套英美配音，保存当前组后生效。"
+                              okText="删除"
+                              cancelText="取消"
+                              okButtonProps={{ danger: true }}
+                              destroyOnHidden
+                              onConfirm={() =>
+                                updatePairs(group.id, (items) =>
+                                  items.filter((p) => p.id !== pair.id)
+                                )
+                              }
+                            >
+                              <Button
+                                danger
+                                type="text"
+                                size="small"
+                                icon={<DeleteOutlined aria-hidden />}
+                                aria-label={`移除推荐 ${pair.name}`}
+                              />
+                            </Popconfirm>
+                          </Space>
+                        )}
+                      </td>
+                      {sides.map((side) => (
+                        <td key={side}>
+                          {sideRow(
+                            pair,
+                            side,
+                            group,
+                            editable,
+                            auditionAllowed
+                          )}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </div>
-              ))}
-              {!pairs.length && (
-                <div className="dubbing-pair-empty">
-                  <Typography.Title level={5}>
-                    {editable ? "从一套英美声音开始" : "本组暂无推荐套"}
-                  </Typography.Title>
-                  <Typography.Paragraph type="secondary">
-                    {editable
-                      ? "添加一套推荐，让这组内容有合适的声音。"
-                      : "当前没有可展示的成套推荐。"}
-                  </Typography.Paragraph>
-                </div>
-              )}
+                  {!pairs.length && (
+                    <tr>
+                      <td colSpan={3} className="dubbing-pair-empty">
+                        <Typography.Title level={5}>暂无推荐</Typography.Title>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>
+          </>
         )}
       </>
     );
@@ -727,10 +767,25 @@ export function DubbingGroups({
         <div>
           <Typography.Title level={2}>分组配音</Typography.Title>
           <Typography.Text type="secondary">
-            维护各类内容的英美推荐，未分组内容使用全局常用。
+            为各板块设置英美配音，无适用分组时使用全局常用。
           </Typography.Text>
         </div>
-        <Button onClick={() => setPreviewArea("word")}>词库中怎么看</Button>
+        <Space wrap>
+          <Button onClick={() => setPreviewArea("word")}>词库预览</Button>
+          {canEdit && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined aria-hidden />}
+              disabled={
+                saving ||
+                current.filter((group) => !group.is_global).length >= 5
+              }
+              onClick={addGroup}
+            >
+              新增分组
+            </Button>
+          )}
+        </Space>
       </div>
       {error && (
         <Alert
@@ -743,159 +798,61 @@ export function DubbingGroups({
         />
       )}
       {saved && <Alert type="success" showIcon title={saved} />}
-      <div className="dubbing-workbench">
-        <aside className="dubbing-group-navigation" aria-label="配音分组">
-          <div className="dubbing-navigation-heading">
-            <Typography.Text type="secondary">内容分组</Typography.Text>
-            {canEdit && (
-              <Button
-                type="text"
-                size="small"
-                aria-expanded={ordering}
-                onClick={() => setOrdering((value) => !value)}
+      <div className="dubbing-group-panels">
+        {!current.length && (
+          <div className="dubbing-empty-groups">
+            <Typography.Paragraph type="secondary">
+              尚未设置分组推荐
+            </Typography.Paragraph>
+          </div>
+        )}
+        {current.map((group, groupIndex) => {
+          const draft = drafts[group.id],
+            editable = canEdit && !saving;
+          const rec = group.recommendations;
+          const storedIndex = groups.data.groups.findIndex(
+            (g) => g.id === group.id
+          );
+          return (
+            <div key={group.id} className="dubbing-group-entry">
+              <div
+                className="dubbing-group-priority"
+                aria-label={`${group.name} 分组顺序`}
               >
-                {ordering ? "完成排序" : "调整顺序"}
-              </Button>
-            )}
-          </div>
-          <div className="dubbing-navigation-list">
-            {current
-              .filter((group) => !group.is_global)
-              .map((group) => {
-                const storedIndex = groups.data.groups.findIndex(
-                  (g) => g.id === group.id
-                );
-                return (
-                  <div key={group.id} className="dubbing-navigation-entry">
-                    <Button
-                      type="text"
-                      className={`dubbing-group-nav-item${active?.id === group.id ? " is-active" : ""}`}
-                      aria-label={`选择分组 ${group.name}`}
-                      aria-current={
-                        active?.id === group.id ? "true" : undefined
-                      }
-                      onClick={() => {
-                        onInvalidatePreview();
-                        setSelectedId(group.id);
-                      }}
-                    >
-                      <span className="dubbing-nav-name">
-                        {group.name}
-                        {drafts[group.id] && (
-                          <Badge
-                            status="processing"
-                            aria-label="有未保存修改"
-                          />
-                        )}
-                      </span>
-                      <span className="dubbing-nav-areas">
-                        {group.areas
-                          .map(
-                            (id) =>
-                              areas.find((area) => area.value === id)?.label ??
-                              id
+                <span className="dubbing-group-number">{groupIndex + 1}</span>
+                {canEdit && !group.is_global && (
+                  <Space size={0}>
+                    {[-1, 1].map((direction) => (
+                      <Button
+                        key={direction}
+                        type="text"
+                        size="small"
+                        icon={
+                          direction < 0 ? (
+                            <ArrowUpOutlined aria-hidden />
+                          ) : (
+                            <ArrowDownOutlined aria-hidden />
                           )
-                          .join(" · ") || "尚未选择板块"}
-                      </span>
-                    </Button>
-                    {canEdit && ordering && (
-                      <div
-                        className="dubbing-navigation-order"
-                        aria-label={`${group.name} 分组顺序`}
-                      >
-                        {[-1, 1].map((direction) => (
-                          <Button
-                            key={direction}
-                            type="text"
-                            size="small"
-                            icon={
-                              direction < 0 ? (
-                                <ArrowUpOutlined aria-hidden />
-                              ) : (
-                                <ArrowDownOutlined aria-hidden />
-                              )
-                            }
-                            aria-label={`${direction < 0 ? "上移" : "下移"}分组 ${group.name}`}
-                            disabled={
-                              saving ||
-                              storedIndex < 0 ||
-                              storedIndex + direction < 0 ||
-                              storedIndex + direction >=
-                                groups.data.groups.length ||
-                              groups.data.groups[storedIndex + direction]
-                                ?.is_global
-                            }
-                            onClick={() => void reorder(group.id, direction)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-          {canEdit && (
-            <Button
-              className="dubbing-add-group"
-              icon={<PlusOutlined aria-hidden />}
-              disabled={
-                saving ||
-                current.filter((group) => !group.is_global).length >= 5
-              }
-              onClick={addGroup}
-            >
-              新增分组
-            </Button>
-          )}
-          <div className="dubbing-global-navigation">
-            {current
-              .filter((group) => group.is_global)
-              .map((group) => (
-                <Button
-                  key={group.id}
-                  type="text"
-                  className={`dubbing-group-nav-item${active?.id === group.id ? " is-active" : ""}`}
-                  aria-label={`选择分组 ${group.name}`}
-                  aria-current={active?.id === group.id ? "true" : undefined}
-                  onClick={() => {
-                    onInvalidatePreview();
-                    setSelectedId(group.id);
-                  }}
-                >
-                  <span className="dubbing-nav-name">
-                    {group.name}
-                    {drafts[group.id] ? (
-                      <Badge status="processing" aria-label="有未保存修改" />
-                    ) : (
-                      <Tag color="blue">兜底</Tag>
-                    )}
-                  </span>
-                  <span className="dubbing-nav-areas">无适用分组时使用</span>
-                </Button>
-              ))}
-          </div>
-        </aside>
-        <div className="dubbing-group-panels">
-          {!current.length && (
-            <div className="dubbing-empty-groups">
-              <Typography.Paragraph type="secondary">
-                尚未设置分组推荐
-              </Typography.Paragraph>
-            </div>
-          )}
-          {current.map((group) => {
-            const draft = drafts[group.id],
-              editable = canEdit && !saving;
-            const rec = group.recommendations;
-            return (
+                        }
+                        aria-label={`${direction < 0 ? "上移" : "下移"}分组 ${group.name}`}
+                        disabled={
+                          saving ||
+                          storedIndex < 0 ||
+                          storedIndex + direction < 0 ||
+                          storedIndex + direction >=
+                            groups.data.groups.length ||
+                          groups.data.groups[storedIndex + direction]?.is_global
+                        }
+                        onClick={() => void reorder(group.id, direction)}
+                      />
+                    ))}
+                  </Space>
+                )}
+              </div>
               <section
-                key={group.id}
                 className="dubbing-group"
                 data-group-id={group.id}
                 aria-label={`${group.name} 分组配置`}
-                hidden={active?.id !== group.id}
-                aria-hidden={active?.id !== group.id}
-                inert={active?.id !== group.id}
               >
                 <div className="dubbing-group-heading">
                   <div>
@@ -905,13 +862,24 @@ export function DubbingGroups({
                       </Typography.Title>
                       {group.is_global && <Tag>全局兜底</Tag>}
                     </div>
-                    <Typography.Text type="secondary">
-                      {group.is_global
-                        ? "没有适用分组时，智能词库显示这里的推荐。"
-                        : "这些内容会优先采用本组中已选的推荐。"}
-                    </Typography.Text>
+                    {!group.is_global && (
+                      <div className="dubbing-group-areas">
+                        {group.areas.length ? (
+                          group.areas.map((id) => (
+                            <Tag key={id}>
+                              {areas.find((area) => area.value === id)?.label ??
+                                id}
+                            </Tag>
+                          ))
+                        ) : (
+                          <Typography.Text type="secondary">
+                            未设置适用板块
+                          </Typography.Text>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <Space>
+                  <Space wrap>
                     {canEdit && !group.is_global && (
                       <Button
                         type="text"
@@ -929,40 +897,35 @@ export function DubbingGroups({
                           setEditing({ groupId: group.id, initial: {} })
                         }
                       >
-                        新增整套推荐
+                        新增推荐
                       </Button>
                     )}
                   </Space>
                 </div>
-                {!group.is_global && (
-                  <div className="dubbing-group-areas">
-                    {group.areas.map((id) => (
-                      <Tag key={id}>
-                        {areas.find((area) => area.value === id)?.label ?? id}
-                      </Tag>
-                    ))}
-                    {canEdit && (
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => openSettings(group)}
-                      >
-                        管理板块
-                      </Button>
-                    )}
-                  </div>
-                )}
                 {recommendations(group, editable)}
+                {saveErrors[group.id] && (
+                  <Alert
+                    type="error"
+                    showIcon
+                    title={saveErrors[group.id]}
+                    className="dubbing-group-save-error"
+                    action={
+                      <Button onClick={() => void groups.refetch()}>
+                        重新载入
+                      </Button>
+                    }
+                  />
+                )}
                 <div className="dubbing-group-footer">
                   <Typography.Text
                     type={draft ? undefined : "secondary"}
                     className={draft ? "dubbing-group-dirty" : undefined}
                   >
                     {draft ? (
-                      "本组有未保存修改"
+                      "未保存"
                     ) : (
                       <>
-                        <CheckOutlined aria-hidden /> 本组配置已保存
+                        <CheckOutlined aria-hidden /> 已保存
                       </>
                     )}
                   </Typography.Text>
@@ -999,9 +962,9 @@ export function DubbingGroups({
                     </div>
                   )}
               </section>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
       <Modal
         open={!!settingsId}
@@ -1136,7 +1099,7 @@ export function DubbingGroups({
       )}
       <Modal
         open={previewArea !== undefined}
-        title="词库中怎么看"
+        title="词库预览"
         onCancel={() => setPreviewArea(undefined)}
         footer={
           <Button type="primary" onClick={() => setPreviewArea(undefined)}>
@@ -1146,7 +1109,7 @@ export function DubbingGroups({
         width={900}
       >
         <Typography.Paragraph type="secondary">
-          有适用分组时展示该组推荐，没有时才展示全局常用。这里预览已保存的配置。
+          预览已保存的推荐；无适用分组时使用全局常用。
         </Typography.Paragraph>
         <Select
           aria-label="预览内容板块"
@@ -1164,7 +1127,7 @@ export function DubbingGroups({
           ))}
           {!previewGroups.length && (
             <Typography.Paragraph type="secondary">
-              尚无推荐，请先维护分组配音。
+              暂无推荐，请先添加。
             </Typography.Paragraph>
           )}
         </div>
