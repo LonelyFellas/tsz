@@ -1,3 +1,4 @@
+import { App } from "antd";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { Dialect, WordPronunciationV3 } from "@tsz/types";
@@ -14,8 +15,10 @@ const pronunciation: WordPronunciationV3 = {
     annotations: [{ type: "bold", start: 0, end: 3 }]
   }
 };
+const renderCopy = (props: Parameters<typeof V3ActualPronunciationCopy>[0]) =>
+  render(<V3ActualPronunciationCopy {...props} />, { wrapper: App });
 
-it("预览转换结果，应用后清除旧标注，撤销恢复完整富文本", () => {
+it("一键转换清除旧标注，不弹确认框，撤销恢复完整富文本", async () => {
   const onChange = vi.fn();
   const props = {
     pronunciation,
@@ -23,15 +26,14 @@ it("预览转换结果，应用后清除旧标注，撤销恢复完整富文本"
     dialect: "us" as Dialect,
     onChange
   };
-  const view = render(<V3ActualPronunciationCopy {...props} />);
+  const view = renderCopy(props);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
-  expect(screen.getByText("ˈfæməlɪ")).toBeInTheDocument();
-  expect(onChange).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByText(/^应\s*用$/));
-  expect(onChange).toHaveBeenLastCalledWith({
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(onChange).toHaveBeenCalledExactlyOnceWith({
     actual_pron: "ˈfæməlɪ",
     actual_pron_rich: { version: 2, text: "ˈfæməlɪ", annotations: [] }
   });
+  expect(await screen.findByText(/原标注已清除/)).toBeInTheDocument();
   view.rerender(
     <V3ActualPronunciationCopy
       {...props}
@@ -43,14 +45,10 @@ it("预览转换结果，应用后清除旧标注，撤销恢复完整富文本"
     actual_pron: "old",
     actual_pron_rich: pronunciation.actual_pron_rich
   });
+  expect(screen.queryByLabelText("撤销实际发音填入")).not.toBeInTheDocument();
 });
 
-it.each([
-  { pronunciation: { ...pronunciation, style: "weak" as const } },
-  { pronunciation: { ...pronunciation, dict_phonetic: "kæt" } },
-  { dialect: "uk" as const },
-  { spelling: "families" }
-])("转换确认期间上下文变化阻止应用旧结果：%j", (changed) => {
+it("每次点击按当前来源、口音与读法转换，撤销只恢复上一次内容", () => {
   const onChange = vi.fn();
   const props = {
     pronunciation,
@@ -58,36 +56,110 @@ it.each([
     dialect: "us" as Dialect,
     onChange
   };
-  const view = render(<V3ActualPronunciationCopy {...props} />);
+  const view = renderCopy(props);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
-  view.rerender(<V3ActualPronunciationCopy {...props} {...changed} />);
-  fireEvent.click(screen.getByText(/^应\s*用$/));
-  expect(onChange).not.toHaveBeenCalled();
-  expect(
-    screen.getByText(/来源、口音、读法或目标内容已变化/)
-  ).toBeInTheDocument();
-});
-
-it("没有词汇依据的弱读显示提示，用户取消后不改写", () => {
-  const onChange = vi.fn();
-  render(
+  const converted = { ...pronunciation, ...onChange.mock.calls[0]![0] };
+  view.rerender(
     <V3ActualPronunciationCopy
-      pronunciation={{
-        ...pronunciation,
-        dict_phonetic: "ˈwɪntər",
-        style: "weak",
-        actual_pron: "",
-        actual_pron_rich: undefined
-      }}
-      spelling="winter"
-      dialect="us"
-      onChange={onChange}
+      {...props}
+      spelling="bib"
+      dialect="uk"
+      pronunciation={{ ...converted, dict_phonetic: "bɪb", style: "strong" }}
     />
   );
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
-  expect(
-    screen.getByText(/请核对强弱读、喉塞音及鼻音闪音/)
-  ).toBeInTheDocument();
-  fireEvent.click(screen.getByText(/^取\s*消$/));
+  expect(onChange).toHaveBeenLastCalledWith({
+    actual_pron: "bɪp",
+    actual_pron_rich: { version: 2, text: "bɪp", annotations: [] }
+  });
+  view.rerender(
+    <V3ActualPronunciationCopy
+      {...props}
+      pronunciation={{ ...converted, ...onChange.mock.calls[1]![0] }}
+    />
+  );
+  fireEvent.click(screen.getByLabelText("撤销实际发音填入"));
+  expect(onChange).toHaveBeenLastCalledWith({
+    actual_pron: converted.actual_pron,
+    actual_pron_rich: converted.actual_pron_rich
+  });
+});
+
+it("没有词汇依据的弱读直接规范音标并提示核对", async () => {
+  const onChange = vi.fn();
+  renderCopy({
+    pronunciation: {
+      ...pronunciation,
+      dict_phonetic: "ˈwɪntər",
+      style: "weak",
+      actual_pron: "",
+      actual_pron_rich: undefined
+    },
+    spelling: "winter",
+    dialect: "us",
+    onChange
+  });
+  fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
+  expect(onChange).toHaveBeenCalledExactlyOnceWith({
+    actual_pron: "ˈwɪntər",
+    actual_pron_rich: { version: 2, text: "ˈwɪntər", annotations: [] }
+  });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(await screen.findByText(/核对读法/)).toBeInTheDocument();
+});
+
+it("无效音标不改写实际发音或标注", async () => {
+  const onChange = vi.fn();
+  renderCopy({
+    pronunciation: { ...pronunciation, dict_phonetic: "???" },
+    spelling: "family",
+    dialect: "us",
+    onChange
+  });
+  fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   expect(onChange).not.toHaveBeenCalled();
+  expect(await screen.findByText(/未支持的音标/)).toBeInTheDocument();
+});
+
+it("字典音标为空时不能转换", () => {
+  const onChange = vi.fn();
+  renderCopy({
+    pronunciation: { ...pronunciation, dict_phonetic: "  " },
+    spelling: "family",
+    dialect: "us",
+    onChange
+  });
+  expect(screen.getByLabelText("从字典音标填入实际发音")).toBeDisabled();
+});
+
+it.each([
+  { actual_pron: "edited" },
+  {
+    actual_pron_rich: {
+      version: 2 as const,
+      text: "ˈfæməlɪ",
+      annotations: [{ type: "bold" as const, start: 0, end: 1 }]
+    }
+  }
+])("后续编辑实际发音或标注后不再提供旧快照撤销：%j", (edited) => {
+  const onChange = vi.fn();
+  const props = {
+    pronunciation,
+    spelling: "family",
+    dialect: "us" as Dialect,
+    onChange
+  };
+  const view = renderCopy(props);
+  fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
+  view.rerender(
+    <V3ActualPronunciationCopy
+      {...props}
+      pronunciation={{
+        ...pronunciation,
+        ...onChange.mock.calls[0]![0],
+        ...edited
+      }}
+    />
+  );
+  expect(screen.queryByLabelText("撤销实际发音填入")).not.toBeInTheDocument();
 });
