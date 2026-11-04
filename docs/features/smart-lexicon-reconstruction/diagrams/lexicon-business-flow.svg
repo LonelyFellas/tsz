@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1160" viewBox="0 0 1600 1160"><rect width="100%" height="100%" fill="#F5F7FB"/>
+<text x="64" y="82.2" font-family="PingFang SC,STHeiti,sans-serif" font-size="38" font-weight="600" fill="#152944">新词库闭环：先有可核查候选，再由人决定</text>
+<text x="64" y="127.8" font-family="PingFang SC,STHeiti,sans-serif" font-size="22" font-weight="400" fill="#53647B">已确认：待审内容可用于词典阅读；测评只使用已审核合格内容。</text>
+<rect x="64" y="183" width="448" height="143" rx="14" fill="#FFFFFF" stroke="#D5DFED"/>
+<text x="88" y="229.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">① 建立新词条与义项</text>
+<text x="88" y="265.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">全新身份，不自动映射旧库</text>
+<text x="88" y="296.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">编辑可直接手工录入</text>
+<rect x="576" y="183" width="448" height="143" rx="14" fill="#FFFFFF" stroke="#D5DFED"/>
+<text x="600" y="229.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">② 选择生成范围与预算</text>
+<text x="600" y="265.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">单板块或组合生成</text>
+<text x="600" y="296.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">先说明范围，再执行</text>
+<rect x="1088" y="183" width="448" height="143" rx="14" fill="#FFFFFF" stroke="#D5DFED"/>
+<text x="1112" y="229.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">③ 获得候选与依据</text>
+<text x="1112" y="265.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">展示来源、覆盖与缺口</text>
+<text x="1112" y="296.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">取消、失败和费用如实记录</text>
+<polyline points="512,252 576,252" fill="none" stroke="#8A9BB3" stroke-width="2"/><polygon points="576,252 565.4690092573155,257.75310646325045 565.4690092573155,246.24689353674955" fill="#8A9BB3"/>
+<polyline points="1024,252 1088,252" fill="none" stroke="#8A9BB3" stroke-width="2"/><polygon points="1088,252 1077.4690092573155,257.75310646325045 1077.4690092573155,246.24689353674955" fill="#8A9BB3"/>
+<polyline points="1312,326 1312,365 800,365 800,404" fill="none" stroke="#8A9BB3" stroke-width="2"/><polygon points="800,404 794.2468935367496,393.4690092573155 805.7531064632504,393.4690092573155" fill="#8A9BB3"/>
+<rect x="350" y="404" width="900" height="137" rx="14" fill="#EAF1FF" stroke="#ADC5F2"/>
+<text x="374" y="450.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">④ 人工选择并保存草稿</text>
+<text x="374" y="486.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">只保存明确选择的内容；重新打开可查询；过期候选不能覆盖新内容</text>
+<polyline points="800,541 800,584 423,584 423,630" fill="none" stroke="#8A9BB3" stroke-width="2"/><polygon points="423,630 417.24689353674955,619.4690092573155 428.75310646325045,619.4690092573155" fill="#8A9BB3"/>
+<polyline points="800,584 1175,584 1175,630" fill="none" stroke="#8A9BB3" stroke-width="2"/><polygon points="1175,630 1169.2468935367497,619.4690092573155 1180.7531064632503,619.4690092573155" fill="#8A9BB3"/>
+<rect x="64" y="630" width="718" height="146" rx="14" fill="#FFF6E7" stroke="#E5C89C"/>
+<text x="88" y="676.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">待审路径：预览并发布</text>
+<text x="88" y="712.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">满足结构、来源和发布约束</text>
+<text x="88" y="743.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">可公开阅读，不进入测评</text>
+<rect x="818" y="630" width="718" height="146" rx="14" fill="#E8F4F2" stroke="#AFCFC9"/>
+<text x="842" y="676.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">审核路径：确认当前内容版本</text>
+<text x="842" y="712.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">人工审核正文与关联依据</text>
+<text x="842" y="743.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">确认后预览并发布</text>
+<polyline points="423,776 423,819" fill="none" stroke="#8A9BB3" stroke-width="2"/><polygon points="423,819 417.24689353674955,808.4690092573155 428.75310646325045,808.4690092573155" fill="#8A9BB3"/>
+<polyline points="1175,776 1175,819" fill="none" stroke="#8A9BB3" stroke-width="2"/><polygon points="1175,819 1169.2468935367497,808.4690092573155 1180.7531064632503,808.4690092573155" fill="#8A9BB3"/>
+<rect x="64" y="819" width="718" height="119" rx="14" fill="#FFFFFF" stroke="#D5DFED"/>
+<text x="88" y="865.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">词典阅读</text>
+<text x="88" y="901.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">显示待审；内部意见与附件不公开</text>
+<rect x="818" y="819" width="718" height="119" rx="14" fill="#FFFFFF" stroke="#D5DFED"/>
+<text x="842" y="865.3" font-family="PingFang SC,STHeiti,sans-serif" font-size="27" font-weight="600" fill="#17375D">词典阅读＋合格测评</text>
+<text x="842" y="901.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#52647C">来源、审核、题型与媒体资格仍须有效</text>
+<rect x="64" y="981" width="1472" height="97" rx="14" fill="#EDF0F6" stroke="#DAE1EC"/>
+<text x="88" y="1020.6" font-family="PingFang SC,STHeiti,sans-serif" font-size="24" font-weight="600" fill="#3B506A">草稿修改：相关审核失效，重新核查。确认撤销：未来测评立即停用。</text>
+<text x="88" y="1055.9" font-family="PingFang SC,STHeiti,sans-serif" font-size="21" font-weight="400" fill="#5F7086">反馈留痕用于改进；不自动改变规则或训练模型。争议内容的公开处置仍待定稿。</text>
+<text x="64" y="1131.2" font-family="PingFang SC,STHeiti,sans-serif" font-size="18" font-weight="400" fill="#7A899C">天生会背 · 方案评审稿 · 2026-11-04</text>
+</svg>
