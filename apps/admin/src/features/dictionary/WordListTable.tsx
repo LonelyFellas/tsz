@@ -31,7 +31,6 @@ interface WordListTableProps {
   rows: AdminWordListItemAny[];
   loading: boolean;
   toolbar: ReactNode;
-  toolbarExtra: ReactNode;
   emptyText: ReactNode;
   page: number;
   pageSize: number;
@@ -51,7 +50,6 @@ export function WordListTable({
   columns,
   rows,
   toolbar,
-  toolbarExtra,
   loading,
   emptyText,
   page,
@@ -98,6 +96,15 @@ export function WordListTable({
     return [{ ...column, fixed: pref.fixed }];
   });
   const selectionWidth = selection ? CHECKBOX_WIDTH : 0;
+  // 手机默认只显示词条与操作，优先让操作按钮完整落在首屏。
+  if (compact && !preferences.customized && width > 0) {
+    const label = visible.find((column) => column.key === "label");
+    const actions = visible.find((column) => column.key === "action");
+    if (label && actions) {
+      actions.width = tableId === "dictionary-trash" ? 168 : 132;
+      label.width = Math.max(84, width - selectionWidth - actions.width);
+    }
+  }
   const baseWidth = visible.reduce(
     (sum, col) => sum + col.width,
     selectionWidth
@@ -165,7 +172,6 @@ export function WordListTable({
   return (
     <>
       <AdminTableToolbar
-        extra={toolbarExtra}
         columnSettings={
           <ColumnSettings
             columns={preferences.columns}

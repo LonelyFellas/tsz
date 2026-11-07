@@ -31,7 +31,7 @@ import {
 import type { MenuProps } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
 import { hasAdminPermission } from "@tsz/shared/auth";
 import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
@@ -1192,8 +1192,36 @@ export function SmartDictionary({
   return (
     <div className="word-list-page">
       <header className="word-list-heading">
-        <span>词库管理</span>
         <h1>{trashMode ? "垃圾桶" : "智能词库"}</h1>
+        <div className="word-list-page-actions">
+          <Link to={trashMode ? "/words" : "/words/trash"}>
+            {trashMode ? <RollbackOutlined /> : <DeleteOutlined />}
+            {trashMode ? "返回智能词库" : "查看垃圾桶"}
+          </Link>
+          {!trashMode && canCreateEntry(writeActor) && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate("/words/new")}
+            >
+              创建词条
+            </Button>
+          )}
+        </div>
+        <Space size={16} wrap className="word-list-stats">
+          <Typography.Text type="secondary">
+            累计智能词条:
+            <Typography.Text strong>{stats.data?.total ?? "-"}</Typography.Text>
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            今日创编:
+            <Typography.Text strong>{stats.data?.today ?? "-"}</Typography.Text>
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            本月创编:
+            <Typography.Text strong>{stats.data?.month ?? "-"}</Typography.Text>
+          </Typography.Text>
+        </Space>
       </header>
 
       <ConfigProvider
@@ -1423,15 +1451,6 @@ export function SmartDictionary({
           tableId={trashMode ? "dictionary-trash" : "dictionary"}
           toolbar={
             <Space wrap>
-              {!trashMode && canCreateEntry(writeActor) && (
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => navigate("/words/new")}
-                >
-                  创建词条
-                </Button>
-              )}
               {!trashMode && canBatchPublish && (
                 <Tooltip title="选择 1–50 个有发布权限的词条，集中审听并确认后发布">
                   <Button
@@ -1497,28 +1516,6 @@ export function SmartDictionary({
                     {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
                   </Button>
                 )}
-            </Space>
-          }
-          toolbarExtra={
-            <Space size={16} wrap className="word-list-stats">
-              <Typography.Text type="secondary">
-                累计智能词条:
-                <Typography.Text strong>
-                  {stats.data?.total ?? "-"}
-                </Typography.Text>
-              </Typography.Text>
-              <Typography.Text type="secondary">
-                今日创编:
-                <Typography.Text strong>
-                  {stats.data?.today ?? "-"}
-                </Typography.Text>
-              </Typography.Text>
-              <Typography.Text type="secondary">
-                本月创编:
-                <Typography.Text strong>
-                  {stats.data?.month ?? "-"}
-                </Typography.Text>
-              </Typography.Text>
             </Space>
           }
           emptyText={

@@ -178,27 +178,65 @@
 
 .word-list-page {
   display: grid;
-  gap: 16px;
   min-width: 0;
 }
 
-.word-list-heading span {
-  color: #626c79;
-  font-size: 13px;
+.word-list-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 20px;
 }
 
 .word-list-heading h1 {
-  margin: 4px 0 0;
-  font-size: 24px;
-  line-height: 1.35;
+  margin: 0;
+  font-size: clamp(24px, 2vw, 30px);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.word-list-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-inline-start: auto;
+}
+
+.word-list-page-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  color: #475467;
+}
+
+.word-list-page-actions a:hover {
+  color: #2053ff;
+  text-decoration: underline;
+}
+
+.word-list-heading .word-list-stats {
+  flex-basis: 100%;
+}
+
+.word-list-stats strong {
+  margin-inline-start: 4px;
+  color: #344054;
 }
 
 .word-list-panel {
   min-width: 0;
-  padding: 16px;
-  border: 1px solid #e1e5ec;
-  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1px solid #dfe4eb;
+  border-radius: 12px 12px 0 0;
   background: white;
+}
+
+.word-list-panel + .word-list-panel {
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
 }
 
 .word-search-main input[type="search"] {
@@ -278,7 +316,9 @@
   margin-top: 16px;
 }
 .word-list-pagination > span {
-  margin-inline-end: 8px;
+  margin-inline-end: auto;
+  color: #475467;
+  font-variant-numeric: tabular-nums;
 }
 .word-list-pagination button,
 .word-list-pagination select {
@@ -306,4 +346,37 @@
 }
 .word-list-pagination select {
   border-color: #cdd3dd;
+}
+
+@media (max-width: 575px) {
+  .word-list-heading {
+    margin-bottom: 12px;
+  }
+  .word-list-panel {
+    padding: 12px;
+  }
+  .word-list-page-actions {
+    gap: 8px;
+  }
+  .word-table td,
+  .word-table th {
+    padding: 10px 6px;
+  }
+  .word-list-primary-actions {
+    gap: 6px;
+    min-width: 0;
+  }
+  .word-list-row-actions {
+    gap: 4px;
+  }
+  .word-list-row-actions button {
+    min-height: 36px;
+  }
+  .word-list-row-actions .word-list-more-action {
+    padding-inline: 4px;
+  }
+  .word-list-pagination button,
+  .word-list-pagination select {
+    min-height: 36px;
+  }
 }
