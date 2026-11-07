@@ -165,6 +165,7 @@ async function run(component, scenario, approved = true) {
 
 async function runSmokeProbe(kind, scenario) {
   let requests = 0;
+  const root = await mkdtemp(join(tmpdir(), "tsz-smoke-probe."));
   const server = createServer((request, response) => {
     requests++;
     if (
@@ -176,7 +177,17 @@ async function runSmokeProbe(kind, scenario) {
     }
     response.statusCode =
       scenario === "bad-status" ? 503 : kind === "page" ? 200 : 401;
-    response.end();
+    if (
+      scenario === "partial-always" ||
+      (scenario === "partial-first" && requests === 1)
+    ) {
+      response.setHeader("Content-Length", "100");
+      response.flushHeaders();
+      response.write("partial response");
+      setTimeout(() => request.socket.destroy(), 25);
+      return;
+    }
+    response.end("complete response");
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
@@ -204,7 +215,8 @@ async function runSmokeProbe(kind, scenario) {
           `set -euo pipefail\napi_path=auth/me\n${command}\n${kind === "api" ? '[[ "$code" = 401 ]]' : ""}`
         ],
         {
-          stdio: ["ignore", "pipe", "pipe"]
+          stdio: ["ignore", "pipe", "pipe"],
+          cwd: root
         }
       );
       let stderr = "";
@@ -219,6 +231,7 @@ async function runSmokeProbe(kind, scenario) {
     return { ...result, requests };
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    await rm(root, { recursive: true, force: true });
   }
 }
 
@@ -228,7 +241,12 @@ for (const kind of ["page", "api"]) {
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.requests, 2);
   });
-  for (const scenario of ["drop-always", "bad-status"]) {
+  test(`${kind}: reload smoke retries a partially received response`, async () => {
+    const result = await runSmokeProbe(kind, "partial-first");
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.requests, 2);
+  });
+  for (const scenario of ["drop-always", "partial-always", "bad-status"]) {
     test(`${kind}: reload smoke rejects ${scenario} within the retry limit`, async () => {
       const result = await runSmokeProbe(kind, scenario);
       assert.notEqual(result.status, 0, result.stderr);
