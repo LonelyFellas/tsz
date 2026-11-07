@@ -362,6 +362,8 @@ textarea.ui-input {
   background: white;
   color: #202631;
   font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
 }
 .ui-select-dropdown {
   padding: 4px;

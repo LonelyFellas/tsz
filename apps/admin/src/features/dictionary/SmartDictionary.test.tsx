@@ -424,6 +424,61 @@ describe("SmartDictionary", () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([undefined, "trash"] as const)(
+    "自定义列在小屏 %s 保持操作列可见且不过度占宽",
+    (mode) => {
+      matchViewport(375);
+      const width = vi
+        .spyOn(HTMLElement.prototype, "clientWidth", "get")
+        .mockReturnValue(317);
+      const key = `tsz:admin:table-columns:v1:${mode === "trash" ? "dictionary-trash" : "dictionary"}`;
+      localStorage.setItem(
+        key,
+        JSON.stringify([
+          { key: "label", visible: true, fixed: "left" },
+          { key: "created_by_name", visible: true, fixed: false },
+          { key: "action", visible: true, fixed: "right" }
+        ])
+      );
+      apiMocks.useWordList.mockReturnValue({
+        data: {
+          words: [
+            mode === "trash"
+              ? archivedWord("compact", "compact")
+              : word("compact", "compact")
+          ],
+          page: { page: 1, page_size: 20, total: 1 }
+        },
+        isPending: false,
+        isError: false
+      });
+      try {
+        render(
+          <FeedbackApp>
+            <MemoryRouter>
+              <SmartDictionary mode={mode} />
+            </MemoryRouter>
+          </FeedbackApp>
+        );
+        const row = screen.getByText("compact").closest("tr")!;
+        expect(row.lastElementChild).toHaveStyle({
+          position: "sticky",
+          right: "0px"
+        });
+        const table = screen.getByRole("table");
+        expect(table.querySelector("colgroup col:last-child")).toHaveStyle({
+          width: mode === "trash" ? "168px" : "132px"
+        });
+        expect(
+          screen.getByRole("columnheader", { name: "创建人" })
+        ).toBeInTheDocument();
+      } finally {
+        width.mockRestore();
+        localStorage.removeItem(key);
+      }
+    }
+  );
+
   it("主搜索常驻，更多筛选按顺序展开且收起后保留创建人条件", async () => {
     render(
       <FeedbackApp>
