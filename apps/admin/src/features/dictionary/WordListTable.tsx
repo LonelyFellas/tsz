@@ -97,13 +97,25 @@ export function WordListTable({
     return [{ ...column, fixed: pref.fixed }];
   });
   const selectionWidth = selection ? CHECKBOX_WIDTH : 0;
-  // 手机默认只显示词条与操作，优先让操作按钮完整落在首屏。
-  if (compact && !preferences.customized && width > 0) {
+  // 小屏优先让操作按钮完整落在首屏，保留自定义列的横向滚动。
+  if (compact && width > 0) {
     const label = visible.find((column) => column.key === "label");
     const actions = visible.find((column) => column.key === "action");
     if (label && actions) {
       actions.width = tableId === "dictionary-trash" ? 168 : 132;
-      label.width = Math.max(84, width - selectionWidth - actions.width);
+      const middleColumns = visible.some(
+        (column) => column.key !== "label" && column.key !== "action"
+      );
+      label.width = Math.max(
+        84,
+        width - selectionWidth - actions.width - (middleColumns ? 80 : 0)
+      );
+      // 细屏保留操作入口；空间不足时让名称参与横向滚动，避免左右固定列相互覆盖。
+      if (
+        middleColumns &&
+        width - selectionWidth - actions.width - label.width < 48
+      )
+        label.fixed = false;
     }
   }
   const baseWidth = visible.reduce(

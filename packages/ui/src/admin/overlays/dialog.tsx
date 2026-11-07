@@ -108,7 +108,14 @@ export function Modal({
           maskClosable ??
           (typeof mask === "object" ? mask.closable !== false : true)
         }
-        closable={closable}
+        closable={
+          closable === false
+            ? false
+            : {
+                "aria-label": "关闭",
+                ...(typeof closable === "object" ? closable : {})
+              }
+        }
         closeIcon={<span aria-hidden="true">×</span>}
         wrapClassName={[wrapClassName, centered && "ui-modal-centered"]
           .filter(Boolean)
@@ -202,6 +209,7 @@ export function Drawer({
           closable === false
             ? false
             : {
+                "aria-label": "关闭",
                 closeIcon: <span aria-hidden="true">×</span>,
                 ...(typeof closable === "object" ? closable : {})
               }
