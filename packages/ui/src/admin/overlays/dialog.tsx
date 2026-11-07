@@ -113,6 +113,7 @@ export function Modal({
             ? false
             : {
                 "aria-label": "关闭",
+                closeIcon: <span aria-hidden="true">×</span>,
                 ...(typeof closable === "object" ? closable : {})
               }
         }
