@@ -217,6 +217,16 @@ async function openRowActions(
   });
 }
 
+async function showColumns(...labels: string[]) {
+  fireEvent.click(screen.getByRole("button", { name: "列设置" }));
+  const panel = await screen.findByRole("region", { name: "表格列设置" });
+  for (const label of labels) {
+    const checkbox = within(panel).getByRole("checkbox", { name: label });
+    if (!(checkbox as HTMLInputElement).checked) fireEvent.click(checkbox);
+  }
+  fireEvent.click(screen.getByRole("button", { name: "列设置" }));
+}
+
 function LocationProbe() {
   const location = useLocation();
   return (
@@ -237,6 +247,7 @@ function HistoryProbe() {
 }
 
 beforeEach(() => {
+  localStorage.removeItem("tsz:admin:table-columns:v1:dictionary");
   vi.clearAllMocks();
   dataSourceMocks.get.mockReset().mockResolvedValue(undefined);
   dataSourceMocks.archiveImpact
@@ -284,6 +295,74 @@ afterEach(() => {
 });
 
 describe("SmartDictionary", () => {
+  it("快捷状态保留已输入搜索，筛选条件可逐项移除并同步地址", async () => {
+    render(
+      <FeedbackApp>
+        <MemoryRouter>
+          <SmartDictionary />
+          <LocationProbe />
+        </MemoryRouter>
+      </FeedbackApp>
+    );
+    fireEvent.change(screen.getByLabelText("词条"), {
+      target: { value: "alpha" }
+    });
+    fireEvent.change(screen.getByLabelText("词义"), {
+      target: { value: "含义" }
+    });
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "词条状态快捷筛选" })).getByRole(
+        "button",
+        { name: "草稿" }
+      )
+    );
+    await waitFor(() =>
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          headword: "alpha",
+          gloss: "含义",
+          status: "draft",
+          page: 1
+        })
+      )
+    );
+    fireEvent.click(screen.getByRole("button", { name: "移除词条：alpha" }));
+    await waitFor(() =>
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 20,
+        gloss: "含义",
+        status: "draft"
+      })
+    );
+    expect(screen.getByLabelText("词条")).toHaveValue("");
+    expect(screen.getByLabelText("词义")).toHaveValue("含义");
+    expect(screen.getByTestId("location")).not.toHaveTextContent("headword=");
+  });
+
+  it("跨页已选数量明确，取消选择会清空跨页选择", async () => {
+    render(
+      <FeedbackApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </FeedbackApp>
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "选择「first」" }));
+    fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
+    await screen.findByText("second");
+    fireEvent.click(screen.getByRole("checkbox", { name: "选择「second」" }));
+    expect(screen.getByRole("status")).toHaveTextContent("已选 2 条");
+    fireEvent.click(screen.getByRole("button", { name: "取消选择" }));
+    expect(screen.queryByText("已选 2 条")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "选择「second」" })
+    ).not.toBeChecked();
+    expect(
+      screen.queryByRole("button", { name: "移入垃圾桶" })
+    ).not.toBeInTheDocument();
+  });
+
   it("主搜索常驻，更多筛选按顺序展开且收起后保留创建人条件", async () => {
     render(
       <FeedbackApp>
@@ -306,14 +385,7 @@ describe("SmartDictionary", () => {
       Array.from(panel.querySelectorAll("label")).map(
         (label) => label.textContent
       )
-    ).toEqual([
-      "词条类型",
-      "基本词性",
-      "词义难度",
-      "词条状态",
-      "创建人",
-      "创建时间"
-    ]);
+    ).toEqual(["词条类型", "基本词性", "词义难度", "创建人", "创建时间"]);
     fireEvent.change(headword, { target: { value: "alpha" } });
     fireEvent.mouseDown(screen.getByLabelText("创建人").closest(".ui-select")!);
     fireEvent.click(await screen.findByText("甲管理员"));
@@ -824,6 +896,19 @@ describe("SmartDictionary", () => {
       expect(
         names.map((name) => name.querySelector("sup")?.textContent)
       ).toEqual(["义项", "义项", "义项"]);
+      const kindIndex = screen
+        .getAllByRole("columnheader")
+        .findIndex((header) => header.textContent === "类型");
+      expect(cells[kindIndex]).toHaveTextContent("单词");
+      expect(names.every((name) => !name.textContent?.includes("单词"))).toBe(
+        true
+      );
+      expect(
+        screen
+          .getByText("cosy")
+          .closest("tr")!
+          .querySelectorAll(".word-list-type")
+      ).toHaveLength(1);
       expect(cells[cells.length - 1]!.querySelector("button")).toBeEnabled();
       expect(screen.queryByText("legacy label")).toBeNull();
       const action = mode === "trash" ? "永久删除" : "移入垃圾桶";
@@ -885,9 +970,14 @@ describe("SmartDictionary", () => {
       0
     );
     // 点号不在斜体里；目录里没有的编码原样显示、不斜体。
-    expect(cells[4]).toHaveTextContent("adj.n.unknown-pos");
+    const posIndex = within(screen.getByRole("table"))
+      .getAllByRole("columnheader")
+      .findIndex((header) => header.textContent === "基本词性");
+    expect(cells[posIndex]).toHaveTextContent("adj.n.unknown-pos");
     expect(
-      [...cells[4]!.querySelectorAll("i")].map((node) => node.textContent)
+      [...cells[posIndex]!.querySelectorAll("i")].map(
+        (node) => node.textContent
+      )
     ).toEqual(["adj", "n"]);
   });
 
@@ -1150,7 +1240,7 @@ describe("SmartDictionary", () => {
     ).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  it("创建人长名称单行省略并可通过键盘触发 Tooltip，空值显示占位", () => {
+  it("创建人长名称单行省略并可通过键盘触发 Tooltip，空值显示占位", async () => {
     matchViewport(1440);
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -1176,6 +1266,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
+    await showColumns("创建人");
     const creator = screen.getByText("非常非常长的创建人名称");
     expect(creator).toHaveAttribute("tabindex", "0");
     expect(creator.closest("td")).toHaveClass("word-cell-ellipsis");
@@ -1215,6 +1306,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
+    await showColumns("创建人", "最后更新人");
     const headers = screen.getAllByRole("columnheader");
     const updaterIndex = headers.findIndex(
       (header) => header.textContent === "最后更新人"
@@ -1296,7 +1388,8 @@ describe("SmartDictionary", () => {
         <LocationProbe />
       </MemoryRouter>
     );
-    const toggle = screen.getByRole("button", { name: /收起筛选/ });
+    const toggle = screen.getByRole("button", { name: /更多筛选/ });
+    fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -1931,6 +2024,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
+    await showColumns("关联");
     const trigger = screen.getByLabelText("查看「referenced」的 7 处关联");
     fireEvent.click(trigger);
 
@@ -2073,7 +2167,9 @@ describe("SmartDictionary", () => {
     );
 
     expect(screen.getByText("智能词库")).toBeInTheDocument();
-    expect(screen.getByLabelText("词条状态")).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "词条状态快捷筛选" })
+    ).toBeInTheDocument();
     expect(screen.getByText("创建词条")).toBeInTheDocument();
   });
 

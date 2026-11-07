@@ -21,6 +21,7 @@ export interface WordColumn {
   width: number;
   fixed?: ColumnFixed;
   wideOnly?: boolean;
+  defaultVisible?: boolean;
   ellipsis?: boolean;
   render: (row: AdminWordListItemAny) => ReactNode;
 }
@@ -63,7 +64,7 @@ export function WordListTable({
     columns.map((column) => ({
       key: column.key,
       label: column.title,
-      visible: true,
+      visible: column.defaultVisible ?? true,
       fixed: column.fixed ?? false
     }))
   );
@@ -110,7 +111,10 @@ export function WordListTable({
     selectionWidth
   );
   // 宽屏多余空间给一列，固定列实际宽度与吸附偏移保持一致。
-  const fill = visible.find((column) => !column.fixed) ?? visible.at(-1);
+  const fill =
+    visible.find((column) => column.key === "gloss") ??
+    visible.find((column) => !column.fixed) ??
+    visible.at(-1);
   if (fill) fill.width += Math.max(0, width - baseWidth);
   const fixedWidth = visible.reduce(
     (sum, col) => sum + (col.fixed ? col.width : 0),
@@ -181,6 +185,25 @@ export function WordListTable({
           />
         }
       >
+        <div className="word-list-result-summary">
+          <span>
+            {loading ? (
+              "正在加载词条…"
+            ) : (
+              <>
+                共 <strong>{total.toLocaleString("zh-CN")}</strong> 条词条
+              </>
+            )}
+          </span>
+          {selection && selection.keys.length > 0 && (
+            <span className="word-list-selected-count" role="status">
+              已选 {selection.keys.length} 条
+              <button type="button" onClick={() => selection.onChange([], [])}>
+                取消选择
+              </button>
+            </span>
+          )}
+        </div>
         {toolbar}
       </AdminTableToolbar>
       <div className="word-table-scroll" ref={container} aria-busy={loading}>
@@ -216,7 +239,12 @@ export function WordListTable({
                 </th>
               )}
               {cells.map(({ column, pin }) => (
-                <th scope="col" key={column.key} style={pin}>
+                <th
+                  scope="col"
+                  key={column.key}
+                  data-column-key={column.key}
+                  style={pin}
+                >
                   {column.title}
                 </th>
               ))}
@@ -263,7 +291,14 @@ export function WordListTable({
         </table>
       </div>
       <nav className="word-list-pagination" aria-label="词条分页">
-        <span>共 {total} 条</span>
+        <span>
+          共 {total} 条
+          <span className="word-pagination-range">
+            {" "}
+            · {total === 0 ? 0 : (current - 1) * pageSize + 1}–
+            {Math.min(current * pageSize, total)} 条
+          </span>
+        </span>
         <button
           type="button"
           aria-label="上一页"

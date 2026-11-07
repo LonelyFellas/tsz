@@ -329,6 +329,16 @@ textarea.ui-input {
 .ui-select:not(:hover):not(:focus-within) .ui-select-clear {
   opacity: 0;
 }
+.ui-select-multiple .ui-select-input {
+  width: calc(var(--select-input-width, 10) * 1px);
+  min-width: 4px;
+  max-width: 100%;
+}
+.ui-select-suffix {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 .ui-select-multiple .ui-select-content {
   flex-wrap: wrap;
   gap: 3px;

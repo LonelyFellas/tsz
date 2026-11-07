@@ -1,23 +1,16 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  CONSOLE_HEADER_Z_INDEX,
-  ConsoleLayout,
-  isWordCreationWorkspacePath,
-  modeOf
-} from "./ConsoleLayout";
+import { CONSOLE_HEADER_Z_INDEX, ConsoleLayout } from "./ConsoleLayout";
 
 vi.mock("@/features/dictionary/part-of-speech/FormTypeLabels", () => ({
   DictionaryFormTypeLabels: ({ children }: { children: React.ReactNode }) =>
     children
 }));
-
 vi.mock("@/features/dictionary/part-of-speech/PartOfSpeechLabels", () => ({
   DictionaryPartOfSpeechLabels: ({ children }: { children: React.ReactNode }) =>
     children
 }));
-
 vi.mock("@/features/auth/AdminRouteGuard", () => ({
   AdminRouteGuard: ({ children }: { children: React.ReactNode }) => children
 }));
@@ -25,23 +18,28 @@ vi.mock("@/features/auth/AdminHeader", () => ({
   AdminHeader: () => <div>header</div>
 }));
 vi.mock("@/features/console/ConsoleSidebar", () => ({
-  ConsoleSidebar: ({ collapsed }: { collapsed?: boolean }) => (
-    <div data-testid="sidebar">{collapsed ? "rail" : "full"}</div>
-  )
+  ConsoleSidebar: ({ onNavigate }: { onNavigate?: () => void }) => {
+    const navigate = useNavigate();
+    return (
+      <button
+        onClick={() => {
+          navigate("/users");
+          onNavigate?.();
+        }}
+      >
+        用户管理
+      </button>
+    );
+  }
 }));
 
-function setViewport(width: number) {
+function renderLayout(width: number) {
   Object.defineProperty(window, "innerWidth", {
     configurable: true,
     value: width
   });
-  fireEvent(window, new Event("resize"));
-}
-
-function renderLayout(pathname: string, width: number) {
-  setViewport(width);
   return render(
-    <MemoryRouter initialEntries={[pathname]}>
+    <MemoryRouter initialEntries={["/words"]}>
       <ConsoleLayout />
     </MemoryRouter>
   );
@@ -49,96 +47,40 @@ function renderLayout(pathname: string, width: number) {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("isWordCreationWorkspacePath", () => {
-  it.each([
-    "/words/new",
-    "/words/word-center/wizard/basics",
-    "/words/word-center/wizard/forms",
-    "/words/word-center/wizard/meanings",
-    "/words/word-center/wizard/preview",
-    "/words/word-center/v3/wizard/basics",
-    "/words/word-center/v3/wizard/forms",
-    "/words/word-center/v3/wizard/meanings",
-    "/words/word-center/v3/wizard/preview"
-  ])("%s 使用宽编辑工作台", (pathname) => {
-    expect(isWordCreationWorkspacePath(pathname)).toBe(true);
-  });
-
-  it.each(["/words", "/words/word-center/wizard/unknown", "/users"])(
-    "%s 保持普通后台布局",
-    (pathname) => {
-      expect(isWordCreationWorkspacePath(pathname)).toBe(false);
+describe("ConsoleLayout 顶部导航", () => {
+  it.each([1440, 900, 375])(
+    "%ipx 下默认收起，通过顶栏展开并在跳转后关闭",
+    async (width) => {
+      const { container } = renderLayout(width);
+      expect(container.querySelector("aside")).not.toBeInTheDocument();
+      const trigger = screen.getByRole("button", { name: "后台导航" });
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      fireEvent.click(trigger);
+      expect(
+        await screen.findByRole("dialog", { name: "后台导航" })
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "用户管理" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
     }
   );
-});
 
-describe("modeOf", () => {
-  it("为创建向导保留至少 1200px 内容宽度后再完整展开导航", () => {
-    expect(modeOf(1468, true)).toBe("full");
-    expect(modeOf(1467, true)).toBe("rail");
-    expect(modeOf(768, true)).toBe("rail");
-    expect(modeOf(767, true)).toBe("drawer");
-  });
-
-  it("不改变非向导页面的既有断点", () => {
-    expect(modeOf(992, false)).toBe("full");
-    expect(modeOf(991, false)).toBe("rail");
-    expect(modeOf(767, false)).toBe("drawer");
-  });
-});
-
-describe("ConsoleLayout", () => {
-  it("向导在超宽、宽中、小屏分别使用 full、rail、drawer", () => {
-    const view = renderLayout("/words/word-center/wizard/forms", 1536);
-    expect(screen.getByTestId("sidebar")).toHaveTextContent("full");
-
-    setViewport(1200);
-    expect(screen.getByTestId("sidebar")).toHaveTextContent("rail");
-
-    setViewport(640);
-    expect(screen.queryByTestId("sidebar")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "打开菜单" })
-    ).toBeInTheDocument();
-    view.unmount();
-  });
-
-  it("同一向导断点内保留用户手动切换结果", () => {
-    renderLayout("/words/word-center/wizard/meanings", 1200);
-    expect(screen.getByTestId("sidebar")).toHaveTextContent("rail");
-
-    fireEvent.click(screen.getByRole("button", { name: "展开侧栏" }));
-    expect(screen.getByTestId("sidebar")).toHaveTextContent("full");
-
-    setViewport(1300);
-    expect(screen.getByTestId("sidebar")).toHaveTextContent("full");
-  });
-
-  it("手机菜单支持键盘关闭并将焦点归还打开按钮", async () => {
-    renderLayout("/words", 640);
-    const trigger = screen.getByRole("button", { name: "打开菜单" });
+  it("支持 Escape 关闭并归还焦点", async () => {
+    renderLayout(1440);
+    const trigger = screen.getByRole("button", { name: "后台导航" });
     fireEvent.click(trigger);
-    const sheet = await screen.findByRole("dialog", { name: "后台导航" });
-    expect(sheet).toContainElement(screen.getByTestId("sidebar"));
-    fireEvent.keyDown(sheet, { key: "Escape" });
+    const panel = await screen.findByRole("dialog", { name: "后台导航" });
+    fireEvent.keyDown(panel, { key: "Escape" });
     await vi.waitFor(() => expect(trigger).toHaveFocus());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("普通页面在相同宽度仍按原规则完整展开", () => {
-    renderLayout("/words", 1200);
-    expect(screen.getByTestId("sidebar")).toHaveTextContent("full");
-  });
-
-  it("顶栏层级高于表格固定列，滚动时表体不会盖住顶栏", () => {
-    // antd v6 表格固定单元格为 `zIndexTableFixed + 固定列偏移`（实测 10~12）：
-    // 顶栏与它同值时，DOM 靠后的表体会反盖住顶栏，因此必须更严格地高于该范围。
-    const { container } = renderLayout("/users", 1440);
-    const header = container.querySelector("header");
-    expect(header).not.toBeNull();
+  it("顶栏层级高于表格固定列", () => {
+    const { container } = renderLayout(1440);
     expect(CONSOLE_HEADER_Z_INDEX).toBeGreaterThan(12);
-    expect(Number(getComputedStyle(header!).zIndex)).toBe(
-      CONSOLE_HEADER_Z_INDEX
-    );
+    expect(
+      Number(getComputedStyle(container.querySelector("header")!).zIndex)
+    ).toBe(CONSOLE_HEADER_Z_INDEX);
   });
 });

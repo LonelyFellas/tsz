@@ -1,139 +1,188 @@
 .profile-settings {
   --settings-blue: #2053ff;
-  --settings-ink: #1f2329;
-  --settings-muted: #646a73;
-  --settings-line: #e5e8ef;
+  --settings-ink: #26324b;
+  --settings-muted: #667085;
+  --settings-line: #e8ebf1;
   max-width: 1120px;
-  margin: 0 auto;
   color: var(--settings-ink);
 }
 
 .profile-settings__header {
-  margin: 8px 0 28px;
+  margin: 0 0 24px;
 }
-
 .profile-settings__header .ui-typography {
   margin: 0;
-  font-size: 24px;
-  font-weight: 600;
+  color: var(--settings-ink);
+  font-size: 28px;
+  font-weight: 650;
+  line-height: 1.4;
   letter-spacing: -0.5px;
 }
-
 .profile-settings__tabs > .ui-tabs-nav {
-  width: 176px;
-  margin-right: 32px;
   align-self: flex-start;
+  margin: 0 0 24px;
+  padding: 4px;
+  border: 0;
+  border-radius: 9px;
+  background: #eceff4;
 }
-
+.profile-settings__tabs .ui-tabs-nav-list {
+  gap: 4px;
+}
 .profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab {
-  margin: 0 0 6px;
-  padding: 12px 18px;
-  border-radius: 8px;
-  text-align: left;
+  margin: 0;
+  padding: 0;
+  border-radius: 6px;
 }
-
-.profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-active {
-  background: #edf2ff;
-}
-
 .profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-btn {
-  width: 100%;
-  font-size: 14px;
+  padding: 9px 15px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #667085;
 }
-
+.profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-active {
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(31 43 70 / 7%);
+}
+.profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-active .ui-tabs-tab-btn {
+  color: #2053ff;
+  font-weight: 600;
+}
+.profile-settings__tabs .ui-tabs-ink-bar {
+  display: none;
+}
+.profile-settings__tab-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.profile-settings__tab-label svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
+}
 .profile-settings__tabs > .ui-tabs-body-holder,
 .profile-settings__content {
   min-width: 0;
-  min-height: 430px;
-  padding: 32px;
+}
+
+.settings-section {
+  padding: 24px;
   border: 1px solid var(--settings-line);
   border-radius: 12px;
   background: #fff;
 }
-
-.profile-settings__tabs.ui-tabs-left > .ui-tabs-body-holder > .ui-tabs-body {
-  padding-left: 0;
-}
-
 .settings-section + .settings-section {
-  margin-top: 32px;
-  padding-top: 28px;
-  border-top: 1px solid #e5e8ef;
+  margin-top: 16px;
 }
-
 .settings-section__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 24px;
 }
-
 .settings-section__heading h2 {
   margin: 0;
-  color: #1f2329;
-  font-size: 18px;
+  color: var(--settings-ink);
+  font-size: 16px;
   font-weight: 600;
 }
-
+.settings-section__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #526687;
+  background: #f0f3fa;
+}
+.settings-section__icon svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.8;
+}
 .settings-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 20px;
 }
-
 .settings-row__label {
-  color: #1f2329;
+  color: var(--settings-ink);
   font-size: 14px;
   font-weight: 500;
 }
-
 .settings-row__hint {
   margin: 5px 0 0;
-  color: #646a73;
+  color: var(--settings-muted);
   font-size: 13px;
   line-height: 1.6;
 }
-
+.settings-row > .ui-btn {
+  min-height: 36px;
+  border-radius: 7px;
+  font-size: 13px;
+}
 .settings-dialect .ui-radio-group {
   display: flex;
-  flex-wrap: wrap;
-  max-width: 100%;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
+  max-width: 100%;
 }
-
 .settings-dialect .ui-radio-button-wrapper {
+  box-sizing: border-box;
   display: flex;
-  min-width: 128px;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 160px;
   height: auto;
-  padding: 14px 20px;
-  border: 1px solid #e5e8ef;
+  padding: 12px 14px;
+  border: 1px solid var(--settings-line);
   border-radius: 8px;
+  background: #fff;
+  color: var(--settings-ink);
   text-align: left;
 }
-
+.settings-dialect .ui-radio-button-wrapper:hover {
+  border-color: #a9bdff;
+}
 .settings-dialect .ui-radio-button-wrapper::before {
   display: none;
 }
-
 .settings-dialect .ui-radio-button-wrapper-checked {
-  border-color: #2053ff;
-  background: #f2f5ff;
+  border-color: #a9bdff;
+  background: #f3f6ff;
+  color: var(--settings-blue);
 }
-
 .settings-dialect .ui-radio-button-wrapper:focus-within {
-  outline: 2px solid #2053ff;
+  outline: 2px solid var(--settings-blue);
   outline-offset: 3px;
 }
-
+.settings-dialect .ui-radio-button-wrapper-disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
 .settings-dialect__option {
   display: flex;
   flex-direction: column;
-  line-height: 1.6;
+  gap: 2px;
+  line-height: 1.5;
+  font-size: 13px;
 }
-
 .settings-dialect__option small {
-  color: #646a73;
-  font-size: 12px;
+  color: var(--settings-muted);
+  font-size: 11px;
+}
+.settings-dialect .settings-dialect__check {
+  width: 16px;
+  height: 16px;
+  color: var(--settings-blue);
+  visibility: hidden;
+}
+.settings-dialect .ui-radio-button-wrapper-checked .settings-dialect__check {
+  visibility: visible;
 }
 
 .settings-provider {
@@ -150,7 +199,7 @@
 }
 
 .settings-provider + .settings-provider {
-  border-top: 1px solid #e5e8ef;
+  border-top: 1px solid var(--settings-line, #e8ebf1);
 }
 
 .settings-provider__summary {
@@ -165,10 +214,10 @@
   height: 42px;
   flex-shrink: 0;
   place-items: center;
-  border: 1px solid #e5e8ef;
   border-radius: 10px;
-  color: #1f2329;
-  font-size: 22px;
+  background: #f5f7fb;
+  color: #526687;
+  font-size: 20px;
 }
 
 .settings-provider__identity {
@@ -267,7 +316,7 @@
 .settings-model-details {
   margin-top: 28px;
   padding-top: 20px;
-  border-top: 1px solid #e5e8ef;
+  border-top: 1px solid var(--settings-line, #e8ebf1);
 }
 
 .settings-model-details summary {
@@ -306,43 +355,42 @@
   .profile-settings__header {
     margin: 0 0 20px;
   }
-
+  .profile-settings__header .ui-typography {
+    font-size: 24px;
+  }
   .profile-settings__tabs > .ui-tabs-nav {
-    width: auto;
-    margin: 0 0 16px;
+    max-width: 100%;
+    margin-bottom: 20px;
   }
-
-  .profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab {
-    margin: 0 6px 0 0;
-    padding: 10px 14px;
+  .profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-btn {
+    padding: 9px 12px;
   }
-
-  .profile-settings__tabs > .ui-tabs-body-holder,
-  .profile-settings__content {
-    min-height: 360px;
-    padding: 22px 18px;
+  .profile-settings__tab-label {
+    gap: 6px;
   }
-
+  .settings-section {
+    padding: 20px;
+  }
+  .settings-section__heading {
+    margin-bottom: 20px;
+  }
   .settings-row {
-    align-items: flex-start;
-    gap: 20px;
+    gap: 16px;
   }
-
   .settings-dialect {
+    align-items: flex-start;
     flex-direction: column;
   }
-
   .settings-dialect .ui-radio-group {
     width: 100%;
+    gap: 8px;
   }
-
   .settings-dialect .ui-radio-button-wrapper {
     min-width: 0;
     flex: 1;
-    justify-content: center;
     padding: 12px;
+    gap: 8px;
   }
-
   .settings-provider__summary {
     flex-wrap: wrap;
     gap: 12px;
@@ -367,4 +415,52 @@
   .profile-settings-dialog .ui-drawer-content-wrapper {
     transition: none;
   }
+}
+
+.settings-models {
+  max-width: 720px;
+}
+.settings-models > [aria-label="当前出题模型"] {
+  padding: 18px 20px;
+  border-radius: 9px;
+  background: #f7f8fb;
+}
+.settings-model-controls {
+  gap: 10px;
+}
+.settings-model-controls .ui-select-selector {
+  border-radius: 7px;
+}
+.settings-provider__actions .ui-btn {
+  min-height: 36px;
+  font-size: 13px;
+  border-radius: 7px;
+}
+.settings-provider__icon svg {
+  width: 21px;
+  height: 21px;
+}
+@media (max-width: 390px) {
+  .profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-btn {
+    padding: 9px 10px;
+  }
+  .profile-settings__tab-label {
+    gap: 5px;
+    font-size: 12px;
+  }
+  .profile-settings__tab-label svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.settings-dialect .ui-radio-button {
+  position: absolute;
+}
+.settings-dialect .ui-radio-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
