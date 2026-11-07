@@ -47,9 +47,9 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 ## 布局
 
 - `apps/web` — C 端，Next App Router + tailwind + `@tsz/ui`。对体验/性能/SEO 有硬要求。
-- `apps/admin` — 平台后台，Vite + React Router + TanStack Query + **Ant Design 6**（品牌蓝 #2053FF）。
+- `apps/admin` — 平台后台，Vite + React Router + TanStack Query + `@tsz/ui/admin/*`，品牌蓝 #2053FF。
 - `packages/types` — 后端 wire 类型镜像；`packages/shared` — 共享逻辑（含鉴权内核）；
-  `packages/api-client` — 请求层；`packages/ui` — web 专用组件库；`packages/config` — 共享配置。
+  `packages/api-client` — 请求层；`packages/ui` — 分入口提供 Web 与后台控件；`packages/config` — 共享配置。
 
 ## 常用命令
 
@@ -72,7 +72,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 - `@tsz/types` 全部 **snake_case，1:1 镜像后端的 JSON wire 格式**，前端不做命名转换层
   （http 层纯 parse）。组件 props / 本地 state 是例外，用 camelCase。
 - 复用优先级：逻辑 → `@tsz/shared`，类型 → `@tsz/types`，请求 → `@tsz/api-client`；
-  UI 按端分叉：web → `@tsz/ui`，admin → Ant Design。
+  Web 组件使用 `@tsz/ui/components`，后台按用途导入 `@tsz/ui/admin/*`。
 
 ### 鉴权
 
@@ -90,12 +90,12 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 - `.dark` 主题 class 加在 `<html>` 上会被 React 水合剥掉：须在水合后的 layout effect
   里重新断言；`useTheme` 状态从 localStorage 派生，不读 DOM。
 
-### admin（Ant Design）
+### admin（后台组件）
 
-- 后台及共享语音编辑器使用 Ant Design 6 与 `@ant-design/icons`；品牌蓝 #2053FF、中文 locale 与 Day.js 集中配置。
-- 普通表单使用 AntD Form；复杂草稿继续由业务模型持有。仅更换 UI 组件，不改变业务行为、接口或持久化格式。
+- 后台及共享语音编辑器使用项目控件与 Lucide 图标，沿用品牌蓝 #2053FF、中文日期与 Day.js。
+- 普通表单使用 `@tsz/ui/admin/forms`；复杂草稿继续由业务模型持有。仅更换 UI 组件，不改变业务行为、接口或持久化格式。
 - reader 入口不依赖 AntD、MUI、Emotion 或后台 Provider；C 端保留现有设计体系。
-- 公共框架、智能词库列表和垃圾桶按 [shadcn/ui 试点](docs/features/admin-shadcn-pilot/README.md) 接入；列表允许按控件导入 `@tsz/ui` 和局部 Tailwind utilities。其余后台页面继续使用 AntD。业务数组以稳定业务 ID 为 key；服务端分页保持 1 基。
+- 基础输入和按钮可从已有 shadcn 控件独立入口复用，词库页面的 Tailwind utilities 保持局部作用域。业务数组以稳定业务 ID 为 key；服务端分页保持 1 基。
 - 日期范围只有完整有效或明确清空时提交。弹窗 pending、取消及失败保留现有业务状态。
 - 隐藏面板采用 hidden / aria-hidden / inert；字段定位聚焦实际控件，测试保留 matchMedia / ResizeObserver 垫片。
 

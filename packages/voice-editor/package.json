@@ -27,14 +27,8 @@
     "lucide-react": "^1.52.0"
   },
   "peerDependencies": {
-    "antd": "^6.6.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
-  },
-  "peerDependenciesMeta": {
-    "antd": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
@@ -43,7 +37,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.2",
-    "antd": "^6.6.8",
     "eslint": "^9.39.0",
     "jsdom": "^30.0.1",
     "react": "^19.2.8",

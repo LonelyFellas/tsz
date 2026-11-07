@@ -1,4 +1,4 @@
-# 后台 shadcn/ui 迁移试点
+# 后台组件迁移与回退
 
 基线为 `5211e4439d346ab3abcb9efa41bc1cfa9478dea2`，本地标签为 `baseline/admin-before-shadcn-pilot-20261107`。试点分支为 `codex/admin-shadcn-pilot`。
 
@@ -9,7 +9,7 @@
 
 列表按入口复用 C 端 shadcn Button、Input。Tailwind 只生成试点使用的 utilities，限定到词库页面，保留现有全局样式。列配置继续使用 `tsz:admin:table-columns:v1:dictionary` 和 `tsz:admin:table-columns:v1:dictionary-trash`。后端请求、数据格式与权限检查沿用原实现。
 
-后续先按普通后台页面复用情况估算，再分别安排词条编辑发布、共享语音编辑器。编辑器关闭浮层后的选区恢复、草稿失败重试和 reader 入口隔离需要在对应批次验证。
+编辑器回归包括关闭浮层后的选区恢复、草稿失败重试和 reader 入口隔离。
 
 ## 回退
 
@@ -26,3 +26,17 @@
 | `checkpoint/word-editor-v2-workspace-20261107`  | 词形录入提示、词义校验提示、操作栏草稿状态与发布前预览标题均已接入 |
 
 只撤第二批可保留新导航。完整撤回时按工作区、导航的顺序 revert 两个提交，无数据迁移。验证覆盖路由切步、只读权限、未保存草稿、版本冲突、发布和桌面／手机布局。浏览器预览使用独立的本地样例接口。
+
+## 全量迁移
+
+后台与共享语音编辑器从 `@tsz/ui/admin/display`、`forms`、`overlays`、`table` 分入口使用控件。沿用词库试点的 shadcn 控件与 Radix 抽屉。复杂表单、日期、表格和浮层复用独立的 `@rc-component/*` 行为库，样式由本项目维护。图标来自 Lucide。C 端阅读入口独立于后台 UI 和反馈 Provider。
+
+| 本地标签                                       | 回退到的状态                               |
+| ---------------------------------------------- | ------------------------------------------ |
+| `baseline/before-full-antd-migration-20261107` | `7a76201d`，全量迁移前的已验收试点         |
+| `checkpoint/admin-full-icons-20261107`         | Lucide 图标已接入                          |
+| `checkpoint/admin-full-components-20261107`    | 共享组件已就绪，原调用端仍可运行           |
+| `checkpoint/admin-full-surfaces-20261107`      | 后台和共享语音编辑器已切换，旧依赖仍可安装 |
+| `checkpoint/admin-full-clean-20261107`         | 已移除旧包、主题、分包及锁文件记录         |
+
+先撤依赖清理，再按相反顺序撤调用端、基础组件和图标提交。按提交 revert 可保留其他工作；只需查看历史页面时可在独立 worktree 检出相应标签。切换依赖后运行 `pnpm install --frozen-lockfile`。这些批次都没有后端迁移，表格偏好和旧草稿沿用原存储格式。
