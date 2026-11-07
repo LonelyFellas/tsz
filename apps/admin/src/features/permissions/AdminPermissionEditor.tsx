@@ -1,19 +1,17 @@
-import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
+import { XIcon, PlusIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
   Button,
-  Checkbox,
   Divider,
-  Drawer,
   Flex,
-  Input,
-  Modal,
   Spin,
   Tag,
-  Typography,
-  theme
-} from "antd";
+  Typography
+} from "@tsz/ui/admin/display";
+import { Checkbox, Input } from "@tsz/ui/admin/forms";
+import { Drawer, Modal } from "@tsz/ui/admin/overlays";
+import { adminTokens } from "@tsz/ui/admin/context";
 import { useState } from "react";
 import type { AdminPermissions, UnifiedPermissionCatalog } from "@tsz/types";
 import { api } from "@/lib/auth";
@@ -32,7 +30,7 @@ function PermissionSelection({
   displayName: string;
   onClose: () => void;
 }) {
-  const { token } = theme.useToken();
+  const token = adminTokens;
   const labels = Object.fromEntries(
     catalog.permissions.map((p) => [p.key, p.label])
   );
@@ -122,7 +120,7 @@ function PermissionSelection({
             <Button
               size="small"
               aria-label="标签池"
-              icon={<PlusOutlined />}
+              icon={<PlusIcon />}
               disabled={availableTags.length === 0}
               onClick={() => {
                 setPickerTagIds(selectedTagIds);
@@ -203,7 +201,7 @@ function PermissionSelection({
                     cursor: "pointer"
                   }}
                 >
-                  <CloseOutlined style={{ fontSize: 10 }} />
+                  <XIcon style={{ fontSize: 10 }} />
                 </button>
               </Tag>
             ))

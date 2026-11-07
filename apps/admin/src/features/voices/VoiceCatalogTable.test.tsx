@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+
 import type { AdminSpeechVoice, AdminSpeechVoiceMetadata } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import { VoiceCatalogTable } from "./VoiceCatalogTable";
@@ -77,33 +77,31 @@ const voices: AdminSpeechVoice[] = [
 ];
 function mount(items = voices) {
   return render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <VoiceCatalogTable
-        voices={items}
-        metadata={
-          new Map([
-            [
-              "sonia",
-              {
-                voice_alias: "sonia",
-                description_zh: "共享介绍",
-                description_revision: 2,
-                notes: "适合慢读",
-                personal_revision: 3,
-                parameters: null
-              }
-            ]
-          ])
-        }
-        loading={false}
-        settingsPending={false}
-        canGenerate
-        validText
-        pendingVoice={null}
-        onAudition={vi.fn()}
-        onDetails={vi.fn()}
-      />
-    </ConfigProvider>
+    <VoiceCatalogTable
+      voices={items}
+      metadata={
+        new Map([
+          [
+            "sonia",
+            {
+              voice_alias: "sonia",
+              description_zh: "共享介绍",
+              description_revision: 2,
+              notes: "适合慢读",
+              personal_revision: 3,
+              parameters: null
+            }
+          ]
+        ])
+      }
+      loading={false}
+      settingsPending={false}
+      canGenerate
+      validText
+      pendingVoice={null}
+      onAudition={vi.fn()}
+      onDetails={vi.fn()}
+    />
   );
 }
 function names(container: HTMLElement) {
@@ -135,7 +133,7 @@ async function select(label: string, option: string) {
   const content = await waitFor(() => {
     const match = Array.from(
       document.querySelectorAll(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+        ".ui-select-dropdown:not(.ui-select-dropdown-hidden) .ui-select-item-option-content"
       )
     ).find((node) => node.textContent === option)!;
     expect(match).toBeDefined();
@@ -153,20 +151,18 @@ describe("音色目录表格", () => {
       display_name: `Voice ${index + 1}`
     }));
     const table = (current: AdminSpeechVoice[], editing: boolean) => (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <VoiceCatalogTable
-          voices={current}
-          metadata={new Map()}
-          metadataEditing={editing}
-          loading={false}
-          settingsPending={false}
-          canGenerate
-          validText
-          pendingVoice={null}
-          onAudition={vi.fn()}
-          onDetails={vi.fn()}
-        />
-      </ConfigProvider>
+      <VoiceCatalogTable
+        voices={current}
+        metadata={new Map()}
+        metadataEditing={editing}
+        loading={false}
+        settingsPending={false}
+        canGenerate
+        validText
+        pendingVoice={null}
+        onAudition={vi.fn()}
+        onDetails={vi.fn()}
+      />
     );
     const { container, rerender } = render(table(items, false));
     fireEvent.click(screen.getByTitle("2"));
@@ -276,8 +272,8 @@ describe("音色目录表格", () => {
     await select("可选角色", "无");
     expect(names(container)).toEqual([]);
     const clear = (label: string) => {
-      const control = visibleControl(label).closest(".ant-select")!;
-      fireEvent.click(control.querySelector(".ant-select-clear")!);
+      const control = visibleControl(label).closest(".ui-select")!;
+      fireEvent.click(control.querySelector(".ui-select-clear")!);
     };
     clear("可选风格");
     expect(names(container)).toEqual(["Sonia", "Ana"]);

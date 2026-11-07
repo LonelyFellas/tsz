@@ -6,7 +6,7 @@ import {
   waitFor
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, usePermission } from "@/lib/auth";
 import { HttpError } from "@tsz/api-client";

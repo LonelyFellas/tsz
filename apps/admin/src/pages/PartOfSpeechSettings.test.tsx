@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PartOfSpeechSettingsPage } from "./PartOfSpeechSettings";
@@ -21,10 +21,10 @@ function LocationProbe() {
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/settings/parts-of-speech"]}>
-      <AntApp>
+      <FeedbackApp>
         <PartOfSpeechSettingsPage />
         <LocationProbe />
-      </AntApp>
+      </FeedbackApp>
     </MemoryRouter>
   );
 }

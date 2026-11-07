@@ -4,13 +4,13 @@ import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
 import {
   Alert,
   Button,
-  Cascader,
   Empty,
   Flex,
   Spin,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Cascader } from "@tsz/ui/admin/forms";
 import type {
   AdminWordV3,
   DraftMeaningsStepContentWritableV3,

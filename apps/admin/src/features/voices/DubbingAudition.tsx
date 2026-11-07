@@ -1,5 +1,5 @@
 import type { AdminSpeechVoice, AdminVoiceParameters } from "@tsz/types";
-import { Button, Typography } from "antd";
+import { Button, Typography } from "@tsz/ui/admin/display";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SsmlDraft } from "@tsz/voice-editor/types";
 import { api, usePermission } from "@/lib/auth";

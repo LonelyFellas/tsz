@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
@@ -152,10 +152,10 @@ beforeEach(() => {
   });
 });
 
-/** 点确认弹窗里的主按钮（.ant-modal-confirm-btns 内，按可见文案定位）。 */
+/** 点确认弹窗里的主按钮（.ui-modal-confirm-btns 内，按可见文案定位）。 */
 function clickConfirmOk(label: RegExp) {
   const btns = document.querySelector(
-    ".ant-modal-confirm-btns, .ant-modal-footer"
+    ".ui-modal-confirm-btns, .ui-modal-footer"
   )!;
   fireEvent.click(within(btns as HTMLElement).getByText(label));
 }
@@ -168,9 +168,9 @@ function renderPage(staleTime = 0) {
   const view = () => (
     <MemoryRouter>
       <QueryClientProvider client={client}>
-        <AntApp>
+        <FeedbackApp>
           <UserManagement />
-        </AntApp>
+        </FeedbackApp>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -224,7 +224,7 @@ describe("UserManagement", () => {
     clickRowButton(/^禁\s?用$/);
     expect(
       await screen.findByText("禁用用户「record」", {
-        selector: ".ant-modal-title"
+        selector: ".ui-modal-title"
       })
     ).toBeInTheDocument();
     clickConfirmOk(/^禁\s?用$/);
@@ -457,7 +457,7 @@ describe("UserManagement", () => {
     expect(screen.queryByText("方言管理")).toBeNull();
     clickRowButton(/^查看详情$/);
     const drawer = (await screen.findByText("用户 ID")).closest<HTMLElement>(
-      ".ant-drawer-body"
+      ".ui-drawer-body"
     )!;
     expect(within(drawer).getByText("学生等级")).toBeInTheDocument();
     expect(within(drawer).getByText("B2")).toBeInTheDocument();
@@ -468,7 +468,7 @@ describe("UserManagement", () => {
   it("翻到第 2 页展示剩余用户", async () => {
     renderPage();
     await screen.findByText("record"); // 第 1 页
-    fireEvent.click(screen.getByTitle("2"));
+    fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
     await waitFor(() => expect(screen.getByText("melody")).toBeInTheDocument());
   });
 
@@ -501,7 +501,7 @@ it("用户状态失败后确认弹窗保留目标并可重试", async () => {
   ).closest<HTMLElement>('[role="dialog"]')!;
   clickConfirmOk(/^禁\s?用$/);
   expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
-  expect(dialog).not.toHaveClass("ant-zoom-leave");
+  expect(dialog).not.toHaveClass("ui-zoom-leave");
   clickConfirmOk(/^禁\s?用$/);
   await waitFor(() => expect(mockSetStatus).toHaveBeenCalledTimes(2));
   expect(mockSetStatus).toHaveBeenLastCalledWith("1", "disabled");

@@ -1,4 +1,4 @@
-import { Button, Empty } from "antd";
+import { Button, Empty } from "@tsz/ui/admin/display";
 
 export function TableEmptyState({
   message,

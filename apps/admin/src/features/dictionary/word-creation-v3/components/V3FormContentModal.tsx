@@ -9,21 +9,17 @@ import {
   useRef,
   useState
 } from "react";
-import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
+import { XIcon, PlusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Button,
-  Checkbox,
-  Drawer,
   Flex,
-  Modal,
   Space,
-  Switch,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Drawer, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { Checkbox, Switch } from "@tsz/ui/admin/forms";
 import type {
   DialectRulesV3,
   RetiredContentSlotV3,
@@ -639,7 +635,7 @@ export function V3FormContentModal({
                     <Button
                       size="small"
                       type="text"
-                      icon={<CloseOutlined />}
+                      icon={<XIcon />}
                       disabled={Boolean(removalReason(binding.id))}
                       onClick={() => removeLabel(binding.id)}
                       aria-label={`移除${partOfSpeechLabel(pos.pos)}${label(binding.form_type)}${number ? ` ${number}` : ""}标签`}
@@ -651,7 +647,7 @@ export function V3FormContentModal({
             <Button
               type="dashed"
               aria-label="新增标签"
-              icon={<PlusOutlined />}
+              icon={<PlusIcon />}
               disabled={rows.length === 0}
               onClick={() => {
                 setAssignmentError("");

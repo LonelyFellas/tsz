@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Typography } from "antd";
+import { Typography } from "@tsz/ui/admin/display";
 import { wordKeys } from "@/features/dictionary/api";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";

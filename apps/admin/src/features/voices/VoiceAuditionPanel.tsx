@@ -1,5 +1,13 @@
-import { SoundOutlined } from "@ant-design/icons";
-import { Alert, Button, Collapse, Flex, Select, Space, Typography } from "antd";
+import { Volume2Icon } from "lucide-react";
+import {
+  Alert,
+  Button,
+  Collapse,
+  Flex,
+  Space,
+  Typography
+} from "@tsz/ui/admin/display";
+import { Select } from "@tsz/ui/admin/forms";
 import {
   useCallback,
   useEffect,
@@ -116,7 +124,7 @@ export function VoiceAuditionPanel({
             />
             <Button
               type="primary"
-              icon={<SoundOutlined />}
+              icon={<Volume2Icon />}
               aria-label="试听当前参数"
               loading={pending}
               disabled={readOnly || !canAudition || !!issue}

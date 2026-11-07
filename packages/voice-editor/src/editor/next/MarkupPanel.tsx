@@ -1,5 +1,6 @@
-import { ClearOutlined, RedoOutlined, UndoOutlined } from "@ant-design/icons";
-import { Button, Tooltip } from "antd";
+import { EraserIcon, Redo2Icon, Undo2Icon } from "lucide-react";
+import { Button } from "@tsz/ui/admin/display";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import { useId, useState, type ReactNode } from "react";
 import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
 import type { VoiceEditorProps } from "../../types";
@@ -291,7 +292,7 @@ export function MarkupPanel({
               aria-label="上一步"
               disabled={readOnly || !canUndo}
               onClick={onUndo}
-              icon={<UndoOutlined />}
+              icon={<Undo2Icon />}
             />
           </Tooltip>
           <Tooltip title="重做">
@@ -302,7 +303,7 @@ export function MarkupPanel({
               aria-label="下一步"
               disabled={readOnly || !canRedo}
               onClick={onRedo}
-              icon={<RedoOutlined />}
+              icon={<Redo2Icon />}
             />
           </Tooltip>
           <Tooltip title="清空标注">
@@ -313,7 +314,7 @@ export function MarkupPanel({
               aria-label="清空标注"
               disabled={readOnly || marked === 0}
               onClick={onClearAll}
-              icon={<ClearOutlined />}
+              icon={<EraserIcon />}
             />
           </Tooltip>
         </div>

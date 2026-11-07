@@ -6,20 +6,17 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 import { usePermission } from "@/lib/auth";
 import {
   Alert,
-  App,
   Button,
   Card,
   Col,
   Empty,
-  Form,
-  Modal,
   Row,
-  Select,
-  Space,
-  Tooltip
-} from "antd";
+  Space
+} from "@tsz/ui/admin/display";
+import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { Form, Select } from "@tsz/ui/admin/forms";
 import { FullNameEnCell } from "./FullNameEnCell";
-import type { TableColumnsType } from "antd";
+import { type TableColumnsType } from "@tsz/ui/admin/table";
 import dayjs from "dayjs";
 import type {
   CreateSubPartOfSpeechInput,

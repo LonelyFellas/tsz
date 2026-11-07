@@ -1,4 +1,5 @@
-import { Popover, Typography } from "antd";
+import { Popover } from "@tsz/ui/admin/overlays";
+import { Typography } from "@tsz/ui/admin/display";
 import { useState } from "react";
 
 /**

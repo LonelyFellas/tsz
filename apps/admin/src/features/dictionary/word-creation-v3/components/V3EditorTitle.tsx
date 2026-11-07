@@ -1,4 +1,4 @@
-import { Flex, Typography } from "antd";
+import { Flex, Typography } from "@tsz/ui/admin/display";
 import { V3RowIndex } from "./V3RowIndex";
 
 /** 富文本弹窗共用标题层级；没有列表序号的入口不虚构序号。 */

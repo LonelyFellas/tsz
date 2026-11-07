@@ -216,7 +216,7 @@ async function expandFirstEntry(
 ): Promise<HTMLElement> {
   return waitFor(() => {
     const entryRow = baseElement.querySelector(
-      ".ant-cascader-menu-item-content"
+      ".ui-cascader-menu-item-content"
     );
     expect(entryRow).not.toBeNull();
     fireEvent.click(entryRow!);
@@ -523,8 +523,8 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     // 没有词义的候选留一条禁用行说明原因，而不是当作没搜到。
     const row = await screen.findByText("give（暂无词义）");
-    expect(row.closest(".ant-cascader-menu-item")?.className).toContain(
-      "ant-cascader-menu-item-disabled"
+    expect(row.closest(".ui-cascader-menu-item")?.className).toContain(
+      "ui-cascader-menu-item-disabled"
     );
     expect(screen.queryByText("没有匹配的词条")).not.toBeInTheDocument();
     fireEvent.click(row);
@@ -592,14 +592,14 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector(".ui-cascader-menu-item-content")
       ).not.toBeNull()
     );
     const formRow = await expandFirstEntry(baseElement, /原形 give/);
-    fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(formRow.closest(".ui-cascader-menu-item-content")!);
     // 改选另一条词义：单选下应替换掉原关联，而非并存
     const otherSense = await screen.findByText("举办；提供");
-    fireEvent.click(otherSense.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(otherSense.closest(".ui-cascader-menu-item-content")!);
     await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
     const written = onUsagesChange.mock.calls.at(
       -1
@@ -707,13 +707,13 @@ describe("V3PhraseComponentUsagesCard", () => {
     // 逐层下钻到词义叶子：父级（词条/词形）不可选，只有词义叶子能选
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector(".ui-cascader-menu-item-content")
       ).not.toBeNull()
     );
     const formRow = await expandFirstEntry(baseElement, /原形 give/);
-    fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(formRow.closest(".ui-cascader-menu-item-content")!);
     const senseRow = await screen.findByText("给；交给");
-    fireEvent.click(senseRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(senseRow.closest(".ui-cascader-menu-item-content")!);
     await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
     const written = onUsagesChange.mock.calls.at(
       -1
@@ -848,12 +848,12 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector(".ui-cascader-menu-item-content")
       ).not.toBeNull()
     );
     // 第一列只展示词面：kind 标签对选择没有帮助，短语候选与单词同构
     expect(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!.textContent
+      baseElement.querySelector(".ui-cascader-menu-item-content")!.textContent
     ).toBe("give");
     expect(
       await expandFirstEntry(baseElement, /原形 give/)
@@ -886,7 +886,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       );
       await waitFor(() =>
         expect(
-          baseElement.querySelector(".ant-cascader-menu-item-content")
+          baseElement.querySelector(".ui-cascader-menu-item-content")
         ).not.toBeNull()
       );
       expect(
@@ -925,7 +925,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector(".ui-cascader-menu-item-content")
       ).not.toBeNull()
     );
     // 偏好是英式，但美式那条已有关联，必须一并列出才能解除；
@@ -967,7 +967,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
       expect(
-        baseElement.querySelector(".ant-cascader-menu-item-content")
+        baseElement.querySelector(".ui-cascader-menu-item-content")
       ).not.toBeNull()
     );
     expect(
@@ -997,7 +997,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       expect(screen.getByText("没有匹配的词条")).toBeInTheDocument()
     );
     expect(
-      baseElement.querySelector(".ant-cascader-menu-item-content")
+      baseElement.querySelector(".ui-cascader-menu-item-content")
     ).toBeNull();
   });
 
@@ -1034,12 +1034,12 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     const formRow = await expandFirstEntry(baseElement, /原形 give/);
-    fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
+    fireEvent.click(formRow.closest(".ui-cascader-menu-item-content")!);
     // 单选模式下 radio 圆点是唯一的可视选中指示（antd 单选叶子只有背景高亮）
     const senseRow = await screen.findByText("给；交给");
     expect(
       senseRow
-        .closest(".ant-cascader-menu-item")!
+        .closest(".ui-cascader-menu-item")!
         .querySelector(".v3-component-usage-radio")
     ).toHaveClass("is-checked");
   });

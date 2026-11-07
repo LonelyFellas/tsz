@@ -7,7 +7,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import { useAuthStore } from "@/lib/auth";
@@ -173,7 +173,7 @@ it("names lead to private details and reversal retries preserve the exact intent
   );
   open();
   fireEvent.click(
-    screen.getByText("发放记录", { selector: ".ant-tabs-tab-btn" })
+    screen.getByText("发放记录", { selector: ".ui-tabs-tab-btn" })
   );
   await screen.findByText("张小明");
   expect(screen.getByText("王老师")).toBeInTheDocument();
@@ -217,7 +217,7 @@ it("hides cached records and closes details when refreshing fails", async () => 
   });
   open();
   fireEvent.click(
-    screen.getByText("发放记录", { selector: ".ant-tabs-tab-btn" })
+    screen.getByText("发放记录", { selector: ".ui-tabs-tab-btn" })
   );
   fireEvent.click(await screen.findByText("查看详情"));
   expect(screen.getByText("内部凭据")).toBeInTheDocument();
@@ -235,7 +235,7 @@ it("hides cached records and closes details when refreshing fails", async () => 
 it("name filters and reset clear both visible and collapsed conditions", async () => {
   open();
   fireEvent.click(
-    screen.getByText("发放记录", { selector: ".ant-tabs-tab-btn" })
+    screen.getByText("发放记录", { selector: ".ui-tabs-tab-btn" })
   );
   fireEvent.change(screen.getByPlaceholderText("输入姓名或账号编号"), {
     target: { value: " 张小明 " }
@@ -281,7 +281,7 @@ it.each([
   });
   open();
   fireEvent.click(
-    screen.getByText("发放记录", { selector: ".ant-tabs-tab-btn" })
+    screen.getByText("发放记录", { selector: ".ui-tabs-tab-btn" })
   );
   fireEvent.click(await screen.findByText("查看详情"));
   expect(

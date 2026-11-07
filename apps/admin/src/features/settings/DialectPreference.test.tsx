@@ -6,7 +6,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updateProfilePreferences = vi.hoisted(() => vi.fn());
@@ -41,9 +41,9 @@ function signIn(id: string, dialect?: "uk" | "us"): AdminProfile {
 
 function renderSetting() {
   return render(
-    <AntApp>
+    <FeedbackApp>
       <DialectPreference />
-    </AntApp>
+    </FeedbackApp>
   );
 }
 

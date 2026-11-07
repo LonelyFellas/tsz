@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Col, Row, Skeleton } from "antd";
+import { Alert, Button, Card, Col, Row, Skeleton } from "@tsz/ui/admin/display";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminDashboardOverview } from "@tsz/types";
 import { Link } from "react-router-dom";

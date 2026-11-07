@@ -9,7 +9,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { describe, expect, it, vi } from "vitest";
 import type {
   DraftFormsStepContentV3,
@@ -139,38 +139,36 @@ function setup({
     const [open, setOpen] = useState(true);
     const [applied, setApplied] = useState(forms);
     return (
-      <ConfigProvider virtual={false} theme={{ token: { motion: false } }}>
-        <App>
-          <VoiceSaveContext.Provider
-            value={persist ? { save: () => persist(applied) } : null}
-          >
-            {open && (
-              <V3FormContentModal
-                forms={applied}
-                onApply={setApplied}
-                contentReassignmentAvailable={contentReassignmentAvailable}
-                savedContentIds={savedContentIds}
-                formId={editFormId ?? forms.pos[0]!.forms[baseOnly ? 0 : 1]!.id}
-                issues={[]}
-                stableVariantIds={createStableVariantIdFactory(
-                  expandFormContents(forms),
-                  []
-                )}
-                retiredContentSlots={[]}
-                registerLeaveGuard={registerLeaveGuard}
-                onConfirm={(next) => {
-                  onConfirm(next);
-                  setOpen(false);
-                }}
-                onCancel={() => {
-                  onCancel();
-                  setOpen(false);
-                }}
-              />
-            )}
-          </VoiceSaveContext.Provider>
-        </App>
-      </ConfigProvider>
+      <App>
+        <VoiceSaveContext.Provider
+          value={persist ? { save: () => persist(applied) } : null}
+        >
+          {open && (
+            <V3FormContentModal
+              forms={applied}
+              onApply={setApplied}
+              contentReassignmentAvailable={contentReassignmentAvailable}
+              savedContentIds={savedContentIds}
+              formId={editFormId ?? forms.pos[0]!.forms[baseOnly ? 0 : 1]!.id}
+              issues={[]}
+              stableVariantIds={createStableVariantIdFactory(
+                expandFormContents(forms),
+                []
+              )}
+              retiredContentSlots={[]}
+              registerLeaveGuard={registerLeaveGuard}
+              onConfirm={(next) => {
+                onConfirm(next);
+                setOpen(false);
+              }}
+              onCancel={() => {
+                onCancel();
+                setOpen(false);
+              }}
+            />
+          )}
+        </VoiceSaveContext.Provider>
+      </App>
     );
   }
   const { unmount } = render(<Host />);

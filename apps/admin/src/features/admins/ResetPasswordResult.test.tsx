@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // 复制逻辑单测在 lib/clipboard.test.ts；这里 mock 掉，只验证「成败→提示文案」的接线。
@@ -13,9 +13,9 @@ const mockCopy = vi.mocked(copyText);
 // message 门户依赖 <App> 上下文，统一包一层。
 function renderModal(props: Parameters<typeof ResetPasswordResult>[0]) {
   return render(
-    <AntApp>
+    <FeedbackApp>
       <ResetPasswordResult {...props} />
-    </AntApp>
+    </FeedbackApp>
   );
 }
 

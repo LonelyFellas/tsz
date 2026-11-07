@@ -1,28 +1,28 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
-import { CloseOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { XIcon, PlusIcon, RotateCwIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { App, Drawer, Modal } from "@tsz/ui/admin/overlays";
 import {
-  App,
   Alert,
   Breadcrumb,
   Button,
   Card,
-  Checkbox,
-  ColorPicker,
-  DatePicker,
-  Drawer,
   Flex,
-  Form,
-  Input,
-  Modal,
-  Pagination,
-  Radio,
-  Select,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import {
+  Checkbox,
+  ColorPicker,
+  DatePicker,
+  Form,
+  Input,
+  Radio,
+  Select
+} from "@tsz/ui/admin/forms";
+import { Pagination } from "@tsz/ui/admin/table";
 import type { Dayjs } from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
@@ -561,7 +561,7 @@ export function PermissionManagement() {
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Button
-              icon={<ReloadOutlined />}
+              icon={<RotateCwIcon />}
               onClick={() => {
                 setSearch("");
                 setModule(undefined);
@@ -757,7 +757,7 @@ export function PermissionManagement() {
                             cursor: busy ? "not-allowed" : "pointer"
                           }}
                         >
-                          <CloseOutlined style={{ fontSize: 10 }} />
+                          <XIcon style={{ fontSize: 10 }} />
                         </button>
                       </Tag>
                     ))}
@@ -777,7 +777,7 @@ export function PermissionManagement() {
                       <Button
                         type="text"
                         size="small"
-                        icon={<PlusOutlined />}
+                        icon={<PlusIcon />}
                         aria-label={`设置${p.label}标签`}
                         title={`设置${p.label}标签`}
                         disabled={busy}

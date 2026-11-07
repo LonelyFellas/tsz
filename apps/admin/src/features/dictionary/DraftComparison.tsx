@@ -1,5 +1,5 @@
 import { AdminTable as Table } from "@/components/AdminTable";
-import { Typography } from "antd";
+import { Typography } from "@tsz/ui/admin/display";
 
 type Difference = { path: string; local: unknown; remote: unknown };
 

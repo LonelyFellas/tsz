@@ -30,8 +30,8 @@ const message = vi.hoisted(() => ({
   error: vi.fn()
 }));
 
-vi.mock("antd", async (importOriginal) => {
-  const antd = await importOriginal<typeof import("antd")>();
+vi.mock("@tsz/ui/admin/overlays", async (importOriginal) => {
+  const antd = await importOriginal<typeof import("@tsz/ui/admin/overlays")>();
   return {
     ...antd,
     App: {

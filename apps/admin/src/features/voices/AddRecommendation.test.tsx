@@ -10,7 +10,7 @@ import type {
   AdminDubbingGroupsV3Response,
   AdminSpeechVoice
 } from "@tsz/types";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
 import { AddRecommendation } from "./AddRecommendation";
@@ -104,13 +104,11 @@ function mount() {
   );
   render(
     <QueryClientProvider client={client}>
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <App>
-          <DubbingDrafts>
-            <Harness />
-          </DubbingDrafts>
-        </App>
-      </ConfigProvider>
+      <App>
+        <DubbingDrafts>
+          <Harness />
+        </DubbingDrafts>
+      </App>
     </QueryClientProvider>
   );
   return client;
@@ -141,7 +139,7 @@ describe("完整推荐只应用到分组草稿", () => {
     fireEvent.mouseDown(screen.getByLabelText("推荐分组"));
     fireEvent.click(
       await screen.findByText("A", {
-        selector: ".ant-select-item-option-content"
+        selector: ".ui-select-item-option-content"
       })
     );
     fireEvent.click(screen.getByRole("button", { name: "创建整套推荐" }));

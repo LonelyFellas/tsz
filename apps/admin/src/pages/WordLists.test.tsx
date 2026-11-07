@@ -1,5 +1,4 @@
-import { App as AntApp, ConfigProvider } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -66,9 +65,7 @@ function mount(page = <WordListsPage />, client?: QueryClient) {
           new QueryClient({ defaultOptions: { queries: { retry: false } } })
         }
       >
-        <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
-          <AntApp>{page}</AntApp>
-        </ConfigProvider>
+        <FeedbackApp>{page}</FeedbackApp>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -500,7 +497,7 @@ it("review queue defaults to pending and filters on the server", async () => {
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "审核状态" }));
   fireEvent.click(
     await screen.findByText("审核通过", {
-      selector: ".ant-select-item-option-content"
+      selector: ".ui-select-item-option-content"
     })
   );
   fireEvent.click(screen.getByRole("button", { name: /搜\s*索/ }));

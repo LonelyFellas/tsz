@@ -1,4 +1,11 @@
-import { Alert, Button, Card, List, Space, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  List,
+  Space,
+  Typography
+} from "@tsz/ui/admin/display";
 import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PublicationAudioReview } from "@tsz/types";

@@ -3,12 +3,14 @@ import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
-  HolderOutlined,
-  MinusCircleOutlined,
-  PlusCircleOutlined,
-  WarningOutlined
-} from "@ant-design/icons";
-import { Button, Flex, Radio, Select, Tooltip, Typography } from "antd";
+  GripVerticalIcon,
+  CircleMinusIcon,
+  CirclePlusIcon,
+  TriangleAlertIcon
+} from "lucide-react";
+import { Button, Flex, Typography } from "@tsz/ui/admin/display";
+import { Radio, Select } from "@tsz/ui/admin/forms";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import type {
   DialectRulesV3,
@@ -192,7 +194,7 @@ function V3ConcreteFormTypeCell({
               文案长、类型列只有 112px，硬塞会折成好几行；收成警示图标 + 悬停说明。 */}
           {formTypeChangeHint ? (
             <Tooltip title={formTypeChangeHint}>
-              <WarningOutlined
+              <TriangleAlertIcon
                 aria-label={formTypeChangeHint}
                 className="word-form-type-change-hint"
               />
@@ -576,7 +578,7 @@ function V3DialectSpellingList({
                     <Button
                       type="text"
                       size="small"
-                      icon={<HolderOutlined />}
+                      icon={<GripVerticalIcon />}
                       aria-label={`移动${label}`}
                       disabled={rows.length < 2}
                       draggable={rows.length > 1}
@@ -616,7 +618,7 @@ function V3DialectSpellingList({
                     <Button
                       type="text"
                       size="small"
-                      icon={<PlusCircleOutlined />}
+                      icon={<CirclePlusIcon />}
                       aria-label={`在${label}后新增拼写`}
                       disabled={
                         !multipleSpellingsAvailable || rows.length >= 2000
@@ -638,7 +640,7 @@ function V3DialectSpellingList({
                     <Button
                       type="text"
                       size="small"
-                      icon={<MinusCircleOutlined />}
+                      icon={<CircleMinusIcon />}
                       aria-label={`删除${label}`}
                       disabled={Boolean(removalReason)}
                       onClick={() =>

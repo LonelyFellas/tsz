@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import type { PermissionTag } from "@tsz/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
@@ -113,15 +113,13 @@ function mount(
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <App>
-          <AdminPermissionEditor
-            adminId="a"
-            displayName="管理员甲"
-            onClose={vi.fn()}
-          />
-        </App>
-      </ConfigProvider>
+      <App>
+        <AdminPermissionEditor
+          adminId="a"
+          displayName="管理员甲"
+          onClose={vi.fn()}
+        />
+      </App>
     </QueryClientProvider>
   );
 }
@@ -132,7 +130,7 @@ describe("个人权限设置", () => {
   const detail = () => within(screen.getByRole("region", { name: "权限明细" }));
   const selectedTags = () =>
     within(screen.getByRole("group", { name: "已选权限标签" }));
-  const picker = () => within(document.querySelector(".ant-modal")!);
+  const picker = () => within(document.querySelector(".ui-modal")!);
   const openPicker = () =>
     fireEvent.click(screen.getByRole("button", { name: "标签池" }));
 
@@ -240,9 +238,9 @@ describe("个人权限设置", () => {
     fireEvent.click(picker().getByRole("button", { name: "确认选择" }));
     expect(selectedTags().getByText("词条编辑")).toBeVisible();
     expect(selectedTags().getByText("例句查看")).toBeVisible();
-    expect(
-      selectedTags().getByText("词条编辑").closest(".ant-tag")
-    ).toHaveClass("ant-tag-blue");
+    expect(selectedTags().getByText("词条编辑").closest(".ui-tag")).toHaveClass(
+      "ui-tag-blue"
+    );
     expect(screen.getByText("开通 2 项 · 取消 0 项")).toBeInTheDocument();
     expect(
       modules().getByRole("button", { name: /例句管理/ })

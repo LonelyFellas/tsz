@@ -1,5 +1,7 @@
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Dropdown, Flex, Input } from "antd";
+import { Trash2Icon, PlusIcon } from "lucide-react";
+import { Button, Flex } from "@tsz/ui/admin/display";
+import { Dropdown } from "@tsz/ui/admin/overlays";
+import { Input } from "@tsz/ui/admin/forms";
 import type {
   SentenceTranslationBandV3,
   TranslationLanguageV3,
@@ -189,7 +191,7 @@ export function V3SentenceTranslationsField({
                     type="text"
                     size="small"
                     className="word-sentence-translation-delete"
-                    icon={<DeleteOutlined />}
+                    icon={<Trash2Icon />}
                     disabled={disabled || rows.length === 1}
                     onClick={() =>
                       onChange(
@@ -226,7 +228,7 @@ export function V3SentenceTranslationsField({
           type="dashed"
           className="word-sentence-translation-add word-section-add-button"
           disabled={disabled}
-          icon={<PlusOutlined />}
+          icon={<PlusIcon />}
           aria-label={`添加例句 ${index + 1} 译文`}
         >
           添加译文

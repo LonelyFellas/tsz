@@ -1,19 +1,9 @@
 // 建 / 改角色弹窗（super_admin）：角色名 + 描述 + 权限勾选框（从 GET /admin/permissions 拉，
 // 按目录=侧栏顺序渲染，对角色已有集合打勾）。权限集提交即「全量替换」：把当前勾中的完整数组
 // 塞 permissions（编辑时也照发，等价于按现状替换）。校验对齐 §3/§4：名称 1–50、无 < >/控制字符。
-import {
-  App,
-  Alert,
-  Button,
-  Checkbox,
-  Col,
-  Form,
-  Input,
-  Modal,
-  Row,
-  Spin,
-  Tag
-} from "antd";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Alert, Button, Col, Row, Spin, Tag } from "@tsz/ui/admin/display";
+import { Checkbox, Form, Input } from "@tsz/ui/admin/forms";
 import { useEffect } from "react";
 import type { AdminRole, CreateRoleRequest, PermissionKey } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";

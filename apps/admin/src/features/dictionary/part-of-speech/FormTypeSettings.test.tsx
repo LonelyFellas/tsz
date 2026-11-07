@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -93,11 +93,9 @@ function setup() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <AntApp message={{ duration: 0.1 }}>
-          <FormTypeSettings />
-        </AntApp>
-      </ConfigProvider>
+      <FeedbackApp message={{ duration: 0.1 }}>
+        <FormTypeSettings />
+      </FeedbackApp>
     </QueryClientProvider>
   );
 }
@@ -161,10 +159,10 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
 it("序号列显示真实排序值，而不是行内位置", async () => {
   setup();
   await waitFor(() =>
-    expect(document.querySelector("tbody tr.ant-table-row")).not.toBeNull()
+    expect(document.querySelector("tbody tr.ui-table-row")).not.toBeNull()
   );
   // 原形的 sort_order 是 0，第 1 行——位置序号会显示 1。
-  const row = document.querySelector("tbody tr.ant-table-row")!;
+  const row = document.querySelector("tbody tr.ui-table-row")!;
   expect(row.querySelectorAll("td")[0]!.textContent).toBe("0");
 });
 
@@ -177,9 +175,9 @@ it("编辑原形时不给归属选择，也不把归属发给后端", async () =
   }));
   setup();
   await waitFor(() =>
-    expect(document.querySelector("tbody tr.ant-table-row")).not.toBeNull()
+    expect(document.querySelector("tbody tr.ui-table-row")).not.toBeNull()
   );
-  const row = document.querySelector("tbody tr.ant-table-row")!;
+  const row = document.querySelector("tbody tr.ui-table-row")!;
   fireEvent.click(row.querySelector("button")!);
 
   const dialog = await screen.findByRole("dialog");
@@ -363,7 +361,7 @@ it("关闭默认模版后失败保留设置，并可重试保存", async () => {
   const retry = within(dialog)
     .getByText(/^保\s*存$/)
     .closest("button")!;
-  await waitFor(() => expect(retry).not.toHaveClass("ant-btn-loading"));
+  await waitFor(() => expect(retry).not.toHaveClass("ui-btn-loading"));
   fireEvent.click(retry);
   await waitFor(() => expect(mock.update).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(dialog).not.toBeInTheDocument());

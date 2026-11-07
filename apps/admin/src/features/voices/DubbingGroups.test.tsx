@@ -14,7 +14,7 @@ import type {
   AdminProfile,
   AdminSpeechVoice
 } from "@tsz/types";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
@@ -151,11 +151,9 @@ function mount(initial = data(), voices = [uk, us]) {
   routers.push(router);
   const view = render(
     <QueryClientProvider client={client}>
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <App>
-          <RouterProvider router={router} />
-        </App>
-      </ConfigProvider>
+      <App>
+        <RouterProvider router={router} />
+      </App>
     </QueryClientProvider>
   );
   return { client, router, onAudition, onDirtyChange, ...view };
@@ -304,14 +302,18 @@ describe("分组工作台与逐组草稿", () => {
     );
     expect(within(a).getByLabelText("推荐名称 1")).toHaveValue("A推荐");
     expect(button("保存当前组", a)).toBeDisabled();
-    fireEvent.click(button(/^取\s*消$/, screen.getByRole("tooltip")));
+    fireEvent.click(
+      button(/^取\s*消$/, screen.getByRole("alertdialog", { name: "确认操作" }))
+    );
     await waitFor(() =>
       expect(screen.queryByText("删除推荐「A推荐」？")).toBeNull()
     );
     expect(within(a).getByLabelText("推荐名称 1")).toHaveValue("A推荐");
     expect(button("保存当前组", a)).toBeDisabled();
     fireEvent.click(button("移除推荐 A推荐", a));
-    fireEvent.click(button(/^删\s*除$/, screen.getByRole("tooltip")));
+    fireEvent.click(
+      button(/^删\s*除$/, screen.getByRole("alertdialog", { name: "确认操作" }))
+    );
     expect(within(a).queryByLabelText("推荐名称 1")).toBeNull();
     expect(button("保存当前组", a)).toBeEnabled();
     expect(within(b).getByLabelText("推荐名称 1")).toHaveValue("B推荐");
@@ -509,7 +511,7 @@ describe("分组工作台与逐组草稿", () => {
       });
       fireEvent.click(button("删除分组", screen.getByRole("dialog")));
       const confirmation = screen
-        .getByText("删除「B」？", { selector: ".ant-modal-confirm-title" })
+        .getByText("删除「B」？", { selector: ".ui-modal-confirm-title" })
         .closest<HTMLElement>('[role="dialog"]')!;
       fireEvent.click(
         button(action === "cancel" ? /^取\s*消$/ : "删除分组", confirmation)
@@ -517,7 +519,7 @@ describe("分组工作台与逐组草稿", () => {
       await waitFor(() =>
         expect(
           screen.queryByText("删除「B」？", {
-            selector: ".ant-modal-confirm-title"
+            selector: ".ui-modal-confirm-title"
           })
         ).toBeNull()
       );
@@ -539,7 +541,7 @@ describe("分组工作台与逐组草稿", () => {
     });
     fireEvent.click(button("删除分组", screen.getByRole("dialog")));
     const confirmation = screen
-      .getByText("删除「B」？", { selector: ".ant-modal-confirm-title" })
+      .getByText("删除「B」？", { selector: ".ui-modal-confirm-title" })
       .closest<HTMLElement>('[role="dialog"]')!;
     fireEvent.click(button("删除分组", confirmation));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -637,7 +639,7 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.mouseDown(screen.getByLabelText("使用板块"));
     fireEvent.click(
       await screen.findByText("词形拼写", {
-        selector: ".ant-select-item-option-content"
+        selector: ".ui-select-item-option-content"
       })
     );
     fireEvent.click(button("应用到本组", screen.getByRole("dialog")));
@@ -767,7 +769,9 @@ describe("分组工作台与逐组草稿", () => {
     expect(screen.queryByRole("button", { name: /删除分组/ })).toBeNull();
     expect(screen.queryByLabelText("上移分组 全局常用")).toBeNull();
     fireEvent.click(button("移除推荐 全局常用推荐", panel));
-    fireEvent.click(button(/^删\s*除$/, screen.getByRole("tooltip")));
+    fireEvent.click(
+      button(/^删\s*除$/, screen.getByRole("alertdialog", { name: "确认操作" }))
+    );
     fireEvent.click(button("保存当前组", panel));
     await screen.findByText(/配音已保存。/);
     expect(
@@ -835,7 +839,7 @@ describe("分组工作台与逐组草稿", () => {
       fireEvent.mouseDown(screen.getByLabelText(`选择${side}原有声音`));
       fireEvent.click(
         await screen.findByText(new RegExp(text!), {
-          selector: ".ant-select-item-option-content"
+          selector: ".ui-select-item-option-content"
         })
       );
     }
@@ -868,7 +872,7 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.mouseDown(screen.getByLabelText("选择英式原有声音"));
     fireEvent.click(
       await screen.findByText(/旧一/, {
-        selector: ".ant-select-item-option-content"
+        selector: ".ui-select-item-option-content"
       })
     );
     selectVoice("Guy 男声");
@@ -1027,7 +1031,7 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.mouseDown(within(dialog).getByLabelText("预览内容板块"));
     fireEvent.click(
       await screen.findByText("词性的语法结构", {
-        selector: ".ant-select-item-option-content"
+        selector: ".ui-select-item-option-content"
       })
     );
     expect(

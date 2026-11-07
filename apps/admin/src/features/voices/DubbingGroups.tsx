@@ -1,15 +1,15 @@
 import { speechAccentGroup } from "@tsz/shared";
 import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  CopyOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  SoundOutlined,
-  PlusOutlined,
-  SaveOutlined,
-  CheckOutlined
-} from "@ant-design/icons";
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CopyIcon,
+  Trash2Icon,
+  PencilIcon,
+  Volume2Icon,
+  PlusIcon,
+  SaveIcon,
+  CheckIcon
+} from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -20,19 +20,14 @@ import type {
 } from "@tsz/types";
 import {
   Alert,
-  App,
   Button,
   Card,
-  Checkbox,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Select,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal, Popconfirm } from "@tsz/ui/admin/overlays";
+import { Checkbox, Form, Input, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useState } from "react";
 import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { useBlocker } from "react-router-dom";
@@ -410,7 +405,7 @@ export function DubbingGroups({
             type="text"
             aria-label={`试听${sideName(side)} ${item.name}`}
             className={`voice-accent-${accent}`}
-            icon={<SoundOutlined aria-hidden />}
+            icon={<Volume2Icon aria-hidden />}
             disabled={!auditionAllowed || !canAudition || !!issue}
             onClick={() => voice && onAudition(voice, item)}
           />
@@ -424,7 +419,7 @@ export function DubbingGroups({
           {edit && (
             <Button
               type="text"
-              icon={<EditOutlined aria-hidden />}
+              icon={<PencilIcon aria-hidden />}
               aria-label={`修改${sideName(side)} ${item.name}`}
               onClick={() => {
                 onInvalidatePreview();
@@ -627,9 +622,9 @@ export function DubbingGroups({
                                 aria-label={`${direction < 0 ? "上移" : "下移"}推荐 ${pair.name}`}
                                 icon={
                                   direction < 0 ? (
-                                    <ArrowUpOutlined aria-hidden />
+                                    <ArrowUpIcon aria-hidden />
                                   ) : (
-                                    <ArrowDownOutlined aria-hidden />
+                                    <ArrowDownIcon aria-hidden />
                                   )
                                 }
                                 disabled={
@@ -654,7 +649,7 @@ export function DubbingGroups({
                             <Button
                               type="text"
                               size="small"
-                              icon={<CopyOutlined aria-hidden />}
+                              icon={<CopyIcon aria-hidden />}
                               aria-label={`复制整套 ${pair.name}`}
                               disabled={pairs.length >= 20}
                               onClick={() =>
@@ -693,7 +688,7 @@ export function DubbingGroups({
                                 danger
                                 type="text"
                                 size="small"
-                                icon={<DeleteOutlined aria-hidden />}
+                                icon={<Trash2Icon aria-hidden />}
                                 aria-label={`移除推荐 ${pair.name}`}
                               />
                             </Popconfirm>
@@ -775,7 +770,7 @@ export function DubbingGroups({
           {canEdit && (
             <Button
               type="primary"
-              icon={<PlusOutlined aria-hidden />}
+              icon={<PlusIcon aria-hidden />}
               disabled={
                 saving ||
                 current.filter((group) => !group.is_global).length >= 5
@@ -829,9 +824,9 @@ export function DubbingGroups({
                         size="small"
                         icon={
                           direction < 0 ? (
-                            <ArrowUpOutlined aria-hidden />
+                            <ArrowUpIcon aria-hidden />
                           ) : (
-                            <ArrowDownOutlined aria-hidden />
+                            <ArrowDownIcon aria-hidden />
                           )
                         }
                         aria-label={`${direction < 0 ? "上移" : "下移"}分组 ${group.name}`}
@@ -883,7 +878,7 @@ export function DubbingGroups({
                     {canEdit && !group.is_global && (
                       <Button
                         type="text"
-                        icon={<EditOutlined aria-hidden />}
+                        icon={<PencilIcon aria-hidden />}
                         onClick={() => openSettings(group)}
                       >
                         编辑分组
@@ -891,7 +886,7 @@ export function DubbingGroups({
                     )}
                     {editable && rec.format === "paired" && (
                       <Button
-                        icon={<PlusOutlined aria-hidden />}
+                        icon={<PlusIcon aria-hidden />}
                         disabled={rec.pairs.length >= 20}
                         onClick={() =>
                           setEditing({ groupId: group.id, initial: {} })
@@ -925,7 +920,7 @@ export function DubbingGroups({
                       "未保存"
                     ) : (
                       <>
-                        <CheckOutlined aria-hidden /> 已保存
+                        <CheckIcon aria-hidden /> 已保存
                       </>
                     )}
                   </Typography.Text>
@@ -942,7 +937,7 @@ export function DubbingGroups({
                       </Button>
                       <Button
                         type="primary"
-                        icon={<SaveOutlined aria-hidden />}
+                        icon={<SaveIcon aria-hidden />}
                         loading={savingId === group.id}
                         disabled={!draft || !canEdit || saving}
                         onClick={() => void save(group.id)}
@@ -1009,7 +1004,7 @@ export function DubbingGroups({
                   <Button
                     danger
                     type="text"
-                    icon={<DeleteOutlined aria-hidden />}
+                    icon={<Trash2Icon aria-hidden />}
                     onClick={() => {
                       const group = current.find((g) => g.id === settingsId);
                       if (group) removeGroup(group);

@@ -112,7 +112,7 @@ it.each([false, true])(
     );
     await expandJob();
     const labels = Array.from(
-      document.querySelectorAll(".ant-cascader-menu .tsz-words")
+      document.querySelectorAll(".ui-cascader-menu .tsz-words")
     )
       .map((node) => node.textContent)
       .filter((text) => text !== "job");
@@ -250,7 +250,7 @@ it("只读旧关联通过合并路径自动展开和回显，不允许更换", a
   expect(sense.querySelector(".v3-component-usage-radio")).toHaveClass(
     "is-checked"
   );
-  expect(sense.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
+  expect(sense.closest("li")).toHaveClass("ui-cascader-menu-item-disabled");
   fireEvent.click(sense);
   expect(onReplace).not.toHaveBeenCalled();
 });

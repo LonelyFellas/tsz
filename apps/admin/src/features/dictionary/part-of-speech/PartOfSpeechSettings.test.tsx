@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { HttpError } from "@tsz/api-client";
 import type {
   PartOfSpeechCatalogResponse,
@@ -16,8 +16,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/lib/auth";
 import { PartOfSpeechSettings } from "./PartOfSpeechSettings";
 
-vi.mock("antd", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("antd")>();
+vi.mock("@tsz/ui/admin/overlays", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@tsz/ui/admin/overlays")>();
   return {
     ...actual,
     Tooltip: ({
@@ -279,9 +280,9 @@ const createdParticle: PartOfSpeechConfig = {
 
 function renderSettings() {
   return render(
-    <AntApp>
+    <FeedbackApp>
       <PartOfSpeechSettings />
-    </AntApp>
+    </FeedbackApp>
   );
 }
 
@@ -409,8 +410,8 @@ describe("PartOfSpeechSettings", () => {
     expect(
       screen
         .getByLabelText("所属基本词性")
-        .closest(".ant-select")
-        ?.querySelector(".ant-select-content")
+        .closest(".ui-select")
+        ?.querySelector(".ui-select-content")
     ).toHaveTextContent("全部");
     expect(screen.getByLabelText("所属基本词性")).toHaveValue("");
     expect(screen.getByTestId("sub-panel")).toHaveTextContent(
@@ -520,24 +521,24 @@ describe("PartOfSpeechSettings", () => {
   // 「词形变化」「细分词性」这些词在分区、表格列头上都出现，按 Segmented 的选项节点定位。
   const section = (label: string) =>
     Array.from(
-      document.querySelectorAll<HTMLElement>(".ant-segmented-item-label")
+      document.querySelectorAll<HTMLElement>(".ui-segmented-item-label")
     ).find((node) => node.textContent?.trim() === label) ?? null;
 
   const sectionSelected = (label: string) =>
     !!section(label)
-      ?.closest(".ant-segmented-item")
-      ?.classList.contains("ant-segmented-item-selected");
+      ?.closest(".ui-segmented-item")
+      ?.classList.contains("ui-segmented-item-selected");
 
   it("单词/短语是一级 Tab，分区降为二级", () => {
     const { container } = renderSettings();
     // jsdom 不做布局，量不了像素；能钉住的是 DOM 顺序——切换必须在 Tab 栏之前出现，
     // 否则它又会被摆回标题行右端那种扫不到的位置。
     const nodes = Array.from(
-      container.querySelectorAll(".ant-tabs-nav, .ant-segmented")
+      container.querySelectorAll(".ui-tabs-nav, .ui-segmented")
     );
     // 一级（单词/短语）必须排在分区之前，否则层级又会反过来。
-    expect(nodes[0]?.className).toContain("ant-tabs-nav");
-    expect(nodes[1]?.className).toContain("ant-segmented");
+    expect(nodes[0]?.className).toContain("ui-tabs-nav");
+    expect(nodes[1]?.className).toContain("ui-segmented");
     expect(screen.getByRole("tab", { name: "单词" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "短语" })).toBeVisible();
   });
@@ -745,13 +746,9 @@ describe("PartOfSpeechSettings", () => {
       expect(mock.queries.at(-1)).toMatchObject({ page: 2, page_size: 10 })
     );
 
-    fireEvent.mouseDown(screen.getByRole("combobox"));
-    const options = await screen.findAllByRole("option");
-    const twentyPerPage = options.find((option) =>
-      option.textContent?.includes("20")
-    );
-    expect(twentyPerPage).toBeDefined();
-    fireEvent.click(twentyPerPage!);
+    fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
+      target: { value: "20" }
+    });
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ page: 1, page_size: 20 })
     );
@@ -826,7 +823,7 @@ it("基本词性编辑不开放细分词性新增，普通管理员即使持有�
   }))
     expect(button.closest("button")).toBeDisabled();
   fireEvent.click(
-    screen.getByText("细分词性", { selector: ".ant-segmented-item-label" })
+    screen.getByText("细分词性", { selector: ".ui-segmented-item-label" })
   );
   expect(screen.getByText("新增细分词性").closest("button")).toBeDisabled();
 });

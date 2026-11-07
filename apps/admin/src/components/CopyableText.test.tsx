@@ -1,13 +1,40 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { CopyableText } from "./CopyableText";
 
 describe("CopyableText", () => {
   it("有值：展示文本并挂上复制按钮", () => {
     render(<CopyableText value="13800138000" />);
     expect(screen.getByText("13800138000")).toBeInTheDocument();
-    // antd 复制按钮 aria-label 为「复制」（取自 tooltips[0]）。
     expect(screen.getByRole("button", { name: "复制" })).toBeInTheDocument();
+  });
+
+  it("受限剪贴板下如实反馈失败，重试时复制完整值", async () => {
+    const value = "12345678-1234-1234-1234-123456789abc";
+    const copy = vi.fn(() => false);
+    const original = Object.getOwnPropertyDescriptor(document, "execCommand");
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: copy
+    });
+    try {
+      render(<CopyableText value={value} ellipsis={96} />);
+      fireEvent.click(screen.getByRole("button", { name: "复制" }));
+      const retry = await screen.findByRole("button", { name: /复制失败/ });
+      copy.mockImplementation(() => {
+        const field = document.querySelector("textarea");
+        return (
+          field?.value.slice(field.selectionStart, field.selectionEnd) === value
+        );
+      });
+      fireEvent.click(retry);
+      expect(
+        await screen.findByRole("button", { name: "已复制" })
+      ).toBeVisible();
+    } finally {
+      if (original) Object.defineProperty(document, "execCommand", original);
+      else Reflect.deleteProperty(document, "execCommand");
+    }
   });
 
   it("空值：渲染占位「-」、不出现复制按钮", () => {
@@ -31,7 +58,7 @@ describe("CopyableText", () => {
       <CopyableText value="a-very-long-uuid-value" ellipsis={96} />
     );
     // Typography.Text 以 style.max-width 承载限宽。
-    const node = container.querySelector<HTMLElement>(".ant-typography");
+    const node = container.querySelector<HTMLElement>(".ui-typography");
     expect(node?.style.maxWidth).toBe("96px");
   });
 
@@ -39,7 +66,7 @@ describe("CopyableText", () => {
     const { container } = render(
       <CopyableText value="another-long-value" ellipsis />
     );
-    const node = container.querySelector<HTMLElement>(".ant-typography");
+    const node = container.querySelector<HTMLElement>(".ui-typography");
     expect(node?.style.maxWidth).toBe("");
   });
 });

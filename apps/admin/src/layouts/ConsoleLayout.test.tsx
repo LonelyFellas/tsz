@@ -114,6 +114,17 @@ describe("ConsoleLayout", () => {
     expect(screen.getByTestId("sidebar")).toHaveTextContent("full");
   });
 
+  it("手机菜单支持键盘关闭并将焦点归还打开按钮", async () => {
+    renderLayout("/words", 640);
+    const trigger = screen.getByRole("button", { name: "打开菜单" });
+    fireEvent.click(trigger);
+    const sheet = await screen.findByRole("dialog", { name: "后台导航" });
+    expect(sheet).toContainElement(screen.getByTestId("sidebar"));
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    await vi.waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("普通页面在相同宽度仍按原规则完整展开", () => {
     renderLayout("/words", 1200);
     expect(screen.getByTestId("sidebar")).toHaveTextContent("full");
@@ -123,7 +134,7 @@ describe("ConsoleLayout", () => {
     // antd v6 表格固定单元格为 `zIndexTableFixed + 固定列偏移`（实测 10~12）：
     // 顶栏与它同值时，DOM 靠后的表体会反盖住顶栏，因此必须更严格地高于该范围。
     const { container } = renderLayout("/users", 1440);
-    const header = container.querySelector("header.ant-layout-header");
+    const header = container.querySelector("header");
     expect(header).not.toBeNull();
     expect(CONSOLE_HEADER_Z_INDEX).toBeGreaterThan(12);
     expect(Number(getComputedStyle(header!).zIndex)).toBe(

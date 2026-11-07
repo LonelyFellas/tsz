@@ -6,7 +6,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type {
   AdminSpeechVoice,
@@ -102,18 +102,16 @@ const initial: AdminDubbingRecommendationPair = {
 function mount(side?: "uk") {
   const onSave = vi.fn();
   render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <App>
-        <RecommendationEditor
-          voices={[sonia, libby, aria]}
-          initial={initial}
-          side={side}
-          disabled={false}
-          onSave={onSave}
-          onCancel={vi.fn()}
-        />
-      </App>
-    </ConfigProvider>
+    <App>
+      <RecommendationEditor
+        voices={[sonia, libby, aria]}
+        initial={initial}
+        side={side}
+        disabled={false}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />
+    </App>
   );
   return onSave;
 }
@@ -122,7 +120,7 @@ async function selectUK(name: string, side?: "uk") {
     fireEvent.mouseDown(screen.getByLabelText("英式音色"));
     fireEvent.click(
       await screen.findByText(name, {
-        selector: ".ant-select-item-option-content"
+        selector: ".ui-select-item-option-content"
       })
     );
   } else fireEvent.click(screen.getByRole("radio", { name: `${name} 女声` }));
@@ -177,12 +175,12 @@ it("高级参数收展、英美往返及试听均保留参数与各自文本、�
   fireEvent.mouseDown(screen.getByLabelText("试听输出格式"));
   fireEvent.click(
     await screen.findByText("WAV", {
-      selector: ".ant-select-item-option-content"
+      selector: ".ui-select-item-option-content"
     })
   );
   fireEvent.click(screen.getByLabelText("配置美式声音"));
   expect(
-    screen.getByLabelText("试听输出格式").closest(".ant-select")
+    screen.getByLabelText("试听输出格式").closest(".ui-select")
   ).toHaveTextContent("MP3");
   fireEvent.change(screen.getByLabelText("合成语速"), {
     target: { value: "0.85" }
@@ -196,7 +194,7 @@ it("高级参数收展、英美往返及试听均保留参数与各自文本、�
   expect(screen.getByLabelText("本次试听文本")).toHaveValue("UK draft");
   expect(screen.getByLabelText("风格强度")).toHaveValue("1.40");
   expect(
-    screen.getByLabelText("试听输出格式").closest(".ant-select")
+    screen.getByLabelText("试听输出格式").closest(".ui-select")
   ).toHaveTextContent("WAV");
   fireEvent.click(screen.getByLabelText("试听当前参数"));
   await screen.findByLabelText("Sonia 试听播放器");

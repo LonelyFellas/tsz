@@ -1,0 +1,171 @@
+.ui-table-wrapper {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+.ui-table {
+  color: #202631;
+  font-size: 14px;
+}
+.ui-table table {
+  width: 100%;
+  border-spacing: 0;
+  text-align: start;
+}
+.ui-table-cell {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e4e7ec;
+  background: white;
+}
+.ui-table-small .ui-table-cell {
+  padding: 7px 8px;
+}
+.ui-table-middle .ui-table-cell {
+  padding: 10px 12px;
+}
+.ui-table-thead .ui-table-cell {
+  font-weight: 600;
+  color: #475467;
+  background: #f7f8fa;
+  text-align: start;
+}
+.ui-table-cell-fix {
+  position: sticky;
+  z-index: 2;
+}
+.ui-table-cell-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-table-cell-row-hover {
+  background: #f8faff;
+}
+.ui-table-sticky-holder {
+  position: sticky;
+  z-index: 3;
+  background: white;
+}
+.ui-table-row-expand-icon,
+.ui-table-sort {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.ui-table-row-expand-icon {
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid #cdd3dd;
+  background: white;
+}
+.ui-table-sort {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  text-align: inherit;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-weight: inherit;
+}
+.ui-table input[type="checkbox"] {
+  accent-color: #2053ff;
+}
+.ui-table-placeholder td {
+  text-align: center;
+  color: #667085;
+}
+.ui-table-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(255 255 255 / 70%);
+  color: #475467;
+  z-index: 4;
+}
+.ui-table-bordered .ui-table-cell {
+  border-inline-end: 1px solid #e4e7ec;
+}
+.ui-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+}
+.ui-table-pagination,
+.ui-pagination-end {
+  justify-content: flex-end;
+}
+.ui-pagination-center {
+  justify-content: center;
+}
+.ui-pagination
+  :where(li:not(.ui-pagination-total-text, .ui-pagination-options)),
+.ui-pagination select {
+  box-sizing: border-box;
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  text-align: center;
+  line-height: 30px;
+}
+.ui-pagination a,
+.ui-pagination button {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.ui-pagination li.ui-pagination-item-active {
+  color: #2053ff;
+  border-color: currentColor;
+}
+.ui-pagination li.ui-pagination-disabled,
+.ui-pagination button:disabled {
+  color: #98a2b3;
+  cursor: default;
+}
+.ui-pagination select {
+  border-color: #cdd3dd;
+  background: white;
+  color: #344054;
+}
+.ui-pagination-options {
+  list-style: none;
+}
+
+.ui-table-sort-mark::before {
+  content: "↕";
+}
+[aria-sort="ascending"] .ui-table-sort-mark::before {
+  content: "↑";
+}
+[aria-sort="descending"] .ui-table-sort-mark::before {
+  content: "↓";
+}
+
+.ui-table-sticky-scroll {
+  position: sticky;
+  z-index: 3;
+  overflow: hidden;
+  background: #f2f4f7;
+}
+.ui-table-sticky-scroll-bar {
+  height: 100%;
+  border-radius: 8px;
+  cursor: grab;
+  background: #98a2b3;
+}
+.ui-table-sticky-scroll-bar-active {
+  cursor: grabbing;
+}

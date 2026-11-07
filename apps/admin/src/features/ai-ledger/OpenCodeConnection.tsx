@@ -5,8 +5,9 @@ import {
   useQuery,
   useQueryClient
 } from "@tanstack/react-query";
-import { LinkOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Alert, Badge, Button, Drawer, Space, Typography } from "antd";
+import { LinkIcon, RotateCwIcon } from "lucide-react";
+import { Alert, Badge, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Drawer } from "@tsz/ui/admin/overlays";
 import type { OpenCodeLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { OpenCodeProviders } from "./OpenCodeProviders";
@@ -91,7 +92,7 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
     <section className="settings-provider" aria-label="OpenCode 账号">
       <div className="settings-provider__summary">
         <span className="settings-provider__icon">
-          <LinkOutlined />
+          <LinkIcon />
         </span>
         <div className="settings-provider__identity">
           <div className="settings-provider__name">
@@ -116,7 +117,7 @@ export function OpenCodeConnection({ adminId }: { adminId: string }) {
         <div className="settings-provider__actions">
           <Button
             type="text"
-            icon={<ReloadOutlined />}
+            icon={<RotateCwIcon />}
             aria-label="刷新 OpenCode 连接状态"
             loading={connection.isFetching}
             onClick={refresh}

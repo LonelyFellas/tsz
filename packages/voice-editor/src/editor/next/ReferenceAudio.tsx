@@ -1,4 +1,4 @@
-import { Button, Space, Typography } from "antd";
+import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioReview, type ReviewAudio } from "./AudioReview";
 import { AUDIO_UPLOAD_ACCEPT, preflightAudioFile } from "./audioAssets";

@@ -1,8 +1,8 @@
-.voice-library-group-content.ant-card {
+.voice-library-group-content.ui-card {
   background: transparent;
   border: 0;
 }
-.voice-library-group-content.ant-card > .ant-card-body {
+.voice-library-group-content.ui-card > .ui-card-body {
   padding: 0;
 }
 .dubbing-groups {
@@ -18,13 +18,13 @@
   gap: 20px;
   padding: 4px 0 0;
 }
-.dubbing-page-heading h2.ant-typography {
+.dubbing-page-heading h2.ui-typography {
   margin: 0 0 6px;
   font-size: 26px;
   font-weight: 600;
 }
-.dubbing-page-heading .ant-typography-secondary,
-.dubbing-group .ant-typography-secondary {
+.dubbing-page-heading .ui-typography-secondary,
+.dubbing-group .ui-typography-secondary {
   color: var(--voice-muted, #687181);
 }
 .dubbing-group-panels {
@@ -72,7 +72,7 @@
   align-items: flex-start;
   gap: 16px;
 }
-.dubbing-group-heading > .ant-space {
+.dubbing-group-heading > .ui-space {
   flex-wrap: wrap;
   justify-content: flex-end;
   flex-shrink: 0;
@@ -86,7 +86,7 @@
   align-items: center;
   flex-wrap: wrap;
 }
-.dubbing-group-title h3.ant-typography {
+.dubbing-group-title h3.ui-typography {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
@@ -100,7 +100,7 @@
   margin-top: 8px;
   font-size: 12px;
 }
-.dubbing-group-areas .ant-tag {
+.dubbing-group-areas .ui-tag {
   margin: 0;
 }
 .dubbing-pairs-scroll {
@@ -176,19 +176,19 @@
   align-items: flex-start;
   gap: 8px;
 }
-.dubbing-pair-choice > .ant-checkbox-wrapper {
+.dubbing-pair-choice > .ui-checkbox-wrapper {
   margin-top: 7px;
 }
 .dubbing-pair-choice > div {
   min-width: 0;
 }
-.dubbing-pair-name.ant-input {
+.dubbing-pair-name.ui-input {
   padding: 3px 5px;
   margin-left: -5px;
   font-weight: 500;
   background: transparent;
 }
-.dubbing-pair-name.ant-input:disabled {
+.dubbing-pair-name.ui-input:disabled {
   color: inherit;
 }
 .dubbing-pair-status {
@@ -200,10 +200,10 @@
   margin-top: 4px;
   margin-left: 19px;
 }
-.dubbing-pair-actions .ant-btn {
+.dubbing-pair-actions .ui-btn {
   color: var(--voice-muted, #687181);
 }
-.dubbing-pair-actions .ant-btn-dangerous {
+.dubbing-pair-actions .ui-btn-dangerous {
   color: #b42329;
 }
 .dubbing-pair-side {
@@ -215,13 +215,13 @@
   align-items: center;
   gap: 8px;
 }
-.dubbing-side-heading > .ant-btn {
+.dubbing-side-heading > .ui-btn {
   flex-shrink: 0;
   width: 30px;
   height: 30px;
   padding: 4px;
 }
-.dubbing-side-heading > .ant-btn:last-child:not(:first-child) {
+.dubbing-side-heading > .ui-btn:last-child:not(:first-child) {
   margin-left: auto;
   color: var(--voice-muted, #687181);
 }
@@ -276,7 +276,7 @@
   text-align: center;
   padding: 28px 18px;
 }
-.dubbing-pair-empty h5.ant-typography {
+.dubbing-pair-empty h5.ui-typography {
   margin: 0;
   font-size: 14px;
   font-weight: 400;
@@ -354,7 +354,7 @@
   gap: 22px;
   margin: 18px 0 22px;
 }
-.dubbing-legacy-review-columns h5.ant-typography {
+.dubbing-legacy-review-columns h5.ui-typography {
   margin: 0 0 10px;
 }
 .dubbing-review-voice {
@@ -366,8 +366,8 @@
   flex-direction: column;
   gap: 9px;
 }
-.dubbing-review-voice > .ant-typography,
-.dubbing-review-voice > .ant-space {
+.dubbing-review-voice > .ui-typography,
+.dubbing-review-voice > .ui-space {
   font-size: 12px;
 }
 .dubbing-simple-confirmation {
@@ -398,16 +398,16 @@
 .dubbing-review-progress {
   margin-top: 15px;
 }
-.dubbing-editor-title h4.ant-typography {
+.dubbing-editor-title h4.ui-typography {
   margin: 6px 0 0;
 }
-.dubbing-editor-title > .ant-typography {
+.dubbing-editor-title > .ui-typography {
   font-size: 12px;
 }
-.dubbing-editor-drawer .ant-drawer-body {
+.dubbing-editor-drawer .ui-drawer-body {
   padding: 23px 26px;
 }
-.dubbing-editor-drawer .ant-drawer-footer {
+.dubbing-editor-drawer .ui-drawer-footer {
   padding: 16px 26px;
   text-align: right;
 }
@@ -427,7 +427,7 @@
   .dubbing-page-heading {
     align-items: flex-start;
   }
-  .dubbing-page-heading h2.ant-typography {
+  .dubbing-page-heading h2.ui-typography {
     font-size: 24px;
   }
   .dubbing-page-heading {
@@ -437,7 +437,7 @@
     grid-template-columns: 40px minmax(0, 1fr);
     gap: 6px;
   }
-  .dubbing-group-priority > .ant-space {
+  .dubbing-group-priority > .ui-space {
     flex-direction: column;
   }
   .dubbing-group {
@@ -447,8 +447,8 @@
   .dubbing-group-footer {
     flex-wrap: wrap;
   }
-  .dubbing-group-heading > .ant-space,
-  .dubbing-group-footer > .ant-space {
+  .dubbing-group-heading > .ui-space,
+  .dubbing-group-footer > .ui-space {
     flex-wrap: wrap;
   }
   .dubbing-legacy-overview,
@@ -473,7 +473,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.voice-shared-name > .anticon {
+.voice-shared-name > .lucide {
   margin-left: 0.2em;
   flex-shrink: 0;
   font-size: inherit;
@@ -499,30 +499,30 @@
   font-size: 0.85em;
 }
 
-.dubbing-pair-actions .ant-btn:disabled {
+.dubbing-pair-actions .ui-btn:disabled {
   color: rgba(0, 0, 0, 0.25);
 }
 
-.dubbing-pair-editor .ant-drawer-header {
+.dubbing-pair-editor .ui-drawer-header {
   padding: 20px 24px 16px;
   margin: 0;
   border-bottom: 1px solid var(--voice-border, #e5e7eb);
 }
-.dubbing-pair-editor-title h4.ant-typography {
+.dubbing-pair-editor-title h4.ui-typography {
   margin: 0 0 4px;
   font-size: 20px;
 }
-.dubbing-pair-editor-title > .ant-typography {
+.dubbing-pair-editor-title > .ui-typography {
   font-size: 13px;
   font-weight: 400;
 }
-.dubbing-pair-editor .ant-drawer-body {
+.dubbing-pair-editor .ui-drawer-body {
   display: flex;
   flex-direction: column;
   padding: 18px 24px;
   overflow: hidden;
 }
-.dubbing-pair-editor .ant-drawer-footer {
+.dubbing-pair-editor .ui-drawer-footer {
   margin: 0;
   padding: 14px 24px;
   border-top: 1px solid var(--voice-border, #e5e7eb);
@@ -534,10 +534,10 @@
   gap: 16px;
   text-align: left;
 }
-.dubbing-editor-footer-status > .ant-typography {
+.dubbing-editor-footer-status > .ui-typography {
   font-size: 12px;
 }
-.dubbing-editor-footer > .ant-space {
+.dubbing-editor-footer > .ui-space {
   flex-shrink: 0;
 }
 .dubbing-editor-drawer .dubbing-editor-footer {
@@ -557,32 +557,32 @@
   gap: 20px;
   flex-shrink: 0;
 }
-.dubbing-pair-metadata > .ant-form-item {
+.dubbing-pair-metadata > .ui-form-item {
   flex: 1;
   width: 100%;
   max-width: 620px;
   min-width: 0;
   margin: 0;
 }
-.dubbing-pair-editor .dubbing-pair-metadata .ant-form-item-row {
+.dubbing-pair-editor .dubbing-pair-metadata .ui-form-item-row {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
 }
-.dubbing-pair-editor .dubbing-pair-metadata .ant-form-item-label {
+.dubbing-pair-editor .dubbing-pair-metadata .ui-form-item-label {
   min-width: 0;
   padding: 0;
 }
-.dubbing-pair-editor .dubbing-pair-metadata .ant-form-item-label > label {
+.dubbing-pair-editor .dubbing-pair-metadata .ui-form-item-label > label {
   height: 32px;
   white-space: nowrap;
 }
-.dubbing-pair-metadata .ant-form-item-control {
+.dubbing-pair-metadata .ui-form-item-control {
   min-width: 0;
   width: 100%;
 }
-.dubbing-pair-metadata > .ant-checkbox-wrapper {
+.dubbing-pair-metadata > .ui-checkbox-wrapper {
   margin: 0;
   flex-shrink: 0;
 }
@@ -592,7 +592,7 @@
   gap: 8px;
   flex-shrink: 0;
 }
-.dubbing-selection-side.ant-btn {
+.dubbing-selection-side.ui-btn {
   height: auto;
   min-width: 0;
   min-height: 50px;
@@ -606,11 +606,11 @@
   border-color: transparent;
   box-shadow: none;
 }
-.dubbing-selection-side.ant-btn.is-active {
+.dubbing-selection-side.ui-btn.is-active {
   background: #f0f4ff;
   border-color: #2053ff;
 }
-.dubbing-selection-side.ant-btn:not(.is-active):hover {
+.dubbing-selection-side.ui-btn:not(.is-active):hover {
   border-color: #b8c5e3;
 }
 .dubbing-selection-label {
@@ -649,15 +649,15 @@
   justify-content: space-between;
   gap: 12px;
 }
-.dubbing-picker-heading h5.ant-typography,
-.dubbing-parameter-empty h5.ant-typography {
+.dubbing-picker-heading h5.ui-typography,
+.dubbing-parameter-empty h5.ui-typography {
   margin: 0 0 12px;
   font-size: 14px;
 }
-.dubbing-picker-heading > .ant-typography:last-child {
+.dubbing-picker-heading > .ui-typography:last-child {
   font-size: 12px;
 }
-.dubbing-picker-heading h5.ant-typography {
+.dubbing-picker-heading h5.ui-typography {
   margin-bottom: 8px;
 }
 .dubbing-picker-filters {
@@ -682,13 +682,13 @@
   border-radius: 8px;
   border-color: transparent;
 }
-.dubbing-picker-option .ant-radio-wrapper {
+.dubbing-picker-option .ui-radio-wrapper {
   width: 100%;
   margin: 0;
   align-items: center;
   line-height: 20px;
 }
-.dubbing-picker-option .ant-radio-wrapper > span:last-child {
+.dubbing-picker-option .ui-radio-wrapper > span:last-child {
   display: flex;
   align-items: center;
   flex: 1;
@@ -701,7 +701,7 @@
   font-size: 11px;
   white-space: nowrap;
 }
-.dubbing-picker-id.ant-typography {
+.dubbing-picker-id.ui-typography {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -715,7 +715,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dubbing-picker-id .ant-typography-copy {
+.dubbing-picker-id .ui-typography-copy {
   flex-shrink: 0;
 }
 .dubbing-pair-controls-panel {
@@ -728,13 +728,13 @@
   scrollbar-gutter: stable;
 }
 @media (max-width: 700px) {
-  .dubbing-pair-editor .ant-drawer-header {
+  .dubbing-pair-editor .ui-drawer-header {
     padding: 16px;
   }
-  .dubbing-pair-editor .ant-drawer-body {
+  .dubbing-pair-editor .ui-drawer-body {
     padding: 12px 16px;
   }
-  .dubbing-pair-editor .ant-drawer-footer {
+  .dubbing-pair-editor .ui-drawer-footer {
     padding: 12px 16px;
   }
   .dubbing-pair-form {
@@ -745,14 +745,14 @@
   .dubbing-pair-metadata {
     display: block;
   }
-  .dubbing-pair-metadata > .ant-checkbox-wrapper {
+  .dubbing-pair-metadata > .ui-checkbox-wrapper {
     margin: 10px 0 0;
   }
   .dubbing-pair-selection {
     background: #fff;
     gap: 8px;
   }
-  .dubbing-selection-side.ant-btn {
+  .dubbing-selection-side.ui-btn {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 3px 8px;
     padding: 8px 10px;
@@ -793,7 +793,7 @@
     align-items: stretch;
     gap: 10px;
   }
-  .dubbing-editor-footer > .ant-space {
+  .dubbing-editor-footer > .ui-space {
     justify-content: flex-end;
   }
 }
@@ -805,9 +805,9 @@
   min-height: 340px;
   flex-shrink: 0;
 }
-.dubbing-pair-editor .ant-typography-secondary,
-.dubbing-editor-footer-status > .ant-typography-secondary,
-.dubbing-pair-editor .ant-empty-description {
+.dubbing-pair-editor .ui-typography-secondary,
+.dubbing-editor-footer-status > .ui-typography-secondary,
+.dubbing-pair-editor .ui-empty-description {
   color: #606b7b;
 }
 .dubbing-pair-editor input::placeholder {
@@ -824,7 +824,7 @@
 .dubbing-pair-editor .dubbing-picker-id {
   color: #606b7b;
 }
-.dubbing-pair-editor .ant-input-number-input {
+.dubbing-pair-editor .ui-input-number-input {
   font-variant-numeric: tabular-nums;
 }
 .dubbing-picker-list:focus-visible {
@@ -832,6 +832,6 @@
   outline-offset: -2px;
 }
 
-.dubbing-editor-footer-status .ant-typography-danger {
+.dubbing-editor-footer-status .ui-typography-danger {
   color: #b42318;
 }

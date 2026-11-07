@@ -14,7 +14,14 @@ import type {
   SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
-import { Alert, Button, Card, Space, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {

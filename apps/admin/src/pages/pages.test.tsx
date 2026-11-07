@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { HomePage } from "./Home";
@@ -227,7 +227,7 @@ describe("admin 页面烟雾测试", () => {
     expect(
       screen.getByRole("heading", { name: "首页数据" })
     ).toBeInTheDocument();
-    expect(container.querySelector(".ant-skeleton")).not.toBeNull();
+    expect(container.querySelector(".ui-skeleton")).not.toBeNull();
     expect(screen.queryByText("累计用户")).not.toBeInTheDocument();
   });
 
@@ -265,9 +265,9 @@ describe("admin 页面烟雾测试", () => {
     render(
       <MemoryRouter>
         <QueryClientProvider client={new QueryClient()}>
-          <AntApp>
+          <FeedbackApp>
             <UsersPage />
-          </AntApp>
+          </FeedbackApp>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -290,10 +290,10 @@ describe("admin 页面烟雾测试", () => {
     render(
       <MemoryRouter>
         <QueryClientProvider client={new QueryClient()}>
-          <AntApp>
+          <FeedbackApp>
             <WordsPage />
             <LocationProbe />
-          </AntApp>
+          </FeedbackApp>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -313,9 +313,9 @@ describe("admin 页面烟雾测试", () => {
     // 依赖路由与 antd App context。
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <ProfileSettingsPage />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     expect(

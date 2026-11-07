@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { GrammarFormLinkV3, RichTextV2 } from "@tsz/types";
@@ -58,11 +58,9 @@ function mount(value: RichTextV2, caps = capabilities) {
     );
   }
   render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <App>
-        <Host />
-      </App>
-    </ConfigProvider>
+    <App>
+      <Host />
+    </App>
   );
   return { observe, readiness };
 }

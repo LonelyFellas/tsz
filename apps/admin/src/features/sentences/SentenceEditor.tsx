@@ -8,17 +8,9 @@ import {
   sameSentenceTarget,
   matchesSentenceTarget
 } from "./associationModel";
-import {
-  Alert,
-  App,
-  Button,
-  Flex,
-  Modal,
-  Radio,
-  Select,
-  Space,
-  Typography
-} from "antd";
+import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Radio, Select } from "@tsz/ui/admin/forms";
 import type {
   AdminWordV3,
   Dialect,

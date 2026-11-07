@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { AdminRole, PermissionCatalogItem } from "@tsz/types";
@@ -128,22 +128,22 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AntApp>
+      <FeedbackApp>
         <RoleManagement />
-      </AntApp>
+      </FeedbackApp>
     </QueryClientProvider>
   );
 }
 
 /**
  * 打开某个 antd Select（点其根节点），在浮层里点选文案匹配的选项。
- * 按 `.ant-select-item-option` 定位而非按浮层可见性——v6 里刚关闭的浮层未必立刻加隐藏类，
+ * 按 `.ui-select-item-option` 定位而非按浮层可见性——v6 里刚关闭的浮层未必立刻加隐藏类，
  * 但各 Select 的选项文案互不相同（管理员名 vs 角色名 vs 收回），据文案定位即可精确命中。
  */
 async function pickOption(selectRoot: Element, text: string) {
   fireEvent.mouseDown(selectRoot);
   const opt = await waitFor(() => {
-    const el = [...document.querySelectorAll(".ant-select-item-option")].find(
+    const el = [...document.querySelectorAll(".ui-select-item-option")].find(
       (i) => (i.textContent ?? "").includes(text)
     );
     if (!el) throw new Error(`option not ready: ${text}`);
@@ -401,7 +401,7 @@ describe("RoleManagement — 删角色", () => {
       await screen.findByText(/该角色下有 3 名管理员/)
     ).toBeInTheDocument();
     const confirmBtns = document.querySelector(
-      ".ant-modal-confirm-btns, .ant-modal-footer"
+      ".ui-modal-confirm-btns, .ui-modal-footer"
     )!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     await waitFor(() => expect(mockRemove).toHaveBeenCalledWith("r-lib"));
@@ -416,7 +416,7 @@ describe("RoleManagement — 删角色", () => {
     fireEvent.click(screen.getAllByText("删除")[2]!);
     expect(await screen.findByText("确认删除该角色？")).toBeInTheDocument();
     const confirmBtns = document.querySelector(
-      ".ant-modal-confirm-btns, .ant-modal-footer"
+      ".ui-modal-confirm-btns, .ui-modal-footer"
     )!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     await waitFor(() => expect(mockRemove).toHaveBeenCalledWith("r-empty"));
@@ -429,7 +429,7 @@ describe("RoleManagement — 删角色", () => {
     fireEvent.click(screen.getAllByText("删除")[1]!);
     await screen.findByText(/该角色下有 3 名管理员/);
     const confirmBtns = document.querySelector(
-      ".ant-modal-confirm-btns, .ant-modal-footer"
+      ".ui-modal-confirm-btns, .ui-modal-footer"
     )!;
     fireEvent.click(within(confirmBtns as HTMLElement).getByText(/^删\s?除$/));
     expect(
@@ -448,7 +448,7 @@ describe("RoleManagement — 派角色", () => {
   // 弹窗底部主按钮（指派）。避开工具栏「指派角色」的同名文案。
   function assignOk() {
     return document.querySelector(
-      ".ant-modal-footer .ant-btn-primary"
+      ".ui-modal-footer .ui-btn-primary"
     ) as HTMLElement;
   }
 
@@ -457,7 +457,7 @@ describe("RoleManagement — 派角色", () => {
     renderPage();
     await screen.findByText("全功能管理员");
     await openAssign();
-    const selectors = document.querySelectorAll(".ant-select");
+    const selectors = document.querySelectorAll(".ui-select");
     await pickOption(selectors[0]!, "审核员小王（13800138000）");
     await pickOption(selectors[1]!, "词库管理员");
     fireEvent.click(assignOk());
@@ -472,7 +472,7 @@ describe("RoleManagement — 派角色", () => {
     renderPage();
     await screen.findByText("全功能管理员");
     await openAssign();
-    const selectors = document.querySelectorAll(".ant-select");
+    const selectors = document.querySelectorAll(".ui-select");
     await pickOption(selectors[0]!, "审核员小王（13800138000）");
     await pickOption(selectors[1]!, "收回角色（降为仅首页）");
     fireEvent.click(assignOk());
@@ -489,7 +489,7 @@ describe("RoleManagement — 派角色", () => {
     renderPage();
     await screen.findByText("全功能管理员");
     await openAssign();
-    const selectors = document.querySelectorAll(".ant-select");
+    const selectors = document.querySelectorAll(".ui-select");
     await pickOption(selectors[0]!, "审核员小王（13800138000）");
     await pickOption(selectors[1]!, "词库管理员");
     fireEvent.click(assignOk());
@@ -511,7 +511,7 @@ it("角色删除失败后确认弹窗保留目标并可重试", async () => {
   ).closest<HTMLElement>('[role="dialog"]')!;
   fireEvent.click(within(dialog).getByText(/^删\s?除$/));
   expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
-  expect(dialog).not.toHaveClass("ant-zoom-leave");
+  expect(dialog).not.toHaveClass("ui-zoom-leave");
   fireEvent.click(within(dialog).getByText(/^删\s?除$/));
   await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(2));
   expect(mockRemove).toHaveBeenLastCalledWith("r-lib");

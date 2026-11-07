@@ -9,18 +9,20 @@ import type {
 import {
   Alert,
   Button,
-  Checkbox,
   Flex,
-  Form,
-  Input,
-  Drawer,
-  Radio,
-  Select,
-  Segmented,
   Empty,
   Space,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import {
+  Checkbox,
+  Form,
+  Input,
+  Radio,
+  Select,
+  Segmented
+} from "@tsz/ui/admin/forms";
+import { Drawer } from "@tsz/ui/admin/overlays";
 import { newWordNodeId } from "@/features/dictionary/word-model/primitives";
 import {
   newPairVoice,

@@ -130,7 +130,7 @@ describe("ConsoleSidebar", () => {
       renderAt("/account/coins");
       fireEvent.click(screen.getByText("天生币"));
       const entry = screen.getByRole("menuitem", { name: "我的天生币" });
-      expect(entry).toHaveClass("ant-menu-item-selected");
+      expect(entry).toHaveClass("ui-menu-item-selected");
       fireEvent.click(entry);
       expect(mockNavigate).toHaveBeenCalledWith("/account/coins");
       expect(
@@ -154,8 +154,8 @@ describe("ConsoleSidebar", () => {
       renderAt("/voices/library");
       const library = screen.getByRole("menuitem", { name: "音色库" });
       const groups = screen.getByRole("menuitem", { name: "分组配音" });
-      expect(library).toHaveClass("ant-menu-item-selected");
-      expect(groups).not.toHaveClass("ant-menu-item-selected");
+      expect(library).toHaveClass("ui-menu-item-selected");
+      expect(groups).not.toHaveClass("ui-menu-item-selected");
       fireEvent.click(library);
       expect(mockNavigate).toHaveBeenCalledWith("/voices/library");
       fireEvent.click(groups);
@@ -329,10 +329,10 @@ it.each([
   fireEvent.click(screen.getByText("词库管理"));
   const library = screen.getByRole("menuitem", { name: "智能词库" });
   const trash = screen.getByRole("menuitem", { name: "垃圾桶" });
-  expect(library.classList.contains("ant-menu-item-selected")).toBe(
+  expect(library.classList.contains("ui-menu-item-selected")).toBe(
     selected === "智能词库"
   );
-  expect(trash.classList.contains("ant-menu-item-selected")).toBe(
+  expect(trash.classList.contains("ui-menu-item-selected")).toBe(
     selected === "垃圾桶"
   );
 });
@@ -345,10 +345,10 @@ it("收起侧栏的浮层菜单中，垃圾桶也不会同时选中智能词库"
   );
   fireEvent.mouseOver(screen.getByText("词库管理"));
   expect(await screen.findByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
-    "ant-menu-item-selected"
+    "ui-menu-item-selected"
   );
   expect(screen.getByRole("menuitem", { name: "智能词库" })).not.toHaveClass(
-    "ant-menu-item-selected"
+    "ui-menu-item-selected"
   );
 });
 
@@ -357,10 +357,10 @@ it("例句垃圾桶与多维例句分别选中，使用例句管理权限", asyn
   renderAt("/sentences/trash");
   fireEvent.click(screen.getByText("例句管理"));
   expect(screen.getByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
-    "ant-menu-item-selected"
+    "ui-menu-item-selected"
   );
   expect(screen.getByRole("menuitem", { name: "多维例句" })).not.toHaveClass(
-    "ant-menu-item-selected"
+    "ui-menu-item-selected"
   );
   const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
   expect(

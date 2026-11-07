@@ -1,4 +1,4 @@
-import { Flex, Typography } from "antd";
+import { Flex, Typography } from "@tsz/ui/admin/display";
 
 export function AccountLabel({
   name,

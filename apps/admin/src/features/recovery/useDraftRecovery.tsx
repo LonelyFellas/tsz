@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Alert, Button, Space } from "antd";
+import { Alert, Button, Space } from "@tsz/ui/admin/display";
 import {
   readSnapshot,
   snapshotKey,

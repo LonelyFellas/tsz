@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Alert, Button, Checkbox, Input, Modal, Space, Typography } from "antd";
+import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Checkbox, Input } from "@tsz/ui/admin/forms";
+import { Modal } from "@tsz/ui/admin/overlays";
 import type {
   AdminDubbingRecommendationPair,
   AdminSpeechVoice

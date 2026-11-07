@@ -1,6 +1,7 @@
 import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
-import { DownOutlined, SoundOutlined, SyncOutlined } from "@ant-design/icons";
-import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
+import { ChevronDownIcon, Volume2Icon, RefreshCwIcon } from "lucide-react";
+import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
+import { Button, Space, Tag } from "@tsz/ui/admin/display";
 import type {
   Dialect,
   RichTextV2,
@@ -397,7 +398,7 @@ export function PronunciationPreviewVoiceSummary({
         aria-label={`查看${dialect === "uk" ? "英式" : dialect === "us" ? "美式" : "通用"}全部 ${enabled.length} 个音色`}
       >
         {summary}
-        <DownOutlined />
+        <ChevronDownIcon />
       </Button>
     </Popover>
   );
@@ -767,7 +768,7 @@ export function PronunciationPreviewControls({
           <Button
             className="word-pronunciation-play-action"
             data-playback-dialect={targetLocale === "en-GB" ? "uk" : "us"}
-            icon={<SoundOutlined />}
+            icon={<Volume2Icon />}
             disabled={
               disabled ||
               busy ||
@@ -806,7 +807,9 @@ export function PronunciationPreviewControls({
           <Button
             className="word-pronunciation-voice-action word-pronunciation-sync-action"
             aria-label={generateLabel}
-            icon={<SyncOutlined spin={busy} />}
+            icon={
+              <RefreshCwIcon className={busy ? "ui-icon-spin" : undefined} />
+            }
             loading={busy}
             disabled={
               disabled ||

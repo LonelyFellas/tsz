@@ -1,6 +1,8 @@
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
-import { DownOutlined, SwapOutlined } from "@ant-design/icons";
-import { Alert, Button, Input, Modal, Radio, Space, Typography } from "antd";
+import { ChevronDownIcon, ArrowLeftRightIcon } from "lucide-react";
+import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Input, Radio } from "@tsz/ui/admin/forms";
+import { Modal } from "@tsz/ui/admin/overlays";
 import { useEffect, useId, useRef, useState } from "react";
 import type {
   AudioAssetV3,
@@ -360,7 +362,7 @@ export function V3SynthesisInputs({
                     }}
                   />
                   <Button
-                    icon={<SwapOutlined />}
+                    icon={<ArrowLeftRightIcon />}
                     aria-label={`${label}转换为${sideLabel} ${name}`}
                     title={
                       alphabet === "ipa"
@@ -455,7 +457,13 @@ export function V3SynthesisInputs({
                 className="word-synthesis-ups-toggle"
                 type="text"
                 size="small"
-                icon={<DownOutlined rotate={upsExpanded ? 180 : 0} />}
+                icon={
+                  <ChevronDownIcon
+                    style={{
+                      transform: upsExpanded ? "rotate(180deg)" : undefined
+                    }}
+                  />
+                }
                 iconPlacement="end"
                 aria-label={`${upsExpanded ? "收起" : "展开"}${label}的 UPS`}
                 aria-expanded={upsExpanded}

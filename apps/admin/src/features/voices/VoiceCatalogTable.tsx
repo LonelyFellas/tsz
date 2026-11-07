@@ -5,25 +5,17 @@ import {
 } from "./VoiceMetadataEditor";
 import { speechAccentGroup } from "@tsz/shared";
 import {
-  SoundOutlined,
-  FilterOutlined,
-  ManOutlined,
-  SearchOutlined,
-  WomanOutlined
-} from "@ant-design/icons";
+  Volume2Icon,
+  ListFilterIcon,
+  MarsIcon,
+  SearchIcon,
+  VenusIcon
+} from "lucide-react";
 import type { AdminSpeechVoice, AdminVoiceLibraryItem } from "@tsz/types";
-import {
-  Button,
-  Checkbox,
-  Input,
-  Pagination,
-  Popover,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip
-} from "antd";
+import { Button, Space, Tag } from "@tsz/ui/admin/display";
+import { Checkbox, Input, Select } from "@tsz/ui/admin/forms";
+import { Pagination, Table } from "@tsz/ui/admin/table";
+import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { useState, type ReactNode } from "react";
 import { GatedButton } from "@/components/GatedButton";
 import { TableEmptyState } from "@/components/TableEmptyState";
@@ -42,8 +34,8 @@ const genderNames: Record<string, string> = {
   neutral: "中性"
 };
 const genderIcons: Record<string, ReactNode> = {
-  male: <ManOutlined aria-hidden className="voice-catalog-gender-male" />,
-  female: <WomanOutlined aria-hidden className="voice-catalog-gender-female" />,
+  male: <MarsIcon aria-hidden className="voice-catalog-gender-male" />,
+  female: <VenusIcon aria-hidden className="voice-catalog-gender-female" />,
   neutral: (
     <span aria-hidden className="voice-catalog-gender-neutral">
       ⚲
@@ -385,7 +377,7 @@ export function VoiceCatalogTable({
                   classNames={{ root: `voice-accent-${voiceAccent(voice)}` }}
                   color="default"
                   variant={voice.alias === activeVoice ? "solid" : "outlined"}
-                  icon={<SoundOutlined />}
+                  icon={<Volume2Icon />}
                   aria-label={`试听 ${voice.display_name}`}
                   disabled={
                     !canGenerate ||
@@ -459,14 +451,14 @@ export function VoiceCatalogTable({
                     <Button
                       type="text"
                       size="small"
-                      icon={<FilterOutlined />}
+                      icon={<ListFilterIcon />}
                       aria-label="音色筛选和排序"
                     />
                   </Popover>
                 </div>
                 <Input
                   type="search"
-                  prefix={<SearchOutlined />}
+                  prefix={<SearchIcon />}
                   aria-label="搜索音色"
                   disabled={metadataEditing}
                   placeholder="搜索名称、介绍或听感"

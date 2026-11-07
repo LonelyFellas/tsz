@@ -1,4 +1,4 @@
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import {
   act,
   fireEvent,
@@ -96,13 +96,11 @@ function response(input: LexiconAssistantInput): LexiconAssistantResponse {
 
 function surface(value: AssistantEditorContext) {
   return (
-    <ConfigProvider>
-      <App>
-        <MemoryRouter>
-          <LexiconAssistant key={value.word.id} context={value} />
-        </MemoryRouter>
-      </App>
-    </ConfigProvider>
+    <App>
+      <MemoryRouter>
+        <LexiconAssistant key={value.word.id} context={value} />
+      </MemoryRouter>
+    </App>
   );
 }
 

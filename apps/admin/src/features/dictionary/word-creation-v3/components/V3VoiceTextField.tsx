@@ -1,6 +1,6 @@
 import { useVoiceSave } from "../voiceSaveContext";
 import { usePermission } from "@/lib/auth";
-import { ConfigProvider } from "antd";
+import { AdminControls } from "@tsz/ui/admin/context";
 import { useContentEditPermissions } from "../../contentEditPermissions";
 import type {
   AudioAssetLocaleV3,
@@ -26,9 +26,11 @@ import {
   recommendationVoiceSetting
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { EditOutlined } from "@ant-design/icons";
+import { PencilIcon } from "lucide-react";
 import { flushSync } from "react-dom";
-import { Alert, Button, Input, Space, message } from "antd";
+import { Alert, Button, Space } from "@tsz/ui/admin/display";
+import { Input } from "@tsz/ui/admin/forms";
+import { message } from "@tsz/ui/admin/overlays";
 import {
   type ReactNode,
   type RefObject,
@@ -760,7 +762,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
 
   const fieldView = (
-    <ConfigProvider
+    <AdminControls
       componentDisabled={
         contentReadOnly && !associationsReadOnly ? false : undefined
       }
@@ -772,7 +774,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         <Button
           aria-label={`打开${ariaLabel}编辑器`}
           disabled={readOnly}
-          icon={<EditOutlined />}
+          icon={<PencilIcon />}
           onClick={() => {
             setDraftState(captureSession());
             setSaveError("");
@@ -782,7 +784,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           style={{ height: "auto" }}
         />
       </Space.Compact>
-    </ConfigProvider>
+    </AdminControls>
   );
 
   const renderActions = (
@@ -838,7 +840,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       <EditorPendingState pending={!canComplete} />
     );
   const editor = (
-    <ConfigProvider
+    <AdminControls
       componentDisabled={
         contentReadOnly && !associationsReadOnly ? false : undefined
       }
@@ -930,7 +932,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           />
         </Suspense>
       </div>
-    </ConfigProvider>
+    </AdminControls>
   );
 
   if (presentation === "editor") return editor;

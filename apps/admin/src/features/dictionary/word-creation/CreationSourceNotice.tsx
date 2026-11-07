@@ -1,4 +1,4 @@
-import { Alert } from "antd";
+import { Alert } from "@tsz/ui/admin/display";
 
 export type CreationSource = "dictionary" | "dictionary-empty" | "blank";
 

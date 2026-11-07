@@ -29,19 +29,35 @@ body {
   border: 0;
 }
 
-.ant-table-wrapper {
+.ui-table-wrapper {
   container-type: inline-size;
 }
-.ant-table-pagination {
+.ui-table-pagination {
   max-width: 100%;
   flex-wrap: wrap;
   row-gap: 8px;
 }
 @media (max-width: 600px) {
-  .ant-pagination .ant-pagination-options {
+  .ui-pagination .ui-pagination-options {
     margin-inline-start: 0;
   }
-  .ant-pagination .ant-pagination-total-text {
+  .ui-pagination .ui-pagination-total-text {
     flex-basis: 100%;
+  }
+}
+
+.lucide {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+.ui-icon-spin,
+.lucide-loader-circle {
+  animation: ui-icon-spin 1s linear infinite;
+}
+@keyframes ui-icon-spin {
+  to {
+    transform: rotate(360deg);
   }
 }

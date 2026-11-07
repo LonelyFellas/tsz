@@ -1,4 +1,9 @@
-import { Button, Grid, Tabs, Typography } from "antd";
+import {
+  Button,
+  useMediumScreen,
+  Tabs,
+  Typography
+} from "@tsz/ui/admin/display";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DialectPreference } from "@/features/settings/DialectPreference";
 import { OpenCodeConnection } from "@/features/ai-ledger/OpenCodeConnection";
@@ -9,7 +14,7 @@ import "./profile-settings.css";
 
 export function ProfileSettingsPage() {
   const profile = useAuthStore((state) => state.profile);
-  const screens = Grid.useBreakpoint();
+  const mediumScreen = useMediumScreen();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const isSuper = profile?.role === "super_admin";
@@ -52,7 +57,7 @@ export function ProfileSettingsPage() {
         <Tabs
           key={profile.id}
           className="profile-settings__tabs"
-          tabPlacement={screens.md ? "start" : "top"}
+          tabPlacement={mediumScreen ? "start" : "top"}
           activeKey={section}
           destroyOnHidden={false}
           onChange={(key) =>

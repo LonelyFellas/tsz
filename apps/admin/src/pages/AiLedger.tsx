@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { InfoCircleOutlined, ReloadOutlined } from "@ant-design/icons";
+import { InfoIcon, RotateCwIcon } from "lucide-react";
 import {
   Alert,
   Breadcrumb,
@@ -8,20 +8,17 @@ import {
   Card,
   Descriptions,
   Flex,
-  Form,
-  Input,
-  Popover,
   Progress,
   Result,
-  Select,
   Space,
   Statistic,
-  Table,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
-import type { TableColumnsType } from "antd";
+} from "@tsz/ui/admin/display";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
+import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
+import { Table, type TableColumnsType } from "@tsz/ui/admin/table";
+
 import dayjs from "dayjs";
 import type { AiCallCost, AiCallPurpose, AiLedgerItem } from "@tsz/types";
 import {
@@ -230,12 +227,12 @@ function Ledger({ adminId }: { adminId: string }) {
               </div>
             }
           >
-            <Button type="text" icon={<InfoCircleOutlined />}>
+            <Button type="text" icon={<InfoIcon />}>
               统计口径
             </Button>
           </Popover>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCwIcon />}
             aria-label="刷新 AI 账本"
             loading={ledger.isFetching}
             onClick={() => void ledger.refetch()}

@@ -12,27 +12,24 @@ import type {
   WordHeadwordsV2
 } from "@tsz/types";
 import {
-  CheckCircleFilled,
-  ExclamationCircleOutlined,
-  PlusOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+  CircleCheckIcon,
+  CircleAlertIcon,
+  PlusIcon,
+  SearchIcon
+} from "lucide-react";
 import {
   Alert,
-  App,
   Button,
   Card,
   Col,
   Descriptions,
-  Form,
-  Input,
   Row,
-  Select,
   Space,
-  Switch,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App } from "@tsz/ui/admin/overlays";
+import { Form, Input, Select, Switch } from "@tsz/ui/admin/forms";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminWordsDataSource } from "../dataSource";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
@@ -361,7 +358,7 @@ function DetectionPresentationCard({
               "同名草稿"
             ) : (
               <Space>
-                <CheckCircleFilled style={{ color: "#22a06b" }} />
+                <CircleCheckIcon style={{ color: "#22a06b" }} />
                 未发现
               </Space>
             )}
@@ -1173,7 +1170,7 @@ export function UnifiedCreateEntryStep({
     // 不同原型组时后端不拦，删掉这道确认就等于静默建重名条。
     modal.confirm({
       title: "确认创建新的独立词条？",
-      icon: <ExclamationCircleOutlined />,
+      icon: <CircleAlertIcon />,
       content:
         "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
       okText: "继续创建",
@@ -1220,7 +1217,7 @@ export function UnifiedCreateEntryStep({
               }
               enterButton={
                 <Space size={6}>
-                  <SearchOutlined />
+                  <SearchIcon />
                   词典检测
                 </Space>
               }
@@ -1275,7 +1272,7 @@ export function UnifiedCreateEntryStep({
           <Button onClick={() => changeValue(value)}>重新检测</Button>
           <Button
             type="primary"
-            icon={<PlusOutlined aria-hidden />}
+            icon={<PlusIcon aria-hidden />}
             loading={busy === "creating"}
             disabled={
               preparationBlocked ||

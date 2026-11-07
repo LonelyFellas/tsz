@@ -238,13 +238,13 @@ describe("PartOfSpeechFormModal", () => {
     api.createPending = true;
     renderModal();
     expect(screen.getByText("新 建").closest("button")).toHaveClass(
-      "ant-btn-loading"
+      "ui-btn-loading"
     );
   });
 
   it("取消调用关闭", () => {
     const callbacks = renderModal();
-    fireEvent.click(screen.getByRole("button", { name: "取 消" }));
+    fireEvent.click(screen.getByRole("button", { name: /^取\s*消$/ }));
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 });

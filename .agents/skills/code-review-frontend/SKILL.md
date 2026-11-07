@@ -1,6 +1,6 @@
 ---
 name: code-review-frontend
-description: 审查 tsz 前端 Next Web、React/antd Admin 与共享包改动，关注鉴权竞态、请求与状态一致性、wire/运行时契约、交互回归及有效测试。只报告，不自动修复或交付。
+description: 审查 tsz 前端 Next Web、React Admin 与共享包改动，关注鉴权竞态、请求与状态一致性、wire/运行时契约、交互回归及有效测试。只报告，不自动修复或交付。
 ---
 
 # TSZ 前端代码审查
@@ -39,7 +39,7 @@ description: 审查 tsz 前端 Next Web、React/antd Admin 与共享包改动，
 
 ### Admin：`apps/admin`
 
-- 沿用 React Router + TanStack Query + antd v6，不引入 tailwind / `@tsz/ui`，不套 Next 路由或 Web SEO 规则。
+- 沿用 React Router + TanStack Query + `@tsz/ui/admin/*`，检查控件的只读、焦点和请求行为，不套 Next 路由或 Web SEO 规则。
 - 检查筛选/翻页/排序联动、删除最后一行后的页码、编辑切换的旧表单值、保存失败时草稿保留和重复提交。
 - `Form.List` 动态行使用 `field.key`，避免删除/重排造成行状态错位；检查 noStyle Form.Item 的无效 style、v6 Alert 的 `title` 等实际命中的 API 变化。
 - 沿真实业务 ID 追踪词条/词形/义项/例句等选中关系、批量操作与回填，不因展示文本相同混用实体；仅对本次涉及的领域展开。
@@ -47,7 +47,7 @@ description: 审查 tsz 前端 Next Web、React/antd Admin 与共享包改动，
 ## 最小验证与交付
 
 - 读取当前 package scripts、Vitest、CI 清单及邻近测试，参考 [test](../test/SKILL.md) 选择已有单文件/包测试；只读任务不自动补测、更新快照、格式化或同步契约。
-- admin 测试核对 matchMedia/ResizeObserver 垫片及 antd 两字按钮空格；大表格避免昂贵查询导致伪超时。测试必须断言用户结果或请求契约，不能只验证 mock 自洽。
+- admin 测试核对 matchMedia/ResizeObserver 垫片及按钮可及名；大表格避免昂贵查询导致伪超时。测试必须断言用户结果或请求契约，不能只验证 mock 自洽。
 - Web 本地真实验收按项目规范用 build + next start，不启动 next dev；仅在风险需要且依赖/数据安全已核实时运行。其余未运行项如实报告。
 - 不固定覆盖率门槛，不重复已有效的全量测试，不自动进入 ship。只读审查是行为约束而非沙箱；当前会话审查不冒充独立 reviewer，也不满足 ship 的独立 pre-push 门禁。
 - 输出按 P0（紧急广泛事故）/P1（严重关键故障）/P2（实质缺陷）/P3（低影响确定缺陷）排序。每条给仓库/文件:行号、具体触发、影响、代码/契约/测试证据与最小修复方向；先找反证，同根因合并并列出本次范围内已确认的同类位置，不逐轮零散提出；已修复或已用证据排除的问题无新证据不重复报告，不凑数、不报纯风格。

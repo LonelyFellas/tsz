@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Empty, Pagination, Skeleton, Tag } from "antd";
+import { Alert, Button, Empty, Skeleton, Tag } from "@tsz/ui/admin/display";
+import { Pagination } from "@tsz/ui/admin/table";
 import { api, useAnyPermission } from "@/lib/auth";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import { sentenceTranslationsV3 } from "./meaningsModel";

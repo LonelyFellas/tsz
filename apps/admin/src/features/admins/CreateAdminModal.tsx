@@ -1,7 +1,9 @@
 // 新建管理员弹窗（super_admin）：新账号手机号/昵称 + 当前超管手机确认码。
 // 密码由后端生成、等级恒为 admin，前端不再收集；创建成功把一次性临时密码交父级展示。
 // 校验对齐 openapi CreateAdminRequest：昵称禁 < > 及控制字符、手机 5–20 位。
-import { App, Button, Form, Input, Modal } from "antd";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Button } from "@tsz/ui/admin/display";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { useRef } from "react";
 import type { CreateAdminInput } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";

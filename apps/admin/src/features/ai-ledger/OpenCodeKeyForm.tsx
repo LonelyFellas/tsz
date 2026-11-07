@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Form, Input, Select } from "antd";
+import { Alert, Button } from "@tsz/ui/admin/display";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import { api } from "@/lib/auth";
 
 export function OpenCodeKeyForm({

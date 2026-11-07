@@ -6,7 +6,10 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, Button, ConfigProvider, Table } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
+import { Button } from "@tsz/ui/admin/display";
+import { AdminControls } from "@tsz/ui/admin/context";
+import { Table } from "@tsz/ui/admin/table";
 import type { SharedFormsStepContentV3 } from "@tsz/types";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,28 +116,26 @@ function Harness({
 }) {
   const [forms, setForms] = useState(initial);
   return (
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <App>
-        <ConfigProvider componentDisabled={disabled}>
-          <V3FormCopyProvider forms={forms} onChange={setForms}>
-            <Cells forms={forms} />
-            <EditProbe />
-            <button
-              onClick={() => {
-                const next = structuredClone(forms);
-                const region = next.contents[1]!.regional_variants;
-                if (region.mode === "common")
-                  region.common.pronunciations[0]!.actual_pron = "later-edit";
-                setForms(next);
-              }}
-            >
-              随后编辑目标
-            </button>
-          </V3FormCopyProvider>
-          <output data-testid="forms">{JSON.stringify(forms)}</output>
-        </ConfigProvider>
-      </App>
-    </ConfigProvider>
+    <App>
+      <AdminControls componentDisabled={disabled}>
+        <V3FormCopyProvider forms={forms} onChange={setForms}>
+          <Cells forms={forms} />
+          <EditProbe />
+          <button
+            onClick={() => {
+              const next = structuredClone(forms);
+              const region = next.contents[1]!.regional_variants;
+              if (region.mode === "common")
+                region.common.pronunciations[0]!.actual_pron = "later-edit";
+              setForms(next);
+            }}
+          >
+            随后编辑目标
+          </button>
+        </V3FormCopyProvider>
+        <output data-testid="forms">{JSON.stringify(forms)}</output>
+      </AdminControls>
+    </App>
   );
 }
 function current() {
@@ -223,14 +224,14 @@ describe("词形复制交互", () => {
   it("空闲时继承页面保存期间的禁用状态", () => {
     const forms = fixture();
     render(
-      <ConfigProvider componentDisabled>
+      <AdminControls componentDisabled>
         <App>
           <V3FormCopyProvider forms={forms} onChange={vi.fn()}>
             <Cells forms={forms} />
             <EditProbe />
           </V3FormCopyProvider>
         </App>
-      </ConfigProvider>
+      </AdminControls>
     );
     expect(screen.getByRole("button", { name: "编辑词形内容" })).toBeDisabled();
     for (const button of screen.getAllByRole("button", {
@@ -308,7 +309,7 @@ describe("词形复制交互", () => {
     fireEvent.click(screen.getByTestId("phonetics-1"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getAllByRole("combobox")).toHaveLength(4);
-    fireEvent.click(within(dialog).getByRole("button", { name: "取 消" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /^取\s*消$/ }));
     expect(current()).toEqual(initial);
   });
 
@@ -358,7 +359,7 @@ describe("词形复制交互", () => {
     fireEvent.click(screen.getByTestId("phonetics-1"));
     await screen.findByRole("button", { name: "撤销" });
     expect(
-      screen.getByText("英美音标已复制").closest(".ant-notification-notice")
+      screen.getByText("英美音标已复制").closest(".ui-notification-notice")
     ).not.toBeNull();
     await waitFor(
       () =>

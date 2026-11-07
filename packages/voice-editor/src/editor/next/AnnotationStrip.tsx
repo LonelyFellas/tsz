@@ -3,7 +3,7 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   ReactNode
 } from "react";
-import { Tooltip } from "antd";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import { SelectionPanel } from "./SelectionPanel";
 import { associationWords } from "../../core/text-links";
 import {

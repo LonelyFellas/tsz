@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Tag, Flex, Select, Typography } from "antd";
-import { RadarChartOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Alert, Button, Tag, Flex, Typography } from "@tsz/ui/admin/display";
+import { Select } from "@tsz/ui/admin/forms";
+import { RadarIcon, RotateCwIcon } from "lucide-react";
 import type { OpenCodeModelSelection, OpenCodeModelProbe } from "@tsz/types";
 import { api } from "@/lib/auth";
 
@@ -176,7 +177,7 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
       </div>
       <Flex align="center" gap={8} wrap>
         <Button
-          icon={<RadarChartOutlined aria-hidden />}
+          icon={<RadarIcon aria-hidden />}
           loading={probe.isPending || running}
           disabled={catalog.isError || !models.length || save.isPending}
           onClick={() => probe.mutate()}
@@ -185,7 +186,7 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
         </Button>
         <Button
           type="text"
-          icon={<ReloadOutlined />}
+          icon={<RotateCwIcon />}
           aria-label="刷新模型"
           loading={catalog.isFetching || current.isFetching}
           onClick={() => {

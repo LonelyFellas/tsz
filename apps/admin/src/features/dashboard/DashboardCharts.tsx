@@ -1,4 +1,4 @@
-import { Card, Typography } from "antd";
+import { Card, Typography } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 import {
   Area,

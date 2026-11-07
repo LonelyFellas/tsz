@@ -1,4 +1,4 @@
-import { Button, Flex, Space, Tag, Typography } from "antd";
+import { Button, Flex, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import type { InboundReferenceV3 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { referenceLink } from "../referenceGuard";

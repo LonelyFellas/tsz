@@ -5,7 +5,8 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { Button, ConfigProvider, Form } from "antd";
+import { Button } from "@tsz/ui/admin/display";
+import { Form } from "@tsz/ui/admin/forms";
 import type { AdminSpeechVoice } from "@tsz/types";
 import { afterEach, expect, it, vi } from "vitest";
 import {
@@ -74,11 +75,7 @@ function Harness({
 }
 function mount(target = voice, initial = defaultVoiceParameters(target)) {
   const onSave = vi.fn();
-  render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <Harness target={target} initial={initial} onSave={onSave} />
-    </ConfigProvider>
-  );
+  render(<Harness target={target} initial={initial} onSave={onSave} />);
   return onSave;
 }
 afterEach(() => cleanup());
@@ -99,7 +96,7 @@ it("选定风格后渐进展示可调项，并提交准确设置", async () => {
   fireEvent.mouseDown(screen.getByLabelText("说话风格"));
   fireEvent.click(
     await screen.findByText(styleNames.cheerful ?? "cheerful", {
-      selector: ".ant-select-item-option-content"
+      selector: ".ui-select-item-option-content"
     })
   );
   const degree = await screen.findByRole("spinbutton", { name: "风格强度" });
@@ -108,7 +105,7 @@ it("选定风格后渐进展示可调项，并提交准确设置", async () => {
   fireEvent.mouseDown(screen.getByLabelText("角色"));
   fireEvent.click(
     await screen.findByText("Girl", {
-      selector: ".ant-select-item-option-content"
+      selector: ".ui-select-item-option-content"
     })
   );
   fireEvent.click(screen.getByRole("button", { name: "应用参数" }));

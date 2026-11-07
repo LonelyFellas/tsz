@@ -1,15 +1,13 @@
-import { UndoOutlined } from "@ant-design/icons";
+import { Undo2Icon } from "lucide-react";
 import {
   Alert,
   Button,
   Flex,
-  Form,
   Collapse,
-  InputNumber,
-  Select,
   Typography,
   Space
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Form, InputNumber, Select } from "@tsz/ui/admin/forms";
 import type { AdminSpeechVoice } from "@tsz/types";
 import { SpeechRateInput } from "./SpeechRateInput";
 import { SpeechVolumeInput } from "./SpeechVolumeInput";
@@ -112,7 +110,7 @@ export function VoiceParameterFields({
         <Button
           type="text"
           size="small"
-          icon={<UndoOutlined />}
+          icon={<Undo2Icon />}
           aria-label="恢复默认参数"
           disabled={disabled || resetDisabled}
           onClick={onReset}

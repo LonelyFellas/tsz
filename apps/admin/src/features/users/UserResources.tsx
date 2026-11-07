@@ -3,7 +3,15 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Card, Empty, Image, Space, Spin } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Empty,
+  Image,
+  Space,
+  Spin
+} from "@tsz/ui/admin/display";
 import type { CertificationFile } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { api, usePermission } from "@/lib/auth";

@@ -2,18 +2,17 @@ import { primaryRegionalVariant } from "@tsz/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  App,
   Button,
-  Checkbox,
   Flex,
-  Modal,
   Space,
   Spin,
-  Table,
   Tag,
   Typography
-} from "antd";
-import { ImportOutlined, ReloadOutlined } from "@ant-design/icons";
+} from "@tsz/ui/admin/display";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Checkbox } from "@tsz/ui/admin/forms";
+import { Table } from "@tsz/ui/admin/table";
+import { ImportIcon, RotateCwIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type { LexiconFormCandidatesResponse } from "@tsz/types";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
@@ -161,7 +160,7 @@ export function FormCandidates({
   return (
     <>
       <Button
-        icon={<ImportOutlined />}
+        icon={<ImportIcon />}
         disabled={!allowed || disabled || pending}
         onClick={() => {
           setOpen(true);
@@ -185,7 +184,7 @@ export function FormCandidates({
               取消
             </Button>
             <Button
-              icon={<ReloadOutlined />}
+              icon={<RotateCwIcon />}
               loading={pending}
               disabled={!allowed || disabled}
               onClick={() => void generate()}

@@ -34,8 +34,8 @@ describe("GatedButton", () => {
         保存
       </GatedButton>
     );
-    expect(container.querySelector("button.ant-btn-loading")).not.toBeNull();
-    expect(container.querySelector("button.ant-btn-primary")).not.toBeNull();
+    expect(container.querySelector("button.ui-btn-loading")).not.toBeNull();
+    expect(container.querySelector("button.ui-btn-primary")).not.toBeNull();
   });
 
   it("reason 缺省时不报错（disabled 无提示文案）", () => {
