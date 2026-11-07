@@ -122,10 +122,10 @@ describe("授权变化与未保存词条表单", () => {
   });
 });
 
-function showLogin() {
+function showLogin(path = "/login") {
   useAuthStore.setState({ profile: null, role: null, hydrated: false });
   return render(
-    <MemoryRouter initialEntries={["/login"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route element={<RootProviders />}>
           <Route path="login" element={<LoginPage />} />
@@ -136,28 +136,31 @@ function showLogin() {
 }
 
 describe("登录页连接提示", () => {
-  it("在登录区域内重试，恢复后移除提示且保留已填写内容", () => {
-    useAuthStore.setState({ connectionError: true });
-    showLogin();
-    const login = within(screen.getByRole("region", { name: "管理员登录" }));
-    const notice = login.getByRole("status");
-    expect(within(notice).getByText("连接暂不可用")).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).toBeNull();
-    const phone = login.getByLabelText("手机号");
-    fireEvent.change(phone, { target: { value: "13800138000" } });
-    fireEvent.click(within(notice).getByRole("button", { name: "重试" }));
-    expect(sessionRestore.retry).toHaveBeenCalledTimes(1);
+  it.each(["/login", "/login/", "/LOGIN"])(
+    "%s 在登录区域内重试，恢复后移除提示且保留已填写内容",
+    (path) => {
+      useAuthStore.setState({ connectionError: true });
+      showLogin(path);
+      const login = within(screen.getByRole("region", { name: "管理员登录" }));
+      const notice = login.getByRole("status");
+      expect(within(notice).getByText("连接暂不可用")).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
+      const phone = login.getByLabelText("手机号");
+      fireEvent.change(phone, { target: { value: "13800138000" } });
+      fireEvent.click(within(notice).getByRole("button", { name: "重试" }));
+      expect(sessionRestore.retry).toHaveBeenCalledTimes(1);
 
-    sessionRestore.retrying = true;
-    act(() => useAuthStore.setState({ hydrated: true }));
-    expect(within(notice).getByText("正在重试…")).toBeInTheDocument();
+      sessionRestore.retrying = true;
+      act(() => useAuthStore.setState({ hydrated: true }));
+      expect(within(notice).getByText("正在重试…")).toBeInTheDocument();
 
-    sessionRestore.retrying = false;
-    act(() => useAuthStore.setState({ connectionError: false }));
-    expect(screen.queryByRole("status")).toBeNull();
-    expect(login.getByLabelText("手机号")).toBe(phone);
-    expect(phone).toHaveValue("13800138000");
-  });
+      sessionRestore.retrying = false;
+      act(() => useAuthStore.setState({ connectionError: false }));
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(login.getByLabelText("手机号")).toBe(phone);
+      expect(phone).toHaveValue("13800138000");
+    }
+  );
 
   it("未确认会话保留重新登录入口，权限不兼容时只显示升级提示", () => {
     useAuthStore.setState({ refreshUnconfirmed: true });

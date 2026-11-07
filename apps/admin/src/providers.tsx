@@ -12,7 +12,7 @@ import {
 } from "@/lib/adminAuthorization";
 import { useEffect, type ReactNode } from "react";
 import zhCN from "antd/locale/zh_CN";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useMatch } from "react-router-dom";
 import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
 
 export type RootOutletContext = { connectionNotice: ReactNode };
@@ -25,7 +25,7 @@ bindAdminAuthorizationCache(useAuthStore, queryClient);
 // 挂载时用 admin refresh cookie 静默恢复会话，写入 profile / level / hydrated。
 // AntApp 提供 message/modal/notification 的 context 版（v6 起不建议再用静态方法）。
 export function RootProviders() {
-  const { pathname } = useLocation();
+  const isLoginPage = useMatch("/login") !== null;
   const permissionModelIncompatible = useAuthStore(
     (s) => s.permissionModelIncompatible
   );
@@ -60,7 +60,6 @@ export function RootProviders() {
   const refreshUnconfirmed = useAuthStore((s) => s.refreshUnconfirmed);
   const connectionError = useAuthStore((s) => s.connectionError);
   const hydrated = useAuthStore((s) => s.hydrated);
-  const isLoginPage = pathname === "/login";
   const connectionNotice = !permissionModelIncompatible &&
     (connectionError || refreshUnconfirmed) && (
       <Alert
@@ -107,7 +106,7 @@ export function RootProviders() {
       <ConfigProvider locale={zhCN} theme={antdTheme}>
         <RecoverySession />
         <AntApp key={identity}>
-          {permissionModelIncompatible && pathname !== "/login" && (
+          {permissionModelIncompatible && !isLoginPage && (
             <Alert
               type="error"
               showIcon
