@@ -1,5 +1,6 @@
 import { EraserIcon, Redo2Icon, Undo2Icon } from "lucide-react";
-import { Button, Tooltip } from "antd";
+import { Button } from "@tsz/ui/admin/display";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import { useId, useState, type ReactNode } from "react";
 import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
 import type { VoiceEditorProps } from "../../types";

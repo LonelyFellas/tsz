@@ -1,5 +1,6 @@
 import { usePermission } from "@/lib/auth";
-import { Form, Modal } from "antd";
+import { Form } from "@tsz/ui/admin/forms";
+import { Modal } from "@tsz/ui/admin/overlays";
 import type {
   AdminWordKind,
   CreatePartOfSpeechInput,

@@ -2,17 +2,16 @@ import { primaryRegionalVariant } from "@tsz/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  App,
   Button,
-  Checkbox,
   Flex,
-  Modal,
   Space,
   Spin,
-  Table,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Checkbox } from "@tsz/ui/admin/forms";
+import { Table } from "@tsz/ui/admin/table";
 import { ImportIcon, RotateCwIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type { LexiconFormCandidatesResponse } from "@tsz/types";

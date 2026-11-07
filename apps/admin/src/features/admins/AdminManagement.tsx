@@ -5,20 +5,17 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 import { PlusIcon, RotateCwIcon, SearchIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Badge,
   Breadcrumb,
   Button,
   Card,
   Flex,
-  Form,
-  Input,
-  Modal,
-  Select,
   Space,
   Tag
-} from "antd";
-import type { TableColumnsType } from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
+import { type TableColumnsType } from "@tsz/ui/admin/table";
 import dayjs from "dayjs";
 import { useState } from "react";
 import type { Admin, AdminLevel, AdminListQuery } from "@tsz/types";

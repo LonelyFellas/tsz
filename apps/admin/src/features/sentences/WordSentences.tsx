@@ -3,17 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Button,
   Empty,
   Flex,
-  Pagination,
-  Popover,
   Space,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
+import { Pagination } from "@tsz/ui/admin/table";
 import type { AdminWordV3, SharedSentence } from "@tsz/types";
 import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";

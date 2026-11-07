@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { ConfigProvider, Typography } from "antd";
+import { Typography } from "@tsz/ui/admin/display";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { WordCreationLayout } from "./WordCreationLayout";
@@ -36,14 +36,12 @@ function renderLayout(
 ) {
   // 关掉动画：抽屉的退场过渡在 jsdom 里不结束，关闭后面板会一直留在可见态。
   return render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <WordCreationLayout {...props}>
-          <div>step-content</div>
-        </WordCreationLayout>
-        <LocationProbe />
-      </MemoryRouter>
-    </ConfigProvider>
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <WordCreationLayout {...props}>
+        <div>step-content</div>
+      </WordCreationLayout>
+      <LocationProbe />
+    </MemoryRouter>
   );
 }
 

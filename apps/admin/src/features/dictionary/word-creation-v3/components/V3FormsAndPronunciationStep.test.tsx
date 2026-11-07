@@ -10,7 +10,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import type {
   DraftFormsStepContentV3,
   Dialect,
@@ -227,7 +227,7 @@ function Harness({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <AntApp>
+    <FeedbackApp>
       <V3FormsAndPronunciationStep
         value={value}
         onChange={setValue}
@@ -236,7 +236,7 @@ function Harness({
       />
       <output data-testid="canonical-value">{JSON.stringify(value)}</output>
       <ProgressCount value={value} />
-    </AntApp>
+    </FeedbackApp>
   );
 }
 
@@ -249,7 +249,7 @@ function DeepIssueHarness({
 }) {
   const [activePosId, setActivePosId] = useState(content.pos[0]!.pos_id);
   return (
-    <AntApp>
+    <FeedbackApp>
       <button onClick={() => setActivePosId(issue.node_location.pos_id!)}>
         定位深层 issue
       </button>
@@ -261,7 +261,7 @@ function DeepIssueHarness({
         value={content}
       />
       <output data-testid="active-pos-id">{activePosId}</output>
-    </AntApp>
+    </FeedbackApp>
   );
 }
 
@@ -283,18 +283,15 @@ function chooseOption(label: string, option: string) {
   );
   const choice = [
     ...document.querySelectorAll<HTMLElement>(
-      ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      ".ui-select-dropdown:not(.ui-select-dropdown-hidden) .ui-select-item-option-content"
     )
   ].find((item) => item.textContent === option);
   if (!choice) throw new Error(`option not found: ${option}`);
   fireEvent.click(choice);
 }
 
-// jsdom 里 antd 的收起动画不会结束，关掉的确认框停在 -leave 状态留在 DOM 里，开合只能按类名判断。
 function openDeleteConfirm() {
-  return document.querySelector<HTMLElement>(
-    ".ant-popconfirm:not(.ant-zoom-big-leave)"
-  );
+  return screen.queryByRole("alertdialog", { name: "确认操作" });
 }
 
 async function chooseGroupAction(groupIndex: number, action: string) {
@@ -571,10 +568,7 @@ describe("V3FormsAndPronunciationStep", () => {
     await changeVoiceText(screen.getByLabelText("第 1 条发音的实际发音"), {
       target: { value: "centre" }
     });
-    expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
-      "data-show",
-      "false"
-    );
+    expect(screen.queryByTitle("该词性未填项")).not.toBeInTheDocument();
     expect(screen.getByLabelText("第 1 条发音的实际发音")).not.toHaveAttribute(
       "aria-invalid",
       "true"
@@ -745,13 +739,13 @@ describe("V3FormsAndPronunciationStep", () => {
       firstMatrix.querySelector(".word-form-matrix-distinguish")
     ).toBeNull();
     expect(
-      firstMatrix.querySelectorAll(".word-form-type-cell .ant-select")
+      firstMatrix.querySelectorAll(".word-form-type-cell .ui-select")
     ).toHaveLength(3);
     expect(
-      screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
+      screen.getByLabelText("变化组 1 词形 1 类型").closest(".ui-select")
     ).toHaveTextContent("原形");
     expect(
-      screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
+      screen.getByLabelText("变化组 1 词形 2 类型").closest(".ui-select")
     ).toHaveTextContent("原形");
     expect(matrices[1]!.querySelectorAll(".v3-membership-row")).toHaveLength(1);
     expect(canonicalValue()).toEqual(content);
@@ -934,7 +928,7 @@ describe("V3FormsAndPronunciationStep", () => {
       membershipCount: 1
     }));
     const view = (visible: typeof rows) => (
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3FormContentOverview
             rows={visible}
@@ -945,7 +939,7 @@ describe("V3FormsAndPronunciationStep", () => {
             issues={[]}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
     const { container, rerender } = render(view(rows));
     expect(
@@ -1003,7 +997,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const pos = forms.pos[0]!;
     const onEdit = vi.fn();
     const view = () => (
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3FormContentOverview
             rows={[
@@ -1024,7 +1018,7 @@ describe("V3FormsAndPronunciationStep", () => {
             issues={[]}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
     const { container, rerender } = render(view());
     expect(screen.getAllByText("travel", { exact: true })).toHaveLength(1);
@@ -1104,7 +1098,7 @@ describe("V3FormsAndPronunciationStep", () => {
       const [value, setValue] = useState(initial);
       const pos = value.pos[0]!;
       return (
-        <AntApp>
+        <FeedbackApp>
           <PronunciationPreviewProvider>
             <V3FormContentOverview
               rows={pos.forms.map((form, index) => ({
@@ -1142,15 +1136,11 @@ describe("V3FormsAndPronunciationStep", () => {
               {JSON.stringify(value)}
             </output>
           </PronunciationPreviewProvider>
-        </AntApp>
+        </FeedbackApp>
       );
     }
-    const { container } = render(
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <GroupHarness />
-      </ConfigProvider>
-    );
-    expect(container.querySelector(".v3-form-overview .ant-select")).toBeNull();
+    const { container } = render(<GroupHarness />);
+    expect(container.querySelector(".v3-form-overview .ui-select")).toBeNull();
     const targetRow = container.querySelector<HTMLElement>(
       `tr[data-overview-form-id="${historical.id}"]`
     )!;
@@ -1161,7 +1151,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     const menu = await waitFor(() => {
       const element = document.querySelector<HTMLElement>(
-        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'
+        '.ui-dropdown:not(.ui-dropdown-hidden) [role="menu"]'
       );
       expect(element).not.toBeNull();
       return element!;
@@ -1184,7 +1174,7 @@ describe("V3FormsAndPronunciationStep", () => {
       const content = formsFixture({ forms: [commonFormFixture()] });
       const pos = content.pos[0]!;
       render(
-        <AntApp>
+        <FeedbackApp>
           <PronunciationPreviewProvider>
             <V3FormGroupCard
               content={content}
@@ -1199,7 +1189,7 @@ describe("V3FormsAndPronunciationStep", () => {
               onEditContent={vi.fn()}
             />
           </PronunciationPreviewProvider>
-        </AntApp>
+        </FeedbackApp>
       );
       expect(screen.queryByRole("button", { name: /列设置/ })).toBeNull();
       expect(
@@ -1243,7 +1233,7 @@ describe("V3FormsAndPronunciationStep", () => {
       const [value, setValue] = useState(content);
       const pos = value.pos[0]!;
       return (
-        <AntApp>
+        <FeedbackApp>
           <PronunciationPreviewProvider>
             <V3FormGroupCard
               content={value}
@@ -1263,7 +1253,7 @@ describe("V3FormsAndPronunciationStep", () => {
             />
           </PronunciationPreviewProvider>
           <output data-testid="canonical-value">{JSON.stringify(value)}</output>
-        </AntApp>
+        </FeedbackApp>
       );
     }
     const { container } = render(<GroupHarness />);
@@ -1272,7 +1262,7 @@ describe("V3FormsAndPronunciationStep", () => {
       name: "为第 1 组增加词形"
     });
     expect(addButton).toHaveTextContent("增加词形");
-    expect(addButton.closest(".ant-card-head")).not.toBeNull();
+    expect(addButton.closest(".ui-card-head")).not.toBeNull();
     expect(screen.queryByLabelText("变化组 1 新增词形类型")).toBeNull();
     expect(screen.getByLabelText("删除变化组 1 的词形 1")).toBeDisabled();
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
@@ -1300,7 +1290,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       [
         ...container.querySelectorAll(
-          ".ant-table-tbody > tr.v3-overview-form-start"
+          ".ui-table-tbody > tr.v3-overview-form-start"
         )
       ].map((row) =>
         row
@@ -1423,8 +1413,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       within(groupCard)
         .getByLabelText("英美拼写无区别")
-        .closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+        .closest(".ui-radio-wrapper")
+    ).toHaveClass("ui-radio-wrapper-checked");
     expect(
       groupCard.querySelector(".word-form-matrix-shared-header")
     ).toHaveTextContent("英美通用");
@@ -1488,17 +1478,17 @@ describe("V3FormsAndPronunciationStep", () => {
       expect(card.getByText("英美拼写是否有区别？")).toBeVisible();
       expect(card.getByText("英美音标是否有区别？")).toBeVisible();
       expect(
-        card.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-      ).toHaveClass("ant-radio-wrapper-checked");
+        card.getByLabelText("英美拼写无区别").closest(".ui-radio-wrapper")
+      ).toHaveClass("ui-radio-wrapper-checked");
     }
     // 英美规则按组生效：第 2 组切换不影响第 1 组。
     fireEvent.click(second.getByLabelText("英美拼写有区别"));
     expect(
-      second.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+      second.getByLabelText("英美拼写有区别").closest(".ui-radio-wrapper")
+    ).toHaveClass("ui-radio-wrapper-checked");
     expect(
-      first.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+      first.getByLabelText("英美拼写无区别").closest(".ui-radio-wrapper")
+    ).toHaveClass("ui-radio-wrapper-checked");
   });
 
   it("UD 规则独立回显拼写不区分、音标区分", async () => {
@@ -1520,12 +1510,12 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(
       (await screen.findByLabelText("英美拼写无区别")).closest(
-        ".ant-radio-wrapper"
+        ".ui-radio-wrapper"
       )
-    ).toHaveClass("ant-radio-wrapper-checked");
+    ).toHaveClass("ui-radio-wrapper-checked");
     expect(
-      screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+      screen.getByLabelText("英美音标有区别").closest(".ui-radio-wrapper")
+    ).toHaveClass("ui-radio-wrapper-checked");
     expect(screen.getByLabelText("英美音标无区别")).not.toBeDisabled();
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("center");
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
@@ -1568,12 +1558,12 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(
       (await screen.findByLabelText("英美拼写无区别")).closest(
-        ".ant-radio-wrapper"
+        ".ui-radio-wrapper"
       )
-    ).toHaveClass("ant-radio-wrapper-checked");
+    ).toHaveClass("ui-radio-wrapper-checked");
     expect(
-      screen.getByLabelText("英美音标无区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+      screen.getByLabelText("英美音标无区别").closest(".ui-radio-wrapper")
+    ).toHaveClass("ui-radio-wrapper-checked");
     expect(screen.queryByLabelText("原形切换为英式和美式")).toBeNull();
     expect(screen.queryByLabelText("比较级切换为英式和美式")).toBeNull();
 
@@ -1582,12 +1572,12 @@ describe("V3FormsAndPronunciationStep", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
-      ).toHaveClass("ant-radio-wrapper-checked")
+        screen.getByLabelText("英美拼写有区别").closest(".ui-radio-wrapper")
+      ).toHaveClass("ui-radio-wrapper-checked")
     );
     expect(
-      screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+      screen.getByLabelText("英美音标有区别").closest(".ui-radio-wrapper")
+    ).toHaveClass("ui-radio-wrapper-checked");
     expect(screen.getByLabelText("英美音标无区别")).toBeDisabled();
     expect(screen.getAllByText("英式英语", { exact: true })[0]).toBeVisible();
     expect(screen.getAllByText("美式英语", { exact: true })[0]).toBeVisible();
@@ -1619,8 +1609,8 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(await screen.findByText("本组的英美结构待统一")).toBeVisible();
     expect(
-      screen.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+      screen.getByLabelText("英美拼写有区别").closest(".ui-radio-wrapper")
+    ).toHaveClass("ui-radio-wrapper-checked");
     fireEvent.click(screen.getByLabelText("英美拼写无区别"));
     await waitFor(() =>
       expect(screen.queryByText("本组的英美结构待统一")).toBeNull()
@@ -1737,8 +1727,8 @@ describe("V3FormsAndPronunciationStep", () => {
       if (control === "拼写") {
         fireEvent.click(screen.getByLabelText("英美拼写无区别"));
         expect(
-          screen.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-        ).toHaveClass("ant-radio-wrapper-checked");
+          screen.getByLabelText("英美拼写无区别").closest(".ui-radio-wrapper")
+        ).toHaveClass("ui-radio-wrapper-checked");
         expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
           spelling_mode: "unified",
           phonetic_mode: "distinguish"
@@ -1774,7 +1764,7 @@ describe("V3FormsAndPronunciationStep", () => {
     fireEvent.click(screen.getByLabelText("管理第 1 组词形变化"));
     const lastGroupDelete = await screen.findByText("至少保留一个词形");
     expect(lastGroupDelete.closest("li")).toHaveClass(
-      "ant-dropdown-menu-item-disabled"
+      "ui-dropdown-menu-item-disabled"
     );
     expect(formById(canonicalValue(), form.id)).toBeDefined();
 
@@ -1892,12 +1882,12 @@ describe("V3FormsAndPronunciationStep", () => {
 
   it("I08 draft 空态可编辑但不误报完成；发布问题只显示简短状态", () => {
     const { rerender } = render(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep
           value={{ pos: [] }}
           onChange={() => undefined}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     expect(screen.getByText("草稿可暂时不添加词性")).toBeInTheDocument();
     expect(screen.queryByText(/已完成/)).toBeNull();
@@ -1914,13 +1904,13 @@ describe("V3FormsAndPronunciationStep", () => {
       }
     ];
     rerender(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep
           value={{ pos: [] }}
           onChange={() => undefined}
           issues={emptyIssues}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     expect(
       screen.getByText(
@@ -1965,13 +1955,13 @@ describe("V3FormsAndPronunciationStep", () => {
       }
     ];
     rerender(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep
           value={incomplete}
           onChange={() => undefined}
           issues={issues}
         />
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(screen.getByText("词形与发音尚未完成")).toBeInTheDocument();
@@ -2105,9 +2095,9 @@ describe("V3FormsAndPronunciationStep", () => {
     const onChange = vi.fn();
     const emptyGroups = formsFixture({ groups: [] });
     const { rerender } = render(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep onChange={onChange} value={emptyGroups} />
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(screen.getByText("草稿可暂时不添加变化组")).toBeInTheDocument();
@@ -2143,7 +2133,7 @@ describe("V3FormsAndPronunciationStep", () => {
     };
     const content = { pos: [pos] };
     rerender(
-      <AntApp>
+      <FeedbackApp>
         <V3PosTab
           content={content}
           idFactory={() => uuidFromInt(984)}
@@ -2151,7 +2141,7 @@ describe("V3FormsAndPronunciationStep", () => {
           onChange={onChange}
           pos={pos}
         />
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(screen.getByText("草稿可暂时保留空变化组")).toBeInTheDocument();
@@ -2169,7 +2159,7 @@ describe("V3FormsAndPronunciationStep", () => {
       allowed_form_types: []
     };
     rerender(
-      <AntApp>
+      <FeedbackApp>
         <V3PosTab
           content={emptyGroups}
           idFactory={() => uuidFromInt(985)}
@@ -2178,7 +2168,7 @@ describe("V3FormsAndPronunciationStep", () => {
           pos={emptyGroups.pos[0]!}
           posCatalog={catalogWithoutDerived}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     expect(screen.queryByText("草稿可暂时不添加变化组")).toBeNull();
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
@@ -2192,7 +2182,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(adverbCatalog.allowed_form_types).toEqual([]);
 
     render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3PosTab
             content={content}
@@ -2203,7 +2193,7 @@ describe("V3FormsAndPronunciationStep", () => {
             posCatalog={adverbCatalog}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
 
     // 副词、代词这类词性只有一个原形组，藏起来就没地方录拼写与发音。
@@ -2230,7 +2220,7 @@ describe("V3FormsAndPronunciationStep", () => {
     )!;
 
     render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3PosTab
             content={content}
@@ -2245,7 +2235,7 @@ describe("V3FormsAndPronunciationStep", () => {
             }}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
@@ -2295,9 +2285,9 @@ describe("V3FormsAndPronunciationStep", () => {
     const original = structuredClone(content);
     const onChange = vi.fn();
     const { container } = render(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep value={content} onChange={onChange} />
-      </AntApp>
+      </FeedbackApp>
     );
     await waitFor(() =>
       expect(screen.getByLabelText("为第 1 组增加词形")).toBeEnabled()
@@ -2327,7 +2317,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const content = formsFixture({ forms });
     const onChange = vi.fn();
     const card = (withCatalog: boolean) => (
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3FormGroupCard
             content={content}
@@ -2347,7 +2337,7 @@ describe("V3FormsAndPronunciationStep", () => {
             }
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
     const { container, rerender } = render(card(true));
     const rowIds = () =>
@@ -2384,7 +2374,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const stale = formsFixture({ forms: [form, keeper], groups: [] });
     const onChange = vi.fn();
     const { rerender } = render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3FormGroupCard
             content={stale}
@@ -2397,7 +2387,7 @@ describe("V3FormsAndPronunciationStep", () => {
             pos={stale.pos[0]!}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
 
     // 一形一组后点删除只弹确认，陈旧内容也不会提前改动草稿。
@@ -2406,7 +2396,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(openDeleteConfirm()).toHaveTextContent("确认删除此词形？");
 
     rerender(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3FormGroupCard
             content={displayed}
@@ -2419,7 +2409,7 @@ describe("V3FormsAndPronunciationStep", () => {
             pos={displayed.pos[0]!}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
     // 内容刷新后确认框仍开着，取消不改动草稿。
     expect(openDeleteConfirm()).not.toBeNull();
@@ -2429,7 +2419,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     const missingForm = formsFixture({ forms: [], groups: [] });
     rerender(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3FormGroupCard
             content={missingForm}
@@ -2442,7 +2432,7 @@ describe("V3FormsAndPronunciationStep", () => {
             pos={missingForm.pos[0]!}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
     // 引用的词形已不在草稿里：整行换成错误提示，删除入口随之消失。
     expect(
@@ -2473,7 +2463,7 @@ describe("V3FormsAndPronunciationStep", () => {
     };
     const onChange = vi.fn();
     render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3ConcreteFormRow
             content={content}
@@ -2488,7 +2478,7 @@ describe("V3FormsAndPronunciationStep", () => {
             onChange={onChange}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(screen.getByLabelText("词形英式拼写")).toHaveAttribute(
@@ -2545,7 +2535,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const onChange = vi.fn();
     const addedId = uuidFromInt(904);
     render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3PronunciationList
             content={content}
@@ -2555,7 +2545,7 @@ describe("V3FormsAndPronunciationStep", () => {
             variant={primaryRegionalVariant(form.regional_variants, "uk")}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(screen.getAllByLabelText(/拖动第 \d+ 条发音/)).toHaveLength(2);
@@ -2656,7 +2646,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ];
 
     render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3PronunciationList
             content={content}
@@ -2666,15 +2656,15 @@ describe("V3FormsAndPronunciationStep", () => {
             variant={form.regional_variants.common}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(
-      screen.getByLabelText("第 1 条发音的读法").closest(".ant-select")
-    ).toHaveClass("ant-select-status-error");
+      screen.getByLabelText("第 1 条发音的读法").closest(".ui-select")
+    ).toHaveClass("ui-select-status-error");
     expect(screen.getByText("请选择读法")).toBeVisible();
     expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveClass(
-      "ant-input-status-error"
+      "ui-input-status-error"
     );
     expect(screen.getByText("请填写字典音标")).toBeVisible();
   });
@@ -2697,7 +2687,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const content = formsFixture({ forms: [form] });
     const onChange = vi.fn();
     const { container } = render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3PronunciationList
             content={content}
@@ -2707,7 +2697,7 @@ describe("V3FormsAndPronunciationStep", () => {
             variant={primaryRegionalVariant(form.regional_variants, "uk")}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
     const handles = screen.getAllByLabelText(/拖动第 \d+ 条发音/);
     expect(handles).toHaveLength(2);
@@ -2817,7 +2807,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const content = formsFixture({ forms: [form] });
     const onChange = vi.fn();
     const { rerender } = render(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3PronunciationList
             content={content}
@@ -2827,7 +2817,7 @@ describe("V3FormsAndPronunciationStep", () => {
             variant={form.regional_variants.common}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
     expect(screen.getByLabelText("第 1 条发音的实际发音")).toBeInTheDocument();
 
@@ -2838,7 +2828,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     const emptyContent = formsFixture({ forms: [emptyForm] });
     rerender(
-      <AntApp>
+      <FeedbackApp>
         <PronunciationPreviewProvider>
           <V3PronunciationList
             content={emptyContent}
@@ -2848,7 +2838,7 @@ describe("V3FormsAndPronunciationStep", () => {
             variant={emptyForm.regional_variants.common}
           />
         </PronunciationPreviewProvider>
-      </AntApp>
+      </FeedbackApp>
     );
 
     expect(screen.getByText("暂无发音")).toBeInTheDocument();
@@ -3118,7 +3108,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     const pluralOption = [
       ...document.querySelectorAll<HTMLElement>(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+        ".ui-select-dropdown:not(.ui-select-dropdown-hidden) .ui-select-item-option-content"
       )
     ].find((item) => item.textContent === "复数");
     expect(pluralOption).toBeDefined();
@@ -3337,7 +3327,7 @@ describe("V3FormsAndPronunciationStep", () => {
     fireEvent.mouseDown(select);
     const choices = [
       ...document.querySelectorAll<HTMLElement>(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+        ".ui-select-dropdown:not(.ui-select-dropdown-hidden) .ui-select-item-option-content"
       )
     ].map((item) => item.textContent);
     expect(choices).toEqual(["复数", "原形", "比较级"]);
@@ -3491,7 +3481,7 @@ describe("V3FormsAndPronunciationStep", () => {
     });
 
     fireEvent.click(
-      within(confirmation).getByRole("button", { name: "取 消" })
+      within(confirmation).getByRole("button", { name: /^取\s*消$/ })
     );
     expect(screen.queryByText("删除变化组需要额外确认")).toBeNull();
     expect(canonicalValue().pos[0]).toMatchObject({
@@ -3531,12 +3521,12 @@ describe("V3FormsAndPronunciationStep", () => {
     catalogState.data = undefined;
     catalogState.isError = true;
     const { unmount } = render(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep
           onChange={() => undefined}
           value={{ pos: [] }}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     expect(
       await screen.findByText("词性目录不可用，已停止新增结构")
@@ -3573,12 +3563,12 @@ describe("V3FormsAndPronunciationStep", () => {
       rejectCatalog = reject;
     });
     const { unmount } = render(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep
           onChange={() => undefined}
           value={{ pos: [] }}
         />
-      </AntApp>
+      </FeedbackApp>
     );
 
     unmount();
@@ -3603,7 +3593,7 @@ describe("V3FormsAndPronunciationStep", () => {
     // jsdom 无布局；浮层的实际可见性由 E01a 浏览器回归验证。
     expect(
       document.querySelector(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden)"
+        ".ui-select-dropdown:not(.ui-select-dropdown-hidden)"
       )
     ).toBeInTheDocument();
     expect(noun).toHaveAttribute("aria-selected", "true");
@@ -3624,7 +3614,7 @@ describe("V3FormsAndPronunciationStep", () => {
         setActivePosId(posId);
       };
       return (
-        <AntApp>
+        <FeedbackApp>
           <V3FormsAndPronunciationStep
             activePosId={activePosId}
             onActivePosChange={changeActivePos}
@@ -3633,7 +3623,7 @@ describe("V3FormsAndPronunciationStep", () => {
           />
           <output data-testid="controlled-active-pos">{activePosId}</output>
           <output data-testid="controlled-pos-count">{value.pos.length}</output>
-        </AntApp>
+        </FeedbackApp>
       );
     }
 
@@ -3781,11 +3771,11 @@ it.each([false, true])(
     for (const [index, label] of labels.entries()) {
       const select = screen
         .getByLabelText(`变化组 1 词形 ${index + 2} 类型`)
-        .closest(".ant-select")!;
-      expect(select.querySelector(".ant-select-content")).toHaveTextContent(
+        .closest(".ui-select")!;
+      expect(select.querySelector(".ui-select-content")).toHaveTextContent(
         label
       );
-      expect(select.querySelector(".ant-select-content")).toHaveStyle({
+      expect(select.querySelector(".ui-select-content")).toHaveStyle({
         whiteSpace: "normal",
         overflowWrap: "anywhere",
         textOverflow: "clip"
@@ -3799,11 +3789,11 @@ it.each([false, true])(
     });
     expect(popup).toHaveStyle({ width: "max-content" });
     expect((popup as HTMLElement).style.maxWidth).toBe("calc(100vw - 32px)");
-    expect(popup).not.toHaveClass("ant-select-dropdown-hidden");
+    expect(popup).not.toHaveClass("ui-select-dropdown-hidden");
     for (const label of labels)
       expect(within(popup as HTMLElement).getByText(label)).toBeInTheDocument();
     expect(formsCss).toMatch(
-      /\.v3-form-type-popup \.ant-select-item-option-content\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/
+      /\.v3-form-type-popup \.ui-select-item-option-content\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/
     );
   }
 );

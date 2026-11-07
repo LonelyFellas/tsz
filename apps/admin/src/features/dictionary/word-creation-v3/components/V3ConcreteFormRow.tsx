@@ -8,7 +8,9 @@ import {
   CirclePlusIcon,
   TriangleAlertIcon
 } from "lucide-react";
-import { Button, Flex, Radio, Select, Tooltip, Typography } from "antd";
+import { Button, Flex, Typography } from "@tsz/ui/admin/display";
+import { Radio, Select } from "@tsz/ui/admin/forms";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import type {
   DialectRulesV3,

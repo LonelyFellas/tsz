@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
 import { OpenCodeConnection } from "./OpenCodeConnection";
@@ -46,13 +45,11 @@ function mount() {
     defaultOptions: { queries: { retry: false } }
   });
   return render(
-    <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
-      <App>
-        <QueryClientProvider client={client}>
-          <OpenCodeConnection adminId="super-test" />
-        </QueryClientProvider>
-      </App>
-    </ConfigProvider>
+    <App>
+      <QueryClientProvider client={client}>
+        <OpenCodeConnection adminId="super-test" />
+      </QueryClientProvider>
+    </App>
   );
 }
 it("点击连接后显示授权，取消失败保留入口且不泄露错误", async () => {

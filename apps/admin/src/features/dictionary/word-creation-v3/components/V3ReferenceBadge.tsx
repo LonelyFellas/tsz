@@ -1,5 +1,6 @@
 import { LinkIcon } from "lucide-react";
-import { Popover, Tag } from "antd";
+import { Popover } from "@tsz/ui/admin/overlays";
+import { Tag } from "@tsz/ui/admin/display";
 import { nodesReferenceCount, referencesForNodes } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
 import { V3ReferenceList } from "./V3ReferenceList";

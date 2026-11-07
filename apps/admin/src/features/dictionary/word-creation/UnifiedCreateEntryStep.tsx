@@ -19,20 +19,17 @@ import {
 } from "lucide-react";
 import {
   Alert,
-  App,
   Button,
   Card,
   Col,
   Descriptions,
-  Form,
-  Input,
   Row,
-  Select,
   Space,
-  Switch,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App } from "@tsz/ui/admin/overlays";
+import { Form, Input, Select, Switch } from "@tsz/ui/admin/forms";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminWordsDataSource } from "../dataSource";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";

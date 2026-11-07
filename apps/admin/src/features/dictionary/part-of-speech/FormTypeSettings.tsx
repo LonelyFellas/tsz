@@ -4,20 +4,16 @@ import { usePermission } from "@/lib/auth";
 import { PlusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Button,
   Card,
   Flex,
-  Form,
-  Modal,
-  Select,
   Space,
-  Switch,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { Form, Select, Switch } from "@tsz/ui/admin/forms";
 import { FullNameEnCell } from "./FullNameEnCell";
-import type { TableColumnsType } from "antd";
+import { type TableColumnsType } from "@tsz/ui/admin/table";
 import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";

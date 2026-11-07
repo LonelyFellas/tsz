@@ -2,7 +2,7 @@ import { useVoiceSave } from "../voiceSaveContext";
 import { flushSync } from "react-dom";
 import { PencilIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
-import { Alert, Button, Space, Typography } from "antd";
+import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import {
   lazy,
   Suspense,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Space, Typography } from "antd";
+import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Volume2Icon } from "lucide-react";
 import type { WordlistAudioLocale, WordlistCustomAudio } from "@tsz/types";
 import { api } from "@/lib/auth";

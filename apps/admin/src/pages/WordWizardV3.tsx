@@ -10,14 +10,14 @@ import { wordKeys } from "@/features/dictionary/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  App,
   Button,
-  ConfigProvider,
   Flex,
   Result,
   Spin,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App } from "@tsz/ui/admin/overlays";
+import { AdminControls } from "@tsz/ui/admin/context";
 import type {
   AdminWordDraftV3Envelope,
   AdminWordV3,
@@ -221,7 +221,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         />
       ) : null}
       <V3BlockedReferencesAlert references={blockedReferences} />
-      <ConfigProvider componentDisabled={busy}>
+      <AdminControls componentDisabled={busy}>
         <div inert={busy}>
           <V3FormsAndPronunciationStep
             sharedForms={
@@ -285,7 +285,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
             value={context.draftForms}
           />
         </div>
-      </ConfigProvider>
+      </AdminControls>
       <V3StepActions
         status={
           busy
@@ -471,10 +471,10 @@ function V3MeaningsSlot({
           }
         />
       ) : null}
-      <ConfigProvider componentDisabled={!permissions.edit}>
+      <AdminControls componentDisabled={!permissions.edit}>
         <V3MeaningsAndExamplesStep
           renderSentenceSection={(senseId) => (
-            <ConfigProvider componentDisabled={false}>
+            <AdminControls componentDisabled={false}>
               <WordSentences
                 key={senseId}
                 sourceWord={context.word}
@@ -500,7 +500,7 @@ function V3MeaningsSlot({
                 }
                 onFocusHandled={onFocusSentenceHandled}
               />
-            </ConfigProvider>
+            </AdminControls>
           )}
           textLinksEnabled={context.word.capabilities.text_links === true}
           activePosId={context.activePosId}
@@ -585,7 +585,7 @@ function V3MeaningsSlot({
           value={context.draftMeanings}
           wordId={context.word.id}
         />
-      </ConfigProvider>
+      </AdminControls>
     </Flex>
   );
 }

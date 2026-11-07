@@ -6,7 +6,8 @@ import {
   V3FormCopyHelp,
   useV3FormCopy
 } from "./V3FormCopyProvider";
-import { Button, Dropdown, Space, Tooltip, Typography } from "antd";
+import { Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Dropdown, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   WordConcreteFormV3,
   WordCommonFormVariantV3,

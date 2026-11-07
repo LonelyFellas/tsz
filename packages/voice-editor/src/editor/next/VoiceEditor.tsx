@@ -10,17 +10,9 @@ import {
   PauseIcon,
   Volume2Icon
 } from "lucide-react";
-import {
-  Alert,
-  Button,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Tag,
-  Tooltip,
-  Typography
-} from "antd";
+import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
+import { Input, Select } from "@tsz/ui/admin/forms";
+import { Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GrammarFormLinkV3,

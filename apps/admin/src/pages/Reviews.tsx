@@ -9,12 +9,10 @@ import {
   Button,
   Card,
   Flex,
-  Form,
-  Input,
   Result,
-  Select,
   Space
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import type { AdminWordlist, WordlistManagementQuery } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { WordlistDetails } from "@/features/wordlists/WordlistDetails";

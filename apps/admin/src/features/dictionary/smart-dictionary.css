@@ -4,12 +4,12 @@
   line-height: 1.6;
 }
 
-.word-list-stats .ant-typography {
+.word-list-stats .ui-typography {
   font-size: 12px;
   white-space: nowrap;
 }
 
-.word-list-stats .ant-typography strong {
+.word-list-stats .ui-typography strong {
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
@@ -100,24 +100,24 @@
   container-type: inline-size;
 }
 
-.word-search-form .ant-form-item {
+.word-search-form .ui-form-item {
   min-width: 0;
   margin-bottom: 0;
 }
 
-.word-search-form .ant-form-item-row {
+.word-search-form .ui-form-item-row {
   flex-wrap: nowrap;
 }
 
-.word-search-form.ant-form
-  .ant-form-item
-  > .ant-form-item-row
-  > .ant-form-item-label {
+.word-search-form.ui-form
+  .ui-form-item
+  > .ui-form-item-row
+  > .ui-form-item-label {
   padding: 0;
   white-space: nowrap;
 }
 
-.word-search-form .ant-form-item-control {
+.word-search-form .ui-form-item-control {
   min-width: 0;
 }
 

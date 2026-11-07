@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { linkedSentenceAnnotation } from "./associationModel";
-import { Alert, Button, Flex, Input, Radio, Typography } from "antd";
+import { Alert, Button, Flex, Typography } from "@tsz/ui/admin/display";
+import { Input, Radio } from "@tsz/ui/admin/forms";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
 import type {
   AdminWordV3,

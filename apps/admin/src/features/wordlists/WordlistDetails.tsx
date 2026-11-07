@@ -6,16 +6,14 @@ import {
   Alert,
   Button,
   Card,
-  Drawer,
-  Input,
-  Modal,
-  Pagination,
-  Radio,
   Space,
   Tabs,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Drawer, Modal } from "@tsz/ui/admin/overlays";
+import { Input, Radio } from "@tsz/ui/admin/forms";
+import { Pagination } from "@tsz/ui/admin/table";
 import type { Wordlist, WordlistEntry, AdminWordlistReview } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import "@tsz/voice-editor/reader.css";

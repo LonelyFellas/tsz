@@ -8,9 +8,9 @@ import {
   Row,
   Space,
   Statistic,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import { RotateCwIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, useAuthStore } from "@/lib/auth";

@@ -1,5 +1,5 @@
 import { GripVerticalIcon } from "lucide-react";
-import { Button } from "antd";
+import { Button } from "@tsz/ui/admin/display";
 import type { SortableRowsController } from "../sortableRows";
 
 /**

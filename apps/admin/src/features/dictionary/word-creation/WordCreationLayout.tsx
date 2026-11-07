@@ -1,5 +1,7 @@
 import { CheckIcon, ChevronLeftIcon, ListIcon } from "lucide-react";
-import { Breadcrumb, Button, ConfigProvider, Drawer, Typography } from "antd";
+import { Breadcrumb, Button, Typography } from "@tsz/ui/admin/display";
+import { useAdminDisabled } from "@tsz/ui/admin/context";
+import { Drawer } from "@tsz/ui/admin/overlays";
 import type { WordCreationStep } from "@tsz/types";
 import {
   useEffect,
@@ -81,7 +83,7 @@ export function WordCreationLayout({
   useEffect(() => {
     if (!narrowProgress) setProgressOpen(false);
   }, [narrowProgress]);
-  const { componentDisabled } = ConfigProvider.useConfig();
+  const componentDisabled = useAdminDisabled();
   const isBasicsStep = currentStep === "basics";
   const completed = new Set(presentation.completedSteps);
   const progressTriggerLabel = presentation.progressBadge

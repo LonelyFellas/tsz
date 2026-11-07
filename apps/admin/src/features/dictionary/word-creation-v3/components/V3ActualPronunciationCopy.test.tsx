@@ -1,4 +1,4 @@
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { Dialect, WordPronunciationV3 } from "@tsz/types";

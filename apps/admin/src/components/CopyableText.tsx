@@ -1,6 +1,6 @@
 // 可复制文本：列表单元格 / 详情项通用的「一键复制 + 可选单行截断 + 空值占位」。
 // 抽出以收敛 tooltips 文案与「有值则展示可复制、否则占位」的重复（列表列与详情抽屉共 6 处）。
-import { Typography } from "antd";
+import { Typography } from "@tsz/ui/admin/display";
 
 interface Props {
   /** 要展示并复制的文本；空 / 未定义时渲染占位。 */

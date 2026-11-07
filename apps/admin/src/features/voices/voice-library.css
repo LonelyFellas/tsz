@@ -12,11 +12,11 @@
   max-width: none;
 }
 
-.voice-library-controls > .ant-card-body {
+.voice-library-controls > .ui-card-body {
   padding: 16px;
 }
 
-.voice-library-catalog .voice-library-content > .ant-card-body {
+.voice-library-catalog .voice-library-content > .ui-card-body {
   padding: 16px;
 }
 
@@ -26,7 +26,7 @@
   background: transparent;
 }
 
-.voice-library-content > .ant-card-body {
+.voice-library-content > .ui-card-body {
   display: flex;
   flex-direction: column;
   padding: 24px;
@@ -46,7 +46,7 @@
   padding-top: 16px;
 }
 
-.voice-catalog-reset.ant-btn {
+.voice-catalog-reset.ui-btn {
   height: 32px;
   padding-inline: 0;
   justify-content: flex-start;
@@ -66,18 +66,18 @@
   width: 180px;
 }
 
-.voice-catalog-controls > .ant-select {
+.voice-catalog-controls > .ui-select {
   width: 100%;
 }
 
-.voice-catalog-table .ant-table-cell {
+.voice-catalog-table .ui-table-cell {
   font-size: 12px;
   line-height: 1.6;
   overflow-wrap: anywhere;
   vertical-align: middle;
 }
 
-.voice-catalog-table .ant-table-thead > tr > th {
+.voice-catalog-table .ui-table-thead > tr > th {
   vertical-align: top;
   font-size: 12px;
   font-weight: 500;
@@ -96,15 +96,15 @@
   min-height: 24px;
 }
 
-.voice-catalog-heading > .ant-select {
+.voice-catalog-heading > .ui-select {
   width: 100%;
 }
 
-.voice-catalog-table .ant-table-tbody > .voice-catalog-row-active > td {
+.voice-catalog-table .ui-table-tbody > .voice-catalog-row-active > td {
   background: var(--voice-primary-bg);
 }
 
-.voice-catalog-play.ant-btn {
+.voice-catalog-play.ui-btn {
   width: 32px;
   height: 32px;
   font-size: 16px;
@@ -152,21 +152,21 @@
 .voice-accent-dot.voice-accent-none {
   background: transparent;
 }
-.ant-btn[class*="voice-accent-"]:not(:disabled) {
+.ui-btn[class*="voice-accent-"]:not(:disabled) {
   color: var(--voice-accent);
   border-color: var(--voice-accent);
 }
 
 .voice-catalog-gender-male {
-  color: var(--ant-color-primary, #2053ff);
+  color: var(--ui-color-primary, #2053ff);
 }
 
 .voice-catalog-gender-female {
-  color: var(--ant-magenta-6, #c41d7f);
+  color: var(--ui-magenta-6, #c41d7f);
 }
 
 .voice-catalog-gender-neutral {
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary, #8c8c8c);
 }
 
 .voice-catalog-cell-preview {
@@ -191,7 +191,7 @@
   margin-bottom: 4px;
 }
 
-.voice-catalog-tags > .ant-tag {
+.voice-catalog-tags > .ui-tag {
   margin: 0;
 }
 
@@ -223,21 +223,21 @@
   min-width: 0;
 }
 
-.voice-library-audition-text .ant-form-item {
+.voice-library-audition-text .ui-form-item {
   flex: 1;
   margin: 0;
 }
 
-.voice-library-audition-text .ant-form-item-row {
+.voice-library-audition-text .ui-form-item-row {
   flex-wrap: nowrap;
 }
 
-.voice-library-audition-text .ant-form-item .ant-form-item-label {
+.voice-library-audition-text .ui-form-item .ui-form-item-label {
   flex: 0 0 auto;
   padding: 0 12px 0 0;
 }
 
-.voice-library-audition-text .ant-form-item .ant-form-item-control {
+.voice-library-audition-text .ui-form-item .ui-form-item-control {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -271,7 +271,7 @@
   font-size: 24px;
 }
 
-.voice-library-audition .voice-library-player > .ant-flex {
+.voice-library-audition .voice-library-player > .ui-flex {
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
@@ -288,7 +288,7 @@
   height: 36px;
 }
 
-.voice-library-sample.ant-typography {
+.voice-library-sample.ui-typography {
   max-height: 120px;
   overflow: auto;
   margin: 0 0 12px;
@@ -309,8 +309,8 @@
 }
 
 @media (max-width: 600px) {
-  .voice-library-controls > .ant-card-body,
-  .voice-library-content > .ant-card-body {
+  .voice-library-controls > .ui-card-body,
+  .voice-library-content > .ui-card-body {
     padding: 16px;
   }
 
@@ -335,29 +335,29 @@
   min-width: 0;
 }
 
-.voice-catalog-editable > .ant-btn {
+.voice-catalog-editable > .ui-btn {
   flex: none;
 }
 
-.voice-catalog-editor .ant-form-item {
+.voice-catalog-editor .ui-form-item {
   margin-bottom: 8px;
 }
 
-.voice-catalog-editor .ant-alert {
+.voice-catalog-editor .ui-alert {
   margin-top: 8px;
 }
 
-.voice-library-settings .ant-drawer-header {
+.voice-library-settings .ui-drawer-header {
   padding: 16px 24px;
 }
 
-.voice-library-settings .ant-drawer-body {
+.voice-library-settings .ui-drawer-body {
   padding: 16px 24px;
   scrollbar-width: thin;
   scrollbar-color: var(--voice-border) transparent;
 }
 
-.voice-library-settings .ant-drawer-footer {
+.voice-library-settings .ui-drawer-footer {
   padding: 16px 24px;
 }
 
@@ -386,7 +386,7 @@
   overflow-wrap: anywhere;
 }
 
-.voice-library-settings-voice > .ant-tag {
+.voice-library-settings-voice > .ui-tag {
   margin: 0;
 }
 
@@ -405,7 +405,7 @@
   gap: 12px;
 }
 
-.voice-library-footer-actions > .ant-btn {
+.voice-library-footer-actions > .ui-btn {
   flex: 1;
   min-width: 0;
   height: 40px;
@@ -415,18 +415,18 @@
   margin-top: 0;
 }
 
-.voice-library-tools.ant-collapse > .ant-collapse-item > .ant-collapse-header,
-.voice-library-notes.ant-collapse > .ant-collapse-item > .ant-collapse-header {
+.voice-library-tools.ui-collapse > .ui-collapse-item > .ui-collapse-header,
+.voice-library-notes.ui-collapse > .ui-collapse-item > .ui-collapse-header {
   padding: 12px 0;
   align-items: center;
 }
 
-.voice-library-tools .ant-collapse-extra,
-.voice-library-notes .ant-collapse-extra {
+.voice-library-tools .ui-collapse-extra,
+.voice-library-notes .ui-collapse-extra {
   font-size: 12px;
 }
 
-.voice-library-notes.ant-collapse .ant-collapse-content-box {
+.voice-library-notes.ui-collapse .ui-collapse-body {
   padding: 0 0 16px;
 }
 
@@ -446,10 +446,10 @@
 }
 
 .voice-library-tools .tsz-ve-ssml-review textarea[readonly] {
-  background: var(--ant-color-fill-quaternary, #fafafa);
+  background: var(--ui-color-fill-quaternary, #fafafa);
 }
 
-.voice-library-tools .tsz-ve-ssml-review > .ant-typography {
+.voice-library-tools .tsz-ve-ssml-review > .ui-typography {
   font-size: 12px;
   line-height: 1.6;
 }
@@ -459,9 +459,9 @@
 }
 
 @media (max-width: 480px) {
-  .voice-library-settings .ant-drawer-header,
-  .voice-library-settings .ant-drawer-body,
-  .voice-library-settings .ant-drawer-footer {
+  .voice-library-settings .ui-drawer-header,
+  .voice-library-settings .ui-drawer-body,
+  .voice-library-settings .ui-drawer-footer {
     padding: 16px;
   }
 
@@ -474,7 +474,7 @@
   justify-content: flex-end;
 }
 
-.voice-library-settings .voice-library-footer-actions > .ant-btn {
+.voice-library-settings .voice-library-footer-actions > .ui-btn {
   flex: 0 1 180px;
 }
 

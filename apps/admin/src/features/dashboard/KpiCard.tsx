@@ -1,5 +1,5 @@
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
-import { Card, Statistic, Typography } from "antd";
+import { Card, Statistic, Typography } from "@tsz/ui/admin/display";
 import type { KpiItem } from "./display";
 
 interface KpiCardProps {

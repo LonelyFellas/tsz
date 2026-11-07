@@ -5,16 +5,13 @@ import {
   Alert,
   Badge,
   Button,
-  Drawer,
   Flex,
-  Form,
-  Input,
-  Modal,
-  Select,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Drawer, Modal } from "@tsz/ui/admin/overlays";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import type { ChatGPTLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
 

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AdminProfile, AiCostOverview as Overview } from "@tsz/types";
 import { api, useAuthStore } from "@/lib/auth";

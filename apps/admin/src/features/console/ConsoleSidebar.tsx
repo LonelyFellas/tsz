@@ -11,8 +11,8 @@ import {
   UsersIcon,
   UserIcon
 } from "lucide-react";
-import { Menu } from "antd";
-import type { MenuProps } from "antd";
+import { Menu, type MenuProps } from "@tsz/ui/admin/overlays";
+
 import type { AdminProfile, MenuPermission } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useMemo } from "react";

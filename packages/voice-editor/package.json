@@ -23,6 +23,7 @@
   "dependencies": {
     "@tsz/shared": "workspace:*",
     "@tsz/types": "workspace:*",
+    "@tsz/ui": "workspace:*",
     "lucide-react": "^1.52.0"
   },
   "peerDependencies": {

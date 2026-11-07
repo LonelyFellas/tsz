@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -105,11 +105,7 @@ import { SmartDictionary } from "./SmartDictionary";
 
 function render(ui: Parameters<typeof testingLibraryRender>[0]) {
   return testingLibraryRender(ui, {
-    wrapper: ({ children }) => (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        {children}
-      </ConfigProvider>
-    )
+    wrapper: ({ children }) => <>{children}</>
   });
 }
 
@@ -214,7 +210,7 @@ async function openRowActions(
   return waitFor(() => {
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     const menu = document.querySelector<HTMLElement>(
-      '.word-list-action-menu:not(.ant-dropdown-hidden) [role="menu"]'
+      '.word-list-action-menu:not(.ui-dropdown-hidden) [role="menu"]'
     );
     expect(menu).toBeVisible();
     return within(menu!);
@@ -290,12 +286,12 @@ afterEach(() => {
 describe("SmartDictionary", () => {
   it("主搜索常驻，更多筛选按顺序展开且收起后保留创建人条件", async () => {
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
           <LocationProbe />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     const headword = screen.getByLabelText("词条");
     expect(headword).toBeVisible();
@@ -319,9 +315,7 @@ describe("SmartDictionary", () => {
       "创建时间"
     ]);
     fireEvent.change(headword, { target: { value: "alpha" } });
-    fireEvent.mouseDown(
-      screen.getByLabelText("创建人").closest(".ant-select")!
-    );
+    fireEvent.mouseDown(screen.getByLabelText("创建人").closest(".ui-select")!);
     fireEvent.click(await screen.findByText("甲管理员"));
     fireEvent.click(screen.getByRole("button", { name: /收起筛选/ }));
     expect(panel).not.toBeVisible();
@@ -369,7 +363,7 @@ describe("SmartDictionary", () => {
         refetch
       });
       render(
-        <AntApp>
+        <FeedbackApp>
           <MemoryRouter
             initialEntries={[
               "/words?headword=alpha&gloss=测试&status=published&created_by=01991111-2222-7333-8444-555566667777"
@@ -378,14 +372,14 @@ describe("SmartDictionary", () => {
             <SmartDictionary />
             <LocationProbe />
           </MemoryRouter>
-        </AntApp>
+        </FeedbackApp>
       );
       const creator = screen.getByLabelText("创建人");
       expect(creator).not.toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: "重新加载创建人" }));
       expect(refetch).toHaveBeenCalledOnce();
       fireEvent.click(
-        creator.closest(".ant-select")!.querySelector(".ant-select-clear")!
+        creator.closest(".ui-select")!.querySelector(".ui-select-clear")!
       );
       fireEvent.submit(screen.getByLabelText("词条").closest("form")!);
       await waitFor(() => {
@@ -417,11 +411,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter initialEntries={["/words?keyword=center"]}>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     const annotation = screen.getByText("00123456789012345678");
     expect(annotation.tagName).toBe("SUP");
@@ -450,11 +444,11 @@ describe("SmartDictionary", () => {
     });
     apiMocks.useWordList.mockImplementation(list);
     const view = () => (
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     const rendered = render(view());
     expect(screen.queryByText("007")).not.toBeInTheDocument();
@@ -482,11 +476,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     const actions = await openRowActions("center");
     expect(
@@ -513,11 +507,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     // 角标是「这张列表里还有没有同词面的另一行」，与归属无关，一律显示；
     // 能不能改才看归属。
@@ -539,11 +533,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     expect(screen.getByLabelText("查看「center」")).toBeVisible();
     expect(screen.queryByLabelText("继续创建「center」")).toBeNull();
@@ -575,11 +569,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     expect(screen.getByLabelText("继续创建「center」")).toBeVisible();
     const trigger = screen.getByLabelText("更多操作「center」");
@@ -620,11 +614,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     const actions = await openRowActions("center");
     expect(
@@ -655,11 +649,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     const actions = await openRowActions("center");
     const archive = actions
@@ -689,11 +683,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     const actions = await openRowActions("center");
     expect(
@@ -718,11 +712,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
     expect(screen.getByText("007").tagName).toBe("SUP");
     const actions = await openRowActions("center");
@@ -756,13 +750,13 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary
             reportUnknownPresentationStrategy={
               reportUnknownPresentationStrategy
             }
           />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -807,9 +801,9 @@ describe("SmartDictionary", () => {
       });
       render(
         <MemoryRouter>
-          <AntApp>
+          <FeedbackApp>
             <SmartDictionary mode={mode} />
-          </AntApp>
+          </FeedbackApp>
         </MemoryRouter>
       );
       const cells = screen
@@ -879,11 +873,11 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
 
     const cells = screen.getByText("hot").closest("tr")!.querySelectorAll("td");
@@ -925,16 +919,16 @@ describe("SmartDictionary", () => {
       isError: false
     });
     render(
-      <AntApp>
+      <FeedbackApp>
         <MemoryRouter>
           <SmartDictionary />
         </MemoryRouter>
-      </AntApp>
+      </FeedbackApp>
     );
 
     // 先悬停未知编码：它若也挂了浮层，会与下面等到的那个一起出现。
     fireEvent.mouseEnter(screen.getByText("unknown-pos"));
-    fireEvent.mouseEnter(screen.getByText("adv").closest(".ant-tag")!);
+    fireEvent.mouseEnter(screen.getByText("adv").closest(".ui-tag")!);
     expect(await screen.findByRole("tooltip")).toHaveTextContent(/^副词$/);
     expect(document.querySelectorAll('[role="tooltip"]')).toHaveLength(1);
   });
@@ -950,9 +944,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -996,13 +990,13 @@ describe("SmartDictionary", () => {
 
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary
             reportUnknownPresentationStrategy={
               reportUnknownPresentationStrategy
             }
           />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1087,9 +1081,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1118,7 +1112,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(
       (await screen.findAllByText("移入垃圾桶", { exact: true }))
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(
@@ -1135,9 +1129,9 @@ describe("SmartDictionary", () => {
     matchViewport(390);
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -1176,9 +1170,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -1215,9 +1209,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -1238,9 +1232,9 @@ describe("SmartDictionary", () => {
   it("从重复检测入口进入时自动定位归档词条", () => {
     render(
       <MemoryRouter initialEntries={["/words?keyword=center&status=archived"]}>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -1261,9 +1255,9 @@ describe("SmartDictionary", () => {
           "/words?keyword=center&status=published&page=3&page_size=50"
         ]}
       >
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1296,9 +1290,9 @@ describe("SmartDictionary", () => {
     }));
     render(
       <MemoryRouter initialEntries={["/words?keyword=center&status=published"]}>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1335,9 +1329,9 @@ describe("SmartDictionary", () => {
   it("用户连续修改筛选后，后退逐步恢复上一筛选状态", async () => {
     render(
       <MemoryRouter initialEntries={["/words"]}>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
         <HistoryProbe />
       </MemoryRouter>
@@ -1382,9 +1376,9 @@ describe("SmartDictionary", () => {
   it("深链筛选重置后同步清空表单、查询与 URL", async () => {
     render(
       <MemoryRouter initialEntries={["/words?keyword=center&status=archived"]}>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1405,9 +1399,9 @@ describe("SmartDictionary", () => {
   it("翻页保留选择和版本，集中审听关闭后保留选择、发布后清空", async () => {
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -1472,9 +1466,9 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
@@ -1498,9 +1492,9 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter initialEntries={["/words?page_size=100"]}>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
@@ -1527,9 +1521,9 @@ describe("SmartDictionary", () => {
       );
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     const actions = await openRowActions("first");
@@ -1542,7 +1536,7 @@ describe("SmartDictionary", () => {
     const confirm = screen
       .getAllByText("移入垃圾桶", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.closest(".ant-modal"))!;
+      .find((item) => item?.closest(".ui-modal"))!;
     expect(confirm).toBeDisabled();
     fireEvent.click(confirm);
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -1579,9 +1573,9 @@ describe("SmartDictionary", () => {
     apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     const actions = await openRowActions("first");
@@ -1619,9 +1613,9 @@ describe("SmartDictionary", () => {
     apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     const actions = await openRowActions("first");
@@ -1647,9 +1641,9 @@ describe("SmartDictionary", () => {
     apiMocks.useArchiveWord.mockReturnValue({ ...idleMutation(), mutateAsync });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     const actions = await openRowActions("first");
@@ -1689,9 +1683,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -1704,7 +1698,7 @@ describe("SmartDictionary", () => {
     const confirm = screen
       .getAllByText("移入垃圾桶", { exact: true })
       .map((item) => item.closest("button"))
-      .find((item) => item?.closest(".ant-modal"))!;
+      .find((item) => item?.closest(".ui-modal"))!;
     fireEvent.click(confirm);
     fireEvent.click(confirm);
 
@@ -1744,9 +1738,9 @@ describe("SmartDictionary", () => {
       });
       render(
         <MemoryRouter>
-          <AntApp>
+          <FeedbackApp>
             <SmartDictionary />
-          </AntApp>
+          </FeedbackApp>
         </MemoryRouter>
       );
 
@@ -1756,7 +1750,11 @@ describe("SmartDictionary", () => {
         .getByLabelText(`${label}「first」`)
         .closest<HTMLElement>('[role="menuitem"]')!;
       expect(item).toHaveAttribute("aria-disabled", "true");
-      expect(within(item).getByRole("img", { name: "loading" })).toBeVisible();
+      expect(actions.getByLabelText(`${label}「first」`)).toHaveAttribute(
+        "aria-busy",
+        "true"
+      );
+      expect(item.querySelector(".lucide-loader-circle")).toBeVisible();
       fireEvent.click(item);
       fireEvent.click(item);
       expect(mutateAsync).not.toHaveBeenCalled();
@@ -1786,9 +1784,9 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     fireEvent.click(
@@ -1798,7 +1796,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(screen.getByText("移入垃圾桶(1)"));
     const confirm = (await screen.findAllByText("移入垃圾桶", { exact: true }))
       .map((item) => item.closest("button"))
-      .find((item) => item?.closest(".ant-modal"))!;
+      .find((item) => item?.closest(".ui-modal"))!;
     expect(confirm).toBeDisabled();
     fireEvent.click(confirm);
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -1815,7 +1813,7 @@ describe("SmartDictionary", () => {
       await screen.findAllByText("移入垃圾桶", { exact: true })
     )
       .map((item) => item.closest("button"))
-      .filter((item) => item?.closest(".ant-modal"))
+      .filter((item) => item?.closest(".ui-modal"))
       .at(-1)!;
     await waitFor(() => expect(retryConfirm).toBeEnabled());
     fireEvent.click(retryConfirm);
@@ -1852,9 +1850,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1875,7 +1873,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("恢 复", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -1927,9 +1925,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -1975,9 +1973,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2011,9 +2009,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary mode="trash" />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2026,7 +2024,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("恢 复", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => !item?.classList.contains("ant-btn-link"))
+        .find((item) => !item?.classList.contains("ui-btn-link"))
     ).toBeTruthy();
     // 即使 URL 上没带 status，也必须只查归档。
     expect(apiMocks.useWordList).toHaveBeenCalledWith(
@@ -2044,9 +2042,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter initialEntries={["/words/trash?status=draft"]}>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary mode="trash" />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2068,9 +2066,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2097,9 +2095,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2115,7 +2113,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -2139,9 +2137,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2168,9 +2166,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2202,9 +2200,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2235,9 +2233,9 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2249,7 +2247,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
@@ -2288,9 +2286,9 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2324,9 +2322,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2339,7 +2337,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("永久删除", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
 
     await screen.findByText("只能永久删除自己创建的词条");
@@ -2366,9 +2364,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2379,7 +2377,7 @@ describe("SmartDictionary", () => {
       screen
         .getAllByText("恢 复", { exact: true })
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
 
     expect(
@@ -2416,9 +2414,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
 
@@ -2428,7 +2426,7 @@ describe("SmartDictionary", () => {
       fireEvent.click(
         (await screen.findAllByText("恢 复", { exact: true }))
           .map((item) => item.closest("button"))
-          .find((item) => item?.closest(".ant-modal"))!
+          .find((item) => item?.closest(".ui-modal"))!
       );
     };
     await restoreOnce();
@@ -2476,9 +2474,9 @@ describe("SmartDictionary", () => {
     });
     render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     const firstCheckbox = screen
@@ -2497,7 +2495,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(
       (await screen.findAllByText("恢 复", { exact: true }))
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(mutateAsync.mock.calls[0]![0].input).toEqual({
@@ -2534,9 +2532,9 @@ describe("SmartDictionary", () => {
     });
     const { container } = render(
       <MemoryRouter>
-        <AntApp>
+        <FeedbackApp>
           <SmartDictionary />
-        </AntApp>
+        </FeedbackApp>
       </MemoryRouter>
     );
     const checkbox = container.querySelector("tbody input[type='checkbox']")!;
@@ -2545,7 +2543,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(
       (await screen.findAllByText("恢 复", { exact: true }))
         .map((item) => item.closest("button"))
-        .find((item) => item?.closest(".ant-modal"))!
+        .find((item) => item?.closest(".ui-modal"))!
     );
     await waitFor(() => expect(dataSourceMocks.get).toHaveBeenCalledTimes(1));
 

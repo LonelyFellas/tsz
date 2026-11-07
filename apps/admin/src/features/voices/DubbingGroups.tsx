@@ -20,19 +20,14 @@ import type {
 } from "@tsz/types";
 import {
   Alert,
-  App,
   Button,
   Card,
-  Checkbox,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Select,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal, Popconfirm } from "@tsz/ui/admin/overlays";
+import { Checkbox, Form, Input, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useState } from "react";
 import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { useBlocker } from "react-router-dom";

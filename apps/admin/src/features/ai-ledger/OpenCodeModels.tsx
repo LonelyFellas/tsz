@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Tag, Flex, Select, Typography } from "antd";
+import { Alert, Button, Tag, Flex, Typography } from "@tsz/ui/admin/display";
+import { Select } from "@tsz/ui/admin/forms";
 import { RadarIcon, RotateCwIcon } from "lucide-react";
 import type { OpenCodeModelSelection, OpenCodeModelProbe } from "@tsz/types";
 import { api } from "@/lib/auth";

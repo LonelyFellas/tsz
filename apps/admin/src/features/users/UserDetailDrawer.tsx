@@ -1,5 +1,6 @@
 // 详情资料按权限展示；余额、账单、证件分别按需请求。
-import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
+import { Avatar, Badge, Descriptions, Space, Tag } from "@tsz/ui/admin/display";
+import { Drawer } from "@tsz/ui/admin/overlays";
 import { UserIcon } from "lucide-react";
 import dayjs from "dayjs";
 import type { AdminUser } from "@tsz/types";

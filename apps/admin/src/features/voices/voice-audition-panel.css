@@ -8,11 +8,11 @@
   position: sticky;
   top: 0;
   z-index: 3;
-  background: var(--ant-color-bg-container, #fff);
+  background: var(--ui-color-bg-container, #fff);
   padding: 4px 0 10px;
   border-bottom: 1px solid var(--voice-border, #e5e7eb);
 }
-.voice-audition-toolbar .ant-select {
+.voice-audition-toolbar .ui-select {
   min-width: 82px;
 }
 .voice-audition-preview {
@@ -34,10 +34,10 @@
 .voice-audition-panel .voice-library-player audio {
   width: 100%;
 }
-.voice-audition-panel .voice-library-player .ant-space {
+.voice-audition-panel .voice-library-player .ui-space {
   row-gap: 4px;
 }
-.voice-audition-panel .voice-library-player .ant-typography {
+.voice-audition-panel .voice-library-player .ui-typography {
   font-size: 12px;
 }
 .voice-audition-panel .voice-library-tools {
@@ -47,10 +47,10 @@
   min-width: 0;
 }
 @media (max-width: 700px) {
-  .voice-audition-toolbar > .ant-flex {
+  .voice-audition-toolbar > .ui-flex {
     align-items: flex-start;
   }
-  .voice-audition-toolbar .ant-space {
+  .voice-audition-toolbar .ui-space {
     row-gap: 8px;
   }
 }

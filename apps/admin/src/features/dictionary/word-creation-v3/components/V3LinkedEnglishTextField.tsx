@@ -7,7 +7,7 @@ import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3
 } from "@tsz/types";
-import { Flex } from "antd";
+import { Flex } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 import { editableEnglishText } from "../meaningsModel";
 import { dialectLabel } from "../presentation";

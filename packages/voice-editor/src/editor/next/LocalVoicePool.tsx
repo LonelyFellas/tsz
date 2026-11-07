@@ -7,18 +7,9 @@ import {
   CircleHelpIcon,
   Volume2Icon
 } from "lucide-react";
-import {
-  Alert,
-  Button,
-  Checkbox,
-  Input,
-  Popover,
-  Radio,
-  Space,
-  Spin,
-  Tooltip,
-  Typography
-} from "antd";
+import { Alert, Button, Space, Spin, Typography } from "@tsz/ui/admin/display";
+import { Checkbox, Input, Radio } from "@tsz/ui/admin/forms";
+import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { speechAccentGroup } from "@tsz/shared";
 import {
   useEffect,

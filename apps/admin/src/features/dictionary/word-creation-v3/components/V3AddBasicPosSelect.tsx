@@ -1,5 +1,5 @@
 import { CirclePlusIcon, PlusIcon } from "lucide-react";
-import { Select } from "antd";
+import { Select } from "@tsz/ui/admin/forms";
 import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
@@ -68,7 +68,7 @@ export function V3AddBasicPosSelect({
                 justifyContent: "center",
                 fontSize: 14,
                 color:
-                  isError || isPending ? undefined : "var(--ant-color-primary)",
+                  isError || isPending ? undefined : "var(--ui-color-primary)",
                 pointerEvents: "none"
               }
             }

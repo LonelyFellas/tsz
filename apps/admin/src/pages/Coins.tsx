@@ -5,19 +5,16 @@ import { RotateCwIcon, SearchIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
   Descriptions,
   Flex,
-  Form,
-  Input,
-  Modal,
-  Select,
   Tabs,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import { HttpError } from "@tsz/api-client";
 import { formatCoins } from "@tsz/shared";
 import { hasAdminPermission } from "@tsz/shared/auth";

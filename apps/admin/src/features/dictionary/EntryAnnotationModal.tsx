@@ -4,13 +4,12 @@ import {
   Alert,
   Button,
   Card,
-  Form,
-  Input,
-  Modal,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Form, Input } from "@tsz/ui/admin/forms";
+import { Modal } from "@tsz/ui/admin/overlays";
 import dayjs from "dayjs";
 import { usePartOfSpeechLabel } from "./part-of-speech/PartOfSpeechLabels";
 import "./EntryAnnotationModal.css";

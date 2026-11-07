@@ -18,13 +18,12 @@ import {
   Card,
   Col,
   Descriptions,
-  Input,
   Row,
-  Select,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Input, Select } from "@tsz/ui/admin/forms";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import { pronunciationStyleLabel } from "./presentation";

@@ -2,13 +2,12 @@ import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import {
   Alert,
   Button,
-  Cascader,
   Empty,
   Flex,
   Spin,
-  Select,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Cascader, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   expandFormContents,

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import type { DraftFormsStepContentV3 } from "@tsz/types";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
@@ -35,14 +35,14 @@ function Harness({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <AntApp>
+    <FeedbackApp>
       <V3FormsAndPronunciationStep
         value={value}
         onChange={setValue}
         idFactory={idFactory}
       />
       <output data-testid="canonical-value">{JSON.stringify(value)}</output>
-    </AntApp>
+    </FeedbackApp>
   );
 }
 

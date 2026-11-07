@@ -3,18 +3,17 @@ import { Link } from "react-router-dom";
 import {
   Alert,
   Button,
-  Drawer,
   Empty,
   Flex,
-  FloatButton,
-  Input,
   Space,
   Spin,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Drawer, FloatButton } from "@tsz/ui/admin/overlays";
+import { Input, type TextAreaRef } from "@tsz/ui/admin/forms";
 import { BotIcon, SendIcon, SquareIcon } from "lucide-react";
-import type { TextAreaRef } from "antd/es/input/TextArea";
+
 import { HttpError } from "@tsz/api-client";
 import type {
   LexiconAssistantHistory,

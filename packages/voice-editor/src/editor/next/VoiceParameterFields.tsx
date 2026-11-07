@@ -3,13 +3,11 @@ import {
   Alert,
   Button,
   Flex,
-  Form,
   Collapse,
-  InputNumber,
-  Select,
   Typography,
   Space
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Form, InputNumber, Select } from "@tsz/ui/admin/forms";
 import type { AdminSpeechVoice } from "@tsz/types";
 import { SpeechRateInput } from "./SpeechRateInput";
 import { SpeechVolumeInput } from "./SpeechVolumeInput";

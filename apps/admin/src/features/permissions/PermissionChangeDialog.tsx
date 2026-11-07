@@ -1,6 +1,7 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Alert, Button, Flex, Modal, Space, Typography } from "antd";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
 import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionPreviewResponse } from "@tsz/types";

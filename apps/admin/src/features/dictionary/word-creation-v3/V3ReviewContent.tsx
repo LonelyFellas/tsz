@@ -17,7 +17,15 @@ import { PronunciationPreviewControls } from "../word-creation/PronunciationPrev
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { BookOpenIcon, Volume2Icon } from "lucide-react";
-import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Collapse,
+  Empty,
+  Flex,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import type {
   AdminWordV3,
   Dialect,
@@ -151,7 +159,7 @@ function FormsReview({
           position: "sticky",
           [column.fixed]:
             (column.fixed === "left" ? index : pinned.length - index - 1) * 240,
-          background: "var(--ant-color-bg-container, #fff)",
+          background: "var(--ui-color-bg-container, #fff)",
           zIndex: 1
         })
     };

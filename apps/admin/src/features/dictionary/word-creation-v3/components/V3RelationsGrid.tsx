@@ -6,19 +6,16 @@ import {
   SearchIcon,
   Volume2Icon
 } from "lucide-react";
+import { AutoComplete, Input, InputNumber, Select } from "@tsz/ui/admin/forms";
 import {
-  AutoComplete,
   Button,
   Card,
   Empty,
   Flex,
-  Input,
-  InputNumber,
-  Select,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   DraftMeaningsStepContentWritableV3,
   WordRelationWritableV3,
@@ -211,7 +208,7 @@ export function V3RelationsGrid({
             styles={{ header: { cursor: "pointer" } }}
             onClick={(event) => {
               const header = event.currentTarget.querySelector(
-                ":scope > .ant-card-head"
+                ":scope > .ui-card-head"
               );
               if (!header?.contains(event.target as Node)) return;
               setCollapsed((current) => ({

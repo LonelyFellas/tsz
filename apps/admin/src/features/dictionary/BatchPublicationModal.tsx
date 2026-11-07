@@ -1,15 +1,8 @@
 import { useCallback, useRef, useState } from "react";
-import {
-  Alert,
-  List,
-  Modal,
-  Space,
-  Typography,
-  Select,
-  Input,
-  Pagination,
-  Button
-} from "antd";
+import { Alert, List, Space, Typography, Button } from "@tsz/ui/admin/display";
+import { Modal } from "@tsz/ui/admin/overlays";
+import { Select, Input } from "@tsz/ui/admin/forms";
+import { Pagination } from "@tsz/ui/admin/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type {

@@ -1,5 +1,5 @@
 import { Trash2Icon } from "lucide-react";
-import { Button } from "antd";
+import { Button } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 import { useSortableRows, type SortableRowsController } from "../sortableRows";
 

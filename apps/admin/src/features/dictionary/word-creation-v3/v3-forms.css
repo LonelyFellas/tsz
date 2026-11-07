@@ -13,7 +13,7 @@
   padding-bottom: 12px;
   isolation: isolate;
 }
-.v3-form-overview .ant-table.ant-table-small .ant-table-thead > tr > th {
+.v3-form-overview .ui-table.ui-table-small .ui-table-thead > tr > th {
   padding: 10px 12px;
   color: #8d929b;
   font-size: 13px;
@@ -21,37 +21,37 @@
   white-space: nowrap;
   background: #fff;
 }
-.v3-form-overview .ant-table-thead > tr > th::before {
+.v3-form-overview .ui-table-thead > tr > th::before {
   display: none;
 }
-.v3-form-overview .ant-table.ant-table-small .ant-table-tbody > tr > td {
+.v3-form-overview .ui-table.ui-table-small .ui-table-tbody > tr > td {
   padding: 2px 12px;
   vertical-align: top;
   border-bottom: 0;
 }
 .v3-form-overview
-  .ant-table.ant-table-small
-  .ant-table-tbody
+  .ui-table.ui-table-small
+  .ui-table-tbody
   > tr.v3-overview-form-start
   > td {
   padding-top: 16px;
 }
 .v3-form-overview
-  .ant-table.ant-table-small
-  .ant-table-tbody
+  .ui-table.ui-table-small
+  .ui-table-tbody
   > tr.v3-overview-form-start
   ~ tr.v3-overview-form-start
   > td {
   border-top: 1px solid var(--word-line);
 }
 .v3-form-overview
-  .ant-table.ant-table-small
-  .ant-table-tbody
+  .ui-table.ui-table-small
+  .ui-table-tbody
   > tr:has(+ .v3-overview-form-start)
   > td {
   padding-bottom: 14px;
 }
-.v3-form-overview .ant-table.ant-table-small tr > .v3-overview-action-cell {
+.v3-form-overview .ui-table.ui-table-small tr > .v3-overview-action-cell {
   padding-inline: 16px 8px;
 }
 .v3-form-copy-feedback:empty {
@@ -138,7 +138,7 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.v3-overview-pronunciation .word-pronunciation-play-action.ant-btn {
+.v3-overview-pronunciation .word-pronunciation-play-action.ui-btn {
   width: 24px;
   height: 28px;
   flex-basis: 24px;
@@ -179,13 +179,13 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.v3-overview-type-fix.ant-btn {
+.v3-overview-type-fix.ui-btn {
   max-width: 100%;
   height: auto;
   padding-inline: 0;
   white-space: normal;
 }
-.v3-overview-edit.ant-btn {
+.v3-overview-edit.ui-btn {
   color: #b4b4b4;
 }
 .v3-overview-notes {
@@ -207,20 +207,20 @@
   --word-uk: #2f5bff;
   --word-us: #d42a91;
 }
-.v3-content-drawer .ant-drawer-header {
+.v3-content-drawer .ui-drawer-header {
   min-height: 56px;
   padding: 12px 24px;
   color: #fff;
   background: #696d76;
 }
-.v3-content-drawer .ant-drawer-title,
-.v3-content-drawer .ant-drawer-close {
+.v3-content-drawer .ui-drawer-title,
+.v3-content-drawer .ui-drawer-close {
   color: inherit;
 }
-.v3-content-drawer .ant-drawer-title {
+.v3-content-drawer .ui-drawer-title {
   font-size: 18px;
 }
-.v3-content-drawer .ant-drawer-body {
+.v3-content-drawer .ui-drawer-body {
   padding: 0;
 }
 .v3-content-rules {
@@ -239,11 +239,11 @@
   min-width: 0;
   min-height: 32px;
 }
-.v3-content-rule-row > .ant-typography,
-.v3-content-labels > .ant-space {
+.v3-content-rule-row > .ui-typography,
+.v3-content-labels > .ui-space {
   font-size: 14px;
 }
-.v3-content-rule-row .ant-radio-wrapper:last-child {
+.v3-content-rule-row .ui-radio-wrapper:last-child {
   margin-inline-end: 0;
 }
 .v3-content-labels {
@@ -253,7 +253,7 @@
   gap: 8px 16px;
   padding: 12px 24px;
 }
-.v3-content-labels > .ant-space:first-child {
+.v3-content-labels > .ui-space:first-child {
   flex-shrink: 0;
 }
 .v3-content-label-list {
@@ -269,21 +269,21 @@
   color: #7d8492;
   font-size: 14px;
 }
-.v3-content-label .ant-btn {
+.v3-content-label .ui-btn {
   color: inherit;
 }
-.v3-label-assignment-modal .ant-modal-header {
+.v3-label-assignment-modal .ui-modal-header {
   padding: 20px 24px;
   margin: -20px -24px 24px;
   background: #a3a7b2;
   border-radius: 8px 8px 0 0;
 }
-.v3-label-assignment-modal .ant-modal-title {
+.v3-label-assignment-modal .ui-modal-title {
   padding-inline-end: 32px;
   color: #fff;
   font-size: 20px;
 }
-.v3-label-assignment-modal .ant-modal-close {
+.v3-label-assignment-modal .ui-modal-close {
   color: #fff;
 }
 .v3-label-assignment-columns {
@@ -291,10 +291,10 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 24px;
 }
-.v3-label-assignment-column .ant-typography {
+.v3-label-assignment-column .ui-typography {
   margin: 0;
 }
-.v3-label-assignment-column h5.ant-typography {
+.v3-label-assignment-column h5.ui-typography {
   padding-block: 12px;
   border-bottom: 1px solid #e2e5eb;
   font-size: 18px;
@@ -369,7 +369,7 @@
   gap: 8px;
 }
 @media (max-width: 720px) {
-  .v3-content-drawer .ant-drawer-header {
+  .v3-content-drawer .ui-drawer-header {
     padding-inline: 16px;
   }
   .v3-content-rules,
@@ -392,7 +392,7 @@
   }
 }
 
-:is(.v3-forms-step, .v3-content-modal) textarea.tsz-words.ant-input,
+:is(.v3-forms-step, .v3-content-modal) textarea.tsz-words.ui-input,
 :is(.v3-forms-step, .v3-content-modal) .v3-grammar-preview-content.tsz-words {
   font-weight: 700;
 }
@@ -401,7 +401,7 @@
   font-weight: 400;
 }
 
-.v3-forms-step > .ant-tabs .ant-tabs-content-holder {
+.v3-forms-step > .ui-tabs .ui-tabs-body-holder {
   min-width: 0;
 }
 
@@ -448,11 +448,11 @@
   box-shadow: none;
 }
 
-.v3-form-group-card > .ant-card-head {
+.v3-form-group-card > .ui-card-head {
   min-height: 48px;
 }
 
-.v3-form-group-card > .ant-card-head {
+.v3-form-group-card > .ui-card-head {
   padding-inline: 14px;
   color: #fff;
   background: var(--word-ink);
@@ -465,7 +465,7 @@
   gap: 8px;
 }
 
-.v3-form-group-menu.ant-btn {
+.v3-form-group-menu.ui-btn {
   color: #fff;
 }
 
@@ -473,11 +473,11 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
-.v3-form-group-card > .ant-card-body {
+.v3-form-group-card > .ui-card-body {
   padding: 0;
 }
 
-.v3-form-group-card > .ant-card-body > .ant-flex {
+.v3-form-group-card > .ui-card-body > .ui-flex {
   gap: 0;
   padding-bottom: 16px;
 }
@@ -648,7 +648,7 @@
 }
 
 /* popup 挂在 body 下，不受矩阵类型列宽度约束。 */
-.v3-form-type-popup .ant-select-item-option-content {
+.v3-form-type-popup .ui-select-item-option-content {
   white-space: normal;
   overflow-wrap: anywhere;
   text-overflow: clip;
@@ -668,7 +668,7 @@
   padding-top: 4px;
 }
 
-.v3-pronunciation-list > .ant-flex > .ant-btn {
+.v3-pronunciation-list > .ui-flex > .ui-btn {
   justify-self: start;
 }
 
@@ -731,11 +731,11 @@
 }
 
 @media (max-width: 767px) {
-  .v3-form-group-card > .ant-card-head {
+  .v3-form-group-card > .ui-card-head {
     align-items: flex-start;
   }
 
-  .v3-form-group-card > .ant-card-head .ant-card-extra {
+  .v3-form-group-card > .ui-card-head .ui-card-extra {
     margin-inline-start: 8px;
   }
 
@@ -744,7 +744,7 @@
   }
 }
 
-.v3-group-sense-editor > .ant-flex:first-child {
+.v3-group-sense-editor > .ui-flex:first-child {
   margin-bottom: 8px;
 }
 
@@ -754,7 +754,7 @@
   border-top: 1px solid #e5e7eb;
 }
 
-.v3-form-group-card > .ant-card-head .ant-card-extra {
+.v3-form-group-card > .ui-card-head .ui-card-extra {
   margin-inline-start: 16px;
 }
 
@@ -763,14 +763,14 @@
   overflow-y: auto;
 }
 
-.v3-group-sense-options .ant-checkbox-wrapper {
+.v3-group-sense-options .ui-checkbox-wrapper {
   align-items: flex-start;
   padding: 12px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
 }
 
-.v3-group-sense-options .ant-checkbox-wrapper-checked {
+.v3-group-sense-options .ui-checkbox-wrapper-checked {
   border-color: #91caff;
   background: #f0f7ff;
 }
@@ -799,13 +799,13 @@
   min-width: 0;
 }
 .v3-spelling-item + .v3-spelling-item {
-  border-top: 1px solid var(--ant-color-border-secondary);
+  border-top: 1px solid var(--ui-color-border-secondary);
 }
 .v3-spelling-item.is-dragging {
   opacity: 0.5;
 }
 .v3-spelling-item.is-drag-over {
-  outline: 2px solid var(--ant-color-primary);
+  outline: 2px solid var(--ui-color-primary);
   outline-offset: -2px;
 }
 .v3-spelling-list .v3-dialect-form-cell {

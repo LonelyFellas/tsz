@@ -1,6 +1,14 @@
 import { primaryRegionalVariant } from "@tsz/shared";
 import { PlusIcon } from "lucide-react";
-import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Empty,
+  Flex,
+  Space,
+  Typography
+} from "@tsz/ui/admin/display";
+import { Radio } from "@tsz/ui/admin/forms";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -362,12 +370,12 @@ export function V3PosTab({
           // 确认条渲染在组列表上方：从下面的卡片菜单点删除时它落在视口外，
           // 看起来就像点了没反应。挂载时把它带进视野。
           ref={(node) => {
-            node?.nativeElement.scrollIntoView?.({ block: "center" });
+            node?.scrollIntoView?.({ block: "center" });
           }}
           action={
             <Space>
               <Button onClick={() => setPendingGroupDeletion(undefined)}>
-                取 消
+                取消
               </Button>
               <Button danger onClick={confirmGroupDeletion}>
                 删除变化组并同时删除 {pendingGroupDeletion.formIds.length}{" "}

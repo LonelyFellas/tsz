@@ -1,4 +1,4 @@
-import { Modal, type ModalProps } from "antd";
+import { Modal, type ModalProps } from "@tsz/ui/admin/overlays";
 import { useRef, useState, type PointerEvent } from "react";
 
 export function VoiceEditorModal({ title, ...props }: ModalProps) {

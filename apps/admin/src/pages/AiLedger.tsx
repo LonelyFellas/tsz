@@ -8,20 +8,17 @@ import {
   Card,
   Descriptions,
   Flex,
-  Form,
-  Input,
-  Popover,
   Progress,
   Result,
-  Select,
   Space,
   Statistic,
-  Table,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
-import type { TableColumnsType } from "antd";
+} from "@tsz/ui/admin/display";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
+import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
+import { Table, type TableColumnsType } from "@tsz/ui/admin/table";
+
 import dayjs from "dayjs";
 import type { AiCallCost, AiCallPurpose, AiLedgerItem } from "@tsz/types";
 import {

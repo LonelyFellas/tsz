@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import type { PartOfSpeechConfig, SubPartOfSpeechConfig } from "@tsz/types";
 import { createRef } from "react";
 import type { ReactNode } from "react";
@@ -16,8 +16,9 @@ import { useAuthStore } from "@/lib/auth";
 import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
 import type { SubPartOfSpeechPanelHandle } from "./SubPartOfSpeechDrawer";
 
-vi.mock("antd", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("antd")>();
+vi.mock("@tsz/ui/admin/overlays", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@tsz/ui/admin/overlays")>();
   return {
     ...actual,
     Tooltip: ({
@@ -131,7 +132,7 @@ function renderPanel(value: PartOfSpeechConfig | null = parent) {
   const onError = vi.fn();
   const handle = createRef<SubPartOfSpeechPanelHandle>();
   const view = render(
-    <AntApp>
+    <FeedbackApp>
       <SubPartOfSpeechPanel
         ref={handle}
         parents={value ? [value] : []}
@@ -139,7 +140,7 @@ function renderPanel(value: PartOfSpeechConfig | null = parent) {
         onSaved={onSaved}
         onError={onError}
       />
-    </AntApp>
+    </FeedbackApp>
   );
   // 「新增细分词性」按钮已挪到设置页的选择器行，面板只暴露 openCreate 句柄。
   const openCreate = () => act(() => handle.current!.openCreate());
@@ -163,7 +164,7 @@ function fillSubForm(values: { nameZh: string; nameEn: string }) {
 async function findDeleteConfirm(name = "集合名词") {
   const titles = await screen.findAllByText(`删除细分词性“${name}”？`);
   const dialog = titles
-    .map((title) => title.closest<HTMLElement>(".ant-modal-confirm"))
+    .map((title) => title.closest<HTMLElement>(".ui-modal-confirm"))
     .find((candidate): candidate is HTMLElement => candidate !== null);
   if (!dialog) throw new Error("delete confirmation not found");
   return dialog;
@@ -441,14 +442,14 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     const onError = vi.fn();
     const handle = createRef<SubPartOfSpeechPanelHandle>();
     render(
-      <AntApp>
+      <FeedbackApp>
         <SubPartOfSpeechPanel
           ref={handle}
           parents={[parent, verbParent]}
           onSaved={onSaved}
           onError={onError}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     return { onSaved, onError, handle };
   }
@@ -491,7 +492,7 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     // 表格里也有"动词"文案，按 antd 下拉选项的 title 定位可见选项再点击。
     const verbOption = await waitFor(() => {
       const option = document.querySelector<HTMLElement>(
-        '.ant-select-item-option[title="动词"]'
+        '.ui-select-item-option[title="动词"]'
       );
       if (!option) throw new Error("动词 选项尚未渲染");
       return option;
@@ -502,7 +503,7 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     fireEvent.mouseDown(parentSelect);
     const nounOption = await waitFor(() => {
       const option = document.querySelector<HTMLElement>(
-        '.ant-select-item-option[title="名词"]'
+        '.ui-select-item-option[title="名词"]'
       );
       if (!option) throw new Error("名词 选项尚未渲染");
       return option;
@@ -512,7 +513,7 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
     fireEvent.mouseDown(parentSelect);
     fireEvent.click(
       document.querySelector<HTMLElement>(
-        '.ant-select-item-option[title="动词"]'
+        '.ui-select-item-option[title="动词"]'
       )!
     );
     fillSubForm({

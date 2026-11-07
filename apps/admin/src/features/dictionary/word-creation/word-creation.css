@@ -233,7 +233,7 @@
   color: #22a06b;
 }
 
-.word-creation-progress-row > .ant-typography:last-child {
+.word-creation-progress-row > .ui-typography:last-child {
   min-width: 34px;
   margin: 0;
   padding: 1px 7px;
@@ -263,7 +263,7 @@
   margin-bottom: 22px;
 }
 
-.word-step-heading .ant-typography-h2 {
+.word-step-heading .ui-typography-h2 {
   color: #161b26;
   font-size: 30px;
   line-height: 1.25;
@@ -313,7 +313,7 @@
   backdrop-filter: blur(8px);
 }
 
-.word-step-actions .ant-btn {
+.word-step-actions .ui-btn {
   min-width: 96px;
   height: 40px;
 }
@@ -357,34 +357,34 @@
   box-shadow: 0 10px 28px rgba(34, 43, 63, 0.06);
 }
 
-.word-form-card > .ant-card-head,
-.word-sense-card > .ant-card-head {
+.word-form-card > .ui-card-head,
+.word-sense-card > .ui-card-head {
   color: #fff;
   background: var(--word-ink);
 }
 
-.word-form-card > .ant-card-head .ant-card-extra,
-.word-sense-card > .ant-card-head .ant-card-extra {
+.word-form-card > .ui-card-head .ui-card-extra,
+.word-sense-card > .ui-card-head .ui-card-extra {
   color: #fff;
 }
 
-.word-form-card > .ant-card-head .ant-card-extra .ant-btn {
+.word-form-card > .ui-card-head .ui-card-extra .ui-btn {
   color: rgba(255, 255, 255, 0.82);
 }
 
-.word-form-card > .ant-card-head .ant-card-extra .ant-btn:hover {
+.word-form-card > .ui-card-head .ui-card-extra .ui-btn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
 }
 
-.word-form-card > .ant-card-head .ant-card-extra .ant-btn:disabled {
+.word-form-card > .ui-card-head .ui-card-extra .ui-btn:disabled {
   color: rgba(255, 255, 255, 0.38);
 }
 
 .word-form-card
-  > .ant-card-head
-  .ant-card-extra
-  .ant-btn-dangerous:not(:disabled) {
+  > .ui-card-head
+  .ui-card-extra
+  .ui-btn-dangerous:not(:disabled) {
   color: #ffb3b3;
 }
 
@@ -396,17 +396,17 @@
 
 .word-basics-input-card,
 .word-detection-result-card,
-.word-basics-input-card > .ant-card-head,
-.word-detection-result-card > .ant-card-head,
-.word-basics-input-card > .ant-card-body {
+.word-basics-input-card > .ui-card-head,
+.word-detection-result-card > .ui-card-head,
+.word-basics-input-card > .ui-card-body {
   padding: 18px;
 }
 
-.word-basics-input-card .ant-form-item:last-of-type {
+.word-basics-input-card .ui-form-item:last-of-type {
   margin-bottom: 12px;
 }
 
-.word-basics-input-card .ant-input-search-button {
+.word-basics-input-card .ui-input-search-button {
   min-width: 128px;
 }
 
@@ -424,7 +424,7 @@
   box-shadow: 0 8px 24px rgba(32, 38, 54, 0.05);
 }
 
-.word-headword-confirmation-card > .ant-card-head {
+.word-headword-confirmation-card > .ui-card-head {
   min-height: 44px;
   padding-inline: 16px;
   background: #fafbfc;
@@ -452,11 +452,11 @@
   gap: 2px;
 }
 
-.word-dialect-detection-row .ant-typography-secondary {
+.word-dialect-detection-row .ui-typography-secondary {
   font-size: 12px;
 }
 
-.word-headword-confirmation-card .ant-alert {
+.word-headword-confirmation-card .ui-alert {
   border-radius: 9px;
 }
 
@@ -465,7 +465,7 @@
   border-radius: 10px;
 }
 
-.word-headword-confirmation-card .dialect-panel > .ant-typography {
+.word-headword-confirmation-card .dialect-panel > .ui-typography {
   display: block;
   margin-bottom: 8px;
 }
@@ -507,13 +507,13 @@
   gap: 16px;
 }
 
-.word-smart-match-summary-row .ant-tag {
+.word-smart-match-summary-row .ui-tag {
   margin-inline-end: 0;
 }
 
 /* 「查看已有原形」是次要动作，去掉 antd 链接按钮的默认内边距，
    让它与主词在同一条基线上收边，不额外撑高整行。 */
-.word-smart-match-summary-row .ant-btn-link {
+.word-smart-match-summary-row .ui-btn-link {
   height: auto;
   padding: 0;
 }
@@ -529,7 +529,7 @@
   color: #98a2b3;
 }
 
-.word-smart-match-context-meta .ant-tag {
+.word-smart-match-context-meta .ui-tag {
   margin-inline-end: 0;
 }
 
@@ -577,16 +577,16 @@
   margin-top: 14px;
 }
 
-.word-entry-actions .ant-btn {
+.word-entry-actions .ui-btn {
   min-width: 112px;
 }
 
-.word-detection-result-card .ant-alert {
+.word-detection-result-card .ui-alert {
   border-radius: 9px;
 }
 
-.word-detection-result-card .ant-descriptions-row > th,
-.word-detection-result-card .ant-descriptions-row > td {
+.word-detection-result-card .ui-descriptions-row > th,
+.word-detection-result-card .ui-descriptions-row > td {
   padding-bottom: 10px;
 }
 
@@ -614,7 +614,7 @@
     .word-detection-result-card,
     .word-headword-confirmation-card
   )
-  > .ant-card-head {
+  > .ui-card-head {
   min-height: 48px;
   padding: 0 var(--word-card-padding);
 }
@@ -625,15 +625,15 @@
     .word-detection-result-card,
     .word-headword-confirmation-card
   )
-  > .ant-card-body {
+  > .ui-card-body {
   padding: var(--word-card-padding);
 }
 
-.word-basics-workflow .word-basics-input-card .ant-form-item {
+.word-basics-workflow .word-basics-input-card .ui-form-item {
   margin-bottom: 20px;
 }
 
-.word-basics-workflow .word-basics-input-card .ant-form-item:last-of-type {
+.word-basics-workflow .word-basics-input-card .ui-form-item:last-of-type {
   margin-bottom: 8px;
 }
 
@@ -662,7 +662,7 @@
   padding: 16px;
 }
 
-.word-basics-workflow .word-headword-confirmation-card .ant-form-item {
+.word-basics-workflow .word-headword-confirmation-card .ui-form-item {
   margin-bottom: 0;
 }
 
@@ -674,7 +674,7 @@
 
 .word-basics-workflow
   .word-detection-result-card
-  .ant-descriptions-row:last-child
+  .ui-descriptions-row:last-child
   > :is(th, td) {
   padding-bottom: 0;
 }
@@ -706,7 +706,7 @@
   padding: 12px 16px;
 }
 
-.word-forms-tabs > .ant-tabs-nav {
+.word-forms-tabs > .ui-tabs-nav {
   padding: 0 2px;
 }
 
@@ -715,18 +715,18 @@
   border-radius: 13px;
 }
 
-.word-form-card > .ant-card-head {
+.word-form-card > .ui-card-head {
   min-height: 48px;
   padding-inline: 14px;
   cursor: pointer;
 }
 
 /* 基准原形卡不可折叠(它是完成本步的硬要求,任何时候都得能改)。 */
-.word-form-base-card > .ant-card-head {
+.word-form-base-card > .ui-card-head {
   cursor: default;
 }
 
-.word-form-card > .ant-card-head .ant-card-head-title {
+.word-form-card > .ui-card-head .ui-card-head-title {
   min-width: 0;
 }
 
@@ -754,14 +754,14 @@
   font-weight: 400;
 }
 
-.word-form-card > .ant-card-body {
+.word-form-card > .ui-card-body {
   padding: 0;
 }
 
 /* 词形组卡的底部留白来自组内的「添加派生词形」行,基准原形卡没有那一行,
    自己补上,否则矩阵/折叠条会直接压在卡片底边上。必须排在上面那条
    padding:0 之后——同特异性,靠顺序取胜。 */
-.word-form-base-card > .ant-card-body {
+.word-form-base-card > .ui-card-body {
   padding-bottom: 16px;
 }
 
@@ -783,8 +783,8 @@
   background: #fff;
 }
 
-.word-shared-form-spelling .ant-tag,
-.word-shared-pronunciation .ant-tag {
+.word-shared-form-spelling .ui-tag,
+.word-shared-pronunciation .ui-tag {
   margin-inline-end: 0;
 }
 
@@ -846,17 +846,17 @@
   min-width: 0;
 }
 
-.word-pronunciation-actions .ant-btn {
+.word-pronunciation-actions .ui-btn {
   width: 27px;
   padding-inline: 0;
 }
 
 .word-pronunciation-actions
-  .ant-btn:not(:disabled):where(:not(.word-pronunciation-remove)) {
+  .ui-btn:not(:disabled):where(:not(.word-pronunciation-remove)) {
   color: var(--word-ink);
 }
 
-.word-pronunciation-actions .word-pronunciation-drag-handle.ant-btn {
+.word-pronunciation-actions .word-pronunciation-drag-handle.ui-btn {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -867,20 +867,20 @@
 }
 
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle.ant-btn:hover:not(:disabled),
+  .word-pronunciation-drag-handle.ui-btn:hover:not(:disabled),
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle.ant-btn:focus-visible {
+  .word-pronunciation-drag-handle.ui-btn:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
 .word-pronunciation-actions
-  .word-pronunciation-drag-handle.ant-btn:active:not(:disabled) {
+  .word-pronunciation-drag-handle.ui-btn:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
-.word-pronunciation-actions .word-pronunciation-drag-handle.ant-btn:disabled {
+.word-pronunciation-actions .word-pronunciation-drag-handle.ui-btn:disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -998,7 +998,7 @@
   padding-left: 10px;
 }
 
-.word-pronunciation-phonetic-control .ant-space-compact {
+.word-pronunciation-phonetic-control .ui-space-compact {
   width: 100%;
 }
 
@@ -1023,9 +1023,9 @@
   --word-playback-color: #d42a91;
 }
 
-.word-pronunciation-play-action.ant-btn:not(:disabled),
-.word-pronunciation-play-action.ant-btn:not(:disabled):hover,
-.word-pronunciation-play-action.ant-btn:not(:disabled):active {
+.word-pronunciation-play-action.ui-btn:not(:disabled),
+.word-pronunciation-play-action.ui-btn:not(:disabled):hover,
+.word-pronunciation-play-action.ui-btn:not(:disabled):active {
   color: var(--word-playback-color);
 }
 
@@ -1048,13 +1048,13 @@
   cursor: help;
 }
 
-.word-pronunciation-voice-popover .ant-popover-container {
+.word-pronunciation-voice-popover .ui-popover-container {
   padding: 12px 14px 6px;
   border: 1px solid #e9ecf1;
   border-radius: 12px;
   box-shadow: 0 6px 24px rgba(32, 38, 54, 0.12);
 }
-.word-pronunciation-voice-popover .ant-popover-title {
+.word-pronunciation-voice-popover .ui-popover-title {
   margin-bottom: 4px;
 }
 .word-pronunciation-voice-heading {
@@ -1117,10 +1117,10 @@
   text-align: right;
   white-space: nowrap;
 }
-.word-pronunciation-voice-controls .ant-space-compact {
+.word-pronunciation-voice-controls .ui-space-compact {
   width: auto;
 }
-.word-pronunciation-voice-controls .ant-btn {
+.word-pronunciation-voice-controls .ui-btn {
   width: 28px;
   min-width: 28px;
   height: 28px;
@@ -1227,7 +1227,7 @@
   border-bottom: 1px solid #d9dee7;
 }
 
-.word-form-type-cell .ant-tag {
+.word-form-type-cell .ui-tag {
   margin-inline-end: 0;
 }
 
@@ -1309,8 +1309,8 @@
   box-shadow: 0 6px 18px rgba(32, 38, 54, 0.04);
 }
 
-.word-sense-groups-card > .ant-card-head,
-.word-grammar-card > .ant-card-head {
+.word-sense-groups-card > .ui-card-head,
+.word-grammar-card > .ui-card-head {
   min-height: 48px;
   padding-inline: 14px;
   background: #fafbfc;
@@ -1318,7 +1318,7 @@
 }
 
 /* 上下留白要和行间对齐：行自带 10px padding，卡片再给 14px 会让首末两条比行间多出 3px。 */
-.word-sense-groups-card > .ant-card-body {
+.word-sense-groups-card > .ui-card-body {
   padding: 10px 14px;
 }
 
@@ -1337,7 +1337,7 @@
   border-radius: 9px;
 }
 
-.word-meaning-dialect-panel .ant-tag {
+.word-meaning-dialect-panel .ui-tag {
   margin-inline-end: 0;
 }
 
@@ -1397,15 +1397,15 @@
   min-width: 0;
 }
 
-.word-pos-tabs > .ant-tabs-nav {
+.word-pos-tabs > .ui-tabs-nav {
   margin-bottom: 16px;
 }
 
-.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab {
+.word-pos-tabs > .ui-tabs-nav .ui-tabs-tab {
   padding-block: 9px;
 }
 
-.word-pos-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+.word-pos-tabs > .ui-tabs-nav .ui-tabs-tab-active {
   font-weight: 700;
 }
 
@@ -1420,7 +1420,7 @@
   box-shadow: 0 6px 18px rgba(32, 38, 54, 0.04);
 }
 
-.word-grammar-card > .ant-card-body {
+.word-grammar-card > .ui-card-body {
   padding: 10px 14px;
 }
 
@@ -1450,11 +1450,11 @@
   width: var(--word-ops-col, 32px);
 }
 
-.word-sort-actions > .ant-btn {
+.word-sort-actions > .ui-btn {
   width: 32px;
 }
 
-:is(.word-sort-actions, .word-sort-leading) .word-sort-drag-handle.ant-btn {
+:is(.word-sort-actions, .word-sort-leading) .word-sort-drag-handle.ui-btn {
   color: #7f8998;
   cursor: grab;
   user-select: none;
@@ -1465,21 +1465,21 @@
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:hover:not(:disabled),
+  .word-sort-drag-handle.ui-btn:hover:not(:disabled),
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:focus-visible {
+  .word-sort-drag-handle.ui-btn:focus-visible {
   color: #1677ff;
   background: rgba(22, 119, 255, 0.1);
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:active:not(:disabled) {
+  .word-sort-drag-handle.ui-btn:active:not(:disabled) {
   cursor: grabbing;
   transform: scale(1.06);
 }
 
 :is(.word-sort-actions, .word-sort-leading)
-  .word-sort-drag-handle.ant-btn:disabled {
+  .word-sort-drag-handle.ui-btn:disabled {
   color: #c4cad4;
   cursor: default;
 }
@@ -1587,7 +1587,7 @@
   --sense-accent: #d22d8d;
 }
 
-.word-sense-editor > .ant-collapse-item {
+.word-sense-editor > .ui-collapse-item {
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--sense-border) !important;
@@ -1596,7 +1596,7 @@
   box-shadow: 0 8px 22px rgba(32, 38, 54, 0.05);
 }
 
-.word-sense-editor > .ant-collapse-item > .ant-collapse-header {
+.word-sense-editor > .ui-collapse-item > .ui-collapse-header {
   align-items: center !important;
   min-height: 48px;
   padding: 9px 12px !important;
@@ -1604,13 +1604,13 @@
 }
 
 .word-sense-editor
-  > .ant-collapse-item
-  > .ant-collapse-content
-  > .ant-collapse-content-box {
+  > .ui-collapse-item
+  > .ui-collapse-panel
+  > .ui-collapse-body {
   padding: 14px !important;
 }
 
-.word-sense-editor .ant-collapse-header-text {
+.word-sense-editor .ui-collapse-title {
   min-width: 0;
 }
 
@@ -1623,7 +1623,7 @@
   min-width: 0;
 }
 
-.word-sense-editor .ant-collapse-header-text .ant-typography {
+.word-sense-editor .ui-collapse-title .ui-typography {
   display: inline-block;
   max-width: min(720px, 58vw);
   overflow: hidden;
@@ -1632,12 +1632,12 @@
   vertical-align: middle;
 }
 
-.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-header {
+.word-sense-editor-v3 > .ui-collapse-item > .ui-collapse-header {
   padding: 8px 12px !important;
   background: color-mix(in srgb, var(--sense-accent) 24%, white);
 }
 
-.word-sense-editor-v3 > .ant-collapse-item > .ant-collapse-panel {
+.word-sense-editor-v3 > .ui-collapse-item > .ui-collapse-panel {
   border-top: 0;
 }
 
@@ -1700,8 +1700,8 @@
   min-width: 0;
 }
 
-.word-sense-field > .ant-typography,
-.word-sense-context-toggle > .ant-typography {
+.word-sense-field > .ui-typography,
+.word-sense-context-toggle > .ui-typography {
   font-size: 12px;
 }
 
@@ -1716,7 +1716,7 @@
   margin-top: 6px;
 }
 
-.word-sense-context-control .ant-switch {
+.word-sense-context-control .ui-switch {
   width: auto;
   min-width: 44px;
 }
@@ -1727,11 +1727,11 @@
   gap: 6px;
 }
 
-.word-sense-field-frequency .ant-input-number {
+.word-sense-field-frequency .ui-input-number {
   width: 100%;
 }
 
-.word-sense-field-frequency .ant-input-number-suffix {
+.word-sense-field-frequency .ui-input-number-suffix {
   color: #7f8794;
 }
 
@@ -1773,7 +1773,7 @@
   outline-offset: -2px;
 }
 
-.word-sense-section-title .ant-tag {
+.word-sense-section-title .ui-tag {
   margin-inline-end: 0;
   color: #737b89;
   background: #fff;
@@ -1855,22 +1855,22 @@
   padding-block: 9px;
 }
 
-.word-definition-text-select.ant-select {
+.word-definition-text-select.ui-select {
   padding-inline: 0;
 }
 
-.word-definition-text-select .ant-select-content {
+.word-definition-text-select .ui-select-content {
   margin-inline-end: 0;
   text-align: center;
 }
 
-.word-definition-text-select.ant-select.ant-select-open
-  .ant-select-content.ant-select-content-has-value {
-  color: var(--ant-color-primary, #2053ff);
+.word-definition-text-select.ui-select.ui-select-open
+  .ui-select-content.ui-select-content-has-value {
+  color: var(--ui-color-primary, #2053ff);
   opacity: 1;
 }
 
-.word-definition-text-options .ant-select-item-option-content {
+.word-definition-text-options .ui-select-item-option-content {
   text-align: center;
 }
 
@@ -1949,30 +1949,29 @@
   place-items: center;
 }
 
-.word-forms-tabs-empty .ant-empty-description {
+.word-forms-tabs-empty .ui-empty-description {
   color: inherit;
 }
 
-.word-forms-tabs-empty .ant-empty-description strong {
+.word-forms-tabs-empty .ui-empty-description strong {
   color: #262626;
 }
 
-.word-add-basic-pos-select .ant-select-selector {
+.word-add-basic-pos-select .ui-select-selector {
   background: #f5faff !important;
   border-color: #91caff !important;
 }
 
-.word-add-basic-pos-select .ant-select-selection-placeholder,
-.word-add-basic-pos-select .ant-select-arrow {
+.word-add-basic-pos-select .ui-select-selection-placeholder,
+.word-add-basic-pos-select .ui-select-arrow {
   color: #1677ff !important;
 }
 
-.word-add-basic-pos-select .ant-select-selection-placeholder {
+.word-add-basic-pos-select .ui-select-selection-placeholder {
   font-weight: 500;
 }
 
-.word-add-basic-pos-select:not(.ant-select-disabled):hover
-  .ant-select-selector {
+.word-add-basic-pos-select:not(.ui-select-disabled):hover .ui-select-selector {
   border-color: #4096ff !important;
 }
 
@@ -2002,7 +2001,7 @@
   display: block;
 }
 
-.word-relations-grid-stacked .word-relation-row > .ant-btn-dangerous {
+.word-relations-grid-stacked .word-relation-row > .ui-btn-dangerous {
   grid-column: 5;
   grid-row: 1;
   position: static;
@@ -2041,28 +2040,28 @@
   box-shadow: 0 9px 22px rgba(32, 83, 255, 0.1);
 }
 
-.word-relation-card > .ant-card-head {
+.word-relation-card > .ui-card-head {
   min-height: 44px;
   padding-inline: 12px 8px;
   background: #f5f6f8;
   border-bottom-color: #dfe3e8;
 }
 
-.word-relation-card > .ant-card-head .ant-card-head-title {
+.word-relation-card > .ui-card-head .ui-card-head-title {
   font-size: 15px;
   font-weight: 700;
 }
 
-.word-relation-card > .ant-card-body {
+.word-relation-card > .ui-card-body {
   padding: 10px;
 }
 
-.word-relation-card.is-collapsed > .ant-card-body {
+.word-relation-card.is-collapsed > .ui-card-body {
   display: none;
 }
 
 /* 关联词复用词义区块的高度与透明度动画，避免 display:none 截断过渡。 */
-.word-relation-card.word-relation-card-animated > .ant-card-body {
+.word-relation-card.word-relation-card-animated > .ui-card-body {
   display: block;
   padding: 0;
 }
@@ -2076,14 +2075,14 @@
 }
 
 .word-relations-grid-stacked .word-relation-row + .word-relation-row {
-  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-top: 1px solid var(--ui-color-border-secondary, #f0f0f0);
   padding-top: 6px;
 }
 
 .word-relation-index {
   min-width: 16px;
   flex-shrink: 0;
-  color: var(--ant-color-text-tertiary, #8c8c8c);
+  color: var(--ui-color-text-tertiary, #8c8c8c);
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -2100,12 +2099,12 @@
   padding-inline-start: 16px;
 }
 
-.word-relation-glosses-connected > .ant-flex {
+.word-relation-glosses-connected > .ui-flex {
   position: relative;
 }
 
-.word-relation-glosses-connected > .ant-flex::before,
-.word-relation-glosses-connected > .ant-flex::after {
+.word-relation-glosses-connected > .ui-flex::before,
+.word-relation-glosses-connected > .ui-flex::after {
   content: "";
   position: absolute;
   inset-inline-start: -16px;
@@ -2116,26 +2115,26 @@
   pointer-events: none;
 }
 
-.word-relation-glosses-connected > .ant-flex::before {
+.word-relation-glosses-connected > .ui-flex::before {
   top: -3px;
   bottom: -3px;
   border-inline-start-width: 1px;
 }
 
-.word-relation-glosses-connected > .ant-flex:first-child::before {
+.word-relation-glosses-connected > .ui-flex:first-child::before {
   top: 50%;
   border-top-width: 1px;
   border-start-start-radius: 6px;
 }
 
-.word-relation-glosses-connected > .ant-flex:last-child::before {
+.word-relation-glosses-connected > .ui-flex:last-child::before {
   bottom: 50%;
   border-bottom-width: 1px;
   border-end-start-radius: 6px;
 }
 
 .word-relation-glosses-connected
-  > .ant-flex:not(:first-child):not(:last-child)::after {
+  > .ui-flex:not(:first-child):not(:last-child)::after {
   top: 50%;
   border-top-width: 1px;
 }
@@ -2171,7 +2170,7 @@
   min-width: 0;
 }
 
-.word-relation-row .ant-input-number {
+.word-relation-row .ui-input-number {
   width: 100%;
 }
 
@@ -2181,12 +2180,12 @@
   min-width: 0;
 }
 
-.word-relation-row .ant-input,
-.word-relation-row .ant-input-number-input {
+.word-relation-row .ui-input,
+.word-relation-row .ui-input-number-input {
   font-weight: 600;
 }
 
-.word-relation-target .ant-input-prefix {
+.word-relation-target .ui-input-prefix {
   color: #2563eb;
 }
 
@@ -2196,8 +2195,8 @@
   min-width: 0;
 }
 
-.word-relation-sense .ant-select-selection-item,
-.word-relation-sense .ant-select-selection-placeholder {
+.word-relation-sense .ui-select-selection-item,
+.word-relation-sense .ui-select-selection-placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2215,7 +2214,7 @@
   white-space: nowrap;
 }
 
-.word-relation-row > .ant-btn-dangerous {
+.word-relation-row > .ui-btn-dangerous {
   position: absolute;
   top: -5px;
   right: -5px;
@@ -2228,8 +2227,8 @@
   transition: opacity 120ms ease;
 }
 
-.word-relation-row:hover > .ant-btn-dangerous,
-.word-relation-row:focus-within > .ant-btn-dangerous {
+.word-relation-row:hover > .ui-btn-dangerous,
+.word-relation-row:focus-within > .ui-btn-dangerous {
   opacity: 1;
 }
 
@@ -2403,13 +2402,13 @@
     min-height: 0;
   }
 
-  .word-step-actions .ant-btn {
+  .word-step-actions .ui-btn {
     width: 100%;
     min-width: 0;
     padding-inline: 8px;
   }
 
-  .word-step-actions .ant-btn-primary:last-child:nth-child(odd) {
+  .word-step-actions .ui-btn-primary:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 }
@@ -2478,7 +2477,7 @@
     display: none;
   }
 
-  .word-sense-group-item > .ant-btn {
+  .word-sense-group-item > .ui-btn {
     width: 100%;
   }
 }
@@ -2534,9 +2533,9 @@
   }
 
   .word-sense-editor
-    > .ant-collapse-item
-    > .ant-collapse-content
-    > .ant-collapse-content-box {
+    > .ui-collapse-item
+    > .ui-collapse-panel
+    > .ui-collapse-body {
     padding: 10px !important;
   }
 
@@ -2564,14 +2563,14 @@
     min-width: 0;
   }
 
-  .word-definition-row > .ant-space,
-  .word-sentence-row > .ant-space {
+  .word-definition-row > .ui-space,
+  .word-sentence-row > .ui-space {
     width: 100%;
   }
 
-  .word-definition-row > .ant-space:last-child,
+  .word-definition-row > .ui-space:last-child,
   .word-definition-row > .word-list-actions,
-  .word-sentence-row > .ant-space:last-child {
+  .word-sentence-row > .ui-space:last-child {
     flex-direction: row;
     justify-content: flex-end;
   }

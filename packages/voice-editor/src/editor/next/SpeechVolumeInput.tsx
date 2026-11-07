@@ -1,5 +1,6 @@
 import { VolumeXIcon, Volume2Icon } from "lucide-react";
-import { Flex, InputNumber, Slider } from "antd";
+import { Flex } from "@tsz/ui/admin/display";
+import { InputNumber, Slider } from "@tsz/ui/admin/forms";
 import type { AriaAttributes } from "react";
 
 interface SpeechVolumeInputProps extends Pick<

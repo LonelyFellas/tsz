@@ -10,22 +10,19 @@ import type {
 } from "@tsz/types";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
   Collapse,
-  Drawer,
   Flex,
-  Form,
-  Input,
-  Modal,
   Result,
   Space,
   Tag,
-  Typography,
-  theme
-} from "antd";
+  Typography
+} from "@tsz/ui/admin/display";
+import { App, Drawer, Modal } from "@tsz/ui/admin/overlays";
+import { Form, Input } from "@tsz/ui/admin/forms";
+import { adminTokens } from "@tsz/ui/admin/context";
 import {
   useCallback,
   useContext,
@@ -150,7 +147,7 @@ export function VoiceLibrary({ view = "groups" }: { view?: VoiceView }) {
 }
 
 function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
-  const { token } = theme.useToken();
+  const token = adminTokens;
   const style = {
     "--voice-fill": token.colorFillAlter,
     "--voice-surface": token.colorBgContainer,

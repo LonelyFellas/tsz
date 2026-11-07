@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { App, Button } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
+import { Button } from "@tsz/ui/admin/display";
 import { ArrowLeftRightIcon, Undo2Icon } from "lucide-react";
 import type { Dialect, WordPronunciationV3 } from "@tsz/types";
 import { convertDictionaryToUnified } from "@tsz/shared";

@@ -6,8 +6,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AdminProfile, AiLedgerPage as Page } from "@tsz/types";
 import { api, useAuthStore } from "@/lib/auth";
@@ -112,11 +111,9 @@ function mount() {
   });
   render(
     <QueryClientProvider client={client}>
-      <ConfigProvider locale={zhCN}>
-        <App>
-          <AiLedgerPage />
-        </App>
-      </ConfigProvider>
+      <App>
+        <AiLedgerPage />
+      </App>
     </QueryClientProvider>
   );
   return client;
@@ -153,11 +150,11 @@ it("区分零命中和未知记录，分页及任务筛选使用服务端查询"
   fireEvent.change(screen.getByLabelText("任务 ID"), {
     target: { value: "invalid" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "查 询" }));
+  fireEvent.click(screen.getByRole("button", { name: "查询" }));
   await screen.findByText("请输入完整的任务 UUID");
   expect(api.aiLedger.costs).toHaveBeenCalledTimes(2);
   fireEvent.change(screen.getByLabelText("任务 ID"), { target: { value: id } });
-  fireEvent.click(screen.getByRole("button", { name: "查 询" }));
+  fireEvent.click(screen.getByRole("button", { name: "查询" }));
   await waitFor(() =>
     expect(api.aiLedger.costs).toHaveBeenLastCalledWith(
       { page: 1, page_size: 20, run_id: id },

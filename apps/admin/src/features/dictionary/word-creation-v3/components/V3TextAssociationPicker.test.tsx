@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ConfigProvider } from "antd";
+
 import type {
   GrammarFormLinkV3,
   PublishedSentenceTargetCandidateV3,
@@ -78,13 +78,13 @@ async function chooseReading() {
     fireEvent.mouseDown(input);
     expect(
       document.querySelector(
-        '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+        '.ui-select-item-option[title="读法 1 · IPA · ɡɪv"]'
       )
     ).not.toBeNull();
   });
   fireEvent.click(
     document.querySelector(
-      '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+      '.ui-select-item-option[title="读法 1 · IPA · ɡɪv"]'
     )!
   );
 }
@@ -157,15 +157,15 @@ const segments = [
 ];
 async function selectGive() {
   await waitFor(() => {
-    fireEvent.click(document.querySelector(".ant-cascader-menu-item-content")!);
+    fireEvent.click(document.querySelector(".ui-cascader-menu-item-content")!);
     expect(screen.getByText(/原形 give/)).toBeVisible();
   });
   fireEvent.click(
-    screen.getByText(/原形 give/).closest(".ant-cascader-menu-item-content")!
+    screen.getByText(/原形 give/).closest(".ui-cascader-menu-item-content")!
   );
   fireEvent.click(
     (await screen.findByText("给；交给")).closest(
-      ".ant-cascader-menu-item-content"
+      ".ui-cascader-menu-item-content"
     )!
   );
 }
@@ -182,11 +182,11 @@ it("语法结构选到词形先暂存，确认才绑定，无释义的词形也�
     />
   );
   await waitFor(() => {
-    fireEvent.click(document.querySelector(".ant-cascader-menu-item-content")!);
+    fireEvent.click(document.querySelector(".ui-cascader-menu-item-content")!);
     expect(screen.getByText(/原形 give/)).toBeVisible();
   });
   fireEvent.click(
-    screen.getByText(/原形 give/).closest(".ant-cascader-menu-item-content")!
+    screen.getByText(/原形 give/).closest(".ui-cascader-menu-item-content")!
   );
   expect(onSelect).not.toHaveBeenCalled();
   await chooseReading();
@@ -458,7 +458,7 @@ it.each([
     );
     await waitFor(() => {
       fireEvent.click(
-        document.querySelector(".ant-cascader-menu-item-content")!
+        document.querySelector(".ui-cascader-menu-item-content")!
       );
       expect(screen.getByText("原形 give · 英美通用")).toBeVisible();
     });
@@ -469,13 +469,13 @@ it.each([
       fireEvent.mouseDown(screen.getByLabelText(label));
       expect(
         document.querySelector(
-          '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+          '.ui-select-item-option[title="读法 1 · IPA · ɡɪv"]'
         )
       ).not.toBeNull();
     });
     fireEvent.click(
       document.querySelector(
-        '.ant-select-item-option[title="读法 1 · IPA · ɡɪv"]'
+        '.ui-select-item-option[title="读法 1 · IPA · ɡɪv"]'
       )!
     );
     expect(screen.queryByLabelText(otherLabel)).toBeNull();
@@ -550,7 +550,7 @@ it("远端同拼写词形合并回显，保留已关联的美式变体；不同�
   expect(screen.getByText("原形 centre · 英式")).toBeVisible();
   expect(screen.getByText("原形 center · 美式")).toBeVisible();
   expect(screen.getByText("已关联 · 英美通用")).toBeVisible();
-  expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+  expect(form.closest(".ui-cascader-menu-item")).toHaveAttribute(
     "aria-checked",
     "true"
   );
@@ -598,7 +598,7 @@ it.each(["uk", "us"] as const)(
     });
     expect(screen.queryByText("原形 job · 英美通用")).toBeNull();
     const form = screen.getByText("复数 jobs · 英美通用");
-    expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+    expect(form.closest(".ui-cascader-menu-item")).toHaveAttribute(
       "aria-checked",
       "true"
     );
@@ -640,7 +640,7 @@ it("已关联当前词条从编辑中词形回显，不再读取服务端旧草�
     />
   );
   const form = await screen.findByText("原形 job · 英美通用");
-  expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+  expect(form.closest(".ui-cascader-menu-item")).toHaveAttribute(
     "aria-checked",
     "true"
   );
@@ -652,38 +652,36 @@ it("已有发布版自关联仍回显，确认后可切换为当前编辑词形"
   search.mockResolvedValue(giveEntryResponse());
   const onSelect = vi.fn();
   render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <V3GrammarFormPicker
-        kind="word"
-        wordId="entry-give"
-        forms={formsFixture({
-          pos_id: "pos-give",
-          pos: "verb",
-          forms: [
-            commonFormFixture({
-              id: "form-new",
-              variant_id: "variant-new",
-              spelling: "give"
-            })
-          ]
-        })}
-        segments={[segments[0]!]}
-        selected={{
-          id: "link-old",
-          source_segments: [segments[0]!],
-          target_word_id: "entry-give",
-          target_publication_id: "pub-give",
-          target_pos_id: "pos-give",
-          target_form_id: "form-give",
-          target_variant_id: "variant-give",
-          target_dialect: "common"
-        }}
-        onSelect={onSelect}
-      />
-    </ConfigProvider>
+    <V3GrammarFormPicker
+      kind="word"
+      wordId="entry-give"
+      forms={formsFixture({
+        pos_id: "pos-give",
+        pos: "verb",
+        forms: [
+          commonFormFixture({
+            id: "form-new",
+            variant_id: "variant-new",
+            spelling: "give"
+          })
+        ]
+      })}
+      segments={[segments[0]!]}
+      selected={{
+        id: "link-old",
+        source_segments: [segments[0]!],
+        target_word_id: "entry-give",
+        target_publication_id: "pub-give",
+        target_pos_id: "pos-give",
+        target_form_id: "form-give",
+        target_variant_id: "variant-give",
+        target_dialect: "common"
+      }}
+      onSelect={onSelect}
+    />
   );
   const selectedForm = await screen.findByText("原形 give · 英美通用");
-  expect(selectedForm.closest(".ant-cascader-menu-item")).toHaveAttribute(
+  expect(selectedForm.closest(".ui-cascader-menu-item")).toHaveAttribute(
     "aria-checked",
     "true"
   );
@@ -692,9 +690,7 @@ it("已有发布版自关联仍回显，确认后可切换为当前编辑词形"
   await waitFor(() => {
     fireEvent.click(screen.getByText("give · 动词（当前词条）"));
     expect(
-      screen
-        .getByText("原形 give · 英美通用")
-        .closest(".ant-cascader-menu-item")
+      screen.getByText("原形 give · 英美通用").closest(".ui-cascader-menu-item")
     ).toHaveAttribute("aria-checked", "false");
   });
   fireEvent.click(screen.getByText("原形 give · 英美通用"));
@@ -759,23 +755,21 @@ it.each(["pub-give", undefined])(
     });
     const onSelect = vi.fn();
     render(
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <V3GrammarFormPicker
-          kind="word"
-          segments={[segments[0]!]}
-          selected={{
-            id: "link-give",
-            source_segments: [segments[0]!],
-            target_word_id: "entry-give",
-            target_publication_id: publicationId,
-            target_pos_id: "pos-give",
-            target_form_id: "form-give",
-            target_variant_id: "variant-give",
-            target_dialect: "common"
-          }}
-          onSelect={onSelect}
-        />
-      </ConfigProvider>
+      <V3GrammarFormPicker
+        kind="word"
+        segments={[segments[0]!]}
+        selected={{
+          id: "link-give",
+          source_segments: [segments[0]!],
+          target_word_id: "entry-give",
+          target_publication_id: publicationId,
+          target_pos_id: "pos-give",
+          target_form_id: "form-give",
+          target_variant_id: "variant-give",
+          target_dialect: "common"
+        }}
+        onSelect={onSelect}
+      />
     );
     await waitFor(() =>
       expect(search).toHaveBeenCalledWith(
@@ -788,7 +782,7 @@ it.each(["pub-give", undefined])(
     expect(search.mock.lastCall?.[0]).toHaveProperty("include_drafts", true);
     expect(screen.queryByText("显示草稿候选")).toBeNull();
     const form = await screen.findByText(/原形 give/);
-    expect(form.closest(".ant-cascader-menu-item")).toHaveAttribute(
+    expect(form.closest(".ui-cascader-menu-item")).toHaveAttribute(
       "aria-checked",
       "true"
     );
@@ -802,7 +796,7 @@ it.each(["pub-give", undefined])(
     expect(onSelect).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(
-        screen.getByText(/原形 give/).closest(".ant-cascader-menu-item")
+        screen.getByText(/原形 give/).closest(".ui-cascader-menu-item")
       ).toHaveAttribute("aria-checked", "true")
     );
     fireEvent.click(screen.getByRole("button", { name: "清除关联" }));
@@ -872,11 +866,7 @@ it("切换词形暂存到确认，取消保留原关联，重复确认当前词�
       />
     );
   }
-  render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <Host />
-    </ConfigProvider>
-  );
+  render(<Host />);
   const alternativeLabel = await screen.findByText("原形 give · 美式");
   fireEvent.click(alternativeLabel);
   expect(onSelect).not.toHaveBeenCalled();
@@ -885,7 +875,7 @@ it("切换词形暂存到确认，取消保留原关联，重复确认当前词�
   expect(onSelect).not.toHaveBeenCalled();
   expect(screen.getByText("已关联 · 英美通用")).toBeVisible();
   expect(
-    screen.getByText("原形 give · 英美通用").closest(".ant-cascader-menu-item")
+    screen.getByText("原形 give · 英美通用").closest(".ui-cascader-menu-item")
   ).toHaveAttribute("aria-checked", "true");
   fireEvent.click(alternativeLabel);
   await chooseReading();
@@ -903,7 +893,7 @@ it("切换词形暂存到确认，取消保留原关联，重复确认当前词�
     )
   );
   expect(screen.getByText("已关联 · 美式")).toBeVisible();
-  expect(alternativeLabel.closest(".ant-cascader-menu-item")).toHaveAttribute(
+  expect(alternativeLabel.closest(".ui-cascader-menu-item")).toHaveAttribute(
     "aria-checked",
     "true"
   );
@@ -1078,11 +1068,11 @@ it.each(["sense", "variant", "binding"] as const)(
     } else {
       await waitFor(() =>
         expect(
-          document.querySelector(".ant-cascader-menu-item-content")
+          document.querySelector(".ui-cascader-menu-item-content")
         ).not.toBeNull()
       );
       fireEvent.click(
-        document.querySelector(".ant-cascader-menu-item-content")!
+        document.querySelector(".ui-cascader-menu-item-content")!
       );
       const row = screen.queryByText("原形 give", { exact: true });
       if (row) fireEvent.click(row);
@@ -1191,7 +1181,7 @@ function phraseResponse() {
 
 function column(index: number) {
   return within(
-    document.querySelectorAll<HTMLElement>(".ant-cascader-menu")[index]!
+    document.querySelectorAll<HTMLElement>(".ui-cascader-menu")[index]!
   );
 }
 
@@ -1215,7 +1205,7 @@ it("短语直接选择词形词义，已关联后只能查看和清除", async (
     />
   );
   await selectPhrase();
-  expect(document.querySelectorAll(".ant-cascader-menu")).toHaveLength(3);
+  expect(document.querySelectorAll(".ui-cascader-menu")).toHaveLength(3);
   expect(onSelect).toHaveBeenLastCalledWith(
     expect.objectContaining({
       source_segments: segments,
@@ -1399,8 +1389,8 @@ it("还没保存词义的草稿列成禁用行并说明原因", async () => {
   const row = await screen.findByText("give（暂无词义）");
   expect(row).toBeVisible();
   expect(screen.getByText("草稿")).toBeVisible();
-  expect(row.closest(".ant-cascader-menu-item")?.className).toContain(
-    "ant-cascader-menu-item-disabled"
+  expect(row.closest(".ui-cascader-menu-item")?.className).toContain(
+    "ui-cascader-menu-item-disabled"
   );
   expect(screen.queryByText("没有匹配的词条")).not.toBeInTheDocument();
   fireEvent.click(row);
@@ -1572,7 +1562,7 @@ it("关联短语的命中词形没有可用词义时不能选择", async () => {
     expect(column(1).getByText(/原形 give up/)).toBeVisible();
   });
   const item = column(1).getByText(/原形 give up/);
-  expect(item.closest(".ant-cascader-menu-item")).toHaveClass(
-    "ant-cascader-menu-item-disabled"
+  expect(item.closest(".ui-cascader-menu-item")).toHaveClass(
+    "ui-cascader-menu-item-disabled"
   );
 });

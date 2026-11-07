@@ -10,7 +10,7 @@ import {
   replaceSharedContent
 } from "./sharedFormsModel";
 import { V3FormContentOverview } from "./components/V3FormContentOverview";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { V3FormContentModal } from "./components/V3FormContentModal";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
@@ -543,9 +543,9 @@ describe("V3WordCreationWizard", () => {
       expect(field("原形英式拼写")).toBeNull();
       expect(field("原形美式拼写")).toBeNull();
       expect(field("原形英美通用拼写")).toHaveValue("hit the sack");
-      expect(
-        field("英美拼写无区别")!.closest(".ant-radio-wrapper")
-      ).toHaveClass("ant-radio-wrapper-checked");
+      expect(field("英美拼写无区别")!.closest(".ui-radio-wrapper")).toHaveClass(
+        "ui-radio-wrapper-checked"
+      );
     }
   }, 15_000);
 
@@ -1374,7 +1374,7 @@ describe("V3WordCreationWizard", () => {
     await act(async () =>
       resolveFirstGet(draftEnvelope(3, "stale reconciliation"))
     );
-    fireEvent.click((await screen.findByText("重 试")).closest("button")!);
+    fireEvent.click((await screen.findByText(/^重\s*试$/u)).closest("button")!);
 
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
     expect(
@@ -1666,7 +1666,7 @@ describe("V3WordCreationWizard", () => {
     expect(
       screen
         .getByLabelText("释义 1 所属语义区间")
-        .closest(".ant-select")
+        .closest(".ui-select")
         ?.textContent?.trim()
     ).toBe("请选择语义区间");
     expect(screen.getAllByText("语法结构").length).toBeGreaterThan(0);
@@ -2240,8 +2240,8 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("meanings-retry-local")).toHaveTextContent(
       "重试仍保留"
     );
-    const retryButton = screen.getByText("重 试").closest("button")!;
-    await waitFor(() => expect(retryButton).not.toHaveClass("ant-btn-loading"));
+    const retryButton = screen.getByText(/^重\s*试$/u).closest("button")!;
+    await waitFor(() => expect(retryButton).not.toHaveClass("ui-btn-loading"));
     fireEvent.click(retryButton);
 
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
@@ -2696,7 +2696,7 @@ describe("V3WordCreationWizard", () => {
       expect(screen.getAllByLabelText("原形英美通用拼写")).toHaveLength(1);
       const sharedInput = screen.getByLabelText("原形英美通用拼写");
       expect(sharedInput).toHaveAttribute("aria-invalid", "true");
-      expect(sharedInput).toHaveClass("ant-input-status-error");
+      expect(sharedInput).toHaveClass("ui-input-status-error");
       for (const candidate of issues) {
         expect(
           document.querySelectorAll(
@@ -2925,7 +2925,7 @@ describe("V3WordCreationWizard", () => {
       renderStep: (context) => <MeaningsSlot context={context} />
     });
     const secondTab = container.querySelector<HTMLElement>(
-      `.ant-tabs-tab[data-node-key="${secondPosId}"] .ant-tabs-tab-btn`
+      `.ui-tabs-tab[data-node-key="${secondPosId}"] .ui-tabs-tab-btn`
     );
     expect(secondTab).not.toBeNull();
     fireEvent.click(secondTab!);
@@ -2955,7 +2955,7 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(collapseDefinitions!);
     fireEvent.click(secondSenseHeader!);
     const firstTab = container.querySelector<HTMLElement>(
-      `.ant-tabs-tab[data-node-key="${UUIDS.pos}"] .ant-tabs-tab-btn`
+      `.ui-tabs-tab[data-node-key="${UUIDS.pos}"] .ui-tabs-tab-btn`
     );
     expect(firstTab).not.toBeNull();
     fireEvent.click(firstTab!);
@@ -2966,7 +2966,7 @@ describe("V3WordCreationWizard", () => {
     expect(secondTab).toHaveAttribute("aria-selected", "true");
     expect(
       container.querySelector(
-        '[data-v3-field="sense"][data-v3-node-id="meaning-sense-1"] .ant-collapse-header'
+        '[data-v3-field="sense"][data-v3-node-id="meaning-sense-1"] .ui-collapse-header'
       )
     ).toHaveAttribute("aria-expanded", "false");
     expect(secondSenseHeader).toHaveAttribute("aria-expanded", "true");
@@ -5283,7 +5283,7 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByText("预览失败后重试"));
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("重 试").closest("button")!);
+    fireEvent.click(screen.getByText(/^重\s*试$/u).closest("button")!);
 
     await waitFor(() =>
       expect(screen.getByTestId("retried-impact")).toHaveTextContent("present")
@@ -5367,8 +5367,8 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("保存"));
     fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
-    const retryButton = screen.getByText("重 试").closest("button")!;
-    await waitFor(() => expect(retryButton).not.toHaveClass("ant-btn-loading"));
+    const retryButton = screen.getByText(/^重\s*试$/u).closest("button")!;
+    await waitFor(() => expect(retryButton).not.toHaveClass("ui-btn-loading"));
     fireEvent.click(retryButton);
 
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
@@ -6725,26 +6725,24 @@ it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份"
     latest = context;
     if (!("forms_format" in context.formContents)) throw new Error("fixture");
     return (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <PronunciationPreviewProvider>
-          <button onClick={() => setOpen(true)}>打开内容弹窗</button>
-          {open && (
-            <V3FormContentModal
-              forms={context.formContents}
-              formId={shared.pos[0]!.forms[0]!.id}
-              issues={[]}
-              stableVariantIds={context.stableVariantIds}
-              pronunciationReferenceIds={context.pronunciationReferenceIds}
-              retiredContentSlots={[]}
-              onCancel={() => setOpen(false)}
-              onConfirm={(next) => {
-                context.setFormContents(next);
-                setOpen(false);
-              }}
-            />
-          )}
-        </PronunciationPreviewProvider>
-      </ConfigProvider>
+      <PronunciationPreviewProvider>
+        <button onClick={() => setOpen(true)}>打开内容弹窗</button>
+        {open && (
+          <V3FormContentModal
+            forms={context.formContents}
+            formId={shared.pos[0]!.forms[0]!.id}
+            issues={[]}
+            stableVariantIds={context.stableVariantIds}
+            pronunciationReferenceIds={context.pronunciationReferenceIds}
+            retiredContentSlots={[]}
+            onCancel={() => setOpen(false)}
+            onConfirm={(next) => {
+              context.setFormContents(next);
+              setOpen(false);
+            }}
+          />
+        )}
+      </PronunciationPreviewProvider>
     );
   }
   renderWizard(source, {
@@ -6892,7 +6890,7 @@ it.each([
     renderWizard(requests(), {
       initialWord,
       renderStep: (context) => (
-        <AntApp>
+        <FeedbackApp>
           <V3FormsAndPronunciationStep
             sharedForms={shared}
             onSharedFormsChange={context.setFormContents}
@@ -6906,7 +6904,7 @@ it.each([
           <button onClick={() => void context.actions.navigateIssue(issue)}>
             定位共享内容槽位
           </button>
-        </AntApp>
+        </FeedbackApp>
       )
     });
     expect(screen.getByText("有待填写项")).toBeInTheDocument();

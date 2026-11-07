@@ -12,18 +12,14 @@ import {
 import { XIcon, PlusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Button,
-  Checkbox,
-  Drawer,
   Flex,
-  Modal,
   Space,
-  Switch,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Drawer, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { Checkbox, Switch } from "@tsz/ui/admin/forms";
 import type {
   DialectRulesV3,
   RetiredContentSlotV3,

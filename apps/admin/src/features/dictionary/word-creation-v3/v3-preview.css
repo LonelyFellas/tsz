@@ -12,15 +12,15 @@
 .v3-review > .word-step-heading {
   margin-bottom: 0;
 }
-.v3-review-header.ant-card {
+.v3-review-header.ui-card {
   border: 0;
   background: transparent;
   box-shadow: none;
 }
-.v3-review-header .ant-card-body {
+.v3-review-header .ui-card-body {
   padding: 16px 0;
 }
-.v3-review-header h2.ant-typography {
+.v3-review-header h2.ui-typography {
   font-size: 14pt;
   line-height: 1.15;
   letter-spacing: -1.5px;
@@ -118,30 +118,27 @@
   color: var(--review-muted);
   font-size: 13px;
 }
-.v3-review-content > .ant-collapse {
+.v3-review-content > .ui-collapse {
   background: transparent;
   border: 0;
 }
-.v3-review-content > .ant-collapse > .ant-collapse-item {
+.v3-review-content > .ui-collapse > .ui-collapse-item {
   border-bottom: 0;
 }
-.v3-review-content > .ant-collapse > .ant-collapse-item > .ant-collapse-header {
+.v3-review-content > .ui-collapse > .ui-collapse-item > .ui-collapse-header {
   padding: 24px 0;
   font-size: 17px;
   font-weight: 600;
 }
-.v3-review-content
-  > .ant-collapse
-  > .ant-collapse-item
-  > .ant-collapse-content {
+.v3-review-content > .ui-collapse > .ui-collapse-item > .ui-collapse-panel {
   border: 0;
   background: transparent;
 }
 .v3-review-content
-  > .ant-collapse
-  > .ant-collapse-item
-  > .ant-collapse-content
-  > .ant-collapse-content-box {
+  > .ui-collapse
+  > .ui-collapse-item
+  > .ui-collapse-panel
+  > .ui-collapse-body {
   padding: 0;
 }
 .v3-review-pos {
@@ -149,7 +146,7 @@
   border-radius: 8px;
   padding: 18px;
 }
-.v3-review-pos h4.ant-typography {
+.v3-review-pos h4.ui-typography {
   font-size: 15px;
 }
 .v3-review-section-label {
@@ -203,7 +200,7 @@
   color: var(--review-muted);
   font-size: 12px;
 }
-.v3-dictionary-pos > .ant-flex > .ant-flex:first-child {
+.v3-dictionary-pos > .ui-flex > .ui-flex:first-child {
   padding: 16px 0;
   border-bottom: 1px solid var(--review-line);
 }
@@ -233,7 +230,7 @@
   font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
-.v3-dictionary-sense .ant-tag {
+.v3-dictionary-sense .ui-tag {
   font-size: 12px;
   border-radius: 4px;
 }
@@ -312,7 +309,7 @@
   border-radius: 8px;
   margin-bottom: 12px;
 }
-.v3-dictionary-example > .ant-tag {
+.v3-dictionary-example > .ui-tag {
   margin-bottom: 10px;
 }
 .v3-dictionary-example .tsz-entry-en {
@@ -353,10 +350,10 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.v3-dictionary-relations > .ant-flex > strong {
+.v3-dictionary-relations > .ui-flex > strong {
   display: none;
 }
-.v3-dictionary-relations .ant-typography {
+.v3-dictionary-relations .ui-typography {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -369,13 +366,13 @@
   font-size: 12px;
   margin-right: 8px;
 }
-.v3-review .ant-empty {
+.v3-review .ui-empty {
   margin: 16px 0;
 }
-.v3-review .ant-empty-image {
+.v3-review .ui-empty-image {
   height: 28px;
 }
-.v3-review .ant-empty-description {
+.v3-review .ui-empty-description {
   font-size: 12px;
   color: var(--review-muted);
 }
@@ -429,7 +426,7 @@
     padding: 14px;
     border-radius: 8px;
   }
-  .v3-review-header h2.ant-typography {
+  .v3-review-header h2.ui-typography {
     font-size: 14pt;
   }
   .v3-dictionary-definition {
@@ -501,7 +498,7 @@
   gap: 8px;
   align-items: center;
 }
-.v3-review-pronunciation-cell .ant-btn {
+.v3-review-pronunciation-cell .ui-btn {
   width: 28px;
   min-width: 28px;
   flex-basis: 28px;
@@ -512,7 +509,7 @@
   min-width: 120px;
   margin-right: 12px;
 }
-.v3-relation-empty .ant-empty-image {
+.v3-relation-empty .ui-empty-image {
   height: 22px;
 }
 .v3-dictionary-usage small {
@@ -522,34 +519,34 @@
   outline: 2px solid #2053ff;
   outline-offset: 2px;
 }
-.v3-review .ant-tag {
+.v3-review .ui-tag {
   max-width: 100%;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 /* 操作栏跟随预览滚动；保留原文档占位，最后一段内容仍可完整滚出。 */
-.ant-space-item:has(> .v3-review-publish) {
+.ui-space-item:has(> .v3-review-publish) {
   position: sticky;
   bottom: 12px;
   z-index: 20;
 }
-.v3-review-publish.ant-card {
+.v3-review-publish.ui-card {
   border-color: #dce4f5;
   box-shadow: 0 -4px 24px rgb(32 53 100 / 12%);
   background: rgba(255, 255, 255, 0.98);
   max-height: min(45vh, 420px);
   overflow-y: auto;
 }
-.v3-review-publish.ant-card > .ant-card-head {
+.v3-review-publish.ui-card > .ui-card-head {
   min-height: 38px;
   font-size: 14px;
 }
-.v3-review-publish.ant-card > .ant-card-body {
+.v3-review-publish.ui-card > .ui-card-body {
   padding: 12px 16px;
 }
 @media (max-width: 760px) {
-  .ant-space-item:has(> .v3-review-publish) {
+  .ui-space-item:has(> .v3-review-publish) {
     bottom: max(8px, env(safe-area-inset-bottom));
   }
 }

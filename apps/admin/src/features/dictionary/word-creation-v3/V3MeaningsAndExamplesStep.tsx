@@ -24,26 +24,25 @@ import {
 } from "lucide-react";
 import {
   Alert,
-  App,
   Badge,
   Button,
   Card,
   Collapse,
   Empty,
   Flex,
-  Input,
-  InputNumber,
-  Modal,
-  Popover,
-  Select,
-  type SelectProps,
   Space,
-  Switch,
   Tag,
   Tabs,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal, Popover, Tooltip } from "@tsz/ui/admin/overlays";
+import {
+  Input,
+  InputNumber,
+  Select,
+  type SelectProps,
+  Switch
+} from "@tsz/ui/admin/forms";
 import type {
   Dialect,
   DialectModeV3,

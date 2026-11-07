@@ -1,6 +1,6 @@
 import { CrownIcon, UserIcon } from "lucide-react";
-import type { AvatarProps } from "antd";
-import { Avatar } from "antd";
+import { type AvatarProps, Avatar } from "@tsz/ui/admin/display";
+
 import type { AdminLevel } from "@tsz/types";
 import type { ReactNode } from "react";
 

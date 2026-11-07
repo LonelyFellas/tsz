@@ -7,7 +7,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, Link, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -490,7 +490,7 @@ describe("新建例句保存与恢复", () => {
     });
     const dialog = (
       await screen.findByText("例句还有未保存的修改", {
-        selector: ".ant-modal-confirm-title"
+        selector: ".ui-modal-confirm-title"
       })
     ).closest('[role="dialog"]')! as HTMLElement;
     fireEvent.click(within(dialog).getByRole("button", { name: "放弃修改" }));
@@ -717,7 +717,7 @@ describe("当前词条关联与离开保护", () => {
     ).toHaveLength(1);
     const footer = screen
       .getByLabelText("保存例句")
-      .closest(".ant-modal-footer");
+      .closest(".ui-modal-footer");
     expect(footer).not.toBeNull();
     expect(
       screen.getByLabelText("保存例句").closest(".tsz-ve-editing-area")
@@ -771,7 +771,7 @@ describe("当前词条关联与离开保护", () => {
     fireEvent.click(screen.getByLabelText("取消例句编辑"));
     const dialog = (
       await screen.findByText("放弃本次未完成的例句编辑？", {
-        selector: ".ant-modal-confirm-title"
+        selector: ".ui-modal-confirm-title"
       })
     ).closest('[role="dialog"]')! as HTMLElement;
     expect(onClose).not.toHaveBeenCalled();
@@ -885,7 +885,7 @@ describe("当前词条关联与离开保护", () => {
     expect(screen.getByLabelText("例句正文")).toHaveValue("We make stories.");
     const dialog = (
       await screen.findByText("放弃本地修改？", {
-        selector: ".ant-modal-confirm-title"
+        selector: ".ui-modal-confirm-title"
       })
     ).closest('[role="dialog"]')! as HTMLElement;
     fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
@@ -976,12 +976,8 @@ describe("当前词条关联与离开保护", () => {
         />
       );
       await screen.findByText(new RegExp(`请关联当前词义：${spelling}`));
-      const shortcut = screen
-        .queryByText(/确认关联 make/, {
-          selector: "button span"
-        })
-        ?.closest("button");
-      if (spelling === "make") expect(shortcut).toBeUndefined();
+      const shortcut = screen.queryByRole("button", { name: /确认关联 make/ });
+      if (spelling === "make") expect(shortcut).toBeNull();
       else expect(shortcut).toBeEnabled();
       expect(screen.getByLabelText("保存例句")).toBeDisabled();
       expect(api.sentences.update).not.toHaveBeenCalled();
@@ -1145,7 +1141,7 @@ describe("当前词条关联与离开保护", () => {
     );
     fireEvent.click(await screen.findByText(/原形 for/, {}, { timeout: 5000 }));
     const sense = await screen.findByText("编造（故事、借口等）");
-    expect(sense.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
+    expect(sense.closest("li")).toHaveClass("ui-cascader-menu-item-disabled");
     expect(sense.querySelector(".v3-component-usage-radio")).toHaveClass(
       "is-checked"
     );

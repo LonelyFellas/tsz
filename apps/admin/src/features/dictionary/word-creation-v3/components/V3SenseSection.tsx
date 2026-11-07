@@ -1,5 +1,5 @@
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import { Button, Tag, Typography } from "antd";
+import { Button, Tag, Typography } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 
 export function SenseSectionTitle({

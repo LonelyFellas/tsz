@@ -1,4 +1,6 @@
-import { Alert, Button, Modal, Select, Space, Typography } from "antd";
+import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Modal } from "@tsz/ui/admin/overlays";
+import { Select } from "@tsz/ui/admin/forms";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { RichTextV2 } from "@tsz/types";
 import type {

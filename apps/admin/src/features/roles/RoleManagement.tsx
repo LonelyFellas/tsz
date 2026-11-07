@@ -5,18 +5,16 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 import { PlusIcon, RotateCwIcon, UserRoundPlusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
   Flex,
-  Modal,
   Space,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
-import type { TableColumnsType } from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { type TableColumnsType } from "@tsz/ui/admin/table";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import type { AdminRole, PermissionKey } from "@tsz/types";

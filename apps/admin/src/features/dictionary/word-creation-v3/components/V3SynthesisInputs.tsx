@@ -1,6 +1,8 @@
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { ChevronDownIcon, ArrowLeftRightIcon } from "lucide-react";
-import { Alert, Button, Input, Modal, Radio, Space, Typography } from "antd";
+import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Input, Radio } from "@tsz/ui/admin/forms";
+import { Modal } from "@tsz/ui/admin/overlays";
 import { useEffect, useId, useRef, useState } from "react";
 import type {
   AudioAssetV3,

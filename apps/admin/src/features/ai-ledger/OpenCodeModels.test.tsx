@@ -7,7 +7,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, expect, it, vi } from "vitest";
 import type {
   OpenCodeModelSelection,
@@ -89,14 +89,12 @@ function mount(withKey = false) {
     defaultOptions: { queries: { retry: false } }
   });
   render(
-    <ConfigProvider>
-      <App>
-        <QueryClientProvider client={client}>
-          <OpenCodeModels adminId="super-test" />
-          {withKey && <OpenCodeKeyForm adminId="super-test" />}
-        </QueryClientProvider>
-      </App>
-    </ConfigProvider>
+    <App>
+      <QueryClientProvider client={client}>
+        <OpenCodeModels adminId="super-test" />
+        {withKey && <OpenCodeKeyForm adminId="super-test" />}
+      </QueryClientProvider>
+    </App>
   );
   return client;
 }

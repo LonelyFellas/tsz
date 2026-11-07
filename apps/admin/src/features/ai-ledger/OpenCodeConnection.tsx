@@ -6,7 +6,8 @@ import {
   useQueryClient
 } from "@tanstack/react-query";
 import { LinkIcon, RotateCwIcon } from "lucide-react";
-import { Alert, Badge, Button, Drawer, Space, Typography } from "antd";
+import { Alert, Badge, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Drawer } from "@tsz/ui/admin/overlays";
 import type { OpenCodeLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { OpenCodeProviders } from "./OpenCodeProviders";

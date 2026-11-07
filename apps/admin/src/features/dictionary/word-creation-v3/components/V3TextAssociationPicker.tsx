@@ -1,4 +1,4 @@
-import { Button, Flex, Typography } from "antd";
+import { Button, Flex, Typography } from "@tsz/ui/admin/display";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
 import type {
   Dialect,

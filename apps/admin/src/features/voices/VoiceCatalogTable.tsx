@@ -12,18 +12,10 @@ import {
   VenusIcon
 } from "lucide-react";
 import type { AdminSpeechVoice, AdminVoiceLibraryItem } from "@tsz/types";
-import {
-  Button,
-  Checkbox,
-  Input,
-  Pagination,
-  Popover,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip
-} from "antd";
+import { Button, Space, Tag } from "@tsz/ui/admin/display";
+import { Checkbox, Input, Select } from "@tsz/ui/admin/forms";
+import { Pagination, Table } from "@tsz/ui/admin/table";
+import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { useState, type ReactNode } from "react";
 import { GatedButton } from "@/components/GatedButton";
 import { TableEmptyState } from "@/components/TableEmptyState";

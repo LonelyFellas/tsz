@@ -1,4 +1,4 @@
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { useCallback, useState } from "react";
 import {
   act,
@@ -123,7 +123,6 @@ function adapter(
 ): VoicePreviewAdapter {
   return { listVoices: vi.fn().mockResolvedValue(options), synthesize };
 }
-const testTheme = { token: { motion: false } };
 
 function Harness({
   initial = pool([version("a"), version("us")]),
@@ -158,33 +157,31 @@ function Harness({
     [recommendations]
   );
   return (
-    <ConfigProvider theme={testTheme}>
-      <App>
-        <VoiceEditor
-          mode={mode}
-          renderActions={renderActions}
-          locale={locale}
-          value={content}
-          onChange={vi.fn()}
-          voiceProfile={profile}
-          onVoiceProfileChange={(next) => {
-            setProfile(next);
-            onProfile(next);
-          }}
-          previewAdapter={preview}
-          audioAssets={audioAssets}
-          audioUploadAdapter={audioAdapter}
-          loadRecommendations={loadRecommendations}
-          recommendationArea="meaning"
-          readOnly={readOnly}
-          contextLabel="释义编辑"
-          inputDataAttributes={{
-            "data-v3-node-id": target,
-            "data-v3-field": "definition"
-          }}
-        />
-      </App>
-    </ConfigProvider>
+    <App>
+      <VoiceEditor
+        mode={mode}
+        renderActions={renderActions}
+        locale={locale}
+        value={content}
+        onChange={vi.fn()}
+        voiceProfile={profile}
+        onVoiceProfileChange={(next) => {
+          setProfile(next);
+          onProfile(next);
+        }}
+        previewAdapter={preview}
+        audioAssets={audioAssets}
+        audioUploadAdapter={audioAdapter}
+        loadRecommendations={loadRecommendations}
+        recommendationArea="meaning"
+        readOnly={readOnly}
+        contextLabel="释义编辑"
+        inputDataAttributes={{
+          "data-v3-node-id": target,
+          "data-v3-field": "definition"
+        }}
+      />
+    </App>
   );
 }
 async function detail(name = "a") {
@@ -237,27 +234,25 @@ describe("新版局部主页和唯一声音草稿", () => {
     function Reproduction() {
       const [profile, setProfile] = useState(pool([]));
       return (
-        <ConfigProvider theme={testTheme}>
-          <App>
-            <VoiceEditor
-              mode="synthesis"
-              value={{ version: 2, text: "hello", annotations: [] }}
-              onChange={vi.fn()}
-              voiceProfile={profile}
-              onVoiceProfileChange={setProfile}
-              previewAdapter={{ ...preview, generateAudio }}
-              recommendationArea="meaning"
-              renderActions={(canComplete, _prepare, capture) => (
-                <button
-                  disabled={!canComplete}
-                  onClick={() => saved(capture?.(true))}
-                >
-                  保存复现草稿
-                </button>
-              )}
-            />
-          </App>
-        </ConfigProvider>
+        <App>
+          <VoiceEditor
+            mode="synthesis"
+            value={{ version: 2, text: "hello", annotations: [] }}
+            onChange={vi.fn()}
+            voiceProfile={profile}
+            onVoiceProfileChange={setProfile}
+            previewAdapter={{ ...preview, generateAudio }}
+            recommendationArea="meaning"
+            renderActions={(canComplete, _prepare, capture) => (
+              <button
+                disabled={!canComplete}
+                onClick={() => saved(capture?.(true))}
+              >
+                保存复现草稿
+              </button>
+            )}
+          />
+        </App>
       );
     }
     render(<Reproduction />);
@@ -789,7 +784,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     fireEvent.mouseDown(dialogField(dialog, "当前音色输出格式"));
     fireEvent.click(
       await screen.findByText("WAV", {
-        selector: ".ant-select-item-option-content"
+        selector: ".ui-select-item-option-content"
       })
     );
     await waitFor(() =>
@@ -1002,7 +997,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     await within(dialog).findByText("存储暂不可用");
     await waitFor(() => {
       expect(generate).toBeEnabled();
-      expect(generate).not.toHaveClass("ant-btn-loading");
+      expect(generate).not.toHaveClass("ui-btn-loading");
     });
     fireEvent.click(generate);
     await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));

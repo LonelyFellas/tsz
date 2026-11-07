@@ -1,6 +1,7 @@
 // 用户管理搜索行：单一关键词（昵称 / 手机号 / 邮箱）+ 注册时间 + 搜索 / 重置。
 import { RotateCwIcon, SearchIcon } from "lucide-react";
-import { Button, Card, DatePicker, Form, Input, Space } from "antd";
+import { Button, Card, Space } from "@tsz/ui/admin/display";
+import { DatePicker, Form, Input } from "@tsz/ui/admin/forms";
 import type { UserFilterValues } from "./listQuery";
 
 interface Props {

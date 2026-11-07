@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Alert, App, Button, Form, Input, Modal } from "antd";
+import { Alert, Button } from "@tsz/ui/admin/display";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { useState } from "react";
 import { api, usePermission } from "@/lib/auth";
 

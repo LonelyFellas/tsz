@@ -1,4 +1,12 @@
-import { Alert, Button, Card, List, Space, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  List,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import { Volume2Icon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {

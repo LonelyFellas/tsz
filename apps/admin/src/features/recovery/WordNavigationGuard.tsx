@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, Modal, Space } from "antd";
+import { Button, Space } from "@tsz/ui/admin/display";
+import { Modal } from "@tsz/ui/admin/overlays";
 import { useBlocker } from "react-router-dom";
 
 export function WordNavigationGuard({

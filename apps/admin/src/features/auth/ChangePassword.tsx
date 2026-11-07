@@ -2,7 +2,9 @@
 import { HttpError } from "@tsz/api-client";
 import { PASSWORD_HINT, passwordLengthError } from "@tsz/shared";
 import { passwordErrorMessage } from "@tsz/shared/auth";
-import { App, Button, Card, Form, Input, Typography } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
+import { Button, Card, Typography } from "@tsz/ui/admin/display";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";

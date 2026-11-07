@@ -5,24 +5,19 @@ import { FormTypeSettings } from "./FormTypeSettings";
 import { PlusIcon, RotateCwIcon, SearchIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
-  ConfigProvider,
   Flex,
-  Form,
-  Input,
-  Segmented,
-  Select,
   Space,
   Tag,
   Tabs,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Tooltip } from "@tsz/ui/admin/overlays";
+import { Form, Input, Segmented, Select } from "@tsz/ui/admin/forms";
 import { FullNameEnCell } from "./FullNameEnCell";
-import type { TableColumnsType } from "antd";
+import { type TableColumnsType } from "@tsz/ui/admin/table";
 import { HttpError } from "@tsz/api-client";
 import type { AdminWordKind, PartOfSpeechConfig } from "@tsz/types";
 import dayjs from "dayjs";
@@ -263,23 +258,16 @@ export function PartOfSpeechSettings() {
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "词库管理" }, { title: "词性配置" }]} />
       {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
-      <ConfigProvider
-        theme={{
-          components: {
-            Tabs: { horizontalItemPadding: "0 0 12px", horizontalMargin: "0" }
-          }
-        }}
-      >
-        <Tabs
-          size="large"
-          activeKey={kind}
-          onChange={(key) => switchKind(key as AdminWordKind)}
-          items={[
-            { key: "word", label: "单词" },
-            { key: "phrase", label: "短语" }
-          ]}
-        />
-      </ConfigProvider>
+
+      <Tabs
+        size="large"
+        activeKey={kind}
+        onChange={(key) => switchKind(key as AdminWordKind)}
+        items={[
+          { key: "word", label: "单词" },
+          { key: "phrase", label: "短语" }
+        ]}
+      />
 
       <Segmented
         aria-label="配置分区"

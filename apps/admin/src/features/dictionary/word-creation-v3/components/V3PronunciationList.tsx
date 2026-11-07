@@ -8,7 +8,8 @@ import {
   CircleMinusIcon,
   CirclePlusIcon
 } from "lucide-react";
-import { Button, Flex, Form, Select, Typography } from "antd";
+import { Button, Flex, Typography } from "@tsz/ui/admin/display";
+import { Form, Select } from "@tsz/ui/admin/forms";
 import type {
   DraftFormsStepContentV3,
   V3DraftValidationIssue,

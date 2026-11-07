@@ -1,5 +1,12 @@
 import { Volume2Icon } from "lucide-react";
-import { Alert, Button, Flex, Space, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Flex,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import { useLayoutEffect, useState, type RefObject } from "react";
 import type {
   AdminSpeechPreviewResponse,

@@ -6,8 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
 import { ChatGPTConnection } from "./ChatGPTConnection";
@@ -71,13 +70,11 @@ function mount() {
     defaultOptions: { queries: { retry: false } }
   });
   return render(
-    <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
-      <App>
-        <QueryClientProvider client={client}>
-          <ChatGPTConnection adminId="fixture-admin" />
-        </QueryClientProvider>
-      </App>
-    </ConfigProvider>
+    <App>
+      <QueryClientProvider client={client}>
+        <ChatGPTConnection adminId="fixture-admin" />
+      </QueryClientProvider>
+    </App>
   );
 }
 const summary = () =>
@@ -127,7 +124,7 @@ it("授权完成后重读账号，首次说明套餐用途，退出保留撤销�
   await waitFor(() => expect(api.chatgpt.login).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(api.chatgpt.loginStatus).toHaveBeenCalled());
   const notice = await screen.findByText("使用 ChatGPT 套餐", {
-    selector: ".ant-modal-title"
+    selector: ".ui-modal-title"
   });
   fireEvent.click(screen.getByRole("button", { name: "知道了" }));
   await waitFor(() => expect(notice).not.toBeVisible());
@@ -323,7 +320,7 @@ it("登录方式错误不封死已有账号管理，但不允许新授权", asyn
 });
 
 it("隐藏分组恢复授权状态时不自动弹出抽屉", async () => {
-  const { Tabs } = await import("antd");
+  const { Tabs } = await import("@tsz/ui/admin/display");
   let finishSetup!: (value: { login_method: "local" }) => void;
   vi.mocked(api.chatgpt.setup).mockReturnValue(
     new Promise((resolve) => {
@@ -338,23 +335,21 @@ it("隐藏分组恢复授权状态时不自动弹出抽屉", async () => {
     defaultOptions: { queries: { retry: false } }
   });
   render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <App>
-        <QueryClientProvider client={client}>
-          <Tabs
-            destroyOnHidden={false}
-            items={[
-              {
-                key: "accounts",
-                label: "模型账号",
-                children: <ChatGPTConnection adminId="fixture-admin" />
-              },
-              { key: "models", label: "出题模型", children: <p>模型选择</p> }
-            ]}
-          />
-        </QueryClientProvider>
-      </App>
-    </ConfigProvider>
+    <App>
+      <QueryClientProvider client={client}>
+        <Tabs
+          destroyOnHidden={false}
+          items={[
+            {
+              key: "accounts",
+              label: "模型账号",
+              children: <ChatGPTConnection adminId="fixture-admin" />
+            },
+            { key: "models", label: "出题模型", children: <p>模型选择</p> }
+          ]}
+        />
+      </QueryClientProvider>
+    </App>
   );
   await summary().findByText("未登录");
   fireEvent.click(screen.getByRole("tab", { name: "出题模型" }));

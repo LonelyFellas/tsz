@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Alert, Button, Input, List, Modal, Space, Typography } from "antd";
+import { Alert, Button, List, Space, Typography } from "@tsz/ui/admin/display";
+import { Input } from "@tsz/ui/admin/forms";
+import { Modal } from "@tsz/ui/admin/overlays";
 import { HttpError } from "@tsz/api-client";
 import type { SharedSentence, SentencePublication } from "@tsz/types";
 import { api } from "@/lib/auth";

@@ -1,4 +1,4 @@
-import { Result } from "antd";
+import { Result } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";

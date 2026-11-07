@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { AdminDubbingAudioUpdate } from "@tsz/types";
-import { Button, Flex, Space, Tag, Typography } from "antd";
+import { Button, Flex, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import { useEffect, useState } from "react";
 import { api, useAuthStore } from "@/lib/auth";
 

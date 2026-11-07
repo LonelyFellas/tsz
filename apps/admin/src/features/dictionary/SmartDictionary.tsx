@@ -12,23 +12,17 @@ import {
   SearchIcon,
   ChevronUpIcon
 } from "lucide-react";
+import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import {
-  Alert,
   App,
-  Button,
-  ConfigProvider,
-  DatePicker,
   Dropdown,
-  Form,
   Popover,
-  Select,
-  Space,
-  Tag,
   Tooltip,
-  Typography,
-  theme
-} from "antd";
-import type { MenuProps } from "antd";
+  type MenuProps
+} from "@tsz/ui/admin/overlays";
+import { DatePicker, Form, Select } from "@tsz/ui/admin/forms";
+import { adminTokens } from "@tsz/ui/admin/context";
+
 import dayjs from "dayjs";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -228,7 +222,7 @@ export function SmartDictionary({
   );
   const [advancedExpanded, setAdvancedExpanded] = useState(hasAdvancedFilters);
   const advancedPanelId = useId();
-  const { token } = theme.useToken();
+  const token = adminTokens;
   const creators = useWordCreators(advancedExpanded);
   const creatorOptions = (creators.data ?? []).map((creator) => ({
     value: creator.id,
@@ -1076,7 +1070,12 @@ export function SmartDictionary({
             icon: rowLifecyclePending ? <LoaderCircleIcon /> : <Trash2Icon />,
             label: (
               <Tooltip title={transitionHint}>
-                <span aria-label={`移入垃圾桶${rowName}`}>移入垃圾桶</span>
+                <span
+                  aria-busy={rowLifecyclePending}
+                  aria-label={`移入垃圾桶${rowName}`}
+                >
+                  移入垃圾桶
+                </span>
               </Tooltip>
             ),
             onClick: () => transitionOne(record, "archive")
@@ -1097,7 +1096,12 @@ export function SmartDictionary({
                     : DELETE_BLOCK_REASON_TEXT[eligibility.reason!]
                 }
               >
-                <span aria-label={`永久删除${rowName}`}>永久删除</span>
+                <span
+                  aria-busy={rowDeletePending}
+                  aria-label={`永久删除${rowName}`}
+                >
+                  永久删除
+                </span>
               </Tooltip>
             ),
             onClick: () => deleteOne(record)
@@ -1108,7 +1112,7 @@ export function SmartDictionary({
             type={archived ? "text" : "link"}
             size="small"
             className="word-list-row-action"
-            autoInsertSpace={false}
+
             disabled={route === undefined}
             aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
             onClick={() => route && navigate(route)}
@@ -1126,7 +1130,7 @@ export function SmartDictionary({
                       type="link"
                       size="small"
                       className="word-list-row-action"
-                      autoInsertSpace={false}
+
                       aria-label={`恢复${rowName}`}
                       disabled={transitionDisabled}
                       loading={rowLifecyclePending}
@@ -1169,7 +1173,7 @@ export function SmartDictionary({
                   type="text"
                   size="small"
                   className="word-list-more-action"
-                  autoInsertSpace={false}
+
                   aria-label={`更多操作${rowName}`}
                   aria-haspopup="menu"
                   aria-expanded={openActionRow === record.id}
@@ -1220,150 +1224,137 @@ export function SmartDictionary({
         </Space>
       </header>
 
-      <ConfigProvider
-        theme={{
-          token: { colorTextPlaceholder: token.colorTextSecondary },
-          components: {
-            Form: { labelColor: token.colorTextSecondary }
-          }
-        }}
-      >
-        <section className="word-list-panel" aria-label="词条筛选">
-          <Form
-            form={form}
-            initialValues={{
-              ...filters,
-              headword: filters.headword ?? filters.keyword
-            }}
-            layout="horizontal"
-            labelCol={{ flex: "72px" }}
-            wrapperCol={{ flex: 1 }}
-            labelAlign="left"
-            colon={false}
-            onFinish={applyFilters}
-            className="word-search-form"
-          >
-            <div className="word-search-main">
-              <Form.Item
-                name="headword"
-                label="词条"
-                labelCol={{ flex: "36px" }}
+      <section className="word-list-panel" aria-label="词条筛选">
+        <Form
+          form={form}
+          initialValues={{
+            ...filters,
+            headword: filters.headword ?? filters.keyword
+          }}
+          layout="horizontal"
+          labelCol={{ flex: "72px" }}
+          wrapperCol={{ flex: 1 }}
+          labelAlign="left"
+          colon={false}
+          onFinish={applyFilters}
+          className="word-search-form"
+        >
+          <div className="word-search-main">
+            <Form.Item name="headword" label="词条" labelCol={{ flex: "36px" }}>
+              <PilotInput
+                type="search"
+                className="min-h-9 rounded-lg px-3 py-1"
+                placeholder="请输入词条名称"
+              />
+            </Form.Item>
+            <Form.Item name="gloss" label="词义" labelCol={{ flex: "36px" }}>
+              <PilotInput
+                type="search"
+                className="min-h-9 rounded-lg px-3 py-1"
+                placeholder="请输入词义"
+              />
+            </Form.Item>
+            <div className="word-search-actions">
+              <PilotButton
+                variant="default"
+                size="compact"
+                className="rounded-lg"
+                type="submit"
               >
-                <PilotInput
-                  type="search"
-                  className="min-h-9 rounded-lg px-3 py-1"
-                  placeholder="请输入词条名称"
-                />
-              </Form.Item>
-              <Form.Item name="gloss" label="词义" labelCol={{ flex: "36px" }}>
-                <PilotInput
-                  type="search"
-                  className="min-h-9 rounded-lg px-3 py-1"
-                  placeholder="请输入词义"
-                />
-              </Form.Item>
-              <div className="word-search-actions">
-                <PilotButton
-                  variant="default"
-                  size="compact"
-                  className="rounded-lg"
-                  type="submit"
-                >
-                  <SearchIcon />
-                  搜索
-                </PilotButton>
-                <PilotButton
-                  type="button"
-                  variant="ghost"
-                  size="compact"
-                  className="rounded-lg"
-                  onClick={() => {
-                    form.resetFields();
-                    applyFilters({});
-                  }}
-                >
-                  重置
-                </PilotButton>
-                <PilotButton
-                  type="button"
-                  variant="link"
-                  size="compact"
-                  aria-expanded={advancedExpanded}
-                  aria-controls={advancedPanelId}
-                  onClick={() => setAdvancedExpanded((value) => !value)}
-                >
-                  {advancedExpanded ? "收起筛选" : "更多筛选"}
-                  {advancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                </PilotButton>
-              </div>
+                <SearchIcon />
+                搜索
+              </PilotButton>
+              <PilotButton
+                type="button"
+                variant="ghost"
+                size="compact"
+                className="rounded-lg"
+                onClick={() => {
+                  form.resetFields();
+                  applyFilters({});
+                }}
+              >
+                重置
+              </PilotButton>
+              <PilotButton
+                type="button"
+                variant="link"
+                size="compact"
+                aria-expanded={advancedExpanded}
+                aria-controls={advancedPanelId}
+                onClick={() => setAdvancedExpanded((value) => !value)}
+              >
+                {advancedExpanded ? "收起筛选" : "更多筛选"}
+                {advancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              </PilotButton>
             </div>
-            <div
-              id={advancedPanelId}
-              className="word-search-advanced"
-              hidden={!advancedExpanded}
-              aria-hidden={!advancedExpanded}
-              inert={!advancedExpanded}
-              style={{
-                borderTop: `1px solid ${token.colorSplit}`
-              }}
-            >
-              <Form.Item name="kind" label="词条类型">
-                <Select placeholder="全部" options={kindOptions} allowClear />
-              </Form.Item>
-              <Form.Item name="pos" label="基本词性">
+          </div>
+          <div
+            id={advancedPanelId}
+            className="word-search-advanced"
+            hidden={!advancedExpanded}
+            aria-hidden={!advancedExpanded}
+            inert={!advancedExpanded}
+            style={{
+              borderTop: `1px solid ${token.colorSplit}`
+            }}
+          >
+            <Form.Item name="kind" label="词条类型">
+              <Select placeholder="全部" options={kindOptions} allowClear />
+            </Form.Item>
+            <Form.Item name="pos" label="基本词性">
+              <Select
+                placeholder="全部"
+                options={partOfSpeechOptions}
+                loading={partOfSpeechCatalog.isPending}
+                disabled={partOfSpeechCatalog.isError}
+                allowClear
+              />
+            </Form.Item>
+            <Form.Item name="level" label="词义难度">
+              <Select placeholder="全部" options={CEFR_OPTIONS} allowClear />
+            </Form.Item>
+            {!trashMode && (
+              <Form.Item name="status" label="词条状态">
                 <Select
                   placeholder="全部"
-                  options={partOfSpeechOptions}
-                  loading={partOfSpeechCatalog.isPending}
-                  disabled={partOfSpeechCatalog.isError}
+                  options={STATUS_OPTIONS}
                   allowClear
                 />
               </Form.Item>
-              <Form.Item name="level" label="词义难度">
-                <Select placeholder="全部" options={CEFR_OPTIONS} allowClear />
-              </Form.Item>
-              {!trashMode && (
-                <Form.Item name="status" label="词条状态">
-                  <Select
-                    placeholder="全部"
-                    options={STATUS_OPTIONS}
-                    allowClear
-                  />
-                </Form.Item>
-              )}
-              <Form.Item
-                name="createdBy"
-                label="创建人"
-                help={
-                  creators.isError ? (
-                    <span>
-                      创建人加载失败
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => void creators.refetch()}
-                      >
-                        重新加载创建人
-                      </Button>
-                    </span>
-                  ) : undefined
-                }
-              >
-                <Select
-                  placeholder="不限"
-                  options={creatorOptions}
-                  allowClear
-                  showSearch={{ optionFilterProp: "label" }}
-                  loading={creators.isPending}
-                />
-              </Form.Item>
-              <Form.Item name="range" label="创建时间">
-                <RangePicker style={{ width: "100%" }} />
-              </Form.Item>
-            </div>
-          </Form>
-        </section>
-      </ConfigProvider>
+            )}
+            <Form.Item
+              name="createdBy"
+              label="创建人"
+              help={
+                creators.isError ? (
+                  <span>
+                    创建人加载失败
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => void creators.refetch()}
+                    >
+                      重新加载创建人
+                    </Button>
+                  </span>
+                ) : undefined
+              }
+            >
+              <Select
+                placeholder="不限"
+                options={creatorOptions}
+                allowClear
+                showSearch={{ optionFilterProp: "label" }}
+                loading={creators.isPending}
+              />
+            </Form.Item>
+            <Form.Item name="range" label="创建时间">
+              <RangePicker style={{ width: "100%" }} />
+            </Form.Item>
+          </div>
+        </Form>
+      </section>
 
       <section className="word-list-panel" aria-label="词条列表">
         {restoreSurface.page && pendingRestore && (

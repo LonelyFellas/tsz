@@ -8,7 +8,9 @@ import type {
   AdminVoiceLibraryResponse,
   VoiceAccent
 } from "@tsz/types";
-import { Alert, App, Button, Form, Input, Select, Space, Tooltip } from "antd";
+import { Alert, Button, Space } from "@tsz/ui/admin/display";
+import { App, Tooltip } from "@tsz/ui/admin/overlays";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, useAuthStore } from "@/lib/auth";
 

@@ -6,7 +6,8 @@ import {
 import { isCode, isPhone, readTestResourceRun } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import { ArrowRightIcon } from "lucide-react";
-import { Alert, Button, Form, Input } from "antd";
+import { Alert, Button } from "@tsz/ui/admin/display";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";

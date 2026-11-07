@@ -31,7 +31,7 @@ describe("CopyableText", () => {
       <CopyableText value="a-very-long-uuid-value" ellipsis={96} />
     );
     // Typography.Text 以 style.max-width 承载限宽。
-    const node = container.querySelector<HTMLElement>(".ant-typography");
+    const node = container.querySelector<HTMLElement>(".ui-typography");
     expect(node?.style.maxWidth).toBe("96px");
   });
 
@@ -39,7 +39,7 @@ describe("CopyableText", () => {
     const { container } = render(
       <CopyableText value="another-long-value" ellipsis />
     );
-    const node = container.querySelector<HTMLElement>(".ant-typography");
+    const node = container.querySelector<HTMLElement>(".ui-typography");
     expect(node?.style.maxWidth).toBe("");
   });
 });

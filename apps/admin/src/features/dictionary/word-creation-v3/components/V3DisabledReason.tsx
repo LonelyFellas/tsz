@@ -1,4 +1,4 @@
-import { Tooltip } from "antd";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import type { ReactNode } from "react";
 import "./V3DisabledReason.css";
 

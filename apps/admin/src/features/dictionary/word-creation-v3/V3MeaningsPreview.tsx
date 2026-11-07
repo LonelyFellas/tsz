@@ -8,7 +8,15 @@ import type {
   WordSenseV3,
   WordPosFormsV3
 } from "@tsz/types";
-import { Button, Card, Empty, Flex, Space, Tag, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Empty,
+  Flex,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { formGroupLabel, sentenceTranslationsV3 } from "./meaningsModel";

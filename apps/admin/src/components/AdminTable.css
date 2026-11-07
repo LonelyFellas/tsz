@@ -27,21 +27,21 @@
 .admin-table-toolbar-extra + .admin-table-toolbar-settings {
   margin-inline-start: 4px;
   padding-inline-start: 8px;
-  border-inline-start: 1px solid var(--ant-color-border-secondary, #e9ecf1);
+  border-inline-start: 1px solid var(--ui-color-border-secondary, #e9ecf1);
 }
 
 .admin-table-toolbar .admin-column-settings-toolbar {
   margin-bottom: 0;
 }
 
-.admin-table-toolbar .ant-picker,
-.admin-table-toolbar .ant-select {
+.admin-table-toolbar .ui-picker,
+.admin-table-toolbar .ui-select {
   max-width: 100%;
 }
 
 @container (max-width: 560px) {
   .admin-table-toolbar-primary,
-  .admin-table-toolbar-primary > .ant-space {
+  .admin-table-toolbar-primary > .ui-space {
     display: contents;
   }
 
@@ -64,7 +64,7 @@
     width: 100%;
   }
 
-  .admin-table-toolbar-filter .ant-select {
+  .admin-table-toolbar-filter .ui-select {
     flex: 1;
     min-width: 0;
   }

@@ -8,16 +8,8 @@ import {
   CirclePlusIcon,
   SettingsIcon
 } from "lucide-react";
-import {
-  Alert,
-  Button,
-  Card,
-  Dropdown,
-  Empty,
-  Flex,
-  Popconfirm,
-  Popover
-} from "antd";
+import { Alert, Button, Card, Empty, Flex } from "@tsz/ui/admin/display";
+import { Dropdown, Popconfirm, Popover } from "@tsz/ui/admin/overlays";
 import type {
   DraftFormsStepContentV3,
   FormTypeCatalogItem,

@@ -6,18 +6,13 @@ import {
 import { CheckIcon, Volume2Icon } from "lucide-react";
 import {
   Button,
-  Form,
-  Input,
-  InputNumber,
-  Popconfirm,
-  Select,
   Space,
   Progress,
-  Radio,
   Spin,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Form, Input, InputNumber, Select, Radio } from "@tsz/ui/admin/forms";
+import { Popconfirm, Tooltip } from "@tsz/ui/admin/overlays";
 import { SelectionPanel } from "./SelectionPanel";
 import {
   VoiceParameterFields,

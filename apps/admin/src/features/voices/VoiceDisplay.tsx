@@ -8,11 +8,11 @@ export function VoiceName({ voice }: { voice: AdminSpeechVoice }) {
   const gender = voice.gender.toLowerCase();
   return (
     <span className="voice-shared-name" title={voice.display_name}>
-      <strong>{english}</strong>
+      <strong>{english}</strong>{" "}
       {gender === "female" ? (
-        <VenusIcon aria-label="女声" />
+        <VenusIcon role="img" aria-label="女声" />
       ) : gender === "male" ? (
-        <MarsIcon aria-label="男声" />
+        <MarsIcon role="img" aria-label="男声" />
       ) : null}
       {chinese && <small>{chinese}</small>}
     </span>

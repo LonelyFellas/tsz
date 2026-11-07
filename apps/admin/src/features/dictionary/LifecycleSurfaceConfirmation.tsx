@@ -8,7 +8,7 @@ import {
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
 import {
   aggregateLifecycleSurfaceMatchCards,
   canAcknowledgeSurfaceSnapshot,

@@ -1,5 +1,7 @@
 import { CircleHelpIcon, TriangleAlertIcon } from "lucide-react";
-import { Button, Checkbox, Empty, Flex, Popover, Tag, Typography } from "antd";
+import { Button, Empty, Flex, Tag, Typography } from "@tsz/ui/admin/display";
+import { Checkbox } from "@tsz/ui/admin/forms";
+import { Popover } from "@tsz/ui/admin/overlays";
 import { useState } from "react";
 import type {
   WordFormGroupV3,

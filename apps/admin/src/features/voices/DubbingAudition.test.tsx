@@ -6,7 +6,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+
 import type {
   AdminSpeechPreviewResponse,
   AdminSpeechVoice,
@@ -60,19 +60,17 @@ const result: AdminSpeechPreviewResponse = {
 };
 function mount(params = parameters, target = voice) {
   return render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <DubbingAudition
-        voice={target}
-        parameters={params}
-        originalVoice={voice}
-        originalParameters={{
-          rate_percent: 0,
-          pitch_semitones: 0,
-          style: null
-        }}
-        side="uk"
-      />
-    </ConfigProvider>
+    <DubbingAudition
+      voice={target}
+      parameters={params}
+      originalVoice={voice}
+      originalParameters={{
+        rate_percent: 0,
+        pitch_semitones: 0,
+        style: null
+      }}
+      side="uk"
+    />
   );
 }
 beforeEach(() => {
@@ -132,13 +130,11 @@ it("换参数会取消请求，迟到结果不能成为新设置的试听", asyn
   fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
   const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
   view.rerender(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <DubbingAudition
-        voice={voice}
-        parameters={{ ...parameters, rate_percent: -20 }}
-        side="uk"
-      />
-    </ConfigProvider>
+    <DubbingAudition
+      voice={voice}
+      parameters={{ ...parameters, rate_percent: -20 }}
+      side="uk"
+    />
   );
   expect(signal.aborted).toBe(true);
   await act(async () => resolve(result));
@@ -149,9 +145,7 @@ it("同值渲染不作废音频，改字和关闭会停止音频或取消请求"
   fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
   const player = await screen.findByLabelText("Sonia 试听播放器");
   view.rerender(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <DubbingAudition voice={voice} parameters={{ ...parameters }} side="uk" />
-    </ConfigProvider>
+    <DubbingAudition voice={voice} parameters={{ ...parameters }} side="uk" />
   );
   expect(screen.getByLabelText("Sonia 试听播放器")).toBe(player);
   fireEvent.change(screen.getByLabelText("本次试听文本"), {
@@ -217,15 +211,13 @@ it("分组使用共用标注与输出格式，富文本和 WAV 原样传入试�
     phoneme: "rɪˈkɔːd"
   });
   render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <DubbingAudition
-        voice={voice}
-        parameters={parameters}
-        side="uk"
-        source={source}
-        onSourceChange={vi.fn()}
-      />
-    </ConfigProvider>
+    <DubbingAudition
+      voice={voice}
+      parameters={parameters}
+      side="uk"
+      source={source}
+      onSourceChange={vi.fn()}
+    />
   );
   fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
   await screen.findByLabelText("Sonia 试听播放器");
@@ -280,21 +272,19 @@ it("原声音不支持当前标注时明确提示，不提交不兼容的对比�
     phoneme: "rɪˈkɔːd"
   });
   render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <DubbingAudition
-        voice={voice}
-        parameters={parameters}
-        originalVoice={{
-          ...voice,
-          capability_evidence: undefined,
-          capabilities: { ...voice.capabilities, supports_phoneme: false }
-        }}
-        originalParameters={parameters}
-        side="uk"
-        source={source}
-        onSourceChange={vi.fn()}
-      />
-    </ConfigProvider>
+    <DubbingAudition
+      voice={voice}
+      parameters={parameters}
+      originalVoice={{
+        ...voice,
+        capability_evidence: undefined,
+        capabilities: { ...voice.capabilities, supports_phoneme: false }
+      }}
+      originalParameters={parameters}
+      side="uk"
+      source={source}
+      onSourceChange={vi.fn()}
+    />
   );
   fireEvent.click(screen.getByRole("button", { name: "试听原参数" }));
   expect(

@@ -8,19 +8,14 @@ import {
   Breadcrumb,
   Button,
   Card,
-  DatePicker,
   Flex,
-  Form,
-  Input,
-  Modal,
   Result,
-  Select,
   Space,
-  Switch,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { DatePicker, Form, Input, Select, Switch } from "@tsz/ui/admin/forms";
+import { Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import type { Dayjs } from "dayjs";
 import type {
   AdminWordlist,

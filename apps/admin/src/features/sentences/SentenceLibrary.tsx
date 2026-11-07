@@ -10,24 +10,19 @@ import { Fragment, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
   Col,
-  DatePicker,
   Descriptions,
-  Dropdown,
   Flex,
-  Form,
-  Input,
-  Modal,
   Row,
-  Select,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Dropdown, Modal } from "@tsz/ui/admin/overlays";
+import { DatePicker, Form, Input, Select } from "@tsz/ui/admin/forms";
 import type { Dayjs } from "dayjs";
 import type { SharedSentence, SentenceListQuery } from "@tsz/types";
 import { Link, useSearchParams } from "react-router-dom";

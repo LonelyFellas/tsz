@@ -3,16 +3,15 @@ import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
 import { CircleMinusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Badge,
   Button,
   Empty,
   Flex,
   Space,
   Tabs,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   Dialect,
   DraftFormsStepContentV3,

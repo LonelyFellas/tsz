@@ -3,15 +3,14 @@ import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ADMIN_PERMISSION_UPGRADE_MESSAGE } from "@tsz/api-client";
-import { Alert, Button, App as AntApp, ConfigProvider } from "antd";
-import { antdTheme } from "@/antd-theme";
+import { Alert, Button } from "@tsz/ui/admin/display";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { authRuntime, useAuthStore } from "@/lib/auth";
 import {
   adminAccountIdentity,
   bindAdminAuthorizationCache
 } from "@/lib/adminAuthorization";
 import { useEffect, type ReactNode } from "react";
-import zhCN from "antd/locale/zh_CN";
 import { Outlet, useMatch } from "react-router-dom";
 import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
 
@@ -103,9 +102,9 @@ export function RootProviders() {
     );
   return (
     <QueryClientProvider client={queryClient}>
-      <ConfigProvider locale={zhCN} theme={antdTheme}>
+      <>
         <RecoverySession />
-        <AntApp key={identity}>
+        <FeedbackApp key={identity}>
           {permissionModelIncompatible && !isLoginPage && (
             <Alert
               type="error"
@@ -115,8 +114,8 @@ export function RootProviders() {
           )}
           {!isLoginPage && connectionNotice}
           <Outlet context={{ connectionNotice } satisfies RootOutletContext} />
-        </AntApp>
-      </ConfigProvider>
+        </FeedbackApp>
+      </>
     </QueryClientProvider>
   );
 }

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfigProvider } from "antd";
+
 import { AdminTable, type AdminTableProps } from "./AdminTable";
 import { revealTableColumns } from "./useColumnSettings";
 
@@ -39,11 +39,7 @@ function table(props: Partial<AdminTableProps<Row>> = {}) {
 }
 function renderTable(element: React.ReactNode) {
   return render(element, {
-    wrapper: ({ children }) => (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        {children}
-      </ConfigProvider>
-    )
+    wrapper: ({ children }) => <>{children}</>
   });
 }
 function headers() {
@@ -98,27 +94,27 @@ describe("AdminTable", () => {
     ).toContainElement(within(panel).getByRole("checkbox", { name: "状态" }));
     expect(headers()).toEqual(["名称", "状态", "操作"]);
     expect(screen.getByRole("columnheader", { name: "名称" })).toHaveClass(
-      "ant-table-cell-fix-start"
+      "ui-table-cell-fix-start"
     );
     expect(screen.getByRole("columnheader", { name: "状态" })).toHaveClass(
-      "ant-table-cell-fix-end"
+      "ui-table-cell-fix-end"
     );
     view.unmount();
     renderTable(table());
     expect(screen.getByRole("columnheader", { name: "状态" })).toHaveClass(
-      "ant-table-cell-fix-end"
+      "ui-table-cell-fix-end"
     );
     const restoredPanel = settings();
     pin("名称", "不固定");
     expect(screen.getByRole("columnheader", { name: "名称" })).not.toHaveClass(
-      "ant-table-cell-fix-start"
+      "ui-table-cell-fix-start"
     );
     fireEvent.click(
       within(restoredPanel).getByRole("button", { name: "恢复默认" })
     );
     expect(headers()).toEqual(["名称", "状态", "操作"]);
     expect(screen.getByRole("columnheader", { name: "状态" })).not.toHaveClass(
-      "ant-table-cell-fix-end"
+      "ui-table-cell-fix-end"
     );
     expect(
       localStorage.getItem("tsz:admin:table-columns:v1:test-table")

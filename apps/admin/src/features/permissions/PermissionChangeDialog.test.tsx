@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionPreviewResponse } from "@tsz/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -80,7 +80,7 @@ describe("单人/批量权限精确预览提交", () => {
     expect(
       screen
         .getByText("words.access、words.edit")
-        .closest(".ant-typography-warning")
+        .closest(".ui-typography-warning")
     ).toHaveTextContent("自动补齐：words.access、words.edit");
     expect(screen.queryByText("同时开通")).toBeNull();
   });
@@ -174,9 +174,9 @@ describe("单人/批量权限精确预览提交", () => {
     const { client, committed } = mount();
     const reload = vi.spyOn(client, "invalidateQueries");
     const automaticRevoke = await screen.findByText("words.edit_others", {
-      selector: ".ant-typography-danger span"
+      selector: ".ui-typography-danger span"
     });
-    expect(automaticRevoke.closest(".ant-typography-danger")).toHaveTextContent(
+    expect(automaticRevoke.closest(".ui-typography-danger")).toHaveTextContent(
       "自动取消：words.edit_others"
     );
     fireEvent.click(screen.getByText("保存变更"));

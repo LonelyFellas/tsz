@@ -32,23 +32,23 @@
   font-variant-numeric: tabular-nums;
 }
 
-.v3-step-actions .ant-btn {
+.v3-step-actions .ui-btn {
   height: 40px;
   padding-inline: 20px;
   font-weight: 500;
   box-shadow: none;
 }
 
-.v3-step-actions .ant-btn-default:not(:disabled) {
+.v3-step-actions .ui-btn-default:not(:disabled) {
   color: #344054;
   border-color: #d5dbe5;
 }
 
-.v3-step-actions .ant-btn-text:not(:disabled) {
+.v3-step-actions .ui-btn-text:not(:disabled) {
   color: #667085;
 }
 
-.v3-step-actions .ant-btn-primary {
+.v3-step-actions .ui-btn-primary {
   min-width: 144px;
 }
 
@@ -65,7 +65,7 @@
     border-end-start-radius: 16px;
   }
 
-  .v3-step-actions .ant-btn {
+  .v3-step-actions .ui-btn {
     width: 100%;
     min-width: 0;
     padding-inline: 8px;
@@ -73,9 +73,9 @@
 
   .v3-draft-status,
   .word-step-actions:has(.v3-draft-status)
-    .ant-btn-primary:last-child:nth-child(even),
+    .ui-btn-primary:last-child:nth-child(even),
   .word-step-actions:not(:has(.v3-draft-status))
-    .ant-btn-primary:last-child:nth-child(odd) {
+    .ui-btn-primary:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 }

@@ -1,5 +1,7 @@
 import { CheckIcon, GripVerticalIcon, SettingsIcon } from "lucide-react";
-import { Button, Checkbox, Popover, Segmented, Typography } from "antd";
+import { Button, Typography } from "@tsz/ui/admin/display";
+import { Checkbox, Segmented } from "@tsz/ui/admin/forms";
+import { Popover } from "@tsz/ui/admin/overlays";
 import {
   useId,
   useLayoutEffect,

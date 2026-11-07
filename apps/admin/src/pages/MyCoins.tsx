@@ -1,6 +1,13 @@
 import { RotateCwIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Breadcrumb, Button, Card, Flex, Typography } from "antd";
+import {
+  Alert,
+  Breadcrumb,
+  Button,
+  Card,
+  Flex,
+  Typography
+} from "@tsz/ui/admin/display";
 import { formatCoins } from "@tsz/shared";
 import { useState } from "react";
 import { api, useAuthStore } from "@/lib/auth";

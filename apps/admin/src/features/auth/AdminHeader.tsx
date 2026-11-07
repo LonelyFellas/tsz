@@ -5,7 +5,8 @@ import {
   LogOutIcon,
   SettingsIcon
 } from "lucide-react";
-import { App, Button, Divider, Popover, Space, Typography } from "antd";
+import { App, Popover } from "@tsz/ui/admin/overlays";
+import { Button, Divider, Space, Typography } from "@tsz/ui/admin/display";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ADMIN_LEVEL_LABEL } from "@/features/admins/labels";

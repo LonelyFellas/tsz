@@ -10,8 +10,7 @@ import {
   within
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App, ConfigProvider } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { App } from "@tsz/ui/admin/overlays";
 import type { SharedSentence, SharedSentenceContent } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WordSentences } from "./WordSentences";
@@ -128,11 +127,9 @@ function show(ui: React.ReactNode) {
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
-        <App>
-          <PronunciationPreviewProvider>{ui}</PronunciationPreviewProvider>
-        </App>
-      </ConfigProvider>
+      <App>
+        <PronunciationPreviewProvider>{ui}</PronunciationPreviewProvider>
+      </App>
     </QueryClientProvider>
   );
 }

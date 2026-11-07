@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { HttpError } from "@tsz/api-client";
 import type { UnifiedPermissionCatalog } from "@tsz/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -105,11 +105,9 @@ function mount() {
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <App>
-          <PermissionManagement />
-        </App>
-      </ConfigProvider>
+      <App>
+        <PermissionManagement />
+      </App>
     </QueryClientProvider>
   );
 }
@@ -122,15 +120,15 @@ async function selectTag(label: string, name: string) {
   fireEvent.mouseDown(screen.getByLabelText(label));
   await waitFor(() =>
     expect(
-      document.querySelector(`.ant-select-item-option[title="${name}"]`)
+      document.querySelector(`.ui-select-item-option[title="${name}"]`)
     ).not.toBeNull()
   );
   fireEvent.click(
-    document.querySelector(`.ant-select-item-option[title="${name}"]`)!
+    document.querySelector(`.ui-select-item-option[title="${name}"]`)!
   );
 }
 function chooseTagRow(name: string) {
-  const drawer = within(document.querySelector(".ant-drawer")!);
+  const drawer = within(document.querySelector(".ui-drawer")!);
   const row = drawer.getByText(name).closest("tr")!;
   fireEvent.click(row.querySelector('input[type="checkbox"]')!);
   return row;
@@ -186,7 +184,7 @@ describe("权限目录、标签和授权人员", () => {
     );
     expect(managerButtons).toHaveLength(1);
     fireEvent.click(managerButtons[0]!);
-    const drawer = within(document.querySelector(".ant-drawer")!);
+    const drawer = within(document.querySelector(".ui-drawer")!);
     expect(drawer.getByText("标签管理")).toBeInTheDocument();
     expect(
       drawer
@@ -217,11 +215,11 @@ describe("权限目录、标签和授权人员", () => {
   it("权限列表按标签保存的颜色显示", async () => {
     mount();
     const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
-    expect(within(row).getByText("内容编辑").closest(".ant-tag")).toHaveClass(
-      "ant-tag-blue"
+    expect(within(row).getByText("内容编辑").closest(".ui-tag")).toHaveClass(
+      "ui-tag-blue"
     );
-    expect(within(row).getByText("高频操作").closest(".ant-tag")).toHaveClass(
-      "ant-tag-purple"
+    expect(within(row).getByText("高频操作").closest(".ui-tag")).toHaveClass(
+      "ui-tag-purple"
     );
   });
 
@@ -259,7 +257,7 @@ describe("权限目录、标签和授权人员", () => {
       )!
     );
     fireEvent.click(screen.getByText("标签管理"));
-    const row = within(document.querySelector(".ant-drawer")!)
+    const row = within(document.querySelector(".ui-drawer")!)
       .getByText("内容编辑")
       .closest("tr")!;
     expect(within(row).getByRole("checkbox")).not.toBeChecked();
@@ -370,7 +368,7 @@ describe("权限目录、标签和授权人员", () => {
       target: { value: "内容" }
     });
     expect(within(dialog).queryByText("高频操作")).toBeNull();
-    fireEvent.click(dialog.querySelector(".ant-drawer-close")!);
+    fireEvent.click(dialog.querySelector(".ui-drawer-close")!);
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
@@ -402,7 +400,7 @@ describe("权限目录、标签和授权人员", () => {
     await waitFor(() =>
       expect(
         within(
-          within(document.querySelector(".ant-drawer")!)
+          within(document.querySelector(".ui-drawer")!)
             .getByText("内容编辑")
             .closest("tr")!
         ).getByRole("checkbox")
@@ -435,7 +433,7 @@ describe("权限目录、标签和授权人员", () => {
     fireEvent.click(within(drawer).getByText("新建标签"));
     const tagName = screen.getByLabelText("标签名称");
     await waitFor(() => expect(tagName).toBeVisible());
-    const modal = within(tagName.closest(".ant-modal")!);
+    const modal = within(tagName.closest(".ui-modal")!);
     fireEvent.change(tagName, { target: { value: "审核" } });
     const green = modal.getByLabelText("绿色");
     expect(green.closest("label")).toBeVisible();
@@ -515,7 +513,7 @@ describe("权限目录、标签和授权人员", () => {
     await waitFor(() =>
       expect(
         within(
-          within(document.querySelector(".ant-drawer")!)
+          within(document.querySelector(".ui-drawer")!)
             .getByText("审核标签")
             .closest("tr")!
         ).getByRole("checkbox")
@@ -566,7 +564,7 @@ describe("权限目录、标签和授权人员", () => {
     mount();
     await screen.findByText("编辑本人词条");
     fireEvent.click(screen.getByText("标签管理"));
-    const drawer = document.querySelector(".ant-drawer")!;
+    const drawer = document.querySelector(".ui-drawer")!;
     fireEvent.click(
       within(
         within(drawer as HTMLElement)
@@ -613,7 +611,7 @@ describe("权限目录、标签和授权人员", () => {
     confirmTagChange("添加");
     await screen.findByText("标签已被删除，请重新选择");
     expect(
-      within(document.querySelector(".ant-drawer")!).queryByText("内容编辑")
+      within(document.querySelector(".ui-drawer")!).queryByText("内容编辑")
     ).toBeNull();
     expect(api.permissionSystem.catalog).toHaveBeenCalledTimes(2);
     chooseTagRow("高频操作");
@@ -698,8 +696,8 @@ describe("权限目录、标签和授权人员", () => {
     chooseRow("编辑本人词条");
     fireEvent.click(screen.getByText("批量授权"));
     await screen.findByText("管理员甲");
-    const drawer = document.querySelector(".ant-drawer")!;
-    const footer = drawer.querySelector(".ant-drawer-footer")!;
+    const drawer = document.querySelector(".ui-drawer")!;
+    const footer = drawer.querySelector(".ui-drawer-footer")!;
     expect(
       within(footer as HTMLElement).getByText(
         "已选 0 人（单次最多选择 100 人）"
@@ -710,29 +708,30 @@ describe("权限目录、标签和授权人员", () => {
         .getByText("下一步：确认权限变更")
         .closest("button")
     ).toBeDisabled();
-    expect(screen.getByText("已启用")).toHaveClass("ant-tag-green");
+    expect(screen.getByText("已启用")).toHaveClass("ui-tag-green");
     expect(screen.getByText("199****0001")).toBeInTheDocument();
     expect(screen.queryByText("19900000001")).toBeNull();
     expect(screen.queryByText("active")).toBeNull();
     chooseRow("管理员甲");
     const scroller = drawer.querySelector<HTMLDivElement>(
-      '.ant-drawer-body div[style*="overflow: auto"]'
+      '.ui-drawer-body div[style*="overflow: auto"]'
     )!;
-    expect(
-      drawer.querySelector(".ant-drawer-body .ant-typography")
-    ).toHaveStyle({ maxHeight: "20%", overflowY: "auto" });
+    expect(drawer.querySelector(".ui-drawer-body .ui-typography")).toHaveStyle({
+      maxHeight: "20%",
+      overflowY: "auto"
+    });
     scroller.scrollTop = 100;
-    fireEvent.click(drawer.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(drawer.querySelector(".ui-pagination-item-2")!);
     await screen.findByText("管理员乙");
     expect(scroller.scrollTop).toBe(0);
-    expect(screen.getByText("已禁用")).toHaveClass("ant-tag-default");
+    expect(screen.getByText("已禁用")).toHaveClass("ui-tag-default");
     expect(screen.queryByText("disabled")).toBeNull();
     chooseRow("管理员乙");
     expect(
       screen.getByText("已选 2 人（单次最多选择 100 人）")
     ).toBeInTheDocument();
     scroller.scrollTop = 200;
-    fireEvent.click(drawer.querySelector(".ant-pagination-item-1")!);
+    fireEvent.click(drawer.querySelector(".ui-pagination-item-1")!);
     const first = await screen.findByText("管理员甲");
     expect(scroller.scrollTop).toBe(0);
     expect(
@@ -840,14 +839,14 @@ describe("权限目录、标签和授权人员", () => {
     expect(within(row as HTMLElement).getByText("高频操作")).toBeVisible();
     expect(within(row as HTMLElement).getByText("内容编辑")).toBeVisible();
     expect(
-      row.querySelectorAll("td")[6]?.querySelector(".ant-tag")?.textContent
+      row.querySelectorAll("td")[6]?.querySelector(".ui-tag")?.textContent
     ).toContain("高频操作");
   });
   it("两个标签在单元格中同一行展示", async () => {
     mount();
     const row = (await screen.findByText("编辑本人词条")).closest("tr")!;
     const tagCell = row.querySelectorAll("td")[6]!;
-    const visibleTags = tagCell.querySelectorAll(".ant-tag");
+    const visibleTags = tagCell.querySelectorAll(".ui-tag");
     expect(visibleTags).toHaveLength(2);
     expect(visibleTags[0]).toHaveTextContent("内容编辑");
     expect(visibleTags[1]).toHaveTextContent("高频操作");
@@ -889,10 +888,10 @@ describe("权限目录、标签和授权人员", () => {
     chooseRow("编辑本人词条");
     chooseRow("查看用户");
     fireEvent.click(screen.getByText("标签管理"));
-    const row = within(document.querySelector(".ant-drawer")!)
+    const row = within(document.querySelector(".ui-drawer")!)
       .getByText("内容编辑")
       .closest("tr")!;
-    expect(row.querySelector(".ant-checkbox-indeterminate")).not.toBeNull();
+    expect(within(row).getByRole("checkbox")).toBePartiallyChecked();
     expect(within(row).getByText("1/2")).toBeInTheDocument();
     chooseTagRow("内容编辑");
     confirmTagChange("添加");
@@ -931,7 +930,7 @@ describe("权限目录、标签和授权人员", () => {
       screen.queryByText("超级管理员无需单独分配权限，因此不在名单中。")
     ).toBeNull();
     fireEvent.click(
-      document.querySelector(".ant-drawer .ant-pagination-item-2")!
+      document.querySelector(".ui-drawer .ui-pagination-item-2")!
     );
     await waitFor(() =>
       expect(api.permissionSystem.grantedAdmins).toHaveBeenCalledWith(
@@ -989,13 +988,11 @@ it("标签保存等待期间禁止修改颜色名称和取消", async () => {
   expect(field).toBeDisabled();
   for (const radio of within(dialog).getAllByRole("radio"))
     expect(radio).toBeDisabled();
-  expect(within(dialog).getByLabelText("自定义颜色")).toHaveClass(
-    "ant-color-picker-trigger-disabled"
-  );
+  expect(within(dialog).getByLabelText("自定义颜色")).toBeDisabled();
   const cancel = within(dialog).getByRole("button", { name: /取\s*消/ });
   expect(cancel).toBeDisabled();
   fireEvent.click(cancel);
-  expect(dialog).not.toHaveClass("ant-zoom-leave");
+  expect(dialog).not.toHaveClass("ui-zoom-leave");
   finish({ ...catalog.tags[0]!, name: "慢保存标签" });
   await waitFor(() => expect(field).not.toBeVisible());
 });
@@ -1007,7 +1004,7 @@ it("标签删除失败保留确认目标，再次确认可以重试", async () =
   mount();
   await screen.findByText("编辑本人词条");
   fireEvent.click(screen.getByText("标签管理"));
-  const row = within(document.querySelector(".ant-drawer")!)
+  const row = within(document.querySelector(".ui-drawer")!)
     .getByText("内容编辑")
     .closest("tr")!;
   fireEvent.click(within(row).getByText("删除"));

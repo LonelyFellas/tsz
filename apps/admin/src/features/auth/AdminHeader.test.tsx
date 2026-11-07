@@ -7,7 +7,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockNavigate = vi.fn();
@@ -57,9 +57,9 @@ const PROFILE: AdminProfile = {
 // 「退出所有设备」用 modal.confirm，须挂在 AntApp 的 context 下才有 modal 实例。
 function renderHeader() {
   return render(
-    <AntApp>
+    <FeedbackApp>
       <AdminHeader />
-    </AntApp>
+    </FeedbackApp>
   );
 }
 
@@ -190,7 +190,7 @@ describe("AdminHeader — 退出所有设备", () => {
   }
 
   function clickConfirmOk() {
-    const btns = document.querySelector(".ant-modal-confirm-btns")!;
+    const btns = document.querySelector(".ui-modal-confirm-btns")!;
     fireEvent.click(within(btns as HTMLElement).getByText(/全部退出/));
   }
 
@@ -225,7 +225,7 @@ describe("AdminHeader — 退出所有设备", () => {
 
   it("取消确认：不发请求也不登出", async () => {
     await openLogoutAllConfirm();
-    const btns = document.querySelector(".ant-modal-confirm-btns")!;
+    const btns = document.querySelector(".ui-modal-confirm-btns")!;
     fireEvent.click(within(btns as HTMLElement).getByText(/取\s?消/));
 
     // 取消是同步的；给一个 tick 让潜在的异步动作有机会发生后再断言什么都没做。
@@ -246,13 +246,13 @@ describe("AdminHeader — 退出所有设备", () => {
     expect(window.location.replace).not.toHaveBeenCalled();
     expect(useAuthStore.getState().profile).toEqual(PROFILE);
 
-    const dialog = failure.closest(".ant-modal-confirm")!;
+    const dialog = failure.closest(".ui-modal-confirm")!;
     const retry = within(dialog as HTMLElement).getByRole("button", {
       name: /全部退出/
     });
     await waitFor(() => {
       expect(retry).toBeEnabled();
-      expect(retry).not.toHaveClass("ant-btn-loading");
+      expect(retry).not.toHaveClass("ui-btn-loading");
     });
     fireEvent.click(retry);
     await waitFor(() =>

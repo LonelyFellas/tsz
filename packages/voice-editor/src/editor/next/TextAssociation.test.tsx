@@ -4,7 +4,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+
 import { useState, type ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { GrammarFormLinkV3, RichTextV2, TextLinkV3 } from "@tsz/types";
@@ -12,9 +12,7 @@ import type { AssociationPickerProps } from "../../types";
 import { VoiceEditor } from "./VoiceEditor";
 
 function render(ui: ReactElement) {
-  return renderUI(
-    <ConfigProvider theme={{ token: { motion: false } }}>{ui}</ConfigProvider>
-  );
+  return renderUI(<>{ui}</>);
 }
 
 const target: TextLinkV3 = {
@@ -255,7 +253,9 @@ it("清除语法词形关联后候选保持打开，可直接改选并撤销恢�
   const choose = await screen.findByRole("button", {
     name: "选择美式词形"
   });
-  await waitFor(() => expect(choose.closest('[role="tooltip"]')).toBeVisible());
+  await waitFor(() =>
+    expect(choose.closest("[data-admin-floating]")).toBeVisible()
+  );
   expect(screen.getByRole("button", { name: "完成标注" })).toBeEnabled();
   fireEvent.click(choose);
   const replacement = {
@@ -338,7 +338,9 @@ it("关联短语先多选词，再确认打开候选，保留非连续词段", a
   );
   fireEvent.click(screen.getByRole("button", { name: "关联短语" }));
   const choose = await screen.findByRole("button", { name: "选择关联短语" });
-  await waitFor(() => expect(choose.closest('[role="tooltip"]')).toBeVisible());
+  await waitFor(() =>
+    expect(choose.closest("[data-admin-floating]")).toBeVisible()
+  );
   expect(choose).toBeDisabled();
   fireEvent.mouseDown(screen.getByLabelText("关联 dress（4）"), { button: 0 });
   fireEvent.click(screen.getByLabelText("关联 dress（4）"));

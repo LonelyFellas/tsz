@@ -1,5 +1,13 @@
 import { Volume2Icon } from "lucide-react";
-import { Alert, Button, Collapse, Flex, Select, Space, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Collapse,
+  Flex,
+  Space,
+  Typography
+} from "@tsz/ui/admin/display";
+import { Select } from "@tsz/ui/admin/forms";
 import {
   useCallback,
   useEffect,

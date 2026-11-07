@@ -1,4 +1,4 @@
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import {
   fireEvent,
   render,
@@ -101,7 +101,6 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 });
-const testTheme = { token: { motion: false } };
 
 function Harness({
   dialect,
@@ -214,26 +213,24 @@ function Harness({
       : {})
   });
   return (
-    <ConfigProvider theme={testTheme}>
-      <App>
-        <PronunciationPreviewProvider>
-          <V3SynthesisInputs
-            pronunciation={pronunciation}
-            synthesisEditable
-            spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
-            dialect={dialect}
-            index={0}
-            issues={issues}
-            onChange={(patch) =>
-              setPronunciation((value) => ({ ...value, ...patch }))
-            }
-          />
-          <output data-testid="pronunciation-wire">
-            {JSON.stringify(pronunciation)}
-          </output>
-        </PronunciationPreviewProvider>
-      </App>
-    </ConfigProvider>
+    <App>
+      <PronunciationPreviewProvider>
+        <V3SynthesisInputs
+          pronunciation={pronunciation}
+          synthesisEditable
+          spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
+          dialect={dialect}
+          index={0}
+          issues={issues}
+          onChange={(patch) =>
+            setPronunciation((value) => ({ ...value, ...patch }))
+          }
+        />
+        <output data-testid="pronunciation-wire">
+          {JSON.stringify(pronunciation)}
+        </output>
+      </PronunciationPreviewProvider>
+    </App>
   );
 }
 

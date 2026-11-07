@@ -3,17 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
   Button,
-  Checkbox,
   Divider,
-  Drawer,
   Flex,
-  Input,
-  Modal,
   Spin,
   Tag,
-  Typography,
-  theme
-} from "antd";
+  Typography
+} from "@tsz/ui/admin/display";
+import { Checkbox, Input } from "@tsz/ui/admin/forms";
+import { Drawer, Modal } from "@tsz/ui/admin/overlays";
+import { adminTokens } from "@tsz/ui/admin/context";
 import { useState } from "react";
 import type { AdminPermissions, UnifiedPermissionCatalog } from "@tsz/types";
 import { api } from "@/lib/auth";
@@ -32,7 +30,7 @@ function PermissionSelection({
   displayName: string;
   onClose: () => void;
 }) {
-  const { token } = theme.useToken();
+  const token = adminTokens;
   const labels = Object.fromEntries(
     catalog.permissions.map((p) => [p.key, p.label])
   );

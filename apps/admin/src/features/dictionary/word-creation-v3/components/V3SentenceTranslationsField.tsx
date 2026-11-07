@@ -1,5 +1,7 @@
 import { Trash2Icon, PlusIcon } from "lucide-react";
-import { Button, Dropdown, Flex, Input } from "antd";
+import { Button, Flex } from "@tsz/ui/admin/display";
+import { Dropdown } from "@tsz/ui/admin/overlays";
+import { Input } from "@tsz/ui/admin/forms";
 import type {
   SentenceTranslationBandV3,
   TranslationLanguageV3,

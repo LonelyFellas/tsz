@@ -20,7 +20,7 @@ import {
   within,
   act
 } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import type {
   AdminWordPublicationV3,
   AdminWordV3,
@@ -282,11 +282,9 @@ function renderPage(
   );
   render(
     <QueryClientProvider client={client}>
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <AntApp>
-          <RouterProvider router={router} />
-        </AntApp>
-      </ConfigProvider>
+      <FeedbackApp>
+        <RouterProvider router={router} />
+      </FeedbackApp>
     </QueryClientProvider>
   );
   return router;
@@ -1610,7 +1608,7 @@ describe("WordWizardV3Page", () => {
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
     expect(screen.getByText("centre-preserved")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("重 试").closest("button")!);
+    fireEvent.click(screen.getByText(/^重\s*试$/u).closest("button")!);
     await waitFor(() =>
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
     );

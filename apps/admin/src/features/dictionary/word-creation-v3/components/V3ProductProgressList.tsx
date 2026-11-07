@@ -1,5 +1,5 @@
 import { CheckIcon } from "lucide-react";
-import { Flex, Typography } from "antd";
+import { Flex, Typography } from "@tsz/ui/admin/display";
 import { useId, useState, type ReactNode } from "react";
 import type { V3ProductProgressDetail } from "../readiness";
 

@@ -1,4 +1,4 @@
-import { Button, Result } from "antd";
+import { Button, Result } from "@tsz/ui/admin/display";
 import { Link } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 

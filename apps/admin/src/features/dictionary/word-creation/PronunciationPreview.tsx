@@ -1,6 +1,7 @@
 import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
 import { ChevronDownIcon, Volume2Icon, RefreshCwIcon } from "lucide-react";
-import { App, Button, Popover, Space, Tag, Tooltip } from "antd";
+import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
+import { Button, Space, Tag } from "@tsz/ui/admin/display";
 import type {
   Dialect,
   RichTextV2,

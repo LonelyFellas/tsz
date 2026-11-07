@@ -1,12 +1,11 @@
 import { ChevronDownIcon } from "lucide-react";
+import { Button, Space } from "@tsz/ui/admin/display";
+import { Dropdown } from "@tsz/ui/admin/overlays";
 import {
-  Button,
-  Dropdown,
   InputNumber,
   Select,
-  Space,
   type InputNumberProps
-} from "antd";
+} from "@tsz/ui/admin/forms";
 
 const presets = [
   -70,

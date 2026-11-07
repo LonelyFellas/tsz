@@ -3,19 +3,18 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 // 用户目录按独立权限展示资料；敏感资源在详情中按需读取。
 import {
   Alert,
-  App,
   Avatar,
   Badge,
   Breadcrumb,
   Button,
   Card,
   Flex,
-  Modal,
-  Segmented,
   Space,
   Tag
-} from "antd";
-import type { TableColumnsType } from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Segmented } from "@tsz/ui/admin/forms";
+import { type TableColumnsType } from "@tsz/ui/admin/table";
 import { UserIcon } from "lucide-react";
 import dayjs from "dayjs";
 import { useState } from "react";

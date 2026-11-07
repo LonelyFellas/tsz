@@ -1,17 +1,9 @@
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { CopyIcon, CircleHelpIcon, Undo2Icon } from "lucide-react";
-import {
-  Alert,
-  App,
-  Button,
-  ConfigProvider,
-  Flex,
-  Modal,
-  Select,
-  Space,
-  Tooltip,
-  Typography
-} from "antd";
+import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
+import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { AdminControls, useAdminDisabled } from "@tsz/ui/admin/context";
+import { Select } from "@tsz/ui/admin/forms";
 import type { FormContentV3, SharedFormsStepContentV3 } from "@tsz/types";
 import {
   createContext,
@@ -122,7 +114,7 @@ export function V3FormCopyProvider({
     },
     [notification, noticeKey]
   );
-  const { componentDisabled } = ConfigProvider.useConfig();
+  const componentDisabled = useAdminDisabled();
   const formTypeLabel = useFormTypeLabel();
   const root = useRef<HTMLDivElement>(null);
   const request = useRef<AbortController | undefined>(undefined);
@@ -521,11 +513,11 @@ export function V3FormCopyProvider({
             />
           )}
         </Flex>
-        <ConfigProvider componentDisabled={busy || Boolean(componentDisabled)}>
+        <AdminControls componentDisabled={busy || Boolean(componentDisabled)}>
           <div inert={busy} aria-busy={busy}>
             {children}
           </div>
-        </ConfigProvider>
+        </AdminControls>
         <Modal
           title={`复制${pending ? copyName(pending.kind) : "配置"}`}
           open={Boolean(pending)}
