@@ -24,6 +24,14 @@
   border-end-end-radius: 16px;
 }
 
+.v3-draft-status {
+  align-self: center;
+  margin-inline-end: auto;
+  color: #475467;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
 .v3-step-actions .ant-btn {
   height: 40px;
   padding-inline: 20px;
@@ -63,7 +71,11 @@
     padding-inline: 8px;
   }
 
-  .v3-step-actions .ant-btn-primary:last-child:nth-child(odd) {
+  .v3-draft-status,
+  .word-step-actions:has(.v3-draft-status)
+    .ant-btn-primary:last-child:nth-child(even),
+  .word-step-actions:not(:has(.v3-draft-status))
+    .ant-btn-primary:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 }

@@ -9,13 +9,16 @@
   max-width: 1440px;
   margin-inline: auto;
 }
+.v3-review > .word-step-heading {
+  margin-bottom: 0;
+}
 .v3-review-header.ant-card {
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 .v3-review-header .ant-card-body {
-  padding: 24px 0;
+  padding: 16px 0;
 }
 .v3-review-header h2.ant-typography {
   font-size: 14pt;

@@ -812,3 +812,25 @@
 [data-v3-node-id] {
   scroll-margin-top: 80px;
 }
+
+.v3-pronunciation-guide {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #475467;
+}
+.v3-pronunciation-guide summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.v3-pronunciation-guide p {
+  max-width: 65ch;
+  margin: 6px 0 0;
+}
+@container word-creation-page (max-width: 640px) {
+  .word-creation-shell
+    .word-creation-content:not(.word-creation-content--basics):has(
+      .v3-meanings-v2
+    ) {
+    padding-bottom: 162px;
+  }
+}

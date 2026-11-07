@@ -442,6 +442,12 @@ export function V3ReviewContent({
 
   return (
     <section className="v3-review" aria-label="预览并生效">
+      <header className="word-step-heading">
+        <span className="word-step-number">STEP 04</span>
+        <Typography.Title level={2} style={{ margin: 0 }}>
+          发布前预览
+        </Typography.Title>
+      </header>
       <Card className="v3-review-header">
         <Flex align="flex-start" justify="space-between" gap="large" wrap>
           <div>

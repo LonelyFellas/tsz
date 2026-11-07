@@ -124,6 +124,7 @@ export interface V3MeaningsAndExamplesStepProps {
   renderSentenceSection?: (senseId: string) => ReactNode;
   saving?: boolean;
   canSave?: boolean;
+  draftStatus?: string;
   issues?: readonly V3DraftValidationIssue[];
   activePosId?: string;
   wordId?: string;
@@ -947,6 +948,7 @@ function V3MeaningsAndExamplesStepContent({
   renderSentenceSection,
   saving = false,
   canSave = true,
+  draftStatus,
   issues = [],
   activePosId,
   wordId,
@@ -1110,8 +1112,7 @@ function V3MeaningsAndExamplesStepContent({
           词义与例句
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          录入顺序：词义 → 语法结构 → 例句。系统报错触发条件：1)
-          某项词义缺本语言释义语句；2) 例句未配置关联单词；
+          先录入词义，再补充语法结构和例句。每个词义都需填写本语言释义，每条例句都需关联单词。
         </Typography.Paragraph>
       </div>
 
@@ -2335,7 +2336,7 @@ function V3MeaningsAndExamplesStepContent({
       )}
 
       {onSave && (
-        <V3StepActions>
+        <V3StepActions status={saving ? "正在处理草稿…" : draftStatus}>
           {onPrevious ? (
             <Button type="text" disabled={saving} onClick={onPrevious}>
               上一步

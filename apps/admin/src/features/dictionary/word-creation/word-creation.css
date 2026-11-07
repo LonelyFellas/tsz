@@ -244,6 +244,7 @@
 }
 
 .word-creation-content {
+  box-sizing: border-box;
   container: word-creation-content / inline-size;
   width: 100%;
   max-width: 1540px;

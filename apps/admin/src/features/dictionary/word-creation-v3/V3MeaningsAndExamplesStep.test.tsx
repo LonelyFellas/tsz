@@ -1026,9 +1026,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("当前词性还没有词义内容")).toBeNull();
     expect(screen.queryByText("开始录入词义")).toBeNull();
     expect(
-      screen.getByText(
-        "录入顺序：词义 → 语法结构 → 例句。系统报错触发条件：1) 某项词义缺本语言释义语句；2) 例句未配置关联单词；"
-      )
+      screen.getByText(/每个词义都需填写本语言释义，每条例句都需关联单词/u)
     ).toBeVisible();
     expect(
       document.querySelector(".word-sense-editor .anticon-caret-up")

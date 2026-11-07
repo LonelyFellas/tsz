@@ -286,7 +286,15 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           />
         </div>
       </ConfigProvider>
-      <V3StepActions>
+      <V3StepActions
+        status={
+          busy
+            ? "正在处理草稿…"
+            : context.hasUnsavedChanges || bindingsDirty
+              ? "词条草稿有未保存修改"
+              : `当前草稿 · 第 ${context.word.revision} 版`
+        }
+      >
         <Button
           disabled={(!context.hasUnsavedChanges && !bindingsDirty) || busy}
           loading={busy}
@@ -549,6 +557,11 @@ function V3MeaningsSlot({
           }}
           onPrevious={() => context.setActiveStep("forms")}
           onSave={saveMeanings}
+          draftStatus={
+            context.hasUnsavedChanges
+              ? "词条草稿有未保存修改"
+              : `当前草稿 · 第 ${context.word.revision} 版`
+          }
           canSave={
             context.dirtySteps.meanings ||
             (context.dirtySteps.forms &&

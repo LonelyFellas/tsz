@@ -2,7 +2,13 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "./V3StepActions.css";
 
-export function V3StepActions({ children }: { children: ReactNode }) {
+export function V3StepActions({
+  children,
+  status
+}: {
+  children: ReactNode;
+  status?: string;
+}) {
   const anchor = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<{
     left: number;
@@ -48,22 +54,30 @@ export function V3StepActions({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const actions = (
+    <div className="word-step-actions">
+      {status && (
+        <span className="v3-draft-status" role="status">
+          {status}
+        </span>
+      )}
+      {children}
+    </div>
+  );
   return (
     <div ref={anchor}>
-      {bounds ? (
-        createPortal(
-          <div
-            className="v3-step-actions"
-            data-at-end={bounds.bottom > 0}
-            style={bounds}
-          >
-            <div className="word-step-actions">{children}</div>
-          </div>,
-          document.body
-        )
-      ) : (
-        <div className="word-step-actions">{children}</div>
-      )}
+      {bounds
+        ? createPortal(
+            <div
+              className="v3-step-actions"
+              data-at-end={bounds.bottom > 0}
+              style={bounds}
+            >
+              {actions}
+            </div>,
+            document.body
+          )
+        : actions}
     </div>
   );
 }
