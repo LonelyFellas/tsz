@@ -1,3 +1,4 @@
+import { toListQuery } from "./listQuery";
 import dayjs from "dayjs";
 import { describe, expect, it } from "vitest";
 import {
@@ -116,4 +117,28 @@ describe("word list search params", () => {
       });
     }
   });
+});
+
+it("首页北京时间深链映射到固定周边界，并在分页和序列化后保留口径", () => {
+  const state = parseWordListSearchParams(
+    new URLSearchParams(
+      "created_from=2026-11-02&created_to=2026-11-08&created_timezone=Asia%2FShanghai"
+    )
+  );
+  const query = toListQuery(state.filters, 1, 20);
+  expect(query).toMatchObject({
+    created_from: "2026-11-01T16:00:00.000Z",
+    created_to: "2026-11-08T16:00:00.000Z"
+  });
+  const next = serializeWordListSearchParams(state.filters, 2, 50);
+  expect(next.get("created_timezone")).toBe("Asia/Shanghai");
+  const restored = parseWordListSearchParams(next);
+  expect(
+    toListQuery(restored.filters, restored.page, restored.pageSize)
+  ).toEqual({ ...query, page: 2, page_size: 50 });
+  expect(
+    serializeWordListSearchParams({ ...state.filters, range: null }, 1, 20).has(
+      "created_timezone"
+    )
+  ).toBe(false);
 });

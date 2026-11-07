@@ -1234,7 +1234,7 @@ export function SmartDictionary({
         ? [
             {
               key: "range" as const,
-              label: `创建时间：${filters.range[0]?.format("YYYY-MM-DD") ?? "不限"} 至 ${filters.range[1]?.format("YYYY-MM-DD") ?? "不限"}`
+              label: `创建时间${filters.rangeTimezone ? "（北京时间）" : ""}：${filters.range[0]?.format("YYYY-MM-DD") ?? "不限"} 至 ${filters.range[1]?.format("YYYY-MM-DD") ?? "不限"}`
             }
           ]
         : [])
@@ -1471,10 +1471,14 @@ export function SmartDictionary({
                 loading={creators.isPending}
               />
             </Form.Item>
+            <Form.Item name="rangeTimezone" hidden>
+              <input type="hidden" />
+            </Form.Item>
             <Form.Item
               name="range"
               label="创建时间"
               className="word-search-date"
+              help={filters.rangeTimezone ? "北京时间（UTC+8）" : undefined}
             >
               <RangePicker style={{ width: "100%" }} />
             </Form.Item>
@@ -1497,6 +1501,7 @@ export function SmartDictionary({
                   const next = { ...filters };
                   delete next[item.key];
                   if (item.key === "headword") delete next.keyword;
+                  if (item.key === "range") delete next.rangeTimezone;
                   applyFilters(next);
                 }}
               >

@@ -48,7 +48,7 @@ export function ContentTrend({
     selected.week_start <= date &&
     weekEnd(selected.week_start) >= date;
   const detailLink = selected
-    ? `/words?created_from=${selected.week_start}&created_to=${weekEnd(selected.week_start)}`
+    ? `/words?created_from=${selected.week_start}&created_to=${weekEnd(selected.week_start)}&created_timezone=Asia%2FShanghai`
     : "/words";
   return (
     <div className="dashboard-trend">

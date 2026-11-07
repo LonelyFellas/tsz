@@ -340,6 +340,67 @@ describe("SmartDictionary", () => {
     expect(screen.getByTestId("location")).not.toHaveTextContent("headword=");
   });
 
+  it("北京时间统计深链在搜索和分页后保留精确边界，移除日期时清除口径", async () => {
+    render(
+      <FeedbackApp>
+        <MemoryRouter
+          initialEntries={[
+            "/words?created_from=2026-11-02&created_to=2026-11-08&created_timezone=Asia%2FShanghai"
+          ]}
+        >
+          <SmartDictionary />
+          <LocationProbe />
+        </MemoryRouter>
+      </FeedbackApp>
+    );
+    const boundaries = {
+      created_from: "2026-11-01T16:00:00.000Z",
+      created_to: "2026-11-08T16:00:00.000Z"
+    };
+    expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+      page: 1,
+      page_size: 20,
+      ...boundaries
+    });
+    fireEvent.change(screen.getByLabelText("词条"), {
+      target: { value: "alpha" }
+    });
+    fireEvent.submit(screen.getByLabelText("词条").closest("form")!);
+    await waitFor(() =>
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 20,
+        headword: "alpha",
+        ...boundaries
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
+    await waitFor(() =>
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 2,
+        page_size: 20,
+        headword: "alpha",
+        ...boundaries
+      })
+    );
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "created_timezone=Asia%2FShanghai"
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /移除创建时间（北京时间）/ })
+    );
+    await waitFor(() =>
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 20,
+        headword: "alpha"
+      })
+    );
+    expect(screen.getByTestId("location")).not.toHaveTextContent(
+      "created_timezone"
+    );
+  });
+
   it("跨页已选数量明确，取消选择会清空跨页选择", async () => {
     render(
       <FeedbackApp>
