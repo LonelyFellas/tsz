@@ -2,11 +2,7 @@ import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 管理员管理（super_admin 专属）：列表、筛选、验证码建号，以及行操作（启禁用 / 重置密码）。
 // 全对接真实接口；超管账号不可被互操作（后端 403），整行操作按钮前端先置灰。
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+import { PlusIcon, RotateCwIcon, SearchIcon } from "lucide-react";
 import {
   Alert,
   App,
@@ -309,15 +305,11 @@ export function AdminManagement() {
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Space>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                htmlType="submit"
-              >
+              <Button type="primary" icon={<SearchIcon />} htmlType="submit">
                 搜索
               </Button>
               <Button
-                icon={<ReloadOutlined />}
+                icon={<RotateCwIcon />}
                 onClick={() => {
                   form.resetFields();
                   applyFilters({});
@@ -350,7 +342,7 @@ export function AdminManagement() {
           toolbar={
             <GatedButton
               type="primary"
-              icon={<PlusOutlined />}
+              icon={<PlusIcon />}
               reason="请先处理上一条临时密码"
               disabled={secretBusy}
               onClick={() => setCreateOpen(true)}

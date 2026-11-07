@@ -1,5 +1,5 @@
 import { splitVoiceDisplayName } from "@tsz/shared";
-import { ManOutlined, WomanOutlined } from "@ant-design/icons";
+import { MarsIcon, VenusIcon } from "lucide-react";
 import type { AdminSpeechVoice, AdminVoiceParameters } from "@tsz/types";
 
 export function VoiceName({ voice }: { voice: AdminSpeechVoice }) {
@@ -10,9 +10,9 @@ export function VoiceName({ voice }: { voice: AdminSpeechVoice }) {
     <span className="voice-shared-name" title={voice.display_name}>
       <strong>{english}</strong>
       {gender === "female" ? (
-        <WomanOutlined aria-label="女声" />
+        <VenusIcon aria-label="女声" />
       ) : gender === "male" ? (
-        <ManOutlined aria-label="男声" />
+        <MarsIcon aria-label="男声" />
       ) : null}
       {chinese && <small>{chinese}</small>}
     </span>

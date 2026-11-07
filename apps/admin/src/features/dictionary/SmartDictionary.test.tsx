@@ -1113,7 +1113,7 @@ describe("SmartDictionary", () => {
     const trashAction = actions
       .getByLabelText("移入垃圾桶「workspace」")
       .closest('[role="menuitem"]')!;
-    expect(trashAction.querySelector(".anticon-delete")).not.toBeNull();
+    expect(trashAction.querySelector(".lucide-trash-2")).not.toBeNull();
     fireEvent.click(trashAction);
     fireEvent.click(
       (await screen.findAllByText("移入垃圾桶", { exact: true }))
@@ -1420,7 +1420,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(firstRowCheckbox!);
     const batchButton = screen.getByText("移入垃圾桶(1)").closest("button");
     expect(batchButton).not.toBeNull();
-    expect(batchButton!.querySelector(".anticon-delete")).not.toBeNull();
+    expect(batchButton!.querySelector(".lucide-trash-2")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
 

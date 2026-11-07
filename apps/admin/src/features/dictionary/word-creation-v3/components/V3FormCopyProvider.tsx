@@ -1,9 +1,5 @@
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
-import {
-  CopyOutlined,
-  QuestionCircleOutlined,
-  UndoOutlined
-} from "@ant-design/icons";
+import { CopyIcon, CircleHelpIcon, Undo2Icon } from "lucide-react";
 import {
   Alert,
   App,
@@ -92,7 +88,7 @@ export function V3FormCopyHandle({
         type="text"
         size="small"
         className="v3-form-copy-handle"
-        icon={<CopyOutlined />}
+        icon={<CopyIcon />}
         aria-label={`复制${copyName(kind)}`}
         aria-pressed={selected}
         disabled={copy.busy || undefined}
@@ -190,7 +186,7 @@ export function V3FormCopyProvider({
         <Button
           size="small"
           aria-label="撤销"
-          icon={<UndoOutlined />}
+          icon={<Undo2Icon />}
           disabled={disabled}
           onClick={() => {
             if (
@@ -648,7 +644,7 @@ export function V3FormCopyProvider({
 export function V3FormCopyHelp() {
   return (
     <Tooltip title="音标和音色参数分开复制，均包含英美两侧。拖动复制图标到目标区域，或点击图标后选择目标。复制会覆盖对应配置；可撤销，保存草稿后生效。音频文件不复制，复制后请重新试听。">
-      <QuestionCircleOutlined aria-label="词形复制说明" />
+      <CircleHelpIcon aria-label="词形复制说明" />
     </Tooltip>
   );
 }

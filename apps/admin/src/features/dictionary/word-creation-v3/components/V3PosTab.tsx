@@ -1,5 +1,5 @@
 import { primaryRegionalVariant } from "@tsz/shared";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusIcon } from "lucide-react";
 import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
 import type {
   DialectRulesV3,
@@ -444,7 +444,7 @@ export function V3PosTab({
           aria-label={`新增${posLabel}变化组`}
           block
           className="word-form-add-group"
-          icon={<PlusOutlined />}
+          icon={<PlusIcon />}
           onClick={addGroup}
           size="large"
           type="dashed"

@@ -45,3 +45,19 @@ body {
     flex-basis: 100%;
   }
 }
+
+.lucide {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+.ui-icon-spin,
+.lucide-loader-circle {
+  animation: ui-icon-spin 1s linear infinite;
+}
+@keyframes ui-icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,4 +1,4 @@
-import { LinkOutlined } from "@ant-design/icons";
+import { LinkIcon } from "lucide-react";
 import { Popover, Tag } from "antd";
 import { nodesReferenceCount, referencesForNodes } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
@@ -39,7 +39,7 @@ export function V3ReferenceBadge({
         title={`存在 ${count} 处关联，点击查看关联内容`}
       >
         {/* 不走 Tag 的 icon 插槽：页签会给内部图标加 12px 右边距、Tag 再给文字加 7px，图标和计数之间空出一大截。行内样式压过这两条。 */}
-        <LinkOutlined style={{ marginInlineEnd: 4 }} />
+        <LinkIcon style={{ marginInlineEnd: 4 }} />
         {count}
       </Tag>
     </Popover>

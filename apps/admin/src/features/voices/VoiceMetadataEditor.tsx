@@ -1,4 +1,4 @@
-import { EditOutlined } from "@ant-design/icons";
+import { PencilIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import { speechAccentGroup } from "@tsz/shared";
@@ -225,7 +225,7 @@ export function VoiceMetadataEditor({
           <Button
             type="text"
             size="small"
-            icon={<EditOutlined />}
+            icon={<PencilIcon />}
             aria-label={`编辑 ${voice.display_name} ${label}`}
             disabled={
               disabled || (field === "accent" && item?.accent_revision == null)

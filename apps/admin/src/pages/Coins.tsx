@@ -1,7 +1,7 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { AccountLabel } from "@/features/coins/AccountLabel";
 import { OperationHistory } from "@/features/coins/OperationHistory";
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { RotateCwIcon, SearchIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -251,7 +251,7 @@ function Management({ profile }: { profile: AdminProfile }) {
             />
           </Form.Item>
           <Form.Item className="admin-filter-actions">
-            <Button htmlType="submit" type="primary" icon={<SearchOutlined />}>
+            <Button htmlType="submit" type="primary" icon={<SearchIcon />}>
               查找
             </Button>
           </Form.Item>
@@ -465,7 +465,7 @@ function Management({ profile }: { profile: AdminProfile }) {
       </Typography.Text>
       <Tabs
         tabBarExtraContent={
-          <Button icon={<ReloadOutlined />} onClick={() => void refresh()}>
+          <Button icon={<RotateCwIcon />} onClick={() => void refresh()}>
             刷新记录
           </Button>
         }

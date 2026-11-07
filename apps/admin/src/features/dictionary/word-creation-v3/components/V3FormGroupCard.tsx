@@ -1,15 +1,13 @@
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
-  CaretDownFilled,
-  CaretUpFilled,
-  DeleteOutlined,
-  DownOutlined,
-  EllipsisOutlined,
-  MinusCircleOutlined,
-  PlusCircleOutlined,
-  SettingOutlined,
-  UpOutlined
-} from "@ant-design/icons";
+  ChevronDownIcon,
+  ChevronUpIcon,
+  Trash2Icon,
+  EllipsisIcon,
+  CircleMinusIcon,
+  CirclePlusIcon,
+  SettingsIcon
+} from "lucide-react";
 import {
   Alert,
   Button,
@@ -286,7 +284,7 @@ export function V3FormGroupCard({
                 aria-label={`删除变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
                 danger
                 disabled={deleteLocked}
-                icon={<MinusCircleOutlined />}
+                icon={<CircleMinusIcon />}
                 size="small"
                 type="text"
               />
@@ -364,7 +362,7 @@ export function V3FormGroupCard({
               aria-label={`为第 ${groupIndex + 1} 组增加词形`}
               disabled={formTypeOptions.length === 0}
               ghost
-              icon={<PlusCircleOutlined />}
+              icon={<CirclePlusIcon />}
               size="small"
             >
               增加词形
@@ -405,7 +403,7 @@ export function V3FormGroupCard({
             onClick={() => setCollapsed((value) => !value)}
           >
             {collapsed ? "展开" : "收起"}
-            {collapsed ? <CaretDownFilled /> : <CaretUpFilled />}
+            {collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
           </Button>
           {onDelete || hasOverview ? (
             <ColumnSettings
@@ -424,7 +422,7 @@ export function V3FormGroupCard({
                           {
                             key: "columns",
                             label: "列设置",
-                            icon: <SettingOutlined />
+                            icon: <SettingsIcon />
                           },
                           { type: "divider" as const }
                         ]
@@ -433,20 +431,20 @@ export function V3FormGroupCard({
                       ? [
                           {
                             key: "move-up",
-                            icon: <UpOutlined />,
+                            icon: <ChevronUpIcon />,
                             label: "上移本组",
                             disabled: groupIndex === 0 || !onMove
                           },
                           {
                             key: "move-down",
-                            icon: <DownOutlined />,
+                            icon: <ChevronDownIcon />,
                             label: "下移本组",
                             disabled: groupIndex === groupCount - 1 || !onMove
                           },
                           { type: "divider" as const },
                           {
                             key: "delete",
-                            icon: <DeleteOutlined />,
+                            icon: <Trash2Icon />,
                             label:
                               deleteBlockedByReferences > 0
                                 ? "删除草稿词形组（发布前需处理受影响的关联）"
@@ -472,7 +470,7 @@ export function V3FormGroupCard({
                 <Button
                   aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
                   className="v3-form-group-menu"
-                  icon={<EllipsisOutlined />}
+                  icon={<EllipsisIcon />}
                   type="text"
                 />
               </Dropdown>

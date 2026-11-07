@@ -14,7 +14,7 @@ import {
   Tag,
   Typography
 } from "antd";
-import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
+import { ChevronDownIcon, SearchIcon, ChevronUpIcon } from "lucide-react";
 import type { Dayjs } from "dayjs";
 import type {
   CoinOperationsQuery,
@@ -139,17 +139,13 @@ export function OperationHistory({
               <DatePicker.RangePicker showTime style={{ width: "100%" }} />
             </Form.Item>
             <Space className="coins-filter-actions" wrap>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<SearchOutlined />}
-              >
+              <Button type="primary" htmlType="submit" icon={<SearchIcon />}>
                 查询
               </Button>
               <Button onClick={reset}>重置</Button>
               <Button
                 type="link"
-                icon={more ? <UpOutlined /> : <DownOutlined />}
+                icon={more ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 onClick={() => setMore(!more)}
                 aria-expanded={more}
               >

@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode
 } from "react";
-import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Button } from "@tsz/ui/components/button";
 import { AdminTableToolbar } from "@/components/AdminTable";
 import { ColumnSettings } from "@/components/ColumnSettings";
@@ -270,7 +270,7 @@ export function WordListTable({
           disabled={page <= 1}
           onClick={() => onPageChange(Math.min(page - 1, lastPage), pageSize)}
         >
-          <LeftOutlined />
+          <ChevronLeftIcon />
         </button>
         {pages.map((number, index) => (
           <Fragment key={number}>
@@ -309,7 +309,7 @@ export function WordListTable({
           disabled={page >= lastPage}
           onClick={() => onPageChange(page + 1, pageSize)}
         >
-          <RightOutlined />
+          <ChevronRightIcon />
         </button>
         <select
           aria-label="每页条数"

@@ -26,7 +26,7 @@ import {
   recommendationVoiceSetting
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { EditOutlined } from "@ant-design/icons";
+import { PencilIcon } from "lucide-react";
 import { flushSync } from "react-dom";
 import { Alert, Button, Input, Space, message } from "antd";
 import {
@@ -772,7 +772,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         <Button
           aria-label={`打开${ariaLabel}编辑器`}
           disabled={readOnly}
-          icon={<EditOutlined />}
+          icon={<PencilIcon />}
           onClick={() => {
             setDraftState(captureSession());
             setSaveError("");

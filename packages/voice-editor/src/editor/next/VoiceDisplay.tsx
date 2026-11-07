@@ -1,4 +1,4 @@
-import { ManOutlined, WomanOutlined } from "@ant-design/icons";
+import { MarsIcon, VenusIcon } from "lucide-react";
 import { splitVoiceDisplayName } from "@tsz/shared";
 import type { VoiceOption, VoiceSetting } from "../../types";
 
@@ -15,9 +15,9 @@ export function PoolVoiceName({
     <span className="tsz-ve-shared-name" title={display}>
       <strong>{english}</strong>
       {voice?.gender === "female" ? (
-        <WomanOutlined aria-label="女声" />
+        <VenusIcon aria-label="女声" />
       ) : voice?.gender === "male" ? (
-        <ManOutlined aria-label="男声" />
+        <MarsIcon aria-label="男声" />
       ) : null}
       {chinese && <small>{chinese}</small>}
     </span>

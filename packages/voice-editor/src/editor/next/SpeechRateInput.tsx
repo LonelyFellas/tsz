@@ -1,4 +1,4 @@
-import { DownOutlined } from "@ant-design/icons";
+import { ChevronDownIcon } from "lucide-react";
 import {
   Button,
   Dropdown,
@@ -73,7 +73,7 @@ export function SpeechRateInput({
         >
           <Button
             aria-label="语速常用值"
-            icon={<DownOutlined />}
+            icon={<ChevronDownIcon />}
             disabled={props.disabled || min === max}
           />
         </Dropdown>

@@ -28,7 +28,7 @@
   min-height: 32px;
   font-size: 12px;
 }
-.voice-audition-panel .voice-library-preview-empty > .anticon {
+.voice-audition-panel .voice-library-preview-empty > .lucide {
   font-size: 18px;
 }
 .voice-audition-panel .voice-library-player audio {

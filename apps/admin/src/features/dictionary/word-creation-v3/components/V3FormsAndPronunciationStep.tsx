@@ -1,6 +1,6 @@
 import { regionalVariants } from "@tsz/shared";
 import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
-import { MinusCircleOutlined } from "@ant-design/icons";
+import { CircleMinusIcon } from "lucide-react";
 import {
   Alert,
   App,
@@ -402,7 +402,7 @@ export function V3FormsAndPronunciationStep({
                       <Button
                         aria-label={`删除${label}`}
                         danger
-                        icon={<MinusCircleOutlined />}
+                        icon={<CircleMinusIcon />}
                         onClick={(event) => {
                           event.stopPropagation();
                           modal.confirm({

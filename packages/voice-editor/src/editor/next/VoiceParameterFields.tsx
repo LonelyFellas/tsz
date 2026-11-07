@@ -1,4 +1,4 @@
-import { UndoOutlined } from "@ant-design/icons";
+import { Undo2Icon } from "lucide-react";
 import {
   Alert,
   Button,
@@ -112,7 +112,7 @@ export function VoiceParameterFields({
         <Button
           type="text"
           size="small"
-          icon={<UndoOutlined />}
+          icon={<Undo2Icon />}
           aria-label="恢复默认参数"
           disabled={disabled || resetDisabled}
           onClick={onReset}

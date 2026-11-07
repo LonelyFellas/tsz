@@ -1,10 +1,10 @@
 import {
-  DisconnectOutlined,
-  DownOutlined,
-  LockOutlined,
-  LogoutOutlined,
-  SettingOutlined
-} from "@ant-design/icons";
+  UnplugIcon,
+  ChevronDownIcon,
+  LockKeyholeIcon,
+  LogOutIcon,
+  SettingsIcon
+} from "lucide-react";
 import { App, Button, Divider, Popover, Space, Typography } from "antd";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -96,7 +96,7 @@ export function AdminHeader() {
         <Button
           type="text"
           block
-          icon={<SettingOutlined />}
+          icon={<SettingsIcon />}
           style={{ justifyContent: "flex-start" }}
           onClick={goProfileSettings}
         >
@@ -105,7 +105,7 @@ export function AdminHeader() {
         <Button
           type="text"
           block
-          icon={<LockOutlined />}
+          icon={<LockKeyholeIcon />}
           style={{ justifyContent: "flex-start" }}
           onClick={goChangePassword}
         >
@@ -115,7 +115,7 @@ export function AdminHeader() {
           type="text"
           block
           danger
-          icon={<LogoutOutlined />}
+          icon={<LogOutIcon />}
           style={{ justifyContent: "flex-start" }}
           onClick={doLogout}
         >
@@ -125,7 +125,7 @@ export function AdminHeader() {
           type="text"
           block
           danger
-          icon={<DisconnectOutlined />}
+          icon={<UnplugIcon />}
           style={{ justifyContent: "flex-start" }}
           onClick={doLogoutAll}
         >
@@ -158,7 +158,7 @@ export function AdminHeader() {
         >
           <Space size={8}>
             <AdminAvatar level={profile?.role} size="small" />
-            <DownOutlined style={{ fontSize: 12, color: "#8c8c8c" }} />
+            <ChevronDownIcon style={{ fontSize: 12, color: "#8c8c8c" }} />
           </Space>
         </Button>
       </Popover>

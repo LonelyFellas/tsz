@@ -2,11 +2,7 @@ import { regionalVariants } from "@tsz/shared";
 import { expandFormContents } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
-import {
-  CheckCircleFilled,
-  InfoCircleOutlined,
-  SafetyCertificateOutlined
-} from "@ant-design/icons";
+import { CircleCheckIcon, InfoIcon, ShieldCheckIcon } from "lucide-react";
 import type {
   AdminWordV3,
   DraftFormsStepContentV3,
@@ -257,7 +253,7 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
             建条时已套用内置词典的英美拼写、词形和音标；下面是草稿的最新内容，在词形与发音步改动后这里同步更新。
           </Typography.Text>
         </div>
-        <SafetyCertificateOutlined />
+        <ShieldCheckIcon />
       </div>
       <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
         {expandFormContents(word.forms).pos.map((pos) => (
@@ -325,7 +321,7 @@ function V3BasicsContent({
               readOnly
               placeholder="暂无词条名称"
               size="large"
-              suffix={<CheckCircleFilled style={{ color: "#52c41a" }} />}
+              suffix={<CircleCheckIcon style={{ color: "#52c41a" }} />}
               value={entryLabel}
               style={{ marginTop: 8 }}
             />
@@ -361,7 +357,7 @@ function V3BasicsContent({
             </Descriptions.Item>
             <Descriptions.Item label="原形检测">
               <Space size={6}>
-                <CheckCircleFilled style={{ color: "#52c41a" }} />
+                <CircleCheckIcon style={{ color: "#52c41a" }} />
                 已完成
               </Space>
             </Descriptions.Item>
@@ -379,7 +375,7 @@ function V3BasicsContent({
           </Descriptions>
           {expandFormContents(word.forms).pos.length === 0 ? (
             <div className="word-detection-empty-state">
-              <InfoCircleOutlined />
+              <InfoIcon />
               <div>
                 <Typography.Text strong>未找到词典建议</Typography.Text>
                 <Typography.Text type="secondary">

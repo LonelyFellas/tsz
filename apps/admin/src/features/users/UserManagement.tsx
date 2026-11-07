@@ -16,7 +16,7 @@ import {
   Tag
 } from "antd";
 import type { TableColumnsType } from "antd";
-import { UserOutlined } from "@ant-design/icons";
+import { UserIcon } from "lucide-react";
 import dayjs from "dayjs";
 import { useState } from "react";
 import type { AdminUser, Role } from "@tsz/types";
@@ -113,7 +113,7 @@ export function UserManagement() {
       dataIndex: "avatar_url",
       width: 64,
       render: (src: string) => (
-        <Avatar src={src || undefined} icon={<UserOutlined />} />
+        <Avatar src={src || undefined} icon={<UserIcon />} />
       )
     },
     {

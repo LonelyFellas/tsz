@@ -1,6 +1,6 @@
 import { regionalVariants } from "@tsz/shared";
 import { AdminTable as Table } from "@/components/AdminTable";
-import { EditOutlined } from "@ant-design/icons";
+import { PencilIcon } from "lucide-react";
 import {
   V3FormCopyHandle,
   V3FormCopyHelp,
@@ -245,7 +245,7 @@ export function V3FormContentOverview({
                     size="small"
                     className="v3-overview-edit"
                     aria-label={`编辑${label(row.form.form_type)}内容`}
-                    icon={<EditOutlined />}
+                    icon={<PencilIcon />}
                     data-v3-node-id={row.form.id}
                     data-v3-field="form_id"
                     data-v3-open-content={row.form.id}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusIcon } from "lucide-react";
 import {
   Alert,
   App,
@@ -345,7 +345,7 @@ export function WordSentences({
                   block
                   type="dashed"
                   className="word-section-add-button"
-                  icon={<PlusOutlined aria-hidden />}
+                  icon={<PlusIcon aria-hidden />}
                   disabled={!savedSense}
                   style={!savedSense ? { pointerEvents: "none" } : undefined}
                   onClick={() => onOpen("new")}

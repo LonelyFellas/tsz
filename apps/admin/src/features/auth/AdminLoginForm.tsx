@@ -5,7 +5,7 @@ import {
 } from "@tsz/api-client";
 import { isCode, isPhone, readTestResourceRun } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
-import { ArrowRightOutlined } from "@ant-design/icons";
+import { ArrowRightIcon } from "lucide-react";
 import { Alert, Button, Form, Input } from "antd";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -318,7 +318,7 @@ export function AdminLoginForm({
                 ) : (
                   <>
                     登录
-                    <ArrowRightOutlined aria-hidden />
+                    <ArrowRightIcon aria-hidden />
                   </>
                 )}
               </Button>

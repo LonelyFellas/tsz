@@ -1,6 +1,6 @@
 // 详情资料按权限展示；余额、账单、证件分别按需请求。
 import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
-import { UserOutlined } from "@ant-design/icons";
+import { UserIcon } from "lucide-react";
 import dayjs from "dayjs";
 import type { AdminUser } from "@tsz/types";
 import { UserRegistrationRegion, UserResources } from "./UserResources";
@@ -148,7 +148,7 @@ export function UserDetailDrawer({ user, onClose }: Props) {
         <Space>
           <Avatar
             src={canReadBasic ? user?.avatar_url || undefined : undefined}
-            icon={<UserOutlined />}
+            icon={<UserIcon />}
           />
           {user?.display_name}
         </Space>

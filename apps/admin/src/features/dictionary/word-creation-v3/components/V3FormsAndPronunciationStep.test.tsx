@@ -2711,7 +2711,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     const handles = screen.getAllByLabelText(/拖动第 \d+ 条发音/);
     expect(handles).toHaveLength(2);
-    expect(handles[0]!.querySelector(".anticon-holder")).not.toBeNull();
+    expect(handles[0]!.querySelector(".lucide-grip-vertical")).not.toBeNull();
     expect(handles.every((handle) => !handle.hasAttribute("disabled"))).toBe(
       true
     );
@@ -3686,7 +3686,7 @@ describe("V3FormsAndPronunciationStep", () => {
       handle.querySelector<HTMLElement>(".word-sort-drag-handle")!
     );
     expect(grips.every((grip) => grip.draggable)).toBe(true);
-    expect(grips[0]!.querySelector(".anticon-holder")).not.toBeNull();
+    expect(grips[0]!.querySelector(".lucide-grip-vertical")).not.toBeNull();
 
     const store = new Map<string, string>();
     const dataTransfer = {

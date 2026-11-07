@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Space, Typography } from "antd";
-import { SoundOutlined } from "@ant-design/icons";
+import { Volume2Icon } from "lucide-react";
 import type { WordlistAudioLocale, WordlistCustomAudio } from "@tsz/types";
 import { api } from "@/lib/auth";
 
@@ -78,7 +78,7 @@ export function CustomAudio({
       {audio.locales.map((locale) => (
         <Button
           key={locale}
-          icon={<SoundOutlined />}
+          icon={<Volume2Icon />}
           loading={busy === locale}
           disabled={!!busy}
           onClick={() => void play(locale)}

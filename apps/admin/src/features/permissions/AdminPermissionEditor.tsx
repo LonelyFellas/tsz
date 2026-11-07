@@ -1,4 +1,4 @@
-import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
+import { XIcon, PlusIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -122,7 +122,7 @@ function PermissionSelection({
             <Button
               size="small"
               aria-label="标签池"
-              icon={<PlusOutlined />}
+              icon={<PlusIcon />}
               disabled={availableTags.length === 0}
               onClick={() => {
                 setPickerTagIds(selectedTagIds);
@@ -203,7 +203,7 @@ function PermissionSelection({
                     cursor: "pointer"
                   }}
                 >
-                  <CloseOutlined style={{ fontSize: 10 }} />
+                  <XIcon style={{ fontSize: 10 }} />
                 </button>
               </Tag>
             ))

@@ -1,7 +1,7 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useEffect, useState } from "react";
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { RotateCwIcon, SearchIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -101,15 +101,11 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Space>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                htmlType="submit"
-              >
+              <Button type="primary" icon={<SearchIcon />} htmlType="submit">
                 搜索
               </Button>
               <Button
-                icon={<ReloadOutlined />}
+                icon={<RotateCwIcon />}
                 onClick={() => {
                   form.resetFields();
                   setQuery(initialQuery);

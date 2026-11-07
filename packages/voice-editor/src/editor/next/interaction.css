@@ -902,7 +902,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tsz-ve-shared-name > .anticon {
+.tsz-ve-shared-name > .lucide {
   margin-left: 0.2em;
   flex-shrink: 0;
   font-size: inherit;

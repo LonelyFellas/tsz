@@ -1,6 +1,6 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
-import { ReloadOutlined } from "@ant-design/icons";
+import { RotateCwIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CertificationFile,
@@ -206,7 +206,7 @@ function ApplicationQueue() {
               </Form.Item>
               <Form.Item className="admin-filter-actions">
                 <Button
-                  icon={<ReloadOutlined />}
+                  icon={<RotateCwIcon />}
                   onClick={() => void list.refetch()}
                 >
                   刷新

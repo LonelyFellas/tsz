@@ -1,4 +1,4 @@
-import { DisconnectOutlined } from "@ant-design/icons";
+import { UnplugIcon } from "lucide-react";
 import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -66,7 +66,7 @@ export function RootProviders() {
         className={isLoginPage ? "admin-login__connection" : undefined}
         role={isLoginPage ? "status" : "alert"}
         type={isLoginPage ? "info" : "warning"}
-        icon={isLoginPage ? <DisconnectOutlined /> : undefined}
+        icon={isLoginPage ? <UnplugIcon /> : undefined}
         showIcon
         title={
           isLoginPage

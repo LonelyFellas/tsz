@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { OpenAIOutlined, ReloadOutlined } from "@ant-design/icons";
+import { SparklesIcon, RotateCwIcon } from "lucide-react";
 import {
   Alert,
   Badge,
@@ -185,7 +185,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
     <section className="settings-provider" aria-label="ChatGPT 账号">
       <div className="settings-provider__summary">
         <span className="settings-provider__icon">
-          <OpenAIOutlined />
+          <SparklesIcon />
         </span>
         <div className="settings-provider__identity">
           <div className="settings-provider__name">
@@ -212,7 +212,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
         <div className="settings-provider__actions">
           <Button
             type="text"
-            icon={<ReloadOutlined />}
+            icon={<RotateCwIcon />}
             loading={accounts.isFetching || setup.isFetching}
             onClick={() => void refresh()}
             aria-label="刷新 ChatGPT 账号状态"
@@ -265,7 +265,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
           <Space wrap>
             {!remote && (
               <Button
-                icon={<OpenAIOutlined />}
+                icon={<SparklesIcon />}
                 disabled={
                   !available ||
                   setup.isPending ||

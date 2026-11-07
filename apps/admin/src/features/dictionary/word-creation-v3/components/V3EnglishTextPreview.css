@@ -40,7 +40,7 @@
 
 .v3-english-preview-playback
   .word-pronunciation-play-action.ant-btn:focus-visible
-  .anticon {
+  .lucide {
   border-radius: 3px;
   outline: 2px solid var(--ant-color-primary, #2053ff);
   outline-offset: 4px;

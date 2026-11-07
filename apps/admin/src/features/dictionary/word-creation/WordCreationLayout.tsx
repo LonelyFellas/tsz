@@ -1,8 +1,4 @@
-import {
-  CheckOutlined,
-  LeftOutlined,
-  UnorderedListOutlined
-} from "@ant-design/icons";
+import { CheckIcon, ChevronLeftIcon, ListIcon } from "lucide-react";
 import { Breadcrumb, Button, ConfigProvider, Drawer, Typography } from "antd";
 import type { WordCreationStep } from "@tsz/types";
 import {
@@ -128,7 +124,7 @@ export function WordCreationLayout({
               }}
             >
               <span className="word-editor-step-index" aria-hidden="true">
-                {finished ? <CheckOutlined /> : index + 1}
+                {finished ? <CheckIcon /> : index + 1}
               </span>
               <span>
                 <strong>{WORD_STEP_TITLE[step]}</strong>
@@ -144,7 +140,7 @@ export function WordCreationLayout({
         <section className="word-creation-summary" aria-label="词条摘要">
           <Button
             type="text"
-            icon={<LeftOutlined />}
+            icon={<ChevronLeftIcon />}
             onClick={() => navigate("/words")}
             className="word-creation-back"
           >
@@ -169,10 +165,10 @@ export function WordCreationLayout({
 
           {narrowProgress ? (
             <Button
-              // 图标的 anticon 会把「unordered-list」混进可及名，显式定名兜住。
+              // 图标 会把「unordered-list」混进可及名，显式定名兜住。
               aria-label={progressTriggerLabel}
               className="word-summary-progress-trigger"
-              icon={<UnorderedListOutlined />}
+              icon={<ListIcon />}
               onClick={() => setProgressOpen(true)}
             >
               {progressTriggerLabel}

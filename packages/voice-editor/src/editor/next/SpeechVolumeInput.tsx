@@ -1,4 +1,4 @@
-import { MutedOutlined, SoundOutlined } from "@ant-design/icons";
+import { VolumeXIcon, Volume2Icon } from "lucide-react";
 import { Flex, InputNumber, Slider } from "antd";
 import type { AriaAttributes } from "react";
 
@@ -31,7 +31,7 @@ export function SpeechVolumeInput({
       aria-describedby={aria["aria-describedby"]}
     >
       <span className="voice-library-volume-icon" aria-hidden="true">
-        {value === 0 ? <MutedOutlined /> : <SoundOutlined />}
+        {value === 0 ? <VolumeXIcon /> : <Volume2Icon />}
       </span>
       <Slider
         ariaLabelForHandle="合成音量滑块"

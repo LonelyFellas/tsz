@@ -1,7 +1,7 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { usePermission } from "@/lib/auth";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusIcon } from "lucide-react";
 import {
   Alert,
   App,
@@ -257,7 +257,7 @@ export function FormTypeSettings() {
           toolbar={
             <Button
               type="primary"
-              icon={<PlusOutlined />}
+              icon={<PlusIcon />}
               disabled={!canEdit || !ready}
               onClick={() => {
                 setEditing(undefined);

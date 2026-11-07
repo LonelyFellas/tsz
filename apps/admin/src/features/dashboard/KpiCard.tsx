@@ -1,4 +1,4 @@
-import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
+import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { Card, Statistic, Typography } from "antd";
 import type { KpiItem } from "./display";
 
@@ -31,7 +31,7 @@ export function KpiCard({ item }: KpiCardProps) {
             color: delta.direction > 0 ? "#52c41a" : "#ff4d4f"
           }}
         >
-          {delta.direction > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{" "}
+          {delta.direction > 0 ? <ArrowUpIcon /> : <ArrowDownIcon />}{" "}
           {delta.label} {delta.display}
         </Typography.Text>
       )}

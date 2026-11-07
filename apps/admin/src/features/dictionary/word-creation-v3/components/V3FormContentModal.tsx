@@ -9,7 +9,7 @@ import {
   useRef,
   useState
 } from "react";
-import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
+import { XIcon, PlusIcon } from "lucide-react";
 import {
   Alert,
   App,
@@ -639,7 +639,7 @@ export function V3FormContentModal({
                     <Button
                       size="small"
                       type="text"
-                      icon={<CloseOutlined />}
+                      icon={<XIcon />}
                       disabled={Boolean(removalReason(binding.id))}
                       onClick={() => removeLabel(binding.id)}
                       aria-label={`移除${partOfSpeechLabel(pos.pos)}${label(binding.form_type)}${number ? ` ${number}` : ""}标签`}
@@ -651,7 +651,7 @@ export function V3FormContentModal({
             <Button
               type="dashed"
               aria-label="新增标签"
-              icon={<PlusOutlined />}
+              icon={<PlusIcon />}
               disabled={rows.length === 0}
               onClick={() => {
                 setAssignmentError("");

@@ -4,14 +4,14 @@ import { WordListTable, type WordColumn } from "./WordListTable";
 import "./word-list-controls.css";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
-  DeleteOutlined,
-  DownOutlined,
-  LoadingOutlined,
-  PlusOutlined,
-  RollbackOutlined,
-  SearchOutlined,
-  UpOutlined
-} from "@ant-design/icons";
+  Trash2Icon,
+  ChevronDownIcon,
+  LoaderCircleIcon,
+  PlusIcon,
+  Undo2Icon,
+  SearchIcon,
+  ChevronUpIcon
+} from "lucide-react";
 import {
   Alert,
   App,
@@ -1073,11 +1073,7 @@ export function SmartDictionary({
             key: "archive",
             danger: true,
             disabled: transitionDisabled || rowLifecyclePending,
-            icon: rowLifecyclePending ? (
-              <LoadingOutlined />
-            ) : (
-              <DeleteOutlined />
-            ),
+            icon: rowLifecyclePending ? <LoaderCircleIcon /> : <Trash2Icon />,
             label: (
               <Tooltip title={transitionHint}>
                 <span aria-label={`移入垃圾桶${rowName}`}>移入垃圾桶</span>
@@ -1092,7 +1088,7 @@ export function SmartDictionary({
             key: "delete",
             danger: true,
             disabled: !eligibility.deletable || rowDeletePending,
-            icon: rowDeletePending ? <LoadingOutlined /> : <DeleteOutlined />,
+            icon: rowDeletePending ? <LoaderCircleIcon /> : <Trash2Icon />,
             label: (
               <Tooltip
                 title={
@@ -1179,7 +1175,7 @@ export function SmartDictionary({
                   aria-expanded={openActionRow === record.id}
                   onFocus={() => setOpenActionRow(record.id)}
                 >
-                  更多 <DownOutlined />
+                  更多 <ChevronDownIcon />
                 </Button>
               </Dropdown>
             )}
@@ -1195,13 +1191,13 @@ export function SmartDictionary({
         <h1>{trashMode ? "垃圾桶" : "智能词库"}</h1>
         <div className="word-list-page-actions">
           <Link to={trashMode ? "/words" : "/words/trash"}>
-            {trashMode ? <RollbackOutlined /> : <DeleteOutlined />}
+            {trashMode ? <Undo2Icon /> : <Trash2Icon />}
             {trashMode ? "返回智能词库" : "查看垃圾桶"}
           </Link>
           {!trashMode && canCreateEntry(writeActor) && (
             <Button
               type="primary"
-              icon={<PlusOutlined />}
+              icon={<PlusIcon />}
               onClick={() => navigate("/words/new")}
             >
               创建词条
@@ -1273,7 +1269,7 @@ export function SmartDictionary({
                   className="rounded-lg"
                   type="submit"
                 >
-                  <SearchOutlined />
+                  <SearchIcon />
                   搜索
                 </PilotButton>
                 <PilotButton
@@ -1297,7 +1293,7 @@ export function SmartDictionary({
                   onClick={() => setAdvancedExpanded((value) => !value)}
                 >
                   {advancedExpanded ? "收起筛选" : "更多筛选"}
-                  {advancedExpanded ? <UpOutlined /> : <DownOutlined />}
+                  {advancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </PilotButton>
               </div>
             </div>
@@ -1475,13 +1471,7 @@ export function SmartDictionary({
               {adminWordsDataSourceCapabilities.batchArchive && (
                 <Button
                   danger={!showRestoreAction}
-                  icon={
-                    showRestoreAction ? (
-                      <RollbackOutlined />
-                    ) : (
-                      <DeleteOutlined />
-                    )
-                  }
+                  icon={showRestoreAction ? <Undo2Icon /> : <Trash2Icon />}
                   disabled={
                     selectedKeys.length === 0 ||
                     selectedRows.some(
@@ -1504,7 +1494,7 @@ export function SmartDictionary({
                 restoringSelection && (
                   <Button
                     danger
-                    icon={<DeleteOutlined />}
+                    icon={<Trash2Icon />}
                     disabled={
                       selectedKeys.length === 0 ||
                       writeActor?.role !== "super_admin"

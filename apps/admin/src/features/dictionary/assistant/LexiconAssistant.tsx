@@ -13,7 +13,7 @@ import {
   Tag,
   Typography
 } from "antd";
-import { RobotOutlined, SendOutlined, StopOutlined } from "@ant-design/icons";
+import { BotIcon, SendIcon, SquareIcon } from "lucide-react";
 import type { TextAreaRef } from "antd/es/input/TextArea";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -253,7 +253,7 @@ export function LexiconAssistant({
     <>
       {!open && (
         <FloatButton
-          icon={<RobotOutlined />}
+          icon={<BotIcon />}
           content="助手"
           shape="square"
           aria-label="打开词库小精灵"
@@ -265,7 +265,7 @@ export function LexiconAssistant({
       <Drawer
         title={
           <Space>
-            <RobotOutlined />
+            <BotIcon />
             <span>词库小精灵</span>
           </Space>
         }
@@ -318,7 +318,7 @@ export function LexiconAssistant({
           {turns.length === 0 && !pending && (
             <div className="lexicon-assistant-welcome">
               <Empty
-                image={<RobotOutlined />}
+                image={<BotIcon />}
                 description={
                   <>
                     <Typography.Title level={5}>
@@ -484,13 +484,13 @@ export function LexiconAssistant({
               建议供核查，内容由你决定。
             </Typography.Text>
             {pending ? (
-              <Button aria-label="停止" icon={<StopOutlined />} onClick={stop}>
+              <Button aria-label="停止" icon={<SquareIcon />} onClick={stop}>
                 停止
               </Button>
             ) : (
               <Button
                 type="primary"
-                icon={<SendOutlined />}
+                icon={<SendIcon />}
                 disabled={
                   !question.trim() || availability !== "ready" || candidateBusy
                 }

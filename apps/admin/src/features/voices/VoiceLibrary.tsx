@@ -1,6 +1,6 @@
 import type { SsmlDraft } from "@tsz/voice-editor/types";
 import { speechAccentGroup } from "@tsz/shared";
-import { ReloadOutlined } from "@ant-design/icons";
+import { RotateCwIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -717,7 +717,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   const refreshButton = (
     <Button
       type="text"
-      icon={<ReloadOutlined />}
+      icon={<RotateCwIcon />}
       loading={voices.isFetching || library.isFetching}
       disabled={metadataEditing}
       onClick={() => {

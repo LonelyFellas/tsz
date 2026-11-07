@@ -1,4 +1,4 @@
-import { CheckOutlined } from "@ant-design/icons";
+import { CheckIcon } from "lucide-react";
 import { Flex, Typography } from "antd";
 import { useId, useState, type ReactNode } from "react";
 import type { V3ProductProgressDetail } from "../readiness";
@@ -59,7 +59,7 @@ export function V3ProductProgressList({
             type="button"
           >
             {row.completed ? (
-              <CheckOutlined
+              <CheckIcon
                 aria-label={`${row.label}已完成`}
                 className="word-progress-done"
               />

@@ -1,4 +1,4 @@
-import { PlusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { CirclePlusIcon, PlusIcon } from "lucide-react";
 import { Select } from "antd";
 import type {
   DraftFormsStepContentV3,
@@ -75,7 +75,7 @@ export function V3AddBasicPosSelect({
           : undefined
       }
       variant={compact ? "borderless" : undefined}
-      suffixIcon={compact ? <PlusCircleOutlined /> : <PlusOutlined />}
+      suffixIcon={compact ? <CirclePlusIcon /> : <PlusIcon />}
       value={undefined}
     />
   );

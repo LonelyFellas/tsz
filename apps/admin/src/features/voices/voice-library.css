@@ -267,7 +267,7 @@
   color: var(--voice-muted);
 }
 
-.voice-library-preview-empty > .anticon {
+.voice-library-preview-empty > .lucide {
   font-size: 24px;
 }
 

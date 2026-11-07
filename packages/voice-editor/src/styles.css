@@ -909,7 +909,7 @@
 .tsz-ve-pop-voices
   .tsz-ve-pop-hit[aria-checked="false"]
   .tsz-ve-pop-check
-  .anticon {
+  .lucide {
   visibility: hidden;
 }
 
@@ -1206,4 +1206,10 @@
   .tsz-ve-letter-text {
   text-decoration: underline dotted var(--ant-color-primary, #2053ff);
   text-underline-offset: 3px;
+}
+
+.tsz-ve-editor .lucide {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
 }

@@ -16,7 +16,7 @@ import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
-import { ReadOutlined, SoundOutlined } from "@ant-design/icons";
+import { BookOpenIcon, Volume2Icon } from "lucide-react";
 import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
 import type {
   AdminWordV3,
@@ -536,7 +536,7 @@ export function V3ReviewContent({
                   key: "forms",
                   label: (
                     <Flex align="center" gap="small">
-                      <SoundOutlined />
+                      <Volume2Icon />
                       词形与发音
                     </Flex>
                   ),
@@ -560,7 +560,7 @@ export function V3ReviewContent({
                   key: "meanings",
                   label: (
                     <Flex align="center" gap="small">
-                      <ReadOutlined />
+                      <BookOpenIcon />
                       词义结构
                     </Flex>
                   ),

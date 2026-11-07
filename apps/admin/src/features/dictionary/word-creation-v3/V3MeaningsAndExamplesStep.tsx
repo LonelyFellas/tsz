@@ -15,13 +15,13 @@ import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import {
-  CaretDownFilled,
-  CaretUpFilled,
-  CopyOutlined,
-  DeleteOutlined,
-  MinusCircleOutlined,
-  PlusOutlined
-} from "@ant-design/icons";
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CopyIcon,
+  Trash2Icon,
+  CircleMinusIcon,
+  PlusIcon
+} from "lucide-react";
 import {
   Alert,
   App,
@@ -289,7 +289,7 @@ function SenseEditorShell({
                 </div>
                 <span className="word-form-card-toggle-state">
                   <span>{expanded ? "收起" : "展开"}</span>
-                  {expanded ? <CaretUpFilled /> : <CaretDownFilled />}
+                  {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </span>
               </div>
             ),
@@ -310,7 +310,7 @@ function SenseEditorShell({
                 >
                   <Button
                     aria-label={`删除词义 ${index + 1}`}
-                    icon={<DeleteOutlined />}
+                    icon={<Trash2Icon />}
                     disabled={!canDelete || undefined}
                     danger
                     size="small"
@@ -530,7 +530,7 @@ function GrammarStructuresCard({
                       ? "至少保留一条语法结构"
                       : undefined
                   }
-                  icon={<DeleteOutlined />}
+                  icon={<Trash2Icon />}
                   onClick={() => {
                     if (
                       structure.variants.some(
@@ -562,7 +562,7 @@ function GrammarStructuresCard({
       <Button
         block
         className="word-section-add-button"
-        icon={<PlusOutlined aria-hidden />}
+        icon={<PlusIcon aria-hidden />}
         onClick={() =>
           change((draft) => {
             draft.pos[posIndex]!.grammar_structures.push(
@@ -724,7 +724,7 @@ function SenseGroupsCard({
                 aria-label={`删除语义区间 ${groupIndex + 1}`}
                 danger
                 disabled={groups.length <= 1}
-                icon={<DeleteOutlined />}
+                icon={<Trash2Icon />}
                 onClick={() =>
                   change((draft) => {
                     if (draft.sense_groups.length <= 1) {
@@ -752,7 +752,7 @@ function SenseGroupsCard({
       <Button
         block
         className="word-section-add-button"
-        icon={<PlusOutlined aria-hidden />}
+        icon={<PlusIcon aria-hidden />}
         onClick={() =>
           change((draft) => {
             draft.sense_groups.push({
@@ -1210,7 +1210,7 @@ function V3MeaningsAndExamplesStepContent({
                         <Button
                           aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
                           danger
-                          icon={<MinusCircleOutlined />}
+                          icon={<CircleMinusIcon />}
                           onClick={(event) => {
                             event.stopPropagation();
                             modal.confirm({
@@ -2084,7 +2084,7 @@ function V3MeaningsAndExamplesStepContent({
                                                                     )
                                                                   }
                                                                   icon={
-                                                                    <CopyOutlined />
+                                                                    <CopyIcon />
                                                                   }
                                                                   onClick={(
                                                                     event
@@ -2167,7 +2167,7 @@ function V3MeaningsAndExamplesStepContent({
                                                     <Button
                                                       aria-label={`删除定义 ${definitionIndex + 1}`}
                                                       danger
-                                                      icon={<DeleteOutlined />}
+                                                      icon={<Trash2Icon />}
                                                       onClick={() =>
                                                         change((draft) => {
                                                           draft.pos[
@@ -2192,7 +2192,7 @@ function V3MeaningsAndExamplesStepContent({
                                         <Button
                                           block
                                           className="word-section-add-button"
-                                          icon={<PlusOutlined aria-hidden />}
+                                          icon={<PlusIcon aria-hidden />}
                                           onClick={() =>
                                             change((draft) => {
                                               draft.pos[posIndex]!.senses[
@@ -2300,7 +2300,7 @@ function V3MeaningsAndExamplesStepContent({
                       <Button
                         block
                         className="word-section-add-button"
-                        icon={<PlusOutlined aria-hidden />}
+                        icon={<PlusIcon aria-hidden />}
                         onClick={() =>
                           change((draft) => {
                             const posDraft = draft.pos[posIndex]!;

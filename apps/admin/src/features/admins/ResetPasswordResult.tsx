@@ -1,5 +1,5 @@
 // 重置密码结果弹窗：一次性展示临时密码（仅此一次返回），提供复制。
-import { CopyOutlined } from "@ant-design/icons";
+import { CopyIcon } from "lucide-react";
 import { Alert, App, Button, Modal, Typography } from "antd";
 import { copyText } from "@/lib/clipboard";
 
@@ -59,7 +59,7 @@ export function ResetPasswordResult({ password, adminName, onClose }: Props) {
           >
             {password}
           </Typography.Paragraph>
-          <Button icon={<CopyOutlined />} onClick={() => void handleCopy()}>
+          <Button icon={<CopyIcon />} onClick={() => void handleCopy()}>
             复制密码
           </Button>
         </>

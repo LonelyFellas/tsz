@@ -545,7 +545,7 @@
   border-radius: 10px;
 }
 
-.word-detection-empty-state > .anticon {
+.word-detection-empty-state > .lucide {
   color: #7c8ca3;
   font-size: 16px;
 }
@@ -1817,7 +1817,7 @@
   color: #858c98;
 }
 
-.word-sense-section-collapse .anticon {
+.word-sense-section-collapse .lucide {
   font-size: 11px;
 }
 
@@ -2071,7 +2071,7 @@
   color: #858c98;
 }
 
-.word-relation-collapse .anticon {
+.word-relation-collapse .lucide {
   font-size: 11px;
 }
 

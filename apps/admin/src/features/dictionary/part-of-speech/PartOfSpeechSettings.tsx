@@ -2,11 +2,7 @@ import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useIsSuperAdmin, usePermission } from "@/lib/auth";
 import { FormTypeSettings } from "./FormTypeSettings";
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+import { PlusIcon, RotateCwIcon, SearchIcon } from "lucide-react";
 import {
   Alert,
   App,
@@ -324,12 +320,12 @@ export function PartOfSpeechSettings() {
                   <Button
                     type="primary"
                     htmlType="submit"
-                    icon={<SearchOutlined />}
+                    icon={<SearchIcon />}
                   >
                     搜 索
                   </Button>
                   <Button
-                    icon={<ReloadOutlined />}
+                    icon={<RotateCwIcon />}
                     onClick={() => {
                       form.resetFields();
                       setQ("");
@@ -362,7 +358,7 @@ export function PartOfSpeechSettings() {
               toolbar={
                 <Button
                   type="primary"
-                  icon={<PlusOutlined />}
+                  icon={<PlusIcon />}
                   disabled={!canEdit || !catalogReady}
                   onClick={() => {
                     setEditing(undefined);
@@ -435,7 +431,7 @@ export function PartOfSpeechSettings() {
               >
                 <Button
                   type="primary"
-                  icon={<PlusOutlined />}
+                  icon={<PlusIcon />}
                   disabled={
                     !canEditSub || catalog.isError || parts.length === 0
                   }

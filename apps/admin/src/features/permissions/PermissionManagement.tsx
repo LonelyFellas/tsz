@@ -1,6 +1,6 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
-import { CloseOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { XIcon, PlusIcon, RotateCwIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
@@ -561,7 +561,7 @@ export function PermissionManagement() {
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Button
-              icon={<ReloadOutlined />}
+              icon={<RotateCwIcon />}
               onClick={() => {
                 setSearch("");
                 setModule(undefined);
@@ -757,7 +757,7 @@ export function PermissionManagement() {
                             cursor: busy ? "not-allowed" : "pointer"
                           }}
                         >
-                          <CloseOutlined style={{ fontSize: 10 }} />
+                          <XIcon style={{ fontSize: 10 }} />
                         </button>
                       </Tag>
                     ))}
@@ -777,7 +777,7 @@ export function PermissionManagement() {
                       <Button
                         type="text"
                         size="small"
-                        icon={<PlusOutlined />}
+                        icon={<PlusIcon />}
                         aria-label={`设置${p.label}标签`}
                         title={`设置${p.label}标签`}
                         disabled={busy}

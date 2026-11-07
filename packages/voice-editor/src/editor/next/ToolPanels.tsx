@@ -3,7 +3,7 @@ import {
   speechLocaleMatchesScope,
   speechRegionLabel
 } from "@tsz/shared";
-import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
+import { CheckIcon, Volume2Icon } from "lucide-react";
 import {
   Button,
   Form,
@@ -85,7 +85,7 @@ function PopRow({
       >
         {/* 勾选位始终占宽，勾上勾下时行内其余文字不会左右跳。 */}
         <span className="tsz-ve-pop-check" aria-hidden>
-          <CheckOutlined />
+          <CheckIcon />
         </span>
         <span className="tsz-ve-pop-name">{label}</span>
         {meta !== undefined && <span className="tsz-ve-pop-meta">{meta}</span>}
@@ -349,7 +349,7 @@ export function VoicePanel({
                               className="tsz-ve-audition-button"
                               aria-label={`试听 ${voice.label}`}
                               loading={pendingVoiceId === voice.id}
-                              icon={<SoundOutlined />}
+                              icon={<Volume2Icon />}
                               aria-busy={pendingVoiceId === voice.id}
                               disabled={
                                 !canAudition ||
@@ -793,7 +793,7 @@ export function UploadPanel({
                   disabled={!available}
                   onClick={() => onPlayAsset(asset)}
                 >
-                  <SoundOutlined />
+                  <Volume2Icon />
                 </Button>
                 <span
                   className="tsz-ve-upload-name"

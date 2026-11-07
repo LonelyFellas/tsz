@@ -1,4 +1,4 @@
-import { InfoCircleOutlined } from "@ant-design/icons";
+import { InfoIcon } from "lucide-react";
 import { Col, Form, Input, InputNumber, Popover, Row } from "antd";
 import type { ReactNode } from "react";
 
@@ -17,7 +17,7 @@ export function LabelWithHint({
     <span>
       {label}
       <Popover content={hint}>
-        <InfoCircleOutlined
+        <InfoIcon
           aria-hidden
           style={{
             marginInlineStart: 4,

@@ -1,16 +1,16 @@
 import {
-  AuditOutlined,
-  BookOutlined,
-  DollarOutlined,
-  HomeOutlined,
-  ProfileOutlined,
-  ReadOutlined,
-  ScheduleOutlined,
-  SettingOutlined,
-  SoundOutlined,
-  TeamOutlined,
-  UserOutlined
-} from "@ant-design/icons";
+  ClipboardCheckIcon,
+  BookIcon,
+  CircleDollarSignIcon,
+  HouseIcon,
+  NotebookTextIcon,
+  BookOpenIcon,
+  CalendarDaysIcon,
+  SettingsIcon,
+  Volume2Icon,
+  UsersIcon,
+  UserIcon
+} from "lucide-react";
 import { Menu } from "antd";
 import type { MenuProps } from "antd";
 import type { AdminProfile, MenuPermission } from "@tsz/types";
@@ -73,7 +73,7 @@ function pageLeaf(
 const GROUPS: Group[] = [
   {
     key: "grp-user",
-    icon: <UserOutlined />,
+    icon: <UserIcon />,
     label: "用户管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.users, "用户管理"),
@@ -83,7 +83,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-class",
-    icon: <TeamOutlined />,
+    icon: <UsersIcon />,
     label: "班级管理",
     leaves: [
       {
@@ -96,7 +96,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-dict",
-    icon: <BookOutlined />,
+    icon: <BookIcon />,
     label: "词库管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.words, "智能词库"),
@@ -112,7 +112,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-voices",
-    icon: <SoundOutlined />,
+    icon: <Volume2Icon />,
     label: "配音中心",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.voices, "分组配音"),
@@ -121,7 +121,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-sentences",
-    icon: <ReadOutlined />,
+    icon: <BookOpenIcon />,
     label: "例句管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.sentences, "多维例句"),
@@ -130,7 +130,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-wordlist",
-    icon: <ReadOutlined />,
+    icon: <BookOpenIcon />,
     label: "词表管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "智能词表"),
@@ -145,7 +145,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-task",
-    icon: <ScheduleOutlined />,
+    icon: <CalendarDaysIcon />,
     label: "任务管理",
     leaves: [
       {
@@ -158,7 +158,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-review",
-    icon: <AuditOutlined />,
+    icon: <ClipboardCheckIcon />,
     label: "审核管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.teacherApplications, "教师申请审核"),
@@ -172,13 +172,13 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-settings",
-    icon: <SettingOutlined />,
+    icon: <SettingsIcon />,
     label: "系统设置",
     leaves: [pageLeaf(ADMIN_PAGE_ROUTES.aiLedger, "AI 账本")]
   },
   {
     key: "grp-coin",
-    icon: <DollarOutlined />,
+    icon: <CircleDollarSignIcon />,
     label: "天生币",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.myCoins, "我的天生币"),
@@ -202,9 +202,7 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
           ? hasAdminPermission(profile, l.perm)
           : profile !== null;
 
-  const items: MenuItem[] = [
-    { key: "/", icon: <HomeOutlined />, label: "首页" }
-  ];
+  const items: MenuItem[] = [{ key: "/", icon: <HouseIcon />, label: "首页" }];
   for (const g of GROUPS) {
     const children = g.leaves
       .filter(visible)
@@ -268,7 +266,7 @@ export function ConsoleSidebar({
           whiteSpace: "nowrap"
         }}
       >
-        <ProfileOutlined style={{ fontSize: 22 }} />
+        <NotebookTextIcon style={{ fontSize: 22 }} />
         {/* 收起时仅留图标，隐藏站名，避免文字被裁切成半个字 */}
         {!collapsed && <span>天生会背</span>}
       </div>

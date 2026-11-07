@@ -1,4 +1,4 @@
-import { ReloadOutlined } from "@ant-design/icons";
+import { RotateCwIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Breadcrumb, Button, Card, Flex, Typography } from "antd";
 import { formatCoins } from "@tsz/shared";
@@ -34,7 +34,7 @@ function Wallet({ id }: { id: string }) {
         title="账户余额"
         extra={
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCwIcon />}
             loading={wallet.isFetching || entries.isFetching}
             onClick={() => {
               setPage(1);

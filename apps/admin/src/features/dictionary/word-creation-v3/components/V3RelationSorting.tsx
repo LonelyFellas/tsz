@@ -1,4 +1,4 @@
-import { DeleteOutlined } from "@ant-design/icons";
+import { Trash2Icon } from "lucide-react";
 import { Button } from "antd";
 import type { ReactNode } from "react";
 import { useSortableRows, type SortableRowsController } from "../sortableRows";
@@ -33,7 +33,7 @@ export function RelationDeleteButton({
   return (
     <Button
       aria-label={`删除${label}`}
-      icon={<DeleteOutlined />}
+      icon={<Trash2Icon />}
       danger
       size="small"
       type="text"

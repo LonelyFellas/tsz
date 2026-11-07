@@ -938,8 +938,8 @@ describe("V3MeaningsAndExamplesStep", () => {
       "ant-btn-sm",
       "ant-btn-dangerous"
     );
-    expect(removePos.querySelector(".anticon-minus-circle")).not.toBeNull();
-    expect(removePos.querySelector(".anticon-delete")).toBeNull();
+    expect(removePos.querySelector(".lucide-circle-minus")).not.toBeNull();
+    expect(removePos.querySelector(".lucide-trash-2")).toBeNull();
     fireEvent.click(removePos);
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
@@ -1029,7 +1029,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByText(/每个词义都需填写本语言释义，每条例句都需关联单词/u)
     ).toBeVisible();
     expect(
-      document.querySelector(".word-sense-editor .anticon-caret-up")
+      document.querySelector(".word-sense-editor .lucide-chevron-up")
     ).not.toBeNull();
 
     clickButton("添加语法结构");
@@ -2089,7 +2089,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(sectionBody(definitions)).toHaveAttribute("aria-hidden", "true");
     expect(
       sectionButton(definitions, "展开多维释义").querySelector(
-        ".anticon-caret-down"
+        ".lucide-chevron-down"
       )
     ).not.toBeNull();
 
@@ -2105,7 +2105,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(sectionBody(relations)).toHaveAttribute("aria-hidden", "true");
     expect(
       sectionButton(relations, "展开拓展词").querySelector(
-        ".anticon-caret-down"
+        ".lucide-chevron-down"
       )
     ).not.toBeNull();
     fireEvent.click(sectionButton(relations, "展开拓展词"));
@@ -2322,7 +2322,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     fireEvent.click(within(synonymCard).getByText("收起").closest("button")!);
     expect(synonymCard).toHaveClass("is-collapsed");
-    expect(synonymCard.querySelector(".anticon-caret-down")).not.toBeNull();
+    expect(synonymCard.querySelector(".lucide-chevron-down")).not.toBeNull();
     expect(meaningsCss).toMatch(
       /\.word-relations-grid\s*\{[^}]*align-items:\s*start;/su
     );
@@ -2460,11 +2460,11 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(
         targetInput
           .closest(".ant-input-affix-wrapper")
-          ?.querySelector(".anticon-sound")
+          ?.querySelector(".lucide-volume-2")
       ).toBeNull();
       expect(targetInput.closest(".ant-input-status-warning")).not.toBeNull();
       expect(screen.getByLabelText(`待关联的${label}`)).toHaveClass(
-        "anticon-info-circle"
+        "lucide-info"
       );
       fireEvent.change(targetInput, { target: { value: "苹果" } });
       expect(targetInput.closest(".ant-input-status-error")).not.toBeNull();
@@ -2498,7 +2498,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(
         targetInput
           .closest(".ant-input-affix-wrapper")
-          ?.querySelector(".anticon-sound")
+          ?.querySelector(".lucide-volume-2")
       ).not.toHaveAttribute("aria-disabled");
       expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
         "pending_target_gloss"
@@ -3725,10 +3725,14 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
 
     expect(
-      screen.getByLabelText("拖动语义区间 1").querySelector(".anticon-holder")
+      screen
+        .getByLabelText("拖动语义区间 1")
+        .querySelector(".lucide-grip-vertical")
     ).not.toBeNull();
     expect(
-      screen.getByLabelText("拖动语法结构 1").querySelector(".anticon-holder")
+      screen
+        .getByLabelText("拖动语法结构 1")
+        .querySelector(".lucide-grip-vertical")
     ).not.toBeNull();
     expect(screen.queryByLabelText("上移语义区间 1")).toBeNull();
     expect(screen.queryByLabelText("下移语法结构 1")).toBeNull();
@@ -3974,7 +3978,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByLabelText("拖动定义 1"),
       screen.getByLabelText("拖动定义 2")
     ];
-    expect(handles[0]!.querySelector(".anticon-holder")).not.toBeNull();
+    expect(handles[0]!.querySelector(".lucide-grip-vertical")).not.toBeNull();
     expect(screen.queryByLabelText("上移定义 1")).toBeNull();
     expect(screen.queryByLabelText("下移定义 2")).toBeNull();
 

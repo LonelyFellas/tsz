@@ -1,10 +1,6 @@
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { DictionaryPartOfSpeechLabels } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
-import {
-  CloseOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined
-} from "@ant-design/icons";
+import { XIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
@@ -98,9 +94,9 @@ export function ConsoleLayout() {
       ? "展开侧栏"
       : "收起侧栏";
   const toggleIcon = (isDrawer ? drawerOpen : !collapsed) ? (
-    <MenuFoldOutlined />
+    <PanelLeftCloseIcon />
   ) : (
-    <MenuUnfoldOutlined />
+    <PanelLeftOpenIcon />
   );
   const toggle = (
     <button
@@ -164,7 +160,7 @@ export function ConsoleLayout() {
                 className="console-nav-button console-nav-close"
                 aria-label="关闭菜单"
               >
-                <CloseOutlined />
+                <XIcon />
               </button>
             </Dialog.Close>
             <ConsoleSidebar onNavigate={() => setDrawerOpen(false)} />
