@@ -293,6 +293,7 @@
   height: auto;
   padding: 0;
   background: transparent;
+  box-shadow: none;
 }
 
 .admin-login__form input::placeholder,
@@ -303,12 +304,12 @@
 .admin-login__form .ui-input:hover,
 .admin-login__form .ui-input-affix-wrapper:hover,
 .admin-login__form .ui-input:focus,
-.admin-login__form .ui-input-affix-wrapper-focused {
+.admin-login__form .ui-input-affix-wrapper:focus-within {
   border-color: var(--login-blue);
 }
 
 .admin-login__form .ui-input:focus,
-.admin-login__form .ui-input-affix-wrapper-focused {
+.admin-login__form .ui-input-affix-wrapper:focus-within {
   background: #fff;
   box-shadow: 0 0 0 3px #2053ff12;
 }
