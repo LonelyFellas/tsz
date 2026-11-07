@@ -56,6 +56,33 @@ describe("管理员新版 profile 失败关闭", () => {
 });
 
 describe("真实请求层权限 API method/path/wire", () => {
+  it("旧客户端接受新增界面偏好，保存方言仍只发送原字段", async () => {
+    const preferences = { dialect: "us", interface_locale: "en-GB" };
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async (_url, init) =>
+          new Response(
+            JSON.stringify(
+              init?.method === "PATCH"
+                ? { preferences }
+                : { ...profile, preferences }
+            ),
+            { status: 200 }
+          )
+      );
+    const api = createAdminEndpoints(
+      createHttpClient({ baseUrl: "/api/v1/admin" })
+    );
+    expect((await api.profile()).preferences.dialect).toBe("us");
+    await api.updateProfilePreferences({ dialect: "us" });
+    expect(fetch.mock.calls[1]?.[0]).toBe("/api/v1/admin/profile/preferences");
+    expect(fetch.mock.calls[1]?.[1]?.method).toBe("PATCH");
+    expect(JSON.parse(fetch.mock.calls[1]?.[1]?.body as string)).toEqual({
+      dialect: "us"
+    });
+  });
+
   it("单人与批量同用preview/commit，依赖差异与版本逐人传输", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
       async (url) =>
