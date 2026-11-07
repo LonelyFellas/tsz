@@ -4,11 +4,11 @@ import {
   Button,
   Divider,
   Flex,
-  Popconfirm,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Popconfirm } from "@tsz/ui/admin/overlays";
 import type { OpenCodeProviderConnection } from "@tsz/types";
 import { api } from "@/lib/auth";
 

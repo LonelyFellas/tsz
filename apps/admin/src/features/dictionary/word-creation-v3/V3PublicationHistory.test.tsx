@@ -451,13 +451,13 @@ describe("V3PublicationHistory", () => {
     fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
     fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     expect(screen.getByLabelText("关闭发布详情")).toBeDisabled();
-    expect(document.querySelector(".ant-modal-close")).toBeNull();
+    expect(document.querySelector(".ui-modal-close")).toBeNull();
     fireEvent.click(screen.getByLabelText("关闭发布详情"));
     fireEvent.keyDown(screen.getByRole("dialog"), {
       key: "Escape",
       keyCode: 27
     });
-    fireEvent.click(document.querySelector(".ant-modal-wrap")!);
+    fireEvent.click(document.querySelector(".ui-modal-wrap")!);
     await waitFor(() =>
       expect(screen.getByTestId("publication-detail")).toBeInTheDocument()
     );
@@ -668,7 +668,7 @@ describe("V3PublicationHistory", () => {
     const retry = screen
       .getByText("确认恢复", { exact: true })
       .closest("button")!;
-    await waitFor(() => expect(retry).not.toHaveClass("ant-btn-loading"));
+    await waitFor(() => expect(retry).not.toHaveClass("ui-btn-loading"));
     fireEvent.click(retry);
     await waitFor(() => expect(onRestored).toHaveBeenCalledWith(canonical));
     expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(2);
@@ -1433,9 +1433,11 @@ describe("V3PublicationHistory", () => {
       expect(
         api.restoreDraftFromPublication.mock.calls[1]![3]
       ).not.toHaveProperty("confirmed_surface_match_token");
-      fireEvent.click(
-        await screen.findByRole("button", { name: "确认并恢复草稿" })
-      );
+      const confirmFreshSnapshot = await screen.findByRole("button", {
+        name: "确认并恢复草稿"
+      });
+      await waitFor(() => expect(confirmFreshSnapshot).toBeEnabled());
+      fireEvent.click(confirmFreshSnapshot);
       await waitFor(() =>
         expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(3)
       );
@@ -2484,10 +2486,10 @@ it("历史发布快照展示释义和例句的人工关联", async () => {
   const body = await screen.findByTestId("publication-snapshot-body");
   for (const label of ["初", "中", "高"]) {
     expect(
-      within(body).getAllByText(label, { selector: ".ant-tag" })
+      within(body).getAllByText(label, { selector: ".ui-tag" })
     ).toHaveLength(2);
   }
-  expect(within(body).queryByText("低", { selector: ".ant-tag" })).toBeNull();
+  expect(within(body).queryByText("低", { selector: ".ui-tag" })).toBeNull();
   expect(within(body).getAllByText("sentence → sentence · 句子")).toHaveLength(
     2
   );

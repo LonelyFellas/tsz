@@ -16,7 +16,16 @@ import type {
   PronunciationSynthesisV3,
   SurfaceMatchPageV3
 } from "@tsz/types";
-import { Alert, Button, Card, Flex, Modal, Spin, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Flex,
+  Spin,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
+import { Modal } from "@tsz/ui/admin/overlays";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LifecycleSurfaceConfirmation } from "../LifecycleSurfaceConfirmation";

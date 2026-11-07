@@ -1,5 +1,5 @@
 import type { AdminSpeechVoice } from "@tsz/types";
-import { Alert, Typography } from "antd";
+import { Alert, Typography } from "@tsz/ui/admin/display";
 import { VoiceEditor } from "@tsz/voice-editor/editor";
 import { V3GrammarFormPicker } from "@/features/dictionary/word-creation-v3/components/V3GrammarFormPicker";
 import { voiceTrialCapabilities, type VoiceTrialSource } from "./voice-trial";

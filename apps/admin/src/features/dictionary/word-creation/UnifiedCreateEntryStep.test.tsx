@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { HttpError } from "@tsz/api-client/http";
 import type {
   AdminWordV3,
@@ -419,11 +419,17 @@ function requests(): UnifiedCreateRequests {
 
 function renderStep(supplied: UnifiedCreateRequests, onCreated = vi.fn()) {
   render(
-    <AntApp>
+    <FeedbackApp>
       <UnifiedCreateEntryStep requests={supplied} onCreated={onCreated} />
-    </AntApp>
+    </FeedbackApp>
   );
   return onCreated;
+}
+
+async function clickReadyCreate(name: string) {
+  const button = await screen.findByRole("button", { name });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
 }
 
 function input() {
@@ -574,7 +580,7 @@ describe("UnifiedCreateEntryStep", () => {
     });
     expect(supplied.createV3).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
 
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(onCreated).toHaveBeenCalledWith(v3Word(), {
@@ -591,7 +597,7 @@ describe("UnifiedCreateEntryStep", () => {
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
     expect(onCreated).toHaveBeenCalledWith(v3Word(), {
@@ -616,7 +622,7 @@ describe("UnifiedCreateEntryStep", () => {
 
       fireEvent.change(input(), { target: { value: "center" } });
       fireEvent.click(screen.getByText("词典检测"));
-      fireEvent.click(await screen.findByText("确认并创建，进入词形与发音"));
+      await clickReadyCreate("确认并创建，进入词形与发音");
 
       await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
       expect(onCreated).toHaveBeenCalledWith(createdWord, {
@@ -683,9 +689,7 @@ describe("UnifiedCreateEntryStep", () => {
       surface: "give up"
     });
     expect(supplied.createV3).not.toHaveBeenCalled();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "创建并进入词形与发音" })
-    );
+    await clickReadyCreate("创建并进入词形与发音");
 
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(expect.any(String), {
@@ -711,7 +715,7 @@ describe("UnifiedCreateEntryStep", () => {
     fireEvent.click(screen.getByText("词典检测"));
 
     expect(await screen.findByText("确认英美主词")).toBeVisible();
-    expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
+    expect(await screen.findByLabelText("英式主词")).toHaveValue("centre");
     expect(screen.getByLabelText("美式主词")).toHaveValue("center");
     expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
     expect(screen.getAllByText("动词").length).toBeGreaterThan(0);
@@ -948,7 +952,7 @@ describe("UnifiedCreateEntryStep", () => {
     const create = screen.getByRole("button", {
       name: "确认并创建，进入词形与发音"
     });
-    expect(create.querySelector('[data-icon="plus"]')).not.toBeNull();
+    expect(create.querySelector(".lucide-plus")).not.toBeNull();
     expect(create).toBeDisabled();
     expect(supplied.createV3).not.toHaveBeenCalled();
 
@@ -1022,7 +1026,7 @@ describe("UnifiedCreateEntryStep", () => {
     fireEvent.click(screen.getByText("词典检测"));
 
     expect(await screen.findByText("确认英美主词")).toBeVisible();
-    expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
+    expect(await screen.findByLabelText("英式主词")).toHaveValue("centre");
     expect(screen.getByLabelText("美式主词")).toHaveValue("center");
     expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
     expect(screen.queryByText("现在分词")).toBeNull();
@@ -1073,12 +1077,12 @@ describe("UnifiedCreateEntryStep", () => {
     );
     vi.mocked(notFoundRequests.createV3).mockReturnValue(creation.promise);
     const { unmount } = render(
-      <AntApp>
+      <FeedbackApp>
         <UnifiedCreateEntryStep
           requests={notFoundRequests}
           onCreated={vi.fn()}
         />
-      </AntApp>
+      </FeedbackApp>
     );
 
     fireEvent.change(input(), { target: { value: "invented" } });
@@ -1126,7 +1130,7 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.queryByText(/继续创建只会新增草稿/)).not.toBeInTheDocument();
     expect(screen.queryByText("snapshot-v3")).toBeNull();
     expect(screen.queryByText("surface-token")).toBeNull();
-    fireEvent.click(screen.getByText("确认并创建，进入词形与发音"));
+    await clickReadyCreate("确认并创建，进入词形与发音");
 
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(
@@ -1154,7 +1158,7 @@ describe("UnifiedCreateEntryStep", () => {
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
     expect(
       await screen.findByText("网络异常，创建结果未知。请原样重试。")
     ).toBeVisible();
@@ -1191,7 +1195,7 @@ describe("UnifiedCreateEntryStep", () => {
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
 
     expect(
       await screen.findByText("响应异常，创建结果未知。请原样重试。")
@@ -1216,16 +1220,16 @@ describe("UnifiedCreateEntryStep", () => {
       word: v3PhraseWord()
     });
     const terminalView = render(
-      <AntApp>
+      <FeedbackApp>
         <UnifiedCreateEntryStep
           requests={terminalRequests}
           onCreated={vi.fn()}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     fireEvent.change(input(), { target: { value: "give up" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("确认并创建，进入词形与发音"));
+    await clickReadyCreate("确认并创建，进入词形与发音");
     await waitFor(() => expect(terminalRequests.createV3).toHaveBeenCalled());
     expect(terminalRequests.createV3).toHaveBeenCalledWith(
       expect.any(String),
@@ -1243,12 +1247,12 @@ describe("UnifiedCreateEntryStep", () => {
     });
     vi.mocked(disabledRequests.detectV3).mockResolvedValue(disabledDetection);
     const disabledView = render(
-      <AntApp>
+      <FeedbackApp>
         <UnifiedCreateEntryStep
           requests={disabledRequests}
           onCreated={vi.fn()}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     fireEvent.change(input(), { target: { value: "give up" } });
     fireEvent.click(screen.getByText("词典检测"));
@@ -1308,7 +1312,7 @@ describe("UnifiedCreateEntryStep", () => {
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
 
     expect(
       await screen.findByText("匹配结果已更新，请重新确认后继续创建。")
@@ -1345,7 +1349,7 @@ describe("UnifiedCreateEntryStep", () => {
 
     expect(supplied.createV3).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(
       expect.any(String),
@@ -1389,6 +1393,7 @@ describe("UnifiedCreateEntryStep", () => {
     const createButton = await screen.findByRole("button", {
       name: "创建并进入词形与发音"
     });
+    await waitFor(() => expect(createButton).toBeEnabled());
     nowSpy.mockReturnValue(now + 2_000);
     fireEvent.click(createButton);
 
@@ -1411,7 +1416,10 @@ describe("UnifiedCreateEntryStep", () => {
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    const createButton = await screen.findByText("创建并进入词形与发音");
+    const createButton = await screen.findByRole("button", {
+      name: "创建并进入词形与发音"
+    });
+    await waitFor(() => expect(createButton).toBeEnabled());
     fireEvent.click(createButton);
     fireEvent.click(createButton);
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
@@ -1432,12 +1440,12 @@ describe("UnifiedCreateEntryStep", () => {
     );
     const detectCreated = vi.fn();
     const detectView = render(
-      <AntApp>
+      <FeedbackApp>
         <UnifiedCreateEntryStep
           requests={detectRequests}
           onCreated={detectCreated}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
@@ -1451,16 +1459,16 @@ describe("UnifiedCreateEntryStep", () => {
     vi.mocked(createRequests.createV3).mockReturnValue(pendingCreation.promise);
     const createCreated = vi.fn();
     const createView = render(
-      <AntApp>
+      <FeedbackApp>
         <UnifiedCreateEntryStep
           requests={createRequests}
           onCreated={createCreated}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
     await waitFor(() => expect(createRequests.createV3).toHaveBeenCalled());
     createView.unmount();
     await act(async () => pendingCreation.resolve({ word: v3Word() }));
@@ -1702,9 +1710,7 @@ describe("真实词条标注创建", () => {
     const created = renderStep(supplied);
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "创建并进入词形与发音" })
-    );
+    await clickReadyCreate("创建并进入词形与发音");
     const dialog = await screen.findByRole("dialog");
     expect(created).not.toHaveBeenCalled();
     expect(within(dialog).getByText("已有词条 1")).toBeInTheDocument();
@@ -1840,7 +1846,7 @@ describe("真实词条标注创建", () => {
     // 提示先于 snapshot 和地区详情就绪出现，须等待按钮真正可交互。
     await waitFor(() => {
       expect(confirmButton).toBeEnabled();
-      expect(confirmButton).not.toHaveClass("ant-btn-loading");
+      expect(confirmButton).not.toHaveClass("ui-btn-loading");
     });
     fireEvent.click(confirmButton);
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(3));
@@ -2081,7 +2087,7 @@ describe("空草稿创建冲突", () => {
     renderStep(supplied);
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    await clickReadyCreate("创建并进入词形与发音");
     expect(
       await screen.findByText("创建请求被服务拒绝，请重新检测。")
     ).toBeInTheDocument();
@@ -2105,7 +2111,7 @@ it("旧后端返回空草稿冲突时保留提示和创建入口，允许重新�
   renderStep(supplied);
   fireEvent.change(input(), { target: { value: "center" } });
   fireEvent.click(screen.getByText("词典检测"));
-  fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+  await clickReadyCreate("创建并进入词形与发音");
   expect(
     await screen.findByText("继续编辑草稿，或新建词条。")
   ).toBeInTheDocument();
@@ -2142,7 +2148,7 @@ it("检测到同名空草稿仍展示主词确认与独立创建操作", async (
     "href",
     "/words/empty-draft/v3/wizard/forms"
   );
-  const resultCard = screen.getByText("检测结果").closest(".ant-card")!;
+  const resultCard = screen.getByText("检测结果").closest(".ui-card")!;
   expect(
     within(resultCard as HTMLElement).getByText("同名草稿")
   ).toBeInTheDocument();
@@ -2169,7 +2175,7 @@ it("检测到同名空草稿仍展示主词确认与独立创建操作", async (
   expect(screen.getAllByRole("link", { name: "打开草稿" })).toHaveLength(1);
   expect(supplied.createV3).not.toHaveBeenCalled();
   vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
-  fireEvent.click(screen.getByText("创建并进入词形与发音"));
+  await clickReadyCreate("创建并进入词形与发音");
   await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
   expect(vi.mocked(supplied.createV3).mock.calls[0]![1].headwords).toEqual({
     mode: "unified",

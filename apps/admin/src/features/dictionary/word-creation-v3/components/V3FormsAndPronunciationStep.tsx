@@ -1,18 +1,17 @@
 import { regionalVariants } from "@tsz/shared";
 import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
-import { MinusCircleOutlined } from "@ant-design/icons";
+import { CircleMinusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Badge,
   Button,
   Empty,
   Flex,
   Space,
   Tabs,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   Dialect,
   DraftFormsStepContentV3,
@@ -402,7 +401,7 @@ export function V3FormsAndPronunciationStep({
                       <Button
                         aria-label={`删除${label}`}
                         danger
-                        icon={<MinusCircleOutlined />}
+                        icon={<CircleMinusIcon />}
                         onClick={(event) => {
                           event.stopPropagation();
                           modal.confirm({
@@ -489,12 +488,15 @@ export function V3FormsAndPronunciationStep({
             词形与发音
           </Typography.Title>
           <Typography.Paragraph className="word-step-description">
-            先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1)
-            英式或美式、2)
-            规则变化或不规则变化。字典音标用于展示与主动转换，选择 Azure IPA 或
-            UPS 输入进行合成。录入实际发音时需严格按照
-            “天生之®通用英语音标字母表” 进行操作。
+            先添加基本词性，再按英美拼写、规则与不规则变化录入词形。
           </Typography.Paragraph>
+          <details className="v3-pronunciation-guide">
+            <summary>发音录入说明</summary>
+            <p>
+              字典音标用于展示与转换。合成时选择 Azure IPA 或
+              UPS，实际发音按“天生之®通用英语音标字母表”录入。
+            </p>
+          </details>
         </div>
         <V3VoiceNotice value={value} />
         {issues.length > 0 && (

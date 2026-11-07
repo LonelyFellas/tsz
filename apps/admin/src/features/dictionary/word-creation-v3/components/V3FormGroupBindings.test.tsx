@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
@@ -74,7 +74,7 @@ describe("词形组的专用词义交互", () => {
       const [value, setValue] = useState(initial);
       const [meanings, setMeanings] = useState(initialMeanings);
       return (
-        <AntApp>
+        <FeedbackApp>
           <V3FormsAndPronunciationStep
             value={value}
             onChange={setValue}
@@ -85,18 +85,14 @@ describe("词形组的专用词义交互", () => {
           <output data-testid="binding-meanings">
             {JSON.stringify(meanings)}
           </output>
-        </AntApp>
+        </FeedbackApp>
       );
     }
-    render(
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <ScopeHarness />
-      </ConfigProvider>
-    );
+    render(<ScopeHarness />);
     // 按标签与可见文案定位；复选框类型、按钮禁用及可见性仍独立断言。
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
-    expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
+    expect(headerEntry.closest(".ui-card-head")).not.toBeNull();
     expect(headerEntry).toHaveTextContent("设置专用词形");
     expect(screen.queryByText("专用", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("限定适用词义")).not.toBeInTheDocument();
@@ -126,8 +122,8 @@ describe("词形组的专用词义交互", () => {
     expect(
       document.querySelector('[role="dialog"], dialog')
     ).not.toBeInTheDocument();
-    expect(dialog.closest(".ant-popover")).not.toBeNull();
-    expect(dialog.closest(".ant-card-body")).toBeNull();
+    expect(dialog.closest(".ui-popover")).not.toBeNull();
+    expect(dialog.closest(".ui-card-body")).toBeNull();
     expect(screen.getByLabelText("展开第 1 组词形变化")).toBeVisible();
     expect(within(dialog).getByLabelText(/本词性释义1/)).toBeChecked();
     fireEvent.click(
@@ -213,7 +209,7 @@ describe("词形组的专用词义交互", () => {
     const go = vi.fn();
     const change = vi.fn();
     render(
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep
           value={initial}
           onChange={change}
@@ -221,7 +217,7 @@ describe("词形组的专用词义交互", () => {
           onMeaningsChange={vi.fn()}
           onGoToMeanings={go}
         />
-      </AntApp>
+      </FeedbackApp>
     );
     fireEvent.click(await screen.findByLabelText("第 1 组专用词义"));
     const dialog = await screen.findByLabelText("第 1 组适用词义编辑");
@@ -326,7 +322,7 @@ it("同一词义可在多个组的 Popover 勾选，恢复一组不移除其他�
     const [value, setValue] = useState(forms);
     const [current, setCurrent] = useState(meanings);
     return (
-      <AntApp>
+      <FeedbackApp>
         <V3FormsAndPronunciationStep
           value={value}
           onChange={setValue}
@@ -337,7 +333,7 @@ it("同一词义可在多个组的 Popover 勾选，恢复一组不移除其他�
         <output data-testid="multi-bindings">
           {JSON.stringify(current.pos[0]!.senses[0]!.form_group_ids)}
         </output>
-      </AntApp>
+      </FeedbackApp>
     );
   }
   render(<Harness />);

@@ -6,7 +6,7 @@ import {
   within
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ConfigProvider } from "antd";
+
 import {
   annotationErrors,
   EntryAnnotationModal,
@@ -61,35 +61,33 @@ describe("词条标注", () => {
   it("展示词性、释义、创建人和更新时间，合并空内容提示并去除重复文案", async () => {
     const updatedAt = new Date(2026, 8, 30, 10, 20).toISOString();
     render(
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <EntryAnnotationModal
-          rows={[
-            {
-              key: "a",
-              label: "center",
-              annotation: "001",
-              posLabels: ["noun"],
-              glossPreviews: ["中心"],
-              createdByName: "张明",
-              updatedAt,
-              referenceCount: 2,
-              href: "/words/a/v3/wizard/forms"
-            },
-            {
-              key: "b",
-              label: "center",
-              annotation: null,
-              posLabels: [],
-              glossPreviews: []
-            },
-            rows[2]!
-          ]}
-          groups={groups}
-          creating
-          onSave={vi.fn()}
-          onClose={vi.fn()}
-        />
-      </ConfigProvider>
+      <EntryAnnotationModal
+        rows={[
+          {
+            key: "a",
+            label: "center",
+            annotation: "001",
+            posLabels: ["noun"],
+            glossPreviews: ["中心"],
+            createdByName: "张明",
+            updatedAt,
+            referenceCount: 2,
+            href: "/words/a/v3/wizard/forms"
+          },
+          {
+            key: "b",
+            label: "center",
+            annotation: null,
+            posLabels: [],
+            glossPreviews: []
+          },
+          rows[2]!
+        ]}
+        groups={groups}
+        creating
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />
     );
     const existing = screen.getByRole("region", { name: "已有词条" });
     const incoming = screen.getByRole("region", { name: "本次新建" });

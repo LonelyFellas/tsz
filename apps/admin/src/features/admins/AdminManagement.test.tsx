@@ -6,7 +6,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import type { Admin } from "@tsz/types";
@@ -79,9 +79,9 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <AntApp>
+      <FeedbackApp>
         <AdminManagement />
-      </AntApp>
+      </FeedbackApp>
     </QueryClientProvider>
   );
 }
@@ -91,10 +91,10 @@ function clickButton(label: string | RegExp, idx = 0) {
   fireEvent.click(screen.getAllByText(label)[idx]!);
 }
 
-/** 点确认弹窗里的主按钮（.ant-modal-confirm-btns 内，按可见文案定位）。 */
+/** 点确认弹窗里的主按钮（.ui-modal-confirm-btns 内，按可见文案定位）。 */
 function clickConfirmOk(label: RegExp) {
   const btns = document.querySelector(
-    ".ant-modal-confirm-btns, .ant-modal-footer"
+    ".ui-modal-confirm-btns, .ui-modal-footer"
   )!;
   fireEvent.click(within(btns as HTMLElement).getByText(label));
 }
@@ -274,7 +274,7 @@ describe("AdminManagement", () => {
     });
     const { container } = renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(container.querySelector(".ui-pagination-item-2")!);
     await waitFor(() =>
       expect(mockList).toHaveBeenCalledWith(
         expect.objectContaining({ page: 2, page_size: 10 })
@@ -399,7 +399,7 @@ it.each(["status", "reset"] as const)(
     )!;
     clickConfirmOk(kind === "status" ? /^禁\s?用$/ : /^重\s?置$/);
     expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
-    expect(dialog).not.toHaveClass("ant-zoom-leave");
+    expect(dialog).not.toHaveClass("ui-zoom-leave");
     clickConfirmOk(kind === "status" ? /^禁\s?用$/ : /^重\s?置$/);
     await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
     if (kind === "reset")

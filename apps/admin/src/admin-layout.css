@@ -3,7 +3,7 @@
   min-width: 0;
 }
 
-.admin-filter-card > .ant-card-body {
+.admin-filter-card > .ui-card-body {
   padding: 16px;
 }
 
@@ -15,58 +15,58 @@
   max-width: 100%;
 }
 
-.admin-filter-form.ant-form-inline > .ant-form-item {
+.admin-filter-form.ui-form-inline > .ui-form-item {
   margin: 0;
   min-width: 0;
   max-width: 100%;
 }
 
-.admin-filter-form .ant-form-item-control {
+.admin-filter-form .ui-form-item-control {
   min-width: 0;
 }
 
-.admin-filter-form .ant-input-affix-wrapper,
-.admin-filter-form .ant-select,
-.admin-filter-form .ant-picker {
+.admin-filter-form .ui-input-affix-wrapper,
+.admin-filter-form .ui-select,
+.admin-filter-form .ui-picker {
   max-width: 100%;
 }
 
-.admin-filter-form .ant-form-item-label > label {
-  color: var(--ant-color-text-secondary, #626b79);
+.admin-filter-form .ui-form-item-label > label {
+  color: var(--ui-color-text-secondary, #626b79);
 }
 
 @container (max-width: 640px) {
-  .admin-filter-form > .ant-form-item:not(.admin-filter-actions) {
+  .admin-filter-form > .ui-form-item:not(.admin-filter-actions) {
     flex: 1 1 220px;
   }
 
-  .admin-filter-form .ant-form-item-row {
+  .admin-filter-form .ui-form-item-row {
     flex-wrap: nowrap;
   }
 
-  .admin-filter-form .ant-form-item-control {
+  .admin-filter-form .ui-form-item-control {
     flex: 1;
   }
 
-  .admin-filter-form .ant-form-item-control-input-content > .ant-input,
+  .admin-filter-form .ui-form-item-control-input-content > .ui-input,
   .admin-filter-form
-    .ant-form-item-control-input-content
-    > .ant-input-affix-wrapper,
+    .ui-form-item-control-input-content
+    > .ui-input-affix-wrapper,
   .admin-filter-form
-    .ant-form-item-control-input-content
-    > .ant-input-group-wrapper,
-  .admin-filter-form .ant-form-item-control-input-content > .ant-select,
-  .admin-filter-form .ant-form-item-control-input-content > .ant-picker {
+    .ui-form-item-control-input-content
+    > .ui-input-group-wrapper,
+  .admin-filter-form .ui-form-item-control-input-content > .ui-select,
+  .admin-filter-form .ui-form-item-control-input-content > .ui-picker {
     width: 100% !important;
   }
 }
 
 @container (max-width: 440px) {
-  .admin-filter-form > .ant-form-item:not(.admin-filter-actions) {
+  .admin-filter-form > .ui-form-item:not(.admin-filter-actions) {
     flex-basis: 100%;
   }
 
-  .admin-filter-form .ant-form-item-label {
+  .admin-filter-form .ui-form-item-label {
     flex: 0 0 72px;
     text-align: left;
   }

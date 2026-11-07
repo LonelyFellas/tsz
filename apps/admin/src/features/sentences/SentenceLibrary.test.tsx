@@ -6,8 +6,7 @@ import {
   within
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App, ConfigProvider } from "antd";
-import zhCN from "antd/locale/zh_CN";
+import { App } from "@tsz/ui/admin/overlays";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedSentence } from "@tsz/types";
@@ -97,15 +96,13 @@ function show(entryId?: string, trash = false, readOnly = false) {
       }
     >
       <MemoryRouter>
-        <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
-          <App>
-            <SentenceLibrary
-              entryId={entryId}
-              trash={trash}
-              readOnly={readOnly}
-            />
-          </App>
-        </ConfigProvider>
+        <App>
+          <SentenceLibrary
+            entryId={entryId}
+            trash={trash}
+            readOnly={readOnly}
+          />
+        </App>
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -312,7 +309,7 @@ describe("独立多维例句库", () => {
     ).toBeGreaterThanOrEqual(2);
     fireEvent.click(screen.getByText(/查\s*看/).closest("button")!);
     await screen.findByText("查看例句");
-    expect(document.querySelector(".ant-modal .tsz-ve-readonly")).toHaveClass(
+    expect(document.querySelector(".ui-modal .tsz-ve-readonly")).toHaveClass(
       "tsz-entry-en",
       "has-liaison"
     );
@@ -439,9 +436,7 @@ it("批量选择显示数量并可取消，草稿删除仍先确认", async () =
   fireEvent.click(screen.getByText("移入垃圾桶"));
   await waitFor(() => expect(screen.getByRole("dialog")).toBeVisible());
   expect(api.sentences.delete).not.toHaveBeenCalled();
-  fireEvent.click(
-    screen.getByRole("dialog").querySelector(".ant-btn-primary")!
-  );
+  fireEvent.click(screen.getByRole("dialog").querySelector(".ui-btn-primary")!);
   await waitFor(() =>
     expect(api.sentences.trash).toHaveBeenCalledWith(expect.any(String), {
       base_revision: 3

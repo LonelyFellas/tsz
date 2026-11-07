@@ -1,0 +1,21 @@
+/* 只编译试点实际引用的控件；不引入会重置旧页面与弹层的 Preflight。 */
+@import "tailwindcss/theme.css" layer(theme);
+@source "../../../../../packages/ui/src/components/ui/button.tsx";
+@source "../../../../../packages/ui/src/components/ui/input.tsx";
+@source inline("min-h-9 rounded-lg px-3 py-1");
+@theme inline {
+  --color-primary: #2053ff;
+  --color-primary-foreground: white;
+  --color-surface: white;
+  --color-foreground: #202631;
+  --color-foreground-muted: #485365;
+  --color-foreground-subtle: #687386;
+  --color-muted: #f2f4f7;
+  --color-border: #cdd3dd;
+  --color-danger: #b42318;
+}
+@layer utilities {
+  @scope (.word-list-page) {
+    @tailwind utilities source(none);
+  }
+}

@@ -14,7 +14,7 @@ import type {
   AdminProfile,
   GrammarFormLinkV3
 } from "@tsz/types";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { HttpError } from "@tsz/api-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -214,11 +214,9 @@ function mount(openLibrary = true) {
   routers.push(router);
   const view = render(
     <QueryClientProvider client={client}>
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <App>
-          <RouterProvider router={router} />
-        </App>
-      </ConfigProvider>
+      <App>
+        <RouterProvider router={router} />
+      </App>
     </QueryClientProvider>
   );
   return { ...view, router };
@@ -370,7 +368,7 @@ describe("配音中心", () => {
     fireEvent.mouseDown(await screen.findByLabelText("推荐分组"));
     fireEvent.click(
       await screen.findByText("测试推荐组", {
-        selector: ".ant-select-item-option-content"
+        selector: ".ui-select-item-option-content"
       })
     );
     fireEvent.click(namedButton("创建整套推荐"));
@@ -442,7 +440,7 @@ describe("配音中心", () => {
     fireEvent.click(open);
     const drawer = document.querySelector<HTMLElement>('[role="dialog"]')!;
     const drawerButton = (text: string) => namedButton(text, drawer);
-    const volume = within(drawer).getByDisplayValue("100");
+    const volume = within(drawer).getByRole("spinbutton", { name: "合成音量" });
     expect(volume).toHaveAttribute("aria-label", "合成音量");
     expect(volume).toHaveValue("100");
     await waitFor(() => expect(drawerButton("恢复默认参数")).toBeDisabled());
@@ -476,7 +474,9 @@ describe("配音中心", () => {
     fireEvent.click(open);
     const reopened = document.querySelector<HTMLElement>('[role="dialog"]')!;
     const reset = labelledControl("恢复默认参数", reopened);
-    const reopenedVolume = within(reopened).getByDisplayValue("65");
+    const reopenedVolume = within(reopened).getByRole("spinbutton", {
+      name: "合成音量"
+    });
     expect(reopenedVolume).toHaveAttribute("aria-label", "合成音量");
     expect(reopenedVolume).toHaveValue("65");
     fireEvent.click(reset);
@@ -1137,7 +1137,7 @@ describe("配音中心", () => {
     const choice = await waitFor(() => {
       const match = Array.from(
         document.querySelectorAll(
-          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+          ".ui-select-dropdown:not(.ui-select-dropdown-hidden) .ui-select-item-option-content"
         )
       ).find((node) => node.textContent === "美式");
       expect(match).toBeDefined();

@@ -1,4 +1,4 @@
-import { theme } from "antd";
+import { adminTokens } from "@tsz/ui/admin/context";
 import type { ReactNode } from "react";
 
 /**
@@ -14,7 +14,7 @@ export function FullscreenCenter({
   children: ReactNode;
   vertical?: boolean;
 }) {
-  const { token } = theme.useToken();
+  const token = adminTokens;
   return (
     <div
       style={{

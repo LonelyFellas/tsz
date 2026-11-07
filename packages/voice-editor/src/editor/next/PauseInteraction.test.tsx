@@ -4,15 +4,11 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+
 import { useState, type ReactElement } from "react";
 const render = (element: ReactElement) =>
   renderView(element, {
-    wrapper: ({ children }) => (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        {children}
-      </ConfigProvider>
-    )
+    wrapper: ({ children }) => <>{children}</>
   });
 import { describe, expect, it, vi } from "vitest";
 import type { RichTextV2 } from "@tsz/types";

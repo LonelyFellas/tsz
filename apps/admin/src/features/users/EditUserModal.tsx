@@ -1,6 +1,7 @@
 // 编辑用户：对接 PATCH /admin/users/{id}（super_admin）。本轮后端只开放昵称一个可编辑字段
 // （1–50 字符、trim 后非空）；联系方式走用户自己的绑定流程，不在此改。
-import { App, Form, Input, Modal } from "antd";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { useEffect } from "react";
 import type { AdminUser } from "@tsz/types";
 import { DISPLAY_NAME_MAX, hasDisplayNameForbiddenChars } from "@tsz/shared";

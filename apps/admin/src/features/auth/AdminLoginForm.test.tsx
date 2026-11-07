@@ -158,6 +158,12 @@ describe("AdminLoginForm — 2FA", () => {
     ).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
+  it("短信验证码标签直接关联输入框", () => {
+    render(<AdminLoginForm />);
+    expect(screen.getByRole("textbox", { name: "短信验证码" })).toBe(
+      screen.getByPlaceholderText("请输入验证码")
+    );
+  });
   // ============================== 发码（2FA 第一步）==============================
 
   it("合法手机号 → 获取验证码可用，点击调 requestLoginCode 并进入倒计时", async () => {
@@ -378,7 +384,7 @@ describe("AdminLoginForm — 2FA", () => {
   });
 
   const primaryButton = (c: HTMLElement) =>
-    c.querySelector("button.ant-btn-primary") as HTMLButtonElement;
+    c.querySelector("button.ui-btn-primary") as HTMLButtonElement;
 
   it("账号被锁定(423)：提示锁定并置灰登录按钮，改动密码后恢复可点", async () => {
     mockLogin.mockRejectedValue(
@@ -507,9 +513,9 @@ describe("AdminLoginForm — 2FA", () => {
     render(<AdminLoginForm />);
     const pwd = screen.getByLabelText("登录密码");
     expect(pwd).toHaveAttribute("type", "password");
-    fireEvent.click(screen.getByRole("img", { name: "eye-invisible" }));
+    fireEvent.click(screen.getByRole("button", { name: "显示密码" }));
     expect(pwd).toHaveAttribute("type", "text");
-    fireEvent.click(screen.getByRole("img", { name: "eye" }));
+    fireEvent.click(screen.getByRole("button", { name: "隐藏密码" }));
     expect(pwd).toHaveAttribute("type", "password");
   });
 });

@@ -1,21 +1,9 @@
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
-import {
-  CopyOutlined,
-  QuestionCircleOutlined,
-  UndoOutlined
-} from "@ant-design/icons";
-import {
-  Alert,
-  App,
-  Button,
-  ConfigProvider,
-  Flex,
-  Modal,
-  Select,
-  Space,
-  Tooltip,
-  Typography
-} from "antd";
+import { CopyIcon, CircleHelpIcon, Undo2Icon } from "lucide-react";
+import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
+import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { AdminControls, useAdminDisabled } from "@tsz/ui/admin/context";
+import { Select } from "@tsz/ui/admin/forms";
 import type { FormContentV3, SharedFormsStepContentV3 } from "@tsz/types";
 import {
   createContext,
@@ -92,7 +80,7 @@ export function V3FormCopyHandle({
         type="text"
         size="small"
         className="v3-form-copy-handle"
-        icon={<CopyOutlined />}
+        icon={<CopyIcon />}
         aria-label={`复制${copyName(kind)}`}
         aria-pressed={selected}
         disabled={copy.busy || undefined}
@@ -126,7 +114,7 @@ export function V3FormCopyProvider({
     },
     [notification, noticeKey]
   );
-  const { componentDisabled } = ConfigProvider.useConfig();
+  const componentDisabled = useAdminDisabled();
   const formTypeLabel = useFormTypeLabel();
   const root = useRef<HTMLDivElement>(null);
   const request = useRef<AbortController | undefined>(undefined);
@@ -190,7 +178,7 @@ export function V3FormCopyProvider({
         <Button
           size="small"
           aria-label="撤销"
-          icon={<UndoOutlined />}
+          icon={<Undo2Icon />}
           disabled={disabled}
           onClick={() => {
             if (
@@ -525,11 +513,11 @@ export function V3FormCopyProvider({
             />
           )}
         </Flex>
-        <ConfigProvider componentDisabled={busy || Boolean(componentDisabled)}>
+        <AdminControls componentDisabled={busy || Boolean(componentDisabled)}>
           <div inert={busy} aria-busy={busy}>
             {children}
           </div>
-        </ConfigProvider>
+        </AdminControls>
         <Modal
           title={`复制${pending ? copyName(pending.kind) : "配置"}`}
           open={Boolean(pending)}
@@ -648,7 +636,7 @@ export function V3FormCopyProvider({
 export function V3FormCopyHelp() {
   return (
     <Tooltip title="音标和音色参数分开复制，均包含英美两侧。拖动复制图标到目标区域，或点击图标后选择目标。复制会覆盖对应配置；可撤销，保存草稿后生效。音频文件不复制，复制后请重新试听。">
-      <QuestionCircleOutlined aria-label="词形复制说明" />
+      <CircleHelpIcon aria-label="词形复制说明" />
     </Tooltip>
   );
 }

@@ -1,12 +1,13 @@
 import { regionalVariants } from "@tsz/shared";
 import { AdminTable as Table } from "@/components/AdminTable";
-import { EditOutlined } from "@ant-design/icons";
+import { PencilIcon } from "lucide-react";
 import {
   V3FormCopyHandle,
   V3FormCopyHelp,
   useV3FormCopy
 } from "./V3FormCopyProvider";
-import { Button, Dropdown, Space, Tooltip, Typography } from "antd";
+import { Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Dropdown, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   WordConcreteFormV3,
   WordCommonFormVariantV3,
@@ -245,7 +246,7 @@ export function V3FormContentOverview({
                     size="small"
                     className="v3-overview-edit"
                     aria-label={`编辑${label(row.form.form_type)}内容`}
-                    icon={<EditOutlined />}
+                    icon={<PencilIcon />}
                     data-v3-node-id={row.form.id}
                     data-v3-field="form_id"
                     data-v3-open-content={row.form.id}

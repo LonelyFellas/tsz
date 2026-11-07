@@ -2,7 +2,9 @@
 // 按 §6 红框做「单向指派」：后端本期不下发管理员当前所属角色，故控件不回显当前值、
 // 只承诺「设为 / 收回」，不做「显示并切换」。超管不挂角色（派超管回 403），故管理员下拉
 // 只取 role=admin。204 后由 useSetAdminRole 失效角色列表刷新 member_count。
-import { App, Alert, Form, Modal, Select } from "antd";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Alert } from "@tsz/ui/admin/display";
+import { Form, Select } from "@tsz/ui/admin/forms";
 import type { AdminRole } from "@tsz/types";
 import { useAdminList } from "@/features/admins/api";
 import { useSetAdminRole } from "./api";

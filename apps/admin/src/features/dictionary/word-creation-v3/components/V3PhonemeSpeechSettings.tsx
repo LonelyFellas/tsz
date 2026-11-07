@@ -1,8 +1,8 @@
 import { useVoiceSave } from "../voiceSaveContext";
 import { flushSync } from "react-dom";
-import { EditOutlined } from "@ant-design/icons";
+import { PencilIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
-import { Alert, Button, Space, Typography } from "antd";
+import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import {
   lazy,
   Suspense,
@@ -289,7 +289,7 @@ export function V3PhonemeSpeechSettings({
   return (
     <>
       <Button
-        icon={<EditOutlined />}
+        icon={<PencilIcon />}
         aria-label={`打开${label} TTS 设置器`}
         data-v3-node-id={nodeId}
         data-v3-field={field}

@@ -1,6 +1,6 @@
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import type { EnglishTextV3 } from "@tsz/types";
-import { ConfigProvider, Flex, Tag, Typography } from "antd";
+import { Flex, Tag, Typography } from "@tsz/ui/admin/display";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { dialectLabel } from "../presentation";
 import "@tsz/voice-editor/styles.css";
@@ -34,17 +34,15 @@ export function V3EnglishTextPreview({
           <Flex align="stretch">
             {showPlayback && (
               <div className="v3-english-preview-playback">
-                <ConfigProvider wave={{ disabled: true }}>
-                  <PronunciationPreviewControls
-                    pronunciationId={variant.id}
-                    content={toRichTextV2(variant.value)}
-                    voiceProfile={variant.voice_profile ?? undefined}
-                    dialect={dialect}
-                    ariaLabelPrefix="整句"
-                    playbackOnly
-                    assetOnly
-                  />
-                </ConfigProvider>
+                <PronunciationPreviewControls
+                  pronunciationId={variant.id}
+                  content={toRichTextV2(variant.value)}
+                  voiceProfile={variant.voice_profile ?? undefined}
+                  dialect={dialect}
+                  ariaLabelPrefix="整句"
+                  playbackOnly
+                  assetOnly
+                />
               </div>
             )}
             <div

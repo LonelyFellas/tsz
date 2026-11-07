@@ -219,7 +219,7 @@
   letter-spacing: -0.02em;
 }
 
-.admin-login__connection.ant-alert {
+.admin-login__connection.ui-alert {
   margin-bottom: 24px;
   padding: 8px 10px;
   border: 0;
@@ -228,13 +228,13 @@
   font-family: inherit;
 }
 
-.admin-login__connection .ant-alert-icon,
-.admin-login__connection .ant-alert-title {
+.admin-login__connection .ui-alert-icon,
+.admin-login__connection .ui-alert-title {
   color: #3b4d6b;
   font-size: 13px;
 }
 
-.admin-login__connection .ant-btn {
+.admin-login__connection .ui-btn {
   height: 32px;
   padding: 0 8px;
   color: var(--login-blue);
@@ -242,34 +242,34 @@
   font-size: 12px;
 }
 
-.admin-login__connection .ant-btn-dangerous {
+.admin-login__connection .ui-btn-dangerous {
   color: #9d1c13;
 }
 
-.admin-login__form.ant-form,
-.admin-login__form .ant-input,
-.admin-login__form .ant-input-affix-wrapper,
-.admin-login__form .ant-btn {
+.admin-login__form.ui-form,
+.admin-login__form .ui-input,
+.admin-login__form .ui-input-affix-wrapper,
+.admin-login__form .ui-btn {
   font-family: inherit;
 }
 
-.admin-login__form .ant-form-item {
+.admin-login__form .ui-form-item {
   margin-bottom: 23px;
 }
 
-.admin-login__form .ant-form-item-label {
+.admin-login__form .ui-form-item-label {
   padding-bottom: 9px;
 }
 
-.admin-login__form .ant-form-item-label > label {
+.admin-login__form .ui-form-item-label > label {
   height: auto;
   color: #303a4d;
   font-size: 13px;
   font-weight: 500;
 }
 
-.admin-login__form .ant-input,
-.admin-login__form .ant-input-affix-wrapper {
+.admin-login__form .ui-input,
+.admin-login__form .ui-input-affix-wrapper {
   background: rgb(255 255 255 / 78%);
   border-color: #929aa8;
   border-radius: 9px;
@@ -278,37 +278,38 @@
   line-height: 22px;
 }
 
-.admin-login__form input.ant-input {
+.admin-login__form input.ui-input {
   height: 52px;
   padding: 14px 15px;
   caret-color: var(--login-blue);
 }
 
-.admin-login__form .ant-input-affix-wrapper {
+.admin-login__form .ui-input-affix-wrapper {
   height: 52px;
   padding: 0 15px;
 }
 
-.admin-login__form .ant-input-affix-wrapper input.ant-input {
+.admin-login__form .ui-input-affix-wrapper input.ui-input {
   height: auto;
   padding: 0;
   background: transparent;
+  box-shadow: none;
 }
 
 .admin-login__form input::placeholder,
-.admin-login__form .ant-input-password-icon {
+.admin-login__form .ui-input-password-icon {
   color: #616d80;
 }
 
-.admin-login__form .ant-input:hover,
-.admin-login__form .ant-input-affix-wrapper:hover,
-.admin-login__form .ant-input:focus,
-.admin-login__form .ant-input-affix-wrapper-focused {
+.admin-login__form .ui-input:hover,
+.admin-login__form .ui-input-affix-wrapper:hover,
+.admin-login__form .ui-input:focus,
+.admin-login__form .ui-input-affix-wrapper:focus-within {
   border-color: var(--login-blue);
 }
 
-.admin-login__form .ant-input:focus,
-.admin-login__form .ant-input-affix-wrapper-focused {
+.admin-login__form .ui-input:focus,
+.admin-login__form .ui-input-affix-wrapper:focus-within {
   background: #fff;
   box-shadow: 0 0 0 3px #2053ff12;
 }
@@ -319,11 +320,11 @@
   align-items: center;
 }
 
-.admin-login__code-control input.ant-input {
+.admin-login__code-control input.ui-input {
   padding-right: 136px;
 }
 
-.admin-login__send-code.ant-btn {
+.admin-login__send-code.ui-btn {
   position: absolute;
   right: 9px;
   height: 30px;
@@ -334,7 +335,7 @@
   font-size: 12px;
 }
 
-.admin-login__send-code.ant-btn:disabled {
+.admin-login__send-code.ui-btn:disabled {
   color: #7d8595;
 }
 
@@ -346,11 +347,11 @@
   margin-top: 16px;
 }
 
-.admin-login__alert .ant-alert-title {
+.admin-login__alert .ui-alert-title {
   font-size: 12px;
 }
 
-.admin-login__submit.ant-btn {
+.admin-login__submit.ui-btn {
   height: 50px;
   margin-top: 27px;
   border-radius: 9px;
@@ -359,17 +360,17 @@
   box-shadow: none;
 }
 
-.admin-login__submit.ant-btn:not(:disabled):hover {
+.admin-login__submit.ui-btn:not(:disabled):hover {
   background: #1742df;
 }
 
-.admin-login__submit.ant-btn:disabled:not(.admin-login__submit--busy) {
+.admin-login__submit.ui-btn:disabled:not(.admin-login__submit--busy) {
   background: #dfe7fb;
   border-color: transparent;
   color: #536789;
 }
 
-.admin-login__submit .anticon-arrow-right {
+.admin-login__submit .lucide-arrow-right {
   margin-left: 8px;
   font-size: 13px;
 }
@@ -450,14 +451,14 @@
   .admin-login__card h1 {
     font-size: 26px;
   }
-  .admin-login__form .ant-input,
-  .admin-login__form .ant-input-affix-wrapper {
+  .admin-login__form .ui-input,
+  .admin-login__form .ui-input-affix-wrapper {
     font-size: 16px;
   }
-  .admin-login__send-code.ant-btn {
+  .admin-login__send-code.ui-btn {
     height: 44px;
   }
-  .admin-login__connection .ant-btn {
+  .admin-login__connection .ui-btn {
     height: 44px;
   }
 }
@@ -471,7 +472,7 @@
     padding-right: 24px;
     padding-left: 24px;
   }
-  .admin-login__code-control input.ant-input {
+  .admin-login__code-control input.ui-input {
     padding-right: 124px;
   }
 }

@@ -1,4 +1,4 @@
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import {
   act,
   fireEvent,
@@ -97,15 +97,13 @@ function response(
 }
 function surface(value: AssistantEditorContext) {
   return (
-    <ConfigProvider>
-      <App>
-        <FormCandidates
-          context={value}
-          disabled={false}
-          onBusyChange={() => {}}
-        />
-      </App>
-    </ConfigProvider>
+    <App>
+      <FormCandidates
+        context={value}
+        disabled={false}
+        onBusyChange={() => {}}
+      />
+    </App>
   );
 }
 beforeEach(() => {

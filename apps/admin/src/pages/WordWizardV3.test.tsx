@@ -20,7 +20,7 @@ import {
   within,
   act
 } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import type {
   AdminWordPublicationV3,
   AdminWordV3,
@@ -282,11 +282,9 @@ function renderPage(
   );
   render(
     <QueryClientProvider client={client}>
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <AntApp>
-          <RouterProvider router={router} />
-        </AntApp>
-      </ConfigProvider>
+      <FeedbackApp>
+        <RouterProvider router={router} />
+      </FeedbackApp>
     </QueryClientProvider>
   );
   return router;
@@ -1454,7 +1452,7 @@ describe("WordWizardV3Page", () => {
     expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue("");
     const formsStep = screen
       .getAllByText("词形与发音")
-      .find((item) => item.closest('[role="button"]'));
+      .find((item) => item.closest(".word-editor-step"));
     if (!formsStep) throw new Error("forms step navigation not found");
     fireEvent.click(formsStep);
     expect(await openContentEditor()).toHaveValue("center-unsaved");
@@ -1610,7 +1608,7 @@ describe("WordWizardV3Page", () => {
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
     expect(screen.getByText("centre-preserved")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("重 试").closest("button")!);
+    fireEvent.click(screen.getByText(/^重\s*试$/u).closest("button")!);
     await waitFor(() =>
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
     );
@@ -1681,9 +1679,9 @@ describe("WordWizardV3Page", () => {
       )
     );
     const previewStep = (await screen.findByText("预览并生效")).closest(
-      ".ant-steps-item"
+      ".word-editor-step"
     )!;
-    expect(previewStep).toHaveClass("ant-steps-item-disabled");
+    expect(previewStep).toBeDisabled();
     fireEvent.click(previewStep);
     expect(router.state.location.pathname).toBe(
       `/words/${WORD_ID}/v3/wizard/meanings`
@@ -2049,7 +2047,9 @@ describe("WordWizardV3Page", () => {
     ).not.toBeInTheDocument();
     for (const step of ["词形与发音", "词义与例句"]) {
       fireEvent.click(
-        within(document.querySelector(".word-creation-steps")!).getByText(step)
+        within(
+          screen.getByRole("navigation", { name: "词条编辑步骤" })
+        ).getByText(step)
       );
       expect(document.querySelector(".v3-publication-history")).toBeNull();
       expect(
@@ -2062,9 +2062,9 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByText("发布历史", { exact: true })).toBeVisible();
     expect(endpoints.listPublications).toHaveBeenCalledTimes(1);
     fireEvent.click(
-      within(document.querySelector(".word-creation-steps")!).getByText(
-        "词形与发音"
-      )
+      within(
+        screen.getByRole("navigation", { name: "词条编辑步骤" })
+      ).getByText("词形与发音")
     );
     await contentEditButton();
     expect(document.querySelector(".v3-publication-history")).toBeNull();
@@ -2166,9 +2166,9 @@ describe("WordWizardV3Page", () => {
       expect(screen.queryByTestId("publication-detail")).not.toBeInTheDocument()
     );
     fireEvent.click(
-      within(document.querySelector(".word-creation-steps")!).getByText(
-        "词形与发音"
-      )
+      within(
+        screen.getByRole("navigation", { name: "词条编辑步骤" })
+      ).getByText("词形与发音")
     );
     expect(await contentEditButton()).toBeEnabled();
     expect(endpoints.validateV3).not.toHaveBeenCalled();
@@ -2444,7 +2444,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(
       screen
         .getAllByText("词形与发音")
-        .find((element) => element.closest(".ant-steps-item"))!
+        .find((element) => element.closest(".word-editor-step"))!
     );
     expect(await openContentEditor()).toHaveValue("restored-canonical");
   });
@@ -2603,8 +2603,8 @@ describe("WordWizardV3Page", () => {
           null
       ).toBeNull();
       expect(
-        screen.getAllByText("词形与发音")[0]?.closest(".ant-steps-item")
-      ).toHaveClass("ant-steps-item-disabled");
+        screen.getAllByText("词形与发音")[0]?.closest(".word-editor-step")
+      ).toBeDisabled();
       expect(endpoints.validateV3).not.toHaveBeenCalled();
       expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
       expect(endpoints.publishV3).not.toHaveBeenCalled();
@@ -2796,9 +2796,9 @@ describe("WordWizardV3Page", () => {
     expect(
       screen
         .getAllByText("词形与发音")
-        .find((element) => element.closest(".ant-steps-item"))
-        ?.closest(".ant-steps-item")
-    ).not.toHaveClass("ant-steps-item-disabled");
+        .find((element) => element.closest(".word-editor-step"))
+        ?.closest(".word-editor-step")
+    ).not.toBeDisabled();
   });
 
   it("keeps a typed meanings slot ready for T5C without adding a request flow", async () => {

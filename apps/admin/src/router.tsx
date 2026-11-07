@@ -1,4 +1,4 @@
-import { Spin, Typography } from "antd";
+import { Spin, Typography } from "@tsz/ui/admin/display";
 import {
   createBrowserRouter,
   redirect,

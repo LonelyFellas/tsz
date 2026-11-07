@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { App, Radio } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
+import { Radio } from "@tsz/ui/admin/forms";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "./useDialectPreference";
 

@@ -1,24 +1,21 @@
 import {
-  CaretDownFilled,
-  CaretUpFilled,
-  InfoCircleOutlined,
-  PlusOutlined,
-  SearchOutlined,
-  SoundOutlined
-} from "@ant-design/icons";
+  ChevronDownIcon,
+  ChevronUpIcon,
+  InfoIcon,
+  PlusIcon,
+  SearchIcon,
+  Volume2Icon
+} from "lucide-react";
+import { AutoComplete, Input, InputNumber, Select } from "@tsz/ui/admin/forms";
 import {
-  AutoComplete,
   Button,
   Card,
   Empty,
   Flex,
-  Input,
-  InputNumber,
-  Select,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   DraftMeaningsStepContentWritableV3,
   WordRelationWritableV3,
@@ -211,7 +208,7 @@ export function V3RelationsGrid({
             styles={{ header: { cursor: "pointer" } }}
             onClick={(event) => {
               const header = event.currentTarget.querySelector(
-                ":scope > .ant-card-head"
+                ":scope > .ui-card-head"
               );
               if (!header?.contains(event.target as Node)) return;
               setCollapsed((current) => ({
@@ -225,9 +222,9 @@ export function V3RelationsGrid({
                 className="word-relation-collapse"
                 icon={
                   collapsed[relationType] ? (
-                    <CaretDownFilled />
+                    <ChevronDownIcon />
                   ) : (
-                    <CaretUpFilled />
+                    <ChevronUpIcon />
                   )
                 }
                 iconPlacement="end"
@@ -618,9 +615,9 @@ export function V3RelationsGrid({
                                   className="word-relation-target tsz-words"
                                   prefix={
                                     relation.target_word_id ? (
-                                      <SoundOutlined />
+                                      <Volume2Icon />
                                     ) : (
-                                      <SearchOutlined data-relation-search />
+                                      <SearchIcon data-relation-search />
                                     )
                                   }
                                   status={
@@ -653,7 +650,7 @@ export function V3RelationsGrid({
                                         <Tooltip
                                           title={`待关联的${relationLabel(relationType)}`}
                                         >
-                                          <InfoCircleOutlined
+                                          <InfoIcon
                                             aria-label={`待关联的${relationLabel(relationType)}`}
                                             className="word-relation-unlinked-icon"
                                             role="note"
@@ -781,7 +778,7 @@ export function V3RelationsGrid({
                                                 <Tooltip
                                                   title={`待关联的${relationLabel(relationType)}`}
                                                 >
-                                                  <InfoCircleOutlined
+                                                  <InfoIcon
                                                     aria-label={`待关联的${relationLabel(relationType)}`}
                                                     className="word-relation-unlinked-icon"
                                                     role="note"
@@ -836,7 +833,7 @@ export function V3RelationsGrid({
                                     aria-label={`添加${relationLabel(relationType)}词义`}
                                     size="small"
                                     type="dashed"
-                                    icon={<PlusOutlined />}
+                                    icon={<PlusIcon />}
                                     onClick={() =>
                                       change((draft) => {
                                         const target =
@@ -1230,7 +1227,7 @@ export function V3RelationsGrid({
                 <Button
                   block
                   className="word-section-add-button"
-                  icon={<PlusOutlined aria-hidden />}
+                  icon={<PlusIcon aria-hidden />}
                   onClick={() => {
                     const relation = newRelation(idFactory, relationType);
                     change((draft) => {

@@ -22,31 +22,21 @@
   },
   "dependencies": {
     "@tsz/shared": "workspace:*",
-    "@tsz/types": "workspace:*"
+    "@tsz/types": "workspace:*",
+    "@tsz/ui": "workspace:*",
+    "lucide-react": "^1.52.0"
   },
   "peerDependencies": {
-    "@ant-design/icons": "^6.3.2",
-    "antd": "^6.6.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
-  "peerDependenciesMeta": {
-    "antd": {
-      "optional": true
-    },
-    "@ant-design/icons": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@ant-design/icons": "^6.3.4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@tsz/config": "workspace:*",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.2",
-    "antd": "^6.6.8",
     "eslint": "^9.39.0",
     "jsdom": "^30.0.1",
     "react": "^19.2.8",

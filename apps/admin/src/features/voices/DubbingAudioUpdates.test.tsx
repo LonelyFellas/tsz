@@ -7,7 +7,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+
 import type { AdminDubbingAudioUpdate, AdminProfile } from "@tsz/types";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
@@ -21,9 +21,7 @@ function mount(node: React.ReactNode) {
   clients.push(client);
   return render(
     <QueryClientProvider client={client}>
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        {node}
-      </ConfigProvider>
+      <>{node}</>
     </QueryClientProvider>
   );
 }

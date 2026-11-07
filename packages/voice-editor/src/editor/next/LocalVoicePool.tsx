@@ -1,24 +1,15 @@
 import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  CaretDownFilled,
-  CaretUpFilled,
-  EditOutlined,
-  QuestionCircleOutlined,
-  SoundOutlined
-} from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Checkbox,
-  Input,
-  Popover,
-  Radio,
-  Space,
-  Spin,
-  Tooltip,
-  Typography
-} from "antd";
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PencilIcon,
+  CircleHelpIcon,
+  Volume2Icon
+} from "lucide-react";
+import { Alert, Button, Space, Spin, Typography } from "@tsz/ui/admin/display";
+import { Checkbox, Input, Radio } from "@tsz/ui/admin/forms";
+import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { speechAccentGroup } from "@tsz/shared";
 import {
   useEffect,
@@ -340,7 +331,7 @@ export function LocalVoicePool({
       <Button
         size="small"
         type="text"
-        icon={<SoundOutlined />}
+        icon={<Volume2Icon />}
         data-accent={currentAccent ?? "other"}
         style={
           disabled
@@ -476,7 +467,7 @@ export function LocalVoicePool({
           >
             <Button
               type="text"
-              icon={<QuestionCircleOutlined />}
+              icon={<CircleHelpIcon />}
               aria-label="配音与播放规则"
             />
           </Popover>
@@ -572,9 +563,9 @@ export function LocalVoicePool({
                                 aria-label={`${direction === -1 ? "上移" : "下移"} ${setting.version_name ?? setting.voice_id}`}
                                 icon={
                                   direction === -1 ? (
-                                    <ArrowUpOutlined />
+                                    <ArrowUpIcon />
                                   ) : (
-                                    <ArrowDownOutlined />
+                                    <ArrowDownIcon />
                                   )
                                 }
                                 disabled={
@@ -603,7 +594,7 @@ export function LocalVoicePool({
                           <Button
                             type="text"
                             size="small"
-                            icon={<EditOutlined />}
+                            icon={<PencilIcon />}
                             aria-label={`修改 ${setting.version_name ?? setting.voice_id}`}
                             disabled={
                               readOnly ||
@@ -893,7 +884,7 @@ export function LocalVoicePool({
             >
               <Button
                 type="text"
-                icon={<QuestionCircleOutlined />}
+                icon={<CircleHelpIcon />}
                 aria-label="选择与试听说明"
                 onClick={(event) => {
                   event.preventDefault();
@@ -904,10 +895,10 @@ export function LocalVoicePool({
           </span>
           <span className="tsz-ve-pool-catalog-toggle">
             <span className="tsz-ve-pool-catalog-expand">
-              展开 <CaretDownFilled />
+              展开 <ChevronDownIcon />
             </span>
             <span className="tsz-ve-pool-catalog-collapse">
-              收起 <CaretUpFilled />
+              收起 <ChevronUpIcon />
             </span>
           </span>
         </summary>

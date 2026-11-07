@@ -1,33 +1,28 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  MoreOutlined
-} from "@ant-design/icons";
+  PlusIcon,
+  RotateCwIcon,
+  SearchIcon,
+  EllipsisVerticalIcon
+} from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
   Col,
-  DatePicker,
   Descriptions,
-  Dropdown,
   Flex,
-  Form,
-  Input,
-  Modal,
   Row,
-  Select,
   Space,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Dropdown, Modal } from "@tsz/ui/admin/overlays";
+import { DatePicker, Form, Input, Select } from "@tsz/ui/admin/forms";
 import type { Dayjs } from "dayjs";
 import type { SharedSentence, SentenceListQuery } from "@tsz/types";
 import { Link, useSearchParams } from "react-router-dom";
@@ -303,7 +298,7 @@ export function SentenceLibrary({
               <Space>
                 <Button
                   type="primary"
-                  icon={<SearchOutlined />}
+                  icon={<SearchIcon />}
                   onClick={() =>
                     setFilters({
                       ...filters,
@@ -318,7 +313,7 @@ export function SentenceLibrary({
                   搜索
                 </Button>
                 <Button
-                  icon={<ReloadOutlined />}
+                  icon={<RotateCwIcon />}
                   onClick={() => {
                     setKeyword("");
                     setLevel(undefined);
@@ -412,7 +407,7 @@ export function SentenceLibrary({
                 canCreate && (
                   <Button
                     type="primary"
-                    icon={<PlusOutlined />}
+                    icon={<PlusIcon />}
                     onClick={() => setEditor("new")}
                   >
                     新建例句
@@ -666,7 +661,7 @@ export function SentenceLibrary({
                             size="small"
                             type="text"
                             aria-label="更多操作"
-                            icon={<MoreOutlined />}
+                            icon={<EllipsisVerticalIcon />}
                           />
                         </Dropdown>
                       )}

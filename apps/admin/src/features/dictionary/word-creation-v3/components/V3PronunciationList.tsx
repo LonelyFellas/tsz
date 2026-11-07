@@ -4,11 +4,12 @@ import { V3SynthesisInputs } from "./V3SynthesisInputs";
 import { V3ActualPronunciationCopy } from "./V3ActualPronunciationCopy";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import {
-  HolderOutlined,
-  MinusCircleOutlined,
-  PlusCircleOutlined
-} from "@ant-design/icons";
-import { Button, Flex, Form, Select, Typography } from "antd";
+  GripVerticalIcon,
+  CircleMinusIcon,
+  CirclePlusIcon
+} from "lucide-react";
+import { Button, Flex, Typography } from "@tsz/ui/admin/display";
+import { Form, Select } from "@tsz/ui/admin/forms";
 import type {
   DraftFormsStepContentV3,
   V3DraftValidationIssue,
@@ -178,7 +179,7 @@ export function V3PronunciationList({
                         disabled={fields.length < 2}
                         draggable={fields.length > 1}
                         htmlType="button"
-                        icon={<HolderOutlined />}
+                        icon={<GripVerticalIcon />}
                         onDragEnd={() => {
                           setDraggingIndex(undefined);
                           setDragOverIndex(undefined);
@@ -228,7 +229,7 @@ export function V3PronunciationList({
                       />
                       <Button
                         aria-label={`在第 ${index + 1} 条后新增发音`}
-                        icon={<PlusCircleOutlined />}
+                        icon={<CirclePlusIcon />}
                         onClick={() => {
                           const next: WordPronunciationV3 = {
                             id: idFactory(),
@@ -257,7 +258,7 @@ export function V3PronunciationList({
                         className="word-pronunciation-remove"
                         danger
                         disabled={fields.length === 1}
-                        icon={<MinusCircleOutlined />}
+                        icon={<CircleMinusIcon />}
                         onClick={() => {
                           remove(index);
                           onChange(
@@ -483,7 +484,7 @@ export function V3PronunciationList({
                   <Typography.Text type="secondary">暂无发音</Typography.Text>
                   <Button
                     aria-label="新增发音"
-                    icon={<PlusCircleOutlined />}
+                    icon={<CirclePlusIcon />}
                     onClick={() => {
                       const pronunciation: WordPronunciationV3 = {
                         id: idFactory(),

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { App, Button } from "antd";
-import { SwapOutlined, UndoOutlined } from "@ant-design/icons";
+import { App } from "@tsz/ui/admin/overlays";
+import { Button } from "@tsz/ui/admin/display";
+import { ArrowLeftRightIcon, Undo2Icon } from "lucide-react";
 import type { Dialect, WordPronunciationV3 } from "@tsz/types";
 import { convertDictionaryToUnified } from "@tsz/shared";
 export function V3ActualPronunciationCopy({
@@ -43,7 +44,7 @@ export function V3ActualPronunciationCopy({
     <>
       <Button
         type="default"
-        icon={<SwapOutlined />}
+        icon={<ArrowLeftRightIcon />}
         aria-label="从字典音标填入实际发音"
         title="转换为实际发音"
         disabled={!pronunciation.dict_phonetic.trim()}
@@ -73,7 +74,7 @@ export function V3ActualPronunciationCopy({
         !hasAnnotations && (
           <Button
             type="default"
-            icon={<UndoOutlined />}
+            icon={<Undo2Icon />}
             aria-label="撤销实际发音填入"
             title="撤销转换"
             onClick={() => {

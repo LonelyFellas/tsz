@@ -1,4 +1,4 @@
-import { Spin, Typography } from "antd";
+import { Spin, Typography } from "@tsz/ui/admin/display";
 import { useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";

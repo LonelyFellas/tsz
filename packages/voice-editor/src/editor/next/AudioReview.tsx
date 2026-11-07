@@ -1,4 +1,5 @@
-import { Button, Checkbox, InputNumber, Select, Space, Typography } from "antd";
+import { Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Checkbox, InputNumber, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useRef, useState } from "react";
 import type { VoicePreviewResult } from "../../types";
 

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { App, ConfigProvider } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
 import { OpenCodeProviders } from "./OpenCodeProviders";
@@ -53,13 +53,11 @@ function mount(disabled = false) {
   });
   const invalidate = vi.spyOn(client, "invalidateQueries");
   render(
-    <ConfigProvider>
-      <App>
-        <QueryClientProvider client={client}>
-          <OpenCodeProviders adminId="super-test" disabled={disabled} />
-        </QueryClientProvider>
-      </App>
-    </ConfigProvider>
+    <App>
+      <QueryClientProvider client={client}>
+        <OpenCodeProviders adminId="super-test" disabled={disabled} />
+      </QueryClientProvider>
+    </App>
   );
   return invalidate;
 }

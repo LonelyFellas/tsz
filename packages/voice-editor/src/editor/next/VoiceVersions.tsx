@@ -3,15 +3,9 @@ import {
   speechLocaleMatchesScope,
   speechRegionLabel
 } from "@tsz/shared";
-import {
-  Button,
-  Input,
-  Popconfirm,
-  Select,
-  Space,
-  Tag,
-  Typography
-} from "antd";
+import { Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
+import { Input, Select } from "@tsz/ui/admin/forms";
+import { Popconfirm } from "@tsz/ui/admin/overlays";
 import { useState } from "react";
 import type { AudioAssetLocale, VoiceOption, VoiceSetting } from "../../types";
 import {

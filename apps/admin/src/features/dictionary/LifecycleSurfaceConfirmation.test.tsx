@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { describe, expect, it, vi } from "vitest";
 import type { SurfaceMatchItemV3, SurfaceMatchPageV3 } from "@tsz/types";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";

@@ -18,7 +18,7 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 import { useState } from "react";
-import { ConfigProvider } from "antd";
+
 import type { AudioUploadAdapter, VoiceSetting } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
@@ -1610,7 +1610,7 @@ it("grammar 富文本位于紧凑组背景上方，透明输入框覆盖长预�
     /\.v3-grammar-preview-content\s*\{[^}]*z-index:\s*5;/su
   );
   expect(fieldCss).toMatch(
-    /\.v3-grammar-preview\s*>\s*textarea\.ant-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
+    /\.v3-grammar-preview\s*>\s*textarea\.ui-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
   );
 });
 
@@ -2295,11 +2295,7 @@ it("业务保存以一次完整快照合并正文和参数，失败保留且连�
       </VoiceSaveContext.Provider>
     );
   }
-  render(
-    <ConfigProvider theme={{ token: { motion: false } }}>
-      <Host />
-    </ConfigProvider>
-  );
+  render(<Host />);
   fireEvent.click(screen.getByLabelText("打开原子正文编辑器"));
   await screen.findByRole("toolbar", { name: "标注工具栏" });
   await waitFor(() =>

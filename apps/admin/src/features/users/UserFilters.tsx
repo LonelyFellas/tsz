@@ -1,6 +1,7 @@
 // 用户管理搜索行：单一关键词（昵称 / 手机号 / 邮箱）+ 注册时间 + 搜索 / 重置。
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, Card, DatePicker, Form, Input, Space } from "antd";
+import { RotateCwIcon, SearchIcon } from "lucide-react";
+import { Button, Card, Space } from "@tsz/ui/admin/display";
+import { DatePicker, Form, Input } from "@tsz/ui/admin/forms";
 import type { UserFilterValues } from "./listQuery";
 
 interface Props {
@@ -32,11 +33,11 @@ export function UserFilters({ onSearch, onReset }: Props) {
         </Form.Item>
         <Form.Item className="admin-filter-actions">
           <Space>
-            <Button type="primary" icon={<SearchOutlined />} htmlType="submit">
+            <Button type="primary" icon={<SearchIcon />} htmlType="submit">
               搜索
             </Button>
             <Button
-              icon={<ReloadOutlined />}
+              icon={<RotateCwIcon />}
               onClick={() => {
                 form.resetFields();
                 onReset();

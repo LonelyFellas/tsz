@@ -8,10 +8,10 @@ import {
   Row,
   Space,
   Statistic,
-  Tooltip,
   Typography
-} from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+} from "@tsz/ui/admin/display";
+import { Tooltip } from "@tsz/ui/admin/overlays";
+import { RotateCwIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, useAuthStore } from "@/lib/auth";
 import {
@@ -45,7 +45,7 @@ function CostOverview({ adminId }: { adminId: string }) {
             type="text"
             size="small"
             aria-label="刷新模型费用"
-            icon={<ReloadOutlined />}
+            icon={<RotateCwIcon />}
             loading={result.isFetching}
             onClick={() => void result.refetch()}
           />

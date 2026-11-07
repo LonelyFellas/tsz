@@ -6,7 +6,8 @@ import { primaryRegionalVariant } from "@tsz/shared";
 // 候选按词形**等值**匹配检索（含从未发布的草稿，带「草稿」标记），词形层按管理员方言偏好只给一侧。
 // 数据按释义归属：读写 sense.component_usages（数组，每单词 0/1 条），随词义步保存；
 // 短语拼写只用于切词展示（unified 取 common、distinguish 取 uk，英美拼写不同时以英式为准）。
-import { Alert, Empty, Flex, Popover } from "antd";
+import { Alert, Empty, Flex } from "@tsz/ui/admin/display";
+import { Popover } from "@tsz/ui/admin/overlays";
 import type {
   DraftFormsStepContentV3,
   PhraseComponentUsageV3

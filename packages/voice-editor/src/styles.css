@@ -2,9 +2,9 @@
 @import "./fonts.css";
 
 .tsz-ve-field {
-  border: 1px solid var(--ant-color-border, #d9d9d9);
-  border-radius: var(--ant-border-radius, 6px);
-  background: var(--ant-color-bg-container, #fff);
+  border: 1px solid var(--ui-color-border, #d9d9d9);
+  border-radius: var(--ui-border-radius, 6px);
+  background: var(--ui-color-bg-container, #fff);
   padding: 8px 11px;
 }
 
@@ -20,7 +20,7 @@
 }
 
 .tsz-ve-readonly.is-invalid {
-  text-decoration: underline wavy var(--ant-color-error, #ff4d4f);
+  text-decoration: underline wavy var(--ui-color-error, #ff4d4f);
 }
 
 /* 语法结构三分类的配色单一来源：按钮与正文标记共用。 */
@@ -101,7 +101,7 @@
   min-width: 22px;
   height: 22px;
   padding: 0;
-  color: var(--tsz-ve-pop-accent, var(--ant-color-text-secondary, #8c8c8c));
+  color: var(--tsz-ve-pop-accent, var(--ui-color-text-secondary, #8c8c8c));
 }
 
 .tsz-ve-audition-button:not(:disabled):hover {
@@ -126,9 +126,9 @@
  */
 .tsz-ve-canvas {
   position: relative;
-  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border: 1px solid var(--ui-color-border, #d9d9d9);
   border-radius: 10px;
-  background: var(--ant-color-bg-layout, #fafafa);
+  background: var(--ui-color-bg-layout, #fafafa);
 }
 
 .tsz-ve-strip,
@@ -199,13 +199,13 @@
   outline: none;
   background: transparent;
   color: transparent;
-  caret-color: var(--ant-color-text, #1a1a1a);
+  caret-color: var(--ui-color-text, #1a1a1a);
   overflow: hidden;
   resize: none;
 }
 
 .tsz-ve-canvas-input::placeholder {
-  color: var(--ant-color-text-quaternary, #bfbfbf);
+  color: var(--ui-color-text-quaternary, #bfbfbf);
   font-weight: 400;
 }
 
@@ -616,9 +616,9 @@
 
 .tsz-ve-upload-tag {
   padding: 0 7px;
-  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border: 1px solid var(--ui-color-border, #d9d9d9);
   border-radius: 999px;
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary, #8c8c8c);
   font-size: 11px;
   line-height: 18px;
   white-space: nowrap;
@@ -637,7 +637,7 @@
 
 /* 还在路上的那几条：名字压淡，进度条 / 失败原因占第三列。 */
 .tsz-ve-upload-item.is-pending .tsz-ve-upload-name {
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary, #8c8c8c);
 }
 
 .tsz-ve-upload-progress {
@@ -646,7 +646,7 @@
 }
 
 .tsz-ve-upload-error {
-  color: var(--ant-color-error, #ff4d4f);
+  color: var(--ui-color-error, #ff4d4f);
   font-size: 12px;
   line-height: 1.3;
 }
@@ -661,12 +661,12 @@
  * 避免一列红字比文件名本身还抢眼。
  */
 .tsz-ve-upload-remove.tsz-ve-upload-remove {
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary, #8c8c8c);
 }
 
 .tsz-ve-upload-remove.tsz-ve-upload-remove:not(:disabled):hover,
 .tsz-ve-upload-remove.tsz-ve-upload-remove:not(:disabled):focus-visible {
-  color: var(--ant-color-error, #ff4d4f);
+  color: var(--ui-color-error, #ff4d4f);
 }
 
 /* ── 标注器：工具栏 + 编辑区连成一体（富文本头部的形态） ──────────── */
@@ -683,16 +683,16 @@
   gap: 4px;
   align-items: center;
   padding: 6px 8px;
-  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border: 1px solid var(--ui-color-border, #d9d9d9);
   border-radius: 10px 10px 0 0;
-  background: var(--ant-color-bg-container, #fff);
+  background: var(--ui-color-bg-container, #fff);
 }
 
 /*
  * 文字按钮收一点左右内边距。antd 的按钮样式是运行时注入的，特异性要够才压得住，
  * 所以类名写两遍。
  */
-.tsz-ve-toolbar .ant-btn.ant-btn {
+.tsz-ve-toolbar .ui-btn.ui-btn {
   padding-inline: 6px;
 }
 
@@ -700,7 +700,7 @@
   width: 1px;
   align-self: stretch;
   margin: 2px 1px;
-  background: var(--ant-color-border, #d9d9d9);
+  background: var(--ui-color-border, #d9d9d9);
 }
 
 /* 与工具栏共用一条边：视觉上是同一个控件，而不是上下两块。 */
@@ -726,8 +726,8 @@
     display: none;
   }
 
-  .tsz-ve-toolbar .tsz-ve-icon-tool.ant-btn,
-  .tsz-ve-toolbar .tsz-ve-icon-button.ant-btn {
+  .tsz-ve-toolbar .tsz-ve-icon-tool.ui-btn,
+  .tsz-ve-toolbar .tsz-ve-icon-button.ui-btn {
     width: 24px;
     min-width: 24px;
     padding-inline: 0;
@@ -766,8 +766,8 @@
   margin-left: 2px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--ant-color-fill-tertiary, #f0f0f0);
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  background: var(--ui-color-fill-tertiary, #f0f0f0);
+  color: var(--ui-color-text-secondary, #8c8c8c);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   line-height: 16px;
@@ -780,7 +780,7 @@
 
 /*
  * 面板宽度定在自己的容器上，不去改 antd 的内部类名：v6 里
- * .ant-popover-inner-content 根本不存在，按那个类名写会静默失效。
+ * .ui-popover-inner-content 根本不存在，按那个类名写会静默失效。
  */
 .tsz-ve-pop {
   display: flex;
@@ -799,7 +799,7 @@
 .tsz-ve-more-voices > summary {
   cursor: pointer;
   padding: 10px 6px;
-  color: var(--ant-color-primary, #0071e3);
+  color: var(--ui-color-primary, #0071e3);
   border-top: 1px solid #eaecf0;
   margin-top: 8px;
 }
@@ -831,7 +831,7 @@
 /* 语种用一行小标题带色，而不是浮在卡角外的徽标——浮层里那种徽标必被切边。 */
 .tsz-ve-pop-section-head {
   padding: 2px 8px 4px;
-  color: var(--tsz-ve-pop-accent, var(--ant-color-text-secondary, #8c8c8c));
+  color: var(--tsz-ve-pop-accent, var(--ui-color-text-secondary, #8c8c8c));
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -853,7 +853,7 @@
 }
 
 .tsz-ve-pop-row:hover {
-  background: var(--ant-color-fill-quaternary, #f5f5f5);
+  background: var(--ui-color-fill-quaternary, #f5f5f5);
 }
 
 .tsz-ve-pop-hit {
@@ -901,7 +901,7 @@
 
 .tsz-ve-pop-voices .tsz-ve-pop-check {
   height: 14px;
-  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border: 1px solid var(--ui-color-border, #d9d9d9);
   border-radius: 3px;
   visibility: visible;
 }
@@ -909,7 +909,7 @@
 .tsz-ve-pop-voices
   .tsz-ve-pop-hit[aria-checked="false"]
   .tsz-ve-pop-check
-  .anticon {
+  .lucide {
   visibility: hidden;
 }
 
@@ -931,14 +931,14 @@
 
 .tsz-ve-pop-meta {
   flex: none;
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary, #8c8c8c);
   font-size: 12px;
 }
 
 .tsz-ve-pop-divider {
   height: 1px;
   margin: 4px 0;
-  background: var(--ant-color-split, #f0f0f0);
+  background: var(--ui-color-split, #f0f0f0);
 }
 
 .tsz-ve-pop-foot,
@@ -958,12 +958,12 @@
 .tsz-ve-pop-loading,
 .tsz-ve-pop-status {
   padding: 6px 8px;
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary, #8c8c8c);
   font-size: 12px;
 }
 
 .tsz-ve-pop-status {
-  border-top: 1px solid var(--ant-color-split, #f0f0f0);
+  border-top: 1px solid var(--ui-color-split, #f0f0f0);
   margin-top: 4px;
 }
 
@@ -975,10 +975,10 @@
 
 .tsz-ve-role-inline {
   padding: 8px 12px;
-  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border: 1px solid var(--ui-color-border, #d9d9d9);
   border-top: 0;
   border-radius: 0 0 10px 10px;
-  background: var(--ant-color-bg-layout, #fafafa);
+  background: var(--ui-color-bg-layout, #fafafa);
 }
 
 .tsz-ve-grammar-panel,
@@ -987,7 +987,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  color: var(--ant-color-text-secondary, #666);
+  color: var(--ui-color-text-secondary, #666);
   font-size: 12px;
 }
 
@@ -1011,7 +1011,7 @@
   text-overflow: ellipsis;
   vertical-align: bottom;
   white-space: nowrap;
-  color: var(--ant-color-text, #262626);
+  color: var(--ui-color-text, #262626);
 }
 
 .tsz-ve-grammar-option .tsz-ve-pop-swatch {
@@ -1023,7 +1023,7 @@
 .tsz-ve-grammar-option:hover:not(:disabled),
 .tsz-ve-grammar-option[aria-pressed="true"] {
   border-color: var(--tsz-ve-role-core);
-  background: var(--ant-color-primary-bg, #f0f5ff);
+  background: var(--ui-color-primary-bg, #f0f5ff);
 }
 
 .tsz-ve-grammar-option:focus-visible {
@@ -1056,7 +1056,7 @@
 
 .tsz-ve-pop-hint {
   padding: 2px 6px 4px;
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary, #8c8c8c);
   font-size: 12px;
 }
 
@@ -1117,13 +1117,13 @@
   margin-left: 2px;
   padding: 0;
   background: transparent;
-  color: var(--ant-color-text-tertiary, #8c8c8c);
+  color: var(--ui-color-text-tertiary, #8c8c8c);
   font-weight: 400;
 }
 
 .tsz-ve-speech-tool[aria-expanded="true"] .tsz-ve-tool-summary {
   background: transparent;
-  color: var(--ant-color-primary, #0071e3);
+  color: var(--ui-color-primary, #0071e3);
 }
 
 .tsz-ve-speech-tool::after {
@@ -1152,7 +1152,7 @@
   min-width: 0;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-top: 1px solid var(--ui-color-border-secondary, #f0f0f0);
 }
 
 .tsz-ve-reference-audio > input[type="file"][hidden] {
@@ -1168,7 +1168,7 @@
 }
 
 .tsz-ve-wave-baseline {
-  stroke: var(--ant-color-border, #d9d9d9);
+  stroke: var(--ui-color-border, #d9d9d9);
   stroke-width: 1;
 }
 .tsz-ve-wave-samples {
@@ -1181,17 +1181,17 @@
   opacity: 0.1;
 }
 .tsz-ve-wave-cursor {
-  stroke: var(--ant-color-text, #141414);
+  stroke: var(--ui-color-text, #141414);
   stroke-width: 1;
 }
 .tsz-ve-wave-scale {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  color: var(--ant-color-text-secondary, #666);
+  color: var(--ui-color-text-secondary, #666);
   font-size: 12px;
 }
-.tsz-ve-audio-review .ant-input-number {
+.tsz-ve-audio-review .ui-input-number {
   width: 100px;
 }
 
@@ -1204,6 +1204,12 @@
 .tsz-ve-editor[data-mode="voice-trial"]
   .tsz-ve-letter.is-speech-mark
   .tsz-ve-letter-text {
-  text-decoration: underline dotted var(--ant-color-primary, #2053ff);
+  text-decoration: underline dotted var(--ui-color-primary, #2053ff);
   text-underline-offset: 3px;
+}
+
+.tsz-ve-editor .lucide {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
 }

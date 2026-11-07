@@ -1,4 +1,4 @@
-import { Table, type TableProps, type TableRef } from "antd";
+import { Table, type TableProps, type TableRef } from "@tsz/ui/admin/table";
 import {
   Children,
   isValidElement,
@@ -106,11 +106,11 @@ function ConfiguredTable<T extends object>({
     .join("|");
   useLayoutEffect(() => {
     const root = tableRef.current?.nativeElement;
-    const header = root?.querySelector(".ant-table-thead > tr");
+    const header = root?.querySelector(".ui-table-thead > tr");
     if (!root || !header) return;
     const measure = () => {
       const fixedWidth = [...header.children]
-        .filter((cell) => cell.classList.contains("ant-table-cell-fix"))
+        .filter((cell) => cell.classList.contains("ui-table-cell-fix"))
         .reduce((width, cell) => width + cell.getBoundingClientRect().width, 0);
       const overflow = root.clientWidth > 0 && fixedWidth > root.clientWidth;
       setFixedOverflow(overflow);

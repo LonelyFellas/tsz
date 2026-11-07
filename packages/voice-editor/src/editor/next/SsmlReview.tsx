@@ -1,4 +1,5 @@
-import { Button, Input, Select, Space, Switch, Typography } from "antd";
+import { Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Input, Select, Switch } from "@tsz/ui/admin/forms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RichTextV2 } from "@tsz/types";
 import type {

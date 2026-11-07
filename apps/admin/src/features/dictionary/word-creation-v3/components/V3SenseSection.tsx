@@ -1,5 +1,5 @@
-import { CaretDownFilled, CaretUpFilled } from "@ant-design/icons";
-import { Button, Tag, Typography } from "antd";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { Button, Tag, Typography } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 
 export function SenseSectionTitle({
@@ -39,7 +39,7 @@ export function SenseSectionTitle({
         <Button
           aria-label={`${collapsed ? "展开" : "收起"}${label}`}
           className="word-sense-section-collapse"
-          icon={collapsed ? <CaretDownFilled /> : <CaretUpFilled />}
+          icon={collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
           iconPlacement="end"
           onClick={(event) => {
             event.stopPropagation();

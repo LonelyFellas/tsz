@@ -2,25 +2,19 @@ import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 角色权限管理（super_admin 专属）：角色列表 + 建 / 改 / 删角色 + 派角色。全对接真实接口。
 // 系统角色（is_system「全功能管理员」）在 UI 上置灰不可编辑 / 删除，后端 403 只是兜底。
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  UsergroupAddOutlined
-} from "@ant-design/icons";
+import { PlusIcon, RotateCwIcon, UserRoundPlusIcon } from "lucide-react";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
   Flex,
-  Modal,
   Space,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
-import type { TableColumnsType } from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { type TableColumnsType } from "@tsz/ui/admin/table";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import type { AdminRole, PermissionKey } from "@tsz/types";
@@ -239,15 +233,11 @@ export function RoleManagement() {
         <Table<AdminRole>
           toolbar={
             <Space wrap>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={openCreate}
-              >
+              <Button type="primary" icon={<PlusIcon />} onClick={openCreate}>
                 新建角色
               </Button>
               <Button
-                icon={<UsergroupAddOutlined />}
+                icon={<UserRoundPlusIcon />}
                 onClick={() => setAssignOpen(true)}
               >
                 指派角色
@@ -256,7 +246,7 @@ export function RoleManagement() {
           }
           toolbarExtra={
             <Button
-              icon={<ReloadOutlined />}
+              icon={<RotateCwIcon />}
               onClick={() => void listQuery.refetch()}
             >
               刷新

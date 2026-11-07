@@ -1,6 +1,6 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
-import { ReloadOutlined } from "@ant-design/icons";
+import { RotateCwIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CertificationFile,
@@ -9,25 +9,21 @@ import type {
 } from "@tsz/types";
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Card,
   Descriptions,
-  Drawer,
   Empty,
   Flex,
-  Form,
   Image,
-  Input,
-  Modal,
   Result,
-  Select,
   Space,
   Spin,
   Tag,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { App, Drawer, Modal } from "@tsz/ui/admin/overlays";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useState } from "react";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { RevokeTeacherButton } from "./RevokeTeacherButton";
@@ -206,7 +202,7 @@ function ApplicationQueue() {
               </Form.Item>
               <Form.Item className="admin-filter-actions">
                 <Button
-                  icon={<ReloadOutlined />}
+                  icon={<RotateCwIcon />}
                   onClick={() => void list.refetch()}
                 >
                   刷新

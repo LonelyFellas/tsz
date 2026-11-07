@@ -1,5 +1,6 @@
 import { primaryRegionalVariant } from "@tsz/shared";
-import { Alert, Button, Flex, Popconfirm } from "antd";
+import { Alert, Button, Flex } from "@tsz/ui/admin/display";
+import { Popconfirm } from "@tsz/ui/admin/overlays";
 import type {
   AdminWordV3,
   PartOfSpeechCatalogItem,

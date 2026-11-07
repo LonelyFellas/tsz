@@ -1,4 +1,4 @@
-import { Button, Result } from "antd";
+import { Button, Result } from "@tsz/ui/admin/display";
 import { useNavigate } from "react-router-dom";
 import { PartOfSpeechSettings } from "@/features/dictionary/part-of-speech/PartOfSpeechSettings";
 import { usePermission } from "@/lib/auth";

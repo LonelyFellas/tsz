@@ -1,6 +1,6 @@
-import { CrownOutlined, UserOutlined } from "@ant-design/icons";
-import type { AvatarProps } from "antd";
-import { Avatar } from "antd";
+import { CrownIcon, UserIcon } from "lucide-react";
+import { type AvatarProps, Avatar } from "@tsz/ui/admin/display";
+
 import type { AdminLevel } from "@tsz/types";
 import type { ReactNode } from "react";
 
@@ -12,8 +12,8 @@ interface AdminAvatarStyle {
 }
 
 const AVATAR_BY_LEVEL: Record<AdminLevel, AdminAvatarStyle> = {
-  super_admin: { icon: <CrownOutlined />, background: "#faad14" },
-  admin: { icon: <UserOutlined />, background: "#2053FF" }
+  super_admin: { icon: <CrownIcon />, background: "#faad14" },
+  admin: { icon: <UserIcon />, background: "#2053FF" }
 };
 
 /**

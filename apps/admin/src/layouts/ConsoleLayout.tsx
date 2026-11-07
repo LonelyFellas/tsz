@@ -1,7 +1,7 @@
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { DictionaryPartOfSpeechLabels } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
-import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
-import { Button, Drawer, Layout, Tooltip } from "antd";
+import { XIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AdminHeader } from "@/features/auth/AdminHeader";
@@ -11,7 +11,7 @@ import { useAuthStore } from "@/lib/auth";
 import { AdminRouteGuard } from "@/features/auth/AdminRouteGuard";
 import { ConsoleSidebar } from "@/features/console/ConsoleSidebar";
 
-const { Header, Sider, Content } = Layout;
+import "./console-shell.css";
 
 // 普通后台沿用 antd 的 md/lg 三档。创建向导的完整导航阈值按可用内容宽度计算：
 // 1200 内容区 + 220 完整导航 + 24 * 2 Content 边距 = 1468。
@@ -66,7 +66,7 @@ function useLayoutMode(isWordCreationWorkspace: boolean): LayoutMode {
   return mode;
 }
 
-// 受保护的后台壳：门禁守卫 + antd Layout（侧栏 Sider + 顶栏 Header），子路由渲染在 <Outlet/>。
+// 全局导航与业务路由共享同一个受保护外壳。
 // Sider 固定不滚动，仅内容区随主体滚动；整壳撑满视口高度。仅登录的 admin 可见。
 export function ConsoleLayout() {
   const identity = useAuthStore((s) => adminAccountIdentity(s.profile));
@@ -83,7 +83,7 @@ export function ConsoleLayout() {
   // 进入手机档不再关心 collapsed，离开手机档则关掉抽屉遮罩。
   useEffect(() => {
     if (!isDrawer) setCollapsed(mode === "rail");
-    else setDrawerOpen(false);
+    setDrawerOpen(false);
   }, [mode, isDrawer]);
 
   const toggleLabel = isDrawer
@@ -94,94 +94,79 @@ export function ConsoleLayout() {
       ? "展开侧栏"
       : "收起侧栏";
   const toggleIcon = (isDrawer ? drawerOpen : !collapsed) ? (
-    <MenuFoldOutlined />
+    <PanelLeftCloseIcon />
   ) : (
-    <MenuUnfoldOutlined />
+    <PanelLeftOpenIcon />
   );
-  const onToggle = () =>
-    isDrawer ? setDrawerOpen((v) => !v) : setCollapsed((v) => !v);
+  const toggle = (
+    <button
+      type="button"
+      className="console-nav-button"
+      title={toggleLabel}
+      aria-label={toggleLabel}
+      aria-expanded={isDrawer ? drawerOpen : !collapsed}
+      onClick={isDrawer ? undefined : () => setCollapsed((value) => !value)}
+    >
+      {toggleIcon}
+    </button>
+  );
 
   return (
     <AdminRouteGuard>
-      <Layout style={{ minHeight: "100vh" }}>
-        {/* 非手机档：in-flow 侧栏（展开/图标轨）。手机档不渲染，内容占满整宽。 */}
-        {!isDrawer && (
-          <Sider
-            width={220}
-            collapsedWidth={72}
-            collapsed={collapsed}
-            trigger={null}
-            theme="light"
-            style={{
-              borderInlineEnd: "1px solid #f0f0f0",
-              position: "sticky",
-              top: 0,
-              height: "100vh",
-              overflow: "auto"
-            }}
-          >
-            <ConsoleSidebar collapsed={collapsed} />
-          </Sider>
-        )}
-
-        {/* 手机档：抽屉侧栏，覆盖式展开/收起。 */}
-        <Drawer
-          placement="left"
-          open={isDrawer && drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          size={220}
-          closable={false}
-          styles={{ body: { padding: 0 } }}
-          rootClassName="console-mobile-drawer"
-        >
-          <ConsoleSidebar
-            collapsed={false}
-            onNavigate={() => setDrawerOpen(false)}
-          />
-        </Drawer>
-
-        <Layout>
-          <Header
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: "#fff",
-              padding: "0 24px 0 8px",
-              borderBottom: "1px solid #f0f0f0",
-              position: "sticky",
-              top: 0,
-              zIndex: CONSOLE_HEADER_Z_INDEX
-            }}
-          >
-            <Tooltip title={toggleLabel} placement="right">
-              <Button
-                type="text"
-                aria-label={toggleLabel}
-                icon={toggleIcon}
-                onClick={onToggle}
-                style={{ width: 40, height: 40, fontSize: 18 }}
-              />
-            </Tooltip>
-            <div style={{ flex: 1 }}>
-              <AdminHeader />
-            </div>
-          </Header>
-          <Content style={{ padding: isDrawer ? 16 : 24 }}>
-            <BusinessPermissionGuard key={identity}>
-              {pathname.startsWith("/words") ? (
-                <DictionaryFormTypeLabels>
-                  <DictionaryPartOfSpeechLabels>
-                    <Outlet />
-                  </DictionaryPartOfSpeechLabels>
-                </DictionaryFormTypeLabels>
+      <Dialog.Root open={isDrawer && drawerOpen} onOpenChange={setDrawerOpen}>
+        <div className="console-shell">
+          {!isDrawer && (
+            <aside className="console-sidebar" data-collapsed={collapsed}>
+              <ConsoleSidebar collapsed={collapsed} />
+            </aside>
+          )}
+          <div className="console-workspace">
+            <header
+              className="console-topbar"
+              style={{ zIndex: CONSOLE_HEADER_Z_INDEX }}
+            >
+              {isDrawer ? (
+                <Dialog.Trigger asChild>{toggle}</Dialog.Trigger>
               ) : (
-                <Outlet />
+                toggle
               )}
-            </BusinessPermissionGuard>
-          </Content>
-        </Layout>
-      </Layout>
+              <AdminHeader />
+            </header>
+            <main className="console-content">
+              <BusinessPermissionGuard key={identity}>
+                {pathname.startsWith("/words") ? (
+                  <DictionaryFormTypeLabels>
+                    <DictionaryPartOfSpeechLabels>
+                      <Outlet />
+                    </DictionaryPartOfSpeechLabels>
+                  </DictionaryFormTypeLabels>
+                ) : (
+                  <Outlet />
+                )}
+              </BusinessPermissionGuard>
+            </main>
+          </div>
+        </div>
+        <Dialog.Portal>
+          <Dialog.Overlay className="console-nav-backdrop" />
+          <Dialog.Content
+            className="console-nav-sheet"
+            aria-describedby={undefined}
+          >
+            <Dialog.Title className="sr-only">后台导航</Dialog.Title>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                className="console-nav-button console-nav-close"
+                aria-label="关闭菜单"
+              >
+                <XIcon />
+              </button>
+            </Dialog.Close>
+            <ConsoleSidebar onNavigate={() => setDrawerOpen(false)} />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </AdminRouteGuard>
   );
 }

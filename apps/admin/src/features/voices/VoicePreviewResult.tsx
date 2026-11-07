@@ -1,5 +1,12 @@
-import { SoundOutlined } from "@ant-design/icons";
-import { Alert, Button, Flex, Space, Tag, Typography } from "antd";
+import { Volume2Icon } from "lucide-react";
+import {
+  Alert,
+  Button,
+  Flex,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import { useLayoutEffect, useState, type RefObject } from "react";
 import type {
   AdminSpeechPreviewResponse,
@@ -44,7 +51,7 @@ export function VoicePreviewResult({
     <div className="voice-library-preview" aria-live="polite">
       {pending && (
         <Space>
-          <SoundOutlined />
+          <Volume2Icon />
           <Typography.Text type="secondary">正在生成试听…</Typography.Text>
           <Button type="link" size="small" onClick={onCancel}>
             取消
@@ -54,7 +61,7 @@ export function VoicePreviewResult({
       {error && <Alert type="error" showIcon title={error} />}
       {!pending && !error && !preview && (
         <div className="voice-library-preview-empty">
-          <SoundOutlined />
+          <Volume2Icon />
           <Typography.Text type="secondary">暂无试听音频</Typography.Text>
         </div>
       )}

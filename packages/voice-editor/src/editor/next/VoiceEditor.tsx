@@ -1,26 +1,18 @@
 import { speechAccentGroup } from "@tsz/shared";
 import "./interaction.css";
 import {
-  AudioOutlined,
-  BoldOutlined,
-  UnderlineOutlined,
-  EditOutlined,
-  ItalicOutlined,
-  LinkOutlined,
-  PauseOutlined,
-  SoundOutlined
-} from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Tag,
-  Tooltip,
-  Typography
-} from "antd";
+  MicIcon,
+  BoldIcon,
+  UnderlineIcon,
+  PencilIcon,
+  ItalicIcon,
+  LinkIcon,
+  PauseIcon,
+  Volume2Icon
+} from "lucide-react";
+import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
+import { Input, Select } from "@tsz/ui/admin/forms";
+import { Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GrammarFormLinkV3,
@@ -2679,7 +2671,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           {
             key: "reading-link",
             label: "关联单词读法",
-            icon: <LinkOutlined aria-hidden />,
+            icon: <LinkIcon aria-hidden />,
             disabled:
               readOnly ||
               !readingSegment ||
@@ -2738,7 +2730,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     {
       key: "reading",
       label: "特殊读法",
-      icon: <SoundOutlined aria-hidden />,
+      icon: <Volume2Icon aria-hidden />,
       disabled:
         readOnly ||
         !textSelection ||
@@ -2907,7 +2899,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           : "文本",
 
       ariaLabel: contentReadOnly ? "结束关联" : "编辑文本",
-      icon: <EditOutlined />,
+      icon: <PencilIcon />,
       active: brush.kind === "none",
       className: "tsz-ve-text-button"
     },
@@ -2918,7 +2910,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           {
             key: "italic",
             label: "斜体",
-            icon: <ItalicOutlined />,
+            icon: <ItalicIcon />,
             active: selectionHasFormat("italic"),
             disabled: !textSelection
           }
@@ -2929,14 +2921,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           {
             key: "bold",
             label: "加粗",
-            icon: <BoldOutlined />,
+            icon: <BoldIcon />,
             active: selectionHasFormat("bold"),
             disabled: !textSelection
           },
           {
             key: "underline",
             label: "下划线",
-            icon: <UnderlineOutlined />,
+            icon: <UnderlineIcon />,
             active: selectionHasFormat("underline"),
             disabled: !textSelection
           }
@@ -3052,7 +3044,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     {
       key: "pause",
       label: "停顿",
-      icon: <PauseOutlined />,
+      icon: <PauseIcon />,
       summary:
         brush.kind === "pause" ? formatPauseLabel(pauseDuration) : undefined,
       className: "tsz-ve-pause-button",
@@ -3102,7 +3094,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       className: "tsz-ve-speech-tool",
       // 「已选」两字在窄容器里就是一行的代价，去掉后语义不减。
       summary: `${enabledVoiceIds.length} 个音色`,
-      icon: <SoundOutlined />,
+      icon: <Volume2Icon />,
       content: (
         <div className="tsz-ve-speech-panel" aria-label="发音设置与试听">
           <div>
@@ -3326,7 +3318,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       label: mode === "grammar" ? "上传音频" : "音频",
       ariaLabel: "音频",
       summary: assets.length > 0 ? String(assets.length) : undefined,
-      icon: <AudioOutlined />,
+      icon: <MicIcon />,
       content: (
         <>
           <UploadPanel
@@ -3863,7 +3855,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                           disabled: linksReadOnly,
                           label:
                             targetKind === "word" ? "关联单词" : "关联短语",
-                          icon: <LinkOutlined />,
+                          icon: <LinkIcon />,
                           active:
                             brush.kind === "association" &&
                             brush.targetKind === targetKind,

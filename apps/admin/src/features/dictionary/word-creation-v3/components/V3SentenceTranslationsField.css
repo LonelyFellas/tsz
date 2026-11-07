@@ -21,7 +21,7 @@
   height: 40px;
   padding: 0 2px;
   font-size: 12px;
-  color: var(--ant-color-text-secondary);
+  color: var(--ui-color-text-secondary);
 }
 
 .word-sentence-translation-groups {
@@ -47,7 +47,7 @@
 }
 
 .word-sentence-translation-tier-hint {
-  color: var(--ant-color-text-secondary, #595959);
+  color: var(--ui-color-text-secondary, #595959);
   font-size: 12px;
 }
 
@@ -66,11 +66,11 @@
 }
 
 .word-sentence-translation-delete:not(:disabled) {
-  color: var(--ant-color-text-tertiary, #8c8c8c);
+  color: var(--ui-color-text-tertiary, #8c8c8c);
 }
 
 .word-sentence-translation-delete:not(:disabled):hover {
-  color: var(--ant-color-error, #ff4d4f);
+  color: var(--ui-color-error, #ff4d4f);
 }
 
 .word-sentence-translation-add {

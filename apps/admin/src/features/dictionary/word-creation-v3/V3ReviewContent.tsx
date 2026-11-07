@@ -16,8 +16,16 @@ import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
-import { ReadOutlined, SoundOutlined } from "@ant-design/icons";
-import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
+import { BookOpenIcon, Volume2Icon } from "lucide-react";
+import {
+  Button,
+  Card,
+  Collapse,
+  Empty,
+  Flex,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import type {
   AdminWordV3,
   Dialect,
@@ -151,7 +159,7 @@ function FormsReview({
           position: "sticky",
           [column.fixed]:
             (column.fixed === "left" ? index : pinned.length - index - 1) * 240,
-          background: "var(--ant-color-bg-container, #fff)",
+          background: "var(--ui-color-bg-container, #fff)",
           zIndex: 1
         })
     };
@@ -442,6 +450,12 @@ export function V3ReviewContent({
 
   return (
     <section className="v3-review" aria-label="预览并生效">
+      <header className="word-step-heading">
+        <span className="word-step-number">STEP 04</span>
+        <Typography.Title level={2} style={{ margin: 0 }}>
+          发布前预览
+        </Typography.Title>
+      </header>
       <Card className="v3-review-header">
         <Flex align="flex-start" justify="space-between" gap="large" wrap>
           <div>
@@ -530,7 +544,7 @@ export function V3ReviewContent({
                   key: "forms",
                   label: (
                     <Flex align="center" gap="small">
-                      <SoundOutlined />
+                      <Volume2Icon />
                       词形与发音
                     </Flex>
                   ),
@@ -554,7 +568,7 @@ export function V3ReviewContent({
                   key: "meanings",
                   label: (
                     <Flex align="center" gap="small">
-                      <ReadOutlined />
+                      <BookOpenIcon />
                       词义结构
                     </Flex>
                   ),

@@ -1,7 +1,8 @@
 import { speechAccentGroup } from "@tsz/shared";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminSpeechVoice, AdminVoiceParameters } from "@tsz/types";
-import { Alert, Button, Form, Select, Space } from "antd";
+import { Alert, Button, Space } from "@tsz/ui/admin/display";
+import { Form, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useState } from "react";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { useDubbingDrafts } from "./DubbingDrafts";

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App } from "antd";
+import { App } from "@tsz/ui/admin/overlays";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TeacherApplicationsPage } from "./TeacherApplications";

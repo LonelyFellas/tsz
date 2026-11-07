@@ -1,30 +1,21 @@
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useRef, useState } from "react";
-import {
-  DeleteOutlined,
-  ReloadOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+import { Trash2Icon, RotateCwIcon, SearchIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Breadcrumb,
   Button,
   Card,
-  DatePicker,
   Flex,
-  Form,
-  Input,
-  Modal,
   Result,
-  Select,
   Space,
-  Switch,
   Tag,
-  Tooltip,
   Typography
-} from "antd";
+} from "@tsz/ui/admin/display";
+import { DatePicker, Form, Input, Select, Switch } from "@tsz/ui/admin/forms";
+import { Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import type { Dayjs } from "dayjs";
 import type {
   AdminWordlist,
@@ -225,15 +216,11 @@ function Management({ adminId }: { adminId: string }) {
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Space>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                htmlType="submit"
-              >
+              <Button type="primary" icon={<SearchIcon />} htmlType="submit">
                 搜索
               </Button>
               <Button
-                icon={<ReloadOutlined />}
+                icon={<RotateCwIcon />}
                 onClick={() => {
                   form.resetFields();
                   setQuery({ page: 1, page_size: 20 });
@@ -441,7 +428,7 @@ function Management({ adminId }: { adminId: string }) {
                       <Button
                         type="link"
                         size="small"
-                        icon={<DeleteOutlined />}
+                        icon={<Trash2Icon />}
                         aria-label={`删除${row.wordlist.name}`}
                         danger
                         disabled={!canDelete || !!busy}

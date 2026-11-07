@@ -28,7 +28,7 @@ describe("package boundaries", () => {
       )) {
         const target = match[2]!;
         expect(target).not.toMatch(
-          /^(?:@mui\/|@emotion\/|antd(?:\/|$)|react-hook-form)/
+          /^(?:@mui\/|@emotion\/|antd(?:\/|$)|@ant-design\/|@tsz\/ui\/admin\/|@rc-component\/|react-hook-form)/
         );
         if (!target.startsWith(".")) continue;
         const base = new URL(
@@ -48,7 +48,7 @@ describe("package boundaries", () => {
     };
     visit("./reader/index.ts");
     expect(visited.size).toBeGreaterThan(1);
-    expect(readerStyles).not.toMatch(/\.Mui|--ant-/);
+    expect(readerStyles).not.toMatch(/\.Mui|--(?:ant|ui)-/);
   });
 
   it("does not import app, request, routing, query, auth, or business DTO layers", () => {

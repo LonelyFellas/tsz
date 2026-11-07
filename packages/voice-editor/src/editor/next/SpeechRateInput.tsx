@@ -1,12 +1,11 @@
-import { DownOutlined } from "@ant-design/icons";
+import { ChevronDownIcon } from "lucide-react";
+import { Button, Space } from "@tsz/ui/admin/display";
+import { Dropdown } from "@tsz/ui/admin/overlays";
 import {
-  Button,
-  Dropdown,
   InputNumber,
   Select,
-  Space,
   type InputNumberProps
-} from "antd";
+} from "@tsz/ui/admin/forms";
 
 const presets = [
   -70,
@@ -73,7 +72,7 @@ export function SpeechRateInput({
         >
           <Button
             aria-label="语速常用值"
-            icon={<DownOutlined />}
+            icon={<ChevronDownIcon />}
             disabled={props.disabled || min === max}
           />
         </Dropdown>

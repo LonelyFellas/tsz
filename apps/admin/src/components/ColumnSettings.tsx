@@ -1,9 +1,7 @@
-import {
-  CheckOutlined,
-  HolderOutlined,
-  SettingOutlined
-} from "@ant-design/icons";
-import { Button, Checkbox, Popover, Segmented, Typography } from "antd";
+import { CheckIcon, GripVerticalIcon, SettingsIcon } from "lucide-react";
+import { Button, Typography } from "@tsz/ui/admin/display";
+import { Checkbox, Segmented } from "@tsz/ui/admin/forms";
+import { Popover } from "@tsz/ui/admin/overlays";
 import {
   useId,
   useLayoutEffect,
@@ -209,7 +207,7 @@ export function ColumnSettings({
                             size="small"
                             type="text"
                             className="admin-column-drag-handle"
-                            icon={<HolderOutlined />}
+                            icon={<GripVerticalIcon />}
                             aria-label={`拖动${column.label}排序`}
                             title="拖动排序，也可使用上下方向键"
                             disabled={!canReorder}
@@ -299,7 +297,7 @@ export function ColumnSettings({
             <div className="admin-column-settings-footer">
               <span>组内拖动排序</span>
               <span>
-                <CheckOutlined aria-hidden="true" /> 仅当前浏览器自动保存
+                <CheckIcon aria-hidden="true" /> 仅当前浏览器自动保存
               </span>
             </div>
           </section>
@@ -310,7 +308,7 @@ export function ColumnSettings({
         ) : (
           <Button
             size={buttonSize}
-            icon={<SettingOutlined />}
+            icon={<SettingsIcon />}
             aria-expanded={open}
           >
             列设置

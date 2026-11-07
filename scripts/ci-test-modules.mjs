@@ -228,7 +228,7 @@ export function buildModuleVitestArgs(
     module.projects.includes("admin") ? ["--maxWorkers=1"] : []
   );
   return [
-    // antd 大表单并行会争抢 CPU；两种模式保持相同分片、用例、超时与 worker 数。
+    // 后台大表单并行会争抢 CPU；两种模式保持相同分片、用例、超时与 worker 数。
     ...runnerArgs.filter((argument) => coverage || argument !== "--coverage"),
     "--config=vitest.ci-shard.config.ts",
     "--reporter=default",

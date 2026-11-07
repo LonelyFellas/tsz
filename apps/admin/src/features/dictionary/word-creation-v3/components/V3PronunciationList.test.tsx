@@ -1,4 +1,4 @@
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
@@ -88,11 +88,7 @@ const renderWithUps = (
   options?: Parameters<typeof rtlRender>[1]
 ) => {
   const view = rtlRender(ui, {
-    wrapper: ({ children }) => (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <AntApp>{children}</AntApp>
-      </ConfigProvider>
-    ),
+    wrapper: ({ children }) => <FeedbackApp>{children}</FeedbackApp>,
     ...options
   });
   for (const toggle of screen.queryAllByRole("button", {
@@ -567,9 +563,9 @@ it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
   renderWithUps(<Harness />);
   fireEvent.mouseDown(screen.getByLabelText("第 1 条发音的读法"));
   expect(
-    Array.from(
-      document.querySelectorAll(".ant-select-item-option-content")
-    ).map((item) => item.textContent)
+    Array.from(document.querySelectorAll(".ui-select-item-option-content")).map(
+      (item) => item.textContent
+    )
   ).toEqual(["逐字正音", "语流连读", "强读", "弱读"]);
   fireEvent.click(screen.getByText("逐字正音"));
   const wire = JSON.parse(screen.getByTestId("form-state").textContent!);

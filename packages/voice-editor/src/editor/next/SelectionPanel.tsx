@@ -1,4 +1,4 @@
-import { Popover } from "antd";
+import { Popover } from "@tsz/ui/admin/overlays";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 

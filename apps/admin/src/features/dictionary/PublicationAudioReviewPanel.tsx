@@ -1,5 +1,13 @@
-import { Alert, Button, Card, List, Space, Tag, Typography } from "antd";
-import { SoundOutlined } from "@ant-design/icons";
+import {
+  Alert,
+  Button,
+  Card,
+  List,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
+import { Volume2Icon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   PublicationAudioIssue,
@@ -236,7 +244,7 @@ function ReviewPanel({
               actions={[
                 <Button
                   key="play"
-                  icon={<SoundOutlined />}
+                  icon={<Volume2Icon />}
                   aria-label={`试听第 ${index + 1} 条正式音频`}
                   disabled={busy || !!item.issue || !item.asset_id}
                   loading={playing === index}

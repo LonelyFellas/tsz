@@ -1,5 +1,5 @@
-import { HolderOutlined } from "@ant-design/icons";
-import { Button } from "antd";
+import { GripVerticalIcon } from "lucide-react";
+import { Button } from "@tsz/ui/admin/display";
 import type { SortableRowsController } from "../sortableRows";
 
 /**
@@ -28,7 +28,7 @@ export function SortableDragHandle({
       disabled={!sorting.canReorder}
       draggable={sorting.canReorder}
       htmlType="button"
-      icon={<HolderOutlined />}
+      icon={<GripVerticalIcon />}
       onDragEnd={sorting.handleDragEnd}
       onDragStart={(event) => {
         sorting.handleDragStart(event, index);
