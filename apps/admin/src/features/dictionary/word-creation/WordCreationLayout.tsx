@@ -1,5 +1,9 @@
-import { LeftOutlined, UnorderedListOutlined } from "@ant-design/icons";
-import { Breadcrumb, Button, Drawer, Steps, Typography } from "antd";
+import {
+  CheckOutlined,
+  LeftOutlined,
+  UnorderedListOutlined
+} from "@ant-design/icons";
+import { Breadcrumb, Button, ConfigProvider, Drawer, Typography } from "antd";
 import type { WordCreationStep } from "@tsz/types";
 import {
   useEffect,
@@ -81,28 +85,9 @@ export function WordCreationLayout({
   useEffect(() => {
     if (!narrowProgress) setProgressOpen(false);
   }, [narrowProgress]);
-  const currentIndex = WORD_STEP_ORDER.indexOf(currentStep);
+  const { componentDisabled } = ConfigProvider.useConfig();
   const isBasicsStep = currentStep === "basics";
   const completed = new Set(presentation.completedSteps);
-  const steps = WORD_STEP_ORDER.map((step) => ({
-    title: WORD_STEP_TITLE[step],
-    content: STEP_SUBTITLE[step],
-    // 只认后端记的 completed_steps。原先「排在当前步之前就算完成」是靠顺序门禁
-    // 兜底才成立的；门禁取消后可以越步进入，再用位置推断会把没做完的步骤画成绿勾。
-    status:
-      currentStep === step
-        ? ("process" as const)
-        : completed.has(step)
-          ? ("finish" as const)
-          : ("wait" as const),
-    // 创建完成后不能返回创建步骤；后续步骤按可达范围导航。
-    disabled:
-      !presentation.wordExists ||
-      step === "basics" ||
-      Boolean(readOnly) ||
-      Boolean(reachableSteps && !reachableSteps.has(step))
-  }));
-
   const progressTriggerLabel = presentation.progressBadge
     ? `完成情况 ${presentation.progressBadge}`
     : "完成情况";
@@ -120,15 +105,40 @@ export function WordCreationLayout({
         ]}
       />
 
-      <section className="word-creation-stepper">
-        <Steps
-          className="word-creation-steps"
-          current={currentIndex}
-          responsive={false}
-          items={steps}
-          onChange={(index) => onStepChange?.(WORD_STEP_ORDER[index]!)}
-        />
-      </section>
+      <nav className="word-creation-stepper" aria-label="词条编辑步骤">
+        {WORD_STEP_ORDER.map((step, index) => {
+          const current = step === currentStep;
+          const finished = completed.has(step) && !current;
+          const disabled =
+            componentDisabled ||
+            !presentation.wordExists ||
+            step === "basics" ||
+            readOnly ||
+            (reachableSteps && !reachableSteps.has(step)) ||
+            !onStepChange;
+          return (
+            <button
+              key={step}
+              type="button"
+              disabled={disabled}
+              aria-current={current ? "step" : undefined}
+              className="word-editor-step"
+              onClick={() => {
+                if (!current) onStepChange?.(step);
+              }}
+            >
+              <span className="word-editor-step-index" aria-hidden="true">
+                {finished ? <CheckOutlined /> : index + 1}
+              </span>
+              <span>
+                <strong>{WORD_STEP_TITLE[step]}</strong>
+                <small>{STEP_SUBTITLE[step]}</small>
+              </span>
+              {finished && <span className="sr-only">已完成</span>}
+            </button>
+          );
+        })}
+      </nav>
 
       <div className="word-creation-shell">
         <section className="word-creation-summary" aria-label="词条摘要">

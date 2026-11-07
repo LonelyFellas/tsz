@@ -17,35 +17,67 @@
 }
 
 .word-creation-stepper {
-  padding: 20px 30px 18px;
-  background: #fff;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  background: white;
   border: 1px solid var(--word-line);
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 8px 28px rgba(32, 38, 54, 0.05);
-  overflow-x: auto;
+  border-radius: 12px 12px 0 0;
 }
-
-.word-creation-stepper .ant-steps {
+.word-editor-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #475467;
+  background: transparent;
+  font: inherit;
+  text-align: start;
 }
-
-.word-creation-stepper .ant-steps-item-title {
-  font-weight: 700;
-  font-size: 16px;
+.word-editor-step:not(:disabled) {
+  cursor: pointer;
 }
-
-.word-creation-stepper .ant-steps-item-content {
-  font-size: 11px;
+.word-editor-step:not(:disabled):hover {
+  background: #f5f7fa;
 }
-
-.word-creation-steps .ant-steps-item-icon {
-  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.1);
+.word-editor-step[aria-current="step"] {
+  color: #173fbf;
+  background: #edf2ff;
 }
-
-.word-creation-steps .ant-steps-item-process .ant-steps-item-title {
-  color: #111827;
+.word-editor-step:focus-visible {
+  outline: 2px solid #2053ff;
+  outline-offset: -2px;
 }
-
+.word-editor-step strong,
+.word-editor-step small {
+  display: block;
+}
+.word-editor-step small {
+  margin-top: 2px;
+  color: #667085;
+  font-size: 12px;
+}
+.word-editor-step-index {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #eff1f4;
+  font-weight: 600;
+}
+.word-editor-step[aria-current="step"] .word-editor-step-index {
+  background: #2053ff;
+  color: white;
+}
+.word-editor-step:disabled:not([aria-current]) {
+  color: #767e8b;
+}
 .word-creation-shell {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -2266,16 +2298,7 @@
 }
 
 @container word-creation-page (max-width: 1199px) {
-  .word-creation-stepper {
-    padding: 14px 20px;
-    overflow-x: hidden;
-  }
-
-  .word-creation-stepper .ant-steps-item-title {
-    font-size: 14px;
-  }
-
-  .word-creation-stepper .ant-steps-item-content {
+  .word-editor-step small {
     display: none;
   }
 
@@ -2348,54 +2371,12 @@
 
 @container word-creation-page (max-width: 640px) {
   .word-creation-stepper {
-    padding: 12px 8px;
-  }
-
-  .word-creation-steps.ant-steps-horizontal {
-    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .word-creation-steps .ant-steps-item {
-    min-width: 0;
-    padding-inline-start: 0;
-  }
-
-  .word-creation-steps .ant-steps-item-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .word-creation-steps .ant-steps-item-icon {
-    margin: 0;
-  }
-
-  .word-creation-steps .ant-steps-item-section {
-    width: 100%;
-    min-width: 0;
-    text-align: center;
-  }
-
-  .word-creation-steps .ant-steps-item-header {
-    display: block;
-    width: 100%;
-  }
-
-  .word-creation-stepper .word-creation-steps .ant-steps-item-title {
-    width: 100%;
-    padding-inline-end: 0;
-    font-size: 12px;
-    line-height: 1.35;
-    overflow-wrap: normal;
-    word-break: keep-all;
-    white-space: nowrap;
-  }
-
-  .word-creation-steps .ant-steps-item-rail,
-  .word-creation-steps .ant-steps-item-content {
-    display: none;
+  .word-editor-step {
+    min-height: 42px;
+    padding: 6px;
+    font-size: 13px;
   }
 
   .word-creation-shell .word-creation-summary {

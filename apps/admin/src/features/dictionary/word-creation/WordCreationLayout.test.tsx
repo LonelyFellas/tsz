@@ -98,8 +98,8 @@ describe("WordCreationLayout", () => {
       })
     });
 
-    const laterStep = screen.getByText("词形与发音").closest(".ant-steps-item");
-    expect(laterStep).toHaveClass("ant-steps-item-disabled");
+    const laterStep = screen.getByText("词形与发音").closest("button");
+    expect(laterStep).toBeDisabled();
     fireEvent.click(screen.getByText("词形与发音"));
     expect(onStepChange).not.toHaveBeenCalled();
   });
@@ -112,12 +112,10 @@ describe("WordCreationLayout", () => {
       presentation: presentation({ completedSteps: ["basics"] })
     });
 
-    expect(document.querySelectorAll(".ant-steps-item-disabled")).toHaveLength(
-      1
-    );
-    expect(screen.getByText("创建词条").closest(".ant-steps-item")).toHaveClass(
-      "ant-steps-item-disabled"
-    );
+    expect(
+      document.querySelectorAll(".word-editor-step:disabled")
+    ).toHaveLength(1);
+    expect(screen.getByText("创建词条").closest("button")).toBeDisabled();
     fireEvent.click(screen.getByText("创建词条"));
     expect(onStepChange).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("词义与例句"));
@@ -135,13 +133,16 @@ describe("WordCreationLayout", () => {
       presentation: presentation({ completedSteps: ["basics"] })
     });
 
-    const statusOf = (title: string) =>
-      screen.getByText(title).closest(".ant-steps-item")!.className;
-
-    expect(statusOf("创建词条")).toContain("ant-steps-item-finish");
-    expect(statusOf("词形与发音")).toContain("ant-steps-item-wait");
-    expect(statusOf("词义与例句")).toContain("ant-steps-item-wait");
-    expect(statusOf("预览并生效")).toContain("ant-steps-item-process");
+    const nav = within(
+      screen.getByRole("navigation", { name: "词条编辑步骤" })
+    );
+    expect(
+      nav.getByRole("button", { name: /创建词条.*已完成/ })
+    ).toBeDisabled();
+    expect(nav.getAllByText("已完成")).toHaveLength(1);
+    expect(nav.getByRole("button", { current: "step" })).toHaveTextContent(
+      "预览并生效"
+    );
   });
 
   it("readOnly 时步骤条整体禁用，但仍可返回词库", () => {
@@ -154,7 +155,7 @@ describe("WordCreationLayout", () => {
     });
 
     expect(
-      view.container.querySelectorAll(".ant-steps-item-disabled").length
+      view.container.querySelectorAll(".word-editor-step:disabled").length
     ).toBeGreaterThan(0);
     const summary = view.container.querySelector<HTMLElement>(
       ".word-creation-summary"
