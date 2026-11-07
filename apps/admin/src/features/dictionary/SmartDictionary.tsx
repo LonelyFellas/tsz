@@ -10,7 +10,9 @@ import {
   PlusIcon,
   Undo2Icon,
   SearchIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  SlidersHorizontalIcon,
+  XIcon
 } from "lucide-react";
 import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import {
@@ -64,8 +66,7 @@ import {
   cefrColor,
   KIND_LABEL,
   KIND_OPTIONS,
-  STATUS_LABEL,
-  STATUS_OPTIONS
+  STATUS_LABEL
 } from "./labels";
 import {
   availablePartOfSpeechOptions,
@@ -216,7 +217,6 @@ export function SmartDictionary({
     filters.kind ||
     filters.pos ||
     filters.level ||
-    (!trashMode && filters.status) ||
     filters.createdBy ||
     filters.range?.some(Boolean)
   );
@@ -817,7 +817,7 @@ export function SmartDictionary({
     {
       title: "词条名称",
       key: "label",
-      width: 150,
+      width: 180,
       fixed: "left",
       ellipsis: true,
       render: (record) => {
@@ -827,26 +827,33 @@ export function SmartDictionary({
           : [{ text: wordListLabel(record), dialects: [] }];
         return (
           <div className="word-list-names">
-            {names.map((name) => (
-              <div className="word-list-name" key={name.text}>
-                <span className="tsz-words word-list-name-text">
-                  {name.text}
-                </span>
-                {annotation ? (
-                  <sup className="word-list-name-annotation">{annotation}</sup>
-                ) : null}
-                {!name.dialects.includes("common") &&
-                  name.dialects.map((dialect) => (
-                    <span
-                      key={dialect}
-                      className={`word-list-dialect-dot word-list-dialect-dot-${dialect}`}
-                      role="img"
-                      aria-label={dialect === "uk" ? "英式拼写" : "美式拼写"}
-                      data-spelling-dialect={dialect}
-                    />
-                  ))}
-              </div>
-            ))}
+            <div className="word-list-name-variants">
+              {names.map((name) => (
+                <div className="word-list-name" key={name.text}>
+                  <span className="tsz-words word-list-name-text">
+                    {name.text}
+                  </span>
+                  {annotation ? (
+                    <sup className="word-list-name-annotation">
+                      {annotation}
+                    </sup>
+                  ) : null}
+                  {!name.dialects.includes("common") &&
+                    name.dialects.map((dialect) => (
+                      <span
+                        key={dialect}
+                        className={`word-list-dialect-dot word-list-dialect-dot-${dialect}`}
+                        role="img"
+                        aria-label={dialect === "uk" ? "英式拼写" : "美式拼写"}
+                        data-spelling-dialect={dialect}
+                      />
+                    ))}
+                </div>
+              ))}
+            </div>
+            <span className="word-list-type-compact">
+              {KIND_LABEL[record.kind]}
+            </span>
           </div>
         );
       }
@@ -854,18 +861,17 @@ export function SmartDictionary({
     {
       title: "类型",
       key: "kind",
-      width: 80,
+      width: 76,
       wideOnly: true,
       render: ({ kind: k }) => (
-        <Tag color={k === "phrase" ? "geekblue" : "default"}>
-          {KIND_LABEL[k]}
-        </Tag>
+        <span className="word-list-type">{KIND_LABEL[k]}</span>
       )
     },
     {
       title: "常见释义",
       key: "gloss",
-      render: (row) => row.gloss,
+      render: (row) =>
+        row.gloss || <span className="word-list-empty-value">—</span>,
       width: 180,
       ellipsis: true,
       wideOnly: true
@@ -873,7 +879,7 @@ export function SmartDictionary({
     {
       title: "基本词性",
       key: "pos_list",
-      width: 180,
+      width: 100,
       wideOnly: true,
       render: ({ pos_list: list }) => (
         <Space size={[4, 4]} wrap>
@@ -894,7 +900,7 @@ export function SmartDictionary({
     {
       title: "难度",
       key: "levels",
-      width: 170,
+      width: 80,
       wideOnly: true,
       render: ({ levels }) => (
         <Space size={[4, 4]} wrap>
@@ -980,7 +986,7 @@ export function SmartDictionary({
     {
       title: "状态",
       key: "status",
-      width: 90,
+      width: 156,
       wideOnly: true,
       render: (record) => (
         <Space size={4} wrap>
@@ -1004,7 +1010,7 @@ export function SmartDictionary({
     {
       title: "更新时间",
       key: "updated_at",
-      width: 150,
+      width: 165,
       wideOnly: true,
       render: (row) => dayjs(row.updated_at).format("YYYY-MM-DD HH:mm")
     },
@@ -1189,8 +1195,84 @@ export function SmartDictionary({
     }
   ];
 
+  const filterSummaries: Array<{ key: keyof WordFilterValues; label: string }> =
+    [
+      ...(filters.headword || filters.keyword
+        ? [
+            {
+              key: "headword" as const,
+              label: `词条：${filters.headword || filters.keyword}`
+            }
+          ]
+        : []),
+      ...(filters.gloss
+        ? [{ key: "gloss" as const, label: `词义：${filters.gloss}` }]
+        : []),
+      ...(filters.kind
+        ? [{ key: "kind" as const, label: `类型：${KIND_LABEL[filters.kind]}` }]
+        : []),
+      ...(filters.pos
+        ? [
+            {
+              key: "pos" as const,
+              label: `词性：${partOfSpeechLookup.byCode.get(filters.pos)?.name_zh ?? filters.pos}`
+            }
+          ]
+        : []),
+      ...(filters.level
+        ? [{ key: "level" as const, label: `难度：${filters.level}` }]
+        : []),
+      ...(filters.createdBy
+        ? [
+            {
+              key: "createdBy" as const,
+              label: `创建人：${creatorOptions.find((item) => item.value === filters.createdBy)?.label ?? filters.createdBy.slice(-8)}`
+            }
+          ]
+        : []),
+      ...(filters.range?.some(Boolean)
+        ? [
+            {
+              key: "range" as const,
+              label: `创建时间${filters.rangeTimezone ? "（北京时间）" : ""}：${filters.range[0]?.format("YYYY-MM-DD") ?? "不限"} 至 ${filters.range[1]?.format("YYYY-MM-DD") ?? "不限"}`
+            }
+          ]
+        : [])
+    ];
+  const columnPriority = [
+    "label",
+    "kind",
+    "gloss",
+    "status",
+    "pos_list",
+    "levels",
+    "updated_at",
+    "updated_by_name",
+    "created_at",
+    "created_by_name",
+    "references",
+    "action"
+  ];
+  const secondaryColumnKeys = new Set([
+    ...(trashMode ? ["status"] : []),
+    "created_at",
+    "created_by_name",
+    "updated_by_name",
+    "references"
+  ]);
+  const orderedColumns = columns
+    .map((column) => ({
+      ...column,
+      defaultVisible: !secondaryColumnKeys.has(column.key)
+    }))
+    .sort(
+      (a, b) => columnPriority.indexOf(a.key) - columnPriority.indexOf(b.key)
+    );
+
   return (
-    <div className="word-list-page">
+    <div
+      className={`word-list-page ${trashMode ? "word-list-page--trash" : "word-list-page--library"}`}
+    >
       <header className="word-list-heading">
         <h1>{trashMode ? "垃圾桶" : "智能词库"}</h1>
         <div className="word-list-page-actions">
@@ -1208,23 +1290,65 @@ export function SmartDictionary({
             </Button>
           )}
         </div>
-        <Space size={16} wrap className="word-list-stats">
-          <Typography.Text type="secondary">
-            累计智能词条:
-            <Typography.Text strong>{stats.data?.total ?? "-"}</Typography.Text>
-          </Typography.Text>
-          <Typography.Text type="secondary">
-            今日创编:
-            <Typography.Text strong>{stats.data?.today ?? "-"}</Typography.Text>
-          </Typography.Text>
-          <Typography.Text type="secondary">
-            本月创编:
-            <Typography.Text strong>{stats.data?.month ?? "-"}</Typography.Text>
-          </Typography.Text>
-        </Space>
+        {!trashMode && (
+          <Space size={16} wrap className="word-list-stats">
+            <Typography.Text type="secondary">
+              累计智能词条:
+              <Typography.Text strong>
+                {stats.data?.total ?? "-"}
+              </Typography.Text>
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              今日创编:
+              <Typography.Text strong>
+                {stats.data?.today ?? "-"}
+              </Typography.Text>
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              本月创编:
+              <Typography.Text strong>
+                {stats.data?.month ?? "-"}
+              </Typography.Text>
+            </Typography.Text>
+          </Space>
+        )}
       </header>
 
-      <section className="word-list-panel" aria-label="词条筛选">
+      <section
+        className="word-list-panel word-list-filter-panel"
+        aria-label="词条筛选"
+      >
+        {!trashMode && (
+          <div
+            className="word-status-filters"
+            role="group"
+            aria-label="词条状态快捷筛选"
+          >
+            {(
+              [
+                { value: undefined, label: "全部词条" },
+                { value: "draft", label: "草稿" },
+                { value: "published", label: "已发布" }
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                aria-pressed={filters.status === item.value}
+                onClick={() =>
+                  applyFilters({ ...form.getFieldsValue(), status: item.value })
+                }
+              >
+                {item.label}
+              </button>
+            ))}
+            {filters.status === "archived" && (
+              <button type="button" aria-pressed="true">
+                垃圾桶
+              </button>
+            )}
+          </div>
+        )}
         <Form
           form={form}
           initialValues={{
@@ -1240,14 +1364,14 @@ export function SmartDictionary({
           className="word-search-form"
         >
           <div className="word-search-main">
-            <Form.Item name="headword" label="词条" labelCol={{ flex: "36px" }}>
+            <Form.Item name="headword" label="词条" labelCol={{ flex: "none" }}>
               <PilotInput
                 type="search"
                 className="min-h-9 rounded-lg px-3 py-1"
                 placeholder="请输入词条名称"
               />
             </Form.Item>
-            <Form.Item name="gloss" label="词义" labelCol={{ flex: "36px" }}>
+            <Form.Item name="gloss" label="词义" labelCol={{ flex: "none" }}>
               <PilotInput
                 type="search"
                 className="min-h-9 rounded-lg px-3 py-1"
@@ -1278,12 +1402,14 @@ export function SmartDictionary({
               </PilotButton>
               <PilotButton
                 type="button"
-                variant="link"
+                variant="ghost"
                 size="compact"
+                className="word-search-toggle"
                 aria-expanded={advancedExpanded}
                 aria-controls={advancedPanelId}
                 onClick={() => setAdvancedExpanded((value) => !value)}
               >
+                <SlidersHorizontalIcon />
                 {advancedExpanded ? "收起筛选" : "更多筛选"}
                 {advancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
               </PilotButton>
@@ -1315,12 +1441,8 @@ export function SmartDictionary({
               <Select placeholder="全部" options={CEFR_OPTIONS} allowClear />
             </Form.Item>
             {!trashMode && (
-              <Form.Item name="status" label="词条状态">
-                <Select
-                  placeholder="全部"
-                  options={STATUS_OPTIONS}
-                  allowClear
-                />
+              <Form.Item name="status" hidden>
+                <input type="hidden" />
               </Form.Item>
             )}
             <Form.Item
@@ -1349,14 +1471,62 @@ export function SmartDictionary({
                 loading={creators.isPending}
               />
             </Form.Item>
-            <Form.Item name="range" label="创建时间">
+            <Form.Item name="rangeTimezone" hidden>
+              <input type="hidden" />
+            </Form.Item>
+            <Form.Item
+              name="range"
+              label="创建时间"
+              className="word-search-date"
+              help={filters.rangeTimezone ? "北京时间（UTC+8）" : undefined}
+            >
               <RangePicker style={{ width: "100%" }} />
             </Form.Item>
+            <div className="word-search-advanced-actions">
+              <Button htmlType="submit" type="primary" size="small">
+                应用筛选
+              </Button>
+            </div>
           </div>
         </Form>
+        {filterSummaries.length > 0 && (
+          <div className="word-active-filters" aria-label="已应用筛选">
+            <span>已筛选</span>
+            {filterSummaries.map((item) => (
+              <button
+                type="button"
+                key={item.key}
+                aria-label={`移除${item.label}`}
+                onClick={() => {
+                  const next = { ...filters };
+                  delete next[item.key];
+                  if (item.key === "headword") delete next.keyword;
+                  if (item.key === "range") delete next.rangeTimezone;
+                  applyFilters(next);
+                }}
+              >
+                {item.label}
+                <XIcon aria-hidden="true" />
+              </button>
+            ))}
+            <button
+              type="button"
+              className="word-clear-filters"
+              onClick={() => {
+                form.resetFields();
+                applyFilters({});
+              }}
+            >
+              清空条件
+            </button>
+          </div>
+        )}
       </section>
 
-      <section className="word-list-panel" aria-label="词条列表">
+      <section
+        className="word-list-panel word-list-results-panel"
+        aria-label="词条列表"
+      >
         {restoreSurface.page && pendingRestore && (
           <div style={{ marginBottom: 12 }}>
             <LifecycleSurfaceConfirmation
@@ -1437,67 +1607,73 @@ export function SmartDictionary({
           key={mode}
           tableId={trashMode ? "dictionary-trash" : "dictionary"}
           toolbar={
-            <Space wrap>
-              {!trashMode && canBatchPublish && (
-                <Tooltip title="选择 1–50 个有发布权限的词条，集中审听并确认后发布">
+            <div hidden={selectedKeys.length === 0}>
+              <Space wrap>
+                {!trashMode && canBatchPublish && (
+                  <Tooltip title="选择 1–50 个有发布权限的词条，集中审听并确认后发布">
+                    <Button
+                      disabled={
+                        selectedKeys.length === 0 ||
+                        selectedKeys.length > 50 ||
+                        selectedRows.length !== selectedKeys.length ||
+                        selectedRows.some(
+                          (row) =>
+                            row.schema_version !== 3 ||
+                            row.status === "archived" ||
+                            !canPublishEntry(writeActor, row)
+                        )
+                      }
+                      onClick={() => setPublicationRows([...selectedRows])}
+                    >
+                      批量审听与发布
+                      {selectedKeys.length > 0
+                        ? `(${selectedKeys.length})`
+                        : ""}
+                    </Button>
+                  </Tooltip>
+                )}
+                {adminWordsDataSourceCapabilities.batchArchive && (
                   <Button
+                    danger={!showRestoreAction}
+                    icon={showRestoreAction ? <Undo2Icon /> : <Trash2Icon />}
                     disabled={
                       selectedKeys.length === 0 ||
-                      selectedKeys.length > 50 ||
-                      selectedRows.length !== selectedKeys.length ||
                       selectedRows.some(
                         (row) =>
-                          row.schema_version !== 3 ||
-                          row.status === "archived" ||
-                          !canPublishEntry(writeActor, row)
+                          !canTransitionEntry(
+                            writeActor,
+                            row,
+                            row.status === "archived" ? "restore" : "archive"
+                          )
                       )
                     }
-                    onClick={() => setPublicationRows([...selectedRows])}
+                    loading={archiveBatch.isPending || restoreBatch.isPending}
+                    onClick={transitionSelected}
                   >
-                    批量审听与发布
-                    {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
-                  </Button>
-                </Tooltip>
-              )}
-              {adminWordsDataSourceCapabilities.batchArchive && (
-                <Button
-                  danger={!showRestoreAction}
-                  icon={showRestoreAction ? <Undo2Icon /> : <Trash2Icon />}
-                  disabled={
-                    selectedKeys.length === 0 ||
-                    selectedRows.some(
-                      (row) =>
-                        !canTransitionEntry(
-                          writeActor,
-                          row,
-                          row.status === "archived" ? "restore" : "archive"
-                        )
-                    )
-                  }
-                  loading={archiveBatch.isPending || restoreBatch.isPending}
-                  onClick={transitionSelected}
-                >
-                  {showRestoreAction ? "恢 复" : "移入垃圾桶"}
-                  {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
-                </Button>
-              )}
-              {adminWordsDataSourceCapabilities.batchPermanentDelete &&
-                restoringSelection && (
-                  <Button
-                    danger
-                    icon={<Trash2Icon />}
-                    disabled={
-                      selectedKeys.length === 0 ||
-                      writeActor?.role !== "super_admin"
-                    }
-                    loading={deleteBatch.isPending}
-                    onClick={deleteSelected}
-                  >
-                    永久删除
+                    {showRestoreAction ? "恢 复" : "移入垃圾桶"}
                     {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
                   </Button>
                 )}
-            </Space>
+                {adminWordsDataSourceCapabilities.batchPermanentDelete &&
+                  restoringSelection && (
+                    <Button
+                      danger
+                      icon={<Trash2Icon />}
+                      disabled={
+                        selectedKeys.length === 0 ||
+                        writeActor?.role !== "super_admin"
+                      }
+                      loading={deleteBatch.isPending}
+                      onClick={deleteSelected}
+                    >
+                      永久删除
+                      {selectedKeys.length > 0
+                        ? `(${selectedKeys.length})`
+                        : ""}
+                    </Button>
+                  )}
+              </Space>
+            </div>
           }
           emptyText={
             <TableEmptyState
@@ -1509,7 +1685,7 @@ export function SmartDictionary({
               }}
             />
           }
-          columns={columns}
+          columns={orderedColumns}
           rows={rows}
           loading={listQuery.isPending}
           selection={

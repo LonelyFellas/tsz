@@ -5,6 +5,7 @@ import {
   HouseIcon,
   NotebookTextIcon,
   BookOpenIcon,
+  ListChecksIcon,
   CalendarDaysIcon,
   SettingsIcon,
   Volume2Icon,
@@ -19,17 +20,20 @@ import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { useAuthStore } from "@/lib/auth";
+import {
+  ConsoleNavigationPanel,
+  type ConsoleNavigationItem
+} from "./ConsoleNavigationPanel";
 import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 
 /**
- * 后台侧栏导航（antd Menu）。业务叶子挂菜单权限 key（RBAC，
+ * 后台权限导航。业务叶子挂菜单权限 key（RBAC，
  * docs/admin-rbac-design.md），仅当当前管理员持有该 key（super_admin 隐式持有全部）时才渲染
  * ——菜单可见性=后端下发的 profile.permissions。这与「路由是否已落地」正交：已落地叶子挂真实
  * path（key 即路由），点击跳转；未落地的以 `todo:` 前缀标记并渲染为禁用态，避免死链。「首页」
  * 与「我的天生币」无需业务权限；「管理员管理」不走 key，仍按 level==super_admin 判定（D9）。当前高亮由
  * useLocation().pathname 推导。
  */
-type MenuItem = Required<MenuProps>["items"][number];
 
 /** 一个菜单叶子：perm 为其权限 key；superOnly 的叶子改按 super_admin 判定（不走 key）。 */
 interface Leaf {
@@ -130,7 +134,7 @@ const GROUPS: Group[] = [
   },
   {
     key: "grp-wordlist",
-    icon: <BookOpenIcon />,
+    icon: <ListChecksIcon />,
     label: "词表管理",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "智能词表"),
@@ -192,7 +196,7 @@ const GROUPS: Group[] = [
  * 无权限要求时登录即可见，否则当 super_admin 或 permissions 含其 key 时可见。
  * 分组过滤掉不可见叶子后若为空则整组不渲染。
  */
-function buildNav(profile: AdminProfile | null): MenuItem[] {
+function buildNav(profile: AdminProfile | null): ConsoleNavigationItem[] {
   const visible = (l: Leaf): boolean =>
     l.superOnly
       ? profile?.role === "super_admin"
@@ -202,7 +206,9 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
           ? hasAdminPermission(profile, l.perm)
           : profile !== null;
 
-  const items: MenuItem[] = [{ key: "/", icon: <HouseIcon />, label: "首页" }];
+  const items: ConsoleNavigationItem[] = [
+    { key: "/", icon: <HouseIcon />, label: "首页" }
+  ];
   for (const g of GROUPS) {
     const children = g.leaves
       .filter(visible)
@@ -216,9 +222,13 @@ function buildNav(profile: AdminProfile | null): MenuItem[] {
 
 export function ConsoleSidebar({
   collapsed = false,
+  showBrand = true,
+  presentation = "menu",
   onNavigate
 }: {
   collapsed?: boolean;
+  showBrand?: boolean;
+  presentation?: "menu" | "panel";
   // 导航发生后回调（如抽屉态点菜单后关闭抽屉）。
   onNavigate?: () => void;
 }) {
@@ -250,26 +260,38 @@ export function ConsoleSidebar({
       ""
     );
 
+  if (presentation === "panel") {
+    return (
+      <ConsoleNavigationPanel
+        items={nav}
+        selectedKey={selectedKey}
+        onNavigate={onNavigate}
+      />
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: collapsed ? "center" : "flex-start",
-          gap: 8,
-          padding: collapsed ? "18px 0" : "18px 24px",
-          fontSize: 18,
-          fontWeight: 700,
-          color: "#2053FF",
-          overflow: "hidden",
-          whiteSpace: "nowrap"
-        }}
-      >
-        <NotebookTextIcon style={{ fontSize: 22 }} />
-        {/* 收起时仅留图标，隐藏站名，避免文字被裁切成半个字 */}
-        {!collapsed && <span>天生会背</span>}
-      </div>
+      {showBrand && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: 8,
+            padding: collapsed ? "18px 0" : "18px 24px",
+            fontSize: 18,
+            fontWeight: 700,
+            color: "#2053FF",
+            overflow: "hidden",
+            whiteSpace: "nowrap"
+          }}
+        >
+          <NotebookTextIcon style={{ fontSize: 22 }} />
+          {/* 收起时仅留图标，隐藏站名，避免文字被裁切成半个字 */}
+          {!collapsed && <span>天生会背</span>}
+        </div>
+      )}
       <Menu
         mode="inline"
         inlineCollapsed={collapsed}

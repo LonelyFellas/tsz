@@ -1,3 +1,4 @@
+import { CheckIcon } from "lucide-react";
 import { useState } from "react";
 import { App } from "@tsz/ui/admin/overlays";
 import { Radio } from "@tsz/ui/admin/forms";
@@ -50,12 +51,22 @@ export function DialectPreference() {
             <span>英式英语</span>
             <small>BrE</small>
           </span>
+          <CheckIcon
+            className="settings-dialect__check"
+            size={16}
+            aria-hidden="true"
+          />
         </Radio.Button>
         <Radio.Button value="us" aria-label={OPTION_LABEL.us}>
           <span className="settings-dialect__option">
             <span>美式英语</span>
             <small>AmE</small>
           </span>
+          <CheckIcon
+            className="settings-dialect__check"
+            size={16}
+            aria-hidden="true"
+          />
         </Radio.Button>
       </Radio.Group>
     </div>

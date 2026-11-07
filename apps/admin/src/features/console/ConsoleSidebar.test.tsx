@@ -368,3 +368,41 @@ it("例句垃圾桶与多维例句分别选中，使用例句管理权限", asyn
   ).toBe(true);
   expect(screen.queryByText("词库管理")).toBeNull();
 });
+
+describe("ConsoleSidebar 顶部面板", () => {
+  it("默认展示当前页面所属分类，切换分类不会跳转，页面链接保留回调", () => {
+    const onNavigate = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/words"]}>
+        <ConsoleSidebar presentation="panel" onNavigate={onNavigate} />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("button", { name: "词库管理" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("link", { name: "智能词库" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "用户管理" }));
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("link", { name: "智能词库" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "用户管理" }));
+    expect(onNavigate).toHaveBeenCalledOnce();
+  });
+
+  it("面板继续按管理员权限隐藏分类", () => {
+    setLevel("admin", ["words.access", "customdict.access"]);
+    render(
+      <MemoryRouter initialEntries={["/words"]}>
+        <ConsoleSidebar presentation="panel" />
+      </MemoryRouter>
+    );
+    expect(
+      screen.queryByRole("button", { name: "用户管理" })
+    ).not.toBeInTheDocument();
+  });
+});

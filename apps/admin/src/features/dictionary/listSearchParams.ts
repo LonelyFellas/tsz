@@ -66,7 +66,12 @@ export function parseWordFilterSearchParams(
       ? { status: status as AdminWordStatus }
       : {}),
     ...(createdFrom || createdTo
-      ? { range: [createdFrom, createdTo] as [Dayjs | null, Dayjs | null] }
+      ? {
+          range: [createdFrom, createdTo] as [Dayjs | null, Dayjs | null],
+          ...(params.get("created_timezone") === "Asia/Shanghai"
+            ? { rangeTimezone: "Asia/Shanghai" as const }
+            : {})
+        }
       : {})
   };
 }
@@ -92,6 +97,8 @@ export function serializeWordFilterSearchParams(
   if (values.range?.[1]) {
     params.set("created_to", values.range[1].format("YYYY-MM-DD"));
   }
+  if (values.range?.some(Boolean) && values.rangeTimezone === "Asia/Shanghai")
+    params.set("created_timezone", values.rangeTimezone);
   return params;
 }
 

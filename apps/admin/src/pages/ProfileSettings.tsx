@@ -1,9 +1,13 @@
+import { Button, Tabs, Typography } from "@tsz/ui/admin/display";
 import {
-  Button,
-  useMediumScreen,
-  Tabs,
-  Typography
-} from "@tsz/ui/admin/display";
+  SlidersHorizontalIcon,
+  KeyRoundIcon,
+  CpuIcon,
+  LanguagesIcon,
+  ShieldCheckIcon,
+  CableIcon,
+  ArrowUpRightIcon
+} from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DialectPreference } from "@/features/settings/DialectPreference";
 import { OpenCodeConnection } from "@/features/ai-ledger/OpenCodeConnection";
@@ -14,7 +18,6 @@ import "./profile-settings.css";
 
 export function ProfileSettingsPage() {
   const profile = useAuthStore((state) => state.profile);
-  const mediumScreen = useMediumScreen();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const isSuper = profile?.role === "super_admin";
@@ -30,6 +33,9 @@ export function ProfileSettingsPage() {
         aria-labelledby="settings-preferences-title"
       >
         <header className="settings-section__heading">
+          <span className="settings-section__icon">
+            <LanguagesIcon aria-hidden="true" />
+          </span>
           <h2 id="settings-preferences-title">使用偏好</h2>
         </header>
         <DialectPreference />
@@ -39,11 +45,16 @@ export function ProfileSettingsPage() {
         aria-labelledby="settings-security-title"
       >
         <header className="settings-section__heading">
+          <span className="settings-section__icon">
+            <ShieldCheckIcon aria-hidden="true" />
+          </span>
           <h2 id="settings-security-title">账号安全</h2>
         </header>
         <div className="settings-row">
           <div className="settings-row__label">登录密码</div>
-          <Button onClick={() => navigate("/change-password")}>修改密码</Button>
+          <Button onClick={() => navigate("/change-password")}>
+            修改密码 <ArrowUpRightIcon aria-hidden="true" />
+          </Button>
         </div>
       </section>
     </>
@@ -57,7 +68,7 @@ export function ProfileSettingsPage() {
         <Tabs
           key={profile.id}
           className="profile-settings__tabs"
-          tabPlacement={mediumScreen ? "start" : "top"}
+          tabPlacement="top"
           activeKey={section}
           destroyOnHidden={false}
           onChange={(key) =>
@@ -72,16 +83,33 @@ export function ProfileSettingsPage() {
             )
           }
           items={[
-            { key: "preferences", label: "偏好设置", children: preferences },
+            {
+              key: "preferences",
+              label: (
+                <span className="profile-settings__tab-label">
+                  <SlidersHorizontalIcon aria-hidden="true" />
+                  偏好设置
+                </span>
+              ),
+              children: preferences
+            },
             {
               key: "accounts",
-              label: "模型账号",
+              label: (
+                <span className="profile-settings__tab-label">
+                  <KeyRoundIcon aria-hidden="true" />
+                  模型账号
+                </span>
+              ),
               children: (
                 <section
                   className="settings-section"
                   aria-labelledby="settings-accounts-title"
                 >
                   <header className="settings-section__heading">
+                    <span className="settings-section__icon">
+                      <CableIcon aria-hidden="true" />
+                    </span>
                     <h2 id="settings-accounts-title">模型账号</h2>
                   </header>
                   <div className="settings-provider-list">
@@ -99,13 +127,21 @@ export function ProfileSettingsPage() {
             },
             {
               key: "models",
-              label: "出题模型",
+              label: (
+                <span className="profile-settings__tab-label">
+                  <CpuIcon aria-hidden="true" />
+                  出题模型
+                </span>
+              ),
               children: (
                 <section
                   className="settings-section"
                   aria-labelledby="settings-models-title"
                 >
                   <header className="settings-section__heading">
+                    <span className="settings-section__icon">
+                      <CpuIcon aria-hidden="true" />
+                    </span>
                     <h2 id="settings-models-title">出题模型</h2>
                   </header>
                   <OpenCodeModels adminId={profile.id} />

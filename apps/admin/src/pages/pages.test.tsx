@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -79,6 +79,9 @@ vi.mock("@/lib/auth", () => ({
           ])
         )
       })
+    },
+    teacherCertification: {
+      list: vi.fn().mockResolvedValue({ items: [], total: 2 })
     },
     dashboard: {
       overview: vi.fn().mockResolvedValue(dashboardOverview)
@@ -167,22 +170,15 @@ describe("admin 页面烟雾测试", () => {
     );
     expect(screen.queryByText("共 0 条")).not.toBeInTheDocument();
   });
-  it("首页渲染 KPI 指标行与四张图表卡", async () => {
+  it("首页呈现内容建设、真实待办和任务进度", async () => {
     renderHome();
-    expect(
-      screen.getByRole("heading", { name: "首页数据" })
-    ).toBeInTheDocument();
-    // 顶部 KPI 四格（等真实聚合数据返回后渲染）。
-    for (const label of ["累计用户", "任务总量", "词库累计", "天生币流通"]) {
+    expect(screen.getByRole("heading", { name: "工作台" })).toBeInTheDocument();
+    // 等待真实聚合数据返回后展示。
+    for (const label of ["累计用户", "学习任务", "词库累计", "天生币流通"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }
-    // 下方四张图表卡的标题。
-    for (const title of [
-      "用户增长趋势",
-      "天生币收支",
-      "学习进度分布",
-      "词库创建趋势"
-    ]) {
+    // 内容与运营分区。
+    for (const title of ["词库建设", "待处理", "今日学习", "内容工作区"]) {
       expect(
         await screen.findByRole("heading", { name: title })
       ).toBeInTheDocument();
@@ -199,6 +195,13 @@ describe("admin 页面烟雾测试", () => {
       screen.queryByRole("button", { name: "扣除" })
     ).not.toBeInTheDocument();
     expect(api.dashboard.overview).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole("link", { name: /教师申请/ })
+    ).toHaveTextContent("2");
+    expect(api.teacherCertification.list).toHaveBeenCalledWith(1, 1, "pending");
+    fireEvent.click(screen.getByRole("button", { name: "数据" }));
+    expect(screen.getByRole("table")).toHaveTextContent("2026-10-19");
+    expect(screen.getByRole("table")).toHaveTextContent("12");
   });
 
   it("没有天生币查询权限时不渲染查看流水入口", async () => {
@@ -208,6 +211,57 @@ describe("admin 页面烟雾测试", () => {
     expect(
       screen.queryByRole("link", { name: "查看流水" })
     ).not.toBeInTheDocument();
+  });
+
+  it("两个审核队列均成功返回零时才显示无待审事项", async () => {
+    vi.mocked(api.wordlists.management).mockResolvedValueOnce({
+      items: [],
+      pagination: { page: 1, page_size: 1, total: 0, total_pages: 0 }
+    });
+    vi.mocked(api.teacherCertification.list).mockResolvedValueOnce({
+      items: [],
+      total: 0
+    });
+    renderHome();
+    expect(await screen.findByText("暂无待审事项")).toBeInTheDocument();
+  });
+
+  it("待办接口失败显示未知数量，不把读取失败当作零", async () => {
+    vi.mocked(api.wordlists.management).mockRejectedValueOnce(
+      new Error("network")
+    );
+    vi.mocked(api.teacherCertification.list).mockRejectedValueOnce(
+      new Error("network")
+    );
+    renderHome();
+    await waitFor(() =>
+      expect(screen.getAllByText("读取失败，进入页面重试")).toHaveLength(2)
+    );
+    expect(screen.queryByText("暂无待审事项")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /词表审核/ })).toHaveTextContent(
+      "—"
+    );
+    expect(screen.getByRole("link", { name: /教师申请/ })).toHaveTextContent(
+      "—"
+    );
+  });
+
+  it("无审核权限时不请求队列，也不渲染受限入口", async () => {
+    const previousRole = smokeProfile.role;
+    smokeProfile.role = "admin" as never;
+    vi.mocked(api.teacherCertification.list).mockClear();
+    vi.mocked(api.wordlists.management).mockClear();
+    try {
+      renderHome();
+      await screen.findByText("当前账号没有审核队列权限");
+      expect(api.teacherCertification.list).not.toHaveBeenCalled();
+      expect(api.wordlists.management).not.toHaveBeenCalled();
+      expect(
+        screen.queryByRole("link", { name: /教师申请/ })
+      ).not.toBeInTheDocument();
+    } finally {
+      smokeProfile.role = previousRole;
+    }
   });
 
   it("学习进度全为零时展示空状态", async () => {
@@ -224,9 +278,7 @@ describe("admin 页面烟雾测试", () => {
       new Promise<never>(() => {})
     );
     const { container } = renderHome();
-    expect(
-      screen.getByRole("heading", { name: "首页数据" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "工作台" })).toBeInTheDocument();
     expect(container.querySelector(".ui-skeleton")).not.toBeNull();
     expect(screen.queryByText("累计用户")).not.toBeInTheDocument();
   });

@@ -490,3 +490,99 @@
 }
 
 /* 输入层与字形层保持同样的尺寸，确保选区和标注在调整字号后仍然对齐。 */
+
+/* 目录表头筛选与单行搜索采用同一控件尺度。 */
+.voice-library-catalog .ui-card {
+  border-color: #e8ebf1;
+  border-radius: 10px;
+}
+.voice-library-catalog .voice-library-controls > .ui-card-body {
+  padding: 16px 20px;
+}
+.voice-library-catalog .voice-library-content > .ui-card-body {
+  padding: 16px 20px;
+}
+.voice-library-catalog .voice-library-audition-row {
+  gap: 16px;
+}
+.voice-library-catalog .voice-library-audition-row > .ui-btn {
+  min-height: 34px;
+  font-size: 12px;
+}
+.voice-library-catalog .voice-library-audition-text label .ui-typography {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475467;
+}
+.voice-library-catalog .voice-library-audition-text textarea.ui-input {
+  min-height: 34px;
+  border-color: #dfe4eb;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.voice-catalog-heading {
+  gap: 7px;
+}
+.voice-catalog-heading > span,
+.voice-catalog-heading-label {
+  min-height: 20px;
+  color: #667085;
+}
+.voice-catalog-heading > .ui-select {
+  box-sizing: border-box;
+  min-height: 32px;
+  border-color: #dfe4eb;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.voice-catalog-heading > .ui-select .ui-select-content {
+  min-height: 24px;
+  line-height: 24px;
+}
+.voice-catalog-heading > .ui-select .ui-select-selection-item {
+  box-sizing: border-box;
+  max-width: 100%;
+  line-height: 20px;
+}
+.voice-catalog-heading .ui-input-affix-wrapper {
+  min-height: 32px;
+  border-color: #dfe4eb;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.voice-catalog-table .ui-table-thead > tr > th {
+  padding-block: 12px;
+  background: #f8f9fc;
+}
+.voice-catalog-table .ui-table-tbody > tr > td {
+  padding-block: 12px;
+  border-color: #edf0f5;
+}
+.voice-catalog-actions .ui-btn {
+  min-height: 30px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.voice-catalog-actions .voice-catalog-play {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 15px;
+}
+.voice-catalog-name {
+  font-size: 14px;
+  color: #26324b;
+}
+.voice-catalog-tags > .ui-tag {
+  font-size: 11px;
+  border-radius: 4px;
+}
+.voice-catalog-footer {
+  padding-top: 20px;
+}
+@media (max-width: 600px) {
+  .voice-library-catalog .voice-library-controls > .ui-card-body,
+  .voice-library-catalog .voice-library-content > .ui-card-body {
+    padding: 14px;
+  }
+}
