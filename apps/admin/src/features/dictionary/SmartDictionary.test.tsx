@@ -1007,9 +1007,9 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    expect(
-      container.querySelectorAll(".ant-table-tbody > tr.ant-table-row")
-    ).toHaveLength(3);
+    expect(container.querySelectorAll(".word-table tbody > tr")).toHaveLength(
+      3
+    );
     expect(screen.getByText("累计智能词条:").parentElement).toHaveTextContent(
       "累计智能词条:3"
     );
@@ -1184,7 +1184,7 @@ describe("SmartDictionary", () => {
 
     const creator = screen.getByText("非常非常长的创建人名称");
     expect(creator).toHaveAttribute("tabindex", "0");
-    expect(creator.closest("td")).toHaveClass("ant-table-cell-ellipsis");
+    expect(creator.closest("td")).toHaveClass("word-cell-ellipsis");
     const creatorIndex = screen
       .getAllByRole("columnheader")
       .findIndex((header) => header.textContent === "创建人");
@@ -1294,7 +1294,7 @@ describe("SmartDictionary", () => {
       isPending: false,
       refetch: vi.fn()
     }));
-    const { container } = render(
+    render(
       <MemoryRouter initialEntries={["/words?keyword=center&status=published"]}>
         <AntApp>
           <SmartDictionary />
@@ -1307,7 +1307,7 @@ describe("SmartDictionary", () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
         "/words?keyword=center&status=published&page=2"
@@ -1315,11 +1315,9 @@ describe("SmartDictionary", () => {
     );
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Page Size" }));
-    const sizeOptions = await screen.findAllByRole("option");
-    fireEvent.click(
-      sizeOptions.find((option) => option.textContent?.includes("50"))!
-    );
+    fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
+      target: { value: "50" }
+    });
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(
         "/words?keyword=center&status=published&page_size=50"
@@ -1424,7 +1422,7 @@ describe("SmartDictionary", () => {
     expect(batchButton).not.toBeNull();
     expect(batchButton!.querySelector(".anticon-delete")).not.toBeNull();
 
-    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
+    fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
 
     await waitFor(() => {
       expect(screen.getByText("second")).toBeInTheDocument();
@@ -2019,7 +2017,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("垃圾桶")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "垃圾桶" })).toBeInTheDocument();
     expect(screen.queryByLabelText("词条状态")).toBeNull();
     expect(screen.queryByText("创建词条")).toBeNull();
     // 垃圾桶里全是归档词条，批量动作恒为恢复，不该出现「移入垃圾桶」。

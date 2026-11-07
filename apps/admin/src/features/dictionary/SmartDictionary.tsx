@@ -1,4 +1,7 @@
-import { AdminTable as Table } from "@/components/AdminTable";
+import { Button as PilotButton } from "@tsz/ui/components/button";
+import { Input as PilotInput } from "@tsz/ui/components/input";
+import { WordListTable, type WordColumn } from "./WordListTable";
+import "./word-list-controls.css";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
   DeleteOutlined,
@@ -12,15 +15,11 @@ import {
 import {
   Alert,
   App,
-  Breadcrumb,
   Button,
-  Card,
   ConfigProvider,
   DatePicker,
   Dropdown,
-  Flex,
   Form,
-  Input,
   Popover,
   Select,
   Space,
@@ -29,7 +28,7 @@ import {
   Typography,
   theme
 } from "antd";
-import type { MenuProps, TableColumnsType } from "antd";
+import type { MenuProps } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -37,7 +36,6 @@ import { useAuthStore } from "@/lib/auth";
 import { hasAdminPermission } from "@tsz/shared/auth";
 import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
-  AdminWordKind,
   AdminWordV3Envelope,
   AdminWordListItemAny,
   CefrLevel,
@@ -243,7 +241,7 @@ export function SmartDictionary({
   }));
 
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
-  const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<
     Record<string, AdminWordListItemAny>
   >({});
@@ -821,14 +819,14 @@ export function SmartDictionary({
     else confirmArchive(entries, confirmation.title, confirmation.onOk);
   };
 
-  const columns: TableColumnsType<AdminWordListItemAny> = [
+  const columns: WordColumn[] = [
     {
       title: "词条名称",
       key: "label",
       width: 150,
       fixed: "left",
-      ellipsis: { showTitle: false },
-      render: (_: unknown, record) => {
+      ellipsis: true,
+      render: (record) => {
         const annotation = visibleWordAnnotation(record);
         const names = record.name_variants?.length
           ? record.name_variants
@@ -861,10 +859,10 @@ export function SmartDictionary({
     },
     {
       title: "类型",
-      dataIndex: "kind",
+      key: "kind",
       width: 80,
-      responsive: ["sm"],
-      render: (k: AdminWordKind) => (
+      wideOnly: true,
+      render: ({ kind: k }) => (
         <Tag color={k === "phrase" ? "geekblue" : "default"}>
           {KIND_LABEL[k]}
         </Tag>
@@ -872,17 +870,18 @@ export function SmartDictionary({
     },
     {
       title: "常见释义",
-      dataIndex: "gloss",
+      key: "gloss",
+      render: (row) => row.gloss,
       width: 180,
       ellipsis: true,
-      responsive: ["sm"]
+      wideOnly: true
     },
     {
       title: "基本词性",
-      dataIndex: "pos_list",
+      key: "pos_list",
       width: 180,
-      responsive: ["sm"],
-      render: (list: AdminWordListItemAny["pos_list"]) => (
+      wideOnly: true,
+      render: ({ pos_list: list }) => (
         <Space size={[4, 4]} wrap>
           {list.map((p) => (
             // 缩写不直观，悬停补正式中文；目录里没有的编码无名可补，不出浮层。
@@ -900,10 +899,10 @@ export function SmartDictionary({
     },
     {
       title: "难度",
-      dataIndex: "levels",
+      key: "levels",
       width: 170,
-      responsive: ["sm"],
-      render: (levels: string[]) => (
+      wideOnly: true,
+      render: ({ levels }) => (
         <Space size={[4, 4]} wrap>
           {levels.map((lv) => (
             <Tag key={lv} color={cefrLevelColor(lv)} style={{ margin: 0 }}>
@@ -915,18 +914,18 @@ export function SmartDictionary({
     },
     {
       title: "创建时间",
-      dataIndex: "created_at",
+      key: "created_at",
       width: 150,
-      responsive: ["sm"],
-      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+      wideOnly: true,
+      render: (row) => dayjs(row.created_at).format("YYYY-MM-DD HH:mm")
     },
     {
       title: "创建人",
-      dataIndex: "created_by_name",
+      key: "created_by_name",
       width: 140,
-      ellipsis: { showTitle: false },
-      responsive: ["sm"],
-      render: (name?: string) => {
+      ellipsis: true,
+      wideOnly: true,
+      render: ({ created_by_name: name }) => {
         const label = name?.trim() || "-";
         return (
           <Tooltip title={name?.trim() || undefined}>
@@ -939,8 +938,8 @@ export function SmartDictionary({
       title: "关联",
       key: "references",
       width: 80,
-      responsive: ["sm"],
-      render: (_: unknown, record) => {
+      wideOnly: true,
+      render: (record) => {
         const summary = record.reference_summary;
         const total = summary?.total ?? 0;
         if (total === 0) {
@@ -986,21 +985,21 @@ export function SmartDictionary({
     },
     {
       title: "状态",
-      dataIndex: "status",
+      key: "status",
       width: 90,
-      responsive: ["sm"],
-      render: (s: AdminWordListItemAny["status"], record) => (
+      wideOnly: true,
+      render: (record) => (
         <Space size={4} wrap>
           <Tag
             color={
-              s === "published"
+              record.status === "published"
                 ? "success"
-                : s === "archived"
+                : record.status === "archived"
                   ? "warning"
                   : "default"
             }
           >
-            {STATUS_LABEL[s]}
+            {STATUS_LABEL[record.status]}
           </Tag>
           {record.has_unpublished_changes && (
             <Tag color="processing">有未发布修改</Tag>
@@ -1010,18 +1009,18 @@ export function SmartDictionary({
     },
     {
       title: "更新时间",
-      dataIndex: "updated_at",
+      key: "updated_at",
       width: 150,
-      responsive: ["sm"],
-      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+      wideOnly: true,
+      render: (row) => dayjs(row.updated_at).format("YYYY-MM-DD HH:mm")
     },
     {
       title: "最后更新人",
-      dataIndex: "updated_by_name",
+      key: "updated_by_name",
       width: 140,
-      ellipsis: { showTitle: false },
-      responsive: ["sm"],
-      render: (name?: string) => {
+      ellipsis: true,
+      wideOnly: true,
+      render: ({ updated_by_name: name }) => {
         const label = name?.trim() || "-";
         return (
           <Tooltip
@@ -1038,7 +1037,7 @@ export function SmartDictionary({
       key: "action",
       width: 190,
       fixed: "right",
-      render: (_: unknown, record: AdminWordListItemAny) => {
+      render: (record) => {
         const rowName = `「${wordListLabel(record)}」`;
         const rowWritable = canModifyEntry(writeActor, record);
         const archived = record.status === "archived";
@@ -1191,13 +1190,11 @@ export function SmartDictionary({
   ];
 
   return (
-    <Flex vertical gap={16}>
-      <Breadcrumb
-        items={[
-          { title: "词库管理" },
-          { title: trashMode ? "垃圾桶" : "智能词库" }
-        ]}
-      />
+    <div className="word-list-page">
+      <header className="word-list-heading">
+        <span>词库管理</span>
+        <h1>{trashMode ? "垃圾桶" : "智能词库"}</h1>
+      </header>
 
       <ConfigProvider
         theme={{
@@ -1207,7 +1204,7 @@ export function SmartDictionary({
           }
         }}
       >
-        <Card size="small" styles={{ body: { padding: 16 } }}>
+        <section className="word-list-panel" aria-label="词条筛选">
           <Form
             form={form}
             initialValues={{
@@ -1228,39 +1225,52 @@ export function SmartDictionary({
                 label="词条"
                 labelCol={{ flex: "36px" }}
               >
-                <Input placeholder="请输入词条名称" allowClear />
+                <PilotInput
+                  type="search"
+                  className="min-h-9 rounded-lg px-3 py-1"
+                  placeholder="请输入词条名称"
+                />
               </Form.Item>
               <Form.Item name="gloss" label="词义" labelCol={{ flex: "36px" }}>
-                <Input placeholder="请输入词义" allowClear />
+                <PilotInput
+                  type="search"
+                  className="min-h-9 rounded-lg px-3 py-1"
+                  placeholder="请输入词义"
+                />
               </Form.Item>
               <div className="word-search-actions">
-                <Button
-                  type="primary"
-                  icon={<SearchOutlined />}
-                  htmlType="submit"
+                <PilotButton
+                  variant="default"
+                  size="compact"
+                  className="rounded-lg"
+                  type="submit"
                 >
+                  <SearchOutlined />
                   搜索
-                </Button>
-                <Button
-                  type="text"
+                </PilotButton>
+                <PilotButton
+                  type="button"
+                  variant="ghost"
+                  size="compact"
+                  className="rounded-lg"
                   onClick={() => {
                     form.resetFields();
                     applyFilters({});
                   }}
                 >
                   重置
-                </Button>
-                <Button
-                  type="link"
-                  className="word-search-toggle"
-                  icon={advancedExpanded ? <UpOutlined /> : <DownOutlined />}
-                  iconPlacement="end"
+                </PilotButton>
+                <PilotButton
+                  type="button"
+                  variant="link"
+                  size="compact"
                   aria-expanded={advancedExpanded}
                   aria-controls={advancedPanelId}
                   onClick={() => setAdvancedExpanded((value) => !value)}
                 >
                   {advancedExpanded ? "收起筛选" : "更多筛选"}
-                </Button>
+                  {advancedExpanded ? <UpOutlined /> : <DownOutlined />}
+                </PilotButton>
               </div>
             </div>
             <div
@@ -1328,10 +1338,10 @@ export function SmartDictionary({
               </Form.Item>
             </div>
           </Form>
-        </Card>
+        </section>
       </ConfigProvider>
 
-      <Card size="small">
+      <section className="word-list-panel" aria-label="词条列表">
         {restoreSurface.page && pendingRestore && (
           <div style={{ marginBottom: 12 }}>
             <LifecycleSurfaceConfirmation
@@ -1408,7 +1418,8 @@ export function SmartDictionary({
           />
         )}
 
-        <Table<AdminWordListItemAny>
+        <WordListTable
+          key={mode}
           tableId={trashMode ? "dictionary-trash" : "dictionary"}
           toolbar={
             <Space wrap>
@@ -1510,29 +1521,23 @@ export function SmartDictionary({
               </Typography.Text>
             </Space>
           }
-          locale={{
-            emptyText: (
-              <TableEmptyState
-                message={trashMode ? "垃圾桶暂无词条" : "暂无词条"}
-                filtered={Object.values(filters).some(Boolean)}
-                onResetFilters={() => {
-                  form.resetFields();
-                  applyFilters({});
-                }}
-              />
-            )
-          }}
-          rowKey="id"
-          size="middle"
+          emptyText={
+            <TableEmptyState
+              message={trashMode ? "垃圾桶暂无词条" : "暂无词条"}
+              filtered={Object.values(filters).some(Boolean)}
+              onResetFilters={() => {
+                form.resetFields();
+                applyFilters({});
+              }}
+            />
+          }
           columns={columns}
-          dataSource={rows}
+          rows={rows}
           loading={listQuery.isPending}
-          scroll={{ x: "max-content" }}
-          rowSelection={
+          selection={
             adminWordsDataSourceCapabilities.batchArchive || canBatchPublish
               ? {
-                  selectedRowKeys: selectedKeys,
-                  preserveSelectedRowKeys: true,
+                  keys: selectedKeys,
                   onChange: (keys, selected) => {
                     restoreAttemptGeneration.current += 1;
                     setSelectedKeys(keys);
@@ -1550,31 +1555,24 @@ export function SmartDictionary({
                       setPendingRestore(undefined);
                     }
                   },
-                  getCheckboxProps: (record) => ({
-                    disabled: lifecycleInput(record) === undefined
-                  })
+                  disabled: (record) => lifecycleInput(record) === undefined
                 }
               : undefined
           }
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            pageSizeOptions: [10, 20, 50, 100],
-            onChange: (nextPage, nextSize) => {
-              setSearchParams(
-                serializeWordListSearchParams(
-                  filters,
-                  nextSize !== pageSize ? 1 : nextPage,
-                  nextSize
-                )
-              );
-            }
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={(nextPage, nextSize) => {
+            setSearchParams(
+              serializeWordListSearchParams(
+                filters,
+                nextSize !== pageSize ? 1 : nextPage,
+                nextSize
+              )
+            );
           }}
         />
-      </Card>
-    </Flex>
+      </section>
+    </div>
   );
 }

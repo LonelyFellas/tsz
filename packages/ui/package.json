@@ -8,6 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./components": "./src/components/ui/index.ts",
+    "./components/button": "./src/components/ui/button.tsx",
+    "./components/input": "./src/components/ui/input.tsx",
     "./components/dropdown-menu": "./src/components/ui/dropdown-menu.tsx",
     "./lib/cn": "./src/lib/cn.ts"
   },

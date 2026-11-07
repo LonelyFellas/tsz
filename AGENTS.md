@@ -95,7 +95,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 - 后台及共享语音编辑器使用 Ant Design 6 与 `@ant-design/icons`；品牌蓝 #2053FF、中文 locale 与 Day.js 集中配置。
 - 普通表单使用 AntD Form；复杂草稿继续由业务模型持有。仅更换 UI 组件，不改变业务行为、接口或持久化格式。
 - reader 入口不依赖 AntD、MUI、Emotion 或后台 Provider；C 端保留现有设计体系。
-- 禁止引入 tailwind / `@tsz/ui`。业务数组以稳定业务 ID 为 key；服务端分页保持 1 基。
+- 公共框架、智能词库列表和垃圾桶按 [shadcn/ui 试点](docs/features/admin-shadcn-pilot/README.md) 接入；列表允许按控件导入 `@tsz/ui` 和局部 Tailwind utilities。其余后台页面继续使用 AntD。业务数组以稳定业务 ID 为 key；服务端分页保持 1 基。
 - 日期范围只有完整有效或明确清空时提交。弹窗 pending、取消及失败保留现有业务状态。
 - 隐藏面板采用 hidden / aria-hidden / inert；字段定位聚焦实际控件，测试保留 matchMedia / ResizeObserver 垫片。
 
