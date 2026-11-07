@@ -45,6 +45,7 @@ function FormRoot<Values>({
   name,
   disabled,
   requiredMark,
+  validateMessages,
   labelCol,
   wrapperCol,
   labelAlign,
@@ -69,6 +70,11 @@ function FormRoot<Values>({
       <AdminControls componentDisabled={disabled}>
         <Fields
           {...props}
+          validateMessages={{
+            required: "请填写${label}",
+            whitespace: "${label}不能只包含空格",
+            ...validateMessages
+          }}
           name={name}
           className={`ui-form ui-form-${layout} ${className}`}
         />
@@ -154,7 +160,19 @@ function Item({
       help ?? (errors.length ? <ErrorList errors={errors} /> : null);
     const bind: Record<string, unknown> = { ...control };
     if (input && !noStyle) {
-      if (label || meta || htmlFor) bind.id = inputId;
+      // 显式 htmlFor 由调用端指向内部控件，不把同一 ID 写到组合字段外壳。
+      const nativeControl =
+        typeof input.type === "string" &&
+        [
+          "input",
+          "textarea",
+          "select",
+          "button",
+          "output",
+          "progress",
+          "meter"
+        ].includes(input.type);
+      if (htmlFor ? nativeControl : label || meta) bind.id = inputId;
       if (invalid) bind["aria-invalid"] = true;
       if (mandatory) bind["aria-required"] = true;
       const desc = [
@@ -242,7 +260,8 @@ function Item({
     <Field
       {...field}
       messageVariables={{
-        label: typeof label === "string" ? label : String(field.name)
+        label: typeof label === "string" ? label : String(field.name),
+        ...field.messageVariables
       }}
     >
       {content}

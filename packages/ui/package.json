@@ -11,6 +11,7 @@
     "./components/button": "./src/components/ui/button.tsx",
     "./components/input": "./src/components/ui/input.tsx",
     "./components/dropdown-menu": "./src/components/ui/dropdown-menu.tsx",
+    "./lib/clipboard": "./src/lib/clipboard.ts",
     "./lib/cn": "./src/lib/cn.ts",
     "./admin/display": "./src/admin/display/index.ts",
     "./admin/table": "./src/admin/table/index.ts",

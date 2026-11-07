@@ -158,6 +158,12 @@ describe("AdminLoginForm — 2FA", () => {
     ).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
+  it("短信验证码标签直接关联输入框", () => {
+    render(<AdminLoginForm />);
+    expect(screen.getByRole("textbox", { name: "短信验证码" })).toBe(
+      screen.getByPlaceholderText("请输入验证码")
+    );
+  });
   // ============================== 发码（2FA 第一步）==============================
 
   it("合法手机号 → 获取验证码可用，点击调 requestLoginCode 并进入倒计时", async () => {

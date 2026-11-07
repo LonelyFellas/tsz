@@ -272,6 +272,19 @@
   .ui-link {
     color: var(--ui-color-link);
   }
+  .ui-typography-with-actions {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    min-width: 0;
+    vertical-align: bottom;
+  }
+  .ui-typography-with-actions > .ui-typography-ellipsis {
+    min-width: 0;
+  }
+  .ui-typography-with-actions > button {
+    flex: none;
+  }
   .ui-typography-ellipsis {
     display: inline-block;
     max-width: 100%;
@@ -303,21 +316,21 @@
     color: #475467;
     font-size: 12px;
   }
-  .ui-tag:is(
-    [data-color="green"],
-    [data-color="success"],
-    [data-color="cyan"]
-  ) {
+  .ui-tag:is([data-color="green"], [data-color="success"]) {
     background: #e9faf0;
     color: #067647;
   }
-  .ui-tag:is(
-    [data-color="warning"],
-    [data-color="gold"],
-    [data-color="orange"]
-  ) {
+  .ui-tag:is([data-color="warning"], [data-color="gold"]) {
     background: #fff5d9;
     color: #8c5700;
+  }
+  .ui-tag[data-color="cyan"] {
+    background: #e2f7fa;
+    color: #09626d;
+  }
+  .ui-tag[data-color="orange"] {
+    background: #ffead6;
+    color: #914300;
   }
   .ui-tag:is([data-color="error"], [data-color="red"], [data-color="volcano"]) {
     background: #ffebe9;

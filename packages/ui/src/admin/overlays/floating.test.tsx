@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Modal } from "./dialog";
-import { Dropdown } from "./floating";
+import { Dropdown, Popover } from "./floating";
+import { Typography } from "../display/typography";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -50,4 +51,22 @@ it("弹窗内用键盘打开菜单，Escape 先关闭菜单并还原焦点，再
   expect(screen.getByRole("dialog", { name: "编辑词条" })).toBeVisible();
   fireEvent.keyDown(trigger, { key: "Escape", keyCode: 27 });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+it("文字节点能作为浮层的实际锚点", async () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  render(
+    <Popover trigger="click" content="完整英文名称">
+      <Typography.Paragraph>英文名称</Typography.Paragraph>
+    </Popover>
+  );
+  fireEvent.click(screen.getByText("英文名称"));
+  expect(await screen.findByText("完整英文名称")).toBeVisible();
 });
