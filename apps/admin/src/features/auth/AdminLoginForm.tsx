@@ -5,8 +5,9 @@ import {
 } from "@tsz/api-client";
 import { isCode, isPhone, readTestResourceRun } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
+import { ArrowRightOutlined } from "@ant-design/icons";
 import { Alert, Button, Form, Input } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
 import "./admin-login.css";
@@ -42,7 +43,9 @@ function safeRedirect(raw: string | null): string {
 // 1) 交互沿用「未达标只禁用按钮、不飘红」，用不上 rules 校验（onFinish 里由 canSubmit 兜底）；
 // 2) Form.useWatch 在 antd v6 + React 19 的 jsdom 测试环境下不触发重渲染，
 //    受控 useState 是能被测试覆盖的可靠写法。
-export function AdminLoginForm() {
+export function AdminLoginForm({
+  connectionNotice
+}: { connectionNotice?: ReactNode } = {}) {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -179,131 +182,154 @@ export function AdminLoginForm() {
   }
 
   return (
-    <div className="admin-login">
-      {/* ── 品牌区 ── */}
-      <header className="admin-login__plate">
-        <div className="admin-login__masthead">
-          <div className="admin-login__brandblock admin-login__a1">
-            <div className="admin-login__mark" aria-hidden>
+    <main className="admin-login">
+      <div className="admin-login__layout">
+        <section className="admin-login__brand-panel" aria-label="天生会背">
+          <div className="admin-login__brand">
+            <span className="admin-login__mark" aria-hidden>
               天
-            </div>
-            <div>
-              <h1 className="admin-login__brand">
-                天生会背
-                <span className="admin-login__postag">平台后台</span>
-              </h1>
-              <p className="admin-login__lede">请使用管理员账号登录</p>
-            </div>
+            </span>
+            <span>天生会背</span>
           </div>
-        </div>
-      </header>
-
-      {/* ── 表单 ── */}
-      <main className="admin-login__body">
-        <section className="admin-login__col admin-login__a4">
-          <div className="admin-login__col-head">
-            <span className="admin-login__zh">管理员登录</span>
-            <span className="admin-login__en">SIGN IN</span>
-          </div>
-
-          <Form onFinish={() => void handleLogin()}>
-            <div className="admin-login__field">
-              <div className="admin-login__label">
-                <span className="admin-login__t">手机号</span>
+          <div className="admin-login__artwork" aria-hidden>
+            <div className="admin-login__paper admin-login__paper--back" />
+            <div className="admin-login__paper admin-login__paper--middle" />
+            <div className="admin-login__paper admin-login__paper--front">
+              <div className="admin-login__letterform">
+                Aa
+                <span className="admin-login__letter-dot" />
               </div>
-              <div className="admin-login__ctl">
+              <div className="admin-login__paper-word">
+                possibility<span>/ˌpɒsəˈbɪləti/</span>
+              </div>
+              <div className="admin-login__paper-definition">
+                <span>n.</span> 可能性；可能发生的事
+              </div>
+              <div className="admin-login__bookmark" />
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="admin-login__panel"
+          aria-labelledby="admin-login-heading"
+        >
+          <header className="admin-login__header">
+            <span className="admin-login__mobile-brand">
+              <span className="admin-login__mark" aria-hidden>
+                天
+              </span>
+              天生会背
+            </span>
+            <span className="admin-login__platform">内容管理平台</span>
+          </header>
+
+          <div className="admin-login__card">
+            <h1 id="admin-login-heading">管理员登录</h1>
+            {connectionNotice}
+            <Form
+              className="admin-login__form"
+              layout="vertical"
+              requiredMark={false}
+              onFinish={() => void handleLogin()}
+            >
+              <Form.Item label="手机号" htmlFor="admin-login-phone">
                 <Input
+                  id="admin-login-phone"
                   size="large"
                   placeholder="请输入手机号"
-                  aria-label="手机号"
                   autoComplete="username"
+                  inputMode="tel"
                   value={account}
                   onChange={(e) => onAccountChange(e.target.value)}
                 />
-              </div>
-            </div>
+              </Form.Item>
 
-            <div className="admin-login__field">
-              <div className="admin-login__label">
-                <span className="admin-login__t">验证码</span>
-              </div>
-              <div className="admin-login__ctl">
-                <Input
-                  size="large"
-                  placeholder="请输入验证码"
-                  aria-label="验证码"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={code}
-                  onChange={(e) => onCodeChange(e.target.value)}
-                />
-                <Button
-                  size="large"
-                  htmlType="button"
-                  onClick={() => void handleSendCode()}
-                  disabled={!canSendCode}
-                >
-                  {countdown > 0
-                    ? `${countdown}s 后重发`
-                    : sending
-                      ? "发送中..."
-                      : "获取验证码"}
-                </Button>
-              </div>
-            </div>
-
-            <div className="admin-login__field">
-              <div className="admin-login__label">
-                <span className="admin-login__t">登录密码</span>
-              </div>
-              <div className="admin-login__ctl">
+              <Form.Item label="登录密码" htmlFor="admin-login-password">
                 <Input.Password
+                  id="admin-login-password"
                   size="large"
-                  placeholder="请输入登录密码"
-                  aria-label="登录密码"
+                  placeholder="请输入密码"
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => onPasswordChange(e.target.value)}
                 />
-              </div>
-            </div>
+              </Form.Item>
 
-            {(error || permissionModelIncompatible) && (
-              <Alert
-                type="error"
-                title={
-                  permissionModelIncompatible
-                    ? ADMIN_PERMISSION_UPGRADE_MESSAGE
-                    : error
+              <Form.Item
+                className="admin-login__code-item"
+                label="短信验证码"
+                htmlFor="admin-login-code"
+              >
+                <div className="admin-login__code-control">
+                  <Input
+                    id="admin-login-code"
+                    size="large"
+                    placeholder="请输入验证码"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(e) => onCodeChange(e.target.value)}
+                  />
+                  <Button
+                    className="admin-login__send-code"
+                    type="text"
+                    htmlType="button"
+                    onClick={() => void handleSendCode()}
+                    disabled={!canSendCode}
+                  >
+                    {countdown > 0
+                      ? `${countdown}s 后重发`
+                      : sending
+                        ? "发送中..."
+                        : "获取验证码"}
+                  </Button>
+                </div>
+              </Form.Item>
+
+              {(error || permissionModelIncompatible) && (
+                <Alert
+                  className="admin-login__alert"
+                  type="error"
+                  title={
+                    permissionModelIncompatible
+                      ? ADMIN_PERMISSION_UPGRADE_MESSAGE
+                      : error
+                  }
+                  showIcon
+                />
+              )}
+
+              <Button
+                className={
+                  loading
+                    ? "admin-login__submit admin-login__submit--busy"
+                    : "admin-login__submit"
                 }
-                showIcon
-                style={{ marginBottom: 16 }}
-              />
-            )}
+                type="primary"
+                htmlType="submit"
+                block
+                size="large"
+                loading={loading}
+                disabled={!canSubmit}
+              >
+                {loading ? (
+                  "登录中..."
+                ) : (
+                  <>
+                    登录
+                    <ArrowRightOutlined aria-hidden />
+                  </>
+                )}
+              </Button>
+            </Form>
+          </div>
 
-            <Button
-              className={
-                loading
-                  ? "admin-login__submit admin-login__submit--busy"
-                  : "admin-login__submit"
-              }
-              type="primary"
-              htmlType="submit"
-              block
-              size="large"
-              loading={loading}
-              disabled={!canSubmit}
-            >
-              {loading ? "登录中..." : "登 录"}
-            </Button>
-          </Form>
+          <footer className="admin-login__footer">
+            © {new Date().getFullYear()} 天生会背
+          </footer>
         </section>
-      </main>
-
-      <footer className="admin-login__foot">
-        <span>© {new Date().getFullYear()} 天生会背</span>
-        <span>平台后台 · 词条编辑与发布</span>
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }

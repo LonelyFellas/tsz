@@ -1,3 +1,4 @@
+import { DisconnectOutlined } from "@ant-design/icons";
 import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -9,10 +10,12 @@ import {
   adminAccountIdentity,
   bindAdminAuthorizationCache
 } from "@/lib/adminAuthorization";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import zhCN from "antd/locale/zh_CN";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useMatch } from "react-router-dom";
 import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
+
+export type RootOutletContext = { connectionNotice: ReactNode };
 
 // 单例 QueryClient：全局唯一，避免每次渲染重建缓存。默认项（staleTime 等）取自
 // @tsz/shared 的 browserQueryDefaults，与 web 共用同一份，避免两处漂移。
@@ -22,7 +25,7 @@ bindAdminAuthorizationCache(useAuthStore, queryClient);
 // 挂载时用 admin refresh cookie 静默恢复会话，写入 profile / level / hydrated。
 // AntApp 提供 message/modal/notification 的 context 版（v6 起不建议再用静态方法）。
 export function RootProviders() {
-  const { pathname } = useLocation();
+  const isLoginPage = useMatch("/login") !== null;
   const permissionModelIncompatible = useAuthStore(
     (s) => s.permissionModelIncompatible
   );
@@ -57,45 +60,61 @@ export function RootProviders() {
   const refreshUnconfirmed = useAuthStore((s) => s.refreshUnconfirmed);
   const connectionError = useAuthStore((s) => s.connectionError);
   const hydrated = useAuthStore((s) => s.hydrated);
+  const connectionNotice = !permissionModelIncompatible &&
+    (connectionError || refreshUnconfirmed) && (
+      <Alert
+        className={isLoginPage ? "admin-login__connection" : undefined}
+        role={isLoginPage ? "status" : "alert"}
+        type={isLoginPage ? "info" : "warning"}
+        icon={isLoginPage ? <DisconnectOutlined /> : undefined}
+        showIcon
+        title={
+          isLoginPage
+            ? refreshUnconfirmed
+              ? "登录状态待确认"
+              : retrying
+                ? "正在重试…"
+                : "连接暂不可用"
+            : refreshUnconfirmed
+              ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
+              : hydrated
+                ? "连接暂时中断，联网后将自动恢复；当前内容已保留"
+                : "正在恢复连接，联网后将自动继续"
+        }
+        action={
+          <Button
+            type={isLoginPage ? "text" : "default"}
+            danger={isLoginPage && !refreshUnconfirmed}
+            loading={retrying}
+            onClick={() =>
+              refreshUnconfirmed
+                ? window.location.assign("/login")
+                : void retry()
+            }
+          >
+            {refreshUnconfirmed
+              ? "重新登录"
+              : isLoginPage
+                ? "重试"
+                : "重试连接"}
+          </Button>
+        }
+      />
+    );
   return (
     <QueryClientProvider client={queryClient}>
       <ConfigProvider locale={zhCN} theme={antdTheme}>
         <RecoverySession />
         <AntApp key={identity}>
-          {permissionModelIncompatible && pathname !== "/login" && (
+          {permissionModelIncompatible && !isLoginPage && (
             <Alert
               type="error"
               showIcon
               title={ADMIN_PERMISSION_UPGRADE_MESSAGE}
             />
           )}
-          {!permissionModelIncompatible &&
-            (connectionError || refreshUnconfirmed) && (
-              <Alert
-                type="warning"
-                showIcon
-                title={
-                  refreshUnconfirmed
-                    ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
-                    : hydrated
-                      ? "连接暂时中断，联网后将自动恢复；当前内容已保留"
-                      : "正在恢复连接，联网后将自动继续"
-                }
-                action={
-                  <Button
-                    loading={retrying}
-                    onClick={() =>
-                      refreshUnconfirmed
-                        ? window.location.assign("/login")
-                        : void retry()
-                    }
-                  >
-                    {refreshUnconfirmed ? "重新登录" : "重试连接"}
-                  </Button>
-                }
-              />
-            )}
-          <Outlet />
+          {!isLoginPage && connectionNotice}
+          <Outlet context={{ connectionNotice } satisfies RootOutletContext} />
         </AntApp>
       </ConfigProvider>
     </QueryClientProvider>

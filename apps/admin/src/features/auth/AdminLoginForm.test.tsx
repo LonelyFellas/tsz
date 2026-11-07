@@ -98,7 +98,7 @@ function fill(opts?: { phone?: string; password?: string; code?: string }) {
   fireEvent.change(screen.getByPlaceholderText("请输入手机号"), {
     target: { value: opts?.phone ?? PHONE }
   });
-  fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+  fireEvent.change(screen.getByLabelText("登录密码"), {
     target: { value: opts?.password ?? PASSWORD }
   });
   fireEvent.change(screen.getByPlaceholderText("请输入验证码"), {
@@ -228,7 +228,7 @@ describe("AdminLoginForm — 2FA", () => {
     fireEvent.change(screen.getByPlaceholderText("请输入手机号"), {
       target: { value: PHONE }
     });
-    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+    fireEvent.change(screen.getByLabelText("登录密码"), {
       target: { value: PASSWORD }
     });
     // 未填验证码
@@ -398,7 +398,7 @@ describe("AdminLoginForm — 2FA", () => {
     expect(primaryButton(container)).toBeDisabled();
     expect(mockNavigate).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+    fireEvent.change(screen.getByLabelText("登录密码"), {
       target: { value: "another-secret" }
     });
     expect(
@@ -505,7 +505,7 @@ describe("AdminLoginForm — 2FA", () => {
 
   it("切换密码显隐", () => {
     render(<AdminLoginForm />);
-    const pwd = screen.getByPlaceholderText("请输入登录密码");
+    const pwd = screen.getByLabelText("登录密码");
     expect(pwd).toHaveAttribute("type", "password");
     fireEvent.click(screen.getByRole("img", { name: "eye-invisible" }));
     expect(pwd).toHaveAttribute("type", "text");
