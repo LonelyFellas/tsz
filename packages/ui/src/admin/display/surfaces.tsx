@@ -104,13 +104,15 @@ export function Result({
 }
 export function Breadcrumb({
   items,
-  className = ""
+  className = "",
+  "aria-label": label = "面包屑"
 }: {
   items: { title?: ReactNode; href?: string }[];
   className?: string;
+  "aria-label"?: string;
 }) {
   return (
-    <nav aria-label="面包屑" className={`ui-breadcrumb ${className}`}>
+    <nav aria-label={label} className={`ui-breadcrumb ${className}`}>
       <ol>
         {items.map(({ title, href }, i) => (
           <li key={i}>

@@ -1,3 +1,4 @@
+import { useWorkspaceTranslation } from "@/features/dictionary/i18n/workspace";
 import { useState } from "react";
 import { Button, Space } from "@tsz/ui/admin/display";
 import { Modal } from "@tsz/ui/admin/overlays";
@@ -14,6 +15,7 @@ export function WordNavigationGuard({
   wordId: string;
   requestSentenceLeave?: () => Promise<boolean>;
 }) {
+  const { t } = useWorkspaceTranslation();
   const [leaving, setLeaving] = useState(false);
   const prefix = `/words/${wordId}/v3/wizard/`;
   const blocker = useBlocker(
@@ -27,7 +29,7 @@ export function WordNavigationGuard({
   return blocker.state === "blocked" ? (
     <Modal
       open
-      title="词条还有未保存的修改"
+      title={t("leave_title")}
       zIndex={2000}
       closable={!leaving}
       onCancel={() => {
@@ -36,7 +38,7 @@ export function WordNavigationGuard({
       footer={
         <Space>
           <Button disabled={leaving} onClick={() => blocker.reset()}>
-            继续编辑
+            {t("continue_editing")}
           </Button>
           <Button
             disabled={busy}
@@ -51,12 +53,12 @@ export function WordNavigationGuard({
               }
             }}
           >
-            离开页面
+            {t("leave_page")}
           </Button>
         </Space>
       }
     >
-      请先保存当前修改。离开后只能恢复已成功写入的本地备份，未上传媒体需单独保留。
+      {t("leave_help")}
     </Modal>
   ) : null;
 }

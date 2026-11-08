@@ -1,3 +1,4 @@
+import { useDashboardTranslation } from "@/features/dashboard/i18n";
 import { Alert, Button, Skeleton } from "@tsz/ui/admin/display";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminDashboardOverview } from "@tsz/types";
@@ -23,6 +24,7 @@ import { formatAmount } from "@/features/dashboard/display";
 import "./home.css";
 
 export function HomePage() {
+  const { t, i18n } = useDashboardTranslation();
   const profile = useAuthStore((s) => s.profile);
   const client = useQueryClient();
   const refresh = () => {
@@ -43,11 +45,11 @@ export function HomePage() {
     <div className="dashboard">
       <header className="dashboard-header">
         <div>
-          <h1>工作台</h1>
+          <h1>{t("title")}</h1>
           <p>
             {overview.data
               ? new Date(overview.data.generated_at).toLocaleDateString(
-                  "zh-CN",
+                  i18n.language,
                   {
                     year: "numeric",
                     month: "long",
@@ -56,15 +58,15 @@ export function HomePage() {
                     timeZone: "Asia/Shanghai"
                   }
                 )
-              : "平台运营概览"}
+              : t("overview")}
           </p>
         </div>
         <div className="dashboard-header-actions">
           {overview.data && (
             <time dateTime={overview.data.generated_at}>
-              更新于{" "}
+              {t("updated")}{" "}
               {new Date(overview.data.generated_at).toLocaleTimeString(
-                "zh-CN",
+                i18n.language,
                 {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -74,12 +76,12 @@ export function HomePage() {
             </time>
           )}
           <Button
-            aria-label="刷新首页"
+            aria-label={t("refresh_home")}
             icon={<RefreshCwIcon />}
             loading={overview.isFetching}
             onClick={refresh}
           >
-            刷新
+            {t("refresh")}
           </Button>
         </div>
       </header>
@@ -92,11 +94,11 @@ export function HomePage() {
         <Alert
           type="error"
           showIcon
-          title="首页数据加载失败"
-          description="请检查网络或稍后重试。"
+          title={t("load_failed")}
+          description={t("retry_help")}
           action={
             <Button onClick={refresh} loading={overview.isFetching}>
-              重试
+              {t("retry")}
             </Button>
           }
         />
@@ -107,47 +109,63 @@ export function HomePage() {
 }
 
 function DashboardContent({ data }: { data: AdminDashboardOverview }) {
+  const { t, i18n } = useDashboardTranslation();
   const profile = useAuthStore((s) => s.profile);
   const canVisit = (path: string) => canVisitAdminRoute(profile, path);
   const canViewCoins = usePermission("coins.access");
-  const count = (value: number) => value.toLocaleString("zh-CN");
+  const count = (value: number) => value.toLocaleString(i18n.language);
   const progress = [
-    { label: "已完成一轮", value: data.learning_progress.completed },
-    { label: "进行中", value: data.learning_progress.in_progress },
-    { label: "未开始", value: data.learning_progress.not_started }
+    {
+      state: "completed",
+      label: t("completed"),
+      value: data.learning_progress.completed
+    },
+    {
+      state: "in-progress",
+      label: t("in_progress"),
+      value: data.learning_progress.in_progress
+    },
+    {
+      state: "not-started",
+      label: t("not_started"),
+      value: data.learning_progress.not_started
+    }
   ];
   const total = progress.reduce((sum, item) => sum + item.value, 0);
   return (
     <>
-      <dl className="dashboard-summary" aria-label="平台规模">
+      <dl className="dashboard-summary" aria-label={t("platform_scale")}>
         <div>
-          <dt>词库累计</dt>
+          <dt>{t("entries_total")}</dt>
           <dd>
             {count(data.lexicon.total)}
-            <small>条</small>
+            <small>{t("entry_unit", { count: data.lexicon.total })}</small>
           </dd>
           <p>
-            本周新增 <b>{count(data.lexicon.week)}</b>
+            {t("new_week")}
+            <b>{count(data.lexicon.week)}</b>
           </p>
         </div>
         <div>
-          <dt>累计用户</dt>
+          <dt>{t("users_total")}</dt>
           <dd>
             {count(data.users.total)}
-            <small>人</small>
+            <small>{t("user_unit", { count: data.users.total })}</small>
           </dd>
           <p>
-            近 7 日新增 <b>{count(data.users.last_7_days)}</b>
+            {t("new_seven_days")}
+            <b>{count(data.users.last_7_days)}</b>
           </p>
         </div>
         <div>
-          <dt>学习任务</dt>
+          <dt>{t("tasks")}</dt>
           <dd>
             {count(data.tasks.total)}
-            <small>个</small>
+            <small>{t("task_unit", { count: data.tasks.total })}</small>
           </dd>
           <p>
-            本周创建 <b>{count(data.tasks.week)}</b>
+            {t("created_week")}
+            <b>{count(data.tasks.week)}</b>
           </p>
         </div>
       </dl>
@@ -158,21 +176,24 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
         >
           <div className="dashboard-panel-heading">
             <div>
-              <h2 id="production-title">词库建设</h2>
-              <p>每周新增词条</p>
+              <h2 id="production-title">{t("production")}</h2>
+              <p>{t("weekly_entries")}</p>
             </div>
             {canVisit("/words") && (
               <Link to="/words">
-                管理词库 <ArrowRightIcon />
+                {t("manage_lexicon")}
+                <ArrowRightIcon />
               </Link>
             )}
           </div>
           <div className="dashboard-production-numbers">
             <span>
-              本月新增 <strong>{count(data.lexicon.month)}</strong>
+              {t("new_month")}
+              <strong>{count(data.lexicon.month)}</strong>
             </span>
             <span>
-              今日新增 <strong>{count(data.lexicon.today)}</strong>
+              {t("new_today")}
+              <strong>{count(data.lexicon.today)}</strong>
             </span>
           </div>
           <ContentTrend
@@ -186,30 +207,23 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
         >
           <div className="dashboard-panel-heading">
             <div>
-              <h2 id="learning-title">今日学习</h2>
-              <p>按今日学习任务统计</p>
+              <h2 id="learning-title">{t("learning_today")}</h2>
+              <p>{t("today_scope")}</p>
             </div>
-            <span className="dashboard-total">{count(total)} 个任务</span>
+            <span className="dashboard-total">
+              {t("task_count", { count: total })}
+            </span>
           </div>
           {total === 0 ? (
-            <div className="dashboard-empty">暂无学习数据</div>
+            <div className="dashboard-empty">{t("no_learning")}</div>
           ) : (
             <dl className="dashboard-progress">
               {progress.map((item) => (
-                <div
-                  key={item.label}
-                  data-state={
-                    item.label === "已完成一轮"
-                      ? "completed"
-                      : item.label === "进行中"
-                        ? "in-progress"
-                        : "not-started"
-                  }
-                >
+                <div key={item.state} data-state={item.state}>
                   <dt>{item.label}</dt>
                   <dd>
                     {count(item.value)}
-                    <small>个</small>
+                    <small>{t("task_unit", { count: item.value })}</small>
                   </dd>
                   <div
                     className="dashboard-meter"
@@ -226,10 +240,10 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
             </dl>
           )}
           <div className="dashboard-footnote">
-            累计 {count(data.tasks.completed)} 个学习任务至少完成过一轮。
+            {t("tasks_completed", { total: count(data.tasks.completed) })}
           </div>
         </section>
-        <aside className="dashboard-side-rail" aria-label="运营与工作入口">
+        <aside className="dashboard-side-rail" aria-label={t("operations")}>
           <WorkQueue />
           <section
             className="dashboard-panel dashboard-entries"
@@ -237,33 +251,33 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
           >
             <div className="dashboard-panel-heading">
               <div>
-                <h2 id="entries-title">内容工作区</h2>
+                <h2 id="entries-title">{t("workspaces")}</h2>
               </div>
             </div>
             <div className="dashboard-workspaces">
               {[
                 {
                   path: "/words",
-                  label: "智能词库",
-                  hint: "词形、发音与多维词义",
+                  label: t("entries"),
+                  hint: t("entries_help"),
                   icon: LibraryBigIcon
                 },
                 {
                   path: "/sentences",
-                  label: "多维例句",
-                  hint: "例句编创与语言资料",
+                  label: t("sentences"),
+                  hint: t("sentences_help"),
                   icon: BookTextIcon
                 },
                 {
                   path: "/voices",
-                  label: "配音中心",
-                  hint: "分组配音与音色管理",
+                  label: t("voices"),
+                  hint: t("voices_help"),
                   icon: Volume2Icon
                 },
                 {
                   path: "/wordlists",
-                  label: "智能词表",
-                  hint: "内容组织与词表管理",
+                  label: t("wordlists"),
+                  hint: t("wordlists_help"),
                   icon: ListChecksIcon
                 }
               ]
@@ -287,32 +301,35 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
       {canViewCoins && (
         <div className="dashboard-finance">
           <span>
-            天生币流通 <strong>{formatAmount(data.coins.circulation)}</strong>
+            {t("circulation")}
+            <strong>{formatAmount(data.coins.circulation)}</strong>
           </span>
           <span>
-            本周净投放 <b>{formatAmount(data.coins.week_net)}</b>
+            {t("net_week")}
+            <b>{formatAmount(data.coins.week_net)}</b>
           </span>
           <Link to="/coins">
-            查看流水 <ArrowRightIcon />
+            {t("ledger")}
+            <ArrowRightIcon />
           </Link>
         </div>
       )}
       {profile?.role === "super_admin" && (
         <details className="dashboard-cost">
           <summary>
-            AI 用量与费用 <span>预估金额与计价明细</span>
+            {t("ai_usage")}
+            <span>{t("estimates")}</span>
           </summary>
           <AiCostOverview />
         </details>
       )}
-      <p className="dashboard-timezone">
-        统计口径：北京时间自然日、周一至今及自然月。词条数量包含不同发布状态。
-      </p>
+      <p className="dashboard-timezone">{t("time_scope")}</p>
     </>
   );
 }
 
 function WorkQueue() {
+  const { t } = useDashboardTranslation();
   const profile = useAuthStore((s) => s.profile);
   const reviewsAllowed = canVisitAdminRoute(profile, "/reviews");
   const teachersAllowed = canVisitAdminRoute(profile, "/teacher-applications");
@@ -356,8 +373,8 @@ function WorkQueue() {
     >
       <div className="dashboard-panel-heading">
         <div>
-          <h2 id="queue-title">待处理</h2>
-          <p>词表与教师申请审核</p>
+          <h2 id="queue-title">{t("queue")}</h2>
+          <p>{t("queue_scope")}</p>
         </div>
         <ClipboardCheckIcon aria-hidden="true" />
       </div>
@@ -366,7 +383,7 @@ function WorkQueue() {
           <span>
             <CheckCheckIcon aria-hidden="true" />
           </span>
-          <strong>暂无待审事项</strong>
+          <strong>{t("queue_empty")}</strong>
         </div>
       )}
       <div className="dashboard-queue-list">
@@ -376,9 +393,9 @@ function WorkQueue() {
               <BookOpenIcon />
             </span>
             <span>
-              词表审核
+              {t("review_wordlists")}
               <small>
-                {reviews.isError ? "读取失败，进入页面重试" : "等待审核的词表"}
+                {reviews.isError ? t("queue_failed") : t("waiting_wordlists")}
               </small>
             </span>
             <strong>
@@ -393,9 +410,9 @@ function WorkQueue() {
               <GraduationCapIcon />
             </span>
             <span>
-              教师申请
+              {t("teachers")}
               <small>
-                {teachers.isError ? "读取失败，进入页面重试" : "等待核验的申请"}
+                {teachers.isError ? t("queue_failed") : t("waiting_teachers")}
               </small>
             </span>
             <strong>
@@ -405,12 +422,12 @@ function WorkQueue() {
           </Link>
         )}
         {!reviewsAllowed && !teachersAllowed && (
-          <p className="dashboard-empty">当前账号没有审核队列权限</p>
+          <p className="dashboard-empty">{t("queue_forbidden")}</p>
         )}
       </div>
       {canVisitAdminRoute(profile, "/words/new") && (
         <Link className="dashboard-create" to="/words/new">
-          <PlusIcon /> 创建词条 <ArrowRightIcon />
+          <PlusIcon /> {t("create_entry")} <ArrowRightIcon />
         </Link>
       )}
     </section>

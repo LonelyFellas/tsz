@@ -15,6 +15,7 @@ import {
   uuidFromInt
 } from "./fixtures";
 import type { V3Problem } from "./problem";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { mockPageWidthObserver } from "../word-creation/wordCreation.test.helper";
 import {
   V3WordCreationLayout,
@@ -79,6 +80,46 @@ function issue(): V3DraftValidationIssue {
     }
   };
 }
+it("切换语言保留本地输入与版本冲突，只有显式选择才处理冲突", () => {
+  const entry = word();
+  const remote = { ...entry, revision: 3 };
+  const keep = vi.fn();
+  const discard = vi.fn();
+  const changeStep = vi.fn();
+  const content = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <MemoryRouter>
+        <V3WordCreationLayout
+          word={entry}
+          activeStep="forms"
+          dirtySteps={{ forms: true, meanings: false }}
+          remoteUpdate={remote}
+          onStepChange={changeStep}
+          onKeepLocalChanges={keep}
+          onDiscardLocalChanges={discard}
+        >
+          <input aria-label="spelling draft" defaultValue="centre" />
+        </V3WordCreationLayout>
+      </MemoryRouter>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = screen.getByLabelText("spelling draft");
+  fireEvent.change(input, { target: { value: "原文与 centre" } });
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByRole("navigation", { name: "Breadcrumb" })
+  ).toBeInTheDocument();
+  expect(screen.getByText("Version conflict")).toBeInTheDocument();
+  expect(screen.getByLabelText("spelling draft")).toBe(input);
+  expect(input).toHaveValue("原文与 centre");
+  expect(keep).not.toHaveBeenCalled();
+  expect(discard).not.toHaveBeenCalled();
+  expect(changeStep).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Keep local changes" }));
+  expect(keep).toHaveBeenCalledOnce();
+  expect(discard).not.toHaveBeenCalled();
+});
 
 function renderLayout(
   options: {

@@ -1,3 +1,7 @@
+import {
+  useWorkspaceTranslation,
+  type WorkspaceMessage
+} from "@/features/dictionary/i18n/workspace";
 import { primaryRegionalVariant } from "@tsz/shared";
 import { Alert, Button, Flex } from "@tsz/ui/admin/display";
 import { Popconfirm } from "@tsz/ui/admin/overlays";
@@ -25,11 +29,11 @@ import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
 import { v3IssueMessages } from "./presentationErrors";
 import "./v3-layout.css";
 
-const STEP_TITLE: Record<WordCreationStep, string> = {
-  basics: "基础信息",
-  forms: "词形与发音",
-  meanings: "词义与例句",
-  preview: "核对与发布"
+const STEP_TITLE: Record<WordCreationStep, WorkspaceMessage> = {
+  basics: "basics",
+  forms: "forms",
+  meanings: "meanings",
+  preview: "review_publish"
 };
 
 export type V3ConflictComparison = (
@@ -78,35 +82,35 @@ interface Props {
   children: ReactNode;
 }
 
-function problemTitle(problem: V3Problem) {
+function problemTitle(problem: V3Problem): WorkspaceMessage {
   switch (problem.kind) {
     case "revision_conflict":
-      return "版本冲突";
+      return "conflict";
     case "entry_archived":
-      return "词条已在垃圾桶中";
+      return "archived";
     case "validation":
-      return "仍有内容需要完成";
+      return "incomplete";
     // 影响确认失效（后端 409 downstream_confirmation_required）：兜底文案，
     // 正常路径由词形步/词义步的确认条挡在前面。
     case "impact_confirmation":
-      return "词形影响需要重新确认";
+      return "impact_confirmation";
     case "inbound_reference":
       return problem.references.length > 0
-        ? "本次修改会导致关联内容不匹配，暂时无法完成操作"
-        : "关联内容正在修改或尚未解除关联，暂时无法完成操作";
+        ? "references_mismatch"
+        : "references_busy";
     case "network":
     case "server":
     case "service_unavailable":
-      return "服务暂时不可用";
+      return "unavailable";
     case "authentication":
-      return "登录状态已失效";
+      return "expired";
     case "authorization":
-      return "没有操作权限";
+      return "forbidden";
     case "client_contract":
     case "unexpected_client":
-      return "响应格式异常，已安全停止";
+      return "invalid_response";
     default:
-      return "操作未完成";
+      return "operation_incomplete";
   }
 }
 
@@ -150,16 +154,17 @@ function DiscardLocalChangesButton({
   revision: number;
   onConfirm: () => void;
 }) {
+  const { t } = useWorkspaceTranslation();
   return (
     <Popconfirm
-      cancelText="取消"
-      description={`未保存的输入会被丢弃，改用第 ${revision} 版内容。`}
+      cancelText={t("cancel")}
+      description={t("discard_revision", { revision })}
       okButtonProps={{ danger: true }}
-      okText="放弃修改"
+      okText={t("discard_changes")}
       onConfirm={onConfirm}
-      title="放弃本地修改？"
+      title={t("discard_local_confirm")}
     >
-      <Button danger>放弃本地修改</Button>
+      <Button danger>{t("discard_local")}</Button>
     </Popconfirm>
   );
 }
@@ -191,6 +196,7 @@ function V3WordCreationLayoutContent({
   onDiscardLocalChanges,
   children
 }: Props) {
+  const { t, i18n } = useWorkspaceTranslation();
   const remoteUpdateAlertRef = useRef<HTMLDivElement>(null);
   const referenceGuard = useV3ReferenceGuard();
   // 保存被引用拦下多半是别处刚新增了引用（或索引过期）：重新拉一次，界面禁用态跟着更新。
@@ -218,7 +224,7 @@ function V3WordCreationLayoutContent({
           (surface) =>
             surface.trim() !== "" &&
             !/^未命名词条(?:\s*·.*)?$/u.test(surface.trim())
-        ) ?? "新词条"));
+        ) ?? t("new_entry")));
   const progressRows = buildV3ProductProgress({
     wordId: word.id,
     language: word.language,
@@ -245,11 +251,11 @@ function V3WordCreationLayoutContent({
       ? problem.issues
       : [];
   const dirtyStepLabel = [
-    dirtySteps.forms ? "词形与发音" : undefined,
-    dirtySteps.meanings ? "词义与例句" : undefined
+    dirtySteps.forms ? t("forms") : undefined,
+    dirtySteps.meanings ? t("meanings") : undefined
   ]
     .filter(Boolean)
-    .join("、");
+    .join(i18n.language.startsWith("en") ? ", " : "、");
   const showRemoteUpdate = Boolean(remoteUpdate) && !readOnly;
   const comparisonWord = remoteUpdate ?? conflict?.serverWord;
   return (
@@ -259,7 +265,7 @@ function V3WordCreationLayoutContent({
       onStepChange={readOnly ? undefined : onStepChange}
       presentation={{
         wordExists: true,
-        breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
+        breadcrumbTitle: `${visibleLabel} · ${t(STEP_TITLE[activeStep])}`,
         completedSteps: word.completed_steps,
         summaryHeadword: (
           <strong className="v3-summary-headword tsz-words">
@@ -274,10 +280,18 @@ function V3WordCreationLayoutContent({
               completed: row.completed,
               index: row.index,
               key: row.key,
-              label: row.label,
+              label: t(`progress_${row.key}`),
               value: row.value ?? row.count,
               details: row.details,
               statusDescription: row.statusDescription
+                ? t(
+                    row.key === "forms"
+                      ? dirtySteps.forms
+                        ? "progress_unsaved_forms"
+                        : "progress_forms_count"
+                      : "progress_editing"
+                  )
+                : undefined
             }))}
           />
         )
@@ -290,26 +304,25 @@ function V3WordCreationLayoutContent({
             <Alert
               showIcon
               type="error"
-              title="版本冲突"
+              title={t("conflict")}
               description={
                 <Flex vertical gap={4}>
                   <span>
-                    {`词条已在别处保存为第 ${remoteUpdate.revision} 版；${
-                      dirtyStepLabel
-                        ? `你在「${dirtyStepLabel}」的修改`
-                        : "你的修改"
-                    }尚未保存，本地输入仍已保留。`}
+                    {t("remote_changed", {
+                      revision: remoteUpdate.revision,
+                      changes: dirtyStepLabel
+                        ? t("changes_in_steps", { steps: dirtyStepLabel })
+                        : t("your_changes")
+                    })}
                   </span>
-                  <span>
-                    保留本地修改后可继续编辑并保存；放弃本地修改则改用最新内容。做出选择前不会保存。
-                  </span>
+                  <span>{t("conflict_help")}</span>
                 </Flex>
               }
               action={
                 <Flex gap="small" wrap="wrap">
                   {onKeepLocalChanges ? (
                     <Button type="primary" onClick={onKeepLocalChanges}>
-                      保留本地修改
+                      {t("keep_local")}
                     </Button>
                   ) : null}
                   {onDiscardLocalChanges ? (
@@ -330,8 +343,8 @@ function V3WordCreationLayoutContent({
           <Alert
             showIcon
             type="warning"
-            title="有未保存的草稿"
-            description={`切换步骤不会丢失当前输入；请先保存${dirtyStepLabel}草稿，再检查或发布。`}
+            title={t("unsaved")}
+            description={t("save_before_publish", { steps: dirtyStepLabel })}
           />
         ) : null}
 
@@ -341,27 +354,25 @@ function V3WordCreationLayoutContent({
             <Alert
               showIcon
               type={problem.kind === "validation" ? "warning" : "error"}
-              title={problemTitle(problem)}
+              title={t(problemTitle(problem))}
               description={
                 conflict ? (
                   <Flex vertical gap={4}>
                     <span>
                       <strong>
                         {conflict.step === "forms"
-                          ? "词形与发音冲突"
-                          : "词义与例句冲突"}
+                          ? t("forms_conflict")
+                          : t("meanings_conflict")}
                       </strong>
-                      ：本地输入仍已保留。
+                      {t("local_retained")}
                     </span>
-                    {conflict.serverWord && <span>已获取服务端最新内容。</span>}
+                    {conflict.serverWord && <span>{t("server_loaded")}</span>}
                   </Flex>
                 ) : inboundReferenceProblem ? (
                   <Flex vertical gap={4}>
-                    <span>
-                      请刷新页面后重试；若仍无法完成，请检查关联内容，调整内容或解除关联后再试。
-                    </span>
+                    <span>{t("reference_help")}</span>
                     <V3ReferenceList
-                      emptyText="暂时无法查看具体关联，请刷新页面后重试。"
+                      emptyText={t("references_unknown")}
                       references={inboundReferenceProblem.references}
                     />
                   </Flex>
@@ -384,7 +395,7 @@ function V3WordCreationLayoutContent({
                       loading={refreshingConflict}
                       onClick={onRefreshConflict}
                     >
-                      刷新并比较
+                      {t("compare")}
                     </Button>
                     {conflict.serverWord && onDiscardLocalChanges ? (
                       <DiscardLocalChangesButton
@@ -399,11 +410,11 @@ function V3WordCreationLayoutContent({
                       onIssueNavigate(operationValidationIssues[0]!)
                     }
                   >
-                    去处理首项
+                    {t("first_issue")}
                   </Button>
                 ) : problem.retryable && onRetry ? (
                   <Button loading={retrying} onClick={onRetry}>
-                    重试
+                    {t("retry")}
                   </Button>
                 ) : undefined
               }

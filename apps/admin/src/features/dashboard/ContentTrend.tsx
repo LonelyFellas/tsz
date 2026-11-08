@@ -1,3 +1,4 @@
+import { useDashboardTranslation } from "@/features/dashboard/i18n";
 import { useState } from "react";
 import type { DashboardWeeklyPoint } from "@tsz/types";
 import {
@@ -29,6 +30,7 @@ export function ContentTrend({
   data: DashboardWeeklyPoint[];
   generatedAt?: string;
 }) {
+  const { t, i18n } = useDashboardTranslation();
   const [table, setTable] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string>();
   const profile = useAuthStore((s) => s.profile);
@@ -57,18 +59,18 @@ export function ContentTrend({
           <span>
             {selected
               ? `${selected.week_start.slice(5).replace("-", ".")} — ${weekEnd(selected.week_start).slice(5).replace("-", ".")}`
-              : "暂无周数据"}
-            {ongoing && <small>本周 · 进行中</small>}
+              : t("no_week")}
+            {ongoing && <small>{t("ongoing_week")}</small>}
           </span>
           <strong>
-            {selected?.value.toLocaleString("zh-CN") ?? "—"}
-            <small>新增词条</small>
+            {selected?.value.toLocaleString(i18n.language) ?? "—"}
+            <small>{t("new_entries")}</small>
           </strong>
         </div>
         <div
           className="dashboard-chart-controls"
           role="group"
-          aria-label="词库建设显示方式"
+          aria-label={t("display_mode")}
         >
           <button
             type="button"
@@ -76,7 +78,7 @@ export function ContentTrend({
             onClick={() => setTable(false)}
           >
             <ChartNoAxesColumnIcon aria-hidden="true" />
-            图表
+            {t("chart")}
           </button>
           <button
             type="button"
@@ -84,18 +86,18 @@ export function ContentTrend({
             onClick={() => setTable(true)}
           >
             <Table2Icon aria-hidden="true" />
-            数据
+            {t("data")}
           </button>
         </div>
       </div>
       {table ? (
         <div className="dashboard-data-table">
           <table>
-            <caption className="sr-only">每周新增词条数据</caption>
+            <caption className="sr-only">{t("weekly_table")}</caption>
             <thead>
               <tr>
-                <th>周起始日</th>
-                <th>新增词条</th>
+                <th>{t("week_start")}</th>
+                <th>{t("new_entries")}</th>
               </tr>
             </thead>
             <tbody>
@@ -115,7 +117,7 @@ export function ContentTrend({
                       {point.week_start}
                     </button>
                   </td>
-                  <td>{point.value.toLocaleString("zh-CN")}</td>
+                  <td>{point.value.toLocaleString(i18n.language)}</td>
                 </tr>
               ))}
             </tbody>
@@ -123,13 +125,13 @@ export function ContentTrend({
         </div>
       ) : !data.length || data.every((point) => point.value === 0) ? (
         <div className="dashboard-empty dashboard-trend-empty">
-          近六周暂无新增词条
+          {t("no_recent_entries")}
         </div>
       ) : (
         <div
           className="dashboard-chart"
           role="group"
-          aria-label="近六周新增词条柱状图，可切换数据查看具体数量"
+          aria-label={t("chart_label")}
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
@@ -153,10 +155,12 @@ export function ContentTrend({
               />
               <Tooltip
                 cursor={{ fill: "#f5f7fb" }}
-                labelFormatter={(label) => `${label} 起的一周`}
+                labelFormatter={(label) =>
+                  t("week_tooltip", { date: String(label) })
+                }
                 formatter={(value) => [
-                  Number(value).toLocaleString("zh-CN"),
-                  "新增词条"
+                  Number(value).toLocaleString(i18n.language),
+                  t("new_entries")
                 ]}
                 contentStyle={{
                   border: 0,
@@ -167,7 +171,7 @@ export function ContentTrend({
               />
               <Bar
                 dataKey="value"
-                name="新增词条"
+                name={t("new_entries")}
                 maxBarSize={24}
                 radius={[4, 4, 0, 0]}
                 isAnimationActive={false}
@@ -193,7 +197,7 @@ export function ContentTrend({
       <div
         className="dashboard-week-selector"
         role="group"
-        aria-label="查看指定周的新增词条"
+        aria-label={t("select_week")}
         style={{
           gridTemplateColumns: `repeat(${Math.max(1, data.length)}, minmax(0, 1fr))`
         }}
@@ -202,7 +206,7 @@ export function ContentTrend({
           <button
             key={point.week_start}
             type="button"
-            aria-label={`查看 ${point.week_start} 当周`}
+            aria-label={t("view_week", { date: point.week_start })}
             aria-pressed={point.week_start === selected?.week_start}
             onClick={() => setSelectedWeek(point.week_start)}
           >
@@ -211,9 +215,9 @@ export function ContentTrend({
         ))}
       </div>
       <div className="dashboard-chart-footer">
-        <span>近六周 · 选择周次查看对应内容</span>
+        <span>{t("week_help")}</span>
         {selected && canVisitAdminRoute(profile, "/words") && (
-          <Link to={detailLink}>查看该周词条 →</Link>
+          <Link to={detailLink}>{t("week_entries")}</Link>
         )}
       </div>
     </div>

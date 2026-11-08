@@ -1,3 +1,4 @@
+import { useWorkspaceTranslation } from "@/features/dictionary/i18n/workspace";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { Typography } from "@tsz/ui/admin/display";
 
@@ -25,8 +26,8 @@ function differences(
   return [{ path, local, remote }];
 }
 
-function valueText(value: unknown) {
-  if (value === undefined) return "（不存在）";
+function valueText(value: unknown, missing: string) {
+  if (value === undefined) return missing;
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
 }
 
@@ -37,12 +38,11 @@ export function DraftComparison({
   local: unknown;
   remote: unknown;
 }) {
+  const { t } = useWorkspaceTranslation();
   const rows = differences(local, remote);
   return (
-    <section aria-label="草稿差异">
-      <Typography.Paragraph>
-        本地输入与服务端最新草稿的差异；未自动合并。请核对后调整输入，再保存。
-      </Typography.Paragraph>
+    <section aria-label={t("draft_differences")}>
+      <Typography.Paragraph>{t("differences_help")}</Typography.Paragraph>
       {rows.length ? (
         <Table<Difference>
           tableId="draft-comparison"
@@ -54,33 +54,33 @@ export function DraftComparison({
           }
           scroll={{ x: 640 }}
           columns={[
-            { title: "字段路径", dataIndex: "path", width: 220 },
+            { title: t("field_path"), dataIndex: "path", width: 220 },
             {
-              title: "本地输入",
+              title: t("local_input"),
               dataIndex: "local",
               render: (value: unknown) => (
                 <span
                   style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
                 >
-                  {valueText(value)}
+                  {valueText(value, t("missing_value"))}
                 </span>
               )
             },
             {
-              title: "服务端最新内容",
+              title: t("server_content"),
               dataIndex: "remote",
               render: (value: unknown) => (
                 <span
                   style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
                 >
-                  {valueText(value)}
+                  {valueText(value, t("missing_value"))}
                 </span>
               )
             }
           ]}
         />
       ) : (
-        <Typography.Text>本地输入与服务端内容相同。</Typography.Text>
+        <Typography.Text>{t("identical")}</Typography.Text>
       )}
     </section>
   );

@@ -1,3 +1,7 @@
+import {
+  useWorkspaceTranslation,
+  type WorkspaceMessage
+} from "@/features/dictionary/i18n/workspace";
 import { CheckIcon, ChevronLeftIcon, ListIcon } from "lucide-react";
 import { Breadcrumb, Button, Typography } from "@tsz/ui/admin/display";
 import { useAdminDisabled } from "@tsz/ui/admin/context";
@@ -15,11 +19,11 @@ import "./word-creation.css";
 
 const WORD_STEP_ORDER = ["basics", "forms", "meanings", "preview"] as const;
 
-const WORD_STEP_TITLE: Record<WordCreationStep, string> = {
-  basics: "创建词条",
-  forms: "词形与发音",
-  meanings: "词义与例句",
-  preview: "预览并生效"
+const WORD_STEP_TITLE: Record<WordCreationStep, WorkspaceMessage> = {
+  basics: "create_entry",
+  forms: "forms",
+  meanings: "meanings",
+  preview: "preview"
 };
 
 interface Props {
@@ -45,11 +49,11 @@ interface Props {
 // 超过这个宽度左栏才排得下，窄于它「完成情况」改走抽屉。
 const PROGRESS_DRAWER_MAX_WIDTH = 1199;
 
-const STEP_SUBTITLE: Record<WordCreationStep, string> = {
-  basics: "所属语言｜英美区分",
-  forms: "词性分类｜词形变化",
-  meanings: "多维释义｜多维例句",
-  preview: "结构核对｜提交生效"
+const STEP_SUBTITLE: Record<WordCreationStep, WorkspaceMessage> = {
+  basics: "basics_help",
+  forms: "forms_help",
+  meanings: "meanings_help",
+  preview: "preview_help"
 };
 
 export function WordCreationLayout({
@@ -60,6 +64,7 @@ export function WordCreationLayout({
   presentation,
   children
 }: Props) {
+  const { t } = useWorkspaceTranslation();
   const navigate = useNavigate();
   // 「完成情况」是只读清单,窄屏平铺在顶部会把主内容整个挤出首屏,改收进右侧抽屉。
   // 量不到宽度时(jsdom、首帧)按宽屏渲染,免得清单被藏进一个没人点的抽屉里。
@@ -87,23 +92,24 @@ export function WordCreationLayout({
   const isBasicsStep = currentStep === "basics";
   const completed = new Set(presentation.completedSteps);
   const progressTriggerLabel = presentation.progressBadge
-    ? `完成情况 ${presentation.progressBadge}`
-    : "完成情况";
+    ? t("progress_badge", { badge: presentation.progressBadge })
+    : t("progress");
 
   return (
     <div className="word-creation-page" ref={pageRef}>
       <Breadcrumb
+        aria-label={t("breadcrumb")}
         className="word-creation-breadcrumb"
         items={[
-          { title: "词库管理" },
+          { title: t("dictionary_management") },
           {
-            title: <Link to="/words">智能词库</Link>
+            title: <Link to="/words">{t("dictionary")}</Link>
           },
           { title: presentation.breadcrumbTitle }
         ]}
       />
 
-      <nav className="word-creation-stepper" aria-label="词条编辑步骤">
+      <nav className="word-creation-stepper" aria-label={t("steps")}>
         {WORD_STEP_ORDER.map((step, index) => {
           const current = step === currentStep;
           const finished = completed.has(step) && !current;
@@ -129,35 +135,37 @@ export function WordCreationLayout({
                 {finished ? <CheckIcon /> : index + 1}
               </span>
               <span>
-                <strong>{WORD_STEP_TITLE[step]}</strong>
-                <small>{STEP_SUBTITLE[step]}</small>
+                <strong>{t(WORD_STEP_TITLE[step])}</strong>
+                <small>{t(STEP_SUBTITLE[step])}</small>
               </span>
-              {finished && <span className="sr-only">已完成</span>}
+              {finished && <span className="sr-only">{t("completed")}</span>}
             </button>
           );
         })}
       </nav>
 
       <div className="word-creation-shell">
-        <section className="word-creation-summary" aria-label="词条摘要">
+        <section className="word-creation-summary" aria-label={t("summary")}>
           <Button
             type="text"
             icon={<ChevronLeftIcon />}
             onClick={() => navigate("/words")}
             className="word-creation-back"
           >
-            返回智能词库
+            {t("back")}
           </Button>
 
           {presentation.showEntrySummary !== false && (
             <div className="word-summary-entry-card">
               <Typography.Text type="secondary" className="word-summary-kicker">
-                当前词条
+                {t("current_entry")}
               </Typography.Text>
               {presentation.summaryHeadword}
 
               <div className="word-summary-language">
-                <Typography.Text type="secondary">所属语言</Typography.Text>
+                <Typography.Text type="secondary">
+                  {t("language")}
+                </Typography.Text>
                 <strong>English</strong>
               </div>
 
@@ -182,7 +190,7 @@ export function WordCreationLayout({
                   type="secondary"
                   className="word-summary-kicker"
                 >
-                  完成情况
+                  {t("progress")}
                 </Typography.Text>
               </div>
               {presentation.progress}
@@ -204,7 +212,7 @@ export function WordCreationLayout({
           open={progressOpen}
           placement="right"
           size="min(360px, 86vw)"
-          title="完成情况"
+          title={t("progress")}
         >
           {presentation.progress}
         </Drawer>
