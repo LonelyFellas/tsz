@@ -1,3 +1,4 @@
+import { useWorkspaceTranslation } from "@/features/dictionary/i18n/workspace";
 import { CheckIcon } from "lucide-react";
 import { Flex, Typography } from "@tsz/ui/admin/display";
 import { useId, useState, type ReactNode } from "react";
@@ -27,6 +28,7 @@ export function V3ProductProgressList({
   currentKey?: string;
   rows: readonly V3ProductProgressListRow[];
 }) {
+  const { t } = useWorkspaceTranslation();
   const detailsId = useId();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   return (
@@ -37,7 +39,7 @@ export function V3ProductProgressList({
     >
       {rows.map((row) => (
         <section
-          aria-label={`${row.label}摘要`}
+          aria-label={t("progress_summary", { label: row.label })}
           className="v3-product-progress-group"
           data-progress-key={row.key}
           key={row.key}
@@ -46,7 +48,10 @@ export function V3ProductProgressList({
             aria-current={row.key === currentKey ? "step" : undefined}
             aria-expanded={Boolean(expanded[row.key])}
             aria-controls={row.details ? `${detailsId}-${row.key}` : undefined}
-            aria-label={`${expanded[row.key] ? "收起" : "展开"}${row.label}`}
+            aria-label={t(
+              expanded[row.key] ? "progress_collapse" : "progress_expand",
+              { label: row.label }
+            )}
             className="word-creation-progress-row"
             data-readiness-state={row.completed ? "complete" : "incomplete"}
             onClick={() =>
@@ -60,7 +65,7 @@ export function V3ProductProgressList({
           >
             {row.completed ? (
               <CheckIcon
-                aria-label={`${row.label}已完成`}
+                aria-label={t("progress_complete", { label: row.label })}
                 className="word-progress-done"
               />
             ) : (
@@ -74,8 +79,12 @@ export function V3ProductProgressList({
               {!(row.completed && row.value === "完成") && (
                 <Typography.Text type="secondary">
                   {typeof row.value === "number"
-                    ? `${row.value} 项`
-                    : row.value}
+                    ? t("item_count", { count: row.value })
+                    : row.value === "完成"
+                      ? t("progress_done")
+                      : row.value === "未完成"
+                        ? t("progress_pending")
+                        : row.value}
                 </Typography.Text>
               )}
               <span
@@ -96,7 +105,9 @@ export function V3ProductProgressList({
                 {row.key in expanded && (
                   <ul className="v3-product-progress-details">
                     {row.details.length === 0 ? (
-                      <li className="v3-product-progress-empty">暂未添加</li>
+                      <li className="v3-product-progress-empty">
+                        {t("not_added")}
+                      </li>
                     ) : (
                       row.details.map((detail, index) => (
                         <li key={detail.key} data-pending={detail.pending}>
@@ -118,7 +129,9 @@ export function V3ProductProgressList({
                               {detail.label}
                             </span>
                             {detail.count !== undefined && (
-                              <span>{detail.count} 项</span>
+                              <span>
+                                {t("item_count", { count: detail.count })}
+                              </span>
                             )}
                           </div>
                           {detail.items && detail.items.length > 0 && (

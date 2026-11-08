@@ -1,3 +1,4 @@
+import { useDashboardTranslation } from "@/features/dashboard/i18n";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -14,10 +15,7 @@ import { Tooltip } from "@tsz/ui/admin/overlays";
 import { RotateCwIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, useAuthStore } from "@/lib/auth";
-import {
-  callPurposeLabels,
-  formatEstimatedCost
-} from "@/features/ai-ledger/cost";
+import { formatEstimatedCost } from "@/features/ai-ledger/cost";
 
 export function AiCostOverview() {
   const profile = useAuthStore((state) => state.profile);
@@ -26,6 +24,7 @@ export function AiCostOverview() {
 }
 
 function CostOverview({ adminId }: { adminId: string }) {
+  const { t } = useDashboardTranslation();
   const result = useQuery({
     queryKey: ["ai-cost-overview", adminId],
     queryFn: ({ signal }) => api.aiLedger.costOverview({ signal }),
@@ -33,18 +32,22 @@ function CostOverview({ adminId }: { adminId: string }) {
     gcTime: 0
   });
   const data = result.isError ? undefined : result.data;
+  const displayCost = (value: string | null | undefined) => {
+    const formatted = formatEstimatedCost(value);
+    return formatted === "未知" ? t("cost_unknown") : formatted;
+  };
   return (
     <Card
       size="small"
       style={{ marginTop: 16 }}
-      title="模型费用预估"
+      title={t("costs_title")}
       extra={
         <Space>
-          <Link to="/ai-ledger">查看账本</Link>
+          <Link to="/ai-ledger">{t("costs_ledger")}</Link>
           <Button
             type="text"
             size="small"
-            aria-label="刷新模型费用"
+            aria-label={t("costs_refresh")}
             icon={<RotateCwIcon />}
             loading={result.isFetching}
             onClick={() => void result.refetch()}
@@ -56,18 +59,18 @@ function CostOverview({ adminId }: { adminId: string }) {
         <Alert
           type="error"
           showIcon
-          title="模型费用暂时不可用"
-          description="请稍后刷新，当前金额未知。"
+          title={t("costs_unavailable")}
+          description={t("costs_retry")}
         />
       ) : (
         <>
           <Row gutter={[16, 16]}>
             {(
               [
-                ["total", "累计"],
-                ["today", "今日"],
-                ["week", "本周"],
-                ["month", "本月"]
+                ["total", t("period_total")],
+                ["today", t("period_today")],
+                ["week", t("period_week")],
+                ["month", t("period_month")]
               ] as const
             ).map(([key, label]) => {
               const period = data?.[key];
@@ -77,9 +80,7 @@ function CostOverview({ adminId }: { adminId: string }) {
                     <Statistic
                       title={label}
                       value={
-                        period
-                          ? formatEstimatedCost(period.estimated_cost_cny)
-                          : "—"
+                        period ? displayCost(period.estimated_cost_cny) : "—"
                       }
                     />
                     {period && (
@@ -87,9 +88,12 @@ function CostOverview({ adminId }: { adminId: string }) {
                         type="secondary"
                         style={{ fontSize: 12 }}
                       >
-                        已计价 {period.priced_calls}/{period.total_calls} 次
+                        {t("priced_calls", {
+                          priced: period.priced_calls,
+                          total: period.total_calls
+                        })}
                         {period.unknown_calls > 0
-                          ? ` · ${period.unknown_calls} 次费用未知`
+                          ? ` · ${t("unknown_calls", { count: period.unknown_calls })}`
                           : ""}
                       </Typography.Text>
                     )}
@@ -100,7 +104,7 @@ function CostOverview({ adminId }: { adminId: string }) {
                           type="warning"
                           style={{ fontSize: 12 }}
                         >
-                          仅含已知部分
+                          {t("partial_cost")}
                         </Typography.Text>
                       )}
                   </Flex>
@@ -112,11 +116,13 @@ function CostOverview({ adminId }: { adminId: string }) {
             <Space wrap style={{ marginTop: 12 }}>
               {data.by_purpose.map(({ purpose, total }) => (
                 <Typography.Text key={purpose} type="secondary">
-                  {callPurposeLabels[purpose]}：
-                  {formatEstimatedCost(total.estimated_cost_cny)} ·{" "}
-                  {total.total_calls} 次
+                  {t("purpose_cost", {
+                    purpose: t(`purpose_${purpose}`),
+                    amount: displayCost(total.estimated_cost_cny),
+                    calls: total.total_calls
+                  })}
                   {total.unknown_calls
-                    ? `（${total.unknown_calls} 次费用未知）`
+                    ? t("unknown_calls_suffix", { count: total.unknown_calls })
                     : ""}
                 </Typography.Text>
               ))}
@@ -126,13 +132,15 @@ function CostOverview({ adminId }: { adminId: string }) {
             type="secondary"
             style={{ fontSize: 12, margin: "12px 0 0" }}
           >
-            按实际 token
-            与调用时单价估算，非供应商账单。北京时间自然日、周一至今及自然月；未知记录不按零元计。
+            {t("cost_basis")}
             {data && (
               <Tooltip
-                title={`价格版本：${data.pricing_version}；计价依据覆盖至 ${data.pricing_valid_until}（不含）。后续需核对价格与节假日日历。`}
+                title={t("pricing_details", {
+                  version: data.pricing_version,
+                  until: data.pricing_valid_until
+                })}
               >
-                <span> 计价依据</span>
+                <span> {t("pricing_basis")}</span>
               </Tooltip>
             )}
           </Typography.Paragraph>

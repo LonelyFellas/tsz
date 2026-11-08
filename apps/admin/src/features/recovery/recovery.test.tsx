@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useDraftRecovery } from "./useDraftRecovery";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   clearOtherSnapshots,
   snapshotKey,
@@ -52,6 +53,28 @@ function Editor({
     </>
   );
 }
+it("切换语言不改写既有备份，也不自动恢复或丢弃输入", () => {
+  const key = snapshotKey("editor", "word:1");
+  writeSnapshot(key, 1, "保留中文与 centre 原文", sessionStorage);
+  const original = sessionStorage.getItem(key);
+  const content = (locale: "zh-Hans" | "en-US" | "zh-Hant") => (
+    <InterfaceI18nProvider locale={locale}>
+      <Editor />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  view.rerender(content("en-US"));
+  expect(screen.getByText("An unsaved editing backup was found")).toBeVisible();
+  expect(screen.getByLabelText("内容")).toHaveValue("");
+  expect(sessionStorage.getItem(key)).toBe(original);
+  view.rerender(content("zh-Hant"));
+  expect(sessionStorage.getItem(key)).toBe(original);
+  fireEvent.click(screen.getByRole("button", { name: "恢復編輯" }));
+  expect(screen.getByLabelText("内容")).toHaveValue("保留中文与 centre 原文");
+  expect(JSON.parse(sessionStorage.getItem(key)!).value).toBe(
+    "保留中文与 centre 原文"
+  );
+});
 it("recovers unsaved input after unmount without automatically saving it", () => {
   const first = render(<Editor />);
   fireEvent.change(screen.getByLabelText("内容"), {

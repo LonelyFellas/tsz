@@ -1,3 +1,4 @@
+import { useWorkspaceTranslation } from "@/features/dictionary/i18n/workspace";
 import { useQueryClient } from "@tanstack/react-query";
 import { Typography } from "@tsz/ui/admin/display";
 import { wordKeys } from "@/features/dictionary/api";
@@ -30,6 +31,7 @@ export function WordCreatePage({
 }: {
   requests?: UnifiedCreateRequests;
 } = {}) {
+  const { t } = useWorkspaceTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
@@ -39,11 +41,11 @@ export function WordCreatePage({
       currentStep="basics"
       presentation={{
         wordExists: false,
-        breadcrumbTitle: "创建词条",
+        breadcrumbTitle: t("create_entry"),
         completedSteps: [],
         summaryHeadword: (
           <Typography.Text className="word-summary-pending-detection">
-            待检测
+            {t("pending_detection")}
           </Typography.Text>
         ),
         progressBadge: v3ProductProgressBadge(EMPTY_PROGRESS_ROWS),
@@ -52,6 +54,10 @@ export function WordCreatePage({
             currentKey="dialect"
             rows={EMPTY_PROGRESS_ROWS.map((row) => ({
               ...row,
+              label: t(`progress_${row.key}`),
+              statusDescription: row.statusDescription
+                ? t("progress_forms_count")
+                : undefined,
               value: row.value ?? row.count
             }))}
           />

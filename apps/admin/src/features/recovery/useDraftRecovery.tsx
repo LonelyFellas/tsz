@@ -1,3 +1,7 @@
+import {
+  useWorkspaceTranslation,
+  type WorkspaceMessage
+} from "@/features/dictionary/i18n/workspace";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert, Button, Space } from "@tsz/ui/admin/display";
 import {
@@ -29,6 +33,7 @@ export function useDraftRecovery<T>({
   restore: (value: T) => void;
   restoreAllowed?: boolean;
 }) {
+  const { t } = useWorkspaceTranslation();
   const userId = useAuthStore((state) => state.profile?.id);
   const key = userId ? snapshotKey(userId, entity) : null;
   const baseRevision = useRef(revision);
@@ -37,17 +42,17 @@ export function useDraftRecovery<T>({
     key: string;
     snapshot: DraftSnapshot<T>;
   } | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WorkspaceMessage | null>(null);
   const [loaded, setLoaded] = useState<string | null>(null);
   useLayoutEffect(() => {
     setSaved(null);
-    setError("");
+    setError(null);
     if (key) {
       try {
         const snapshot = readSnapshot<T>(key, sessionStorage);
         if (snapshot) setSaved({ key, snapshot });
       } catch {
-        setError("无法读取编辑备份，请勿在保存前刷新页面。");
+        setError("backup_read_error");
       }
     }
     setLoaded(key);
@@ -59,9 +64,7 @@ export function useDraftRecovery<T>({
         writeSnapshot(key, baseRevision.current, value, sessionStorage);
       else sessionStorage.removeItem(key);
     } catch {
-      setError(
-        "编辑备份不可用（存储空间不足或含未上传媒体）。请先保存或导出内容，再刷新。"
-      );
+      setError("backup_write_error");
     }
   }, [key, loaded, saved, error, dirty, revision, savedRevision, value]);
   useEffect(() => {
@@ -87,9 +90,9 @@ export function useDraftRecovery<T>({
     try {
       if (key) sessionStorage.removeItem(key);
       setSaved(null);
-      setError("");
+      setError(null);
     } catch {
-      setError("无法清理备份，请检查浏览器存储权限。");
+      setError("backup_clear_error");
     }
   };
   const download = () => {
@@ -113,17 +116,15 @@ export function useDraftRecovery<T>({
           type="warning"
           showIcon
           title={
-            error ||
-            (sameRevision
-              ? "发现尚未保存的编辑备份"
-              : "发现编辑备份，但服务器内容已更新")
+            (error && t(error)) ||
+            (sameRevision ? t("backup_found") : t("backup_outdated"))
           }
           description={
             error
-              ? "导出包含当前可序列化内容，未上传文件需单独保留。"
+              ? t("backup_export_help")
               : sameRevision
-                ? "恢复后请核对内容，再手动保存。"
-                : "为避免覆盖他人修改，请导出备份并对照当前内容处理。"
+                ? t("backup_restore_help")
+                : t("backup_outdated_help")
           }
           action={
             <Space wrap>
@@ -135,12 +136,12 @@ export function useDraftRecovery<T>({
                     setSaved(null);
                   }}
                 >
-                  恢复编辑
+                  {t("restore_editing")}
                 </Button>
               )}
-              <Button onClick={download}>导出备份</Button>
+              <Button onClick={download}>{t("export_backup")}</Button>
               <Button disabled={busy} onClick={discard}>
-                丢弃备份
+                {t("discard_backup")}
               </Button>
             </Space>
           }
