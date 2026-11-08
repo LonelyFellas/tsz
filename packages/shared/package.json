@@ -8,6 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./format": "./src/format.ts",
+    "./i18n": "./src/i18n/index.ts",
+    "./i18n/react": "./src/i18n/react.tsx",
     "./auth": "./src/auth/index.ts",
     "./recovery": "./src/recovery/index.ts",
     "./fonts.css": "./src/fonts.css"
@@ -20,6 +22,8 @@
   "dependencies": {
     "@tsz/api-client": "workspace:*",
     "@tsz/types": "workspace:*",
+    "i18next": "^27.0.1",
+    "react-i18next": "^18.0.0",
     "zustand": "^5.0.16"
   },
   "peerDependencies": {

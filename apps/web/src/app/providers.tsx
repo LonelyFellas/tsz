@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClientProvider } from "@tanstack/react-query";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect } from "react";
 import { getQueryClient } from "@/lib/query-client";
@@ -105,17 +106,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeSync />
-      <SessionRestorer />
-      <DailyLoginReward />
-      <NotificationTabBadge />
-      <PhoneBindingGuard>
-        <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
-      </PhoneBindingGuard>
-      {process.env.NODE_ENV === "development" && (
-        <ReactQueryDevtools initialIsOpen={false} />
-      )}
-    </QueryClientProvider>
+    <InterfaceI18nProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeSync />
+        <SessionRestorer />
+        <DailyLoginReward />
+        <NotificationTabBadge />
+        <PhoneBindingGuard>
+          <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
+        </PhoneBindingGuard>
+        {process.env.NODE_ENV === "development" && (
+          <ReactQueryDevtools initialIsOpen={false} />
+        )}
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
   );
 }
