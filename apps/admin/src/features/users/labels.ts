@@ -1,13 +1,24 @@
+import {
+  defaultUserTranslation,
+  type UserTranslation,
+  type UserMessageKey
+} from "./messages";
 // 用户管理的展示映射（纯常量/纯函数，可单测）。
 import type { Role } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { DISPLAY_NAME_MAX } from "@tsz/shared";
 
-export const ROLE_LABEL: Record<Role, string> = {
-  student: "学生",
-  teacher: "老师",
-  admin: "管理员"
+const ROLE_MESSAGES: Record<Role, UserMessageKey> = {
+  student: "role_student",
+  teacher: "role_teacher",
+  admin: "role_admin"
 };
+export function roleLabel(
+  role: Role,
+  t: UserTranslation = defaultUserTranslation
+) {
+  return t(ROLE_MESSAGES[role]);
+}
 
 export const ROLE_TAG_COLOR: Record<Role, string> = {
   student: "blue",
@@ -29,21 +40,25 @@ export function levelColor(level: string): string {
 }
 
 /**
- * 把用户管理写操作（启禁用 / 编辑）的后端错误映射为中文提示。契约里的四种错误：
+ * 把用户管理写操作（启禁用 / 编辑）的已知后端错误映射为界面提示。契约里的四种错误：
  * 403 = 非超管（按钮本已置灰，这是第二道防线）；400 invalid_display_name = 昵称不合规
- *（只可能来自编辑，后端原文是英文，换成与弹窗预检同一套规则的中文）；
+ *（只可能来自编辑，后端原文是英文，换成与弹窗预检同一套规则的界面提示）；
  * 404 = 用户不存在（可能被并发删）；422 = 请求体缺字段 / status 不在枚举内。
  * 其余错误回退后端原文（Error.message），再兜底 fallback。
  */
-export function userActionError(err: unknown, fallback: string): string {
+export function userActionError(
+  err: unknown,
+  fallback: string,
+  t: UserTranslation = defaultUserTranslation
+): string {
   if (err instanceof HttpError) {
-    if (err.status === 403) return "需超级管理员权限";
+    if (err.status === 403) return t("super_required");
     // 按稳定错误码判定而非匹配 message（文案可变、code 是契约）。
     if (err.code === "invalid_display_name") {
-      return `昵称需 1–${DISPLAY_NAME_MAX} 字符，且不能包含 < > 或控制字符`;
+      return t("name_rule", { max: DISPLAY_NAME_MAX });
     }
-    if (err.status === 404) return "该用户不存在，可能已被删除";
-    if (err.status === 422) return "请求参数不合法";
+    if (err.status === 404) return t("user_missing");
+    if (err.status === 422) return t("invalid_request");
   }
   if (err instanceof Error && err.message) return err.message;
   return fallback;
