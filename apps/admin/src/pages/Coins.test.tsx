@@ -1,3 +1,6 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { INTERFACE_LOCALES, type InterfaceLocale } from "@tsz/shared/i18n";
+import { MyCoinsPage } from "./MyCoins";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -18,6 +21,7 @@ vi.mock("@/lib/auth", async () => {
   return {
     useAuthStore: createAdminAuthStore(),
     api: {
+      coins: { wallet: vi.fn(), entries: vi.fn() },
       coinManagement: {
         accounts: vi.fn(),
         entries: vi.fn(),
@@ -42,6 +46,7 @@ const profile = {
 const pagination = { page: 1, page_size: 20, total: 1, total_pages: 1 };
 beforeEach(() => {
   vi.resetAllMocks();
+  localStorage.clear();
   useAuthStore.getState().setProfile(profile);
   vi.mocked(api.coinManagement.accounts).mockResolvedValue({
     items: [
@@ -66,17 +71,22 @@ beforeEach(() => {
     pagination: { ...pagination, total: 0 }
   });
 });
-function open() {
+function open(myWallet = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
-  return render(
-    <QueryClientProvider client={client}>
-      <App>
-        <CoinsPage />
-      </App>
-    </QueryClientProvider>
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <App>{myWallet ? <MyCoinsPage /> : <CoinsPage />}</App>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
   );
+  const view = render(content("zh-Hans"));
+  return {
+    ...view,
+    setLocale: (locale: InterfaceLocale) => view.rerender(content(locale))
+  };
 }
 async function prepare() {
   fireEvent.change(
@@ -303,6 +313,287 @@ it("manual operation filters exclude automatic rewards and submit supported sour
   await waitFor(() =>
     expect(api.coinManagement.operations).toHaveBeenLastCalledWith(
       expect.objectContaining({ source_type: "manual_reward" }),
+      expect.anything()
+    )
+  );
+});
+
+it("四语切换保留发放草稿、焦点、冻结确认、在途请求及失败后的原幂等载荷", async () => {
+  let reject!: (error: unknown) => void;
+  vi.mocked(api.coinManagement.credit)
+    .mockImplementationOnce(
+      () =>
+        new Promise((_, failure) => {
+          reject = failure;
+        })
+    )
+    .mockRejectedValue(new HttpError(504, "upstream original detail"));
+  const view = open();
+  await prepare();
+  const confirm = screen.getByRole("dialog");
+  fireEvent.click(within(confirm).getByText("返回修改"));
+  const input = screen.getByLabelText("业务单号");
+  input.focus();
+  const reads = [
+    api.coinManagement.accounts,
+    api.coinManagement.entries,
+    api.coinManagement.operations
+  ].map((fn) => vi.mocked(fn).mock.calls.length);
+  for (const locale of INTERFACE_LOCALES) {
+    view.setLocale(locale);
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue("invoice1");
+    expect(input).toHaveFocus();
+  }
+  fireEvent.click(screen.getByText("Review credit"));
+  await screen.findByText("Confirm coin credit");
+  fireEvent.click(screen.getByText("Confirm credit"));
+  await waitFor(() =>
+    expect(api.coinManagement.credit).toHaveBeenCalledTimes(1)
+  );
+  const first = vi.mocked(api.coinManagement.credit).mock.calls[0]![0];
+  for (const locale of INTERFACE_LOCALES) {
+    view.setLocale(locale);
+    expect(screen.getByRole("dialog")).toBe(confirm);
+    expect(within(confirm).getByText(/9,007,199,254,740,993/)).toBeVisible();
+    expect(within(confirm).getByText("invoice1")).toBeVisible();
+    expect(within(confirm).getByText("verified")).toBeVisible();
+    expect(within(confirm).getByText("user1")).toBeVisible();
+    expect(
+      within(confirm)
+        .getAllByRole("button")
+        .every((b) => b.hasAttribute("disabled"))
+    ).toBe(true);
+    expect(api.coinManagement.credit).toHaveBeenCalledTimes(1);
+  }
+  expect(
+    [
+      api.coinManagement.accounts,
+      api.coinManagement.entries,
+      api.coinManagement.operations
+    ].map((fn) => vi.mocked(fn).mock.calls.length)
+  ).toEqual(reads);
+  await act(async () => reject(new HttpError(504, "upstream original detail")));
+  expect(within(confirm).getAllByRole("alert").at(-1)).toHaveTextContent(
+    "The result is unconfirmed."
+  );
+  view.setLocale("zh-Hant");
+  expect(within(confirm).getAllByRole("alert").at(-1)).toHaveTextContent(
+    "暫時無法確認操作結果"
+  );
+  expect(within(confirm).getAllByRole("alert").at(-1)).toHaveTextContent(
+    "upstream original detail"
+  );
+  fireEvent.click(within(confirm).getByText("確認發放"));
+  await waitFor(() =>
+    expect(api.coinManagement.credit).toHaveBeenCalledTimes(2)
+  );
+  expect(vi.mocked(api.coinManagement.credit).mock.calls[1]![0]).toEqual(first);
+  expect(first).toEqual({
+    owner_type: "user",
+    owner_id: "user1",
+    category: "purchase",
+    amount: "9007199254740993",
+    event_id: "invoice1",
+    reason: "verified",
+    evidence_ref: null,
+    idempotency_key: expect.any(String)
+  });
+});
+
+it("已展示的金额校验随语言变化，不提交非法大整数或清空输入", async () => {
+  const view = open();
+  await prepare();
+  fireEvent.click(screen.getByText("返回修改"));
+  const amount = screen.getByLabelText("天生币数量");
+  fireEvent.change(amount, { target: { value: "9223372036854775808" } });
+  fireEvent.change(screen.getByLabelText("业务单号"), {
+    target: { value: "" }
+  });
+  fireEvent.change(screen.getByLabelText("发放原因"), {
+    target: { value: "" }
+  });
+  fireEvent.click(screen.getByText("核对并发放"));
+  await screen.findByText("请输入 1 至 9,223,372,036,854,775,807 之间的整数");
+  view.setLocale("en-GB");
+  expect(
+    await screen.findByText(
+      "Enter an integer from 1 to 9,223,372,036,854,775,807."
+    )
+  ).toBeVisible();
+  expect(screen.getByText("Enter a transaction reference.")).toBeVisible();
+  expect(screen.getByText("Enter a reason for the credit.")).toBeVisible();
+  expect(screen.getByLabelText("Coin amount")).toBe(amount);
+  expect(amount).toHaveValue("9223372036854775808");
+  expect(api.coinManagement.credit).not.toHaveBeenCalled();
+});
+
+it("详情跨语保持身份，撤销在途及已知错误重绘后仍重试原请求", async () => {
+  vi.mocked(api.coinManagement.operations).mockResolvedValue({
+    items: [operation],
+    pagination
+  });
+  let reject!: (error: unknown) => void;
+  vi.mocked(api.coinManagement.reverse)
+    .mockImplementationOnce(
+      () =>
+        new Promise((_, failure) => {
+          reject = failure;
+        })
+    )
+    .mockRejectedValue(
+      new HttpError(409, "raw known error", [], "coin_insufficient_balance")
+    );
+  const view = open();
+  fireEvent.click(
+    screen.getByText("发放记录", { selector: ".ui-tabs-tab-btn" })
+  );
+  fireEvent.click(await screen.findByText("查看详情"));
+  const drawer = screen.getByRole("dialog", { hidden: true });
+  const reads = vi.mocked(api.coinManagement.operations).mock.calls.length;
+  for (const locale of INTERFACE_LOCALES) {
+    view.setLocale(locale);
+    expect(screen.getByRole("dialog", { hidden: true })).toBe(drawer);
+    expect(
+      within(drawer).getByText(operation.evidence_ref)
+    ).toBeInTheDocument();
+    expect(within(drawer).getByText(operation.reason)).toBeInTheDocument();
+    expect(within(drawer).getByText(operation.event_id)).toBeInTheDocument();
+    expect(
+      within(drawer).getByText(
+        new Date(operation.created_at).toLocaleString("zh-CN")
+      )
+    ).toBeInTheDocument();
+  }
+  fireEvent.click(
+    within(drawer).getByText("Reverse credit", { selector: "button span" })
+  );
+  const modal = screen.getByRole("dialog");
+  const reason = within(modal).getByLabelText("Reason for reversal");
+  fireEvent.change(reason, { target: { value: "原始冲正原因 centre" } });
+  reason.focus();
+  view.setLocale("zh-Hans");
+  expect(within(modal).getByLabelText("撤销原因")).toBe(reason);
+  expect(reason).toHaveFocus();
+  fireEvent.click(within(modal).getByText("确认扣回"));
+  await waitFor(() =>
+    expect(api.coinManagement.reverse).toHaveBeenCalledTimes(1)
+  );
+  const first = vi.mocked(api.coinManagement.reverse).mock.calls[0];
+  view.setLocale("en-US");
+  expect(reason).toHaveValue("原始冲正原因 centre");
+  expect(reason).toBeDisabled();
+  expect(api.coinManagement.operations).toHaveBeenCalledTimes(reads);
+  await act(async () =>
+    reject(
+      new HttpError(409, "raw known error", [], "coin_insufficient_balance")
+    )
+  );
+  expect(
+    await within(modal).findByText(
+      "This account has insufficient coins to reverse this credit."
+    )
+  ).toBeVisible();
+  view.setLocale("zh-Hant");
+  expect(
+    within(modal).getByText("此帳號餘額不足，無法扣回此筆天生幣")
+  ).toBeVisible();
+  fireEvent.click(within(modal).getByText("確認扣回"));
+  await waitFor(() =>
+    expect(api.coinManagement.reverse).toHaveBeenCalledTimes(2)
+  );
+  expect(vi.mocked(api.coinManagement.reverse).mock.calls[1]).toEqual(first);
+});
+
+it("我的天生币分页快照、精确余额和请求身份跨语保留", async () => {
+  vi.mocked(api.coins.wallet).mockResolvedValue({
+    owner_type: "admin",
+    owner_id: profile.id,
+    balance: "9223372036854775807",
+    status: "open"
+  });
+  vi.mocked(api.coins.entries).mockResolvedValue({
+    items: [],
+    snapshot: "9007199254740993",
+    pagination: { ...pagination, total: 21, total_pages: 2 }
+  });
+  const view = open(true);
+  await screen.findByText("9,223,372,036,854,775,807 天生币");
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+  await waitFor(() =>
+    expect(api.coins.entries).toHaveBeenLastCalledWith(
+      { page: 2, page_size: 20, snapshot: "9007199254740993" },
+      expect.anything()
+    )
+  );
+  const counts = [
+    vi.mocked(api.coins.wallet).mock.calls.length,
+    vi.mocked(api.coins.entries).mock.calls.length
+  ];
+  for (const locale of INTERFACE_LOCALES) {
+    view.setLocale(locale);
+    expect(screen.getByText(/9,223,372,036,854,775,807/)).toBeInTheDocument();
+  }
+  expect(screen.getByRole("heading", { name: "My coins" })).toBeVisible();
+  expect([
+    vi.mocked(api.coins.wallet).mock.calls.length,
+    vi.mocked(api.coins.entries).mock.calls.length
+  ]).toEqual(counts);
+});
+
+it("操作历史跨语保留未提交筛选、展开、页码和旧列偏好，不因显示标签重发查询", async () => {
+  vi.mocked(api.coinManagement.operations).mockImplementation(async (q) => ({
+    items: [operation],
+    pagination: { ...pagination, page: q?.page ?? 1, total: 21, total_pages: 2 }
+  }));
+  const view = open();
+  fireEvent.click(
+    screen.getByText("发放记录", { selector: ".ui-tabs-tab-btn" })
+  );
+  await screen.findByText("查看详情");
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+  await waitFor(() =>
+    expect(api.coinManagement.operations).toHaveBeenLastCalledWith(
+      { page: 2, page_size: 20, include_names: true },
+      expect.anything()
+    )
+  );
+  const input = screen.getByPlaceholderText("输入姓名或账号编号");
+  fireEvent.change(input, { target: { value: "未提交原文 centre" } });
+  fireEvent.click(screen.getByText("更多筛选"));
+  const actor = screen.getByPlaceholderText("输入姓名或操作人编号");
+  fireEvent.change(actor, { target: { value: "原操作人" } });
+  fireEvent.click(screen.getByRole("button", { name: /列设置/ }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "状态" }));
+  const reads = vi.mocked(api.coinManagement.operations).mock.calls.length;
+  for (const locale of INTERFACE_LOCALES) {
+    view.setLocale(locale);
+    expect(input).toHaveValue("未提交原文 centre");
+    expect(actor).toHaveValue("原操作人");
+    expect(actor.closest("[aria-hidden]")).toHaveAttribute(
+      "aria-hidden",
+      "false"
+    );
+  }
+  expect(screen.getByRole("checkbox", { name: "Status" })).not.toBeChecked();
+  expect(
+    screen.queryByRole("columnheader", { name: "Status" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Fewer filters" })).toHaveAttribute(
+    "aria-expanded",
+    "true"
+  );
+  expect(api.coinManagement.operations).toHaveBeenCalledTimes(reads);
+  fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  await waitFor(() =>
+    expect(api.coinManagement.operations).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        page: 1,
+        owner_search: "未提交原文 centre",
+        actor_search: "原操作人",
+        include_names: true
+      }),
       expect.anything()
     )
   );
