@@ -1,3 +1,6 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
+import { act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
@@ -230,4 +233,66 @@ describe("CreateAdminModal", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(mockCreate).not.toHaveBeenCalled();
   });
+});
+
+it("语言切换保留校验、在途建号和字段冲突，不重发验证码或创建", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  let rejectCreation!: (error: unknown) => void;
+  mockCreate.mockReset().mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        rejectCreation = reject;
+      })
+  );
+  mockRequestCode.mockReset().mockResolvedValue();
+  const onCreated = vi.fn(),
+    onClose = vi.fn(),
+    onPendingChange = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <FeedbackApp>
+          <CreateAdminModal
+            open
+            onClose={onClose}
+            onCreated={onCreated}
+            onPendingChange={onPendingChange}
+          />
+        </FeedbackApp>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fill({ phone: "19900000019", display_name: "<name>", code: "000019" });
+  fireEvent.click(screen.getByRole("button", { name: CREATE }));
+  await screen.findByText("昵称不能包含 < > 或控制字符");
+  view.rerender(content("en-GB"));
+  await screen.findByText(
+    "Display names cannot contain < > or control characters"
+  );
+  const name = screen.getByPlaceholderText("Administrator display name");
+  fireEvent.change(name, { target: { value: "保留 Name" } });
+  fireEvent.click(screen.getByRole("button", { name: "Get code" }));
+  await waitFor(() => expect(mockRequestCode).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole("button", { name: "Create" }));
+  await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+  for (const locale of ["zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(name).toHaveValue("保留 Name");
+    expect(mockRequestCode).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  }
+  await act(async () => rejectCreation(new HttpError(409, "occupied")));
+  await screen.findByText("该手机号已被占用");
+  view.rerender(content("en-US"));
+  await screen.findByText("This phone number is already in use");
+  expect(mockCreate).toHaveBeenCalledWith({
+    phone: "19900000019",
+    display_name: "保留 Name",
+    code: "000019"
+  });
+  expect(onCreated).not.toHaveBeenCalled();
 });

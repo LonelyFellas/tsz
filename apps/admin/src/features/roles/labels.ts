@@ -1,3 +1,8 @@
+import {
+  accessLabel,
+  defaultAccessTranslation,
+  type AccessTranslation
+} from "../permissions/i18n";
 // 角色治理的展示映射、校验与错误文案（纯常量/纯函数，可单测）。
 import type { PermissionKey } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
@@ -24,14 +29,17 @@ export const ROLE_DESC_MAX = 200;
  * 角色名本地预检（挡掉 §3 名称非法类 400 的绝大多数，400 只作兜底）：
  * 去空白后非空、≤50 字符、不含 < > 或控制/不可见字符。合法返回 null，否则返回中文错误文案。
  */
-export function validateRoleName(name: string): string | null {
+export function validateRoleName(
+  name: string,
+  t: AccessTranslation = defaultAccessTranslation
+): string | null {
   const trimmed = name.trim();
-  if (!trimmed) return "请输入角色名";
+  if (!trimmed) return accessLabel("请输入角色名", t);
   if ([...trimmed].length > ROLE_NAME_MAX) {
-    return `角色名最长 ${ROLE_NAME_MAX} 字符`;
+    return t("role_name_max", { max: ROLE_NAME_MAX });
   }
   if (hasDisplayNameForbiddenChars(trimmed)) {
-    return "角色名不能包含 < > 或控制字符";
+    return accessLabel("角色名不能包含 < > 或控制字符", t);
   }
   return null;
 }
@@ -55,10 +63,16 @@ export function errorText(err: unknown, fallback: string): string {
  * 404 = 角色或管理员不存在（可能被并发删）。其余回退后端原文再兜底 fallback。
  * 注：409 重名与 400 unknown_permission_key 由调用方就地处理（字段标红 / 重拉目录），不走这里。
  */
-export function roleMutationError(err: unknown, fallback: string): string {
+export function roleMutationError(
+  err: unknown,
+  fallback: string,
+  t: AccessTranslation = defaultAccessTranslation
+): string {
   if (err instanceof HttpError) {
-    if (err.status === 403) return "无权限执行此操作（系统角色或超管不可操作）";
-    if (err.status === 404) return "角色或管理员不存在，可能已被删除";
+    if (err.status === 403)
+      return accessLabel("无权限执行此操作（系统角色或超管不可操作）", t);
+    if (err.status === 404)
+      return accessLabel("角色或管理员不存在，可能已被删除", t);
   }
   return errorText(err, fallback);
 }

@@ -1,3 +1,4 @@
+import { useAccessTranslation, AccessText } from "../permissions/i18n";
 // 重置密码结果弹窗：一次性展示临时密码（仅此一次返回），提供复制。
 import { CopyIcon } from "lucide-react";
 import { Alert, Button, Typography } from "@tsz/ui/admin/display";
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ResetPasswordResult({ password, adminName, onClose }: Props) {
+  const { t } = useAccessTranslation();
   const { message } = App.useApp();
 
   // 自持复制并校验真实成败：不依赖 antd copyable 的静默成功态，避免非安全上下文下
@@ -20,17 +22,19 @@ export function ResetPasswordResult({ password, adminName, onClose }: Props) {
   const handleCopy = async () => {
     if (!password) return;
     if (await copyText(password)) {
-      message.success("已复制临时密码");
+      message.success(<AccessText message="temporary_password_copied" />);
     } else {
-      message.warning("复制失败，请手动选中下方密码复制");
+      message.warning(
+        <AccessText message="could_not_copy_select_and_copy_the_password_below_manually" />
+      );
     }
   };
 
   return (
     <Modal
       open={!!password}
-      title="临时密码已生成"
-      okText="我已复制"
+      title={t("temporary_password_generated")}
+      okText={t("i_have_copied_it")}
       onOk={onClose}
       onCancel={onClose}
       cancelButtonProps={{ style: { display: "none" } }}
@@ -40,8 +44,12 @@ export function ResetPasswordResult({ password, adminName, onClose }: Props) {
         type="warning"
         showIcon
         style={{ marginBottom: 16 }}
-        title="此密码仅显示一次"
-        description={`请复制后线下转交${adminName ? `「${adminName}」` : "该管理员"}，对方下次登录须修改。关闭后无法再次查看。`}
+        title={t("this_password_is_shown_only_once")}
+        description={
+          adminName
+            ? t("password_handoff", { name: adminName })
+            : t("password_handoff_unnamed")
+        }
       />
       {password && (
         <>
@@ -61,7 +69,7 @@ export function ResetPasswordResult({ password, adminName, onClose }: Props) {
             {password}
           </Typography.Paragraph>
           <Button icon={<CopyIcon />} onClick={() => void handleCopy()}>
-            复制密码
+            {t("copy_password")}
           </Button>
         </>
       )}

@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -1022,4 +1024,88 @@ it("标签删除失败保留确认目标，再次确认可以重试", async () =
   await waitFor(() => expect(remove).toHaveBeenCalledTimes(2));
   expect(remove).toHaveBeenLastCalledWith("t1", 3);
   await waitFor(() => expect(dialog).not.toBeInTheDocument());
+});
+
+it("切换语言保留所选权限和标签草稿，显式保存保留原名及颜色码", async () => {
+  const create = vi.spyOn(api.permissionSystem, "createTag").mockResolvedValue({
+    id: "new-tag",
+    name: "保留标签 Raw",
+    color: "blue",
+    version: 1,
+    permissions: []
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <App>
+          <PermissionManagement />
+        </App>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const entryCell = await screen.findByText("查看词条", { selector: "td" });
+  fireEvent.click(
+    entryCell.closest("tr")!.querySelector('input[type="checkbox"]')!
+  );
+  fireEvent.click(screen.getByRole("button", { name: "标签管理" }));
+  fireEvent.click(screen.getByRole("button", { name: "新建标签" }));
+  const name = screen.getByRole("textbox", { name: "标签名称" });
+  fireEvent.change(name, { target: { value: "保留标签 Raw" } });
+  fireEvent.click(screen.getByRole("radio", { name: "蓝色" }));
+  const calls = vi.mocked(api.permissionSystem.catalog).mock.calls.length;
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(name).toHaveValue("保留标签 Raw");
+    expect(create).not.toHaveBeenCalled();
+    expect(api.permissionSystem.catalog).toHaveBeenCalledTimes(calls);
+    expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
+  }
+  expect(screen.getByText("已选 1 项权限")).toBeVisible();
+  fireEvent.click(
+    within(name.closest('[role="dialog"]')!).getByRole("button", {
+      name: "保存"
+    })
+  );
+  await waitFor(() =>
+    expect(create).toHaveBeenCalledWith("保留标签 Raw", "blue")
+  );
+});
+
+it("目录名称检索跨语言保持相同结果与已选权限，不重新请求", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <App>
+          <PermissionManagement />
+        </App>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("en-GB"));
+  await screen.findByText("View entries", { selector: "td" });
+  const search = screen.getByPlaceholderText("Permission name / description");
+  fireEvent.change(search, { target: { value: "View entries" } });
+  const row = screen
+    .getByText("View entries", { selector: "td" })
+    .closest("tr")!;
+  const checkbox = row.querySelector<HTMLInputElement>(
+    'input[type="checkbox"]'
+  )!;
+  fireEvent.click(checkbox);
+  const calls = vi.mocked(api.permissionSystem.catalog).mock.calls.length;
+  for (const locale of ["zh-Hans", "zh-Hant", "en-US", "en-GB"] as const) {
+    view.rerender(content(locale));
+    expect(search).toHaveValue("View entries");
+    expect(document.querySelectorAll("tbody tr[data-row-key]")).toHaveLength(1);
+    expect(checkbox).toBeChecked();
+    expect(api.permissionSystem.catalog).toHaveBeenCalledTimes(calls);
+    expect(api.permissionSystem.commit).not.toHaveBeenCalled();
+  }
 });

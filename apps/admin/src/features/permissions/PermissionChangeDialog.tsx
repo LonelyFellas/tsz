@@ -1,3 +1,4 @@
+import { useAccessTranslation, AccessText } from "./i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Modal } from "@tsz/ui/admin/overlays";
@@ -45,6 +46,7 @@ export function PermissionChangeDialog({
   onClose: () => void;
   onCommitted: () => void;
 }) {
+  const { t } = useAccessTranslation();
   const { message } = App.useApp();
   const client = useQueryClient();
   const [saving, setSaving] = useState(false);
@@ -123,7 +125,7 @@ export function PermissionChangeDialog({
         permissionCommitFromPreview(preview.data)
       );
       await client.invalidateQueries({ queryKey: ["permission-system"] });
-      message.success("权限已保存");
+      message.success(<AccessText message="permissions_saved" />);
       onCommitted();
     } catch (error) {
       if (
@@ -142,32 +144,44 @@ export function PermissionChangeDialog({
     }
   };
   const describePermissions = (keys: string[]) =>
-    keys.map((key) => permissionLabels?.[key] ?? key).join("、") || "无";
+    keys
+      .map((key) => permissionLabels?.[key] ?? key)
+      .join(t("list_separator")) || t("none");
   const renderChanges = (
     keys: string[],
     dependencies: string[],
-    automaticLabel: "自动补齐" | "自动取消"
+    automaticKind: "grant" | "revoke"
   ) => {
     const direct = keys.filter((key) => !dependencies.includes(key));
     return (
       <Flex vertical gap={4}>
         {(direct.length > 0 || dependencies.length === 0) && (
-          <span title={direct.join("、")}>{describePermissions(direct)}</span>
+          <span title={direct.join(t("list_separator"))}>
+            {describePermissions(direct)}
+          </span>
         )}
         {dependencies.length > 0 && (
           <Typography.Text
-            title={dependencies.join("、")}
-            type={automaticLabel === "自动补齐" ? "warning" : "danger"}
+            title={dependencies.join(t("list_separator"))}
+            type={automaticKind === "grant" ? "warning" : "danger"}
             style={{ fontSize: 12 }}
           >
-            {automaticLabel}：<span>{describePermissions(dependencies)}</span>
+            {t("automatic_permissions", {
+              action: t(
+                automaticKind === "grant"
+                  ? "automatically_added"
+                  : "automatically_removed"
+              ),
+              permissions: describePermissions(dependencies)
+            })}
           </Typography.Text>
         )}
       </Flex>
     );
   };
   const adminColumn = {
-    title: "管理员",
+    key: "管理员",
+    title: t("administrator"),
     render: (_: unknown, row: PermissionPreviewResponse["targets"][number]) => (
       <Typography.Text title={row.admin_id}>
         {adminNames?.[row.admin_id] ?? row.admin_id}
@@ -178,18 +192,18 @@ export function PermissionChangeDialog({
   return (
     <Modal
       open
-      title="权限变更预览"
+      title={t("preview_permission_changes")}
       width={720}
       closable={!saving && recovery !== "reading"}
       onCancel={close}
       footer={
         <Space>
           <Button disabled={saving || recovery === "reading"} onClick={close}>
-            取消
+            {t("cancel")}
           </Button>
           {conflict ? (
             <Button disabled={saving || recovery === "reading"} onClick={close}>
-              返回查看
+              {t("return_to_review")}
             </Button>
           ) : (
             <Button
@@ -198,28 +212,35 @@ export function PermissionChangeDialog({
               loading={saving}
               onClick={() => void commit()}
             >
-              保存变更
+              {t("save_changes")}
             </Button>
           )}
         </Space>
       }
     >
       {recovery === "reading" && (
-        <Alert type="info" title="正在确认当前权限，请勿重复保存。" />
+        <Alert
+          type="info"
+          title={t("checking_current_permissions_do_not_save_again")}
+        />
       )}
       {recovery === "read" && (
         <Alert
           type="warning"
           showIcon
-          title="已重新读取当前权限。请核对后返回，重新选择需要的调整。"
+          title={t(
+            "current_permissions_have_been_reloaded_review_them_then_return_to"
+          )}
         />
       )}
       {recovery === "failed" && (
         <Alert
           type="warning"
           showIcon
-          title="暂时无法确认是否保存成功，请重新查看后再操作"
-          action={<Button onClick={() => void reread()}>重新查看</Button>}
+          title={t(
+            "the_save_result_cannot_be_confirmed_reload_before_making_changes"
+          )}
+          action={<Button onClick={() => void reread()}>{t("reload")}</Button>}
         />
       )}
       {preview.isError && !conflict && (
@@ -227,7 +248,9 @@ export function PermissionChangeDialog({
           type="error"
           title={preview.error.message}
           action={
-            <Button onClick={() => void preview.refetch()}>重新查看</Button>
+            <Button onClick={() => void preview.refetch()}>
+              {t("reload")}
+            </Button>
           }
         />
       )}
@@ -242,9 +265,10 @@ export function PermissionChangeDialog({
             columns={[
               adminColumn,
               {
-                title: "当前权限",
+                key: "当前权限",
+                title: t("current_permissions"),
                 render: (_, row) => (
-                  <span title={row.after.join("、")}>
+                  <span title={row.after.join(t("list_separator"))}>
                     {describePermissions(row.after)}
                   </span>
                 )
@@ -262,18 +286,16 @@ export function PermissionChangeDialog({
           columns={[
             adminColumn,
             {
-              title: "开通",
+              key: "开通",
+              title: t("grant"),
               render: (_, row) =>
-                renderChanges(row.grant, row.dependency_grants, "自动补齐")
+                renderChanges(row.grant, row.dependency_grants, "grant")
             },
             {
-              title: "取消",
+              key: "取消",
+              title: t("revoke"),
               render: (_, row) =>
-                renderChanges(
-                  row.revoke,
-                  row.dependency_revocations,
-                  "自动取消"
-                )
+                renderChanges(row.revoke, row.dependency_revocations, "revoke")
             }
           ]}
         />

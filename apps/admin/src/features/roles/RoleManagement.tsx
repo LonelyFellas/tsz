@@ -1,3 +1,8 @@
+import {
+  useAccessTranslation,
+  AccessText,
+  accessLabel
+} from "../permissions/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 角色权限管理（super_admin 专属）：角色列表 + 建 / 改 / 删角色 + 派角色。全对接真实接口。
@@ -32,6 +37,7 @@ import { roleMutationError } from "./labels";
 import { RoleFormModal } from "./RoleFormModal";
 
 export function RoleManagement() {
+  const { t } = useAccessTranslation();
   const { message } = App.useApp();
   const listQuery = useRoleList();
   const catalog = usePermissionCatalog();
@@ -48,10 +54,10 @@ export function RoleManagement() {
   const { labelOf, catalogOrder } = useMemo(() => {
     const items = catalog.data?.permissions ?? [];
     return {
-      labelOf: new Map(items.map((i) => [i.key, i.label])),
+      labelOf: new Map(items.map((i) => [i.key, accessLabel(i.label, t)])),
       catalogOrder: items.map((i) => i.key)
     };
-  }, [catalog.data]);
+  }, [catalog.data, t]);
 
   const openCreate = () => {
     setEditingRole(null);
@@ -63,16 +69,16 @@ export function RoleManagement() {
   };
 
   const [deleting, setDeleting] = useState<AdminRole>();
-  const [deleteError, setDeleteError] = useState<string>();
+  const [deleteError, setDeleteError] = useState<{ cause: unknown }>();
   const confirmDelete = async () => {
     if (!deleting || deleteRole.isPending || deleting.is_system) return;
     setDeleteError(undefined);
     try {
       await deleteRole.mutateAsync(deleting.id);
-      void message.success("已删除");
+      void message.success(<AccessText message="deleted" />);
       setDeleting(undefined);
     } catch (err) {
-      setDeleteError(roleMutationError(err, "删除失败"));
+      setDeleteError({ cause: err });
       if (err instanceof HttpError && err.status === 404) invalidate();
     }
   };
@@ -80,10 +86,14 @@ export function RoleManagement() {
   // 角色权限集 → 标签。系统角色显「全部功能」；空集显「仅首页」；否则按侧栏顺序取前 6 个 + 折叠。
   const renderPermissions = (role: AdminRole) => {
     if (role.is_system) {
-      return <Tag color="geekblue">全部功能</Tag>;
+      return <Tag color="geekblue">{t("all_features")}</Tag>;
     }
     if (role.permissions.length === 0) {
-      return <Typography.Text type="secondary">仅首页</Typography.Text>;
+      return (
+        <Typography.Text type="secondary">
+          {t("dashboard_only")}
+        </Typography.Text>
+      );
     }
     const permSet = new Set<PermissionKey>(role.permissions);
     // 目录已加载则按侧栏顺序，否则退回后端返回的字母序。
@@ -99,7 +109,11 @@ export function RoleManagement() {
           <Tag key={k}>{labelOf.get(k) ?? k}</Tag>
         ))}
         {rest.length > 0 && (
-          <Tooltip title={rest.map((k) => labelOf.get(k) ?? k).join("、")}>
+          <Tooltip
+            title={rest
+              .map((k) => labelOf.get(k) ?? k)
+              .join(t("list_separator"))}
+          >
             <Tag>+{rest.length}</Tag>
           </Tooltip>
         )}
@@ -109,49 +123,49 @@ export function RoleManagement() {
 
   const columns: TableColumnsType<AdminRole> = [
     {
-      title: "角色名",
+      title: t("role_name"),
       dataIndex: "name",
       width: 180,
       fixed: "left",
       render: (name: string, record) => (
         <Space size={6}>
           <span>{name}</span>
-          {record.is_system && <Tag color="gold">系统</Tag>}
+          {record.is_system && <Tag color="gold">{t("system")}</Tag>}
         </Space>
       )
     },
     {
-      title: "描述",
+      title: t("description"),
       dataIndex: "description",
       width: 220,
       render: (d: string) => d || "-"
     },
     {
-      title: "权限",
+      title: t("permissions"),
       key: "permissions",
       width: 300,
       render: (_: unknown, record) => renderPermissions(record)
     },
     {
-      title: "成员数",
+      title: t("members"),
       dataIndex: "member_count",
       width: 90,
       align: "center"
     },
     {
-      title: "更新时间",
+      title: t("updated_at"),
       dataIndex: "updated_at",
       width: 160,
       render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "操作",
+      title: t("actions"),
       key: "action",
       width: 150,
       fixed: "right",
       render: (_: unknown, record) => {
         // 系统角色只读：编辑 / 删除均置灰，后端 403 兜底。
-        const reason = "系统角色不可编辑或删除";
+        const reason = t("system_roles_cannot_be_edited_or_deleted");
         return (
           <Space size={4}>
             <GatedButton
@@ -161,7 +175,7 @@ export function RoleManagement() {
               disabled={record.is_system}
               onClick={() => openEdit(record)}
             >
-              编辑
+              {t("edit")}
             </GatedButton>
             <GatedButton
               type="link"
@@ -177,7 +191,7 @@ export function RoleManagement() {
                 setDeleting(record);
               }}
             >
-              删除
+              {t("delete")}
             </GatedButton>
           </Space>
         );
@@ -190,9 +204,9 @@ export function RoleManagement() {
       {deleting && (
         <Modal
           open
-          title={`删除角色「${deleting.name}」`}
-          okText="删除"
-          cancelText="取消"
+          title={t("delete_role_title", { name: deleting.name })}
+          okText={t("delete")}
+          cancelText={t("cancel")}
           confirmLoading={deleteRole.isPending}
           okButtonProps={{ danger: true }}
           cancelButtonProps={{ disabled: deleteRole.isPending }}
@@ -206,16 +220,25 @@ export function RoleManagement() {
         >
           <p>
             {deleting.member_count > 0
-              ? `该角色下有 ${deleting.member_count} 名管理员，删除后他们将被解绑、降级为仅可见首页。确认删除？`
-              : "确认删除该角色？"}
+              ? t("delete_role_members", { count: deleting.member_count })
+              : t("delete_this_role")}
           </p>
-          {deleteError && <Alert type="error" title={deleteError} />}
+          {deleteError && (
+            <Alert
+              type="error"
+              title={roleMutationError(
+                deleteError.cause,
+                t("could_not_delete"),
+                t
+              )}
+            />
+          )}
         </Modal>
       )}
 
       <PageHeader
-        title="角色权限管理"
-        breadcrumb={<Breadcrumb items={[{ title: "用户管理" }]} />}
+        title={t("roles_and_permissions")}
+        breadcrumb={<Breadcrumb items={[{ title: t("user_management") }]} />}
       />
 
       <Card size="small">
@@ -224,11 +247,11 @@ export function RoleManagement() {
             type="error"
             showIcon
             style={{ marginBottom: 12 }}
-            title="角色列表加载失败"
+            title={t("could_not_load_roles")}
             description={listQuery.error.message}
             action={
               <Button size="small" onClick={() => void listQuery.refetch()}>
-                重试
+                {t("try_again")}
               </Button>
             }
           />
@@ -238,13 +261,13 @@ export function RoleManagement() {
           toolbar={
             <Space wrap>
               <Button type="primary" icon={<PlusIcon />} onClick={openCreate}>
-                新建角色
+                {t("create_role")}
               </Button>
               <Button
                 icon={<UserRoundPlusIcon />}
                 onClick={() => setAssignOpen(true)}
               >
-                指派角色
+                {t("assign_role")}
               </Button>
             </Space>
           }
@@ -253,12 +276,14 @@ export function RoleManagement() {
               icon={<RotateCwIcon />}
               onClick={() => void listQuery.refetch()}
             >
-              刷新
+              {t("refresh")}
             </Button>
           }
 
           tableId="roles"
-          locale={{ emptyText: <TableEmptyState message="暂无角色" /> }}
+          locale={{
+            emptyText: <TableEmptyState message={t("no_roles_yet")} />
+          }}
           rowKey="id"
           size="middle"
           columns={columns}

@@ -1,3 +1,8 @@
+import {
+  accessLabel,
+  defaultAccessTranslation,
+  type AccessTranslation
+} from "../permissions/i18n";
 // 管理员管理的展示映射与错误文案（纯常量/纯函数，可单测）。
 import type { AdminLevel } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
@@ -32,12 +37,14 @@ const SUPER_ADMIN_FORBIDDEN: Record<AdminActionKind, string> = {
 export function adminActionError(
   err: unknown,
   kind: AdminActionKind,
-  fallback: string
+  fallback: string,
+  t: AccessTranslation = defaultAccessTranslation
 ): string {
   if (err instanceof HttpError) {
-    if (err.status === 403) return SUPER_ADMIN_FORBIDDEN[kind];
-    if (err.status === 404) return "该管理员不存在，可能已被删除";
-    if (err.status === 422) return "请求参数不合法";
+    if (err.status === 403) return accessLabel(SUPER_ADMIN_FORBIDDEN[kind], t);
+    if (err.status === 404)
+      return accessLabel("该管理员不存在，可能已被删除", t);
+    if (err.status === 422) return accessLabel("请求参数不合法", t);
   }
   if (err instanceof Error && err.message) return err.message;
   return fallback;

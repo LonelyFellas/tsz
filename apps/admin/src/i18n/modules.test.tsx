@@ -1,5 +1,6 @@
 import { voiceResources } from "@/features/voices/i18n";
 import { userResources } from "@/features/users/i18n";
+import { accessResources } from "@/features/permissions/i18n";
 import { sentenceResources } from "@/features/sentences/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it } from "vitest";
@@ -31,6 +32,7 @@ it("按模块加载的资源保持键、插值及复数形式完整", () => {
     lexiconEditorResources,
     sentenceResources,
     userResources,
+    accessResources,
     voiceResources
   ];
   for (const resources of modules) {
@@ -108,6 +110,7 @@ it("模块资源不进入新建的登录实例，不在多个根节点间串语�
     ).toBeInTheDocument();
   }
   const fresh = createAdminI18n("en-US");
+  expect(fresh.hasResourceBundle("en", "adminAccess")).toBe(false);
   expect(fresh.hasResourceBundle("en", "adminVoices")).toBe(false);
   expect(fresh.hasResourceBundle("en", "adminDashboard")).toBe(false);
   expect(fresh.hasResourceBundle("en", "adminWorkspace")).toBe(false);
