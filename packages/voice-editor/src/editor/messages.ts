@@ -317,21 +317,6 @@ export const voiceEditorMessages = {
     "正文為空時，試聽使用示例文字“Hello, this is a voice preview.”，不會寫入正文。",
     "With empty text, auditions use “Hello, this is a voice preview.” This is not written into the text."
   ],
-  this_text_only_edits_the: [
-    "当前正文仅编辑",
-    "當前正文僅編輯",
-    "This text only edits the"
-  ],
-  local_pool_the_other_accent_s_catalogue_and_recommendations_are_view_only_a: [
-    "局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。",
-    "局部池；另一側目錄和推薦供檢視，不改變其正文與音訊歸屬。",
-    "local pool. The other accent’s catalogue and recommendations are view-only and do not change its text or audio ownership."
-  ],
-  auditions_must_also_match_the_current_language_region: [
-    "试听还需符合当前语言地区。",
-    "試聽還需符合當前語言地區。",
-    "Auditions must also match the current language region."
-  ],
   expand: ["展开", "展開", "Expand"],
   collapse: ["收起", "收起", "Collapse"],
   loading_voice_catalogue: [
@@ -341,11 +326,15 @@ export const voiceEditorMessages = {
   ],
   female: ["女声", "女聲", "Female"],
   male: ["男声", "男聲", "Male"],
-  catalogue: ["{{p0}}{{p1}}目录", "{{p0}}{{p1}}目錄", "{{p0}}{{p1}} catalogue"],
+  catalogue: [
+    "{{p0}}{{p1}}目录",
+    "{{p0}}{{p1}}目錄",
+    "{{p0}} {{p1}} catalogue"
+  ],
   search_catalogue: [
     "{{p0}}{{p1}}目录搜索",
     "{{p0}}{{p1}}目錄搜尋",
-    "Search {{p0}}{{p1}} catalogue"
+    "Search {{p0}} {{p1}} catalogue"
   ],
   search_voices: ["搜索音色", "搜尋音色", "Search voices"],
   no_matching_voices: [
@@ -414,7 +403,6 @@ export const voiceEditorMessages = {
     "Select text to set its reading"
   ],
   selected_3: ["已选中", "已選中", "Selected"],
-  configure: ["，可配置", "，可配置", "; configure"],
   select_text_to_configure: [
     "选中文字，可配置{{p0}}。",
     "選中文字，可配置{{p0}}。",
@@ -1055,12 +1043,6 @@ export const voiceEditorMessages = {
     "恢復繼承推薦",
     "Restore inherited recommendations"
   ],
-  use_latest: ["使用最新", "使用最新", "Use latest"],
-  first_choice_recommendation: [
-    "首位推荐",
-    "首位推薦",
-    "First-choice recommendation"
-  ],
   resolve_pause_and_liaison_conflicts_before_auditioning: [
     "请先处理停顿与连读的冲突，再试听",
     "請先處理停頓與連讀的衝突，再試聽",
@@ -1087,16 +1069,6 @@ export const voiceEditorMessages = {
     "Recordings for this text’s accent"
   ],
   human_recording: ["真人录音", "真人錄音", "Human recording"],
-  recordings_are_for_this_text_s: [
-    "录音用于当前正文的",
-    "錄音用於當前正文的",
-    "Recordings are for this text’s"
-  ],
-  pronunciation_and_are_saved_separately_from_synthesised_voices: [
-    "发音，与合成音色分开保存。",
-    "發音，與合成音色分開儲存。",
-    "pronunciation and are saved separately from synthesised voices."
-  ],
   mock_audition: ["模拟试听", "模擬試聽", "Mock audition"],
   human_recording_disabled: [
     "真人录音 · 暂未启用",
@@ -1315,21 +1287,6 @@ export const voiceEditorMessages = {
     "當前文字的配音版本",
     "Voice versions for current text"
   ],
-  select_multiple_versions_for_an_accent_audition_in_order_and_use_the_first: [
-    "同口音可选多个版本，按顺序审听，首个有效已选版本作为默认。",
-    "同口音可選多個版本，按順序審聽，首個有效已選版本作為預設。",
-    "Select multiple versions for an accent, audition in order, and use the first valid selected version as the default."
-  ],
-  select_one_final_version_each_for_british_and_american_accents_other_region: [
-    "英式与美式各选一个正式版本，其他地区按地区选用补充版本。",
-    "英式與美式各選一個正式版本，其他地區按地區選用補充版本。",
-    "Select one final version each for British and American accents; other regions use supplementary regional versions."
-  ],
-  current_parameters_are_retained_after_saving: [
-    "保存后保留当前参数。",
-    "儲存後保留當前引數。",
-    "Current parameters are retained after saving."
-  ],
   voice_version: ["配音版本 {{p0}}", "配音版本 {{p0}}", "Voice version {{p0}}"],
   edit_version_name: ["修改版本名称", "修改版本名稱", "Edit version name"],
   ungrouped: ["不归类", "不歸類", "Ungrouped"],
@@ -1484,5 +1441,41 @@ export const voiceEditorMessages = {
   ],
   seconds_value: ["{{count}} 秒", "{{count}} 秒", "{{count}} seconds"],
   seconds_value_one: ["{{count}} 秒", "{{count}} 秒", "{{count}} second"],
-  seconds_value_other: ["{{count}} 秒", "{{count}} 秒", "{{count}} seconds"]
+  seconds_value_other: ["{{count}} 秒", "{{count}} 秒", "{{count}} seconds"],
+  use_latest_accent_recommendation: [
+    "使用最新{{accent}}首位推荐",
+    "使用最新{{accent}}首位推薦",
+    "Use latest {{accent}} first-choice recommendation"
+  ],
+  recordings_accent_help: [
+    "录音用于当前正文的{{accent}}发音，与合成音色分开保存。",
+    "錄音用於當前正文的{{accent}}發音，與合成音色分開儲存。",
+    "Recordings are for this text’s {{accent}} pronunciation and are saved separately from synthesised voices."
+  ],
+  accent_voice: ["{{accent}}音色", "{{accent}}音色", "{{accent}} voice"],
+  selection_tools_suffix: [
+    "，可配置{{tools}}。",
+    "，可配置{{tools}}。",
+    "; configure {{tools}}."
+  ],
+  voice_pool_scope_help: [
+    "当前正文仅编辑{{accent}}局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。",
+    "當前正文僅編輯{{accent}}局部池；另一側目錄和推薦供檢視，不改變其正文與音訊歸屬。",
+    "This text only edits the {{accent}} local pool. The other accent’s catalogue and recommendations are view-only and do not change its text or audio ownership."
+  ],
+  voice_pool_scope_native_help: [
+    "当前正文仅编辑{{accent}}局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。试听还需符合当前语言地区。",
+    "當前正文僅編輯{{accent}}局部池；另一側目錄和推薦供檢視，不改變其正文與音訊歸屬。試聽還需符合當前語言地區。",
+    "This text only edits the {{accent}} local pool. The other accent’s catalogue and recommendations are view-only and do not change its text or audio ownership. Auditions must also match the current language region."
+  ],
+  voice_versions_help_multiple: [
+    "同口音可选多个版本，按顺序审听，首个有效已选版本作为默认。保存后保留当前参数。",
+    "同口音可選多個版本，按順序審聽，首個有效已選版本作為預設。儲存後保留當前引數。",
+    "Select multiple versions for an accent, audition in order, and use the first valid selected version as the default. Current parameters are retained after saving."
+  ],
+  voice_versions_help_regional: [
+    "英式与美式各选一个正式版本，其他地区按地区选用补充版本。保存后保留当前参数。",
+    "英式與美式各選一個正式版本，其他地區按地區選用補充版本。儲存後保留當前引數。",
+    "Select one final version each for British and American accents; other regions use supplementary regional versions. Current parameters are retained after saving."
+  ]
 } as const satisfies Record<string, readonly [string, string, string]>;

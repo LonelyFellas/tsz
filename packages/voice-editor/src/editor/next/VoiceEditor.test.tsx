@@ -1,3 +1,4 @@
+import { VoiceVersions } from "./VoiceVersions";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
 import stylesSource from "../../styles.css?raw";
@@ -4141,4 +4142,85 @@ it("校验错误随界面语言更新，保留自定义停顿输入和原有标�
   expect(screen.getByLabelText("Custom pause in seconds")).toBe(input);
   expect(input).toHaveValue("6");
   expect(base.onChange).not.toHaveBeenCalled();
+});
+
+it("英文选区提示保留词界与句末标点", () => {
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <VoiceEditor {...props()} />
+    </InterfaceI18nProvider>
+  );
+  selectText(2, 8);
+  expect(document.querySelector(".tsz-ve-selection-status")).toHaveTextContent(
+    "Selected centre; configure grammar structures and liaison marks."
+  );
+});
+
+it.each([true, false])("英文版本说明的句界完整（multiple=%s）", (multiple) => {
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <VoiceVersions
+        settings={[]}
+        voices={[]}
+        readOnly
+        canAudition={false}
+        multiple={multiple}
+        onEdit={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+        onAudition={vi.fn()}
+      />
+    </InterfaceI18nProvider>
+  );
+  expect(
+    screen.getByText(
+      multiple ? /Select multiple versions/ : /Select one final version/
+    )
+  ).toHaveTextContent(
+    multiple
+      ? "default. Current parameters are retained after saving."
+      : "versions. Current parameters are retained after saving."
+  );
+});
+
+it("英文录音说明保留口音两侧的词界", async () => {
+  const setting = {
+    version_id: "11111111-1111-4111-8111-111111111111",
+    version_name: "saved-version",
+    locale: "en-GB",
+    voice_id: "sonia",
+    enabled: true,
+    rate_percent: 0,
+    audio_asset_id: "saved-audio"
+  };
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <VoiceEditor
+        {...props({
+          mode: "association",
+          locale: "en-GB",
+          recommendationArea: "meaning",
+          autoRecommend: false,
+          voiceProfile: {
+            voices: [setting],
+            dubbing: {
+              mode: "local",
+              area: "meaning",
+              pool_version: "provider_id_v1"
+            }
+          },
+          onVoiceProfileChange: vi.fn(),
+          previewAdapter: adapter()
+        })}
+      />
+    </InterfaceI18nProvider>
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Edit saved-version" })
+  );
+  expect(
+    await screen.findByText(
+      "Recordings are for this text’s British pronunciation and are saved separately from synthesised voices."
+    )
+  ).toBeVisible();
 });

@@ -371,8 +371,7 @@ export function MarkupPanel({
               ) : selectionText ? (
                 <>
                   {t("selected_3")} <strong>{selectionText}</strong>
-                  {t("configure")}
-                  {selectionToolsLabel}。
+                  {t("selection_tools_suffix", { tools: selectionToolsLabel })}
                 </>
               ) : (
                 t("select_text_to_configure", { p0: selectionToolsLabel })

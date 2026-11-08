@@ -3331,9 +3331,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                       disabled={readOnly || !onVoiceProfileChange}
                       onClick={() => void useLatestRecommendation(accent)}
                     >
-                      {t("use_latest")}
-                      {accent === "en-GB" ? t("british") : t("american")}
-                      {t("first_choice_recommendation")}
+                      {t("use_latest_accent_recommendation", {
+                        accent:
+                          accent === "en-GB" ? t("british") : t("american")
+                      })}
                     </Button>
                   ))}
               </Space>
@@ -3646,11 +3647,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               {t("human_recording")}
             </Typography.Title>
             <p>
-              {t("recordings_are_for_this_text_s")}
-              {dialect === "en-GB" ? t("british") : t("american")}
-              {t(
-                "pronunciation_and_are_saved_separately_from_synthesised_voices"
-              )}
+              {t("recordings_accent_help", {
+                accent: dialect === "en-GB" ? t("british") : t("american")
+              })}
             </p>
             <UploadPanel
               uploadAllowed={audioUploadAllowed}

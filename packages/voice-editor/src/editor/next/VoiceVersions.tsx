@@ -86,14 +86,11 @@ export function VoiceVersions({
         {t("voice_versions_for_current_text")}
       </Typography.Text>
       <Typography.Paragraph type="secondary">
-        {multiple
-          ? t(
-              "select_multiple_versions_for_an_accent_audition_in_order_and_use_the_first"
-            )
-          : t(
-              "select_one_final_version_each_for_british_and_american_accents_other_region"
-            )}
-        {t("current_parameters_are_retained_after_saving")}
+        {t(
+          multiple
+            ? "voice_versions_help_multiple"
+            : "voice_versions_help_regional"
+        )}
       </Typography.Paragraph>
       {visible.map((setting) => {
         const key = voiceSettingKey(setting);

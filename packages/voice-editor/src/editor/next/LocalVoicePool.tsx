@@ -806,10 +806,7 @@ export function LocalVoicePool({
               {voiceSides(t).map((side) => (
                 <div key={side.key} className="tsz-ve-pool-pair-side">
                   <span>{t("audition")}</span>
-                  <span>
-                    {side.label}
-                    {t("voice")}
-                  </span>
+                  <span>{t("accent_voice", { accent: side.label })}</span>
                   <span>{t("rate")}</span>
                   <span>{t("volume")}</span>
                 </div>
@@ -969,15 +966,15 @@ export function LocalVoicePool({
                   )}
                   {locale && (
                     <Typography.Paragraph type="secondary">
-                      {t("this_text_only_edits_the")}
-                      {locale === "en-GB" ? t("british") : t("american")}
                       {t(
-                        "local_pool_the_other_accent_s_catalogue_and_recommendations_are_view_only_a"
+                        nativeAuditionLocale
+                          ? "voice_pool_scope_native_help"
+                          : "voice_pool_scope_help",
+                        {
+                          accent:
+                            locale === "en-GB" ? t("british") : t("american")
+                        }
                       )}
-                      {nativeAuditionLocale &&
-                        t(
-                          "auditions_must_also_match_the_current_language_region"
-                        )}
                     </Typography.Paragraph>
                   )}
                 </div>
