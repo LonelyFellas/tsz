@@ -1,3 +1,7 @@
+import {
+  useLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { ColumnSettings } from "@/components/ColumnSettings";
 import { useColumnSettings } from "@/components/useColumnSettings";
@@ -9,8 +13,7 @@ import {
   synthesisInputIssue,
   synthesisLocaleIssue,
   pronunciationLocale,
-  synthesisForLocale,
-  pronunciationSynthesisLabel
+  synthesisForLocale
 } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
@@ -30,7 +33,8 @@ import type {
   AdminWordV3,
   Dialect,
   WordPronunciationV3,
-  SpellingSpeechV3
+  SpellingSpeechV3,
+  PronunciationSynthesisV3
 } from "@tsz/types";
 import {
   useEffect,
@@ -68,6 +72,7 @@ function ReviewPronunciationPlayback({
   dialect: Dialect;
   legacyDialect: Dialect;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const { preference } = useDialectPreference();
   const locale = pronunciationLocale(dialect, preference);
   const synthesis = synthesisForLocale(
@@ -89,12 +94,22 @@ function ReviewPronunciationPlayback({
       assetOnly
       pronunciationId={pronunciation.id}
       dialect={dialect}
-      ariaLabelPrefix={`${spelling} ${pronunciation.synthesis?.uk || pronunciation.synthesis?.us ? `${dialect === "uk" ? "英式" : "美式"} ` : ""}最终读音`}
+      ariaLabelPrefix={t("panel_final_pronunciation", {
+        p0: spelling,
+        p1:
+          pronunciation.synthesis?.uk || pronunciation.synthesis?.us
+            ? t("panel_label_3", {
+                p0: dialect === "uk" ? t("panel_british") : t("panel_american")
+              })
+            : ""
+      })}
       audioAssetId={assetId}
       disabled={!assetId}
       disabledReason={
         !assetId && (content || !pronunciation.synthesis)
-          ? "尚未保存正式音频，请返回编辑补齐"
+          ? t(
+              "panel_final_audio_has_not_been_saved_return_to_the_editor_to_add_it"
+            )
           : content
             ? undefined
             : (synthesisInputIssue(
@@ -107,7 +122,9 @@ function ReviewPronunciationPlayback({
                 locale,
                 dialect === "common"
               ) ??
-              (!spelling.trim() ? "请先填写词形拼写" : undefined))
+              (!spelling.trim()
+                ? t("panel_enter_the_form_spelling_first")
+                : undefined))
       }
       content={content ?? { version: 2, text: "", annotations: [] }}
       voiceProfile={profile}
@@ -122,13 +139,29 @@ function FormsReview({
   word: AdminWordV3;
   playback?: boolean;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const formTypeLabel = useFormTypeLabel();
   const partOfSpeechLabel = usePartOfSpeechLabel();
   const settings = useColumnSettings("word-forms-review", [
-    { key: "form", label: "词形", visible: true, fixed: false },
-    { key: "spelling", label: "拼写 / 方言", visible: true, fixed: false },
-    { key: "phonetic", label: "字典音标", visible: true, fixed: false },
-    { key: "actual", label: "实际发音", visible: true, fixed: false }
+    { key: "form", label: t("panel_form"), visible: true, fixed: false },
+    {
+      key: "spelling",
+      label: t("panel_spelling_dialect"),
+      visible: true,
+      fixed: false
+    },
+    {
+      key: "phonetic",
+      label: t("panel_dictionary_transcription"),
+      visible: true,
+      fixed: false
+    },
+    {
+      key: "actual",
+      label: t("panel_actual_pronunciation"),
+      visible: true,
+      fixed: false
+    }
   ]);
   const visibleColumns = settings.columns.filter((column) => column.visible);
   const reviewRef = useRef<HTMLDivElement>(null);
@@ -165,7 +198,7 @@ function FormsReview({
     };
   };
   if (word.forms.pos.length === 0)
-    return <Empty description="暂无词形与发音" />;
+    return <Empty description={t("panel_no_forms_or_pronunciation_yet")} />;
   return (
     <Flex ref={reviewRef} vertical gap="middle">
       {expandFormContents(word.forms).pos.map((pos) => (
@@ -174,11 +207,15 @@ function FormsReview({
             <Typography.Title level={4} style={{ margin: 0 }}>
               {partOfSpeechLabel(pos.pos)}
             </Typography.Title>
-            <Tag>{pos.form_groups.length} 个变化组</Tag>
+            <Tag>
+              {t("preview_form_group_count", { count: pos.form_groups.length })}
+            </Tag>
           </Flex>
           <div className="v3-review-group-list">
             {pos.form_groups.length === 0 && (
-              <Typography.Text type="secondary">暂无变化组</Typography.Text>
+              <Typography.Text type="secondary">
+                {t("panel_no_form_groups_yet")}
+              </Typography.Text>
             )}
             {pos.form_groups.map((group, index) => (
               <div
@@ -186,7 +223,9 @@ function FormsReview({
                 data-testid={`preview-group-${group.id}`}
                 key={group.id}
               >
-                <Tag>变化组 {index + 1}</Tag>
+                <Tag>
+                  {t("panel_form_group")} {index + 1}
+                </Tag>
                 <span className="v3-review-form-chain">
                   {group.members.map((member, i) => {
                     const form = pos.forms.find((f) => f.id === member.form_id);
@@ -200,7 +239,9 @@ function FormsReview({
                       >
                         {i > 0 && <small> → </small>}
                         {i + 1}.{" "}
-                        {form ? formTypeLabel(form.form_type) : "未知词形"}
+                        {form
+                          ? formTypeLabel(form.form_type)
+                          : t("panel_unknown_form")}
                         {variant ? (
                           <>
                             {" · "}
@@ -269,10 +310,14 @@ function FormsReview({
                                           annotations: []
                                         }
                                       }
-                                      emptyText="待填写拼写"
+                                      emptyText={t(
+                                        "panel_spelling_not_entered"
+                                      )}
                                     />
                                   </strong>
-                                  <small>{dialectLabel(variant.dialect)}</small>
+                                  <small>
+                                    {dialectLabel(variant.dialect, t)}
+                                  </small>
                                 </>
                               )}
                             </>
@@ -313,21 +358,23 @@ function FormsReview({
                                   <small>
                                     {pronunciation.style
                                       ? pronunciationStyleLabel(
-                                          pronunciation.style
+                                          pronunciation.style,
+                                          t
                                         )
-                                      : "未选择读法"}
+                                      : t("panel_reading_not_selected")}
                                   </small>
                                   {pronunciation.synthesis && (
                                     <small>
-                                      {pronunciationSynthesisLabel(
+                                      {reviewSynthesisLabel(
                                         pronunciation.synthesis,
-                                        variant.dialect
+                                        variant.dialect,
+                                        t
                                       )}
                                     </small>
                                   )}
                                 </>
                               ) : (
-                                "暂无发音"
+                                t("panel_no_pronunciation_yet")
                               )}
                             </>
                           ),
@@ -389,6 +436,7 @@ export function V3ReviewContent({
   renderSentences,
   onEdit
 }: Props) {
+  const { t } = useLexiconEditorTranslation();
   const posLabel = usePartOfSpeechLabel();
   const [openSections, setOpenSections] = useState<string[]>([
     "forms",
@@ -434,33 +482,33 @@ export function V3ReviewContent({
         ? "warning"
         : "processing";
   const summaryItems = [
-    ["基本词性", model.summary.posCount],
-    ["原形数", model.summary.baseCount],
-    ["全部词形", model.summary.formCount],
-    ["发音", model.summary.pronunciationCount],
-    ["词义", model.summary.senseCount],
+    [t("panel_part_of_speech"), model.summary.posCount],
+    [t("panel_base_forms"), model.summary.baseCount],
+    [t("panel_all_forms"), model.summary.formCount],
+    [t("panel_pronunciation"), model.summary.pronunciationCount],
+    [t("panel_meanings_2"), model.summary.senseCount],
     [
-      "例句",
+      t("panel_examples"),
       sentenceCount === null
         ? "—"
         : (sentenceCount ?? model.summary.sentenceCount)
     ],
-    ["关系词", model.summary.relationCount]
+    [t("panel_related_entries_2"), model.summary.relationCount]
   ] as const;
 
   return (
-    <section className="v3-review" aria-label="预览并生效">
+    <section className="v3-review" aria-label={t("panel_preview_and_apply")}>
       <header className="word-step-heading">
         <span className="word-step-number">STEP 04</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          发布前预览
+          {t("panel_preview_before_publishing")}
         </Typography.Title>
       </header>
       <Card className="v3-review-header">
         <Flex align="flex-start" justify="space-between" gap="large" wrap>
           <div>
             <Typography.Text className="v3-review-kicker">
-              当前词条
+              {t("panel_current_entry")}
             </Typography.Text>
             <Typography.Title className="tsz-words" level={2}>
               {model.identity.label}
@@ -472,7 +520,7 @@ export function V3ReviewContent({
             {model.state.status === "published" ||
             model.state.status === "archived" ? (
               <Typography.Text type="secondary">
-                当前词条为只读查看
+                {t("panel_this_entry_is_read_only")}
               </Typography.Text>
             ) : null}
           </div>
@@ -485,8 +533,11 @@ export function V3ReviewContent({
         </Flex>
       </Card>
 
-      <div className="v3-review-summary" aria-label="内容概览">
-        <span>内容概览</span>
+      <div
+        className="v3-review-summary"
+        aria-label={t("panel_content_overview")}
+      >
+        <span>{t("panel_content_overview")}</span>
         {summaryItems.map(([label, value]) => (
           <span key={label}>
             <strong>{value}</strong> {label}
@@ -494,14 +545,14 @@ export function V3ReviewContent({
         ))}
       </div>
       <div className="v3-review-reading-layout">
-        <nav className="v3-review-index" aria-label="词条阅读目录">
-          <div className="v3-review-index-title">本词条</div>
+        <nav className="v3-review-index" aria-label={t("panel_entry_contents")}>
+          <div className="v3-review-index-title">{t("panel_this_entry")}</div>
           <button
             type="button"
             aria-current={activeId === "review-forms" ? "location" : undefined}
             onClick={() => jump("review-forms")}
           >
-            词形与发音
+            {t("panel_forms_and_pronunciation_3")}
           </button>
           {word.meanings.pos.map((pos) => (
             <div key={pos.pos_id}>
@@ -522,16 +573,19 @@ export function V3ReviewContent({
                   onClick={() => jump(`review-sense-${sense.id}`)}
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
-                  {reviewSenseTitle(sense)}
+                  {reviewSenseTitle(sense, t)}
                 </button>
               ))}
             </div>
           ))}
-          <a href="#review-publish">发布检查 ↓</a>
+          <a href="#review-publish">{t("panel_publication_checks_2")}</a>
         </nav>
         <div className="v3-review-paper">
           <div className="v3-review-readiness" role="status">
-            {readiness ?? "当前内容已保存，可查看内容或发布历史。"}
+            {readiness ??
+              t(
+                "panel_content_is_saved_view_the_content_or_publication_history"
+              )}
           </div>
           <div className="v3-review-content">
             <Collapse
@@ -545,7 +599,7 @@ export function V3ReviewContent({
                   label: (
                     <Flex align="center" gap="small">
                       <Volume2Icon />
-                      词形与发音
+                      {t("panel_forms_and_pronunciation_3")}
                     </Flex>
                   ),
                   children: (
@@ -557,7 +611,7 @@ export function V3ReviewContent({
                             onEdit(word.forms.pos[0]?.pos_id ?? word.id)
                           }
                         >
-                          编辑词形与发音
+                          {t("panel_edit_forms_and_pronunciation")}
                         </Button>
                       )}
                       <FormsReview word={word} playback={playback} />
@@ -569,12 +623,12 @@ export function V3ReviewContent({
                   label: (
                     <Flex align="center" gap="small">
                       <BookOpenIcon />
-                      词义结构
+                      {t("panel_meaning_structure")}
                     </Flex>
                   ),
                   extra: (
                     <Typography.Text type="secondary">
-                      释义、例句与关系
+                      {t("panel_definitions_examples_and_relations")}
                     </Typography.Text>
                   ),
                   children: (
@@ -593,4 +647,32 @@ export function V3ReviewContent({
       </div>
     </section>
   );
+}
+
+function reviewSynthesisLabel(
+  synthesis: PronunciationSynthesisV3,
+  dialect: Dialect,
+  t: LexiconEditorTranslation
+) {
+  if (synthesis.use_spelling) return t("review_spelling_source");
+  const name = `Azure ${synthesis.alphabet.toUpperCase()}`;
+  const empty = t("review_not_entered");
+  if (!synthesis.uk && !synthesis.us)
+    return t("review_synthesis_value", {
+      name,
+      value: synthesis[synthesis.alphabet] || empty
+    });
+  const uk =
+    synthesisForLocale(synthesis, "en-GB", dialect)[synthesis.alphabet] ||
+    empty;
+  const us =
+    synthesisForLocale(synthesis, "en-US", dialect)[synthesis.alphabet] ||
+    empty;
+  if (dialect !== "common")
+    return t("review_synthesis_dialect", {
+      name,
+      dialect: dialectLabel(dialect, t),
+      value: dialect === "uk" ? uk : us
+    });
+  return t("review_synthesis_both", { name, uk, us });
 }

@@ -1,6 +1,9 @@
+import { useState } from "react";
+import { lexiconEditorPanelMessages } from "./editor-panel-messages";
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconEditorMessages = {
+  ...lexiconEditorPanelMessages,
   add_pos_group: [
     "新增{{pos}}变化组",
     "新增{{pos}}變化組",
@@ -1114,4 +1117,48 @@ export function LexiconEditorText({
 }) {
   const { t } = useLexiconEditorTranslation();
   return <>{t(message, params ?? {})}</>;
+}
+
+export type LexiconEditorTranslation = (
+  key: LexiconEditorKey,
+  values?: Record<string, string | number>
+) => string;
+export const defaultLexiconEditorTranslation: LexiconEditorTranslation = (
+  key,
+  values
+) =>
+  lexiconEditorMessages[key][0].replace(/{{(\w+)}}/g, (_, name: string) =>
+    String(values?.[name] ?? `{{${name}}}`)
+  );
+
+export type LexiconEditorMessage = {
+  key: LexiconEditorKey;
+  values?: Record<string, string | number>;
+};
+export function createLexiconEditorMessage(
+  key: LexiconEditorKey,
+  values?: Record<string, string | number>
+): LexiconEditorMessage {
+  return { key, values };
+}
+export function useLexiconEditorMessageState(initial = "") {
+  const { t } = useLexiconEditorTranslation();
+  const [message, setMessage] = useState<
+    string | LexiconEditorMessage | undefined
+  >(initial);
+  return [
+    typeof message === "object"
+      ? t(message.key, message.values ?? {})
+      : (message ?? ""),
+    setMessage
+  ] as const;
+}
+
+export function lexiconEditorMessageText(
+  message: string | LexiconEditorMessage | undefined,
+  t: LexiconEditorTranslation
+) {
+  return typeof message === "object"
+    ? t(message.key, message.values ?? {})
+    : message;
 }

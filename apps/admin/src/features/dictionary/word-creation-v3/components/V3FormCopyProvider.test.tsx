@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import {
   act,
   fireEvent,
@@ -463,4 +465,41 @@ describe("词形复制交互", () => {
     expect(targetPronunciation().actual_pron).toBe("later-edit");
     expect(screen.getByText(/来源或目标.*变化/)).toBeInTheDocument();
   });
+});
+
+it("复制请求中切换语言保留源目标和结果，完成后仍可撤销且不重发复制", async () => {
+  let finish!: (value: []) => void;
+  resolveProfiles.mockImplementationOnce(
+    () =>
+      new Promise<[]>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const initial = fixture();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <Harness initial={initial} />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(
+    within(screen.getByTestId("form-0")).getByRole("button", {
+      name: "复制英美音标"
+    })
+  );
+  fireEvent.click(screen.getByTestId("phonetics-1"));
+  const before = structuredClone(current());
+  view.rerender(content("en-US"));
+  expect(resolveProfiles).toHaveBeenCalledOnce();
+  expect(current()).toEqual(before);
+  expect(screen.getByRole("button", { name: "编辑词形内容" })).toBeDisabled();
+  await act(async () => finish([]));
+  expect(targetPronunciation().actual_pron).toBe("source");
+  expect(current().pos).toEqual(before.pos);
+  view.rerender(content("zh-Hant"));
+  expect(targetPronunciation().actual_pron).toBe("source");
+  const undo = await screen.findByRole("button", { name: "撤銷" });
+  fireEvent.click(undo);
+  expect(current()).toEqual(before);
+  expect(resolveProfiles).toHaveBeenCalledOnce();
 });

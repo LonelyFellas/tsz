@@ -1,3 +1,8 @@
+import {
+  useVoiceEditorTranslation,
+  useVoiceEditorMessageState,
+  createVoiceEditorMessage
+} from "../i18n";
 import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Checkbox, InputNumber, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useRef, useState } from "react";
@@ -52,6 +57,7 @@ export function AudioReview({
   media: ReviewAudio;
   onPlay?: () => void;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const { audio, result } = media;
   const [blob, setBlob] = useState<Blob>();
   const [peaks, setPeaks] = useState<number[]>([]);
@@ -61,7 +67,7 @@ export function AudioReview({
   const [range, setRange] = useState<[number, number]>([0, 0]);
   const [loop, setLoop] = useState(false);
   const [hover, setHover] = useState<number>();
-  const [error, setError] = useState("");
+  const [error, setError] = useVoiceEditorMessageState("");
   const [loading, setLoading] = useState(true);
   const drag = useRef<number | undefined>(undefined);
   const onPlayRef = useRef(onPlay);
@@ -83,7 +89,7 @@ export function AudioReview({
         ? await result.loadAudio({ signal: controller.signal })
         : await fetch(result.audioUrl, { signal: controller.signal }).then(
             (response) => {
-              if (!response.ok) throw new Error("音频读取失败");
+              if (!response.ok) throw new Error(t("could_not_read_audio"));
               return response.blob();
             }
           );
@@ -106,7 +112,11 @@ export function AudioReview({
     void load()
       .catch(() => {
         if (!controller.signal.aborted)
-          setError("波形读取或解码失败，可重新试听后重试。");
+          setError(
+            createVoiceEditorMessage(
+              "could_not_read_or_decode_the_waveform_audition_again_and_retry"
+            )
+          );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -116,7 +126,7 @@ export function AudioReview({
       controller.abort();
       void decoder?.close().catch(() => {});
     };
-  }, [result]);
+  }, [result, setError]);
 
   useEffect(() => {
     let frame = 0;
@@ -144,7 +154,13 @@ export function AudioReview({
         playback.current.range[1] > playback.current.range[0]
       ) {
         audio.currentTime = playback.current.range[0];
-        void audio.play().catch(() => setError("音频播放失败，请重新试听"));
+        void audio
+          .play()
+          .catch(() =>
+            setError(
+              createVoiceEditorMessage("audio_playback_failed_audition_again")
+            )
+          );
       } else update();
     };
     audio.addEventListener("timeupdate", update);
@@ -160,7 +176,7 @@ export function AudioReview({
       audio.removeEventListener("ended", ended);
       audio.playbackRate = 1;
     };
-  }, [audio]);
+  }, [audio, setError]);
 
   function seek(time: number) {
     audio.currentTime = Math.max(0, Math.min(duration, time));
@@ -182,11 +198,14 @@ export function AudioReview({
       Math.min(peaks.length - 1, Math.floor((at / duration) * peaks.length))
     ] ?? 0;
   return (
-    <section className="tsz-ve-audio-review" aria-label={`审听 ${media.name}`}>
+    <section
+      className="tsz-ve-audio-review"
+      aria-label={t("review", { p0: media.name })}
+    >
       <Typography.Text strong>{media.name}</Typography.Text>
       {loading && (
         <Typography.Text type="secondary">
-          正在读取真实音频波形…
+          {t("loading_audio_waveform")}
         </Typography.Text>
       )}
       {error && <Typography.Text type="danger">{error}</Typography.Text>}
@@ -198,7 +217,9 @@ export function AudioReview({
             className="tsz-ve-waveform"
             role="slider"
             tabIndex={0}
-            aria-label="音频波形，点击定位或拖动选择区间"
+            aria-label={t(
+              "audio_waveform_click_to_seek_or_drag_to_select_a_range"
+            )}
             aria-valuemin={0}
             aria-valuemax={duration}
             aria-valuenow={position}
@@ -269,11 +290,13 @@ export function AudioReview({
             />
           </svg>
           <div className="tsz-ve-wave-scale">
-            <span>0 秒</span>
+            <span>{t("0_seconds")}</span>
             <span>
-              {at.toFixed(2)} 秒 · 峰值 {peak.toFixed(3)}
+              {at.toFixed(2)} {t("seconds_peak")} {peak.toFixed(3)}
             </span>
-            <span>{duration.toFixed(2)} 秒</span>
+            <span>
+              {duration.toFixed(2)} {t("seconds")}
+            </span>
           </div>
         </>
       )}
@@ -286,14 +309,20 @@ export function AudioReview({
                 seek(loopPosition(audio.currentTime, range[0], range[1]));
               void audio
                 .play()
-                .catch(() => setError("音频播放失败，请重新试听"));
+                .catch(() =>
+                  setError(
+                    createVoiceEditorMessage(
+                      "audio_playback_failed_audition_again"
+                    )
+                  )
+                );
             } else audio.pause();
           }}
         >
-          {playing ? "暂停" : "播放"}
+          {playing ? t("pause_2") : t("play")}
         </Button>
         <Select
-          aria-label="审听倍速"
+          aria-label={t("review_playback_speed")}
           size="small"
           defaultValue={1}
           options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => ({
@@ -305,7 +334,7 @@ export function AudioReview({
           }}
         />
         <InputNumber
-          aria-label="循环起点秒数"
+          aria-label={t("loop_start_in_seconds")}
           size="small"
           min={0}
           max={range[1]}
@@ -319,7 +348,7 @@ export function AudioReview({
         />
         <span>–</span>
         <InputNumber
-          aria-label="循环终点秒数"
+          aria-label={t("loop_end_in_seconds")}
           size="small"
           min={range[0]}
           max={duration}
@@ -339,7 +368,7 @@ export function AudioReview({
             if (event.target.checked) seek(range[0]);
           }}
         >
-          区间循环
+          {t("loop_selection")}
         </Checkbox>
         <Button
           size="small"
@@ -353,10 +382,12 @@ export function AudioReview({
               );
           }}
         >
-          下载原音频
+          {t("download_original_audio")}
         </Button>
       </Space>
-      <Typography.Text type="secondary">倍速仅影响本次审听。</Typography.Text>
+      <Typography.Text type="secondary">
+        {t("playback_speed_only_affects_this_review")}
+      </Typography.Text>
     </section>
   );
 }

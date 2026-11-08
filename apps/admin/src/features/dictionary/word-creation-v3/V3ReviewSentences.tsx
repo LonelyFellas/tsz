@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../i18n/editor";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Button, Empty, Skeleton, Tag } from "@tsz/ui/admin/display";
@@ -16,6 +17,7 @@ export function V3ReviewSentences({
   senseId: string;
   revision: number;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const canRead = useAnyPermission([
     "sentences.access",
     "sentences.read_published"
@@ -51,28 +53,43 @@ export function V3ReviewSentences({
         page_size: 5
       })
   });
-  if (!canRead) return <Alert type="info" title="未开通例句查看权限" />;
+  if (!canRead)
+    return (
+      <Alert
+        type="info"
+        title={t("panel_example_viewing_permission_is_required")}
+      />
+    );
   return (
     <section
       ref={root}
       className="v3-dictionary-sentences"
-      aria-label="多维例句"
+      aria-label={t("panel_examples_2")}
     >
-      <h4>多维例句 {query.data && <span>{query.data.total} 条</span>}</h4>
+      <h4>
+        {t("panel_examples_2")}{" "}
+        {query.data && (
+          <span>{t("preview_row_count", { count: query.data.total })}</span>
+        )}
+      </h4>
       {query.isPending ? (
         <Skeleton active paragraph={{ rows: 2 }} />
       ) : query.isError ? (
         <Alert
           type="error"
-          title="例句加载失败"
-          action={<Button onClick={() => void query.refetch()}>重试</Button>}
+          title={t("panel_could_not_load_examples")}
+          action={
+            <Button onClick={() => void query.refetch()}>
+              {t("panel_try_again")}
+            </Button>
+          }
         />
       ) : (
         <>
           {query.data.items.length === 0 && (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="暂无关联例句"
+              description={t("panel_no_linked_examples_yet")}
             />
           )}
           {query.data.items.map((item) => (
@@ -89,10 +106,10 @@ export function V3ReviewSentences({
                     <div key={translation.id}>
                       <span>
                         {translation.band === "word_for_word"
-                          ? "初"
+                          ? t("panel_w")
                           : translation.band === "balanced_fluency"
-                            ? "中"
-                            : "高"}
+                            ? t("panel_b")
+                            : t("panel_a")}
                       </span>
                       <p>{translation.content.text}</p>
                     </div>
@@ -120,7 +137,9 @@ export function V3ReviewSentences({
                         <Tag
                           color={target.state === "pending" ? "orange" : "blue"}
                         >
-                          {target.state === "pending" ? "待关联" : "已关联"}
+                          {target.state === "pending"
+                            ? t("panel_pending_link")
+                            : t("panel_linked")}
                         </Tag>
                         {annotation.source_segments
                           .map((segment) => segment.surface)
@@ -128,7 +147,7 @@ export function V3ReviewSentences({
                         →{" "}
                         {target.state === "pending"
                           ? target.headword
-                          : (entry?.headword ?? "词条")}
+                          : (entry?.headword ?? t("panel_entry"))}
                         {sense ? ` · ${sense.gloss}` : ""}
                       </span>
                     );

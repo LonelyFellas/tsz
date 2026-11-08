@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { Button, Flex, Typography } from "@tsz/ui/admin/display";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
 import type {
@@ -23,6 +24,7 @@ export function V3TextAssociationPicker({
   forms?: DraftFormsStepContentV3;
   meanings?: DraftMeaningsStepContentWritableV3;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const literal = segments.map((segment) => segment.surface).join(" ");
   if (selected) {
     return (
@@ -31,19 +33,22 @@ export function V3TextAssociationPicker({
           {literal}
         </Typography.Text>
         <Typography.Text className="tsz-entry-en">
-          已关联：{selected.target_headword ?? "词条"} ·{" "}
-          {selected.target_gloss ?? "词义"}
+          {t("panel_linked_2")}
+          {selected.target_headword ?? t("panel_entry")} ·{" "}
+          {selected.target_gloss ?? t("panel_meanings_2")}
           {selected.target_word_id === wordId
-            ? "（当前词条）"
+            ? t("panel_current_entry_2")
             : selected.target_publication_id
               ? null
-              : "（草稿）"}
+              : t("panel_draft_2")}
         </Typography.Text>
         <Typography.Text type="secondary">
-          这些单词已有关联，请先清除原关联再重新选择。
+          {t(
+            "panel_these_words_are_already_linked_clear_their_links_before_selecting_again"
+          )}
         </Typography.Text>
         <Button size="small" onClick={() => onSelect(undefined)}>
-          清除关联
+          {t("panel_clear_link")}
         </Button>
       </Flex>
     );

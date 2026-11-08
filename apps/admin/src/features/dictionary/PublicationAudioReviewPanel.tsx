@@ -1,4 +1,11 @@
 import {
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage
+} from "./i18n/editor";
+import {
   Alert,
   Button,
   Card,
@@ -33,18 +40,36 @@ interface Props {
   resolveAudio?: PublicationAudioResolver;
 }
 
-export const publicationAudioIssueLabels: Record<
-  PublicationAudioIssue,
-  string
-> = {
-  missing_configuration: "尚未选择发音配置",
-  missing_asset: "已选音色尚未生成正式音频",
-  invalid_source: "读法或声音配置已失效",
-  asset_unavailable: "音频不可用或尚未保存到当前内容",
-  effect_mismatch: "音频与当前读法或声音配置不一致",
-  object_unavailable: "音频文件暂时无法读取"
-};
-const accentLabels = { uk: "英式", us: "美式", other: "其他" };
+export function audioIssueLabels(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): Record<PublicationAudioIssue, string> {
+  return {
+    missing_configuration: t("panel_no_pronunciation_configuration_selected"),
+    missing_asset: t(
+      "panel_final_audio_has_not_been_generated_for_the_selected_voice"
+    ),
+    invalid_source: t(
+      "panel_the_reading_or_voice_configuration_is_unavailable"
+    ),
+    asset_unavailable: t(
+      "panel_audio_is_unavailable_or_has_not_been_saved_to_the_current_content"
+    ),
+    effect_mismatch: t(
+      "panel_audio_does_not_match_the_current_reading_or_voice_configuration"
+    ),
+    object_unavailable: t("panel_the_audio_file_cannot_currently_be_read")
+  };
+}
+export const publicationAudioIssueLabels = audioIssueLabels();
+function audioAccentLabels(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) {
+  return {
+    uk: t("panel_british"),
+    us: t("panel_american"),
+    other: t("panel_other")
+  };
+}
 
 export function PublicationAudioReviewPanel(props: Props) {
   return (
@@ -65,6 +90,7 @@ function ReviewPanel({
   requests,
   resolveAudio
 }: Props) {
+  const { t } = useLexiconEditorTranslation();
   const endpoint =
     requests ??
     (owner === "entry"
@@ -73,7 +99,7 @@ function ReviewPanel({
   const [review, setReview] = useState<PublicationAudioReview>();
   const [busy, setBusy] = useState(false);
   const [legacyService, setLegacyService] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useLexiconEditorMessageState();
   const request = useRef<AbortController | null>(null);
   const readyCallback = useRef(onReady);
   readyCallback.current = onReady;
@@ -120,7 +146,12 @@ function ReviewPanel({
           : !("sentence" in result.manifest.owner) ||
             result.manifest.owner.sentence !== id)
       ) {
-        throw new Error("音频清单与当前内容不一致，请重新检查");
+        setError(
+          createLexiconEditorMessage(
+            "panel_the_audio_manifest_does_not_match_the_current_content_check_again"
+          )
+        );
+        return;
       }
       setReview(result);
       readyCallback.current(
@@ -141,12 +172,14 @@ function ReviewPanel({
       }
       if (!controller.signal.aborted)
         setError(
-          failure instanceof Error ? failure.message : "音频检查失败，请重试"
+          failure instanceof Error
+            ? failure.message
+            : createLexiconEditorMessage("panel_audio_check_failed_try_again")
         );
     } finally {
       if (!controller.signal.aborted) setBusy(false);
     }
-  }, [endpoint, id, revision, owner, stop]);
+  }, [endpoint, id, revision, owner, stop, setError]);
 
   useEffect(() => {
     void load();
@@ -186,14 +219,20 @@ function ReviewPanel({
           : !("sentence" in result.manifest.owner) ||
             result.manifest.owner.sentence !== id)
       ) {
-        throw new Error("音频清单已变化，请重新检查并审听");
+        throw new Error(
+          t("panel_the_audio_manifest_changed_check_and_review_it_again")
+        );
       }
       setReview(result);
       readyCallback.current(true);
     } catch (failure) {
       if (!controller.signal.aborted)
         setError(
-          failure instanceof Error ? failure.message : "音频确认失败，请重试"
+          failure instanceof Error
+            ? failure.message
+            : createLexiconEditorMessage(
+                "panel_audio_confirmation_failed_try_again"
+              )
         );
     } finally {
       if (!controller.signal.aborted) setBusy(false);
@@ -208,31 +247,41 @@ function ReviewPanel({
   const ready =
     review?.manifest.ready && (review.confirmed || items.length === 0);
   return (
-    <Card size="small" title="发布音频">
+    <Card size="small" title={t("panel_publication_audio")}>
       <Space orientation="vertical" style={{ width: "100%" }}>
         <Typography.Text type="secondary">
-          集中审听当前正式音频后，一次确认本批。修改内容或声音后需重新检查。
+          {t(
+            "panel_review_the_current_final_audio_then_confirm_this_batch_check_again_after_ch"
+          )}
         </Typography.Text>
         {error && <Alert type="error" showIcon title={error} />}
         {legacyService && (
           <Alert
             type="info"
             showIcon
-            title="当前服务版本尚未提供音频确认"
-            description="此过渡版本继续由服务端执行发布检查。服务升级后，请重新检查并确认音频。"
+            title={t(
+              "panel_this_service_version_does_not_support_audio_confirmation_yet"
+            )}
+            description={t(
+              "panel_this_transitional_version_continues_server_side_publication_checks_check_an"
+            )}
           />
         )}
         {review && !review.manifest.ready && (
           <Alert
             type="warning"
             showIcon
-            title="仍有音频待完成"
-            description="请返回对应内容选择读法和音色，生成并保存正式音频后重新检查。"
+            title={t("panel_audio_still_needs_completing")}
+            description={t(
+              "panel_return_to_the_relevant_content_select_readings_and_voices_generate_and_save"
+            )}
           />
         )}
         {ready && (
           <Tag color="success">
-            {items.length ? "本批音频已确认" : "没有需要确认的配音版本"}
+            {items.length
+              ? t("panel_audio_batch_confirmed")
+              : t("panel_no_voice_versions_need_confirmation")}
           </Tag>
         )}
         <List
@@ -245,12 +294,14 @@ function ReviewPanel({
                 <Button
                   key="play"
                   icon={<Volume2Icon />}
-                  aria-label={`试听第 ${index + 1} 条正式音频`}
+                  aria-label={t("panel_audition_final_audio", {
+                    p0: index + 1
+                  })}
                   disabled={busy || !!item.issue || !item.asset_id}
                   loading={playing === index}
                   onClick={() => void audition([index])}
                 >
-                  试听
+                  {t("panel_audition")}
                 </Button>
               ]}
             >
@@ -260,19 +311,20 @@ function ReviewPanel({
                 style={{ minWidth: 0, flex: 1, wordBreak: "break-word" }}
               >
                 <Typography.Text>
-                  {publicationAudioText(content, item) || `音频 ${index + 1}`}{" "}
+                  {publicationAudioText(content, item) ||
+                    t("panel_audio_2", { p0: index + 1 })}{" "}
                   {item.setting?.version_name ?? item.setting?.voice_id ?? ""}
                 </Typography.Text>
                 <Typography.Text type={item.issue ? "warning" : "secondary"}>
-                  {item.default_for.map((a) => accentLabels[a]).join(" / ") ||
+                  {item.default_for
+                    .map((a) => audioAccentLabels(t)[a])
+                    .join(" / ") ||
                     (item.setting?.locale === "en-GB"
-                      ? "英式"
+                      ? t("panel_british")
                       : item.setting?.locale === "en-US"
-                        ? "美式"
-                        : "已选正式音频")}
-                  {item.issue
-                    ? ` · ${publicationAudioIssueLabels[item.issue]}`
-                    : ""}
+                        ? t("panel_american")
+                        : t("panel_selected_final_audio"))}
+                  {item.issue ? ` · ${audioIssueLabels(t)[item.issue]}` : ""}
                 </Typography.Text>
               </Space>
             </List.Item>
@@ -280,11 +332,11 @@ function ReviewPanel({
         />
         <Space wrap>
           <Button
-            aria-label="重新检查音频"
+            aria-label={t("panel_check_audio_again")}
             loading={busy}
             onClick={() => void load()}
           >
-            重新检查音频
+            {t("panel_check_audio_again")}
           </Button>
           <Button
             disabled={
@@ -292,16 +344,18 @@ function ReviewPanel({
             }
             onClick={() => void audition(items.map((_, index) => index))}
           >
-            连续试听
+            {t("panel_audition_all")}
           </Button>
-          {playing !== undefined && <Button onClick={stop}>停止试听</Button>}
+          {playing !== undefined && (
+            <Button onClick={stop}>{t("panel_stop_audition")}</Button>
+          )}
           {canConfirm && !ready && (
             <Button
               type="primary"
               disabled={busy || !!error || !review?.manifest.ready}
               onClick={() => void confirm()}
             >
-              确认本批音频
+              {t("panel_confirm_audio_batch")}
             </Button>
           )}
         </Space>

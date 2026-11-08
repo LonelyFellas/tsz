@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import { useState } from "react";
@@ -183,4 +185,43 @@ it("保存期间语言选择器一并关闭", () => {
   expect(
     screen.getByRole("button", { name: "例句 1 译文语言" })
   ).toBeDisabled();
+});
+
+it("界面语言切换保留译文输入、语言编码、风格与节点身份", () => {
+  const changed = vi.fn();
+  function Host() {
+    const [sentence, setSentence] = useState(initial);
+    return (
+      <>
+        <V3SentenceTranslationsField
+          sentence={sentence}
+          index={0}
+          onChange={(rows) => {
+            changed(rows);
+            setSentence({ ...sentence, zh_translations: rows });
+          }}
+        />
+        <output data-testid="translation-draft">
+          {JSON.stringify(sentence)}
+        </output>
+      </>
+    );
+  }
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <Host />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = screen.getByLabelText("例句 1 中文");
+  fireEvent.change(input, { target: { value: "保留中文译文与 English" } });
+  const snapshot = screen.getByTestId("translation-draft").textContent;
+  changed.mockClear();
+  for (const locale of ["zh-Hant", "en-GB", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByRole("textbox")).toBe(input);
+    expect(input).toHaveValue("保留中文译文与 English");
+    expect(screen.getByTestId("translation-draft").textContent).toBe(snapshot);
+    expect(changed).not.toHaveBeenCalled();
+  }
 });

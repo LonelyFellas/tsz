@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { api, useAuthStore } from "@/lib/auth";
 import { HttpError, RequestTimeoutError } from "@tsz/api-client";
 import type {
@@ -1619,4 +1621,82 @@ beforeEach(() => {
       preferences: { dialect: "uk" }
     }
   });
+});
+
+it("预览切换语言保留影响确认边界，pending 时不隐式发布或重发请求", async () => {
+  const current = word();
+  const publish = vi.fn(async () => {});
+  const confirmImpact = vi.fn(() => true);
+  let pending = false;
+  const controller: V3PreviewPublishController = {
+    validation: {
+      schema_version: 3,
+      validated_revision: 7,
+      valid: true,
+      issues: []
+    },
+    impact: {
+      schema_version: 3,
+      base_revision: 7,
+      requires_confirmation: true,
+      affected: []
+    },
+    issues: [],
+    isPending: () => pending,
+    actions: {
+      validate: vi.fn(),
+      previewFormsImpact: vi.fn(),
+      publish,
+      confirmImpact
+    }
+  };
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <V3PreviewAndPublishStep word={current} controller={controller} />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+  view.rerender(content("en-US"));
+  expect(screen.queryByRole("button", { name: "Publish entry" })).toBeNull();
+  expect(confirmImpact).not.toHaveBeenCalled();
+  expect(publish).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Confirm impact and allow publication" })
+  );
+  expect(confirmImpact).toHaveBeenCalledOnce();
+  controller.impactConfirmed = true;
+  view.rerender(content("zh-Hant"));
+  expect(await screen.findByRole("button", { name: "發布詞條" })).toBeEnabled();
+  pending = true;
+  view.rerender(content("en-GB"));
+  expect(screen.getByRole("button", { name: "Publish entry" })).toBeDisabled();
+  expect(publish).not.toHaveBeenCalled();
+  pending = false;
+  view.rerender(content("en-US"));
+  fireEvent.click(screen.getByRole("button", { name: "Publish entry" }));
+  await waitFor(() => expect(publish).toHaveBeenCalledOnce());
+  expect(controller.actions.validate).not.toHaveBeenCalled();
+});
+
+it("英文发布预览翻译语音来源标签，保留词形与音素原文", () => {
+  const current = word();
+  const form = current.forms.pos[0]!.forms[0]!;
+  if (form.regional_variants.mode !== "common") throw new Error("fixture");
+  form.regional_variants.common.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    use_spelling: true,
+    ipa: "保持音素 rɪˈteɪn",
+    ups: ""
+  };
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <V3ReviewContent word={current} />
+    </InterfaceI18nProvider>
+  );
+  expect(screen.getByText("Spelling (speech source)")).toBeVisible();
+  expect(screen.getAllByText("learn").length).toBeGreaterThan(0);
+  expect(form.regional_variants.common.pronunciations[0]!.synthesis.ipa).toBe(
+    "保持音素 rɪˈteɪn"
+  );
 });

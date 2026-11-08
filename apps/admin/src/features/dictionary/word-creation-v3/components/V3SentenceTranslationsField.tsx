@@ -1,3 +1,8 @@
+import {
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../../i18n/editor";
 import { Trash2Icon, PlusIcon } from "lucide-react";
 import { Button, Flex } from "@tsz/ui/admin/display";
 import { Dropdown } from "@tsz/ui/admin/overlays";
@@ -17,47 +22,48 @@ import {
 import "./V3SentenceTranslationsField.css";
 
 // 初/中/高是译文风格，与例句的难度等级无关，顺序固定为初、中、高。
-const TIERS = [
-  {
-    key: "word_for_word",
-    label: "初阶",
-    name: "初阶",
-    short: "初",
-    hint: "逐字直译; Word-for-Word"
-  },
-  {
-    key: "balanced_fluency",
-    label: "中阶",
-    name: "中阶",
-    short: "中",
-    hint: "语句通顺; Balanced Fluency"
-  },
-  {
-    key: "adapted_creation",
-    label: "高阶",
-    name: "高阶",
-    short: "高",
-    hint: "深层重构; Adapted Creation"
-  }
-] as const;
+function translationTiers(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) {
+  return [
+    {
+      key: "word_for_word",
+      label: t("panel_literal"),
+      name: t("panel_literal"),
+      short: t("panel_w"),
+      hint: t("panel_word_for_word_translation")
+    },
+    {
+      key: "balanced_fluency",
+      label: t("panel_fluent"),
+      name: t("panel_fluent"),
+      short: t("panel_b"),
+      hint: t("panel_balanced_fluency")
+    },
+    {
+      key: "adapted_creation",
+      label: t("panel_adapted"),
+      name: t("panel_adapted"),
+      short: t("panel_a"),
+      hint: t("panel_adapted_creation")
+    }
+  ] as const;
+}
 
 // 两个下拉共用：光看「初/中/高」分不出该往哪一档写，把每档的含义摆在名字后面。
-const TIER_MENU_ITEMS = TIERS.map(({ key, label, hint }) => ({
-  key,
-  label: (
-    <span className="word-sentence-translation-tier-option">
-      {label}
-      <span className="word-sentence-translation-tier-hint">({hint})</span>
-    </span>
-  )
-}));
-
 // 译文语言现阶段只开放汉语；下拉就一项，位置留给将来的多语言译文。
-const LANGUAGES = [{ key: "zh", label: "汉语" }] as const;
-const LANGUAGE_LABELS: Record<TranslationLanguageV3, string> = {
-  zh: "汉语"
-};
-const LANGUAGE_MENU_ITEMS = LANGUAGES.map(({ key, label }) => ({ key, label }));
+function translationLanguages(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) {
+  return [{ key: "zh", label: t("panel_chinese_2") }] as const;
+}
+function translationLanguageLabels(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): Record<TranslationLanguageV3, string> {
+  return {
+    zh: t("panel_chinese_2")
+  };
+}
 
 export function V3SentenceTranslationsField({
   sentence,
@@ -70,6 +76,21 @@ export function V3SentenceTranslationsField({
   disabled?: boolean;
   onChange: (translations: WordSentenceTranslationV3[]) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
+  const TIER_MENU_ITEMS = translationTiers(t).map(({ key, label, hint }) => ({
+    key,
+    label: (
+      <span className="word-sentence-translation-tier-option">
+        {label}
+        <span className="word-sentence-translation-tier-hint">({hint})</span>
+      </span>
+    )
+  }));
+
+  const LANGUAGE_MENU_ITEMS = translationLanguages(t).map(({ key, label }) => ({
+    key,
+    label
+  }));
   const rows = sentenceTranslationsV3(sentence);
   // sentenceTranslationsV3 已经把缺席的 language 补成汉语，这里直接读第一行即可。
   const language = rows[0]?.language ?? DEFAULT_SENTENCE_TRANSLATION_LANGUAGE;
@@ -95,13 +116,17 @@ export function V3SentenceTranslationsField({
           size="small"
           disabled={disabled}
           className="word-sentence-translation-label"
-          aria-label={`例句 ${index + 1} 译文语言`}
+          aria-label={t("panel_example_translation_language", {
+            p0: index + 1
+          })}
         >
-          {LANGUAGE_LABELS[language]}译文
+          {t("translation_language_label", {
+            language: translationLanguageLabels(t)[language]
+          })}
         </Button>
       </Dropdown>
       <div className="word-sentence-translation-groups">
-        {TIERS.map((tier) => {
+        {translationTiers(t).map((tier) => {
           const groupRows = rows
             .map((translation, translationIndex) => ({
               translation,
@@ -113,7 +138,10 @@ export function V3SentenceTranslationsField({
             <div
               className="word-sentence-translation-group"
               role="group"
-              aria-label={`例句 ${index + 1} ${tier.name}译文组`}
+              aria-label={t("panel_example_translation_group", {
+                p0: index + 1,
+                p1: tier.name
+              })}
               key={tier.key}
             >
               {groupRows.map(({ translation, translationIndex }) => (
@@ -147,10 +175,13 @@ export function V3SentenceTranslationsField({
                       size="small"
                       disabled={disabled}
                       className="word-sentence-translation-band-button"
-                      aria-label={`例句 ${index + 1} 译文 ${translationIndex + 1} 风格`}
+                      aria-label={t("panel_example_translation_style", {
+                        p0: index + 1,
+                        p1: translationIndex + 1
+                      })}
                     >
                       <span
-                        aria-label={`${tier.name}译文`}
+                        aria-label={t("panel_translation_2", { p0: tier.name })}
                         className="word-sentence-translation-tier"
                       >
                         <strong>{tier.short}</strong>
@@ -159,12 +190,15 @@ export function V3SentenceTranslationsField({
                   </Dropdown>
 
                   <Input.TextArea
-                    placeholder="请输入对应的中文译文"
+                    placeholder={t("panel_enter_the_chinese_translation")}
                     autoSize={{ minRows: 1, maxRows: 4 }}
                     aria-label={
                       rows.length === 1
-                        ? `例句 ${index + 1} 中文`
-                        : `例句 ${index + 1} 译文 ${translationIndex + 1} 中文`
+                        ? t("panel_example_chinese", { p0: index + 1 })
+                        : t("panel_example_translation_chinese", {
+                            p0: index + 1,
+                            p1: translationIndex + 1
+                          })
                     }
                     data-v3-field="zh_translations"
                     data-v3-node-id={translation.id}
@@ -187,7 +221,10 @@ export function V3SentenceTranslationsField({
                     }
                   />
                   <Button
-                    aria-label={`删除例句 ${index + 1} 译文 ${translationIndex + 1}`}
+                    aria-label={t("panel_delete_example_translation", {
+                      p0: index + 1,
+                      p1: translationIndex + 1
+                    })}
                     type="text"
                     size="small"
                     className="word-sentence-translation-delete"
@@ -229,9 +266,9 @@ export function V3SentenceTranslationsField({
           className="word-sentence-translation-add word-section-add-button"
           disabled={disabled}
           icon={<PlusIcon />}
-          aria-label={`添加例句 ${index + 1} 译文`}
+          aria-label={t("panel_add_example_translation", { p0: index + 1 })}
         >
-          添加译文
+          {t("panel_add_translation")}
         </Button>
       </Dropdown>
     </div>

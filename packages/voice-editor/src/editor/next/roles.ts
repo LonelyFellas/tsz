@@ -1,3 +1,7 @@
+import {
+  defaultVoiceEditorTranslation,
+  type VoiceEditorTranslation
+} from "../i18n";
 import type {
   AudioAssetGender,
   AudioAssetLocale,
@@ -5,11 +9,16 @@ import type {
 } from "../../types";
 
 /** 界面术语标识与现有 wire 等级分离，保存格式保持兼容。 */
-export const GRAMMAR_ROLE_DEFINITIONS = {
-  replaceable_slot: { level: "function", label: "可替换搭配" },
-  fixed_core: { level: "core", label: "固定核心词" },
-  pos_indicator: { level: "grammar", label: "词性提示符" }
-} as const;
+export function grammarRoleDefinitions(
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+) {
+  return {
+    replaceable_slot: { level: "function", label: t("replaceable_slot") },
+    fixed_core: { level: "core", label: t("fixed_core") },
+    pos_indicator: { level: "grammar", label: t("part_of_speech_indicator") }
+  } as const;
+}
+export const GRAMMAR_ROLE_DEFINITIONS = grammarRoleDefinitions();
 export const GRAMMAR_ROLES: ReadonlyArray<{ level: string; label: string }> =
   Object.values(GRAMMAR_ROLE_DEFINITIONS);
 
@@ -91,13 +100,18 @@ export const VOICE_LOCALES: ReadonlyArray<{
   { locale: "en-US", badge: "AmE" }
 ];
 
-export const VOICE_GENDERS: ReadonlyArray<{
+export function voiceGenderLabels(
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): ReadonlyArray<{
   gender: AudioAssetGender;
   label: string;
-}> = [
-  { gender: "female", label: "女声 ♀" },
-  { gender: "male", label: "男声 ♂" }
-];
+}> {
+  return [
+    { gender: "female", label: t("female_2") },
+    { gender: "male", label: t("male_2") }
+  ];
+}
+export const VOICE_GENDERS = voiceGenderLabels();
 
 /**
  * 停顿时长展示：不足 1 秒用 ms，1 秒及以上用 s 且不补小数零。

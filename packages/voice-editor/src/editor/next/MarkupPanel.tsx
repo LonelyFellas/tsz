@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import { EraserIcon, Redo2Icon, Undo2Icon } from "lucide-react";
 import { Button } from "@tsz/ui/admin/display";
 import { Tooltip } from "@tsz/ui/admin/overlays";
@@ -111,6 +112,7 @@ export function MarkupPanel({
   actions,
   onOpenToolChange
 }: MarkupPanelProps) {
+  const { t } = useVoiceEditorTranslation();
   const grammarMode = mode === "grammar";
   const associationMode = mode === "association";
   const composedMode = grammarMode || associationMode;
@@ -122,14 +124,14 @@ export function MarkupPanel({
     mode === "phoneme-settings" ||
     mode === "voice-trial";
   const selectionToolsLabel = grammarMode
-    ? "“语法结构”和“连读符号”"
+    ? t("grammar_structures_and_liaison_marks")
     : associationMode
-      ? "“文本格式”和“连读符号”"
+      ? t("text_formatting_and_liaison_marks")
       : mode === "spelling"
-        ? "“斜体”和“连读符号”"
+        ? t("italics_and_liaison_marks")
         : mode === "voice-trial"
-          ? "音标、关联读法或特殊读法"
-          : "“连读符号”";
+          ? t("phonemes_linked_readings_or_special_readings")
+          : t("liaison_marks");
   const [voicesExpanded, setVoicesExpanded] = useState(true);
   const voicesPanelId = useId();
   const headerTools = selectionMode
@@ -269,7 +271,7 @@ export function MarkupPanel({
         className={`tsz-ve-top-tools${selectionMode ? " is-selection" : ""}`}
 
         role="toolbar"
-        aria-label="标注工具栏"
+        aria-label={t("annotation_toolbar")}
       >
         {headerTools.length > 0 && (
           <div className="tsz-ve-primary-tools">
@@ -280,7 +282,7 @@ export function MarkupPanel({
           <Tooltip
             title={
               <>
-                <span>撤销</span>
+                <span>{t("undo")}</span>
                 <ShortcutHint shortcut="Z" />
               </>
             }
@@ -289,29 +291,29 @@ export function MarkupPanel({
               size="small"
               type="text"
               className="tsz-ve-icon-button"
-              aria-label="上一步"
+              aria-label={t("previous_step")}
               disabled={readOnly || !canUndo}
               onClick={onUndo}
               icon={<Undo2Icon />}
             />
           </Tooltip>
-          <Tooltip title="重做">
+          <Tooltip title={t("redo")}>
             <Button
               size="small"
               type="text"
               className="tsz-ve-icon-button"
-              aria-label="下一步"
+              aria-label={t("next_step")}
               disabled={readOnly || !canRedo}
               onClick={onRedo}
               icon={<Redo2Icon />}
             />
           </Tooltip>
-          <Tooltip title="清空标注">
+          <Tooltip title={t("clear_annotations")}>
             <Button
               size="small"
               type="text"
               className="tsz-ve-icon-button"
-              aria-label="清空标注"
+              aria-label={t("clear_annotations")}
               disabled={readOnly || marked === 0}
               onClick={onClearAll}
               icon={<EraserIcon />}
@@ -330,8 +332,12 @@ export function MarkupPanel({
             <Tooltip
               title={
                 composedMode || mode === "spelling"
-                  ? "开启后点击已有连读或停顿即可取消，再次点击退出"
-                  : "开启后点击已有连读即可取消，再次点击退出"
+                  ? t(
+                      "enable_to_remove_existing_liaison_marks_or_pauses_by_clicking_them_click_ag"
+                    )
+                  : t(
+                      "enable_to_remove_existing_liaison_marks_by_clicking_them_click_again_to_exi"
+                    )
               }
             >
               {trigger(eraseTool, false)}
@@ -343,28 +349,33 @@ export function MarkupPanel({
             tools.some((tool) => !tool.disabledReason)) && (
             <div className="tsz-ve-selection-status" role="status">
               {contentReadOnly ? (
-                "正文只读，请选择单词或短语编辑关联。"
+                t(
+                  "text_is_read_only_select_words_or_phrases_to_edit_their_links"
+                )
               ) : brush.kind === "erase" ? (
                 composedMode || mode === "spelling" ? (
-                  "清除模式：点击已有连读或停顿即可取消。"
+                  t(
+                    "clear_mode_click_existing_liaison_marks_or_pauses_to_remove_them"
+                  )
                 ) : (
-                  "清除模式：点击已有连读即可取消。"
+                  t("clear_mode_click_existing_liaison_marks_to_remove_them")
                 )
               ) : mode === "voice-trial" ? (
                 selectionText ? (
                   <>
-                    已选 <strong>{selectionText}</strong>
+                    {t("selected_2")} <strong>{selectionText}</strong>
                   </>
                 ) : (
-                  "选中文字设置读法"
+                  t("select_text_to_set_its_reading")
                 )
               ) : selectionText ? (
                 <>
-                  已选中 <strong>{selectionText}</strong>
-                  ，可配置{selectionToolsLabel}。
+                  {t("selected_3")} <strong>{selectionText}</strong>
+                  {t("configure")}
+                  {selectionToolsLabel}。
                 </>
               ) : (
-                `选中文字，可配置${selectionToolsLabel}。`
+                t("select_text_to_configure", { p0: selectionToolsLabel })
               )}
             </div>
           )}
@@ -373,8 +384,12 @@ export function MarkupPanel({
           mode !== "voice-trial" && (
             <div className="tsz-ve-top-hint">
               {mode === "phoneme-settings"
-                ? "选择词形拼写的词缝设置停顿；音素正文在外部输入框编辑"
-                : "直接编辑正文；光标停在词间可插入停顿"}
+                ? t(
+                    "select_gaps_in_the_form_spelling_to_add_pauses_edit_phoneme_text_in_the_ext"
+                  )
+                : t(
+                    "edit_text_directly_place_the_cursor_between_words_to_insert_a_pause"
+                  )}
             </div>
           )}
       </div>

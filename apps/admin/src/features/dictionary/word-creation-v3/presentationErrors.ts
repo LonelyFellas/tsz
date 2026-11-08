@@ -1,115 +1,122 @@
 import {
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
+const ISSUE_MESSAGE_KEYS = {
+  form_content_mapping_invalid: "validation_form_content_mapping_invalid",
+  invalid_regional_variant_shape: "validation_invalid_regional_variant_shape",
+  dialect_rules_invalid: "validation_dialect_rules_invalid",
+  invalid_form_type_for_part_of_speech:
+    "validation_invalid_form_type_for_part_of_speech",
+  forbidden_v3_field: "validation_forbidden_v3_field",
+  duplicate_node_id: "validation_duplicate_node_id",
+  duplicate_pos_code: "validation_duplicate_pos_code",
+  pos_required: "validation_pos_required",
+  part_of_speech_kind_mismatch: "validation_part_of_speech_kind_mismatch",
+  form_group_membership_invalid: "validation_form_group_membership_invalid",
+  orphan_form: "validation_orphan_form",
+  form_group_required: "validation_form_group_required",
+  empty_form_group: "validation_empty_form_group",
+  base_form_required_in_group: "validation_base_form_required_in_group",
+  spelling_rich_text_invalid: "validation_spelling_rich_text_invalid",
+  variant_spelling_required: "validation_variant_spelling_required",
+  pronunciation_required: "validation_pronunciation_required",
+  duplicate_pronunciation: "validation_duplicate_pronunciation",
+  content_limit_exceeded: "validation_content_limit_exceeded",
+  sense_group_required: "validation_sense_group_required",
+  sense_group_name_required: "validation_sense_group_name_required",
+  sense_group_name_too_long: "validation_sense_group_name_too_long",
+  pos_not_found: "validation_pos_not_found",
+  duplicate_pos_meanings: "validation_duplicate_pos_meanings",
+  grammar_required: "validation_grammar_required",
+  grammar_variants_invalid: "validation_grammar_variants_invalid",
+  grammar_form_link_invalid: "validation_grammar_form_link_invalid",
+  sense_required: "validation_sense_required",
+  level_invalid: "validation_level_invalid",
+  sub_pos_required: "validation_sub_pos_required",
+  invalid_sub_part_of_speech: "validation_invalid_sub_part_of_speech",
+  frequency_invalid: "validation_frequency_invalid",
+  sense_group_not_found: "validation_sense_group_not_found",
+  sense_form_group_invalid: "validation_sense_form_group_invalid",
+  dedicated_form_group_unused: "validation_dedicated_form_group_unused",
+  sense_form_group_required: "validation_sense_form_group_required",
+  definition_required: "validation_definition_required",
+  definition_level_invalid: "validation_definition_level_invalid",
+  definition_invalid: "validation_definition_invalid",
+  phonetic_rich_text_invalid: "validation_phonetic_rich_text_invalid",
+  audio_asset_invalid: "validation_audio_asset_invalid",
+  native_definition_required: "validation_native_definition_required",
+  sentence_level_invalid: "validation_sentence_level_invalid",
+  sentence_incomplete: "validation_sentence_incomplete",
+  sentence_translation_required: "validation_sentence_translation_required",
+  sentence_translation_invalid: "validation_sentence_translation_invalid",
+  duplicate_sentence_translation_band:
+    "validation_duplicate_sentence_translation_band",
+  sentence_link_role_invalid: "validation_sentence_link_role_invalid",
+  duplicate_sentence_link: "validation_duplicate_sentence_link",
+  relation_score_invalid: "validation_relation_score_invalid",
+  relation_type_invalid: "validation_relation_type_invalid",
+  relation_self_target: "validation_relation_self_target",
+  relation_target_archived: "validation_relation_target_archived",
+  relation_target_has_no_sense: "validation_relation_target_has_no_sense",
+  relation_target_unavailable: "validation_relation_target_unavailable",
+  relation_target_stale: "validation_relation_target_stale",
+  sentence_context_target_unavailable:
+    "validation_sentence_context_target_unavailable",
+  relation_pending_headword_invalid:
+    "validation_relation_pending_headword_invalid",
+  relation_target_shape_invalid: "validation_relation_target_shape_invalid",
+  relation_pending_gloss_without_headword:
+    "validation_relation_pending_gloss_without_headword",
+  relation_pending_gloss_invalid: "validation_relation_pending_gloss_invalid",
+  relation_pending_gloss_conflict: "validation_relation_pending_gloss_conflict",
+  relation_pending_gloss_target_exists:
+    "validation_relation_pending_gloss_target_exists",
+  relation_prebound_target_not_found:
+    "validation_relation_prebound_target_not_found",
+  relation_prebound_target_archived:
+    "validation_relation_prebound_target_archived",
+  relation_prebound_target_has_no_sense:
+    "validation_relation_prebound_target_has_no_sense",
+  relation_target_sense_deleted: "validation_relation_target_sense_deleted",
+  node_id_reused: "validation_node_id_reused",
+  node_binding_unknown: "validation_node_binding_unknown",
+  node_binding_changed: "validation_node_binding_changed",
+  meanings_storage_unsafe: "validation_meanings_storage_unsafe",
+  pos_meanings_required: "validation_pos_meanings_required",
+  sense_has_inbound_publication_refs:
+    "validation_sense_has_inbound_publication_refs",
+  phrase_component_not_allowed: "validation_phrase_component_not_allowed",
+  phrase_component_limit_exceeded: "validation_phrase_component_limit_exceeded",
+  phrase_component_literal_invalid:
+    "validation_phrase_component_literal_invalid",
+  phrase_component_self_target: "validation_phrase_component_self_target",
+  phrase_component_target_unavailable:
+    "validation_phrase_component_target_unavailable",
+  phrase_component_target_nested: "validation_phrase_component_target_nested",
+  phrase_component_target_stale: "validation_phrase_component_target_stale",
+  voice_profile_invalid: "validation_voice_profile_invalid"
+} as const;
+import {
   HttpError,
   RequestTimeoutError,
   InvalidAdminWordResponseError,
   UnsupportedAdminWordSchemaVersionError
 } from "@tsz/api-client";
-import type { V3DraftValidationIssue, V3ValidationIssueCode } from "@tsz/types";
+import type { V3DraftValidationIssue } from "@tsz/types";
 
-const UNKNOWN_ISSUE_MESSAGE = "该内容暂时无法完成，请刷新后重试";
-
-const ISSUE_MESSAGES = {
-  form_content_mapping_invalid: "词形内容与标签的关联无效，请检查对应标签",
-  invalid_regional_variant_shape: "词形的英美结构与当前规则不一致",
-  dialect_rules_invalid: "英美拼写与音标规则组合无效",
-  invalid_form_type_for_part_of_speech: "当前词性不支持该词形类型",
-  forbidden_v3_field: "词条包含当前版本不支持的内容",
-  duplicate_node_id: "词条内容存在重复标识，请刷新后重试",
-  duplicate_pos_code: "同一词条不能重复添加相同词性",
-  pos_required: "请至少添加一个词性",
-  part_of_speech_kind_mismatch:
-    "该词性不属于当前词条所在的目录，请改选同一侧的词性",
-  form_group_membership_invalid:
-    "词形变化组关联的词形已不可用，请检查并重新选择",
-  orphan_form: "每个词形都必须加入至少一个词形变化组",
-  form_group_required: "每个词性都需要至少一个词形变化组",
-  empty_form_group: "词形变化组不能为空",
-  base_form_required_in_group: "第 1 组词形变化需要至少一个原形",
-  spelling_rich_text_invalid: "拼写正文与标注不一致或标注范围无效，请重新编辑",
-  variant_spelling_required: "请填写词形拼写",
-  pronunciation_required: "请完整填写读法、字典音标和实际发音",
-  duplicate_pronunciation: "同一词形下不能添加重复发音",
-  content_limit_exceeded: "词条内容数量超过上限，请精简后重试",
-  sense_group_required: "请至少添加一个语义区间",
-  sense_group_name_required: "请填写语义区间名称",
-  sense_group_name_too_long: "语义区间名称过长",
-  pos_not_found: "词义关联的词性不存在，请刷新后重试",
-  duplicate_pos_meanings: "同一词性不能重复录入词义",
-  grammar_required: "请至少添加一个语法结构",
-  grammar_variants_invalid: "请完整填写当前方言的语法结构",
-  grammar_form_link_invalid: "词形关联无效，或第一个发音未配置，请检查后重试",
-  sense_required: "请至少添加一条词义",
-  level_invalid: "请选择有效的词义等级",
-  sub_pos_required: "请选择细分词性",
-  invalid_sub_part_of_speech: "细分词性与当前基本词性不匹配",
-  frequency_invalid: "请填写词频，取值 0–100 且最多两位小数",
-  sense_group_not_found: "词义关联的语义区间不存在",
-  sense_form_group_invalid:
-    "词义绑定的词形变化组无效，请重新选择本词性的专用组",
-  dedicated_form_group_unused:
-    "专用变化组还没有词义使用，请在词义中绑定或改为通用",
-  sense_form_group_required:
-    "本词性没有通用变化组，请为该词义选择专用组或添加通用组",
-  definition_required: "请至少添加一条释义",
-  definition_level_invalid: "请选择有效的释义等级",
-  definition_invalid: "请完整填写释义并选择语法结构",
-  phonetic_rich_text_invalid: "音标正文与标注不一致或标注范围无效，请重新编辑",
-  audio_asset_invalid: "音频不可用、格式错误或你没有使用权限，请重新选择",
-  native_definition_required: "请至少填写一条中文释义",
-  sentence_level_invalid: "请选择有效的例句等级",
-  sentence_incomplete: "请完整填写中英文例句并关联当前词义",
-  sentence_translation_required: "请填写当前等级的中文译文",
-  sentence_translation_invalid: "中文译文格式无效",
-  duplicate_sentence_translation_band:
-    "当前后端尚不支持同档多条译文，请更新服务后重试",
-  sentence_link_role_invalid: "例句关联类型无效",
-  duplicate_sentence_link: "例句中存在重复关联",
-  relation_score_invalid: "关系词相关度必须在有效范围内",
-  relation_type_invalid: "关系词类型无效",
-  relation_self_target: "关系词不能指向当前词义本身",
-  relation_target_archived: "关系词目标在垃圾桶中，请重新选择",
-  relation_target_has_no_sense: "关系词目标没有可用词义",
-  relation_target_unavailable: "关系词目标当前不可用",
-  relation_target_stale: "关系词目标已变化，请重新选择",
-  sentence_context_target_unavailable: "例句关联目标当前不可用",
-  relation_pending_headword_invalid: "待关联词条名称无效",
-  relation_target_shape_invalid: "关联词目标信息不完整，请重新选择",
-  relation_pending_gloss_without_headword: "请先填写待关联词条名称",
-  relation_pending_gloss_invalid: "预定义词义不能超过 5000 个字符",
-  relation_pending_gloss_conflict: "同一待建关联词不能填写不同的预定义词义",
-  relation_pending_gloss_target_exists: "同名词条已存在，请选择已有词义",
-  relation_prebound_target_not_found: "已选择的关联词草稿不存在，请重新搜索",
-  relation_prebound_target_archived: "关联词目标已归档，请先恢复或重新选择",
-  relation_prebound_target_has_no_sense:
-    "关联词目标还没有词义，请先补充第一词义",
-  relation_target_sense_deleted: "原关联词义已删除，请显式重选词义或删除关联",
-  node_id_reused: "内容标识已被使用，请刷新后重试",
-  node_binding_unknown: "内容来源无法确认，请刷新后重试",
-  node_binding_changed: "内容结构已变化，请刷新后重试",
-  meanings_storage_unsafe: "词义内容暂时无法安全保存，请刷新后重试",
-  pos_meanings_required: "每个词性都需要填写词义",
-  sense_has_inbound_publication_refs:
-    "该词义仍与已发布内容有关联，解除关联后才能移除",
-  phrase_component_not_allowed: "只有短语词条可以设置成分用词",
-  phrase_component_limit_exceeded: "单条释义最多设置 100 个成分用词",
-  phrase_component_literal_invalid: "成分用词的词面不合法，请重新选词",
-  phrase_component_self_target: "成分用词不能关联短语自己",
-  phrase_component_target_unavailable: "成分用词关联的词条已不可用，请重新选择",
-  phrase_component_target_nested: "关联的短语自身含成分用词，只能再套一层",
-  phrase_component_target_stale: "关联的词条内容已变化，请重新选择",
-  voice_profile_invalid:
-    "音色或语速设置不合法，请重新选择音色并把语速调回 0.50×–2.00×"
-} satisfies Record<V3ValidationIssueCode, string>;
-
-export function v3IssueMessage(issue: V3DraftValidationIssue): string {
+export function v3IssueMessage(
+  issue: V3DraftValidationIssue,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
   if (issue.field === "synthesis.ipa" || issue.field === "synthesis.ups") {
     const name = issue.field === "synthesis.ipa" ? "Azure IPA" : "Azure UPS";
     return issue.code === "content_limit_exceeded"
-      ? `${name} 超长或包含控制字符，请检查输入`
-      : `请填写有效的 ${name} 合成音素`;
+      ? t("validation_phoneme_long", { name })
+      : t("validation_phoneme_required", { name });
   }
-  if (issue.field === "text_links") return "正文关联无效，请重新选择或清除关联";
-  return ISSUE_MESSAGES[issue.code] ?? UNKNOWN_ISSUE_MESSAGE;
+  if (issue.field === "text_links") return t("validation_text_links");
+  return t(ISSUE_MESSAGE_KEYS[issue.code] ?? "validation_unknown");
 }
 
 // 同一个 code 会按字段分别下发（语义区间的中英文名各算一条）。只按文案去重会把它们

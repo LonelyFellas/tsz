@@ -1,3 +1,11 @@
+import { AudioUploadError } from "../../types";
+import {
+  useVoiceEditorTranslation,
+  defaultVoiceEditorTranslation,
+  type VoiceEditorTranslation,
+  useVoiceEditorMessageState,
+  createVoiceEditorMessage
+} from "../i18n";
 import { speechAccentGroup } from "@tsz/shared";
 import "./interaction.css";
 import {
@@ -81,7 +89,7 @@ import {
 import type { UploadDraft } from "./ToolPanels";
 import {
   DEFAULT_BRUSH,
-  GRAMMAR_ROLES,
+  grammarRoleDefinitions,
   PAUSE_PRESETS,
   formatPauseLabel,
   type Brush,
@@ -122,8 +130,13 @@ const MAX_HISTORY = 100;
  */
 const TYPING_COALESCE_MS = 800;
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "操作失败，请重试";
+function errorMessage(
+  error: unknown,
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): string {
+  return error instanceof Error
+    ? error.message
+    : t("operation_failed_try_again");
 }
 
 /**
@@ -135,7 +148,10 @@ function errorMessage(error: unknown): string {
  * ErrorBoundary 兜底。所以这里降级成「只保留正文、丢掉读不出的标注」并说明原因，
  * 让人还能继续编辑。
  */
-function parseValue(value: RichText): { value: RichTextV2; error?: string } {
+function parseValue(
+  value: RichText,
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): { value: RichTextV2; error?: string } {
   try {
     return { value: toRichTextV2(value) };
   } catch (error) {
@@ -146,7 +162,10 @@ function parseValue(value: RichText): { value: RichTextV2; error?: string } {
         text: typeof raw === "string" ? raw : "",
         annotations: []
       },
-      error: `原有标注读不出来（${errorMessage(error)}），已只保留正文`
+      error: t(
+        "previous_annotations_could_not_be_read_only_the_text_was_retained",
+        { p0: errorMessage(error, t) }
+      )
     };
   }
 }
@@ -199,6 +218,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   audioAssetLimit = AUDIO_ASSETS_PER_VARIANT_MAX,
   onChange
 }: VoiceEditorProps<TLink>) {
+  const { t } = useVoiceEditorTranslation();
   const [recommendations, setRecommendations] = useState<VoiceRecommendation[]>(
     []
   );
@@ -208,7 +228,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     (item) => !item.fallbackOnly
   );
   const [recommendationId, setRecommendationId] = useState<string>();
-  const [recommendationError, setRecommendationError] = useState("");
+  const [recommendationError, setRecommendationError] =
+    useVoiceEditorMessageState("");
   const [editingVersionKey, setEditingVersionKey] = useState<string>();
   const [generatingVersion, setGeneratingVersion] = useState<string>();
   const [automaticAudioKeys, setAutomaticAudioKeys] = useState<string[]>([]);
@@ -250,7 +271,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       })
       .catch(() => {
         if (!controller.signal.aborted)
-          setRecommendationError("分组推荐加载失败，仍可选择下方音色。");
+          setRecommendationError(
+            createVoiceEditorMessage(
+              "could_not_load_group_recommendations_you_can_still_select_voices_below"
+            )
+          );
       });
     return () => controller.abort();
   }, [recommendationArea, locale, loadRecommendations, recommendationRefresh]);
@@ -260,7 +285,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 初值直接从 value 灌，而不是先置空再由 effect 补。先置空的话，首帧折算出的是
    * 空内容，实时回调会把这份空值抛给宿主——一挂载就把表单里原有的文本清掉。
    */
-  const [initial] = useState(() => parseValue(value));
+  const [initial] = useState(() => parseValue(value, t));
   const [text, setText] = useState(initial.value.text);
   const [links, setLinks] = useState<TLink[]>(textLinks ?? []);
   const [speechLinks, setSpeechLinks] = useState<GrammarFormLinkV3[]>(
@@ -276,7 +301,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [inspectedLinkId, setInspectedLinkId] = useState<string>();
   const [associationPickerOpen, setAssociationPickerOpen] = useState(false);
   const [associationDraftPending, setAssociationDraftPending] = useState(false);
-  const [linkNotice, setLinkNotice] = useState("");
+  const [linkNotice, setLinkNotice] = useVoiceEditorMessageState("");
   const [marks, setMarks] = useState<MarkState>(() =>
     annotationsToMarks(initial.value)
   );
@@ -288,7 +313,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     start: number;
     end: number;
   }>();
-  const [spellingNotice, setSpellingNotice] = useState("");
+  const [spellingNotice, setSpellingNotice] = useVoiceEditorMessageState("");
   const [readingKind, setReadingKind] = useState("characters");
   const [readingAlias, setReadingAlias] = useState("");
   const [phonemeAlphabet, setPhonemeAlphabet] = useState<"ipa" | "ups">("ipa");
@@ -343,7 +368,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     );
     return index < 0 ? undefined : index;
   };
-  const [validationMessage, setValidationMessage] = useState("");
+  const [validationMessage, setValidationMessage] =
+    useVoiceEditorMessageState("");
 
   // 未配置表示尚未选择 C 端音色；只有显式保存的选择才回填。
   const [voiceSettings, setVoiceSettings] = useState<VoiceSetting[]>(
@@ -359,6 +385,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [assets, setAssets] = useState<AudioAsset[]>(audioAssets ?? []);
   const assetsRef = useRef(assets);
   /** 还没落成资产的上传：进行中或失败待重试。 */
+  function uploadFailure(error: unknown) {
+    const issue = describeUploadError(error, t);
+    return error instanceof AudioUploadError
+      ? { ...issue, code: error.code }
+      : issue;
+  }
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [playingAssetId, setPlayingAssetId] = useState<string>();
   const [assetReview, setAssetReview] = useState<ReviewAudio>();
@@ -460,7 +492,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           ? entry
           : {
               ...entry,
-              error: { message: "当前没有上传音频的权限", retryable: true }
+              error: {
+                message: t("you_do_not_have_permission_to_upload_audio"),
+                retryable: true,
+                code: "permission_denied"
+              }
             }
       )
     );
@@ -509,7 +545,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     try {
       return { value: normalizeRichTextV2(candidate) };
     } catch (error) {
-      return { value: candidate, error: errorMessage(error) };
+      return { value: candidate, error: errorMessage(error, t) };
     }
   }, [marks, text]);
 
@@ -522,7 +558,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   // 外部值变了才重新灌入；自己刚抛出去、又被父组件回灌的那一份直接跳过。
   useEffect(() => {
-    const parsed = parseValue(value);
+    const parsed = parseValue(value, t);
     const incoming = JSON.stringify({
       value: parsed.value,
       links: textLinks ?? [],
@@ -751,7 +787,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           failed?.status === "rejected"
             ? failed.reason instanceof Error
               ? failed.reason.message
-              : "部分口音配音解析失败，请修复配置"
+              : createVoiceEditorMessage(
+                  "could_not_resolve_voice_settings_for_some_accents_fix_the_configuration"
+                )
             : ""
         );
       })
@@ -761,7 +799,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           setRecommendationError(
             error instanceof Error
               ? error.message
-              : "有效配音解析失败，请修复配置"
+              : createVoiceEditorMessage(
+                  "could_not_resolve_effective_voice_settings_fix_the_configuration"
+                )
           );
         }
       });
@@ -918,7 +958,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       setVoiceSettings(profile.voices);
       emittedProfileRef.current = JSON.stringify(profile);
       onVoiceProfileChange?.(profile);
-      setRecommendationError("正文或读法已变化，请重新生成正式音频。");
+      setRecommendationError(
+        createVoiceEditorMessage(
+          "the_text_or_reading_changed_generate_final_audio_again"
+        )
+      );
     }
   }, [audioContentKey, onVoiceProfileChange]);
 
@@ -952,7 +996,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         ))
     ) {
       setRecommendationError(
-        "该模型不支持当前参数、停顿或指定音素；请明确调整后再生成，原内容已保留"
+        createVoiceEditorMessage(
+          "this_model_does_not_support_the_current_parameters_pauses_or_phonemes_adjus"
+        )
       );
       return;
     }
@@ -1003,7 +1049,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         voiceEffectKey(current)
       ]);
       if (currentSignature !== signature) {
-        setRecommendationError("生成期间参数已修改，请重新生成。");
+        setRecommendationError(
+          createVoiceEditorMessage(
+            "parameters_changed_during_generation_generate_again"
+          )
+        );
         return;
       }
       if (mode !== "synthesis" && value.version === 1) {
@@ -1021,11 +1071,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       emittedProfileRef.current = JSON.stringify(profile);
       onVoiceProfileChange?.(profile);
       generationKeys.current.delete(key);
-      setRecommendationError("正式音频已生成，请完成编辑并保存正文。");
+      setRecommendationError(
+        createVoiceEditorMessage(
+          "final_audio_generated_complete_editing_and_save_the_text"
+        )
+      );
     } catch (error) {
       if (!request.signal.aborted)
         setRecommendationError(
-          error instanceof Error ? error.message : "生成失败，请重试。"
+          error instanceof Error
+            ? error.message
+            : createVoiceEditorMessage("generation_failed_try_again_2")
         );
     } finally {
       if (generationRequest.current === request)
@@ -1051,7 +1107,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
     ) {
       setRecommendationError(
-        "已启用的失效音色口音未知，请先取消启用，再选用版本。"
+        createVoiceEditorMessage(
+          "an_enabled_unavailable_voice_has_an_unknown_accent_disable_it_before_select"
+        )
       );
       return;
     }
@@ -1119,7 +1177,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       });
       if (request.signal.aborted || latestReadOnly.current) return;
       if (voiceSettingsRef.current !== baseline) {
-        setRecommendationError("加载期间配音配置已修改，请重新选用最新推荐。");
+        setRecommendationError(
+          createVoiceEditorMessage(
+            "voice_configuration_changed_while_loading_select_the_latest_recommendation"
+          )
+        );
         return;
       }
       setRecommendations(items);
@@ -1134,14 +1196,20 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           )
       );
       if (!first) {
-        setRecommendationError("当前口音没有可用的首位推荐，请检查分组设置。");
+        setRecommendationError(
+          createVoiceEditorMessage(
+            "no_first_choice_recommendation_is_available_for_this_accent_check_group_set"
+          )
+        );
         return;
       }
       if (
         voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
       ) {
         setRecommendationError(
-          "已启用的失效音色口音未知，请先取消启用，再应用推荐。"
+          createVoiceEditorMessage(
+            "an_enabled_unavailable_voice_has_an_unknown_accent_disable_it_before_applyi"
+          )
         );
         return;
       }
@@ -1150,7 +1218,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     } catch {
       if (!request.signal.aborted)
         setRecommendationError(
-          "最新推荐加载失败，当前文本配置未修改，请重试。"
+          createVoiceEditorMessage(
+            "could_not_load_the_latest_recommendations_current_text_configuration_is_unc"
+          )
         );
     } finally {
       if (recommendationRequest.current === request)
@@ -1199,7 +1269,18 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const unavailable = first.filter((item) => !recommendationAvailable(item));
     if (unavailable.length)
       setRecommendationError(
-        `${unavailable.map((item) => (item.locale === "en-GB" ? "英式" : "美式")).join("、")}首位推荐已失效，请选择其他音色。`
+        createVoiceEditorMessage(
+          "first_choice_recommendations_are_unavailable_for_select_other_voices",
+          {
+            p0: unavailable
+              .map((item) =>
+                item.locale === "en-GB"
+                  ? createVoiceEditorMessage("british")
+                  : createVoiceEditorMessage("american")
+              )
+              .join("、")
+          }
+        )
       );
     initialRecommendationPending.current = false;
     if (!usable.length && !recommendationArea) return;
@@ -1401,7 +1482,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       associationsReadOnly &&
       JSON.stringify(next.textLinks ?? []) !== JSON.stringify(links)
     ) {
-      setLinkNotice("此修改会改变现有关联，需要单词与短语关联权限。");
+      setLinkNotice(
+        createVoiceEditorMessage(
+          "this_change_affects_existing_links_and_requires_word_and_phrase_linking_per"
+        )
+      );
       return false;
     }
     return true;
@@ -1494,7 +1579,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   const captureResult = (forSave = false) => {
     if (forSave && automaticAudioPending)
-      throw new Error("已选音色的正式音频尚未生成完成，请等待或重试");
+      throw new Error(
+        t("final_audio_for_selected_voices_is_incomplete_wait_or_retry")
+      );
     let profile = voiceProfile;
     if (
       forSave &&
@@ -1505,7 +1592,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       profile == null
     )
       throw new Error(
-        "默认配音尚未配置，请加载目录并选择当前口音的可用音色后保存"
+        t(
+          "default_voices_are_not_configured_load_the_catalogue_and_select_an_availabl"
+        )
       );
     if (
       forSave &&
@@ -1513,7 +1602,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       mode !== "actual-pron" &&
       profile?.dubbing?.pool_version
     ) {
-      if (voiceSavePending) throw new Error("正在校验有效配音，请稍后保存");
+      if (voiceSavePending)
+        throw new Error(
+          t("checking_effective_voice_settings_wait_before_saving")
+        );
       const required = locale ? [speechAccentGroup(locale)] : ["uk", "us"];
       for (const accent of required) {
         if (
@@ -1527,7 +1619,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           )
         )
           throw new Error(
-            `${accent === "uk" ? "英式" : "美式"}没有实际可用的已选音色，请选择后保存`
+            t("no_selected_voice_is_usable_select_one_before_saving", {
+              p0: accent === "uk" ? t("british") : t("american")
+            })
           );
       }
       if (inherited && !restoreInheritance.current) {
@@ -1597,8 +1691,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     resetTransient();
     setSpellingNotice(
       normalized.annotations.length < workingValue.annotations.length
-        ? "已规范化拼写并移除受影响的标注，请检查后完成；可撤销恢复"
-        : "已规范化拼写，请检查后完成；可撤销恢复"
+        ? createVoiceEditorMessage(
+            "spelling_normalised_and_affected_annotations_removed_check_before_completin"
+          )
+        : createVoiceEditorMessage(
+            "spelling_normalised_check_before_completing_you_can_undo_this"
+          )
     );
     return false;
   };
@@ -1627,7 +1725,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setRecoverableLinks(previous.recoverableTextLinks ?? []);
     setLinkNotice(
       previous.recoverableTextLinks?.length
-        ? "部分关联暂时失效，改回原文后会自动恢复；也可撤销。"
+        ? createVoiceEditorMessage(
+            "some_links_are_temporarily_unavailable_and_will_recover_if_the_original_tex"
+          )
         : ""
     );
     resetTransient();
@@ -1657,7 +1757,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setRecoverableLinks(next.recoverableTextLinks ?? []);
     setLinkNotice(
       next.recoverableTextLinks?.length
-        ? "部分关联暂时失效，改回原文后会自动恢复；也可撤销。"
+        ? createVoiceEditorMessage(
+            "some_links_are_temporarily_unavailable_and_will_recover_if_the_original_tex"
+          )
         : ""
     );
     resetTransient();
@@ -1684,10 +1786,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setLinkNotice(
       restoreTextLinksOnCorrection
         ? mapped.recoverable.length
-          ? "部分关联暂时失效，改回原文后会自动恢复；也可撤销。"
+          ? createVoiceEditorMessage(
+              "some_links_are_temporarily_unavailable_and_will_recover_if_the_original_tex"
+            )
           : ""
         : mapped.links.length < links.length
-          ? "被修改词段的关联已移除，请重新选择；可撤销恢复。"
+          ? createVoiceEditorMessage(
+              "links_in_modified_text_were_removed_select_them_again_you_can_undo_this"
+            )
           : ""
     );
     // 剪切和粘贴仍是正文编辑，只在操作前后打断连续输入的历史合并。
@@ -1758,7 +1864,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       const start = Math.min(...next.map((item) => item.start));
       const end = Math.max(...next.map((item) => item.end));
       if (/[\r\n]/u.test(Array.from(text).slice(start, end).join(""))) {
-        setLinkNotice("请选择同一段落内的词语。");
+        setLinkNotice(
+          createVoiceEditorMessage("select_words_within_the_same_paragraph")
+        );
         return;
       }
     }
@@ -1822,7 +1930,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             rangesOverlap(link.source_segments, linkSegments)
           )
         ) {
-          setLinkNotice("所选单词已有关联，请先清除原关联。");
+          setLinkNotice(
+            createVoiceEditorMessage(
+              "the_selected_words_are_already_linked_clear_their_existing_links_first"
+            )
+          );
           return;
         }
         commit((current) => ({
@@ -2149,7 +2261,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         ? { start: selected.start, end: selected.end }
         : { start: selected.end, end: selected.start };
     if (!isValidLiaison(link)) {
-      setValidationMessage("请选择有效的连读端点");
+      setValidationMessage(
+        createVoiceEditorMessage("select_valid_liaison_endpoints")
+      );
       return;
     }
     const existingIndex = findLiaison(link);
@@ -2170,7 +2284,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (crossesParagraph(text, link)) {
       // wire 不接受跨换行的标注；放进来的话本地就折算不出合法 wire，
       // 从此改动静默停止回写，比当场说清楚糟得多。
-      setValidationMessage("连读不能跨越换行，请把两个词放在同一行");
+      setValidationMessage(
+        createVoiceEditorMessage(
+          "liaison_cannot_cross_a_line_break_put_both_words_on_the_same_line"
+        )
+      );
       return;
     }
     const gaps = Object.keys(marks.pauses)
@@ -2256,7 +2374,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       voiceSettings.some((item) => item.enabled && !voiceLocale(item, voices))
     ) {
       setRecommendationError(
-        "已启用的失效音色口音未知，请先取消启用，再选择音色。"
+        createVoiceEditorMessage(
+          "an_enabled_unavailable_voice_has_an_unknown_accent_disable_it_before_select_2"
+        )
       );
       return;
     }
@@ -2297,7 +2417,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       durationMs > MAX_PAUSE_MS
     ) {
       setValidationMessage(
-        `停顿时长必须是 ${MIN_PAUSE_MS}–${MAX_PAUSE_MS} 之间的整数毫秒`
+        createVoiceEditorMessage(
+          "pause_duration_must_be_an_integer_between_and_milliseconds",
+          { p0: MIN_PAUSE_MS, p1: MAX_PAUSE_MS }
+        )
       );
       return;
     }
@@ -2311,7 +2434,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    */
   const blockingError =
     validationMessage ||
-    (working.error && `${working.error}；在改回来之前，这里的编辑不会被保存`) ||
+    (working.error &&
+      t("edits_here_will_not_be_saved_until_this_is_corrected", {
+        p0: working.error
+      })) ||
     loadError;
 
   const conflictCount = Object.keys(marks.pauses).filter((gap) =>
@@ -2398,7 +2524,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         (error: unknown) => {
           if (controller.signal.aborted) return;
           uploadControllersRef.current.delete(entry.id);
-          patchPending(entry.id, { error: describeUploadError(error) });
+          patchPending(entry.id, { error: uploadFailure(error) });
         }
       );
   };
@@ -2411,9 +2537,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const entries: PendingUpload[] = [...files].map((file) => {
       // id 不用 crypto.randomUUID：测试服是裸 HTTP 的非安全上下文，该 API 缺失。
       uploadSeqRef.current += 1;
-      let error = preflightAudioFile(file);
+      let error = preflightAudioFile(file, undefined, t);
       if (!error) {
-        if (room <= 0) error = tooManyAudioError(audioAssetLimit);
+        if (room <= 0) error = tooManyAudioError(audioAssetLimit, t);
         else room -= 1;
       }
       return {
@@ -2423,7 +2549,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         locale: upload.locale,
         gender: upload.gender,
         progress: 0,
-        error: error ? describeUploadError(error) : undefined
+        error: error ? uploadFailure(error) : undefined
       };
     });
     setPendingUploads((current) => [...current, ...entries]);
@@ -2453,7 +2579,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     emitAssets(assetsRef.current.filter((item) => item.id !== asset.id));
   };
 
-  const PLAYBACK_FAILED = "音频暂时无法试听，请稍后重试";
+  const PLAYBACK_FAILED = t(
+    "audio_cannot_currently_be_auditioned_try_again_later"
+  );
 
   const playAsset = async (asset: AudioAsset) => {
     if (playingAssetId === asset.id) {
@@ -2524,8 +2652,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   const roleLevel = brush.kind === "role" ? brush.level : lastRoleRef.current;
   const roleLabel =
-    GRAMMAR_ROLES.find((role) => role.level === roleLevel)?.label ??
-    GRAMMAR_ROLES[0]!.label;
+    Object.values(grammarRoleDefinitions(t)).find(
+      (role) => role.level === roleLevel
+    )?.label ?? Object.values(grammarRoleDefinitions(t))[0]!.label;
   const pauseDuration =
     brush.kind === "pause" ? brush.durationMs : lastPauseRef.current;
 
@@ -2567,26 +2696,29 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       ? [
           {
             key: "phoneme",
-            label: "输入音标",
+            label: t("enter_phonemes"),
             disabled:
               !textSelection || speechCapabilities?.supportsPhoneme === false,
             disabledReason:
               speechCapabilities?.supportsPhoneme === false
-                ? "当前音色暂未开放指定音标"
+                ? t("this_voice_does_not_support_specified_phonemes_yet")
                 : undefined,
             content: (
               <Space orientation="vertical" size={8}>
                 <Select
-                  aria-label="标音系统"
+                  aria-label={t("phonetic_alphabet")}
                   value={phonemeAlphabet}
                   options={[
-                    { value: "ipa", label: "IPA · 国际音标" },
-                    { value: "ups", label: "UPS · 通用音素集" }
+                    {
+                      value: "ipa",
+                      label: t("ipa_international_phonetic_alphabet")
+                    },
+                    { value: "ups", label: t("ups_universal_phone_set") }
                   ]}
                   onChange={setPhonemeAlphabet}
                 />
                 <Input.TextArea
-                  aria-label="指定音标"
+                  aria-label={t("specified_phonemes")}
                   value={phonemeText}
                   onChange={(event) => setPhonemeText(event.target.value)}
                   autoSize={{ minRows: 2, maxRows: 5 }}
@@ -2638,7 +2770,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                       setOpenTool(undefined);
                     }}
                   >
-                    应用音标
+                    {t("apply_phonemes")}
                   </Button>
                   <Button
                     disabled={readOnly || !textSelection}
@@ -2659,7 +2791,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                       setOpenTool(undefined);
                     }}
                   >
-                    删除音标
+                    {t("delete_phonemes")}
                   </Button>
                 </Space>
               </Space>
@@ -2671,7 +2803,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       ? [
           {
             key: "reading-link",
-            label: "关联单词读法",
+            label: t("link_a_word_reading"),
             icon: <LinkIcon aria-hidden />,
             disabled:
               readOnly ||
@@ -2679,7 +2811,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               speechCapabilities?.supportsPhoneme === false,
             disabledReason:
               speechCapabilities?.supportsPhoneme === false
-                ? "当前音色暂未开放关联单词读法"
+                ? t("this_voice_does_not_support_linked_word_readings_yet")
                 : undefined,
             content:
               readingSegment && openTool === "reading-link"
@@ -2730,7 +2862,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       : []),
     {
       key: "reading",
-      label: "特殊读法",
+      label: t("special_reading"),
       icon: <Volume2Icon aria-hidden />,
       disabled:
         readOnly ||
@@ -2740,60 +2872,60 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       disabledReason:
         speechCapabilities?.supportsSayAs === false &&
         speechCapabilities?.supportsSub === false
-          ? "当前音色暂未开放特殊读法"
+          ? t("this_voice_does_not_support_special_readings_yet")
           : undefined,
       content: (
         <Space orientation="vertical" size={8}>
           <Select
-            aria-label="特殊读法类型"
+            aria-label={t("special_reading_type")}
             value={readingKind}
             onChange={setReadingKind}
             options={[
               {
                 value: "characters",
                 disabled: speechCapabilities?.supportsSayAs === false,
-                label: "逐字母"
+                label: t("spell_out")
               },
               {
                 value: "cardinal",
                 disabled: speechCapabilities?.supportsSayAs === false,
-                label: "基数"
+                label: t("cardinal_number")
               },
               {
                 value: "ordinal",
                 disabled: speechCapabilities?.supportsSayAs === false,
-                label: "序数"
+                label: t("ordinal_number")
               },
               {
                 value: "digits",
                 disabled: speechCapabilities?.supportsSayAs === false,
-                label: "逐位数字"
+                label: t("digits")
               },
               {
                 value: "date",
                 disabled: speechCapabilities?.supportsSayAs === false,
-                label: "日期"
+                label: t("date")
               },
               {
                 value: "time",
                 disabled: speechCapabilities?.supportsSayAs === false,
-                label: "时间"
+                label: t("time")
               },
               {
                 value: "telephone",
                 disabled: speechCapabilities?.supportsSayAs === false,
-                label: "电话号码"
+                label: t("telephone_number")
               },
               {
                 value: "sub",
                 disabled: speechCapabilities?.supportsSub === false,
-                label: "替换文字读"
+                label: t("read_replacement_text")
               }
             ]}
           />
           {readingKind === "sub" && (
             <Input
-              aria-label="替换读法文字"
+              aria-label={t("replacement_reading_text")}
               value={readingAlias}
               maxLength={200}
               onChange={(event) => setReadingAlias(event.target.value)}
@@ -2848,7 +2980,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               setOpenTool(undefined);
             }}
           >
-            应用特殊读法
+            {t("apply_special_reading")}
           </Button>
           <Button
             disabled={!textSelection || readOnly}
@@ -2870,7 +3002,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               setOpenTool(undefined);
             }}
           >
-            删除特殊读法
+            {t("delete_special_reading")}
           </Button>
         </Space>
       )
@@ -2882,7 +3014,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       ? [
           {
             key: "erase",
-            label: "清除模式",
+            label: t("clear_mode"),
             className: "tsz-ve-clear-mode",
             active: brush.kind === "erase"
           }
@@ -2891,15 +3023,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     {
       key: "text",
       label: contentReadOnly
-        ? "结束关联"
+        ? t("end_linking")
         : mode === "grammar" ||
             mode === "association" ||
             mode === "spelling" ||
             mode === "actual-pron"
-          ? "文本编辑"
-          : "文本",
+          ? t("text_editing")
+          : t("text"),
 
-      ariaLabel: contentReadOnly ? "结束关联" : "编辑文本",
+      ariaLabel: contentReadOnly ? t("end_linking") : t("edit_text"),
       icon: <PencilIcon />,
       active: brush.kind === "none",
       className: "tsz-ve-text-button"
@@ -2910,7 +3042,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       ? [
           {
             key: "italic",
-            label: "斜体",
+            label: t("italic"),
             icon: <ItalicIcon />,
             active: selectionHasFormat("italic"),
             disabled: !textSelection
@@ -2921,14 +3053,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       ? [
           {
             key: "bold",
-            label: "加粗",
+            label: t("bold"),
             icon: <BoldIcon />,
             active: selectionHasFormat("bold"),
             disabled: !textSelection
           },
           {
             key: "underline",
-            label: "下划线",
+            label: t("underline"),
             icon: <UnderlineIcon />,
             active: selectionHasFormat("underline"),
             disabled: !textSelection
@@ -2937,8 +3069,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       : []),
     {
       key: "roles",
-      label: "语法结构",
-      ariaLabel: `语法结构 ${roleLabel}`,
+      label: t("grammar_structures"),
+      ariaLabel: t("grammar_structure", { p0: roleLabel }),
       className: `tsz-ve-role-button is-${roleLevel}`,
       active: !!textSelection || brush.kind === "role",
       disabled: !textSelection && brush.kind !== "role",
@@ -2974,7 +3106,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     },
     {
       key: "liaison",
-      label: "连读",
+      label: t("liaison"),
       icon: <LiaisonIcon />,
       className: "tsz-ve-liaison-button",
       active: !!textSelection,
@@ -2994,7 +3126,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               setDraft({ start: { ...textSelection } });
             }}
           >
-            连读起点
+            {t("liaison_start")}
           </Button>
           <Button
             size="small"
@@ -3009,7 +3141,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 });
             }}
           >
-            连读终点
+            {t("liaison_end")}
           </Button>
           <Tooltip title={<ShortcutHint shortcut="L" />}>
             <Button
@@ -3024,27 +3156,35 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               aria-pressed={selectionHasLiaison}
               onClick={() => toggleSelectionLiaison()}
             >
-              {selectionHasLiaison ? "取消连读" : "一次性添加"}
+              {selectionHasLiaison ? t("cancel_liaison") : t("add_once")}
             </Button>
           </Tooltip>
           {draft.start && (
             <Button size="small" onClick={resetDraft}>
-              取消起点
+              {t("cancel_start")}
             </Button>
           )}
           <span>
             {draft.start
-              ? `起点「${Array.from(text).slice(draft.start.start, draft.start.end).join("")}」，请选中终点文字`
+              ? t("start_select_the_endpoint_text", {
+                  p0: Array.from(text)
+                    .slice(draft.start.start, draft.start.end)
+                    .join("")
+                })
               : textSelection
-                ? `已选「${Array.from(text).slice(textSelection.start, textSelection.end).join("")}」`
-                : "先选中文字，再添加连读"}
+                ? t("selected_6", {
+                    p0: Array.from(text)
+                      .slice(textSelection.start, textSelection.end)
+                      .join("")
+                  })
+                : t("select_text_before_adding_liaison")}
           </span>
         </div>
       )
     },
     {
       key: "pause",
-      label: "停顿",
+      label: t("pause_3"),
       icon: <PauseIcon />,
       summary:
         brush.kind === "pause" ? formatPauseLabel(pauseDuration) : undefined,
@@ -3054,7 +3194,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         tokens.length < 2 || speechCapabilities?.supportsPause === false,
       disabledReason:
         speechCapabilities?.supportsPause === false
-          ? "当前音色暂未开放停顿"
+          ? t("this_voice_does_not_support_pauses_yet")
           : undefined,
       placement: "topLeft" as const,
       stayOpen: true,
@@ -3091,20 +3231,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     },
     {
       key: "voices",
-      label: "发音",
+      label: t("pronunciation"),
       className: "tsz-ve-speech-tool",
       // 「已选」两字在窄容器里就是一行的代价，去掉后语义不减。
-      summary: `${enabledVoiceIds.length} 个音色`,
+      summary: t("voices", { p0: enabledVoiceIds.length }),
       icon: <Volume2Icon />,
       content: (
-        <div className="tsz-ve-speech-panel" aria-label="发音设置与试听">
+        <div
+          className="tsz-ve-speech-panel"
+          aria-label={t("pronunciation_settings_and_audition")}
+        >
           <div>
             <div className="tsz-ve-speech-panel-title">
               {mode === "synthesis" && locale === "en-GB"
-                ? "英式音色"
+                ? t("british_voice")
                 : mode === "synthesis" && locale === "en-US"
-                  ? "美式音色"
-                  : "音色"}
+                  ? t("american_voice")
+                  : t("voice")}
             </div>
             {recommendationError && (
               <Alert type="warning" title={recommendationError} />
@@ -3117,20 +3260,27 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               !voicesLoading && (
                 <Alert
                   type="warning"
-                  title="已启用的失效音色口音未知，请先取消启用，再应用替代推荐。"
+                  title={t(
+                    "an_enabled_unavailable_voice_has_an_unknown_accent_disable_it_before_applyi_2"
+                  )}
                 />
               )}
             {visibleRecommendations.length > 0 && (
               <Space wrap style={{ marginBottom: 12 }}>
                 <Select
-                  aria-label="分组推荐"
-                  placeholder="选择分组推荐"
+                  aria-label={t("group_recommendations")}
+                  placeholder={t("select_group_recommendation")}
                   value={recommendationId}
                   style={{ minWidth: 220 }}
                   onChange={setRecommendationId}
                   options={visibleRecommendations.map((item) => ({
                     value: item.id,
-                    label: `${item.groupName} / ${item.locale === "en-GB" ? "英式" : "美式"} / ${item.name}`,
+                    label: t("label_3", {
+                      p0: item.groupName,
+                      p1:
+                        item.locale === "en-GB" ? t("british") : t("american"),
+                      p2: item.name
+                    }),
                     disabled: !recommendationAvailable(item)
                   }))}
                 />
@@ -3153,7 +3303,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     applyRecommendation(item);
                   }}
                 >
-                  应用到当前文本
+                  {t("apply_to_current_text")}
                 </Button>
               </Space>
             )}
@@ -3161,16 +3311,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               <Space wrap style={{ marginBottom: 12 }}>
                 <Tag>
                   {inherited
-                    ? "继承推荐"
+                    ? t("inherit_recommendations")
                     : voiceProfile?.dubbing
-                      ? "局部独立"
-                      : "历史独立配置"}
+                      ? t("local_custom_settings")
+                      : t("historical_custom_settings")}
                 </Tag>
                 <Button
                   disabled={readOnly || !onVoiceProfileChange}
                   onClick={() => void restoreRecommendations()}
                 >
-                  恢复继承推荐
+                  {t("restore_inherited_recommendations")}
                 </Button>
                 {(["en-GB", "en-US"] as const)
                   .filter((accent) => !locale || accent === locale)
@@ -3181,7 +3331,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                       disabled={readOnly || !onVoiceProfileChange}
                       onClick={() => void useLatestRecommendation(accent)}
                     >
-                      使用最新{accent === "en-GB" ? "英式" : "美式"}首位推荐
+                      {t("use_latest")}
+                      {accent === "en-GB" ? t("british") : t("american")}
+                      {t("first_choice_recommendation")}
                     </Button>
                   ))}
               </Space>
@@ -3239,7 +3391,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     audition(voice, setting);
                   }}
                 >
-                  播放旧音频 · {setting.version_name ?? setting.voice_id}
+                  {t("play_previous_audio")}{" "}
+                  {setting.version_name ?? setting.voice_id}
                 </Button>
               ) : null;
             })}
@@ -3272,10 +3425,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               onAudition={handleAudition}
               auditionStatus={
                 conflictCount > 0
-                  ? "请先处理停顿与连读的冲突，再试听"
+                  ? t("resolve_pause_and_liaison_conflicts_before_auditioning")
                   : previewAdapter
                     ? auditionStatus
-                    : "TTS 后端未启用，仍可编辑"
+                    : t("tts_backend_is_disabled_editing_is_still_available")
               }
             />
             {auditionMedia && (
@@ -3316,8 +3469,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     },
     {
       key: "uploads",
-      label: mode === "grammar" ? "上传音频" : "音频",
-      ariaLabel: "音频",
+      label: mode === "grammar" ? t("upload_audio") : t("audio"),
+      ariaLabel: t("audio"),
       summary: assets.length > 0 ? String(assets.length) : undefined,
       icon: <MicIcon />,
       content: (
@@ -3329,8 +3482,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             available={Boolean(audioUploadAdapter) && !storageUnavailable}
             unavailableReason={
               audioUploadAdapter
-                ? "音频存储尚未开通，暂时不能上传"
-                : "音频上传未启用"
+                ? t("audio_storage_is_unavailable_uploading_is_disabled")
+                : t("audio_uploading_is_disabled")
             }
             upload={upload}
             onUploadChange={(next: Partial<UploadDraft>) =>
@@ -3488,11 +3641,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         }}
         onCloseDetail={stopAssetPlayback}
         audioTools={(dialect, stopDetailPlayback) => (
-          <section aria-label="当前文本口音录音">
-            <Typography.Title level={5}>真人录音</Typography.Title>
+          <section aria-label={t("recordings_for_this_text_s_accent")}>
+            <Typography.Title level={5}>
+              {t("human_recording")}
+            </Typography.Title>
             <p>
-              录音用于当前正文的{dialect === "en-GB" ? "英式" : "美式"}
-              发音，与合成音色分开保存。
+              {t("recordings_are_for_this_text_s")}
+              {dialect === "en-GB" ? t("british") : t("american")}
+              {t(
+                "pronunciation_and_are_saved_separately_from_synthesised_voices"
+              )}
             </p>
             <UploadPanel
               uploadAllowed={audioUploadAllowed}
@@ -3501,8 +3659,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               available={!!audioUploadAdapter && !storageUnavailable}
               unavailableReason={
                 audioUploadAdapter
-                  ? "音频存储尚未开通，暂时不能上传"
-                  : "音频上传未启用"
+                  ? t("audio_storage_is_unavailable_uploading_is_disabled")
+                  : t("audio_uploading_is_disabled")
               }
               upload={{ ...upload, locale: dialect }}
               onUploadChange={(next) =>
@@ -3576,9 +3734,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       <section
         className="tsz-ve-editor tsz-ve-synthesis"
         data-locale={locale}
-        aria-label={contextLabel}
+        aria-label={
+          contextLabel === "语音编辑器" ? t("voice_editor") : contextLabel
+        }
       >
-        {previewIsMock && <Tag color="warning">模拟试听</Tag>}
+        {previewIsMock && <Tag color="warning">{t("mock_audition")}</Tag>}
         {localPool}
         {!localPool &&
           tools
@@ -3589,7 +3749,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 !audioUploadAdapter &&
                 assets.length === 0 ? (
                   <div className="tsz-ve-synthesis-upload-unavailable">
-                    真人录音 · 暂未启用
+                    {t("human_recording_disabled")}
                   </div>
                 ) : (
                   tool.content
@@ -3695,9 +3855,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     >
       <Modal
         open={pendingText !== undefined}
-        title="修改文字会移除已有标注"
-        okText="确认修改"
-        cancelText="保留原文"
+        title={t("changing_text_will_remove_existing_annotations")}
+        okText={t("confirm_changes")}
+        cancelText={t("keep_original_text")}
         onOk={() => {
           if (pendingText !== undefined)
             changeText(pendingText, true, pendingTextCoalesceRef.current);
@@ -3706,18 +3866,20 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         onCancel={() => setPendingText(undefined)}
         okButtonProps={{ disabled: readOnly }}
       >
-        此次修改会移除受影响的连读、关联或停顿。未受影响的标注会保留；确认后仍可撤销恢复。
+        {t(
+          "this_change_removes_affected_liaison_marks_links_or_pauses_unaffected_annot"
+        )}
       </Modal>
       <Modal
         destroyOnHidden
         open={!!pendingConflict}
-        title="同一位置不能同时连读和停顿"
+        title={t("liaison_and_pause_cannot_share_the_same_position")}
         okText={
           pendingConflict?.kind === "pause"
-            ? "移除冲突连读，添加停顿"
-            : "移除冲突停顿，添加连读"
+            ? t("remove_conflicting_liaison_and_add_pause")
+            : t("remove_conflicting_pauses_and_add_liaison")
         }
-        cancelText="取消，保留原标注"
+        cancelText={t("cancel_and_keep_original_annotations")}
         onOk={confirmConflict}
         onCancel={() => setPendingConflict(undefined)}
         okButtonProps={{ disabled: readOnly }}
@@ -3725,17 +3887,30 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       >
         <p>
           {pendingConflict?.kind === "pause"
-            ? `此处位于 ${pendingConflict.links.length} 条连读范围内。添加 ${pendingConflict.durationMs / 1000} 秒停顿，需要先移除这些连读。`
-            : `这条连读跨过 ${pendingConflict?.gaps.length ?? 0} 处停顿，需要先移除这些停顿。`}
+            ? t(
+                "this_position_is_inside_liaison_spans_remove_them_before_adding_a_second_pa",
+                {
+                  p0: pendingConflict.links.length,
+                  p1: pendingConflict.durationMs / 1000
+                }
+              )
+            : t("this_liaison_crosses_pauses_remove_them_first", {
+                p0: pendingConflict?.gaps.length ?? 0
+              })}
         </p>
         <p style={{ color: "#7c8593", fontSize: 12 }}>
-          当前标注尚未改变。仅在确认后替换；可一次撤销恢复。
+          {t(
+            "current_annotations_are_unchanged_replacement_requires_confirmation_and_can"
+          )}
         </p>
       </Modal>
       {conflictCount > 0 && (
         <Alert
           type="warning"
-          title={`现有内容有 ${conflictCount} 处停顿与连读重叠，请选择保留哪一种标注`}
+          title={t(
+            "current_content_has_overlapping_pause_and_liaison_marks_choose_which_annota",
+            { p0: conflictCount }
+          )}
           showIcon
         />
       )}
@@ -3744,7 +3919,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       {unsupportedSpeech && (
         <Alert
           type="warning"
-          title="当前音色暂未开放已有的发音标注，请清空标注或选择支持的音色。"
+          title={t(
+            "this_voice_does_not_support_existing_pronunciation_annotations_clear_them_o"
+          )}
           showIcon
         />
       )}
@@ -3752,14 +3929,20 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
       <div className="tsz-ve-badge-row">
         {previewAdapter && previewIsMock && (
-          <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
+          <Tooltip
+            title={t(
+              "local_tts_mock_is_active_audition_audio_is_not_a_real_synthesis_result"
+            )}
+          >
             <Tag
               className="tsz-ve-preview-mock-tag"
               color="warning"
               role="note"
-              aria-label="试听走本地 TTS mock，音频不是真实合成结果"
+              aria-label={t(
+                "audition_uses_local_tts_mock_audio_is_not_a_real_synthesis_result"
+              )}
             >
-              模拟
+              {t("mock")}
             </Tag>
           </Tooltip>
         )}
@@ -3817,13 +4000,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         onLetterClick={handleLetterClick}
         onLiaisonClick={handleLiaisonClick}
         onClearAll={clearAll}
-        inputLabel={contextLabel}
+        inputLabel={
+          contextLabel === "语音编辑器" ? t("voice_editor") : contextLabel
+        }
         inputDataAttributes={inputDataAttributes}
         inputPlaceholder={
           contentReadOnly
-            ? "正文只读，可编辑关联"
+            ? t("text_is_read_only_links_can_be_edited")
             : textReadOnly
-              ? "请先在外面的输入框填写文字"
+              ? t("enter_text_in_the_external_input_first")
               : placeholder
         }
         onTextChange={(nextText, coalesce) =>
@@ -3855,7 +4040,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                           key: `association-${targetKind}`,
                           disabled: linksReadOnly,
                           label:
-                            targetKind === "word" ? "关联单词" : "关联短语",
+                            targetKind === "word"
+                              ? t("link_word")
+                              : t("link_phrase"),
                           icon: <LinkIcon />,
                           active:
                             brush.kind === "association" &&
@@ -3866,12 +4053,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                             <div className="tsz-ve-pop">
                               <div className="tsz-ve-pop-hint">
                                 {!renderAssociationPicker
-                                  ? "当前后端尚不支持正文关联，已有关联保留。"
+                                  ? t(
+                                      "this_backend_does_not_support_text_links_yet_existing_links_are_retained"
+                                    )
                                   : targetKind === "word"
-                                    ? "点击一个未关联的单词，再选择关联目标。"
+                                    ? t(
+                                        "click_an_unlinked_word_then_select_its_target"
+                                      )
                                     : linkWords.length > 0
-                                      ? `已选 ${linkWords.length} 个单词：${linkSegments.map((segment) => segment.surface).join(" … ")}`
-                                      : "依次点击至少两个未关联的单词，可不连续；再次点击取消选择。"}
+                                      ? t("selected_words", {
+                                          p0: linkWords.length,
+                                          p1: linkSegments
+                                            .map((segment) => segment.surface)
+                                            .join(" … ")
+                                        })
+                                      : t(
+                                          "click_at_least_two_unlinked_words_in_order_they_can_be_non_adjacent_click_a"
+                                        )}
                               </div>
                               {renderAssociationPicker &&
                                 targetKind === "phrase" && (
@@ -3885,7 +4083,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                                       setAssociationPickerOpen(true);
                                     }}
                                   >
-                                    选择关联短语
+                                    {t("select_linked_phrase")}
                                   </Button>
                                 )}
                             </div>
@@ -3907,7 +4105,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       {localPool &&
         (collapseVoiceSettings ? (
           <details className="tsz-ve-voice-settings">
-            <summary>配音设置</summary>
+            <summary>{t("voice_settings")}</summary>
             {localPool}
           </details>
         ) : (

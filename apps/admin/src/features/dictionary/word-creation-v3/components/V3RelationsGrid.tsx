@@ -1,4 +1,9 @@
 import {
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../../i18n/editor";
+import {
   ChevronDownIcon,
   ChevronUpIcon,
   InfoIcon,
@@ -46,11 +51,15 @@ type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
 const RELATION_TYPES = ["derivative", "synonym", "antonym"] as const;
 type RelationType = (typeof RELATION_TYPES)[number];
 
-const RELATION_META: Record<RelationType, { metric: string }> = {
-  synonym: { metric: "相似度" },
-  antonym: { metric: "差异度" },
-  derivative: { metric: "关联度" }
-};
+function relationMetrics(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): Record<RelationType, { metric: string }> {
+  return {
+    synonym: { metric: t("panel_similarity") },
+    antonym: { metric: t("panel_difference") },
+    derivative: { metric: t("panel_relatedness") }
+  };
+}
 
 /** 未保存选择优先用搜索结果，已绑定关系回显服务端快照。 */
 function relationDisplayHeadword(
@@ -95,6 +104,7 @@ export function V3RelationsGrid({
   currentWordId?: string;
   relationDisplaySnapshots?: RelationDisplaySnapshots;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [collapsed, setCollapsed] = useState<Record<RelationType, boolean>>({
     synonym: false,
     antonym: false,
@@ -165,7 +175,9 @@ export function V3RelationsGrid({
         other.pending_target_headword?.trim().toLowerCase() === key
     );
     return duplicated
-      ? "同类关联里已有这个词面，一个词面只配一条词义"
+      ? t(
+          "panel_this_surface_already_has_a_link_of_this_type_each_surface_can_link_to_one_m"
+        )
       : undefined;
   };
 
@@ -189,12 +201,12 @@ export function V3RelationsGrid({
       ?.senses.find((item) => item.sense_id === relation.target_sense_id)
       ?.gloss ||
     relationDisplaySnapshots?.[relation.id]?.gloss ||
-    "已匹配词义";
+    t("panel_matched_meaning");
 
   return (
     <div className="word-relations-grid word-relations-grid-stacked">
       {RELATION_TYPES.map((relationType) => {
-        const meta = RELATION_META[relationType];
+        const meta = relationMetrics(t)[relationType];
         const relations = groupRelations(
           sense.relations,
           relationRowKeys.current
@@ -218,7 +230,12 @@ export function V3RelationsGrid({
             }}
             extra={
               <Button
-                aria-label={`${collapsed[relationType] ? "展开" : "收起"}${relationLabel(relationType)}`}
+                aria-label={t("panel_label", {
+                  p0: collapsed[relationType]
+                    ? t("panel_expand")
+                    : t("panel_collapse"),
+                  p1: relationLabel(relationType, t)
+                })}
                 className="word-relation-collapse"
                 icon={
                   collapsed[relationType] ? (
@@ -239,18 +256,20 @@ export function V3RelationsGrid({
                 size="small"
                 type="text"
               >
-                {collapsed[relationType] ? "展开" : "收起"}
+                {collapsed[relationType]
+                  ? t("panel_expand")
+                  : t("panel_collapse")}
               </Button>
             }
             key={relationType}
             size="small"
-            title={relationLabel(relationType)}
+            title={relationLabel(relationType, t)}
           >
             <SenseSectionBody collapsed={Boolean(collapsed[relationType])}>
               <div style={{ padding: 10 }}>
                 {relations.length === 0 ? (
                   <Empty
-                    description={`暂无${relationLabel(relationType)}`}
+                    description={t(`relations_empty_${relationType}`)}
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
                 ) : (
@@ -275,8 +294,8 @@ export function V3RelationsGrid({
                         <div className="word-relation-column-heads">
                           <span />
                           <span>{meta.metric}</span>
-                          <span>{relationLabel(relationType)}</span>
-                          <span>匹配词义</span>
+                          <span>{relationLabel(relationType, t)}</span>
+                          <span>{t("panel_match_meaning")}</span>
                           <span />
                         </div>
                         {relations.map(({ relation, group }, relationIndex) => (
@@ -315,8 +334,13 @@ export function V3RelationsGrid({
                               <SortableDragHandle
                                 sorting={relationSorting}
                                 index={relationIndex}
-                                label={`拖动${relationLabel(relationType)} ${relationIndex + 1}`}
-                                singleItemTitle="至少需要两个关联词"
+                                label={t("panel_drag", {
+                                  p0: relationLabel(relationType, t),
+                                  p1: relationIndex + 1
+                                })}
+                                singleItemTitle={t(
+                                  "panel_at_least_two_related_entries_are_needed"
+                                )}
                                 dragImageSelector=".word-relation-row"
                               />
                               <span className="word-grammar-index">
@@ -356,11 +380,11 @@ export function V3RelationsGrid({
                                 filterOption={false}
                                 notFoundContent={
                                   relatedSearch.isFetching
-                                    ? "搜索中…"
+                                    ? t("panel_searching")
                                     : searchFailed
-                                      ? "搜索失败，请重试"
+                                      ? t("panel_search_failed_try_again")
                                       : searching?.query
-                                        ? "未找到匹配词条"
+                                        ? t("panel_no_matching_entries")
                                         : null
                                 }
                                 onFocus={() => {
@@ -554,8 +578,8 @@ export function V3RelationsGrid({
                                                 }
                                               >
                                                 {word.status === "draft"
-                                                  ? "草稿"
-                                                  : "已发布"}
+                                                  ? t("panel_draft")
+                                                  : t("panel_published")}
                                               </Tag>
                                               {/* 顺序即优先级：先说禁用理由，再说选中后会发生什么。
                                                 「已发布且无词义」本身就是禁用理由，最该先说；
@@ -565,16 +589,22 @@ export function V3RelationsGrid({
                                                 word.senses.length) === 0 &&
                                               word.status !== "draft" ? (
                                                 <Typography.Text type="secondary">
-                                                  暂无词义，请先添加词义
+                                                  {t(
+                                                    "panel_no_meanings_yet_add_a_meaning_first"
+                                                  )}
                                                 </Typography.Text>
                                               ) : alreadyLinked ? (
                                                 <Typography.Text type="secondary">
-                                                  已被同类型的另一行关联
+                                                  {t(
+                                                    "panel_already_linked_by_another_row_of_the_same_type"
+                                                  )}
                                                 </Typography.Text>
                                               ) : (word.senseCount ??
                                                   word.senses.length) === 0 ? (
                                                 <Typography.Text type="secondary">
-                                                  暂无词义，选中仅记文本
+                                                  {t(
+                                                    "panel_no_meanings_yet_selection_stores_text_only"
+                                                  )}
                                                 </Typography.Text>
                                               ) : null}
                                             </Flex>
@@ -606,12 +636,14 @@ export function V3RelationsGrid({
                                         relationDisplaySnapshots?.[relation.id]
                                       ) ||
                                       (relation.target_word_id
-                                        ? "已选择关联词"
+                                        ? t("panel_related_entry_selected")
                                         : "")
                                 }
                               >
                                 <Input
-                                  aria-label={`${relationLabel(relationType)}目标词条`}
+                                  aria-label={t("panel_target_entry", {
+                                    p0: relationLabel(relationType, t)
+                                  })}
                                   className="word-relation-target tsz-words"
                                   prefix={
                                     relation.target_word_id ? (
@@ -632,7 +664,9 @@ export function V3RelationsGrid({
                                       {searching?.relationId === relation.id &&
                                       searchFailed ? (
                                         <Button
-                                          aria-label="重试关联词搜索"
+                                          aria-label={t(
+                                            "panel_retry_related_entry_search"
+                                          )}
                                           onClick={() =>
                                             void retryRelatedSearch()
                                           }
@@ -642,16 +676,20 @@ export function V3RelationsGrid({
                                           size="small"
                                           type="link"
                                         >
-                                          搜索失败，重试
+                                          {t("panel_search_failed_try_again_2")}
                                         </Button>
                                       ) : null}
                                       {isUnlinkedText(relation) &&
                                       !isSelectedEmptyDraft(relation) ? (
                                         <Tooltip
-                                          title={`待关联的${relationLabel(relationType)}`}
+                                          title={t("panel_pending", {
+                                            p0: relationLabel(relationType, t)
+                                          })}
                                         >
                                           <InfoIcon
-                                            aria-label={`待关联的${relationLabel(relationType)}`}
+                                            aria-label={t("panel_pending", {
+                                              p0: relationLabel(relationType, t)
+                                            })}
                                             className="word-relation-unlinked-icon"
                                             role="note"
                                           />
@@ -659,7 +697,9 @@ export function V3RelationsGrid({
                                       ) : null}
                                     </>
                                   }
-                                  placeholder="搜索关联词"
+                                  placeholder={t(
+                                    "panel_search_related_entries"
+                                  )}
                                   size="small"
                                 />
                               </AutoComplete>
@@ -742,13 +782,33 @@ export function V3RelationsGrid({
                                             <SortableDragHandle
                                               sorting={glossSorting}
                                               index={glossIndex}
-                                              label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
-                                              singleItemTitle="至少需要两个词义"
+                                              label={t("panel_drag_meaning", {
+                                                p0: relationLabel(
+                                                  relationType,
+                                                  t
+                                                ),
+                                                p1: glossIndex + 1
+                                              })}
+                                              singleItemTitle={t(
+                                                "panel_at_least_two_meanings_are_needed"
+                                              )}
                                               dragImageSelector=".word-relation-gloss-row"
                                             />
                                           ) : null}
                                           <Input
-                                            aria-label={`${relationLabel(relationType)}待关联词义${group.length > 1 ? ` ${glossIndex + 1}` : ""}`}
+                                            aria-label={t(
+                                              "panel_pending_meaning",
+                                              {
+                                                p0: relationLabel(
+                                                  relationType,
+                                                  t
+                                                ),
+                                                p1:
+                                                  group.length > 1
+                                                    ? ` ${glossIndex + 1}`
+                                                    : ""
+                                              }
+                                            )}
                                             className="word-relation-sense"
                                             data-v3-field="pending_target_gloss"
                                             data-v3-node-id={member.id}
@@ -770,16 +830,31 @@ export function V3RelationsGrid({
                                                   delete target.pending_target_gloss;
                                               })
                                             }
-                                            placeholder="输入词义"
+                                            placeholder={t(
+                                              "panel_enter_a_meaning"
+                                            )}
                                             size="small"
                                             status="warning"
                                             suffix={
                                               isSelectedEmptyDraft(relation) ? (
                                                 <Tooltip
-                                                  title={`待关联的${relationLabel(relationType)}`}
+                                                  title={t("panel_pending", {
+                                                    p0: relationLabel(
+                                                      relationType,
+                                                      t
+                                                    )
+                                                  })}
                                                 >
                                                   <InfoIcon
-                                                    aria-label={`待关联的${relationLabel(relationType)}`}
+                                                    aria-label={t(
+                                                      "panel_pending",
+                                                      {
+                                                        p0: relationLabel(
+                                                          relationType,
+                                                          t
+                                                        )
+                                                      }
+                                                    )}
                                                     className="word-relation-unlinked-icon"
                                                     role="note"
                                                   />
@@ -793,7 +868,13 @@ export function V3RelationsGrid({
 
                                           {group.length > 1 ? (
                                             <RelationDeleteButton
-                                              label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                              label={t("panel_meaning", {
+                                                p0: relationLabel(
+                                                  relationType,
+                                                  t
+                                                ),
+                                                p1: glossIndex + 1
+                                              })}
                                               onDelete={() => {
                                                 const remaining = group.filter(
                                                   (item) =>
@@ -830,7 +911,9 @@ export function V3RelationsGrid({
                                 </RelationSortScope>
                                 {relationType === "derivative" ? (
                                   <Button
-                                    aria-label={`添加${relationLabel(relationType)}词义`}
+                                    aria-label={t("panel_add_meaning", {
+                                      p0: relationLabel(relationType, t)
+                                    })}
                                     size="small"
                                     type="dashed"
                                     icon={<PlusIcon />}
@@ -862,7 +945,7 @@ export function V3RelationsGrid({
                                       })
                                     }
                                   >
-                                    添加词义
+                                    {t("panel_add_meaning_2")}
                                   </Button>
                                 ) : null}
                               </Flex>
@@ -873,7 +956,9 @@ export function V3RelationsGrid({
                                 gap={6}
                               >
                                 <Select
-                                  aria-label={`${relationLabel(relationType)}目标词义`}
+                                  aria-label={t("panel_target_meaning", {
+                                    p0: relationLabel(relationType, t)
+                                  })}
                                   className="word-relation-sense"
                                   disabled={!relation.target_word_id}
                                   mode={
@@ -887,7 +972,9 @@ export function V3RelationsGrid({
                                       : undefined
                                   }
                                   maxTagPlaceholder={(omitted) =>
-                                    `已选 ${omitted.length} 条词义`
+                                    t("panel_selected_meanings", {
+                                      p0: omitted.length
+                                    })
                                   }
                                   onChange={(selection: string | string[]) => {
                                     const discovered =
@@ -991,7 +1078,9 @@ export function V3RelationsGrid({
                                               void relatedSenses.refetch()
                                             }
                                           >
-                                            词义加载失败，重试或重新选择词条
+                                            {t(
+                                              "panel_could_not_load_meanings_retry_or_select_the_entry_again"
+                                            )}
                                           </Button>
                                         )}
                                     </>
@@ -1012,7 +1101,8 @@ export function V3RelationsGrid({
                                             gloss:
                                               relationDisplaySnapshots?.[
                                                 item.id
-                                              ]?.gloss ?? "已匹配词义"
+                                              ]?.gloss ??
+                                              t("panel_matched_meaning")
                                           })),
                                         ...(Object.values(knownWords).find(
                                           (word) =>
@@ -1028,11 +1118,14 @@ export function V3RelationsGrid({
                                         {
                                           label: (
                                             <span>
-                                              {item.gloss || "（无释义）"}
+                                              {item.gloss ||
+                                                t("panel_no_definition")}
                                               {"status" in item &&
                                                 item.status === "draft" && (
                                                   <Tag color="warning">
-                                                    未发布词义
+                                                    {t(
+                                                      "panel_unpublished_meaning"
+                                                    )}
                                                   </Tag>
                                                 )}
                                             </span>
@@ -1042,7 +1135,7 @@ export function V3RelationsGrid({
                                       ])
                                     ).values()
                                   )}
-                                  placeholder="选择词义"
+                                  placeholder={t("panel_select_a_meaning")}
                                   size="small"
                                   value={
                                     relationType === "derivative"
@@ -1133,8 +1226,16 @@ export function V3RelationsGrid({
                                             <SortableDragHandle
                                               sorting={glossSorting}
                                               index={glossIndex}
-                                              label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
-                                              singleItemTitle="至少需要两个词义"
+                                              label={t("panel_drag_meaning", {
+                                                p0: relationLabel(
+                                                  relationType,
+                                                  t
+                                                ),
+                                                p1: glossIndex + 1
+                                              })}
+                                              singleItemTitle={t(
+                                                "panel_at_least_two_meanings_are_needed"
+                                              )}
                                               dragImageSelector=".word-relation-gloss-row"
                                             />
                                             {/* tabIndex 让校验问题能定位到这一行：
@@ -1158,7 +1259,13 @@ export function V3RelationsGrid({
                                                   在上面的多选里取消最后一条，那等于删整条。 */}
                                             {group.length > 1 ? (
                                               <RelationDeleteButton
-                                                label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                                label={t("panel_meaning", {
+                                                  p0: relationLabel(
+                                                    relationType,
+                                                    t
+                                                  ),
+                                                  p1: glossIndex + 1
+                                                })}
                                                 onDelete={() => {
                                                   const remaining =
                                                     group.filter(
@@ -1205,7 +1312,7 @@ export function V3RelationsGrid({
                               </div>
                             ) : null}
                             <RelationDeleteButton
-                              label={relationLabel(relationType)}
+                              label={relationLabel(relationType, t)}
                               onDelete={() =>
                                 change((draft) => {
                                   const draftSense =
@@ -1240,7 +1347,7 @@ export function V3RelationsGrid({
                   size="small"
                   type="dashed"
                 >
-                  添加{relationLabel(relationType)}
+                  {t(`relations_add_${relationType}`)}
                 </Button>
               </div>
             </SenseSectionBody>

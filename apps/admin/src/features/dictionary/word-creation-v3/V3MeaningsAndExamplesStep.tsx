@@ -158,9 +158,10 @@ function fieldIssue(
 }
 
 function FieldIssueHelp({ issue }: { issue?: V3DraftValidationIssue }) {
+  const { t } = useLexiconEditorTranslation();
   return issue ? (
     <Typography.Text className="word-field-help" type="danger">
-      {v3IssueMessage(issue)}
+      {v3IssueMessage(issue, t)}
     </Typography.Text>
   ) : null;
 }

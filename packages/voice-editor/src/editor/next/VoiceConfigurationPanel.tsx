@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import type { ReactNode } from "react";
 import "./voice-configuration-panel.css";
 
@@ -10,12 +11,16 @@ export function VoiceConfigurationPanel({
   audition: ReactNode;
   personal?: ReactNode;
 }) {
+  const { t } = useVoiceEditorTranslation();
   return (
-    <section className="voice-configuration-panel" aria-label="调节声音">
+    <section
+      className="voice-configuration-panel"
+      aria-label={t("adjust_voice")}
+    >
       <div className="voice-configuration-layout">
         <section
           className="voice-configuration-parameters"
-          aria-label="声音参数"
+          aria-label={t("voice_parameters")}
         >
           {parameters}
           {personal}

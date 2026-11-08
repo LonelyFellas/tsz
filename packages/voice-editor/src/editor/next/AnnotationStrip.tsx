@@ -1,3 +1,8 @@
+import {
+  useVoiceEditorTranslation,
+  defaultVoiceEditorTranslation,
+  type VoiceEditorTranslation
+} from "../i18n";
 import type {
   MouseEvent as ReactMouseEvent,
   KeyboardEvent as ReactKeyboardEvent,
@@ -138,6 +143,7 @@ export function AnnotationStrip({
   onLetterClick,
   onLiaisonClick
 }: AnnotationStripProps) {
+  const { t } = useVoiceEditorTranslation();
   const tokens = tokenize(text);
   const textPoints = Array.from(text);
   const target = readOnly
@@ -522,7 +528,7 @@ export function AnnotationStrip({
                   role={target === "word" ? "button" : undefined}
                   aria-label={
                     target === "word"
-                      ? `关联 ${token.text}（${token.index + 1}）`
+                      ? t("link", { p0: token.text, p1: token.index + 1 })
                       : undefined
                   }
                   onMouseDown={(event) => {
@@ -602,7 +608,11 @@ export function AnnotationStrip({
                         ref={registerLetter(start)}
                         className={`tsz-ve-letter${roleClass}${formatClass}${speechClass}${textSelectedClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
                         role="button"
-                        aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
+                        aria-label={t("letter", {
+                          p0: token.text,
+                          p1: offset + 1,
+                          p2: letter
+                        })}
                         aria-pressed={Boolean(anchorRole)}
                         aria-disabled={target !== "letter"}
                         data-codepoint={start}
@@ -649,7 +659,7 @@ export function AnnotationStrip({
                 <span
                   className={`tsz-ve-gap${pause === undefined ? "" : " has-pause"}${gapClass}${pausePlacement && selectedPauseGap === position ? " is-pause-selected" : ""}`}
                   role="button"
-                  aria-label={gapLabel(position, pause)}
+                  aria-label={gapLabel(position, pause, t)}
                   aria-pressed={pause !== undefined}
                   aria-disabled={
                     pause !== undefined && brush.kind === "none"
@@ -681,7 +691,13 @@ export function AnnotationStrip({
                           title={
                             pausePopover?.gap === position
                               ? null
-                              : `停顿 ${pause / 1000} 秒 · 点击${brush.kind === "erase" ? "取消" : "调整"}`
+                              : t("pause_seconds_click_to", {
+                                  p0: pause / 1000,
+                                  p1:
+                                    brush.kind === "erase"
+                                      ? t("cancel")
+                                      : t("adjust")
+                                })
                           }
                         >
                           <button
@@ -689,7 +705,14 @@ export function AnnotationStrip({
                             className="tsz-ve-gap-pause-value tsz-ve-pause-chip"
                             data-duration-ms={pause}
                             style={{ minWidth: pauseMarkerWidth(pause) }}
-                            aria-label={`${brush.kind === "erase" ? "清除" : "编辑"}第 ${position + 1} 处停顿 ${pause / 1000} 秒`}
+                            aria-label={t("pause_seconds", {
+                              p0:
+                                brush.kind === "erase"
+                                  ? t("clear")
+                                  : t("edit_3"),
+                              p1: position + 1,
+                              p2: pause / 1000
+                            })}
                             disabled={
                               readOnly ||
                               (brush.kind !== "none" &&
@@ -750,7 +773,8 @@ export function AnnotationStrip({
         readOnly={readOnly || textReadOnly}
         spellCheck={false}
         placeholder={
-          inputPlaceholder ?? "在这里直接输入英文，然后用上面的工具在字上标注"
+          inputPlaceholder ??
+          t("enter_english_text_here_then_annotate_it_using_the_tools_above")
         }
         onSelect={(event) => syncTextSelection(event.currentTarget)}
         onClick={(event) => syncTextSelection(event.currentTarget)}
@@ -800,7 +824,12 @@ function trailingSpace(
   return points.slice(last.end).join("");
 }
 
-function gapLabel(gap: number, pause: number | undefined): string {
-  const suffix = pause === undefined ? "" : `：停顿 ${formatPauseLabel(pause)}`;
-  return `第 ${gap + 1} 处词缝${suffix}`;
+function gapLabel(
+  gap: number,
+  pause: number | undefined,
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): string {
+  const suffix =
+    pause === undefined ? "" : t("pause", { p0: formatPauseLabel(pause) });
+  return t("word_gap", { p0: gap + 1, p1: suffix });
 }

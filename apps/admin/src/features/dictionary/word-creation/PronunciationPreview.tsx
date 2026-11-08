@@ -1,3 +1,10 @@
+import {
+  useLexiconEditorTranslation,
+  lexiconEditorMessageText,
+  type LexiconEditorMessage,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage
+} from "../i18n/editor";
 import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
 import { ChevronDownIcon, Volume2Icon, RefreshCwIcon } from "lucide-react";
 import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
@@ -29,7 +36,7 @@ import {
   useState
 } from "react";
 import { env } from "@/lib/env";
-import { DIALECT_SHORT_LABEL } from "../editorConstants";
+import { dialectLabel } from "../word-creation-v3/presentation";
 import {
   adminVoicePreviewAdapter,
   voicePreviewIsMock
@@ -50,8 +57,10 @@ interface PreviewContextValue {
 
 const PreviewContext = createContext<PreviewContextValue | null>(null);
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "试听请求失败，请重试";
+function errorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : createLexiconEditorMessage("panel_audition_request_failed_try_again");
 }
 
 export function PronunciationPreviewProvider({
@@ -73,7 +82,7 @@ export function PronunciationPreviewProvider({
   const { preference: dialectPreference } = useDialectPreference();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
-  const [voicesError, setVoicesError] = useState("");
+  const [voicesError, setVoicesError] = useLexiconEditorMessageState("");
 
   useEffect(() => {
     if (!enabled) {
@@ -90,7 +99,10 @@ export function PronunciationPreviewProvider({
       .then((items) => {
         if (controller.signal.aborted) return;
         setVoices(items);
-        if (items.length === 0) setVoicesError("暂无可用发音人");
+        if (items.length === 0)
+          setVoicesError(
+            createLexiconEditorMessage("panel_no_speakers_available")
+          );
       })
       .catch((error) => {
         if (!controller.signal.aborted) setVoicesError(errorMessage(error));
@@ -99,7 +111,7 @@ export function PronunciationPreviewProvider({
         if (!controller.signal.aborted) setVoicesLoading(false);
       });
     return () => controller.abort();
-  }, [enabled]);
+  }, [enabled, setVoicesError]);
 
   const value = useMemo(
     () => ({
@@ -169,6 +181,7 @@ function voiceForDialect(
 export function usePronunciationVoiceNotice(
   dialects: readonly Dialect[]
 ): string | undefined {
+  const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
   if (!context?.enabled || context.voicesLoading) return undefined;
   if (context.voicesError) return context.voicesError;
@@ -178,12 +191,17 @@ export function usePronunciationVoiceNotice(
   );
   if (missing.length === 0) return undefined;
   const labels = missing
-    .map(
-      (dialect) =>
-        `${DIALECT_SHORT_LABEL[dialect]}（${localeForDialect(dialect, preference) ?? "英语"}）`
+    .map((dialect) =>
+      t("panel_label_6", {
+        p0: dialectLabel(dialect, t),
+        p1: localeForDialect(dialect, preference) ?? t("panel_english_2")
+      })
     )
     .join("、");
-  return `${labels}暂无可用发音人，对应的「获取语音」已禁用`;
+  return t(
+    "panel_no_speakers_available_for_get_audio_is_disabled_for_these_accents",
+    { p0: labels }
+  );
 }
 
 export function resolvePronunciationPreviewVoice(
@@ -223,6 +241,7 @@ function useResolvedPreviewProfile(
   dialect: Dialect,
   adapter = context.adapter
 ) {
+  const { t } = useLexiconEditorTranslation();
   const locale = localeForDialect(dialect, context.dialectPreference);
   const key = JSON.stringify([
     profile,
@@ -235,7 +254,7 @@ function useResolvedPreviewProfile(
   const [resolved, setResolved] = useState<{
     key: string;
     voices: VoiceSetting[];
-    error?: string;
+    error?: string | LexiconEditorMessage;
   }>();
   useEffect(() => {
     const { profile, content, locale, adapter } = inputRef.current;
@@ -266,7 +285,9 @@ function useResolvedPreviewProfile(
     return {
       profile: { ...profile, voices: [] },
       pending: false,
-      error: "当前环境尚未支持推荐配音解析"
+      error: t(
+        "panel_this_environment_does_not_support_resolving_recommended_voices_yet"
+      )
     };
   return {
     profile: {
@@ -277,7 +298,10 @@ function useResolvedPreviewProfile(
       )
     },
     pending: !!content.text.trim() && resolved?.key !== key,
-    error: resolved?.key === key ? resolved.error : undefined
+    error:
+      resolved?.key === key
+        ? lexiconEditorMessageText(resolved.error, t)
+        : undefined
   };
 }
 
@@ -294,6 +318,7 @@ export function PronunciationPreviewVoiceSummary({
   content?: RichTextV2;
   column?: "voice" | "rate" | "volume";
 }) {
+  const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
   const resolved = useResolvedPreviewProfile(
@@ -320,13 +345,22 @@ export function PronunciationPreviewVoiceSummary({
   const summary = (
     <span
       className="word-pronunciation-voice-label"
-      title={voice ? `${isDefault ? "默认 · " : ""}${voice.label}` : undefined}
+      title={
+        voice
+          ? t("panel_label_7", {
+              p0: isDefault ? t("panel_default") : "",
+              p1: voice.label
+            })
+          : undefined
+      }
     >
       {context.voicesLoading || resolved.pending
-        ? "正在读取音色"
+        ? t("panel_loading_voices")
         : voice
           ? voice.label.replace(` · ${voice.locale}`, "")
-          : resolved.error || context.voicesError || "当前口音没有可用音色"}
+          : resolved.error ||
+            context.voicesError ||
+            t("panel_no_voices_available_for_this_accent")}
     </span>
   );
   if (enabled.length <= 1) return summary;
@@ -336,7 +370,7 @@ export function PronunciationPreviewVoiceSummary({
       classNames={{ root: "word-pronunciation-voice-popover" }}
       title={
         <div className="word-pronunciation-voice-heading">
-          <span>已启用音色</span>
+          <span>{t("panel_enabled_voices")}</span>
           <span className="word-pronunciation-voice-count">
             {enabled.length}
           </span>
@@ -344,7 +378,10 @@ export function PronunciationPreviewVoiceSummary({
       }
       destroyOnHidden
       content={
-        <ul className="word-pronunciation-voice-list" aria-label="已启用音色">
+        <ul
+          className="word-pronunciation-voice-list"
+          aria-label={t("panel_enabled_voices")}
+        >
           {enabled.map((setting) => {
             const option = context.voices.find(
               (row) => row.id === setting.voice_id
@@ -362,13 +399,19 @@ export function PronunciationPreviewVoiceSummary({
                     {name}
                   </span>
                   <span className="word-pronunciation-voice-locale">
-                    {option?.locale ?? "不可用"}
+                    {option?.locale ?? t("panel_unavailable")}
                   </span>
                 </div>
-                <span className="word-pronunciation-voice-rate" title="语速">
+                <span
+                  className="word-pronunciation-voice-rate"
+                  title={t("panel_rate")}
+                >
                   {(1 + setting.rate_percent / 100).toFixed(2)}×
                 </span>
-                <span className="word-pronunciation-voice-volume" title="音量">
+                <span
+                  className="word-pronunciation-voice-volume"
+                  title={t("panel_volume")}
+                >
                   {setting.volume_percent ?? 100}%
                 </span>
                 {pronunciationId && (
@@ -379,7 +422,9 @@ export function PronunciationPreviewVoiceSummary({
                       content={content}
                       voiceProfile={{ voices: [setting] }}
                       disabled={!content}
-                      disabledReason="请先填写当前口音的合成输入"
+                      disabledReason={t(
+                        "panel_enter_synthesis_input_for_this_accent_first"
+                      )}
                       ariaLabelPrefix={option?.label ?? setting.voice_id}
                       compact
                     />
@@ -395,7 +440,15 @@ export function PronunciationPreviewVoiceSummary({
         type="text"
         size="small"
         className="word-pronunciation-voice-summary"
-        aria-label={`查看${dialect === "uk" ? "英式" : dialect === "us" ? "美式" : "通用"}全部 ${enabled.length} 个音色`}
+        aria-label={t("panel_view_all_voices", {
+          p0:
+            dialect === "uk"
+              ? t("panel_british")
+              : dialect === "us"
+                ? t("panel_american")
+                : t("panel_common"),
+          p1: enabled.length
+        })}
       >
         {summary}
         <ChevronDownIcon />
@@ -437,13 +490,14 @@ export function PronunciationPreviewControls({
   audioFactory?: (src: string) => HTMLAudioElement;
   children?: ReactNode;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
   const assetOnly = assetOnlyProp || context.readOnly || !!audioAssetId;
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VoicePreviewResult>();
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useLexiconEditorMessageState("");
   const abortRef = useRef<AbortController | null>(null);
   const generationRef = useRef<symbol | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -509,11 +563,11 @@ export function PronunciationPreviewControls({
   );
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
-    ? `${ariaLabelPrefix} 播放语音`
-    : "播放语音";
+    ? t("panel_play_audio", { p0: ariaLabelPrefix })
+    : t("panel_play_audio_2");
   const generateLabel = ariaLabelPrefix
-    ? `${ariaLabelPrefix} 获取语音`
-    : "获取语音";
+    ? t("panel_get_audio", { p0: ariaLabelPrefix })
+    : t("panel_get_audio_2");
 
   const clearExpiry = useCallback(() => {
     if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
@@ -540,7 +594,7 @@ export function PronunciationPreviewControls({
     cleanup();
     setBusy(false);
     setStatus("");
-  }, [cleanup]);
+  }, [cleanup, setStatus]);
   const { claimPlayback, releasePlayback } = context;
 
   useLayoutEffect(() => {
@@ -548,7 +602,14 @@ export function PronunciationPreviewControls({
     cleanup();
     setBusy(false);
     setStatus("");
-  }, [cleanup, contentKey, pronunciationId, disabled, previewAdapter]);
+  }, [
+    cleanup,
+    contentKey,
+    pronunciationId,
+    disabled,
+    previewAdapter,
+    setStatus
+  ]);
 
   useEffect(
     () => () => {
@@ -570,8 +631,8 @@ export function PronunciationPreviewControls({
           if (audioRef.current !== audio) return;
           discardResult();
           const error = savedAssetId
-            ? "正式音频读取失败，请重试"
-            : "试听音频加载失败，请重新生成";
+            ? t("panel_could_not_read_final_audio_try_again")
+            : t("panel_could_not_load_audition_audio_generate_it_again");
           setStatus(error);
           void message.error(error);
         },
@@ -581,13 +642,17 @@ export function PronunciationPreviewControls({
         "ended",
         () => {
           if (audioRef.current === audio)
-            setStatus(savedAssetId ? "正式音频已就绪" : "已生成试听");
+            setStatus(
+              savedAssetId
+                ? createLexiconEditorMessage("panel_final_audio_ready")
+                : createLexiconEditorMessage("panel_audition_generated")
+            );
         },
         { once: true }
       );
       return audio;
     },
-    [audioFactory, discardResult, message, savedAssetId]
+    [audioFactory, discardResult, message, savedAssetId, setStatus, t]
   );
 
   const generate = async () => {
@@ -614,7 +679,9 @@ export function PronunciationPreviewControls({
       voice.locale !== targetLocale
     ) {
       setStatus(
-        "指定音素仅支持完全匹配的地区，请选择对应音色或显式改用自然朗读"
+        createLexiconEditorMessage(
+          "panel_specified_phonemes_require_an_exact_regional_match_select_the_matching_voic"
+        )
       );
       return;
     }
@@ -625,7 +692,11 @@ export function PronunciationPreviewControls({
     const controller = new AbortController();
     abortRef.current = controller;
     setBusy(true);
-    setStatus(assetId ? "正在读取正式音频…" : "正在生成试听…");
+    setStatus(
+      assetId
+        ? createLexiconEditorMessage("panel_loading_final_audio")
+        : createLexiconEditorMessage("panel_generating_audition")
+    );
     try {
       let preview: VoicePreviewResult;
       if (assetId && adapter.resolveAudio) {
@@ -670,7 +741,13 @@ export function PronunciationPreviewControls({
       const expire = () => {
         discardResult();
         setStatus(
-          assetId ? "音频地址已过期，请重新播放" : "试听已过期，请重新生成"
+          assetId
+            ? createLexiconEditorMessage(
+                "panel_the_audio_url_expired_play_it_again"
+              )
+            : createLexiconEditorMessage(
+                "panel_the_audition_expired_generate_it_again"
+              )
         );
       };
       if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
@@ -685,22 +762,26 @@ export function PronunciationPreviewControls({
         if (audioRef.current === audio) {
           setStatus(
             assetId
-              ? "播放中（正式音频）"
+              ? createLexiconEditorMessage("panel_playing_final_audio")
               : preview.cached
-                ? "播放中（缓存命中）"
-                : "播放中（新合成）"
+                ? createLexiconEditorMessage("panel_playing_cached")
+                : createLexiconEditorMessage("panel_playing_new_synthesis")
           );
         }
       } catch {
         if (audioRef.current === audio) {
-          setStatus("浏览器阻止自动播放，请点击播放语音");
+          setStatus(
+            createLexiconEditorMessage(
+              "panel_the_browser_blocked_autoplay_click_play_audio"
+            )
+          );
         }
       }
     } catch (error) {
       if (!controller.signal.aborted) {
         const nextStatus = errorMessage(error);
         setStatus(nextStatus);
-        void message.error(nextStatus);
+        void message.error(lexiconEditorMessageText(nextStatus, t));
       }
     } finally {
       if (generationRef.current === generation) {
@@ -720,32 +801,47 @@ export function PronunciationPreviewControls({
     try {
       await audio.play();
       if (audioRef.current === audio)
-        setStatus(savedAssetId ? "播放中（正式音频）" : "播放中");
+        setStatus(
+          savedAssetId
+            ? createLexiconEditorMessage("panel_playing_final_audio")
+            : createLexiconEditorMessage("panel_playing")
+        );
     } catch {
       if (audioRef.current === audio) {
-        setStatus("播放失败，请检查浏览器音频权限后重试");
-        void message.error("播放失败，请检查浏览器音频权限后重试");
+        setStatus(
+          createLexiconEditorMessage(
+            "panel_playback_failed_check_browser_audio_permissions_and_retry"
+          )
+        );
+        void message.error(
+          t("panel_playback_failed_check_browser_audio_permissions_and_retry")
+        );
       }
     }
   };
 
   const unavailableReason = !context.enabled
-    ? "语音试听功能未启用"
+    ? t("panel_voice_auditions_are_disabled")
     : context.voicesLoading || resolved.pending
-      ? "正在加载发音人…"
+      ? t("panel_loading_speakers")
       : resolved.error
         ? resolved.error
         : context.voicesError
           ? context.voicesError
           : !text
             ? content
-              ? "请先填写字典音标"
-              : "请先填写词形拼写"
+              ? t("panel_enter_the_dictionary_transcription_first")
+              : t("panel_enter_the_form_spelling_first")
             : !voice
               ? enabledSettings.length
-                ? `已选音色不匹配 ${targetLocale ?? "当前口音"}，请在发音设置中选择对应音色`
-                : `${targetLocale ?? "英语"} 暂无可用发音人`
-              : "获取语音";
+                ? t(
+                    "panel_the_selected_voice_does_not_match_select_a_matching_voice_in_pronunciation",
+                    { p0: targetLocale ?? t("panel_current_accent") }
+                  )
+                : t("panel_no_speakers_available_for", {
+                    p0: targetLocale ?? t("panel_english_2")
+                  })
+              : t("panel_get_audio_2");
 
   const controls = (
     <>
@@ -755,14 +851,16 @@ export function PronunciationPreviewControls({
             (disabled ? disabledReason : undefined) ||
             status ||
             (result || canReadSavedAudio
-              ? "播放语音"
+              ? t("panel_play_audio_2")
               : assetOnly
                 ? savedAssetId
-                  ? "播放正式音频"
-                  : "尚未保存正式音频，请返回编辑补齐"
+                  ? t("panel_play_final_audio")
+                  : t(
+                      "panel_final_audio_has_not_been_saved_return_to_the_editor_to_add_it"
+                    )
                 : playbackOnly
                   ? unavailableReason
-                  : "请先获取语音")
+                  : t("panel_get_audio_first"))
           }
         >
           <Button
@@ -791,14 +889,20 @@ export function PronunciationPreviewControls({
       }
       {children}
       {voicePreviewIsMock && (
-        <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
+        <Tooltip
+          title={t(
+            "panel_local_tts_mock_is_active_audition_audio_is_not_a_real_synthesis_result"
+          )}
+        >
           <Tag
             className="word-pronunciation-mock-tag"
             color="warning"
             role="note"
-            aria-label="试听走本地 TTS mock，音频不是真实合成结果"
+            aria-label={t(
+              "panel_audition_uses_local_tts_mock_audio_is_not_a_real_synthesis_result"
+            )}
           >
-            模拟
+            {t("panel_mock")}
           </Tag>
         </Tooltip>
       )}

@@ -1,3 +1,8 @@
+import {
+  useVoiceEditorTranslation,
+  useVoiceEditorMessageState,
+  createVoiceEditorMessage
+} from "../i18n";
 import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Input, Select, Switch } from "@tsz/ui/admin/forms";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -34,6 +39,7 @@ export function SsmlReview({
   onPlay: () => void;
   registerStop?: (stop: () => void) => () => void;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const [internalOpen, setOpen] = useState(false);
   const open = expanded ?? internalOpen;
   const [version, setVersion] = useState<string>();
@@ -52,7 +58,7 @@ export function SsmlReview({
   }
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useVoiceEditorMessageState("");
   const [media, setMedia] = useState<ReviewAudio>();
   const active = useRef<
     { audio: HTMLAudioElement; result: VoicePreviewResult } | undefined
@@ -89,14 +95,18 @@ export function SsmlReview({
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
-          setError(cause instanceof Error ? cause.message : "SSML 生成失败");
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : createVoiceEditorMessage("ssml_generation_failed")
+          );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
     // The serialized key captures the actual source and selected version, not object identity.
-  }, [open, inputKey, adapter, stop, automaticAvailable]);
+  }, [open, inputKey, adapter, stop, automaticAvailable, setError]);
 
   const value = manual ? (raw ?? "") : automatic;
   async function preview() {
@@ -132,13 +142,17 @@ export function SsmlReview({
       setMedia({
         audio,
         result,
-        name: `${selected.version_name ?? selected.voice_id} SSML 试听`
+        name: t("ssml_audition", {
+          p0: selected.version_name ?? selected.voice_id
+        })
       });
       await audio.play();
     } catch (cause) {
       if (!controller.signal.aborted)
         setError(
-          cause instanceof Error ? cause.message : "SSML 试听失败，输入已保留"
+          cause instanceof Error
+            ? cause.message
+            : createVoiceEditorMessage("ssml_audition_failed_input_is_retained")
         );
     } finally {
       if (request.current === controller) {
@@ -151,15 +165,18 @@ export function SsmlReview({
   if (!open)
     return (
       <Button size="small" onClick={() => setOpen(true)}>
-        查看 SSML
+        {t("view_ssml")}
       </Button>
     );
   return (
-    <section className="tsz-ve-ssml-review" aria-label="SSML 试听设置">
+    <section
+      className="tsz-ve-ssml-review"
+      aria-label={t("ssml_audition_settings")}
+    >
       <Space wrap>
         {!singleVoice && (
           <Select
-            aria-label="SSML 配音版本"
+            aria-label={t("ssml_voice_version")}
             value={selected && voiceSettingKey(selected)}
             options={settings.map((setting) => ({
               value: voiceSettingKey(setting),
@@ -182,9 +199,9 @@ export function SsmlReview({
               raw: checked ? (raw ?? automatic) : raw
             });
           }}
-          aria-label="手动编辑 SSML"
+          aria-label={t("edit_ssml_manually")}
         />
-        <Typography.Text>手动编辑</Typography.Text>
+        <Typography.Text>{t("manual_editing")}</Typography.Text>
         <Button
           size="small"
           onClick={() => {
@@ -192,7 +209,7 @@ export function SsmlReview({
             changeDraft({ manual: false });
           }}
         >
-          恢复自动生成
+          {t("restore_automatic_generation")}
         </Button>
         {expanded === undefined && (
           <Button
@@ -203,12 +220,12 @@ export function SsmlReview({
               setOpen(false);
             }}
           >
-            收起 SSML
+            {t("hide_ssml")}
           </Button>
         )}
       </Space>
       <Input.TextArea
-        aria-label="SSML 原文"
+        aria-label={t("ssml_source")}
         value={value}
         readOnly={!manual}
         autoSize={{ minRows: 4, maxRows: 10 }}
@@ -220,7 +237,7 @@ export function SsmlReview({
       />
       {!manual && !automaticAvailable && (
         <Typography.Text type="secondary">
-          请先填写有效参数，再自动生成 SSML。
+          {t("enter_valid_parameters_before_generating_ssml_automatically")}
         </Typography.Text>
       )}
       <Space wrap>
@@ -235,7 +252,7 @@ export function SsmlReview({
           loading={pending}
           onClick={() => void preview()}
         >
-          试听 SSML
+          {t("audition_ssml")}
         </Button>
         <Button
           size="small"
@@ -243,10 +260,16 @@ export function SsmlReview({
           onClick={() => {
             void navigator.clipboard
               .writeText(value)
-              .catch(() => setError("复制失败，请手动复制原文"));
+              .catch(() =>
+                setError(
+                  createVoiceEditorMessage(
+                    "copy_failed_copy_the_source_manually"
+                  )
+                )
+              );
           }}
         >
-          复制 SSML
+          {t("copy_ssml")}
         </Button>
         <Button
           size="small"
@@ -258,14 +281,16 @@ export function SsmlReview({
             )
           }
         >
-          下载 SSML
+          {t("download_ssml")}
         </Button>
       </Space>
       <Typography.Text type="secondary">
-        手动修改仅用于本次 SSML 试听。
+        {t("manual_changes_apply_only_to_this_ssml_audition")}
       </Typography.Text>
       {loading && (
-        <Typography.Text type="secondary">正在生成 SSML…</Typography.Text>
+        <Typography.Text type="secondary">
+          {t("generating_ssml")}
+        </Typography.Text>
       )}
       {error && <Typography.Text type="danger">{error}</Typography.Text>}
       {media && (

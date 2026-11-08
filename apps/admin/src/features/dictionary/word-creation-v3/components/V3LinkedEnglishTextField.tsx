@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import type {
@@ -52,6 +53,7 @@ export function V3LinkedEnglishTextField({
   linksEnabled: boolean;
   onChange: (next: EnglishTextV3) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const createReadingPreviewAdapter = useReadingPreviewAdapter(wordId, forms);
   const update = (dialect: Dialect, patch: Partial<RichTextVariantV3>) => {
     if (readOnly) return;
@@ -78,7 +80,7 @@ export function V3LinkedEnglishTextField({
                 assetOnly={readOnly}
                 pronunciationId={row.variant_id}
                 dialect={row.dialect}
-                ariaLabelPrefix={`${label} ${dialectLabel(row.dialect)}${suffix}`}
+                ariaLabelPrefix={`${label} ${dialectLabel(row.dialect, t)}${suffix}`}
                 content={toRichTextV2(variant.value)}
                 voiceProfile={variant.voice_profile ?? undefined}
                 previewAdapter={createReadingPreviewAdapter(
@@ -97,7 +99,7 @@ export function V3LinkedEnglishTextField({
                 meanings={meanings}
               />
             )}
-            ariaLabel={`${label} ${dialectLabel(row.dialect)}${suffix}`}
+            ariaLabel={`${label} ${dialectLabel(row.dialect, t)}${suffix}`}
             editorTitle={renderEditorTitle?.(row.dialect)}
             nodeId={row.variant_id}
             field="value"

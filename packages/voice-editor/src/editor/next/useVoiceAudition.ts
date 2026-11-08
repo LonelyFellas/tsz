@@ -1,3 +1,10 @@
+import {
+  useVoiceEditorTranslation,
+  defaultVoiceEditorTranslation,
+  type VoiceEditorTranslation,
+  useVoiceEditorMessageState,
+  createVoiceEditorMessage
+} from "../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RichTextV2 } from "@tsz/types";
 import type { ReviewAudio } from "./AudioReview";
@@ -15,8 +22,13 @@ import type {
   VoiceSetting
 } from "../../types";
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "试听失败，请稍后重试";
+function errorMessage(
+  error: unknown,
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): string {
+  return error instanceof Error
+    ? error.message
+    : t("audition_failed_try_again_later");
 }
 
 /** 试听使用该音色自己的语速，并按供应商能力夹取。 */
@@ -104,9 +116,10 @@ export function useVoiceAudition({
   previewAdapter,
   catalog
 }: VoiceAuditionInput): VoiceAudition {
+  const { t } = useVoiceEditorTranslation();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useVoiceEditorMessageState("");
   const [pendingVoiceId, setPendingVoiceId] = useState<string>();
   const [playingVoiceId, setPlayingVoiceId] = useState<string>();
   const [media, setMedia] = useState<ReviewAudio>();
@@ -167,7 +180,11 @@ export function useVoiceAudition({
     )
       return;
     stop();
-    setStatus("内容或语音参数已变化，请重新试听");
+    setStatus(
+      createVoiceEditorMessage(
+        "content_or_voice_parameters_changed_audition_again"
+      )
+    );
   }, [content, settings, stop]);
 
   useEffect(() => {
@@ -186,10 +203,14 @@ export function useVoiceAudition({
       .then((items) => {
         if (controller.signal.aborted) return;
         setVoices(items);
-        setStatus(items.length > 0 ? "" : "暂无可用发音人");
+        setStatus(
+          items.length > 0
+            ? ""
+            : createVoiceEditorMessage("no_speakers_available")
+        );
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setStatus(errorMessage(error));
+        if (!controller.signal.aborted) setStatus(errorMessage(error, t));
       })
       .finally(() => {
         if (!controller.signal.aborted) setVoicesLoading(false);
@@ -218,7 +239,9 @@ export function useVoiceAudition({
         )
       ) {
         setStatus(
-          "该模型不支持当前参数、停顿或指定音素；请明确调整后再试听，原内容已保留"
+          createVoiceEditorMessage(
+            "this_model_does_not_support_the_current_parameters_pauses_or_phonemes_adjus_2"
+          )
         );
         return;
       }
@@ -238,8 +261,8 @@ export function useVoiceAudition({
       activeAssetRef.current = stored?.audio_asset_id;
       setStatus(
         stored?.audio_asset_id
-          ? `正在读取 ${voice.label} 正式音频…`
-          : `正在合成 ${voice.label}…`
+          ? createVoiceEditorMessage("loading_final_audio", { p0: voice.label })
+          : createVoiceEditorMessage("synthesising", { p0: voice.label })
       );
       const result =
         stored?.audio_asset_id && previewAdapter.resolveAudio
@@ -277,7 +300,11 @@ export function useVoiceAudition({
             () => {
               if (!isCurrent()) return;
               stopMedia();
-              setStatus("试听音频加载失败，请重新试听");
+              setStatus(
+                createVoiceEditorMessage(
+                  "could_not_load_audition_audio_audition_again"
+                )
+              );
             },
             { once: true }
           );
@@ -286,7 +313,11 @@ export function useVoiceAudition({
             () => {
               if (!isCurrent()) return;
               setPlayingVoiceId(undefined);
-              setStatus(result.cached ? "试听完毕（缓存）" : "试听完毕");
+              setStatus(
+                result.cached
+                  ? createVoiceEditorMessage("audition_complete_cached")
+                  : createVoiceEditorMessage("audition_complete")
+              );
             },
             { once: true }
           );
@@ -298,17 +329,23 @@ export function useVoiceAudition({
               setPlayingVoiceId(voice.id);
               setStatus(
                 result.cached
-                  ? `播放中 ${voice.label}（缓存）`
-                  : `播放中 ${voice.label}`
+                  ? createVoiceEditorMessage("playing_cached", {
+                      p0: voice.label
+                    })
+                  : createVoiceEditorMessage("playing", { p0: voice.label })
               );
             })
             .catch(() => {
               if (!isCurrent()) return;
-              setStatus("浏览器阻止了自动播放，请再点一次试听");
+              setStatus(
+                createVoiceEditorMessage(
+                  "the_browser_blocked_autoplay_click_audition_again"
+                )
+              );
             });
         })
         .catch((error) => {
-          if (!controller.signal.aborted) setStatus(errorMessage(error));
+          if (!controller.signal.aborted) setStatus(errorMessage(error, t));
         })
         .finally(() => {
           if (abortRef.current === controller) {

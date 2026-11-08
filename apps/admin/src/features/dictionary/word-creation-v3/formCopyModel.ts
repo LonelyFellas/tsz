@@ -1,3 +1,10 @@
+import { lexiconEditorPanelMessages } from "../i18n/editor-panel-messages";
+
+export class FormCopyError extends Error {
+  constructor(readonly messageKey: keyof typeof lexiconEditorPanelMessages) {
+    super(lexiconEditorPanelMessages[messageKey][0]);
+  }
+}
 import { regionalVariants } from "@tsz/shared";
 import type {
   FormContentV3,
@@ -81,7 +88,7 @@ export function variantForCopyReference(
   const variant = regionalVariants(content.regional_variants).find(
     (row) => row.id === ref.variantId
   );
-  if (!variant) throw new Error("拼写版本已变化，请重新发起复制");
+  if (!variant) throw new FormCopyError("copy_spelling_changed");
   return variant;
 }
 
@@ -108,7 +115,7 @@ export function planFormCopy(
 ): FormCopyPlan {
   const source = sharedContentForForm(forms, sourceFormId);
   const target = sharedContentForForm(forms, targetFormId);
-  if (!source || !target) throw new Error("来源或目标词形已不存在，请重新选择");
+  if (!source || !target) throw new FormCopyError("copy_form_missing");
   const matches: FormCopyPlan["matches"] = [];
   let sourceCount = 0;
   for (const side of SIDES) {
@@ -137,7 +144,7 @@ export function planFormCopy(
               ? -1
               : index;
       if (explicit != null && sourceIndex < 0)
-        throw new Error("所选来源发音已不存在，请重新选择");
+        throw new FormCopyError("copy_source_pronunciation_missing");
       matches.push({
         side,
         source: from[sourceIndex] ?? null,
@@ -195,7 +202,7 @@ function pronunciationAt(
     (item) => item.id === ref.pronunciationId
   );
   if (!row || variant?.id !== ref.variantId)
-    throw new Error("发音版本已变化，请重新发起复制");
+    throw new FormCopyError("copy_pronunciation_changed");
   return row;
 }
 
@@ -241,7 +248,7 @@ function rebindSpeechContent(
   target: string
 ): RichTextV2V3 {
   if (content.text !== source)
-    throw new Error("来源合成正文与拼写不一致，请先修正后再复制");
+    throw new FormCopyError("copy_source_text_mismatch");
   const words = (text: string) =>
     [...text.matchAll(/\S+/gu)].map((match) => ({
       start: Array.from(text.slice(0, match.index)).length,
@@ -249,8 +256,7 @@ function rebindSpeechContent(
     }));
   const from = words(source);
   const to = words(target);
-  const fail = () =>
-    new Error("语音标注无法对应目标词界，请先调整拼写或语音标注后再复制");
+  const fail = () => new FormCopyError("copy_annotation_boundary_mismatch");
   if (
     source !== target &&
     content.annotations.length &&
@@ -286,9 +292,7 @@ function rebindUpsWords(
   const words = candidate.ups_words;
   if (words == null) {
     if (candidate.ups.trim() && (from.length > 1 || to.length > 1))
-      throw new Error(
-        "来源 UPS 缺少逐词边界，无法对应目标拼写，请先完善 UPS 后再复制"
-      );
+      throw new FormCopyError("copy_ups_boundaries_missing");
     return words;
   }
   if (
@@ -299,7 +303,7 @@ function rebindUpsWords(
     ) ||
     words.map((word) => word.phoneme).join(" ") !== candidate.ups.trim()
   )
-    throw new Error("UPS 逐词内容无法对应目标拼写，请先调整后再复制");
+    throw new FormCopyError("copy_ups_target_mismatch");
   return words.map((word, index) => ({ ...word, text: to[index]! }));
 }
 
@@ -337,9 +341,7 @@ function copyPhonetics(
   if (
     fields.some((value) => JSON.stringify(value) !== JSON.stringify(fields[0]))
   )
-    throw new Error(
-      "来源英美字典音标或实际发音不同，请先将目标切换为英美区分后再复制"
-    );
+    throw new FormCopyError("copy_transcriptions_differ");
   const candidates = matches.map((match, index) =>
     match.source
       ? candidateForSide(rows[index]!, match.source.region, match.side)
@@ -357,7 +359,7 @@ function copyPhonetics(
           Boolean(value.use_spelling) !== Boolean(selected?.use_spelling))
     )
   )
-    throw new Error("来源英美发音源选择不同，请先将目标切换为英美区分后再复制");
+    throw new FormCopyError("copy_synthesis_sources_differ");
   delete target.dict_phonetic_rich;
   delete target.actual_pron_rich;
   Object.assign(target, structuredClone(fields[0]));
@@ -449,9 +451,7 @@ function copyPhonetics(
             (profile) => JSON.stringify(profile) !== JSON.stringify(profiles[0])
           )
         )
-          throw new Error(
-            "目标英美音色不同，切换拼写发音无法保留原音色，请先将目标切换为英美区分"
-          );
+          throw new FormCopyError("copy_target_voices_differ");
         if (profiles[0]) target.voice_profile = structuredClone(profiles[0]);
         else delete target.voice_profile;
       } else {
@@ -487,7 +487,7 @@ function copiedProfile(
       item.channel === channel
   )?.profile;
   if (profile?.dubbing && !effective)
-    throw new Error("来源音色需要先解析当前有效配置，请重新发起复制");
+    throw new FormCopyError("copy_source_voice_unresolved");
   const value = effective ?? profile;
   if (!value?.voices.length) return undefined;
   const local = localVoiceProfile(value.voices, [], value.dubbing?.area, value);
@@ -547,9 +547,7 @@ function mergeFallbacks(
     unchanged.some((voice) => !profileSide(voice.locale)) ||
     (!complete && Boolean(target?.dubbing))
   )
-    throw new Error(
-      "音色口音不明确，无法合并英美音色或保留跳过侧，请先明确音色口音或将目标切换为英美区分"
-    );
+    throw new FormCopyError("copy_voice_accent_unknown");
   const voices = values.flatMap(({ match, profile, sideScoped }) =>
     sideScoped
       ? profile.voices
@@ -656,7 +654,7 @@ function copyVoices(
         annotations: []
       };
       if (content.text !== match.target.spelling)
-        throw new Error("目标合成正文与拼写不一致，请先修正后再复制音色");
+        throw new FormCopyError("copy_target_text_mismatch");
       target.synthesis ??= emptySynthesis();
       // 写入首个分侧候选前，保留旧格式在两侧实际可用的内容。
       if (!target.synthesis.uk && !target.synthesis.us) {
@@ -699,11 +697,10 @@ export function applyFormCopy(
       current?.id !== ref.contentId ||
       JSON.stringify(current) !== JSON.stringify(ref.contentSnapshot)
     )
-      throw new Error("来源或目标内容已变化，请重新发起复制");
+      throw new FormCopyError("copy_content_changed");
   }
   if (plan.sameContent) return forms;
-  if (plan.needsMapping)
-    throw new Error("发音版本数量不同，请为每个目标版本选择来源或跳过");
+  if (plan.needsMapping) throw new FormCopyError("copy_mapping_required");
   if (!plan.matches.some((match) => match.source)) return forms;
   const target = structuredClone(plan.target.contentSnapshot);
   const grouped = new Map<string, FormCopyPlan["matches"]>();
@@ -733,7 +730,7 @@ export function applyFormCopy(
         ) || copiedVoices;
   }
   if (plan.kind === "voices" && !copiedVoices)
-    throw new Error("来源未配置可复制的音色，请先配置来源音色");
+    throw new FormCopyError("copy_source_voice_missing");
   const regions = target.regional_variants;
   for (const variant of regionalVariants(regions)) {
     if (!variant.pronunciations.some((row) => spellingCopies.has(row.id)))
@@ -751,9 +748,7 @@ export function applyFormCopy(
         (value) => JSON.stringify(value) !== JSON.stringify(profile)
       )
     )
-      throw new Error(
-        "同一词形的拼写音色由多个读法共用，所选映射或跳过项无法同时保留，请统一选择后再复制"
-      );
+      throw new FormCopyError("copy_shared_spelling_mapping_conflict");
     variant.spelling_speech = {
       ...variant.spelling_speech,
       content: variant.spelling_speech?.content ?? {

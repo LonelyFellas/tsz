@@ -1,3 +1,8 @@
+import {
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../dictionary/i18n/editor";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
@@ -25,11 +30,15 @@ import { V3RowIndex } from "../dictionary/word-creation-v3/components/V3RowIndex
 import "./WordSentences.css";
 
 const PAGE_SIZE = 5;
-const TRANSLATION_BANDS = [
-  { band: "word_for_word", label: "初" },
-  { band: "balanced_fluency", label: "中" },
-  { band: "adapted_creation", label: "高" }
-] as const;
+function translationBands(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) {
+  return [
+    { band: "word_for_word", label: t("panel_w") },
+    { band: "balanced_fluency", label: t("panel_b") },
+    { band: "adapted_creation", label: t("panel_a") }
+  ] as const;
+}
 
 export function WordSentences({
   sourceWord,
@@ -53,6 +62,7 @@ export function WordSentences({
   focusSentenceId?: string;
   onFocusHandled?: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const profile = useAuthStore((state) => state.profile);
   const canReadAll = hasAdminPermission(profile, "sentences.access");
   const readOnly = requestedReadOnly || !canReadAll;
@@ -116,7 +126,9 @@ export function WordSentences({
   };
   const failure = (error: unknown) => {
     void message.error(
-      error instanceof Error ? error.message : "操作失败，请重试"
+      error instanceof Error
+        ? error.message
+        : t("panel_operation_failed_try_again")
     );
   };
   const edit = async (item: SharedSentence) => {
@@ -149,9 +161,10 @@ export function WordSentences({
   }, [focusSentenceId]);
   const remove = (item: SharedSentence) => {
     const confirmation = modal.confirm({
-      title: "从当前词义移除例句？",
-      content:
-        "移除只写入当前词条草稿，发布词条后生效。共享标注和其他词义的展示不变。",
+      title: t("panel_remove_this_example_from_the_current_meaning"),
+      content: t(
+        "panel_removal_only_updates_this_entry_s_draft_and_applies_after_publishing_the_en"
+      ),
       onOk: (close) => {
         confirmation.update({
           okButtonProps: { loading: true },
@@ -179,7 +192,13 @@ export function WordSentences({
       }
     });
   };
-  if (!canRead) return <Alert type="info" title="未开通例句查看权限" />;
+  if (!canRead)
+    return (
+      <Alert
+        type="info"
+        title={t("panel_example_viewing_permission_is_required")}
+      />
+    );
   return (
     <section
       className={`word-sense-section${collapsed ? " is-collapsed" : ""}`}
@@ -187,9 +206,9 @@ export function WordSentences({
       data-sentence-sense-id={senseId}
     >
       <SenseSectionTitle
-        label="多维例句"
+        label={t("panel_examples_2")}
         count={query.data?.total ?? 0}
-        unit="条"
+        unit={t("row_count_unit", { count: query.data?.total ?? 0 })}
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
       />
@@ -214,22 +233,26 @@ export function WordSentences({
         <Flex vertical gap="small">
           {savedSense && (
             <Typography.Text type="secondary">
-              保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。
+              {t(
+                "panel_saving_only_updates_the_example_draft_display_updates_after_publishing_the"
+              )}
             </Typography.Text>
           )}
           {query.isError && (
             <Alert
               type="error"
-              title="例句加载失败"
+              title={t("panel_could_not_load_examples")}
               action={
-                <Button onClick={() => void query.refetch()}>重试</Button>
+                <Button onClick={() => void query.refetch()}>
+                  {t("panel_try_again")}
+                </Button>
               }
             />
           )}
           {!rows.length && !query.isFetching && (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="暂无关联例句"
+              description={t("panel_no_linked_examples_yet")}
             />
           )}
           {rows.map((item, index) => (
@@ -256,10 +279,12 @@ export function WordSentences({
                       size="small"
                       onClick={() => void edit(item)}
                     >
-                      编辑
+                      {t("panel_edit")}
                     </Button>
                     <Popover
-                      content="从当前词义移除，随词条发布生效"
+                      content={t(
+                        "panel_remove_from_current_meaning_applies_after_publishing_the_entry"
+                      )}
                       trigger="hover"
                     >
                       <Button
@@ -267,7 +292,7 @@ export function WordSentences({
                         disabled={!canEditWord}
                         onClick={() => remove(item)}
                       >
-                        移除
+                        {t("panel_remove")}
                       </Button>
                     </Popover>
                   </Space>
@@ -282,7 +307,7 @@ export function WordSentences({
                   />
                 </div>
                 <Flex vertical gap={8} className="shared-sentence-translations">
-                  {TRANSLATION_BANDS.flatMap(({ band, label }) =>
+                  {translationBands(t).flatMap(({ band, label }) =>
                     item.content.sentence.zh_translations
                       .filter(
                         (translation) =>
@@ -293,7 +318,7 @@ export function WordSentences({
                         <Flex
                           key={translation.id}
                           role="group"
-                          aria-label={`${label}阶译文`}
+                          aria-label={t("panel_translation_3", { p0: label })}
                           align="start"
                           gap={10}
                           className="shared-sentence-translation"
@@ -329,7 +354,11 @@ export function WordSentences({
           )}
           {canCreate && (
             <Tooltip
-              title={!savedSense ? "先保存词义，再添加例句。" : undefined}
+              title={
+                !savedSense
+                  ? t("panel_save_the_meaning_before_adding_examples")
+                  : undefined
+              }
               trigger={["hover", "focus"]}
             >
               <span
@@ -348,7 +377,7 @@ export function WordSentences({
                   style={!savedSense ? { pointerEvents: "none" } : undefined}
                   onClick={() => onOpen("new")}
                 >
-                  添加例句
+                  {t("panel_add_example")}
                 </Button>
               </span>
             </Tooltip>

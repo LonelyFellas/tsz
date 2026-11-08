@@ -1,3 +1,9 @@
+import {
+  useLexiconEditorTranslation,
+  createLexiconEditorMessage,
+  lexiconEditorMessageText,
+  type LexiconEditorMessage
+} from "../../i18n/editor";
 import { useVoiceSave } from "../voiceSaveContext";
 import { usePermission } from "@/lib/auth";
 import { AdminControls } from "@tsz/ui/admin/context";
@@ -184,6 +190,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onChange,
   onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
+  const { t } = useLexiconEditorTranslation();
   const businessSave = useVoiceSave();
   const saveRef = useRef({ onSave, businessSave });
   useLayoutEffect(() => {
@@ -255,7 +262,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const [defaultVoice, setDefaultVoice] = useState<{
     key: string;
     profile?: VoiceProfileV3;
-    error?: string;
+    error?: LexiconEditorMessage;
   }>();
   const defaultLoading = prepareDefault && defaultVoice?.key !== defaultKey;
   useEffect(() => {
@@ -305,14 +312,18 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           },
           error:
             usable.length < accents.length
-              ? "部分首位推荐已失效，请打开编辑器选择其他音色。"
+              ? createLexiconEditorMessage(
+                  "panel_some_first_choice_recommendations_are_unavailable_open_the_editor_to_select"
+                )
               : undefined
         });
       } catch {
         if (!controller.signal.aborted)
           setDefaultVoice({
             key: defaultKey,
-            error: "默认配音加载失败，可继续输入并打开编辑器选择音色。"
+            error: createLexiconEditorMessage(
+              "panel_default_voices_could_not_be_loaded_you_can_keep_typing_and_select_voices_in"
+            )
           });
       }
     })();
@@ -485,7 +496,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       if (persist && !(await persist())) {
         if (activeTarget.current !== target) return false;
         setSaveError(
-          "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。"
+          t(
+            "panel_saving_is_incomplete_all_changes_are_retained_resolve_validation_issues_or"
+          )
         );
         return false;
       }
@@ -500,7 +513,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       setSaveError(
         error instanceof Error
           ? error.message
-          : "保存失败，全部修改已保留，请重试"
+          : t("panel_saving_failed_all_changes_are_retained_try_again")
       );
       return false;
     } finally {
@@ -632,13 +645,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
               normalized.annotations.length <
               toRichTextV2(value).annotations.length
             )
-              void feedback.info("已规范化拼写并移除受影响的标注，可撤销恢复");
+              void feedback.info(
+                t(
+                  "panel_spelling_normalised_and_affected_annotations_removed_you_can_undo_this"
+                )
+              );
           }
         }
         setFocused(false);
         if (value.text.trim()) setRecorded(true);
       }}
-      aria-label={expanded ? `${ariaLabel}预览` : ariaLabel}
+      aria-label={expanded ? t("panel_preview", { p0: ariaLabel }) : ariaLabel}
       aria-invalid={invalid}
       status={invalid ? "error" : undefined}
       // 无连读时用自然高度；有连读时显式设置最小行数。
@@ -695,7 +712,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             : undefined
         );
         if (removed)
-          void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");
+          void feedback.info(
+            t(
+              "panel_links_or_annotations_affected_by_text_changes_were_removed_you_can_undo_thi"
+            )
+          );
       }}
       placeholder={placeholder}
       aria-busy={defaultLoading || undefined}
@@ -772,7 +793,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {collapsedField}
         {trailingAction}
         <Button
-          aria-label={`打开${ariaLabel}编辑器`}
+          aria-label={t("panel_open_editor", { p0: ariaLabel })}
           disabled={readOnly}
           icon={<PencilIcon />}
           onClick={() => {
@@ -810,11 +831,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             {showDone && (
               <Button
                 size="small"
-                aria-label={`取消${ariaLabel}编辑`}
+                aria-label={t("panel_cancel_editing", { p0: ariaLabel })}
                 disabled={doneLoading || saving}
                 onClick={cancelEditing}
               >
-                取消
+                {t("panel_cancel")}
               </Button>
             )}
             <Button
@@ -822,8 +843,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
               size="small"
               aria-label={
                 businessSave || onSave
-                  ? `保存${ariaLabel}修改`
-                  : `完成${ariaLabel}编辑`
+                  ? t("panel_save_changes", { p0: ariaLabel })
+                  : t("panel_complete_editing", { p0: ariaLabel })
               }
               loading={doneLoading || saving}
               disabled={doneDisabled || readOnly || !canComplete}
@@ -831,7 +852,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 if (prepareComplete()) void completeEditing(captureResult);
               }}
             >
-              {businessSave || onSave ? "保存修改" : "完成"}
+              {businessSave || onSave
+                ? t("panel_save_changes_2")
+                : t("panel_done")}
             </Button>
           </Space>
         )}
@@ -848,8 +871,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
         {feedbackHolder}
         {saveError && <Alert type="error" showIcon title={saveError} />}
-        {saving && <span role="status">正在保存修改…</span>}
-        {saved && <span role="status">修改已保存为草稿</span>}
+        {saving && <span role="status">{t("panel_saving_changes")}</span>}
+        {saved && (
+          <span role="status">{t("panel_changes_saved_as_a_draft")}</span>
+        )}
         <Suspense
           fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}
         >
@@ -940,15 +965,23 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   return (
     <>
       {fieldView}
-      {saved && !editing && <span role="status">修改已保存为草稿</span>}
-      {defaultLoading && <span role="status">正在加载默认配音…</span>}
+      {saved && !editing && (
+        <span role="status">{t("panel_changes_saved_as_a_draft")}</span>
+      )}
+      {defaultLoading && (
+        <span role="status">{t("panel_loading_default_voices")}</span>
+      )}
       {!editing && defaultVoice?.key === defaultKey && defaultVoice.error && (
-        <Alert type="warning" showIcon title={defaultVoice.error} />
+        <Alert
+          type="warning"
+          showIcon
+          title={lexiconEditorMessageText(defaultVoice.error, t)}
+        />
       )}
       {editing && (
         <VoiceEditorModal
           {...(area ? { width: 1200 } : {})}
-          title={editorTitle ?? `编辑${ariaLabel}`}
+          title={editorTitle ?? t("panel_edit_2", { p0: ariaLabel })}
           open={editing}
           footer={null}
           onCancel={cancelEditing}
