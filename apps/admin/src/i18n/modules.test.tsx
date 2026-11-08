@@ -1,3 +1,4 @@
+import { aiResources } from "@/features/ai-ledger/i18n";
 import { voiceResources } from "@/features/voices/i18n";
 import { userResources } from "@/features/users/i18n";
 import { accessResources } from "@/features/permissions/i18n";
@@ -33,7 +34,8 @@ it("按模块加载的资源保持键、插值及复数形式完整", () => {
     sentenceResources,
     userResources,
     accessResources,
-    voiceResources
+    voiceResources,
+    aiResources
   ];
   for (const resources of modules) {
     const base = Object.values(resources["zh-Hans"]!)[0]!;

@@ -1,3 +1,4 @@
+import { useAiTranslation, AiText } from "./i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button } from "@tsz/ui/admin/display";
 import { Form, Input, Select } from "@tsz/ui/admin/forms";
@@ -10,6 +11,7 @@ export function OpenCodeKeyForm({
   adminId: string;
   disabled?: boolean;
 }) {
+  const { t } = useAiTranslation();
   const client = useQueryClient();
   const [form] = Form.useForm<{ provider_id: string; api_key: string }>();
   const providerKey = ["opencode-providers", adminId];
@@ -44,13 +46,15 @@ export function OpenCodeKeyForm({
     >
       <Form.Item
         name="provider_id"
-        label="模型服务商"
-        rules={[{ required: true, message: "请选择服务商" }]}
+        label={t("provider")}
+        rules={[
+          { required: true, message: <AiText message="provider_required" /> }
+        ]}
       >
         <Select
           showSearch
           optionFilterProp="label"
-          placeholder="选择服务商"
+          placeholder={t("choose_provider")}
           loading={providers.isFetching}
           disabled={providers.isError || disabled || connect.isPending}
           options={providers.data?.providers.map((p) => ({
@@ -63,18 +67,20 @@ export function OpenCodeKeyForm({
         name="api_key"
         label="API Key"
         rules={[
-          { required: true, whitespace: true, message: "请输入 API Key" },
-          { max: 8192, message: "API Key 过长" }
+          {
+            required: true,
+            whitespace: true,
+            message: <AiText message="key_required" />
+          },
+          { max: 8192, message: <AiText message="key_too_long" /> }
         ]}
       >
         <Input.Password
           autoComplete="new-password"
-          placeholder="粘贴 API Key"
+          placeholder={t("paste_key")}
         />
       </Form.Item>
-      <p className="settings-model-note">
-        费用由服务商收取，保存后仍需选择模型。
-      </p>
+      <p className="settings-model-note">{t("key_cost_notice")}</p>
       <Button
         type="primary"
         htmlType="submit"
@@ -83,23 +89,25 @@ export function OpenCodeKeyForm({
           disabled || providers.isError || !providers.data?.providers.length
         }
       >
-        保存 API Key
+        {t("save_key")}
       </Button>
       {providers.isError && (
         <Alert
           type="error"
           showIcon
-          title="服务商读取失败"
+          title={t("provider_read_failed")}
           action={
-            <Button onClick={() => void providers.refetch()}>重试</Button>
+            <Button onClick={() => void providers.refetch()}>
+              {t("retry")}
+            </Button>
           }
         />
       )}
       {connect.isError && (
-        <Alert type="error" showIcon title="保存失败，请重新输入。" />
+        <Alert type="error" showIcon title={t("key_failed")} />
       )}
       {connect.isSuccess && (
-        <Alert type="success" showIcon title="API Key 已保存。" />
+        <Alert type="success" showIcon title={t("key_saved")} />
       )}
     </Form>
   );

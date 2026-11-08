@@ -1,3 +1,4 @@
+import { useAiTranslation, type AiTranslation } from "./i18n";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Tag, Flex, Typography } from "@tsz/ui/admin/display";
@@ -6,17 +7,19 @@ import { RadarIcon, RotateCwIcon } from "lucide-react";
 import type { OpenCodeModelSelection, OpenCodeModelProbe } from "@tsz/types";
 import { api } from "@/lib/auth";
 
-function probeLabel(model: OpenCodeModelProbe): string {
-  if (model.status === "available") return "可用";
-  if (model.status === "checking") return "测试中";
-  if (model.status === "unverified") return "未测试";
-  if (model.error === "timeout") return "测试超时";
+function probeLabel(model: OpenCodeModelProbe, t: AiTranslation): string {
+  if (model.status === "available") return t("available");
+  if (model.status === "checking") return t("checking");
+  if (model.status === "unverified") return t("unverified");
+  if (model.error === "timeout") return t("timeout");
   if (model.error === "disabled" || model.error === "not_configured")
-    return "未配置";
-  if (model.error === "interrupted") return "已中断";
-  if (model.error === "invalid_response") return "返回异常";
-  if (model.error === "runtime_failed") return "调用失败";
-  return model.http_status ? `不可用（HTTP ${model.http_status}）` : "不可用";
+    return t("not_configured");
+  if (model.error === "interrupted") return t("interrupted");
+  if (model.error === "invalid_response") return t("invalid_response");
+  if (model.error === "runtime_failed") return t("runtime_failed");
+  return model.http_status
+    ? t("http_unavailable", { status: model.http_status })
+    : t("unavailable");
 }
 
 const encode = (model: OpenCodeModelSelection) =>
@@ -36,6 +39,7 @@ const displayName = (model: OpenCodeModelProbe) =>
       : model.name;
 
 export function OpenCodeModels({ adminId }: { adminId: string }) {
+  const { t } = useAiTranslation();
   const client = useQueryClient();
   const [draft, setDraft] = useState<string>();
   const catalogKey = ["opencode-model-probes", adminId];
@@ -101,23 +105,26 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
     const [, providerId, modelId] = JSON.parse(selected) as string[];
     options.push({
       value: selected,
-      label: `${modelId}（${providerId}，不可用）`,
+      label: t("model_unavailable_option", {
+        model: modelId,
+        provider: providerId
+      }),
       searchLabel: `${modelId} ${providerId}`,
       disabled: true
     });
   }
   const currentName = current.isError
-    ? "读取失败"
+    ? t("read_failed")
     : current.data
       ? currentProbe
         ? displayName(currentProbe)
         : current.data.model_id
-      : "正在读取…";
+      : t("reading_ellipsis");
 
   return (
     <div className="settings-models">
-      <div role="region" aria-label="当前出题模型">
-        <div className="settings-model-note">当前使用</div>
+      <div role="region" aria-label={t("current_model")}>
+        <div className="settings-model-note">{t("current")}</div>
         <Flex align="center" gap={12} wrap style={{ marginTop: 8 }}>
           <Typography.Title
             level={4}
@@ -128,13 +135,13 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
           {current.data && <Tag>{sourceName(current.data)}</Tag>}
         </Flex>
       </div>
-      <p className="settings-model-note">仅影响新任务。</p>
+      <p className="settings-model-note">{t("new_tasks_only")}</p>
       <div className="settings-model-controls">
         <Select
-          aria-label="出题模型"
+          aria-label={t("question_model")}
           showSearch
           optionFilterProp="searchLabel"
-          placeholder="选择模型"
+          placeholder={t("choose_model")}
           options={options}
           value={selected}
           loading={catalog.isFetching || current.isFetching}
@@ -172,7 +179,7 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
             save.mutate({ source, provider_id, model_id });
           }}
         >
-          保存模型
+          {t("save_model")}
         </Button>
       </div>
       <Flex align="center" gap={8} wrap>
@@ -182,66 +189,67 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
           disabled={catalog.isError || !models.length || save.isPending}
           onClick={() => probe.mutate()}
         >
-          {running ? `测试中 ${passed + failed}/${models.length}` : "测试模型"}
+          {running
+            ? t("checking_progress", {
+                done: passed + failed,
+                total: models.length
+              })
+            : t("test_models")}
         </Button>
         <Button
           type="text"
           icon={<RotateCwIcon />}
-          aria-label="刷新模型"
+          aria-label={t("refresh_models")}
           loading={catalog.isFetching || current.isFetching}
           onClick={() => {
             void current.refetch();
             void catalog.refetch();
           }}
         >
-          刷新
+          {t("refresh")}
         </Button>
       </Flex>
-      <p className="settings-model-note">测试可能消耗服务商额度。</p>
+      <p className="settings-model-note">{t("test_cost_notice")}</p>
       {current.data?.source === "chatgpt" && (
         <Typography.Link
           href="https://chatgpt.com/settings/usage"
           target="_blank"
           rel="noopener noreferrer"
         >
-          管理 ChatGPT 用量
+          {t("chatgpt_usage")}
         </Typography.Link>
       )}
       {save.isSuccess && !current.isError && (
-        <Alert type="success" showIcon title="出题模型已保存。" />
+        <Alert type="success" showIcon title={t("model_saved")} />
       )}
       {save.isError && (
-        <Alert type="error" showIcon title="模型保存失败，请刷新后重试。" />
+        <Alert type="error" showIcon title={t("model_save_failed")} />
       )}
       {probe.isError && (
-        <Alert type="error" showIcon title="测试未能开始，请重试。" />
+        <Alert type="error" showIcon title={t("probe_failed")} />
       )}
       {current.isError && (
-        <Alert type="error" showIcon title="当前模型读取失败，请刷新。" />
+        <Alert type="error" showIcon title={t("current_failed")} />
       )}
       {catalog.isError && (
-        <Alert type="error" showIcon title="模型列表读取失败，请刷新。" />
+        <Alert type="error" showIcon title={t("catalog_failed")} />
       )}
       {catalog.data?.state === "idle" && catalog.data.batch_id && (
-        <Alert type="info" showIcon title="连接已变化，请重新测试。" />
+        <Alert type="info" showIcon title={t("connection_changed")} />
       )}
       {catalog.data?.state === "interrupted" && (
-        <Alert type="warning" showIcon title="测试已中断，请重试。" />
+        <Alert type="warning" showIcon title={t("probe_interrupted")} />
       )}
       {current.data &&
         catalog.isSuccess &&
         (!currentProbe?.enabled || currentProbe.status === "unavailable") && (
-          <Alert
-            type="warning"
-            showIcon
-            title="当前模型不可用，请重新测试或选择。"
-          />
+          <Alert type="warning" showIcon title={t("current_unavailable")} />
         )}
       {catalog.isSuccess && !models.length && (
-        <Alert type="info" showIcon title="没有可选模型，请刷新。" />
+        <Alert type="info" showIcon title={t("no_models")} />
       )}
       <details className="settings-model-details">
-        <summary>查看测试结果（{models.length}）</summary>
+        <summary>{t("probe_results", { count: models.length })}</summary>
         <div className="settings-model-results">
           {models.map((model) => (
             <div className="settings-model-result" key={encode(model)}>
@@ -260,7 +268,7 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
                       : undefined
                 }
               >
-                {probeLabel(model)}
+                {probeLabel(model, t)}
               </Tag>
             </div>
           ))}
