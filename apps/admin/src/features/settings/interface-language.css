@@ -1,0 +1,46 @@
+.admin-language {
+  min-width: 0;
+}
+.admin-language + .settings-row {
+  margin-top: 24px;
+}
+.admin-language__control {
+  width: 220px;
+  max-width: 100%;
+  min-width: 0;
+}
+.admin-language__control .ui-select {
+  width: 100%;
+}
+.admin-language__notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #667085;
+}
+.admin-language--compact {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.admin-language__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-language--compact .admin-language__control {
+  width: 190px;
+}
+@media (max-width: 480px) {
+  .admin-language--compact .admin-language__control {
+    width: 175px;
+  }
+}

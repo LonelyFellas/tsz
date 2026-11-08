@@ -1,3 +1,4 @@
+import { useAdminTranslation } from "@/i18n";
 import { ArrowRightIcon, CheckIcon, ChevronRightIcon } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -19,6 +20,7 @@ export function ConsoleNavigationPanel({
   selectedKey: string;
   onNavigate?: () => void;
 }) {
+  const { t } = useAdminTranslation();
   const headingId = useId();
   const currentGroup = items.find((item) =>
     item.children?.some((child) => child.key === selectedKey)
@@ -31,7 +33,10 @@ export function ConsoleNavigationPanel({
 
   return (
     <div className="console-navigation-browser">
-      <nav className="console-navigation-categories" aria-label="导航分类">
+      <nav
+        className="console-navigation-categories"
+        aria-label={t("nav_categories")}
+      >
         {items.map((item) =>
           item.children ? (
             <button
@@ -92,7 +97,7 @@ export function ConsoleNavigationPanel({
                 >
                   <span>{item.label}</span>
                   <span className="console-navigation-unavailable">
-                    暂未开放
+                    {t("nav_unavailable")}
                   </span>
                 </button>
               ) : (

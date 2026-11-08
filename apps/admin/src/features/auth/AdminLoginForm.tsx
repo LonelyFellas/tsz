@@ -1,10 +1,9 @@
-import {
-  HttpError,
-  InvalidAdminProfileResponseError,
-  ADMIN_PERMISSION_UPGRADE_MESSAGE
-} from "@tsz/api-client";
+import { HttpError, InvalidAdminProfileResponseError } from "@tsz/api-client";
 import { isCode, isPhone, readTestResourceRun } from "@tsz/shared";
-import { translateAuthError } from "@tsz/shared/auth";
+import { useAdminTranslation } from "@/i18n";
+import { adminAuthError } from "@/i18n/auth";
+import type { AdminShellKey } from "@/i18n/resources";
+import { InterfaceLanguage } from "@/features/settings/InterfaceLanguage";
 import { ArrowRightIcon } from "lucide-react";
 import { Alert, Button } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
@@ -12,13 +11,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
 import "./admin-login.css";
-
-const LOGIN_ERRORS: Record<string, string> = {
-  // 401：密码错 / 验证码错 / 查无此号逐字节一致（防枚举），前端统一文案不区分。
-  "invalid credentials": "账号、密码或验证码错误，请重新输入",
-  // 403：账号被禁用。
-  "account disabled": "该账号已被禁用，请联系超级管理员"
-};
 
 // redirect 参数来自 URL、用户可控。只接受站内绝对路径（单个 "/" 开头），拒绝
 // "//host"、"/\host"（浏览器会把 \ 规范化为 /，同样是协议相对 URL）、"https://host"
@@ -47,11 +39,14 @@ function safeRedirect(raw: string | null): string {
 export function AdminLoginForm({
   connectionNotice
 }: { connectionNotice?: ReactNode } = {}) {
+  const { t } = useAdminTranslation();
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<AdminShellKey | { cause: unknown } | "">(
+    ""
+  );
   // 验证码倒计时（发码后 60s 内禁止重发）与在途发码态。
   const [countdown, setCountdown] = useState(0);
   const [sending, setSending] = useState(false);
@@ -132,7 +127,7 @@ export function AdminLoginForm({
       setCountdown(60);
     } catch {
       // 发码失败（手机格式 400 / 基础设施 503）：提示重试，不进入倒计时（按钮仍可点）。
-      setError("验证码发送失败，请稍后重试");
+      setError("auth_code_failed");
     } finally {
       setSending(false);
     }
@@ -163,19 +158,18 @@ export function AdminLoginForm({
         tokens.setAccessToken(null);
         setError(
           profileError instanceof InvalidAdminProfileResponseError
-            ? profileError.message
-            : "登录成功但加载账号信息失败，请重试"
+            ? "auth_upgrade"
+            : "auth_profile_failed"
         );
       }
     } catch (e: unknown) {
       // 423 = 账号被临时锁定（连续失败触发）：区别于 401 凭证错，置灰按钮并提示 15 分钟后再试。
       if (e instanceof HttpError && e.status === 423) {
-        setError("账号已被锁定，请约 15 分钟后再试");
+        setError("auth_locked");
         setLocked(true);
         return;
       }
-      const msg = e instanceof Error ? e.message : "";
-      setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
+      setError({ cause: e });
     } finally {
       setLoading(false);
       inFlight.current = false;
@@ -215,6 +209,7 @@ export function AdminLoginForm({
           className="admin-login__panel"
           aria-labelledby="admin-login-heading"
         >
+          <InterfaceLanguage compact />
           <header className="admin-login__header">
             <span className="admin-login__mobile-brand">
               <span className="admin-login__mark" aria-hidden>
@@ -222,11 +217,11 @@ export function AdminLoginForm({
               </span>
               天生会背
             </span>
-            <span className="admin-login__platform">内容管理平台</span>
+            <span className="admin-login__platform">{t("login_platform")}</span>
           </header>
 
           <div className="admin-login__card">
-            <h1 id="admin-login-heading">管理员登录</h1>
+            <h1 id="admin-login-heading">{t("login_title")}</h1>
             {connectionNotice}
             <Form
               className="admin-login__form"
@@ -234,11 +229,11 @@ export function AdminLoginForm({
               requiredMark={false}
               onFinish={() => void handleLogin()}
             >
-              <Form.Item label="手机号" htmlFor="admin-login-phone">
+              <Form.Item label={t("login_phone")} htmlFor="admin-login-phone">
                 <Input
                   id="admin-login-phone"
                   size="large"
-                  placeholder="请输入手机号"
+                  placeholder={t("login_phone_placeholder")}
                   autoComplete="username"
                   inputMode="tel"
                   value={account}
@@ -246,11 +241,14 @@ export function AdminLoginForm({
                 />
               </Form.Item>
 
-              <Form.Item label="登录密码" htmlFor="admin-login-password">
+              <Form.Item
+                label={t("login_password")}
+                htmlFor="admin-login-password"
+              >
                 <Input.Password
                   id="admin-login-password"
                   size="large"
-                  placeholder="请输入密码"
+                  placeholder={t("login_password_placeholder")}
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => onPasswordChange(e.target.value)}
@@ -259,14 +257,14 @@ export function AdminLoginForm({
 
               <Form.Item
                 className="admin-login__code-item"
-                label="短信验证码"
+                label={t("login_code")}
                 htmlFor="admin-login-code"
               >
                 <div className="admin-login__code-control">
                   <Input
                     id="admin-login-code"
                     size="large"
-                    placeholder="请输入验证码"
+                    placeholder={t("login_code_placeholder")}
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     value={code}
@@ -280,10 +278,10 @@ export function AdminLoginForm({
                     disabled={!canSendCode}
                   >
                     {countdown > 0
-                      ? `${countdown}s 后重发`
+                      ? t("login_countdown", { seconds: countdown })
                       : sending
-                        ? "发送中..."
-                        : "获取验证码"}
+                        ? t("login_sending")
+                        : t("login_send_code")}
                   </Button>
                 </div>
               </Form.Item>
@@ -294,8 +292,12 @@ export function AdminLoginForm({
                   type="error"
                   title={
                     permissionModelIncompatible
-                      ? ADMIN_PERMISSION_UPGRADE_MESSAGE
-                      : error
+                      ? t("auth_upgrade")
+                      : typeof error === "string"
+                        ? error
+                          ? t(error)
+                          : ""
+                        : adminAuthError(error.cause, t, "auth_login_failed")
                   }
                   showIcon
                 />
@@ -315,10 +317,10 @@ export function AdminLoginForm({
                 disabled={!canSubmit}
               >
                 {loading ? (
-                  "登录中..."
+                  t("login_submitting")
                 ) : (
                   <>
-                    登录
+                    {t("login_submit")}
                     <ArrowRightIcon aria-hidden />
                   </>
                 )}

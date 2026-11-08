@@ -1,4 +1,5 @@
 import { Check, CircleAlert, Copy, Pencil } from "lucide-react";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import {
   useImperativeHandle,
   useLayoutEffect,
@@ -73,6 +74,7 @@ function TextBlock({
     ro.observe(el);
     return () => ro.disconnect();
   }, [onEllipsis, children, rows, separateActions, editing]);
+  const { t } = useInterfaceTranslation();
   const copied = copyState === "copied";
   const tip =
     typeof copyable === "object" && Array.isArray(copyable.tooltips)
@@ -80,12 +82,12 @@ function TextBlock({
       : undefined;
   const copyLabel =
     copyState === "failed"
-      ? "复制失败，点击重试"
+      ? t("actions.copyFailed")
       : typeof tip === "string"
         ? tip
         : copied
-          ? "已复制"
-          : "复制";
+          ? t("actions.copied")
+          : t("actions.copy");
   const finish = (commit: boolean) => {
     if (commit && editable) editable.onChange(draft.trim());
     setEditing(false);
@@ -114,7 +116,7 @@ function TextBlock({
     >
       {editing ? (
         <textarea
-          aria-label={(editable && editable.tooltip) || "编辑"}
+          aria-label={(editable && editable.tooltip) || t("actions.edit")}
           autoFocus
           maxLength={editable ? editable.maxLength : undefined}
           value={draft}
@@ -143,7 +145,7 @@ function TextBlock({
         <button
           className="ui-typography-edit ui-icon-action"
           type="button"
-          aria-label={editable.tooltip ?? "编辑"}
+          aria-label={editable.tooltip ?? t("actions.edit")}
           title={editable.tooltip}
           onClick={() => {
             setDraft(

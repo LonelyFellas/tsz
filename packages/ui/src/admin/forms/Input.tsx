@@ -10,6 +10,7 @@ import RcNumber, {
 } from "@rc-component/input-number";
 import { forwardRef, useRef, useState, type ReactNode } from "react";
 import { useFieldDisabled } from "./Form";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 export type { TextAreaRef } from "@rc-component/input";
 
 type Size = "small" | "middle" | "large";
@@ -34,15 +35,16 @@ function fieldClass(
     .filter(Boolean)
     .join(" ");
 }
-function clearControl(clear: RcInputProps["allowClear"]) {
+function clearControl(clear: RcInputProps["allowClear"], label: string) {
   return clear === true
-    ? { clearIcon: <span aria-label="清除">×</span> }
+    ? { clearIcon: <span aria-label={label}>×</span> }
     : clear;
 }
 const TextInput = forwardRef<InputRef, InputProps>(function TextInput(
   { disabled, size, status, variant, className, allowClear, ...props },
   ref
 ) {
+  const { t } = useInterfaceTranslation();
   return (
     <RcInput
       {...props}
@@ -50,7 +52,7 @@ const TextInput = forwardRef<InputRef, InputProps>(function TextInput(
       prefixCls="ui-input"
       className={fieldClass("ui-input", { size, status, variant }, className)}
       disabled={useFieldDisabled(disabled)}
-      allowClear={clearControl(allowClear)}
+      allowClear={clearControl(allowClear, t("actions.clear"))}
     />
   );
 });
@@ -61,6 +63,7 @@ const TextArea = forwardRef<
   { disabled, status, className, allowClear, ...props },
   ref
 ) {
+  const { t } = useInterfaceTranslation();
   return (
     <RcTextArea
       {...props}
@@ -69,11 +72,12 @@ const TextArea = forwardRef<
       className={fieldClass("ui-input", { status }, className)}
       classNames={{ textarea: "ui-input ui-input-textarea" }}
       disabled={useFieldDisabled(disabled)}
-      allowClear={clearControl(allowClear)}
+      allowClear={clearControl(allowClear, t("actions.clear"))}
     />
   );
 });
 function Password(props: InputProps) {
+  const { t } = useInterfaceTranslation();
   const [visible, setVisible] = useState(false);
   const disabled = useFieldDisabled(props.disabled);
   return (
@@ -85,7 +89,9 @@ function Password(props: InputProps) {
           className="ui-input-password-icon"
           type="button"
           disabled={disabled}
-          aria-label={visible ? "隐藏密码" : "显示密码"}
+          aria-label={t(
+            visible ? "controls.hidePassword" : "controls.showPassword"
+          )}
           aria-pressed={visible}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => setVisible(!visible)}
@@ -124,6 +130,7 @@ function Search({
   onChange,
   ...props
 }: SearchProps) {
+  const { t } = useInterfaceTranslation();
   const ref = useRef<InputRef>(null);
   const disabled = useFieldDisabled(providedDisabled);
   const search = () => {
@@ -156,7 +163,9 @@ function Search({
         aria-busy={loading || undefined}
         onClick={search}
       >
-        {enterButton === true || !enterButton ? "搜索" : enterButton}
+        {enterButton === true || !enterButton
+          ? t("controls.search")
+          : enterButton}
       </button>
     </span>
   );

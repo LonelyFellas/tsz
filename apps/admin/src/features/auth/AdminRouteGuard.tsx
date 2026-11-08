@@ -1,3 +1,4 @@
+import { useAdminTranslation } from "@/i18n";
 import { Spin, Typography } from "@tsz/ui/admin/display";
 import { useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -14,6 +15,7 @@ import { useAuthStore } from "@/lib/auth";
  * 由各页面自行按 super_admin 控制，不在门禁层处理。
  */
 export function AdminRouteGuard({ children }: { children: ReactNode }) {
+  const { t } = useAdminTranslation();
   const profile = useAuthStore((s) => s.profile);
   const hydrated = useAuthStore((s) => s.hydrated);
   const permissionModelIncompatible = useAuthStore(
@@ -37,7 +39,9 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
   if (permissionModelIncompatible) {
     return (
       <FullscreenCenter>
-        <Typography.Text type="danger">后台服务暂不可用</Typography.Text>
+        <Typography.Text type="danger">
+          {t("auth_service_unavailable")}
+        </Typography.Text>
       </FullscreenCenter>
     );
   }
@@ -45,7 +49,7 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
     return (
       <FullscreenCenter>
         <Spin size="small" />
-        <Typography.Text type="secondary">加载中...</Typography.Text>
+        <Typography.Text type="secondary">{t("loading")}</Typography.Text>
       </FullscreenCenter>
     );
   }

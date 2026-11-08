@@ -1,3 +1,4 @@
+import { useAdminTranslation } from "@/i18n";
 import { useEffect } from "react";
 import { isResourceError } from "@tsz/shared/recovery";
 import { Button, Result, Space, Typography } from "@tsz/ui/admin/display";
@@ -8,6 +9,7 @@ import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 // 会渲染最近的 errorElement（挂在根路由，见 router.tsx）。不做静默白屏，给出可读
 // 提示与「刷新重试」，避免整页 shell 消失后用户无路可走。
 export function RouteErrorPage() {
+  const { t } = useAdminTranslation();
   const error = useRouteError();
   const resourceError = isResourceError(error);
   useEffect(() => {
@@ -17,8 +19,8 @@ export function RouteErrorPage() {
   // 随之而来的是这里没有 ConfigProvider，需要就地补一个品牌主题，
   // 否则整页会退回 antd 默认蓝，与后台其余部分明显不同色。
   const message = resourceError
-    ? "页面资源加载失败，请检查网络或刷新重试。编辑备份可在原页面恢复。"
-    : "页面暂时无法显示，请刷新后重试。";
+    ? t("error_resource_help")
+    : t("error_page_help");
   // 便于截图/转述给运维定位；过长只截前 200 字符，避免撑破布局。
   const detail =
     error instanceof Error && error.message ? error.message.slice(0, 200) : "";
@@ -27,7 +29,9 @@ export function RouteErrorPage() {
     <FullscreenCenter>
       <Result
         status="error"
-        title={resourceError ? "页面资源加载失败" : "页面出错了"}
+        title={
+          resourceError ? t("error_resource_title") : t("error_page_title")
+        }
         subTitle={
           <>
             {message}
@@ -40,7 +44,8 @@ export function RouteErrorPage() {
                   wordBreak: "break-word"
                 }}
               >
-                错误信息：{detail}
+                {t("error_detail")}
+                {detail}
               </Typography.Paragraph>
             )}
           </>
@@ -48,11 +53,11 @@ export function RouteErrorPage() {
         extra={
           <Space wrap size={12}>
             <Button type="primary" onClick={() => window.location.reload()}>
-              刷新重试
+              {t("error_reload")}
             </Button>
             {/* 整页跳转：出错后 router 状态可能已不可靠，走新的入口更稳。 */}
             <Button onClick={() => window.location.assign("/")}>
-              返回首页
+              {t("error_home")}
             </Button>
           </Space>
         }

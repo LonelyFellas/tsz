@@ -54,6 +54,71 @@ function fixture() {
 }
 
 describe("账号界面偏好", () => {
+  it("访客选择独立持久化，不调用私有 API 或复制到登录账号", async () => {
+    const f = fixture();
+    f.session(null, 1);
+    await f.controller.refresh();
+    await f.controller.saveGuest("en-US");
+    await f.controller.refresh();
+    expect(f.controller.getSnapshot().locale).toBe("en-US");
+    expect(f.options.read).not.toHaveBeenCalled();
+    expect(f.options.write).not.toHaveBeenCalled();
+    expect(f.values.get(interfaceLocaleStorageKey("web", "guest"))).toBe(
+      "en-US"
+    );
+    f.session("a", 2);
+    await f.controller.refresh();
+    expect(f.controller.getSnapshot().locale).toBe("zh-Hans");
+    await expect(f.controller.saveGuest("en-US")).rejects.toThrow();
+    await f.controller.save("en-US");
+    f.session(null, 3);
+    await f.controller.refresh();
+    await f.controller.saveGuest(null);
+    expect(f.controller.getSnapshot().locale).toBe("zh-Hans");
+    expect(f.values.get(interfaceLocaleStorageKey("web", "a"))).toBe("en-US");
+    expect(f.values.has(interfaceLocaleStorageKey("web", "guest"))).toBe(false);
+  });
+
+  it("访客存储不可用时在本次页面内保留选择，清除后不复用旧缓存", async () => {
+    const f = fixture();
+    f.session(null, 1);
+    f.values.set(interfaceLocaleStorageKey("web", "guest"), "en-US");
+    f.options.getStorage = () => {
+      throw new Error("storage disabled");
+    };
+    const controller = createInterfacePreferences(f.options);
+    await controller.refresh();
+    await controller.saveGuest("en-US");
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("en-US");
+    await controller.saveGuest(null);
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("zh-Hans");
+    expect(f.options.write).not.toHaveBeenCalled();
+  });
+
+  it("重新核对目录时保留当前语言并禁写；收缩后回退但不改写已存偏好", async () => {
+    const f = fixture();
+    f.options.read.mockResolvedValue("en-US");
+    await f.controller.refresh();
+    const response = deferred<InterfaceCapabilities>();
+    f.options.capabilities.mockImplementationOnce(() => response.promise);
+    const refreshing = f.controller.refresh();
+    expect(f.controller.getSnapshot()).toMatchObject({
+      locale: "en-US",
+      refreshing: true
+    });
+    await expect(f.controller.save(null)).rejects.toThrow();
+    response.resolve({ ...directory, supported_locales: ["zh-Hans"] });
+    await refreshing;
+    expect(f.controller.getSnapshot()).toMatchObject({
+      locale: "zh-Hans",
+      preference: "en-US",
+      refreshing: false
+    });
+    expect(f.options.write).not.toHaveBeenCalled();
+  });
+
   it("保存尚未发出就换号时，不得使用新账号会话执行旧账号操作", async () => {
     const f = fixture();
     await f.controller.refresh();

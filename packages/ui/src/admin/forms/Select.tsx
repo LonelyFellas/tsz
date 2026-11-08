@@ -14,6 +14,7 @@ import {
   type ReactNode
 } from "react";
 import { useFieldDisabled } from "./Form";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 
 type MenuParts<T> = Partial<
   Record<
@@ -57,6 +58,7 @@ export function Select<
   allowClear,
   ...props
 }: SelectProps<V, O>) {
+  const { t } = useInterfaceTranslation();
   const prefix = "ui-select";
   const { root: rootStyle, popup: popupStyles, ...parts } = styles ?? {};
   const { root: rootClass, popup: popupClasses, ...classes } = classNames ?? {};
@@ -90,9 +92,11 @@ export function Select<
           ? { clearIcon: <X size="1em" aria-hidden="true" /> }
           : allowClear
       }
-      removeIcon={<X size="1em" aria-label="移除" />}
+      removeIcon={<X size="1em" aria-label={t("actions.remove")} />}
       notFoundContent={
-        props.notFoundContent === undefined ? "暂无数据" : props.notFoundContent
+        props.notFoundContent === undefined
+          ? t("status.noData")
+          : props.notFoundContent
       }
       onPopupVisibleChange={onOpenChange}
       popupClassName={popupClasses?.root}
@@ -125,13 +129,14 @@ function Panel<O extends CascadeOption = CascadeOption>({
   disabled,
   ...props
 }: PanelProps<O>) {
+  const { t } = useInterfaceTranslation();
   return (
     <RcCascader.Panel<O>
       {...props}
       prefixCls="ui-cascader"
       disabled={useFieldDisabled(disabled)}
       expandIcon={<span aria-hidden="true">›</span>}
-      loadingIcon={<span aria-label="加载中">…</span>}
+      loadingIcon={<span aria-label={t("status.loading")}>…</span>}
     />
   );
 }
