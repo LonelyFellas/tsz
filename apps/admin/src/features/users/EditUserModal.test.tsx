@@ -1,3 +1,6 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
+import { act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
@@ -125,4 +128,64 @@ describe("EditUserModal", () => {
     expect(screen.queryByText("编辑用户")).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue("Frank")).not.toBeInTheDocument();
   });
+});
+
+it("校验和已知失败随四语更新，保留输入与在途保存的原 ID/snake_case payload", async () => {
+  let reject!: (error: unknown) => void;
+  mockUpdate.mockImplementationOnce(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      })
+  );
+  const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    }),
+    closed = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <FeedbackApp>
+          <EditUserModal user={user} onClose={closed} />
+        </FeedbackApp>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = await screen.findByDisplayValue("Frank");
+  fireEvent.change(input, { target: { value: "<bad>" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await screen.findByText("昵称不能包含 < > 或控制字符");
+  for (const locale of ["zh-Hant", "en-GB", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(input).toHaveValue("<bad>");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  }
+  expect(
+    screen.getByText("Display names cannot contain < > or control characters")
+  ).toBeVisible();
+  fireEvent.change(input, { target: { value: "  原始昵称 centre  " } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(mockUpdate).toHaveBeenCalledExactlyOnceWith("u7", {
+      display_name: "原始昵称 centre"
+    })
+  );
+  view.rerender(content("zh-Hant"));
+  expect(input).toHaveValue("  原始昵称 centre  ");
+  expect(closed).not.toHaveBeenCalled();
+  await act(async () =>
+    reject(new HttpError(400, "raw name issue", [], "invalid_display_name"))
+  );
+  expect(
+    await screen.findByText("暱稱需為 1–50 個字元，且不能包含 < > 或控制字元")
+  ).toBeVisible();
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByText(
+      "Display names must contain 1–50 characters and cannot contain < > or control characters"
+    )
+  ).toBeVisible();
+  expect(input).toHaveValue("  原始昵称 centre  ");
+  expect(mockUpdate).toHaveBeenCalledTimes(1);
 });

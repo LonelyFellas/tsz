@@ -1,3 +1,4 @@
+import { useUserTranslation } from "./i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useEffect, useState } from "react";
@@ -17,6 +18,7 @@ import { HttpError } from "@tsz/api-client";
 import { api, usePermission } from "@/lib/auth";
 
 export function UserRegistrationRegion({ userId }: { userId: string }) {
+  const { t } = useUserTranslation();
   const query = useQuery({
     queryKey: ["admin-users", "registration-region", userId],
     staleTime: 0,
@@ -26,12 +28,12 @@ export function UserRegistrationRegion({ userId }: { userId: string }) {
   });
   if (query.isError)
     return query.error instanceof HttpError && query.error.status === 403 ? (
-      <span>无权限</span>
+      <span>{t("no_permission")}</span>
     ) : (
       <Space size={8}>
-        <span>加载失败</span>
+        <span>{t("resource_failed")}</span>
         <Button size="small" onClick={() => void query.refetch()}>
-          重试
+          {t("retry")}
         </Button>
       </Space>
     );
@@ -39,8 +41,8 @@ export function UserRegistrationRegion({ userId }: { userId: string }) {
   return query.data.status === "resolved"
     ? query.data.city
     : query.data.status === "not_recorded"
-      ? "未记录"
-      : "未知";
+      ? t("not_recorded")
+      : t("unknown");
 }
 
 function IdentityImage({
@@ -50,6 +52,7 @@ function IdentityImage({
   userId: string;
   file: CertificationFile;
 }) {
+  const { t } = useUserTranslation();
   const [image, setImage] = useState<{ url?: string; failed?: boolean }>();
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -70,7 +73,7 @@ function IdentityImage({
       if (url) URL.revokeObjectURL(url);
     };
   }, [userId, file.id, attempt]);
-  const label = file.kind === "id_front" ? "身份证人像面" : "身份证国徽面";
+  const label = file.kind === "id_front" ? t("id_front") : t("id_back");
   return (
     <div>
       {label}
@@ -78,7 +81,9 @@ function IdentityImage({
         {image?.url ? (
           <Image src={image.url} alt={label} width={180} />
         ) : image?.failed ? (
-          <Button onClick={() => setAttempt(attempt + 1)}>重新读取</Button>
+          <Button onClick={() => setAttempt(attempt + 1)}>
+            {t("reload_image")}
+          </Button>
         ) : (
           <Spin />
         )}
@@ -88,6 +93,7 @@ function IdentityImage({
 }
 
 function Wallet({ userId }: { userId: string }) {
+  const { t } = useUserTranslation();
   const query = useQuery({
     queryKey: ["admin-users", "wallet", userId],
     staleTime: 0,
@@ -98,14 +104,26 @@ function Wallet({ userId }: { userId: string }) {
     return (
       <Alert
         type="error"
-        title="余额加载失败"
-        action={<Button onClick={() => void query.refetch()}>重试</Button>}
+        title={t("balance_failed")}
+        action={
+          <Button onClick={() => void query.refetch()}>{t("retry")}</Button>
+        }
       />
     );
-  return query.isPending ? <Spin /> : <span>{query.data.balance} 天生币</span>;
+  return query.isPending ? (
+    <Spin />
+  ) : (
+    <span>
+      {t("coin_balance", {
+        balance: query.data.balance,
+        count: query.data.balance === "1" ? 1 : 2
+      })}
+    </span>
+  );
 }
 
 function Entries({ userId }: { userId: string }) {
+  const { t } = useUserTranslation();
   const canBalance = usePermission("users.read_coin_balance");
   const [page, setPage] = useState(1);
   const [snapshot, setSnapshot] = useState<string>();
@@ -117,26 +135,30 @@ function Entries({ userId }: { userId: string }) {
     return (
       <Alert
         type="error"
-        title="账单加载失败"
-        action={<Button onClick={() => void query.refetch()}>重试</Button>}
+        title={t("bills_failed")}
+        action={
+          <Button onClick={() => void query.refetch()}>{t("retry")}</Button>
+        }
       />
     );
   return (
     <Table
       tableId="user-coin-bills"
-      locale={{ emptyText: <TableEmptyState message="暂无账单记录" /> }}
+      locale={{ emptyText: <TableEmptyState message={t("bills_empty")} /> }}
       rowKey="id"
       size="small"
       loading={query.isPending}
       dataSource={query.data?.items ?? []}
       columns={[
         {
-          title: "时间",
+          title: t("time"),
           dataIndex: "created_at",
           render: (value: string) => dayjs(value).format("YYYY-MM-DD HH:mm")
         },
-        { title: "收支", dataIndex: "delta" },
-        ...(canBalance ? [{ title: "余额", dataIndex: "balance_after" }] : [])
+        { title: t("delta"), dataIndex: "delta" },
+        ...(canBalance
+          ? [{ title: t("balance"), dataIndex: "balance_after" }]
+          : [])
       ]}
       pagination={{
         current: page,
@@ -153,6 +175,7 @@ function Entries({ userId }: { userId: string }) {
 }
 
 function IdentityDocuments({ userId }: { userId: string }) {
+  const { t } = useUserTranslation();
   const query = useQuery({
     queryKey: ["admin-users", "identity", userId],
     staleTime: 0,
@@ -163,8 +186,10 @@ function IdentityDocuments({ userId }: { userId: string }) {
     return (
       <Alert
         type="error"
-        title="身份证件加载失败"
-        action={<Button onClick={() => void query.refetch()}>重试</Button>}
+        title={t("identity_failed")}
+        action={
+          <Button onClick={() => void query.refetch()}>{t("retry")}</Button>
+        }
       />
     );
   if (query.isPending) return <Spin />;
@@ -175,11 +200,12 @@ function IdentityDocuments({ userId }: { userId: string }) {
       ))}
     </Space>
   ) : (
-    <Empty description="暂无已提交的身份证件" />
+    <Empty description={t("identity_empty")} />
   );
 }
 
 export function UserResources({ userId }: { userId: string }) {
+  const { t } = useUserTranslation();
   const balance = usePermission("users.read_coin_balance");
   const entries = usePermission("users.read_coin_entries");
   const identity = usePermission("users.read_identity");
@@ -187,19 +213,22 @@ export function UserResources({ userId }: { userId: string }) {
   const resources = [
     {
       key: "balance",
-      title: "天生币余额",
+      title: t("wallet_title"),
+      viewLabel: t("view_wallet"),
       allowed: balance,
       content: <Wallet userId={userId} />
     },
     {
       key: "entries",
-      title: "天生币账单",
+      title: t("bills_title"),
+      viewLabel: t("view_bills"),
       allowed: entries,
       content: <Entries userId={userId} />
     },
     {
       key: "identity",
-      title: "身份证件",
+      title: t("identity_title"),
+      viewLabel: t("view_identity"),
       allowed: identity,
       content: <IdentityDocuments userId={userId} />
     }
@@ -214,7 +243,7 @@ export function UserResources({ userId }: { userId: string }) {
               r.content
             ) : (
               <Button onClick={() => setOpened([...opened, r.key])}>
-                查看{r.title}
+                {r.viewLabel}
               </Button>
             )}
           </Card>

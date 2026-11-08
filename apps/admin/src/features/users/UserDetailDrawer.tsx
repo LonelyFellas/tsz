@@ -1,3 +1,4 @@
+import { useUserTranslation } from "./i18n";
 // 详情资料按权限展示；余额、账单、证件分别按需请求。
 import { Avatar, Badge, Descriptions, Space, Tag } from "@tsz/ui/admin/display";
 import { Drawer } from "@tsz/ui/admin/overlays";
@@ -8,7 +9,7 @@ import { UserRegistrationRegion, UserResources } from "./UserResources";
 import { CopyableText } from "@/components/CopyableText";
 import { usePermission } from "@/lib/auth";
 import { RevokeTeacherButton } from "@/features/teacher-certification/RevokeTeacherButton";
-import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
+import { roleLabel, ROLE_TAG_COLOR, levelColor } from "./labels";
 
 interface Props {
   user: AdminUser | null;
@@ -20,6 +21,7 @@ function fmt(t?: string): string {
 }
 
 export function UserDetailDrawer({ user, onClose }: Props) {
+  const { t } = useUserTranslation();
   const canReadBasic = usePermission("users.read_basic");
   const canRevoke = usePermission("teacherapply.revoke");
   const canReadSensitive = usePermission("users.read_sensitive");
@@ -32,17 +34,17 @@ export function UserDetailDrawer({ user, onClose }: Props) {
           ? [
               {
                 key: "id",
-                label: "用户 ID",
+                label: t("user_id_spaced"),
                 children: <CopyableText value={user.id} />
               },
               {
                 key: "roles",
-                label: "分类",
+                label: t("roles"),
                 children: (
                   <Space size={[4, 4]} wrap>
                     {(user.roles ?? []).map((r) => (
                       <Tag key={r} color={ROLE_TAG_COLOR[r]}>
-                        {ROLE_LABEL[r]}
+                        {roleLabel(r, t)}
                       </Tag>
                     ))}
                   </Space>
@@ -50,73 +52,75 @@ export function UserDetailDrawer({ user, onClose }: Props) {
               },
               {
                 key: "teacher",
-                label: "教师认证",
+                label: t("teacher_certification"),
                 children: (
                   <Tag color={user.teacher_verified ? "success" : "default"}>
-                    {user.teacher_verified ? "已认证" : "未认证"}
+                    {user.teacher_verified ? t("verified") : t("unverified")}
                   </Tag>
                 )
               },
               {
                 key: "level",
-                label: "学生等级",
+                label: t("level"),
                 children: user.learning_settings ? (
                   <Tag color={levelColor(user.learning_settings.cefr_level)}>
                     {user.learning_settings.cefr_level}
                   </Tag>
                 ) : (
-                  "未设置"
+                  t("not_set")
                 )
               },
               {
                 key: "english-variant",
-                label: "英美式偏好",
+                label: t("variant"),
                 children: user.learning_settings
                   ? user.learning_settings.english_variant === "BrE"
-                    ? "英式"
-                    : "美式"
-                  : "未设置"
+                    ? t("british")
+                    : t("american")
+                  : t("not_set")
               }
             ]
           : []),
         {
           key: "phone",
-          label: "绑定电话",
+          label: t("phone"),
           children: canReadSensitive ? (
             <CopyableText value={user.phone} />
           ) : (
-            "未授权"
+            t("unauthorized")
           )
         },
         {
           key: "email",
-          label: "绑定邮箱",
+          label: t("email"),
           children: canReadSensitive ? (
             <CopyableText value={user.email} />
           ) : (
-            "未授权"
+            t("unauthorized")
           )
         },
         ...(canReadBasic
           ? [
               {
                 key: "status",
-                label: "状态",
+                label: t("status"),
                 children: (
                   <Badge
                     status={user.status === "active" ? "success" : "default"}
-                    text={user.status === "active" ? "正常" : "已禁用"}
+                    text={
+                      user.status === "active" ? t("active") : t("disabled")
+                    }
                   />
                 )
               }
             ]
           : []),
-        { key: "created", label: "注册时间", children: fmt(user.created_at) },
+        { key: "created", label: t("created"), children: fmt(user.created_at) },
         ...(canReadRegistrationRegion
           ? [
               {
                 key: "registration-region",
-                label: "注册地区",
+                label: t("region"),
                 children: (
                   <UserRegistrationRegion key={user.id} userId={user.id} />
                 )
@@ -127,7 +131,7 @@ export function UserDetailDrawer({ user, onClose }: Props) {
           ? [
               {
                 key: "updated",
-                label: "更新时间",
+                label: t("updated"),
                 children: fmt(user.updated_at)
               }
             ]

@@ -14,16 +14,13 @@ interface Props {
   placeholder?: string;
 }
 
-// 复制按钮的悬浮提示（复制前 / 复制后），集中一处避免各调用点各写一遍。
-const COPY_TOOLTIPS: [string, string] = ["复制", "已复制"];
-
 export function CopyableText({ value, ellipsis, placeholder = "-" }: Props) {
   if (!value) return <>{placeholder}</>;
   const maxWidth = typeof ellipsis === "number" ? ellipsis : undefined;
   return (
     <Typography.Text
       ellipsis={ellipsis ? { tooltip: value } : undefined}
-      copyable={{ text: value, tooltips: COPY_TOOLTIPS }}
+      copyable={{ text: value }}
       style={maxWidth ? { maxWidth } : undefined}
     >
       {value}
