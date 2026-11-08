@@ -241,7 +241,8 @@ describe("SubPartOfSpeechPanel", () => {
         }
       })
     );
-    expect(callbacks.onSaved).toHaveBeenCalledWith("细分词性已新增");
+    render(<>{callbacks.onSaved.mock.calls[0]![0]}</>);
+    expect(screen.getByText("细分词性已新增")).toBeVisible();
   });
 
   it("HTTP 环境缺少 randomUUID 时仍能创建细分词性", async () => {
@@ -358,7 +359,8 @@ describe("SubPartOfSpeechPanel", () => {
         base_revision: 1
       })
     );
-    expect(callbacks.onSaved).toHaveBeenCalledWith("细分词性已删除");
+    render(<>{callbacks.onSaved.mock.calls[0]![0]}</>);
+    expect(screen.getByText("细分词性已删除")).toBeVisible();
   });
 
   it("删除竞态失败时上报错误并刷新引用计数", async () => {

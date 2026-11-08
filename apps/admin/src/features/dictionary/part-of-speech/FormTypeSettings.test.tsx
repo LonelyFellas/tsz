@@ -388,3 +388,79 @@ it("旧服务没有开关字段时禁用设置，保存不发送不受支持的�
   await waitFor(() => expect(mock.update).toHaveBeenCalledTimes(1));
   expect(mock.update.mock.calls[0]![1]).not.toHaveProperty("is_default");
 });
+
+it("四语切换保留词形草稿、默认模板、归属与 revision，在途保存不重发", async () => {
+  const { InterfaceI18nProvider } = await import("@tsz/shared/i18n/react");
+  mock.items.push({
+    ...base,
+    id: "rare-id",
+    code: "raw_rare",
+    part_of_speech_id: "pos-verb",
+    name_zh: "原文词形",
+    revision: 4
+  });
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity },
+      mutations: { retry: false }
+    }
+  });
+  let finish!: () => void;
+  mock.update.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = () => resolve({ ...mock.items[1], revision: 5 });
+      })
+  );
+  const content = (locale: import("@tsz/shared/i18n").InterfaceLocale) => (
+    <QueryClientProvider client={client}>
+      <InterfaceI18nProvider locale={locale}>
+        <FeedbackApp>
+          <FormTypeSettings />
+        </FeedbackApp>
+      </InterfaceI18nProvider>
+    </QueryClientProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const dialog = await openFormType("原文词形");
+  const input = within(dialog).getByLabelText("正式中文");
+  fireEvent.change(input, { target: { value: "原文修改" } });
+  fireEvent.click(within(dialog).getByLabelText("默认模版"));
+  input.focus();
+  const reads = mock.list.mock.calls.length;
+  for (const locale of ["en-GB", "zh-Hant", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(
+      within(dialog).getByLabelText(
+        locale.startsWith("en") ? "Chinese name" : "正式中文"
+      )
+    ).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("原文修改");
+    expect(
+      within(dialog).getByLabelText(
+        locale.startsWith("en") ? "Default template" : "預設範本"
+      )
+    ).not.toBeChecked();
+    expect(mock.list).toHaveBeenCalledTimes(reads);
+    expect(mock.update).not.toHaveBeenCalled();
+  }
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(mock.update).toHaveBeenCalledWith(
+      "rare-id",
+      expect.objectContaining({
+        base_revision: 4,
+        part_of_speech_id: "pos-verb",
+        name_zh: "原文修改",
+        is_default: false
+      })
+    )
+  );
+  view.rerender(content("zh-Hant"));
+  expect(within(dialog).getByLabelText("正式中文")).toBe(input);
+  expect(within(dialog).getByLabelText("預設範本")).toBeDisabled();
+  expect(mock.update).toHaveBeenCalledTimes(1);
+  finish();
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+});

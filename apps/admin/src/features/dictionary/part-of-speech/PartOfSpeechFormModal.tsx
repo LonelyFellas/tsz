@@ -1,3 +1,4 @@
+import { useContentTranslation } from "@/features/content/i18n";
 import { usePermission } from "@/lib/auth";
 import { Form } from "@tsz/ui/admin/forms";
 import { Modal } from "@tsz/ui/admin/overlays";
@@ -57,14 +58,6 @@ export function derivePartOfSpeechCode(
 // 稳定编码不暴露给用户，由英文全称派生；kind 由所在分页决定；序号是表单字段。
 type PartFormValues = Omit<CreatePartOfSpeechInput, "code" | "kind">;
 
-const PLACEHOLDERS = {
-  name_zh: "例如 名词",
-  short_name_zh: "例如 名词",
-  name_en: "例如 NOUN",
-  abbreviation: "例如 n.",
-  full_name_en: "例如 noun"
-};
-
 export function PartOfSpeechFormModal({
   open,
   value,
@@ -74,6 +67,7 @@ export function PartOfSpeechFormModal({
   onSaved,
   onError
 }: Props) {
+  const { t } = useContentTranslation();
   const canEdit = usePermission("lexicon_settings.edit_basic");
   const [form] = Form.useForm<PartFormValues>();
   const create = useCreatePartOfSpeech();
@@ -128,9 +122,17 @@ export function PartOfSpeechFormModal({
     <Modal
       open={open}
       width={720}
-      title={`${value ? "修改" : "新增"}${kind === "phrase" ? "短语" : "单词"}基本词性`}
-      okText={value ? "保 存" : "新 建"}
-      cancelText="取 消"
+      title={t(
+        value
+          ? kind === "phrase"
+            ? "edit_phrase_part"
+            : "edit_word_part"
+          : kind === "phrase"
+            ? "add_phrase_part"
+            : "add_word_part"
+      )}
+      okText={value ? t("save_spaced") : t("create_spaced")}
+      cancelText={t("cancel_spaced")}
       okButtonProps={{ disabled: !canEdit }}
       confirmLoading={pending}
       onOk={() => form.submit()}
@@ -138,7 +140,15 @@ export function PartOfSpeechFormModal({
       destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={submit}>
-        <PartOfSpeechSharedFields placeholders={PLACEHOLDERS} />
+        <PartOfSpeechSharedFields
+          placeholders={{
+            name_zh: t("example_noun_zh"),
+            short_name_zh: t("example_noun_zh"),
+            name_en: t("example_noun_name"),
+            abbreviation: t("example_n_abbr"),
+            full_name_en: t("example_noun_full")
+          }}
+        />
       </Form>
     </Modal>
   );

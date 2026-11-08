@@ -377,3 +377,68 @@ describe("derivePartOfSpeechCode", () => {
     );
   });
 });
+
+it("切换语言保留目录原文、输入焦点和已展示校验，不重置表单或改变派生编码", async () => {
+  const { InterfaceI18nProvider } = await import("@tsz/shared/i18n/react");
+  const props = {
+    open: true,
+    kind: "word" as const,
+    onClose: vi.fn(),
+    onSaved: vi.fn(),
+    onError: vi.fn()
+  };
+  const content = (locale: import("@tsz/shared/i18n").InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <PartOfSpeechFormModal {...props} />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(screen.getByText("新 建"));
+  await screen.findByText("请输入中文名称");
+  const input = screen.getByLabelText("正式中文");
+  fireEvent.change(input, { target: { value: "原文 名词" } });
+  fireEvent.change(screen.getByLabelText("正式英文"), {
+    target: { value: "USER NOUN" }
+  });
+  fireEvent.change(screen.getByLabelText("简洁显示"), {
+    target: { value: "原文" }
+  });
+  fireEvent.change(screen.getByLabelText("英文缩写"), {
+    target: { value: "un." }
+  });
+  input.focus();
+  for (const locale of ["en-GB", "zh-Hant", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(
+      screen.getByLabelText(
+        locale.startsWith("en") ? "Chinese name" : "正式中文"
+      )
+    ).toBe(input);
+    expect(input).toHaveValue("原文 名词");
+    expect(input).toHaveFocus();
+    expect(
+      screen.getByText(
+        locale.startsWith("en")
+          ? "Enter the full English name"
+          : "請輸入英文全稱"
+      )
+    ).toBeVisible();
+    expect(api.create).not.toHaveBeenCalled();
+  }
+  fireEvent.change(screen.getByLabelText("Full English name"), {
+    target: { value: "original content" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Create" }));
+  await waitFor(() =>
+    expect(api.create).toHaveBeenCalledWith({
+      kind: "word",
+      code: "original_content",
+      name_zh: "原文 名词",
+      name_en: "USER NOUN",
+      short_name_zh: "原文",
+      abbreviation: "un.",
+      full_name_en: "original content",
+      sort_order: 100
+    })
+  );
+});

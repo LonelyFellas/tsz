@@ -1,3 +1,4 @@
+import { useContentTranslation, ContentText } from "@/features/content/i18n";
 import {
   AdminTable as Table,
   AdminTableToolbar
@@ -54,7 +55,7 @@ interface Props {
   loading?: boolean;
   filtered?: boolean;
   onResetFilters?: () => void;
-  onSaved: (message: string) => void;
+  onSaved: (message: ReactNode) => void;
   onError: (error: unknown) => void;
   ref?: Ref<SubPartOfSpeechPanelHandle>;
 }
@@ -62,14 +63,6 @@ interface Props {
 type SubPartFormValues = Omit<CreateSubPartOfSpeechInput, "code"> & {
   /** 所属基本词性；固定父级或修改时由弹窗回填并锁定，「全部」视图下新建时由用户选择。 */
   part_of_speech_id: string;
-};
-
-const PLACEHOLDERS = {
-  name_zh: "例如 可数名词",
-  short_name_zh: "例如 可数名词",
-  name_en: "例如 Countable noun",
-  abbreviation: "例如 n.",
-  full_name_en: "例如 countable noun"
 };
 
 function SubPartFormModal({
@@ -90,10 +83,19 @@ function SubPartFormModal({
   nextSortOrderFor: (parentId: string) => number;
   open: boolean;
   onClose: () => void;
-  onSaved: (message: string) => void;
+  onSaved: (message: ReactNode) => void;
   onError: (error: unknown) => void;
 }) {
+  const { t } = useContentTranslation();
   const canEdit = usePermission("lexicon_settings.edit_sub");
+  const PLACEHOLDERS = {
+    name_zh: t("example_countable_zh"),
+    short_name_zh: t("example_countable_zh"),
+    name_en: t("example_countable_name"),
+    abbreviation: t("example_n_abbr"),
+    full_name_en: t("example_countable_full")
+  };
+
   const [form] = Form.useForm<SubPartFormValues>();
   const create = useCreateSubPartOfSpeech();
   const update = useUpdateSubPartOfSpeech();
@@ -147,7 +149,13 @@ function SubPartFormModal({
           }
         });
       }
-      onSaved(value ? "细分词性已更新" : "细分词性已新增");
+      onSaved(
+        value ? (
+          <ContentText message="sub_updated" />
+        ) : (
+          <ContentText message="sub_added" />
+        )
+      );
       onClose();
     } catch (error) {
       onError(error);
@@ -160,13 +168,13 @@ function SubPartFormModal({
       width={720}
       title={
         value
-          ? "修改细分词性"
+          ? t("edit_sub")
           : parent
-            ? `为“${parent.name_zh}”新增细分词性`
-            : "新增细分词性"
+            ? t("add_sub_to", { name: parent.name_zh })
+            : t("add_sub")
       }
-      okText={value ? "保 存" : "新 建"}
-      cancelText="取 消"
+      okText={value ? t("save_spaced") : t("create_spaced")}
+      cancelText={t("cancel_spaced")}
       okButtonProps={{ disabled: !canEdit }}
       confirmLoading={create.isPending || update.isPending}
       onOk={() => form.submit()}
@@ -178,17 +186,22 @@ function SubPartFormModal({
           <Col span={12}>
             <Form.Item
               name="part_of_speech_id"
-              label="所属基本词性"
-              rules={[{ required: true, message: "请选择所属基本词性" }]}
+              label={t("parent_part")}
+              rules={[
+                {
+                  required: true,
+                  message: <ContentText message="select_parent" />
+                }
+              ]}
             >
               <Select
-                aria-label="所属基本词性"
+                aria-label={t("parent_part")}
                 disabled={Boolean(value) || Boolean(parent)}
                 options={parentOptions.map((item) => ({
                   value: item.id,
                   label: item.name_zh
                 }))}
-                placeholder="请选择所属基本词性"
+                placeholder={t("select_parent")}
                 // 序号在所属父级下才有意义，换父级就按新父级重新预填；
                 // 管理员已经手填过就别覆盖他。
                 onChange={(id: string) => {
@@ -220,6 +233,7 @@ export function SubPartOfSpeechPanel({
   toolbarExtra,
   ref
 }: Props) {
+  const { t } = useContentTranslation();
   const canEdit = usePermission("lexicon_settings.edit_sub");
   const canDelete = usePermission("lexicon_settings.delete");
   const { modal } = App.useApp();
@@ -257,11 +271,13 @@ export function SubPartOfSpeechPanel({
 
   const removeItem = (item: SubPartOfSpeechConfig) => {
     modal.confirm({
-      title: `删除细分词性“${item.name_zh}”？`,
-      content: "删除后不可恢复。如果仍有词义关联此细分词性，将无法删除。",
-      okText: "删 除",
+      title: (
+        <ContentText message="delete_sub" params={{ name: item.name_zh }} />
+      ),
+      content: <ContentText message="delete_sub_help" />,
+      okText: <ContentText message="delete_spaced" />,
       okButtonProps: { danger: true },
-      cancelText: "取 消",
+      cancelText: <ContentText message="cancel_spaced" />,
       onOk: async () => {
         try {
           await remove.mutateAsync({
@@ -269,7 +285,7 @@ export function SubPartOfSpeechPanel({
             subId: item.id,
             base_revision: item.revision
           });
-          onSaved("细分词性已删除");
+          onSaved(<ContentText message="sub_deleted" />);
         } catch (error) {
           onError(error);
           await list.refetch();
@@ -279,43 +295,44 @@ export function SubPartOfSpeechPanel({
   };
 
   const columns: TableColumnsType<SubPartOfSpeechConfig> = [
-    { title: "序号", dataIndex: "sort_order", width: 64 },
-    { title: "正式中文", dataIndex: "name_zh", width: 120 },
-    { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
-    { title: "正式英文", dataIndex: "name_en", width: 150 },
-    { title: "英文缩写", dataIndex: "abbreviation", width: 90 },
+    { title: t("sort_order"), dataIndex: "sort_order", width: 64 },
+    { title: t("name_zh"), dataIndex: "name_zh", width: 120 },
+    { title: t("short_name_zh"), dataIndex: "short_name_zh", width: 110 },
+    { title: t("name_en"), dataIndex: "name_en", width: 150 },
+    { title: t("abbreviation"), dataIndex: "abbreviation", width: 90 },
     {
-      title: "英文全称",
+      title: t("full_name_en"),
       dataIndex: "full_name_en",
       width: 160,
       render: (value: string) => <FullNameEnCell value={value} />
     },
     {
-      title: "所属基本词性",
+      title: t("parent_part"),
       dataIndex: "part_of_speech_id",
       width: 110,
       render: (id: string) => parentById.get(id)?.name_zh
     },
     {
-      title: "关联",
+      title: t("links"),
       dataIndex: "usage_count",
       width: 100,
-      render: (count: number) => (count > 0 ? `${count} 个词义` : "无关联")
+      render: (count: number) =>
+        count > 0 ? t("senses", { count }) : t("no_links")
     },
     {
-      title: "创建人",
+      title: t("creator"),
       dataIndex: "created_by",
       width: 100,
       render: (actor: SubPartOfSpeechConfig["created_by"]) => actor.display_name
     },
     {
-      title: "创建时间",
+      title: t("created_at"),
       dataIndex: "created_at",
       width: 150,
       render: (value: string) => dayjs(value).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "操作",
+      title: t("actions"),
       key: "actions",
       fixed: "right",
       width: 150,
@@ -329,12 +346,12 @@ export function SubPartOfSpeechPanel({
               setFormOpen(true);
             }}
           >
-            修 改
+            {t("edit_spaced")}
           </Button>
           <Tooltip
             title={
               item.usage_count > 0
-                ? `已关联 ${item.usage_count} 个词义，可以修改，但不能删除`
+                ? t("linked_senses", { count: item.usage_count })
                 : undefined
             }
           >
@@ -344,7 +361,7 @@ export function SubPartOfSpeechPanel({
               disabled={!canDelete || item.usage_count > 0}
               onClick={() => removeItem(item)}
             >
-              删 除
+              {t("delete_spaced")}
             </Button>
           </Tooltip>
         </Space>
@@ -365,16 +382,16 @@ export function SubPartOfSpeechPanel({
           <AdminTableToolbar extra={toolbarExtra}>{toolbar}</AdminTableToolbar>
         )}
         {!loading && parents.length === 0 ? (
-          <Empty description="暂无基本词性" />
+          <Empty description={t("no_parts")} />
         ) : list.error ? (
           <Alert
             type="error"
             showIcon
-            title="细分词性加载失败"
+            title={t("subs_failed")}
             description={list.error.message}
             action={
               <Button size="small" onClick={() => void list.refetch()}>
-                重 试
+                {t("retry_spaced")}
               </Button>
             }
             style={{ marginBottom: 12 }}
@@ -387,7 +404,7 @@ export function SubPartOfSpeechPanel({
             locale={{
               emptyText: (
                 <TableEmptyState
-                  message="暂无细分词性"
+                  message={t("no_subs")}
                   filtered={filtered}
                   onResetFilters={onResetFilters}
                 />
@@ -404,7 +421,7 @@ export function SubPartOfSpeechPanel({
               pageSize,
               showSizeChanger: true,
               pageSizeOptions: [10, 20, 50],
-              showTotal: (total) => `共 ${total} 条`,
+              showTotal: (total) => t("total", { count: total }),
               onChange: (nextPage, nextSize) => {
                 setPage(nextSize !== pageSize ? 1 : nextPage);
                 setPageSize(nextSize);

@@ -1,3 +1,4 @@
+import { useContentTranslation, ContentText } from "@/features/content/i18n";
 import { InfoIcon } from "lucide-react";
 import { Col, Row } from "@tsz/ui/admin/display";
 import { Form, Input, InputNumber } from "@tsz/ui/admin/forms";
@@ -54,16 +55,21 @@ interface Props {
  * 英文全称 200 且须含英文字母、序号是 32 位有符号整数）。
  */
 export function PartOfSpeechSharedFields({ placeholders }: Props) {
+  const { t } = useContentTranslation();
   return (
     <>
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
             name="name_zh"
-            label="正式中文"
+            label={t("name_zh")}
             rules={[
-              { required: true, whitespace: true, message: "请输入中文名称" },
-              { max: 64, message: "中文名称不能超过 64 个字符" }
+              {
+                required: true,
+                whitespace: true,
+                message: <ContentText message="name_zh_required" />
+              },
+              { max: 64, message: <ContentText message="name_zh_max" /> }
             ]}
           >
             <Input placeholder={placeholders.name_zh} />
@@ -72,14 +78,14 @@ export function PartOfSpeechSharedFields({ placeholders }: Props) {
         <Col span={12}>
           <Form.Item
             name="short_name_zh"
-            label="简洁显示"
+            label={t("short_name_zh")}
             rules={[
               {
                 required: true,
                 whitespace: true,
-                message: "请输入简洁显示名称"
+                message: <ContentText message="short_name_required" />
               },
-              { max: 16, message: "简洁显示不能超过 16 个字符" }
+              { max: 16, message: <ContentText message="short_name_max" /> }
             ]}
           >
             <Input placeholder={placeholders.short_name_zh} />
@@ -90,10 +96,14 @@ export function PartOfSpeechSharedFields({ placeholders }: Props) {
         <Col span={12}>
           <Form.Item
             name="name_en"
-            label="正式英文"
+            label={t("name_en")}
             rules={[
-              { required: true, whitespace: true, message: "请输入英文名称" },
-              { max: 64, message: "英文名称不能超过 64 个字符" }
+              {
+                required: true,
+                whitespace: true,
+                message: <ContentText message="name_en_required" />
+              },
+              { max: 64, message: <ContentText message="name_en_max" /> }
             ]}
           >
             <Input placeholder={placeholders.name_en} />
@@ -102,10 +112,14 @@ export function PartOfSpeechSharedFields({ placeholders }: Props) {
         <Col span={12}>
           <Form.Item
             name="abbreviation"
-            label="英文缩写"
+            label={t("abbreviation")}
             rules={[
-              { required: true, whitespace: true, message: "请输入英文缩写" },
-              { max: 16, message: "英文缩写不能超过 16 个字符" }
+              {
+                required: true,
+                whitespace: true,
+                message: <ContentText message="abbreviation_required" />
+              },
+              { max: 16, message: <ContentText message="abbreviation_max" /> }
             ]}
           >
             <Input placeholder={placeholders.abbreviation} />
@@ -117,11 +131,18 @@ export function PartOfSpeechSharedFields({ placeholders }: Props) {
         <Col span={12}>
           <Form.Item
             name="full_name_en"
-            label="英文全称"
+            label={t("full_name_en")}
             rules={[
-              { required: true, whitespace: true, message: "请输入英文全称" },
-              { max: 200, message: "英文全称不能超过 200 个字符" },
-              { pattern: /[A-Za-z]/, message: "英文全称需包含英文字母" }
+              {
+                required: true,
+                whitespace: true,
+                message: <ContentText message="full_name_required" />
+              },
+              { max: 200, message: <ContentText message="full_name_max" /> },
+              {
+                pattern: /[A-Za-z]/,
+                message: <ContentText message="full_name_letters" />
+              }
             ]}
           >
             <Input placeholder={placeholders.full_name_en} />
@@ -132,17 +153,19 @@ export function PartOfSpeechSharedFields({ placeholders }: Props) {
             name="sort_order"
             // 列表按序号从小到大排，相同序号再按创建时间。留出间隔就能插队。
             label={
-              <LabelWithHint
-                label="序号"
-                hint="数字越小越靠前，允许与别的行相同"
-              />
+              <LabelWithHint label={t("sort_order")} hint={t("sort_help")} />
             }
-            rules={[{ required: true, message: "请输入序号" }]}
+            rules={[
+              {
+                required: true,
+                message: <ContentText message="sort_required" />
+              }
+            ]}
           >
             <InputNumber
               style={{ width: "100%" }}
               // 细分词性要选完父级才预填，空着的时候框里就是这句引导。
-              placeholder="数字越小越靠前，允许与别的行相同"
+              placeholder={t("sort_help")}
               precision={0}
               min={SORT_ORDER_MIN}
               max={SORT_ORDER_MAX}

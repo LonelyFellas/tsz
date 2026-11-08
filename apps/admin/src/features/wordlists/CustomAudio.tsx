@@ -1,3 +1,4 @@
+import { useContentTranslation } from "@/features/content/i18n";
 import { useEffect, useRef, useState } from "react";
 import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Volume2Icon } from "lucide-react";
@@ -13,6 +14,7 @@ export function CustomAudio({
   requestId?: string;
   audio: WordlistCustomAudio;
 }) {
+  const { t } = useContentTranslation();
   const [busy, setBusy] = useState<WordlistAudioLocale | null>(null);
   const [error, setError] = useState(false);
   const request = useRef<AbortController | null>(null);
@@ -65,10 +67,10 @@ export function CustomAudio({
       <Typography.Text type="secondary">
         {
           {
-            queued: "语音等待生成",
-            processing: "语音生成中",
-            refunding: "退款处理中",
-            refunded: "已退款"
+            queued: t("audio_queued"),
+            processing: t("audio_processing"),
+            refunding: t("refunding"),
+            refunded: t("refunded")
           }[audio.status]
         }
       </Typography.Text>
@@ -83,12 +85,12 @@ export function CustomAudio({
           disabled={!!busy}
           onClick={() => void play(locale)}
         >
-          {locale === "en-GB" ? "播放英式语音" : "播放美式语音"}
+          {locale === "en-GB" ? t("play_british") : t("play_american")}
         </Button>
       ))}
       {error && (
         <Typography.Text type="danger" role="alert">
-          播放失败，请重试
+          {t("play_failed")}
         </Typography.Text>
       )}
     </Space>

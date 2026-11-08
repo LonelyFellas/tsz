@@ -1,3 +1,4 @@
+import { useContentTranslation, ContentText } from "@/features/content/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useState } from "react";
@@ -50,12 +51,6 @@ export function WordlistEntryView({ entry }: { entry: WordlistEntry }) {
     </section>
   );
 }
-const reviewLabels: Record<string, string> = {
-  pending: "待审核",
-  approved: "已通过",
-  rejected: "已驳回",
-  cancelled: "已取消"
-};
 const reviewColors: Record<string, string> = {
   pending: "processing",
   approved: "success",
@@ -73,14 +68,22 @@ export function WordlistDetails({
   reviewMode?: boolean;
   onClose: () => void;
 }) {
+  const { t } = useContentTranslation();
   const client = useQueryClient();
+  const reviewLabels: Record<string, string> = {
+    pending: t("pending"),
+    approved: t("review_approved"),
+    rejected: t("review_rejected"),
+    cancelled: t("cancelled")
+  };
+
   const canReview = usePermission("wordlists.review");
   const [tab, setTab] = useState(reviewMode ? "reviews" : "current");
   const [page, setPage] = useState(1);
   const [requestId, setRequestId] = useState<string>();
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [reason, setReason] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<React.ReactNode>("");
   const [busy, setBusy] = useState(false);
   const key = ["admin-wordlists", adminId, list.id];
   const reviews = useQuery({
@@ -145,7 +148,7 @@ export function WordlistDetails({
     )
       return;
     if (action === "reject" && !reason.trim()) {
-      setError("请填写驳回原因");
+      setError(<ContentText message="reject_reason_required" />);
       return;
     }
     setBusy(true);
@@ -161,9 +164,7 @@ export function WordlistDetails({
       });
       onClose();
     } catch {
-      setError(
-        "操作失败或结果未确认，请刷新核对；旧审核不会覆盖已修改的内容。"
-      );
+      setError(<ContentText message="review_uncertain" />);
     } finally {
       setBusy(false);
     }
@@ -190,7 +191,7 @@ export function WordlistDetails({
                       setError("");
                     }}
                   >
-                    通过审核
+                    {t("approve_review")}
                   </Button>
                   <Button
                     danger
@@ -199,7 +200,7 @@ export function WordlistDetails({
                       setError("");
                     }}
                   >
-                    驳回
+                    {t("reject")}
                   </Button>
                 </Space>
               )}
@@ -210,7 +211,8 @@ export function WordlistDetails({
         }}
       >
         <Typography.Paragraph>
-          创建人：{list.owner_name} · ID：{list.id}
+          {t("creator_prefix")}
+          {list.owner_name} · ID：{list.id}
         </Typography.Paragraph>
         <Tabs
           activeKey={tab}
@@ -219,8 +221,8 @@ export function WordlistDetails({
             setPage(1);
           }}
           items={[
-            { key: "current", label: "当前内容" },
-            { key: "reviews", label: "审核记录" }
+            { key: "current", label: t("current_content") },
+            { key: "reviews", label: t("review_history") }
           ]}
         />
         {tab === "reviews" && (
@@ -228,20 +230,22 @@ export function WordlistDetails({
             {reviews.isError ? (
               <Alert
                 type="error"
-                title="审核记录加载失败"
+                title={t("reviews_failed")}
                 action={
-                  <Button onClick={() => void reviews.refetch()}>重试</Button>
+                  <Button onClick={() => void reviews.refetch()}>
+                    {t("retry")}
+                  </Button>
                 }
               />
             ) : reviews.isPending ? (
-              <p>读取审核记录…</p>
+              <p>{t("loading_reviews")}</p>
             ) : !current ? (
-              <p>尚未提交公开审核</p>
+              <p>{t("no_public_review")}</p>
             ) : !reviewMode ? (
               <Table<AdminWordlistReview>
                 tableId="wordlist-review-history"
                 locale={{
-                  emptyText: <TableEmptyState message="暂无审核记录" />
+                  emptyText: <TableEmptyState message={t("no_reviews")} />
                 }}
                 rowKey="id"
                 size="small"
@@ -249,35 +253,37 @@ export function WordlistDetails({
                 dataSource={reviews.data.items}
                 columns={[
                   {
-                    title: "审核状态",
+                    key: "审核状态",
+                    title: t("review_state"),
                     render: (_, r) => (
                       <Tag color={reviewColors[r.state]}>
                         {reviewLabels[r.state] ?? r.state}
                       </Tag>
                     )
                   },
-                  { title: "申请名称", dataIndex: "name" },
+                  { title: t("submitted_name"), dataIndex: "name" },
                   {
-                    title: "提交时间",
+                    title: t("submitted_at"),
                     dataIndex: "created_at",
                     render: (value: string) =>
                       value ? new Date(value).toLocaleString("zh-CN") : "—"
                   },
                   {
-                    title: "审核人",
+                    key: "审核人",
+                    title: t("reviewer"),
                     render: (_, r) =>
                       r.reviewer_name ||
                       r.reviewer_id ||
-                      (r.decided_at ? "未提供" : "—")
+                      (r.decided_at ? t("not_provided") : "—")
                   },
                   {
-                    title: "审核时间",
+                    title: t("reviewed_at"),
                     dataIndex: "decided_at",
                     render: (value: string | null) =>
                       value ? new Date(value).toLocaleString("zh-CN") : "—"
                   },
                   {
-                    title: "审核意见",
+                    title: t("review_reason"),
                     dataIndex: "reason",
                     render: (value: string | null) => value || "—"
                   }
@@ -286,7 +292,7 @@ export function WordlistDetails({
             ) : (
               <>
                 <Radio.Group
-                  aria-label="审核记录"
+                  aria-label={t("review_history")}
                   value={current.id}
                   onChange={(e) => {
                     setRequestId(e.target.value);
@@ -304,20 +310,28 @@ export function WordlistDetails({
                     ))}
                   </Space>
                 </Radio.Group>
-                <p>申请名称：{current.name}</p>
                 <p>
-                  审核人：
+                  {t("submitted_name_prefix")}
+                  {current.name}
+                </p>
+                <p>
+                  {t("reviewer_prefix")}
                   {current.reviewer_name ||
                     current.reviewer_id ||
-                    (current.decided_at ? "未提供" : "—")}
+                    (current.decided_at ? t("not_provided") : "—")}
                 </p>
                 {current.decided_at && (
                   <p>
-                    审核时间：
+                    {t("reviewed_at_prefix")}
                     {new Date(current.decided_at).toLocaleString("zh-CN")}
                   </p>
                 )}
-                {current.reason && <p>审核意见：{current.reason}</p>}
+                {current.reason && (
+                  <p>
+                    {t("review_reason_prefix")}
+                    {current.reason}
+                  </p>
+                )}
               </>
             )}
           </>
@@ -326,25 +340,29 @@ export function WordlistDetails({
           (items.isError ? (
             <Alert
               type="error"
-              title="词条加载失败"
+              title={t("entries_failed")}
               action={
-                <Button onClick={() => void items.refetch()}>重试</Button>
+                <Button onClick={() => void items.refetch()}>
+                  {t("retry")}
+                </Button>
               }
             />
           ) : items.isPending ? (
-            <p>读取词条…</p>
+            <p>{t("loading_entries")}</p>
           ) : (
             <>
               {audio.isError && (
                 <Alert
                   type="warning"
-                  title="语音暂不可用，仍可查看词表内容"
+                  title={t("audio_unavailable")}
                   action={
-                    <Button onClick={() => void audio.refetch()}>重试</Button>
+                    <Button onClick={() => void audio.refetch()}>
+                      {t("retry")}
+                    </Button>
                   }
                 />
               )}
-              {items.data.items.length === 0 && <p>暂无词项</p>}
+              {items.data.items.length === 0 && <p>{t("no_items")}</p>}
               {items.data.items.map((item, index) => (
                 <article
                   key={item.item_id ?? item.entry_id}
@@ -355,7 +373,11 @@ export function WordlistDetails({
                       <Typography.Text type="secondary">
                         {(page - 1) * 20 + index + 1}
                       </Typography.Text>
-                      <Tag>{item.custom_word ? "自定义词条" : "平台词条"}</Tag>
+                      <Tag>
+                        {item.custom_word
+                          ? t("custom_entry")
+                          : t("platform_entry")}
+                      </Tag>
                     </Space>
                     {item.custom_word ? (
                       <>
@@ -382,7 +404,7 @@ export function WordlistDetails({
                     ) : item.entry ? (
                       <WordlistEntryView entry={item.entry} />
                     ) : (
-                      <p>内容不可用</p>
+                      <p>{t("content_unavailable")}</p>
                     )}
                     {item.author_note && (
                       <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
@@ -400,7 +422,7 @@ export function WordlistDetails({
                 onChange={setPage}
                 itemRender={(_, type, original) =>
                   type === "next" ? (
-                    <button type="button" aria-label="下一页">
+                    <button type="button" aria-label={t("next_page")}>
                       ›
                     </button>
                   ) : (
@@ -412,14 +434,16 @@ export function WordlistDetails({
           ))}
       </Drawer>
       <Modal
-        title={action === "approve" ? "确认通过审核并公开" : "驳回词表"}
+        title={
+          action === "approve" ? t("confirm_approve") : t("reject_wordlist")
+        }
         open={!!action}
         confirmLoading={busy}
         cancelButtonProps={{ disabled: busy }}
         closable={!busy}
         keyboard={!busy}
         mask={{ closable: !busy }}
-        okText="确认"
+        okText={t("confirm")}
         okButtonProps={{ danger: action === "reject" }}
         onCancel={() => {
           if (!busy) setAction(null);
@@ -429,7 +453,7 @@ export function WordlistDetails({
         <p>{current?.name}</p>
         {action === "reject" && (
           <Input.TextArea
-            aria-label="操作原因"
+            aria-label={t("action_reason")}
             disabled={busy}
             maxLength={1000}
             value={reason}
