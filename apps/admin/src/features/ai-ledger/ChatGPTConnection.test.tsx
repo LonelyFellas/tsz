@@ -87,7 +87,7 @@ it("账号列表保持简洁，点击登录才打开授权；取消失败保留�
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
   fireEvent.click(
-    await screen.findByRole("button", { name: /Continue with ChatGPT/ })
+    await screen.findByRole("button", { name: /使用 ChatGPT 继续/ })
   );
   const link = await screen.findByRole("link", { name: "前往 ChatGPT 授权" });
   expect(link).toHaveAttribute("href", attempt.authorization_url);
@@ -119,7 +119,7 @@ it("授权完成后重读账号，首次说明套餐用途，退出保留撤销�
   vi.mocked(api.chatgpt.accounts).mockResolvedValue(loggedIn);
   fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
   fireEvent.click(
-    await screen.findByRole("button", { name: /Continue with ChatGPT/ })
+    await screen.findByRole("button", { name: /使用 ChatGPT 继续/ })
   );
   await waitFor(() => expect(api.chatgpt.login).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(api.chatgpt.loginStatus).toHaveBeenCalled());
@@ -168,7 +168,7 @@ it("重开页面恢复待完成授权，未启用或账号状态失败时不能�
   expect(screen.getByRole("button", { name: "登录 ChatGPT" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
   expect(
-    await screen.findByRole("button", { name: /Continue with ChatGPT/ })
+    await screen.findByRole("button", { name: /使用 ChatGPT 继续/ })
   ).toBeDisabled();
   fireEvent.click(within(drawer()).getByRole("button", { name: "关闭" }));
   await waitFor(() =>
@@ -184,7 +184,7 @@ it("重开页面恢复待完成授权，未启用或账号状态失败时不能�
   expect(screen.getByRole("button", { name: "登录 ChatGPT" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
   expect(
-    await screen.findByRole("button", { name: /Continue with ChatGPT/ })
+    await screen.findByRole("button", { name: /使用 ChatGPT 继续/ })
   ).toBeDisabled();
   fireEvent.click(within(drawer()).getByRole("button", { name: "关闭" }));
   await waitFor(() =>
@@ -228,7 +228,7 @@ it("登录方式未知时不启动回调", async () => {
   expect(screen.getByRole("button", { name: "登录 ChatGPT" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
   expect(
-    await screen.findByRole("button", { name: /Continue with ChatGPT/ })
+    await screen.findByRole("button", { name: /使用 ChatGPT 继续/ })
   ).toBeDisabled();
   fireEvent.click(within(drawer()).getByRole("button", { name: "关闭" }));
   await waitFor(() =>
@@ -241,7 +241,7 @@ it("关闭抽屉不取消授权，再打开可继续且不重复发起", async (
   await summary().findByText("未登录");
   fireEvent.click(screen.getByRole("button", { name: "登录 ChatGPT" }));
   fireEvent.click(
-    await screen.findByRole("button", { name: /Continue with ChatGPT/ })
+    await screen.findByRole("button", { name: /使用 ChatGPT 继续/ })
   );
   await screen.findByRole("link", { name: "前往 ChatGPT 授权" });
   fireEvent.click(within(drawer()).getByRole("button", { name: "关闭" }));
@@ -294,7 +294,7 @@ it("打开管理不自动授权，切换账号期间重开也不发起登录", a
     await screen.findByRole("dialog", { name: "ChatGPT 账号" });
     expect(api.chatgpt.login).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("button", { name: /Continue with ChatGPT/ })
+      screen.getByRole("button", { name: /使用 ChatGPT 继续/ })
     ).toBeDisabled();
   } finally {
     finishSwitch();
@@ -314,7 +314,7 @@ it("登录方式错误不封死已有账号管理，但不允许新授权", asyn
   ).toBeEnabled();
   expect(screen.getByRole("button", { name: "退出 ChatGPT" })).toBeEnabled();
   expect(
-    screen.getByRole("button", { name: /Continue with ChatGPT/ })
+    screen.getByRole("button", { name: /使用 ChatGPT 继续/ })
   ).toBeDisabled();
   expect(screen.getByRole("button", { name: "添加其他账号" })).toBeDisabled();
 });

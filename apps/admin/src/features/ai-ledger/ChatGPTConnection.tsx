@@ -1,3 +1,4 @@
+import { useAiTranslation, AiText } from "./i18n";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SparklesIcon, RotateCwIcon } from "lucide-react";
@@ -16,6 +17,7 @@ import type { ChatGPTLogin } from "@tsz/types";
 import { api } from "@/lib/auth";
 
 export function ChatGPTConnection({ adminId }: { adminId: string }) {
+  const { t } = useAiTranslation();
   const client = useQueryClient();
   const [attempt, setAttempt] = useState<ChatGPTLogin>();
   const [revocationUnconfirmed, setRevocationUnconfirmed] = useState(false);
@@ -159,16 +161,16 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
     logout.isPending;
   const available = !!accounts.data?.configured && !accounts.isError;
   const label = accounts.isError
-    ? "状态不可用"
+    ? t("state_unavailable")
     : accounts.isPending
-      ? "正在读取"
+      ? t("reading")
       : accounts.data && !accounts.data.configured
-        ? "未启用"
+        ? t("not_enabled")
         : active?.signed_in
           ? active.plan_enabled
-            ? "已授权套餐"
-            : "已登录，未授权套餐"
-          : "未登录";
+            ? t("plan_authorised")
+            : t("signed_in_no_plan")
+          : t("signed_out");
   const dismissWelcome = () => {
     try {
       if (welcome) localStorage.setItem(welcome, "1");
@@ -179,7 +181,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
   };
 
   return (
-    <section className="settings-provider" aria-label="ChatGPT 账号">
+    <section className="settings-provider" aria-label={t("chatgpt_account")}>
       <div className="settings-provider__summary">
         <span className="settings-provider__icon">
           <SparklesIcon />
@@ -198,12 +200,16 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                       : "default"
               }
               text={
-                setup.isError ? "登录暂不可用" : pending ? "等待授权" : label
+                setup.isError
+                  ? t("login_unavailable")
+                  : pending
+                    ? t("awaiting_auth")
+                    : label
               }
             />
           </div>
           <div className="settings-provider__description">
-            {active?.email || "使用 ChatGPT 套餐"}
+            {active?.email || t("chatgpt_plan")}
           </div>
         </div>
         <div className="settings-provider__actions">
@@ -212,26 +218,30 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
             icon={<RotateCwIcon />}
             loading={accounts.isFetching || setup.isFetching}
             onClick={() => void refresh()}
-            aria-label="刷新 ChatGPT 账号状态"
+            aria-label={t("chatgpt_refresh")}
           />
           <Button
             aria-label={
               pending
-                ? "继续登录 ChatGPT"
+                ? t("chatgpt_continue")
                 : active?.signed_in
-                  ? "管理 ChatGPT"
-                  : "登录 ChatGPT"
+                  ? t("chatgpt_manage")
+                  : t("chatgpt_login")
             }
             onClick={() => setOpen(true)}
           >
-            {pending ? "继续登录" : active?.signed_in ? "管理" : "登录"}
+            {pending
+              ? t("continue_login")
+              : active?.signed_in
+                ? t("manage")
+                : t("login")}
           </Button>
         </div>
       </div>
       <Drawer
         rootClassName="profile-settings-dialog"
-        closable={{ "aria-label": "关闭" }}
-        title="ChatGPT 账号"
+        closable={{ "aria-label": t("close") }}
+        title={t("chatgpt_account")}
         open={open}
         onClose={() => setOpen(false)}
         size={480}
@@ -240,18 +250,18 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
         <div className="settings-dialog-content">
           <Tag>{label}</Tag>
           {setup.data?.login_method === "local" && (
-            <Typography.Text>请在运行 Agent 的电脑上登录。</Typography.Text>
+            <Typography.Text>{t("local_login")}</Typography.Text>
           )}
           {!!accounts.data?.accounts.length && !accounts.isError && (
             <Select
-              aria-label="ChatGPT 账号"
+              aria-label={t("chatgpt_account")}
               style={{ width: 520, maxWidth: "100%" }}
               value={accounts.data.active ?? undefined}
               disabled={busy || pending}
               loading={useAccount.isPending}
               options={accounts.data.accounts.map((account) => ({
                 value: account.client_id,
-                label: `${account.email || "ChatGPT 账号"}${(accounts.data?.accounts.length ?? 0) > 1 ? ` (${account.client_id.slice(-6)})` : ""}${account.signed_in ? "" : "（已退出）"}`
+                label: `${account.email || t("chatgpt_account")}${(accounts.data?.accounts.length ?? 0) > 1 ? ` (${account.client_id.slice(-6)})` : ""}${account.signed_in ? "" : t("account_signed_out")}`
               }))}
               onChange={(id) => {
                 useAccount.reset();
@@ -276,7 +286,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                   login.mutate(active?.client_id ?? null);
                 }}
               >
-                Continue with ChatGPT
+                {t("continue_with_chatgpt")}
               </Button>
             )}
             {remote && active?.signed_in && (
@@ -284,7 +294,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                 disabled={busy || setup.isPending || setup.isError}
                 onClick={() => setRemoteIntent("current")}
               >
-                重新登录
+                {t("login_again")}
               </Button>
             )}
             {active && (
@@ -300,7 +310,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                   remote ? setRemoteIntent("new") : login.mutate(null)
                 }
               >
-                添加其他账号
+                {t("add_account")}
               </Button>
             )}
             {active?.signed_in && (
@@ -312,7 +322,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                   logout.mutate(active.client_id);
                 }}
               >
-                退出 ChatGPT
+                {t("chatgpt_logout")}
               </Button>
             )}
             <Typography.Link
@@ -321,21 +331,22 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
               rel="noopener noreferrer"
               referrerPolicy="no-referrer"
             >
-              管理 ChatGPT 用量
+              {t("chatgpt_usage")}
             </Typography.Link>
           </Space>
           {setup.isError && (
-            <Alert
-              type="error"
-              showIcon
-              title="无法确认登录方式，请刷新状态后重试。"
-            />
+            <Alert type="error" showIcon title={t("setup_failed")} />
           )}
           {remote &&
             available &&
             (!active?.signed_in || remoteIntent !== undefined) && (
-              <section className="settings-ssh" aria-label="在电脑上登录">
-                <Typography.Title level={5}>在电脑上登录</Typography.Title>
+              <section
+                className="settings-ssh"
+                aria-label={t("computer_login")}
+              >
+                <Typography.Title level={5}>
+                  {t("computer_login")}
+                </Typography.Title>
                 <Flex vertical gap={12}>
                   <Form
                     layout="vertical"
@@ -346,26 +357,27 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                   >
                     <Form.Item
                       name="ssh_host"
-                      label="SSH 主机"
+                      label={t("ssh_host")}
                       rules={[
-                        { required: true, message: "请填写 SSH 主机" },
+                        {
+                          required: true,
+                          message: <AiText message="ssh_required" />
+                        },
                         {
                           pattern:
                             /^(?:[a-zA-Z0-9_.-]+@)?[a-zA-Z0-9][a-zA-Z0-9_.-]*$/,
-                          message: "请使用 SSH 配置名称或 user@主机名"
+                          message: <AiText message="ssh_invalid" />
                         }
                       ]}
                     >
                       <Input
-                        placeholder="例如 tshb-test"
+                        placeholder={t("ssh_example")}
                         maxLength={253}
                         autoComplete="off"
                       />
                     </Form.Item>
                   </Form>
-                  <Typography.Text>
-                    在电脑的 tsz-agent 目录运行：
-                  </Typography.Text>
+                  <Typography.Text>{t("ssh_run")}</Typography.Text>
                   {remoteCommand && (
                     <Typography.Paragraph
                       className="settings-ssh__command"
@@ -378,56 +390,43 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                     loading={accounts.isFetching}
                     onClick={() => void refresh()}
                   >
-                    刷新账号
+                    {t("refresh_accounts")}
                   </Button>
                 </Flex>
               </section>
             )}
           {!accounts.isError && accounts.data && !accounts.data.configured && (
-            <Alert
-              type="info"
-              showIcon
-              title="此 Agent 尚未启用 ChatGPT 登录，请先在本机启用后刷新。"
-            />
+            <Alert type="info" showIcon title={t("chatgpt_disabled")} />
           )}
           {accounts.isError && (
-            <Alert
-              type="error"
-              showIcon
-              title="无法读取 ChatGPT 账号状态，请刷新重试。"
-            />
+            <Alert type="error" showIcon title={t("chatgpt_read_failed")} />
           )}
           {(login.isError || useAccount.isError || logout.isError) && (
-            <Alert
-              type="error"
-              showIcon
-              title="ChatGPT 账号操作未完成，请刷新状态后重试；若已有登录正在进行，请先完成或取消。"
-            />
+            <Alert type="error" showIcon title={t("chatgpt_action_failed")} />
           )}
           {active?.signed_in && !active.plan_enabled && !accounts.isError && (
-            <Alert
-              type="warning"
-              showIcon
-              title="该账号尚未授权套餐使用，请重新登录并授权后再选择模型。"
-            />
+            <Alert type="warning" showIcon title={t("plan_required")} />
           )}
           {revocationUnconfirmed && (
             <Alert
               type="warning"
               showIcon
-              title="本地已退出，远端撤销未确认。请前往 ChatGPT 用量设置断开此应用。"
+              title={t("revocation_unconfirmed")}
             />
           )}
           {pending && (
             <Alert
               type="info"
               showIcon
-              title="等待完成 ChatGPT 授权"
+              title={t("chatgpt_wait")}
               description={
                 <Flex vertical gap={8}>
                   <Typography.Text>
-                    在官方页面登录并授权，完成后自动刷新账号与模型。授权链接有效至{" "}
-                    {new Date(attempt.expires_at).toLocaleTimeString("zh-CN")}。
+                    {t("chatgpt_auth_help", {
+                      time: new Date(attempt.expires_at).toLocaleTimeString(
+                        "zh-CN"
+                      )
+                    })}
                   </Typography.Text>
                   <Space wrap>
                     <Button
@@ -437,13 +436,13 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
                       rel="noopener noreferrer"
                       referrerPolicy="no-referrer"
                     >
-                      前往 ChatGPT 授权
+                      {t("chatgpt_authorise")}
                     </Button>
                     <Button
                       loading={cancel.isPending}
                       onClick={() => cancel.mutate()}
                     >
-                      取消 ChatGPT 登录
+                      {t("chatgpt_cancel")}
                     </Button>
                   </Space>
                 </Flex>
@@ -454,20 +453,16 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
             <Alert
               type="error"
               showIcon
-              title="暂时无法确认 ChatGPT 授权结果，请刷新结果或取消登录后重试。"
+              title={t("chatgpt_result_failed")}
               action={
                 <Button onClick={() => void status.refetch()}>
-                  刷新授权结果
+                  {t("refresh_auth")}
                 </Button>
               }
             />
           )}
           {cancel.isError && (
-            <Alert
-              type="error"
-              showIcon
-              title="取消 ChatGPT 登录失败，请重试。"
-            />
+            <Alert type="error" showIcon title={t("chatgpt_cancel_failed")} />
           )}
           {status.data?.status === "failed" && (
             <Alert
@@ -475,36 +470,28 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
               showIcon
               title={
                 status.data.error === "denied"
-                  ? "你已取消 ChatGPT 授权，可重新登录。"
-                  : "ChatGPT 授权未完成，请重新登录。"
+                  ? t("chatgpt_denied")
+                  : t("chatgpt_incomplete")
               }
             />
           )}
           {status.data?.status === "expired" && (
-            <Alert
-              type="warning"
-              showIcon
-              title="ChatGPT 登录链接已过期，请重新登录。"
-            />
+            <Alert type="warning" showIcon title={t("chatgpt_expired")} />
           )}
           {status.data?.status === "complete" && (
-            <Alert
-              type="success"
-              showIcon
-              title="已登录，可在出题模型中选择使用。"
-            />
+            <Alert type="success" showIcon title={t("chatgpt_complete")} />
           )}
         </div>
       </Drawer>
       <Modal
         open={!!welcome}
-        title="使用 ChatGPT 套餐"
-        okText="知道了"
+        title={t("chatgpt_plan")}
+        okText={t("understood")}
         footer={(_, { OkBtn }) => <OkBtn />}
         onOk={dismissWelcome}
         onCancel={dismissWelcome}
       >
-        出题和模型测试会使用 ChatGPT 额度，可在“管理 ChatGPT 用量”中设置限额。
+        {t("plan_notice")}
       </Modal>
     </section>
   );
