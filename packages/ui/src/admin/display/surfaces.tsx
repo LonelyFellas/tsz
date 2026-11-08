@@ -1,3 +1,4 @@
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import {
   Children,
   isValidElement,
@@ -68,15 +69,18 @@ export function Card({
 }
 export function Empty({
   image,
-  description = "暂无数据",
+  description,
   children,
   className = "",
   ...props
 }: Div & { image?: ReactNode; description?: ReactNode }) {
+  const { t } = useInterfaceTranslation();
   return (
     <div {...props} className={`ui-empty ${className}`}>
       {image && <div className="ui-empty-image">{image}</div>}
-      <div className="ui-empty-description">{description}</div>
+      <div className="ui-empty-description">
+        {description === undefined ? t("status.noData") : description}
+      </div>
       {children}
     </div>
   );

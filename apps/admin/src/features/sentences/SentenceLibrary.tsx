@@ -1,3 +1,8 @@
+import {
+  useSentenceTranslation,
+  SentenceText,
+  type SentenceTranslation
+} from "./i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
@@ -43,16 +48,21 @@ function sentenceText(item: SharedSentence) {
     .map((row) => row.text)
     .join(" / ");
 }
-function entryLink(entry: SharedSentence["entries"][number]) {
+function entryLink(
+  entry: SharedSentence["entries"][number],
+  t: SentenceTranslation
+) {
   return (
     <Link
-      title={`词条 ID：${entry.id}`}
+      title={t("entry_id", { id: entry.id })}
       to={`/words/${entry.id}/v3/wizard/meanings`}
     >
       {entry.headword || entry.id} ·{" "}
       {entry.senses.length
-        ? entry.senses.map((sense) => sense.gloss || "暂无释义").join(" / ")
-        : "待选择词义"}
+        ? entry.senses
+            .map((sense) => sense.gloss || t("no_definition"))
+            .join(" / ")
+        : t("select_sense")}
     </Link>
   );
 }
@@ -66,6 +76,7 @@ export function SentenceLibrary({
   trash?: boolean;
   readOnly?: boolean;
 }) {
+  const { t, i18n } = useSentenceTranslation();
   const { modal, message } = App.useApp();
   const profile = useAuthStore((state) => state.profile);
   const canReadAll = hasAdminPermission(profile, "sentences.access");
@@ -128,7 +139,13 @@ export function SentenceLibrary({
     setSelected([]);
   };
   const failure = (e: unknown) =>
-    message.error(e instanceof Error ? e.message : "操作失败，请重试");
+    message.error(
+      e instanceof Error ? (
+        e.message
+      ) : (
+        <SentenceText message="operation_failed" />
+      )
+    );
   const open = async (id: string, editing: boolean) => {
     try {
       const fresh = await api.sentences.get(
@@ -156,27 +173,47 @@ export function SentenceLibrary({
   };
   const remove = (items: SharedSentence[], restoring = false) =>
     modal.confirm({
-      title: `${restoring ? "恢复" : trash ? "永久删除" : "移入垃圾桶"} ${items.length} 条未发布草稿？`,
+      title: (
+        <SentenceText
+          message={
+            restoring
+              ? "restore_confirm"
+              : trash
+                ? "delete_confirm"
+                : "trash_confirm"
+          }
+          params={{ count: items.length }}
+        />
+      ),
       content: (
         <Flex vertical gap="small">
           {items.map((item) => (
             <Typography.Text key={item.id}>
-              {sentenceText(item).slice(0, 100)}：影响 {item.entries.length}{" "}
-              个关联词条。
+              <SentenceText
+                message="affected_entries"
+                params={{
+                  text: sentenceText(item).slice(0, 100),
+                  count: item.entries.length
+                }}
+              />
             </Typography.Text>
           ))}
           <Typography.Text type="danger">
-            {restoring
-              ? "恢复时会重新校验关联词条和词义；目标失效时保留在垃圾桶。"
-              : trash
-                ? "永久删除后无法恢复，关联及音频引用将被清理。"
-                : "仅从未发布的草稿可移入垃圾桶；保留关联与音频，可在垃圾桶恢复。"}
+            <SentenceText
+              message={
+                restoring
+                  ? "restore_help"
+                  : trash
+                    ? "delete_help"
+                    : "trash_help"
+              }
+            />
           </Typography.Text>
         </Flex>
       ),
       okButtonProps: { danger: !restoring },
       onOk: async () => {
-        const errors: string[] = [];
+        const errors: Array<{ id: string; message?: string }> = [];
         for (const item of items) {
           try {
             await (
@@ -189,16 +226,26 @@ export function SentenceLibrary({
               base_revision: item.revision
             });
           } catch (e) {
-            errors.push(
-              `${item.id}：${e instanceof Error ? e.message : "删除失败"}`
-            );
+            errors.push({
+              id: item.id,
+              message: e instanceof Error ? e.message : undefined
+            });
           }
         }
         refresh();
         if (errors.length)
           modal.error({
-            title: "部分例句操作失败",
-            content: errors.join("；")
+            title: <SentenceText message="partial_failure" />,
+            content: (
+              <>
+                {errors.map((error) => (
+                  <div key={error.id}>
+                    {error.id}:{" "}
+                    {error.message ?? <SentenceText message="delete_failed" />}
+                  </div>
+                ))}
+              </>
+            )
           });
       }
     });
@@ -241,28 +288,31 @@ export function SentenceLibrary({
       )}
       {entryId ? (
         <Typography.Title level={4} style={{ margin: 0 }}>
-          多维例句
+          {t("title")}
         </Typography.Title>
       ) : (
         <PageHeader
-          title={trash ? "垃圾桶" : "多维例句"}
-          breadcrumb={<Breadcrumb items={[{ title: "例句管理" }]} />}
+          title={trash ? t("trash_title") : t("title")}
+          breadcrumb={
+            <Breadcrumb
+              aria-label={t("breadcrumb_label")}
+              items={[{ title: t("breadcrumb") }]}
+            />
+          }
         />
       )}
       {entryId && (
-        <Typography.Text type="secondary">
-          展示句内关联到当前词条的例句。修改会同步到例句库。
-        </Typography.Text>
+        <Typography.Text type="secondary">{t("entry_help")}</Typography.Text>
       )}
       {!entryId && (
         <Card className="admin-filter-card" size="small">
           <Form className="admin-filter-form" colon={false} layout="inline">
-            <Form.Item label="关键词">
+            <Form.Item label={t("keyword")}>
               <Input
-                aria-label="例句关键词"
+                aria-label={t("keyword_label")}
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder="输入 ID / 例句 / 创建人"
+                placeholder={t("keyword_placeholder")}
                 style={{ width: 250 }}
                 onPressEnter={() =>
                   setFilters({
@@ -276,11 +326,11 @@ export function SentenceLibrary({
                 }
               />
             </Form.Item>
-            <Form.Item label="例句等级">
+            <Form.Item label={t("level")}>
               <Select
-                aria-label="筛选例句等级"
+                aria-label={t("level_filter")}
                 allowClear
-                placeholder="例句等级"
+                placeholder={t("level")}
                 value={level}
                 onChange={setLevel}
                 style={{ width: 130 }}
@@ -290,7 +340,7 @@ export function SentenceLibrary({
                 }))}
               />
             </Form.Item>
-            <Form.Item label="创建时间">
+            <Form.Item label={t("created_at")}>
               <DatePicker.RangePicker value={dates} onChange={setDates} />
             </Form.Item>
             <Form.Item className="admin-filter-actions">
@@ -309,7 +359,7 @@ export function SentenceLibrary({
                     })
                   }
                 >
-                  搜索
+                  {t("search")}
                 </Button>
                 <Button
                   icon={<RotateCwIcon />}
@@ -320,7 +370,7 @@ export function SentenceLibrary({
                     setFilters({ page: 1, page_size: 10 });
                   }}
                 >
-                  重置
+                  {t("reset")}
                 </Button>
               </Space>
             </Form.Item>
@@ -331,8 +381,10 @@ export function SentenceLibrary({
         {query.isError && (
           <Alert
             type="error"
-            title="例句加载失败"
-            action={<Button onClick={() => void query.refetch()}>重试</Button>}
+            title={t("load_failed")}
+            action={
+              <Button onClick={() => void query.refetch()}>{t("retry")}</Button>
+            }
           />
         )}
         <Row gutter={[16, 16]}>
@@ -342,7 +394,7 @@ export function SentenceLibrary({
                 !entryId && (
                   <Space wrap>
                     <Typography.Text aria-live="polite">
-                      已选 {selected.length} 条
+                      {t("selected_count", { count: selected.length })}
                     </Typography.Text>
                     {canPublish && !trash && (
                       <Button
@@ -360,7 +412,7 @@ export function SentenceLibrary({
                           )
                         }
                       >
-                        发布所选
+                        {t("publish_selected")}
                       </Button>
                     )}
                     {trash && canDelete && (
@@ -373,7 +425,7 @@ export function SentenceLibrary({
                           )
                         }
                       >
-                        恢复所选
+                        {t("restore_selected")}
                       </Button>
                     )}
                     <Button
@@ -391,10 +443,12 @@ export function SentenceLibrary({
                         remove(rows.filter((row) => selected.includes(row.id)))
                       }
                     >
-                      {trash ? "永久删除所选" : "移入垃圾桶所选"}
+                      {trash ? t("delete_selected") : t("trash_selected")}
                     </Button>
                     {selected.length > 0 && (
-                      <Button onClick={() => setSelected([])}>取消选择</Button>
+                      <Button onClick={() => setSelected([])}>
+                        {t("clear_selection")}
+                      </Button>
                     )}
                   </Space>
                 )
@@ -409,7 +463,7 @@ export function SentenceLibrary({
                     icon={<PlusIcon />}
                     onClick={() => setEditor("new")}
                   >
-                    新建例句
+                    {t("create")}
                   </Button>
                 )
               }
@@ -419,10 +473,10 @@ export function SentenceLibrary({
                   <TableEmptyState
                     message={
                       entryId
-                        ? "暂无关联例句"
+                        ? t("empty_linked")
                         : trash
-                          ? "垃圾桶暂无例句"
-                          : "暂无例句"
+                          ? t("empty_trash")
+                          : t("empty")
                     }
                     filtered={
                       !!(
@@ -451,7 +505,7 @@ export function SentenceLibrary({
                       selectedRowKeys: selected,
                       onChange: setSelected,
                       getTitleCheckboxProps: () => ({
-                        "aria-label": "选择本页"
+                        "aria-label": t("select_page")
                       })
                     }
                   : undefined
@@ -462,12 +516,13 @@ export function SentenceLibrary({
                 total: query.data?.total,
                 showSizeChanger: true,
                 pageSizeOptions: [10, 20, 50],
-                showTotal: (total) => `共 ${total} 条`,
+                showTotal: (total) => t("total_count", { count: total }),
                 onChange: (page, page_size) => {
                   setFilters((current) => ({ ...current, page, page_size }));
                   setSelected([]);
                 }
               }}
+              // 固定既有列身份，保留中文界面创建的列偏好；显示标题随语言更新。
               columns={[
                 ...(!entryId
                   ? [
@@ -484,27 +539,30 @@ export function SentenceLibrary({
                     ]
                   : []),
                 {
-                  title: "状态",
+                  key: "状态",
+                  title: t("status"),
                   width: 100,
                   render: (_, row) => (
                     <Tag>
                       {trash
-                        ? "垃圾桶"
+                        ? t("trash_title")
                         : row.withdrawn_at
-                          ? "草稿（已撤回）"
+                          ? t("withdrawn")
                           : row.current_publication_id
-                            ? "已发布"
-                            : "草稿"}
+                            ? t("published")
+                            : t("draft")}
                     </Tag>
                   )
                 },
                 {
-                  title: "等级",
+                  key: "等级",
+                  title: t("level_short"),
                   width: 65,
                   render: (_, row) => row.content.sentence.level
                 },
                 {
-                  title: "例句",
+                  key: "例句",
+                  title: t("sentence"),
                   width: 350,
                   render: (_, row) => (
                     <V3EnglishTextPreview
@@ -514,14 +572,15 @@ export function SentenceLibrary({
                   )
                 },
                 {
-                  title: "关联词条",
+                  key: "关联词条",
+                  title: t("entries"),
                   width: 190,
                   render: (_, row) => (
                     <Flex vertical>
-                      {!row.entries.length && <Tag>未关联</Tag>}
+                      {!row.entries.length && <Tag>{t("unlinked")}</Tag>}
                       {row.entries.slice(0, 2).map((e) => (
                         <span className="tsz-words" key={e.id}>
-                          {entryLink(e)}{" "}
+                          {entryLink(e, t)}{" "}
                         </span>
                       ))}
                       {row.entries.length > 2 && (
@@ -533,29 +592,36 @@ export function SentenceLibrary({
                       )}
                       {row.content.annotations.some(
                         (a) => a.target.state === "pending"
-                      ) && <Tag color="orange">含待关联</Tag>}
+                      ) && <Tag color="orange">{t("pending_links")}</Tag>}
                     </Flex>
                   )
                 },
                 ...(!entryId
                   ? [
                       {
-                        title: "创建时间",
+                        key: "创建时间",
+                        title: t("created_at"),
                         width: 170,
                         render: (_: unknown, row: SharedSentence) =>
-                          new Date(row.created_at).toLocaleString("zh-CN")
+                          new Date(row.created_at).toLocaleString(i18n.language)
                       },
-                      { title: "创建人", dataIndex: "created_by", width: 100 },
                       {
-                        title: "更新时间",
+                        title: t("creator"),
+                        dataIndex: "created_by",
+                        width: 100
+                      },
+                      {
+                        key: "更新时间",
+                        title: t("updated_at"),
                         width: 170,
                         render: (_: unknown, row: SharedSentence) =>
-                          new Date(row.updated_at).toLocaleString("zh-CN")
+                          new Date(row.updated_at).toLocaleString(i18n.language)
                       }
                     ]
                   : []),
                 {
-                  title: "操作",
+                  key: "操作",
+                  title: t("actions"),
                   fixed: "right",
                   width: canEdit || canPublish ? 208 : 112,
                   render: (_, row) => (
@@ -566,7 +632,7 @@ export function SentenceLibrary({
                           trash ? setDetail(row) : void open(row.id, false)
                         }
                       >
-                        查看
+                        {t("view")}
                       </Button>
                       {!readOnly && !trash && (
                         <>
@@ -576,7 +642,7 @@ export function SentenceLibrary({
                               size="small"
                               onClick={() => void open(row.id, true)}
                             >
-                              编辑
+                              {t("edit")}
                             </Button>
                           )}
                           {canAction(row, "publish") && (
@@ -586,7 +652,7 @@ export function SentenceLibrary({
                                 void openPublication(row, "publish")
                               }
                             >
-                              发布
+                              {t("publish")}
                             </Button>
                           )}
                         </>
@@ -597,14 +663,14 @@ export function SentenceLibrary({
                             size="small"
                             onClick={() => remove([row], true)}
                           >
-                            恢复
+                            {t("restore")}
                           </Button>
                           <Button
                             size="small"
                             danger
                             onClick={() => remove([row])}
                           >
-                            永久删除
+                            {t("delete")}
                           </Button>
                         </>
                       )}
@@ -615,7 +681,7 @@ export function SentenceLibrary({
                             items: [
                               {
                                 key: "history",
-                                label: "历史",
+                                label: t("history"),
                                 onClick: () =>
                                   void openPublication(row, "history")
                               },
@@ -629,8 +695,8 @@ export function SentenceLibrary({
                                       key: "visibility",
                                       danger: !row.withdrawn_at,
                                       label: row.withdrawn_at
-                                        ? "重新展示原发布"
-                                        : "撤回",
+                                        ? t("show_publication")
+                                        : t("withdraw"),
                                       onClick: () =>
                                         void openPublication(
                                           row,
@@ -648,7 +714,7 @@ export function SentenceLibrary({
                                     {
                                       key: "delete",
                                       danger: true,
-                                      label: "移入垃圾桶",
+                                      label: t("trash"),
                                       onClick: () => remove([row])
                                     }
                                   ]
@@ -659,7 +725,7 @@ export function SentenceLibrary({
                           <Button
                             size="small"
                             type="text"
-                            aria-label="更多操作"
+                            aria-label={t("more")}
                             icon={<EllipsisVerticalIcon />}
                           />
                         </Dropdown>
@@ -700,18 +766,22 @@ export function SentenceLibrary({
       {detail && (
         <Modal
           open
-          title="查看例句"
+          title={t("details")}
           width={850}
           onCancel={() => setDetail(undefined)}
-          footer={<Button onClick={() => setDetail(undefined)}>关闭</Button>}
+          footer={
+            <Button onClick={() => setDetail(undefined)}>{t("close")}</Button>
+          }
         >
           <Flex vertical gap="middle">
             <Descriptions
+              layout="vertical"
+              column={{ xs: 1, md: 2 }}
               items={[
                 { key: "id", label: "ID", children: detail.id },
                 {
                   key: "level",
-                  label: "等级",
+                  label: t("level_short"),
                   children: detail.content.sentence.level
                 }
               ]}
@@ -720,20 +790,24 @@ export function SentenceLibrary({
               value={detail.content.sentence.en_text}
               hideCommonDialect
             />
-            {detail.content.sentence.zh_translations.map((t) => (
-              <Typography.Paragraph key={t.id}>
-                {t.band === "word_for_word"
-                  ? "初阶"
-                  : t.band === "balanced_fluency"
-                    ? "中阶"
-                    : "高阶"}
-                ：{t.content.text}
+            {detail.content.sentence.zh_translations.map((translation) => (
+              <Typography.Paragraph key={translation.id}>
+                {t("translation_content", {
+                  band: t(
+                    translation.band === "word_for_word"
+                      ? "band_beginner"
+                      : translation.band === "balanced_fluency"
+                        ? "band_intermediate"
+                        : "band_advanced"
+                  ),
+                  content: translation.content.text
+                })}
               </Typography.Paragraph>
             ))}
             <Space wrap>
               {detail.entries.map((e) => (
                 <span className="tsz-words" key={e.id}>
-                  {entryLink(e)}
+                  {entryLink(e, t)}
                 </span>
               ))}
             </Space>
@@ -749,8 +823,11 @@ export function SentenceLibrary({
                           : "")
                     )?.headword ?? a.target.target_entry_id)
                   : a.target.state === "entry_only"
-                    ? "待选择词义"
-                    : `待关联：${a.target.headword} ${a.target.gloss ?? ""}`}
+                    ? t("select_sense")
+                    : t("pending_target", {
+                        headword: a.target.headword,
+                        gloss: a.target.gloss ?? ""
+                      })}
               </Typography.Text>
             ))}
           </Flex>

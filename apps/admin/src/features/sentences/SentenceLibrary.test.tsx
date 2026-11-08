@@ -1,3 +1,6 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
+import { act } from "@testing-library/react";
 import {
   fireEvent,
   render,
@@ -490,4 +493,183 @@ it("普通管理员查看垃圾桶时不提供恢复或永久删除行操作", a
   const row = screen.getByText("A wonderful flower.").closest("tr")!;
   expect(within(row).queryByText(/^恢\s*复$/)).toBeNull();
   expect(within(row).queryByText("永久删除")).toBeNull();
+});
+
+it("四语切换保留筛选输入、选择、详情节点与既有列偏好，不改写查询或正文", async () => {
+  auth.role = "super_admin";
+  auth.permissions = ["sentences.access", "sentences.edit"];
+  const item = fixture();
+  vi.mocked(api.sentences.list).mockResolvedValue({ items: [item], total: 25 });
+  vi.mocked(api.sentences.get).mockResolvedValue(item);
+  const preferenceKey = "tsz:admin:table-columns:v1:sentences";
+  const preference = JSON.stringify([
+    { key: "等级", visible: false, fixed: false }
+  ]);
+  localStorage.setItem(preferenceKey, preference);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <App>
+            <SentenceLibrary />
+          </App>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const row = (await screen.findByText("A wonderful flower.")).closest("tr")!;
+  const selected = within(row).getByRole("checkbox");
+  fireEvent.click(selected);
+  const input = screen.getByRole("textbox", { name: "例句关键词" });
+  fireEvent.change(input, { target: { value: "原文 centre" } });
+  fireEvent.click(within(row).getByRole("button", { name: "查看" }));
+  const detail = await screen.findByRole("dialog", { name: "查看例句" });
+  const original = within(detail).getByText("A wonderful flower.");
+  const calls = vi.mocked(api.sentences.list).mock.calls.length;
+  for (const locale of ["zh-Hant", "en-GB", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(input).toHaveValue("原文 centre");
+    expect(selected).toBeChecked();
+    expect(within(detail).getByText("A wonderful flower.")).toBe(original);
+    expect(localStorage.getItem(preferenceKey)).toBe(preference);
+    expect(
+      within(screen.getByRole("table")).queryByRole("columnheader", {
+        name: /^(等级|等級|Level)$/
+      })
+    ).toBeNull();
+    expect(api.sentences.list).toHaveBeenCalledTimes(calls);
+    expect(api.sentences.get).toHaveBeenCalledTimes(1);
+  }
+  fireEvent.click(within(detail).getAllByRole("button", { name: "Close" })[0]!);
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  await waitFor(() =>
+    expect(api.sentences.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        q: "原文 centre",
+        page: 1,
+        page_size: 10,
+        view: "draft"
+      })
+    )
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Page 2" }));
+  await waitFor(() =>
+    expect(api.sentences.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ q: "原文 centre", page: 2, page_size: 10 })
+    )
+  );
+  const updatedRow = (await screen.findByText("A wonderful flower.")).closest(
+    "tr"
+  )!;
+  expect(within(updatedRow).getByRole("checkbox")).not.toBeChecked();
+  expect(api.sentences.trash).not.toHaveBeenCalled();
+  localStorage.removeItem(preferenceKey);
+});
+
+it("垃圾桶确认中切换语言保持目标和 pending，点击确认才发送原 ID/revision", async () => {
+  auth.role = "super_admin";
+  auth.permissions = ["sentences.access"];
+  const item = fixture();
+  vi.mocked(api.sentences.list).mockResolvedValue({ items: [item], total: 1 });
+  let resolve!: () => void;
+  vi.mocked(api.sentences.untrash).mockImplementationOnce(
+    () =>
+      new Promise<void>((done) => {
+        resolve = done;
+      })
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <App>
+            <SentenceLibrary trash />
+          </App>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const row = (await screen.findByText("A wonderful flower.")).closest("tr")!;
+  fireEvent.click(within(row).getByRole("button", { name: "恢复" }));
+  const dialog = await screen.findByRole("dialog", {
+    name: "恢复 1 条未发布草稿？"
+  });
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByRole("dialog", { name: "Restore 1 unpublished draft?" })
+  ).toBe(dialog);
+  expect(api.sentences.untrash).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "OK" }));
+  expect(api.sentences.untrash).toHaveBeenCalledWith(item.id, {
+    base_revision: item.revision
+  });
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByRole("dialog", { name: "恢復 1 筆未發布草稿？" })).toBe(
+    dialog
+  );
+  expect(within(dialog).getByRole("button", { name: "取消" })).toBeDisabled();
+  expect(api.sentences.untrash).toHaveBeenCalledTimes(1);
+  await act(async () => resolve());
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+it("取消不提交，失败提示跨语言保留后端原文且不重复删除", async () => {
+  auth.role = "super_admin";
+  auth.permissions = ["sentences.access"];
+  const item = fixture();
+  vi.mocked(api.sentences.list).mockResolvedValue({ items: [item], total: 1 });
+  vi.mocked(api.sentences.trash).mockRejectedValue(
+    new Error("后端原始错误 centre")
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <App>
+            <SentenceLibrary />
+          </App>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("en-US"));
+  const row = (await screen.findByText("A wonderful flower.")).closest("tr")!;
+  fireEvent.click(within(row).getByRole("checkbox"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Move selected to trash" })
+  );
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" })
+  );
+  expect(api.sentences.trash).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  fireEvent.click(
+    screen.getByRole("button", { name: "Move selected to trash" })
+  );
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "OK" })
+  );
+  const failure = await screen.findByRole("dialog", {
+    name: "Some sentence operations failed"
+  });
+  expect(failure).toHaveTextContent("后端原始错误 centre");
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByRole("dialog", { name: "部分例句操作失敗" })).toBe(
+    failure
+  );
+  expect(failure).toHaveTextContent("后端原始错误 centre");
+  expect(api.sentences.trash).toHaveBeenCalledExactlyOnceWith(item.id, {
+    base_revision: item.revision
+  });
 });
