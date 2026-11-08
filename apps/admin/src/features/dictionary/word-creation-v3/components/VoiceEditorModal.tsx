@@ -33,7 +33,6 @@ export function VoiceEditorModal({ title, ...props }: ModalProps) {
       mask={{ closable: false }}
       styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}
       {...props}
-      style={{ maxWidth: "calc(100vw - 32px)", ...props.style }}
       title={
         <div
           style={{

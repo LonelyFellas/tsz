@@ -1,7 +1,7 @@
 .voice-library {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
   min-width: 0;
   width: 100%;
   max-width: 1440px;
@@ -13,11 +13,11 @@
 }
 
 .voice-library-controls > .ui-card-body {
-  padding: 16px;
+  padding: var(--ui-space-4);
 }
 
 .voice-library-catalog .voice-library-content > .ui-card-body {
-  padding: 16px;
+  padding: var(--ui-space-4);
 }
 
 .voice-library-controls .voice-library-audition {
@@ -29,7 +29,7 @@
 .voice-library-content > .ui-card-body {
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: var(--ui-space-6);
 }
 
 .voice-catalog {
@@ -42,8 +42,8 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 12px;
-  padding-top: 16px;
+  gap: var(--ui-space-3);
+  padding-top: var(--ui-space-4);
 }
 
 .voice-catalog-reset.ui-btn {
@@ -62,7 +62,7 @@
 .voice-catalog-controls {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
   width: 180px;
 }
 
@@ -71,7 +71,7 @@
 }
 
 .voice-catalog-table .ui-table-cell {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.6;
   overflow-wrap: anywhere;
   vertical-align: middle;
@@ -79,14 +79,14 @@
 
 .voice-catalog-table .ui-table-thead > tr > th {
   vertical-align: top;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-weight: 500;
 }
 
 .voice-catalog-heading {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-width: 0;
 }
 
@@ -114,7 +114,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--ui-space-1);
   min-width: 0;
 }
 
@@ -122,7 +122,7 @@
   display: block;
   width: 100%;
   overflow-wrap: anywhere;
-  font-size: 14px;
+  font-size: var(--ui-font-size);
 }
 
 .voice-catalog-name .voice-shared-name > strong {
@@ -132,13 +132,13 @@
 }
 
 .voice-accent-gb {
-  --voice-accent: #2053ff;
+  --voice-accent: var(--ui-color-primary);
 }
 .voice-accent-us {
   --voice-accent: #fc007a;
 }
 .voice-accent-none {
-  --voice-accent: #8c8c8c;
+  --voice-accent: var(--ui-color-text-tertiary);
 }
 
 .voice-accent-dot {
@@ -158,7 +158,7 @@
 }
 
 .voice-catalog-gender-male {
-  color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-primary);
 }
 
 .voice-catalog-gender-female {
@@ -166,7 +166,7 @@
 }
 
 .voice-catalog-gender-neutral {
-  color: var(--ui-color-text-secondary, #8c8c8c);
+  color: var(--ui-color-text-secondary);
 }
 
 .voice-catalog-cell-preview {
@@ -179,16 +179,16 @@
 }
 
 .voice-catalog-summary > .voice-catalog-notes {
-  margin: 4px 0 0;
+  margin: var(--ui-space-1) 0 0;
   color: var(--voice-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .voice-catalog-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 4px;
+  gap: var(--ui-space-1);
+  margin-bottom: var(--ui-space-1);
 }
 
 .voice-catalog-tags > .ui-tag {
@@ -204,9 +204,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding: 10px 12px;
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-5);
+  padding: 10px var(--ui-space-3);
   border-radius: var(--voice-radius);
   background: var(--voice-fill);
 }
@@ -215,7 +215,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .voice-library-audition-text {
@@ -234,7 +234,7 @@
 
 .voice-library-audition-text .ui-form-item .ui-form-item-label {
   flex: 0 0 auto;
-  padding: 0 12px 0 0;
+  padding: 0 var(--ui-space-3) 0 0;
 }
 
 .voice-library-audition-text .ui-form-item .ui-form-item-control {
@@ -245,12 +245,12 @@
 .voice-library-audition-input {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .voice-library-audition-count {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   white-space: nowrap;
 }
 
@@ -291,7 +291,7 @@
 .voice-library-sample.ui-typography {
   max-height: 120px;
   overflow: auto;
-  margin: 0 0 12px;
+  margin: 0 0 var(--ui-space-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -299,7 +299,7 @@
 @media (max-width: 900px) {
   .voice-library-audition {
     grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+    gap: var(--ui-space-2);
   }
 
   .voice-library-preview-empty {
@@ -311,22 +311,22 @@
 @media (max-width: 600px) {
   .voice-library-controls > .ui-card-body,
   .voice-library-content > .ui-card-body {
-    padding: 16px;
+    padding: var(--ui-space-4);
   }
 
   .voice-library-audition {
-    padding: 8px;
+    padding: var(--ui-space-2);
   }
 
   .voice-library-audition-input {
-    gap: 8px;
+    gap: var(--ui-space-2);
   }
 }
 
 .voice-catalog-editable {
   display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--ui-space-1);
   min-width: 0;
 }
 
@@ -340,25 +340,25 @@
 }
 
 .voice-catalog-editor .ui-form-item {
-  margin-bottom: 8px;
+  margin-bottom: var(--ui-space-2);
 }
 
 .voice-catalog-editor .ui-alert {
-  margin-top: 8px;
+  margin-top: var(--ui-space-2);
 }
 
 .voice-library-settings .ui-drawer-header {
-  padding: 16px 24px;
+  padding: var(--ui-space-4) var(--ui-space-6);
 }
 
 .voice-library-settings .ui-drawer-body {
-  padding: 16px 24px;
+  padding: var(--ui-space-4) var(--ui-space-6);
   scrollbar-width: thin;
   scrollbar-color: var(--voice-border) transparent;
 }
 
 .voice-library-settings .ui-drawer-footer {
-  padding: 16px 24px;
+  padding: var(--ui-space-4) var(--ui-space-6);
 }
 
 .voice-library-settings-title {
@@ -376,8 +376,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-size);
   font-weight: 400;
 }
 
@@ -393,16 +393,16 @@
 .voice-library-settings-footer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .voice-library-footer-status {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .voice-library-footer-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .voice-library-footer-actions > .ui-btn {
@@ -417,56 +417,56 @@
 
 .voice-library-tools.ui-collapse > .ui-collapse-item > .ui-collapse-header,
 .voice-library-notes.ui-collapse > .ui-collapse-item > .ui-collapse-header {
-  padding: 12px 0;
+  padding: var(--ui-space-3) 0;
   align-items: center;
 }
 
 .voice-library-tools .ui-collapse-extra,
 .voice-library-notes .ui-collapse-extra {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .voice-library-notes.ui-collapse .ui-collapse-body {
-  padding: 0 0 16px;
+  padding: 0 0 var(--ui-space-4);
 }
 
 .voice-library-tools .tsz-ve-ssml-review {
-  gap: 12px;
+  gap: var(--ui-space-3);
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
 }
 
 .voice-library-tools .tsz-ve-ssml-review textarea {
-  padding: 12px;
+  padding: var(--ui-space-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.7;
   tab-size: 2;
 }
 
 .voice-library-tools .tsz-ve-ssml-review textarea[readonly] {
-  background: var(--ui-color-fill-quaternary, #fafafa);
+  background: var(--ui-color-fill-quaternary);
 }
 
 .voice-library-tools .tsz-ve-ssml-review > .ui-typography {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.6;
 }
 
 .voice-library-notes-field {
-  margin-block: 0 12px;
+  margin-block: 0 var(--ui-space-3);
 }
 
 @media (max-width: 480px) {
   .voice-library-settings .ui-drawer-header,
   .voice-library-settings .ui-drawer-body,
   .voice-library-settings .ui-drawer-footer {
-    padding: 16px;
+    padding: var(--ui-space-4);
   }
 
   .voice-library-footer-actions {
-    gap: 8px;
+    gap: var(--ui-space-2);
   }
 }
 
@@ -493,32 +493,32 @@
 
 /* 目录表头筛选与单行搜索采用同一控件尺度。 */
 .voice-library-catalog .ui-card {
-  border-color: #e8ebf1;
+  border-color: var(--ui-color-border-secondary);
   border-radius: 10px;
 }
 .voice-library-catalog .voice-library-controls > .ui-card-body {
-  padding: 16px 20px;
+  padding: var(--ui-space-4) var(--ui-space-5);
 }
 .voice-library-catalog .voice-library-content > .ui-card-body {
-  padding: 16px 20px;
+  padding: var(--ui-space-4) var(--ui-space-5);
 }
 .voice-library-catalog .voice-library-audition-row {
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 .voice-library-catalog .voice-library-audition-row > .ui-btn {
   min-height: 34px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .voice-library-catalog .voice-library-audition-text label .ui-typography {
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   font-weight: 500;
-  color: #475467;
+  color: var(--ui-color-text-secondary);
 }
 .voice-library-catalog .voice-library-audition-text textarea.ui-input {
   min-height: 34px;
-  border-color: #dfe4eb;
+  border-color: var(--ui-color-border-secondary);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
 }
 .voice-catalog-heading {
   gap: 7px;
@@ -526,14 +526,14 @@
 .voice-catalog-heading > span,
 .voice-catalog-heading-label {
   min-height: 20px;
-  color: #667085;
+  color: var(--ui-color-text-secondary);
 }
 .voice-catalog-heading > .ui-select {
   box-sizing: border-box;
   min-height: 32px;
-  border-color: #dfe4eb;
+  border-color: var(--ui-color-border-secondary);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .voice-catalog-heading > .ui-select .ui-select-content {
   min-height: 24px;
@@ -546,22 +546,22 @@
 }
 .voice-catalog-heading .ui-input-affix-wrapper {
   min-height: 32px;
-  border-color: #dfe4eb;
+  border-color: var(--ui-color-border-secondary);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .voice-catalog-table .ui-table-thead > tr > th {
-  padding-block: 12px;
+  padding-block: var(--ui-space-3);
   background: #f8f9fc;
 }
 .voice-catalog-table .ui-table-tbody > tr > td {
-  padding-block: 12px;
-  border-color: #edf0f5;
+  padding-block: var(--ui-space-3);
+  border-color: var(--ui-color-border-secondary);
 }
 .voice-catalog-actions .ui-btn {
   min-height: 30px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .voice-catalog-actions .voice-catalog-play {
   width: 30px;
@@ -570,15 +570,15 @@
   font-size: 15px;
 }
 .voice-catalog-name {
-  font-size: 14px;
-  color: #26324b;
+  font-size: var(--ui-font-size);
+  color: var(--ui-color-text);
 }
 .voice-catalog-tags > .ui-tag {
   font-size: 11px;
   border-radius: 4px;
 }
 .voice-catalog-footer {
-  padding-top: 20px;
+  padding-top: var(--ui-space-5);
 }
 @media (max-width: 600px) {
   .voice-library-catalog .voice-library-controls > .ui-card-body,

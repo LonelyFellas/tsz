@@ -5,10 +5,10 @@ import {
   Alert,
   Avatar,
   Badge,
-  Breadcrumb,
   Button,
   Card,
   Flex,
+  PageHeader,
   Space,
   Tag
 } from "@tsz/ui/admin/display";
@@ -119,10 +119,12 @@ export function UserManagement() {
       title: "用户昵称",
       dataIndex: "display_name",
       width: 130,
+      ellipsis: true,
       render: (name: string, record) => (
         <Button
           type="link"
-          style={{ padding: 0 }}
+          title={name}
+          className="admin-table-text-action"
           onClick={() => setDetailUser(record)}
         >
           {name}
@@ -297,7 +299,7 @@ export function UserManagement() {
         </Modal>
       )}
 
-      <Breadcrumb items={[{ title: "用户管理" }, { title: "用户管理" }]} />
+      <PageHeader title="用户管理" />
 
       <UserFilters
         key={filterResetKey}

@@ -6,6 +6,7 @@ import { PlusIcon, RotateCwIcon, UserRoundPlusIcon } from "lucide-react";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Flex,
@@ -212,7 +213,10 @@ export function RoleManagement() {
         </Modal>
       )}
 
-      <Breadcrumb items={[{ title: "用户管理" }, { title: "角色权限管理" }]} />
+      <PageHeader
+        title="角色权限管理"
+        breadcrumb={<Breadcrumb items={[{ title: "用户管理" }]} />}
+      />
 
       <Card size="small">
         {listQuery.isError && (

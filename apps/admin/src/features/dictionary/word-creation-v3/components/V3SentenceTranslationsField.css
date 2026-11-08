@@ -1,10 +1,10 @@
 .word-sentence-translation-list {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr);
   grid-template-areas:
     "label groups"
     "add add";
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-width: 0;
   width: 100%;
 }
@@ -12,7 +12,7 @@
 /*
  * 语言选择器占标题位。它是 Button 而非纯文本，需要三处校正才不破坏原有排版：
  * 高度对齐同行输入框的 40px；
- * 收紧左右内边距，因为 64px 的列宽下「汉语译文」四个字只剩 2px 余量；
+ * 收紧左右内边距，标签列按实际译文语言名称分配宽度；
  * 颜色回到次要色，否则 Button 的默认文本色会让标题比正文还重。
  */
 .word-sentence-translation-label.word-sentence-translation-label {
@@ -20,7 +20,7 @@
   justify-self: start;
   height: 40px;
   padding: 0 2px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   color: var(--ui-color-text-secondary);
 }
 
@@ -29,14 +29,14 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-width: 0;
 }
 
 .word-sentence-translation-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-width: 0;
 }
 
@@ -47,8 +47,8 @@
 }
 
 .word-sentence-translation-tier-hint {
-  color: var(--ui-color-text-secondary, #595959);
-  font-size: 12px;
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-sm);
 }
 
 .word-sentence-translation-item > textarea {
@@ -59,18 +59,18 @@
 .word-sentence-translation-item > .word-sentence-translation-band-button,
 .word-sentence-translation-item > .word-sentence-translation-delete {
   flex: none;
-  margin-top: 4px;
+  margin-top: var(--ui-space-1);
   padding: 0;
   width: 32px;
   height: 32px;
 }
 
 .word-sentence-translation-delete:not(:disabled) {
-  color: var(--ui-color-text-tertiary, #8c8c8c);
+  color: var(--ui-color-text-tertiary);
 }
 
 .word-sentence-translation-delete:not(:disabled):hover {
-  color: var(--ui-color-error, #ff4d4f);
+  color: var(--ui-color-error);
 }
 
 .word-sentence-translation-add {

@@ -10,6 +10,7 @@ export function V3StepActions({
   status?: string;
 }) {
   const anchor = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<{
     left: number;
     width: number;
@@ -54,8 +55,31 @@ export function V3StepActions({
     };
   }, []);
 
+  // 浮动助手需要避开底栏；窄屏按钮换行后，不能继续假设固定的底栏高度。
+  useLayoutEffect(() => {
+    const actions = actionsRef.current;
+    if (!actions || !bounds) return;
+    const root = document.documentElement;
+    const variable = "--word-step-actions-clearance";
+    const previous = root.style.getPropertyValue(variable);
+    const update = () => {
+      root.style.setProperty(
+        variable,
+        `${Math.max(0, window.innerHeight - actions.getBoundingClientRect().top)}px`
+      );
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(actions);
+    update();
+    return () => {
+      observer.disconnect();
+      if (previous) root.style.setProperty(variable, previous);
+      else root.style.removeProperty(variable);
+    };
+  }, [bounds]);
+
   const actions = (
-    <div className="word-step-actions">
+    <div ref={actionsRef} className="word-step-actions">
       {status && (
         <span className="v3-draft-status" role="status">
           {status}

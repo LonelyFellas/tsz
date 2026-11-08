@@ -18,7 +18,6 @@ it.each(["modal", "drawer"] as const)(
       )
     );
     const button = screen.getByRole("button", { name: "关闭" });
-    expect(button).toHaveTextContent("×");
     fireEvent.click(button);
     expect(close).toHaveBeenCalledOnce();
   }

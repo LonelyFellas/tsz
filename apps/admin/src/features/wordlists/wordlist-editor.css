@@ -1,16 +1,16 @@
 .wordlist-editor {
-  --wordlist-ink: #202636;
-  --wordlist-muted: #7d8492;
-  --wordlist-line: #e2e5eb;
+  --wordlist-ink: var(--ui-color-text);
+  --wordlist-muted: var(--ui-color-text-secondary);
+  --wordlist-line: var(--ui-color-border-secondary);
   display: grid;
-  gap: 20px;
+  gap: var(--ui-space-5);
   max-width: 1440px;
   min-width: 0;
   margin-inline: auto;
   color: var(--wordlist-ink);
 }
 .wordlist-editor > .ui-breadcrumb {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .wordlist-editor__header {
   position: sticky;
@@ -19,15 +19,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding-block: 12px;
-  background: var(--ui-color-bg-layout, #f5f5f5);
+  gap: var(--ui-space-4);
+  padding-block: var(--ui-space-3);
+  background: var(--ui-color-bg-layout);
 }
 .wordlist-editor__heading {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--ui-space-3);
   min-width: 0;
 }
 .wordlist-editor__heading .ui-typography {
@@ -45,35 +45,35 @@
   min-width: 0;
   border: 1px solid var(--wordlist-line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--ui-color-bg-container);
 }
 .wordlist-editor__basics {
   display: grid;
   gap: 10px;
-  padding: 24px;
+  padding: var(--ui-space-6);
 }
 .wordlist-editor__basics > .ui-input-affix-wrapper {
   max-width: 640px;
 }
 .wordlist-editor__label {
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   font-weight: 500;
 }
 .wordlist-editor__required {
-  color: var(--ui-color-error, #ff4d4f);
+  color: var(--ui-color-error);
 }
 .wordlist-editor__toolbar {
   position: sticky;
   top: 120px;
   z-index: 8;
-  background: #fff;
+  background: var(--ui-color-bg-container);
   border-radius: 16px 16px 0 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 20px 24px;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-5) var(--ui-space-6);
 }
 .wordlist-editor__section-title {
   display: flex;
@@ -85,7 +85,7 @@
   color: var(--wordlist-ink);
 }
 .wordlist-editor__section-title > span {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   color: var(--wordlist-muted);
 }
 .wordlist-editor__filter {
@@ -95,24 +95,24 @@
 .wordlist-editor__row {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 88px;
-  column-gap: 16px;
+  column-gap: var(--ui-space-4);
 }
 .wordlist-editor__columns {
-  padding: 10px 24px;
+  padding: 10px var(--ui-space-6);
   background: #f5f7fa;
   border-block: 1px solid var(--wordlist-line);
   color: var(--wordlist-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .wordlist-editor__row {
   position: relative;
   align-items: start;
-  row-gap: 12px;
-  padding: 20px 24px;
+  row-gap: var(--ui-space-3);
+  padding: var(--ui-space-5) var(--ui-space-6);
   border-bottom: 1px solid #eceff3;
 }
 .wordlist-editor__row--invalid {
-  background: var(--ui-color-error-bg, #fff2f0);
+  background: var(--ui-color-error-bg);
 }
 .wordlist-editor__leading {
   display: flex;
@@ -130,7 +130,7 @@
   cursor: default;
 }
 .wordlist-editor__index {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 .wordlist-editor__word,
@@ -145,7 +145,7 @@
   grid-column: 3;
   grid-row: 1;
   padding: 5px 0;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   line-height: 22px;
   overflow-wrap: anywhere;
 }
@@ -171,32 +171,32 @@
   align-items: flex-start;
   gap: 10px;
   min-width: 0;
-  padding-bottom: 12px;
+  padding-bottom: var(--ui-space-3);
 }
 .wordlist-editor__note > label {
   flex: none;
   padding-top: 6px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   color: var(--wordlist-muted);
 }
 .wordlist-editor__note > .ui-input-textarea {
   min-width: 0;
 }
 .wordlist-editor__note textarea {
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
 }
 .wordlist-editor__note .ui-input-data-count {
   font-size: 11px;
   color: #a5abb5;
 }
 .wordlist-editor__hint {
-  margin-top: 8px;
+  margin-top: var(--ui-space-2);
   color: var(--wordlist-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .wordlist-editor__suggestions {
   margin-top: 6px;
-  padding: 4px;
+  padding: var(--ui-space-1);
   border: 1px solid var(--wordlist-line);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgb(32 38 54 / 5%);
@@ -205,7 +205,7 @@
   display: grid;
   gap: 2px;
   width: 100%;
-  padding: 8px;
+  padding: var(--ui-space-2);
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -215,7 +215,7 @@
 }
 .wordlist-editor__suggestions > button:hover,
 .wordlist-editor__suggestions > button:focus-visible {
-  background: var(--ui-color-primary-bg, #edf4ff);
+  background: var(--ui-color-primary-bg);
 }
 .wordlist-editor__suggestions > button:disabled {
   cursor: not-allowed;
@@ -223,7 +223,7 @@
 }
 .wordlist-editor__suggestions small {
   color: var(--wordlist-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   overflow-wrap: anywhere;
 }
 .wordlist-editor__footer {
@@ -231,18 +231,18 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px 24px;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-4) var(--ui-space-6);
 }
 .wordlist-editor__mobile-label {
   display: none;
 }
 @media (max-width: 767px) {
   .wordlist-editor {
-    gap: 16px;
+    gap: var(--ui-space-4);
   }
   .wordlist-editor__header {
-    gap: 8px;
+    gap: var(--ui-space-2);
   }
   .wordlist-editor__heading {
     gap: 6px;
@@ -253,7 +253,7 @@
   .wordlist-editor__basics,
   .wordlist-editor__toolbar,
   .wordlist-editor__footer {
-    padding: 16px;
+    padding: var(--ui-space-4);
   }
   .wordlist-editor__columns {
     display: none;
@@ -261,7 +261,7 @@
   .wordlist-editor__row {
     grid-template-columns: 28px minmax(0, 1fr) 88px;
     gap: 10px;
-    padding: 16px;
+    padding: var(--ui-space-4);
   }
   .wordlist-editor__word {
     grid-column: 2 / 4;
@@ -280,7 +280,7 @@
   .wordlist-editor__mobile-label {
     display: block;
     margin-bottom: 6px;
-    font-size: 12px;
+    font-size: var(--ui-font-size-sm);
     color: var(--wordlist-muted);
   }
   .wordlist-editor__filter {

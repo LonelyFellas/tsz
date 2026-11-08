@@ -1,6 +1,6 @@
 .word-pronunciation-floating-fields {
-  gap: 20px;
-  padding-block-start: 8px;
+  gap: var(--ui-space-5);
+  padding-block-start: var(--ui-space-2);
 }
 
 .word-pronunciation-floating-fields > .word-pronunciation-row {
@@ -22,11 +22,11 @@
   z-index: 5;
   inset-inline-start: 12px;
   top: -8px;
-  padding-inline: 4px;
-  color: var(--ui-color-text-secondary, #8c8c8c);
-  background: var(--ui-color-bg-container, #fff);
+  padding-inline: var(--ui-space-1);
+  color: var(--ui-color-text-secondary);
+  background: var(--ui-color-bg-container);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 16px;
   cursor: text;
 }
@@ -35,18 +35,18 @@
   > .word-pronunciation-row:focus-within
   > .word-pronunciation-label,
 .word-synthesis-candidate:focus-within > .word-pronunciation-label {
-  color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-primary);
 }
 
 .word-pronunciation-synthesis {
   display: grid;
-  gap: 20px;
+  gap: var(--ui-space-5);
   min-width: 0;
 }
 
 .word-synthesis-optional {
   display: grid;
-  gap: 12px;
+  gap: var(--ui-space-3);
   min-width: 0;
 }
 
@@ -57,28 +57,28 @@
 
 .word-synthesis-ups-toggle {
   margin-inline-start: auto;
-  padding-inline: 4px;
+  padding-inline: var(--ui-space-1);
   border: 0;
-  font-size: 12px;
-  color: var(--ui-color-text-secondary, #8c8c8c);
+  font-size: var(--ui-font-size-sm);
+  color: var(--ui-color-text-secondary);
 }
 
 .word-synthesis-ups-toggle .ui-btn-icon {
-  color: var(--ui-color-text-quaternary, rgba(0, 0, 0, 0.25));
+  color: var(--ui-color-text-quaternary);
   font-size: var(--ui-font-size-icon, 12px);
 }
 
 .word-synthesis-ups-toggle[aria-expanded="true"] {
-  color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-primary);
 }
 
 .word-synthesis-ups-fields {
-  padding-block: 12px;
+  padding-block: var(--ui-space-3);
 }
 
 .word-synthesis-source {
   display: grid;
-  gap: 12px;
+  gap: var(--ui-space-3);
   min-width: 0;
 }
 
@@ -108,14 +108,14 @@
   textarea.v3-voice-text-large-preview.ui-input {
   font-size: 14pt;
   font-weight: 400;
-  padding: 4px 11px;
+  padding: var(--ui-space-1) 11px;
   line-height: var(--ui-line-height, 1.5714285714);
 }
 
 .word-synthesis-input {
   display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--ui-space-1);
   min-width: 0;
 }
 
@@ -132,8 +132,8 @@
 .word-actual-pronunciation-control
   .v3-voice-text-field-compact
   textarea.ui-input {
-  border-start-start-radius: var(--ui-border-radius, 6px);
-  border-end-start-radius: var(--ui-border-radius, 6px);
+  border-start-start-radius: var(--ui-border-radius);
+  border-end-start-radius: var(--ui-border-radius);
   border-start-end-radius: 0;
   border-end-end-radius: 0;
 }
@@ -149,14 +149,14 @@
 
 .word-synthesis-locale-warning {
   grid-column: 1;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1.6;
 }
 
 @container (max-width: 440px) {
   .word-pronunciation-synthesis .word-pronunciation-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
+    gap: var(--ui-space-1);
   }
 
   .word-synthesis-locale-warning {
@@ -167,7 +167,7 @@
 .word-synthesis-candidates {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--ui-space-3);
   min-width: 0;
 }
 .word-synthesis-candidates:has(> .word-synthesis-candidate:only-child) {
@@ -209,28 +209,28 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--ui-space-1);
 }
 
 .word-synthesis-settings {
   container-type: inline-size;
   width: min(560px, calc(100vw - 48px));
   display: grid;
-  gap: 12px;
+  gap: var(--ui-space-3);
   min-width: 0;
 }
 .word-synthesis-settings-body {
   display: grid;
-  gap: 12px;
+  gap: var(--ui-space-3);
   max-height: min(540px, calc(100dvh - 180px));
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 0 4px 4px;
+  padding: 0 var(--ui-space-1) var(--ui-space-1);
 }
 .word-synthesis-settings-source {
   display: block;
   margin-top: 3px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-weight: 400;
 }
 
@@ -241,7 +241,7 @@
 
 .word-synthesis-settings .tsz-ve-editor {
   display: grid;
-  gap: 16px;
+  gap: var(--ui-space-4);
   min-width: 0;
 }
 
@@ -252,8 +252,8 @@
 }
 
 .word-synthesis-settings .tsz-ve-pop-upload {
-  padding-top: 12px;
-  border-top: 1px solid var(--ui-color-border-secondary, #f0f0f0);
+  padding-top: var(--ui-space-3);
+  border-top: 1px solid var(--ui-color-border-secondary);
 }
 
 @container (max-width: 480px) {
@@ -277,14 +277,14 @@
 .word-synthesis-choice-content {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-width: 0;
 }
 
 .word-synthesis-choice-tag {
   flex-shrink: 0;
-  padding-inline: 4px;
-  border: 1px solid var(--ui-color-border, #d9d9d9);
+  padding-inline: var(--ui-space-1);
+  border: 1px solid var(--ui-color-border);
   border-radius: 4px;
   line-height: 20px;
 }
@@ -302,9 +302,9 @@
 }
 
 .word-synthesis-choice.ui-radio-wrapper-checked .word-synthesis-choice-tag {
-  color: var(--ui-color-text-light-solid, #fff);
-  background: var(--ui-color-primary, #2053ff);
-  border-color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-text-light-solid);
+  background: var(--ui-color-primary);
+  border-color: var(--ui-color-primary);
 }
 
 :is(
@@ -329,13 +329,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--ui-space-2);
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--ui-color-border-secondary, #f0f0f0);
+  border-bottom: 1px solid var(--ui-color-border-secondary);
 }
 
 .word-synthesis-settings-hint {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .word-synthesis-settings
@@ -350,15 +350,15 @@
 }
 
 .word-synthesis-settings .tsz-ve-synthesis-upload-unavailable {
-  padding-top: 12px;
-  border-top: 1px solid var(--ui-color-border-secondary, #f0f0f0);
-  color: var(--ui-color-text-secondary, #8c8c8c);
-  font-size: 12px;
+  padding-top: var(--ui-space-3);
+  border-top: 1px solid var(--ui-color-border-secondary);
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-sm);
 }
 
 .word-synthesis-control
   > .word-pronunciation-play-action[data-playback-dialect="uk"] {
-  color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-primary);
 }
 .word-synthesis-control
   > .word-pronunciation-play-action[data-playback-dialect="us"] {

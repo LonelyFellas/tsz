@@ -1,5 +1,5 @@
 .v3-step-actions {
-  --word-line: #e2e5eb;
+  --word-line: var(--ui-color-border-secondary);
   position: fixed;
   z-index: 5;
   bottom: 0;
@@ -10,11 +10,11 @@
   position: static;
   align-items: center;
   box-sizing: border-box;
-  gap: 12px;
+  gap: var(--ui-space-3);
   min-height: 68px;
   margin: 0;
   padding: 14px clamp(22px, 2.4vw, 40px);
-  background: #fff;
+  background: var(--ui-color-bg-container);
   border-top: 1px solid var(--word-line);
   box-shadow: 0 -4px 16px rgba(32, 38, 54, 0.025);
   backdrop-filter: none;
@@ -27,25 +27,25 @@
 .v3-draft-status {
   align-self: center;
   margin-inline-end: auto;
-  color: #475467;
-  font-size: 13px;
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
   font-variant-numeric: tabular-nums;
 }
 
 .v3-step-actions .ui-btn {
   height: 40px;
-  padding-inline: 20px;
+  padding-inline: var(--ui-space-5);
   font-weight: 500;
   box-shadow: none;
 }
 
 .v3-step-actions .ui-btn-default:not(:disabled) {
-  color: #344054;
+  color: var(--ui-color-text);
   border-color: #d5dbe5;
 }
 
 .v3-step-actions .ui-btn-text:not(:disabled) {
-  color: #667085;
+  color: var(--ui-color-text-secondary);
 }
 
 .v3-step-actions .ui-btn-primary {
@@ -56,9 +56,9 @@
   .v3-step-actions > .word-step-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: var(--ui-space-2);
     min-height: 0;
-    padding: 14px 12px max(14px, env(safe-area-inset-bottom));
+    padding: 14px var(--ui-space-3) max(14px, env(safe-area-inset-bottom));
   }
 
   .v3-step-actions[data-at-end="true"] > .word-step-actions {
@@ -68,7 +68,7 @@
   .v3-step-actions .ui-btn {
     width: 100%;
     min-width: 0;
-    padding-inline: 8px;
+    padding-inline: var(--ui-space-2);
   }
 
   .v3-draft-status,

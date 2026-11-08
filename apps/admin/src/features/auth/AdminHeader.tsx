@@ -175,7 +175,9 @@ export function AdminHeader() {
         >
           <Space size={8}>
             <AdminAvatar level={profile?.role} size="small" />
-            <ChevronDownIcon style={{ fontSize: 12, color: "#8c8c8c" }} />
+            <ChevronDownIcon
+              style={{ fontSize: 12, color: "var(--ui-color-text-secondary)" }}
+            />
           </Space>
         </Button>
       </Popover>

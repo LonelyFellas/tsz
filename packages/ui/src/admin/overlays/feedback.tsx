@@ -1,4 +1,5 @@
 import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
+import { X } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -108,7 +109,7 @@ function MessageNotice({
           className="ui-feedback-close"
           aria-label={t("controls.closeNotification")}
         >
-          ×
+          <X size={14} aria-hidden="true" />
         </button>
       )}
     </div>

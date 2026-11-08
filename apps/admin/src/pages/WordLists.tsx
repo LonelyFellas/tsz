@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Flex,
@@ -142,7 +143,10 @@ function Management({ adminId }: { adminId: string }) {
   }
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "词表管理" }, { title: "智能词表" }]} />
+      <PageHeader
+        title="智能词表"
+        breadcrumb={<Breadcrumb items={[{ title: "词表管理" }]} />}
+      />
       <Card className="admin-filter-card" size="small">
         <Form
           className="admin-filter-form"

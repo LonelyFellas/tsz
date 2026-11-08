@@ -1,10 +1,10 @@
 .console-shell {
-  --console-ink: #26324b;
-  --console-muted: #667085;
-  --console-line: #e8ebf1;
-  --console-blue: #2053ff;
+  --console-ink: var(--ui-color-text);
+  --console-muted: var(--ui-color-text-secondary);
+  --console-line: var(--ui-color-border-secondary);
+  --console-blue: var(--ui-color-primary);
   min-height: 100vh;
-  background: #f6f7f9;
+  background: var(--ui-color-bg-layout);
 }
 
 .console-workspace {
@@ -19,10 +19,10 @@
   align-items: center;
   box-sizing: border-box;
   height: 64px;
-  padding: 0 24px;
-  gap: 16px;
+  padding: 0 var(--ui-space-6);
+  gap: var(--ui-space-4);
   border-bottom: 1px solid var(--console-line);
-  background: #fff;
+  background: var(--ui-color-bg-container);
 }
 
 .console-header-left,
@@ -35,21 +35,21 @@
 }
 
 .console-header-left {
-  gap: 20px;
+  gap: var(--ui-space-5);
   min-width: 0;
 }
 .console-header-account {
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 .console-platform-label {
   color: var(--console-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .console-brand {
   flex-shrink: 0;
   gap: 9px;
-  color: #26324b;
+  color: var(--ui-color-text);
   font-size: 16px;
   font-weight: 650;
   text-decoration: none;
@@ -62,22 +62,22 @@
   width: 30px;
   height: 32px;
   border-radius: 8px;
-  background: #edf2ff;
-  color: #2053ff;
+  background: var(--ui-color-primary-bg);
+  color: var(--ui-color-primary);
 }
 
 .console-navigation-trigger {
   flex-shrink: 0;
   justify-content: center;
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-height: 36px;
   padding: 6px 10px;
   border: 1px solid transparent;
-  border-radius: 7px;
-  background: #f5f6f8;
-  color: #475467;
+  border-radius: var(--ui-border-radius);
+  background: var(--ui-color-fill-secondary);
+  color: var(--ui-color-text-secondary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -86,15 +86,15 @@
 }
 
 .console-navigation-trigger:hover {
-  background: #edf0f5;
-  color: #26324b;
+  background: var(--ui-color-border-secondary);
+  color: var(--ui-color-text);
 }
 .console-navigation-trigger[aria-expanded="true"] {
-  background: #edf2ff;
-  color: #2053ff;
+  background: var(--ui-color-primary-bg);
+  color: var(--ui-color-primary);
 }
 .console-navigation-trigger > svg:first-child {
-  color: #667085;
+  color: var(--ui-color-text-secondary);
 }
 .console-navigation-trigger[aria-expanded="true"] > svg:first-child {
   color: inherit;
@@ -108,13 +108,13 @@
 .console-navigation-close:focus-visible,
 .console-navigation-category:focus-visible,
 .console-navigation-destination:focus-visible {
-  outline: 2px solid #2053ff;
+  outline: var(--ui-focus-ring);
   outline-offset: 2px;
 }
 
 .console-content {
   min-width: 0;
-  padding: 24px;
+  padding: var(--ui-space-6);
 }
 
 .console-navigation-panel {
@@ -128,8 +128,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   border-radius: 14px;
-  background: #fff;
-  color: #26324b;
+  background: var(--ui-color-bg-container);
+  color: var(--ui-color-text);
   box-shadow:
     0 16px 48px rgb(31 43 70 / 16%),
     0 3px 10px rgb(31 43 70 / 5%);
@@ -147,23 +147,23 @@
   justify-content: space-between;
   min-height: 52px;
   padding: 0 18px;
-  border-bottom: 1px solid #e8ebf1;
-  background: #fff;
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+  background: var(--ui-color-bg-container);
 }
 
 .console-navigation-heading h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   font-weight: 600;
 }
 .console-navigation-dismiss {
   gap: 10px;
 }
 .console-navigation-dismiss kbd {
-  border: 1px solid #e4e7ec;
+  border: 1px solid var(--ui-color-border-secondary);
   border-radius: 4px;
-  padding: 1px 4px;
-  color: #667085;
+  padding: 1px var(--ui-space-1);
+  color: var(--ui-color-text-secondary);
   font: inherit;
   font-size: 10px;
 }
@@ -176,12 +176,12 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #667085;
+  color: var(--ui-color-text-secondary);
   cursor: pointer;
 }
 .console-navigation-close:hover {
-  background: #f2f4f7;
-  color: #26324b;
+  background: var(--ui-color-fill-secondary);
+  color: var(--ui-color-text);
 }
 .console-navigation-close svg {
   width: 16px;
@@ -197,8 +197,8 @@
   flex-direction: column;
   gap: 3px;
   padding: 10px;
-  background: #f7f8fa;
-  border-right: 1px solid #e8ebf1;
+  background: var(--ui-color-fill-alter);
+  border-right: 1px solid var(--ui-color-border-secondary);
 }
 .console-navigation-category {
   box-sizing: border-box;
@@ -208,24 +208,24 @@
   min-height: 38px;
   padding: 7px 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--ui-border-radius);
   background: transparent;
-  color: #475467;
+  color: var(--ui-color-text-secondary);
   text-decoration: none;
   text-align: left;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   line-height: 1.5;
   cursor: pointer;
 }
 .console-navigation-category:hover {
-  background: #edf0f5;
-  color: #26324b;
+  background: var(--ui-color-border-secondary);
+  color: var(--ui-color-text);
 }
 .console-navigation-category[aria-pressed="true"],
 .console-navigation-category[aria-current="page"] {
-  background: #fff;
-  color: #2053ff;
+  background: var(--ui-color-bg-container);
+  color: var(--ui-color-primary);
   box-shadow: 0 2px 5px rgb(31 43 70 / 6%);
 }
 .console-navigation-icon {
@@ -247,7 +247,7 @@
 }
 .console-navigation-destinations {
   min-width: 0;
-  padding: 20px 16px;
+  padding: var(--ui-space-5) var(--ui-space-4);
 }
 .console-navigation-section-heading {
   display: flex;
@@ -257,7 +257,7 @@
 }
 .console-navigation-section-heading h3 {
   margin: 0;
-  color: #26324b;
+  color: var(--ui-color-text);
   font-size: 15px;
   font-weight: 600;
 }
@@ -267,8 +267,8 @@
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: #f0f3fa;
-  color: #526687;
+  background: var(--ui-color-fill-secondary);
+  color: var(--ui-color-text-secondary);
 }
 .console-navigation-section-icon svg {
   width: 18px;
@@ -284,15 +284,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-height: 44px;
-  padding: 9px 12px;
+  padding: 9px var(--ui-space-3);
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #475467;
+  color: var(--ui-color-text-secondary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   line-height: 1.5;
   text-decoration: none;
   text-align: left;
@@ -303,12 +303,12 @@
   color: #98a2b3;
 }
 .console-navigation-destination:hover {
-  background: #f5f7fb;
-  color: #2053ff;
+  background: var(--ui-color-fill-alter);
+  color: var(--ui-color-primary);
 }
 .console-navigation-destination[aria-current="page"] {
-  background: #edf2ff;
-  color: #2053ff;
+  background: var(--ui-color-primary-bg);
+  color: var(--ui-color-primary);
   font-weight: 600;
 }
 .console-navigation-destination[aria-current="page"] > svg {
@@ -316,11 +316,11 @@
 }
 .console-navigation-destination:disabled {
   cursor: not-allowed;
-  color: #667085;
+  color: var(--ui-color-text-secondary);
   background: transparent;
 }
 .console-navigation-unavailable {
-  color: #667085;
+  color: var(--ui-color-text-secondary);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -343,17 +343,17 @@
 
 @media (max-width: 767px) {
   .console-topbar {
-    padding: 0 16px;
-    gap: 8px;
+    padding: 0 var(--ui-space-4);
+    gap: var(--ui-space-2);
   }
   .console-header-left {
-    gap: 12px;
+    gap: var(--ui-space-3);
   }
   .console-platform-label {
     display: none;
   }
   .console-content {
-    padding: 16px;
+    padding: var(--ui-space-4);
   }
 }
 
@@ -362,32 +362,32 @@
     grid-template-columns: 136px minmax(0, 1fr);
   }
   .console-navigation-categories {
-    padding: 8px 6px;
+    padding: var(--ui-space-2) 6px;
   }
   .console-navigation-category {
-    padding: 8px;
+    padding: var(--ui-space-2);
     gap: 7px;
-    font-size: 12px;
+    font-size: var(--ui-font-size-sm);
   }
   .console-navigation-category-arrow {
     display: none;
   }
   .console-navigation-destinations {
-    padding: 16px 8px;
+    padding: var(--ui-space-4) var(--ui-space-2);
   }
   .console-navigation-section-heading {
-    padding: 0 8px 14px;
+    padding: 0 var(--ui-space-2) 14px;
     gap: 7px;
   }
   .console-navigation-section-heading h3 {
-    font-size: 13px;
+    font-size: var(--ui-font-size-compact);
   }
   .console-navigation-section-icon {
     display: none;
   }
   .console-navigation-destination {
-    padding: 9px 8px;
-    font-size: 12px;
+    padding: 9px var(--ui-space-2);
+    font-size: var(--ui-font-size-sm);
   }
 }
 
@@ -396,7 +396,7 @@
     display: none;
   }
   .console-navigation-trigger {
-    padding-inline: 8px;
+    padding-inline: var(--ui-space-2);
   }
 }
 

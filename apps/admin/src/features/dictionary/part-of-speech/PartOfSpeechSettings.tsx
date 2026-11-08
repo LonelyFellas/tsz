@@ -6,6 +6,7 @@ import { PlusIcon, RotateCwIcon, SearchIcon } from "lucide-react";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Flex,
@@ -256,7 +257,10 @@ export function PartOfSpeechSettings() {
 
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "词库管理" }, { title: "词性配置" }]} />
+      <PageHeader
+        title="词性配置"
+        breadcrumb={<Breadcrumb items={[{ title: "词库管理" }]} />}
+      />
       {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
 
       <Tabs

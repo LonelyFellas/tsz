@@ -320,7 +320,9 @@ function V3BasicsContent({
               readOnly
               placeholder="暂无词条名称"
               size="large"
-              suffix={<CircleCheckIcon style={{ color: "#52c41a" }} />}
+              suffix={
+                <CircleCheckIcon style={{ color: "var(--ui-color-success)" }} />
+              }
               value={entryLabel}
               style={{ marginTop: 8 }}
             />
@@ -356,7 +358,7 @@ function V3BasicsContent({
             </Descriptions.Item>
             <Descriptions.Item label="原形检测">
               <Space size={6}>
-                <CircleCheckIcon style={{ color: "#52c41a" }} />
+                <CircleCheckIcon style={{ color: "var(--ui-color-success)" }} />
                 已完成
               </Space>
             </Descriptions.Item>

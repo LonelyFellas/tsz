@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Flex,
@@ -32,7 +33,10 @@ function Wallet({ id }: { id: string }) {
   });
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "天生币" }, { title: "我的天生币" }]} />
+      <PageHeader
+        title="我的天生币"
+        breadcrumb={<Breadcrumb items={[{ title: "天生币" }]} />}
+      />
       <Typography.Text type="secondary">
         查看当前管理员账号的天生币余额与收支记录。
       </Typography.Text>

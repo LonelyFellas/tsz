@@ -623,7 +623,13 @@ export function SentenceEditor({
               save={saveBeforeLeave}
             />
           )}
-          <Flex justify="space-between" align="center" gap={8}>
+          <Flex
+            className="sentence-editor-meta"
+            justify="space-between"
+            align="center"
+            wrap
+            gap="small"
+          >
             <Typography.Text type="secondary">
               {sentence
                 ? t("sentence_publish_impact", {
@@ -641,7 +647,7 @@ export function SentenceEditor({
                     "panel_examples_are_saved_separately_as_drafts_after_publishing_their_links_determ"
                   )}
             </Typography.Text>
-            <Space style={{ flexShrink: 0 }}>
+            <Space>
               <Typography.Text>{t("panel_level")}</Typography.Text>
               <Select
                 aria-label={t("panel_example_level")}

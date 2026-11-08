@@ -418,18 +418,16 @@ describe("SmartDictionary", () => {
       target: { value: "alpha" }
     });
     fireEvent.submit(screen.getByLabelText("词条").closest("form")!);
-    // 查询 mock 可先于 transition 提交调用，分页前先等待界面地址生效。
-    await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent(
-        "headword=alpha"
-      );
+    await waitFor(() =>
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 1,
         page_size: 20,
         headword: "alpha",
         ...boundaries
-      });
-    });
+      })
+    );
+    // 查询 mock 可先于并发渲染提交执行；等筛选项进入 DOM 后再翻页。
+    await screen.findByRole("button", { name: "移除词条：alpha" });
     fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent("page=2");

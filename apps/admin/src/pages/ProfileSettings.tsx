@@ -1,5 +1,5 @@
 import { useAdminTranslation } from "@/i18n";
-import { Button, Tabs, Typography } from "@tsz/ui/admin/display";
+import { Button, PageHeader, Tabs } from "@tsz/ui/admin/display";
 import {
   SlidersHorizontalIcon,
   KeyRoundIcon,
@@ -66,9 +66,10 @@ export function ProfileSettingsPage() {
   );
   return (
     <div className="profile-settings">
-      <header className="profile-settings__header">
-        <Typography.Title level={2}>{t("account_settings")}</Typography.Title>
-      </header>
+      <PageHeader
+        className="profile-settings__header"
+        title={t("account_settings")}
+      />
       {isSuper && profile ? (
         <Tabs
           key={profile.id}
