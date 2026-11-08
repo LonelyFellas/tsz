@@ -27,34 +27,28 @@ import { App, Drawer, Modal } from "@tsz/ui/admin/overlays";
 import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import { useEffect, useState } from "react";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
+import { useTeacherTranslation, TeacherText, TeacherError } from "./i18n";
 import { RevokeTeacherButton } from "./RevokeTeacherButton";
 
-const statuses: Record<
-  TeacherApplicationStatus,
-  { label: string; color: string }
-> = {
-  pending: { label: "待审核", color: "blue" },
-  approved: { label: "已通过", color: "green" },
-  rejected: { label: "已驳回", color: "orange" },
-  revoked: { label: "已撤销", color: "red" }
-};
-const kinds = {
-  id_front: "身份证人像面",
-  id_back: "身份证国徽面",
-  education: "学历证书",
-  language: "语言成绩"
+const statuses: Record<TeacherApplicationStatus, { color: string }> = {
+  pending: { color: "blue" },
+  approved: { color: "green" },
+  rejected: { color: "orange" },
+  revoked: { color: "red" }
 };
 
 export function TeacherApplicationsPage() {
+  const { t } = useTeacherTranslation();
   const allowed = usePermission("teacherapply.access");
   return allowed ? (
     <ApplicationQueue />
   ) : (
-    <Result status="403" title="未开通教师资格申请列表查看权限" />
+    <Result status="403" title={t("no_access")} />
   );
 }
 
 function PrivateMaterial({ file }: { file: CertificationFile }) {
+  const { t } = useTeacherTranslation();
   const allowed = usePermission(
     file.kind === "id_front" || file.kind === "id_back"
       ? "teacherapply.read_identity"
@@ -93,19 +87,19 @@ function PrivateMaterial({ file }: { file: CertificationFile }) {
   if (!allowed) return null;
   return (
     <div style={{ width: 160 }}>
-      <Typography.Text type="secondary">{kinds[file.kind]}</Typography.Text>
+      <Typography.Text type="secondary">{t(file.kind)}</Typography.Text>
       <div style={{ minHeight: 120, marginTop: 8 }}>
         {current?.url ? (
           <Image
             src={current.url}
-            alt={kinds[file.kind]}
+            alt={t(file.kind)}
             width={160}
             height={120}
             style={{ objectFit: "contain" }}
           />
         ) : current?.failed ? (
           <Button onClick={() => setAttempt((value) => value + 1)}>
-            重新读取
+            {t("reread")}
           </Button>
         ) : (
           <Spin />
@@ -116,6 +110,7 @@ function PrivateMaterial({ file }: { file: CertificationFile }) {
 }
 
 function ApplicationQueue() {
+  const { t } = useTeacherTranslation();
   const canReview = usePermission("teacherapply.review");
   const canReadCertificates = usePermission("teacherapply.read_certificates");
   const canReadIdentity = usePermission("teacherapply.read_identity");
@@ -156,7 +151,7 @@ function ApplicationQueue() {
         client.invalidateQueries({ queryKey: ["admin-users"] })
       ]);
       setAction(undefined);
-      void message.success("审核结果已保存并通知申请人");
+      void message.success(<TeacherText message="success" />);
     }
   });
   function review(
@@ -171,15 +166,20 @@ function ApplicationQueue() {
   return (
     <Flex vertical gap={16}>
       <PageHeader
-        title="教师申请审核"
-        breadcrumb={<Breadcrumb items={[{ title: "审核管理" }]} />}
+        title={t("title")}
+        breadcrumb={
+          <Breadcrumb
+            aria-label={t("breadcrumb")}
+            items={[{ title: t("reviews") }]}
+          />
+        }
       />
 
       <Card size="small">
         {list.isError && (
           <Alert
             type="error"
-            title={list.error.message}
+            title={<TeacherError error={list.error} />}
             showIcon
             style={{ marginBottom: 16 }}
           />
@@ -187,16 +187,16 @@ function ApplicationQueue() {
         <Table<TeacherApplication>
           toolbar={
             <Form className="admin-filter-form" colon={false} layout="inline">
-              <Form.Item label="审核状态">
+              <Form.Item label={t("review_status")}>
                 <Select
-                  aria-label="认证状态"
+                  aria-label={t("certification_status")}
                   allowClear
-                  placeholder="全部状态"
+                  placeholder={t("all_statuses")}
                   value={status}
                   style={{ width: 140 }}
-                  options={Object.entries(statuses).map(([value, label]) => ({
+                  options={Object.keys(statuses).map((value) => ({
                     value,
-                    label: label.label
+                    label: t(value as TeacherApplicationStatus)
                   }))}
                   onChange={(value) => {
                     setStatus(value);
@@ -209,7 +209,7 @@ function ApplicationQueue() {
                   icon={<RotateCwIcon />}
                   onClick={() => void list.refetch()}
                 >
-                  刷新
+                  {t("refresh")}
                 </Button>
               </Form.Item>
             </Form>
@@ -219,9 +219,7 @@ function ApplicationQueue() {
           locale={{
             emptyText: (
               <TableEmptyState
-                message={
-                  status === "pending" ? "暂无待审核的教师申请" : "暂无教师申请"
-                }
+                message={t(status === "pending" ? "empty_pending" : "empty")}
                 filtered={status !== undefined && status !== "pending"}
                 onResetFilters={() => {
                   setStatus("pending");
@@ -246,26 +244,26 @@ function ApplicationQueue() {
             }
           }}
           columns={[
-            { title: "姓名", dataIndex: "real_name" },
-            { title: "联系方式", dataIndex: "contact" },
+            { title: t("name"), dataIndex: "real_name" },
+            { title: t("contact"), dataIndex: "contact" },
             {
-              title: "提交时间",
+              title: t("submitted"),
               dataIndex: "submitted_at",
               render: (value: string) => new Date(value).toLocaleString()
             },
             {
-              title: "状态",
+              title: t("status"),
               dataIndex: "status",
               render: (value: TeacherApplicationStatus) => (
-                <Tag color={statuses[value].color}>{statuses[value].label}</Tag>
+                <Tag color={statuses[value].color}>{t(value)}</Tag>
               )
             },
             {
-              title: "操作",
+              title: t("actions"),
               key: "actions",
               render: (_, row) => (
                 <Button type="link" onClick={() => setSelected(row.id)}>
-                  查看材料
+                  {t("view")}
                 </Button>
               )
             }
@@ -273,7 +271,7 @@ function ApplicationQueue() {
         />
       </Card>
       <Drawer
-        title="认证资料"
+        title={t("materials")}
         open={!!selected}
         onClose={() => setSelected(undefined)}
         size={820}
@@ -284,9 +282,11 @@ function ApplicationQueue() {
         ) : detail.isError ? (
           <Alert
             type="error"
-            title={detail.error.message}
+            title={<TeacherError error={detail.error} />}
             action={
-              <Button onClick={() => void detail.refetch()}>重 试</Button>
+              <Button onClick={() => void detail.refetch()}>
+                {t("retry")}
+              </Button>
             }
           />
         ) : application ? (
@@ -295,20 +295,24 @@ function ApplicationQueue() {
               column={1}
               bordered
               items={[
-                { key: "name", label: "姓名", children: application.real_name },
+                {
+                  key: "name",
+                  label: t("name"),
+                  children: application.real_name
+                },
                 {
                   key: "contact",
-                  label: "联系方式",
+                  label: t("contact"),
                   children: application.contact
                 },
                 {
                   key: "status",
-                  label: "状态",
-                  children: statuses[application.status].label
+                  label: t("status"),
+                  children: t(application.status)
                 },
                 {
                   key: "statement",
-                  label: "认证说明",
+                  label: t("statement"),
                   children: (
                     <div style={{ whiteSpace: "pre-wrap" }}>
                       {application.statement}
@@ -319,7 +323,7 @@ function ApplicationQueue() {
                   ? [
                       {
                         key: "review",
-                        label: "审核原因",
+                        label: t("review_reason"),
                         children: application.review_reason
                       }
                     ]
@@ -328,7 +332,7 @@ function ApplicationQueue() {
                   ? [
                       {
                         key: "revoke",
-                        label: "撤销原因",
+                        label: t("revoke_reason"),
                         children: application.revoke_reason
                       }
                     ]
@@ -344,7 +348,7 @@ function ApplicationQueue() {
                 </Flex>
               </Image.PreviewGroup>
             ) : (
-              <Alert type="info" title="未开通资格证书或身份证查看权限" />
+              <Alert type="info" title={t("no_material_access")} />
             )}
             {canReview && application.status === "pending" && (
               <Space>
@@ -352,10 +356,10 @@ function ApplicationQueue() {
                   type="primary"
                   onClick={() => review(application, "approve")}
                 >
-                  通 过
+                  {t("approve")}
                 </Button>
                 <Button danger onClick={() => review(application, "reject")}>
-                  驳 回
+                  {t("reject")}
                 </Button>
               </Space>
             )}
@@ -368,20 +372,22 @@ function ApplicationQueue() {
         )}
       </Drawer>
       <Modal
-        title={action?.decision === "approve" ? "通过教师认证" : "驳回教师申请"}
+        title={t(
+          action?.decision === "approve" ? "approve_title" : "reject_title"
+        )}
         open={!!action}
         confirmLoading={mutation.isPending}
-        okText={action?.decision === "approve" ? "确认通过" : "确认驳回"}
-        cancelText="取 消"
+        okText={t(
+          action?.decision === "approve" ? "confirm_approve" : "confirm_reject"
+        )}
+        cancelText={t("cancel")}
         onOk={() => form.submit()}
         onCancel={() => {
           if (!mutation.isPending) setAction(undefined);
         }}
         destroyOnHidden
       >
-        {action?.decision === "approve" && (
-          <p>通过后，该账号将新增教师身份，学生身份保持不变。</p>
-        )}
+        {action?.decision === "approve" && <p>{t("approve_help")}</p>}
         <Form
           form={form}
           layout="vertical"
@@ -393,10 +399,19 @@ function ApplicationQueue() {
           {action?.decision === "reject" && (
             <Form.Item
               name="reason"
-              label="驳回原因"
+              label={t("rejection_reason")}
               rules={[
-                { required: true, whitespace: true, message: "请填写驳回原因" },
-                { max: 2000 }
+                {
+                  required: true,
+                  whitespace: true,
+                  message: <TeacherText message="reason_required" />
+                },
+                {
+                  max: 2000,
+                  message: (
+                    <TeacherText message="reason_max" params={{ max: 2000 }} />
+                  )
+                }
               ]}
             >
               <Input.TextArea
@@ -409,7 +424,11 @@ function ApplicationQueue() {
           )}
         </Form>
         {mutation.error && (
-          <Alert type="error" title={mutation.error.message} showIcon />
+          <Alert
+            type="error"
+            title={<TeacherError error={mutation.error} />}
+            showIcon
+          />
         )}
       </Modal>
     </Flex>

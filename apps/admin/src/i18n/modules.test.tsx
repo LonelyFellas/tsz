@@ -1,3 +1,4 @@
+import { teacherResources } from "@/features/teacher-certification/i18n";
 import { coinResources } from "@/features/coins/i18n";
 import { contentResources } from "@/features/content/i18n";
 import { aiResources } from "@/features/ai-ledger/i18n";
@@ -39,7 +40,8 @@ it("按模块加载的资源保持键、插值及复数形式完整", () => {
     voiceResources,
     aiResources,
     contentResources,
-    coinResources
+    coinResources,
+    teacherResources
   ];
   for (const resources of modules) {
     const base = Object.values(resources["zh-Hans"]!)[0]!;
@@ -116,6 +118,7 @@ it("模块资源不进入新建的登录实例，不在多个根节点间串语�
     ).toBeInTheDocument();
   }
   const fresh = createAdminI18n("en-US");
+  expect(fresh.hasResourceBundle("en", "adminTeacher")).toBe(false);
   expect(fresh.hasResourceBundle("en", "adminCoins")).toBe(false);
   expect(fresh.hasResourceBundle("en", "adminContent")).toBe(false);
   expect(fresh.hasResourceBundle("en", "adminAccess")).toBe(false);
