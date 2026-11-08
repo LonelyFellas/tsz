@@ -1,3 +1,4 @@
+import { useVoiceTranslation } from "./i18n";
 import { Volume2Icon } from "lucide-react";
 import {
   Alert,
@@ -77,6 +78,7 @@ export function VoiceAuditionPanel({
   ssmlDraft?: SsmlDraft;
   onSsmlDraftChange?: (draft: SsmlDraft) => void;
 }) {
+  const { t } = useVoiceTranslation();
   const [ssmlExpanded, setSsmlExpanded] = useState(false);
   const ssml = useRef<() => void>(undefined);
   const reference = useRef<() => void>(undefined);
@@ -103,15 +105,18 @@ export function VoiceAuditionPanel({
       if (reference.current === value) reference.current = undefined;
     };
   }, []);
-  const issue = voiceTrialIssue(voice, source);
+  const issue = voiceTrialIssue(voice, source, t);
   return (
-    <section className="voice-audition-panel" aria-label="试听与审听">
+    <section
+      className="voice-audition-panel"
+      aria-label={t("preview_and_review")}
+    >
       <div className="voice-audition-toolbar">
         <Flex align="center" justify="space-between" gap={12} wrap>
-          <Typography.Text strong>试听内容</Typography.Text>
+          <Typography.Text strong>{t("preview_content")}</Typography.Text>
           <Space wrap>
             <Select
-              aria-label="试听输出格式"
+              aria-label={t("preview_output_format")}
               value={source.output_format}
               options={[
                 { value: "mp3", label: "MP3" },
@@ -125,12 +130,12 @@ export function VoiceAuditionPanel({
             <Button
               type="primary"
               icon={<Volume2Icon />}
-              aria-label="试听当前参数"
+              aria-label={t("preview_current_parameters")}
               loading={pending}
               disabled={readOnly || !canAudition || !!issue}
               onClick={onAudition}
             >
-              试听当前参数
+              {t("preview_current_parameters")}
             </Button>
             {comparisonAction}
           </Space>
@@ -148,7 +153,7 @@ export function VoiceAuditionPanel({
       />
       {issue && <Alert type="warning" showIcon title={issue} />}
       <div className="voice-audition-preview">
-        <Typography.Text strong>音频审听</Typography.Text>
+        <Typography.Text strong>{t("audio_review")}</Typography.Text>
         <VoicePreviewResult
           preview={preview}
           pending={pending}

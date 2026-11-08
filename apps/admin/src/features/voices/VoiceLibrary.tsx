@@ -1,3 +1,13 @@
+import {
+  useVoiceTranslation,
+  VoiceText,
+  voiceMessage,
+  useVoiceMessageState,
+  voiceLabel,
+  defaultVoiceTranslation,
+  type VoiceTranslation,
+  type VoiceMessageValue
+} from "./i18n";
 import type { SsmlDraft } from "@tsz/voice-editor/types";
 import { speechAccentGroup } from "@tsz/shared";
 import { RotateCwIcon } from "lucide-react";
@@ -79,20 +89,32 @@ interface VoiceForm extends Parameters {
 interface Preview extends AdminSpeechPreviewResponse {
   voice: AdminSpeechVoice;
   parameters: Parameters;
-  comparison?: string;
+  comparison?: VoiceMessageValue;
 }
 
-function previewError(error: unknown): string {
+function previewError(
+  error: unknown,
+  t: VoiceTranslation = defaultVoiceTranslation
+): string {
   if (error instanceof HttpError) {
-    if (error.status === 403) return "没有生成试听的权限，请联系管理员。";
-    if (error.status === 404) return "这个音色已不可用，请刷新音色列表。";
-    if (error.status === 409) return "相同试听正在生成，请稍后重试。";
-    if (error.status === 429) return "试听请求过于频繁，请稍后重试。";
+    if (error.status === 403)
+      return t(
+        "you_do_not_have_permission_to_generate_previews_contact_an_admini"
+      );
+    if (error.status === 404)
+      return t("this_voice_is_unavailable_refresh_the_voice_list");
+    if (error.status === 409)
+      return t("the_same_preview_is_being_generated_try_again_later");
+    if (error.status === 429)
+      return t("too_many_preview_requests_try_again_later");
     if (error.status === 400 || error.status === 422)
-      return "试听文本或参数不受支持，请调整后重试。";
-    if (error.status >= 500) return "试听服务暂时不可用，请稍后重试。";
+      return t(
+        "the_preview_text_or_parameters_are_unsupported_adjust_them_and_tr"
+      );
+    if (error.status >= 500)
+      return t("the_preview_service_is_unavailable_try_again_later");
   }
-  return "试听失败，请检查网络后重试。";
+  return t("preview_failed_check_the_connection_and_try_again");
 }
 
 function VoiceSettingsNavigationGuard({
@@ -102,6 +124,7 @@ function VoiceSettingsNavigationGuard({
   dirty: boolean;
   busy: boolean;
 }) {
+  const { t } = useVoiceTranslation();
   const [drafts, setDrafts] = useDubbingDrafts();
   const groupsPath = `/${ADMIN_PAGE_ROUTES.voices.path}`;
   const hasGroupDrafts = Object.keys(drafts).length > 0;
@@ -112,11 +135,13 @@ function VoiceSettingsNavigationGuard({
   return blocker.state === "blocked" ? (
     <Modal
       open
-      title="还有未保存的音色设置"
+      title={t("voice_settings_have_not_been_saved")}
       onCancel={() => blocker.reset()}
       footer={
         <Space>
-          <Button onClick={() => blocker.reset()}>继续编辑</Button>
+          <Button onClick={() => blocker.reset()}>
+            {t("continue_editing")}
+          </Button>
           <Button
             disabled={busy}
             onClick={() => {
@@ -124,14 +149,14 @@ function VoiceSettingsNavigationGuard({
               blocker.proceed();
             }}
           >
-            放弃并离开
+            {t("discard_and_leave")}
           </Button>
         </Space>
       }
     >
       {hasGroupDrafts && blocker.location?.pathname === groupsPath
-        ? "当前音色的未保存修改将丢弃，已添加的分组草稿会保留。"
-        : "离开后将丢弃尚未保存的音色修改和分组草稿。"}
+        ? t("unsaved_changes_to_this_voice_will_be_discarded_added_group_draft")
+        : t("leaving_discards_unsaved_voice_changes_and_group_drafts")}
     </Modal>
   ) : null;
 }
@@ -148,6 +173,7 @@ export function VoiceLibrary({ view = "groups" }: { view?: VoiceView }) {
 }
 
 function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
+  const { t } = useVoiceTranslation();
   const token = adminTokens;
   const style = {
     "--voice-fill": token.colorFillAlter,
@@ -187,7 +213,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   const router = useContext(UNSAFE_DataRouterContext);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useVoiceMessageState(null);
   const [trialSources, setTrialSources] = useState<
     Record<string, VoiceTrialSource>
   >({});
@@ -228,8 +254,8 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   const canEditDescription = usePermission("speech.global_dubbing");
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState<"personal" | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useVoiceMessageState(null);
+  const [saveError, setSaveError] = useVoiceMessageState(null);
   const [basePersonalRevision, setBasePersonalRevision] = useState(0);
   const settingsBusy = !!saving || recommendationPending || reloading;
   const [metadataEditors, setMetadataEditors] = useState<
@@ -325,12 +351,12 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
       setPreview(null);
       setError(null);
     }
-  }, [canGenerate]);
+  }, [canGenerate, setError]);
 
   async function audition(
     voice: AdminSpeechVoice,
     parameters?: Parameters,
-    comparison?: string
+    comparison?: VoiceMessageValue
   ) {
     const source = voiceTrial(voice);
     if (
@@ -408,8 +434,10 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
           source.reading_links.length &&
             cause instanceof HttpError &&
             cause.status === 400
-            ? "关联读法或标注已失效，请重新确认词形和读法后再试听。草稿已保留。"
-            : previewError(cause)
+            ? voiceMessage(
+                "linked_readings_or_annotations_are_no_longer_valid_confirm_the_fo"
+              )
+            : { format: (t) => previewError(cause, t) }
         );
     } finally {
       if (controller.current === request) {
@@ -459,7 +487,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         "role"
       ]);
       if (session !== editSession.current) return;
-      await audition(selected, parameters, "当前参数");
+      await audition(selected, parameters, voiceMessage("current_parameters"));
     } catch {
       // Form keeps invalid values visible beside the corresponding fields.
     }
@@ -509,10 +537,12 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
       source.reading_links.length
     ) {
       modal.confirm({
-        title: "恢复共用试听文本？",
-        content: "会清除当前音色的文本标注和关联读法，声音参数保持不变。",
-        okText: "恢复共用文本",
-        cancelText: "保留草稿",
+        title: <VoiceText message="restore_shared_preview_text" />,
+        content: (
+          <VoiceText message="this_clears_text_annotations_and_linked_readings_for_this_voice_v" />
+        ),
+        okText: <VoiceText message="restore_shared_text" />,
+        cancelText: <VoiceText message="keep_draft" />,
         onOk: restore
       });
     } else restore();
@@ -598,14 +628,20 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         notes: values.notes
       };
       updateDirty(form.getFieldsValue());
-      setSaveMessage("听感已保存，仅你可见。");
+      setSaveMessage(
+        voiceMessage("listening_notes_saved_only_you_can_view_them")
+      );
     } catch (cause) {
       setSaveError(
         cause instanceof HttpError && cause.status === 409
-          ? "设置已在其他页面修改。当前输入已保留，请重新载入最新设置后再编辑。"
+          ? voiceMessage(
+              "settings_changed_in_another_page_your_input_has_been_kept_reload_"
+            )
           : cause instanceof HttpError && cause.status === 403
-            ? "没有保存权限，当前输入已保留。"
-            : "保存失败，当前输入已保留，请重试。"
+            ? voiceMessage(
+                "you_do_not_have_permission_to_save_your_input_has_been_kept"
+              )
+            : voiceMessage("could_not_save_your_input_has_been_kept_try_again")
       );
     } finally {
       setSaving(null);
@@ -665,10 +701,10 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
       return;
     }
     modal.confirm({
-      title: "还有未保存的音色设置",
-      content: "关闭会丢弃尚未保存的听感。",
-      okText: "放弃修改",
-      cancelText: "继续编辑",
+      title: <VoiceText message="voice_settings_have_not_been_saved" />,
+      content: <VoiceText message="closing_discards_unsaved_listening_notes" />,
+      okText: <VoiceText message="discard_changes_9b7824" />,
+      cancelText: <VoiceText message="continue_editing" />,
       onOk: close
     });
   }
@@ -699,8 +735,10 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     return (
       <Result
         status="403"
-        title="无权限"
-        subTitle="需要词库或例句查看权限才能浏览音色库。"
+        title={t("access_denied")}
+        subTitle={t(
+          "lexicon_or_sentence_viewing_permission_is_required_to_browse_the_"
+        )}
       />
     );
 
@@ -724,11 +762,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         void library.refetch();
       }}
     >
-      刷新音色
+      {t("refresh_voices")}
     </Button>
   );
   const auditionPanel = (
-    <section className="voice-library-audition" aria-label="音色试听">
+    <section className="voice-library-audition" aria-label={t("voice_preview")}>
       <div className="voice-library-audition-row">
         {tab === "library" && refreshButton}
         <Form
@@ -737,13 +775,19 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
           colon={false}
         >
           <Form.Item
-            label={<Typography.Text strong>试听文本</Typography.Text>}
+            label={
+              <Typography.Text strong>{t("preview_text")}</Typography.Text>
+            }
             validateStatus={!validText ? "error" : undefined}
-            help={!validText ? "请输入 1–500 个字符的试听文本。" : undefined}
+            help={
+              !validText
+                ? t("enter_1_500_characters_of_preview_text_4dc82c")
+                : undefined
+            }
           >
             <div className="voice-library-audition-input">
               <Input.TextArea
-                aria-label="共用试听文本"
+                aria-label={t("shared_preview_text")}
                 value={text}
                 autoSize={{ minRows: 1, maxRows: 3 }}
                 onChange={(event) => {
@@ -771,11 +815,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     >
       {tab === "library" ? (
         <PageHeader
-          title="音色库"
-          breadcrumb={<Breadcrumb items={[{ title: "配音中心" }]} />}
+          title={t("voice_library")}
+          breadcrumb={<Breadcrumb items={[{ title: t("dubbing_centre") }]} />}
         />
       ) : (
-        <Breadcrumb items={[{ title: "配音中心" }]} />
+        <Breadcrumb items={[{ title: t("dubbing_centre") }]} />
       )}
       {router && tab === "library" && (
         <VoiceSettingsNavigationGuard
@@ -787,16 +831,22 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         <Alert
           type="info"
           showIcon
-          title="当前账号可以浏览音色；生成试听需要词库查看和语音生成权限。"
+          title={t(
+            "you_can_browse_voices_generating_previews_requires_lexicon_viewin"
+          )}
         />
       )}
       {library.isError && (
         <Alert
           type="warning"
           showIcon
-          title="音色资料和个人设置未能加载，仍可使用默认参数试听。"
+          title={t(
+            "voice_information_and_personal_settings_could_not_be_loaded_you_c"
+          )}
           action={
-            <Button onClick={() => void library.refetch()}>重试资料</Button>
+            <Button onClick={() => void library.refetch()}>
+              {t("retry_loading_information")}
+            </Button>
           }
         />
       )}
@@ -834,9 +884,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
               <Alert
                 type="error"
                 showIcon
-                title="音色列表加载失败，请重试。"
+                title={t("could_not_load_voices_try_again")}
                 action={
-                  <Button onClick={() => void voices.refetch()}>重试</Button>
+                  <Button onClick={() => void voices.refetch()}>
+                    {t("try_again")}
+                  </Button>
                 }
               />
             ) : (
@@ -868,7 +920,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         style={style}
         title={
           <div className="voice-library-settings-title">
-            <span>调节声音</span>
+            <span>{t("adjust_voice_label")}</span>
             {selected && (
               <div className="voice-library-settings-voice">
                 <VoiceName voice={selected} />
@@ -881,7 +933,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                         : "default"
                   }
                 >
-                  {accentNames[voiceAccent(selected)]}
+                  {voiceLabel(accentNames[voiceAccent(selected)], t)}
                 </Tag>
               </div>
             )}
@@ -899,12 +951,12 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                   type="secondary"
                   className="voice-library-footer-status"
                 >
-                  听感尚未保存
+                  {t("listening_notes_are_unsaved")}
                 </Typography.Text>
               )}
               <div className="voice-library-footer-actions">
                 <Button
-                  title="仅本页有效，刷新后重置"
+                  title={t("applies_to_this_page_only_resets_on_refresh")}
                   disabled={
                     settingsBusy ||
                     !trialReady ||
@@ -912,7 +964,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                   }
                   onClick={() => void retainTrial()}
                 >
-                  保留本次试听
+                  {t("keep_current_preview")}
                 </Button>
                 {canEditDescription && (
                   <Button
@@ -926,12 +978,14 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                     title={
                       speechAccentGroup(selected.locale, selected.accent) ===
                       "other"
-                        ? "其他地区仅作文本补充音色，不加入英美默认推荐"
+                        ? t(
+                            "other_regions_are_supplementary_text_voices_and_are_not_added_to_"
+                          )
                         : undefined
                     }
                     onClick={() => void openRecommendation()}
                   >
-                    加入分组推荐
+                    {t("add_to_group_recommendations")}
                   </Button>
                 )}
               </div>
@@ -952,7 +1006,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                     loading={reloading}
                     onClick={() => void reloadSettings()}
                   >
-                    重新载入设置
+                    {t("reload_settings")}
                   </Button>
                 }
               />
@@ -1041,12 +1095,14 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                     items={[
                       {
                         key: "notes",
-                        label: "我的听感",
+                        label: t("my_listening_notes"),
                         extra: (
                           <Typography.Text
                             type={settingsDirty ? "warning" : "secondary"}
                           >
-                            {settingsDirty ? "未保存" : "仅自己可见"}
+                            {settingsDirty
+                              ? t("unsaved")
+                              : t("visible_only_to_you")}
                           </Typography.Text>
                         ),
                         forceRender: true,
@@ -1057,19 +1113,25 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                               className="voice-library-notes-field"
                               rules={[
                                 {
+                                  message: (
+                                    <VoiceText message="listening_notes_must_be_at_most_3000_characters" />
+                                  ),
+
                                   validator: (_, value: string) =>
                                     Array.from(value ?? "").length <= 3000
                                       ? Promise.resolve()
                                       : Promise.reject(
-                                          new Error("听感最多 3000 个字符")
+                                          new Error(
+                                            "listening_notes_must_be_at_most_3000_characters"
+                                          )
                                         )
                                 }
                               ]}
                             >
                               <Input.TextArea
-                                aria-label="我的听感"
+                                aria-label={t("my_listening_notes")}
                                 rows={2}
-                                placeholder="记录试听感受"
+                                placeholder={t("record_your_listening_notes")}
                               />
                             </Form.Item>
                             <Button
@@ -1077,7 +1139,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                               disabled={!library.isSuccess || settingsBusy}
                               onClick={() => void save()}
                             >
-                              保存听感
+                              {t("save_listening_notes")}
                             </Button>
                           </>
                         )
@@ -1149,11 +1211,11 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                             selected,
                             settingsBaseline.current ??
                               initialParameters(selected),
-                            "原参数"
+                            voiceMessage("original_parameters")
                           )
                         }
                       >
-                        试听原参数
+                        {t("preview_original_parameters")}
                       </Button>
                     }
                     sourceAction={
@@ -1164,7 +1226,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                           disabled={settingsBusy}
                           onClick={restoreCommonText}
                         >
-                          恢复共用文本
+                          {t("restore_shared_text")}
                         </Button>
                       )
                     }
@@ -1174,7 +1236,9 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
             </Form>
             {canEditDescription && (
               <Modal
-                title={`将 ${selected.display_name} 加入分组推荐`}
+                title={t("add_voice_recommendation", {
+                  name: selected.display_name
+                })}
                 open={addingRecommendation}
                 onCancel={() =>
                   !recommendationPending && setAddingRecommendation(false)
@@ -1186,7 +1250,9 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
                 destroyOnHidden
               >
                 <Typography.Paragraph type="secondary">
-                  使用当前音量、语速、音调和风格创建推荐。
+                  {t(
+                    "create_a_recommendation_using_the_current_volume_rate_pitch_and_s"
+                  )}
                 </Typography.Paragraph>
                 <AddRecommendation
                   onBusyChange={setRecommendationPending}

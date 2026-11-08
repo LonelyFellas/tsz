@@ -1,3 +1,4 @@
+import { useVoiceTranslation } from "./i18n";
 import type { AdminSpeechVoice } from "@tsz/types";
 import { Alert, Typography } from "@tsz/ui/admin/display";
 import { VoiceEditor } from "@tsz/voice-editor/editor";
@@ -19,6 +20,7 @@ export function VoiceTrialEditor({
   onChange: (source: VoiceTrialSource) => void;
   onValidationChange: (ready: boolean) => void;
 }) {
+  const { t } = useVoiceTranslation();
   const capabilities = voiceTrialCapabilities(voice);
   const english = voice.locale === "en-GB" || voice.locale === "en-US";
   const noReading =
@@ -36,19 +38,22 @@ export function VoiceTrialEditor({
           title={
             noReading
               ? voice.synthesis_available === false
-                ? "暂未开放合成"
-                : "发音标注暂不可用"
-              : "音标与关联读法仅限英美音色"
+                ? t("synthesis_is_not_enabled_yet")
+                : t("pronunciation_annotations_are_unavailable")
+              : t(
+                  "phonemes_and_linked_readings_are_only_available_for_british_and_a"
+                )
           }
         />
       )}
       <VoiceEditor
+        contextKey={`voice-trial:${voice.alias}`}
         value={source.content}
         readingLinks={source.reading_links}
         mode="voice-trial"
         language={voice.locale.split("-")[0]}
-        contextLabel="本次试听文本"
-        placeholder="输入试听文本"
+        contextLabel={t("current_preview_text")}
+        placeholder={t("enter_preview_text")}
         speechCapabilities={capabilities}
         previewEnabled={false}
         readOnly={readOnly}
@@ -75,7 +80,9 @@ export function VoiceTrialEditor({
       >
         {length} / 500
       </Typography.Text>
-      {length > 500 && <Alert type="error" showIcon title="最多 500 字符" />}
+      {length > 500 && (
+        <Alert type="error" showIcon title={t("at_most_500_characters")} />
+      )}
     </div>
   );
 }

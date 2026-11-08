@@ -1,3 +1,4 @@
+import { defaultVoiceTranslation, type VoiceTranslation } from "./i18n";
 import type {
   AdminSpeechVoice,
   AdminVoiceParameters,
@@ -43,20 +44,23 @@ export function voiceTrialCapabilities(
 
 export function voiceTrialIssue(
   voice: AdminSpeechVoice,
-  source: VoiceTrialSource
+  source: VoiceTrialSource,
+  t: VoiceTranslation = defaultVoiceTranslation
 ): string | undefined {
   if (
     !source.content.text.trim() ||
     Array.from(source.content.text).length > 500
   )
-    return "请输入 1–500 个字符的试听文本。";
+    return t("enter_1_500_characters_of_preview_text_4dc82c");
   const caps = voiceTrialCapabilities(voice);
   if (
     (source.reading_links.length ||
       source.content.annotations.some((mark) => mark.type === "phoneme")) &&
     !caps.supportsPhoneme
   )
-    return "当前音色暂未开放指定音标或关联单词读法，请移除标注或使用支持的音色。";
+    return t(
+      "this_voice_does_not_support_specified_phonemes_or_linked_word_rea"
+    );
   if (
     source.content.annotations.some(
       (mark) =>
@@ -65,10 +69,14 @@ export function voiceTrialIssue(
         (mark.type === "sub" && !caps.supportsSub)
     )
   )
-    return "当前音色暂未开放这些读法或停顿，请移除标注或使用支持的音色。";
+    return t(
+      "this_voice_does_not_support_these_readings_or_pauses_yet_remove_t"
+    );
   const accent = voice.locale === "en-GB" ? "uk" : "us";
   if (source.reading_links.some((link) => !link.reading_reference?.[accent]))
-    return "当前口音尚未确认关联词的具体读法，请重新选择。";
+    return t(
+      "confirm_a_specific_reading_for_the_linked_word_in_the_current_acc"
+    );
 }
 
 export function voiceTrialSetting(

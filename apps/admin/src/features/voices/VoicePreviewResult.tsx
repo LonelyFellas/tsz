@@ -1,3 +1,9 @@
+import {
+  useVoiceTranslation,
+  voiceMessageText,
+  voiceLabel,
+  type VoiceMessageValue
+} from "./i18n";
 import { Volume2Icon } from "lucide-react";
 import {
   Alert,
@@ -22,7 +28,7 @@ export interface VoicePreviewData {
   result: AdminSpeechPreviewResponse;
   voice: AdminSpeechVoice;
   parameters: AdminVoiceParameters;
-  comparison?: string;
+  comparison?: VoiceMessageValue;
 }
 
 export function VoicePreviewResult({
@@ -40,6 +46,7 @@ export function VoicePreviewResult({
   player: RefObject<HTMLAudioElement | null>;
   onPlay: () => void;
 }) {
+  const { t } = useVoiceTranslation();
   const [audioError, setAudioError] = useState(false);
   const [reviewAudio, setReviewAudio] = useState<ReviewAudio>();
   // 在新音频触发加载事件前清理旧状态，避免覆盖当前的加载错误。
@@ -52,9 +59,11 @@ export function VoicePreviewResult({
       {pending && (
         <Space>
           <Volume2Icon />
-          <Typography.Text type="secondary">正在生成试听…</Typography.Text>
+          <Typography.Text type="secondary">
+            {t("generating_preview")}
+          </Typography.Text>
           <Button type="link" size="small" onClick={onCancel}>
-            取消
+            {t("cancel")}
           </Button>
         </Space>
       )}
@@ -62,7 +71,9 @@ export function VoicePreviewResult({
       {!pending && !error && !preview && (
         <div className="voice-library-preview-empty">
           <Volume2Icon />
-          <Typography.Text type="secondary">暂无试听音频</Typography.Text>
+          <Typography.Text type="secondary">
+            {t("no_preview_audio_yet")}
+          </Typography.Text>
         </div>
       )}
       {preview && (
@@ -71,19 +82,27 @@ export function VoicePreviewResult({
             <Space wrap>
               <VoiceName voice={preview.voice} />
               <Tag>
-                {preview.comparison ??
+                {voiceMessageText(preview.comparison, t) ??
                   (preview.voice.locale === "en-GB"
-                    ? "英式英语"
+                    ? t("british_english")
                     : preview.voice.locale === "en-US"
-                      ? "美式英语"
+                      ? t("american_english")
                       : preview.voice.locale)}
               </Tag>
               <Typography.Text type="secondary">
-                本次试听：音量 <VoiceVolume parameters={preview.parameters} />，
+                {t("preview_parameters_intro")}{" "}
+                <VoiceVolume parameters={preview.parameters} />
+                {t("preview_parameter_separator")}
                 <VoiceRate parameters={preview.parameters} />
-                {preview.parameters.style
-                  ? `，${styleNames[preview.parameters.style] ?? preview.parameters.style}`
-                  : "，默认"}
+                {t("preview_style_suffix", {
+                  style: preview.parameters.style
+                    ? voiceLabel(
+                        styleNames[preview.parameters.style] ??
+                          preview.parameters.style,
+                        t
+                      )
+                    : t("default")
+                })}
               </Typography.Text>
             </Space>
             <audio
@@ -91,7 +110,9 @@ export function VoicePreviewResult({
               ref={player}
               controls
               autoPlay
-              aria-label={`${preview.voice.display_name} 试听播放器`}
+              aria-label={t("preview_player", {
+                name: preview.voice.display_name
+              })}
               src={preview.result.audio_url}
               onLoadedMetadata={(event) =>
                 setReviewAudio({
@@ -134,13 +155,15 @@ export function VoicePreviewResult({
               <Alert
                 type="warning"
                 showIcon
-                title="音频加载失败或链接已过期，请重新生成试听。"
+                title={t(
+                  "audio_could_not_be_loaded_or_the_link_has_expired_generate_a_new_"
+                )}
               />
             )}
             <Typography.Text type="secondary">
               {audioError
-                ? "请重新点击试听。"
-                : "若未自动播放，请点击播放按钮。"}
+                ? t("select_preview_again")
+                : t("if_playback_does_not_start_automatically_select_play")}
             </Typography.Text>
           </Flex>
         </div>

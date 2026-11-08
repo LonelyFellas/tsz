@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -126,4 +128,51 @@ it("完成后不保留历史状态，也不把更早的失败任务重新展示"
   expect(
     screen.queryByRole("button", { name: "重试失败项" })
   ).not.toBeInTheDocument();
+});
+
+it("切语言保留任务计时与轮询身份，不自动撤销或重试", async () => {
+  vi.useFakeTimers();
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } }
+  });
+  clients.push(client);
+  const job = update();
+  client.setQueryData(
+    ["admin-dubbing-audio-updates", "update-admin", "group", 3],
+    { updates: [job] }
+  );
+  const read = vi
+    .spyOn(api.speech, "audioUpdates")
+    .mockResolvedValue({ updates: [job] });
+  const cancel = vi
+      .spyOn(api.speech, "cancelAudioUpdate")
+      .mockResolvedValue(undefined),
+    retry = vi
+      .spyOn(api.speech, "retryAudioUpdate")
+      .mockResolvedValue(undefined);
+  const timers = vi.spyOn(window, "setInterval");
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <DubbingAudioUpdates groupId="group" revision={3} />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  try {
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    const count = timers.mock.calls.length;
+    for (const locale of ["en-GB", "zh-Hant", "en-US"] as const) {
+      await act(async () => view.rerender(content(locale)));
+      expect(view.container.textContent).toContain("59");
+      expect(timers).toHaveBeenCalledTimes(count);
+      expect(read).not.toHaveBeenCalled();
+      expect(cancel).not.toHaveBeenCalled();
+      expect(retry).not.toHaveBeenCalled();
+    }
+  } finally {
+    view.unmount();
+    client.clear();
+    vi.useRealTimers();
+  }
 });

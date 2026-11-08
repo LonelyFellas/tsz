@@ -1,3 +1,4 @@
+import { useVoiceTranslation, voiceLabel } from "./i18n";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminDubbingAudioUpdate } from "@tsz/types";
 import { Button, Flex, Space, Tag, Typography } from "@tsz/ui/admin/display";
@@ -18,6 +19,7 @@ function Update({
   update: AdminDubbingAudioUpdate;
   refresh: () => Promise<unknown>;
 }) {
+  const { t } = useVoiceTranslation();
   const [now, setNow] = useState(Date.now());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
@@ -54,20 +56,29 @@ function Update({
               : "default"
           }
         >
-          {labels[update.state] ?? update.state}
+          {voiceLabel(labels[update.state] ?? update.state, t)}
         </Tag>
         {update.state === "pending" && (
           <Typography.Text>
             {seconds > 0
-              ? `配置已保存，${seconds} 秒后自动更新相关草稿音频`
-              : "已到执行时间，等待自动更新"}
+              ? t("audio_update_due", { count: seconds })
+              : t("scheduled_time_reached_awaiting_automatic_update")}
           </Typography.Text>
         )}
         {update.total > 0 && (
           <Typography.Text>
-            完成 {update.completed}／{update.total}
-            {update.failed > 0 ? `，失败 ${update.failed}` : ""}
-            {update.skipped > 0 ? `，跳过 ${update.skipped}` : ""}
+            {t("audio_update_progress", {
+              completed: update.completed,
+              total: update.total,
+              failed:
+                update.failed > 0
+                  ? t("audio_update_failed", { count: update.failed })
+                  : "",
+              skipped:
+                update.skipped > 0
+                  ? t("audio_update_skipped", { count: update.skipped })
+                  : ""
+            })}
           </Typography.Text>
         )}
         {update.state === "pending" && (
@@ -76,7 +87,7 @@ function Update({
             loading={pending}
             onClick={() => void change(false)}
           >
-            撤销待更新
+            {t("cancel_pending_update")}
           </Button>
         )}
         {["failed", "partial"].includes(update.state) && (
@@ -85,26 +96,32 @@ function Update({
             loading={pending}
             onClick={() => void change(true)}
           >
-            重试失败项
+            {t("retry_failed_items")}
           </Button>
         )}
       </Space>
       {update.error_codes.includes("forbidden") && (
         <Typography.Text type="danger">
-          提交账号缺少生成或目标内容编辑权限，未替换原音频。
+          {t(
+            "the_submitting_account_lacks_generation_or_target_editing_permiss"
+          )}
         </Typography.Text>
       )}
       {update.error_codes.some((code) => code !== "forbidden") && (
         <Typography.Text type="secondary">
-          部分目标未更新，原音频保留。
+          {t("some_targets_were_not_updated_original_audio_has_been_kept")}{" "}
           {update.error_codes.includes("revision_conflict")
-            ? "正文或推荐已变化，请按当前配置重新提交。"
-            : "请检查读法、音色或服务状态后重试。"}
+            ? t(
+                "the_text_or_recommendation_has_changed_submit_again_using_the_cur"
+              )
+            : t("check_the_reading_voice_or_service_status_and_try_again")}
         </Typography.Text>
       )}
       {error && (
         <Typography.Text type="danger">
-          操作失败或任务状态已变化，请刷新后重试。
+          {t(
+            "the_operation_failed_or_the_task_state_changed_refresh_and_try_ag"
+          )}
         </Typography.Text>
       )}
     </Flex>
@@ -118,6 +135,7 @@ export function DubbingAudioUpdates({
   groupId: string;
   revision: number;
 }) {
+  const { t } = useVoiceTranslation();
   const accountId = useAuthStore((state) => state.profile?.id);
   const updates = useQuery({
     queryKey: ["admin-dubbing-audio-updates", accountId, groupId, revision],
@@ -131,9 +149,9 @@ export function DubbingAudioUpdates({
   if (updates.isError)
     return (
       <Typography.Text type="secondary">
-        音频更新状态暂不可用{" "}
+        {t("audio_update_status_is_unavailable")}{" "}
         <Button size="small" onClick={() => void updates.refetch()}>
-          重试
+          {t("try_again")}
         </Button>
       </Typography.Text>
     );

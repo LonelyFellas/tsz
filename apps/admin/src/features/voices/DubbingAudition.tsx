@@ -1,3 +1,8 @@
+import {
+  useVoiceTranslation,
+  voiceMessage,
+  useVoiceMessageState
+} from "./i18n";
 import type { AdminSpeechVoice, AdminVoiceParameters } from "@tsz/types";
 import { Button, Typography } from "@tsz/ui/admin/display";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -44,6 +49,7 @@ export function DubbingAudition({
   ssmlDraft?: SsmlDraft;
   onSsmlDraftChange?: (draft: SsmlDraft) => void;
 }) {
+  const { t } = useVoiceTranslation();
   const canGenerate = usePermission("speech.generate");
   const canRead = usePermission("words.access");
   const [localSource, setLocalSource] = useState(() =>
@@ -53,7 +59,7 @@ export function DubbingAudition({
   const [ready, setReady] = useState(true);
   const [preview, setPreview] = useState<VoicePreviewData>();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useVoiceMessageState();
   const request = useRef<AbortController | null>(null);
   const audio = useRef<HTMLAudioElement>(null);
   const tools = useRef<() => void>(undefined);
@@ -94,7 +100,7 @@ export function DubbingAudition({
     setError(undefined);
     setPending(false);
     return stop;
-  }, [signature, stop]);
+  }, [signature, stop, setError]);
   async function audition(original: boolean) {
     const target = original ? originalVoice : voice;
     const raw = original ? originalParameters : parameters;
@@ -105,25 +111,39 @@ export function DubbingAudition({
       stop();
       setPreview(undefined);
       setPending(false);
-      setError(sourceIssue);
+      setError({ format: (t) => voiceTrialIssue(target, source, t) ?? "" });
       return;
     }
     const caps = target.capabilities;
     const effective = effectiveVoiceParameters(target, raw);
     const style = effective.style;
     const issue = recommendationError(
-      "试听",
+      t("preview"),
       side,
       {
         id: "preview",
-        name: "当前设置",
+        name: t("current_settings"),
         voice_alias: target.alias,
         parameters: effective
       },
       target
     );
     if (issue) {
-      setError(issue);
+      setError({
+        format: (t) =>
+          recommendationError(
+            t("preview"),
+            side,
+            {
+              id: "preview",
+              name: t("current_settings"),
+              voice_alias: target.alias,
+              parameters: effective
+            },
+            target,
+            t
+          ) ?? ""
+      });
       return;
     }
     stop();
@@ -187,11 +207,17 @@ export function DubbingAudition({
           result,
           voice: target,
           parameters: effective,
-          comparison: original ? "原参数" : "当前参数"
+          comparison: voiceMessage(
+            original ? "original_parameters" : "current_parameters"
+          )
         });
     } catch {
       if (request.current === controller && !controller.signal.aborted)
-        setError("试听失败，请检查音色或稍后重试；当前参数已保留。");
+        setError(
+          voiceMessage(
+            "preview_failed_check_the_voice_or_try_again_later_current_paramet"
+          )
+        );
     } finally {
       if (request.current === controller) setPending(false);
     }
@@ -242,14 +268,14 @@ export function DubbingAudition({
           originalVoice &&
           originalParameters && (
             <Button disabled={!allowed} onClick={() => void audition(true)}>
-              试听原参数
+              {t("preview_original_parameters")}
             </Button>
           )
         }
       />
       {!canGenerate && (
         <Typography.Paragraph type="secondary">
-          需要语音生成权限才能试听。
+          {t("speech_generation_permission_is_required_to_preview")}
         </Typography.Paragraph>
       )}
     </>

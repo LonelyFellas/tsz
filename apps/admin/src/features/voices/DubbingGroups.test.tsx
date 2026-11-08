@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -1038,4 +1040,79 @@ describe("分组工作台与逐组草稿", () => {
       within(dialog).getByRole("region", { name: "全局常用 词库推荐预览" })
     ).toBeVisible();
   });
+});
+
+it("切语言保留分组草稿、冲突提示和原版本，不自动保存或重读", async () => {
+  vi.mocked(api.speech.savePairedGroup).mockRejectedValue(
+    new HttpError(409, "conflict")
+  );
+  const snapshot = data();
+  const candidates = [uk, us];
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } }
+  });
+  clients.push(client);
+  client.setQueryData(queryKey, snapshot);
+  const router = createMemoryRouter([
+    {
+      path: "/",
+      element: (
+        <DubbingDrafts>
+          <DubbingGroups
+            voices={candidates}
+            canAudition
+            onAudition={vi.fn()}
+            onInvalidatePreview={vi.fn()}
+            onDirtyChange={vi.fn()}
+          />
+        </DubbingDrafts>
+      )
+    }
+  ]);
+  routers.push(router);
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <App>
+          <RouterProvider router={router} />
+        </App>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await rename("A", "保留 A");
+  const panel = groupPanel("保留 A");
+  const reads = vi.mocked(api.speech.groupsV3).mock.calls.length;
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(panel).toHaveTextContent("保留 A");
+    expect(api.speech.groupsV3).toHaveBeenCalledTimes(reads);
+    expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
+  }
+  fireEvent.click(button("保存当前组", panel));
+  await screen.findByText(
+    "本组已被修改或名称已被使用，全部草稿已保留。请重新载入；取消本组后可按最新配置编辑。"
+  );
+  const original = snapshot.groups[0]!;
+  expect(api.speech.savePairedGroup).toHaveBeenCalledWith(
+    {
+      group: {
+        id: "a",
+        name: "保留 A",
+        areas: original.areas,
+        is_global: false,
+        pairs:
+          original.recommendations.format === "paired"
+            ? original.recommendations.pairs
+            : []
+      },
+      base_revision: 1
+    },
+    false
+  );
+  view.rerender(content("en-GB"));
+  await screen.findByText(/This group changed or its name is in use/);
+  expect(panel).toHaveTextContent("保留 A");
+  expect(api.speech.savePairedGroup).toHaveBeenCalledTimes(1);
+  expect(api.speech.groupsV3).toHaveBeenCalledTimes(reads);
 });

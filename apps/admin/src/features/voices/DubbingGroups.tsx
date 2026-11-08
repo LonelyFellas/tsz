@@ -1,3 +1,12 @@
+import {
+  useVoiceTranslation,
+  VoiceText,
+  voiceMessage,
+  useVoiceMessageState,
+  voiceMessageText,
+  voiceLabel,
+  type VoiceMessageValue
+} from "./i18n";
 import { speechAccentGroup } from "@tsz/shared";
 import {
   ArrowDownIcon,
@@ -83,6 +92,11 @@ export function DubbingGroups({
   onInvalidatePreview: () => void;
   onDirtyChange: (dirty: boolean) => void;
 }) {
+  const { t } = useVoiceTranslation();
+  const areaOptions = areas.map((option) => ({
+    ...option,
+    label: voiceLabel(option.label, t)
+  }));
   const accountId = useAuthStore((state) => state.profile?.id);
   const canEdit = usePermission("speech.global_dubbing");
   const client = useQueryClient();
@@ -94,9 +108,11 @@ export function DubbingGroups({
   });
   const [drafts, setDrafts] = useDubbingDrafts();
   const [savingId, setSavingId] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState<string>();
+  const [error, setError] = useVoiceMessageState();
+  const [saveErrors, setSaveErrors] = useState<
+    Record<string, VoiceMessageValue>
+  >({});
+  const [saved, setSaved] = useVoiceMessageState();
   const [editing, setEditing] = useState<Editing>();
   const [settingsId, setSettingsId] = useState<string>();
   const [settingsCreating, setSettingsCreating] = useState(false);
@@ -136,7 +152,7 @@ export function DubbingGroups({
     );
     setSaved(undefined);
   }
-  function setGroupSaveError(id: string, message?: string) {
+  function setGroupSaveError(id: string, message?: VoiceMessageValue) {
     setSaveErrors((value) => {
       const next = { ...value };
       if (message) next[id] = message;
@@ -178,21 +194,29 @@ export function DubbingGroups({
     const draft = drafts[id];
     if (!draft || !canEdit || saving) return;
     if (!draft.name.trim()) {
-      setGroupSaveError(id, "请填写分组名称。");
+      setGroupSaveError(id, voiceMessage("enter_a_group_name"));
       return;
     }
     if (draft.recommendations.format !== "paired") {
-      setGroupSaveError(id, "请先确认本组原有英美声音的组合，再保存。");
+      setGroupSaveError(
+        id,
+        voiceMessage(
+          "confirm_the_existing_british_and_american_voice_pairs_before_savi"
+        )
+      );
       return;
     }
     const original = groups.data?.groups.find((g) => g.id === id);
     for (const pair of draft.recommendations.pairs) {
       if (!pair.name.trim()) {
-        setGroupSaveError(id, "请填写推荐名称。");
+        setGroupSaveError(id, voiceMessage("enter_a_recommendation_name"));
         return;
       }
       if (Array.from(pair.name).length > 40) {
-        setGroupSaveError(id, "推荐名称最多 40 字。");
+        setGroupSaveError(
+          id,
+          voiceMessage("recommendation_names_must_be_at_most_40_characters")
+        );
         return;
       }
       for (const side of sides) {
@@ -221,7 +245,16 @@ export function DubbingGroups({
               parameters: stored.parameters
             }) !== JSON.stringify(pair[side]))
         ) {
-          setGroupSaveError(id, issue);
+          setGroupSaveError(id, {
+            format: (t) =>
+              recommendationError(
+                draft.name,
+                side,
+                item,
+                voices.find((v) => v.alias === item.voice_alias),
+                t
+              ) ?? ""
+          });
           return;
         }
       }
@@ -246,14 +279,18 @@ export function DubbingGroups({
       );
       if (await accept(result)) {
         discard(id);
-        setSaved(`「${draft.name.trim()}」配音已保存。`);
+        setSaved(voiceMessage("group_saved", { name: draft.name.trim() }));
       }
     } catch (cause) {
       setGroupSaveError(
         id,
         cause instanceof HttpError && cause.status === 409
-          ? "本组已被修改或名称已被使用，全部草稿已保留。请重新载入；取消本组后可按最新配置编辑。"
-          : "保存失败，本组全部草稿已保留，请重试。"
+          ? voiceMessage(
+              "this_group_changed_or_its_name_is_in_use_all_drafts_have_been_kep"
+            )
+          : voiceMessage(
+              "could_not_save_all_drafts_in_this_group_have_been_kept_try_again"
+            )
       );
     } finally {
       setSavingId(undefined);
@@ -286,12 +323,20 @@ export function DubbingGroups({
           })
         )
       )
-        setSaved("分组顺序已保存，未完成内容仍保留在各组草稿。");
+        setSaved(
+          voiceMessage(
+            "group_order_saved_incomplete_content_remains_in_each_group_s_draf"
+          )
+        );
     } catch (cause) {
       setError(
         cause instanceof HttpError && cause.status === 409
-          ? "分组集合或顺序已变化，排序未保存；全部草稿已保留，请重新载入后重排。"
-          : "排序失败，全部草稿已保留，请重试。"
+          ? voiceMessage(
+              "the_group_set_or_order_changed_the_order_was_not_saved_all_drafts"
+            )
+          : voiceMessage(
+              "could_not_save_the_order_all_drafts_have_been_kept_try_again"
+            )
       );
     } finally {
       setSavingId(undefined);
@@ -317,10 +362,12 @@ export function DubbingGroups({
   }
   function removeGroup(group: DubbingDraft) {
     modal.confirm({
-      title: `删除「${group.name}」？`,
-      content: "删除后按其他适用组或全局常用解析；已发布音频保持原样。",
-      okText: "删除分组",
-      cancelText: "取消",
+      title: <VoiceText message="delete_group" params={{ name: group.name }} />,
+      content: (
+        <VoiceText message="other_applicable_groups_or_global_defaults_will_be_used_published" />
+      ),
+      okText: <VoiceText message="delete_group_label" />,
+      cancelText: <VoiceText message="cancel" />,
       onOk: async () => {
         if (!canEdit || saving) return;
         const stored = groups.data?.groups.find((g) => g.id === group.id);
@@ -342,8 +389,10 @@ export function DubbingGroups({
         } catch (cause) {
           setError(
             cause instanceof HttpError && cause.status === 409
-              ? "分组已更新，删除未生效；全部草稿保留，请重新载入。"
-              : "删除失败，当前草稿保留。"
+              ? voiceMessage(
+                  "the_group_changed_and_was_not_deleted_all_drafts_have_been_kept_r"
+                )
+              : voiceMessage("could_not_delete_the_current_draft_has_been_kept")
           );
         } finally {
           setSavingId(undefined);
@@ -395,7 +444,7 @@ export function DubbingGroups({
     auditionAllowed = true
   ) {
     const voice = voices.find((v) => v.alias === item.voice_alias);
-    const issue = recommendationError(group.name, side, item, voice);
+    const issue = recommendationError(group.name, side, item, voice, t);
     const accent = voice
       ? speechAccentGroup(voice.locale, voice.accent)
       : "other";
@@ -404,7 +453,10 @@ export function DubbingGroups({
         <div className="dubbing-side-heading">
           <Button
             type="text"
-            aria-label={`试听${sideName(side)} ${item.name}`}
+            aria-label={t("audition_side", {
+              side: sideName(side, t),
+              name: item.name
+            })}
             className={`voice-accent-${accent}`}
             icon={<Volume2Icon aria-hidden />}
             disabled={!auditionAllowed || !canAudition || !!issue}
@@ -414,14 +466,17 @@ export function DubbingGroups({
             {voice ? (
               <VoiceName voice={voice} />
             ) : (
-              <span>音色已不可用：{item.voice_alias}</span>
+              <span>{t("unavailable_voice", { alias: item.voice_alias })}</span>
             )}
           </div>
           {edit && (
             <Button
               type="text"
               icon={<PencilIcon aria-hidden />}
-              aria-label={`修改${sideName(side)} ${item.name}`}
+              aria-label={t("edit_side", {
+                side: sideName(side, t),
+                name: item.name
+              })}
               onClick={() => {
                 onInvalidatePreview();
                 edit();
@@ -431,10 +486,10 @@ export function DubbingGroups({
         </div>
         <div className="dubbing-side-parameters">
           <span>
-            语速 <VoiceRate parameters={item.parameters} />
+            {t("rate")} <VoiceRate parameters={item.parameters} />
           </span>
           <span>
-            音量 <VoiceVolume parameters={item.parameters} />
+            {t("volume")} <VoiceVolume parameters={item.parameters} />
           </span>
         </div>
         {issue && (
@@ -485,20 +540,27 @@ export function DubbingGroups({
           <>
             <div className="dubbing-legacy-notice">
               <Typography.Text type="secondary">
-                原有声音已保留，请先核对英美组合。
+                {t(
+                  "existing_voices_have_been_kept_check_the_british_and_american_pai"
+                )}
               </Typography.Text>
               {editable && (
-                <Button onClick={() => setReviewId(group.id)}>核对声音</Button>
+                <Button onClick={() => setReviewId(group.id)}>
+                  {t("review_voices")}
+                </Button>
               )}
             </div>
             <div className="dubbing-legacy-overview">
               {sides.map((side) => (
                 <section
                   key={side}
-                  aria-label={`${group.name} ${sideName(side)}原有声音`}
+                  aria-label={t("group_legacy_side", {
+                    name: group.name,
+                    side: sideName(side, t)
+                  })}
                 >
                   <Typography.Text className={`voice-accent-${side}`}>
-                    {sideName(side)}
+                    {sideName(side, t)}
                   </Typography.Text>
                   {rec[side].map((item) => (
                     <div key={item.id} className="dubbing-legacy-voice">
@@ -509,7 +571,7 @@ export function DubbingGroups({
                         item.selected === false) && (
                         <span className="dubbing-legacy-label">
                           {item.name}
-                          {item.selected === false ? "（未选）" : ""}
+                          {item.selected === false ? t("not_selected") : ""}
                         </span>
                       )}
                       {voiceRow(item, side, group, undefined, auditionAllowed)}
@@ -517,7 +579,7 @@ export function DubbingGroups({
                   ))}
                   {!rec[side].length && (
                     <Typography.Paragraph type="secondary">
-                      尚无{sideName(side)}声音
+                      {t("no_side_voices", { side: sideName(side, t) })}
                     </Typography.Paragraph>
                   )}
                 </section>
@@ -532,7 +594,7 @@ export function DubbingGroups({
                 className="dubbing-table-scroll-hint"
                 type="secondary"
               >
-                左右滑动查看完整配音
+                {t("scroll_horizontally_to_view_all_dubbing_settings")}
               </Typography.Text>
             )}
             <div
@@ -541,18 +603,18 @@ export function DubbingGroups({
             >
               <table
                 className={`dubbing-pairs${pairs.length ? "" : " is-empty"}`}
-                aria-label={`${group.name}英美推荐`}
+                aria-label={t("group_pairs", { name: group.name })}
               >
                 {pairs.length > 0 && (
                   <thead>
                     <tr className="dubbing-pair-head">
-                      <th scope="col">推荐套</th>
+                      <th scope="col">{t("recommendation_pair")}</th>
                       {sides.map((side) => (
                         <th key={side} scope="col">
                           <div
                             className={`dubbing-locale-heading voice-accent-${side}`}
                           >
-                            <span>{sideName(side)}</span>
+                            <span>{sideName(side, t)}</span>
                           </div>
                         </th>
                       ))}
@@ -569,7 +631,7 @@ export function DubbingGroups({
                       <td className="dubbing-pair-controls">
                         <div className="dubbing-pair-choice">
                           <Checkbox
-                            aria-label={`选用 ${pair.name}`}
+                            aria-label={t("select_pair", { name: pair.name })}
                             disabled={!editable}
                             checked={pair.selected}
                             onChange={(event) =>
@@ -586,7 +648,9 @@ export function DubbingGroups({
                             <Input
                               variant="borderless"
                               className="dubbing-pair-name"
-                              aria-label={`推荐名称 ${pairIndex + 1}`}
+                              aria-label={t("recommendation_index", {
+                                index: pairIndex + 1
+                              })}
                               maxLength={40}
                               value={pair.name}
                               disabled={!editable}
@@ -607,9 +671,9 @@ export function DubbingGroups({
                               {pair.selected
                                 ? pairIndex ===
                                   pairs.findIndex((p) => p.selected)
-                                  ? "优先使用"
-                                  : "已选用"
-                                : "未选用"}
+                                  ? t("use_first")
+                                  : t("selected")
+                                : t("not_selected_834924")}
                             </Typography.Text>
                           </div>
                         </div>
@@ -620,7 +684,12 @@ export function DubbingGroups({
                                 key={direction}
                                 size="small"
                                 type="text"
-                                aria-label={`${direction < 0 ? "上移" : "下移"}推荐 ${pair.name}`}
+                                aria-label={t(
+                                  direction < 0
+                                    ? "move_recommendation_up"
+                                    : "move_recommendation_down",
+                                  { name: pair.name }
+                                )}
                                 icon={
                                   direction < 0 ? (
                                     <ArrowUpIcon aria-hidden />
@@ -651,7 +720,7 @@ export function DubbingGroups({
                               type="text"
                               size="small"
                               icon={<CopyIcon aria-hidden />}
-                              aria-label={`复制整套 ${pair.name}`}
+                              aria-label={t("copy_pair", { name: pair.name })}
                               disabled={pairs.length >= 20}
                               onClick={() =>
                                 setEditing({
@@ -673,10 +742,14 @@ export function DubbingGroups({
                               }
                             />
                             <Popconfirm
-                              title={`删除推荐「${pair.name}」？`}
-                              description="将移除本套英美配音，保存当前组后生效。"
-                              okText="删除"
-                              cancelText="取消"
+                              title={t("delete_recommendation", {
+                                name: pair.name
+                              })}
+                              description={t(
+                                "this_british_and_american_pair_will_be_removed_when_you_save_the_"
+                              )}
+                              okText={t("delete")}
+                              cancelText={t("cancel")}
                               okButtonProps={{ danger: true }}
                               destroyOnHidden
                               onConfirm={() =>
@@ -690,7 +763,9 @@ export function DubbingGroups({
                                 type="text"
                                 size="small"
                                 icon={<Trash2Icon aria-hidden />}
-                                aria-label={`移除推荐 ${pair.name}`}
+                                aria-label={t("remove_recommendation", {
+                                  name: pair.name
+                                })}
                               />
                             </Popconfirm>
                           </Space>
@@ -712,7 +787,9 @@ export function DubbingGroups({
                   {!pairs.length && (
                     <tr>
                       <td colSpan={3} className="dubbing-pair-empty">
-                        <Typography.Title level={5}>暂无推荐</Typography.Title>
+                        <Typography.Title level={5}>
+                          {t("no_recommendations_yet")}
+                        </Typography.Title>
                       </td>
                     </tr>
                   )}
@@ -729,8 +806,12 @@ export function DubbingGroups({
       <Alert
         type="error"
         showIcon
-        title="分组加载失败，请重试。"
-        action={<Button onClick={() => void groups.refetch()}>重试</Button>}
+        title={t("could_not_load_groups_try_again")}
+        action={
+          <Button onClick={() => void groups.refetch()}>
+            {t("try_again")}
+          </Button>
+        }
       />
     );
   if (!groups.data) return <Card loading />;
@@ -739,11 +820,13 @@ export function DubbingGroups({
       {blocker.state === "blocked" && (
         <Modal
           open
-          title="分组还有未保存的修改"
+          title={t("group_changes_have_not_been_saved")}
           onCancel={() => blocker.reset()}
           footer={
             <Space>
-              <Button onClick={() => blocker.reset()}>继续编辑</Button>
+              <Button onClick={() => blocker.reset()}>
+                {t("continue_editing")}
+              </Button>
               <Button
                 disabled={saving}
                 onClick={() => {
@@ -751,20 +834,22 @@ export function DubbingGroups({
                   blocker.proceed();
                 }}
               >
-                放弃并离开
+                {t("discard_and_leave")}
               </Button>
             </Space>
           }
         >
-          离开后将丢弃当前分组草稿。
+          {t("leaving_discards_the_current_group_drafts")}
         </Modal>
       )}
       <PageHeader
         className="dubbing-page-heading"
-        title="分组配音"
+        title={t("group_dubbing")}
         actions={
           <Space wrap>
-            <Button onClick={() => setPreviewArea("word")}>词库预览</Button>
+            <Button onClick={() => setPreviewArea("word")}>
+              {t("lexicon_preview")}
+            </Button>
             {canEdit && (
               <Button
                 type="primary"
@@ -775,13 +860,13 @@ export function DubbingGroups({
                 }
                 onClick={addGroup}
               >
-                新增分组
+                {t("add_group")}
               </Button>
             )}
           </Space>
         }
       >
-        为各板块设置英美配音，无适用分组时使用全局常用。
+        {t("set_british_and_american_voices_for_each_area_global_defaults_app")}
       </PageHeader>
       {error && (
         <Alert
@@ -789,7 +874,7 @@ export function DubbingGroups({
           showIcon
           title={error}
           action={
-            <Button onClick={() => void groups.refetch()}>重新载入</Button>
+            <Button onClick={() => void groups.refetch()}>{t("reload")}</Button>
           }
         />
       )}
@@ -798,7 +883,7 @@ export function DubbingGroups({
         {!current.length && (
           <div className="dubbing-empty-groups">
             <Typography.Paragraph type="secondary">
-              尚未设置分组推荐
+              {t("no_group_recommendations_configured")}
             </Typography.Paragraph>
           </div>
         )}
@@ -813,7 +898,7 @@ export function DubbingGroups({
             <div key={group.id} className="dubbing-group-entry">
               <div
                 className="dubbing-group-priority"
-                aria-label={`${group.name} 分组顺序`}
+                aria-label={t("group_order", { name: group.name })}
               >
                 <span className="dubbing-group-number">{groupIndex + 1}</span>
                 {canEdit && !group.is_global && (
@@ -830,7 +915,10 @@ export function DubbingGroups({
                             <ArrowDownIcon aria-hidden />
                           )
                         }
-                        aria-label={`${direction < 0 ? "上移" : "下移"}分组 ${group.name}`}
+                        aria-label={t(
+                          direction < 0 ? "move_group_up" : "move_group_down",
+                          { name: group.name }
+                        )}
                         disabled={
                           saving ||
                           storedIndex < 0 ||
@@ -848,7 +936,7 @@ export function DubbingGroups({
               <section
                 className="dubbing-group"
                 data-group-id={group.id}
-                aria-label={`${group.name} 分组配置`}
+                aria-label={t("group_settings", { name: group.name })}
               >
                 <div className="dubbing-group-heading">
                   <div>
@@ -856,20 +944,20 @@ export function DubbingGroups({
                       <Typography.Title level={3}>
                         {group.name}
                       </Typography.Title>
-                      {group.is_global && <Tag>全局兜底</Tag>}
+                      {group.is_global && <Tag>{t("global_fallback")}</Tag>}
                     </div>
                     {!group.is_global && (
                       <div className="dubbing-group-areas">
                         {group.areas.length ? (
                           group.areas.map((id) => (
                             <Tag key={id}>
-                              {areas.find((area) => area.value === id)?.label ??
-                                id}
+                              {areaOptions.find((area) => area.value === id)
+                                ?.label ?? id}
                             </Tag>
                           ))
                         ) : (
                           <Typography.Text type="secondary">
-                            未设置适用板块
+                            {t("no_areas_selected")}
                           </Typography.Text>
                         )}
                       </div>
@@ -882,7 +970,7 @@ export function DubbingGroups({
                         icon={<PencilIcon aria-hidden />}
                         onClick={() => openSettings(group)}
                       >
-                        编辑分组
+                        {t("edit_group")}
                       </Button>
                     )}
                     {editable && rec.format === "paired" && (
@@ -893,7 +981,7 @@ export function DubbingGroups({
                           setEditing({ groupId: group.id, initial: {} })
                         }
                       >
-                        新增推荐
+                        {t("add_recommendation")}
                       </Button>
                     )}
                   </Space>
@@ -903,11 +991,11 @@ export function DubbingGroups({
                   <Alert
                     type="error"
                     showIcon
-                    title={saveErrors[group.id]}
+                    title={voiceMessageText(saveErrors[group.id], t)}
                     className="dubbing-group-save-error"
                     action={
                       <Button onClick={() => void groups.refetch()}>
-                        重新载入
+                        {t("reload")}
                       </Button>
                     }
                   />
@@ -918,10 +1006,10 @@ export function DubbingGroups({
                     className={draft ? "dubbing-group-dirty" : undefined}
                   >
                     {draft ? (
-                      "未保存"
+                      t("unsaved")
                     ) : (
                       <>
-                        <CheckIcon aria-hidden /> 已保存
+                        <CheckIcon aria-hidden /> {t("saved")}
                       </>
                     )}
                   </Typography.Text>
@@ -934,7 +1022,7 @@ export function DubbingGroups({
                           void groups.refetch();
                         }}
                       >
-                        取消修改
+                        {t("discard_changes")}
                       </Button>
                       <Button
                         type="primary"
@@ -943,7 +1031,7 @@ export function DubbingGroups({
                         disabled={!draft || !canEdit || saving}
                         onClick={() => void save(group.id)}
                       >
-                        保存当前组
+                        {t("save_current_group")}
                       </Button>
                     </Space>
                   )}
@@ -964,7 +1052,7 @@ export function DubbingGroups({
       </div>
       <Modal
         open={!!settingsId}
-        title={settingsCreating ? "新建分组" : "编辑分组"}
+        title={settingsCreating ? t("create_group") : t("edit_group")}
         onCancel={cancelSettings}
         footer={null}
         destroyOnHidden
@@ -988,15 +1076,23 @@ export function DubbingGroups({
         >
           <Form.Item
             name="name"
-            label="分组名称"
+            label={t("group_name")}
             rules={[
-              { required: true, whitespace: true, message: "请填写分组名称" }
+              {
+                required: true,
+                whitespace: true,
+                message: <VoiceText message="enter_a_group_name_c4069d" />
+              }
             ]}
           >
-            <Input aria-label="分组名称" maxLength={30} />
+            <Input aria-label={t("group_name")} maxLength={30} />
           </Form.Item>
-          <Form.Item name="areas" label="适用板块">
-            <Select aria-label="使用板块" mode="multiple" options={areas} />
+          <Form.Item name="areas" label={t("applicable_areas")}>
+            <Select
+              aria-label={t("areas")}
+              mode="multiple"
+              options={areaOptions}
+            />
           </Form.Item>
           <div className="dubbing-settings-footer">
             <div>
@@ -1011,20 +1107,20 @@ export function DubbingGroups({
                       if (group) removeGroup(group);
                     }}
                   >
-                    删除分组
+                    {t("delete_group_label")}
                   </Button>
                 )}
             </div>
             <Space>
               <Button disabled={saving} onClick={cancelSettings}>
-                取消
+                {t("cancel")}
               </Button>
               <Button
                 type="primary"
                 htmlType="submit"
                 disabled={!canEdit || saving}
               >
-                应用到本组
+                {t("apply_to_this_group")}
               </Button>
             </Space>
           </div>
@@ -1095,35 +1191,40 @@ export function DubbingGroups({
       )}
       <Modal
         open={previewArea !== undefined}
-        title="词库预览"
+        title={t("lexicon_preview")}
         onCancel={() => setPreviewArea(undefined)}
         footer={
           <Button type="primary" onClick={() => setPreviewArea(undefined)}>
-            知道了
+            {t("understood")}
           </Button>
         }
         width={900}
       >
         <Typography.Paragraph type="secondary">
-          预览已保存的推荐；无适用分组时使用全局常用。
+          {t(
+            "preview_saved_recommendations_global_defaults_apply_when_no_group"
+          )}
         </Typography.Paragraph>
         <Select
-          aria-label="预览内容板块"
-          options={areas}
+          aria-label={t("preview_area")}
+          options={areaOptions}
           value={previewArea}
           onChange={setPreviewArea}
           style={{ width: 260 }}
         />
         <div className="dubbing-scope-preview">
           {previewGroups.map((group) => (
-            <section key={group.id} aria-label={`${group.name} 词库推荐预览`}>
+            <section
+              key={group.id}
+              aria-label={t("group_preview", { name: group.name })}
+            >
               <Typography.Title level={5}>{group.name}</Typography.Title>
               {recommendations(group, false, false)}
             </section>
           ))}
           {!previewGroups.length && (
             <Typography.Paragraph type="secondary">
-              暂无推荐，请先添加。
+              {t("no_recommendations_yet_add_one_first")}
             </Typography.Paragraph>
           )}
         </div>

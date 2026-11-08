@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import {
   act,
   cleanup,
@@ -322,4 +324,54 @@ it("生成中切换英美会取消旧请求，迟到结果不能回到新侧", a
     "aria-pressed",
     "true"
   );
+});
+
+it("切语言不回填参数或重建推荐，保存保留原 ID、口音和名称", async () => {
+  const onSave = vi.fn(),
+    onCancel = vi.fn();
+  const preview = vi.spyOn(api.speech, "preview");
+  const candidates = [sonia, libby, aria];
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <App>
+        <RecommendationEditor
+          voices={candidates}
+          initial={initial}
+          side="uk"
+          disabled={false}
+          onSave={onSave}
+          onCancel={onCancel}
+        />
+      </App>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const rate = screen.getByLabelText("合成语速") as HTMLInputElement;
+  const volume = screen.getByLabelText("合成音量") as HTMLInputElement;
+  fireEvent.change(rate, { target: { value: "0.73" } });
+  fireEvent.change(volume, { target: { value: "65" } });
+  rate.focus();
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(rate).toBeInTheDocument();
+    expect(document.activeElement).toBe(rate);
+    expect(rate.value).toBe("0.73");
+    expect(volume.value).toBe("65");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(preview).not.toHaveBeenCalled();
+  }
+  fireEvent.click(screen.getByRole("button", { name: "保存到本组" }));
+  await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+  expect(onSave).toHaveBeenCalledWith({
+    ...initial,
+    uk: {
+      ...initial.uk,
+      parameters: {
+        ...initial.uk.parameters,
+        rate_percent: -27,
+        volume_percent: 65
+      }
+    }
+  });
 });

@@ -1,3 +1,8 @@
+import {
+  useVoiceTranslation,
+  voiceMessage,
+  useVoiceMessageState
+} from "./i18n";
 import { useLayoutEffect, useRef, useState } from "react";
 import { speechAccentGroup } from "@tsz/shared";
 import type {
@@ -71,6 +76,7 @@ export function RecommendationEditor({
   onSave: (pair: AdminDubbingRecommendationPair) => void;
   onCancel: () => void;
 }) {
+  const { t } = useVoiceTranslation();
   const [parameterForm] = Form.useForm<ParameterFormValues>();
   const controlsPanel = useRef<HTMLElement>(null);
   const [value, setValue] = useState<RecommendationSeed>(() =>
@@ -87,7 +93,7 @@ export function RecommendationEditor({
   const [activeSide, setActiveSide] = useState<DubbingSide>(
     side ?? (initial.uk && !initial.us ? "us" : "uk")
   );
-  const [error, setError] = useState<string>();
+  const [error, setError] = useVoiceMessageState();
   useLayoutEffect(() => {
     if (catalog.current) catalog.current.scrollTop = 0;
   }, [activeSide, search, gender]);
@@ -140,11 +146,13 @@ export function RecommendationEditor({
   function save() {
     if (disabled) return;
     if (!value.name?.trim()) {
-      setError("请填写推荐名称。");
+      setError(voiceMessage("enter_a_recommendation_name"));
       return;
     }
     if (Array.from(value.name.trim()).length > 40) {
-      setError("推荐名称最多 40 字。");
+      setError(
+        voiceMessage("recommendation_names_must_be_at_most_40_characters")
+      );
       return;
     }
     for (const key of sides) {
@@ -152,19 +160,30 @@ export function RecommendationEditor({
       if (!next) {
         setActiveSide(key);
         setSearch("");
-        setError(`请明确选择${sideName(key)}音色，每套必须包含英美各一项。`);
+        setError({
+          format: (t) => t("choose_pair_side", { side: sideName(key, t) })
+        });
         return;
       }
       if (!side || side === key) {
         const issue = recommendationError(
-          "推荐",
+          t("recommendation"),
           key,
           { ...next, name: value.name },
           voices.find((v) => v.alias === next.voice_alias)
         );
         if (issue) {
           setActiveSide(key);
-          setError(issue);
+          setError({
+            format: (t) =>
+              recommendationError(
+                t("recommendation"),
+                key,
+                { ...next, name: value.name! },
+                voices.find((v) => v.alias === next.voice_alias),
+                t
+              ) ?? ""
+          });
           return;
         }
       }
@@ -276,10 +295,12 @@ export function RecommendationEditor({
     ) : (
       <div className="dubbing-parameter-empty">
         <Typography.Title level={5}>
-          {sideName(activeSide)}声音参数
+          {t("side_parameters", { side: sideName(activeSide, t) })}
         </Typography.Title>
         <Typography.Paragraph type="secondary">
-          先从目录选择声音，即可调节参数并试听。
+          {t(
+            "select_a_voice_from_the_catalog_to_adjust_its_parameters_and_prev"
+          )}
         </Typography.Paragraph>
       </div>
     );
@@ -307,9 +328,9 @@ export function RecommendationEditor({
     >
       {side ? (
         <>
-          <Form.Item label={`${sideName(side)}音色`}>
+          <Form.Item label={t("side_voice", { side: sideName(side, t) })}>
             <Select
-              aria-label={`${sideName(side)}音色`}
+              aria-label={t("side_voice", { side: sideName(side, t) })}
               showSearch
               value={item?.voice_alias}
               options={voices
@@ -336,10 +357,14 @@ export function RecommendationEditor({
       ) : (
         <>
           <div className="dubbing-pair-metadata">
-            <Form.Item label="推荐名称" layout="horizontal" colon={false}>
+            <Form.Item
+              label={t("recommendation_name")}
+              layout="horizontal"
+              colon={false}
+            >
               <Input
-                aria-label="推荐名称"
-                placeholder="例如：自然朗读、慢速跟读"
+                aria-label={t("recommendation_name")}
+                placeholder={t("e_g_natural_reading_or_slow_practice")}
                 maxLength={40}
                 value={value.name ?? ""}
                 onChange={(event) =>
@@ -359,30 +384,40 @@ export function RecommendationEditor({
                 }))
               }
             >
-              选用整套推荐
+              {t("select_the_whole_recommendation_pair")}
             </Checkbox>
           </div>
           {legacy && (
             <Alert
               type="info"
-              title="请选择要组成一套的原有声音，也可以补充缺少的一侧。现有声音设置会全部保留。"
+              title={t(
+                "select_existing_voices_to_pair_or_add_a_missing_side_all_existing"
+              )}
             />
           )}
           {legacy && (
             <Flex gap={16} wrap>
               {sides.map((key) => (
-                <Form.Item key={key} label={`${sideName(key)}原有声音`}>
+                <Form.Item
+                  key={key}
+                  label={t("legacy_side", { side: sideName(key, t) })}
+                >
                   <Select
-                    aria-label={`选择${sideName(key)}原有声音`}
+                    aria-label={t("select_legacy_side", {
+                      side: sideName(key, t)
+                    })}
                     value={
                       legacy[key].some((i) => i.id === value[key]?.id)
                         ? value[key]?.id
                         : undefined
                     }
-                    placeholder="选择现有声音，或在下方补充音色"
+                    placeholder={t("select_an_existing_voice_or_add_one_below")}
                     style={{ width: 300 }}
                     options={[
-                      { value: "__new__", label: "补充音色（下方选择）" },
+                      {
+                        value: "__new__",
+                        label: t("add_a_voice_select_below")
+                      },
                       ...legacy[key].map((i) => ({
                         value: i.id,
                         label: `${i.name} · ${voices.find((v) => v.alias === i.voice_alias)?.display_name ?? i.voice_alias} · ${((i.parameters.rate_percent + 100) / 100).toFixed(2)}× / ${i.parameters.volume_percent ?? 100}%`
@@ -414,7 +449,7 @@ export function RecommendationEditor({
           <div
             className="dubbing-pair-selection"
             role="group"
-            aria-label="英美声音组合"
+            aria-label={t("british_and_american_voice_pair")}
           >
             {sides.map((key) => {
               const selected = value[key];
@@ -427,7 +462,7 @@ export function RecommendationEditor({
                 <Button
                   key={key}
                   className={`dubbing-selection-side${activeSide === key ? " is-active" : ""}`}
-                  aria-label={`配置${sideName(key)}声音`}
+                  aria-label={t("configure_side", { side: sideName(key, t) })}
                   aria-pressed={activeSide === key}
                   onClick={() => {
                     setActiveSide(key);
@@ -435,7 +470,7 @@ export function RecommendationEditor({
                   }}
                 >
                   <span className="dubbing-selection-label">
-                    {sideName(key)}声音
+                    {t("side_voice", { side: sideName(key, t) })}
                   </span>
                   <span className="dubbing-selection-name">
                     {chosen ? (
@@ -443,13 +478,13 @@ export function RecommendationEditor({
                     ) : selected ? (
                       selected.voice_alias
                     ) : (
-                      "待选音色"
+                      t("voice_not_selected")
                     )}
                   </span>
                   <span className="dubbing-selection-parameters">
                     {selected
                       ? `${Number.isFinite(rate) ? ((rate! + 100) / 100).toFixed(2) : "—"}× · ${Number.isFinite(volume) ? volume : "—"}%`
-                      : "从目录选择"}
+                      : t("select_from_catalog")}
                   </span>
                 </Button>
               );
@@ -458,32 +493,32 @@ export function RecommendationEditor({
           <div className="dubbing-pair-workspace">
             <section
               className="dubbing-voice-picker"
-              aria-label={`${sideName(activeSide)}音色目录`}
+              aria-label={t("side_catalog", { side: sideName(activeSide, t) })}
             >
               <div className="dubbing-picker-heading">
                 <Typography.Title level={5}>
-                  选择{sideName(activeSide)}声音
+                  {t("select_side_voice", { side: sideName(activeSide, t) })}
                 </Typography.Title>
                 <Typography.Text type="secondary">
-                  {candidates.length} 个音色
+                  {t("voice_count_short", { count: candidates.length })}
                 </Typography.Text>
               </div>
               <div className="dubbing-picker-filters">
                 <Input.Search
-                  aria-label="搜索推荐音色"
-                  placeholder="搜索名称或官方 ID"
+                  aria-label={t("search_recommendation_voices")}
+                  placeholder={t("search_name_or_official_id")}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   allowClear
                 />
                 <Segmented
-                  aria-label="音色性别"
+                  aria-label={t("voice_gender")}
                   value={gender}
                   onChange={setGender}
                   options={[
-                    { value: "all", label: "全部" },
-                    { value: "female", label: "女声" },
-                    { value: "male", label: "男声" }
+                    { value: "all", label: t("all") },
+                    { value: "female", label: t("female_voice") },
+                    { value: "male", label: t("male_voice") }
                   ]}
                 />
               </div>
@@ -491,7 +526,9 @@ export function RecommendationEditor({
                 className="dubbing-picker-list"
                 ref={catalog}
                 tabIndex={0}
-                aria-label={`${sideName(activeSide)}音色滚动列表`}
+                aria-label={t("side_scroll_list", {
+                  side: sideName(activeSide, t)
+                })}
               >
                 {candidates.length ? (
                   candidates.map((candidate) => (
@@ -509,9 +546,9 @@ export function RecommendationEditor({
                         <VoiceName voice={candidate} />
                         <span className="dubbing-picker-badge" aria-hidden>
                           {candidate.synthesis_available === false
-                            ? "暂不可用"
+                            ? t("unavailable")
                             : candidate.is_common
-                              ? "常用"
+                              ? t("common")
                               : ""}
                         </span>
                       </Radio>
@@ -538,7 +575,9 @@ export function RecommendationEditor({
                 ) : (
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="没有符合条件的音色，请调整搜索或筛选"
+                    description={t(
+                      "no_matching_voices_adjust_the_search_or_filters"
+                    )}
                   />
                 )}
               </div>
@@ -546,7 +585,9 @@ export function RecommendationEditor({
             <section
               className="dubbing-pair-controls-panel"
               ref={controlsPanel}
-              aria-label={`${sideName(activeSide)}参数与试听`}
+              aria-label={t("side_parameters_preview", {
+                side: sideName(activeSide, t)
+              })}
             >
               {controls}
             </section>
@@ -561,11 +602,12 @@ export function RecommendationEditor({
       <div className="dubbing-editor-footer-status">
         <Typography.Text type="secondary">
           {side
-            ? "调整先存入本组草稿"
+            ? t("editor_status_side")
             : !value.uk || !value.us
-              ? `还需选择${!value.uk ? "英式" : "美式"}声音`
-              : "英美声音已选齐"}
-          ，保存当前组后生效。
+              ? t("editor_status_missing", {
+                  side: sideName(!value.uk ? "uk" : "us", t)
+                })
+              : t("editor_status_complete")}
         </Typography.Text>
         {!side && error && (
           <Typography.Text type="danger" role="alert">
@@ -574,9 +616,9 @@ export function RecommendationEditor({
         )}
       </div>
       <Space>
-        <Button onClick={onCancel}>取消</Button>
+        <Button onClick={onCancel}>{t("cancel")}</Button>
         <Button type="primary" disabled={disabled} onClick={save}>
-          {side ? "保存到本组" : "保存整套推荐"}
+          {side ? t("save_to_this_group") : t("save_recommendation_pair")}
         </Button>
       </Space>
     </div>
@@ -588,21 +630,28 @@ export function RecommendationEditor({
         side ? (
           <div className="dubbing-editor-title">
             <Typography.Text type="secondary">
-              {sideName(side)}声音 · {initial.name}
+              {t("side_voice_name", {
+                side: sideName(side, t),
+                name: initial.name ?? ""
+              })}
             </Typography.Text>
-            <Typography.Title level={4}>配音设置</Typography.Title>
+            <Typography.Title level={4}>
+              {t("dubbing_settings")}
+            </Typography.Title>
           </div>
         ) : (
           <div className="dubbing-pair-editor-title">
             <Typography.Title level={4}>
               {legacy
-                ? "组合原有声音"
+                ? t("pair_existing_voices")
                 : initial.uk && initial.us
-                  ? "复制整套推荐"
-                  : "新建整套推荐"}
+                  ? t("copy_recommendation_pair")
+                  : t("create_recommendation_pair_d3784a")}
             </Typography.Title>
             <Typography.Text type="secondary">
-              分别选择英美声音，组成一套适用于本组的配音推荐。
+              {t(
+                "select_british_and_american_voices_to_create_a_recommendation_pai"
+              )}
             </Typography.Text>
           </div>
         )
