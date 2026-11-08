@@ -1,7 +1,8 @@
 import {
   useVoiceEditorTranslation,
   useVoiceEditorMessageState,
-  createVoiceEditorMessage
+  createVoiceEditorMessage,
+  voiceEditorErrorMessage
 } from "../i18n";
 import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Input, Select, Switch } from "@tsz/ui/admin/forms";
@@ -95,11 +96,7 @@ export function SsmlReview({
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : createVoiceEditorMessage("ssml_generation_failed")
-          );
+          setError(voiceEditorErrorMessage(cause, "ssml_generation_failed"));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -150,9 +147,10 @@ export function SsmlReview({
     } catch (cause) {
       if (!controller.signal.aborted)
         setError(
-          cause instanceof Error
-            ? cause.message
-            : createVoiceEditorMessage("ssml_audition_failed_input_is_retained")
+          voiceEditorErrorMessage(
+            cause,
+            "ssml_audition_failed_input_is_retained"
+          )
         );
     } finally {
       if (request.current === controller) {

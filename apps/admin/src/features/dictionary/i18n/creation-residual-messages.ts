@@ -1,4 +1,50 @@
 export const creationResidualMessages = {
+  creation_this_content: ["此内容", "此內容", "This content"],
+  creation_node_reference_count: [
+    "{{label}}存在 {{count}} 处关联",
+    "{{label}}有 {{count}} 處關聯",
+    "{{label}} has {{count}} links"
+  ],
+  creation_node_reference_count_one: [
+    "{{label}}存在 {{count}} 处关联",
+    "{{label}}有 {{count}} 處關聯",
+    "{{label}} has {{count}} link"
+  ],
+  creation_node_reference_count_other: [
+    "{{label}}存在 {{count}} 处关联",
+    "{{label}}有 {{count}} 處關聯",
+    "{{label}} has {{count}} links"
+  ],
+  creation_view_reference_count: [
+    "查看 {{count}} 处关联",
+    "檢視 {{count}} 處關聯",
+    "View {{count}} links"
+  ],
+  creation_view_reference_count_one: [
+    "查看 {{count}} 处关联",
+    "檢視 {{count}} 處關聯",
+    "View {{count}} link"
+  ],
+  creation_view_reference_count_other: [
+    "查看 {{count}} 处关联",
+    "檢視 {{count}} 處關聯",
+    "View {{count}} links"
+  ],
+  creation_reference_count_help: [
+    "存在 {{count}} 处关联，点击查看关联内容",
+    "有 {{count}} 處關聯，點擊檢視關聯內容",
+    "{{count}} links. Click to view linked content"
+  ],
+  creation_reference_count_help_one: [
+    "存在 {{count}} 处关联，点击查看关联内容",
+    "有 {{count}} 處關聯，點擊檢視關聯內容",
+    "{{count}} link. Click to view linked content"
+  ],
+  creation_reference_count_help_other: [
+    "存在 {{count}} 处关联，点击查看关联内容",
+    "有 {{count}} 處關聯，點擊檢視關聯內容",
+    "{{count}} links. Click to view linked content"
+  ],
   creation_phonetic_enter_azure_alphabet: [
     "请填写 Azure {{alphabet}}",
     "請填寫 Azure {{alphabet}}",

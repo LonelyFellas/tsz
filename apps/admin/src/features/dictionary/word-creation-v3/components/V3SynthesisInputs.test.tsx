@@ -1,3 +1,4 @@
+import { HttpError } from "@tsz/api-client";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { App } from "@tsz/ui/admin/overlays";
@@ -1112,4 +1113,66 @@ it("语言切换保留待确认转换、草稿和撤销历史且不请求音频"
   expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
   expect(speech.synthesize).not.toHaveBeenCalled();
   expect(speech.generateAudio).not.toHaveBeenCalled();
+});
+
+it("已显示的音素后端兼容诊断随语言更新，不重建设置器或重新生成", async () => {
+  speech.recommendations.mockResolvedValue([
+    {
+      id: "first",
+      name: "自然",
+      groupName: "发音",
+      locale: "en-GB",
+      setting: {
+        version_id: "11111111-1111-4111-8111-111111111111",
+        version_name: "自然",
+        locale: "en-GB",
+        voice_id: "en-gb-sonia",
+        enabled: true,
+        rate_percent: 0
+      }
+    }
+  ]);
+  speech.generateAudio.mockRejectedValue(
+    new HttpError(422, "phoneme_locale unsupported")
+  );
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <Harness dialect="uk" />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(
+    screen.getByLabelText("打开第 1 条发音 英式 Azure IPA TTS 设置器")
+  );
+  const input = await screen.findByLabelText(
+    "第 1 条发音 英式 Azure IPA音标编辑"
+  );
+  fireEvent.change(input, { target: { value: "fɑːɹ" } });
+  const editVoice = await screen.findByLabelText("修改 自然");
+  await waitFor(() => expect(editVoice).toBeEnabled());
+  fireEvent.click(editVoice);
+  const detail = (await screen.findByLabelText("当前音色语速")).closest(
+    '[role="dialog"]'
+  ) as HTMLElement;
+  const generate = await dialogButton(detail, "生成正式音频");
+  await waitFor(() => expect(generate).toBeEnabled());
+  fireEvent.click(generate);
+  await within(detail).findByText(/当前后端尚未支持精确地区音素生成/);
+  const before = screen.getByTestId("pronunciation-wire").textContent;
+  const calls = [
+    speech.generateAudio.mock.calls.length,
+    speech.resolve.mock.calls.length,
+    speech.recommendations.mock.calls.length
+  ];
+  view.rerender(content("en-GB"));
+  await within(detail).findByText(
+    /This backend does not support generation for the exact phoneme locale yet/
+  );
+  expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
+  expect(input).toHaveValue("fɑːɹ");
+  expect([
+    speech.generateAudio.mock.calls.length,
+    speech.resolve.mock.calls.length,
+    speech.recommendations.mock.calls.length
+  ]).toEqual(calls);
 });

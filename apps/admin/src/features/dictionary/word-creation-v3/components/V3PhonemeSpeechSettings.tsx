@@ -1,3 +1,4 @@
+import { VoiceEditorDisplayError } from "@tsz/voice-editor/types";
 import { localPhoneticDiagnostic } from "./localPhoneticDiagnostic";
 import { useLexiconEditorTranslation } from "../../i18n/editor";
 import {
@@ -148,11 +149,16 @@ export function V3PhonemeSpeechSettings({
     : t(
         "creation_pauses_must_be_between_words_and_special_readings_must_cover_whole_words_keep_ups_word_bou"
       );
-  const inputIssue =
-    localPhoneticDiagnostic(
-      synthesisInputIssue(alphabet, draft.content.text),
-      t
-    ) ?? pauseIssue;
+  const inputDiagnostic = synthesisInputIssue(alphabet, draft.content.text);
+  const inputIssue = localPhoneticDiagnostic(inputDiagnostic, t) ?? pauseIssue;
+  const inputError = inputDiagnostic
+    ? () => localPhoneticDiagnostic(inputDiagnostic, currentT.current)!
+    : pauseIssue
+      ? () =>
+          currentT.current(
+            "creation_pauses_must_be_between_words_and_special_readings_must_cover_whole_words_keep_ups_word_bou"
+          )
+      : undefined;
   const resolveCandidate = (content: RichTextV2) => ({
     ...editedCandidate,
     [`${alphabet}_speech`]: {
@@ -178,7 +184,7 @@ export function V3PhonemeSpeechSettings({
     spelling,
     alphabet,
     locale,
-    inputIssue,
+    inputError,
     resolveCandidate
   });
   useLayoutEffect(() => {
@@ -186,7 +192,7 @@ export function V3PhonemeSpeechSettings({
       spelling,
       alphabet,
       locale,
-      inputIssue,
+      inputError,
       resolveCandidate
     };
   });
@@ -198,9 +204,9 @@ export function V3PhonemeSpeechSettings({
       resolveAudio: adminVoicePreviewAdapter.resolveAudio,
       synthesizeSsml: adminVoicePreviewAdapter.synthesizeSsml,
       async renderSsml(input, options) {
-        const { alphabet, locale, inputIssue, resolveCandidate } =
+        const { alphabet, locale, inputError, resolveCandidate } =
           latest.current;
-        if (inputIssue) throw new Error(inputIssue);
+        if (inputError) throw new VoiceEditorDisplayError(inputError);
         const candidate = resolveCandidate(input.content);
         return (
           await api.speech.renderSsml(
@@ -220,9 +226,9 @@ export function V3PhonemeSpeechSettings({
         ).ssml;
       },
       async resolveVoices(input, options) {
-        const { alphabet, locale, inputIssue, resolveCandidate } =
+        const { alphabet, locale, inputError, resolveCandidate } =
           latest.current;
-        if (inputIssue) throw new Error(inputIssue);
+        if (inputError) throw new VoiceEditorDisplayError(inputError);
         const candidate = resolveCandidate(input.content);
         return (
           await api.speech.resolve(
@@ -243,9 +249,9 @@ export function V3PhonemeSpeechSettings({
         ).voices;
       },
       async generateAudio(input, options) {
-        const { alphabet, locale, inputIssue, resolveCandidate } =
+        const { alphabet, locale, inputError, resolveCandidate } =
           latest.current;
-        if (inputIssue) throw new Error(inputIssue);
+        if (inputError) throw new VoiceEditorDisplayError(inputError);
         const candidate = resolveCandidate(input.content);
         try {
           const result = await api.speech.generateAudio(
@@ -271,7 +277,7 @@ export function V3PhonemeSpeechSettings({
             error.status === 422 &&
             /phoneme_locale/.test(error.message)
           )
-            throw new Error(
+            throw new VoiceEditorDisplayError(() =>
               currentT.current(
                 "creation_this_backend_does_not_support_generation_for_the_exact_phoneme_locale_yet_upgrade_and_retr"
               )
@@ -280,9 +286,9 @@ export function V3PhonemeSpeechSettings({
         }
       },
       async synthesize(input, options) {
-        const { spelling, alphabet, locale, inputIssue, resolveCandidate } =
+        const { spelling, alphabet, locale, inputError, resolveCandidate } =
           latest.current;
-        if (inputIssue) throw new Error(inputIssue);
+        if (inputError) throw new VoiceEditorDisplayError(inputError);
         const content = pronunciationSynthesisContent(spelling, {
           alphabet,
           ...resolveCandidate(input.content),
@@ -291,7 +297,7 @@ export function V3PhonemeSpeechSettings({
           ups_locale: locale
         });
         if (!content)
-          throw new Error(
+          throw new VoiceEditorDisplayError(() =>
             currentT.current(
               "creation_phonemes_do_not_match_the_form_s_word_boundaries_check_them_phrase_ups_can_be_converted_ag"
             )

@@ -108,7 +108,7 @@ export function V3PosTab({
   const { t, i18n } = useLexiconEditorTranslation();
   const posLabel = posCatalog
     ? localizedCatalogName(posCatalog, i18n.language)
-    : partOfSpeechLabel(pos.pos);
+    : partOfSpeechLabel(pos.pos, t);
   const { preference } = useDialectPreference();
   const referenceGuard = useV3ReferenceGuard();
   const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];

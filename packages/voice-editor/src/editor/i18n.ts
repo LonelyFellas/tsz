@@ -1,3 +1,4 @@
+import { VoiceEditorDisplayError } from "../types";
 import { useState, useMemo } from "react";
 import { useInterfaceInstance, useTranslation } from "@tsz/shared/i18n/react";
 import { voiceEditorMessages } from "./messages";
@@ -58,12 +59,25 @@ export function createVoiceEditorMessage(
 export function useVoiceEditorMessageState(initial = "") {
   const { t } = useVoiceEditorTranslation();
   const [message, setMessage] = useState<
-    string | VoiceEditorMessage | undefined
+    string | VoiceEditorMessage | VoiceEditorDisplayError | undefined
   >(initial);
   return [
-    typeof message === "object"
-      ? t(message.key, message.values ?? {})
-      : (message ?? ""),
+    message instanceof VoiceEditorDisplayError
+      ? message.displayMessage()
+      : typeof message === "object"
+        ? t(message.key, message.values ?? {})
+        : (message ?? ""),
     setMessage
   ] as const;
+}
+
+export function voiceEditorErrorMessage(
+  error: unknown,
+  fallback: VoiceEditorKey
+) {
+  return error instanceof VoiceEditorDisplayError
+    ? error
+    : error instanceof Error
+      ? error.message
+      : createVoiceEditorMessage(fallback);
 }

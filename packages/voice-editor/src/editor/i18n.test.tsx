@@ -1,6 +1,6 @@
 import { createInterfaceI18n, INTERFACE_LOCALES } from "@tsz/shared/i18n";
 import { expect, it } from "vitest";
-import { voiceEditorResources } from "./i18n";
+import { voiceEditorResources, voiceEditorErrorMessage } from "./i18n";
 import { voiceEditorMessages } from "./messages";
 
 it("共享编辑器四语资源的键、插值与非空译文完整，独立实例仍不预载编辑资源", () => {
@@ -57,5 +57,12 @@ it("英文停顿时长使用正确的单复数", () => {
   ).toBe("Pause 2 seconds");
   expect(instance.t("seconds_value", { ns: "voiceEditor", count: 0.5 })).toBe(
     "0.5 seconds"
+  );
+});
+
+it("未知提供方错误保留原文，不进入本地诊断翻译", () => {
+  const cause = new Error("provider raw detail 001 / en-GB");
+  expect(voiceEditorErrorMessage(cause, "generation_failed_try_again")).toBe(
+    cause.message
   );
 });
