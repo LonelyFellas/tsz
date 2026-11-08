@@ -1,3 +1,4 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { primaryRegionalVariant } from "@tsz/shared";
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
 import { env } from "../../../../lib/env";
@@ -3649,7 +3650,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(activeChanges).toHaveBeenCalledTimes(1);
   });
 
-  it("拖动词性标签可以重排基本词性，单个词性时不可拖", () => {
+  it("拖动词性标签在界面语言切换后保留位移、节点与排序，单个词性不可拖", async () => {
     const twoPos: DraftFormsStepContentV3 = {
       pos: [
         ...formsFixture({ pos_id: uuidFromInt(901), pos: "noun" }).pos,
@@ -3662,7 +3663,12 @@ describe("V3FormsAndPronunciationStep", () => {
         }).pos
       ]
     };
-    render(<Harness initial={twoPos} />);
+    const content = (locale: "zh-Hans" | "en-US") => (
+      <InterfaceI18nProvider locale={locale}>
+        <Harness initial={twoPos} />
+      </InterfaceI18nProvider>
+    );
+    const view = render(content("zh-Hans"));
 
     const handles = [
       ...document.querySelectorAll<HTMLElement>(".word-pos-tab-handle")
@@ -3701,6 +3707,24 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(preview).not.toHaveClass("is-dragging");
     fireEvent.dragOver(handles[1]!, { dataTransfer });
     expect(handles[1]!).toHaveClass("is-drag-over");
+    expect(handles[1]!.querySelector(".word-pos-tab-content")).toHaveStyle({
+      transform: "translateX(-160px)"
+    });
+    view.rerender(content("en-US"));
+    expect(document.querySelectorAll(".word-pos-tab-handle")[0]).toBe(
+      handles[0]
+    );
+    expect(document.querySelectorAll(".word-pos-tab-handle")[1]).toBe(
+      handles[1]
+    );
+    await waitFor(() => {
+      expect(
+        handles[0]!.querySelector(".word-sort-drag-handle")
+      ).toHaveAttribute(
+        "aria-label",
+        `Drag ${catalogState.data!.items.find((item) => item.code === "noun")!.name_en}`
+      );
+    });
     expect(handles[1]!.querySelector(".word-pos-tab-content")).toHaveStyle({
       transform: "translateX(-160px)"
     });
