@@ -220,7 +220,7 @@ describe("UserManagement", () => {
     expect(await screen.findByText("用户 ID")).toBeInTheDocument();
     expect(screen.getAllByText("正常")).toHaveLength(2);
     expect(screen.getAllByText("已认证")).toHaveLength(2);
-    fireEvent.click(screen.getByLabelText("Close"));
+    fireEvent.click(screen.getByLabelText("关闭"));
     clickRowButton(/^禁\s?用$/);
     expect(
       await screen.findByText("禁用用户「record」", {
@@ -339,8 +339,8 @@ describe("UserManagement", () => {
     renderPage();
     fireEvent.click(await screen.findByText("record"));
     expect(await screen.findByText("用户 ID")).toBeInTheDocument();
-    // antd Drawer 关闭按钮 aria-label="Close"；点击触发 onClose → 抽屉隐藏。
-    fireEvent.click(screen.getByLabelText("Close"));
+    // 关闭按钮触发 onClose，详情抽屉隐藏。
+    fireEvent.click(screen.getByLabelText("关闭"));
     await waitFor(() => expect(screen.queryByText("用户 ID")).toBeNull());
   });
 

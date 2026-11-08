@@ -392,7 +392,7 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "关闭的复制推荐" }
     });
-    fireEvent.click(button("Close", screen.getByRole("dialog")));
+    fireEvent.click(button("关闭", screen.getByRole("dialog")));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(
       within(b).getAllByRole("textbox", { name: /推荐名称/ })
@@ -401,7 +401,7 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.90" }
     });
-    fireEvent.click(button("Close", screen.getByRole("dialog")));
+    fireEvent.click(button("关闭", screen.getByRole("dialog")));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(b.textContent).toContain("0.80");
     fireEvent.click(button("取消修改", b));
@@ -419,7 +419,7 @@ describe("分组工作台与逐组草稿", () => {
     const { router } = mount();
     await rename("A", "A草稿");
     await rename("B", "B草稿");
-    for (const action of ["Close", "继续编辑"]) {
+    for (const action of ["关闭", "继续编辑"]) {
       await act(() => router.navigate("/elsewhere"));
       const dialog = screen.getByRole("dialog", {
         name: "分组还有未保存的修改"
@@ -572,7 +572,7 @@ describe("分组工作台与逐组草稿", () => {
         target: { value: "不要应用的名称" }
       });
       if (action === "cancel") closeDialog();
-      else fireEvent.click(button("Close", screen.getByRole("dialog")));
+      else fireEvent.click(button("关闭", screen.getByRole("dialog")));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(screen.getByLabelText("未保存分组 分组配置")).toBeVisible();
       const panel = groupPanel("未保存分组");
@@ -859,7 +859,7 @@ describe("分组工作台与逐组草稿", () => {
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "关闭的未完成组合" }
     });
-    fireEvent.click(button("Close", screen.getByRole("dialog")));
+    fireEvent.click(button("关闭", screen.getByRole("dialog")));
     await waitFor(() =>
       expect(
         within(screen.getByRole("dialog")).getByText("人工第一套")

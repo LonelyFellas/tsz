@@ -467,7 +467,7 @@ describe("配音中心", () => {
         parameters: null
       })
     );
-    fireEvent.click(within(drawer).getByLabelText("Close"));
+    fireEvent.click(within(drawer).getByLabelText("关闭"));
     await waitFor(() =>
       expect(document.querySelector('[role="dialog"]')).toBeNull()
     );
@@ -511,7 +511,7 @@ describe("配音中心", () => {
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.80" }
     });
-    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
+    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("关闭"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     first.unmount();
     mount();
@@ -581,7 +581,7 @@ describe("配音中心", () => {
       await act(async () => get.resolve(old));
       if (kind === "personal") {
         fireEvent.click(
-          within(screen.getByRole("dialog")).getByLabelText("Close")
+          within(screen.getByRole("dialog")).getByLabelText("关闭")
         );
         await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
         fireEvent.click(screen.getByLabelText("调节 Sonia 声音"));
@@ -645,7 +645,7 @@ describe("配音中心", () => {
       );
       if (kind === "personal") {
         fireEvent.click(
-          within(screen.getByRole("dialog")).getByLabelText("Close")
+          within(screen.getByRole("dialog")).getByLabelText("关闭")
         );
         await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
         fireEvent.click(screen.getByLabelText("调节 Sonia 声音"));
@@ -764,7 +764,7 @@ describe("配音中心", () => {
     expect(screen.getByLabelText("合成语速")).toBeDisabled();
     expect(screen.getByLabelText("音调")).toBeDisabled();
     await act(async () => pending.resolve(info));
-    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
+    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("关闭"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const latest = {
       ...info,
@@ -787,7 +787,7 @@ describe("配音中心", () => {
     fireEvent.change(notesInput(), {
       target: { value: "不能丢失的笔记" }
     });
-    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
+    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("关闭"));
     expect(
       await screen.findByText("关闭会丢弃尚未保存的听感。")
     ).toBeInTheDocument();
@@ -801,7 +801,7 @@ describe("配音中心", () => {
     const pending = deferred<{ items: [] }>();
     vi.mocked(api.speech.library).mockImplementationOnce(() => pending.promise);
     fireEvent.click(reload);
-    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
+    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("关闭"));
     expect(notesInput()).toHaveValue("不能丢失的笔记");
     expect(screen.getByLabelText("合成语速")).toBeDisabled();
     await act(async () => pending.resolve({ items: [] }));
@@ -840,7 +840,7 @@ describe("配音中心", () => {
       notes: "清晰慢读",
       base_revision: 0
     });
-    fireEvent.click(namedButton("Close", dialog));
+    fireEvent.click(namedButton("关闭", dialog));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(open);
     const reopened = await screen.findByRole("dialog");
@@ -1095,7 +1095,7 @@ describe("配音中心", () => {
     fireEvent.click(within(drawer).getByText("保存听感"));
     await screen.findByText("听感已保存，仅你可见。");
     expect(api.speech.saveDescription).not.toHaveBeenCalled();
-    fireEvent.click(within(drawer).getByLabelText("Close"));
+    fireEvent.click(within(drawer).getByLabelText("关闭"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByLabelText("中文介绍")).toHaveValue("清晰自然");
     fireEvent.click(namedButton(/^取\s*消$/));
@@ -1350,7 +1350,7 @@ describe("配音中心", () => {
       fireEvent.change(screen.getByLabelText("SSML 原文"), {
         target: { value: raw }
       });
-      fireEvent.click(screen.getByLabelText("Close"));
+      fireEvent.click(screen.getByLabelText("关闭"));
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     }
     fireEvent.click(screen.getByLabelText("调节 Sonia 声音"));
@@ -1419,7 +1419,7 @@ describe("配音中心", () => {
     fireEvent.click(screen.getByLabelText("调节 Guy 声音"));
     expect(labelledControl("本次试听文本")).toHaveValue("new shared text");
     expect(screen.getByLabelText("合成语速")).toHaveValue("1.00");
-    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("Close"));
+    fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("关闭"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByLabelText("调节 Sonia 声音"));
     expect(labelledControl("本次试听文本")).toHaveValue("record again");
