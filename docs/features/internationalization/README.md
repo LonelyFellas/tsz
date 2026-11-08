@@ -64,7 +64,7 @@ function SaveButton() {
 
 第一批 PR：[tsz #678](https://github.com/LonelyFellas/tsz/pull/678)，精确审查覆盖 `ff29fc8b99266140de73bb14e879b7f6de2d5b27`。审查 3 轮，确认缺陷 1（CI 既有异步等待问题），误报 0；该测试问题已由 main #679 修复，分支已同步 main；精确提交 CI run `42429162837`（attempt 1）全部通过，PR 已由用户在 GitHub 侧于 2026-11-08 08:23:54（Asia/Singapore）合入 main `07dd8262`，本轮未执行合并或部署。第二批前端分支 `codex/i18n-preferences` 已快进到含第一批的 main `07dd8262`，本批差异独立交付，不混入第一批 PR。
 
-后端在独立工作树 `/Users/darwish/.codex/worktrees/i18n-preferences-api/tsz-rust`、`codex/i18n-preferences`，基于 `9b7eb8e` 加本批差异。新增语言目录、用户本人偏好、后台按字段更新及成对迁移；新 SQL 使用运行时 typed query，未改现有 query! 输入，因此没有 `.sqlx` 缓存变化。两端仍仅开放 `zh-Hans`，未新增可见切换入口、翻译业务正文或更改错误语言。
+后端在独立工作树 `/Users/darwish/.codex/worktrees/i18n-preferences-api/tsz-rust`、`codex/i18n-preferences`，基于 `9b7eb8e` 加本批差异。新增语言目录、用户本人偏好、后台按字段更新及成对迁移；后台身份的已有查询同时读取可空界面偏好，profile 复用同一请求快照，保持原有 4 次 SELECT 约束；相应 query_as! 缓存由原生 hook 刷新，字段级更新继续使用 typed query。两端仍仅开放 `zh-Hans`，未新增可见切换入口、翻译业务正文或更改错误语言。
 
 前端控制器只在目录确认后读写偏好，目录缺失返回旧中文路径；页面和鉴权不等待目录。缓存按 surface/账号隔离，保存发送前核对会话，读取轮次与会话 generation 共同阻止旧响应覆盖；同字段写入排斥重叠，保存中刷新等待后回读，包括提交结果未知的网络错误。后台方言保存只合并本次服务端 dialect，不覆盖其他偏好或最新权限。
 
@@ -84,3 +84,5 @@ function SaveButton() {
 第二批交付回归：新增“保存调用排队后、发送前换号”测试，修复前确认 write 仍被调用，修复后在发送前拒绝旧会话；既有迟到保存测试明确等待请求发出后再换号，继续覆盖响应隔离。独立审查与自检识别为同一根因。
 
 第二批导出契约回归：明确 surface 为 query 参数，并注册 InterfaceSurface schema；新增测试同时校验参数位置和引用可解析，修复前以 path 导出导致失败，修复后通过，已按原生链同步前端生成物与哈希。
+
+第二批 CI 回归：权限分片的既有查询计数测试发现 profile 多一次 SELECT。修复为在现有 Admin 身份投影中带回界面偏好，profile 不再另查；保留原查询数 4 的断言。升级前 schema 的迁移 fixture 按历史列准备数据，不用当前 repository 读取尚未出现的列，迁移与安全断言保持不变。
