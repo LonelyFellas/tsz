@@ -1,7 +1,7 @@
 .v3-english-preview-playback {
   display: flex;
   flex: 0 0 44px;
-  border-right: 1px solid var(--ui-color-border, #d9d9d9);
+  border-right: 1px solid var(--ui-color-border);
 }
 
 .v3-english-preview-playback .word-pronunciation-play-action {
@@ -11,15 +11,15 @@
   height: auto;
   min-height: 44px;
   border: 0;
-  border-radius: var(--ui-border-radius, 6px) 0 0 var(--ui-border-radius, 6px);
+  border-radius: var(--ui-border-radius) 0 0 var(--ui-border-radius);
   box-shadow: none;
-  background: var(--ui-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+  background: var(--ui-color-fill-quaternary);
 }
 
 .v3-english-preview-text {
   flex: 1;
   min-width: 0;
-  padding: 8px 12px;
+  padding: var(--ui-space-2) var(--ui-space-3);
 }
 
 /* 焦点落在图标上，避免整块前置区域出现输入框式蓝色轮廓。 */
@@ -35,13 +35,13 @@
 .v3-english-preview-playback
   .word-pronunciation-play-action.ui-btn:not(:disabled):active {
   color: var(--word-playback-color);
-  background: var(--ui-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+  background: var(--ui-color-fill-quaternary);
 }
 
 .v3-english-preview-playback
   .word-pronunciation-play-action.ui-btn:focus-visible
   .lucide {
   border-radius: 3px;
-  outline: 2px solid var(--ui-color-primary, #2053ff);
+  outline: var(--ui-focus-ring);
   outline-offset: 4px;
 }

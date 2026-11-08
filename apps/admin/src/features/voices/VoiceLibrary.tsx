@@ -11,6 +11,7 @@ import type {
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Collapse,
@@ -154,7 +155,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     "--voice-border": token.colorBorderSecondary,
     "--voice-primary-bg": token.colorPrimaryBg,
     "--voice-muted": token.colorTextSecondary,
-    "--voice-radius": `${token.borderRadius}px`
+    "--voice-radius": token.borderRadius
   } as CSSProperties;
   const canView = useAnyPermission([
     "words.access",
@@ -768,12 +769,14 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
       className={`voice-library${tab === "library" ? " voice-library-catalog" : ""}`}
       style={style}
     >
-      <Breadcrumb
-        items={[
-          { title: "配音中心" },
-          { title: tab === "library" ? "音色库" : "分组配音" }
-        ]}
-      />
+      {tab === "library" ? (
+        <PageHeader
+          title="音色库"
+          breadcrumb={<Breadcrumb items={[{ title: "配音中心" }]} />}
+        />
+      ) : (
+        <Breadcrumb items={[{ title: "配音中心" }]} />
+      )}
       {router && tab === "library" && (
         <VoiceSettingsNavigationGuard
           dirty={settingsDirty || metadataDirty}

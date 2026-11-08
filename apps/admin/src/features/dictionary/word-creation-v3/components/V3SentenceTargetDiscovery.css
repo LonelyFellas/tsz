@@ -25,32 +25,32 @@
 
 .v3-sentence-target-discovery-action,
 .v3-sentence-target-discovery-manual {
-  padding: 14px 16px;
+  padding: 14px var(--ui-space-4);
   border: 1px solid #dce8f7;
-  border-radius: 12px;
+  border-radius: var(--ui-border-radius-lg);
   background: linear-gradient(135deg, #f6faff 0%, #fbfdff 100%);
 }
 
 .v3-sentence-target-discovery-tokens {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--ui-space-2);
   margin-top: 14px;
-  padding: 12px;
+  padding: var(--ui-space-3);
   border: 1px solid #e4eaf1;
   border-radius: 10px;
-  background: #fff;
+  background: var(--ui-color-bg-container);
 }
 
 .v3-sentence-target-discovery-tokens button {
   min-width: 40px;
-  padding: 8px 12px;
+  padding: var(--ui-space-2) var(--ui-space-3);
   border: 1px solid transparent;
   border-radius: 8px;
   /* button 不继承页面字体：不写死就会落到 UA 默认的 13.33px Arial，
      和周围 system-ui 正文不是一套字。 */
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--ui-font-size);
   line-height: 20px;
   color: #2d3748;
   background: #f1f4f8;
@@ -75,9 +75,9 @@
 }
 
 .v3-sentence-target-discovery-tokens button.is-selected {
-  border-color: #2053ff;
-  color: #fff;
-  background: #2053ff;
+  border-color: var(--ui-color-primary);
+  color: var(--ui-color-text-light-solid);
+  background: var(--ui-color-primary);
   box-shadow: 0 4px 12px rgb(0 113 227 / 22%);
   transform: translateY(-1px);
 }
@@ -91,8 +91,8 @@
 
 .v3-sentence-target-discovery-status {
   min-height: 22px;
-  color: #667085;
-  font-size: 13px;
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
 }
 
 .v3-sentence-target-discovery-results {
@@ -112,28 +112,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--ui-space-3);
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px var(--ui-space-3);
   overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  color: #344054;
+  color: var(--ui-color-text);
   text-align: left;
-  background: #fff;
+  background: var(--ui-color-bg-container);
   cursor: pointer;
 }
 
 .v3-sentence-target-discovery-occurrences button:hover {
-  border-color: #91caff;
+  border-color: var(--ui-color-primary-border);
   background: #f7fbff;
 }
 
 .v3-sentence-target-discovery-occurrences button[aria-current="true"] {
-  border-color: #91caff;
+  border-color: var(--ui-color-primary-border);
   color: #005bb8;
   background: #eaf4ff;
-  box-shadow: inset 3px 0 0 #2053ff;
+  box-shadow: inset 3px 0 0 var(--ui-color-primary);
 }
 
 .v3-sentence-target-discovery-occurrences button span {
@@ -151,11 +151,11 @@
 .v3-sentence-target-discovery-occurrence-detail {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
   min-width: 0;
   padding: 14px;
   border: 1px solid #dfe7f1;
-  border-radius: 12px;
+  border-radius: var(--ui-border-radius-lg);
   background: #fbfcfe;
 }
 
@@ -165,10 +165,10 @@
 }
 
 .v3-sentence-target-discovery-components {
-  padding: 8px 10px;
+  padding: var(--ui-space-2) 10px;
   border: 1px solid #e6edf5;
   border-radius: 9px;
-  background: #fff;
+  background: var(--ui-color-bg-container);
 }
 
 .v3-sentence-target-discovery-components .ui-tag {
@@ -176,10 +176,10 @@
 }
 
 .v3-sentence-target-discovery-candidate {
-  padding: 12px 14px;
-  border: 1px solid #e4e9f0;
+  padding: var(--ui-space-3) 14px;
+  border: 1px solid var(--ui-color-border-secondary);
   border-radius: 10px;
-  background: #fff;
+  background: var(--ui-color-bg-container);
 }
 
 .v3-sentence-target-discovery-candidate-main {
@@ -194,10 +194,10 @@
 .v3-sentence-target-discovery-draft-gloss {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ui-space-2);
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid #edf0f4;
+  border-top: 1px solid var(--ui-color-fill-secondary);
 }
 
 .v3-sentence-target-discovery-draft-gloss {
@@ -224,7 +224,7 @@
 .v3-component-usage-sense {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .v3-component-usage-radio {
@@ -232,12 +232,12 @@
   flex: none;
   width: 14px;
   height: 14px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--ui-color-border);
   border-radius: 50%;
 }
 
 .v3-component-usage-radio.is-checked {
-  border-color: #2053ff;
+  border-color: var(--ui-color-primary);
 }
 
 .v3-component-usage-radio.is-checked::after {
@@ -247,7 +247,7 @@
   height: 6px;
   margin: 3px;
   border-radius: 50%;
-  background: #2053ff;
+  background: var(--ui-color-primary);
 }
 
 /* 上下翻转时也能容纳候选：预留半屏内的标题、分页、确认操作与箭头间距。 */

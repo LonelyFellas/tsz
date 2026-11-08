@@ -1,16 +1,16 @@
 .voice-audition-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-space-4);
   min-width: 0;
 }
 .voice-audition-toolbar {
   position: sticky;
   top: 0;
   z-index: 3;
-  background: var(--ui-color-bg-container, #fff);
-  padding: 4px 0 10px;
-  border-bottom: 1px solid var(--voice-border, #e5e7eb);
+  background: var(--ui-color-bg-container);
+  padding: var(--ui-space-1) 0 10px;
+  border-bottom: 1px solid var(--voice-border, var(--ui-color-border-secondary));
 }
 .voice-audition-toolbar .ui-select {
   min-width: 82px;
@@ -18,15 +18,15 @@
 .voice-audition-preview {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
   border-radius: 8px;
-  background: var(--voice-fill, #f7f8fa);
+  background: var(--voice-fill, var(--ui-color-fill-alter));
 }
 .voice-audition-panel .voice-library-preview-empty {
   justify-content: flex-start;
   min-height: 32px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .voice-audition-panel .voice-library-preview-empty > .lucide {
   font-size: 18px;
@@ -35,13 +35,13 @@
   width: 100%;
 }
 .voice-audition-panel .voice-library-player .ui-space {
-  row-gap: 4px;
+  row-gap: var(--ui-space-1);
 }
 .voice-audition-panel .voice-library-player .ui-typography {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .voice-audition-panel .voice-library-tools {
-  border-top: 1px solid var(--voice-border, #e5e7eb);
+  border-top: 1px solid var(--voice-border, var(--ui-color-border-secondary));
 }
 .voice-audition-panel .tsz-ve-ssml-review {
   min-width: 0;
@@ -51,20 +51,20 @@
     align-items: flex-start;
   }
   .voice-audition-toolbar .ui-space {
-    row-gap: 8px;
+    row-gap: var(--ui-space-2);
   }
 }
 
 .voice-trial-editor {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 
 .voice-trial-counter {
   align-self: flex-end;
   flex: none;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -77,23 +77,23 @@
 }
 
 .voice-trial-editor .tsz-ve-top-tools {
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .voice-trial-editor .tsz-ve-selection-status {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .voice-trial-editor .tsz-ve-editor .tsz-ve-markup {
   box-sizing: border-box;
-  border-color: var(--voice-border, #e5e7eb);
+  border-color: var(--voice-border, var(--ui-color-border-secondary));
   border-radius: var(--voice-radius, 8px);
 }
 
 .voice-trial-editor .tsz-ve-top-tools {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  background: var(--voice-fill, #f7f8fa);
+  background: var(--voice-fill, var(--ui-color-fill-alter));
 }
 
 .voice-trial-editor .tsz-ve-primary-tools {
@@ -112,12 +112,12 @@
 .voice-trial-editor .tsz-ve-selection-status {
   grid-column: 1 / -1;
   margin: 0;
-  color: var(--voice-muted, #606b7b);
+  color: var(--voice-muted, var(--ui-color-text-secondary));
 }
 
 .voice-trial-editor .tsz-ve-editor .tsz-ve-strip,
 .voice-trial-editor .tsz-ve-editor .tsz-ve-canvas-input {
-  padding: 16px 12px;
+  padding: var(--ui-space-4) var(--ui-space-3);
   font-size: 16px;
   line-height: 1.8;
 }

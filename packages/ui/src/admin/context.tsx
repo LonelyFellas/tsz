@@ -1,3 +1,4 @@
+import "./tokens.css";
 import { createContext, useContext, type ReactNode } from "react";
 
 const Disabled = createContext(false);
@@ -21,13 +22,13 @@ export function AdminControls({
 }
 
 export const adminTokens = {
-  colorPrimaryBg: "#edf2ff",
-  colorTextSecondary: "#667085",
-  colorSplit: "#e4e7ec",
-  colorBorderSecondary: "#e4e7ec",
-  colorBgContainer: "#fff",
-  colorBgLayout: "#f6f7f9",
-  colorFillAlter: "#f8f9fb",
-  borderRadius: 8,
-  borderRadiusLG: 12
+  colorPrimaryBg: "var(--ui-color-primary-bg)",
+  colorTextSecondary: "var(--ui-color-text-secondary)",
+  colorSplit: "var(--ui-color-split)",
+  colorBorderSecondary: "var(--ui-color-border-secondary)",
+  colorBgContainer: "var(--ui-color-bg-container)",
+  colorBgLayout: "var(--ui-color-bg-layout)",
+  colorFillAlter: "var(--ui-color-fill-alter)",
+  borderRadius: "var(--ui-border-radius)",
+  borderRadiusLG: "var(--ui-border-radius-lg)"
 };

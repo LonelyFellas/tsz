@@ -1,7 +1,7 @@
 .coins-filters {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) 160px minmax(320px, 1.5fr) auto;
-  gap: 12px 16px;
+  gap: var(--ui-space-3) var(--ui-space-4);
   align-items: start;
 }
 .coins-filters .ui-form-item,
@@ -14,8 +14,8 @@
 .coins-more-filters:not([hidden]) {
   display: grid;
   grid-template-columns: minmax(180px, 320px) 160px;
-  gap: 16px;
-  margin-top: 16px;
+  gap: var(--ui-space-4);
+  margin-top: var(--ui-space-4);
 }
 .coins-amount {
   white-space: nowrap;

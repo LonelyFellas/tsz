@@ -11,6 +11,7 @@ import RcNumber, {
 import { forwardRef, useRef, useState, type ReactNode } from "react";
 import { useFieldDisabled } from "./Form";
 import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
+import { X } from "lucide-react";
 export type { TextAreaRef } from "@rc-component/input";
 
 type Size = "small" | "middle" | "large";
@@ -37,7 +38,13 @@ function fieldClass(
 }
 function clearControl(clear: RcInputProps["allowClear"], label: string) {
   return clear === true
-    ? { clearIcon: <span aria-label={label}>×</span> }
+    ? {
+        clearIcon: (
+          <span aria-label={label}>
+            <X size={12} aria-hidden="true" />
+          </span>
+        )
+      }
     : clear;
 }
 const TextInput = forwardRef<InputRef, InputProps>(function TextInput(

@@ -22,6 +22,7 @@ import {
   Alert,
   Button,
   Card,
+  PageHeader,
   Space,
   Tag,
   Typography
@@ -758,30 +759,30 @@ export function DubbingGroups({
           离开后将丢弃当前分组草稿。
         </Modal>
       )}
-      <div className="dubbing-page-heading">
-        <div>
-          <Typography.Title level={2}>分组配音</Typography.Title>
-          <Typography.Text type="secondary">
-            为各板块设置英美配音，无适用分组时使用全局常用。
-          </Typography.Text>
-        </div>
-        <Space wrap>
-          <Button onClick={() => setPreviewArea("word")}>词库预览</Button>
-          {canEdit && (
-            <Button
-              type="primary"
-              icon={<PlusIcon aria-hidden />}
-              disabled={
-                saving ||
-                current.filter((group) => !group.is_global).length >= 5
-              }
-              onClick={addGroup}
-            >
-              新增分组
-            </Button>
-          )}
-        </Space>
-      </div>
+      <PageHeader
+        className="dubbing-page-heading"
+        title="分组配音"
+        actions={
+          <Space wrap>
+            <Button onClick={() => setPreviewArea("word")}>词库预览</Button>
+            {canEdit && (
+              <Button
+                type="primary"
+                icon={<PlusIcon aria-hidden />}
+                disabled={
+                  saving ||
+                  current.filter((group) => !group.is_global).length >= 5
+                }
+                onClick={addGroup}
+              >
+                新增分组
+              </Button>
+            )}
+          </Space>
+        }
+      >
+        为各板块设置英美配音，无适用分组时使用全局常用。
+      </PageHeader>
       {error && (
         <Alert
           type="error"

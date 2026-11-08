@@ -1,6 +1,6 @@
 .v3-word-creation {
   display: grid;
-  gap: 24px;
+  gap: var(--ui-space-6);
   width: min(100%, 1440px);
   margin-inline: auto;
 }
@@ -9,7 +9,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .v3-word-creation__header .ui-typography {
@@ -19,7 +19,7 @@
 .v3-word-creation__shell {
   display: grid;
   grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-  gap: 24px;
+  gap: var(--ui-space-6);
   align-items: start;
 }
 
@@ -32,16 +32,16 @@
 .v3-word-creation__main {
   display: grid;
   min-width: 0;
-  gap: 16px;
+  gap: var(--ui-space-4);
 }
 
 .v3-word-creation__issues,
 .v3-word-creation__content {
   min-width: 0;
-  padding: 24px;
-  border: 1px solid #f0f0f0;
+  padding: var(--ui-space-6);
+  border: 1px solid var(--ui-color-border-secondary);
   border-radius: 16px;
-  background: #fff;
+  background: var(--ui-color-bg-container);
 }
 
 .v3-word-creation__issue {
@@ -60,7 +60,7 @@
    这里只留 8px，合计 24px。 */
 .v3-forms-step > .word-step-heading,
 .v3-meanings-v2 > .word-step-heading {
-  margin-bottom: 8px;
+  margin-bottom: var(--ui-space-2);
 }
 
 /* 语义区间卡片挪到步骤顶层后，遗留的 14px margin 会与容器 gap 叠成 30px。 */
@@ -71,8 +71,8 @@
 .v3-meanings-v2 {
   --word-leading-width: 50px;
   --word-leading-gap: 2px;
-  --word-row-gap: 8px;
-  --word-row-padding: 8px;
+  --word-row-gap: var(--ui-space-2);
+  --word-row-padding: var(--ui-space-2);
   min-width: 0;
 }
 
@@ -85,9 +85,9 @@
   display: block;
   box-sizing: border-box;
   padding-inline-start: 6px;
-  color: var(--ui-color-text-secondary, #6f7785);
-  font-family: var(--ui-font-family, inherit);
-  font-size: 12px;
+  color: var(--ui-color-text-secondary);
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size-sm);
   font-weight: 400;
   line-height: 20px;
 }
@@ -225,7 +225,7 @@
 
 /* 工具栏沿用通用/英美面板配色，正文保留编辑器自身背景。 */
 .v3-meanings-v2 .word-grammar-panel-uk .tsz-ve-toolbar {
-  background: #eef2ff;
+  background: var(--ui-color-primary-bg);
 }
 
 .v3-meanings-v2 .word-grammar-panel-us .tsz-ve-toolbar {
@@ -244,7 +244,7 @@
 
 .v3-meanings-v2 .word-sentence-list-header {
   grid-template-columns: 28px 64px minmax(0, 1fr) 56px;
-  padding-inline: 12px;
+  padding-inline: var(--ui-space-3);
 }
 
 .v3-meanings-v2 .word-table-row.word-sentence-row {
@@ -252,12 +252,12 @@
   grid-template-areas:
     "number level english actions"
     ". translations translations translations";
-  gap: 12px 8px;
-  padding: 12px;
+  gap: var(--ui-space-3) var(--ui-space-2);
+  padding: var(--ui-space-3);
   margin-bottom: 10px;
-  border: 1px solid #e8ecf2;
+  border: 1px solid var(--ui-color-border-secondary);
   border-radius: 10px;
-  background: var(--ui-color-bg-container, #fff);
+  background: var(--ui-color-bg-container);
 }
 
 .v3-meanings-v2 .word-sentence-row > .word-number-cell {
@@ -314,7 +314,7 @@
 /* 容器的 8px gap 同时管着「等级那排 → 第一个分组」和「分组之间」，两层读起来一样平。
    补一档给前者，让卡片直属内容与子分组分得开。 */
 .v3-meanings-v2 .word-sense-meta-grid + .word-sense-section {
-  margin-top: 8px;
+  margin-top: var(--ui-space-2);
 }
 
 /* 横排后操作列只有 24px 高，而行是 align-items: start：撑到 32px 让图标与同行控件共一条中心线。 */
@@ -391,7 +391,7 @@
 
 /* 关联词输入错误归到目标词列，不能从序号/关联度列下面开始。 */
 .v3-meanings-v2 .word-relation-row:has(> .word-relation-input-error) {
-  row-gap: 4px;
+  row-gap: var(--ui-space-1);
 }
 
 .v3-meanings-v2 .word-relation-input-error {
@@ -422,7 +422,7 @@
 .word-grammar-option {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .word-grammar-option-label {
@@ -470,7 +470,7 @@
 
 .word-grammar-select.ui-select {
   height: auto;
-  min-height: var(--ui-control-height, 32px);
+  min-height: var(--ui-control-height);
 }
 
 /* 弧线按 DOM 坐标测量，此浮层禁用缩放，避免首次测量落在动画中间帧。 */
@@ -496,7 +496,7 @@
 
 .v3-summary-headword {
   min-width: 0;
-  color: #273043;
+  color: var(--ui-color-text);
   font-size: 14pt;
   font-weight: 700;
   line-height: 1.4;
@@ -510,7 +510,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   line-height: 1;
 }
 
@@ -520,20 +520,20 @@
 }
 
 .v3-product-progress-list .word-progress-index {
-  color: #667085;
-  background: var(--ui-color-fill-secondary, #f0f1f3);
+  color: var(--ui-color-text-secondary);
+  background: var(--ui-color-fill-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .v3-product-progress-list
   .word-creation-progress-row[aria-current="step"]
   :is(.word-progress-done, .word-progress-index) {
-  color: #fff;
-  background: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-text-light-solid);
+  background: var(--ui-color-primary);
 }
 
 .v3-product-progress-list .word-progress-label {
-  color: #344054;
+  color: var(--ui-color-text);
   font-weight: 400;
 }
 
@@ -542,7 +542,7 @@
   gap: 10px;
   align-items: center;
   justify-self: end;
-  color: #8b9099;
+  color: var(--ui-color-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -552,8 +552,8 @@
   > .ui-typography {
   min-width: 0;
   padding: 0;
-  color: #8b9099;
-  font-size: 12px;
+  color: var(--ui-color-text-tertiary);
+  font-size: var(--ui-font-size-sm);
   background: transparent;
   border-radius: 0;
 }
@@ -575,8 +575,8 @@
   grid-template-columns: 22px minmax(0, 1fr) auto;
   gap: 10px;
   min-height: 40px;
-  padding: 8px;
-  font-size: 13px;
+  padding: var(--ui-space-2);
+  font-size: var(--ui-font-size-compact);
   background: transparent;
   border: 0;
   border-radius: 6px;
@@ -586,24 +586,24 @@
 :is(.word-creation-shell, .word-creation-progress-drawer)
   .v3-product-progress-list
   .word-creation-progress-row:hover {
-  background: var(--ui-color-fill-quaternary, #fafafa);
+  background: var(--ui-color-fill-quaternary);
 }
 
 .v3-product-progress-list .word-creation-progress-row:focus-visible {
-  outline: 2px solid var(--ui-color-primary, #2053ff);
+  outline: var(--ui-focus-ring);
   outline-offset: 2px;
 }
 
 :is(.word-creation-shell, .word-creation-progress-drawer)
   .v3-product-progress-list
   .word-creation-progress-row[aria-current="step"] {
-  background: var(--ui-color-primary-bg, #edf4ff);
+  background: var(--ui-color-primary-bg);
 }
 
 .v3-product-progress-list
   .word-creation-progress-row[aria-current="step"]
   .word-progress-label {
-  color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-primary);
   font-weight: 600;
 }
 
@@ -613,7 +613,7 @@
   flex: none;
   width: 10px;
   height: 10px;
-  color: var(--ui-color-text-description, #8b9099);
+  color: var(--ui-color-text-description);
   transition: transform var(--ui-motion-duration-slow, 0.3s);
 }
 
@@ -625,7 +625,7 @@
   width: 6px;
   height: 1.5px;
   background: currentColor;
-  border-radius: var(--ui-border-radius, 6px);
+  border-radius: var(--ui-border-radius);
   content: "";
   transition: transform var(--ui-motion-duration-slow, 0.3s)
     var(--ui-motion-ease-in-out, cubic-bezier(0.645, 0.045, 0.355, 1));
@@ -681,10 +681,10 @@
 .v3-product-progress-items {
   display: grid;
   gap: 2px;
-  margin: 0 0 4px;
-  padding: 0 8px 0 40px;
-  color: #667085;
-  font-size: 12px;
+  margin: 0 0 var(--ui-space-1);
+  padding: 0 var(--ui-space-2) 0 40px;
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-sm);
   line-height: 1.6;
   list-style: none;
 }
@@ -707,7 +707,7 @@
   position: absolute;
   inset-inline-start: -32px;
   width: 28px;
-  color: #667085;
+  color: var(--ui-color-text-secondary);
   text-align: end;
   font-variant-numeric: tabular-nums;
 }
@@ -728,7 +728,7 @@
   position: relative;
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--ui-space-2);
   min-width: 0;
   min-height: 22px;
 }
@@ -775,7 +775,7 @@
 
 @media (max-width: 767px) {
   .v3-word-creation {
-    gap: 16px;
+    gap: var(--ui-space-4);
   }
 
   .v3-word-creation__header {
@@ -788,8 +788,8 @@
 
   .v3-word-creation__issues,
   .v3-word-creation__content {
-    padding: 16px;
-    border-radius: 12px;
+    padding: var(--ui-space-4);
+    border-radius: var(--ui-border-radius-lg);
   }
 }
 
@@ -800,7 +800,7 @@
 
   .v3-word-creation__issues,
   .v3-word-creation__content {
-    padding: 12px;
+    padding: var(--ui-space-3);
   }
 
   .v3-word-creation :where(.ui-btn, .ui-select, .ui-input-number) {
@@ -814,9 +814,9 @@
 }
 
 .v3-pronunciation-guide {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #475467;
+  margin-top: var(--ui-space-2);
+  font-size: var(--ui-font-size-compact);
+  color: var(--ui-color-text-secondary);
 }
 .v3-pronunciation-guide summary {
   width: fit-content;

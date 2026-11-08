@@ -10,6 +10,7 @@ import type {
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Descriptions,
@@ -169,7 +170,10 @@ function ApplicationQueue() {
   const application = detail.data?.application;
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "审核管理" }, { title: "教师申请审核" }]} />
+      <PageHeader
+        title="教师申请审核"
+        breadcrumb={<Breadcrumb items={[{ title: "审核管理" }]} />}
+      />
 
       <Card size="small">
         {list.isError && (

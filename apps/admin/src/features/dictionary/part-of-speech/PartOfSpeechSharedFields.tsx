@@ -23,7 +23,7 @@ export function LabelWithHint({
           aria-hidden
           style={{
             marginInlineStart: 4,
-            color: "rgba(0, 0, 0, 0.45)",
+            color: "var(--ui-color-text-secondary)",
             cursor: "help"
           }}
         />

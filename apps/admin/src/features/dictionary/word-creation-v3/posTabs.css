@@ -54,7 +54,7 @@
 :is(.word-pos-tab-handle, .word-pos-tab-preview) .word-sort-drag-handle.ui-btn {
   width: 24px;
   min-width: 24px;
-  color: #7f8998;
+  color: var(--ui-color-text-tertiary);
   cursor: grab;
   user-select: none;
   transition:
@@ -65,7 +65,7 @@
 
 .word-pos-tab-handle .word-sort-drag-handle.ui-btn:hover:not(:disabled),
 .word-pos-tab-handle .word-sort-drag-handle.ui-btn:focus-visible {
-  color: #1677ff;
+  color: var(--ui-color-primary);
   background: rgba(22, 119, 255, 0.1);
 }
 

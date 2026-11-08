@@ -111,7 +111,7 @@ export function ChangePassword() {
     <FullscreenCenter>
       <Card style={{ width: "100%", maxWidth: 384 }}>
         <InterfaceLanguage compact />
-        <Typography.Title level={3} style={{ marginBottom: 4 }}>
+        <Typography.Title level={1} style={{ marginBottom: 4 }}>
           {t(forced ? "password_forced_title" : "account_change_password")}
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>

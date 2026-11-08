@@ -4,15 +4,15 @@
 @source "../../../../../packages/ui/src/components/ui/input.tsx";
 @source inline("min-h-9 rounded-lg px-3 py-1");
 @theme inline {
-  --color-primary: #2053ff;
-  --color-primary-foreground: white;
-  --color-surface: white;
-  --color-foreground: #202631;
-  --color-foreground-muted: #485365;
-  --color-foreground-subtle: #687386;
-  --color-muted: #f2f4f7;
-  --color-border: #cdd3dd;
-  --color-danger: #b42318;
+  --color-primary: var(--ui-color-primary);
+  --color-primary-foreground: var(--ui-color-text-light-solid);
+  --color-surface: var(--ui-color-bg-container);
+  --color-foreground: var(--ui-color-text);
+  --color-foreground-muted: var(--ui-color-text-secondary);
+  --color-foreground-subtle: var(--ui-color-text-tertiary);
+  --color-muted: var(--ui-color-fill-secondary);
+  --color-border: var(--ui-color-border);
+  --color-danger: var(--ui-color-error);
 }
 @layer utilities {
   @scope (.word-list-page) {

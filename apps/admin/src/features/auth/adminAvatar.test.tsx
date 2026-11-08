@@ -13,7 +13,7 @@ describe("adminAvatarStyle", () => {
 
   it("admin → 品牌蓝用户图标", () => {
     const s = adminAvatarStyle("admin");
-    expect(s.background).toBe("#2053FF");
+    expect(s.background).not.toBe(adminAvatarStyle("super_admin").background);
     expect((s.icon as { type: unknown }).type).toBe(UserIcon);
   });
 

@@ -1,10 +1,23 @@
+.sentence-editor-meta > .ui-typography {
+  flex: 1 1 240px;
+}
+
+.sentence-editor-meta > .ui-space {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sentence-editor-meta .ui-select {
+  min-width: 72px;
+}
+
 .sentence-editor .word-sentence-translation-list {
-  margin-top: 16px;
+  margin-top: var(--ui-space-4);
 }
 
 .sentence-editor .tsz-ve-toolbar {
-  gap: 4px;
-  padding: 8px;
+  gap: var(--ui-space-1);
+  padding: var(--ui-space-2);
   border-radius: 8px 8px 0 0;
 }
 
@@ -12,7 +25,7 @@
 .sentence-editor .tsz-ve-toolbar-slot {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--ui-space-1);
 }
 
 .sentence-editor [data-tool="pause"] .tsz-ve-toolbar-divider {
@@ -20,7 +33,7 @@
 }
 
 .sentence-editor .tsz-ve-toolbar-divider {
-  margin-inline: 4px;
+  margin-inline: var(--ui-space-1);
 }
 
 /* 工具槽之外的分隔线将历史操作推到右侧。 */
@@ -40,7 +53,7 @@
 /* 显色层与输入层必须保持相同度量；上下仍留出连读、停顿标注空间。 */
 .sentence-editor .v3-voice-text-editor .tsz-ve-strip,
 .sentence-editor .v3-voice-text-editor .tsz-ve-canvas-input {
-  padding: 24px 14px 32px;
+  padding: var(--ui-space-6) 14px 32px;
   font-size: 20px;
   line-height: 1.6;
 }
@@ -51,7 +64,7 @@
 }
 
 .sentence-editor .tsz-ve-canvas-input::placeholder {
-  font-size: 14px;
+  font-size: var(--ui-font-size);
   font-weight: 400;
-  color: var(--ui-color-text-placeholder, #bfbfbf);
+  color: var(--ui-color-text-placeholder);
 }

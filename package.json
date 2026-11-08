@@ -7,6 +7,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "check:node": "node scripts/check-node-runtime.mjs",
+    "check:admin-ui": "node scripts/check-admin-ui.mjs && node --test scripts/check-admin-ui.test.mjs",
     "preinstall": "node scripts/check-node-runtime.mjs",
     "dev": "turbo run dev --filter=@tsz/web",
     "dev:admin": "turbo run dev --filter=@tsz/admin",

@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Flex,
+  PageHeader,
   Space,
   Tag
 } from "@tsz/ui/admin/display";
@@ -130,7 +131,7 @@ export function AdminManagement() {
 
   const columns: TableColumnsType<Admin> = [
     { title: "手机号", dataIndex: "phone", width: 140, fixed: "left" },
-    { title: "昵称", dataIndex: "display_name", width: 160 },
+    { title: "昵称", dataIndex: "display_name", width: 160, ellipsis: true },
     {
       title: "业务权限",
       key: "permissions",
@@ -276,7 +277,10 @@ export function AdminManagement() {
         </Modal>
       )}
 
-      <Breadcrumb items={[{ title: "用户管理" }, { title: "管理员管理" }]} />
+      <PageHeader
+        title="管理员管理"
+        breadcrumb={<Breadcrumb items={[{ title: "用户管理" }]} />}
+      />
 
       <Card className="admin-filter-card" size="small">
         <Form
