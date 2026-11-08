@@ -1,10 +1,10 @@
 .entry-annotation-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--ui-space-5);
   max-height: calc(100dvh - 180px);
   overflow-y: auto;
-  padding-inline-end: 4px;
+  padding-inline-end: var(--ui-space-1);
 }
 
 .entry-annotation-intro {
@@ -13,19 +13,19 @@
 
 .entry-annotation-section-title {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: var(--ui-space-2);
 }
 
 .entry-annotation-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 180px;
   align-items: start;
-  gap: 24px;
+  gap: var(--ui-space-6);
   padding: 18px;
 }
 
 .entry-annotation-row + .entry-annotation-row {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--ui-color-border-secondary);
 }
 
 .entry-annotation-details {
@@ -41,8 +41,8 @@
   grid-template-columns: minmax(0, 160px) max-content max-content;
   justify-content: start;
   align-items: center;
-  gap: 12px;
-  font-size: 12px;
+  gap: var(--ui-space-3);
+  font-size: var(--ui-font-size-sm);
   line-height: 20px;
 }
 
@@ -87,7 +87,7 @@
 @media (max-width: 575px) {
   .entry-annotation-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: var(--ui-space-3);
     padding: 14px;
   }
 }

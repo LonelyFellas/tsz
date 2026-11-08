@@ -52,7 +52,7 @@ export function ResetPasswordResult({ password, adminName, onClose }: Props) {
               fontSize: 18,
               fontFamily: "monospace",
               padding: "8px 12px",
-              background: "rgba(0,0,0,0.04)",
+              background: "var(--ui-color-fill-alter)",
               borderRadius: 8,
               margin: "0 0 12px",
               userSelect: "all"

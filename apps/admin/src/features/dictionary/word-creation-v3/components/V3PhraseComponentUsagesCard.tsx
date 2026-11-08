@@ -222,7 +222,10 @@ export function V3PhraseComponentUsagesCard({
                 disabled={!editable}
                 style={
                   hasLinks
-                    ? { background: "#389e0d", borderColor: "#389e0d" }
+                    ? {
+                        background: "var(--ui-color-success)",
+                        borderColor: "var(--ui-color-success)"
+                      }
                     : undefined
                 }
                 type="button"

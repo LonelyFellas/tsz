@@ -19,8 +19,8 @@
 }
 .ui-tabs-top > .ui-tabs-nav,
 .ui-tabs-bottom > .ui-tabs-nav {
-  margin-bottom: 12px;
-  border-bottom: 1px solid #dfe4eb;
+  margin-bottom: var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-color-border-secondary);
 }
 .ui-tabs-nav-wrap {
   display: flex;
@@ -42,9 +42,9 @@
   cursor: pointer;
 }
 .ui-tabs-tab-btn {
-  padding: 9px 12px;
+  padding: 9px var(--ui-space-3);
   font: inherit;
-  color: #475467;
+  color: var(--ui-color-text-secondary);
   cursor: inherit;
   outline-offset: -2px;
 }
@@ -52,7 +52,7 @@
   padding: 6px 10px;
 }
 .ui-tabs-tab-active > .ui-tabs-tab-btn {
-  color: #2053ff;
+  color: var(--ui-color-primary);
   font-weight: 600;
 }
 .ui-tabs-tab-disabled {
@@ -61,7 +61,7 @@
 }
 .ui-tabs-tab-btn:focus-visible,
 .ui-tabs-tab-focus {
-  outline: 2px solid #2053ff;
+  outline: var(--ui-focus-ring);
 }
 .ui-tabs-body-holder {
   flex: 1;
@@ -74,7 +74,7 @@
 .ui-tabs-ink-bar {
   position: absolute;
   height: 2px;
-  background: #2053ff;
+  background: var(--ui-color-primary);
   pointer-events: none;
   bottom: 0;
 }
@@ -88,12 +88,12 @@
   align-items: stretch;
 }
 .ui-tabs-left > .ui-tabs-nav {
-  border-inline-end: 1px solid #dfe4eb;
-  margin-inline-end: 16px;
+  border-inline-end: 1px solid var(--ui-color-border-secondary);
+  margin-inline-end: var(--ui-space-4);
 }
 .ui-tabs-right > .ui-tabs-nav {
-  border-inline-start: 1px solid #dfe4eb;
-  margin-inline-start: 16px;
+  border-inline-start: 1px solid var(--ui-color-border-secondary);
+  margin-inline-start: var(--ui-space-4);
 }
 :is(.ui-tabs-left, .ui-tabs-right) > .ui-tabs-nav .ui-tabs-ink-bar {
   width: 2px;
@@ -120,8 +120,8 @@
 .ui-tabs-dropdown {
   position: absolute;
   z-index: 1050;
-  padding: 4px;
-  border: 1px solid #dfe4eb;
+  padding: var(--ui-space-1);
+  border: 1px solid var(--ui-color-border-secondary);
   border-radius: 8px;
   background: white;
   box-shadow: 0 6px 16px #1018281c;
@@ -146,20 +146,20 @@
 }
 .ui-collapse {
   min-width: 0;
-  border: 1px solid #dfe4eb;
+  border: 1px solid var(--ui-color-border-secondary);
   border-radius: 8px;
   background: white;
 }
 .ui-collapse-item + .ui-collapse-item {
-  border-top: 1px solid #dfe4eb;
+  border-top: 1px solid var(--ui-color-border-secondary);
 }
 .ui-collapse-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-4);
   cursor: pointer;
-  color: #202631;
+  color: var(--ui-color-text);
 }
 .ui-collapse-title {
   flex: 1;
@@ -173,10 +173,10 @@
 }
 .ui-collapse-small .ui-collapse-header,
 .ui-collapse-small .ui-collapse-body {
-  padding: 8px 12px;
+  padding: var(--ui-space-2) var(--ui-space-3);
 }
 .ui-collapse-body {
-  padding: 12px 16px;
+  padding: var(--ui-space-3) var(--ui-space-4);
 }
 .ui-collapse-panel-hidden,
 .ui-collapse-panel-inactive {

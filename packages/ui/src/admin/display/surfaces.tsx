@@ -10,6 +10,30 @@ import { Spin } from "./controls";
 import type { Size } from "./layout";
 
 type Div = ComponentPropsWithRef<"div">;
+export function PageHeader({
+  title,
+  breadcrumb,
+  actions,
+  children,
+  className = "",
+  ...props
+}: Omit<ComponentPropsWithRef<"header">, "title"> & {
+  title: ReactNode;
+  breadcrumb?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <header {...props} className={`ui-page-header ${className}`}>
+      {breadcrumb}
+      <div className="ui-page-header-main">
+        <h1 className="ui-page-header-title">{title}</h1>
+        {actions && <div className="ui-page-header-actions">{actions}</div>}
+      </div>
+      {children && <div className="ui-page-header-meta">{children}</div>}
+    </header>
+  );
+}
+
 export function Card({
   title,
   extra,

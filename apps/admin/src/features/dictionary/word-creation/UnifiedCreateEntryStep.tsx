@@ -358,7 +358,7 @@ function DetectionPresentationCard({
               "同名草稿"
             ) : (
               <Space>
-                <CircleCheckIcon style={{ color: "#22a06b" }} />
+                <CircleCheckIcon style={{ color: "var(--ui-color-success)" }} />
                 未发现
               </Space>
             )}
@@ -422,7 +422,7 @@ function DetectionPresentationCard({
                             position: "relative",
                             top: "-0.4em",
                             marginInlineStart: 2,
-                            color: "rgba(0, 0, 0, 0.65)",
+                            color: "var(--ui-color-text-secondary)",
                             fontSize: 11,
                             fontWeight: 600,
                             lineHeight: 1,

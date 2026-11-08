@@ -13,7 +13,7 @@ interface AdminAvatarStyle {
 
 const AVATAR_BY_LEVEL: Record<AdminLevel, AdminAvatarStyle> = {
   super_admin: { icon: <CrownIcon />, background: "#faad14" },
-  admin: { icon: <UserIcon />, background: "#2053FF" }
+  admin: { icon: <UserIcon />, background: "var(--ui-color-primary)" }
 };
 
 /**

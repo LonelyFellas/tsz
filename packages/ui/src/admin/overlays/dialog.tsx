@@ -1,5 +1,6 @@
 import RcDialog, { type DialogProps } from "@rc-component/dialog";
 import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
+import { X } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -119,11 +120,11 @@ export function Modal({
             ? false
             : {
                 "aria-label": t("actions.close"),
-                closeIcon: <span aria-hidden="true">×</span>,
+                closeIcon: <X size={16} aria-hidden="true" />,
                 ...(typeof closable === "object" ? closable : {})
               }
         }
-        closeIcon={<span aria-hidden="true">×</span>}
+        closeIcon={<X size={16} aria-hidden="true" />}
         wrapClassName={[wrapClassName, centered && "ui-modal-centered"]
           .filter(Boolean)
           .join(" ")}
@@ -218,7 +219,7 @@ export function Drawer({
             ? false
             : {
                 "aria-label": t("actions.close"),
-                closeIcon: <span aria-hidden="true">×</span>,
+                closeIcon: <X size={16} aria-hidden="true" />,
                 ...(typeof closable === "object" ? closable : {})
               }
         }

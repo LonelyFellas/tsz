@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Flex,
@@ -60,7 +61,10 @@ function ReviewQueue({ adminId }: { adminId: string }) {
   }, [result.data, result.isFetching, result.isSuccess]);
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "词表管理" }, { title: "词表审核" }]} />
+      <PageHeader
+        title="词表审核"
+        breadcrumb={<Breadcrumb items={[{ title: "词表管理" }]} />}
+      />
       <Card className="admin-filter-card" size="small">
         <Form
           className="admin-filter-form"

@@ -571,7 +571,13 @@ export function SentenceEditor({
               save={saveBeforeLeave}
             />
           )}
-          <Flex justify="space-between" align="center">
+          <Flex
+            className="sentence-editor-meta"
+            justify="space-between"
+            align="center"
+            wrap
+            gap="small"
+          >
             <Typography.Text type="secondary">
               {sentence
                 ? `保存仅更新草稿；发布后影响 ${sentence.entries.length} 个词条的 ${sentence.entries.reduce((count, entry) => count + entry.senses.length, 0)} 个词义`

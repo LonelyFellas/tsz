@@ -20,7 +20,7 @@
     "./admin/context": "./src/admin/context.tsx"
   },
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint . && pnpm -w check:admin-ui",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

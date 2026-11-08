@@ -297,17 +297,16 @@ describe("admin 页面烟雾测试", () => {
   });
 
   it.each([[ReviewsPage, "词表审核"]] as const)(
-    "%o 显示面包屑 %s",
+    "%o 显示可识别的页面主标题 %s",
     (Page, title) => {
       render(
         <QueryClientProvider client={new QueryClient()}>
           <Page />
         </QueryClientProvider>
       );
-      expect(screen.getByText(title)).toBeInTheDocument();
       expect(
-        screen.queryByRole("heading", { name: title })
-      ).not.toBeInTheDocument();
+        screen.getByRole("heading", { name: title, level: 1 })
+      ).toBeInTheDocument();
     }
   );
 

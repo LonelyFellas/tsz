@@ -1,8 +1,8 @@
 .shared-sentence-row {
-  padding: 12px 16px 16px;
-  border: 1px solid var(--ui-color-border-secondary, #f0f0f0);
-  border-radius: var(--ui-border-radius-lg, 8px);
-  background: var(--ui-color-bg-container, #fff);
+  padding: var(--ui-space-3) var(--ui-space-4) var(--ui-space-4);
+  border: 1px solid var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  background: var(--ui-color-bg-container);
   min-width: 0;
 }
 
@@ -11,15 +11,15 @@
 }
 
 .shared-sentence-english {
-  font-size: var(--ui-font-size, 14px);
+  font-size: var(--ui-font-size);
   font-weight: 400;
   line-height: 1.6;
-  border: 1px solid var(--ui-color-border, #d9d9d9);
-  border-radius: var(--ui-border-radius, 6px);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-border-radius);
 }
 
 .shared-sentence-translations {
-  padding: 0 12px;
+  padding: 0 var(--ui-space-3);
 }
 
 .shared-sentence-translation > .ui-tag {
@@ -35,7 +35,7 @@
 
 @media (max-width: 600px) {
   .shared-sentence-row {
-    padding: 12px;
+    padding: var(--ui-space-3);
   }
 
   .shared-sentence-translations {

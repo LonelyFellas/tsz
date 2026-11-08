@@ -15,15 +15,23 @@ import { resolveInterfaceLocale } from "@tsz/shared/i18n";
 import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import type { Dayjs } from "dayjs";
 import { useFieldDisabled } from "./Form";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  X
+} from "lucide-react";
 
 const calendarProps = {
   generateConfig,
   prefixCls: "ui-picker",
-  suffixIcon: <span aria-hidden="true">▦</span>,
-  prevIcon: <span aria-hidden="true">‹</span>,
-  nextIcon: <span aria-hidden="true">›</span>,
-  superPrevIcon: <span aria-hidden="true">«</span>,
-  superNextIcon: <span aria-hidden="true">»</span>,
+  suffixIcon: <CalendarDays size={14} aria-hidden="true" />,
+  prevIcon: <ChevronLeft size={14} aria-hidden="true" />,
+  nextIcon: <ChevronRight size={14} aria-hidden="true" />,
+  superPrevIcon: <ChevronsLeft size={14} aria-hidden="true" />,
+  superNextIcon: <ChevronsRight size={14} aria-hidden="true" />,
   getPopupContainer: (anchor: HTMLElement) =>
     anchor.closest<HTMLElement>('[role="dialog"]') ?? document.body
 };
@@ -38,7 +46,11 @@ function useCalendarProps() {
       clear: t("controls.dateClear")
     },
     allowClear: {
-      clearIcon: <span aria-label={t("controls.dateClear")}>×</span>
+      clearIcon: (
+        <span aria-label={t("controls.dateClear")}>
+          <X size={12} aria-hidden="true" />
+        </span>
+      )
     }
   };
 }

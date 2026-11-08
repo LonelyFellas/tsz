@@ -1,11 +1,14 @@
+@import "../tokens.css";
+
 .ui-table-wrapper {
   position: relative;
   min-width: 0;
   max-width: 100%;
 }
 .ui-table {
-  color: #202631;
-  font-size: 14px;
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size);
+  font-variant-numeric: tabular-nums;
 }
 .ui-table table {
   width: 100%;
@@ -13,20 +16,20 @@
   text-align: start;
 }
 .ui-table-cell {
-  padding: 12px 14px;
-  border-bottom: 1px solid #e4e7ec;
-  background: white;
+  padding: var(--ui-space-3) 14px;
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+  background: var(--ui-color-bg-container);
 }
 .ui-table-small .ui-table-cell {
-  padding: 7px 8px;
+  padding: 7px var(--ui-space-2);
 }
 .ui-table-middle .ui-table-cell {
-  padding: 10px 12px;
+  padding: 10px var(--ui-space-3);
 }
 .ui-table-thead .ui-table-cell {
   font-weight: 600;
-  color: #475467;
-  background: #f7f8fa;
+  color: var(--ui-color-text-secondary);
+  background: var(--ui-color-fill-alter);
   text-align: start;
 }
 .ui-table-cell-fix {
@@ -39,12 +42,12 @@
   white-space: nowrap;
 }
 .ui-table-cell-row-hover {
-  background: #f8faff;
+  background: var(--ui-color-fill-alter);
 }
 .ui-table-sticky-holder {
   position: sticky;
   z-index: 3;
-  background: white;
+  background: var(--ui-color-bg-container);
 }
 .ui-table-row-expand-icon,
 .ui-table-sort {
@@ -57,8 +60,8 @@
   width: 22px;
   height: 22px;
   border-radius: 4px;
-  border: 1px solid #cdd3dd;
-  background: white;
+  border: 1px solid var(--ui-color-border);
+  background: var(--ui-color-bg-container);
 }
 .ui-table-sort {
   display: flex;
@@ -71,11 +74,11 @@
   font-weight: inherit;
 }
 .ui-table input[type="checkbox"] {
-  accent-color: #2053ff;
+  accent-color: var(--ui-color-primary);
 }
 .ui-table-placeholder td {
   text-align: center;
-  color: #667085;
+  color: var(--ui-color-text-secondary);
 }
 .ui-table-loading {
   position: absolute;
@@ -83,17 +86,17 @@
   display: grid;
   place-items: center;
   background: rgb(255 255 255 / 70%);
-  color: #475467;
+  color: var(--ui-color-text-secondary);
   z-index: 4;
 }
 .ui-table-bordered .ui-table-cell {
-  border-inline-end: 1px solid #e4e7ec;
+  border-inline-end: 1px solid var(--ui-color-border-secondary);
 }
 .ui-pagination {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: var(--ui-space-1);
   list-style: none;
   padding: 0;
   margin: 14px 0 0;
@@ -110,9 +113,9 @@
 .ui-pagination select {
   box-sizing: border-box;
   min-width: 32px;
-  min-height: 32px;
+  min-height: var(--ui-control-height);
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--ui-border-radius);
   text-align: center;
   line-height: 30px;
 }
@@ -127,8 +130,21 @@
   cursor: pointer;
 }
 .ui-pagination li.ui-pagination-item-active {
-  color: #2053ff;
+  color: var(--ui-color-primary);
   border-color: currentColor;
+  background: var(--ui-color-primary-bg);
+}
+.ui-pagination
+  li:not(
+    .ui-pagination-disabled,
+    .ui-pagination-total-text,
+    .ui-pagination-options
+  ):hover {
+  background: var(--ui-color-fill-secondary);
+}
+.ui-pagination :is(button, select):focus-visible {
+  outline: var(--ui-focus-ring);
+  outline-offset: var(--ui-focus-offset);
 }
 .ui-pagination li.ui-pagination-disabled,
 .ui-pagination button:disabled {
@@ -136,9 +152,9 @@
   cursor: default;
 }
 .ui-pagination select {
-  border-color: #cdd3dd;
-  background: white;
-  color: #344054;
+  border-color: var(--ui-color-border);
+  background: var(--ui-color-bg-container);
+  color: var(--ui-color-text);
 }
 .ui-pagination-options {
   list-style: none;
@@ -158,7 +174,7 @@
   position: sticky;
   z-index: 3;
   overflow: hidden;
-  background: #f2f4f7;
+  background: var(--ui-color-fill-secondary);
 }
 .ui-table-sticky-scroll-bar {
   height: 100%;
