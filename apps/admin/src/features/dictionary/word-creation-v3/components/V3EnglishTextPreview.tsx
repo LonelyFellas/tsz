@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import type { EnglishTextV3 } from "@tsz/types";
 import { Flex, Tag, Typography } from "@tsz/ui/admin/display";
@@ -18,6 +19,7 @@ export function V3EnglishTextPreview({
   showPlayback?: boolean;
   textRole?: "definition" | "example";
 }) {
+  const { t } = useLexiconEditorTranslation();
   const rows =
     value.mode === "unified"
       ? [{ dialect: "common" as const, variant: value.common }]
@@ -39,7 +41,7 @@ export function V3EnglishTextPreview({
                   content={toRichTextV2(variant.value)}
                   voiceProfile={variant.voice_profile ?? undefined}
                   dialect={dialect}
-                  ariaLabelPrefix="整句"
+                  ariaLabelPrefix={t("panel_whole_sentence")}
                   playbackOnly
                   assetOnly
                 />
@@ -49,7 +51,7 @@ export function V3EnglishTextPreview({
               className={showPlayback ? "v3-english-preview-text" : undefined}
             >
               {(!hideCommonDialect || dialect !== "common") && (
-                <Tag>{dialectLabel(dialect)}</Tag>
+                <Tag>{dialectLabel(dialect, t)}</Tag>
               )}
               <RichTextReadOnly
                 className="tsz-entry-en"
@@ -68,8 +70,8 @@ export function V3EnglishTextPreview({
               {link.source_segments
                 .map((segment) => segment.surface)
                 .join(" … ")}{" "}
-              → {link.target_headword ?? "已关联词条"} ·{" "}
-              {link.target_gloss ?? "词义"}
+              → {link.target_headword ?? t("panel_linked_entries")} ·{" "}
+              {link.target_gloss ?? t("panel_meanings_2")}
             </Typography.Text>
           ))}
         </div>

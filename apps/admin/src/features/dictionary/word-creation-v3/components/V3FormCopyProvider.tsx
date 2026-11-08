@@ -1,3 +1,10 @@
+import {
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage
+} from "../../i18n/editor";
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { CopyIcon, CircleHelpIcon, Undo2Icon } from "lucide-react";
 import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
@@ -18,6 +25,7 @@ import {
 } from "react";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
+  FormCopyError,
   applyFormCopy,
   planFormCopy,
   type FormCopyKind,
@@ -27,8 +35,13 @@ import {
 import { resolveFormCopyProfiles } from "../formCopyProfiles";
 import { pronunciationStyleLabel } from "../presentation";
 
-const copyName = (kind: FormCopyKind) =>
-  kind === "phonetics" ? "英美音标" : "英美音色参数";
+const copyName = (
+  kind: FormCopyKind,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) =>
+  kind === "phonetics"
+    ? t("panel_british_and_american_transcriptions")
+    : t("panel_british_and_american_voice_parameters");
 type Selection = {
   formId: string;
   kind: FormCopyKind;
@@ -69,19 +82,23 @@ export function V3FormCopyHandle({
   formId: string;
   kind: FormCopyKind;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const copy = useV3FormCopy();
   if (!copy) return null;
   const selected = copy.source?.formId === formId && copy.source.kind === kind;
   return (
     <Tooltip
-      title={`拖动复制${copyName(kind)}；也可点击后选择目标，或用方向键和 Enter 操作`}
+      title={t(
+        "panel_drag_to_copy_or_click_to_select_a_target_or_use_arrow_keys_and_enter",
+        { p0: copyName(kind, t) }
+      )}
     >
       <Button
         type="text"
         size="small"
         className="v3-form-copy-handle"
         icon={<CopyIcon />}
-        aria-label={`复制${copyName(kind)}`}
+        aria-label={t("panel_copy", { p0: copyName(kind, t) })}
         aria-pressed={selected}
         disabled={copy.busy || undefined}
         onClick={(event) => {
@@ -106,6 +123,7 @@ export function V3FormCopyProvider({
   onChange: (next: SharedFormsStepContentV3) => void;
   children: ReactNode;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const { message, notification } = App.useApp();
   const noticeKey = useId();
   useEffect(
@@ -139,10 +157,11 @@ export function V3FormCopyProvider({
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<FormCopyPlan>();
   const [mapping, setMapping] = useState<FormCopyMapping>({});
-  const [error, setError] = useState<string>();
+  const [error, setError] = useLexiconEditorMessageState();
   const [copyResult, setCopyResult] = useState<{
-    title: string;
-    description: string;
+    kind: FormCopyKind;
+    targetLabel: string;
+    recordingsWarning: boolean;
     undo: { formId: string; before: FormContentV3; after: FormContentV3 };
   }>();
   const disabled = busy || Boolean(componentDisabled);
@@ -167,8 +186,14 @@ export function V3FormCopyProvider({
     const { undo } = copyResult;
     notification.success({
       key: noticeKey,
-      title: copyResult.title,
-      description: copyResult.description,
+      title: t("panel_copied", { p0: copyName(copyResult.kind, t) }),
+      description: t(
+        "panel_target_save_the_draft_to_apply_then_audition_again",
+        {
+          p0: copyResult.targetLabel,
+          p1: copyResult.recordingsWarning ? t("copy_recordings_retained") : ""
+        }
+      ),
       duration: 0,
       onClose: () =>
         setCopyResult((current) =>
@@ -177,7 +202,7 @@ export function V3FormCopyProvider({
       actions: (
         <Button
           size="small"
-          aria-label="撤销"
+          aria-label={t("panel_undo")}
           icon={<Undo2Icon />}
           disabled={disabled}
           onClick={() => {
@@ -188,7 +213,11 @@ export function V3FormCopyProvider({
               return;
             const current = latest.current.forms;
             if (!same(contentFor(current, undo.formId), undo.after)) {
-              setError("目标在复制后又被修改，不能撤销覆盖这些修改");
+              setError(
+                createLexiconEditorMessage(
+                  "panel_the_target_changed_after_copying_undo_cannot_overwrite_these_changes"
+                )
+              );
               setCopyResult(undefined);
               return;
             }
@@ -201,14 +230,16 @@ export function V3FormCopyProvider({
               )
             });
             setCopyResult(undefined);
-            void message.success("已撤销刚才的复制，请保存草稿。");
+            void message.success(
+              t("panel_copy_undone_save_the_draft_to_keep_this_change")
+            );
           }}
         >
-          撤销
+          {t("panel_undo")}
         </Button>
       )
     });
-  }, [copyResult, disabled, notification, noticeKey, message]);
+  }, [copyResult, disabled, notification, noticeKey, message, t, setError]);
   useEffect(() => () => request.current?.abort(), []);
   const labelFor = (formId: string) => {
     const bindings = forms.pos.flatMap((pos) => pos.forms);
@@ -231,7 +262,11 @@ export function V3FormCopyProvider({
       matches.length > 1
         ? ` ${matches.findIndex((form) => form.id === formId) + 1}`
         : "";
-    return `${binding ? formTypeLabel(binding.form_type) : "词形"}${suffix}${spelling ? ` · ${spelling}` : ""}`;
+    return t("panel_label_2", {
+      p0: binding ? formTypeLabel(binding.form_type) : t("panel_form"),
+      p1: suffix,
+      p2: spelling ? ` · ${spelling}` : ""
+    });
   };
   const cancel = () => {
     pointer.current = undefined;
@@ -258,7 +293,9 @@ export function V3FormCopyProvider({
         plan.target.contentSnapshot
       )
     )
-      throw new Error("来源或目标已变化，请重新选择后复制");
+      throw new FormCopyError(
+        "panel_the_source_or_target_changed_select_them_again_to_copy"
+      );
   };
   const apply = async (plan: FormCopyPlan) => {
     const controller = new AbortController();
@@ -276,7 +313,9 @@ export function V3FormCopyProvider({
       const after = contentFor(next, plan.target.formId)!;
       setPending(undefined);
       if (same(after, plan.target.contentSnapshot)) {
-        void message.info("两处配置相同，无需复制");
+        void message.info(
+          t("panel_both_configurations_are_identical_no_copy_is_needed")
+        );
         return;
       }
       latest.current.onChange(next);
@@ -286,13 +325,20 @@ export function V3FormCopyProvider({
         after: structuredClone(after)
       };
       setCopyResult({
-        title: `${copyName(plan.kind)}已复制`,
-        description: `目标：${labelFor(plan.target.formId)}。保存草稿后生效，请重新试听。${plan.warnings.join("；")}`,
+        kind: plan.kind,
+        targetLabel: labelFor(plan.target.formId),
+        recordingsWarning: plan.warnings.length > 0,
         undo
       });
     } catch (cause) {
       if (!controller.signal.aborted)
-        setError(cause instanceof Error ? cause.message : "复制失败，请重试");
+        setError(
+          cause instanceof FormCopyError
+            ? createLexiconEditorMessage(cause.messageKey)
+            : cause instanceof Error
+              ? cause.message
+              : createLexiconEditorMessage("panel_copy_failed_try_again")
+        );
     } finally {
       if (!controller.signal.aborted) setBusy(false);
     }
@@ -304,10 +350,14 @@ export function V3FormCopyProvider({
     try {
       const current = latest.current.forms;
       if (!same(contentFor(current, source.formId), source.snapshot))
-        throw new Error("来源内容已变化，请重新选择后复制");
+        throw new FormCopyError(
+          "panel_the_source_changed_select_it_again_to_copy"
+        );
       const plan = planFormCopy(current, source.formId, formId, kind);
       if (plan.sameContent) {
-        void message.info("两个词形已共用同一份内容，无需复制");
+        void message.info(
+          t("panel_both_forms_already_share_the_same_content_no_copy_is_needed")
+        );
         return;
       }
       const sharedCount = current.pos
@@ -324,7 +374,13 @@ export function V3FormCopyProvider({
         setError(undefined);
       } else void apply(plan);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "暂时无法复制");
+      setError(
+        cause instanceof FormCopyError
+          ? createLexiconEditorMessage(cause.messageKey)
+          : cause instanceof Error
+            ? cause.message
+            : createLexiconEditorMessage("panel_copying_is_unavailable")
+      );
     }
   };
   const sharedLabels = pending
@@ -489,20 +545,34 @@ export function V3FormCopyProvider({
             <Alert
               type="info"
               showIcon
-              title={`正在复制“${labelFor(source.formId)}”的${copyName(source.kind)}`}
+              title={t("panel_copying_from", {
+                p0: labelFor(source.formId),
+                p1: copyName(source.kind, t)
+              })}
               description={
                 target
-                  ? `复制到“${labelFor(target)}”；松开鼠标、点击目标或按 Enter 应用，Esc 取消。`
-                  : "请选择另一个词形的同类区域。点击复制时，也可用上下方向键选择目标，Enter 应用。"
+                  ? t(
+                      "panel_copy_to_release_click_the_target_or_press_enter_to_apply_esc_to_cancel",
+                      { p0: labelFor(target) }
+                    )
+                  : t(
+                      "panel_select_the_same_area_in_another_form_after_clicking_copy_you_can_also_selec"
+                    )
               }
               action={
                 <Button size="small" onClick={cancel}>
-                  取消
+                  {t("panel_cancel")}
                 </Button>
               }
             />
           )}
-          {busy && <Alert type="info" showIcon title="正在读取完整音色配置…" />}
+          {busy && (
+            <Alert
+              type="info"
+              showIcon
+              title={t("panel_loading_complete_voice_configuration")}
+            />
+          )}
           {error && !pending && (
             <Alert
               type="error"
@@ -519,11 +589,13 @@ export function V3FormCopyProvider({
           </div>
         </AdminControls>
         <Modal
-          title={`复制${pending ? copyName(pending.kind) : "配置"}`}
+          title={t("panel_copy_2", {
+            p0: pending ? copyName(pending.kind, t) : t("panel_configuration")
+          })}
           open={Boolean(pending)}
           confirmLoading={busy}
-          okText="复制到草稿"
-          cancelText="取消"
+          okText={t("panel_copy_to_draft")}
+          cancelText={t("panel_cancel")}
           mask={{ closable: !busy }}
           closable={!busy}
           cancelButtonProps={{ disabled: busy }}
@@ -548,29 +620,37 @@ export function V3FormCopyProvider({
               setError(
                 cause instanceof Error
                   ? cause.message
-                  : "复制条件已变化，请重新选择"
+                  : createLexiconEditorMessage(
+                      "panel_copy_conditions_changed_select_again"
+                    )
               );
             }
           }}
         >
           <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
             <Typography.Text>
-              从“{pending && labelFor(pending.source.formId)}”复制到“
+              {t("panel_copy_from")}
+              {pending && labelFor(pending.source.formId)}
+              {t("panel_to")}
               {pending && labelFor(pending.target.formId)}
-              ”。目标的拼写和读法标签保持原样。
+              {t("panel_target_spellings_and_reading_labels_stay_unchanged")}
             </Typography.Text>
             {sharedLabels.length > 1 && (
               <Alert
                 type="warning"
                 showIcon
-                title="这些标签共用目标内容，将一起更新"
+                title={t(
+                  "panel_these_labels_share_the_target_content_and_will_update_together"
+                )}
                 description={sharedLabels.join("、")}
               />
             )}
             {pending?.needsMapping && (
               <>
                 <Typography.Paragraph>
-                  两侧读法数量不同，请为每条目标读法选择来源，或选择跳过。英式与美式分别对应。
+                  {t(
+                    "panel_the_numbers_of_readings_differ_select_a_source_for_each_target_reading_or_s"
+                  )}
                 </Typography.Paragraph>
                 {pending.matches.map((match) => {
                   const regions =
@@ -588,7 +668,16 @@ export function V3FormCopyProvider({
                   const row = targetVariant.pronunciations.find(
                     (item) => item.id === match.target.pronunciationId
                   )!;
-                  const label = `${match.side === "uk" ? "英式" : "美式"} · 目标读法 ${match.target.index + 1}${row.style ? ` · ${pronunciationStyleLabel(row.style)}` : ""}`;
+                  const label = t("panel_target_reading", {
+                    p0:
+                      match.side === "uk"
+                        ? t("panel_british")
+                        : t("panel_american"),
+                    p1: match.target.index + 1,
+                    p2: row.style
+                      ? ` · ${pronunciationStyleLabel(row.style, t)}`
+                      : ""
+                  });
                   return (
                     <Flex
                       key={`${match.side}:${match.target.pronunciationId}`}
@@ -604,10 +693,21 @@ export function V3FormCopyProvider({
                           ""
                         }
                         options={[
-                          { value: "", label: "跳过，保留目标内容" },
+                          {
+                            value: "",
+                            label: t("panel_skip_and_keep_target_content")
+                          },
                           ...sourcePronunciations.map((item, index) => ({
                             value: item.id,
-                            label: `来源读法 ${index + 1}${item.style ? ` · ${pronunciationStyleLabel(item.style)}` : ""}${item.actual_pron ? ` · ${item.actual_pron}` : ""}`
+                            label: t("panel_source_reading", {
+                              p0: index + 1,
+                              p1: item.style
+                                ? ` · ${pronunciationStyleLabel(item.style, t)}`
+                                : "",
+                              p2: item.actual_pron
+                                ? ` · ${item.actual_pron}`
+                                : ""
+                            })
                           }))
                         ]}
                         onChange={(id) =>
@@ -634,9 +734,14 @@ export function V3FormCopyProvider({
 }
 
 export function V3FormCopyHelp() {
+  const { t } = useLexiconEditorTranslation();
   return (
-    <Tooltip title="音标和音色参数分开复制，均包含英美两侧。拖动复制图标到目标区域，或点击图标后选择目标。复制会覆盖对应配置；可撤销，保存草稿后生效。音频文件不复制，复制后请重新试听。">
-      <CircleHelpIcon aria-label="词形复制说明" />
+    <Tooltip
+      title={t(
+        "panel_transcriptions_and_voice_parameters_are_copied_separately_including_both_br"
+      )}
+    >
+      <CircleHelpIcon aria-label={t("panel_form_copying_guidance")} />
     </Tooltip>
   );
 }

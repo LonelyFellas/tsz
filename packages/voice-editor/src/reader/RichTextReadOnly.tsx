@@ -1,3 +1,4 @@
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import { useCallback, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import type { RichText, RichTextAnnotation } from "@tsz/types";
@@ -131,8 +132,9 @@ export function RichTextReadOnly({
   value,
   textRole = "body",
   className,
-  emptyText = "未填写"
+  emptyText
 }: RichTextReadOnlyProps) {
+  const { t } = useInterfaceTranslation();
   const containerRef = useRef<HTMLSpanElement | null>(null);
   const parsed = useMemo(() => parse(value), [value]);
   const liaisons = useMemo(
@@ -167,7 +169,9 @@ export function RichTextReadOnly({
   const { arcs, strokeWidth } = useLiaisonArcs(containerRef, collectLinks);
 
   if (!text) {
-    return <span className={className}>{emptyText}</span>;
+    return (
+      <span className={className}>{emptyText ?? t("status.notEntered")}</span>
+    );
   }
   if ("error" in parsed) {
     return (

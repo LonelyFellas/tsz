@@ -1,3 +1,8 @@
+import {
+  useLexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage
+} from "../dictionary/i18n/editor";
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { expandFormContents } from "@tsz/shared";
@@ -59,6 +64,7 @@ export function SentenceEditor({
   onClose: () => void;
   onSaved: (sentence: SharedSentence) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const readingForms = useMemo(
     () => (sourceWord ? expandFormContents(sourceWord.forms) : undefined),
     [sourceWord]
@@ -95,7 +101,7 @@ export function SentenceEditor({
       : [];
   const contextLabel = currentTargets[0]
     ? `${currentTargets[0].surface.headword} · ${currentTargets[0].gloss}`
-    : "当前词义";
+    : t("panel_current_meaning");
   const [content, setContent] = useState<SharedSentenceContent>(() => {
     if (sentence) return structuredClone(sentence.content);
     const fresh = newSentence();
@@ -137,7 +143,11 @@ export function SentenceEditor({
     };
     try {
       if (env.VOICE_EDITOR && !saveActionRef.current) {
-        setError("正文或配音仍在准备，请稍后重试保存。");
+        setError(
+          createLexiconEditorMessage(
+            "panel_text_or_voices_are_still_being_prepared_try_saving_again_shortly"
+          )
+        );
         return false;
       }
       // 成功回调可能立即卸载编辑器；离开结果以业务保存成功为准。
@@ -151,7 +161,7 @@ export function SentenceEditor({
   };
   const [dialect, setDialect] = useState<Dialect>("common");
   const [pendingAnnotation, setPendingAnnotation] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useLexiconEditorMessageState("");
   const [baseRevision, setBaseRevision] = useState(sentence?.revision ?? 0);
   const [conflict, setConflict] = useState(false);
   const [latest, setLatest] = useState<SharedSentence>();
@@ -170,7 +180,13 @@ export function SentenceEditor({
       setLatest(await api.sentences.get(storedSentence.id, "draft"));
       setError("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "获取最新草稿失败，请重试");
+      setError(
+        e instanceof Error
+          ? e.message
+          : createLexiconEditorMessage(
+              "panel_could_not_fetch_the_latest_draft_try_again"
+            )
+      );
     } finally {
       setSaving(false);
     }
@@ -189,18 +205,30 @@ export function SentenceEditor({
   const finish = async (afterSave?: () => void) => {
     if (conflict || saving || !allowed) return false;
     if (pendingEditor) {
-      setError("请先处理正文中的未完成操作，再保存例句。");
+      setError(
+        createLexiconEditorMessage(
+          "panel_complete_pending_text_operations_before_saving_the_example"
+        )
+      );
       return false;
     }
     if (pendingAnnotation) {
-      setError("请先确认当前句内标注，或取消所选片段。");
+      setError(
+        createLexiconEditorMessage(
+          "panel_confirm_the_current_annotation_or_cancel_the_selected_segments_first"
+        )
+      );
       return;
     }
     if (!canSave) {
       setError(
         sourceEntryId
-          ? "请填写正文和译文，并确认句中已有效关联当前词义"
-          : "请填写例句正文和至少一条译文"
+          ? createLexiconEditorMessage(
+              "panel_enter_the_text_and_translation_and_link_the_current_meaning_within_the_sent"
+            )
+          : createLexiconEditorMessage(
+              "panel_enter_example_text_and_at_least_one_translation"
+            )
       );
       return false;
     }
@@ -214,7 +242,9 @@ export function SentenceEditor({
           (t) => t.content.text.trim()
         );
         if (!next.sentence.zh_translations.length) {
-          setError("请至少填写一条译文");
+          setError(
+            createLexiconEditorMessage("panel_enter_at_least_one_translation")
+          );
           return;
         }
         const alias =
@@ -279,7 +309,9 @@ export function SentenceEditor({
             !canUpdate
           ) {
             const cannotUpdate = new Error(
-              "例句已创建，但当前账号没有修改例句的权限。新的输入已保留。"
+              t(
+                "panel_the_example_was_created_but_your_account_cannot_edit_it_new_input_is_retain"
+              )
             );
             if (
               createError instanceof HttpError &&
@@ -308,7 +340,9 @@ export function SentenceEditor({
               setConflict(true);
               setLatest(existing);
               setError(
-                "例句已创建且内容已变化，请比较草稿后再保存。本地输入已保留。"
+                createLexiconEditorMessage(
+                  "panel_the_example_was_created_and_its_content_has_changed_compare_drafts_before_s"
+                )
               );
               return false;
             }
@@ -354,15 +388,23 @@ export function SentenceEditor({
         setConflict(true);
         setLatest(undefined);
       }
-      setError(e instanceof Error ? e.message : "保存失败，输入已保留，请重试");
+      setError(
+        e instanceof Error
+          ? e.message
+          : createLexiconEditorMessage(
+              "panel_saving_failed_input_is_retained_try_again"
+            )
+      );
     } finally {
       setSaving(false);
     }
   };
   const close = () =>
     modal.confirm({
-      title: "放弃本次未完成的例句编辑？",
-      content: "尚未保存的修改和本地备份会被丢弃。此前已保存的例句不受影响。",
+      title: t("panel_discard_this_unfinished_example_edit"),
+      content: t(
+        "panel_unsaved_changes_and_local_backups_will_be_discarded_previously_saved_exampl"
+      ),
       onOk: () => {
         recovery.discard();
         onClose();
@@ -426,8 +468,10 @@ export function SentenceEditor({
         ? () =>
             new Promise<boolean>((resolve) => {
               const dialog = modal.confirm({
-                title: "例句还有未保存的修改",
-                content: "例句独立保存，词义保存不会代为保存这里的修改。",
+                title: t("panel_this_example_has_unsaved_changes"),
+                content: t(
+                  "panel_examples_are_saved_separately_saving_the_meaning_does_not_save_these_change"
+                ),
                 onCancel: () => resolve(false),
                 footer: (
                   <Space>
@@ -437,7 +481,7 @@ export function SentenceEditor({
                         resolve(false);
                       }}
                     >
-                      继续编辑
+                      {t("panel_continue_editing")}
                     </Button>
                     <Button
                       disabled={saving}
@@ -447,7 +491,7 @@ export function SentenceEditor({
                         resolve(true);
                       }}
                     >
-                      放弃修改
+                      {t("panel_discard_changes")}
                     </Button>
                     <Button
                       type="primary"
@@ -456,14 +500,14 @@ export function SentenceEditor({
                         dialog.update({
                           closable: false,
                           footer: null,
-                          content: "正在保存例句…"
+                          content: t("panel_saving_example")
                         });
                         const saved = await saveBeforeLeave();
                         dialog.destroy();
                         resolve(saved === true);
                       }}
                     >
-                      保存例句后离开
+                      {t("panel_save_example_and_leave")}
                     </Button>
                   </Space>
                 )
@@ -536,23 +580,31 @@ export function SentenceEditor({
         title={
           <V3EditorTitle
             index={rowIndex}
-            title="多维例句"
-            details={`${sentence ? "" : "新建 · "}${content.sentence.level} · ${dialectLabel(row.dialect)}`}
+            title={t("panel_examples_2")}
+            details={t("panel_label_4", {
+              p0: sentence ? "" : t("panel_new"),
+              p1: content.sentence.level,
+              p2: dialectLabel(row.dialect, t)
+            })}
           />
         }
         footer={
           <Flex justify="end" gap="small">
-            <Button aria-label="取消例句编辑" disabled={saving} onClick={close}>
-              取消
+            <Button
+              aria-label={t("panel_cancel_example_editing")}
+              disabled={saving}
+              onClick={close}
+            >
+              {t("panel_cancel")}
             </Button>
             <Button
               type="primary"
-              aria-label="保存例句"
+              aria-label={t("panel_save_example")}
               loading={saving}
               disabled={conflict || !allowed || !canSave}
               onClick={() => void saveBeforeLeave()}
             >
-              保存草稿
+              {t("panel_save_draft")}
             </Button>
           </Flex>
         }
@@ -580,13 +632,25 @@ export function SentenceEditor({
           >
             <Typography.Text type="secondary">
               {sentence
-                ? `保存仅更新草稿；发布后影响 ${sentence.entries.length} 个词条的 ${sentence.entries.reduce((count, entry) => count + entry.senses.length, 0)} 个词义`
-                : "例句独立保存为草稿，发布后按句内关联展示到对应词义。"}
+                ? t("sentence_publish_impact", {
+                    entries: t("publication_entry_count", {
+                      count: sentence.entries.length
+                    }),
+                    meanings: t("preview_meaning_count", {
+                      count: sentence.entries.reduce(
+                        (count, entry) => count + entry.senses.length,
+                        0
+                      )
+                    })
+                  })
+                : t(
+                    "panel_examples_are_saved_separately_as_drafts_after_publishing_their_links_determ"
+                  )}
             </Typography.Text>
             <Space>
-              <Typography.Text>等级</Typography.Text>
+              <Typography.Text>{t("panel_level")}</Typography.Text>
               <Select
-                aria-label="例句等级"
+                aria-label={t("panel_example_level")}
                 value={content.sentence.level}
                 options={LEVELS}
                 disabled={saving || !canEdit}
@@ -600,20 +664,26 @@ export function SentenceEditor({
             </Space>
           </Flex>
           {error && (
-            <Alert type="error" title={error} description="输入已保留。" />
+            <Alert
+              type="error"
+              title={error}
+              description={t("panel_input_is_retained")}
+            />
           )}
           {conflict && (
             <Alert
               type="warning"
-              title="例句版本冲突"
-              description="本地输入仍已保留。比较最新草稿并选择保留或放弃后，才能再次保存。"
+              title={t("panel_example_version_conflict")}
+              description={t(
+                "panel_local_input_is_retained_compare_the_latest_draft_and_choose_whether_to_keep"
+              )}
               action={
                 <Space wrap>
                   <Button
                     loading={saving}
                     onClick={() => void refreshConflict()}
                   >
-                    刷新并比较
+                    {t("panel_refresh_and_compare")}
                   </Button>
                   {latest && (
                     <>
@@ -621,20 +691,23 @@ export function SentenceEditor({
                         disabled={saving}
                         onClick={() => resolveConflict(false)}
                       >
-                        保留本地修改
+                        {t("panel_keep_local_changes")}
                       </Button>
                       <Button
                         disabled={saving}
                         danger
                         onClick={() =>
                           modal.confirm({
-                            title: "放弃本地修改？",
-                            content: `未保存的输入会被丢弃，改用第 ${latest.revision} 版内容。`,
+                            title: t("panel_discard_local_changes"),
+                            content: t(
+                              "panel_unsaved_input_will_be_discarded_and_replaced_with_revision",
+                              { p0: latest.revision }
+                            ),
                             onOk: () => resolveConflict(true)
                           })
                         }
                       >
-                        放弃本地修改
+                        {t("panel_discard_local_changes_2")}
                       </Button>
                     </>
                   )}
@@ -650,8 +723,10 @@ export function SentenceEditor({
           ) && (
             <Alert
               type="warning"
-              title="旧关联待选择词义"
-              description="请点击原来的关联片段，补选具体词义或清除关联后再完成。"
+              title={t("panel_select_meanings_for_historical_links")}
+              description={t(
+                "panel_click_the_original_linked_segments_to_select_a_specific_meaning_or_clear_th"
+              )}
             />
           )}
           {!sourceEntryId &&
@@ -660,7 +735,9 @@ export function SentenceEditor({
             ) && (
               <Alert
                 type="info"
-                title="未关联具体词义，暂不会用于对应单词的练习。可先保存，之后再补充关联。"
+                title={t(
+                  "panel_no_specific_meaning_is_linked_so_this_will_not_be_used_for_the_correspondin"
+                )}
               />
             )}
           {sourceEntryId && (
@@ -668,18 +745,24 @@ export function SentenceEditor({
               type={currentLinked ? "success" : "info"}
               title={
                 currentLinked
-                  ? `已关联当前词义：${contextLabel}`
-                  : `请关联当前词义：${contextLabel}`
+                  ? t("panel_current_meaning_linked", { p0: contextLabel })
+                  : t("panel_link_the_current_meaning", { p0: contextLabel })
               }
               description={
                 !currentLinked
-                  ? "至少一处单词或短语关联到此词义后才能完成。"
+                  ? t(
+                      "panel_link_at_least_one_word_or_phrase_to_this_meaning_before_completing"
+                    )
                   : undefined
               }
             />
           )}
           {candidates.length > 0 && (
-            <Flex wrap gap="small" aria-label="当前词义匹配位置">
+            <Flex
+              wrap
+              gap="small"
+              aria-label={t("panel_matching_positions_for_current_meaning")}
+            >
               {candidates.map(({ segments, target, gloss, surface }) => (
                 <Button
                   key={segments[0]!.start}
@@ -709,21 +792,25 @@ export function SentenceEditor({
                     }));
                   }}
                 >
-                  确认关联 {segments.map((s) => s.surface).join(" … ")}（位置{" "}
-                  {segments[0]!.start + 1}）
+                  {t("panel_confirm_link")}{" "}
+                  {segments.map((s) => s.surface).join(" … ")}
+                  {t("panel_position")} {segments[0]!.start + 1}）
                 </Button>
               ))}
             </Flex>
           )}
           {rows.length > 1 && (
             <Radio.Group
-              aria-label="例句方言"
+              aria-label={t("panel_example_dialect")}
               value={row.dialect}
               disabled={saving || pendingEditor}
               onChange={(event) => setDialect(event.target.value)}
               options={rows.map((item) => ({
                 value: item.dialect,
-                label: item.dialect === "uk" ? "英式" : "美式"
+                label:
+                  item.dialect === "uk"
+                    ? t("panel_british")
+                    : t("panel_american")
               }))}
             />
           )}
@@ -773,10 +860,10 @@ export function SentenceEditor({
               )}
               readingLinks={variant.reading_links}
               createReadingPreviewAdapter={createReadingPreviewAdapter}
-              ariaLabel="例句正文"
+              ariaLabel={t("panel_example_text")}
               nodeId={row.variant_id}
               field="value"
-              placeholder="请输入英文例句"
+              placeholder={t("panel_enter_an_english_example")}
               dialect={row.dialect}
               readOnly={saving}
               contentReadOnly={!canEdit}
@@ -840,17 +927,18 @@ function SentenceNavigationGuard({
   discard: () => void;
   save: (afterSave?: () => void) => Promise<boolean | undefined>;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const blocker = useBlocker(dirty);
   return blocker.state === "blocked" ? (
     <Modal
       open
-      title="例句还有未保存的修改"
+      title={t("panel_this_example_has_unsaved_changes")}
       closable={!saving}
       onCancel={() => blocker.reset()}
       footer={
         <Space>
           <Button disabled={saving} onClick={() => blocker.reset()}>
-            继续编辑
+            {t("panel_continue_editing")}
           </Button>
           <Button
             disabled={saving}
@@ -859,7 +947,7 @@ function SentenceNavigationGuard({
               blocker.proceed();
             }}
           >
-            放弃修改
+            {t("panel_discard_changes")}
           </Button>
           <Button
             type="primary"
@@ -869,12 +957,14 @@ function SentenceNavigationGuard({
               if (!(await save(blocker.proceed))) blocker.reset();
             }}
           >
-            保存例句后离开
+            {t("panel_save_example_and_leave")}
           </Button>
         </Space>
       }
     >
-      例句独立保存，词义保存不会代为保存这里的修改。
+      {t(
+        "panel_examples_are_saved_separately_saving_the_meaning_does_not_save_these_change"
+      )}
     </Modal>
   ) : null;
 }

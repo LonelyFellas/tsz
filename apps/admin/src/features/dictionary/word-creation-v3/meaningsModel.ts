@@ -545,7 +545,9 @@ export function spellingModeForPos(
  */
 export function formGroupLabel(
   pos: WordPosFormsV3,
-  groupId: string
+  groupId: string,
+  format = (index: number, spelling: string) =>
+    `第 ${index} 组 · ${spelling || "未填写原形"}`
 ): string | undefined {
   const index = pos.form_groups.findIndex((group) => group.id === groupId);
   if (index < 0) return undefined;
@@ -563,7 +565,7 @@ export function formGroupLabel(
   const spelling = [
     ...new Set(spellings.map((value) => value.trim()).filter(Boolean))
   ].join(" / ");
-  return `第 ${index + 1} 组 · ${spelling || "未填写原形"}`;
+  return format(index + 1, spelling);
 }
 
 export function boundFormGroupIds(sense: {

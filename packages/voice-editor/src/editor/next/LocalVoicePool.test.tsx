@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { LocalVoicePool } from "./LocalVoicePool";
 import { App } from "@tsz/ui/admin/overlays";
 import { useCallback, useState } from "react";
 import {
@@ -1162,4 +1164,56 @@ describe("新版局部主页和唯一声音草稿", () => {
       ).toBe(false);
     }
   );
+});
+
+it("英文局部池说明、表头和目录可及名保留完整词界", async () => {
+  const changed = vi.fn();
+  const profile = pool([version("a")]);
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <LocalVoicePool
+        profile={profile}
+        settings={profile.voices}
+        voices={options}
+        loading={false}
+        recommendations={[]}
+        area="meaning"
+        locale="en-GB"
+        nativeAuditionLocale="en-AU"
+        content={{ version: 2, text: "original words", annotations: [] }}
+        sourceKey="localised-pool"
+        readOnly={false}
+        canAudition={false}
+        canAuditionCatalog={false}
+        auditionActive={false}
+        onStopAudition={vi.fn()}
+        pendingUpload={false}
+        audioPending={false}
+        onRetryAudio={vi.fn()}
+        onChange={changed}
+        onAudition={vi.fn()}
+        onRestore={vi.fn()}
+        onOpenDetail={vi.fn()}
+        onCloseDetail={vi.fn()}
+        audioTools={() => null}
+      />
+    </InterfaceI18nProvider>
+  );
+  expect(screen.getByText("British voice")).toBeVisible();
+  fireEvent.focus(
+    screen.getByRole("button", { name: "Selection and audition guidance" })
+  );
+  expect(
+    await screen.findByText(/This text only edits the British local pool/)
+  ).toHaveTextContent(
+    "ownership. Auditions must also match the current language region."
+  );
+  fireEvent.click(screen.getByText("Full voice catalogue").closest("summary")!);
+  expect(
+    screen.getByRole("region", { name: "British Female catalogue" })
+  ).toBeVisible();
+  expect(
+    screen.getByRole("searchbox", { name: "Search British Female catalogue" })
+  ).toBeVisible();
+  expect(changed).not.toHaveBeenCalled();
 });

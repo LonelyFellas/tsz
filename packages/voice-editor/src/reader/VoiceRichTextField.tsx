@@ -1,3 +1,4 @@
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import type { VoiceRichTextFieldProps } from "../types";
 import { RichTextReadOnly } from "./RichTextReadOnly";
 
@@ -8,6 +9,7 @@ export function VoiceRichTextField({
   readOnly,
   onEdit
 }: VoiceRichTextFieldProps) {
+  const { t } = useInterfaceTranslation();
   return (
     <div className="tsz-ve-field" data-testid="voice-rich-text-field">
       <div className="tsz-ve-field-heading">
@@ -19,7 +21,7 @@ export function VoiceRichTextField({
         </div>
         {!readOnly && onEdit && (
           <button className="tsz-ve-field-edit" type="button" onClick={onEdit}>
-            语音编辑
+            {t("actions.editVoice")}
           </button>
         )}
       </div>

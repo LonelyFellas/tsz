@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { sentenceWord, sentenceTarget, sentenceCandidate } from "./fixtures";
 import {
   act,
@@ -1397,3 +1399,77 @@ it.each([
     }
   }
 );
+
+it("保存 pending 与失败期间切换语言保留例句草稿及 ID，重试只提交原文 DTO", async () => {
+  speech.editor = false;
+  const sentence = example();
+  const saved = vi.fn();
+  let rejectSave!: (reason?: unknown) => void;
+  vi.mocked(api.sentences.update).mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        rejectSave = reject;
+      })
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <App>
+          <SentenceEditor
+            sentence={sentence}
+            onClose={vi.fn()}
+            onSaved={saved}
+          />
+        </App>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = screen.getByLabelText("例句正文");
+  fireEvent.change(input, { target: { value: "We retain original words." } });
+  const translation =
+    screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!;
+  fireEvent.change(translation, { target: { value: "保留中文原文" } });
+  fireEvent.click(screen.getByLabelText("保存例句"));
+  await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
+  const first = structuredClone(
+    vi.mocked(api.sentences.update).mock.calls[0]![1]
+  );
+  view.rerender(content("en-US"));
+  expect(screen.getByLabelText("Example text")).toBe(input);
+  expect(input).toHaveValue("We retain original words.");
+  expect(translation).toHaveValue("保留中文原文");
+  expect(screen.getByLabelText("Save example")).toBeDisabled();
+  expect(api.sentences.update).toHaveBeenCalledOnce();
+  await act(async () => rejectSave(undefined));
+  expect(
+    await screen.findByText("Saving failed. Input is retained. Try again.")
+  ).toBeVisible();
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByText("儲存失敗，輸入已保留，請重試")).toBeVisible();
+  vi.mocked(api.sentences.update).mockResolvedValueOnce({
+    ...sentence,
+    revision: 4,
+    content: first.content
+  });
+  fireEvent.click(screen.getByLabelText("儲存例句"));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  const second = vi.mocked(api.sentences.update).mock.calls[1]![1];
+  expect(second).toEqual(first);
+  expect(second.content.sentence.id).toBe(sentence.content.sentence.id);
+  expect(second.content.sentence.en_text).toMatchObject({
+    common: {
+      id:
+        sentence.content.sentence.en_text.mode === "unified"
+          ? sentence.content.sentence.en_text.common.id
+          : "",
+      value: { text: "We retain original words." }
+    }
+  });
+  expect(second.content.sentence.zh_translations[0]!.content.text).toBe(
+    "保留中文原文"
+  );
+});

@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import { MarsIcon, VenusIcon } from "lucide-react";
 import { splitVoiceDisplayName } from "@tsz/shared";
 import type { VoiceOption, VoiceSetting } from "../../types";
@@ -9,15 +10,16 @@ export function PoolVoiceName({
   voice?: VoiceOption;
   fallback: string;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const display = voice?.displayName ?? voice?.label ?? fallback;
   const { english, chinese } = splitVoiceDisplayName(display);
   return (
     <span className="tsz-ve-shared-name" title={display}>
       <strong>{english}</strong>
       {voice?.gender === "female" ? (
-        <VenusIcon aria-label="女声" />
+        <VenusIcon aria-label={t("female")} />
       ) : voice?.gender === "male" ? (
-        <MarsIcon aria-label="男声" />
+        <MarsIcon aria-label={t("male")} />
       ) : null}
       {chinese && <small>{chinese}</small>}
     </span>

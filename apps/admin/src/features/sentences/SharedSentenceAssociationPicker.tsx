@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../dictionary/i18n/editor";
 import { useState } from "react";
 import { linkedSentenceAnnotation } from "./associationModel";
 import { Alert, Button, Flex, Typography } from "@tsz/ui/admin/display";
@@ -36,6 +37,7 @@ export function SharedSentenceAssociationPicker({
   sourceForms?: AdminWordV3["forms"];
   onTargetLabel: (id: string, label: string) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const literal = segments.map((segment) => segment.surface).join(" ");
   const [mode, setMode] = useState<"linked" | "pending">("linked");
   const [choice, setChoice] = useState<ResolvedTarget>();
@@ -49,11 +51,21 @@ export function SharedSentenceAssociationPicker({
         </Typography.Text>
         <Typography.Text className="tsz-entry-en">
           {target.state === "linked"
-            ? `已关联：${labels[`${target.target_entry_id}:${target.target_sense_id}`] ?? "具体词义"}`
-            : `待关联：${target.headword}${target.gloss ? ` · ${target.gloss}` : ""}`}
+            ? t("panel_linked_3", {
+                p0:
+                  labels[
+                    `${target.target_entry_id}:${target.target_sense_id}`
+                  ] ?? t("panel_specific_meaning")
+              })
+            : t("panel_pending_link_2", {
+                p0: target.headword,
+                p1: target.gloss ? ` · ${target.gloss}` : ""
+              })}
         </Typography.Text>
         <Typography.Text type="secondary">
-          可查看关联列表，清除后可以重新选择词形和词义。
+          {t(
+            "panel_view_linked_entries_clear_a_link_to_select_a_different_form_and_meaning"
+          )}
         </Typography.Text>
         <V3TargetCascader
           literal={literal}
@@ -82,10 +94,14 @@ export function SharedSentenceAssociationPicker({
         />
         <Flex justify="end" gap="small">
           <Button size="small" onClick={() => onSelect(undefined)}>
-            清除关联
+            {t("panel_clear_link")}
           </Button>
-          <Button size="small" aria-label="关闭关联详情" onClick={onCancel}>
-            关闭
+          <Button
+            size="small"
+            aria-label={t("panel_close_link_details")}
+            onClick={onCancel}
+          >
+            {t("panel_close")}
           </Button>
         </Flex>
       </Flex>
@@ -94,7 +110,10 @@ export function SharedSentenceAssociationPicker({
   return (
     <Flex
       role="group"
-      aria-label={`${kind === "word" ? "关联单词" : "关联短语"}：${literal}`}
+      aria-label={t("panel_label_5", {
+        p0: kind === "word" ? t("panel_link_word") : t("panel_link_phrase"),
+        p1: literal
+      })}
       vertical
       gap="small"
       style={{ maxWidth: "min(760px, 85vw)" }}
@@ -103,14 +122,22 @@ export function SharedSentenceAssociationPicker({
         {segments.map((segment) => segment.surface).join(" … ")}
       </Typography.Text>
       {selected?.target.state === "entry_only" && (
-        <Alert type="warning" title="旧关联尚未选择具体词义，请补全或清除。" />
+        <Alert
+          type="warning"
+          title={t(
+            "panel_this_historical_link_has_no_specific_meaning_complete_or_clear_it"
+          )}
+        />
       )}
       <Radio.Group
         value={mode}
         onChange={(event) => setMode(event.target.value)}
         options={[
-          { value: "linked", label: "关联已有词义" },
-          { value: "pending", label: "词条未创建，记为待关联" }
+          { value: "linked", label: t("panel_link_an_existing_meaning") },
+          {
+            value: "pending",
+            label: t("panel_entry_not_created_store_as_pending_link")
+          }
         ]}
       />
       {mode === "linked" ? (
@@ -130,15 +157,15 @@ export function SharedSentenceAssociationPicker({
       ) : (
         <>
           <Input
-            aria-label="待关联词面"
+            aria-label={t("panel_pending_surface")}
             className="tsz-entry-en"
             value={literal}
             readOnly
-            title="由选中的正文片段确定"
+            title={t("panel_determined_by_the_selected_text_segments")}
           />
           <Input
-            aria-label="待关联释义"
-            placeholder="释义或上下文（可选）"
+            aria-label={t("panel_pending_definition")}
+            placeholder={t("panel_definition_or_context_optional")}
             value={gloss}
             maxLength={2000}
             onChange={(event) => setGloss(event.target.value)}
@@ -147,7 +174,7 @@ export function SharedSentenceAssociationPicker({
       )}
       <Flex justify="end" gap="small">
         <Button size="small" onClick={() => onSelect(undefined)}>
-          {selected ? "清除关联" : "取消选择"}
+          {selected ? t("panel_clear_link") : t("panel_cancel_selection")}
         </Button>
         <Button
           size="small"
@@ -181,7 +208,7 @@ export function SharedSentenceAssociationPicker({
             );
           }}
         >
-          确认关联
+          {t("panel_confirm_link")}
         </Button>
       </Flex>
     </Flex>

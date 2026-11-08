@@ -1,3 +1,10 @@
+import {
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage
+} from "../dictionary/i18n/editor";
 import { useCallback, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Alert, Button, List, Space, Typography } from "@tsz/ui/admin/display";
@@ -11,12 +18,16 @@ import { PublicationAudioReviewPanel } from "../dictionary/PublicationAudioRevie
 
 export type SentencePublicationAction =
   "publish" | "history" | "withdraw" | "restore";
-const titles = {
-  publish: "发布例句草稿",
-  history: "例句发布历史",
-  withdraw: "撤回例句",
-  restore: "重新展示原发布"
-};
+function publicationTitles(
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) {
+  return {
+    publish: t("panel_publish_example_draft"),
+    history: t("panel_example_publication_history"),
+    withdraw: t("panel_withdraw_example"),
+    restore: t("panel_restore_original_publication")
+  };
+}
 
 /** 打开时冻结双 revision；确定性失败要求重新加载，未知结果复用原幂等请求。 */
 export function SentencePublicationModal({
@@ -32,6 +43,7 @@ export function SentencePublicationModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const audioScope = `${sentence.id}:${sentence.revision}`;
   const [reviewedAudio, setReviewedAudio] = useState<string>();
   const audioReady = reviewedAudio === audioScope;
@@ -47,7 +59,7 @@ export function SentencePublicationModal({
   const [reason, setReason] = useState("");
   const [selected, setSelected] = useState<SentencePublication>();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useLexiconEditorMessageState();
   const [blocked, setBlocked] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const key = useRef(crypto.randomUUID());
@@ -111,11 +123,20 @@ export function SentencePublicationModal({
     } catch (failure) {
       if (failure instanceof HttpError && failure.status < 500) {
         setBlocked(true);
-        setError(`${failure.message}。请关闭窗口，刷新后重新确认。`);
+        setError(
+          createLexiconEditorMessage(
+            "panel_close_this_window_refresh_and_confirm_again",
+            {
+              p0: failure.message
+            }
+          )
+        );
       } else {
         setUncertain(true);
         setError(
-          "操作结果暂时未知，请重试确认；重试复用原请求，不会重复创建发布版本。"
+          createLexiconEditorMessage(
+            "panel_the_result_is_unknown_retry_to_confirm_retries_reuse_the_original_request_a"
+          )
         );
       }
     } finally {
@@ -126,14 +147,18 @@ export function SentencePublicationModal({
   return (
     <Modal
       open
-      title={titles[action]}
+      title={publicationTitles(t)[action]}
       width={800}
       onCancel={onClose}
       closable={!pending}
       keyboard={!pending}
       mask={{ closable: false }}
       cancelButtonProps={{ disabled: pending }}
-      okText={action === "history" ? "恢复所选历史到草稿" : "确认"}
+      okText={
+        action === "history"
+          ? t("panel_restore_selected_history_to_draft")
+          : t("panel_confirm")
+      }
       confirmLoading={pending}
       okButtonProps={{
         disabled:
@@ -151,14 +176,24 @@ export function SentencePublicationModal({
           type="info"
           title={
             action === "withdraw"
-              ? "撤回后例句不再公开展示，草稿、历史版本和关联仍会保留"
+              ? t(
+                  "panel_withdrawal_hides_this_example_publicly_drafts_history_and_links_are_retaine"
+                )
               : action === "restore"
-                ? "恢复前重新校验当前发布版本，草稿不会发布"
+                ? t(
+                    "panel_the_current_publication_will_be_checked_again_before_restoring_the_draft_wi"
+                  )
                 : action === "history"
-                  ? "恢复历史版本会覆盖当前草稿，已发布例句须先撤回；重新公开需另行发布"
-                  : "发布当前草稿为公开例句；已撤回例句会重新公开展示"
+                  ? t(
+                      "panel_restoring_history_overwrites_the_current_draft_withdraw_a_published_example"
+                    )
+                  : t(
+                      "panel_publish_the_current_draft_as_a_public_example_withdrawn_examples_become_pub"
+                    )
           }
-          description="需要对应的发布、撤回或历史恢复权限；普通管理员仅能操作本人例句。"
+          description={t(
+            "panel_publication_withdrawal_or_history_restoration_permission_is_required_ordina"
+          )}
         />
         {action === "publish" && (
           <>
@@ -178,21 +213,26 @@ export function SentencePublicationModal({
         {action === "withdraw" && (
           <>
             {impact.isPending && (
-              <Typography.Text>正在核对下架影响…</Typography.Text>
+              <Typography.Text>
+                {t("panel_checking_withdrawal_impact")}
+              </Typography.Text>
             )}
             {impact.isError && (
               <Alert
                 type="error"
-                title="影响确认加载失败"
+                title={t("panel_could_not_load_impact_confirmation")}
                 action={
-                  <Button onClick={() => void impact.refetch()}>重试</Button>
+                  <Button onClick={() => void impact.refetch()}>
+                    {t("panel_try_again")}
+                  </Button>
                 }
               />
             )}
             {impact.data && (
               <>
                 <Typography.Text>
-                  当前发布涉及 {impact.data.targets.length} 个词义：
+                  {t("panel_current_publication_affects")}{" "}
+                  {impact.data.targets.length} {t("panel_meanings_3")}
                 </Typography.Text>
                 <List
                   size="small"
@@ -200,19 +240,19 @@ export function SentencePublicationModal({
                   renderItem={(target) => (
                     <List.Item>
                       {target.entry_id} / {target.sense_id}
-                      {target.hidden ? "（宿主已隐藏）" : ""}
+                      {target.hidden ? t("panel_host_hidden") : ""}
                     </List.Item>
                   )}
                 />
               </>
             )}
             <Input.TextArea
-              aria-label="下架原因"
+              aria-label={t("panel_withdrawal_reason")}
               value={reason}
               maxLength={2000}
               disabled={pending || uncertain || blocked}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="填写下架原因"
+              placeholder={t("panel_enter_a_withdrawal_reason")}
             />
           </>
         )}
@@ -221,9 +261,11 @@ export function SentencePublicationModal({
             {history.isError && (
               <Alert
                 type="error"
-                title="发布历史加载失败"
+                title={t("panel_could_not_load_publication_history")}
                 action={
-                  <Button onClick={() => void history.refetch()}>重试</Button>
+                  <Button onClick={() => void history.refetch()}>
+                    {t("panel_try_again")}
+                  </Button>
                 }
               />
             )}
@@ -241,8 +283,8 @@ export function SentencePublicationModal({
                             onClick={() => setSelected(publication)}
                           >
                             {selected?.id === publication.id
-                              ? "已选择"
-                              : "选择恢复"}
+                              ? t("panel_selected")
+                              : t("panel_select_to_restore")}
                           </Button>
                         ]
                       : []
@@ -250,7 +292,7 @@ export function SentencePublicationModal({
                 >
                   <Space orientation="vertical">
                     <Typography.Text>
-                      版本 {publication.publication_number} ·{" "}
+                      {t("panel_version")} {publication.publication_number} ·{" "}
                       {new Date(publication.published_at).toLocaleString(
                         "zh-CN"
                       )}
@@ -268,7 +310,7 @@ export function SentencePublicationModal({
                 loading={history.isFetchingNextPage}
                 onClick={() => void history.fetchNextPage()}
               >
-                加载更早历史
+                {t("panel_load_earlier_history")}
               </Button>
             )}
           </>

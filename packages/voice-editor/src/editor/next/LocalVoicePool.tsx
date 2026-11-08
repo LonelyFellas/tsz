@@ -1,4 +1,11 @@
 import {
+  useVoiceEditorTranslation,
+  defaultVoiceEditorTranslation,
+  type VoiceEditorTranslation,
+  useVoiceEditorMessageState,
+  createVoiceEditorMessage
+} from "../i18n";
+import {
   ArrowDownIcon,
   ArrowUpIcon,
   ChevronDownIcon,
@@ -43,10 +50,12 @@ import {
 import { PoolVoiceName, PoolVoiceRate, PoolVoiceVolume } from "./VoiceDisplay";
 import { VoiceDetail } from "./VoiceDetail";
 
-const sides = [
-  { key: "uk", locale: "en-GB", label: "英式" },
-  { key: "us", locale: "en-US", label: "美式" }
-] as const;
+function voiceSides(t: VoiceEditorTranslation = defaultVoiceEditorTranslation) {
+  return [
+    { key: "uk", locale: "en-GB", label: t("british") },
+    { key: "us", locale: "en-US", label: t("american") }
+  ] as const;
+}
 
 export function LocalVoicePool({
   profile,
@@ -118,7 +127,8 @@ export function LocalVoicePool({
   unavailableVersions?: ReadonlySet<string>;
   previousAudio?: VoiceSetting[];
 }) {
-  const [notice, setNotice] = useState("");
+  const { t } = useVoiceEditorTranslation();
+  const [notice, setNotice] = useVoiceEditorMessageState("");
   const [search, setSearch] = useState<Record<string, string>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<{
@@ -209,7 +219,11 @@ export function LocalVoicePool({
   );
   function materialize(): VoiceProfile | undefined {
     if (conflicts.length) {
-      setNotice("请先在历史冲突中明确选择保留配置，再转换为新池。");
+      setNotice(
+        createVoiceEditorMessage(
+          "resolve_the_historical_configuration_conflicts_before_converting_to_a_new_p"
+        )
+      );
       return;
     }
     const local = convertVoicePool(profile, current, voices, area);
@@ -248,10 +262,16 @@ export function LocalVoicePool({
       );
     setNotice(
       result.duplicates.length
-        ? "推荐与已有音色重复，已保留现有局部参数，没有覆盖。"
+        ? createVoiceEditorMessage(
+            "this_recommendation_duplicates_an_existing_voice_existing_local_parameters"
+          )
         : pair.length
-          ? "已采用推荐局部副本；仍须按宿主流程保存。"
-          : "已取消推荐，原推荐声音保留为未选缓存；不会自动补声。"
+          ? createVoiceEditorMessage(
+              "local_recommendation_copy_applied_save_it_through_the_host_workflow"
+            )
+          : createVoiceEditorMessage(
+              "recommendation_deselected_its_voice_remains_in_the_unselected_cache_voices"
+            )
     );
     onChange(result.profile);
   }
@@ -345,7 +365,11 @@ export function LocalVoicePool({
                       : "#8c8c8c"
               }
         }
-        aria-label={`${catalog ? "试听目录音色" : "试听"} ${voice.displayName ?? voice.label}${!accent && item.version_name ? ` · ${item.version_name}` : ""}`}
+        aria-label={t("label", {
+          p0: catalog ? t("audition_catalogue_voice") : t("audition"),
+          p1: voice.displayName ?? voice.label,
+          p2: !accent && item.version_name ? ` · ${item.version_name}` : ""
+        })}
         disabled={disabled}
         onClick={() => onAudition(voice, item, catalog)}
       />
@@ -363,15 +387,17 @@ export function LocalVoicePool({
     );
   }
   return (
-    <section className="tsz-ve-local-pool" aria-label="局部配音音色池">
+    <section className="tsz-ve-local-pool" aria-label={t("local_voice_pool")}>
       {audioPending && (
         <Alert
           type={generatingVersion ? "info" : "warning"}
           showIcon
           title={
             generatingVersion
-              ? "正在生成已选音色的正式音频，请稍候"
-              : "仍有正式音频待完成，请重试或取消选用对应音色"
+              ? t("generating_final_audio_for_selected_voices_please_wait")
+              : t(
+                  "some_final_audio_is_incomplete_retry_or_deselect_those_voices"
+                )
           }
           action={
             <Button
@@ -379,7 +405,7 @@ export function LocalVoicePool({
               disabled={readOnly || !!generatingVersion}
               onClick={onRetryAudio}
             >
-              重试生成正式音频
+              {t("retry_generating_final_audio")}
             </Button>
           }
         />
@@ -392,10 +418,12 @@ export function LocalVoicePool({
         />
       )}
       {conflicts.length > 0 && (
-        <section aria-label="历史音色冲突">
+        <section aria-label={t("historical_voice_conflicts")}>
           <Alert
             type="warning"
-            title="同一官方 ID 存在多个历史配置。原版本仍可播放；请明确保留配置后转换，旧发布快照不变。"
+            title={t(
+              "several_historical_configurations_share_an_official_id_existing_versions_re"
+            )}
           />
           {conflicts.map(([id, items]) => (
             <div key={id}>
@@ -404,7 +432,9 @@ export function LocalVoicePool({
                   ?.providerVoiceId ?? items[0]!.voice_id}
               </Typography.Text>
               <Radio.Group
-                aria-label={`历史冲突 ${items[0]!.voice_id}`}
+                aria-label={t("historical_conflict", {
+                  p0: items[0]!.voice_id
+                })}
                 value={choices[id]}
                 onChange={(event) =>
                   setChoices((previous) => ({
@@ -419,7 +449,7 @@ export function LocalVoicePool({
                       {item.version_name ?? item.voice_id} ·{" "}
                       <PoolVoiceRate setting={item} /> ·{" "}
                       <PoolVoiceVolume setting={item} />
-                      {item.enabled ? " 已选" : " 缓存"}
+                      {item.enabled ? t("selected") : t("cached")}
                     </Radio>
                     {preview(item)}
                   </div>
@@ -439,28 +469,37 @@ export function LocalVoicePool({
               onChange(
                 convertVoicePool(profile, current, voices, area, choices)
               );
-              setNotice("已按明确选择转换局部草稿；仍须按宿主流程保存。");
+              setNotice(
+                createVoiceEditorMessage(
+                  "local_draft_converted_using_your_selections_save_it_through_the_host_workfl"
+                )
+              );
             }}
           >
-            按选择转换为新池
+            {t("convert_using_selections")}
           </Button>
         </section>
       )}
       <div className="tsz-ve-pool-current-header">
         <div className="tsz-ve-pool-heading">
-          <Typography.Title level={5}>已获取的配音设置</Typography.Title>
+          <Typography.Title level={5}>
+            {t("current_voice_settings")}
+          </Typography.Title>
           <Popover
-            title="配音与播放规则"
+            title={t("voice_and_playback_rules")}
             placement="bottomLeft"
             trigger={["hover", "focus"]}
             content={
               <div className="tsz-ve-pool-help-content">
                 <Typography.Paragraph>
-                  下方列出当前正文已选的音色，可试听、调整顺序或修改参数。
+                  {t(
+                    "selected_voices_for_this_text_are_listed_below_audition_them_change_their_o"
+                  )}
                 </Typography.Paragraph>
                 <Typography.Paragraph>
-                  概率表示从第 2
-                  题起，各音色被播放的机会，英式和美式分别计算。正文或音色不可用时，不参与概率计算。
+                  {t(
+                    "from_question_2_onwards_probability_is_each_voice_s_chance_of_being_played"
+                  )}
                 </Typography.Paragraph>
               </div>
             }
@@ -468,18 +507,22 @@ export function LocalVoicePool({
             <Button
               type="text"
               icon={<CircleHelpIcon />}
-              aria-label="配音与播放规则"
+              aria-label={t("voice_and_playback_rules")}
             />
           </Popover>
         </div>
-        <Tooltip title="清除当前正文的自定义音色配置，重新使用默认推荐；保存后生效。">
+        <Tooltip
+          title={t(
+            "clear_custom_voice_settings_for_this_text_and_restore_default_recommendatio"
+          )}
+        >
           <Button
             className="tsz-ve-pool-restore"
             type="link"
             disabled={readOnly}
             onClick={onRestore}
           >
-            恢复默认推荐
+            {t("restore_default_recommendations")}
           </Button>
         </Tooltip>
       </div>
@@ -488,14 +531,14 @@ export function LocalVoicePool({
           <Typography.Text type="secondary">{auditionStatus}</Typography.Text>
           {auditionActive && (
             <Button size="small" type="link" onClick={onStopAudition}>
-              停止试听
+              {t("stop_audition")}
             </Button>
           )}
         </Space>
       )}
       <div className="tsz-ve-pool-scroll">
         <div className="tsz-ve-pool-sides" data-single={!!locale}>
-          {sides
+          {voiceSides(t)
             .filter((side) => !locale || locale === side.locale)
             .map((side) => {
               const selected = current.filter((setting) => {
@@ -509,7 +552,10 @@ export function LocalVoicePool({
                 );
               });
               return (
-                <section key={side.key} aria-label={`${side.label}已获取音色`}>
+                <section
+                  key={side.key}
+                  aria-label={t("selected_voices", { p0: side.label })}
+                >
                   <Typography.Text
                     className="tsz-ve-pool-side-title"
                     data-accent={side.key}
@@ -519,22 +565,26 @@ export function LocalVoicePool({
                   </Typography.Text>
                   {!!selected.length && (
                     <div className="tsz-ve-pool-row tsz-ve-pool-head">
-                      <span>序号</span>
-                      <span>概率</span>
-                      <span>排序</span>
-                      <span>试听</span>
-                      <span>音色</span>
-                      <span>语速</span>
-                      <span>音量</span>
-                      <span>修改</span>
+                      <span>{t("no")}</span>
+                      <span>{t("probability")}</span>
+                      <span>{t("order")}</span>
+                      <span>{t("audition")}</span>
+                      <span>{t("voice")}</span>
+                      <span>{t("rate")}</span>
+                      <span>{t("volume")}</span>
+                      <span>{t("edit")}</span>
                     </div>
                   )}
                   {!selected.length && (
                     <div className="tsz-ve-pool-empty">
                       <div className="tsz-ve-pool-empty-copy">
-                        <Typography.Text strong>暂无已选音色</Typography.Text>
+                        <Typography.Text strong>
+                          {t("no_voices_selected")}
+                        </Typography.Text>
                         <Typography.Text type="secondary">
-                          选择下方推荐配音，或从完整目录添加音色。
+                          {t(
+                            "select_a_recommendation_below_or_add_voices_from_the_full_catalogue"
+                          )}
                         </Typography.Text>
                       </div>
                     </div>
@@ -545,7 +595,10 @@ export function LocalVoicePool({
                     return (
                       <div
                         key={key}
-                        aria-label={`${side.label}池 ${setting.version_name ?? setting.voice_id}`}
+                        aria-label={t("pool", {
+                          p0: side.label,
+                          p1: setting.version_name ?? setting.voice_id
+                        })}
                       >
                         <div className="tsz-ve-pool-row">
                           <span>{rank + 1}</span>
@@ -560,7 +613,13 @@ export function LocalVoicePool({
                                 key={direction}
                                 size="small"
                                 type="text"
-                                aria-label={`${direction === -1 ? "上移" : "下移"} ${setting.version_name ?? setting.voice_id}`}
+                                aria-label={t("label_2", {
+                                  p0:
+                                    direction === -1
+                                      ? t("move_up")
+                                      : t("move_down"),
+                                  p1: setting.version_name ?? setting.voice_id
+                                })}
                                 icon={
                                   direction === -1 ? (
                                     <ArrowUpIcon />
@@ -595,7 +654,9 @@ export function LocalVoicePool({
                             type="text"
                             size="small"
                             icon={<PencilIcon />}
-                            aria-label={`修改 ${setting.version_name ?? setting.voice_id}`}
+                            aria-label={t("edit_2", {
+                              p0: setting.version_name ?? setting.voice_id
+                            })}
                             disabled={
                               readOnly ||
                               !!generatingVersion ||
@@ -611,15 +672,17 @@ export function LocalVoicePool({
                             }
                           >
                             {setting.audio_asset_id
-                              ? "正式音频已就绪"
+                              ? t("final_audio_ready")
                               : generatingVersion === key
-                                ? "正在生成正式音频"
-                                : "待生成正式音频"}
+                                ? t("generating_final_audio")
+                                : t("final_audio_not_generated")}
                           </Typography.Text>
                         )}
                         {probability === undefined && (
                           <Typography.Text type="warning">
-                            当前声音、参数或正文读法不可用，保留配置，不参与概率。
+                            {t(
+                              "this_voice_its_parameters_or_the_text_reading_is_unavailable_configuration"
+                            )}
                           </Typography.Text>
                         )}
                         {!voices.some(
@@ -642,7 +705,8 @@ export function LocalVoicePool({
                                 });
                             }}
                           >
-                            取消选用 {setting.version_name ?? setting.voice_id}
+                            {t("deselect")}{" "}
+                            {setting.version_name ?? setting.voice_id}
                           </Button>
                         )}
                       </div>
@@ -675,12 +739,20 @@ export function LocalVoicePool({
           <div key={voiceSettingKey(item)}>
             <Alert
               type="warning"
-              title={`${locale ? "音色归属与当前正文口音不符" : "音色口音未知"}：${item.version_name ?? item.voice_id}；原配置保留，不参与播放池。`}
+              title={t(
+                "configuration_is_retained_and_excluded_from_playback_pools",
+                {
+                  p0: locale
+                    ? t("voice_ownership_does_not_match_this_text_s_accent")
+                    : t("voice_accent_unknown"),
+                  p1: item.version_name ?? item.voice_id
+                }
+              )}
             />
             {preview(item)}
             <Button
               disabled={readOnly}
-              aria-label={`取消启用失效音色 ${item.voice_id}`}
+              aria-label={t("disable_unavailable_voice", { p0: item.voice_id })}
               onClick={() =>
                 onChange({
                   ...profile,
@@ -692,13 +764,13 @@ export function LocalVoicePool({
                 })
               }
             >
-              取消启用失效音色 {item.voice_id}
+              {t("disable_unavailable_voice_2")} {item.voice_id}
             </Button>
           </div>
         ))}
       <Radio.Group
         className="tsz-ve-pool-recommendation-section"
-        aria-label="局部推荐"
+        aria-label={t("local_recommendation")}
         value={
           selectedPair
             ? `${selectedPair[0]!.groupId}/${selectedPair[0]!.pairId}`
@@ -719,22 +791,24 @@ export function LocalVoicePool({
         }
       >
         <div className="tsz-ve-pool-recommendation-header">
-          <Typography.Title level={5}>推荐配音</Typography.Title>
+          <Typography.Title level={5}>
+            {t("recommended_voices")}
+          </Typography.Title>
           <Radio value="none" disabled={readOnly}>
-            不使用推荐配音
+            {t("do_not_use_recommended_voices")}
           </Radio>
         </div>
         <div className="tsz-ve-pool-scroll">
           <div className="tsz-ve-pool-recommendations tsz-ve-pool-paired-recommendations">
             <div className="tsz-ve-pool-pair tsz-ve-pool-head">
-              <span>推荐配音</span>
-              <span>来源分组</span>
-              {sides.map((side) => (
+              <span>{t("recommended_voices")}</span>
+              <span>{t("source_group")}</span>
+              {voiceSides(t).map((side) => (
                 <div key={side.key} className="tsz-ve-pool-pair-side">
-                  <span>试听</span>
-                  <span>{side.label}音色</span>
-                  <span>语速</span>
-                  <span>音量</span>
+                  <span>{t("audition")}</span>
+                  <span>{t("accent_voice", { accent: side.label })}</span>
+                  <span>{t("rate")}</span>
+                  <span>{t("volume")}</span>
                 </div>
               ))}
             </div>
@@ -776,13 +850,17 @@ export function LocalVoicePool({
                 </Radio>
                 <span className="tsz-ve-pool-group-name">
                   {pair[0]!.groupName}
-                  {pair[0]!.selected === false ? "（组内未选）" : ""}
+                  {pair[0]!.selected === false
+                    ? t("none_selected_in_group")
+                    : ""}
                 </span>
                 {pair.map((item) => (
                   <div
                     className="tsz-ve-pool-pair-side"
                     data-label={
-                      item.locale === "en-GB" ? "英式音色" : "美式音色"
+                      item.locale === "en-GB"
+                        ? t("british_voice")
+                        : t("american_voice")
                     }
                     key={item.id}
                   >
@@ -802,19 +880,23 @@ export function LocalVoicePool({
         </div>
       </Radio.Group>
       {legacyRecommendations.length > 0 && (
-        <section aria-label="历史未配对推荐">
+        <section aria-label={t("unpaired_historical_recommendation")}>
           <Typography.Paragraph type="secondary">
-            历史未配对分组仅保留默认解析；请在分组页明确整理后选用整套推荐。
+            {t(
+              "unpaired_historical_groups_retain_default_resolution_only_organise_the_grou"
+            )}
           </Typography.Paragraph>
           <div className="tsz-ve-pool-scroll">
             <div className="tsz-ve-pool-recommendations">
               <div className="tsz-ve-pool-pair tsz-ve-pool-head">
-                <span>历史单侧推荐／来源</span>
+                <span>
+                  {t("historical_single_accent_recommendation_source")}
+                </span>
                 <div className="tsz-ve-pool-pair-side">
-                  <span>试听</span>
-                  <span>音色</span>
-                  <span>语速</span>
-                  <span>音量</span>
+                  <span>{t("audition")}</span>
+                  <span>{t("voice")}</span>
+                  <span>{t("rate")}</span>
+                  <span>{t("volume")}</span>
                 </div>
               </div>
               {legacyRecommendations.map((item) => (
@@ -823,8 +905,11 @@ export function LocalVoicePool({
                     {item.name}
                     <small>
                       {item.groupName} ·{" "}
-                      {item.locale === "en-GB" ? "英式" : "美式"} · 未配对
-                      {item.selected === false ? " · 组内未选" : ""}
+                      {item.locale === "en-GB" ? t("british") : t("american")}{" "}
+                      {t("unpaired")}
+                      {item.selected === false
+                        ? t("none_selected_in_group_2")
+                        : ""}
                     </small>
                   </span>
                   <div className="tsz-ve-pool-pair-side">
@@ -845,38 +930,51 @@ export function LocalVoicePool({
       )}
       {!visiblePairs.length && !loading && (
         <Typography.Paragraph type="secondary">
-          尚无适用的配对推荐，可直接从目录多选。
+          {t(
+            "no_paired_recommendations_apply_you_can_select_voices_from_the_catalogue"
+          )}
         </Typography.Paragraph>
       )}
       {source && !selectedPair && (
         <Typography.Paragraph type="secondary">
-          来源推荐已变更或删除；已采用的局部副本仍保留。
+          {t(
+            "the_source_recommendation_changed_or_was_removed_applied_local_copies_are_r"
+          )}
         </Typography.Paragraph>
       )}
       <details className="tsz-ve-pool-catalog-disclosure">
         <summary>
           <span className="tsz-ve-pool-heading">
-            <span>完整音色目录</span>
+            <span>{t("full_voice_catalogue")}</span>
             <Popover
-              title="选择与试听说明"
+              title={t("selection_and_audition_guidance")}
               placement="bottomLeft"
               trigger={["hover", "focus"]}
               content={
                 <div className="tsz-ve-pool-help-content">
                   <Typography.Paragraph type="secondary">
-                    勾选音色用于当前正文；试听不会改变已选音色。
+                    {t(
+                      "select_voices_to_use_for_this_text_auditioning_does_not_change_selections"
+                    )}
                   </Typography.Paragraph>
                   {!content.text.trim() && (
                     <Typography.Paragraph type="secondary">
-                      正文为空时，试听使用示例文本“Hello, this is a voice
-                      preview.”，不会写入正文。
+                      {t(
+                        "with_empty_text_auditions_use_hello_this_is_a_voice_preview_this_is_not_wri"
+                      )}
                     </Typography.Paragraph>
                   )}
                   {locale && (
                     <Typography.Paragraph type="secondary">
-                      当前正文仅编辑{locale === "en-GB" ? "英式" : "美式"}
-                      局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。
-                      {nativeAuditionLocale && "试听还需符合当前语言地区。"}
+                      {t(
+                        nativeAuditionLocale
+                          ? "voice_pool_scope_native_help"
+                          : "voice_pool_scope_help",
+                        {
+                          accent:
+                            locale === "en-GB" ? t("british") : t("american")
+                        }
+                      )}
                     </Typography.Paragraph>
                   )}
                 </div>
@@ -885,7 +983,7 @@ export function LocalVoicePool({
               <Button
                 type="text"
                 icon={<CircleHelpIcon />}
-                aria-label="选择与试听说明"
+                aria-label={t("selection_and_audition_guidance")}
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
@@ -895,18 +993,18 @@ export function LocalVoicePool({
           </span>
           <span className="tsz-ve-pool-catalog-toggle">
             <span className="tsz-ve-pool-catalog-expand">
-              展开 <ChevronDownIcon />
+              {t("expand")} <ChevronDownIcon />
             </span>
             <span className="tsz-ve-pool-catalog-collapse">
-              收起 <ChevronUpIcon />
+              {t("collapse")} <ChevronUpIcon />
             </span>
           </span>
         </summary>
         <div className="tsz-ve-pool-catalog-body">
-          {loading && <Spin aria-label="正在加载音色目录" />}
+          {loading && <Spin aria-label={t("loading_voice_catalogue")} />}
           <div className="tsz-ve-pool-scroll">
             <div className="tsz-ve-pool-catalog">
-              {sides.flatMap((side) =>
+              {voiceSides(t).flatMap((side) =>
                 ["female", "male"].map((gender) => {
                   const key = `${side.key}-${gender}`;
                   const columnVoices = voices.filter(
@@ -924,7 +1022,10 @@ export function LocalVoicePool({
                   return (
                     <section
                       key={key}
-                      aria-label={`${side.label}${gender === "female" ? "女声" : "男声"}目录`}
+                      aria-label={t("catalogue", {
+                        p0: side.label,
+                        p1: gender === "female" ? t("female") : t("male")
+                      })}
                     >
                       <div className="tsz-ve-pool-catalog-column-head">
                         <Typography.Text
@@ -932,12 +1033,16 @@ export function LocalVoicePool({
                           data-accent={side.key}
                           strong
                         >
-                          {side.label} · {gender === "female" ? "女声" : "男声"}
+                          {side.label} ·{" "}
+                          {gender === "female" ? t("female") : t("male")}
                         </Typography.Text>
                         <Input.Search
                           size="small"
-                          aria-label={`${side.label}${gender === "female" ? "女声" : "男声"}目录搜索`}
-                          placeholder="搜索音色"
+                          aria-label={t("search_catalogue", {
+                            p0: side.label,
+                            p1: gender === "female" ? t("female") : t("male")
+                          })}
+                          placeholder={t("search_voices")}
                           value={search[key] ?? ""}
                           allowClear
                           onChange={(event) => {
@@ -976,15 +1081,17 @@ export function LocalVoicePool({
                             className="tsz-ve-pool-catalog-empty"
                           >
                             {search[key]?.trim()
-                              ? "没有匹配的音色"
-                              : "暂无可选音色"}
+                              ? t("no_matching_voices")
+                              : t("no_voices_available")}
                           </Typography.Text>
                         )}
                         {columnVoices.map((voice) => (
                           <div key={voice.id} hidden={!isVisible(voice)}>
                             <div className="tsz-ve-pool-catalog-item-head">
                               <Checkbox
-                                aria-label={`选用 ${voice.displayName ?? voice.label}`}
+                                aria-label={t("select", {
+                                  p0: voice.displayName ?? voice.label
+                                })}
                                 disabled={
                                   readOnly ||
                                   !!(locale && locale !== side.locale)

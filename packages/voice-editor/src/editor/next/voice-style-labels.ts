@@ -1,21 +1,30 @@
-export const styleNames: Record<string, string> = {
-  neutral: "默认",
-  cheerful: "愉快",
-  sad: "悲伤",
-  angry: "生气",
-  excited: "兴奋",
-  friendly: "友好",
-  hopeful: "充满希望",
-  calm: "平静",
-  chat: "日常交流",
-  whispering: "耳语",
-  shouting: "高声",
-  terrified: "惊恐",
-  unfriendly: "冷淡",
-  empathetic: "共情",
-  newscast: "新闻播报",
-  "newscast-casual": "轻松播报",
-  "newscast-formal": "正式播报",
-  customerservice: "客户服务",
-  "narration-professional": "专业叙述"
-};
+import {
+  defaultVoiceEditorTranslation,
+  type VoiceEditorTranslation
+} from "../i18n";
+export function voiceStyleNames(
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): Record<string, string> {
+  return {
+    neutral: t("default"),
+    cheerful: t("cheerful"),
+    sad: t("sad"),
+    angry: t("angry"),
+    excited: t("excited"),
+    friendly: t("friendly"),
+    hopeful: t("hopeful"),
+    calm: t("calm"),
+    chat: t("chat"),
+    whispering: t("whispering"),
+    shouting: t("shouting"),
+    terrified: t("terrified"),
+    unfriendly: t("unfriendly"),
+    empathetic: t("empathetic"),
+    newscast: t("newscast"),
+    "newscast-casual": t("casual_newscast"),
+    "newscast-formal": t("formal_newscast"),
+    customerservice: t("customer_service"),
+    "narration-professional": t("professional_narration")
+  };
+}
+export const styleNames = voiceStyleNames();

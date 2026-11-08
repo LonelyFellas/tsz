@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import { ChevronDownIcon } from "lucide-react";
 import { Button, Space } from "@tsz/ui/admin/display";
 import { Dropdown } from "@tsz/ui/admin/overlays";
@@ -34,6 +35,7 @@ export function SpeechRateInput({
   step = 0.05,
   ...props
 }: Props) {
+  const { t } = useVoiceEditorTranslation();
   const input = (
     <InputNumber<number>
       {...props}
@@ -71,7 +73,7 @@ export function SpeechRateInput({
           disabled={props.disabled || min === max}
         >
           <Button
-            aria-label="语速常用值"
+            aria-label={t("common_speech_rates")}
             icon={<ChevronDownIcon />}
             disabled={props.disabled || min === max}
           />
@@ -86,11 +88,11 @@ export function SpeechRateInput({
       styles={{ item: { width: "100%" } }}
     >
       <Select
-        aria-label="语速常用值"
+        aria-label={t("common_speech_rates")}
         disabled={props.disabled}
         value={presets.includes(value ?? NaN) ? value : "custom"}
         options={[
-          { value: "custom", label: "自定义" },
+          { value: "custom", label: t("custom") },
           ...presets.map((percent) => ({
             value: percent,
             label: (

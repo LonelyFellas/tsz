@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import {
   speechAccentGroup,
   speechLocaleMatchesScope,
@@ -55,6 +56,7 @@ export function VoiceVersions({
   unavailableVersions?: ReadonlySet<string>;
   multiple?: boolean;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const [name, setName] = useState("");
   const [sourceId, setSourceId] = useState<string>();
   const candidates = voices.filter((voice) =>
@@ -76,13 +78,19 @@ export function VoiceVersions({
     ? voiceSettingFor(settings, source.id, editingKey)
     : undefined;
   return (
-    <section className="tsz-ve-versions" aria-label="当前文本的配音版本">
-      <Typography.Text strong>当前文本的配音版本</Typography.Text>
+    <section
+      className="tsz-ve-versions"
+      aria-label={t("voice_versions_for_current_text")}
+    >
+      <Typography.Text strong>
+        {t("voice_versions_for_current_text")}
+      </Typography.Text>
       <Typography.Paragraph type="secondary">
-        {multiple
-          ? "同口音可选多个版本，按顺序审听，首个有效已选版本作为默认。"
-          : "英式与美式各选一个正式版本，其他地区按地区选用补充版本。"}
-        保存后保留当前参数。
+        {t(
+          multiple
+            ? "voice_versions_help_multiple"
+            : "voice_versions_help_regional"
+        )}
       </Typography.Paragraph>
       {visible.map((setting) => {
         const key = voiceSettingKey(setting);
@@ -123,7 +131,9 @@ export function VoiceVersions({
           <div
             className="tsz-ve-version"
             key={key}
-            aria-label={`配音版本 ${setting.version_name ?? voice?.label ?? setting.voice_id}`}
+            aria-label={t("voice_version", {
+              p0: setting.version_name ?? voice?.label ?? setting.voice_id
+            })}
           >
             <Space wrap>
               <Typography.Text
@@ -131,7 +141,7 @@ export function VoiceVersions({
                 editable={
                   !readOnly && !!setting.version_id
                     ? {
-                        tooltip: "修改版本名称",
+                        tooltip: t("edit_version_name"),
                         maxLength: 40,
                         onChange: (version_name) => {
                           if (version_name.trim())
@@ -154,29 +164,47 @@ export function VoiceVersions({
               </Typography.Text>
               <Tag>
                 {accent
-                  ? `${speechAccentGroup(accent, voice?.accent) === "uk" ? "英式" : speechAccentGroup(accent, voice?.accent) === "us" ? "美式" : "不归类"} · ${speechRegionLabel(accent)}`
-                  : "口音未知"}
+                  ? t("label_4", {
+                      p0:
+                        speechAccentGroup(accent, voice?.accent) === "uk"
+                          ? t("british")
+                          : speechAccentGroup(accent, voice?.accent) === "us"
+                            ? t("american")
+                            : t("ungrouped"),
+                      p1: speechRegionLabel(accent)
+                    })
+                  : t("unknown_accent")}
               </Tag>
               {setting.enabled && (
                 <Tag color="blue">
-                  {setting.version_id ? "正式选用" : "原有已启用"}
+                  {setting.version_id
+                    ? t("selected_final_version")
+                    : t("previously_enabled")}
                 </Tag>
               )}
-              {editingKey === key && <Tag>正在调参</Tag>}
-              {setting.audio_asset_id && <Tag color="green">已生成音频</Tag>}
+              {editingKey === key && <Tag>{t("adjusting_parameters")}</Tag>}
+              {setting.audio_asset_id && (
+                <Tag color="green">{t("audio_generated")}</Tag>
+              )}
               {!available && (
-                <Tag color="warning">音色或参数不可用，请调整</Tag>
+                <Tag color="warning">
+                  {t(
+                    "voice_or_parameters_are_unavailable_adjust_them_to_continue"
+                  )}
+                </Tag>
               )}
             </Space>
             <Typography.Paragraph type="secondary">
               {voice?.label ?? setting.voice_id}，
-              {((setting.rate_percent + 100) / 100).toFixed(2)}×，音量{" "}
-              {setting.volume_percent ?? 100}%
+              {((setting.rate_percent + 100) / 100).toFixed(2)}
+              {t("volume_3")} {setting.volume_percent ?? 100}%
             </Typography.Paragraph>
             <Space wrap>
               <Select
                 size="small"
-                aria-label={`输出格式 ${setting.version_name ?? setting.voice_id}`}
+                aria-label={t("output_format", {
+                  p0: setting.version_name ?? setting.voice_id
+                })}
                 value={setting.output_format ?? "mp3"}
                 disabled={readOnly || !!generatingVersion}
                 options={[
@@ -198,7 +226,7 @@ export function VoiceVersions({
                 disabled={readOnly || !voice}
                 onClick={() => onEdit(key)}
               >
-                调整参数
+                {t("adjust_parameters")}
               </Button>
               <Button
                 size="small"
@@ -209,7 +237,9 @@ export function VoiceVersions({
                   playbackVoice && onAudition(playbackVoice, setting)
                 }
               >
-                {setting.audio_asset_id ? "播放正式音频" : "试听此版本"}
+                {setting.audio_asset_id
+                  ? t("play_final_audio")
+                  : t("audition_this_version")}
               </Button>
               {onGenerate && setting.version_id && (
                 <Button
@@ -223,7 +253,9 @@ export function VoiceVersions({
                   }
                   onClick={() => onGenerate(setting)}
                 >
-                  {setting.audio_asset_id ? "重新生成音频" : "生成正式音频"}
+                  {setting.audio_asset_id
+                    ? t("regenerate_audio")
+                    : t("generate_final_audio")}
                 </Button>
               )}
               {setting.audio_asset_id && (
@@ -240,7 +272,7 @@ export function VoiceVersions({
                     )
                   }
                 >
-                  移除音频
+                  {t("remove_audio")}
                 </Button>
               )}
               <Button
@@ -254,7 +286,9 @@ export function VoiceVersions({
                 }
                 onClick={() => onSelect(setting)}
               >
-                {multiple && setting.enabled ? "取消选用" : "正式选用"}
+                {multiple && setting.enabled
+                  ? t("deselect")
+                  : t("selected_final_version")}
               </Button>
               {multiple &&
                 [-1, 1].map((offset) => {
@@ -270,7 +304,10 @@ export function VoiceVersions({
                         index + offset < 0 ||
                         index + offset >= settings.length
                       }
-                      aria-label={`${offset < 0 ? "上移" : "下移"}配音版本 ${setting.version_name ?? setting.voice_id}`}
+                      aria-label={t("voice_version_2", {
+                        p0: offset < 0 ? t("move_up") : t("move_down"),
+                        p1: setting.version_name ?? setting.voice_id
+                      })}
                       onClick={() => {
                         const next = [...settings];
                         [next[index], next[index + offset]] = [
@@ -280,12 +317,12 @@ export function VoiceVersions({
                         (onReorder ?? onChange)(next);
                       }}
                     >
-                      {offset < 0 ? "上移" : "下移"}
+                      {offset < 0 ? t("move_up") : t("move_down")}
                     </Button>
                   );
                 })}
               <Popconfirm
-                title="删除这个配音版本？"
+                title={t("delete_this_voice_version")}
                 onConfirm={() =>
                   onChange(
                     settings.filter((item) => voiceSettingKey(item) !== key)
@@ -298,7 +335,7 @@ export function VoiceVersions({
                   danger
                   disabled={readOnly || setting.enabled}
                 >
-                  删除版本
+                  {t("delete_version")}
                 </Button>
               </Popconfirm>
             </Space>
@@ -308,7 +345,7 @@ export function VoiceVersions({
       {!readOnly && source && (
         <Space wrap className="tsz-ve-version-create">
           <Select
-            aria-label="另存版本的音色"
+            aria-label={t("voice_for_saved_version")}
             value={source.id}
             onChange={setSourceId}
             options={candidates.map((voice) => ({
@@ -318,8 +355,8 @@ export function VoiceVersions({
             style={{ minWidth: 180 }}
           />
           <Input
-            aria-label="新版本名称"
-            placeholder="版本名称，如清晰慢读"
+            aria-label={t("new_version_name")}
+            placeholder={t("version_name_e_g_clear_slow_reading")}
             maxLength={40}
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -342,7 +379,7 @@ export function VoiceVersions({
               setName("");
             }}
           >
-            另存为新版本
+            {t("save_as_new_version")}
           </Button>
         </Space>
       )}

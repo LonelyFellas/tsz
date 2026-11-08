@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import { VolumeXIcon, Volume2Icon } from "lucide-react";
 import { Flex } from "@tsz/ui/admin/display";
 import { InputNumber, Slider } from "@tsz/ui/admin/forms";
@@ -22,20 +23,21 @@ export function SpeechVolumeInput({
   id,
   ...aria
 }: SpeechVolumeInputProps) {
+  const { t } = useVoiceEditorTranslation();
   return (
     <Flex
       className="voice-library-volume-control"
       align="center"
       gap={8}
       role="group"
-      aria-label="音量"
+      aria-label={t("volume")}
       aria-describedby={aria["aria-describedby"]}
     >
       <span className="voice-library-volume-icon" aria-hidden="true">
         {value === 0 ? <VolumeXIcon /> : <Volume2Icon />}
       </span>
       <Slider
-        ariaLabelForHandle="合成音量滑块"
+        ariaLabelForHandle={t("synthesis_volume_slider")}
         min={0}
         max={100}
         step={1}
@@ -48,7 +50,7 @@ export function SpeechVolumeInput({
       <InputNumber
         {...aria}
         id={id}
-        aria-label={ariaLabel ?? "合成音量"}
+        aria-label={ariaLabel ?? t("synthesis_volume")}
         min={0}
         max={100}
         step={1}

@@ -429,30 +429,31 @@ describe("SmartDictionary", () => {
     // 查询 mock 可先于并发渲染提交执行；等筛选项进入 DOM 后再翻页。
     await screen.findByRole("button", { name: "移除词条：alpha" });
     fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
-    await waitFor(() =>
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("page=2");
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 2,
         page_size: 20,
         headword: "alpha",
         ...boundaries
-      })
-    );
+      });
+    });
     expect(screen.getByTestId("location")).toHaveTextContent(
       "created_timezone=Asia%2FShanghai"
     );
     fireEvent.click(
       screen.getByRole("button", { name: /移除创建时间（北京时间）/ })
     );
-    await waitFor(() =>
+    await waitFor(() => {
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 1,
         page_size: 20,
         headword: "alpha"
-      })
-    );
-    expect(screen.getByTestId("location")).not.toHaveTextContent(
-      "created_timezone"
-    );
+      });
+      expect(screen.getByTestId("location")).not.toHaveTextContent(
+        "created_timezone"
+      );
+    });
   });
 
   it("跨页已选数量明确，取消选择会清空跨页选择", async () => {

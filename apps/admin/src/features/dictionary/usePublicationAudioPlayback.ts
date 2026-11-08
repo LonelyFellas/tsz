@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "./i18n/editor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicationAudioRequirement } from "@tsz/types";
 import { api } from "@/lib/auth";
@@ -15,6 +16,7 @@ export function usePublicationAudioPlayback(
   onFailure: (message: string) => void,
   resolveAudio: PublicationAudioResolver = resolveAsset
 ) {
+  const { t } = useLexiconEditorTranslation();
   const [playing, setPlaying] = useState<number>();
   const playback = useRef<AbortController | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
@@ -62,7 +64,9 @@ export function usePublicationAudioPlayback(
           };
           audio.onerror = () => {
             cleanup();
-            reject(new Error("正式音频加载失败，请重新检查"));
+            reject(
+              new Error(t("panel_could_not_load_final_audio_check_again"))
+            );
           };
           controller.signal.addEventListener("abort", cancelled, {
             once: true
@@ -77,7 +81,9 @@ export function usePublicationAudioPlayback(
     } catch (failure) {
       if (!controller.signal.aborted) {
         failureCallback.current(
-          failure instanceof Error ? failure.message : "音频播放失败，请重试"
+          failure instanceof Error
+            ? failure.message
+            : t("panel_audio_playback_failed_try_again")
         );
       }
     } finally {

@@ -10,9 +10,10 @@ const zhHans = {
     edit: "编辑",
     copy: "复制",
     copied: "已复制",
-    copyFailed: "复制失败，点击重试"
+    copyFailed: "复制失败，点击重试",
+    editVoice: "语音编辑"
   },
-  status: { loading: "加载中…", noData: "暂无数据" },
+  status: { loading: "加载中…", noData: "暂无数据", notEntered: "未填写" },
   controls: {
     pagination: "分页",
     previous: "上一页",
@@ -63,9 +64,10 @@ const zhHant = {
     edit: "編輯",
     copy: "複製",
     copied: "已複製",
-    copyFailed: "複製失敗，點擊重試"
+    copyFailed: "複製失敗，點擊重試",
+    editVoice: "語音編輯"
   },
-  status: { loading: "載入中…", noData: "暫無資料" },
+  status: { loading: "載入中…", noData: "暫無資料", notEntered: "未填寫" },
   controls: {
     pagination: "分頁",
     previous: "上一頁",
@@ -116,9 +118,10 @@ const en = {
     edit: "Edit",
     copy: "Copy",
     copied: "Copied",
-    copyFailed: "Copy failed. Try again."
+    copyFailed: "Copy failed. Try again.",
+    editVoice: "Edit voice"
   },
-  status: { loading: "Loading…", noData: "No data" },
+  status: { loading: "Loading…", noData: "No data", notEntered: "Not entered" },
   controls: {
     pagination: "Pagination",
     previous: "Previous page",

@@ -1,3 +1,8 @@
+import {
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
 import { expandFormContents } from "@tsz/shared";
 import { boundFormGroupIds } from "./meaningsModel";
 import type {
@@ -32,7 +37,10 @@ import {
   useSubPartOfSpeechLabel
 } from "../part-of-speech/PartOfSpeechLabels";
 
-export function reviewSenseTitle(sense: WordSenseV3): string {
+export function reviewSenseTitle(
+  sense: WordSenseV3,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
   for (const definition of sense.definitions) {
     if (
       (definition.definition_mode === "zh_definition" ||
@@ -41,7 +49,7 @@ export function reviewSenseTitle(sense: WordSenseV3): string {
     )
       return definition.content.text;
   }
-  return "待填写释义";
+  return t("panel_definition_not_entered");
 }
 
 function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
@@ -62,14 +70,30 @@ function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
   );
 }
 
-function boundFormGroupLabel(pos: WordPosFormsV3 | undefined, groupId: string) {
-  return (pos && formGroupLabel(pos, groupId)) ?? "已失效的变化组";
+function boundFormGroupLabel(
+  pos: WordPosFormsV3 | undefined,
+  groupId: string,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) {
+  return (
+    (pos &&
+      formGroupLabel(pos, groupId, (index, spelling) =>
+        t("review_form_group", {
+          index,
+          spelling: spelling || t("review_base_not_entered")
+        })
+      )) ??
+    t("panel_unavailable_form_group")
+  );
 }
 
-function translationBandLabel(band: SentenceTranslationBandV3) {
-  if (band === "word_for_word") return "初";
-  if (band === "balanced_fluency") return "中";
-  return "高";
+function translationBandLabel(
+  band: SentenceTranslationBandV3,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+) {
+  if (band === "word_for_word") return t("panel_w");
+  if (band === "balanced_fluency") return t("panel_b");
+  return t("panel_a");
 }
 
 export function V3MeaningsPreview({
@@ -83,6 +107,7 @@ export function V3MeaningsPreview({
   renderSentences?: (senseId: string) => ReactNode;
   onEdit?: (nodeId: string) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const partOfSpeechLabel = usePartOfSpeechLabel();
   const subPartOfSpeechLabel = useSubPartOfSpeechLabel();
   const posCodeById = new Map(
@@ -98,7 +123,10 @@ export function V3MeaningsPreview({
       group.id,
       {
         index: index + 1,
-        label: group.name_zh || group.name_en || `语义区间 ${index + 1}`
+        label:
+          group.name_zh ||
+          group.name_en ||
+          t("panel_sense_group", { p0: index + 1 })
       }
     ])
   );
@@ -109,14 +137,14 @@ export function V3MeaningsPreview({
         <Flex gap="small" wrap>
           {word.meanings.sense_groups.map((group, index) => (
             <Tag key={group.id}>
-              语义区间 {index + 1}：
+              {t("panel_sense_group_2")} {index + 1}：
               {[group.name_zh, group.name_en].filter(Boolean).join(" / ")}
             </Tag>
           ))}
         </Flex>
       ) : null}
       {word.meanings.pos.length === 0 ? (
-        <Empty description="暂无词义与例句" />
+        <Empty description={t("panel_no_meanings_or_examples_yet")} />
       ) : (
         word.meanings.pos.map((pos) => (
           <section
@@ -126,22 +154,29 @@ export function V3MeaningsPreview({
           >
             <header className="v3-dictionary-pos-heading">
               <h2>{partOfSpeechLabel(posCodeById.get(pos.pos_id) ?? "")}</h2>
-              <span>{pos.senses.length} 个词义</span>
+              <span>
+                {t("preview_meaning_count", { count: pos.senses.length })}
+              </span>
             </header>
             <Flex vertical gap="middle">
               {pos.grammar_structures.length > 0 ? (
                 <Flex vertical gap="small">
-                  <Typography.Text strong>语法结构</Typography.Text>
+                  <Typography.Text strong>
+                    {t("panel_grammar_structures")}
+                  </Typography.Text>
                   {pos.grammar_structures.map((structure, index) => (
                     <Flex key={structure.id} gap="small" wrap>
-                      <Tag>语法结构 {index + 1}</Tag>
+                      <Tag>
+                        {t("panel_grammar_structures")} {index + 1}
+                      </Tag>
                       {structure.variants.map((variant) => (
                         <Typography.Text className="tsz-words" key={variant.id}>
-                          {dialectLabel(variant.dialect)}：
+                          {dialectLabel(variant.dialect, t)}：
                           {variant.content.text}
                           {variant.audio_assets?.length ? (
                             <Tag style={{ marginInlineStart: 6 }}>
-                              音频 {variant.audio_assets.length} 条
+                              {t("panel_audio")} {variant.audio_assets.length}{" "}
+                              {t("panel_items_3")}
                             </Tag>
                           ) : null}
                         </Typography.Text>
@@ -151,7 +186,9 @@ export function V3MeaningsPreview({
                 </Flex>
               ) : null}
               {pos.senses.length === 0 ? (
-                <Typography.Text type="secondary">暂无释义</Typography.Text>
+                <Typography.Text type="secondary">
+                  {t("panel_no_definitions_yet")}
+                </Typography.Text>
               ) : (
                 pos.senses.map((sense, senseIndex) => {
                   const group = sense.sense_group_id
@@ -167,14 +204,16 @@ export function V3MeaningsPreview({
                         <span className="v3-dictionary-number">
                           {String(senseIndex + 1).padStart(2, "0")}
                         </span>
-                        <h3>{reviewSenseTitle(sense)}</h3>
+                        <h3>{reviewSenseTitle(sense, t)}</h3>
                         {onEdit && (
                           <Button
                             type="link"
                             onClick={() => onEdit(sense.id)}
-                            aria-label={`编辑词义 ${senseIndex + 1}`}
+                            aria-label={t("panel_edit_meaning", {
+                              p0: senseIndex + 1
+                            })}
                           >
-                            编辑
+                            {t("panel_edit")}
                           </Button>
                         )}
                       </header>
@@ -189,11 +228,14 @@ export function V3MeaningsPreview({
                             <Tag color="blue">{sense.level}</Tag>
                           ) : null}
                           {sense.frequency !== undefined && (
-                            <Tag>词频 {sense.frequency}%</Tag>
+                            <Tag>
+                              {t("panel_frequency")} {sense.frequency}%
+                            </Tag>
                           )}
                           {group ? (
                             <Tag color="purple">
-                              语义区间 {group.index}：{group.label}
+                              {t("panel_sense_group_2")} {group.index}：
+                              {group.label}
                             </Tag>
                           ) : null}
                           {boundFormGroupIds(sense).map((groupId) => (
@@ -202,20 +244,23 @@ export function V3MeaningsPreview({
                               className="tsz-words"
                               color="cyan"
                             >
-                              词形与发音：
+                              {t("panel_forms_and_pronunciation_2")}
                               {boundFormGroupLabel(
                                 formsPosById.get(pos.pos_id),
-                                groupId
+                                groupId,
+                                t
                               )}
                             </Tag>
                           ))}
                           {sense.depends_on_context ? (
-                            <Tag color="gold">依赖上下文</Tag>
+                            <Tag color="gold">
+                              {t("panel_context_dependent")}
+                            </Tag>
                           ) : null}
                         </Space>
                         <div
                           className="v3-dictionary-definitions"
-                          aria-label="多维释义"
+                          aria-label={t("panel_definitions")}
                         >
                           {sense.definitions.map((definition, index) => {
                             const grammar = pos.grammar_structures.find(
@@ -229,14 +274,21 @@ export function V3MeaningsPreview({
                                 key={definition.id}
                               >
                                 <div className="v3-dictionary-definition-meta">
-                                  <Tag>{definition.level || "未设等级"}</Tag>
-                                  <span>{chinese ? "中文" : "英文"}</span>
+                                  <Tag>
+                                    {definition.level ||
+                                      t("panel_level_not_set")}
+                                  </Tag>
+                                  <span>
+                                    {chinese
+                                      ? t("panel_chinese")
+                                      : t("panel_english")}
+                                  </span>
                                   <span>
                                     {definition.definition_mode.endsWith(
                                       "_sentence"
                                     )
-                                      ? "整句释义"
-                                      : "定义释义"}{" "}
+                                      ? t("panel_full_sentence_definition")
+                                      : t("panel_definition")}{" "}
                                     {index + 1}
                                   </span>
                                 </div>
@@ -244,11 +296,11 @@ export function V3MeaningsPreview({
                                   <DefinitionText definition={definition} />
                                   {grammar && (
                                     <div className="v3-dictionary-usage">
-                                      <span>用法</span>
+                                      <span>{t("panel_usage")}</span>
                                       {grammar.variants.map((variant) => (
                                         <div key={variant.id}>
                                           <small>
-                                            {dialectLabel(variant.dialect)}
+                                            {dialectLabel(variant.dialect, t)}
                                           </small>
                                           <RichTextReadOnly
                                             className="tsz-words"
@@ -260,7 +312,11 @@ export function V3MeaningsPreview({
                                   )}
                                   {definition.grammar_structure_id &&
                                     !grammar && (
-                                      <Tag color="warning">语法结构已失效</Tag>
+                                      <Tag color="warning">
+                                        {t(
+                                          "panel_grammar_structure_is_unavailable"
+                                        )}
+                                      </Tag>
                                     )}
                                 </div>
                               </section>
@@ -272,7 +328,7 @@ export function V3MeaningsPreview({
                           <Card
                             key={sentence.id}
                             size="small"
-                            title={`例句 ${index + 1}`}
+                            title={t("panel_example", { p0: index + 1 })}
                           >
                             <Flex vertical gap={4}>
                               <V3EnglishTextPreview value={sentence.en_text} />
@@ -280,7 +336,10 @@ export function V3MeaningsPreview({
                                 (translation) => (
                                   <Typography.Text key={translation.id}>
                                     <Tag>
-                                      {translationBandLabel(translation.band)}
+                                      {translationBandLabel(
+                                        translation.band,
+                                        t
+                                      )}
                                     </Tag>
                                     {translation.content.text}
                                   </Typography.Text>
@@ -292,7 +351,7 @@ export function V3MeaningsPreview({
                                     <Tag
                                       key={`${sentence.id}-link-${linkIndex}`}
                                     >
-                                      {sentenceLinkRoleLabel(link.role)}
+                                      {sentenceLinkRoleLabel(link.role, t)}
                                     </Tag>
                                   ))}
                                 </Space>
@@ -308,10 +367,15 @@ export function V3MeaningsPreview({
                                 return (
                                   <Space key={association.id} size={4} wrap>
                                     <Tag color={pending ? "orange" : "green"}>
-                                      {pending ? "待关联" : "已关联"}
+                                      {pending
+                                        ? t("panel_pending_link")
+                                        : t("panel_linked")}
                                     </Tag>
                                     <Typography.Text className="tsz-entry-en">
-                                      {pending ? "待关联词条" : "上下文关联"}：
+                                      {pending
+                                        ? t("panel_pending_entry")
+                                        : t("panel_context_link")}
+                                      ：
                                       {headword ??
                                         association.source_segments
                                           .map((segment) => segment.surface)
@@ -325,7 +389,7 @@ export function V3MeaningsPreview({
                           </Card>
                         ))}
                         <div className="v3-dictionary-relations">
-                          <h4>拓展词</h4>
+                          <h4>{t("panel_related_entries")}</h4>
                           {sense.relations.length > 0 ? (
                             <Flex vertical gap={4}>
                               {groupRelations(sense.relations).map((group) => {
@@ -344,7 +408,7 @@ export function V3MeaningsPreview({
                                     key={relation.id}
                                   >
                                     <Tag>
-                                      {relationLabel(relation.relation)}
+                                      {relationLabel(relation.relation, t)}
                                     </Tag>
                                     <Tag
                                       color={
@@ -354,8 +418,8 @@ export function V3MeaningsPreview({
                                       }
                                     >
                                       {relation.target_word_id
-                                        ? "已关联"
-                                        : "待关联"}
+                                        ? t("panel_linked")
+                                        : t("panel_pending_link")}
                                     </Tag>
                                     <span className="v3-relation-score">
                                       {group
@@ -364,7 +428,7 @@ export function V3MeaningsPreview({
                                     </span>
                                     {relation.target_headword ??
                                       relation.pending_target_headword ??
-                                      "待补充目标词条"}
+                                      t("panel_target_entry_needed")}
                                     {gloss ? ` · ${gloss}` : ""}
                                   </Typography.Text>
                                 );
@@ -385,7 +449,9 @@ export function V3MeaningsPreview({
                               <div className="v3-relation-empty" key={type}>
                                 <Empty
                                   image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                  description={`暂无${relationLabel(type)}`}
+                                  description={t("panel_no_yet", {
+                                    p0: relationLabel(type, t)
+                                  })}
                                 />
                               </div>
                             ))}
@@ -401,5 +467,9 @@ export function V3MeaningsPreview({
       )}
     </Flex>
   );
-  return embedded ? content : <Card title="词义与例句">{content}</Card>;
+  return embedded ? (
+    content
+  ) : (
+    <Card title={t("panel_meanings_and_examples_2")}>{content}</Card>
+  );
 }

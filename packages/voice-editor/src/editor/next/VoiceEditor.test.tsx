@@ -1,3 +1,6 @@
+import { VoiceVersions } from "./VoiceVersions";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import stylesSource from "../../styles.css?raw";
 import interactionSource from "./interaction.css?raw";
 import { VoicePanel } from "./ToolPanels";
@@ -4053,4 +4056,171 @@ it("普通保存固定有效继承副本并保留原始参数与稳定来源，�
       { voice_id: "gone", enabled: false, rate_percent: 10 }
     ]
   });
+});
+
+it("切换四语保留编辑正文、标注、选区、音频身份与撤销栈，切换本身不提交", async () => {
+  const value: RichTextV2 = {
+    version: 2,
+    text: TEXT,
+    annotations: [{ type: "pause", at: 8, duration_ms: 500 }]
+  };
+  const setting = {
+    version_id: "11111111-1111-4111-8111-111111111111",
+    version_name: "保留原名",
+    locale: "en-GB" as const,
+    voice_id: "sonia",
+    enabled: true,
+    rate_percent: 0,
+    audio_asset_id: "saved-audio"
+  };
+  const onVoiceProfileChange = vi.fn();
+  const base = props({
+    value,
+    contextKey: "stable-example-field",
+    voiceProfile: { voices: [setting] },
+    onVoiceProfileChange,
+    previewEnabled: false
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <VoiceEditor
+        {...base}
+        contextLabel={locale.startsWith("en") ? "Example text" : "例句正文"}
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = screen.getByLabelText("例句正文") as HTMLTextAreaElement;
+  selectText(2, 8);
+  fireEvent.click(screen.getByRole("button", { name: "斜体" }));
+  const edited = applied(base);
+  expect(edited.text).toBe(TEXT);
+  expect(edited.annotations).toEqual(
+    expect.arrayContaining([
+      { type: "pause", at: 8, duration_ms: 500 },
+      { type: "italic", start: 2, end: 8 }
+    ])
+  );
+  base.onChange.mockClear();
+  onVoiceProfileChange.mockClear();
+  for (const locale of ["zh-Hant", "en-GB", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    const sameInput = screen.getByLabelText(
+      locale.startsWith("en") ? "Example text" : "例句正文"
+    );
+    expect(sameInput).toBe(input);
+    expect(input.value).toBe(TEXT);
+    expect(input.selectionStart).toBe(2);
+    expect(input.selectionEnd).toBe(8);
+    expect(
+      screen.getByRole("button", {
+        name: locale.startsWith("en") ? "Previous step" : "上一步"
+      })
+    ).toBeEnabled();
+    expect(base.onChange).not.toHaveBeenCalled();
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+  }
+  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  expect(applied(base)).toEqual(value);
+});
+
+it("校验错误随界面语言更新，保留自定义停顿输入和原有标注", () => {
+  const base = props();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <VoiceEditor {...base} />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  usePauseBrush();
+  const input = screen.getByLabelText("自定义停顿秒");
+  fireEvent.change(input, { target: { value: "6" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(screen.getByText(/停顿时长必须是/)).toBeVisible();
+  view.rerender(content("en-GB"));
+  expect(screen.getByText(/Pause duration must be an integer/)).toBeVisible();
+  expect(screen.getByLabelText("Custom pause in seconds")).toBe(input);
+  expect(input).toHaveValue("6");
+  expect(base.onChange).not.toHaveBeenCalled();
+});
+
+it("英文选区提示保留词界与句末标点", () => {
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <VoiceEditor {...props()} />
+    </InterfaceI18nProvider>
+  );
+  selectText(2, 8);
+  expect(document.querySelector(".tsz-ve-selection-status")).toHaveTextContent(
+    "Selected centre; configure grammar structures and liaison marks."
+  );
+});
+
+it.each([true, false])("英文版本说明的句界完整（multiple=%s）", (multiple) => {
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <VoiceVersions
+        settings={[]}
+        voices={[]}
+        readOnly
+        canAudition={false}
+        multiple={multiple}
+        onEdit={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+        onAudition={vi.fn()}
+      />
+    </InterfaceI18nProvider>
+  );
+  expect(
+    screen.getByText(
+      multiple ? /Select multiple versions/ : /Select one final version/
+    )
+  ).toHaveTextContent(
+    multiple
+      ? "default. Current parameters are retained after saving."
+      : "versions. Current parameters are retained after saving."
+  );
+});
+
+it("英文录音说明保留口音两侧的词界", async () => {
+  const setting = {
+    version_id: "11111111-1111-4111-8111-111111111111",
+    version_name: "saved-version",
+    locale: "en-GB",
+    voice_id: "sonia",
+    enabled: true,
+    rate_percent: 0,
+    audio_asset_id: "saved-audio"
+  };
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <VoiceEditor
+        {...props({
+          mode: "association",
+          locale: "en-GB",
+          recommendationArea: "meaning",
+          autoRecommend: false,
+          voiceProfile: {
+            voices: [setting],
+            dubbing: {
+              mode: "local",
+              area: "meaning",
+              pool_version: "provider_id_v1"
+            }
+          },
+          onVoiceProfileChange: vi.fn(),
+          previewAdapter: adapter()
+        })}
+      />
+    </InterfaceI18nProvider>
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Edit saved-version" })
+  );
+  expect(
+    await screen.findByText(
+      "Recordings are for this text’s British pronunciation and are saved separately from synthesised voices."
+    )
+  ).toBeVisible();
 });

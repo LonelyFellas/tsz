@@ -1,3 +1,7 @@
+import {
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import type {
   AdminWordV3,
@@ -206,7 +210,8 @@ function issueScopes(
   word: AdminWordV3,
   issues: readonly V3DraftValidationIssue[],
   formTypeLabel: (code: string) => string,
-  posLabel = fallbackPartOfSpeechLabel
+  posLabel = fallbackPartOfSpeechLabel,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
 ) {
   const groups = groupIssuesByPosition(word, issues, posLabel);
   return groups.map((position) => {
@@ -218,11 +223,17 @@ function issueScopes(
       formTypes.set(label, (formTypes.get(label) ?? 0) + 1);
     }
     if (formTypes.size === 0) {
-      return `${position.label} ${position.issues.length} 项`;
+      return t("summary_scope_count", {
+        label: localizedPositionLabel(position, t),
+        count: position.issues.length
+      });
     }
-    return `${position.label}：${[...formTypes]
-      .map(([label, count]) => `${label} ${count} 项`)
-      .join("、")}`;
+    return t("summary_position_scope", {
+      label: localizedPositionLabel(position, t),
+      details: [...formTypes]
+        .map(([label, count]) => t("summary_scope_count", { label, count }))
+        .join(t("summary_list_separator"))
+    });
   });
 }
 
@@ -255,7 +266,8 @@ export function buildV3PublicationIssueSummary(
   word: AdminWordV3,
   issues: readonly V3DraftValidationIssue[],
   formTypeLabel = fallbackFormTypeLabel,
-  posLabel = fallbackPartOfSpeechLabel
+  posLabel = fallbackPartOfSpeechLabel,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
 ): V3PublicationIssueSummary {
   const positionedIssues = issues.map((issue) =>
     issueWithResolvedPosition(word, issue)
@@ -268,13 +280,29 @@ export function buildV3PublicationIssueSummary(
   }
   return {
     total: issues.length,
-    positions: groupIssuesByPosition(word, positionedIssues, posLabel),
+    positions: groupIssuesByPosition(word, positionedIssues, posLabel).map(
+      (position) => ({
+        ...position,
+        label: localizedPositionLabel(position, t)
+      })
+    ),
     types: [...types].map(([code, groupedIssues]) => ({
       code,
-      label: v3IssueMessage(groupedIssues[0]!),
+      label: v3IssueMessage(groupedIssues[0]!, t),
       count: groupedIssues.length,
-      scopes: issueScopes(word, groupedIssues, formTypeLabel, posLabel),
+      scopes: issueScopes(word, groupedIssues, formTypeLabel, posLabel, t),
       issues: groupedIssues
     }))
   };
+}
+
+function localizedPositionLabel(
+  position: V3PublicationIssuePosition,
+  t: LexiconEditorTranslation
+) {
+  if (position.key === "step:basics") return t("summary_basics");
+  if (position.key === "step:forms") return t("forms_title");
+  if (position.key === "step:meanings")
+    return t("panel_meanings_and_examples_2");
+  return position.label;
 }

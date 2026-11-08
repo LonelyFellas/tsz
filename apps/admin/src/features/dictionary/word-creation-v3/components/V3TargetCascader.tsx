@@ -1,3 +1,11 @@
+import {
+  useLexiconEditorTranslation,
+  createLexiconEditorMessage,
+  lexiconEditorMessageText,
+  type LexiconEditorMessage,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../../i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
@@ -46,7 +54,7 @@ interface CandidateSearchState {
   candidates: PublishedSentenceTargetCandidateV3[];
   nextCursor?: string;
   truncated: boolean;
-  error?: string;
+  error?: LexiconEditorMessage;
   stale?: boolean;
 }
 
@@ -117,11 +125,12 @@ function cascaderOptionsFromGroups(
   groups: CandidateEntryGroup[],
   selectedTarget?: TargetIdentity,
   readOnly = false,
-  preferredTarget?: TargetIdentity
+  preferredTarget?: TargetIdentity,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
 ): CascaderOptionNode[] {
   return groups.map((group) => {
     const draftTag = group.draft ? (
-      <Tag className="v3-component-usage-draft">草稿</Tag>
+      <Tag className="v3-component-usage-draft">{t("panel_draft")}</Tag>
     ) : null;
     // 没有词义就没有可关联的叶子：留一条禁用行说明原因（草稿常见——词义步还没保存），
     // 免得用户以为词条不存在。
@@ -133,7 +142,8 @@ function cascaderOptionsFromGroups(
         label: (
           <span className="v3-component-usage-entry">
             <Typography.Text className="tsz-words" type="secondary">
-              {group.headword}（暂无词义）
+              {group.headword}
+              {t("panel_no_meanings_yet")}
             </Typography.Text>
             {draftTag}
           </span>
@@ -180,7 +190,7 @@ function cascaderOptionsFromGroups(
               {posLabels.size > 1
                 ? `${formGroup.formLabel}（${formGroup.posLabel}）`
                 : formGroup.formLabel}
-              {senses.length === 0 ? "（暂无可关联词义）" : null}
+              {senses.length === 0 ? t("panel_no_linkable_meanings_yet") : null}
             </span>
           ),
           children: senses.map((sense) => {
@@ -205,9 +215,11 @@ function cascaderOptionsFromGroups(
                     aria-hidden
                     className={`v3-component-usage-radio${selected ? " is-checked" : ""}`}
                   />
-                  {sense.gloss.trim() || "词义未填写"}
+                  {sense.gloss.trim() || t("panel_meaning_not_entered")}
                   {target && !target.target_publication_id && (
-                    <Tag className="v3-component-usage-draft">未发布目标</Tag>
+                    <Tag className="v3-component-usage-draft">
+                      {t("panel_unpublished_target")}
+                    </Tag>
                   )}
                 </span>
               )
@@ -236,7 +248,8 @@ function groupsFromCandidates(
   formTypeLabel: (code: string) => string,
   posLabelOf: (code: string) => string,
   // 正文会先过滤方言；标签仍需全量拼写信息，避免把通用拼写误标成美式拼写。
-  spellingCandidates: readonly PublishedSentenceTargetCandidateV3[] = candidates
+  spellingCandidates: readonly PublishedSentenceTargetCandidateV3[] = candidates,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
 ): CandidateEntryGroup[] {
   const byEntry = new Map<string, CandidateEntryGroup>();
   for (const candidate of candidates) {
@@ -303,7 +316,7 @@ function groupsFromCandidates(
                 )
             )
               ? `${formTypeLabel(form.form_type)} ${form.spelling}`
-              : `${formTypeLabel(form.form_type)} ${form.spelling}（${dialectLabel(form.dialect)}）`,
+              : `${formTypeLabel(form.form_type)} ${form.spelling}（${dialectLabel(form.dialect, t)}）`,
           posLabel: posName,
           matched: false,
           senses: []
@@ -492,6 +505,7 @@ export function V3TargetCascader({
   draftOnly?: boolean;
   sourceDialect?: "common" | "uk" | "us";
 }) {
+  const { t } = useLexiconEditorTranslation();
   const formTypeLabel = useFormTypeLabel();
   const posLabelOf = usePartOfSpeechLabel();
   const includePhraseComponents =
@@ -582,10 +596,16 @@ export function V3TargetCascader({
           loadingMore: false,
           stale,
           error: stale
-            ? "词库已更新，请重新加载候选；已有关联保留。"
+            ? createLexiconEditorMessage(
+                "panel_the_lexicon_changed_reload_candidates_existing_links_are_retained"
+              )
             : append
-              ? "加载更多失败，已加载的候选保留，请重试。"
-              : "词库查询失败，请稍后重试；已有关联未受影响。"
+              ? createLexiconEditorMessage(
+                  "panel_could_not_load_more_loaded_candidates_are_retained_try_again"
+                )
+              : createLexiconEditorMessage(
+                  "panel_lexicon_query_failed_try_again_later_existing_links_are_unaffected"
+                )
         }));
       } finally {
         busy = false;
@@ -757,7 +777,8 @@ export function V3TargetCascader({
           selfEntryId,
           formTypeLabel,
           posLabelOf,
-          candidates
+          candidates,
+          t
         ),
         prioritizedEntryId,
         prioritizedSenseId,
@@ -772,6 +793,7 @@ export function V3TargetCascader({
       candidates,
       formTypeLabel,
       posLabelOf,
+      t,
       prioritizedEntryId,
       prioritizedSenseId,
       prioritizedPosId,
@@ -888,7 +910,8 @@ export function V3TargetCascader({
       groups,
       displayedTarget,
       readOnly,
-      preferredTarget
+      preferredTarget,
+      t
     );
     if (!includePhraseComponents) return entries;
     return entries.map((entry, index) => {
@@ -903,10 +926,13 @@ export function V3TargetCascader({
           components.length === 0 ? (
             <span className="v3-component-usage-entry">
               <Typography.Text className="tsz-words" type="secondary">
-                {groups[index]!.headword}（未配置成分用词）
+                {groups[index]!.headword}
+                {t("panel_no_component_entries_configured")}
               </Typography.Text>
               {groups[index]!.draft ? (
-                <Tag className="v3-component-usage-draft">草稿</Tag>
+                <Tag className="v3-component-usage-draft">
+                  {t("panel_draft")}
+                </Tag>
               ) : null}
             </span>
           ) : (
@@ -921,13 +947,16 @@ export function V3TargetCascader({
               selectedVariantIds,
               selfEntryId,
               formTypeLabel,
-              posLabelOf
+              posLabelOf,
+              undefined,
+              t
             );
             const forms = cascaderOptionsFromGroups(
               componentGroups,
               undefined,
               readOnly,
-              preferredTarget
+              preferredTarget,
+              t
             )
               .flatMap((target) => target.children ?? [])
               .map((form) => ({
@@ -957,10 +986,12 @@ export function V3TargetCascader({
                           value: "unavailable",
                           disabled: true,
                           label: result.error
-                            ? "词形词义加载失败"
+                            ? t("panel_could_not_load_form_meanings")
                             : result.truncated
-                              ? "候选未完整返回，暂未找到此成分的词形词义"
-                              : "没有可关联的词形词义"
+                              ? t(
+                                  "panel_candidates_are_incomplete_no_form_meaning_for_this_component_has_been_found"
+                                )
+                              : t("panel_no_linkable_form_meanings")
                         }
                       ]
             };
@@ -980,7 +1011,8 @@ export function V3TargetCascader({
     displayedTarget,
     preferredTarget,
     readOnly,
-    formTypeLabel
+    formTypeLabel,
+    t
   ]);
   const selectedFormKey = useMemo(() => {
     if (!displayedTarget) return undefined;
@@ -1018,7 +1050,7 @@ export function V3TargetCascader({
           style={{ paddingInline: 0, height: "auto" }}
           type="link"
         >
-          清除关联
+          {t("panel_clear_link")}
         </Button>
       </Flex>
     ) : null;
@@ -1032,7 +1064,9 @@ export function V3TargetCascader({
         style={{ width: 360, padding: 16 }}
       >
         <Spin />
-        <Typography.Text type="secondary">正在按关键字查询词库</Typography.Text>
+        <Typography.Text type="secondary">
+          {t("panel_searching_the_lexicon_by_keyword")}
+        </Typography.Text>
       </Flex>
     );
   }
@@ -1047,32 +1081,40 @@ export function V3TargetCascader({
   const pagination = (
     <>
       {state.error ? (
-        <Alert showIcon title={state.error} type="warning" />
+        <Alert
+          showIcon
+          title={lexiconEditorMessageText(state.error, t)}
+          type="warning"
+        />
       ) : null}
       {state.stale || (state.error && !state.nextCursor) ? (
         <Button
           key="reload"
-          aria-label="重新加载"
+          aria-label={t("panel_reload")}
           size="small"
           onClick={reloadCandidates}
         >
-          重新加载
+          {t("panel_reload")}
         </Button>
       ) : state.nextCursor ? (
         <Button
           key="more"
-          aria-label={state.error ? "重试加载更多" : "加载更多"}
+          aria-label={
+            state.error ? t("panel_retry_loading_more") : t("panel_load_more")
+          }
           size="small"
           loading={state.loadingMore}
           onClick={state.loadMore}
         >
-          {state.error ? "重试加载更多" : "加载更多"}
+          {state.error ? t("panel_retry_loading_more") : t("panel_load_more")}
         </Button>
       ) : state.truncated ? (
         <Alert
           showIcon
           type="info"
-          title="候选未完整返回，当前服务暂不支持继续加载。"
+          title={t(
+            "panel_candidates_are_incomplete_this_service_does_not_support_loading_more_yet"
+          )}
         />
       ) : null}
     </>
@@ -1085,8 +1127,8 @@ export function V3TargetCascader({
           <Empty
             description={
               state.nextCursor || state.truncated
-                ? "已加载的候选中没有可关联的词条"
-                : "没有匹配的词条"
+                ? t("panel_no_linkable_entries_among_loaded_candidates")
+                : t("panel_no_matching_entries_2")
             }
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
@@ -1102,13 +1144,15 @@ export function V3TargetCascader({
         <Alert
           showIcon
           type="warning"
-          title="成分词形词义加载失败，已有关联未受影响。"
+          title={t(
+            "panel_could_not_load_component_form_meanings_existing_links_are_unaffected"
+          )}
           action={
             <Button
               size="small"
               onClick={() => void loadComponent(failedComponent)}
             >
-              重试
+              {t("panel_try_again")}
             </Button>
           }
         />

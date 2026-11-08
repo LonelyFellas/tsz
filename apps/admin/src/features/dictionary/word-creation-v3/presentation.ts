@@ -1,3 +1,8 @@
+import {
+  defaultLexiconEditorTranslation,
+  type LexiconEditorKey,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
 import type {
   Dialect,
   FormsImpactNodeTypeV3,
@@ -16,18 +21,19 @@ const FORM_TYPE_LABEL: Record<WordFormTypeV3, string> = {
   superlative: "最高级"
 };
 
-const DIALECT_LABEL: Record<Dialect, string> = {
-  common: "英美通用",
-  uk: "英式",
-  us: "美式"
+const DIALECT_LABEL: Record<Dialect, LexiconEditorKey> = {
+  common: "presentation_dialect_label_common",
+  uk: "presentation_dialect_label_uk",
+  us: "presentation_dialect_label_us"
 };
 
-const PRONUNCIATION_STYLE_LABEL: Record<PronunciationStyle, string> = {
-  normal: "语流连读",
-  citation: "逐字正音",
-  strong: "强读",
-  weak: "弱读"
-};
+const PRONUNCIATION_STYLE_LABEL: Record<PronunciationStyle, LexiconEditorKey> =
+  {
+    normal: "presentation_pronunciation_style_label_normal",
+    citation: "presentation_pronunciation_style_label_citation",
+    strong: "presentation_pronunciation_style_label_strong",
+    weak: "presentation_pronunciation_style_label_weak"
+  };
 
 const PART_OF_SPEECH_LABEL: Record<string, string> = {
   noun: "名词",
@@ -65,29 +71,29 @@ const SUB_PART_OF_SPEECH_LABEL: Record<string, string> = {
   INT: "感叹词"
 };
 
-const RELATION_LABEL: Record<string, string> = {
-  synonym: "近义词",
-  antonym: "反义词",
-  derivative: "派生词",
-  derived: "派生词"
+const RELATION_LABEL: Record<string, LexiconEditorKey> = {
+  synonym: "presentation_relation_label_synonym",
+  antonym: "presentation_relation_label_antonym",
+  derivative: "presentation_relation_label_derivative",
+  derived: "presentation_relation_label_derived"
 };
 
-const IMPACT_LABEL: Record<FormsImpactNodeTypeV3, string> = {
-  pos: "词性",
-  form_group: "词形变化组",
-  membership: "词形使用位置",
-  form: "词形",
-  variant: "地区拼写",
-  pronunciation: "发音",
-  phrase_component_usage: "成分用词",
-  surface: "公开词面",
-  publication: "发布内容",
-  grammar_structure: "语法结构",
-  text_variant: "文本内容",
-  sense: "词义",
-  definition: "释义",
-  sentence: "例句",
-  relation: "词义关系"
+const IMPACT_LABEL: Record<FormsImpactNodeTypeV3, LexiconEditorKey> = {
+  pos: "presentation_impact_label_pos",
+  form_group: "presentation_impact_label_form_group",
+  membership: "presentation_impact_label_membership",
+  form: "presentation_impact_label_form",
+  variant: "presentation_impact_label_variant",
+  pronunciation: "presentation_impact_label_pronunciation",
+  phrase_component_usage: "presentation_impact_label_phrase_component_usage",
+  surface: "presentation_impact_label_surface",
+  publication: "presentation_impact_label_publication",
+  grammar_structure: "presentation_impact_label_grammar_structure",
+  text_variant: "presentation_impact_label_text_variant",
+  sense: "presentation_impact_label_sense",
+  definition: "presentation_impact_label_definition",
+  sentence: "presentation_impact_label_sentence",
+  relation: "presentation_impact_label_relation"
 };
 
 const languageNamesZh = new Intl.DisplayNames(["zh-CN"], {
@@ -123,12 +129,20 @@ export function formTypeLabel(value: WordFormTypeV3): string {
       : "未识别词形类型";
 }
 
-export function dialectLabel(value: Dialect): string {
-  return DIALECT_LABEL[value] ?? "未识别地区";
+export function dialectLabel(
+  value: Dialect,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
+  const key = DIALECT_LABEL[value];
+  return key ? t(key) : t("presentation_unknown_dialectLabel");
 }
 
-export function pronunciationStyleLabel(value: PronunciationStyle): string {
-  return PRONUNCIATION_STYLE_LABEL[value] ?? "未识别读法";
+export function pronunciationStyleLabel(
+  value: PronunciationStyle,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
+  const key = PRONUNCIATION_STYLE_LABEL[value];
+  return key ? t(key) : t("presentation_unknown_pronunciationStyleLabel");
 }
 
 export function partOfSpeechLabel(value: string): string {
@@ -139,25 +153,39 @@ export function subPartOfSpeechLabel(value: string): string {
   return SUB_PART_OF_SPEECH_LABEL[value] ?? "其他细分词性";
 }
 
-export function relationLabel(value: string): string {
-  return RELATION_LABEL[value] ?? "其他关系";
+export function relationLabel(
+  value: string,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
+  const key = RELATION_LABEL[value];
+  return key ? t(key) : t("presentation_unknown_relationLabel");
 }
 
-export function sentenceLinkRoleLabel(value: string): string {
-  if (value === "focus" || value === "head") return "主关联";
-  if (value === "context") return "上下文关联";
-  return "其他关联";
+export function sentenceLinkRoleLabel(
+  value: string,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
+  if (value === "focus" || value === "head")
+    return t("presentation_link_primary");
+  if (value === "context") return t("presentation_link_context");
+  return t("presentation_link_other");
 }
 
-const IMPACT_REASON_LABEL: Record<string, string> = {
-  node_removed_from_draft: "将从草稿移除",
-  downstream_node_removed_with_pos: "会随词性一起删除",
-  form_group_binding_cleared: "词义的专用组绑定将解除"
+const IMPACT_REASON_LABEL: Record<string, LexiconEditorKey> = {
+  node_removed_from_draft:
+    "presentation_impact_reason_label_node_removed_from_draft",
+  downstream_node_removed_with_pos:
+    "presentation_impact_reason_label_downstream_node_removed_with_pos",
+  form_group_binding_cleared:
+    "presentation_impact_reason_label_form_group_binding_cleared"
 };
 
-export function impactReasonLabel(value: string): string {
+export function impactReasonLabel(
+  value: string,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
   if (/[\u3400-\u9fff]/u.test(value)) return value;
-  return IMPACT_REASON_LABEL[value] ?? "关联内容将随本次调整受到影响。";
+  return t(IMPACT_REASON_LABEL[value] ?? "presentation_impact_other");
 }
 
 export type FormsImpactSummaryGroup = {
@@ -200,8 +228,12 @@ export function summarizeFormsImpact(
   });
 }
 
-export function impactTypeLabel(value: FormsImpactNodeTypeV3): string {
-  return IMPACT_LABEL[value] ?? "受影响内容";
+export function impactTypeLabel(
+  value: FormsImpactNodeTypeV3,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
+  const key = IMPACT_LABEL[value];
+  return key ? t(key) : t("presentation_unknown_impactTypeLabel");
 }
 
 export function definitionModeLabel(value: string): string {

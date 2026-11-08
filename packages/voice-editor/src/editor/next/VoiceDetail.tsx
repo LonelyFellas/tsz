@@ -1,3 +1,8 @@
+import {
+  useVoiceEditorTranslation,
+  useVoiceEditorMessageState,
+  createVoiceEditorMessage
+} from "../i18n";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Modal } from "@tsz/ui/admin/overlays";
 import { Select } from "@tsz/ui/admin/forms";
@@ -57,8 +62,9 @@ export function VoiceDetail({
   onCancel: () => void;
   stopExternalAudio: () => void;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const [draft, setDraft] = useState(() => structuredClone(setting));
-  const [error, setError] = useState("");
+  const [error, setError] = useVoiceEditorMessageState("");
   const [generating, setGenerating] = useState(false);
   const [parametersValid, setParametersValid] = useState(true);
   const generationId = useRef<{ key: string; id: string } | undefined>(
@@ -152,7 +158,11 @@ export function VoiceDetail({
       setDraft((value) => ({ ...value, audio_asset_id: asset.id }));
     } catch (cause) {
       if (!controller.signal.aborted)
-        setError(cause instanceof Error ? cause.message : "生成失败，请重试");
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : createVoiceEditorMessage("generation_failed_try_again")
+        );
     } finally {
       if (request.current === controller) setGenerating(false);
     }
@@ -176,7 +186,10 @@ export function VoiceDetail({
     <Modal
       className="tsz-ve-voice-detail"
       open
-      title={`修改${dialect === "en-GB" ? "英式" : "美式"}配音设置 · ${voice.displayName ?? voice.label}`}
+      title={t("edit_voice_settings", {
+        p0: dialect === "en-GB" ? t("british") : t("american"),
+        p1: voice.displayName ?? voice.label
+      })}
       width={1200}
       destroyOnHidden
       mask={{ closable: false }}
@@ -196,7 +209,7 @@ export function VoiceDetail({
               onCancel();
             }}
           >
-            取消
+            {t("cancel")}
           </Button>
           <Button
             type="primary"
@@ -208,13 +221,15 @@ export function VoiceDetail({
               onSave(draft);
             }}
           >
-            保存配音设置
+            {t("save_voice_settings")}
           </Button>
         </Space>
       }
     >
       <Typography.Paragraph type="secondary">
-        仅修改当前音色；保存配音设置后，请继续保存正文修改。
+        {t(
+          "only_this_voice_is_changed_after_saving_its_settings_save_the_text_changes"
+        )}
       </Typography.Paragraph>
       <VoiceConfigurationPanel
         parameters={
@@ -238,7 +253,7 @@ export function VoiceDetail({
           <div className="tsz-ve-detail-audition">
             <Space wrap className="tsz-ve-detail-actions">
               <Select
-                aria-label="当前音色输出格式"
+                aria-label={t("current_voice_output_format")}
                 value={draft.output_format ?? "mp3"}
                 disabled={readOnly || generating}
                 options={[
@@ -261,7 +276,9 @@ export function VoiceDetail({
                   preview.audition(voice, draft);
                 }}
               >
-                {draft.audio_asset_id ? "播放正式音频" : "试听当前音色"}
+                {draft.audio_asset_id
+                  ? t("play_final_audio")
+                  : t("audition_current_voice")}
               </Button>
               {adapter?.generateAudio && (
                 <Button
@@ -272,14 +289,16 @@ export function VoiceDetail({
                   loading={generating}
                   onClick={() => void generate()}
                 >
-                  生成正式音频
+                  {t("generate_final_audio")}
                 </Button>
               )}
             </Space>
             {!available && (
               <Alert
                 type="warning"
-                title="当前音色或正文读法不可用，请修复；原参数和标注已保留。"
+                title={t(
+                  "the_voice_or_text_reading_is_unavailable_resolve_it_to_continue_existing_pa"
+                )}
               />
             )}
             {(preview.status || error) && (
@@ -297,7 +316,7 @@ export function VoiceDetail({
                   preview.audition(voice, item);
                 }}
               >
-                播放旧音频 · {item.version_name ?? item.voice_id}
+                {t("play_previous_audio")} {item.version_name ?? item.voice_id}
               </Button>
             ))}
             {preview.media && (

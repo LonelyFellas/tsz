@@ -29,6 +29,13 @@ it("按模块加载的资源保持键、插值及复数形式完整", () => {
   ];
   for (const resources of modules) {
     const base = Object.values(resources["zh-Hans"]!)[0]!;
+    const english = Object.values(resources.en!)[0]!;
+    for (const key of Object.keys(english).filter(
+      (key) => key.endsWith("_other") && english[key]!.includes("{{count}}")
+    )) {
+      expect(english[key.replace(/_other$/, "_one")], key).toBeTruthy();
+    }
+
     for (const bundles of Object.values(resources)) {
       const messages = Object.values(bundles)[0]!;
       expect(Object.keys(messages).sort()).toEqual(Object.keys(base).sort());

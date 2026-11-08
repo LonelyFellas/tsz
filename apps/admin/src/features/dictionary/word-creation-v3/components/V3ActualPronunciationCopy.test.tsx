@@ -1,3 +1,4 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { App } from "@tsz/ui/admin/overlays";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
@@ -162,4 +163,31 @@ it.each([
     />
   );
   expect(screen.queryByLabelText("撤销实际发音填入")).not.toBeInTheDocument();
+});
+
+it("英文界面显示本地转换校验，拒绝输入时不改原发音", async () => {
+  const onChange = vi.fn();
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <App>
+        <V3ActualPronunciationCopy
+          pronunciation={{ ...pronunciation, dict_phonetic: "x\u0000" }}
+          spelling="family"
+          dialect="uk"
+          onChange={onChange}
+        />
+      </App>
+    </InterfaceI18nProvider>
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Fill actual pronunciation from dictionary transcription"
+    })
+  );
+  expect(
+    await screen.findByText(
+      "Dictionary transcriptions cannot contain control characters"
+    )
+  ).toBeVisible();
+  expect(onChange).not.toHaveBeenCalled();
 });

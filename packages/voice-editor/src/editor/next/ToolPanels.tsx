@@ -1,4 +1,11 @@
 import {
+  useVoiceEditorTranslation,
+  defaultVoiceEditorTranslation,
+  type VoiceEditorTranslation,
+  useVoiceEditorMessageState,
+  createVoiceEditorMessage
+} from "../i18n";
+import {
   speechAccentGroup,
   speechLocaleMatchesScope,
   speechRegionLabel
@@ -32,16 +39,18 @@ import type {
 } from "../../types";
 import {
   AUDIO_UPLOAD_ACCEPT,
-  AUDIO_UPLOAD_HINT,
+  audioUploadHint,
+  audioFormatHint,
+  audioSizeHint,
   progressPercent,
   type PendingUpload
 } from "./audioAssets";
 import {
-  GRAMMAR_ROLES,
+  grammarRoleDefinitions,
   RATE_PRESETS,
   RATE_MULTIPLIER_MIN,
   RATE_MULTIPLIER_MAX,
-  VOICE_GENDERS,
+  voiceGenderLabels,
   VOICE_LOCALES,
   voiceShortName
 } from "./roles";
@@ -150,6 +159,7 @@ export function VoicePanel({
   onAudition,
   auditionStatus
 }: VoicePanelProps) {
+  const { t } = useVoiceEditorTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
   const common = voices.filter((voice) => voice.isCommon !== false);
   const uncommon = voices.filter((voice) => voice.isCommon === false);
@@ -160,9 +170,9 @@ export function VoicePanel({
   const renderGroups = (items: VoiceOption[]) =>
     (
       [
-        { key: "uk", badge: "BrE", label: "英式发音" },
-        { key: "us", badge: "AmE", label: "美式发音" },
-        { key: "other", badge: "Other", label: "其他音色" }
+        { key: "uk", badge: "BrE", label: t("british_pronunciation") },
+        { key: "us", badge: "AmE", label: t("american_pronunciation") },
+        { key: "other", badge: "Other", label: t("other_voices") }
       ] as const
     ).map(({ key, badge, label: groupLabel }) => {
       const group = items.filter(
@@ -182,9 +192,9 @@ export function VoicePanel({
         >
           <div className="tsz-ve-voice-columns">
             {[
-              ...VOICE_GENDERS,
+              ...voiceGenderLabels(t),
               ...(group.some((voice) => voice.gender === "neutral")
-                ? [{ gender: "neutral" as const, label: "其他" }]
+                ? [{ gender: "neutral" as const, label: t("other") }]
                 : [])
             ].map(({ gender, label }) => (
               <div
@@ -218,10 +228,10 @@ export function VoicePanel({
                             <span> · {speechRegionLabel(voice.locale)}</span>
                           </>
                         }
-                        ariaLabel={`启用 ${voice.label}`}
+                        ariaLabel={t("enable", { p0: voice.label })}
                         meta={
                           voice.supportsVolume === false
-                            ? "仅自然朗读"
+                            ? t("natural_reading_only")
                             : undefined
                         }
                         disabled={readOnly}
@@ -240,7 +250,7 @@ export function VoicePanel({
                             )}
                             {onParametersChange && (
                               <details>
-                                <summary>更多参数</summary>
+                                <summary>{t("more_parameters")}</summary>
                                 <Space direction="vertical">
                                   {voice.supportsVolume === false &&
                                     ((setting?.volume_percent ?? 100) !== 100 ||
@@ -259,13 +269,17 @@ export function VoicePanel({
                                           })
                                         }
                                       >
-                                        恢复该模型默认参数
+                                        {t(
+                                          "restore_this_model_s_default_parameters"
+                                        )}
                                       </Button>
                                     )}
                                   <label>
-                                    音量
+                                    {t("volume")}
                                     <InputNumber
-                                      aria-label={`${voice.label} 音量`}
+                                      aria-label={t("volume_2", {
+                                        p0: voice.label
+                                      })}
                                       value={setting?.volume_percent ?? 100}
                                       min={0}
                                       max={100}
@@ -284,12 +298,12 @@ export function VoicePanel({
                                     />
                                   </label>
                                   <Select
-                                    aria-label={`${voice.label} 风格`}
+                                    aria-label={t("style", { p0: voice.label })}
                                     value={setting?.style ?? ""}
                                     style={{ minWidth: 120 }}
                                     disabled={readOnly}
                                     options={[
-                                      { value: "", label: "自然" },
+                                      { value: "", label: t("natural") },
                                       ...voice.styles.map((style) => ({
                                         value: style,
                                         label: style
@@ -302,9 +316,11 @@ export function VoicePanel({
                                     }
                                   />
                                   <label>
-                                    音调（半音）
+                                    {t("pitch_semitones")}
                                     <InputNumber
-                                      aria-label={`${voice.label} 音调`}
+                                      aria-label={t("pitch", {
+                                        p0: voice.label
+                                      })}
                                       value={setting?.pitch_semitones ?? 0}
                                       min={voice.pitchRange?.min ?? -12}
                                       max={voice.pitchRange?.max ?? 12}
@@ -342,7 +358,7 @@ export function VoicePanel({
                                       : "#8c8c8c"
                               }}
                               className="tsz-ve-audition-button"
-                              aria-label={`试听 ${voice.label}`}
+                              aria-label={t("audition_2", { p0: voice.label })}
                               loading={pendingVoiceId === voice.id}
                               icon={<Volume2Icon />}
                               aria-busy={pendingVoiceId === voice.id}
@@ -360,7 +376,10 @@ export function VoicePanel({
                                 auditionLocale &&
                                 voice.locale.toLowerCase() !==
                                   auditionLocale.toLowerCase()
-                                  ? `当前音素为 ${auditionLocale}，不能使用另一口音试听；可取消该历史音色`
+                                  ? t(
+                                      "current_phonemes_use_and_cannot_be_auditioned_with_another_accent_you_can_d",
+                                      { p0: auditionLocale }
+                                    )
                                   : undefined
                               }
                               data-playing={playingVoiceId === voice.id}
@@ -378,7 +397,7 @@ export function VoicePanel({
       );
     });
   return (
-    <div className="tsz-ve-pop tsz-ve-pop-voices" aria-label="音色清单">
+    <div className="tsz-ve-pop tsz-ve-pop-voices" aria-label={t("voice_list")}>
       {voices.find((voice) => voice.personalSettingsError)
         ?.personalSettingsError && (
         <div className="tsz-ve-pop-status" role="status">
@@ -390,7 +409,7 @@ export function VoicePanel({
       )}
       {voicesLoading ? (
         <div className="tsz-ve-pop-loading">
-          <Spin size="small" aria-label="正在加载音色" />
+          <Spin size="small" aria-label={t("loading_voices")} />
         </div>
       ) : (
         <>
@@ -402,14 +421,17 @@ export function VoicePanel({
             )
             .map((setting) => (
               <div key={voiceSettingKey(setting)} className="tsz-ve-pop-status">
-                {setting.voice_id}（音色已失效，口音未知）
+                {setting.voice_id}
+                {t("voice_unavailable_accent_unknown")}
                 <Button
                   size="small"
                   disabled={readOnly}
-                  aria-label={`取消启用失效音色 ${setting.voice_id}`}
+                  aria-label={t("disable_unavailable_voice_3", {
+                    p0: setting.voice_id
+                  })}
                   onClick={() => onToggleVoice(setting.voice_id)}
                 >
-                  取消启用
+                  {t("disable")}
                 </Button>
               </div>
             ))}
@@ -422,8 +444,11 @@ export function VoicePanel({
                   setMoreOpen((open) => !open);
                 }}
               >
-                更多音色（{uncommon.length}）
-                {selectedUncommon > 0 ? ` · 已选 ${selectedUncommon}` : ""}
+                {t("more_voices")}
+                {uncommon.length}）
+                {selectedUncommon > 0
+                  ? t("selected_4", { p0: selectedUncommon })
+                  : ""}
               </summary>
               <div className="tsz-ve-more-voice-groups">
                 {renderGroups(uncommon)}
@@ -453,9 +478,10 @@ function VoiceRateControl({
   readOnly?: boolean;
   onChange: (ratePercent: number) => void;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const [open, setOpen] = useState(false);
   const [customRate, setCustomRate] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useVoiceEditorMessageState("");
   const allowed = (percent: number) =>
     !voice.rateRange ||
     (voice.rateRange.min <= percent && percent <= voice.rateRange.max);
@@ -470,7 +496,7 @@ function VoiceRateControl({
       open={open}
       onDismiss={() => setOpen(false)}
       content={
-        <div role="group" aria-label={`${voice.label} 语速设置`}>
+        <div role="group" aria-label={t("rate_settings", { p0: voice.label })}>
           <RatePanel
             readOnly={readOnly}
             ratePercent={ratePercent}
@@ -488,7 +514,11 @@ function VoiceRateControl({
                 multiplier > RATE_MULTIPLIER_MAX ||
                 !allowed(percent)
               ) {
-                setError("请输入该音色支持的语速，范围为 0.30×–1.70×");
+                setError(
+                  createVoiceEditorMessage(
+                    "enter_a_supported_rate_between_0_30_and_1_70"
+                  )
+                );
                 return;
               }
               apply(percent);
@@ -508,7 +538,7 @@ function VoiceRateControl({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         disabled={readOnly || !voice.supportsRate}
-        aria-label={`设置 ${voice.label} 的语速`}
+        aria-label={t("set_rate", { p0: voice.label })}
       >
         {(1 + ratePercent / 100).toFixed(2)}×
       </Button>
@@ -536,27 +566,31 @@ export function RatePanel({
   onCustomRateChange,
   onCustomRateSubmit
 }: RatePanelProps) {
+  const { t } = useVoiceEditorTranslation();
   return (
-    <div className="tsz-ve-pop tsz-ve-pop-rate" aria-label="语速微调">
+    <div
+      className="tsz-ve-pop tsz-ve-pop-rate"
+      aria-label={t("fine_tune_rate")}
+    >
       {RATE_PRESETS.map(({ multiplier, percent }) => (
         <PopRow
           key={multiplier}
           selected={ratePercent === percent}
           label={`${multiplier.toFixed(2)} ×`}
-          meta={percent === 0 ? "原速" : undefined}
-          ariaLabel={`语速 ${multiplier.toFixed(2)} 倍`}
+          meta={percent === 0 ? t("original_rate") : undefined}
+          ariaLabel={t("rate_2", { p0: multiplier.toFixed(2) })}
           disabled={readOnly || !isRateAllowed(percent)}
           onToggle={() => onRate(percent)}
         />
       ))}
       <div className="tsz-ve-pop-divider" aria-hidden />
       <div className="tsz-ve-pop-foot">
-        <Typography.Text type="secondary">自定义</Typography.Text>
+        <Typography.Text type="secondary">{t("custom")}</Typography.Text>
         <Input
           size="small"
           className="tsz-ve-custom-input"
-          aria-label="自定义语速倍数"
-          placeholder="例如 1.10，回车生效"
+          aria-label={t("custom_rate_multiplier")}
+          placeholder={t("e_g_1_10_press_enter_to_apply")}
           value={customRate}
           disabled={readOnly}
           onChange={(event) => onCustomRateChange(event.target.value)}
@@ -611,8 +645,8 @@ export interface UploadPanelProps {
 
 const localeBadge = (locale: string) =>
   VOICE_LOCALES.find((item) => item.locale === locale)?.badge ?? locale;
-const genderLabel = (gender: string) =>
-  VOICE_GENDERS.find((item) => item.gender === gender)?.label ?? gender;
+const genderLabel = (gender: string, t: VoiceEditorTranslation) =>
+  voiceGenderLabels(t).find((item) => item.gender === gender)?.label ?? gender;
 
 /**
  * 音频：先定归属再选文件；上面是还在路上的（进度 / 失败可重试），下面是已保存的（试听 / 移除）。
@@ -637,12 +671,13 @@ export function UploadPanel({
   playingAssetId,
   playbackMessage
 }: UploadPanelProps) {
+  const { t } = useVoiceEditorTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inFlight = pending.filter((item) => !item.error).length;
   const used = assets.length + inFlight;
   const canAdd = available && uploadAllowed && !readOnly && used < limit;
   return (
-    <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label="音频">
+    <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label={t("audio")}>
       {/*
        * 原生 file input 藏起来、只用它的能力：默认控件是英文且无法定制，
        * 更要命的是我们每次添加后会清空 value（好让同名文件能再传一次），
@@ -653,7 +688,7 @@ export function UploadPanel({
         type="file"
         accept={AUDIO_UPLOAD_ACCEPT}
         multiple
-        aria-label="上传音频"
+        aria-label={t("upload_audio")}
         style={{ display: "none" }}
         disabled={!canAdd}
         onChange={(event) => {
@@ -667,11 +702,11 @@ export function UploadPanel({
        * 顺序本身说明了它只作用于接下来添加的那批，不必再写一句解释。
        */}
       <div className="tsz-ve-pop-field">
-        <Typography.Text type="secondary">归属</Typography.Text>
+        <Typography.Text type="secondary">{t("ownership")}</Typography.Text>
         <Radio.Group
           size="small"
           optionType="button"
-          aria-label="上传音频语种"
+          aria-label={t("upload_audio_language")}
           value={upload.locale}
           disabled={readOnly || !available || !uploadAllowed}
           onChange={(event) => onUploadChange({ locale: event.target.value })}
@@ -685,11 +720,11 @@ export function UploadPanel({
         <Radio.Group
           size="small"
           optionType="button"
-          aria-label="上传音频性别"
+          aria-label={t("upload_audio_gender")}
           value={upload.gender}
           disabled={readOnly || !available || !uploadAllowed}
           onChange={(event) => onUploadChange({ gender: event.target.value })}
-          options={VOICE_GENDERS.map(({ gender, label }) => ({
+          options={voiceGenderLabels(t).map(({ gender, label }) => ({
             value: gender,
             label
           }))}
@@ -702,7 +737,7 @@ export function UploadPanel({
         disabled={!canAdd}
         onClick={() => fileInputRef.current?.click()}
       >
-        选择音频文件
+        {t("select_audio_files")}
       </Button>
       <Typography.Text
         type="secondary"
@@ -710,9 +745,13 @@ export function UploadPanel({
         role={available && uploadAllowed ? undefined : "note"}
       >
         {!uploadAllowed
-          ? "没有上传音频的权限"
+          ? t("audio_upload_permission_is_required")
           : available
-            ? `${AUDIO_UPLOAD_HINT}，最多 ${limit} 条（已用 ${used}）`
+            ? t("up_to_items_used", {
+                p0: audioUploadHint(t),
+                p1: limit,
+                p2: used
+              })
             : unavailableReason}
       </Typography.Text>
       {playbackMessage && (
@@ -728,7 +767,7 @@ export function UploadPanel({
       {(pending.length > 0 || assets.length > 0) && (
         <>
           <div className="tsz-ve-pop-divider" aria-hidden />
-          <ul className="tsz-ve-upload-list" aria-label="已上传音频">
+          <ul className="tsz-ve-upload-list" aria-label={t("uploaded_audio")}>
             {pending.map((item) => (
               <li
                 key={item.id}
@@ -741,7 +780,15 @@ export function UploadPanel({
                 </span>
                 {item.error ? (
                   <span className="tsz-ve-upload-error" role="alert">
-                    {item.error.message}
+                    {item.error.code === "unsupported_type"
+                      ? audioFormatHint(t)
+                      : item.error.code === "too_large"
+                        ? audioSizeHint(t)
+                        : item.error.code === "too_many"
+                          ? t("at_most_audio_items_allowed", { p0: limit })
+                          : item.error.code === "permission_denied"
+                            ? t("you_do_not_have_permission_to_upload_audio")
+                            : item.error.message}
                   </span>
                 ) : (
                   <Progress
@@ -749,7 +796,7 @@ export function UploadPanel({
                     percent={progressPercent(item.progress)}
                     size="small"
                     showInfo={false}
-                    aria-label={`上传进度 ${item.name}`}
+                    aria-label={t("upload_progress_for", { p0: item.name })}
                   />
                 )}
                 <span className="tsz-ve-upload-actions">
@@ -757,22 +804,22 @@ export function UploadPanel({
                     <Button
                       size="small"
                       type="text"
-                      aria-label={`重试 ${item.name}`}
+                      aria-label={t("retry", { p0: item.name })}
                       disabled={!available || readOnly || !uploadAllowed}
                       onClick={() => onRetryUpload(item.id)}
                     >
-                      重试
+                      {t("try_again")}
                     </Button>
                   )}
                   <Button
                     size="small"
                     type="text"
                     className="tsz-ve-upload-remove"
-                    aria-label={`移除 ${item.name}`}
+                    aria-label={t("remove", { p0: item.name })}
                     disabled={readOnly}
                     onClick={() => onDismissUpload(item.id)}
                   >
-                    移除
+                    {t("remove_2")}
                   </Button>
                 </span>
               </li>
@@ -783,7 +830,7 @@ export function UploadPanel({
                   size="small"
                   type="text"
                   className="tsz-ve-audition-button"
-                  aria-label={`试听 ${asset.original_name}`}
+                  aria-label={t("audition_3", { p0: asset.original_name })}
                   data-playing={playingAssetId === asset.id}
                   disabled={!available}
                   onClick={() => onPlayAsset(asset)}
@@ -797,14 +844,14 @@ export function UploadPanel({
                   {asset.original_name}
                 </span>
                 <span className="tsz-ve-upload-tag">
-                  {localeBadge(asset.locale)} · {genderLabel(asset.gender)}
+                  {localeBadge(asset.locale)} · {genderLabel(asset.gender, t)}
                 </span>
                 {/* 移除只是从草稿里去掉引用、保存后才生效，但不进撤销栈，所以要确认一下 */}
                 <Popconfirm
-                  title="移除这条音频？"
-                  description="保存草稿后生效"
-                  okText="移除"
-                  cancelText="取消"
+                  title={t("remove_this_audio")}
+                  description={t("applies_after_saving_the_draft")}
+                  okText={t("remove_2")}
+                  cancelText={t("cancel")}
                   okButtonProps={{ danger: true }}
                   disabled={readOnly}
                   onConfirm={() => onRemoveAsset(asset)}
@@ -813,10 +860,10 @@ export function UploadPanel({
                     size="small"
                     type="text"
                     className="tsz-ve-upload-remove"
-                    aria-label={`移除 ${asset.original_name}`}
+                    aria-label={t("remove_3", { p0: asset.original_name })}
                     disabled={readOnly}
                   >
-                    移除
+                    {t("remove_2")}
                   </Button>
                 </Popconfirm>
               </li>
@@ -864,17 +911,25 @@ export interface RolePanelProps {
   selectedLevel?: string;
 }
 
-const ROLE_DESCRIPTIONS: Record<string, string> = {
-  function: "可以替换成其他内容的部分",
-  core: "句型中保持不变的部分",
-  grammar: "例如 n.、adj. 等词性提示"
-};
+function roleDescriptions(
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): Record<string, string> {
+  return {
+    function: t("a_part_that_can_be_replaced_with_other_content"),
+    core: t("a_part_that_stays_fixed_in_the_pattern"),
+    grammar: t("part_of_speech_hints_such_as_n_or_adj")
+  };
+}
 
-const ROLE_SHORT_LABELS: Record<string, string> = {
-  function: "可替换搭配",
-  core: "固定核心词",
-  grammar: "词性提示符"
-};
+function roleShortLabels(
+  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
+): Record<string, string> {
+  return {
+    function: t("replaceable_slot"),
+    core: t("fixed_core"),
+    grammar: t("part_of_speech_indicator")
+  };
+}
 
 /** 先选文字再设置语法分类。 */
 export function RolePanel({
@@ -884,23 +939,28 @@ export function RolePanel({
   selectionText,
   selectedLevel
 }: RolePanelProps) {
+  const { t } = useVoiceEditorTranslation();
   return (
     <div
       className="tsz-ve-grammar-panel"
-      aria-label="语法结构标注"
+      aria-label={t("grammar_structure_annotation")}
       onMouseDown={(event) => event.preventDefault()}
     >
-      <Space.Compact role="group" aria-label="语法标注类别" size="small">
-        {GRAMMAR_ROLES.map((role) => (
+      <Space.Compact
+        role="group"
+        aria-label={t("grammar_annotation_category")}
+        size="small"
+      >
+        {Object.values(grammarRoleDefinitions(t)).map((role) => (
           <Tooltip
             key={role.level}
-            title={`${role.label}：${ROLE_DESCRIPTIONS[role.level]}`}
+            title={`${role.label}：${roleDescriptions(t)[role.level]}`}
           >
             <Button
               className="tsz-ve-grammar-option"
               color={selectedLevel === role.level ? "primary" : "default"}
               variant={selectedLevel === role.level ? "filled" : "outlined"}
-              aria-label={`标记为${role.label}`}
+              aria-label={t("mark_as", { p0: role.label })}
               aria-pressed={selectedLevel === role.level}
               disabled={readOnly || !hasWords || selectionText === undefined}
               onClick={() => onBrushChange({ kind: "role", level: role.level })}
@@ -909,7 +969,7 @@ export function RolePanel({
                 className={`tsz-ve-pop-swatch is-${role.level}`}
                 aria-hidden
               />
-              {ROLE_SHORT_LABELS[role.level]}
+              {roleShortLabels(t)[role.level]}
             </Button>
           </Tooltip>
         ))}
@@ -919,18 +979,21 @@ export function RolePanel({
         role="status"
         title={
           selectionText !== undefined
-            ? `已选中「${selectionText}」`
-            : "拖选文字或双击选词，再设置类别；选中已有标注可修改类别"
+            ? t("selected_5", { p0: selectionText })
+            : t(
+                "drag_to_select_text_or_double_click_a_word_then_set_a_category_select_an_ex"
+              )
         }
       >
         {selectionText !== undefined ? (
           <>
-            已选中 <strong title={selectionText}>「{selectionText}」</strong>
+            {t("selected_3")}{" "}
+            <strong title={selectionText}>「{selectionText}」</strong>
           </>
         ) : hasWords ? (
-          <>拖选文字或双击选词</>
+          <>{t("drag_to_select_text_or_double_click_a_word")}</>
         ) : (
-          <>先输入句型或短语，再选中文字标注</>
+          <>{t("enter_a_pattern_or_phrase_then_select_text_to_annotate")}</>
         )}
       </div>
     </div>
@@ -967,6 +1030,7 @@ export function PausePanel({
   onCustomPauseChange,
   onCustomPauseSubmit
 }: PausePanelProps) {
+  const { t } = useVoiceEditorTranslation();
   const continuous = brush.kind === "pause";
   const current = continuous ? brush.durationMs : duration;
   const choices = [250, 500, 750, 1000, 2000, 3000];
@@ -979,27 +1043,27 @@ export function PausePanel({
     onCustomPauseSubmit(valid ? String(Math.round(Number(raw) * 1000)) : "");
   };
   return (
-    <div className="tsz-ve-pause-editor" aria-label="停顿设置">
+    <div className="tsz-ve-pause-editor" aria-label={t("pause_settings")}>
       <div className="tsz-ve-pause-editor-head">
         <strong>
           {continuous
-            ? "连续添加停顿"
+            ? t("add_multiple_pauses")
             : duration !== undefined
-              ? "编辑停顿"
-              : "插入停顿"}
+              ? t("edit_pause")
+              : t("insert_pause")}
         </strong>
         <Button
           size="small"
           type="text"
-          aria-label="关闭停顿设置"
+          aria-label={t("close_pause_settings")}
           onClick={onClose}
         >
-          关闭
+          {t("close")}
         </Button>
       </div>
       <div className="tsz-ve-pause-location" role="status">
         {continuous ? (
-          "选择时长后，依次点击词间空隙；Esc 退出"
+          t("choose_a_duration_then_click_word_gaps_esc_to_exit")
         ) : location ? (
           <>
             <b>{location.before}</b>
@@ -1007,9 +1071,11 @@ export function PausePanel({
             <b>{location.after}</b>
           </>
         ) : active ? (
-          "选择停顿时长后，点击词间的灰色插入位"
+          t(
+            "choose_a_pause_duration_then_click_a_grey_insertion_point_between_words"
+          )
         ) : (
-          "先选中“停顿”，再选择时长并点击词间插入位"
+          t("select_pause_choose_a_duration_and_click_a_word_gap")
         )}
       </div>
       <div className="tsz-ve-pause-presets">
@@ -1020,19 +1086,19 @@ export function PausePanel({
             disabled={disabled}
             color={current === ms ? "primary" : "default"}
             variant={current === ms ? "filled" : "outlined"}
-            aria-label={`停顿 ${ms / 1000} 秒`}
+            aria-label={t("pause_duration_seconds", { count: ms / 1000 })}
             aria-pressed={current === ms}
             onClick={() => onApply(ms)}
           >
-            {ms / 1000} 秒
+            {t("seconds_value", { count: ms / 1000 })}
           </Button>
         ))}
       </div>
       <div className="tsz-ve-pause-custom">
         <Input
           size="small"
-          aria-label="自定义停顿秒"
-          placeholder={current ? `${current / 1000}` : "自定义秒数"}
+          aria-label={t("custom_pause_in_seconds")}
+          placeholder={current ? `${current / 1000}` : t("custom_seconds")}
           value={customPause}
           disabled={disabled}
           onChange={(e) => onCustomPauseChange(e.target.value)}
@@ -1040,13 +1106,13 @@ export function PausePanel({
             if (e.key === "Enter") submit();
           }}
         />
-        <span className="tsz-ve-pause-unit">秒</span>
+        <span className="tsz-ve-pause-unit">{t("seconds")}</span>
         <Button
           size="small"
           disabled={disabled || !customPause.trim()}
           onClick={submit}
         >
-          应用
+          {t("apply")}
         </Button>
       </div>
       {!continuous && duration !== undefined && (
@@ -1058,7 +1124,7 @@ export function PausePanel({
             disabled={readOnly}
             onClick={onRemove}
           >
-            移除停顿
+            {t("remove_pause")}
           </Button>
         </div>
       )}
@@ -1080,6 +1146,7 @@ export function VoiceParameters({
   onChange: (patch: Partial<VoiceSetting>) => void;
   onValidationChange?: (valid: boolean) => void;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const [form] = Form.useForm<VoiceParameterValues>();
   const parameterVoice: ParameterVoice = {
     capabilities: {
@@ -1189,12 +1256,12 @@ export function VoiceParameters({
           max: parameterVoice.capabilities.max_rate_percent
         }}
         labels={{
-          rate: "当前音色语速",
-          volume: "当前音色音量",
-          pitch: "当前音色音调",
-          style: "当前音色风格",
-          degree: "当前音色风格强度",
-          role: "当前音色角色"
+          rate: t("current_voice_rate"),
+          volume: t("current_voice_volume"),
+          pitch: t("current_voice_pitch"),
+          style: t("current_voice_style"),
+          degree: t("current_voice_style_intensity"),
+          role: t("current_voice_role")
         }}
         onReset={() => {
           form.setFieldsValue(defaults);

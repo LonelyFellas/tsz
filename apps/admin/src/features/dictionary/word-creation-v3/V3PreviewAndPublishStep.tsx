@@ -1,9 +1,12 @@
-import { useAuthStore } from "@/lib/auth";
 import {
-  canPublishEntry,
-  canCheckEntry,
-  ENTRY_PUBLISH_BLOCKED_HINT
-} from "../entryWritePermission";
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage,
+  useLexiconEditorTranslation,
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
+import { useAuthStore } from "@/lib/auth";
+import { canPublishEntry, canCheckEntry } from "../entryWritePermission";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import type {
@@ -127,22 +130,40 @@ function terminalPage(
   };
 }
 
-function requestErrorMessage(error: unknown): string {
+function requestErrorMessage(error: unknown) {
   const problem = classifyV3Problem(error, "publish");
   if (problem.kind === "network") {
-    return "网络异常，发布结果尚未确认，可原样重试确认。";
+    return createLexiconEditorMessage(
+      "panel_network_error_publication_is_unconfirmed_retry_the_same_request_to_check"
+    );
   }
-  if (problem.kind === "authentication") return "登录已失效，请重新登录。";
-  if (problem.kind === "authorization") return "当前账号没有发布权限。";
+  if (problem.kind === "authentication")
+    return createLexiconEditorMessage(
+      "panel_your_session_has_expired_sign_in_again"
+    );
+  if (problem.kind === "authorization")
+    return createLexiconEditorMessage(
+      "panel_your_account_does_not_have_permission_to_publish"
+    );
   if (problem.kind === "service_unavailable") {
-    return "发布结果尚未确认，请刷新查看结果或原样重试确认。";
+    return createLexiconEditorMessage(
+      "panel_publication_is_unconfirmed_refresh_or_retry_the_same_request_to_check"
+    );
   }
-  if (problem.kind === "validation") return "发布校验未通过。";
-  return "发布失败，请检查当前内容后重试。";
+  if (problem.kind === "validation")
+    return createLexiconEditorMessage("panel_publication_validation_failed");
+  return createLexiconEditorMessage(
+    "panel_publication_failed_check_the_content_and_try_again"
+  );
 }
 
-function publicationUnavailableMessage(word: AdminWordV3): string | undefined {
-  return word.status === "archived" ? "垃圾桶中的词条不能发布。" : undefined;
+function publicationUnavailableMessage(
+  word: AdminWordV3,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string | undefined {
+  return word.status === "archived"
+    ? t("panel_entries_in_the_bin_cannot_be_published")
+    : undefined;
 }
 
 function V3WordPreview({
@@ -168,6 +189,7 @@ function ImpactDescription({
   impact: FormsImpactResponseV3;
   summary: string;
 }) {
+  const { t } = useLexiconEditorTranslation();
   return (
     <Space orientation="vertical" size={4} style={{ width: "100%" }}>
       <Typography.Text>{summary}</Typography.Text>
@@ -180,9 +202,9 @@ function ImpactDescription({
               data-testid={`impact-item-${item.node_type}-${item.node_id}`}
             >
               <Space wrap size={4}>
-                <Tag>{impactTypeLabel(item.node_type)}</Tag>
+                <Tag>{impactTypeLabel(item.node_type, t)}</Tag>
                 <Typography.Text>
-                  {impactReasonLabel(item.reason)}
+                  {impactReasonLabel(item.reason, t)}
                 </Typography.Text>
               </Space>
             </li>
@@ -202,25 +224,32 @@ function ValidationIssueSummary({
   issues: readonly V3DraftValidationIssue[];
   onNavigate?: (issue: V3DraftValidationIssue) => Promise<void>;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const formTypeLabel = useFormTypeLabel();
   const posLabel = usePartOfSpeechLabel();
   const summary = buildV3PublicationIssueSummary(
     word,
     issues,
     formTypeLabel,
-    posLabel
+    posLabel,
+    t
   );
   return (
-    <section aria-label="发布待完成摘要" className="v3-validation-summary">
+    <section
+      aria-label={t("panel_publication_checklist")}
+      className="v3-validation-summary"
+    >
       <div className="v3-validation-summary__overview">
         <Typography.Text type="danger" strong>
-          仍有未完成的内容
+          {t("panel_content_still_needs_completing")}
         </Typography.Text>
         <Typography.Title level={3}>
-          还有 {summary.total} 项待完成
+          {t("summary_remaining", { count: summary.total })}
         </Typography.Title>
         <Typography.Text type="secondary">
-          发布条件保持不变。请先处理下列内容，再重新检查。
+          {t(
+            "panel_publication_requirements_are_unchanged_complete_the_following_then_check_ag"
+          )}
         </Typography.Text>
       </div>
 
@@ -228,10 +257,14 @@ function ValidationIssueSummary({
         {summary.positions.map((position) => {
           const stepCounts = [
             position.by_step.forms > 0
-              ? `词形与发音 ${position.by_step.forms}`
+              ? t("panel_forms_and_pronunciation", {
+                  p0: position.by_step.forms
+                })
               : undefined,
             position.by_step.meanings > 0
-              ? `词义与例句 ${position.by_step.meanings}`
+              ? t("panel_meanings_and_examples", {
+                  p0: position.by_step.meanings
+                })
               : undefined
           ].filter(Boolean);
           return (
@@ -243,7 +276,9 @@ function ValidationIssueSummary({
               <div>
                 <Typography.Text strong>{position.label}</Typography.Text>
                 <Typography.Text type="secondary">
-                  {position.issues.length} 项待完成
+                  {t("summary_position_remaining", {
+                    count: position.issues.length
+                  })}
                 </Typography.Text>
                 {stepCounts.length > 0 ? (
                   <Typography.Text type="secondary">
@@ -253,12 +288,14 @@ function ValidationIssueSummary({
               </div>
               {onNavigate ? (
                 <Button
-                  aria-label={`填写${position.label}未完成项`}
+                  aria-label={t("panel_complete_missing_fields_for", {
+                    p0: position.label
+                  })}
                   size="small"
                   type="link"
                   onClick={() => void onNavigate(position.issues[0]!)}
                 >
-                  去填写
+                  {t("panel_complete_fields")}
                 </Button>
               ) : null}
             </div>
@@ -267,12 +304,14 @@ function ValidationIssueSummary({
       </div>
 
       <div className="v3-validation-summary__types">
-        <Typography.Text strong>问题分布</Typography.Text>
+        <Typography.Text strong>{t("panel_issues_by_type")}</Typography.Text>
         {summary.types.map((type) => (
           <div className="v3-validation-summary__type" key={type.code}>
             <div className="v3-validation-summary__type-copy">
               <Space size={6} wrap>
-                <Tag color="error">{type.count} 项</Tag>
+                <Tag color="error">
+                  {t("summary_items_count", { count: type.count })}
+                </Tag>
                 <Typography.Text>{type.label}</Typography.Text>
               </Space>
               <Typography.Text type="secondary">
@@ -281,12 +320,12 @@ function ValidationIssueSummary({
             </div>
             {onNavigate ? (
               <Button
-                aria-label={`填写${type.label}问题`}
+                aria-label={t("panel_resolve_issues", { p0: type.label })}
                 size="small"
                 type="link"
                 onClick={() => void onNavigate(type.issues[0]!)}
               >
-                去填写
+                {t("panel_complete_fields")}
               </Button>
             ) : null}
           </div>
@@ -303,6 +342,7 @@ function ControlledV3PreviewAndPublishStep({
   word: AdminWordV3;
   controller: V3PreviewPublishController;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const { audioReady, onAudioReady } = useAudioReviewReadiness(word);
   const publishLock = useRef(false);
   const impactPage = controller.impact?.surface_match_page;
@@ -329,8 +369,10 @@ function ControlledV3PreviewAndPublishStep({
   const canPrepare = canCheckEntry(profile);
   const allowedToPublish = canPublishEntry(profile, word);
   const unavailableMessage =
-    publicationUnavailableMessage(word) ??
-    (!canPrepare ? "未开通词条检查权限" : undefined);
+    publicationUnavailableMessage(word, t) ??
+    (!canPrepare
+      ? t("panel_entry_checking_permission_is_required")
+      : undefined);
   const requiresImpactConfirmation = Boolean(
     controller.impact && (controller.impact.requires_confirmation || impactPage)
   );
@@ -377,17 +419,25 @@ function ControlledV3PreviewAndPublishStep({
         render={controller.renderPreview}
         readiness={
           unavailableMessage ? (
-            <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("panel_this_entry_cannot_be_published")}
+            </Typography.Text>
           ) : controller.issues.length > 0 ? (
-            <Typography.Text type="danger">有待完成内容</Typography.Text>
+            <Typography.Text type="danger">
+              {t("panel_content_needs_completing")}
+            </Typography.Text>
           ) : controller.validation?.valid ? (
             <Typography.Text type={audioReady ? "success" : "secondary"}>
               {audioReady
-                ? "当前内容已通过发布检查"
-                : "内容检查已通过，请完成音频确认"}
+                ? t("panel_this_content_has_passed_publication_checks")
+                : t(
+                    "panel_content_checks_passed_confirm_the_audio_to_continue"
+                  )}
             </Typography.Text>
           ) : (
-            <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("panel_publication_requirements_have_not_been_checked")}
+            </Typography.Text>
           )
         }
         word={word}
@@ -406,7 +456,7 @@ function ControlledV3PreviewAndPublishStep({
         <Alert
           showIcon
           type="warning"
-          title="当前词条不可发布"
+          title={t("panel_this_entry_cannot_be_published")}
           description={unavailableMessage}
         />
       ) : (
@@ -414,14 +464,14 @@ function ControlledV3PreviewAndPublishStep({
           id="review-publish"
           className="v3-review-publish"
           size="small"
-          title="发布检查"
+          title={t("panel_publication_checks")}
         >
           <Space orientation="vertical" style={{ width: "100%" }}>
             {!allowedToPublish && (
               <Alert
                 type="info"
-                title="当前账号不能发布这条词条"
-                description={ENTRY_PUBLISH_BLOCKED_HINT}
+                title={t("panel_your_account_cannot_publish_this_entry")}
+                description={t("publish_permission_hint")}
               />
             )}
             <Button
@@ -431,7 +481,7 @@ function ControlledV3PreviewAndPublishStep({
               }
               onClick={() => void prepare()}
             >
-              检查发布条件
+              {t("panel_check_publication_requirements")}
             </Button>
             {controller.issues.length > 0 ? (
               <ValidationIssueSummary
@@ -444,16 +494,21 @@ function ControlledV3PreviewAndPublishStep({
               <Alert
                 showIcon
                 type={requiresImpactConfirmation ? "warning" : "success"}
-                title={`影响预览：${controller.impact.affected.length} 项`}
+                title={t("panel_impact_preview_items", {
+                  p0: controller.impact.affected.length
+                })}
                 description={
                   <ImpactDescription
                     impact={controller.impact}
                     summary={
                       impactPage
-                        ? `确认快照已加载 ${impactState.items.length}/${impactState.total}`
+                        ? t("panel_confirmation_snapshot_loaded", {
+                            p0: impactState.items.length,
+                            p1: impactState.total
+                          })
                         : controller.impact.requires_confirmation
-                          ? "需要由向导确认当前影响。"
-                          : "未发现需要确认的影响。"
+                          ? t("panel_confirm_the_current_impact_in_the_wizard")
+                          : t("panel_no_impact_needs_confirmation")
                     }
                   />
                 }
@@ -471,7 +526,7 @@ function ControlledV3PreviewAndPublishStep({
                 }
                 onClick={confirmImpact}
               >
-                确认影响并允许发布
+                {t("panel_confirm_impact_and_allow_publication")}
               </Button>
             ) : null}
             {readyToPublish ? (
@@ -480,21 +535,21 @@ function ControlledV3PreviewAndPublishStep({
                 loading={controller.isPending("publish")}
                 onClick={() => void publish()}
               >
-                发布词条
+                {t("panel_publish_entry")}
               </Button>
             ) : null}
           </Space>
         </Card>
       )}
       {allowedToPublish && publishPage ? (
-        <Card size="small" title="发布同形提示">
+        <Card size="small" title={t("panel_publication_homograph_notice")}>
           <Button
             type="primary"
             loading={controller.isPending("publish")}
             disabled={!canAcknowledgeSurfaceSnapshot(publishState)}
             onClick={confirmPublishSurface}
           >
-            确认同形提示并重试发布
+            {t("panel_confirm_homograph_notice_and_retry_publication")}
           </Button>
         </Card>
       ) : null}
@@ -509,6 +564,7 @@ function StandaloneV3PreviewAndPublishStep({
   createFlow = createV3SaveFlow,
   onPublished
 }: StandaloneProps) {
+  const { t } = useLexiconEditorTranslation();
   const requests = useMemo(
     () => suppliedRequests ?? createV3WordRequests(),
     [suppliedRequests]
@@ -531,7 +587,7 @@ function StandaloneV3PreviewAndPublishStep({
   const [impactAccepted, setImpactAccepted] = useState(false);
   const [publishSurfacePage, setPublishSurfacePage] =
     useState<SurfaceMatchPageV3>();
-  const [error, setError] = useState<string>();
+  const [error, setError] = useLexiconEditorMessageState();
   const prepareLock = useRef(false);
   const publishLock = useRef(false);
   const publishKey = useRef<string | undefined>(undefined);
@@ -552,8 +608,10 @@ function StandaloneV3PreviewAndPublishStep({
   const canPrepare = canCheckEntry(profile);
   const allowedToPublish = canPublishEntry(profile, currentWord);
   const unavailableMessage =
-    publicationUnavailableMessage(currentWord) ??
-    (!canPrepare ? "未开通词条检查权限" : undefined);
+    publicationUnavailableMessage(currentWord, t) ??
+    (!canPrepare
+      ? t("panel_entry_checking_permission_is_required")
+      : undefined);
   const needsImpactAcknowledgement = Boolean(
     impact && (impact.requires_confirmation || impact.surface_match_page)
   );
@@ -585,7 +643,7 @@ function StandaloneV3PreviewAndPublishStep({
     setValidationIssues([]);
     setError(undefined);
     publishKey.current = undefined;
-  }, [word.id, word.revision]);
+  }, [word.id, word.revision, setError]);
 
   const clearPreparedPublish = () => {
     setImpact(undefined);
@@ -617,7 +675,7 @@ function StandaloneV3PreviewAndPublishStep({
     clearPreparedPublish();
     setError(undefined);
     publishKey.current = undefined;
-  }, [replaceFlow, word]);
+  }, [replaceFlow, word, setError]);
 
   const reconcilePublishConflict = async () => {
     if (!reconciliationRequiredRef.current || reconciliationLockRef.current) {
@@ -840,17 +898,25 @@ function StandaloneV3PreviewAndPublishStep({
       <V3WordPreview
         readiness={
           unavailableMessage ? (
-            <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("panel_this_entry_cannot_be_published")}
+            </Typography.Text>
           ) : validationIssues.length > 0 ? (
-            <Typography.Text type="danger">有待完成内容</Typography.Text>
+            <Typography.Text type="danger">
+              {t("panel_content_needs_completing")}
+            </Typography.Text>
           ) : impact ? (
             <Typography.Text type={audioReady ? "success" : "secondary"}>
               {audioReady
-                ? "当前内容已通过发布检查"
-                : "内容检查已通过，请完成音频确认"}
+                ? t("panel_this_content_has_passed_publication_checks")
+                : t(
+                    "panel_content_checks_passed_confirm_the_audio_to_continue"
+                  )}
             </Typography.Text>
           ) : (
-            <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("panel_publication_requirements_have_not_been_checked")}
+            </Typography.Text>
           )
         }
         word={currentWord}
@@ -869,7 +935,7 @@ function StandaloneV3PreviewAndPublishStep({
         <Alert
           showIcon
           type="warning"
-          title="当前词条不可发布"
+          title={t("panel_this_entry_cannot_be_published")}
           description={unavailableMessage}
         />
       ) : (
@@ -877,14 +943,14 @@ function StandaloneV3PreviewAndPublishStep({
           id="review-publish"
           className="v3-review-publish"
           size="small"
-          title="发布检查"
+          title={t("panel_publication_checks")}
         >
           <Space orientation="vertical" style={{ width: "100%" }}>
             {!allowedToPublish && (
               <Alert
                 type="info"
-                title="当前账号不能发布这条词条"
-                description={ENTRY_PUBLISH_BLOCKED_HINT}
+                title={t("panel_your_account_cannot_publish_this_entry")}
+                description={t("publish_permission_hint")}
               />
             )}
             <Button
@@ -892,7 +958,7 @@ function StandaloneV3PreviewAndPublishStep({
               loading={preparing || refreshingCanonical}
               onClick={() => void handlePrepare()}
             >
-              检查发布条件
+              {t("panel_check_publication_requirements")}
             </Button>
             {validationIssues.length > 0 ? (
               <ValidationIssueSummary
@@ -904,16 +970,23 @@ function StandaloneV3PreviewAndPublishStep({
               <Alert
                 showIcon
                 type={needsImpactAcknowledgement ? "warning" : "success"}
-                title={`影响预览：${impact.affected.length} 项`}
+                title={t("panel_impact_preview_items_2", {
+                  p0: impact.affected.length
+                })}
                 description={
                   <ImpactDescription
                     impact={impact}
                     summary={
                       impact.surface_match_page
-                        ? `确认快照已加载 ${impactState.items.length}/${impactState.total}`
+                        ? t("panel_confirmation_snapshot_loaded", {
+                            p0: impactState.items.length,
+                            p1: impactState.total
+                          })
                         : impact.requires_confirmation
-                          ? "需要显式确认当前影响。"
-                          : "未发现需要确认的影响。"
+                          ? t(
+                              "panel_explicit_confirmation_of_the_current_impact_is_required"
+                            )
+                          : t("panel_no_impact_needs_confirmation")
                     }
                   />
                 }
@@ -929,7 +1002,7 @@ function StandaloneV3PreviewAndPublishStep({
                 }
                 onClick={handleAcceptImpact}
               >
-                确认影响并允许发布
+                {t("panel_confirm_impact_and_allow_publication")}
               </Button>
             ) : null}
             {readyToPublish ? (
@@ -938,18 +1011,18 @@ function StandaloneV3PreviewAndPublishStep({
                 loading={publishing}
                 onClick={() => void runPublish()}
               >
-                发布词条
+                {t("panel_publish_entry")}
               </Button>
             ) : null}
           </Space>
         </Card>
       )}
       {allowedToPublish && publishSurfacePage ? (
-        <Card size="small" title="发布同形提示">
+        <Card size="small" title={t("panel_publication_homograph_notice")}>
           <Space orientation="vertical">
             <Typography.Text>
-              已加载 {publishSurfaceState.items.length}/
-              {publishSurfaceState.total} 条匹配来源
+              {t("panel_loaded")} {publishSurfaceState.items.length}/
+              {publishSurfaceState.total} {t("panel_matching_sources")}
             </Typography.Text>
             <Button
               type="primary"
@@ -957,7 +1030,7 @@ function StandaloneV3PreviewAndPublishStep({
               disabled={!canAcknowledgeSurfaceSnapshot(publishSurfaceState)}
               onClick={handleConfirmPublishSurface}
             >
-              确认同形提示并重试发布
+              {t("panel_confirm_homograph_notice_and_retry_publication")}
             </Button>
           </Space>
         </Card>
@@ -966,13 +1039,15 @@ function StandaloneV3PreviewAndPublishStep({
         <Alert
           showIcon
           type="error"
-          title="刷新最新词条失败，请先重试对账。"
+          title={t(
+            "panel_could_not_refresh_the_latest_entry_retry_reconciliation_first"
+          )}
           action={
             <Button
               loading={refreshingCanonical}
               onClick={() => void reconcilePublishConflict()}
             >
-              重新刷新最新词条
+              {t("panel_refresh_latest_entry")}
             </Button>
           }
         />

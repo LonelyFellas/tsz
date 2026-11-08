@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioReview, type ReviewAudio } from "./AudioReview";
@@ -10,6 +11,7 @@ export function ReferenceAudio({
   onPlay: () => void;
   registerStop?: (stop: () => void) => () => void;
 }) {
+  const { t } = useVoiceEditorTranslation();
   const input = useRef<HTMLInputElement>(null);
   const active = useRef<ReviewAudio | undefined>(undefined);
   const [media, setMedia] = useState<ReviewAudio>();
@@ -24,10 +26,13 @@ export function ReferenceAudio({
   useEffect(() => registerStop?.(stop), [registerStop, stop]);
   useEffect(() => clear, [clear]);
   return (
-    <section className="tsz-ve-reference-audio" aria-label="本次参考音频">
+    <section
+      className="tsz-ve-reference-audio"
+      aria-label={t("reference_audio_for_this_session")}
+    >
       <input
         ref={input}
-        aria-label="导入参考音频"
+        aria-label={t("import_reference_audio")}
         type="file"
         accept={AUDIO_UPLOAD_ACCEPT}
         hidden
@@ -35,7 +40,7 @@ export function ReferenceAudio({
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
-          const issue = preflightAudioFile(file);
+          const issue = preflightAudioFile(file, undefined, t);
           if (issue) {
             setError(issue.message);
             return;
@@ -62,14 +67,14 @@ export function ReferenceAudio({
       <Space wrap>
         <Button
           size="small"
-          title="仅本次使用，关闭后清除"
+          title={t("used_only_in_this_session_cleared_on_close")}
           onClick={() => input.current?.click()}
         >
-          导入参考音频
+          {t("import_reference_audio")}
         </Button>
         {media && (
           <Button size="small" onClick={clear}>
-            移除参考音频
+            {t("remove_reference_audio")}
           </Button>
         )}
       </Space>

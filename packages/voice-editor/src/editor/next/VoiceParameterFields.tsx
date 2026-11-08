@@ -1,3 +1,4 @@
+import { useVoiceEditorTranslation } from "../i18n";
 import { Undo2Icon } from "lucide-react";
 import {
   Alert,
@@ -11,7 +12,7 @@ import { Form, InputNumber, Select } from "@tsz/ui/admin/forms";
 import type { AdminSpeechVoice } from "@tsz/types";
 import { SpeechRateInput } from "./SpeechRateInput";
 import { SpeechVolumeInput } from "./SpeechVolumeInput";
-import { styleNames } from "./voice-style-labels";
+import { voiceStyleNames } from "./voice-style-labels";
 import "./voice-parameter-fields.css";
 
 export type ParameterVoice = Pick<AdminSpeechVoice, "capabilities"> & {
@@ -71,6 +72,7 @@ export function VoiceParameterFields({
   >;
   rateBounds?: { min: number; max: number };
 }) {
+  const { t } = useVoiceEditorTranslation();
   const capabilities = voice.capabilities;
   const rateMin =
     rateBounds?.min ?? Math.max(-70, capabilities.min_rate_percent);
@@ -86,12 +88,14 @@ export function VoiceParameterFields({
   const showRole = (supportsRole && !!style) || !!role;
   const advancedHint = !hasAdvanced
     ? degree != null || role
-      ? "当前音色不支持调整，已有设置仍会保留。"
-      : "此音色没有可调的高级参数。"
+      ? t(
+          "this_voice_does_not_support_adjustments_existing_settings_are_retained"
+        )
+      : t("this_voice_has_no_adjustable_advanced_parameters")
     : !style
-      ? "先选择说话风格，再调节高级参数。"
+      ? t("select_a_speaking_style_before_adjusting_advanced_parameters")
       : (!supportsDegree && degree != null) || (!supportsRole && role)
-        ? "部分已有值不支持调整，仍会保留。"
+        ? t("some_existing_values_cannot_be_adjusted_and_will_be_retained")
         : undefined;
   return (
     <div className="voice-parameter-panel">
@@ -102,32 +106,36 @@ export function VoiceParameterFields({
         gap={8}
       >
         <Space size={8}>
-          <Typography.Text strong>声音参数</Typography.Text>
+          <Typography.Text strong>{t("voice_parameters")}</Typography.Text>
           <span className="voice-parameter-muted-status" role="status">
-            {volume === 0 ? "已静音" : ""}
+            {volume === 0 ? t("muted") : ""}
           </span>
         </Space>
         <Button
           type="text"
           size="small"
           icon={<Undo2Icon />}
-          aria-label="恢复默认参数"
+          aria-label={t("restore_default_parameters")}
           disabled={disabled || resetDisabled}
           onClick={onReset}
         >
-          重置
+          {t("reset")}
         </Button>
       </Flex>
       {capabilities.supports_volume_percent === false && (
-        <Alert type="info" showIcon title="此音色使用固定参数" />
+        <Alert
+          type="info"
+          showIcon
+          title={t("this_voice_uses_fixed_parameters")}
+        />
       )}
       <div className="voice-parameter-fields">
         <Form.Item
           layout="horizontal"
           colon={false}
           name="volume_percent"
-          label="音量"
-          tooltip="100% 为原音量，0% 为静音。"
+          label={t("volume")}
+          tooltip={t("100_is_the_original_volume_0_is_mute")}
           rules={[
             {
               required: true,
@@ -136,8 +144,10 @@ export function VoiceParameterFields({
               max: 100,
               message:
                 capabilities.supports_volume_percent === false
-                  ? "该模型仅支持原音量，请明确恢复默认参数"
-                  : "请输入 0 至 100 的整数"
+                  ? t(
+                      "this_model_only_supports_the_original_volume_restore_default_parameters_exp"
+                    )
+                  : t("enter_an_integer_from_0_to_100")
             }
           ]}
         >
@@ -154,25 +164,28 @@ export function VoiceParameterFields({
             colon={false}
             name="rate_percent"
             className="voice-parameter-number"
-            label="语速"
+            label={t("rate")}
             rules={[
               {
                 required: true,
                 type: "integer",
                 min: rateMin,
                 max: rateMax,
-                message: `请输入 ${((100 + rateMin) / 100).toFixed(2)} 至 ${((100 + rateMax) / 100).toFixed(2)} 倍速`
+                message: t("enter_a_rate_between_and", {
+                  p0: ((100 + rateMin) / 100).toFixed(2),
+                  p1: ((100 + rateMax) / 100).toFixed(2)
+                })
               }
             ]}
             tooltip={
               capabilities.min_rate_percent === capabilities.max_rate_percent
-                ? "该音色使用固定语速。"
-                : "1.00× 为标准语速。"
+                ? t("this_voice_uses_a_fixed_rate")
+                : t("1_00_is_the_standard_rate")
             }
           >
             <SpeechRateInput
               compact
-              aria-label={labels.rate ?? "合成语速"}
+              aria-label={labels.rate ?? t("synthesis_rate")}
               min={rateMin}
               max={rateMax}
               disabled={
@@ -187,26 +200,31 @@ export function VoiceParameterFields({
             colon={false}
             name="pitch_semitones"
             className="voice-parameter-number"
-            label="音调"
+            label={t("pitch_2")}
             rules={[
               {
                 required: true,
                 type: "integer",
                 min: capabilities.min_pitch_semitones,
                 max: capabilities.max_pitch_semitones,
-                message: `请输入 ${capabilities.min_pitch_semitones} 至 ${capabilities.max_pitch_semitones} 的整数`
+                message: t("enter_an_integer_from_to", {
+                  p0: capabilities.min_pitch_semitones,
+                  p1: capabilities.max_pitch_semitones
+                })
               }
             ]}
             tooltip={
               capabilities.min_pitch_semitones ===
               capabilities.max_pitch_semitones
-                ? "该音色使用固定音调。"
-                : "0 保持原音调，正数升高，负数降低。"
+                ? t("this_voice_uses_a_fixed_pitch")
+                : t(
+                    "0_keeps_the_original_pitch_positive_values_raise_it_and_negative_values_low"
+                  )
             }
           >
             <InputNumber
-              aria-label={labels.pitch ?? "音调"}
-              suffix="半音"
+              aria-label={labels.pitch ?? t("pitch_2")}
+              suffix={t("semitones")}
               min={capabilities.min_pitch_semitones}
               max={capabilities.max_pitch_semitones}
               disabled={
@@ -218,15 +236,15 @@ export function VoiceParameterFields({
             />
           </Form.Item>
         </div>
-        <Form.Item name="style" label="说话风格">
+        <Form.Item name="style" label={t("speaking_style")}>
           <Select
-            aria-label={labels.style ?? "说话风格"}
+            aria-label={labels.style ?? t("speaking_style")}
             disabled={disabled}
             options={[
-              { value: "", label: "默认" },
+              { value: "", label: t("default") },
               ...capabilities.styles.map((style) => ({
                 value: style,
-                label: styleNames[style] ?? style
+                label: voiceStyleNames(t)[style] ?? style
               }))
             ]}
           />
@@ -239,17 +257,20 @@ export function VoiceParameterFields({
         items={[
           {
             key: "expression",
-            label: "高级参数",
+            label: t("advanced_parameters"),
             extra: (
               <Typography.Text
                 className="voice-parameter-advanced-status"
                 type="secondary"
               >
                 {!hasAdvanced
-                  ? "无可调项"
+                  ? t("no_adjustable_parameters")
                   : !style
-                    ? "选择风格后可调"
-                    : [supportsDegree && "风格强度", supportsRole && "角色"]
+                    ? t("adjustable_after_selecting_a_style")
+                    : [
+                        supportsDegree && t("style_intensity"),
+                        supportsRole && t("role")
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
               </Typography.Text>
@@ -272,7 +293,7 @@ export function VoiceParameterFields({
                     name="style_degree"
                     className="voice-parameter-number"
                     hidden={!showDegree}
-                    label="风格强度"
+                    label={t("style_intensity")}
                     getValueProps={(value: number | undefined) => ({
                       value:
                         value === undefined
@@ -286,12 +307,12 @@ export function VoiceParameterFields({
                         type: "number",
                         min: 0.01,
                         max: 2,
-                        message: "请输入 0.01 至 2 的风格强度"
+                        message: t("enter_a_style_intensity_from_0_01_to_2")
                       }
                     ]}
                   >
                     <InputNumber
-                      aria-label={labels.degree ?? "风格强度"}
+                      aria-label={labels.degree ?? t("style_intensity")}
                       min={0.01}
                       max={2}
                       step={0.1}
@@ -309,18 +330,18 @@ export function VoiceParameterFields({
                     colon={false}
                     name="role"
                     hidden={!showRole}
-                    label="角色"
+                    label={t("role")}
                     getValueProps={(value?: string) => ({ value: value ?? "" })}
                   >
                     <Select
-                      aria-label={labels.role ?? "角色"}
+                      aria-label={labels.role ?? t("role")}
                       disabled={
                         disabled ||
                         !style ||
                         !voice.capability_evidence?.roles?.length
                       }
                       options={[
-                        { value: "", label: "默认" },
+                        { value: "", label: t("default") },
                         ...(voice.capability_evidence?.roles ?? []).map(
                           (role) => ({ value: role, label: role })
                         )

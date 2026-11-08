@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { Trash2Icon } from "lucide-react";
 import { Button } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
@@ -30,9 +31,10 @@ export function RelationDeleteButton({
   label: string;
   onDelete: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   return (
     <Button
-      aria-label={`删除${label}`}
+      aria-label={t("panel_delete", { p0: label })}
       icon={<Trash2Icon />}
       danger
       size="small"

@@ -1,3 +1,7 @@
+.sentence-editor {
+  container-type: inline-size;
+}
+
 .sentence-editor-meta > .ui-typography {
   flex: 1 1 240px;
 }
