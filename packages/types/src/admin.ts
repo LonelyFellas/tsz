@@ -5,6 +5,8 @@
 // 独立 refresh cookie（path=/api/v1/admin）。这些类型此前散落在 @tsz/api-client，
 // 现统一收敛到 @tsz/types（wire 类型的唯一家），api-client / shared 均镜像本文件。
 
+import type { InterfaceLocaleV1 } from "./i18n";
+
 /** admin 权限等级：super_admin 额外可管理管理员账号。 */
 export type AdminLevel = "admin" | "super_admin";
 
@@ -65,6 +67,8 @@ export type AdminDialectPreference = "uk" | "us";
  */
 export interface AdminPreferences {
   dialect: AdminDialectPreference;
+  /** 新后端恒返回可空值；旧后端省略此字段。 */
+  interface_locale?: InterfaceLocaleV1 | null;
 }
 
 /** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」+ 动态菜单。 */
@@ -86,7 +90,8 @@ export interface AdminProfile {
 
 /** PATCH /admin/profile/preferences 的请求体。只带要改的偏好，改的恒是自己的。 */
 export interface UpdateAdminPreferencesInput {
-  dialect: AdminDialectPreference;
+  dialect?: AdminDialectPreference;
+  interface_locale?: InterfaceLocaleV1 | null;
 }
 
 /** PATCH /admin/profile/preferences 的响应：落库后的完整偏好。 */

@@ -3,6 +3,7 @@
 // 仅前端内部、不经网络的形状(组件 props、本地 state)不受此约束,沿用 camelCase。
 
 export * from "./user";
+export * from "./i18n";
 export * from "./word";
 export * from "./task";
 export * from "./api";

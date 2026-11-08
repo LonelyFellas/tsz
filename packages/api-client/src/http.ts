@@ -356,12 +356,17 @@ export function createHttpClient({
       }),
     get: <T>(
       path: string,
-      opts?: { signal?: AbortSignal; headers?: HeadersInit }
+      opts?: { signal?: AbortSignal; headers?: HeadersInit; skipAuth?: boolean }
     ) =>
-      request<T>(path, {
-        ...(opts?.signal ? { signal: opts.signal } : {}),
-        ...(opts?.headers ? { headers: opts.headers } : {})
-      }),
+      request<T>(
+        path,
+        {
+          ...(opts?.signal ? { signal: opts.signal } : {}),
+          ...(opts?.headers ? { headers: opts.headers } : {})
+        },
+        false,
+        opts?.skipAuth
+      ),
     post: <T>(
       path: string,
       data?: unknown,

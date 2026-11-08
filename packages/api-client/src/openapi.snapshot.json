@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/1d45/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-02T15:36:38.561Z",
+  "_source": "/Users/darwish/.codex/worktrees/i18n-preferences-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-08T00:06:27.111Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -194,6 +194,7 @@
     "/dictionary": ["get"],
     "/dictionary/entries/{id}": ["get"],
     "/dictionary/entries/{id}/audio/{asset_id}": ["get"],
+    "/i18n/capabilities": ["get"],
     "/me": ["get", "patch"],
     "/me/account-deletion": ["get", "post"],
     "/me/account-deletion/{id}/cancel": ["post"],
@@ -234,6 +235,7 @@
     "/me/memory/overview": ["get"],
     "/me/notifications": ["get"],
     "/me/notifications/{id}/read": ["patch"],
+    "/me/preferences": ["get", "patch"],
     "/me/review-sessions": ["post"],
     "/me/review-sessions/{id}": ["get"],
     "/me/review-sessions/{id}/answers": ["post"],

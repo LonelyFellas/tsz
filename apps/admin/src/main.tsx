@@ -1,17 +1,29 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
-import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
+import { interfacePreferences } from "./lib/interface-preferences";
+import { useAuthStore } from "./lib/auth";
 import { router } from "./router";
 import "./globals.css";
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("找不到 #root 挂载点");
 
+function AdminApp() {
+  const sessionKey = useAuthStore(() => interfacePreferences.sessionKey());
+  return (
+    <InterfacePreferencesProvider
+      controller={interfacePreferences}
+      sessionKey={sessionKey}
+    >
+      <RouterProvider router={router} />
+    </InterfacePreferencesProvider>
+  );
+}
+
 createRoot(rootEl).render(
   <StrictMode>
-    <InterfaceI18nProvider>
-      <RouterProvider router={router} />
-    </InterfaceI18nProvider>
+    <AdminApp />
   </StrictMode>
 );
