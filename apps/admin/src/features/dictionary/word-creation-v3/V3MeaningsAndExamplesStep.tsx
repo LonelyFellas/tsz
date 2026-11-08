@@ -77,6 +77,7 @@ import {
 import { dialectLabel, partOfSpeechLabel } from "./presentation";
 import {
   sortableRowClass,
+  sortableTabOffset,
   useSortableRows,
   type SortableRowsController
 } from "./sortableRows";
@@ -1166,66 +1167,73 @@ function V3MeaningsAndExamplesStepContent({
                     posSorting.handleDrop(event, displayPosIndex)
                   }
                 >
-                  <SortableDragHandle
-                    dragImageSelector=".word-pos-tab-handle"
-                    index={displayPosIndex}
-                    label={`拖动${visiblePosLabel(posId, displayPosIndex)}`}
-                    singleItemTitle="至少需要两个基本词性"
-                    sorting={posSorting}
-                  />
-                  <span className="word-pos-tab-label">
-                    <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
-                    {pos ? (
-                      <Badge
-                        count={countV3PosMeaningIncomplete(
-                          pos,
-                          value,
-                          catalogByCode.get(formPosById.get(posId) ?? "")
-                            ?.sub_pos_required ?? true
-                        )}
-                        size="small"
-                        title="该词性未填项"
-                      />
-                    ) : null}
-                  </span>
                   <span
-                    className="word-pos-tab-actions"
-                    onClick={(event) => event.stopPropagation()}
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
+                    className="word-pos-tab-content"
+                    style={{
+                      transform: `translateX(${sortableTabOffset(posSorting, displayPosIndex)}px)`
+                    }}
                   >
-                    {addBasicPosSelect}
-                    {forms &&
-                    forms.pos.length > 1 &&
-                    forms.pos.some((formPos) => formPos.pos_id === posId) &&
-                    onFormsChange ? (
-                      <Tooltip
-                        title={
-                          posReferenceCount(posId) > 0
-                            ? referenceBlockedHint(posReferenceCount(posId))
-                            : undefined
-                        }
-                      >
-                        <Button
-                          aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
-                          danger
-                          icon={<CircleMinusIcon />}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            modal.confirm({
-                              title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                              content:
-                                "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                              okText: "删除",
-                              okButtonProps: { danger: true },
-                              onOk: () => deleteBasicPos(posId)
-                            });
-                          }}
+                    <SortableDragHandle
+                      dragImageSelector=".word-pos-tab-handle"
+                      index={displayPosIndex}
+                      label={`拖动${visiblePosLabel(posId, displayPosIndex)}`}
+                      singleItemTitle="至少需要两个基本词性"
+                      sorting={posSorting}
+                    />
+                    <span className="word-pos-tab-label">
+                      <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
+                      {pos ? (
+                        <Badge
+                          count={countV3PosMeaningIncomplete(
+                            pos,
+                            value,
+                            catalogByCode.get(formPosById.get(posId) ?? "")
+                              ?.sub_pos_required ?? true
+                          )}
                           size="small"
-                          type="text"
+                          title="该词性未填项"
                         />
-                      </Tooltip>
-                    ) : null}
+                      ) : null}
+                    </span>
+                    <span
+                      className="word-pos-tab-actions"
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      {addBasicPosSelect}
+                      {forms &&
+                      forms.pos.length > 1 &&
+                      forms.pos.some((formPos) => formPos.pos_id === posId) &&
+                      onFormsChange ? (
+                        <Tooltip
+                          title={
+                            posReferenceCount(posId) > 0
+                              ? referenceBlockedHint(posReferenceCount(posId))
+                              : undefined
+                          }
+                        >
+                          <Button
+                            aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                            danger
+                            icon={<CircleMinusIcon />}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              modal.confirm({
+                                title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
+                                content:
+                                  "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
+                                okText: "删除",
+                                okButtonProps: { danger: true },
+                                onOk: () => deleteBasicPos(posId)
+                              });
+                            }}
+                            size="small"
+                            type="text"
+                          />
+                        </Tooltip>
+                      ) : null}
+                    </span>
                   </span>
                 </span>
               ),
