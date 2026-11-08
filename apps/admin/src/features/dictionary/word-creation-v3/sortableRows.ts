@@ -16,6 +16,7 @@ export interface SortableRowsController {
   canReorder: boolean;
   draggingIndex?: number;
   dragOverIndex?: number;
+  draggingTabWidth?: number;
   handleDragStart: (event: DragEvent<HTMLElement>, sourceIndex: number) => void;
   handleDragEnd: () => void;
   handleDragOver: (event: DragEvent<HTMLElement>, targetIndex: number) => void;
@@ -40,6 +41,7 @@ export function useSortableRows<T>({
 }): SortableRowsController {
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
+  const [draggingTabWidth, setDraggingTabWidth] = useState<number>();
   const canReorder = items.length > 1;
   const reorder = (sourceIndex: number, targetIndex: number) => {
     if (
@@ -69,6 +71,9 @@ export function useSortableRows<T>({
       JSON.stringify({ scopeId, index: sourceIndex })
     );
     setDraggingIndex(sourceIndex);
+    setDraggingTabWidth(
+      event.currentTarget.closest<HTMLElement>(".ui-tabs-tab")?.offsetWidth
+    );
   };
   const handleDragOver = (
     event: DragEvent<HTMLElement>,
@@ -81,7 +86,9 @@ export function useSortableRows<T>({
   };
   const handleDrop = (event: DragEvent<HTMLElement>, targetIndex: number) => {
     event.preventDefault();
+    setDraggingIndex(undefined);
     setDragOverIndex(undefined);
+    setDraggingTabWidth(undefined);
     const raw = event.dataTransfer.getData(dragType);
     if (!raw) return;
     try {
@@ -114,16 +121,34 @@ export function useSortableRows<T>({
     canReorder,
     ...(draggingIndex === undefined ? {} : { draggingIndex }),
     ...(dragOverIndex === undefined ? {} : { dragOverIndex }),
+    ...(draggingTabWidth === undefined ? {} : { draggingTabWidth }),
     handleDragStart,
     handleDragEnd: () => {
       setDraggingIndex(undefined);
       setDragOverIndex(undefined);
+      setDraggingTabWidth(undefined);
     },
     handleDragOver,
     handleDragLeave: () => setDragOverIndex(undefined),
     handleDrop,
     handleKeyDown
   };
+}
+
+export function sortableTabOffset(
+  sorting: SortableRowsController,
+  index: number
+) {
+  const { draggingIndex, dragOverIndex, draggingTabWidth } = sorting;
+  if (
+    draggingIndex === undefined ||
+    dragOverIndex === undefined ||
+    draggingTabWidth === undefined
+  )
+    return 0;
+  if (draggingIndex < index && index <= dragOverIndex) return -draggingTabWidth;
+  if (dragOverIndex <= index && index < draggingIndex) return draggingTabWidth;
+  return 0;
 }
 
 /**

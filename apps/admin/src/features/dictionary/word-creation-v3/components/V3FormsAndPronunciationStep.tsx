@@ -57,7 +57,11 @@ import {
 } from "../../word-creation/PronunciationPreview";
 import "../v3-forms.css";
 import "../posTabs.css";
-import { sortableRowClass, useSortableRows } from "../sortableRows";
+import {
+  sortableRowClass,
+  sortableTabOffset,
+  useSortableRows
+} from "../sortableRows";
 import { SortableDragHandle } from "./SortableDragHandle";
 import { V3FormContentModal } from "./V3FormContentModal";
 import { V3FormCopyProvider } from "./V3FormCopyProvider";
@@ -367,57 +371,64 @@ export function V3FormsAndPronunciationStep({
                 }
                 onDrop={(event) => posSorting.handleDrop(event, posIndex)}
               >
-                <SortableDragHandle
-                  dragImageSelector=".word-pos-tab-handle"
-                  index={posIndex}
-                  label={`拖动${label}`}
-                  singleItemTitle="至少需要两个基本词性"
-                  sorting={posSorting}
-                />
-                <span className="word-pos-tab-label">
-                  <strong>{label}</strong>
-                  <Badge
-                    count={countV3PosFormIncomplete(pos)}
-                    size="small"
-                    title="该词性未填项"
-                  />
-                  <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
-                </span>
                 <span
-                  className="word-pos-tab-actions"
-                  onClick={(event) => event.stopPropagation()}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => event.stopPropagation()}
+                  className="word-pos-tab-content"
+                  style={{
+                    transform: `translateX(${sortableTabOffset(posSorting, posIndex)}px)`
+                  }}
                 >
-                  {addPosSelect}
-                  {value.pos.length > 1 ? (
-                    <Tooltip
-                      title={
-                        posReferences > 0
-                          ? referenceBlockedHint(posReferences)
-                          : undefined
-                      }
-                    >
-                      <Button
-                        aria-label={`删除${label}`}
-                        danger
-                        icon={<CircleMinusIcon />}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          modal.confirm({
-                            title: `删除词性“${label}”？`,
-                            content:
-                              "保存时会同时预览该词性下游词义、例句和关系的影响。",
-                            okText: "删除",
-                            okButtonProps: { danger: true },
-                            onOk: () => deletePos(pos.pos_id)
-                          });
-                        }}
-                        size="small"
-                        type="text"
-                      />
-                    </Tooltip>
-                  ) : null}
+                  <SortableDragHandle
+                    dragImageSelector=".word-pos-tab-handle"
+                    index={posIndex}
+                    label={`拖动${label}`}
+                    singleItemTitle="至少需要两个基本词性"
+                    sorting={posSorting}
+                  />
+                  <span className="word-pos-tab-label">
+                    <strong>{label}</strong>
+                    <Badge
+                      count={countV3PosFormIncomplete(pos)}
+                      size="small"
+                      title="该词性未填项"
+                    />
+                    <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
+                  </span>
+                  <span
+                    className="word-pos-tab-actions"
+                    onClick={(event) => event.stopPropagation()}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    {addPosSelect}
+                    {value.pos.length > 1 ? (
+                      <Tooltip
+                        title={
+                          posReferences > 0
+                            ? referenceBlockedHint(posReferences)
+                            : undefined
+                        }
+                      >
+                        <Button
+                          aria-label={`删除${label}`}
+                          danger
+                          icon={<CircleMinusIcon />}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            modal.confirm({
+                              title: `删除词性“${label}”？`,
+                              content:
+                                "保存时会同时预览该词性下游词义、例句和关系的影响。",
+                              okText: "删除",
+                              okButtonProps: { danger: true },
+                              onOk: () => deletePos(pos.pos_id)
+                            });
+                          }}
+                          size="small"
+                          type="text"
+                        />
+                      </Tooltip>
+                    ) : null}
+                  </span>
                 </span>
               </span>
             ),
