@@ -1,10 +1,11 @@
+import { useAccessTranslation, AccessText } from "../permissions/i18n";
 // 新建管理员弹窗（super_admin）：新账号手机号/昵称 + 当前超管手机确认码。
 // 密码由后端生成、等级恒为 admin，前端不再收集；创建成功把一次性临时密码交父级展示。
 // 校验对齐 openapi CreateAdminRequest：昵称禁 < > 及控制字符、手机 5–20 位。
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { Button } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CreateAdminInput } from "@tsz/types";
 import { HttpError } from "@tsz/api-client";
 import { useCreateAdmin, useRequestCreateAdminCode } from "./api";
@@ -32,24 +33,43 @@ export function CreateAdminModal({
   onPendingChange,
   onCreated
 }: Props) {
+  const { t } = useAccessTranslation();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
   const createAdmin = useCreateAdmin();
   const requestCode = useRequestCreateAdminCode();
   // isPending 要到下一次渲染才更新；ref 同步拦截同一帧内的重复提交。
   const submitInFlight = useRef(false);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof FormValues, "phone_taken" | "invalid_code">>
+  >({});
+
+  useEffect(() => {
+    if (open) {
+      form.resetFields();
+      setFieldErrors({});
+    }
+  }, [open, form]);
 
   const sendCode = async () => {
     try {
       await requestCode.mutateAsync();
-      message.success("验证码已发送至当前超级管理员手机号");
+      message.success(
+        <AccessText message="a_verification_code_was_sent_to_the_current_super_administrator_s" />
+      );
     } catch (err) {
       if (err instanceof HttpError && err.status === 429) {
-        message.warning("请求过于频繁，请稍后再试");
+        message.warning(
+          <AccessText message="too_many_requests_try_again_later" />
+        );
         return;
       }
       message.error(
-        err instanceof Error && err.message ? err.message : "验证码发送失败"
+        err instanceof Error && err.message ? (
+          err.message
+        ) : (
+          <AccessText message="could_not_send_the_verification_code" />
+        )
       );
     }
   };
@@ -61,6 +81,7 @@ export function CreateAdminModal({
 
     try {
       const values = await form.validateFields();
+      setFieldErrors({});
       const input: CreateAdminInput = {
         phone: values.phone.trim(),
         display_name: values.display_name.trim(),
@@ -76,18 +97,22 @@ export function CreateAdminModal({
       } catch (err) {
         // Rust 后端 409 表示新管理员手机号已存在。
         if (err instanceof HttpError && err.status === 409) {
-          form.setFields([{ name: "phone", errors: ["该手机号已被占用"] }]);
+          setFieldErrors({ phone: "phone_taken" });
           return;
         }
         if (err instanceof HttpError && err.status === 400) {
           const detail = err.message.toLowerCase();
           if (detail.includes("验证码") || detail.includes("code")) {
-            form.setFields([{ name: "code", errors: ["验证码无效或已过期"] }]);
+            setFieldErrors({ code: "invalid_code" });
             return;
           }
         }
         message.error(
-          err instanceof Error && err.message ? err.message : "创建失败"
+          err instanceof Error && err.message ? (
+            err.message
+          ) : (
+            <AccessText message="creation_failed" />
+          )
         );
       }
     } finally {
@@ -99,9 +124,9 @@ export function CreateAdminModal({
   return (
     <Modal
       open={open}
-      title="新建管理员"
-      okText="创建"
-      cancelText="取消"
+      title={t("create_administrator")}
+      okText={t("create")}
+      cancelText={t("cancel")}
       confirmLoading={createAdmin.isPending}
       okButtonProps={{ disabled: createAdmin.isPending }}
       cancelButtonProps={{ disabled: createAdmin.isPending }}
@@ -112,52 +137,98 @@ export function CreateAdminModal({
       onCancel={() => {
         if (!createAdmin.isPending && !submitInFlight.current) onClose();
       }}
-      afterOpenChange={(visible) => {
-        if (visible) form.resetFields();
-      }}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
+      <Form
+        form={form}
+        layout="vertical"
+        style={{ marginTop: 12 }}
+        onValuesChange={(changed) =>
+          setFieldErrors((current) => ({
+            ...current,
+            ...Object.fromEntries(
+              Object.keys(changed).map((key) => [key, undefined])
+            )
+          }))
+        }
+      >
         <Form.Item
           name="phone"
-          label="手机号"
+          validateStatus={fieldErrors.phone ? "error" : undefined}
+          help={
+            fieldErrors.phone ? (
+              <AccessText message="this_phone_number_is_already_in_use" />
+            ) : undefined
+          }
+          label={t("phone_number")}
           rules={[
-            { required: true, message: "请输入手机号" },
-            { min: 5, max: 20, message: "手机号 5–20 位" }
+            {
+              required: true,
+              message: <AccessText message="enter_a_phone_number" />
+            },
+            {
+              min: 5,
+              max: 20,
+              message: (
+                <AccessText message="phone_numbers_must_be_5_20_characters" />
+              )
+            }
           ]}
         >
-          <Input placeholder="登录用手机号" allowClear />
+          <Input placeholder={t("phone_number_for_sign_in")} allowClear />
         </Form.Item>
         <Form.Item
           name="display_name"
-          label="昵称"
+          label={t("display_name")}
           rules={[
             {
               required: true,
               transform: (v: string) => v?.trim(),
-              message: "请输入昵称"
+              message: <AccessText message="enter_a_display_name" />
             },
-            { max: 50, message: "最长 50 字符" },
             {
+              max: 50,
+              message: <AccessText message="at_most_50_characters" />
+            },
+            {
+              message: (
+                <AccessText message="display_names_cannot_contain_or_control_characters" />
+              ),
               validator: (_, v: string) =>
                 v && DISPLAY_NAME_FORBIDDEN.test(v)
-                  ? Promise.reject(new Error("昵称不能包含 < > 或控制字符"))
+                  ? Promise.reject(new Error("invalid_display_name"))
                   : Promise.resolve()
             }
           ]}
         >
-          <Input placeholder="管理员昵称" allowClear />
+          <Input placeholder={t("administrator_display_name")} allowClear />
         </Form.Item>
         <Form.Item
           name="code"
-          label="超管手机验证码"
+          validateStatus={fieldErrors.code ? "error" : undefined}
+          help={
+            fieldErrors.code ? (
+              <AccessText message="the_verification_code_is_invalid_or_has_expired" />
+            ) : undefined
+          }
+          label={t("super_administrator_s_verification_code")}
           rules={[
-            { required: true, message: "请输入验证码" },
-            { pattern: /^\d{6}$/, message: "请输入 6 位数字验证码" }
+            {
+              required: true,
+              message: <AccessText message="enter_the_verification_code" />
+            },
+            {
+              pattern: /^\d{6}$/,
+              message: (
+                <AccessText message="enter_the_6_digit_verification_code" />
+              )
+            }
           ]}
         >
           <Input
-            placeholder="当前超管手机号收到的 6 位验证码"
+            placeholder={t(
+              "6_digit_code_sent_to_the_current_super_administrator_s_phone"
+            )}
             maxLength={6}
             inputMode="numeric"
             allowClear
@@ -168,7 +239,7 @@ export function CreateAdminModal({
                 loading={requestCode.isPending}
                 onClick={() => void sendCode()}
               >
-                获取验证码
+                {t("get_code")}
               </Button>
             }
           />

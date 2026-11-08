@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App } from "@tsz/ui/admin/overlays";
@@ -79,7 +81,7 @@ describe("单人/批量权限精确预览提交", () => {
     ).toEqual(["管理员", "开通", "取消"]);
     expect(
       screen
-        .getByText("words.access、words.edit")
+        .getByText("自动补齐：words.access、words.edit")
         .closest(".ui-typography-warning")
     ).toHaveTextContent("自动补齐：words.access、words.edit");
     expect(screen.queryByText("同时开通")).toBeNull();
@@ -94,7 +96,7 @@ describe("单人/批量权限精确预览提交", () => {
       targets: []
     });
     const { committed } = mount({ expectedVersions: { a: 3 } });
-    await screen.findByText("words.access、words.edit");
+    await screen.findByText("自动补齐：words.access、words.edit");
     expect(read).toHaveBeenCalledWith({
       catalog_version: "v1",
       targets: [{ admin_id: "a", expected_version: 3 }],
@@ -142,7 +144,7 @@ describe("单人/批量权限精确预览提交", () => {
       ]
     });
     const { committed } = mount();
-    await screen.findByText("words.access、words.edit");
+    await screen.findByText("自动补齐：words.access、words.edit");
     fireEvent.click(screen.getByText("保存变更"));
     await waitFor(() => expect(committed).toHaveBeenCalledOnce());
     expect(useAuthStore.getState().profile).toBe(own);
@@ -173,9 +175,12 @@ describe("单人/批量权限精确预览提交", () => {
       );
     const { client, committed } = mount();
     const reload = vi.spyOn(client, "invalidateQueries");
-    const automaticRevoke = await screen.findByText("words.edit_others", {
-      selector: ".ui-typography-danger span"
-    });
+    const automaticRevoke = await screen.findByText(
+      "自动取消：words.edit_others",
+      {
+        selector: ".ui-typography-danger"
+      }
+    );
     expect(automaticRevoke.closest(".ui-typography-danger")).toHaveTextContent(
       "自动取消：words.edit_others"
     );
@@ -213,7 +218,7 @@ describe("单人/批量权限精确预览提交", () => {
         .spyOn(api.permissionSystem, "commit")
         .mockRejectedValue(failure);
       const { committed } = mount({ expectedVersions: { a: 3 } });
-      await screen.findByText("words.access、words.edit");
+      await screen.findByText("自动补齐：words.access、words.edit");
       fireEvent.click(screen.getByText("保存变更"));
       await screen.findByText("当前权限");
       expect(read).toHaveBeenLastCalledWith({
@@ -238,7 +243,7 @@ describe("单人/批量权限精确预览提交", () => {
       .spyOn(api.permissionSystem, "commit")
       .mockRejectedValue(new TypeError("response lost"));
     mount();
-    await screen.findByText("words.access、words.edit");
+    await screen.findByText("自动补齐：words.access、words.edit");
     fireEvent.click(screen.getByText("保存变更"));
     await screen.findByText("暂时无法确认是否保存成功，请重新查看后再操作");
     expect(screen.queryByText("保存变更")).toBeNull();
@@ -262,4 +267,73 @@ describe("单人/批量权限精确预览提交", () => {
     expect(screen.getByText("保存变更").closest("button")).toBeDisabled();
     expect(save).not.toHaveBeenCalled();
   });
+});
+
+it("语言切换保留预览差异和版本，未知提交结果只回读一次，不自动重提", async () => {
+  const read = vi
+    .spyOn(api.permissionSystem, "preview")
+    .mockResolvedValueOnce(preview)
+    .mockResolvedValue(current);
+  const catalog = vi
+    .spyOn(api.permissionSystem, "catalog")
+    .mockResolvedValue({ catalog_version: "v2", permissions: [], tags: [] });
+  const save = vi
+    .spyOn(api.permissionSystem, "commit")
+    .mockRejectedValue(new TypeError("response lost"));
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const onClose = vi.fn(),
+    onCommitted = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <App>
+          <PermissionChangeDialog
+            catalogVersion="v1"
+            adminIds={["a"]}
+            expectedVersions={{ a: 3 }}
+            grant={["words.edit_others"]}
+            revoke={[]}
+            onClose={onClose}
+            onCommitted={onCommitted}
+          />
+        </App>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await screen.findByText("自动补齐：words.access、words.edit");
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(save).not.toHaveBeenCalled();
+    expect(catalog).not.toHaveBeenCalled();
+  }
+  fireEvent.click(screen.getByText("保存变更"));
+  await screen.findByText(
+    "已重新读取当前权限。请核对后返回，重新选择需要的调整。"
+  );
+  const committedInput = save.mock.calls[0]![0];
+  expect(committedInput).toEqual({
+    catalog_version: preview.catalog_version,
+    targets: preview.targets.map(
+      ({ admin_id, expected_version, grant, revoke }) => ({
+        admin_id,
+        expected_version,
+        grant,
+        revoke
+      })
+    )
+  });
+  for (const locale of ["en-US", "zh-Hant", "en-GB"] as const) {
+    view.rerender(content(locale));
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(catalog).toHaveBeenCalledTimes(1);
+  }
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  expect(screen.getByText("words.access")).toBeVisible();
+  expect(onCommitted).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
 });

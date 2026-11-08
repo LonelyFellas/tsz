@@ -1,3 +1,4 @@
+import { useAccessTranslation, accessLabel } from "./i18n";
 import { XIcon, PlusIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -30,9 +31,10 @@ function PermissionSelection({
   displayName: string;
   onClose: () => void;
 }) {
+  const { t } = useAccessTranslation();
   const token = adminTokens;
   const labels = Object.fromEntries(
-    catalog.permissions.map((p) => [p.key, p.label])
+    catalog.permissions.map((p) => [p.key, accessLabel(p.label, t)])
   );
   const modules = [...new Set(catalog.permissions.flatMap(permissionModules))];
   const [selected, setSelected] = useState<string[]>(snapshot.permissions);
@@ -85,7 +87,7 @@ function PermissionSelection({
       <Flex justify="space-between" align="center" gap={16}>
         <Flex vertical gap={2}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            授权对象
+            {t("grant_access_to")}
           </Typography.Text>
           <Typography.Text strong style={{ fontSize: 16 }}>
             {displayName}
@@ -93,7 +95,7 @@ function PermissionSelection({
         </Flex>
         <Flex vertical align="end" gap={2}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            已选权限
+            {t("selected_permissions_label")}
           </Typography.Text>
           <Typography.Text strong style={{ whiteSpace: "nowrap" }}>
             {selected.length} / {catalog.permissions.length}
@@ -112,14 +114,14 @@ function PermissionSelection({
         }}
       >
         <Flex justify="space-between" align="center">
-          <Typography.Text strong>权限标签</Typography.Text>
+          <Typography.Text strong>{t("permission_tags")}</Typography.Text>
           <Flex align="center" gap={10}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              已选 {selectedTags.length} 项
+              {t("selected_count", { count: selectedTags.length })}
             </Typography.Text>
             <Button
               size="small"
-              aria-label="标签池"
+              aria-label={t("tag_pool")}
               icon={<PlusIcon />}
               disabled={availableTags.length === 0}
               onClick={() => {
@@ -128,7 +130,7 @@ function PermissionSelection({
                 setPickerOpen(true);
               }}
             >
-              标签池
+              {t("tag_pool")}
             </Button>
           </Flex>
         </Flex>
@@ -136,12 +138,14 @@ function PermissionSelection({
           wrap
           gap={6}
           role="group"
-          aria-label="已选权限标签"
+          aria-label={t("selected_permission_tags")}
           style={{ maxHeight: 96, overflowY: "auto", alignContent: "start" }}
         >
           {selectedTags.length === 0 ? (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {availableTags.length === 0 ? "暂无可用标签" : "未选择标签"}
+              {availableTags.length === 0
+                ? t("no_tags_available")
+                : t("no_tags_selected")}
             </Typography.Text>
           ) : (
             selectedTags.map((tag) => (
@@ -159,7 +163,7 @@ function PermissionSelection({
               >
                 <button
                   type="button"
-                  aria-label={`${tag.name}：查看权限`}
+                  aria-label={t("view_tag_permissions", { name: tag.name })}
                   onClick={() =>
                     setActiveModule(
                       catalog.permissions.find(
@@ -181,8 +185,8 @@ function PermissionSelection({
                 </button>
                 <button
                   type="button"
-                  aria-label={`${tag.name}：移除权限`}
-                  title={`移除${tag.name}权限`}
+                  aria-label={t("remove_tag_permissions", { name: tag.name })}
+                  title={t("remove_tag_permissions_title", { name: tag.name })}
                   onClick={() =>
                     applyTagSelection(
                       selectedTagIds.filter((id) => id !== tag.id)
@@ -209,7 +213,7 @@ function PermissionSelection({
         </Flex>
       </Flex>
       <Flex vertical gap={10} style={{ flex: 1, minHeight: 0 }}>
-        <Typography.Text strong>权限项</Typography.Text>
+        <Typography.Text strong>{t("permissions_a96992")}</Typography.Text>
         <Flex
           style={{
             flex: 1,
@@ -223,7 +227,7 @@ function PermissionSelection({
             vertical
             gap={4}
             role="group"
-            aria-label="权限模块"
+            aria-label={t("permission_modules")}
             style={{
               width: 184,
               flexShrink: 0,
@@ -247,11 +251,23 @@ function PermissionSelection({
                   type={activeModule === module ? "primary" : "text"}
                   aria-pressed={activeModule === module}
                   onClick={() => setActiveModule(module)}
-                  style={{ textAlign: "left", height: 40 }}
+                  style={{
+                    textAlign: "left",
+                    height: "auto",
+                    minHeight: 40,
+                    whiteSpace: "normal"
+                  }}
                 >
-                  <Flex justify="space-between" gap={8}>
-                    <span>{MODULE_LABELS[module] ?? module}</span>
-                    <span>
+                  <Flex
+                    justify="space-between"
+                    align="center"
+                    gap={8}
+                    style={{ minWidth: 0, width: "100%" }}
+                  >
+                    <span style={{ minWidth: 0 }}>
+                      {accessLabel(MODULE_LABELS[module] ?? module, t)}
+                    </span>
+                    <span style={{ flexShrink: 0 }}>
                       {count}/{permissions.length}
                     </span>
                   </Flex>
@@ -262,7 +278,7 @@ function PermissionSelection({
           <Flex
             vertical
             role="region"
-            aria-label="权限明细"
+            aria-label={t("permission_details")}
             style={{
               flex: 1,
               minWidth: 0,
@@ -272,16 +288,15 @@ function PermissionSelection({
           >
             <Flex justify="space-between" align="center" gap={12}>
               <Typography.Text strong style={{ fontSize: 15 }}>
-                {MODULE_LABELS[activeModule] ?? activeModule}
+                {accessLabel(MODULE_LABELS[activeModule] ?? activeModule, t)}
               </Typography.Text>
               <Typography.Text type="secondary">
-                已选{" "}
-                {
-                  activePermissions.filter((permission) =>
+                {t("selected_permissions_ratio", {
+                  selected: activePermissions.filter((permission) =>
                     selected.includes(permission.key)
-                  ).length
-                }{" "}
-                / {activePermissions.length} 项
+                  ).length,
+                  total: activePermissions.length
+                })}
               </Typography.Text>
             </Flex>
             <Divider style={{ margin: "12px 0 4px" }} />
@@ -314,10 +329,12 @@ function PermissionSelection({
                   style={{ width: "100%", alignItems: "flex-start" }}
                 >
                   <Flex vertical gap={4}>
-                    <Typography.Text>{permission.label}</Typography.Text>
+                    <Typography.Text>
+                      {accessLabel(permission.label, t)}
+                    </Typography.Text>
                     {permission.description !== permission.label && (
                       <Typography.Text type="secondary">
-                        {permission.description}
+                        {accessLabel(permission.description, t)}
                       </Typography.Text>
                     )}
                     {permission.requires.length > 0 && (
@@ -325,10 +342,11 @@ function PermissionSelection({
                         type="secondary"
                         style={{ fontSize: 12 }}
                       >
-                        前置权限：
-                        {permission.requires
-                          .map((key) => labels[key] ?? key)
-                          .join("、")}
+                        {t("required_permissions", {
+                          permissions: permission.requires
+                            .map((key) => labels[key] ?? key)
+                            .join(t("list_separator"))
+                        })}
                       </Typography.Text>
                     )}
                   </Flex>
@@ -349,11 +367,14 @@ function PermissionSelection({
         }}
       >
         <Flex vertical gap={2}>
-          <Typography.Text strong>待提交变更</Typography.Text>
+          <Typography.Text strong>{t("pending_changes")}</Typography.Text>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {grant.length || revoke.length
-              ? `开通 ${grant.length} 项 · 取消 ${revoke.length} 项`
-              : "无变更"}
+              ? t("changes_summary", {
+                  grant: grant.length,
+                  revoke: revoke.length
+                })
+              : t("no_changes")}
           </Typography.Text>
         </Flex>
         <Button
@@ -361,15 +382,15 @@ function PermissionSelection({
           disabled={!grant.length && !revoke.length}
           onClick={() => setPreviewing(true)}
         >
-          预览变更
+          {t("preview_changes")}
         </Button>
       </Flex>
       <Modal
         open={pickerOpen}
-        title="标签池"
+        title={t("tag_pool")}
         width={560}
-        okText="确认选择"
-        cancelText="取消"
+        okText={t("confirm_selection")}
+        cancelText={t("cancel")}
         okButtonProps={{
           disabled:
             pickerTagIds.length === selectedTagIds.length &&
@@ -397,8 +418,8 @@ function PermissionSelection({
       >
         <Flex vertical gap={12}>
           <Input
-            aria-label="搜索标签"
-            placeholder="搜索标签"
+            aria-label={t("search_tags")}
+            placeholder={t("search_tags")}
             allowClear
             value={tagSearch}
             onChange={(event) => setTagSearch(event.target.value)}
@@ -407,7 +428,7 @@ function PermissionSelection({
             vertical
             gap={4}
             role="group"
-            aria-label="可用标签"
+            aria-label={t("available_tags")}
             style={{ maxHeight: 360, overflowY: "auto" }}
           >
             {availableTags
@@ -415,7 +436,10 @@ function PermissionSelection({
               .map((tag) => (
                 <Checkbox
                   key={tag.id}
-                  aria-label={`${tag.name}，${tag.permissions.length} 项权限`}
+                  aria-label={t("tag_permission_count", {
+                    name: tag.name,
+                    count: tag.permissions.length
+                  })}
                   checked={pickerTagIds.includes(tag.id)}
                   onChange={(event) =>
                     setPickerTagIds((current) =>
@@ -436,13 +460,15 @@ function PermissionSelection({
                     {tag.name}
                   </Tag>
                   <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
-                    {tag.permissions.length} 项权限
+                    {t("permission_count", { count: tag.permissions.length })}
                   </Typography.Text>
                 </Checkbox>
               ))}
             {availableTags.filter((tag) => tag.name.includes(tagSearch.trim()))
               .length === 0 && (
-              <Typography.Text type="secondary">无匹配标签</Typography.Text>
+              <Typography.Text type="secondary">
+                {t("no_matching_tags")}
+              </Typography.Text>
             )}
           </Flex>
         </Flex>
@@ -475,6 +501,7 @@ export function AdminPermissionEditor({
   displayName: string;
   onClose: () => void;
 }) {
+  const { t } = useAccessTranslation();
   const catalog = useQuery({
     queryKey: ["permission-system", "catalog"],
     queryFn: api.permissionSystem.catalog
@@ -487,7 +514,7 @@ export function AdminPermissionEditor({
     <Drawer
       open
       size={720}
-      title="权限配置"
+      title={t("configure_permissions_2ee440")}
       onClose={onClose}
       styles={{ body: { overflow: "hidden" } }}
     >
@@ -496,7 +523,7 @@ export function AdminPermissionEditor({
       ) : catalog.isError || snapshot.isError ? (
         <Alert
           type="error"
-          title="无法读取权限"
+          title={t("could_not_load_permissions")}
           action={
             <Button
               onClick={() => {
@@ -504,7 +531,7 @@ export function AdminPermissionEditor({
                 void snapshot.refetch();
               }}
             >
-              重试
+              {t("try_again")}
             </Button>
           }
         />
