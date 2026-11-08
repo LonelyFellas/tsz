@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import {
   act,
   fireEvent,
@@ -2277,3 +2279,54 @@ it.each(["unavailable", "unknown-pos"])(
     expect(supplied.createV3).not.toHaveBeenCalled();
   }
 );
+
+it("切换语言保留检测请求、已编辑主词和未知结果的完整重试身份", async () => {
+  const supplied = requests();
+  const detection = deferred<DetectLexiconSurfaceResponseV3>();
+  vi.mocked(supplied.detectV3).mockReturnValue(detection.promise);
+  vi.mocked(supplied.createV3)
+    .mockRejectedValueOnce(new TypeError("offline"))
+    .mockResolvedValueOnce({ word: v3Word() });
+  const onCreated = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <FeedbackApp>
+        <UnifiedCreateEntryStep requests={supplied} onCreated={onCreated} />
+      </FeedbackApp>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const field = input();
+  fireEvent.change(field, { target: { value: "center" } });
+  fireEvent.click(screen.getByText("词典检测"));
+  view.rerender(content("en-GB"));
+  expect(field).toHaveValue("center");
+  expect(supplied.detectV3).toHaveBeenCalledTimes(1);
+  await act(async () => detection.resolve(v3Detection()));
+  view.rerender(content("zh-Hans"));
+  const headword = await screen.findByLabelText("英美通用主词");
+  fireEvent.change(headword, { target: { value: "Centre" } });
+  for (const locale of ["en-US", "zh-Hant", "en-GB", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(headword).toHaveValue("Centre");
+    expect(supplied.detectV3).toHaveBeenCalledTimes(1);
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    expect(supplied.getWord).not.toHaveBeenCalled();
+  }
+  await clickReadyCreate("创建并进入词形与发音");
+  await screen.findByText("网络异常，创建结果未知。请原样重试。");
+  const original = vi.mocked(supplied.createV3).mock.calls[0]!;
+  view.rerender(content("en-US"));
+  await screen.findByText(
+    "A network error left the creation result unknown. Retry the same request."
+  );
+  expect(field).toBeDisabled();
+  expect(headword).toBeDisabled();
+  expect(supplied.createV3).toHaveBeenCalledTimes(1);
+  view.rerender(content("zh-Hant"));
+  view.rerender(content("zh-Hans"));
+  fireEvent.click(screen.getByText("原样重试创建"));
+  await waitFor(() => expect(onCreated).toHaveBeenCalled());
+  expect(vi.mocked(supplied.createV3).mock.calls[1]).toEqual(original);
+  expect(supplied.detectV3).toHaveBeenCalledTimes(1);
+});

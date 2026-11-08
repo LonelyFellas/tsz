@@ -1,7 +1,7 @@
 import {
   useVoiceEditorTranslation,
   useVoiceEditorMessageState,
-  createVoiceEditorMessage
+  voiceEditorErrorMessage
 } from "../i18n";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Modal } from "@tsz/ui/admin/overlays";
@@ -158,11 +158,7 @@ export function VoiceDetail({
       setDraft((value) => ({ ...value, audio_asset_id: asset.id }));
     } catch (cause) {
       if (!controller.signal.aborted)
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : createVoiceEditorMessage("generation_failed_try_again")
-        );
+        setError(voiceEditorErrorMessage(cause, "generation_failed_try_again"));
     } finally {
       if (request.current === controller) setGenerating(false);
     }

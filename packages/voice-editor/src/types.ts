@@ -8,6 +8,14 @@ import type {
 import type { SentenceSourceRangeV3, TextLinkV3 } from "@tsz/types";
 import type { ReactNode } from "react";
 
+/** Adapter failures with known UI copy can be rendered again after a language change. */
+export class VoiceEditorDisplayError extends Error {
+  constructor(readonly displayMessage: () => string) {
+    super(displayMessage());
+    this.name = "VoiceEditorDisplayError";
+  }
+}
+
 export type VoiceAssociation = Pick<TextLinkV3, "id" | "source_segments">;
 
 export interface AssociationPickerProps<

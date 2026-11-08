@@ -1,3 +1,8 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
+import {
+  useLexiconEditorMessageState as useCreationMessageState,
+  createLexiconEditorMessage as creationMessage
+} from "../../i18n/editor";
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import {
   Alert,
@@ -67,6 +72,7 @@ export function V3GrammarFormPicker({
   forms?: DraftFormsStepContentV3;
   meanings?: DraftMeaningsStepContentWritableV3 | DraftMeaningsStepContentV3;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [selected, setSelected] = useState(initialSelected);
   const segmentsKey = JSON.stringify(segments);
   useEffect(() => {
@@ -74,10 +80,11 @@ export function V3GrammarFormPicker({
   }, [initialSelected, segmentsKey]);
   const [readings, setReadings] = useState<WordPronunciationV3[]>([]);
   const [readingPending, setReadingPending] = useState(false);
-  const [readingError, setReadingError] = useState("");
-  const [senses, setSenses] = useState<Array<{ value: string; label: string }>>(
-    []
-  );
+  const [readingError, setReadingError] = useCreationMessageState();
+  const [error, setError] = useCreationMessageState();
+  const [senses, setSenses] = useState<
+    Array<{ value: string; level: string; gloss: string }>
+  >([]);
   const draftPending = !sameTarget(selected, initialSelected);
   useEffect(() => {
     onPendingChange?.(draftPending);
@@ -132,7 +139,15 @@ export function V3GrammarFormPicker({
       const variant = variants.find(
         (variant) => variant.id === target.target_variant_id
       );
-      if (!variant) throw new Error("关联词形已失效，请重新选择");
+      if (!variant) {
+        if (active)
+          setReadingError(
+            creationMessage(
+              "creation_the_linked_form_is_invalid_select_it_again"
+            )
+          );
+        return;
+      }
       if (active) {
         setReadings(variant.pronunciations);
         const pos = targetForms.pos.find(
@@ -160,7 +175,11 @@ export function V3GrammarFormPicker({
             )
             .map((sense) => ({
               value: sense.id,
-              label: `${sense.level} · ${sense.definitions.flatMap((definition) => ("text" in definition.content ? [definition.content.text] : []))[0] ?? "未填写释义"}`
+              level: sense.level,
+              gloss:
+                sense.definitions.flatMap((definition) =>
+                  "text" in definition.content ? [definition.content.text] : []
+                )[0] ?? ""
             }))
         );
       }
@@ -168,7 +187,9 @@ export function V3GrammarFormPicker({
       .catch((error) => {
         if (active)
           setReadingError(
-            error instanceof Error ? error.message : "读法加载失败"
+            error instanceof Error
+              ? error.message
+              : creationMessage("creation_could_not_load_readings")
           );
       })
       .finally(() => {
@@ -177,7 +198,7 @@ export function V3GrammarFormPicker({
     return () => {
       active = false;
     };
-  }, [selectedTarget, requests, wordId, forms, meanings]);
+  }, [selectedTarget, requests, wordId, forms, meanings, setReadingError]);
   const formLabel = useFormTypeLabel();
   const posLabel = usePartOfSpeechLabel();
   const { preference } = useDialectPreference();
@@ -233,19 +254,21 @@ export function V3GrammarFormPicker({
           });
       })
       .catch(() => {
-        if (active) setError("已关联词形读取失败，请重试");
+        if (active)
+          setError(
+            creationMessage("creation_could_not_load_the_linked_form_try_again")
+          );
       });
     return () => {
       active = false;
     };
-  }, [requests, initialSelected, revision, wordId, forms]);
+  }, [requests, initialSelected, revision, wordId, forms, setError]);
   const [cursor, setCursor] = useState<string>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [candidates, setCandidates] = useState<
     PublishedSentenceTargetCandidateV3[]
   >([]);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
   const [truncated, setTruncated] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -273,13 +296,16 @@ export function V3GrammarFormPicker({
         setTruncated(response.truncated);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError("词形候选加载失败，请重试");
+        if (!controller.signal.aborted)
+          setError(
+            creationMessage("creation_could_not_load_form_candidates_try_again")
+          );
       })
       .finally(() => {
         if (!controller.signal.aborted) setPending(false);
       });
     return () => controller.abort();
-  }, [requests, literal, cursor, revision]);
+  }, [requests, literal, cursor, revision, setError]);
 
   const formChoices = (
     formList: CandidateForm[],
@@ -339,7 +365,7 @@ export function V3GrammarFormPicker({
   ];
   const options = unique.map((candidate) => ({
     value: `${candidate.entry_id}:${candidate.publication_id ?? "draft"}:${candidate.pos_id}`,
-    label: `${candidate.headword} · ${posLabel(candidate.pos)}${candidate.publication_id ? "" : "（草稿）"}`,
+    label: `${candidate.headword} · ${posLabel(candidate.pos)}${candidate.publication_id ? "" : t("panel_draft_2")}`,
     children: formChoices(
       candidate.forms,
       candidate.entry_id,
@@ -356,7 +382,7 @@ export function V3GrammarFormPicker({
       .map(({ form, displayDialect }) => ({
         value: form.variant_id,
         displayDialect,
-        label: `${formLabel(form.form_type)} ${form.spelling} · ${dialectLabel(displayDialect)}`,
+        label: `${formLabel(form.form_type)} ${form.spelling} · ${dialectLabel(displayDialect, t)}`,
         link: {
           id: newWordNodeId(),
           source_segments: segments,
@@ -397,7 +423,7 @@ export function V3GrammarFormPicker({
           .map(({ form: variant, displayDialect }) => ({
             value: variant.variant_id,
             displayDialect,
-            label: `${formLabel(form.form_type)} ${variant.spelling} · ${dialectLabel(displayDialect)}`,
+            label: `${formLabel(form.form_type)} ${variant.spelling} · ${dialectLabel(displayDialect, t)}`,
             link: {
               id: newWordNodeId(),
               source_segments: segments,
@@ -413,7 +439,10 @@ export function V3GrammarFormPicker({
         ? [
             {
               value: `${wordId}:draft:${pos.pos_id}`,
-              label: `${literal} · ${posLabel(pos.pos)}（当前词条）`,
+              label: t("creation_current_entry_candidate", {
+                text: literal,
+                pos: posLabel(pos.pos)
+              }),
               children
             }
           ]
@@ -438,12 +467,15 @@ export function V3GrammarFormPicker({
   ) {
     options.unshift({
       value: `${selected.target_word_id}:draft:${selected.target_pos_id}`,
-      label: `${linkedForm.headword} · ${posLabel(linkedForm.pos)}（已关联草稿）`,
+      label: t("creation_linked_draft_candidate", {
+        text: linkedForm.headword,
+        pos: posLabel(linkedForm.pos)
+      }),
       children: [
         {
           value: selected.target_variant_id,
           displayDialect: linkedForm.displayDialect,
-          label: `${formLabel(linkedForm.formType)} ${linkedForm.spelling} · ${dialectLabel(linkedForm.displayDialect)}`,
+          label: `${formLabel(linkedForm.formType)} ${linkedForm.spelling} · ${dialectLabel(linkedForm.displayDialect, t)}`,
           link: selected
         }
       ]
@@ -465,20 +497,28 @@ export function V3GrammarFormPicker({
       </Typography.Text>
       {selected && (
         <Typography.Text>
-          {draftPending ? "待确认" : "已关联"} ·{" "}
+          {draftPending
+            ? t("creation_awaiting_confirmation")
+            : t("panel_linked")}{" "}
+          ·{" "}
           {dialectLabel(
-            selectedOption?.displayDialect ?? selected.target_dialect
+            selectedOption?.displayDialect ?? selected.target_dialect,
+            t
           )}
-          {selected.target_publication_id ? "" : "（草稿）"}
+          {selected.target_publication_id ? "" : t("panel_draft_2")}
         </Typography.Text>
       )}
       {initialSelected && !selected && (
-        <Typography.Text type="secondary">确认后清除原关联</Typography.Text>
+        <Typography.Text type="secondary">
+          {t("creation_confirm_to_clear_the_original_link")}
+        </Typography.Text>
       )}
       <Typography.Text type="secondary">
         {selected
-          ? "分别选择具体口音、音标字段和读法；历史关联保留原读法"
-          : "选择词形关联"}
+          ? t(
+              "creation_select_the_accent_phonetic_field_and_reading_separately_historical_links_keep_their_origin"
+            )
+          : t("creation_choose_a_form_link")}
       </Typography.Text>
       {options.length > 0 && (
         <Cascader.Panel
@@ -511,10 +551,16 @@ export function V3GrammarFormPicker({
       {selected && (
         <Flex vertical gap={8}>
           <Select
-            aria-label="读法对应义项"
+            aria-label={t("creation_meaning_for_this_reading")}
             allowClear
-            placeholder="选择对应义项（可选）"
-            options={senses}
+            placeholder={t("creation_select_a_meaning_optional")}
+            options={senses.map((sense) => ({
+              value: sense.value,
+              label: t("creation_reading_sense", {
+                level: sense.level,
+                gloss: sense.gloss || t("creation_definition_not_entered")
+              })
+            }))}
             value={selected.reading_reference?.sense_id}
             onChange={(sense_id) =>
               setSelected(
@@ -547,7 +593,9 @@ export function V3GrammarFormPicker({
                           ? [
                               {
                                 value: `${row.id}:spelling`,
-                                label: `读法 ${index + 1} · 按拼写自然朗读`,
+                                label: t("creation_reading_natural", {
+                                  index: index + 1
+                                }),
                                 row,
                                 alphabet,
                                 use_spelling: true
@@ -560,7 +608,11 @@ export function V3GrammarFormPicker({
                         ...natural,
                         {
                           value: `${row.id}:${alphabet}`,
-                          label: `读法 ${index + 1} · ${alphabet.toUpperCase()} · ${value[alphabet]}`,
+                          label: t("creation_reading_value", {
+                            index: index + 1,
+                            alphabet: alphabet.toUpperCase(),
+                            value: value[alphabet]
+                          }),
                           row,
                           alphabet,
                           use_spelling: false
@@ -572,8 +624,12 @@ export function V3GrammarFormPicker({
               return (
                 <Select
                   key={locale}
-                  aria-label={`${locale === "en-GB" ? "英式" : "美式"}具体读法`}
-                  placeholder="明确选择读法"
+                  aria-label={t("creation_specific_reading", {
+                    side: t(
+                      locale === "en-GB" ? "candidate_uk" : "candidate_us"
+                    )
+                  })}
+                  placeholder={t("creation_select_a_reading_explicitly")}
                   loading={readingPending}
                   value={
                     selection
@@ -621,7 +677,9 @@ export function V3GrammarFormPicker({
               <Alert
                 type="info"
                 showIcon
-                title="所选词形暂无可用的发音数据，请先完善词形读法或选择其他词形。"
+                title={t(
+                  "creation_this_form_has_no_usable_pronunciation_data_add_its_readings_or_choose_another_form"
+                )}
               />
             )}
           {readingError && <Alert type="warning" title={readingError} />}
@@ -631,12 +689,12 @@ export function V3GrammarFormPicker({
       {!pending && !error && options.length === 0 && (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配的词形"
+          description={t("creation_no_matching_forms")}
         />
       )}
       {selected && (
         <Button size="small" onClick={() => setSelected(undefined)}>
-          清除关联
+          {t("panel_clear_link")}
         </Button>
       )}
       {error && (
@@ -649,7 +707,7 @@ export function V3GrammarFormPicker({
               size="small"
               onClick={() => setRevision((value) => value + 1)}
             >
-              重试
+              {t("batch_retry")}
             </Button>
           }
         />
@@ -660,29 +718,31 @@ export function V3GrammarFormPicker({
           loading={pending}
           onClick={() => setCursor(nextCursor)}
         >
-          加载更多
+          {t("panel_load_more")}
         </Button>
       )}
       {truncated && !nextCursor && (
         <Typography.Text type="secondary">
-          候选未完整返回，请缩小查询范围后重试。
+          {t(
+            "creation_not_all_candidates_were_returned_narrow_the_query_and_try_again"
+          )}
         </Typography.Text>
       )}
       <Flex justify="flex-end" gap="small">
         <Button
           size="small"
-          aria-label="取消词形关联"
+          aria-label={t("creation_cancel_form_link")}
           onClick={() => {
             setSelected(initialSelected);
             onCancel?.();
           }}
         >
-          取 消
+          {t("cancel_spaced")}
         </Button>
         <Button
           type="primary"
           size="small"
-          aria-label="确认词形关联"
+          aria-label={t("creation_confirm_form_link")}
           disabled={
             readingPending ||
             (!selected && !initialSelected) ||
@@ -700,7 +760,7 @@ export function V3GrammarFormPicker({
             onCancel?.();
           }}
         >
-          确 认
+          {t("creation_confirm")}
         </Button>
       </Flex>
     </Flex>

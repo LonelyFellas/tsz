@@ -1,6 +1,6 @@
-import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
+import { useLexiconEditorTranslation } from "../i18n/editor";
 import { localizedCatalogName } from "./catalog";
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useMemo, useCallback } from "react";
 import type { PropsWithChildren } from "react";
 import type { PartOfSpeechCatalogItem } from "@tsz/types";
 import {
@@ -11,15 +11,18 @@ import { usePartOfSpeechCatalog } from "./api";
 
 // 基本词性与细分词性展示目录正式名称，按界面语言选择已有中英文名；词形变化保留简洁中文名
 // （见 FormTypeLabels）。目录里没有的编码才回退到内置文案。
-const PosLabels = createContext<(code: string) => string>(partOfSpeechLabel);
-const SubPosLabels =
-  createContext<(code: string) => string>(subPartOfSpeechLabel);
+const PosLabels = createContext<((code: string) => string) | undefined>(
+  undefined
+);
+const SubPosLabels = createContext<((code: string) => string) | undefined>(
+  undefined
+);
 
 export function PartOfSpeechLabelsProvider({
   items,
   children
 }: PropsWithChildren<{ items?: readonly PartOfSpeechCatalogItem[] }>) {
-  const { i18n } = useInterfaceTranslation();
+  const { t, i18n } = useLexiconEditorTranslation();
   const [posLabel, subPosLabel] = useMemo(() => {
     const posNames = new Map<string, string>();
     const subPosNames = new Map<string, string>();
@@ -33,10 +36,10 @@ export function PartOfSpeechLabelsProvider({
       }
     }
     return [
-      (code: string) => posNames.get(code) ?? partOfSpeechLabel(code),
-      (code: string) => subPosNames.get(code) ?? subPartOfSpeechLabel(code)
+      (code: string) => posNames.get(code) ?? partOfSpeechLabel(code, t),
+      (code: string) => subPosNames.get(code) ?? subPartOfSpeechLabel(code, t)
     ] as const;
-  }, [items, i18n.language]);
+  }, [items, i18n.language, t]);
   return (
     <PosLabels.Provider value={posLabel}>
       <SubPosLabels.Provider value={subPosLabel}>
@@ -56,9 +59,21 @@ export function DictionaryPartOfSpeechLabels({ children }: PropsWithChildren) {
 }
 
 export function usePartOfSpeechLabel() {
-  return useContext(PosLabels);
+  const label = useContext(PosLabels);
+  const { t } = useLexiconEditorTranslation();
+  const fallback = useCallback(
+    (code: string) => partOfSpeechLabel(code, t),
+    [t]
+  );
+  return label ?? fallback;
 }
 
 export function useSubPartOfSpeechLabel() {
-  return useContext(SubPosLabels);
+  const label = useContext(SubPosLabels);
+  const { t } = useLexiconEditorTranslation();
+  const fallback = useCallback(
+    (code: string) => subPartOfSpeechLabel(code, t),
+    [t]
+  );
+  return label ?? fallback;
 }

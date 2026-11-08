@@ -1,3 +1,8 @@
+import { useLexiconEditorTranslation } from "./i18n/editor";
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation
+} from "./i18n/editor";
 import { useState } from "react";
 import type { EntryAnnotationGroup } from "@tsz/types";
 import {
@@ -34,16 +39,18 @@ export function annotationErrors(
   rows: AnnotationRow[],
   values: Record<string, string>,
   groups: EntryAnnotationGroup[],
-  required: boolean
+  required: boolean,
+  t: CreationTranslation = creationDefaultT
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const row of rows) {
     if (row.readOnly) continue;
     const value = (values[row.key] ?? "").trim();
-    if (!value && required) errors[row.key] = "请输入标注";
+    if (!value && required) errors[row.key] = t("creation_enter_an_annotation");
     else if (value && !/^[0-9]+$/.test(value))
-      errors[row.key] = "标注只能输入数字";
-    else if (value.length > 20) errors[row.key] = "标注最多 20 位数字";
+      errors[row.key] = t("creation_annotations_must_contain_digits_only");
+    else if (value.length > 20)
+      errors[row.key] = t("creation_annotations_cannot_exceed_20_digits");
   }
   for (const group of groups) {
     const members = rows.filter(
@@ -60,7 +67,9 @@ export function annotationErrors(
             (values[other.key] ?? "").trim().toLowerCase() === value
         )
       )
-        errors[row.key] = "同组标注不能相同";
+        errors[row.key] = t(
+          "creation_annotations_in_the_same_group_must_be_unique"
+        );
     }
   }
   return errors;
@@ -86,6 +95,7 @@ export function EntryAnnotationModal({
   onSave: (values: Record<string, string>) => void;
   onClose: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const posLabel = usePartOfSpeechLabel();
   const existingRows = rows.filter((row) => !row.incoming);
   const incomingRows = rows.filter((row) => row.incoming);
@@ -97,7 +107,8 @@ export function EntryAnnotationModal({
     rows,
     values,
     groups,
-    creating || groups.length > 0
+    creating || groups.length > 0,
+    t
   );
   const renderRow = (row: AnnotationRow, index: number) => {
     const fieldError = errors[row.key];
@@ -110,7 +121,9 @@ export function EntryAnnotationModal({
             <Typography.Text className="tsz-words" strong>
               {row.label}
             </Typography.Text>
-            {!row.incoming ? <Tag>{`已有词条 ${index + 1}`}</Tag> : null}
+            {!row.incoming ? (
+              <Tag>{t("creation_existing_index", { index: index + 1 })}</Tag>
+            ) : null}
             {row.readOnly && row.readOnlyHint ? (
               <Tag>{row.readOnlyHint}</Tag>
             ) : null}
@@ -130,12 +143,12 @@ export function EntryAnnotationModal({
                 {row.glossPreviews?.length
                   ? row.glossPreviews.join("；")
                   : row.posLabels?.length
-                    ? "暂无释义"
-                    : "暂无词性、释义"}
+                    ? t("panel_no_definitions_yet")
+                    : t("creation_no_part_of_speech_or_definition")}
               </Typography.Text>
               {row.referenceCount ? (
                 <Typography.Text type="secondary">
-                  关联引用：{row.referenceCount} 处
+                  {t("creation_reference_count", { count: row.referenceCount })}
                 </Typography.Text>
               ) : null}
               {row.createdByName || row.updatedAt || row.href ? (
@@ -144,7 +157,9 @@ export function EntryAnnotationModal({
                     <Typography.Text
                       type="secondary"
                       className="entry-annotation-creator"
-                      title={`创建人：${row.createdByName}`}
+                      title={t("creation_creator_label", {
+                        name: row.createdByName
+                      })}
                     >
                       {row.createdByName}
                     </Typography.Text>
@@ -156,7 +171,9 @@ export function EntryAnnotationModal({
                     >
                       <time
                         dateTime={row.updatedAt}
-                        title={`更新于 ${dayjs(row.updatedAt).format("YYYY-MM-DD HH:mm")}`}
+                        title={t("creation_updated_label", {
+                          time: dayjs(row.updatedAt).format("YYYY-MM-DD HH:mm")
+                        })}
                       >
                         {dayjs(row.updatedAt).format("MM-DD HH:mm")}
                       </time>
@@ -167,12 +184,14 @@ export function EntryAnnotationModal({
                       type="link"
                       size="small"
                       className="entry-annotation-view"
-                      aria-label={`查看词条 ${row.label}`}
+                      aria-label={t("creation_view_entry", {
+                        label: row.label
+                      })}
                       href={row.href}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      查看
+                      {t("creation_view")}
                     </Button>
                   ) : null}
                 </div>
@@ -181,7 +200,7 @@ export function EntryAnnotationModal({
           ) : null}
         </div>
         <Form.Item
-          label="数字标注"
+          label={t("creation_numeric_annotation")}
           required={!row.readOnly && (creating || groups.length > 0)}
           layout="vertical"
           style={{ marginBottom: 0 }}
@@ -189,8 +208,12 @@ export function EntryAnnotationModal({
           help={showError ? fieldError : undefined}
         >
           <Input
-            aria-label={`${row.incoming ? "新建词条" : row.label}标注`}
-            placeholder={row.readOnly ? "未标注" : "例如 001"}
+            aria-label={t("creation_annotation_field", {
+              label: row.incoming ? t("creation_new_entry_d4dfcf") : row.label
+            })}
+            placeholder={
+              row.readOnly ? t("creation_no_annotation") : t("creation_e_g_001")
+            }
             inputMode="numeric"
             className="entry-annotation-input"
             value={values[row.key] ?? ""}
@@ -211,8 +234,12 @@ export function EntryAnnotationModal({
   };
   return (
     <Modal
-      title={creating ? "设置词条标注" : "编辑词条标注"}
-      cancelText="取消"
+      title={
+        creating
+          ? t("creation_set_entry_annotations")
+          : t("creation_edit_entry_annotations")
+      }
+      cancelText={t("batch_cancel")}
       open
       centered
       width={760}
@@ -228,7 +255,11 @@ export function EntryAnnotationModal({
         );
         onSave(normalized);
       }}
-      okText={creating ? "保存标注并创建" : "保存标注"}
+      okText={
+        creating
+          ? t("creation_save_annotations_and_create")
+          : t("creation_save_annotations")
+      }
       confirmLoading={busy}
       okButtonProps={{
         disabled: Object.keys(errors).length > 0
@@ -246,13 +277,15 @@ export function EntryAnnotationModal({
       <div className="entry-annotation-content">
         <div className="entry-annotation-intro">
           <Typography.Text type="secondary">
-            同原形词条需使用不同的数字标注，最多 20 位。
+            {t(
+              "creation_entries_with_the_same_base_form_need_different_numeric_annotations_of_up_to_20_digits"
+            )}
           </Typography.Text>
         </div>
         {existingRows.length > 0 ? (
-          <section aria-label="已有词条">
+          <section aria-label={t("creation_existing_entries")}>
             <Typography.Text strong className="entry-annotation-section-title">
-              已有词条 · {existingRows.length} 条
+              {t("creation_existing_count", { count: existingRows.length })}
             </Typography.Text>
             <Card size="small" styles={{ body: { padding: 0 } }}>
               {existingRows.map(renderRow)}
@@ -260,9 +293,9 @@ export function EntryAnnotationModal({
           </section>
         ) : null}
         {incomingRows.length > 0 ? (
-          <section aria-label="本次新建">
+          <section aria-label={t("creation_new_in_this_request")}>
             <Typography.Text strong className="entry-annotation-section-title">
-              本次新建
+              {t("creation_new_in_this_request")}
             </Typography.Text>
             <Card
               size="small"

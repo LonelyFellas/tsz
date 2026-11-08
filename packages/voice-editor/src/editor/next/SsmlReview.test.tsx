@@ -1,3 +1,6 @@
+import { InterfaceI18nProvider, useTranslation } from "@tsz/shared/i18n/react";
+import { VoiceEditorDisplayError } from "../../types";
+import { useRef } from "react";
 import {
   act,
   cleanup,
@@ -244,4 +247,48 @@ it("宿主暂存草稿，开关手动模式及卸载重挂都不丢原文，明�
   fireEvent.click(screen.getByRole("button", { name: "恢复自动生成" }));
   expect(screen.getByLabelText("SSML 原文")).toHaveValue(automatic);
   expect(screen.getByLabelText("手动编辑 SSML")).not.toBeChecked();
+});
+
+it("保留适配器的可翻译错误，切换不重发 SSML", async () => {
+  const renderSsml = vi.fn();
+  const adapter: VoicePreviewAdapter = {
+    listVoices: vi.fn(),
+    synthesize: vi.fn(),
+    renderSsml
+  };
+  function Probe() {
+    const { i18n } = useTranslation();
+    const locale = useRef(i18n.language);
+    locale.current = i18n.language;
+    renderSsml.mockImplementation(() =>
+      Promise.reject(
+        new VoiceEditorDisplayError(() =>
+          locale.current.startsWith("en")
+            ? "Known local failure"
+            : "已知本地错误"
+        )
+      )
+    );
+    return (
+      <SsmlReview
+        adapter={adapter}
+        content={content}
+        settings={settings}
+        onPlay={() => {}}
+        expanded
+        automaticAvailable
+      />
+    );
+  }
+  const ui = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <Probe />
+    </InterfaceI18nProvider>
+  );
+  const view = render(ui("zh-Hans"));
+  await screen.findByText("已知本地错误");
+  const calls = renderSsml.mock.calls.length;
+  view.rerender(ui("en-US"));
+  await screen.findByText("Known local failure");
+  expect(renderSsml).toHaveBeenCalledTimes(calls);
 });

@@ -474,7 +474,7 @@ export function V3ReviewContent({
         ?.scrollIntoView({ behavior: "smooth", block: "start" })
     );
   };
-  const model = buildV3ReviewModel(word);
+  const model = buildV3ReviewModel(word, t);
   const statusColor =
     model.state.status === "published"
       ? "success"

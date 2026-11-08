@@ -1,3 +1,4 @@
+import { creationResidualMessages } from "./creation-residual-messages";
 import { batchPublicationMessages } from "./batch-publication-messages";
 import { publishingWorkspaceMessages } from "./publishing-workspace-messages";
 import { useState } from "react";
@@ -8,6 +9,7 @@ export const lexiconEditorMessages = {
   ...lexiconEditorPanelMessages,
   ...publishingWorkspaceMessages,
   ...batchPublicationMessages,
+  ...creationResidualMessages,
   add_pos_group: [
     "新增{{pos}}变化组",
     "新增{{pos}}變化組",

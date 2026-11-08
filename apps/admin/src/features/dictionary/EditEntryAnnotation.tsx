@@ -1,3 +1,8 @@
+import { useLexiconEditorTranslation } from "./i18n/editor";
+import {
+  useLexiconEditorMessageState as useCreationMessageState,
+  createLexiconEditorMessage as creationMessage
+} from "./i18n/editor";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client/http";
@@ -5,7 +10,7 @@ import type { AdminWordListItemAny, EntryAnnotationConflict } from "@tsz/types";
 import { adminWordsDataSource } from "./dataSource";
 import { EntryAnnotationModal } from "./EntryAnnotationModal";
 import { wordListLabel } from "./presentation";
-import { annotationForbiddenMessage } from "./annotationPermission";
+import { isAnnotationOwnershipError } from "./annotationPermission";
 import { wordKeys } from "./api";
 
 export function EditEntryAnnotation({
@@ -15,11 +20,12 @@ export function EditEntryAnnotation({
   entry: AdminWordListItemAny;
   onClose: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const queryClient = useQueryClient();
   const [conflict, setConflict] = useState<EntryAnnotationConflict>();
   const [version, setVersion] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useCreationMessageState();
   const locked = useRef(false);
   const current = conflict?.entries.find((item) => item.entry_id === entry.id);
   const rows = conflict
@@ -35,7 +41,10 @@ export function EditEntryAnnotation({
         href: `/words/${item.entry_id}/v3/wizard/forms`,
         // 这条 PATCH 只改一个词条，同组的其他行一律只读——列出来是为了避重。
         readOnly: item.entry_id !== entry.id,
-        readOnlyHint: item.entry_id === entry.id ? undefined : "仅供比对"
+        readOnlyHint:
+          item.entry_id === entry.id
+            ? undefined
+            : t("creation_for_comparison_only")
       }))
     : [
         {
@@ -83,13 +92,25 @@ export function EditEntryAnnotation({
           ) {
             setConflict(error.meta.annotation_conflict);
             setVersion((version) => version + 1);
-            setError("标注或原型分组已变化，请根据当前标注重新确认。");
+            setError(
+              creationMessage(
+                "creation_annotations_or_base_form_groups_have_changed_confirm_again_using_the_current_annotations"
+              )
+            );
           } else if (error instanceof HttpError && error.status === 403) {
             // 越权改不动，重试也不会好——不能混进「请重试」的通用文案里。
-            setError(annotationForbiddenMessage(error.code));
+            setError(
+              creationMessage(
+                isAnnotationOwnershipError(error.code)
+                  ? "creation_you_can_only_change_annotations_on_entries_you_created"
+                  : "creation_this_account_cannot_change_this_entry_s_annotation"
+              )
+            );
           } else {
             setError(
-              "保存失败，请重试。若上次请求已保存，将重新确认最新标注。"
+              creationMessage(
+                "creation_could_not_save_retry_if_the_previous_request_was_saved_the_latest_annotations_will_be_chec"
+              )
             );
           }
         } finally {

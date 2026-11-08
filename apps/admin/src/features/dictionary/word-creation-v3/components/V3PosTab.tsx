@@ -1,3 +1,8 @@
+import {
+  createLexiconEditorMessage as creationMessage,
+  lexiconEditorMessageText as creationMessageText,
+  type LexiconEditorMessage as CreationMessage
+} from "../../i18n/editor";
 import { primaryRegionalVariant } from "@tsz/shared";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { localizedCatalogName } from "../../part-of-speech/catalog";
@@ -98,12 +103,12 @@ export function V3PosTab({
   // 英美规则按组生效，合并冲突也只挂在发起切换的那一组上。
   const [dialectChangeError, setDialectChangeError] = useState<{
     groupId: string;
-    message: string;
+    message: CreationMessage;
   }>();
   const { t, i18n } = useLexiconEditorTranslation();
   const posLabel = posCatalog
     ? localizedCatalogName(posCatalog, i18n.language)
-    : partOfSpeechLabel(pos.pos);
+    : partOfSpeechLabel(pos.pos, t);
   const { preference } = useDialectPreference();
   const referenceGuard = useV3ReferenceGuard();
   const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];
@@ -139,25 +144,30 @@ export function V3PosTab({
     } else if (result.reason === "spelling_marks_merge_required") {
       setDialectChangeError({
         groupId,
-        message:
-          "英式与美式拼写标注或试听配置不同，请先统一需要保留的配置，再合并拼写。"
+        message: creationMessage(
+          "creation_british_and_american_spelling_annotations_or_preview_settings_differ_align_the_settings_to"
+        )
       });
     } else if (result.reason === "regularity_merge_required") {
       setDialectChangeError({
         groupId,
-        message: "英式与美式的规则变化设置不同，请先统一设置，再合并拼写。"
+        message: creationMessage(
+          "creation_british_and_american_regular_form_settings_differ_align_them_before_merging_spellings"
+        )
       });
     } else if (result.reason === "component_merge_required") {
       setDialectChangeError({
         groupId,
-        message:
-          "英式与美式成分用词配置不同，请先统一需要保留的配置，再合并为英美通用。"
+        message: creationMessage(
+          "creation_british_and_american_component_word_settings_differ_align_the_settings_to_keep_before_merg"
+        )
       });
     } else if (result.reason === "pronunciation_merge_required") {
       setDialectChangeError({
         groupId,
-        message:
-          "英式与美式发音内容不同，请先统一需要保留的发音，再合并为英美通用。"
+        message: creationMessage(
+          "creation_british_and_american_pronunciation_content_differs_align_the_pronunciations_to_keep_before"
+        )
       });
     }
   };
@@ -194,10 +204,12 @@ export function V3PosTab({
             data-v3-node-id={group.id}
             tabIndex={-1}
           >
-            <Typography.Text strong>英美拼写是否有区别？</Typography.Text>
+            <Typography.Text strong>
+              {t("creation_do_british_and_american_spellings_differ")}
+            </Typography.Text>
             <Flex align="center" gap={12}>
               <V3ReferenceBadge
-                label="本组词形变体"
+                label={t("creation_form_variants_in_this_group")}
                 nodeIds={commonVariantIds}
               />
               <Radio.Group
@@ -217,11 +229,21 @@ export function V3PosTab({
                 }
                 value={rules.spelling_mode}
               >
-                <Radio aria-label="英美拼写有区别" value="distinguish">
-                  是
+                <Radio
+                  aria-label={t(
+                    "creation_british_and_american_spellings_differ"
+                  )}
+                  value="distinguish"
+                >
+                  {t("yes")}
                 </Radio>
-                <Radio aria-label="英美拼写无区别" value="unified">
-                  否
+                <Radio
+                  aria-label={t(
+                    "creation_british_and_american_spellings_are_the_same"
+                  )}
+                  value="unified"
+                >
+                  {t("no")}
                 </Radio>
               </Radio.Group>
             </Flex>
@@ -232,10 +254,12 @@ export function V3PosTab({
             data-v3-node-id={group.id}
             tabIndex={-1}
           >
-            <Typography.Text strong>英美音标是否有区别？</Typography.Text>
+            <Typography.Text strong>
+              {t("creation_do_british_and_american_phonetics_differ")}
+            </Typography.Text>
             <Flex align="center" gap={12}>
               <V3ReferenceBadge
-                label="本组词形变体"
+                label={t("creation_form_variants_in_this_group")}
                 nodeIds={memberVariantIds}
               />
               <Radio.Group
@@ -247,22 +271,31 @@ export function V3PosTab({
                 }
                 value={rules.phonetic_mode}
               >
-                <Radio aria-label="英美音标有区别" value="distinguish">
-                  是
+                <Radio
+                  aria-label={t(
+                    "creation_british_and_american_phonetics_differ"
+                  )}
+                  value="distinguish"
+                >
+                  {t("yes")}
                 </Radio>
                 <V3DisabledReason
                   reason={
                     rules.spelling_mode === "distinguish"
-                      ? "英美拼写有区别时，音标也必须区分"
+                      ? t(
+                          "creation_separate_phonetics_when_british_and_american_spellings_differ"
+                        )
                       : undefined
                   }
                 >
                   <Radio
-                    aria-label="英美音标无区别"
+                    aria-label={t(
+                      "creation_british_and_american_phonetics_are_the_same"
+                    )}
                     disabled={rules.spelling_mode === "distinguish"}
                     value="unified"
                   >
-                    否
+                    {t("no")}
                   </Radio>
                 </V3DisabledReason>
               </Radio.Group>
@@ -271,9 +304,13 @@ export function V3PosTab({
         </div>
         {!consistent ? (
           <Alert
-            description="请选择统一目标；系统会按唯一词形逐条要求显式映射，不会静默复制或丢弃发音。"
+            description={t(
+              "creation_choose_the_shared_target_each_unique_form_needs_an_explicit_mapping_pronunciations_are_not"
+            )}
             showIcon
-            title="本组的英美结构待统一"
+            title={t(
+              "creation_british_and_american_structures_in_this_group_need_alignment"
+            )}
             type="warning"
           />
         ) : null}
@@ -282,8 +319,8 @@ export function V3PosTab({
             closable
             onClose={() => setDialectChangeError(undefined)}
             showIcon
-            title="暂不能合并英美配置"
-            description={dialectChangeError.message}
+            title={t("creation_cannot_merge_british_and_american_settings_yet")}
+            description={creationMessageText(dialectChangeError.message, t)}
             type="warning"
           />
         ) : null}
@@ -380,33 +417,40 @@ export function V3PosTab({
           action={
             <Space>
               <Button onClick={() => setPendingGroupDeletion(undefined)}>
-                取消
+                {t("batch_cancel")}
               </Button>
               <Button danger onClick={confirmGroupDeletion}>
-                删除变化组并同时删除 {pendingGroupDeletion.formIds.length}{" "}
-                个不再被其他变化组使用的词形
+                {t("creation_group_delete_count", {
+                  count: pendingGroupDeletion.formIds.length
+                })}
               </Button>
             </Space>
           }
           description={
             <ul>
               {pendingGroupDeletion.formIds.map((formId, index) => (
-                <li key={formId}>受影响词形 {index + 1}</li>
+                <li key={formId}>
+                  {t("creation_affected_form", { index: index + 1 })}
+                </li>
               ))}
             </ul>
           }
           showIcon
           title={
             pendingGroupDeletion.changed
-              ? "删除影响已变化，请重新确认"
-              : "删除变化组需要额外确认"
+              ? t("creation_the_deletion_impact_has_changed_confirm_again")
+              : t("creation_deleting_this_form_group_needs_confirmation")
           }
           type="warning"
         />
       ) : null}
       {visibleGroups.length === 0 ? (
         !posCatalog || allowedDerivedTypes.length > 0 ? (
-          <Empty description="草稿可暂时不添加变化组" />
+          <Empty
+            description={t(
+              "creation_a_draft_can_temporarily_have_no_form_groups"
+            )}
+          />
         ) : null
       ) : (
         <Space

@@ -988,7 +988,7 @@ export function WordWizardV3Page({
     );
   }
   if (detail.isError || !detail.data) {
-    const presentation = presentV3DetailError(detail.error);
+    const presentation = presentV3DetailError(detail.error, t);
     return (
       <Result
         status="error"

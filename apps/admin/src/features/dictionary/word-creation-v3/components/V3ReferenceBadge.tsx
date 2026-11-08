@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { LinkIcon } from "lucide-react";
 import { Popover } from "@tsz/ui/admin/overlays";
 import { Tag } from "@tsz/ui/admin/display";
@@ -18,6 +19,7 @@ export function V3ReferenceBadge({
   /** 悬停说明里的节点名，如「词形」「词义」。 */
   label?: string;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const { index } = useV3ReferenceGuard();
   const count = nodesReferenceCount(index, nodeIds);
   if (count === 0) return null;
@@ -26,18 +28,21 @@ export function V3ReferenceBadge({
     <Popover
       content={<V3ReferenceList references={references} total={count} />}
       overlayStyle={{ maxWidth: 560 }}
-      title={`${label || "此内容"}存在 ${count} 处关联`}
+      title={t("creation_node_reference_count", {
+        label: label || t("creation_this_content"),
+        count
+      })}
       trigger="click"
     >
       <Tag
-        aria-label={`查看 ${count} 处关联`}
+        aria-label={t("creation_view_reference_count", { count })}
         className="v3-reference-badge"
         color="orange"
         onClick={(event) => event.stopPropagation()}
         role="button"
         style={{ cursor: "pointer", marginInlineEnd: 0 }}
         tabIndex={0}
-        title={`存在 ${count} 处关联，点击查看关联内容`}
+        title={t("creation_reference_count_help", { count })}
       >
         {/* 不走 Tag 的 icon 插槽：页签会给内部图标加 12px 右边距、Tag 再给文字加 7px，图标和计数之间空出一大截。行内样式压过这两条。 */}
         <LinkIcon style={{ marginInlineEnd: 4 }} />
