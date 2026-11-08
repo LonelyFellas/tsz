@@ -1,12 +1,14 @@
+import type { InterfaceLocaleV1 } from "@tsz/types";
+
 /** 已内置资源的界面语言；是否向用户开放由后续业务能力目录决定。 */
 export const INTERFACE_LOCALES = [
   "zh-Hans",
   "zh-Hant",
   "en-GB",
   "en-US"
-] as const;
+] as const satisfies readonly InterfaceLocaleV1[];
 
-export type InterfaceLocale = (typeof INTERFACE_LOCALES)[number];
+export type InterfaceLocale = InterfaceLocaleV1;
 
 export const DEFAULT_INTERFACE_LOCALE: InterfaceLocale = "zh-Hans";
 

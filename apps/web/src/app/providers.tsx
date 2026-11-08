@@ -1,7 +1,8 @@
 "use client";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
+import { interfacePreferences } from "@/lib/interface-preferences";
 import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect } from "react";
 import { getQueryClient } from "@/lib/query-client";
@@ -72,6 +73,9 @@ function SessionRestorer() {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const interfaceSessionKey = useUserStore(() =>
+    interfacePreferences.sessionKey()
+  );
   // getQueryClient 在浏览器端返回单例,不放进 useState 也安全。
   const queryClient = getQueryClient();
   useEffect(() => {
@@ -106,7 +110,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <InterfaceI18nProvider>
+    <InterfacePreferencesProvider
+      controller={interfacePreferences}
+      sessionKey={interfaceSessionKey}
+    >
       <QueryClientProvider client={queryClient}>
         <ThemeSync />
         <SessionRestorer />
@@ -119,6 +126,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <ReactQueryDevtools initialIsOpen={false} />
         )}
       </QueryClientProvider>
-    </InterfaceI18nProvider>
+    </InterfacePreferencesProvider>
   );
 }

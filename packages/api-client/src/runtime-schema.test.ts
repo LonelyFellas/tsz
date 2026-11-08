@@ -35,6 +35,9 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "InterfaceCapabilities",
+  "InterfaceLocaleV1",
+  "UserInterfacePreferencesResponse",
   "LexiconAssistantCapability",
   "LexiconAssistantResponse",
   "LexiconAssistantEvent",

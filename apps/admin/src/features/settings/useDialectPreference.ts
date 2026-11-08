@@ -10,7 +10,7 @@ import {
   resolveDialectPreference,
   type AdminDialectPreference
 } from "@tsz/shared";
-import { api, useAuthStore } from "@/lib/auth";
+import { api, tokens, useAuthStore } from "@/lib/auth";
 
 const cache = createDialectPreferenceCache({
   storage: globalThis.localStorage,
@@ -47,15 +47,23 @@ export function useDialectPreference(): DialectPreferenceHandle {
       if (!profile) {
         throw new Error("当前会话已失效，请重新登录");
       }
+      const generation = tokens.getSessionGeneration();
       const { preferences } = await api.updateProfilePreferences({
         dialect: value
       });
       // 偏好请求可能晚于权限刷新；只合并到同账号的最新身份，不能复活旧授权。
       const current = useAuthStore.getState().profile;
-      if (!current || current.id !== profile.id) {
+      if (
+        !current ||
+        current.id !== profile.id ||
+        generation !== tokens.getSessionGeneration()
+      ) {
         throw new Error("当前会话已变化，请重试");
       }
-      setProfile({ ...current, preferences });
+      setProfile({
+        ...current,
+        preferences: { ...current.preferences, dialect: preferences.dialect }
+      });
       cache.write(current.id, preferences.dialect);
     },
     [profile, setProfile]
