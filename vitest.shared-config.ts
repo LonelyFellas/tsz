@@ -52,12 +52,7 @@ export const coverageCollectionConfig = {
     // ② api.ts 是 React Query 薄装配(useQuery/useMutation 包 api.words.*),无业务分支。
     "apps/admin/src/features/dictionary/*.tsx",
     "apps/admin/src/features/dictionary/word-editor/**/*.tsx",
-    "apps/admin/src/features/dictionary/api.ts",
-    // 首页看板图表：recharts 组装壳，无业务分支且 jsdom 量不到布局（宽高恒 0），
-    // 单测价值低，由 pages 冒烟测试保底渲染不抛错。
-    // TODO(看板): 接 /admin 统计接口后，为数据映射/空态/加载态补组件测试并移除本行。
-    // KpiCard 有 delta 涨跌逻辑，已在 KpiCard.test.tsx 覆盖，不在此列。
-    "apps/admin/src/features/dashboard/DashboardCharts.tsx"
+    "apps/admin/src/features/dictionary/api.ts"
   ]
 };
 
