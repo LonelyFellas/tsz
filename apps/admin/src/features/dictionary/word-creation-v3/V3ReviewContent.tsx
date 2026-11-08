@@ -1,7 +1,4 @@
-import {
-  useLexiconEditorTranslation,
-  type LexiconEditorTranslation
-} from "../i18n/editor";
+import { useLexiconEditorTranslation } from "../i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { ColumnSettings } from "@/components/ColumnSettings";
 import { useColumnSettings } from "@/components/useColumnSettings";
@@ -33,8 +30,7 @@ import type {
   AdminWordV3,
   Dialect,
   WordPronunciationV3,
-  SpellingSpeechV3,
-  PronunciationSynthesisV3
+  SpellingSpeechV3
 } from "@tsz/types";
 import {
   useEffect,
@@ -44,7 +40,11 @@ import {
   type CSSProperties,
   type ReactNode
 } from "react";
-import { dialectLabel, pronunciationStyleLabel } from "./presentation";
+import {
+  dialectLabel,
+  pronunciationStyleLabel,
+  reviewSynthesisLabel
+} from "./presentation";
 import { buildV3ReviewModel } from "./reviewModel";
 import { V3MeaningsPreview, reviewSenseTitle } from "./V3MeaningsPreview";
 import "./v3-preview.css";
@@ -647,32 +647,4 @@ export function V3ReviewContent({
       </div>
     </section>
   );
-}
-
-function reviewSynthesisLabel(
-  synthesis: PronunciationSynthesisV3,
-  dialect: Dialect,
-  t: LexiconEditorTranslation
-) {
-  if (synthesis.use_spelling) return t("review_spelling_source");
-  const name = `Azure ${synthesis.alphabet.toUpperCase()}`;
-  const empty = t("review_not_entered");
-  if (!synthesis.uk && !synthesis.us)
-    return t("review_synthesis_value", {
-      name,
-      value: synthesis[synthesis.alphabet] || empty
-    });
-  const uk =
-    synthesisForLocale(synthesis, "en-GB", dialect)[synthesis.alphabet] ||
-    empty;
-  const us =
-    synthesisForLocale(synthesis, "en-US", dialect)[synthesis.alphabet] ||
-    empty;
-  if (dialect !== "common")
-    return t("review_synthesis_dialect", {
-      name,
-      dialect: dialectLabel(dialect, t),
-      value: dialect === "uk" ? uk : us
-    });
-  return t("review_synthesis_both", { name, uk, us });
 }

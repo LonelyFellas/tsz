@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { App } from "@tsz/ui/admin/overlays";
 import {
   act,
@@ -181,4 +183,68 @@ it("取消在途生成后忽略迟到结果并保留草稿", async () => {
   expect(screen.queryAllByText("/bæŋk/")).toHaveLength(0);
   expect(value.applyForms).not.toHaveBeenCalled();
   expect(value.forms.pos).toHaveLength(0);
+});
+
+it("语言切换保留候选选择、预览节点及导入计划，显式点击才应用原草稿", async () => {
+  const value = context();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      {surface(value)}
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(screen.getByRole("button", { name: /生成词性与发音候选/ }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /导入当前草稿/ })).toBeEnabled()
+  );
+  const checkbox = screen.getByRole("checkbox");
+  const spelling = screen.getAllByText("bank")[0];
+  const uuid = vi.spyOn(crypto, "randomUUID");
+  for (const locale of ["en-GB", "en-US", "zh-Hant"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByRole("checkbox")).toBe(checkbox);
+    expect(checkbox).toBeChecked();
+    expect(screen.getAllByText("bank")[0]).toBe(spelling);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(value.applyForms).not.toHaveBeenCalled();
+  }
+  expect(uuid).not.toHaveBeenCalled();
+  uuid.mockRestore();
+  fireEvent.click(screen.getByRole("button", { name: /匯入目前草稿/ }));
+  expect(value.applyForms).toHaveBeenCalledTimes(1);
+  expect(value.applyForms).toHaveBeenCalledWith(
+    expect.objectContaining({ forms_format: "shared_v1" }),
+    JSON.stringify(value.forms)
+  );
+});
+
+it("生成中切换语言保留取消与失败信息，不重发请求", async () => {
+  let reject!: (cause: unknown) => void;
+  request.mockImplementationOnce(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      })
+  );
+  const value = context();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      {surface(value)}
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(screen.getByRole("button", { name: /生成词性与发音候选/ }));
+  const signal = request.mock.calls[0]![1] as AbortSignal;
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByRole("button", { name: /Import into draft/ })
+  ).toBeDisabled();
+  expect(signal.aborted).toBe(false);
+  await act(async () => reject(new Error("network")));
+  expect(screen.getByText(/Could not generate valid candidates/)).toBeVisible();
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByText(/未能產生有效候選/)).toBeVisible();
+  expect(value.applyForms).not.toHaveBeenCalled();
+  expect(request).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "取消" }));
 });

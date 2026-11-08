@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { useAuthStore } from "@/lib/auth";
 import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
@@ -1773,7 +1775,7 @@ describe("V3PublicationHistory", () => {
   it.each([
     [403, "当前账号没有恢复历史草稿的权限。"],
     [422, "恢复请求校验未通过。"],
-    [500, "恢复历史草稿失败，请稍后重试。"],
+    [500, "backend diagnostic"],
     [503, "恢复结果尚未确认，请刷新查看结果或原样重试确认。"]
   ])(
     "classifies activate HTTP %s and preserves immutable detail",
@@ -1783,7 +1785,7 @@ describe("V3PublicationHistory", () => {
       api.listPublications.mockResolvedValue({ publications: [historical] });
       api.getPublication.mockResolvedValue({ publication: historical });
       api.restoreDraftFromPublication.mockRejectedValue(
-        new HttpError(status as number, "sensitive backend detail")
+        new HttpError(status as number, "backend diagnostic")
       );
       render(
         <V3PublicationHistory
@@ -2508,4 +2510,70 @@ beforeEach(() => {
       preferences: { dialect: "uk" }
     }
   });
+});
+
+it("切换语言保留历史选择、恢复确认和幂等请求，失败后可原样重试", async () => {
+  const api = requests();
+  const historical = v3PublicationWithSnapshotBody();
+  api.listPublications.mockResolvedValue({ publications: [historical] });
+  api.getPublication.mockResolvedValue({ publication: historical });
+  const pending = deferred<AdminWordDraftV3Envelope>();
+  api.restoreDraftFromPublication
+    .mockReturnValueOnce(pending.promise)
+    .mockRejectedValueOnce(new HttpError(500, "unknown backend message"));
+  const restored = vi.fn();
+  const word = v3Word();
+  const key = vi.fn(() => "stable-restore-key");
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <V3PublicationHistory
+        currentWord={word}
+        requests={api}
+        onRestored={restored}
+        idempotencyKeyFactory={key}
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "查看第 2 次发布" })
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
+  const body = screen.getByTestId("publication-snapshot-body");
+  for (const locale of ["en-GB", "en-US", "zh-Hant"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByTestId("publication-snapshot-body")).toBe(body);
+    expect(screen.getByText("historical-v3-spelling")).toBeVisible();
+    expect(api.getPublication).toHaveBeenCalledTimes(1);
+    expect(api.restoreDraftFromPublication).not.toHaveBeenCalled();
+  }
+  view.rerender(content("en-US"));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm restore" }));
+  const payload = structuredClone(
+    api.restoreDraftFromPublication.mock.calls[0]
+  );
+  expect(payload).toEqual([
+    word.id,
+    historical.publication_id,
+    "stable-restore-key",
+    {
+      schema_version: 3,
+      base_revision: word.revision,
+      base_lifecycle_revision: word.lifecycle_revision
+    }
+  ]);
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByRole("button", { name: "關閉發布詳情" })).toBeDisabled();
+  expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(1);
+  await act(async () => pending.reject(new TypeError("network")));
+  expect(screen.getByText(/網路異常，恢復狀態未知/)).toBeVisible();
+  view.rerender(content("en-GB"));
+  expect(
+    screen.getByText(/A network error left the restore result unknown/)
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm restore" }));
+  expect(api.restoreDraftFromPublication.mock.calls[1]).toEqual(payload);
+  expect(await screen.findByText("unknown backend message")).toBeVisible();
+  expect(key).toHaveBeenCalledTimes(1);
+  expect(restored).not.toHaveBeenCalled();
 });

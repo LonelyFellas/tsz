@@ -293,6 +293,6 @@ describe("AI 候选本地导入", () => {
     );
     expect(plan.changed).toBe(0);
     expect(plan.forms).toEqual(shared);
-    expect(plan.rows[0]!.message).toContain("共用");
+    expect(plan.rows[0]!.message).toBe("candidate_shared_kept");
   });
 });

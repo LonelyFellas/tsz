@@ -1,3 +1,4 @@
+import type { LexiconEditorKey } from "../i18n/editor";
 import { primaryRegionalVariant } from "@tsz/shared";
 import type {
   AssistantCandidateForm,
@@ -37,7 +38,7 @@ export interface CandidateImportRow {
   key: string;
   pos: string;
   form_type: string;
-  message: string;
+  message: LexiconEditorKey | "";
   changed: boolean;
   uk: AssistantCandidateVariant;
   us: AssistantCandidateVariant;
@@ -234,7 +235,7 @@ export function planFormCandidates(
       };
       rows.push(row);
       if (pos.form_groups.length !== 1) {
-        row.message = "已有多组或游离词形，请在编辑器中确认归属";
+        row.message = "candidate_multiple_groups";
         continue;
       }
       const group = pos.form_groups[0]!;
@@ -243,11 +244,11 @@ export function planFormCandidates(
           (form) => !group.members.some((member) => member.form_id === form.id)
         )
       ) {
-        row.message = "存在游离词形，请在编辑器中确认归属";
+        row.message = "candidate_ungrouped";
         continue;
       }
       if (!compatible(proposal, group.dialect_rules)) {
-        row.message = "英美设置与候选不同，保留已有设置";
+        row.message = "candidate_dialect_mismatch";
         continue;
       }
       const sameType = pos.forms.filter(
@@ -265,7 +266,7 @@ export function planFormCandidates(
         );
       });
       if (matching.length > 1 || (!matching.length && blank.length > 1)) {
-        row.message = "存在多个可填位置，请在编辑器中选择";
+        row.message = "candidate_multiple_targets";
         continue;
       }
       let target =
@@ -273,7 +274,7 @@ export function planFormCandidates(
           ? sameType[0]
           : (matching[0] ?? blank[0]);
       if (!target && proposal.form_type === "base" && sameType.length) {
-        row.message = "已有不同原形拼写，未替换";
+        row.message = "candidate_base_kept";
         continue;
       }
       if (!target) {
@@ -292,7 +293,7 @@ export function planFormCandidates(
         target.regional_variants = newVariants(proposal, group.dialect_rules);
         result = applyFormsStructure(result, inline);
         row.changed = true;
-        row.message = isNew ? "新增词性与词形" : "新增词形";
+        row.message = isNew ? "candidate_add_pos" : "candidate_add_form";
       } else {
         result = applyFormsStructure(result, inline);
         if (!isSharedForms(result)) throw new Error("共享词形不可用");
@@ -304,7 +305,7 @@ export function planFormCandidates(
             .flatMap((value) => value.forms)
             .filter((form) => form.content_id === binding.content_id).length > 1
         ) {
-          row.message = "内容被多个标签共用，保留原内容";
+          row.message = "candidate_shared_kept";
           continue;
         }
         const content = structuredClone(
@@ -312,7 +313,7 @@ export function planFormCandidates(
         );
         const before = JSON.stringify(content);
         if (content.regional_variants.mode === "uk_us_many") {
-          row.message = "已有多条拼写，保留原内容";
+          row.message = "candidate_many_spellings";
           continue;
         }
         if (content.regional_variants.mode === "common")
@@ -322,9 +323,7 @@ export function planFormCandidates(
           fillVariant(content.regional_variants.us, proposal.us, "us");
         }
         row.changed = before !== JSON.stringify(content);
-        row.message = row.changed
-          ? "补充空缺，保留已有内容"
-          : "已填写，保留原内容";
+        row.message = row.changed ? "candidate_fill" : "candidate_filled";
         if (row.changed)
           result = replaceSharedContent(
             result,

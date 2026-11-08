@@ -1,6 +1,11 @@
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const workspaceMessages = {
+  backup_filename: [
+    "编辑内容备份.json",
+    "編輯內容備份.json",
+    "editing-backup.json"
+  ],
   breadcrumb: ["面包屑", "導覽路徑", "Breadcrumb"],
   create_entry: ["创建词条", "建立詞條", "Create entry"],
   basics: ["基础信息", "基本資訊", "Basic information"],

@@ -1,3 +1,8 @@
+import {
+  useLexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage as uiMessage
+} from "../i18n/editor";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -22,11 +27,7 @@ import type {
 } from "@tsz/types";
 import { api } from "@/lib/auth";
 import { newWordNodeId } from "../word-model/primitives";
-import {
-  ASSISTANT_STEP_LABELS,
-  assistantSnapshot,
-  type AssistantEditorContext
-} from "./context";
+import { assistantSnapshot, type AssistantEditorContext } from "./context";
 import "./assistant.css";
 import { FormCandidates } from "./FormCandidates";
 
@@ -39,19 +40,19 @@ interface Turn {
   >;
   interrupted?: boolean;
   fingerprint: string;
-  step: string;
+  step: WordCreationStep;
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown) {
   if (error instanceof HttpError) {
-    if (error.status === 409)
-      return "词条版本已更新，请核对当前编辑后重新提问。";
-    if (error.status === 403) return "当前没有词库查询权限，请联系管理员。";
-    if (error.status === 429) return "助手正在回答或提问过于频繁，请稍后重试。";
+    if (error.status === 409) return uiMessage("assistant_revision");
+    if (error.status === 403) return uiMessage("assistant_forbidden");
+    if (error.status === 429) return uiMessage("assistant_rate_limit");
     if (error.status === 404 || error.status === 503)
-      return "词库助手暂时不可用，请稍后重试。";
+      return uiMessage("assistant_unavailable");
+    return error.message;
   }
-  return "这次未能完成回答，请重试。问题和当前编辑已保留。";
+  return uiMessage("assistant_failed");
 }
 
 const STARTERS: Record<WordCreationStep, string[]> = {
@@ -73,11 +74,25 @@ const STARTERS: Record<WordCreationStep, string[]> = {
   preview: ["发布前还差什么？", "整体检查一遍有没有前后矛盾的地方"]
 };
 
+const STARTER_KEYS = {
+  "这个词应该拆几个词性？": "assistant_starter_0",
+  "库里有没有同拼写的词条？": "assistant_starter_1",
+  结合内置词典给我一些填写建议: "assistant_starter_2",
+  检查词形和发音还缺什么: "assistant_starter_3",
+  "这些词形的英美拼写和音标对吗？": "assistant_starter_4",
+  检查词义和例句还缺什么: "assistant_starter_6",
+  "义项划分和 CEFR 合理吗？": "assistant_starter_7",
+  结合内置词典看看漏了哪些义项: "assistant_starter_8",
+  "发布前还差什么？": "assistant_starter_9",
+  整体检查一遍有没有前后矛盾的地方: "assistant_starter_10"
+} as const;
+
 export function LexiconAssistant({
   context
 }: {
   context: AssistantEditorContext;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [open, setOpen] = useState(false);
   const [availability, setAvailability] = useState<
     "checking" | "ready" | "unavailable"
@@ -87,9 +102,9 @@ export function LexiconAssistant({
   const [candidateBusy, setCandidateBusy] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState<string>();
-  const [error, setError] = useState<string>();
+  const [error, setError] = useLexiconEditorMessageState();
   const [liveAnswer, setLiveAnswer] = useState("");
-  const [liveStatus, setLiveStatus] = useState("正在读取当前编辑内容…");
+  const [liveStatus, setLiveStatus] = useState<string>();
   const partial = useRef<Turn | undefined>(undefined);
   const [checking, setChecking] = useState(false);
   const request = useRef<AbortController | undefined>(undefined);
@@ -158,12 +173,13 @@ export function LexiconAssistant({
     setError(undefined);
     setPending(value);
     setLiveAnswer("");
+    setLiveStatus(undefined);
     partial.current = {
       id: contextId,
       question: value,
       response: { answer: "", sources: [] },
       fingerprint: captured.fingerprint,
-      step: ASSISTANT_STEP_LABELS[context.step]
+      step: context.step
     };
     const history: LexiconAssistantHistory[] = turns
       .filter((turn) => !turn.interrupted)
@@ -220,7 +236,7 @@ export function LexiconAssistant({
           question: value,
           response,
           fingerprint: captured.fingerprint,
-          step: ASSISTANT_STEP_LABELS[context.step]
+          step: context.step
         }
       ]);
       partial.current = undefined;
@@ -245,7 +261,7 @@ export function LexiconAssistant({
     request.current?.abort();
     request.current = undefined;
     setPending(undefined);
-    setError("已停止等待，问题已保留。已发出的模型请求可能仍会产生用量。");
+    setError(uiMessage("assistant_stopped"));
   };
 
   return (
@@ -253,10 +269,10 @@ export function LexiconAssistant({
       {!open && (
         <FloatButton
           icon={<BotIcon />}
-          content="助手"
+          content={t("assistant_short")}
           shape="square"
-          aria-label="打开词库小精灵"
-          tooltip={{ title: "词库小精灵" }}
+          aria-label={t("assistant_open")}
+          tooltip={{ title: t("assistant_title") }}
           onClick={() => setOpen(true)}
           className="lexicon-assistant-launcher"
         />
@@ -265,7 +281,7 @@ export function LexiconAssistant({
         title={
           <Space>
             <BotIcon />
-            <span>词库小精灵</span>
+            <span>{t("assistant_title")}</span>
           </Space>
         }
         open={open}
@@ -279,14 +295,16 @@ export function LexiconAssistant({
       >
         <div className="lexicon-assistant-context">
           <Typography.Text strong>
-            {context.word.presentation.label || "当前词条"}
+            {context.word.presentation.label || t("assistant_current_entry")}
           </Typography.Text>
           <Typography.Text type="secondary">
-            {ASSISTANT_STEP_LABELS[context.step]} · 包含当前未保存内容
+            {t("assistant_context", {
+              step: t(`assistant_step_${context.step}`)
+            })}
           </Typography.Text>
         </div>
         {availability === "checking" && (
-          <Spin description="正在连接助手">
+          <Spin description={t("assistant_connecting")}>
             <div className="lexicon-assistant-connecting" />
           </Spin>
         )}
@@ -294,15 +312,15 @@ export function LexiconAssistant({
           <Alert
             type="info"
             showIcon
-            title="助手暂未就绪"
-            description="当前编辑可以继续。助手连接恢复后即可查询词库、内置词典并获取建议。"
+            title={t("assistant_not_ready")}
+            description={t("assistant_not_ready_help")}
             action={
               <Button
                 size="small"
                 loading={checking}
                 onClick={() => void checkAvailability()}
               >
-                重试连接
+                {t("assistant_reconnect")}
               </Button>
             }
           />
@@ -311,7 +329,7 @@ export function LexiconAssistant({
           className="lexicon-assistant-transcript"
           ref={transcript}
           role="log"
-          aria-label="词库助手对话"
+          aria-label={t("assistant_log")}
           aria-live="polite"
         >
           {turns.length === 0 && !pending && (
@@ -320,11 +338,8 @@ export function LexiconAssistant({
                 image={<BotIcon />}
                 description={
                   <>
-                    <Typography.Title level={5}>
-                      一起把词条填写清楚
-                    </Typography.Title>
                     <Typography.Paragraph type="secondary">
-                      我可以查智能词库和内置词典，结合你正在编辑的内容，解释字段、比较词义、提供建议。
+                      {t("assistant_help")}
                     </Typography.Paragraph>
                   </>
                 }
@@ -340,7 +355,7 @@ export function LexiconAssistant({
                       input.current?.focus();
                     }}
                   >
-                    {starter}
+                    {t(STARTER_KEYS[starter as keyof typeof STARTER_KEYS])}
                   </Button>
                 ))}
               </Flex>
@@ -350,13 +365,15 @@ export function LexiconAssistant({
             <section className="lexicon-assistant-turn" key={turn.id}>
               <div className="lexicon-assistant-question">{turn.question}</div>
               <div className="lexicon-assistant-answer">
-                <Typography.Text strong>小精灵</Typography.Text>
+                <Typography.Text strong>{t("assistant_name")}</Typography.Text>
                 {turn.fingerprint !== snapshot.fingerprint && (
                   <Typography.Text
                     type="secondary"
                     className="lexicon-assistant-stale"
                   >
-                    基于此前的{turn.step}内容
+                    {t("assistant_stale", {
+                      step: t(`assistant_step_${turn.step}`)
+                    })}
                   </Typography.Text>
                 )}
                 <Typography.Paragraph className="lexicon-assistant-answer-text">
@@ -375,7 +392,7 @@ export function LexiconAssistant({
                           context.navigateField?.(ref.path);
                         }}
                       >
-                        定位：{ref.label}
+                        {t("assistant_locate", { label: ref.label })}
                       </Button>
                     ))}
                   </Space>
@@ -383,7 +400,9 @@ export function LexiconAssistant({
                 {turn.response.sources.length > 0 && (
                   <details className="lexicon-assistant-sources">
                     <summary>
-                      查看本次查询依据（{turn.response.sources.length}）
+                      {t("assistant_sources", {
+                        count: turn.response.sources.length
+                      })}
                     </summary>
                     <ul>
                       {turn.response.sources.map((source) => (
@@ -412,7 +431,9 @@ export function LexiconAssistant({
                               · {source.version}
                             </Typography.Text>
                           )}
-                          {source.truncated && <Tag>部分内容</Tag>}
+                          {source.truncated && (
+                            <Tag>{t("assistant_partial_source")}</Tag>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -420,12 +441,12 @@ export function LexiconAssistant({
                 )}
                 {turn.interrupted && (
                   <Typography.Text type="warning">
-                    回答未完成，已保留收到的内容。
+                    {t("assistant_interrupted")}
                   </Typography.Text>
                 )}
                 {!turn.interrupted && turn.response.sources.length === 0 && (
                   <Typography.Text type="secondary">
-                    本次未查询外部资料，回答为模型建议。
+                    {t("assistant_no_sources")}
                   </Typography.Text>
                 )}
               </div>
@@ -436,7 +457,7 @@ export function LexiconAssistant({
               <div className="lexicon-assistant-question">{pending}</div>
               <Space role="status">
                 <Spin size="small" />
-                <span>{liveStatus}</span>
+                <span>{liveStatus ?? t("assistant_reading")}</span>
               </Space>
               {liveAnswer && (
                 <Typography.Paragraph className="lexicon-assistant-answer-text">
@@ -455,14 +476,14 @@ export function LexiconAssistant({
           {error && <Alert type="warning" showIcon title={error} />}
           {snapshot.context_truncated && (
             <Typography.Text type="secondary">
-              词条内容较多，本次仅附带部分编辑内容；可针对具体词义提问。
+              {t("assistant_truncated")}
             </Typography.Text>
           )}
           <Input.TextArea
             ref={input}
             value={question}
-            aria-label="向词库小精灵提问"
-            placeholder="哪里拿不准，问问小精灵…"
+            aria-label={t("assistant_input")}
+            placeholder={t("assistant_placeholder")}
             maxLength={2000}
             autoSize={{ minRows: 3, maxRows: 6 }}
             disabled={Boolean(pending)}
@@ -478,13 +499,17 @@ export function LexiconAssistant({
               }
             }}
           />
-          <Flex justify="space-between" align="center" gap={12}>
+          <Flex justify="space-between" align="center" gap={12} wrap>
             <Typography.Text type="secondary">
-              建议供核查，内容由你决定。
+              {t("assistant_disclaimer")}
             </Typography.Text>
             {pending ? (
-              <Button aria-label="停止" icon={<SquareIcon />} onClick={stop}>
-                停止
+              <Button
+                aria-label={t("assistant_stop")}
+                icon={<SquareIcon />}
+                onClick={stop}
+              >
+                {t("assistant_stop")}
               </Button>
             ) : (
               <Button
@@ -495,7 +520,7 @@ export function LexiconAssistant({
                 }
                 onClick={() => void send()}
               >
-                发送
+                {t("assistant_send")}
               </Button>
             )}
           </Flex>

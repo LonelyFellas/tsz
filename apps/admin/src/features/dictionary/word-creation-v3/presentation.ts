@@ -1,3 +1,4 @@
+import { synthesisForLocale } from "@tsz/shared";
 import {
   defaultLexiconEditorTranslation,
   type LexiconEditorKey,
@@ -5,6 +6,7 @@ import {
 } from "../i18n/editor";
 import type {
   Dialect,
+  PronunciationSynthesisV3,
   FormsImpactNodeTypeV3,
   PronunciationStyle,
   WordFormTypeV3
@@ -245,4 +247,32 @@ export function definitionModeLabel(value: string): string {
       en_sentence: "英文例句"
     }[value] ?? "未识别内容方式"
   );
+}
+
+export function reviewSynthesisLabel(
+  synthesis: PronunciationSynthesisV3,
+  dialect: Dialect,
+  t: LexiconEditorTranslation
+) {
+  if (synthesis.use_spelling) return t("review_spelling_source");
+  const name = `Azure ${synthesis.alphabet.toUpperCase()}`;
+  const empty = t("review_not_entered");
+  if (!synthesis.uk && !synthesis.us)
+    return t("review_synthesis_value", {
+      name,
+      value: synthesis[synthesis.alphabet] || empty
+    });
+  const uk =
+    synthesisForLocale(synthesis, "en-GB", dialect)[synthesis.alphabet] ||
+    empty;
+  const us =
+    synthesisForLocale(synthesis, "en-US", dialect)[synthesis.alphabet] ||
+    empty;
+  if (dialect !== "common")
+    return t("review_synthesis_dialect", {
+      name,
+      dialect: dialectLabel(dialect, t),
+      value: dialect === "uk" ? uk : us
+    });
+  return t("review_synthesis_both", { name, uk, us });
 }
