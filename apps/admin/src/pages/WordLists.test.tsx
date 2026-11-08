@@ -900,3 +900,173 @@ it("驳回提交等待期间锁定原因，失败后保留原输入", async () =
     within(dialog).getByText(/旧审核不会覆盖已修改的内容/)
   ).toBeInTheDocument();
 });
+
+it("切换四语保留分页、未提交搜索、列身份与删除确认，只显式确认提交原 revision", async () => {
+  const { InterfaceI18nProvider } = await import("@tsz/shared/i18n/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } }
+  });
+  const fixture = {
+    ...row,
+    tip_amount: "9007199254740993",
+    wordlist: {
+      ...row.wordlist,
+      name: "原文 centre",
+      state: "published" as const
+    }
+  };
+  vi.mocked(api.wordlists.management).mockResolvedValue({
+    items: [fixture],
+    pagination: { ...pagination, total: 21, total_pages: 2 }
+  });
+  const content = (locale: import("@tsz/shared/i18n").InterfaceLocale) => (
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <InterfaceI18nProvider locale={locale}>
+          <FeedbackApp>
+            <WordListsPage />
+          </FeedbackApp>
+        </InterfaceI18nProvider>
+      </QueryClientProvider>
+    </MemoryRouter>
+  );
+  const columnStorageKey = "tsz:admin:table-columns:v1:wordlists";
+  const originalColumns = localStorage.getItem(columnStorageKey);
+  localStorage.setItem(
+    columnStorageKey,
+    JSON.stringify([{ key: "创建人", visible: false, fixed: false }])
+  );
+  const view = render(content("zh-Hans"));
+  await screen.findByText("原文 centre");
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+  await waitFor(() =>
+    expect(api.wordlists.management).toHaveBeenCalledTimes(2)
+  );
+  fireEvent.click(await screen.findByLabelText("删除原文 centre"));
+  await screen.findByText(/已有 2 个进行中轮次/);
+  const input = screen.getByLabelText("搜索词表");
+  fireEvent.change(input, { target: { value: "未提交 search" } });
+  input.focus();
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    const current = screen.getByLabelText(
+      locale.startsWith("en")
+        ? "Search word lists"
+        : locale === "zh-Hant"
+          ? "搜尋詞表"
+          : "搜索词表"
+    );
+    expect(current).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("未提交 search");
+    expect(screen.getByRole("dialog")).toHaveTextContent("原文 centre");
+    expect(screen.getByText("9007199254740993")).toBeVisible();
+    expect(
+      screen.queryByRole("columnheader", {
+        name: locale.startsWith("en")
+          ? "Creator"
+          : locale === "zh-Hant"
+            ? "建立者"
+            : "创建人"
+      })
+    ).not.toBeInTheDocument();
+    expect(api.wordlists.management).toHaveBeenCalledTimes(2);
+    expect(api.wordlists.deleteImpact).toHaveBeenCalledTimes(1);
+    expect(api.wordlists.delete).not.toHaveBeenCalled();
+  }
+  expect(
+    vi.mocked(api.wordlists.management).mock.calls.at(-1)![0]
+  ).toMatchObject({ page: 2, include_stats: true });
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: /^确\s*认$/
+    })
+  );
+  await waitFor(() =>
+    expect(api.wordlists.delete).toHaveBeenCalledWith("list", {
+      expected_revision: 4
+    })
+  );
+  view.unmount();
+  if (originalColumns === null) localStorage.removeItem(columnStorageKey);
+  else localStorage.setItem(columnStorageKey, originalColumns);
+});
+
+it("审核确认、已显示错误和原因输入随语言重绘，冻结快照与在途请求保持原值", async () => {
+  const { InterfaceI18nProvider } = await import("@tsz/shared/i18n/react");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } }
+  });
+  let finish!: () => void;
+  vi.mocked(api.wordlists.decision).mockImplementation(
+    () =>
+      new Promise<import("@tsz/types").Wordlist>((resolve) => {
+        finish = () => resolve(row.wordlist);
+      })
+  );
+  const content = (locale: import("@tsz/shared/i18n").InterfaceLocale) => (
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <InterfaceI18nProvider locale={locale}>
+          <FeedbackApp>
+            <ReviewsPage />
+          </FeedbackApp>
+        </InterfaceI18nProvider>
+      </QueryClientProvider>
+    </MemoryRouter>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(await screen.findByText(/^查\s*看$/));
+  fireEvent.click(await screen.findByRole("button", { name: /^驳\s*回$/ }));
+  fireEvent.click(
+    within(screen.getByText("驳回词表").closest('[role="dialog"]')!).getByRole(
+      "button",
+      { name: /^确\s*认$/ }
+    )
+  );
+  await screen.findByText("请填写驳回原因");
+  const reason = screen.getByLabelText("操作原因");
+  fireEvent.change(reason, { target: { value: "保留原文 reason" } });
+  reason.focus();
+  const reads = [
+    vi.mocked(api.wordlists.management).mock.calls.length,
+    vi.mocked(api.wordlists.reviews).mock.calls.length,
+    vi.mocked(api.wordlists.items).mock.calls.length
+  ];
+  view.rerender(content("en-GB"));
+  expect(screen.getByLabelText("Reason")).toBe(reason);
+  expect(reason).toHaveValue("保留原文 reason");
+  expect(reason).toHaveFocus();
+  expect(screen.getByText("Enter a reason for rejection")).toBeVisible();
+  expect(
+    screen.getByText("Reject word list").closest('[role="dialog"]')!
+  ).toHaveTextContent("提交名称");
+  fireEvent.click(
+    within(
+      screen.getByText("Reject word list").closest('[role="dialog"]')!
+    ).getByRole("button", { name: "Confirm" })
+  );
+  await waitFor(() =>
+    expect(api.wordlists.decision).toHaveBeenCalledWith("list", "request", {
+      expected_revision: 2,
+      approve: false,
+      reason: "保留原文 reason"
+    })
+  );
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByLabelText("操作原因")).toBe(reason);
+  expect(reason).toBeDisabled();
+  expect(
+    screen.getByText("駁回詞表").closest('[role="dialog"]')!
+  ).toBeVisible();
+  expect(api.wordlists.decision).toHaveBeenCalledTimes(1);
+  expect([
+    vi.mocked(api.wordlists.management).mock.calls.length,
+    vi.mocked(api.wordlists.reviews).mock.calls.length,
+    vi.mocked(api.wordlists.items).mock.calls.length
+  ]).toEqual(reads);
+  finish();
+  await waitFor(() =>
+    expect(screen.queryByText("駁回詞表")).not.toBeInTheDocument()
+  );
+});

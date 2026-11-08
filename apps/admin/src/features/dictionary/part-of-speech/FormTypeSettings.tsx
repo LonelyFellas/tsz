@@ -1,3 +1,4 @@
+import { useContentTranslation, ContentText } from "@/features/content/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { usePermission } from "@/lib/auth";
@@ -23,7 +24,7 @@ import { partOfSpeechKeys, usePartOfSpeechCatalog } from "./api";
 import { nextSortOrder } from "./catalog";
 import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
 import { slugifyCode } from "./PartOfSpeechFormModal";
-import { errorMessage } from "./PartOfSpeechSettings";
+import { ContentError } from "./PartOfSpeechSettings";
 
 type Values = Omit<CreatePartOfSpeechInput, "code"> & {
   /** 原形没有归属，wire 上是 null；表单里按未选处理。 */
@@ -41,6 +42,7 @@ function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
 }
 
 export function FormTypeSettings() {
+  const { t } = useContentTranslation();
   const canEdit = usePermission("lexicon_settings.edit_forms");
   const canDelete = usePermission("lexicon_settings.delete");
   const { message, modal } = App.useApp();
@@ -108,9 +110,15 @@ export function FormTypeSettings() {
     onSuccess: async () => {
       await refresh();
       setOpen(false);
-      message.success(editing ? "词形变化已更新" : "词形变化已新增");
+      message.success(
+        editing ? (
+          <ContentText message="form_updated" />
+        ) : (
+          <ContentText message="form_added" />
+        )
+      );
     },
-    onError: (error) => message.error(errorMessage(error))
+    onError: (error) => message.error(<ContentError error={error} />)
   });
   useEffect(() => {
     if (!open) return;
@@ -131,10 +139,12 @@ export function FormTypeSettings() {
   }, [editing, form, open, query.part_of_speech_id]);
   const remove = (item: FormTypeConfig) =>
     modal.confirm({
-      title: `删除词形变化“${item.name_zh}”？`,
-      content: "该操作不可恢复。删除后，词条录入和词典建议不再提供此类型。",
-      okText: "删 除",
-      cancelText: "取 消",
+      title: (
+        <ContentText message="delete_form" params={{ name: item.name_zh }} />
+      ),
+      content: <ContentText message="delete_form_help" />,
+      okText: <ContentText message="delete_spaced" />,
+      cancelText: <ContentText message="cancel_spaced" />,
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
@@ -142,50 +152,54 @@ export function FormTypeSettings() {
             base_revision: item.revision
           });
           await refresh();
-          message.success("词形变化已删除");
+          message.success(<ContentText message="form_deleted" />);
         } catch (error) {
-          message.error(errorMessage(error));
+          message.error(<ContentError error={error} />);
           await refresh();
         }
       }
     });
   const columns: TableColumnsType<FormTypeConfig> = [
-    { title: "序号", dataIndex: "sort_order", width: 64 },
-    { title: "正式中文", dataIndex: "name_zh", width: 130 },
-    { title: "简洁显示", dataIndex: "short_name_zh", width: 120 },
-    { title: "正式英文", dataIndex: "name_en", width: 160 },
-    { title: "英文缩写", dataIndex: "abbreviation", width: 100 },
+    { title: t("sort_order"), dataIndex: "sort_order", width: 64 },
+    { title: t("name_zh"), dataIndex: "name_zh", width: 130 },
+    { title: t("short_name_zh"), dataIndex: "short_name_zh", width: 120 },
+    { title: t("name_en"), dataIndex: "name_en", width: 160 },
+    { title: t("abbreviation"), dataIndex: "abbreviation", width: 100 },
     {
-      title: "英文全称",
+      title: t("full_name_en"),
       dataIndex: "full_name_en",
       width: 170,
       render: (value: string) => <FullNameEnCell value={value} />
     },
     {
-      title: "所属基本词性",
+      title: t("parent_part"),
       dataIndex: "part_of_speech_id",
       width: 120,
       render: (partId?: string | null) =>
-        partId ? (partNameById.get(partId) ?? partId) : "所有词性"
+        partId ? (partNameById.get(partId) ?? partId) : t("all_parts")
     },
     {
-      title: "关联",
+      title: t("links"),
       dataIndex: "usage_count",
       width: 100,
-      render: (count: number) => (count ? `${count} 个词条` : "无关联")
+      render: (count: number) =>
+        count ? `${t("entries", { count })}` : t("no_links")
     },
     {
-      title: "创建人",
+      key: "创建人",
+      title: t("creator"),
       render: (_, item) => item.created_by.display_name,
       width: 100
     },
     {
-      title: "创建时间",
+      key: "创建时间",
+      title: t("created_at"),
       render: (_, item) => dayjs(item.created_at).format("YYYY-MM-DD HH:mm"),
       width: 150
     },
     {
-      title: "操作",
+      key: "操作",
+      title: t("actions"),
       fixed: "right",
       width: 150,
       render: (_, item) => (
@@ -198,14 +212,14 @@ export function FormTypeSettings() {
               setOpen(true);
             }}
           >
-            修 改
+            {t("edit_spaced")}
           </Button>
           <Tooltip
             title={
               item.code === "base"
-                ? "原形为必需类型，不能删除"
+                ? t("base_required")
                 : item.usage_count
-                  ? "仍与词条有关联，可以修改，但不能删除"
+                  ? t("linked_entries")
                   : undefined
             }
           >
@@ -217,7 +231,7 @@ export function FormTypeSettings() {
               }
               onClick={() => remove(item)}
             >
-              删 除
+              {t("delete_spaced")}
             </Button>
           </Tooltip>
         </Space>
@@ -231,11 +245,13 @@ export function FormTypeSettings() {
           showIcon
           type={catalog.isError ? "error" : "info"}
           title={
-            catalog.isError
-              ? "词形目录加载失败"
-              : "服务尚未提供词形配置，请更新后重试"
+            catalog.isError ? t("form_catalog_failed") : t("forms_unsupported")
           }
-          action={<Button onClick={() => void catalog.refetch()}>重 试</Button>}
+          action={
+            <Button onClick={() => void catalog.refetch()}>
+              {t("retry_spaced")}
+            </Button>
+          }
         />
       )}
 
@@ -244,8 +260,12 @@ export function FormTypeSettings() {
           <Alert
             showIcon
             type="error"
-            title="词形配置加载失败"
-            action={<Button onClick={() => void list.refetch()}>重 试</Button>}
+            title={t("forms_failed")}
+            action={
+              <Button onClick={() => void list.refetch()}>
+                {t("retry_spaced")}
+              </Button>
+            }
             style={{ marginBottom: 12 }}
           />
         )}
@@ -260,7 +280,7 @@ export function FormTypeSettings() {
                 setOpen(true);
               }}
             >
-              新增词形变化
+              {t("add_form")}
             </Button>
           }
           toolbarExtra={
@@ -270,16 +290,18 @@ export function FormTypeSettings() {
               gap={12}
               wrap
             >
-              <Typography.Text type="secondary">所属基本词性</Typography.Text>
+              <Typography.Text type="secondary">
+                {t("parent_part")}
+              </Typography.Text>
               <Select
-                aria-label="所属基本词性"
+                aria-label={t("parent_part")}
                 value={query.part_of_speech_id ?? ""}
                 showSearch
                 optionFilterProp="label"
                 loading={catalog.isPending}
                 disabled={catalog.isError || parts.length === 0}
                 options={[
-                  { value: "", label: "全部" },
+                  { value: "", label: t("all") },
                   ...parts.map((item) => ({
                     value: item.id,
                     label: item.name_zh
@@ -293,7 +315,7 @@ export function FormTypeSettings() {
                   })
                 }
                 style={{ width: 200 }}
-                placeholder="请选择基本词性"
+                placeholder={t("select_part")}
               />
             </Flex>
           }
@@ -302,7 +324,7 @@ export function FormTypeSettings() {
           locale={{
             emptyText: (
               <TableEmptyState
-                message="暂无词形变化"
+                message={t("no_forms")}
                 filtered={!!query.part_of_speech_id}
                 onResetFilters={() =>
                   setQuery({ ...query, page: 1, part_of_speech_id: undefined })
@@ -322,7 +344,7 @@ export function FormTypeSettings() {
             total: list.data?.pagination.total ?? 0,
             showSizeChanger: true,
             pageSizeOptions: [10, 20, 50],
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total) => t("total", { count: total }),
             onChange: (page, page_size) =>
               setQuery({
                 ...query,
@@ -334,10 +356,10 @@ export function FormTypeSettings() {
       </Card>
       <Modal
         open={open}
-        title={editing ? "修改词形变化" : "新增词形变化"}
+        title={editing ? t("edit_form") : t("add_form")}
         width={720}
-        okText={editing ? "保 存" : "新 建"}
-        cancelText="取 消"
+        okText={editing ? t("save_spaced") : t("create_spaced")}
+        cancelText={t("cancel_spaced")}
         okButtonProps={{ disabled: !canEdit }}
         confirmLoading={save.isPending}
         onOk={() => form.submit()}
@@ -355,21 +377,21 @@ export function FormTypeSettings() {
             <Tooltip
               title={
                 editing?.code === "base"
-                  ? "原形始终作为默认模版"
+                  ? t("base_default")
                   : !supportsDefaultTemplate
-                    ? "当前服务暂不支持默认模版设置"
-                    : "开启后，新建词条或新增词性时自动生成此词形的录入框"
+                    ? t("default_unsupported")
+                    : t("default_help")
               }
             >
               <Form.Item
                 name="is_default"
-                label="默认模版"
+                label={t("default_template")}
                 valuePropName="checked"
                 layout="horizontal"
                 style={{ marginBottom: 0 }}
               >
                 <Switch
-                  aria-label="默认模版"
+                  aria-label={t("default_template")}
                   disabled={
                     !canEdit ||
                     !supportsDefaultTemplate ||
@@ -384,34 +406,39 @@ export function FormTypeSettings() {
             <Alert
               type="info"
               showIcon
-              title="原形对所有基本词性通用，不归属某一个词性。"
+              title={t("base_all_parts")}
               style={{ marginBottom: 16 }}
             />
           ) : (
             <Form.Item
               name="part_of_speech_id"
-              label="所属基本词性"
-              rules={[{ required: true, message: "请选择所属基本词性" }]}
+              label={t("parent_part")}
+              rules={[
+                {
+                  required: true,
+                  message: <ContentText message="select_parent" />
+                }
+              ]}
             >
               <Select
-                aria-label="所属基本词性"
+                aria-label={t("parent_part")}
                 showSearch
                 optionFilterProp="label"
                 options={parts.map((item) => ({
                   value: item.id,
                   label: item.name_zh
                 }))}
-                placeholder="请选择所属基本词性"
+                placeholder={t("select_parent")}
               />
             </Form.Item>
           )}
           <PartOfSpeechSharedFields
             placeholders={{
-              name_zh: "例如 过去式",
-              short_name_zh: "例如 过去式",
-              name_en: "例如 Past tense",
-              abbreviation: "例如 past",
-              full_name_en: "例如 past tense"
+              name_zh: t("example_past_zh"),
+              short_name_zh: t("example_past_zh"),
+              name_en: t("example_past_name"),
+              abbreviation: t("example_past_abbr"),
+              full_name_en: t("example_past_full")
             }}
           />
         </Form>

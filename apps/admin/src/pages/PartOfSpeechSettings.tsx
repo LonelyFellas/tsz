@@ -1,9 +1,11 @@
+import { useContentTranslation } from "@/features/content/i18n";
 import { Button, Result } from "@tsz/ui/admin/display";
 import { useNavigate } from "react-router-dom";
 import { PartOfSpeechSettings } from "@/features/dictionary/part-of-speech/PartOfSpeechSettings";
 import { usePermission } from "@/lib/auth";
 
 export function PartOfSpeechSettingsPage() {
+  const { t } = useContentTranslation();
   const isSuperAdmin = usePermission("lexicon_settings.access");
   const navigate = useNavigate();
 
@@ -11,11 +13,11 @@ export function PartOfSpeechSettingsPage() {
     return (
       <Result
         status="403"
-        title="无权限"
-        subTitle="需要词性配置查看权限。"
+        title={t("access_denied")}
+        subTitle={t("parts_permission_required")}
         extra={
           <Button type="primary" onClick={() => navigate("/")}>
-            返回首页
+            {t("home")}
           </Button>
         }
       />

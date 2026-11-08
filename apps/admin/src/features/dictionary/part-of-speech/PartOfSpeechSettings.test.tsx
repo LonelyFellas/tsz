@@ -827,3 +827,35 @@ it("基本词性编辑不开放细分词性新增，普通管理员即使持有�
   );
   expect(screen.getByText("新增细分词性").closest("button")).toBeDisabled();
 });
+
+it("已经打开的目录删除确认随四语切换更新，原名与精确 ID/revision 保持原值", async () => {
+  const { InterfaceI18nProvider } = await import("@tsz/shared/i18n/react");
+  const content = (locale: import("@tsz/shared/i18n").InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <FeedbackApp>
+        <PartOfSpeechSettings />
+      </FeedbackApp>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const row = screen.getByText("小品词").closest("tr")!;
+  fireEvent.click(within(row).getByText("删 除"));
+  const dialog = await screen.findByRole("dialog");
+  for (const locale of ["en-GB", "zh-Hant", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(dialog).toHaveTextContent(
+      locale.startsWith("en")
+        ? "Delete part of speech “小品词”?"
+        : "刪除基本詞性「小品词」？"
+    );
+    expect(mock.remove).not.toHaveBeenCalled();
+  }
+  fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+  await waitFor(() =>
+    expect(mock.remove).toHaveBeenCalledWith({
+      id: items[1]!.id,
+      base_revision: items[1]!.revision
+    })
+  );
+});

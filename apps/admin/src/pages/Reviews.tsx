@@ -1,3 +1,4 @@
+import { useContentTranslation } from "@/features/content/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useEffect, useState } from "react";
@@ -18,12 +19,6 @@ import type { AdminWordlist, WordlistManagementQuery } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { WordlistDetails } from "@/features/wordlists/WordlistDetails";
 
-const reviewLabels = {
-  none: "未提交审核",
-  pending: "待审核",
-  approved: "审核通过",
-  rejected: "审核未通过"
-};
 const initialQuery: WordlistManagementQuery = {
   page: 1,
   page_size: 20,
@@ -32,6 +27,7 @@ const initialQuery: WordlistManagementQuery = {
 type Filters = Pick<WordlistManagementQuery, "q" | "review_state">;
 
 export function ReviewsPage() {
+  const { t } = useContentTranslation();
   const allowed = usePermission("wordlists.access");
   const profile = useAuthStore((s) => s.profile);
   return allowed && profile ? (
@@ -40,11 +36,19 @@ export function ReviewsPage() {
       adminId={profile.id}
     />
   ) : (
-    <Result status="403" title="未开通词表查看权限" />
+    <Result status="403" title={t("wordlists_denied")} />
   );
 }
 
 function ReviewQueue({ adminId }: { adminId: string }) {
+  const { t } = useContentTranslation();
+  const reviewLabels = {
+    none: t("not_submitted"),
+    pending: t("pending"),
+    approved: t("approved"),
+    rejected: t("rejected")
+  };
+
   const [form] = Form.useForm<Filters>();
   const [query, setQuery] = useState(initialQuery);
   const [selected, setSelected] = useState<AdminWordlist | null>(null);
@@ -62,8 +66,13 @@ function ReviewQueue({ adminId }: { adminId: string }) {
   return (
     <Flex vertical gap={16}>
       <PageHeader
-        title="词表审核"
-        breadcrumb={<Breadcrumb items={[{ title: "词表管理" }]} />}
+        title={t("wordlist_reviews")}
+        breadcrumb={
+          <Breadcrumb
+            aria-label={t("breadcrumb")}
+            items={[{ title: t("wordlist_management") }]}
+          />
+        }
       />
       <Card className="admin-filter-card" size="small">
         <Form
@@ -82,18 +91,18 @@ function ReviewQueue({ adminId }: { adminId: string }) {
             })
           }
         >
-          <Form.Item name="q" label="关键词">
+          <Form.Item name="q" label={t("keyword")}>
             <Input
-              aria-label="搜索词表"
+              aria-label={t("search_wordlists")}
               maxLength={100}
-              placeholder="词表名称 / 创建人"
+              placeholder={t("wordlist_search_placeholder")}
               style={{ width: 180 }}
               allowClear
             />
           </Form.Item>
-          <Form.Item name="review_state" label="审核状态">
+          <Form.Item name="review_state" label={t("review_state")}>
             <Select
-              aria-label="审核状态"
+              aria-label={t("review_state")}
               style={{ width: 140 }}
               options={Object.entries(reviewLabels).map(([value, label]) => ({
                 value,
@@ -104,7 +113,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           <Form.Item className="admin-filter-actions">
             <Space>
               <Button type="primary" icon={<SearchIcon />} htmlType="submit">
-                搜索
+                {t("search")}
               </Button>
               <Button
                 icon={<RotateCwIcon />}
@@ -113,7 +122,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
                   setQuery(initialQuery);
                 }}
               >
-                重置
+                {t("reset")}
               </Button>
             </Space>
           </Form.Item>
@@ -123,8 +132,12 @@ function ReviewQueue({ adminId }: { adminId: string }) {
         {result.isError && (
           <Alert
             type="error"
-            title="审核词表加载失败"
-            action={<Button onClick={() => void result.refetch()}>重试</Button>}
+            title={t("review_wordlists_failed")}
+            action={
+              <Button onClick={() => void result.refetch()}>
+                {t("retry")}
+              </Button>
+            }
           />
         )}
         <Table<AdminWordlist>
@@ -132,7 +145,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           locale={{
             emptyText: (
               <TableEmptyState
-                message="暂无待审核词表"
+                message={t("no_pending_wordlists")}
                 filtered={!!query.q || query.review_state !== "pending"}
                 onResetFilters={() => {
                   form.resetFields();
@@ -148,7 +161,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           pagination={{
             itemRender: (_, type, original) =>
               type === "next" ? (
-                <button type="button" aria-label="下一页">
+                <button type="button" aria-label={t("next_page")}>
                   ›
                 </button>
               ) : (
@@ -167,15 +180,29 @@ function ReviewQueue({ adminId }: { adminId: string }) {
               }))
           }}
           columns={[
-            { title: "词表名称", render: (_, row) => row.wordlist.name },
-            { title: "创建人", render: (_, row) => row.wordlist.owner_name },
-            { title: "词条数量", render: (_, row) => row.wordlist.item_count },
             {
-              title: "审核状态",
+              key: "词表名称",
+              title: t("wordlist_name"),
+              render: (_, row) => row.wordlist.name
+            },
+            {
+              key: "创建人",
+              title: t("creator"),
+              render: (_, row) => row.wordlist.owner_name
+            },
+            {
+              key: "词条数量",
+              title: t("entry_count"),
+              render: (_, row) => row.wordlist.item_count
+            },
+            {
+              key: "审核状态",
+              title: t("review_state"),
               render: (_, row) => reviewLabels[row.review_state]
             },
             {
-              title: "操作",
+              key: "操作",
+              title: t("actions"),
               fixed: "right",
               width: 100,
               render: (_, row) => (
@@ -184,7 +211,7 @@ function ReviewQueue({ adminId }: { adminId: string }) {
                   size="small"
                   onClick={() => setSelected(row)}
                 >
-                  查看
+                  {t("view")}
                 </Button>
               )
             }

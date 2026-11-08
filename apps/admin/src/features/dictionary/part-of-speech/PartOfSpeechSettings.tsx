@@ -1,3 +1,10 @@
+import {
+  useContentTranslation,
+  ContentText,
+  defaultContentTranslation,
+  type ContentTranslation,
+  type ContentKey
+} from "@/features/content/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useIsSuperAdmin, usePermission } from "@/lib/auth";
@@ -34,66 +41,66 @@ import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
 import type { SubPartOfSpeechPanelHandle } from "./SubPartOfSpeechDrawer";
 
 // 后端 409 冲突会带上撞车的字段名。
-const CONFLICT_FIELD_LABEL: Record<string, string> = {
-  name_zh: "正式中文",
-  name_en: "正式英文",
-  abbreviation: "英文缩写",
-  short_name_zh: "简洁显示",
-  full_name_en: "英文全称"
+const CONFLICT_FIELD_LABEL: Record<string, ContentKey> = {
+  name_zh: "name_zh",
+  name_en: "name_en",
+  abbreviation: "abbreviation",
+  short_name_zh: "short_name_zh",
+  full_name_en: "full_name_en"
 };
 
-function conflictMessage(kind: string, field: string | null | undefined) {
+function conflictMessage(
+  kind: string,
+  field: string | null | undefined,
+  t: ContentTranslation
+) {
   if (field === "code") {
-    return `英文全称与已有${kind}过于接近，请调整英文全称`;
+    return t("conflict_code", { kind });
   }
   const label = field ? CONFLICT_FIELD_LABEL[field] : undefined;
-  return label ? `${label}与已有${kind}重复` : `${kind}名称已存在`;
+  return label
+    ? t("conflict_field", { label: t(label), kind })
+    : t("conflict_name", { kind });
 }
 
-export function errorMessage(error: unknown): string {
+export function errorMessage(
+  error: unknown,
+  t: ContentTranslation = defaultContentTranslation
+): string {
   if (error instanceof HttpError) {
     if (error.code === "form_type_conflict")
-      return conflictMessage("词形变化", error.problem?.field);
-    if (error.code === "form_type_in_use")
-      return "该词形类型仍与词条或历史发布内容有关联，可以修改，但不能删除";
-    if (error.code === "form_type_required") return "原形为必需类型，不能删除";
-    if (error.code === "form_type_not_found")
-      return "词形类型不存在或已被删除，请刷新后重试";
-    if (error.code === "invalid_form_type")
-      return "词形配置字段不符合要求，请检查后重试";
+      return conflictMessage(t("form_type"), error.problem?.field, t);
+    if (error.code === "form_type_in_use") return t("form_in_use");
+    if (error.code === "form_type_required") return t("base_required");
+    if (error.code === "form_type_not_found") return t("form_not_found");
+    if (error.code === "invalid_form_type") return t("invalid_form");
     if (error.code === "part_of_speech_conflict")
-      return conflictMessage("基本词性", error.problem?.field);
+      return conflictMessage(t("basic_part"), error.problem?.field, t);
     if (error.code === "sub_part_of_speech_conflict")
       return error.problem?.field === "code"
-        ? "内部标识冲突，请重新提交"
-        : conflictMessage("细分词性", error.problem?.field);
-    if (error.code === "part_of_speech_in_use")
-      return "该基本词性仍与单词或短语有关联，可以修改，但不能删除";
+        ? t("internal_conflict")
+        : conflictMessage(t("sub_part"), error.problem?.field, t);
+    if (error.code === "part_of_speech_in_use") return t("part_in_use");
     if (error.code === "part_of_speech_has_form_types")
-      return "该基本词性下还有词形变化，请先删除词形变化";
+      return t("part_has_forms");
     if (error.code === "part_of_speech_has_sub_parts")
-      return "该基本词性下还有细分词性，请先删除细分词性";
-    if (error.code === "sub_part_of_speech_in_use")
-      return "该细分词性仍与词义有关联，不能删除或修改编码";
+      return t("part_has_subs");
+    if (error.code === "sub_part_of_speech_in_use") return t("sub_in_use");
     if (error.code === "sub_part_of_speech_not_allowed")
-      return "该基本词性不支持细分词性";
-    if (error.code === "revision_conflict")
-      return "配置已被其他管理员修改，请刷新后重试";
-    if (error.code === "part_of_speech_not_found")
-      return "基本词性不存在或已被删除，请刷新后重试";
+      return t("sub_not_allowed");
+    if (error.code === "revision_conflict") return t("revision_conflict");
+    if (error.code === "part_of_speech_not_found") return t("part_not_found");
     if (error.code === "sub_part_of_speech_not_found")
-      return "细分词性不存在或已被删除，请刷新后重试";
-    if (error.code === "invalid_part_of_speech")
-      return "词性配置字段不符合要求，请检查后重试";
-    if (error.code === "invalid_request_body")
-      return "提交内容不完整或格式错误，请检查后重试";
-    if (error.code === "invalid_query")
-      return "请求版本或查询参数无效，请刷新后重试";
+      return t("sub_not_found");
+    if (error.code === "invalid_part_of_speech") return t("invalid_part");
+    if (error.code === "invalid_request_body") return t("invalid_body");
+    if (error.code === "invalid_query") return t("invalid_query");
   }
-  return error instanceof Error ? error.message : "操作失败";
+  return error instanceof Error ? error.message : t("action_failed");
 }
 
 export function PartOfSpeechSettings() {
+  const { t } = useContentTranslation();
   const canEdit = usePermission("lexicon_settings.edit_basic");
   const canEditSub = usePermission("lexicon_settings.edit_sub");
   const canDelete = useIsSuperAdmin();
@@ -139,22 +146,25 @@ export function PartOfSpeechSettings() {
   // 空串表示「全部」：面板并排展示所有词性的细分词性；新增时在弹窗里选所属词性。
   const selectedPart = parts.find((item) => item.id === selectedPartId);
 
-  const showError = (error: unknown) => message.error(errorMessage(error));
+  const showError = (error: unknown) =>
+    message.error(<ContentError error={error} />);
 
   const removeItem = (item: PartOfSpeechConfig) => {
     modal.confirm({
-      title: `删除基本词性“${item.name_zh}”？`,
-      content: "该操作不可恢复。",
-      okText: "删 除",
+      title: (
+        <ContentText message="delete_part" params={{ name: item.name_zh }} />
+      ),
+      content: <ContentText message="irreversible" />,
+      okText: <ContentText message="delete_spaced" />,
       okButtonProps: { danger: true },
-      cancelText: "取 消",
+      cancelText: <ContentText message="cancel_spaced" />,
       onOk: async () => {
         try {
           await remove.mutateAsync({
             id: item.id,
             base_revision: item.revision
           });
-          message.success("基本词性已删除");
+          message.success(<ContentText message="part_deleted" />);
         } catch (error) {
           showError(error);
           await list.refetch();
@@ -164,51 +174,55 @@ export function PartOfSpeechSettings() {
   };
 
   const columns: TableColumnsType<PartOfSpeechConfig> = [
-    { title: "序号", dataIndex: "sort_order", width: 64 },
-    { title: "正式中文", dataIndex: "name_zh", width: 120 },
-    { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
-    { title: "正式英文", dataIndex: "name_en", width: 130 },
-    { title: "英文缩写", dataIndex: "abbreviation", width: 90 },
+    { title: t("sort_order"), dataIndex: "sort_order", width: 64 },
+    { title: t("name_zh"), dataIndex: "name_zh", width: 120 },
+    { title: t("short_name_zh"), dataIndex: "short_name_zh", width: 110 },
+    { title: t("name_en"), dataIndex: "name_en", width: 130 },
+    { title: t("abbreviation"), dataIndex: "abbreviation", width: 90 },
     {
-      title: "英文全称",
+      title: t("full_name_en"),
       dataIndex: "full_name_en",
       width: 140,
       render: (value: string) => <FullNameEnCell value={value} />
     },
     {
-      title: "细分词性",
+      title: t("sub_parts"),
       dataIndex: "sub_part_count",
       width: 90,
-      render: (count: number) => `${count} 项`
+      render: (count: number) => t("items", { count })
     },
     {
-      title: "词形变化",
+      title: t("form_types"),
       dataIndex: "allowed_form_types",
       width: 100,
       render: (types: PartOfSpeechConfig["allowed_form_types"]) =>
-        types ? `${types.length} 项` : "—"
+        types ? t("items", { count: types.length }) : "—"
     },
     {
-      title: "关联",
+      title: t("links"),
       dataIndex: "usage_count",
       width: 100,
       render: (count: number) =>
-        count > 0 ? <Tag color="blue">{count} 个词条</Tag> : "无关联"
+        count > 0 ? (
+          <Tag color="blue">{t("entries", { count })}</Tag>
+        ) : (
+          t("no_links")
+        )
     },
     {
-      title: "创建人",
+      title: t("creator"),
       dataIndex: "created_by",
       width: 100,
       render: (actor: PartOfSpeechConfig["created_by"]) => actor.display_name
     },
     {
-      title: "创建时间",
+      title: t("created_at"),
       dataIndex: "created_at",
       width: 150,
       render: (value: string) => dayjs(value).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "操作",
+      title: t("actions"),
       key: "actions",
       fixed: "right",
       width: 150,
@@ -222,16 +236,18 @@ export function PartOfSpeechSettings() {
               setFormOpen(true);
             }}
           >
-            修 改
+            {t("edit_spaced")}
           </Button>
           <Tooltip
             title={
               item.usage_count > 0
-                ? `已关联 ${item.usage_count} 个单词或短语，可以修改，但不能删除`
+                ? t("linked_words", { count: item.usage_count })
                 : item.sub_part_count > 0
-                  ? `还有 ${item.sub_part_count} 项细分词性，请先删除细分词性`
+                  ? t("remaining_subs", { count: item.sub_part_count })
                   : (item.allowed_form_types?.length ?? 0) > 0
-                    ? `还有 ${item.allowed_form_types!.length} 项词形变化，请先删除词形变化`
+                    ? t("remaining_forms", {
+                        count: item.allowed_form_types!.length
+                      })
                     : undefined
             }
           >
@@ -247,7 +263,7 @@ export function PartOfSpeechSettings() {
               }
               onClick={() => removeItem(item)}
             >
-              删 除
+              {t("delete_spaced")}
             </Button>
           </Tooltip>
         </Space>
@@ -258,8 +274,13 @@ export function PartOfSpeechSettings() {
   return (
     <Flex vertical gap={16}>
       <PageHeader
-        title="词性配置"
-        breadcrumb={<Breadcrumb items={[{ title: "词库管理" }]} />}
+        title={t("parts_settings")}
+        breadcrumb={
+          <Breadcrumb
+            aria-label={t("breadcrumb")}
+            items={[{ title: t("lexicon") }]}
+          />
+        }
       />
       {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
 
@@ -268,20 +289,22 @@ export function PartOfSpeechSettings() {
         activeKey={kind}
         onChange={(key) => switchKind(key as AdminWordKind)}
         items={[
-          { key: "word", label: "单词" },
-          { key: "phrase", label: "短语" }
+          { key: "word", label: t("word") },
+          { key: "phrase", label: t("phrase") }
         ]}
       />
 
       <Segmented
-        aria-label="配置分区"
+        aria-label={t("settings_section")}
         value={activeTab}
         onChange={(key) => setActiveTab(key as "basic" | "detailed" | "forms")}
         style={{ alignSelf: "flex-start" }}
         options={[
-          { value: "basic", label: "基本词性" },
-          { value: "detailed", label: "细分词性" },
-          ...(kind === "phrase" ? [] : [{ value: "forms", label: "词形变化" }])
+          { value: "basic", label: t("basic_parts") },
+          { value: "detailed", label: t("sub_parts") },
+          ...(kind === "phrase"
+            ? []
+            : [{ value: "forms", label: t("form_types") }])
         ]}
       />
 
@@ -300,10 +323,10 @@ export function PartOfSpeechSettings() {
                 setPage(1);
               }}
             >
-              <Form.Item name="q" label="关键词">
+              <Form.Item name="q" label={t("keyword")}>
                 <Input
                   allowClear
-                  placeholder="中文 / 英文 / 编码 / 缩写"
+                  placeholder={t("part_search_placeholder")}
                   style={{ width: 260 }}
                 />
               </Form.Item>
@@ -314,7 +337,7 @@ export function PartOfSpeechSettings() {
                     htmlType="submit"
                     icon={<SearchIcon />}
                   >
-                    搜 索
+                    {t("search_spaced")}
                   </Button>
                   <Button
                     icon={<RotateCwIcon />}
@@ -324,7 +347,7 @@ export function PartOfSpeechSettings() {
                       setPage(1);
                     }}
                   >
-                    重 置
+                    {t("reset_spaced")}
                   </Button>
                 </Space>
               </Form.Item>
@@ -336,11 +359,11 @@ export function PartOfSpeechSettings() {
               <Alert
                 type="error"
                 showIcon
-                title="词性配置加载失败"
+                title={t("parts_failed")}
                 description={list.error.message}
                 action={
                   <Button size="small" onClick={() => void list.refetch()}>
-                    重 试
+                    {t("retry_spaced")}
                   </Button>
                 }
                 style={{ marginBottom: 12 }}
@@ -357,7 +380,7 @@ export function PartOfSpeechSettings() {
                     setFormOpen(true);
                   }}
                 >
-                  新增基本词性
+                  {t("add_part")}
                 </Button>
               }
 
@@ -365,7 +388,7 @@ export function PartOfSpeechSettings() {
               locale={{
                 emptyText: (
                   <TableEmptyState
-                    message="暂无基本词性"
+                    message={t("no_parts")}
                     filtered={!!q}
                     onResetFilters={() => {
                       form.resetFields();
@@ -387,7 +410,7 @@ export function PartOfSpeechSettings() {
                 total: list.data?.pagination.total ?? 0,
                 showSizeChanger: true,
                 pageSizeOptions: [10, 20, 50],
-                showTotal: (total) => `共 ${total} 条`,
+                showTotal: (total) => t("total", { count: total }),
                 onChange: (nextPage, nextSize) => {
                   setPage(nextSize !== pageSize ? 1 : nextPage);
                   setPageSize(nextSize);
@@ -402,11 +425,11 @@ export function PartOfSpeechSettings() {
             <Alert
               type="error"
               showIcon
-              title="基本词性目录加载失败"
+              title={t("catalog_failed")}
               description={catalog.error.message}
               action={
                 <Button size="small" onClick={() => void catalog.refetch()}>
-                  重 试
+                  {t("retry_spaced")}
                 </Button>
               }
             />
@@ -417,7 +440,7 @@ export function PartOfSpeechSettings() {
               <Tooltip
                 title={
                   !catalog.isError && parts.length === 0
-                    ? "暂无基本词性"
+                    ? t("no_parts")
                     : undefined
                 }
               >
@@ -429,7 +452,7 @@ export function PartOfSpeechSettings() {
                   }
                   onClick={() => subPanelRef.current?.openCreate()}
                 >
-                  新增细分词性
+                  {t("add_sub")}
                 </Button>
               </Tooltip>
             }
@@ -440,16 +463,18 @@ export function PartOfSpeechSettings() {
                 gap={12}
                 wrap
               >
-                <Typography.Text type="secondary">所属基本词性</Typography.Text>
+                <Typography.Text type="secondary">
+                  {t("parent_part")}
+                </Typography.Text>
                 <Select
-                  aria-label="所属基本词性"
+                  aria-label={t("parent_part")}
                   value={selectedPart?.id ?? ""}
                   showSearch
                   optionFilterProp="label"
                   loading={catalog.isPending}
                   disabled={catalog.isError || !parts.length}
                   options={[
-                    { value: "", label: "全部" },
+                    { value: "", label: t("all") },
                     ...parts.map((item) => ({
                       value: item.id,
                       label: item.name_zh
@@ -457,7 +482,7 @@ export function PartOfSpeechSettings() {
                   ]}
                   onChange={setSelectedPartId}
                   style={{ width: 220 }}
-                  placeholder="请选择基本词性"
+                  placeholder={t("select_part")}
                 />
               </Flex>
             }
@@ -481,10 +506,10 @@ export function PartOfSpeechSettings() {
         onClose={() => setFormOpen(false)}
         onSaved={(saved) => {
           if (editing) {
-            message.success("基本词性已更新");
+            message.success(<ContentText message="part_updated" />);
             return;
           }
-          message.success("基本词性已新增");
+          message.success(<ContentText message="part_added" />);
           // 新建的词性名下还没有细分词性，直接把管理员带到细分词性 Tab 去配。
           setSelectedPartId(saved.id);
           setActiveTab("detailed");
@@ -493,4 +518,9 @@ export function PartOfSpeechSettings() {
       />
     </Flex>
   );
+}
+
+export function ContentError({ error }: { error: unknown }) {
+  const { t } = useContentTranslation();
+  return <>{errorMessage(error, t)}</>;
 }

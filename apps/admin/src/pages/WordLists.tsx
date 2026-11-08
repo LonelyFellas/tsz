@@ -1,3 +1,4 @@
+import { useContentTranslation, ContentText } from "@/features/content/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useRef, useState } from "react";
@@ -25,12 +26,6 @@ import type {
 } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { WordlistDetails } from "@/features/wordlists/WordlistDetails";
-const reviewLabels: Record<string, string> = {
-  none: "—",
-  pending: "待审核",
-  approved: "审核通过",
-  rejected: "审核未通过"
-};
 type Filters = {
   q?: string;
   public?: boolean;
@@ -39,6 +34,7 @@ type Filters = {
   dates?: [Dayjs, Dayjs];
 };
 export function WordListsPage() {
+  const { t } = useContentTranslation();
   const allowed = usePermission("wordlists.access");
   const profile = useAuthStore((s) => s.profile);
   return allowed && profile ? (
@@ -47,10 +43,18 @@ export function WordListsPage() {
       adminId={profile.id}
     />
   ) : (
-    <Result status="403" title="未开通词表查看权限" />
+    <Result status="403" title={t("wordlists_denied")} />
   );
 }
 function Management({ adminId }: { adminId: string }) {
+  const { t } = useContentTranslation();
+  const reviewLabels: Record<string, string> = {
+    none: "—",
+    pending: t("pending"),
+    approved: t("approved"),
+    rejected: t("rejected")
+  };
+
   const client = useQueryClient();
   const canDelete = usePermission("wordlists.delete");
   const canVisibility = usePermission("wordlists.visibility");
@@ -66,11 +70,12 @@ function Management({ adminId }: { adminId: string }) {
     row: AdminWordlist;
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<React.ReactNode>("");
   const [deleteImpact, setDeleteImpact] = useState<WordlistDeleteImpact | null>(
     null
   );
-  const [deleteImpactError, setDeleteImpactError] = useState("");
+  const [deleteImpactError, setDeleteImpactError] =
+    useState<React.ReactNode>("");
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
   const deleteImpactRequest = useRef(0);
   const key = ["admin-wordlists", adminId];
@@ -91,9 +96,7 @@ function Management({ adminId }: { adminId: string }) {
       if (deleteImpactRequest.current === request) setDeleteImpact(impact);
     } catch {
       if (deleteImpactRequest.current === request)
-        setDeleteImpactError(
-          "任务影响读取失败；仍可删除，但请先确认当前使用情况。"
-        );
+        setDeleteImpactError(<ContentText message="impact_failed" />);
     } finally {
       if (deleteImpactRequest.current === request)
         setDeleteImpactLoading(false);
@@ -134,7 +137,7 @@ function Management({ adminId }: { adminId: string }) {
       )
         setQuery((q) => ({ ...q, page: (q.page ?? 1) - 1 }));
     } catch {
-      setError("操作失败或结果未确认，请刷新核对最新状态后重试。");
+      setError(<ContentText message="action_uncertain" />);
       await client.invalidateQueries({ queryKey: key });
       setAction(null);
     } finally {
@@ -144,8 +147,13 @@ function Management({ adminId }: { adminId: string }) {
   return (
     <Flex vertical gap={16}>
       <PageHeader
-        title="智能词表"
-        breadcrumb={<Breadcrumb items={[{ title: "词表管理" }]} />}
+        title={t("wordlists")}
+        breadcrumb={
+          <Breadcrumb
+            aria-label={t("breadcrumb")}
+            items={[{ title: t("wordlist_management") }]}
+          />
+        }
       />
       <Card className="admin-filter-card" size="small">
         <Form
@@ -170,58 +178,58 @@ function Management({ adminId }: { adminId: string }) {
             })
           }
         >
-          <Form.Item name="q" label="关键词">
+          <Form.Item name="q" label={t("keyword")}>
             <Input
-              aria-label="搜索词表"
+              aria-label={t("search_wordlists")}
               maxLength={100}
-              placeholder="词表名称 / 创建人"
+              placeholder={t("wordlist_search_placeholder")}
               style={{ width: 180 }}
               allowClear
             />
           </Form.Item>
-          <Form.Item name="public" label="公开状态">
+          <Form.Item name="public" label={t("visibility")}>
             <Select
-              aria-label="公开状态"
+              aria-label={t("visibility")}
               style={{ width: 120 }}
               allowClear
-              placeholder="全部"
+              placeholder={t("all")}
               options={[
-                { value: true, label: "公开" },
-                { value: false, label: "私密" }
+                { value: true, label: t("public") },
+                { value: false, label: t("private") }
               ]}
             />
           </Form.Item>
-          <Form.Item name="review_state" label="审核状态">
+          <Form.Item name="review_state" label={t("review_state")}>
             <Select
-              aria-label="审核状态"
+              aria-label={t("review_state")}
               style={{ width: 140 }}
               allowClear
-              placeholder="全部"
+              placeholder={t("all")}
               options={Object.entries(reviewLabels).map(([value, label]) => ({
                 value,
-                label: value === "none" ? "未申请" : label
+                label: value === "none" ? t("not_applied") : label
               }))}
             />
           </Form.Item>
-          <Form.Item name="recommended" label="是否推荐">
+          <Form.Item name="recommended" label={t("recommended")}>
             <Select
-              aria-label="是否推荐"
+              aria-label={t("recommended")}
               style={{ width: 120 }}
               allowClear
-              placeholder="全部"
+              placeholder={t("all")}
               options={[
-                { value: true, label: "是" },
-                { value: false, label: "否" }
+                { value: true, label: t("yes") },
+                { value: false, label: t("no") }
               ]}
             />
           </Form.Item>
-          <Form.Item name="dates" label="创建时间">
+          <Form.Item name="dates" label={t("created_at")}>
             <DatePicker.RangePicker />
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Space>
               <Button type="primary" icon={<SearchIcon />} htmlType="submit">
-                搜索
+                {t("search")}
               </Button>
               <Button
                 icon={<RotateCwIcon />}
@@ -230,7 +238,7 @@ function Management({ adminId }: { adminId: string }) {
                   setQuery({ page: 1, page_size: 20 });
                 }}
               >
-                重置
+                {t("reset")}
               </Button>
             </Space>
           </Form.Item>
@@ -248,8 +256,12 @@ function Management({ adminId }: { adminId: string }) {
         {result.isError && (
           <Alert
             type="error"
-            title="词表加载失败"
-            action={<Button onClick={() => void result.refetch()}>重试</Button>}
+            title={t("wordlists_failed")}
+            action={
+              <Button onClick={() => void result.refetch()}>
+                {t("retry")}
+              </Button>
+            }
           />
         )}
         <Table<AdminWordlist>
@@ -257,7 +269,7 @@ function Management({ adminId }: { adminId: string }) {
           locale={{
             emptyText: (
               <TableEmptyState
-                message="暂无词表"
+                message={t("no_wordlists")}
                 filtered={
                   !!query.q ||
                   query.public !== undefined ||
@@ -280,7 +292,7 @@ function Management({ adminId }: { adminId: string }) {
           pagination={{
             itemRender: (_, type, original) =>
               type === "next" ? (
-                <button type="button" aria-label="下一页">
+                <button type="button" aria-label={t("next_page")}>
                   ›
                 </button>
               ) : (
@@ -300,6 +312,7 @@ function Management({ adminId }: { adminId: string }) {
           }}
           columns={[
             {
+              key: "ID",
               title: "ID",
               width: 120,
               render: (_, r) => (
@@ -312,65 +325,75 @@ function Management({ adminId }: { adminId: string }) {
               )
             },
             {
-              title: "词表名称",
+              key: "词表名称",
+              title: t("wordlist_name"),
               width: 240,
               render: (_, r) => r.wordlist.name
             },
             {
-              title: "词条数量",
+              key: "词条数量",
+              title: t("entry_count"),
               width: 90,
               render: (_, r) => r.wordlist.item_count
             },
             {
-              title: <span style={{ whiteSpace: "nowrap" }}>含自定义词</span>,
+              key: "含自定义词",
+              title: t("has_custom_words"),
               width: 120,
               render: (_, r) =>
                 r.has_custom_words === undefined
                   ? "—"
                   : r.has_custom_words
-                    ? "是"
-                    : "否"
+                    ? t("yes")
+                    : t("no")
             },
             {
-              title: "点赞量",
+              key: "点赞量",
+              title: t("likes"),
               width: 80,
               render: (_, r) => r.like_count ?? "—"
             },
             {
-              title: "收藏量",
+              key: "收藏量",
+              title: t("favourites"),
               width: 80,
               render: (_, r) => r.favorite_count ?? "—"
             },
-            { title: "投币枚数", width: 100, dataIndex: "tip_amount" },
+            { title: t("tips"), width: 100, dataIndex: "tip_amount" },
             {
-              title: "公开状态",
+              key: "公开状态",
+              title: t("visibility"),
               width: 90,
               render: (_, r) => (
                 <Tag
                   color={r.wordlist.state === "published" ? "green" : "default"}
                 >
-                  {r.wordlist.state === "published" ? "公开" : "私密"}
+                  {r.wordlist.state === "published"
+                    ? t("public")
+                    : t("private")}
                 </Tag>
               )
             },
             {
-              title: "审核状态",
+              key: "审核状态",
+              title: t("review_state"),
               width: 110,
               render: (_, r) => reviewLabels[r.review_state]
             },
             {
-              title: "是否推荐",
+              key: "是否推荐",
+              title: t("recommended"),
               width: 100,
               render: (_, r) => (
                 <Tooltip
                   title={
                     r.wordlist.state !== "published"
-                      ? "仅公开词表可推荐"
+                      ? t("recommend_public_only")
                       : undefined
                   }
                 >
                   <Switch
-                    aria-label={`推荐 ${r.wordlist.name}`}
+                    aria-label={t("recommend_named", { name: r.wordlist.name })}
                     checked={r.recommended}
                     loading={busy === r.wordlist.id}
                     disabled={
@@ -384,23 +407,28 @@ function Management({ adminId }: { adminId: string }) {
               )
             },
             {
-              title: "创建人",
+              key: "创建人",
+              title: t("creator"),
               width: 130,
               render: (_, r) => (
                 <>
                   {r.wordlist.owner_name}
-                  {r.wordlist.owner_user_id === null && <Tag>平台</Tag>}
+                  {r.wordlist.owner_user_id === null && (
+                    <Tag>{t("platform")}</Tag>
+                  )}
                 </>
               )
             },
             {
-              title: "创建时间",
+              key: "创建时间",
+              title: t("created_at"),
               width: 180,
               render: (_, r) =>
                 new Date(r.wordlist.created_at).toLocaleString("zh-CN")
             },
             {
-              title: "操作",
+              key: "操作",
+              title: t("actions"),
               fixed: "right",
               width: 220,
               render: (_, row) => (
@@ -411,7 +439,7 @@ function Management({ adminId }: { adminId: string }) {
                       size="small"
                       onClick={() => setSelected(row)}
                     >
-                      查看
+                      {t("view")}
                     </Button>
                     {(row.wordlist.state === "published" ||
                       row.wordlist.owner_user_id === null) && (
@@ -422,18 +450,20 @@ function Management({ adminId }: { adminId: string }) {
                         onClick={() => setAction({ kind: "visibility", row })}
                       >
                         {row.wordlist.state === "published"
-                          ? "设为私密"
-                          : "设为公开"}
+                          ? t("make_private")
+                          : t("make_public")}
                       </Button>
                     )}
                   </Space>
-                  <Tooltip title="删除">
+                  <Tooltip title={t("delete")}>
                     <span>
                       <Button
                         type="link"
                         size="small"
                         icon={<Trash2Icon />}
-                        aria-label={`删除${row.wordlist.name}`}
+                        aria-label={t("delete_named", {
+                          name: row.wordlist.name
+                        })}
                         danger
                         disabled={!canDelete || !!busy}
                         onClick={() => void openDelete(row)}
@@ -457,14 +487,14 @@ function Management({ adminId }: { adminId: string }) {
       <Modal
         title={
           action?.kind === "delete"
-            ? "删除词表"
+            ? t("delete_wordlist")
             : action?.row.wordlist.state === "published"
-              ? "设为私密"
-              : "设为公开"
+              ? t("make_private")
+              : t("make_public")
         }
         open={!!action}
         confirmLoading={!!busy}
-        okText="确认"
+        okText={t("confirm")}
         okButtonProps={{
           danger: action?.kind === "delete",
           disabled: deleteImpactLoading
@@ -484,31 +514,32 @@ function Management({ adminId }: { adminId: string }) {
         <p>{action?.row.wordlist.name}</p>
         {action?.kind === "delete" ? (
           <>
-            <p>删除后该词表将不可访问，系统推荐也会取消。历史投币记录保留。</p>
+            <p>{t("delete_wordlist_help")}</p>
             {deleteImpactLoading ? (
-              <p aria-live="polite">正在读取学习任务影响…</p>
+              <p aria-live="polite">{t("loading_impact")}</p>
             ) : deleteImpactError ? (
               <p role="alert">{deleteImpactError}</p>
             ) : deleteImpact ? (
               action.row.wordlist.state === "published" ? (
                 <div aria-live="polite">
                   <p>
-                    已有 {deleteImpact.active_run_count} 个进行中轮次（涉及{" "}
-                    {deleteImpact.active_task_count} 个任务、
-                    {deleteImpact.affected_user_count}{" "}
-                    位用户）可在删除后继续完成；日任务仍受当天窗口限制，长期任务在宽限期内完成。
-                    完成后对应任务自动结束，不能再开新一轮。
+                    {t("impact_active", {
+                      runs: deleteImpact.active_run_count,
+                      tasks: deleteImpact.active_task_count,
+                      users: deleteImpact.affected_user_count
+                    })}
                   </p>
                   <p>
-                    {deleteImpact.blocked_task_count}{" "}
-                    个引用该词表但没有可继续轮次的任务将无法再开始。
+                    {t("impact_blocked", {
+                      count: deleteImpact.blocked_task_count
+                    })}
                   </p>
                 </div>
               ) : (
                 <p aria-live="polite">
-                  该词表当前不是公开状态，删除不会保留在途轮次；
-                  {deleteImpact.blocked_task_count}{" "}
-                  个引用该词表的活动任务将无法再开始。
+                  {t("impact_private", {
+                    count: deleteImpact.blocked_task_count
+                  })}
                 </p>
               )
             ) : null}
@@ -516,8 +547,8 @@ function Management({ adminId }: { adminId: string }) {
         ) : (
           <p>
             {action?.row.wordlist.state === "published"
-              ? "设为私密后其他用户将无法访问，系统推荐会取消。审核状态保持不变。"
-              : "公开后其他用户可以搜索和使用此词表。审核状态保持不变。"}
+              ? t("make_private_help")
+              : t("make_public_help")}
           </p>
         )}
       </Modal>
