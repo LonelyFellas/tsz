@@ -418,39 +418,44 @@ describe("SmartDictionary", () => {
       target: { value: "alpha" }
     });
     fireEvent.submit(screen.getByLabelText("词条").closest("form")!);
-    await waitFor(() =>
+    // 查询 mock 可先于 transition 提交调用，分页前先等待界面地址生效。
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "headword=alpha"
+      );
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 1,
         page_size: 20,
         headword: "alpha",
         ...boundaries
-      })
-    );
+      });
+    });
     fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
-    await waitFor(() =>
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("page=2");
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 2,
         page_size: 20,
         headword: "alpha",
         ...boundaries
-      })
-    );
+      });
+    });
     expect(screen.getByTestId("location")).toHaveTextContent(
       "created_timezone=Asia%2FShanghai"
     );
     fireEvent.click(
       screen.getByRole("button", { name: /移除创建时间（北京时间）/ })
     );
-    await waitFor(() =>
+    await waitFor(() => {
       expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
         page: 1,
         page_size: 20,
         headword: "alpha"
-      })
-    );
-    expect(screen.getByTestId("location")).not.toHaveTextContent(
-      "created_timezone"
-    );
+      });
+      expect(screen.getByTestId("location")).not.toHaveTextContent(
+        "created_timezone"
+      );
+    });
   });
 
   it("跨页已选数量明确，取消选择会清空跨页选择", async () => {
