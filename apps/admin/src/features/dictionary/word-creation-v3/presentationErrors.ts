@@ -1,4 +1,9 @@
 import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation,
+  type LexiconEditorKey as CreationKey
+} from "../i18n/editor";
+import {
   defaultLexiconEditorTranslation,
   type LexiconEditorTranslation
 } from "../i18n/editor";
@@ -121,19 +126,23 @@ export function v3IssueMessage(
 
 // 同一个 code 会按字段分别下发（语义区间的中英文名各算一条）。只按文案去重会把它们
 // 并成一句，管理员填完中文再点一次完成，又看到一模一样的提示，像是改了没生效。
-const ISSUE_FIELD_SUFFIX: Record<string, string> = {
-  name_zh: "（中文）",
-  name_en: "（英文）"
+const ISSUE_FIELD_SUFFIX: Record<string, CreationKey> = {
+  name_zh: "creation_chinese",
+  name_en: "creation_english_bd3ec6"
 };
 
 export function v3IssueMessages(
-  issues: readonly V3DraftValidationIssue[]
+  issues: readonly V3DraftValidationIssue[],
+  t: CreationTranslation = creationDefaultT
 ): string[] {
   return [
     ...new Set(
       issues.map(
         (issue) =>
-          v3IssueMessage(issue) + (ISSUE_FIELD_SUFFIX[issue.field] ?? "")
+          v3IssueMessage(issue, t) +
+          (ISSUE_FIELD_SUFFIX[issue.field]
+            ? t(ISSUE_FIELD_SUFFIX[issue.field]!)
+            : "")
       )
     )
   ];
@@ -146,20 +155,25 @@ export interface V3DetailErrorPresentation {
 }
 
 export function presentV3DetailError(
-  error: unknown
+  error: unknown,
+  t: CreationTranslation = creationDefaultT
 ): V3DetailErrorPresentation {
-  const title = "无法打开词条";
+  const title = t("creation_cannot_open_entry");
   if (error instanceof UnsupportedAdminWordSchemaVersionError) {
     return {
       title,
-      description: "当前前端不支持该词条数据版本，请升级后重试",
+      description: t(
+        "creation_this_frontend_does_not_support_the_entry_version_upgrade_and_try_again"
+      ),
       retryable: false
     };
   }
   if (error instanceof InvalidAdminWordResponseError) {
     return {
       title,
-      description: "词条响应格式异常，已安全停止",
+      description: t(
+        "creation_the_entry_response_has_an_invalid_format_processing_has_stopped"
+      ),
       retryable: false
     };
   }
@@ -167,51 +181,73 @@ export function presentV3DetailError(
     if (error.status === 401) {
       return {
         title,
-        description: "登录状态已失效，请重新登录",
+        description: t(
+          "creation_your_session_has_expired_sign_in_again_597b79"
+        ),
         retryable: false
       };
     }
     if (error.status === 403) {
       return {
         title,
-        description: "当前账号没有查看该词条的权限",
+        description: t("creation_this_account_cannot_view_this_entry"),
         retryable: false
       };
     }
     if (error.status === 404 || error.code === "word_not_found") {
-      return { title, description: "词条不存在或已被删除", retryable: false };
+      return {
+        title,
+        description: t(
+          "creation_this_entry_does_not_exist_or_has_been_deleted"
+        ),
+        retryable: false
+      };
     }
     if (error.status === 422 && error.code === "unsupported_schema_version") {
       return {
         title,
-        description: "当前前端不支持该词条数据版本，请升级后重试",
+        description: t(
+          "creation_this_frontend_does_not_support_the_entry_version_upgrade_and_try_again"
+        ),
         retryable: false
       };
     }
     if (error.status === 503) {
       return {
         title,
-        description: "词条服务暂时不可用，请稍后重试",
+        description: t(
+          "creation_the_entry_service_is_unavailable_try_again_later_e80864"
+        ),
         retryable: true
       };
     }
     if (error.status >= 500) {
       return {
         title,
-        description: "词条加载失败，请稍后重试",
+        description: t("creation_could_not_load_the_entry_try_again_later"),
         retryable: true
       };
     }
-    return { title, description: "词条暂时无法打开", retryable: false };
+    return {
+      title,
+      description: t("creation_the_entry_cannot_be_opened_right_now"),
+      retryable: false
+    };
   }
   if (error instanceof TypeError || error instanceof RequestTimeoutError) {
     return {
       title,
-      description: "网络异常，请检查连接后重试",
+      description: t(
+        "creation_a_network_error_occurred_check_the_connection_and_try_again"
+      ),
       retryable: true
     };
   }
-  return { title, description: "词条暂时无法打开", retryable: false };
+  return {
+    title,
+    description: t("creation_the_entry_cannot_be_opened_right_now"),
+    retryable: false
+  };
 }
 
 export function shouldRetryV3Detail(

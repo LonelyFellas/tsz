@@ -1,3 +1,4 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { buildReferenceIndex } from "../referenceGuard";
@@ -84,4 +85,31 @@ describe("V3ReferenceBadge", () => {
     expect(screen.getByText("共 7 处，显示前 1 条")).toBeInTheDocument();
     expect(screen.getByText("已失效")).toBeInTheDocument();
   });
+});
+
+it("引用徽标语言与计数外壳同步更新，已打开浮层保留原引用", () => {
+  const guard: V3ReferenceGuard = {
+    index: buildReferenceIndex(
+      inboundReferences([sharedSentenceReference(target)])
+    ),
+    openReference: vi.fn(),
+    refresh: vi.fn(),
+    registerNavigator: vi.fn()
+  };
+  const content = (locale: "zh-Hant" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <V3ReferenceGuardProvider value={guard}>
+        <V3ReferenceBadge nodeIds={["sense-1"]} />
+      </V3ReferenceGuardProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("en-US"));
+  fireEvent.click(screen.getByRole("button", { name: "View 1 link" }));
+  expect(screen.getByText("This content has 1 link")).toBeInTheDocument();
+  view.rerender(content("zh-Hant"));
+  expect(
+    screen.getByRole("button", { name: "檢視 1 處關聯" })
+  ).toBeInTheDocument();
+  expect(screen.getByText("此內容有 1 處關聯")).toBeInTheDocument();
+  expect(guard.refresh).not.toHaveBeenCalled();
 });

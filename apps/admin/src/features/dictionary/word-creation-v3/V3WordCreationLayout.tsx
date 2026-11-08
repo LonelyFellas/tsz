@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../i18n/editor";
 import {
   useWorkspaceTranslation,
   type WorkspaceMessage
@@ -197,6 +198,7 @@ function V3WordCreationLayoutContent({
   children
 }: Props) {
   const { t, i18n } = useWorkspaceTranslation();
+  const { t: editorT } = useLexiconEditorTranslation();
   const remoteUpdateAlertRef = useRef<HTMLDivElement>(null);
   const referenceGuard = useV3ReferenceGuard();
   // 保存被引用拦下多半是别处刚新增了引用（或索引过期）：重新拉一次，界面禁用态跟着更新。
@@ -225,15 +227,19 @@ function V3WordCreationLayoutContent({
             surface.trim() !== "" &&
             !/^未命名词条(?:\s*·.*)?$/u.test(surface.trim())
         ) ?? t("new_entry")));
-  const progressRows = buildV3ProductProgress({
-    wordId: word.id,
-    language: word.language,
-    partOfSpeechCatalog,
-    dirtySteps,
-    completedSteps: word.completed_steps,
-    forms: expandFormContents(draftForms ?? word.forms),
-    meanings: draftMeanings ?? word.meanings
-  });
+  const progressRows = buildV3ProductProgress(
+    {
+      wordId: word.id,
+      language: word.language,
+      partOfSpeechCatalog,
+      dirtySteps,
+      completedSteps: word.completed_steps,
+      forms: expandFormContents(draftForms ?? word.forms),
+      meanings: draftMeanings ?? word.meanings
+    },
+    editorT,
+    i18n.language
+  );
   if (sharedSentenceCount !== undefined) {
     const sentences = progressRows.find((row) => row.key === "sentences");
     if (sentences) {
@@ -378,7 +384,7 @@ function V3WordCreationLayoutContent({
                   </Flex>
                 ) : operationValidationIssues.length > 0 ? (
                   <Flex vertical gap={4}>
-                    {v3IssueMessages(operationValidationIssues).map(
+                    {v3IssueMessages(operationValidationIssues, editorT).map(
                       (message) => (
                         <span key={message}>{message}</span>
                       )

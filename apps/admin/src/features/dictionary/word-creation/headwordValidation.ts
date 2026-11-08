@@ -1,3 +1,7 @@
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation
+} from "../i18n/editor";
 // 词条主词的字符集预检。
 //
 // 「录入与检测」卡片上写着「仅支持英文词条」，但内置词典未命中时
@@ -33,11 +37,18 @@ export const HEADWORD_CHARSET_MESSAGE =
 export const HEADWORD_NO_LETTER_MESSAGE = "词条至少需要包含一个英文字母";
 
 /** 返回不通过的原因文案；通过时返回 `undefined`。空值交给 `required` 规则，不在这里报。 */
-export function headwordIssue(value: string): string | undefined {
+export function headwordIssue(
+  value: string,
+  t: CreationTranslation = creationDefaultT
+): string | undefined {
   const trimmed = value.trim();
   if (trimmed === "") return undefined;
-  if (!ALLOWED_HEADWORD.test(trimmed)) return HEADWORD_CHARSET_MESSAGE;
-  if (!HAS_LATIN_LETTER.test(trimmed)) return HEADWORD_NO_LETTER_MESSAGE;
+  if (!ALLOWED_HEADWORD.test(trimmed))
+    return t(
+      "creation_english_entries_may_contain_letters_digits_spaces_and_common_symbols_such_as"
+    );
+  if (!HAS_LATIN_LETTER.test(trimmed))
+    return t("creation_an_entry_must_contain_at_least_one_english_letter");
   return undefined;
 }
 
@@ -45,17 +56,20 @@ export function headwordIssue(value: string): string | undefined {
  * 按方言侧给出英美主词的问题文案，供「确认英美主词」逐框标红。
  * unified 模式下两侧同源，问题只挂在英式侧展示位上没有意义，故只在 distinguish 时分侧返回。
  */
-export function headwordsIssues(headwords: WordHeadwordsV2): {
+export function headwordsIssues(
+  headwords: WordHeadwordsV2,
+  t: CreationTranslation = creationDefaultT
+): {
   uk?: string;
   us?: string;
 } {
   if (headwords.mode === "unified") {
-    const issue = headwordIssue(headwords.common);
+    const issue = headwordIssue(headwords.common, t);
     return { uk: issue, us: issue };
   }
   return {
-    uk: headwordIssue(headwords.uk),
-    us: headwordIssue(headwords.us)
+    uk: headwordIssue(headwords.uk, t),
+    us: headwordIssue(headwords.us, t)
   };
 }
 

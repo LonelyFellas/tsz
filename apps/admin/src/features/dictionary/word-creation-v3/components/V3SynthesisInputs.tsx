@@ -1,3 +1,9 @@
+import { localPhoneticDiagnostic } from "./localPhoneticDiagnostic";
+import { useLexiconEditorTranslation } from "../../i18n/editor";
+import {
+  useLexiconEditorMessageState as useCreationMessageState,
+  createLexiconEditorMessage as creationMessage
+} from "../../i18n/editor";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { ChevronDownIcon, ArrowLeftRightIcon } from "lucide-react";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
@@ -19,7 +25,6 @@ import {
   pronunciationSynthesisContent,
   synthesisInputIssue,
   pronunciationLocale,
-  pronunciationLocaleLabel,
   synthesisLocaleIssue,
   synthesisForLocale
 } from "@tsz/shared";
@@ -66,6 +71,7 @@ export function V3SynthesisInputs({
   issues: readonly V3DraftValidationIssue[];
   onChange: (patch: Partial<WordPronunciationV3>) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
   const inputPrefix = useId();
   const [upsState, setUpsState] = useState<
@@ -85,7 +91,7 @@ export function V3SynthesisInputs({
   const { preference } = useDialectPreference();
   const locale = pronunciationLocale(dialect, preference);
   const requireLocaleConfirmation = dialect === "common";
-  const [diagnostic, setDiagnostic] = useState("");
+  const [diagnostic, setDiagnostic] = useCreationMessageState();
   const [pending, setPending] = useState<{
     side: Side;
     alphabet: Alphabet;
@@ -118,7 +124,7 @@ export function V3SynthesisInputs({
     }
     expected.current = synthesis;
   }, [synthesis, dialect]);
-  const label = `第 ${index + 1} 条发音`;
+  const label = t("creation_pronunciation_item", { index: index + 1 });
   const selectedSynthesis = synthesisForLocale(synthesis, locale, dialect);
   const content = pronunciationSynthesisContent(
     spelling,
@@ -278,7 +284,7 @@ export function V3SynthesisInputs({
         <div className="word-synthesis-candidates">
           {(dialect === "common" ? SIDES : [dialect]).map((side) => {
             const sideLocale = pronunciationLocale(side, "uk");
-            const sideLabel = pronunciationLocaleLabel(sideLocale);
+            const sideLabel = t(side === "uk" ? "dialect_uk" : "dialect_us");
             const candidate = candidateForSide(synthesis, side, dialect);
             const rowContent = pronunciationSynthesisContent(
               spelling,
@@ -316,12 +322,21 @@ export function V3SynthesisInputs({
                     playbackOnly
                     pronunciationId={pronunciation.id}
                     dialect={side}
-                    ariaLabelPrefix={`${label} ${sideLabel} ${name} 最终读音`}
+                    ariaLabelPrefix={t("creation_final_reading_label", {
+                      label,
+                      side: sideLabel,
+                      name
+                    })}
                     disabled={!rowContent}
                     disabledReason={
-                      synthesisInputIssue(alphabet, candidate[alphabet]) ??
+                      localPhoneticDiagnostic(
+                        synthesisInputIssue(alphabet, candidate[alphabet]),
+                        t
+                      ) ??
                       (!rowContent
-                        ? "音素词界缺失或与正文不一致，请检查 IPA 或重新转换 UPS"
+                        ? t(
+                            "creation_phoneme_word_boundaries_are_missing_or_do_not_match_the_text_check_ipa_or_convert_ups_agai"
+                          )
                         : undefined)
                     }
                     content={
@@ -340,13 +355,20 @@ export function V3SynthesisInputs({
                     id={`${inputPrefix}-${side}-${alphabet}`}
                     className="tsz-phonetics"
                     autoSize={{ minRows: 1, maxRows: 6 }}
-                    aria-label={`${label}的${sideLabel} ${name}`}
+                    aria-label={t("creation_synthesis_field", {
+                      label,
+                      side: sideLabel,
+                      name
+                    })}
                     data-v3-node-id={pronunciation.id}
                     data-v3-field={inputIssue?.field ?? field}
                     status={invalid ? "error" : undefined}
                     aria-invalid={invalid}
                     value={candidate[alphabet]}
-                    placeholder={`请输入${sideLabel}${alphabet.toUpperCase()}`}
+                    placeholder={t("creation_synthesis_placeholder", {
+                      side: sideLabel,
+                      alphabet: alphabet.toUpperCase()
+                    })}
                     onChange={(event) =>
                       change(side, alphabet, event.target.value)
                     }
@@ -363,11 +385,21 @@ export function V3SynthesisInputs({
                   />
                   <Button
                     icon={<ArrowLeftRightIcon />}
-                    aria-label={`${label}转换为${sideLabel} ${name}`}
+                    aria-label={t("creation_convert_field", {
+                      label,
+                      side: sideLabel,
+                      name
+                    })}
                     title={
                       alphabet === "ipa"
-                        ? `从字典音标转换为${sideLabel} ${name}`
-                        : `从当前${sideLabel} Azure IPA 转换为 ${name}`
+                        ? t("creation_convert_dictionary", {
+                            side: sideLabel,
+                            name
+                          })
+                        : t("creation_convert_current_ipa", {
+                            side: sideLabel,
+                            name
+                          })
                     }
                     onClick={() => convert(side, alphabet)}
                   />
@@ -388,10 +420,15 @@ export function V3SynthesisInputs({
                 </Space.Compact>
                 {invalid && (
                   <Typography.Text className="word-field-help" type="danger">
-                    {synthesisInputIssue(alphabet, candidate[alphabet]) ??
+                    {localPhoneticDiagnostic(
+                      synthesisInputIssue(alphabet, candidate[alphabet]),
+                      t
+                    ) ??
                       (inputIssue
-                        ? v3IssueMessage(inputIssue)
-                        : "请检查合成输入与逐词边界")}
+                        ? v3IssueMessage(inputIssue, t)
+                        : t(
+                            "creation_check_synthesis_input_and_word_boundaries"
+                          ))}
                   </Typography.Text>
                 )}
               </div>
@@ -403,15 +440,21 @@ export function V3SynthesisInputs({
           !synthesis[alphabet === "ipa" ? "ipa_locale" : "ups_locale"] && (
             <div className="word-synthesis-locale-warning">
               <Typography.Text type="warning">
-                旧 {name}：{synthesis[alphabet]}
-                ，请确认口音后保留到对应一侧。
+                {t("creation_legacy_phoneme_value", {
+                  name,
+                  value: synthesis[alphabet]
+                })}
               </Typography.Text>
               {SIDES.map((side) => (
                 <Button
                   key={side}
                   type="link"
                   size="small"
-                  aria-label={`${label}确认 ${name} 为${side === "uk" ? "英式" : "美式"}`}
+                  aria-label={t("creation_confirm_label_side", {
+                    label,
+                    name,
+                    side: t(side === "uk" ? "candidate_uk" : "candidate_us")
+                  })}
                   disabled={Boolean(synthesis[side]?.[alphabet]?.trim())}
                   onClick={() => {
                     const candidate = candidateForSide(
@@ -434,7 +477,9 @@ export function V3SynthesisInputs({
                     onChange({ synthesis: next });
                   }}
                 >
-                  确认此音标为{side === "uk" ? "英式" : "美式"}
+                  {t("creation_confirm_phoneme_locale", {
+                    locale: t(side === "uk" ? "candidate_uk" : "candidate_us")
+                  })}
                 </Button>
               ))}
             </div>
@@ -451,7 +496,7 @@ export function V3SynthesisInputs({
           <div className="word-synthesis-optional word-pronunciation-row">
             <div className="word-synthesis-source-label word-synthesis-source-heading">
               <Typography.Text className="word-pronunciation-label">
-                语音来源
+                {t("creation_speech_source")}
               </Typography.Text>
               <Button
                 className="word-synthesis-ups-toggle"
@@ -465,9 +510,16 @@ export function V3SynthesisInputs({
                   />
                 }
                 iconPlacement="end"
-                aria-label={`${upsExpanded ? "收起" : "展开"}${label}的 UPS`}
+                aria-label={t("creation_ups_toggle", {
+                  action: t(upsExpanded ? "panel_collapse" : "panel_expand"),
+                  label
+                })}
                 aria-expanded={upsExpanded}
-                title={upsExpanded ? "收起 UPS 输入" : "展开 UPS 输入"}
+                title={
+                  upsExpanded
+                    ? t("creation_collapse_ups_input")
+                    : t("creation_expand_ups_input")
+                }
                 onClick={() =>
                   setUpsState((state) =>
                     state === "expanded" ? "collapsed" : "expanded"
@@ -490,7 +542,7 @@ export function V3SynthesisInputs({
             <div className="word-synthesis-source-actions">
               <Radio.Group
                 name={`synthesis-source-${pronunciation.id}`}
-                aria-label={`${label}的合成来源`}
+                aria-label={t("creation_synthesis_source_label", { label })}
                 value={source}
                 onChange={(event) =>
                   onChange({
@@ -508,7 +560,7 @@ export function V3SynthesisInputs({
                 {[
                   {
                     value: "spelling",
-                    name: "词形拼写",
+                    name: t("spelling"),
                     text: spelling,
                     fontClass: "tsz-words"
                   },
@@ -553,22 +605,32 @@ export function V3SynthesisInputs({
               </Radio.Group>
             </div>
           </div>
-          {diagnostic && <Alert type="warning" title={diagnostic} showIcon />}
+          {diagnostic && (
+            <Alert
+              type="warning"
+              title={localPhoneticDiagnostic(diagnostic, t)}
+              showIcon
+            />
+          )}
           {!selectedSynthesis.use_spelling &&
             !content &&
             Boolean(selectedSynthesis[selectedSynthesis.alphabet].trim()) && (
               <Typography.Text type="warning">
-                {selectedIssue ?? "当前合成输入缺少有效词界，请重新转换"}
+                {localPhoneticDiagnostic(selectedIssue, t) ??
+                  t(
+                    "creation_the_current_synthesis_input_has_no_valid_word_boundaries_convert_it_again"
+                  )}
               </Typography.Text>
             )}
         </>
       ) : (
         <Space wrap>
           <Typography.Text>
-            当前来源：
-            {selectedSynthesis.use_spelling
-              ? "词形拼写"
-              : `Azure ${selectedSynthesis.alphabet.toUpperCase()}`}
+            {t("creation_current_source", {
+              source: selectedSynthesis.use_spelling
+                ? t("spelling")
+                : `Azure ${selectedSynthesis.alphabet.toUpperCase()}`
+            })}
           </Typography.Text>
         </Space>
       )}
@@ -576,11 +638,13 @@ export function V3SynthesisInputs({
         open={Boolean(pending)}
         title={
           pending?.normalizedIpa !== undefined
-            ? "规范 Azure IPA 并转换 UPS"
-            : `替换 Azure ${pending?.alphabet.toUpperCase() ?? ""}`
+            ? t("creation_normalise_azure_ipa_and_convert_to_ups")
+            : t("creation_replace_azure", {
+                alphabet: pending?.alphabet.toUpperCase() ?? ""
+              })
         }
-        okText="应用转换结果"
-        cancelText="取消"
+        okText={t("creation_apply_conversion")}
+        cancelText={t("batch_cancel")}
         onCancel={() => setPending(undefined)}
         onOk={() => {
           if (!pending) return;
@@ -595,7 +659,11 @@ export function V3SynthesisInputs({
             pronunciation.style !== pending.style ||
             spelling !== pending.spelling
           )
-            setDiagnostic("来源、口音或目标内容已变化，请重新转换");
+            setDiagnostic(
+              creationMessage(
+                "creation_the_source_accent_or_target_content_has_changed_convert_again"
+              )
+            );
           else
             change(
               pending.side,
@@ -610,8 +678,9 @@ export function V3SynthesisInputs({
         {pending?.normalizedIpa !== undefined && (
           <>
             <Typography.Paragraph>
-              当前 Azure IPA 含字典记法 r。确认后将其改为英语音素 ɹ，再转换为
-              UPS；其他音素保持原样。
+              {t(
+                "creation_the_current_azure_ipa_contains_dictionary_notation_r_confirm_to_change_it_to_the_english_p"
+              )}
             </Typography.Paragraph>
             <Typography.Paragraph className="tsz-phonetics">
               IPA：{pending.source} → {pending.normalizedIpa}
@@ -619,7 +688,9 @@ export function V3SynthesisInputs({
           </>
         )}
         <Typography.Paragraph>
-          将用以下结果替换已有内容，应用后可撤销：
+          {t(
+            "creation_the_following_result_will_replace_the_existing_content_you_can_undo_it_after_applying"
+          )}
         </Typography.Paragraph>
         <Typography.Paragraph code>{pending?.value}</Typography.Paragraph>
       </Modal>

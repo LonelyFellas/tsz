@@ -1,3 +1,7 @@
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation
+} from "../i18n/editor";
 import { headwordIssue } from "./headwordValidation";
 
 export type ClassifiedEntryInput = {
@@ -17,13 +21,16 @@ export function classifyEntryInput(raw: string): ClassifiedEntryInput {
 }
 
 /** Step 1 与关联词共用的英文词条输入准备规则。 */
-export function validateEntryInput(raw: string): ValidatedEntryInput {
+export function validateEntryInput(
+  raw: string,
+  t: CreationTranslation = creationDefaultT
+): ValidatedEntryInput {
   const classified = classifyEntryInput(raw);
   const issue = !classified.normalized
-    ? "请输入词条"
-    : (headwordIssue(classified.normalized) ??
+    ? t("creation_enter_a_word_or_phrase")
+    : (headwordIssue(classified.normalized, t) ??
       (classified.normalized.length > 200
-        ? "词条不能超过 200 个字符"
+        ? t("creation_entries_cannot_exceed_200_characters")
         : undefined));
   return {
     ...classified,

@@ -1,4 +1,8 @@
 import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation
+} from "./i18n/editor";
+import {
   canAdminResourceAction,
   type AdminPermissionActor
 } from "@tsz/shared/auth";
@@ -40,15 +44,16 @@ export function canEditConflictEntry(
   return canEditAnnotationOf(actor, createdBy);
 }
 
-export const OTHERS_ENTRY_HINT = "当前账号仅有读取权限";
-
 /**
  * 标注保存失败里 403 的文案。归属越权与「压根没有标注权限」对管理员意味不同，
  * 统一说「保存失败」会让人以为是重试就能好的故障。
  * 拿不到具体 code 时退回同时成立的宽口径说法，不猜。
  */
-export function annotationForbiddenMessage(code: string | undefined): string {
+export function annotationForbiddenMessage(
+  code: string | undefined,
+  t: CreationTranslation = creationDefaultT
+): string {
   return isAnnotationOwnershipError(code)
-    ? "只能修改自己创建的词条的标注。"
-    : "当前账号没有修改该词条标注的权限。";
+    ? t("creation_you_can_only_change_annotations_on_entries_you_created")
+    : t("creation_this_account_cannot_change_this_entry_s_annotation");
 }

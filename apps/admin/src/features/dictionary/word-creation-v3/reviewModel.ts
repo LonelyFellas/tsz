@@ -1,3 +1,7 @@
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation
+} from "../i18n/editor";
 import { primaryRegionalVariant, regionalVariants } from "@tsz/shared";
 import type { AdminWordV3, WordConcreteFormV3 } from "@tsz/types";
 import { expandFormContents } from "@tsz/shared";
@@ -8,8 +12,8 @@ export type V3ReviewStatus =
 export interface V3ReviewModel {
   identity: {
     label: string;
-    kindLabel: "单词" | "短语";
-    languageLabel: "English 英语";
+    kindLabel: string;
+    languageLabel: string;
   };
   state: {
     status: V3ReviewStatus;
@@ -54,7 +58,10 @@ function baseSpellingKey(form: WordConcreteFormV3): string | undefined {
   return key === "|" ? undefined : key;
 }
 
-export function buildV3ReviewModel(word: AdminWordV3): V3ReviewModel {
+export function buildV3ReviewModel(
+  word: AdminWordV3,
+  t: CreationTranslation = creationDefaultT
+): V3ReviewModel {
   const forms = expandFormContents(word.forms).pos.flatMap((pos) => pos.forms);
   const pronunciations = forms.flatMap((form) =>
     regionalVariants(form.regional_variants).flatMap(
@@ -71,19 +78,29 @@ export function buildV3ReviewModel(word: AdminWordV3): V3ReviewModel {
           ? "published_dirty"
           : "published";
   const state = {
-    draft: { statusLabel: "草稿", primaryAction: "validate" as const },
-    published: { statusLabel: "已发布", primaryAction: "edit" as const },
-    published_dirty: {
-      statusLabel: "已发布 · 有未发布修改",
+    draft: {
+      statusLabel: t("panel_draft"),
       primaryAction: "validate" as const
     },
-    archived: { statusLabel: "垃圾桶", primaryAction: "none" as const }
+    published: {
+      statusLabel: t("panel_published"),
+      primaryAction: "edit" as const
+    },
+    published_dirty: {
+      statusLabel: t("creation_published_unpublished_changes"),
+      primaryAction: "validate" as const
+    },
+    archived: {
+      statusLabel: t("creation_trash"),
+      primaryAction: "none" as const
+    }
   }[status];
   return {
     identity: {
       label: word.presentation.label,
-      kindLabel: word.kind === "phrase" ? "短语" : "单词",
-      languageLabel: "English 英语"
+      kindLabel:
+        word.kind === "phrase" ? t("creation_phrase") : t("creation_word"),
+      languageLabel: t("creation_english_0e6e99")
     },
     state: { status, ...state },
     summary: {

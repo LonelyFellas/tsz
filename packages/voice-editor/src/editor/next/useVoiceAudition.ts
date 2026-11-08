@@ -1,9 +1,7 @@
 import {
-  useVoiceEditorTranslation,
-  defaultVoiceEditorTranslation,
-  type VoiceEditorTranslation,
   useVoiceEditorMessageState,
-  createVoiceEditorMessage
+  createVoiceEditorMessage,
+  voiceEditorErrorMessage
 } from "../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RichTextV2 } from "@tsz/types";
@@ -21,15 +19,6 @@ import type {
   VoiceSettings,
   VoiceSetting
 } from "../../types";
-
-function errorMessage(
-  error: unknown,
-  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
-): string {
-  return error instanceof Error
-    ? error.message
-    : t("audition_failed_try_again_later");
-}
 
 /** 试听使用该音色自己的语速，并按供应商能力夹取。 */
 function settingsForVoice(
@@ -116,7 +105,6 @@ export function useVoiceAudition({
   previewAdapter,
   catalog
 }: VoiceAuditionInput): VoiceAudition {
-  const { t } = useVoiceEditorTranslation();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [status, setStatus] = useVoiceEditorMessageState("");
@@ -210,7 +198,10 @@ export function useVoiceAudition({
         );
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setStatus(errorMessage(error, t));
+        if (!controller.signal.aborted)
+          setStatus(
+            voiceEditorErrorMessage(error, "audition_failed_try_again_later")
+          );
       })
       .finally(() => {
         if (!controller.signal.aborted) setVoicesLoading(false);
@@ -345,7 +336,10 @@ export function useVoiceAudition({
             });
         })
         .catch((error) => {
-          if (!controller.signal.aborted) setStatus(errorMessage(error, t));
+          if (!controller.signal.aborted)
+            setStatus(
+              voiceEditorErrorMessage(error, "audition_failed_try_again_later")
+            );
         })
         .finally(() => {
           if (abortRef.current === controller) {

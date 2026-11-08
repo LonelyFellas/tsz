@@ -1,3 +1,7 @@
+import {
+  lexiconEditorMessages,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
 import type {
   DraftMeaningsStepContentWritableV3,
   WordSentenceWritableV3
@@ -909,4 +913,39 @@ describe("实时摘要明细", () => {
     expect(orphan[5]!.count).toBe(3);
     expect(orphan[5]!.completed).toBe(false);
   });
+});
+
+it("进度翻译只影响显示，保留业务标识、计数、完成状态与输入", () => {
+  const input = {
+    wordId: "raw-entry",
+    language: "en",
+    completedSteps: ["basics", "forms", "meanings"] as const,
+    forms: formsFixture(),
+    meanings: meaningsFixture(),
+    partOfSpeechCatalog: partOfSpeechCatalogFixture.items
+  };
+  const before = JSON.stringify(input);
+  const zh = buildV3ProductProgress(input);
+  const t: LexiconEditorTranslation = (key, values) =>
+    lexiconEditorMessages[key][2].replace(/{{(\w+)}}/g, (_, name: string) =>
+      String(values?.[name] ?? "")
+    );
+  const en = buildV3ProductProgress(input, t, "en-GB");
+  const flags = (rows: ReturnType<typeof buildV3ProductProgress>) =>
+    rows.map(({ key, step, completed, count, details }) => ({
+      key,
+      step,
+      completed,
+      count,
+      details: details.map(({ key, count, pending, dialect, items }) => ({
+        key,
+        count,
+        pending,
+        dialect,
+        items: items?.map(({ key, pending }) => ({ key, pending }))
+      }))
+    }));
+  expect(flags(en)).toEqual(flags(zh));
+  expect(en[0]!.label).not.toEqual(zh[0]!.label);
+  expect(JSON.stringify(input)).toBe(before);
 });

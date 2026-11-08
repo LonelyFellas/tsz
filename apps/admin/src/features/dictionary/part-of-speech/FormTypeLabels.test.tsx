@@ -1,3 +1,4 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { FormTypeCatalogItem } from "@tsz/types";
@@ -39,4 +40,24 @@ describe("FormTypeLabelsProvider", () => {
 
     expect(screen.getByText("过去式")).toBeInTheDocument();
   });
+});
+
+it("已有英文目录名与无 Provider 的 fallback 随语言变化，未知编码原样保留", () => {
+  const content = (locale: "zh-Hant" | "en-GB") => (
+    <InterfaceI18nProvider locale={locale}>
+      <FormTypeLabelsProvider items={[thirdPersonSingular]}>
+        <Label code="third_person_singular" />
+      </FormTypeLabelsProvider>
+      <Label code="past_tense" />
+      <Label code="future_raw_code" />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("en-GB"));
+  expect(screen.getByText("Third person singular")).toBeVisible();
+  expect(screen.getByText("Past tense")).toBeVisible();
+  expect(screen.getByText("future_raw_code")).toBeVisible();
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByText("三单")).toBeVisible();
+  expect(screen.getByText("過去式")).toBeVisible();
+  expect(screen.getByText("future_raw_code")).toBeVisible();
 });
