@@ -1,7 +1,7 @@
 .v3-review {
-  --review-ink: #202632;
-  --review-muted: #667085;
-  --review-line: #e9ecf1;
+  --review-ink: var(--ui-color-text);
+  --review-muted: var(--ui-color-text-secondary);
+  --review-line: var(--ui-color-border-secondary);
   color: var(--review-ink);
   display: flex;
   flex-direction: column;
@@ -18,29 +18,29 @@
   box-shadow: none;
 }
 .v3-review-header .ui-card-body {
-  padding: 16px 0;
+  padding: var(--ui-space-4) 0;
 }
 .v3-review-header h2.ui-typography {
   font-size: 14pt;
   line-height: 1.15;
   letter-spacing: -1.5px;
-  margin: 8px 0 16px;
+  margin: var(--ui-space-2) 0 var(--ui-space-4);
 }
 .v3-review-kicker {
-  color: #2053ff;
-  font-size: 12px;
+  color: var(--ui-color-primary);
+  font-size: var(--ui-font-size-sm);
   font-weight: 600;
 }
 .v3-review-status {
   border-radius: 20px;
-  padding: 3px 12px;
+  padding: 3px var(--ui-space-3);
 }
 .v3-review-summary {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px 22px;
-  padding: 16px 0 24px;
+  gap: var(--ui-space-3) 22px;
+  padding: var(--ui-space-4) 0 var(--ui-space-6);
   color: var(--review-muted);
   border-bottom: 1px solid var(--review-line);
 }
@@ -50,7 +50,7 @@
   margin-right: 3px;
 }
 .v3-review-summary > span:first-child {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .v3-review-reading-layout {
   display: grid;
@@ -64,18 +64,18 @@
   top: 84px;
   max-height: calc(100vh - 110px);
   overflow-y: auto;
-  padding-right: 12px;
-  font-size: 13px;
+  padding-right: var(--ui-space-3);
+  font-size: var(--ui-font-size-compact);
 }
 .v3-review-index-title {
   color: var(--review-muted);
   font-size: 11px;
   letter-spacing: 2px;
-  margin-bottom: 16px;
+  margin-bottom: var(--ui-space-4);
 }
 .v3-review-index strong {
   display: block;
-  padding: 20px 12px 8px;
+  padding: var(--ui-space-5) var(--ui-space-3) var(--ui-space-2);
 }
 .v3-review-index button {
   display: flex;
@@ -83,7 +83,7 @@
   border: 0;
   background: transparent;
   text-align: left;
-  padding: 10px 12px;
+  padding: 10px var(--ui-space-3);
   width: 100%;
   border-radius: 6px;
   color: #626b7a;
@@ -98,12 +98,12 @@
 }
 .v3-review-index button:hover,
 .v3-review-index button[aria-current] {
-  background: #edf2ff;
-  color: #2053ff;
+  background: var(--ui-color-primary-bg);
+  color: var(--ui-color-primary);
 }
 .v3-review-index a {
   display: block;
-  margin: 24px 12px;
+  margin: var(--ui-space-6) var(--ui-space-3);
 }
 .v3-review-paper {
   min-width: 0;
@@ -114,9 +114,9 @@
 }
 .v3-review-readiness {
   border-bottom: 1px solid var(--review-line);
-  padding-bottom: 20px;
+  padding-bottom: var(--ui-space-5);
   color: var(--review-muted);
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
 }
 .v3-review-content > .ui-collapse {
   background: transparent;
@@ -126,7 +126,7 @@
   border-bottom: 0;
 }
 .v3-review-content > .ui-collapse > .ui-collapse-item > .ui-collapse-header {
-  padding: 24px 0;
+  padding: var(--ui-space-6) 0;
   font-size: 17px;
   font-weight: 600;
 }
@@ -151,8 +151,8 @@
 }
 .v3-review-section-label {
   display: block;
-  font-size: 12px;
-  margin: 16px 0 8px;
+  font-size: var(--ui-font-size-sm);
+  margin: var(--ui-space-4) 0 var(--ui-space-2);
   color: var(--review-muted);
 }
 .v3-review-group-list,
@@ -167,14 +167,14 @@
 .v3-review-form {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) 0;
   border-top: 1px solid var(--review-line);
 }
 .v3-review-form-type {
   color: var(--review-muted);
-  font-size: 12px;
-  padding-top: 4px;
+  font-size: var(--ui-font-size-sm);
+  padding-top: var(--ui-space-1);
 }
 .v3-review-form-variants {
   display: grid;
@@ -189,7 +189,7 @@
   display: flex;
   align-items: baseline;
   gap: 14px;
-  padding: 28px 0 16px;
+  padding: 28px 0 var(--ui-space-4);
   border-bottom: 2px solid var(--review-ink);
 }
 .v3-dictionary-pos-heading h2 {
@@ -198,10 +198,10 @@
 }
 .v3-dictionary-pos-heading > span {
   color: var(--review-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 .v3-dictionary-pos > .ui-flex > .ui-flex:first-child {
-  padding: 16px 0;
+  padding: var(--ui-space-4) 0;
   border-bottom: 1px solid var(--review-line);
 }
 .v3-dictionary-sense {
@@ -231,7 +231,7 @@
   font-variant-numeric: tabular-nums;
 }
 .v3-dictionary-sense .ui-tag {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   border-radius: 4px;
 }
 .v3-dictionary-definitions {
@@ -269,14 +269,14 @@
   font-weight: 400;
 }
 .v3-dictionary-usage {
-  background: #f7f8fa;
+  background: var(--ui-color-fill-alter);
   border-radius: 6px;
   padding: 10px 14px;
   margin-top: 10px;
   color: #616b7b;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   display: flex;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
 .v3-dictionary-usage > span {
   flex-shrink: 0;
@@ -285,7 +285,7 @@
 }
 .v3-dictionary-usage small {
   font-size: 11px;
-  color: #8993a1;
+  color: var(--ui-color-text-tertiary);
 }
 .v3-dictionary-sentences,
 .v3-dictionary-relations {
@@ -293,21 +293,21 @@
 }
 .v3-dictionary-sentences h4,
 .v3-dictionary-relations h4 {
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
   font-weight: 600;
   margin: 0 0 14px;
 }
 .v3-dictionary-sentences h4 span {
   color: var(--review-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   font-weight: 400;
-  margin-left: 8px;
+  margin-left: var(--ui-space-2);
 }
 .v3-dictionary-example {
-  padding: 18px 20px;
+  padding: 18px var(--ui-space-5);
   background: #f8faff;
   border-radius: 8px;
-  margin-bottom: 12px;
+  margin-bottom: var(--ui-space-3);
 }
 .v3-dictionary-example > .ui-tag {
   margin-bottom: 10px;
@@ -317,12 +317,12 @@
   line-height: 1.8;
 }
 .v3-dictionary-translations {
-  margin-top: 12px;
+  margin-top: var(--ui-space-3);
 }
 .v3-dictionary-translations > div {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
+  gap: var(--ui-space-3);
+  margin-top: var(--ui-space-2);
 }
 .v3-dictionary-translations span {
   font-size: 11px;
@@ -335,7 +335,7 @@
 }
 .v3-dictionary-translations p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--ui-font-size);
   line-height: 1.8;
   color: #596476;
   white-space: pre-wrap;
@@ -343,12 +343,12 @@
 .v3-dictionary-links {
   border-top: 1px solid #e5ebf5;
   padding-top: 10px;
-  margin-top: 12px;
-  font-size: 12px;
+  margin-top: var(--ui-space-3);
+  font-size: var(--ui-font-size-sm);
   color: var(--review-muted);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 .v3-dictionary-relations > .ui-flex > strong {
   display: none;
@@ -363,17 +363,17 @@
 }
 .v3-relation-score {
   color: var(--review-muted);
-  font-size: 12px;
-  margin-right: 8px;
+  font-size: var(--ui-font-size-sm);
+  margin-right: var(--ui-space-2);
 }
 .v3-review .ui-empty {
-  margin: 16px 0;
+  margin: var(--ui-space-4) 0;
 }
 .v3-review .ui-empty-image {
   height: 28px;
 }
 .v3-review .ui-empty-description {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
   color: var(--review-muted);
 }
 #review-forms,
@@ -390,10 +390,10 @@
 @media (max-width: 1100px) {
   .v3-review-reading-layout {
     grid-template-columns: 150px minmax(0, 1fr);
-    gap: 20px;
+    gap: var(--ui-space-5);
   }
   .v3-review-paper {
-    padding: 20px;
+    padding: var(--ui-space-5);
   }
 }
 @media (max-width: 760px) {
@@ -405,7 +405,7 @@
     display: flex;
     flex-wrap: wrap;
     max-height: 150px;
-    padding: 0 0 20px;
+    padding: 0 0 var(--ui-space-5);
     gap: 6px;
   }
   .v3-review-index-title,
@@ -417,7 +417,7 @@
     min-width: 120px;
   }
   .v3-review-index strong {
-    padding-top: 4px;
+    padding-top: var(--ui-space-1);
   }
   .v3-review-index button {
     padding: 6px;
@@ -431,7 +431,7 @@
   }
   .v3-dictionary-definition {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: var(--ui-space-2);
   }
   .v3-dictionary-definition-meta > span:last-child {
     width: auto;
@@ -452,16 +452,16 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
-  font-size: 12px;
-  color: #667085;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-size-sm);
+  color: var(--ui-color-text-secondary);
   margin: 14px 0;
 }
 .v3-review-form-chain {
-  color: #344054;
+  color: var(--ui-color-text);
 }
 .v3-review-form-chain small {
-  color: #8993a1;
+  color: var(--ui-color-text-tertiary);
 }
 .v3-review-table-scroll {
   overflow-x: auto;
@@ -470,24 +470,24 @@
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--ui-font-size-compact);
 }
 .v3-review-form-table th {
   font-size: 11px;
   color: #788394;
   font-weight: 500;
-  background: #f7f8fa;
+  background: var(--ui-color-fill-alter);
 }
 .v3-review-form-table td,
 .v3-review-form-table th {
-  padding: 12px 10px;
-  border-bottom: 1px solid #edf0f4;
+  padding: var(--ui-space-3) 10px;
+  border-bottom: 1px solid var(--ui-color-fill-secondary);
   vertical-align: top;
 }
 .v3-review-form-table td small {
   display: block;
-  color: #8993a1;
-  margin-top: 4px;
+  color: var(--ui-color-text-tertiary);
+  margin-top: var(--ui-space-1);
   font-size: 11px;
 }
 .v3-review-form-table td strong {
@@ -495,7 +495,7 @@
 }
 .v3-review-pronunciation-cell {
   display: flex;
-  gap: 8px;
+  gap: var(--ui-space-2);
   align-items: center;
 }
 .v3-review-pronunciation-cell .ui-btn {
@@ -507,7 +507,7 @@
 .v3-relation-empty {
   display: inline-block;
   min-width: 120px;
-  margin-right: 12px;
+  margin-right: var(--ui-space-3);
 }
 .v3-relation-empty .ui-empty-image {
   height: 22px;
@@ -516,7 +516,7 @@
   display: block;
 }
 .v3-review-index button:focus-visible {
-  outline: 2px solid #2053ff;
+  outline: var(--ui-focus-ring);
   outline-offset: 2px;
 }
 .v3-review .ui-tag {
@@ -540,10 +540,10 @@
 }
 .v3-review-publish.ui-card > .ui-card-head {
   min-height: 38px;
-  font-size: 14px;
+  font-size: var(--ui-font-size);
 }
 .v3-review-publish.ui-card > .ui-card-body {
-  padding: 12px 16px;
+  padding: var(--ui-space-3) var(--ui-space-4);
 }
 @media (max-width: 760px) {
   .ui-space-item:has(> .v3-review-publish) {

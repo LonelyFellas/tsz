@@ -6,6 +6,7 @@ import { App, Drawer, Modal } from "@tsz/ui/admin/overlays";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Flex,
@@ -517,7 +518,10 @@ export function PermissionManagement() {
   };
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "用户管理" }, { title: "权限管理" }]} />
+      <PageHeader
+        title="权限管理"
+        breadcrumb={<Breadcrumb items={[{ title: "用户管理" }]} />}
+      />
       <Card className="admin-filter-card" size="small">
         <Form className="admin-filter-form" colon={false} layout="inline">
           <Form.Item label="关键词">

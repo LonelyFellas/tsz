@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Col,
@@ -243,11 +244,9 @@ export function SentenceLibrary({
           多维例句
         </Typography.Title>
       ) : (
-        <Breadcrumb
-          items={[
-            { title: "例句管理" },
-            { title: trash ? "垃圾桶" : "多维例句" }
-          ]}
+        <PageHeader
+          title={trash ? "垃圾桶" : "多维例句"}
+          breadcrumb={<Breadcrumb items={[{ title: "例句管理" }]} />}
         />
       )}
       {entryId && (

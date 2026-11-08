@@ -1,28 +1,15 @@
+@import "../tokens.css";
+
 @layer ui-base {
-  :root {
-    --ui-color-primary: #2053ff;
-    --ui-color-primary-bg: #edf2ff;
-    --ui-color-link: #2053ff;
-    --ui-color-text: #202631;
-    --ui-color-text-secondary: #667085;
-    --ui-color-text-tertiary: #747e8c;
-    --ui-color-border: #cdd3dd;
-    --ui-color-border-secondary: #e4e7ec;
-    --ui-color-split: #e4e7ec;
-    --ui-color-bg-container: white;
-    --ui-color-bg-layout: #f6f7f9;
-    --ui-color-fill-secondary: #f2f4f7;
-    --ui-color-error: #b42318;
-    --ui-color-success: #067647;
-    --ui-control-height: 32px;
-    --ui-border-radius: 8px;
-    --ui-border-radius-lg: 12px;
-    --ui-font-size: 14px;
-    --ui-font-family: var(--tsz-font-text, system-ui, sans-serif);
-  }
   .ui-app {
     color: var(--ui-color-text);
-    font: 14px/1.57 var(--ui-font-family);
+    font: var(--ui-font-size) / 1.57 var(--ui-font-family);
+    accent-color: var(--ui-color-primary);
+    caret-color: var(--ui-color-primary);
+  }
+  :where(.ui-app, .ui-modal, .ui-drawer, .ui-popover) ::selection {
+    background: var(--ui-color-primary-bg);
+    color: var(--ui-color-text);
   }
   :where(.ui-app, .ui-modal, .ui-drawer, .ui-popover, .tsz-ve-editor) *,
   :where(
@@ -45,7 +32,7 @@
     text-decoration: none;
   }
   :where(.ui-app, .ui-modal, .ui-drawer, .ui-popover) :focus-visible {
-    outline: 2px solid #2053ff;
+    outline: var(--ui-focus-ring);
     outline-offset: 2px;
   }
   .ui-btn,
@@ -60,19 +47,23 @@
     line-height: 1.35;
   }
   .ui-btn {
-    min-height: 32px;
-    padding: 4px 12px;
+    min-height: var(--ui-control-height);
+    padding: var(--ui-space-1) var(--ui-space-3);
     border: 1px solid var(--ui-color-border);
-    border-radius: 7px;
-    background: white;
-    color: #344054;
+    border-radius: var(--ui-border-radius);
+    background: var(--ui-color-bg-container);
+    color: var(--ui-color-text);
     text-decoration: none;
     white-space: nowrap;
+    transition:
+      background-color var(--ui-motion-duration) var(--ui-motion-easing),
+      border-color var(--ui-motion-duration) var(--ui-motion-easing),
+      color var(--ui-motion-duration) var(--ui-motion-easing);
   }
   .ui-btn-primary {
     background: var(--ui-color-primary);
     border-color: var(--ui-color-primary);
-    color: white;
+    color: var(--ui-color-text-light-solid);
   }
   .ui-btn-link,
   .ui-btn-text,
@@ -85,25 +76,53 @@
     color: var(--ui-color-primary);
   }
   .ui-btn-dangerous {
-    color: #b42318;
+    color: var(--ui-color-error);
     border-color: #f19b95;
   }
   .ui-btn-primary.ui-btn-dangerous {
-    background: #b42318;
-    border-color: #b42318;
-    color: white;
+    background: var(--ui-color-error);
+    border-color: var(--ui-color-error);
+    color: var(--ui-color-text-light-solid);
   }
-  .ui-btn:hover:not(:disabled) {
-    filter: brightness(0.95);
+  .ui-btn:hover:not(:disabled, [aria-disabled="true"]) {
+    background: var(--ui-color-fill-secondary);
+    border-color: var(--ui-color-border-hover);
+  }
+  .ui-btn-primary:hover:not(:disabled, [aria-disabled="true"]) {
+    background: var(--ui-color-primary-hover);
+    border-color: var(--ui-color-primary-hover);
+  }
+  .ui-btn-primary:active:not(:disabled, [aria-disabled="true"]) {
+    background: var(--ui-color-primary-active);
+    border-color: var(--ui-color-primary-active);
+  }
+  .ui-btn-link:hover:not(:disabled, [aria-disabled="true"]) {
+    background: transparent;
+    color: var(--ui-color-primary-hover);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .ui-btn-dangerous:hover:not(:disabled, [aria-disabled="true"]) {
+    background: var(--ui-color-error-bg);
+    color: var(--ui-color-error-hover);
+    border-color: var(--ui-color-error-border);
+  }
+  .ui-btn-primary.ui-btn-dangerous:is(:hover, :active):not(
+      :disabled,
+      [aria-disabled="true"]
+    ) {
+    background: var(--ui-color-error-hover);
+    border-color: var(--ui-color-error-hover);
+    color: var(--ui-color-text-light-solid);
   }
   .ui-btn-sm {
-    min-height: 24px;
+    min-height: var(--ui-control-height-sm);
     padding: 2px 7px;
-    font-size: 13px;
+    font-size: var(--ui-font-size-compact);
   }
   .ui-btn-lg {
-    min-height: 40px;
-    padding: 6px 16px;
+    min-height: var(--ui-control-height-lg);
+    padding: 6px var(--ui-space-4);
     font-size: 16px;
   }
   .ui-btn-block {
@@ -120,6 +139,10 @@
   .ui-btn[aria-disabled="true"] {
     cursor: not-allowed;
     opacity: 0.5;
+  }
+  .ui-btn-loading:disabled {
+    opacity: 1;
+    cursor: progress;
   }
   .ui-btn-ghost {
     background: transparent;
@@ -147,7 +170,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--ui-space-2);
     color: var(--ui-color-primary);
   }
   .ui-row {
@@ -192,31 +215,65 @@
   .ui-card {
     min-width: 0;
     border: 1px solid var(--ui-color-border-secondary);
-    border-radius: 12px;
-    background: white;
+    border-radius: var(--ui-border-radius-lg);
+    background: var(--ui-color-bg-container);
+  }
+  .ui-page-header {
+    display: grid;
+    gap: var(--ui-space-3);
+    min-width: 0;
+  }
+  .ui-page-header-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--ui-space-3) var(--ui-space-4);
+    min-width: 0;
+  }
+  .ui-page-header-title {
+    margin: 0;
+    color: var(--ui-color-text);
+    font-size: var(--ui-font-size-title);
+    font-weight: 650;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  .ui-page-header-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--ui-space-2);
+    min-width: 0;
+    max-width: 100%;
+  }
+  .ui-page-header-meta {
+    min-width: 0;
+    color: var(--ui-color-text-secondary);
+    font-size: var(--ui-font-size-sm);
   }
   .ui-card-head {
-    padding: 12px 20px;
+    padding: var(--ui-space-3) var(--ui-space-5);
     border-bottom: 1px solid var(--ui-color-border-secondary);
   }
   .ui-card-head-wrapper {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--ui-space-2);
   }
   .ui-card-head-title {
     font-weight: 600;
     min-width: 0;
   }
   .ui-card-body {
-    padding: 20px;
+    padding: var(--ui-space-5);
   }
   .ui-card-small .ui-card-body {
-    padding: 12px;
+    padding: var(--ui-space-3);
   }
   .ui-card-small .ui-card-head {
-    padding: 8px 12px;
+    padding: var(--ui-space-2) var(--ui-space-3);
   }
   .ui-alert {
     display: flex;
@@ -231,16 +288,16 @@
     border-color: #c5d8fc;
   }
   .ui-alert-error {
-    background: #fff3f2;
-    border-color: #f2b6b0;
+    background: var(--ui-color-error-bg);
+    border-color: var(--ui-color-error-border);
   }
   .ui-alert-warning {
-    background: #fffaeb;
-    border-color: #f2da9d;
+    background: var(--ui-color-warning-bg);
+    border-color: var(--ui-color-warning-border);
   }
   .ui-alert-success {
-    background: #edfcf2;
-    border-color: #a9dec0;
+    background: var(--ui-color-success-bg);
+    border-color: var(--ui-color-success-border);
   }
   .ui-alert-title {
     font-weight: 550;
@@ -261,13 +318,13 @@
     color: var(--ui-color-text-secondary);
   }
   .ui-typography-danger {
-    color: #b42318;
+    color: var(--ui-color-error);
   }
   .ui-typography-success {
-    color: #067647;
+    color: var(--ui-color-success);
   }
   .ui-typography-warning {
-    color: #925d09;
+    color: var(--ui-color-warning);
   }
   .ui-link {
     color: var(--ui-color-link);
@@ -302,6 +359,19 @@
     font-weight: 650;
     line-height: 1.3;
   }
+  .ui-typography-h1,
+  .ui-typography-h2 {
+    font-size: var(--ui-font-size-title);
+  }
+  .ui-typography-h3 {
+    font-size: var(--ui-font-size-heading);
+  }
+  .ui-typography-h4 {
+    font-size: var(--ui-font-size-subheading);
+  }
+  .ui-typography-h5 {
+    font-size: var(--ui-font-size-section);
+  }
   .ui-icon-action {
     padding: 3px;
     border-radius: 4px;
@@ -312,13 +382,13 @@
     padding: 0 6px;
     line-height: 20px;
     border-radius: 5px;
-    background: #f2f4f7;
-    color: #475467;
-    font-size: 12px;
+    background: var(--ui-color-fill-secondary);
+    color: var(--ui-color-text-secondary);
+    font-size: var(--ui-font-size-sm);
   }
   .ui-tag:is([data-color="green"], [data-color="success"]) {
     background: #e9faf0;
-    color: #067647;
+    color: var(--ui-color-success);
   }
   .ui-tag:is([data-color="warning"], [data-color="gold"]) {
     background: #fff5d9;
@@ -334,14 +404,14 @@
   }
   .ui-tag:is([data-color="error"], [data-color="red"], [data-color="volcano"]) {
     background: #ffebe9;
-    color: #b42318;
+    color: var(--ui-color-error);
   }
   .ui-tag:is(
     [data-color="blue"],
     [data-color="geekblue"],
     [data-color="processing"]
   ) {
-    background: #edf2ff;
+    background: var(--ui-color-primary-bg);
     color: #2449b9;
   }
   .ui-tag:is([data-color="purple"], [data-color="magenta"]) {
@@ -354,7 +424,7 @@
     overflow: hidden;
     border-radius: 50%;
     background: #e7edfc;
-    color: white;
+    color: var(--ui-color-text-light-solid);
   }
   .ui-avatar img {
     width: 100%;
@@ -364,13 +434,13 @@
   .ui-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--ui-space-1);
   }
   .ui-badge sup {
     border-radius: 20px;
     padding: 0 5px;
     background: #d92d20;
-    color: white;
+    color: var(--ui-color-text-light-solid);
     font-size: 11px;
   }
   .ui-badge i {
@@ -383,7 +453,7 @@
     background: #079455;
   }
   .ui-badge i[data-status="processing"] {
-    background: #2053ff;
+    background: var(--ui-color-primary);
   }
   .ui-badge i[data-status="error"] {
     background: #d92d20;
@@ -396,7 +466,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    color: #667085;
+    color: var(--ui-color-text-secondary);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -405,32 +475,32 @@
     margin-inline-end: 6px;
   }
   .ui-breadcrumb li:last-child {
-    color: #344054;
+    color: var(--ui-color-text);
   }
   .ui-empty,
   .ui-result {
-    padding: 24px 16px;
+    padding: var(--ui-space-6) var(--ui-space-4);
     text-align: center;
   }
   .ui-result-title {
-    font-size: 22px;
+    font-size: var(--ui-font-size-title);
     font-weight: 600;
   }
   .ui-result-subtitle,
   .ui-empty-description {
-    color: #667085;
+    color: var(--ui-color-text-secondary);
   }
   .ui-result-extra,
   .ui-empty-description + button {
-    margin-top: 12px;
+    margin-top: var(--ui-space-3);
   }
   .ui-empty-image {
     color: #98a2b3;
   }
   .ui-divider {
-    margin: 16px 0;
+    margin: var(--ui-space-4) 0;
     border: 0;
-    border-top: 1px solid #e4e7ec;
+    border-top: 1px solid var(--ui-color-border-secondary);
   }
   .ui-list-items {
     margin: 0;
@@ -441,14 +511,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--ui-space-3);
     padding: 10px 0;
     border-bottom: 1px solid #eaecf0;
   }
   .ui-list-item-action {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--ui-space-2);
   }
   .ui-skeleton i {
     display: block;
@@ -456,7 +526,7 @@
     background: #eef1f5;
     height: 12px;
     border-radius: 3px;
-    margin: 8px 0;
+    margin: var(--ui-space-2) 0;
   }
   .ui-skeleton i:last-child {
     width: 60%;
@@ -468,7 +538,7 @@
   }
   .ui-descriptions-item {
     display: flex;
-    gap: 8px;
+    gap: var(--ui-space-2);
     padding: 6px 10px;
   }
   .ui-descriptions[data-layout="vertical"] .ui-descriptions-item {
@@ -478,7 +548,7 @@
     border: 1px solid #eaecf0;
   }
   .ui-descriptions-item-label {
-    color: #667085;
+    color: var(--ui-color-text-secondary);
   }
   .ui-descriptions-item-content {
     margin: 0;
@@ -493,10 +563,10 @@
   .ui-progress progress {
     width: 100%;
     height: 6px;
-    accent-color: #2053ff;
+    accent-color: var(--ui-color-primary);
   }
   .ui-statistic-title {
-    color: #667085;
+    color: var(--ui-color-text-secondary);
   }
   .ui-statistic-content {
     font-size: 24px;

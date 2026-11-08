@@ -5,7 +5,7 @@ import { RotateCwIcon, SearchIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Descriptions,
@@ -456,7 +456,7 @@ function Management({ profile }: { profile: AdminProfile }) {
   );
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "天生币管理" }]} />
+      <PageHeader title="天生币管理" />
       <Typography.Text type="secondary">
         查找账号、发放天生币，或查看和撤销手动发放记录。
       </Typography.Text>

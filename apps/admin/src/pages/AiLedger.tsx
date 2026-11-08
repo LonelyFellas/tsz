@@ -4,6 +4,7 @@ import { InfoIcon, RotateCwIcon } from "lucide-react";
 import {
   Alert,
   Breadcrumb,
+  PageHeader,
   Button,
   Card,
   Descriptions,
@@ -201,7 +202,10 @@ function Ledger({ adminId }: { adminId: string }) {
   const summary = data?.summary;
   return (
     <Flex vertical gap={16} className="ai-ledger">
-      <Breadcrumb items={[{ title: "系统设置" }, { title: "AI 账本" }]} />
+      <PageHeader
+        title="AI 账本"
+        breadcrumb={<Breadcrumb items={[{ title: "系统设置" }]} />}
+      />
       <Flex justify="space-between" align="center" wrap gap={12}>
         <Typography.Text type="secondary">
           模型用量、缓存与响应耗时

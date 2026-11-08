@@ -1,0 +1,70 @@
+/* 后台视觉值的唯一来源；使用规则见 apps/admin/style.md。 */
+@layer ui-base {
+  :root {
+    --ui-color-primary: #2053ff;
+    --ui-color-primary-hover: #1744df;
+    --ui-color-primary-active: #163bc0;
+    --ui-color-primary-bg: #edf2ff;
+    --ui-color-primary-border: #a9bdff;
+    --ui-color-link: var(--ui-color-primary);
+    --ui-color-text: #202631;
+    --ui-color-text-secondary: #667085;
+    --ui-color-text-tertiary: #667085;
+    --ui-color-text-placeholder: var(--ui-color-text-tertiary);
+    --ui-color-text-disabled: #727d8b;
+    --ui-color-text-light-solid: #fff;
+    --ui-color-text-description: var(--ui-color-text-secondary);
+    --ui-color-text-quaternary: var(--ui-color-text-disabled);
+    --ui-color-border: #cdd3dd;
+    --ui-color-border-hover: #98a2b3;
+    --ui-color-border-secondary: #e4e7ec;
+    --ui-color-split: var(--ui-color-border-secondary);
+    --ui-color-bg-container: #fff;
+    --ui-color-bg-layout: #f6f7f9;
+    --ui-color-fill-secondary: #f2f4f7;
+    --ui-color-fill-alter: #f8f9fb;
+    --ui-color-fill-quaternary: var(--ui-color-fill-alter);
+    --ui-color-bg-disabled: #f4f5f7;
+    --ui-color-error: #b42318;
+    --ui-color-error-hover: #912018;
+    --ui-color-error-bg: #fff3f2;
+    --ui-color-error-border: #f2b6b0;
+    --ui-color-success: #067647;
+    --ui-color-success-bg: #edfcf2;
+    --ui-color-success-border: #a9dec0;
+    --ui-color-warning: #925d09;
+    --ui-color-warning-bg: #fffaeb;
+    --ui-color-warning-border: #f2da9d;
+    --ui-focus-ring: 2px solid var(--ui-color-primary);
+    --ui-focus-offset: 2px;
+    --ui-control-height: 32px;
+    --ui-control-height-sm: 24px;
+    --ui-control-height-lg: 40px;
+    --ui-control-height-comfortable: 36px;
+    --ui-border-radius: 7px;
+    --ui-border-radius-sm: 4px;
+    --ui-border-radius-lg: 12px;
+    --ui-font-size: 14px;
+    --ui-font-size-sm: 12px;
+    --ui-font-size-compact: 13px;
+    --ui-font-size-title: 24px;
+    --ui-font-size-heading: 20px;
+    --ui-font-size-subheading: 18px;
+    --ui-font-size-section: 16px;
+    --ui-font-family: var(--tsz-font-text, system-ui, sans-serif);
+    --ui-space-1: 4px;
+    --ui-space-2: 8px;
+    --ui-space-3: 12px;
+    --ui-space-4: 16px;
+    --ui-space-5: 20px;
+    --ui-space-6: 24px;
+    --ui-shadow-overlay: 0 12px 32px rgb(16 24 40 / 14%);
+    --ui-motion-duration: 150ms;
+    --ui-motion-easing: ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --ui-motion-duration: 0ms;
+    }
+  }
+}

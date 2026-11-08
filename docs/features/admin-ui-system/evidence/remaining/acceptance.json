@@ -1,0 +1,653 @@
+{
+  "date": "2026-11-08",
+  "environment": "local Vite with intercepted fixture APIs; no real backend writes",
+  "pages": [
+    {
+      "name": "home",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["工作台"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["工作台"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["工作台"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "wordlists",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["智能词表"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["智能词表"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["智能词表"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "reviews",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["词表审核"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["词表审核"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["词表审核"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "coins",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["天生币管理"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["天生币管理"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["天生币管理"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "my-coins",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["我的天生币"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["我的天生币"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["我的天生币"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "ai-ledger",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["AI 账本"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["AI 账本"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["AI 账本"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "permissions",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["权限管理"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["权限管理"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["权限管理"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "teacher-applications",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["教师申请审核"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["教师申请审核"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["教师申请审核"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "parts-of-speech",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["词性配置"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["词性配置"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["词性配置"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "settings-preferences",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["个人设置"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["个人设置"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["个人设置"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "settings-accounts",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["个人设置"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["个人设置"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["个人设置"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "settings-models",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["个人设置"],
+          "errors": [
+            "当前模型不可用，请重新测试或选择。",
+            "没有可选模型，请刷新。"
+          ]
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["个人设置"],
+          "errors": [
+            "当前模型不可用，请重新测试或选择。",
+            "没有可选模型，请刷新。"
+          ]
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["个人设置"],
+          "errors": [
+            "当前模型不可用，请重新测试或选择。",
+            "没有可选模型，请刷新。"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "voices-library",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["音色库"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["音色库"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["音色库"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "voices-groups",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["分组配音"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["分组配音"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["分组配音"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "sentences",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["多维例句"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["多维例句"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["多维例句"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "sentences-trash",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["垃圾桶"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["垃圾桶"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["垃圾桶"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "admins",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["管理员管理"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["管理员管理"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["管理员管理"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["用户管理"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["用户管理"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["用户管理"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "words",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["智能词库"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["智能词库"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["智能词库"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "words-trash",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": ["垃圾桶"],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": ["垃圾桶"],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": ["垃圾桶"],
+          "errors": []
+        }
+      ]
+    },
+    {
+      "name": "words-new",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440,
+          "h1": [],
+          "errors": []
+        },
+        {
+          "width": 768,
+          "scroll": 768,
+          "h1": [],
+          "errors": []
+        },
+        {
+          "width": 390,
+          "scroll": 390,
+          "h1": [],
+          "errors": []
+        }
+      ]
+    }
+  ],
+  "deep_pages": [
+    {
+      "name": "wizard-basics",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440
+        },
+        {
+          "width": 768,
+          "scroll": 768
+        },
+        {
+          "width": 390,
+          "scroll": 390
+        }
+      ]
+    },
+    {
+      "name": "wizard-forms",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440
+        },
+        {
+          "width": 768,
+          "scroll": 768
+        },
+        {
+          "width": 390,
+          "scroll": 390
+        }
+      ]
+    },
+    {
+      "name": "wizard-meanings",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440
+        },
+        {
+          "width": 768,
+          "scroll": 768
+        },
+        {
+          "width": 390,
+          "scroll": 390
+        }
+      ]
+    },
+    {
+      "name": "wizard-preview",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440
+        },
+        {
+          "width": 768,
+          "scroll": 768
+        },
+        {
+          "width": 390,
+          "scroll": 390
+        }
+      ]
+    },
+    {
+      "name": "password",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440
+        },
+        {
+          "width": 768,
+          "scroll": 768
+        },
+        {
+          "width": 390,
+          "scroll": 390
+        }
+      ]
+    },
+    {
+      "name": "login",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440
+        },
+        {
+          "width": 768,
+          "scroll": 768
+        },
+        {
+          "width": 390,
+          "scroll": 390
+        }
+      ]
+    },
+    {
+      "name": "not-found",
+      "widths": [
+        {
+          "width": 1440,
+          "scroll": 1440
+        },
+        {
+          "width": 768,
+          "scroll": 768
+        },
+        {
+          "width": 390,
+          "scroll": 390
+        }
+      ]
+    }
+  ],
+  "interaction_checks": {
+    "results": [
+      {
+        "width": 1440,
+        "clearance": 16
+      },
+      {
+        "width": 768,
+        "clearance": 16
+      },
+      {
+        "width": 390,
+        "clearance": 16
+      }
+    ],
+    "clearanceCleaned": true,
+    "misses": []
+  },
+  "sentence_editor_modal": {
+    "bounds": {
+      "x": 16,
+      "y": 60.28125,
+      "width": 358,
+      "height": 723.4375
+    }
+  },
+  "cleanup": {
+    "browser_session_closed": true,
+    "browser_profile_remaining": false,
+    "vite_stopped": true,
+    "local_fixture_scripts_removed": true,
+    "real_backend_writes": false,
+    "oss_objects_created": false
+  }
+}

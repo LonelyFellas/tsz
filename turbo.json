@@ -10,6 +10,14 @@
     "lint": {
       "dependsOn": ["^build"]
     },
+    "@tsz/ui#lint": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/check-admin-ui*.mjs",
+        "$TURBO_ROOT$/apps/admin/src/**/*.css"
+      ]
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     },

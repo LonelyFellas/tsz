@@ -1,7 +1,7 @@
 .admin-column-settings-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  margin-bottom: var(--ui-space-2);
 }
 .admin-column-settings-custom-trigger {
   display: inline-flex;
@@ -19,19 +19,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 16px 12px;
+  padding: var(--ui-space-4) var(--ui-space-4) var(--ui-space-3);
 }
 
 .admin-column-settings-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ui-space-2);
   font-size: 16px;
 }
 
 .admin-column-settings-count,
 .admin-column-settings-heading .ui-btn {
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .admin-column-settings-heading .ui-btn {
@@ -41,21 +41,21 @@
 .admin-column-settings-list {
   max-height: min(420px, 55vh);
   overflow-y: auto;
-  padding: 0 8px 8px;
+  padding: 0 var(--ui-space-2) var(--ui-space-2);
 }
 
 .admin-column-settings-group + .admin-column-settings-group {
-  margin-top: 4px;
+  margin-top: var(--ui-space-1);
 }
 
 .admin-column-settings-group-heading {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-inline: 8px;
+  padding-inline: var(--ui-space-2);
   height: 24px;
-  font-size: 12px;
-  color: var(--ui-color-text-secondary, #626b79);
+  font-size: var(--ui-font-size-sm);
+  color: var(--ui-color-text-secondary);
 }
 
 .admin-column-settings-group-heading::after {
@@ -63,7 +63,7 @@
   flex: 1;
   height: 1px;
   margin-left: 2px;
-  background: var(--ui-color-border-secondary, #e9ecf1);
+  background: var(--ui-color-border-secondary);
 }
 
 .admin-column-position-icon {
@@ -72,7 +72,7 @@
   width: 15px;
   height: 12px;
   flex-shrink: 0;
-  border: 1px solid var(--ui-color-text-quaternary, #b7c0cc);
+  border: 1px solid var(--ui-color-text-quaternary);
   border-radius: 2px;
 }
 
@@ -83,7 +83,7 @@
   left: 1px;
   width: 3px;
   border-radius: 1px;
-  background: var(--ui-color-primary, #2053ff);
+  background: var(--ui-color-primary);
 }
 
 .admin-column-position-icon-right::after {
@@ -93,13 +93,13 @@
 
 .admin-column-position-icon-none::after {
   left: 5px;
-  background: var(--ui-color-text-quaternary, #97a1b0);
+  background: var(--ui-color-text-quaternary);
 }
 
 .admin-column-settings-empty {
   display: block;
-  padding: 6px 8px 8px;
-  font-size: 12px;
+  padding: 6px var(--ui-space-2) var(--ui-space-2);
+  font-size: var(--ui-font-size-sm);
 }
 
 .admin-column-settings-row {
@@ -115,11 +115,11 @@
 
 .admin-column-settings-row:hover,
 .admin-column-settings-row:focus-within {
-  background: var(--ui-color-fill-tertiary, #f5f7fb);
+  background: var(--ui-color-fill-tertiary, var(--ui-color-fill-alter));
 }
 
 .admin-column-settings-row.is-hidden .ui-checkbox-label {
-  color: var(--ui-color-text-secondary, #626b79);
+  color: var(--ui-color-text-secondary);
 }
 
 .admin-column-settings-row.is-dragging {
@@ -127,11 +127,11 @@
 }
 
 .admin-column-settings-row.is-drop-before {
-  border-top-color: var(--ui-color-primary, #2053ff);
+  border-top-color: var(--ui-color-primary);
 }
 
 .admin-column-settings-row.is-drop-after {
-  border-bottom-color: var(--ui-color-primary, #2053ff);
+  border-bottom-color: var(--ui-color-primary);
 }
 
 .admin-column-drag-handle:not(:disabled) {
@@ -144,7 +144,7 @@
 
 .admin-column-drag-handle {
   flex-shrink: 0;
-  color: var(--ui-color-text-tertiary, #737d8b);
+  color: var(--ui-color-text-tertiary);
 }
 
 .admin-column-settings-row .ui-checkbox-wrapper {
@@ -164,11 +164,11 @@
 
 .admin-column-pin-control .ui-segmented-item-label {
   padding-inline: 6px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-sm);
 }
 
 .admin-column-pin-control .ui-segmented-item-selected {
-  color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-primary);
 }
 
 .admin-column-settings-footer {
@@ -176,20 +176,20 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 11px 16px;
-  border-top: 1px solid var(--ui-color-border-secondary, #e9ecf1);
-  color: var(--ui-color-text-secondary, #626b79);
-  font-size: 12px;
+  gap: var(--ui-space-2);
+  padding: 11px var(--ui-space-4);
+  border-top: 1px solid var(--ui-color-border-secondary);
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-sm);
 }
 
 .admin-column-settings-footer .lucide {
-  color: var(--ui-color-primary, #2053ff);
+  color: var(--ui-color-primary);
 }
 
 .admin-column-settings-overflow {
-  margin: 0 16px 12px;
-  font-size: 12px;
+  margin: 0 var(--ui-space-4) var(--ui-space-3);
+  font-size: var(--ui-font-size-sm);
 }
 
 .admin-table-pins-overflow .ui-table-cell-fix {

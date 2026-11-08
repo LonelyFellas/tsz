@@ -4,14 +4,14 @@
 }
 
 .admin-filter-card > .ui-card-body {
-  padding: 16px;
+  padding: var(--ui-space-4);
 }
 
 .admin-filter-form {
   display: flex;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: 12px 16px;
+  gap: var(--ui-space-3) var(--ui-space-4);
   max-width: 100%;
 }
 
@@ -32,7 +32,7 @@
 }
 
 .admin-filter-form .ui-form-item-label > label {
-  color: var(--ui-color-text-secondary, #626b79);
+  color: var(--ui-color-text-secondary);
 }
 
 @container (max-width: 640px) {

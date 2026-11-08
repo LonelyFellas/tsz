@@ -19,7 +19,14 @@ import {
   SlidersHorizontalIcon,
   XIcon
 } from "lucide-react";
-import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
+import {
+  Alert,
+  Button,
+  PageHeader,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import {
   App,
   Dropdown,
@@ -1418,23 +1425,27 @@ export function SmartDictionary({
     <div
       className={`word-list-page ${trashMode ? "word-list-page--trash" : "word-list-page--library"}`}
     >
-      <header className="word-list-heading">
-        <h1>{trashMode ? t("status_archived") : t("entries")}</h1>
-        <div className="word-list-page-actions">
-          <Link to={trashMode ? "/words" : "/words/trash"}>
-            {trashMode ? <Undo2Icon /> : <Trash2Icon />}
-            {trashMode ? t("back_entries") : t("view_trash")}
-          </Link>
-          {!trashMode && canCreateEntry(writeActor) && (
-            <Button
-              type="primary"
-              icon={<PlusIcon />}
-              onClick={() => navigate("/words/new")}
-            >
-              {t("create")}
-            </Button>
-          )}
-        </div>
+      <PageHeader
+        className="word-list-heading"
+        title={trashMode ? t("status_archived") : t("entries")}
+        actions={
+          <div className="word-list-page-actions">
+            <Link to={trashMode ? "/words" : "/words/trash"}>
+              {trashMode ? <Undo2Icon /> : <Trash2Icon />}
+              {trashMode ? t("back_entries") : t("view_trash")}
+            </Link>
+            {!trashMode && canCreateEntry(writeActor) && (
+              <Button
+                type="primary"
+                icon={<PlusIcon />}
+                onClick={() => navigate("/words/new")}
+              >
+                {t("create")}
+              </Button>
+            )}
+          </div>
+        }
+      >
         {!trashMode && (
           <Space size={16} wrap className="word-list-stats">
             <Typography.Text type="secondary">
@@ -1457,7 +1468,7 @@ export function SmartDictionary({
             </Typography.Text>
           </Space>
         )}
-      </header>
+      </PageHeader>
 
       <section
         className="word-list-panel word-list-filter-panel"
