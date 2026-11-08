@@ -58,6 +58,9 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "InterfaceCapabilities",
+  "InterfaceLocaleV1",
+  "UserInterfacePreferencesResponse",
   "LexiconAssistantCapability",
   "LexiconAssistantResponse",
   "LexiconAssistantEvent",

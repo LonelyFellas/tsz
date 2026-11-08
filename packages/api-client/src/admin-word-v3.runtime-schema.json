@@ -1,8 +1,11 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/1d45/tsz-rust/docs/openapi.json",
-  "_source_sha256": "d51eab1fe83602563e66b5ed1efd52e63f3abee69bd26a3de7076576f77fb50e",
+  "_source": "/Users/darwish/.codex/worktrees/i18n-preferences-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "705474d93559757d86e8223586b2e7477f3e1e279b11607531981471578d00df",
   "roots": [
+    "InterfaceCapabilities",
+    "InterfaceLocaleV1",
+    "UserInterfacePreferencesResponse",
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
     "LexiconAssistantEvent",
@@ -2352,6 +2355,28 @@
         "target": { "$ref": "#/$defs/InboundReferenceTargetV3" }
       },
       "additionalProperties": false
+    },
+    "InterfaceCapabilities": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "preference_version",
+        "default_locale",
+        "supported_locales"
+      ],
+      "properties": {
+        "default_locale": { "$ref": "#/$defs/InterfaceLocaleV1" },
+        "preference_version": { "type": "integer", "maximum": 1, "minimum": 1 },
+        "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
+        "supported_locales": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InterfaceLocaleV1" }
+        }
+      }
+    },
+    "InterfaceLocaleV1": {
+      "type": "string",
+      "enum": ["zh-Hans", "zh-Hant", "en-GB", "en-US"]
     },
     "InvitationCode": {
       "type": "object",
@@ -5453,6 +5478,22 @@
         "snapshot": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }
       },
       "additionalProperties": false
+    },
+    "UserInterfacePreferences": {
+      "type": "object",
+      "required": ["interface_locale"],
+      "properties": {
+        "interface_locale": {
+          "oneOf": [{ "$ref": "#/$defs/InterfaceLocaleV1" }, { "type": "null" }]
+        }
+      }
+    },
+    "UserInterfacePreferencesResponse": {
+      "type": "object",
+      "required": ["preferences"],
+      "properties": {
+        "preferences": { "$ref": "#/$defs/UserInterfacePreferences" }
+      }
     },
     "V3DraftNodeLocation": {
       "type": "object",

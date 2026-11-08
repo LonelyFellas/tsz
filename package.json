@@ -19,6 +19,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:i18n": "vitest run packages/shared/src/i18n apps/web/src/lib/i18n.test.tsx",
     "test:node-runtime": "node --test scripts/node-runtime-version.test.mjs",
     "test:coverage-lock": "node --test scripts/coverage-lock.test.mjs",
     "test:ci-modules": "node --test scripts/ci-metrics.test.mjs scripts/ci-test-modules.test.mjs scripts/ci-workflow.test.mjs",

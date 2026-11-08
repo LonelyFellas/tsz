@@ -10,11 +10,13 @@ import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updateProfilePreferences = vi.hoisted(() => vi.fn());
+const session = vi.hoisted(() => ({ generation: 0 }));
 
 vi.mock("@/lib/auth", async () => {
   const { createAdminAuthStore } = await import("@tsz/shared/auth");
   return {
     useAuthStore: createAdminAuthStore(),
+    tokens: { getSessionGeneration: () => session.generation },
     api: { updateProfilePreferences }
   };
 });
@@ -51,6 +53,7 @@ const ukRadio = () => screen.getByRole("radio", { name: "英式（BrE）" });
 const usRadio = () => screen.getByRole("radio", { name: "美式（AmE）" });
 
 beforeEach(() => {
+  session.generation = 0;
   vi.restoreAllMocks();
   updateProfilePreferences.mockReset();
   updateProfilePreferences.mockResolvedValue({
@@ -61,6 +64,32 @@ beforeEach(() => {
 });
 
 describe("DialectPreference", () => {
+  it("同账号重新登录后，旧会话的方言响应不得覆盖当前偏好", async () => {
+    signIn("same-admin", "uk");
+    let release!: (value: unknown) => void;
+    updateProfilePreferences.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      })
+    );
+    renderSetting();
+    fireEvent.click(usRadio());
+    await waitFor(() =>
+      expect(updateProfilePreferences).toHaveBeenCalledOnce()
+    );
+    act(() => {
+      session.generation += 1;
+      signIn("same-admin", "uk");
+    });
+    release({ preferences: { dialect: "us" } });
+    await waitFor(() =>
+      expect(screen.getByText(/会话已变化/)).toBeInTheDocument()
+    );
+    expect(useAuthStore.getState().profile?.preferences.dialect).toBe("uk");
+    expect(
+      localStorage.getItem(dialectPreferenceStorageKey("same-admin"))
+    ).toBeNull();
+  });
   it("偏好迟到成功只合并到最新同账号profile，不能把撤权后的版本8退回7", async () => {
     const before = {
       ...signIn("admin-current", "uk"),
@@ -84,14 +113,18 @@ describe("DialectPreference", () => {
       permission_version: 8,
       role: "super_admin" as const,
       catalog_version: "v2",
+      preferences: {
+        dialect: "uk" as const,
+        interface_locale: "zh-Hans" as const
+      },
       permissions: ["words.access"]
     };
     act(() => useAuthStore.getState().setProfile(current));
-    release({ preferences: { dialect: "us" } });
+    release({ preferences: { dialect: "us", interface_locale: "en-GB" } });
     await waitFor(() => expect(usRadio()).toBeChecked());
     expect(useAuthStore.getState().profile).toEqual({
       ...current,
-      preferences: { dialect: "us" }
+      preferences: { dialect: "us", interface_locale: "zh-Hans" }
     });
   });
   it("账号切换或登出后迟到偏好不得复活旧profile与旧账号缓存", async () => {
