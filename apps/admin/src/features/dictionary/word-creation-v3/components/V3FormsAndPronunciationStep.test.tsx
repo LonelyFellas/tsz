@@ -3687,11 +3687,32 @@ describe("V3FormsAndPronunciationStep", () => {
       getData: (type: string) => store.get(type) ?? "",
       setDragImage: vi.fn()
     };
+    vi.spyOn(
+      grips[0]!.closest<HTMLElement>(".ui-tabs-tab")!,
+      "offsetWidth",
+      "get"
+    ).mockReturnValue(160);
     fireEvent.dragStart(grips[0]!, { dataTransfer });
     expect(handles[0]!).toHaveClass("is-dragging");
+    const preview = dataTransfer.setDragImage.mock.calls[0]![0] as HTMLElement;
+    expect(preview).not.toBe(handles[0]);
+    expect(preview).toHaveAttribute("aria-hidden", "true");
+    expect(preview).toHaveTextContent(handles[0]!.textContent!);
+    expect(preview).not.toHaveClass("is-dragging");
     fireEvent.dragOver(handles[1]!, { dataTransfer });
     expect(handles[1]!).toHaveClass("is-drag-over");
+    expect(handles[1]!.querySelector(".word-pos-tab-content")).toHaveStyle({
+      transform: "translateX(-160px)"
+    });
+    fireEvent.dragLeave(handles[1]!, { dataTransfer });
+    expect(handles[1]!.querySelector(".word-pos-tab-content")).toHaveStyle({
+      transform: "translateX(0px)"
+    });
+    fireEvent.dragOver(handles[1]!, { dataTransfer });
     fireEvent.drop(handles[1]!, { dataTransfer });
+    expect(
+      document.querySelector(".word-pos-tab-handle.is-dragging")
+    ).toBeNull();
 
     const value = JSON.parse(
       screen.getByTestId("canonical-value").textContent!
