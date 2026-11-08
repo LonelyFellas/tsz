@@ -95,11 +95,12 @@ export function Skeleton({
   title?: boolean;
   active?: boolean;
 }) {
+  const { t } = useInterfaceTranslation();
   return (
     <div
       className="ui-skeleton"
       role="status"
-      aria-label="加载中"
+      aria-label={t("status.loading")}
       data-active={active}
     >
       {title && <i />}
@@ -133,14 +134,18 @@ export function Result({
 export function Breadcrumb({
   items,
   className = "",
-  "aria-label": label = "面包屑"
+  "aria-label": label
 }: {
   items: { title?: ReactNode; href?: string }[];
   className?: string;
   "aria-label"?: string;
 }) {
+  const { t } = useInterfaceTranslation();
   return (
-    <nav aria-label={label} className={`ui-breadcrumb ${className}`}>
+    <nav
+      aria-label={label ?? t("controls.breadcrumb")}
+      className={`ui-breadcrumb ${className}`}
+    >
       <ol>
         {items.map(({ title, href }, i) => (
           <li key={i}>

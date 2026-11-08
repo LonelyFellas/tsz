@@ -1,3 +1,5 @@
+import { VoiceEditorDisplayError } from "@tsz/voice-editor/types";
+import { speechDiagnostic } from "../../voice-editor/diagnostics";
 import { speechAccentGroup } from "@tsz/shared";
 import { grammarSynthesisContent } from "@tsz/shared";
 import type { GrammarFormLinkV3 } from "@tsz/types";
@@ -55,7 +57,9 @@ export function createGrammarFormPreviewAdapter(
           if (options.preserveDirectPhonemes) {
             const locale = input.setting.locale;
             if (locale !== "en-GB" && locale !== "en-US")
-              throw new Error("指定读法请使用对应的英美英语音色");
+              throw new VoiceEditorDisplayError(
+                speechDiagnostic("reading_locale")
+              );
             requestOptions?.signal?.throwIfAborted();
             const bindings = await resolve();
             requestOptions?.signal?.throwIfAborted();
@@ -127,9 +131,11 @@ export function createGrammarFormPreviewAdapter(
       const bindings = await resolve();
       if (locale !== "en-GB" && locale !== "en-US") {
         if (!locale || !speechAccentGroup(locale))
-          throw new Error("请选择可用英语发音人");
+          throw new VoiceEditorDisplayError(speechDiagnostic("reading_voice"));
         if (bindings.some((binding) => !binding.reading_reference))
-          throw new Error("该地区尚未验证指定音素，请明确选择按拼写自然朗读");
+          throw new VoiceEditorDisplayError(
+            speechDiagnostic("reading_natural")
+          );
         const accent = speechAccentGroup(
           locale,
           voices.find((voice) => voice.id === input.voiceId)?.accent
@@ -140,9 +146,7 @@ export function createGrammarFormPreviewAdapter(
           accent === "uk" ? "en-GB" : "en-US"
         );
         if (content.annotations.some((mark) => mark.type === "phoneme"))
-          throw new Error(
-            "该地区尚未验证指定音素，请选择对应英美音色或显式改用自然朗读"
-          );
+          throw new VoiceEditorDisplayError(speechDiagnostic("reading_region"));
         return source.synthesize({ ...input, content }, options);
       }
       options?.signal?.throwIfAborted();

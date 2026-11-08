@@ -1,3 +1,4 @@
+import { AdminRequestError } from "@/components/AdminRequestError";
 import {
   useSentenceTranslation,
   SentenceText,
@@ -141,7 +142,7 @@ export function SentenceLibrary({
   const failure = (e: unknown) =>
     message.error(
       e instanceof Error ? (
-        e.message
+        <AdminRequestError error={e} />
       ) : (
         <SentenceText message="operation_failed" />
       )

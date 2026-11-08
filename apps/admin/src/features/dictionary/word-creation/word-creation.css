@@ -2621,3 +2621,23 @@
   display: block;
   bottom: -4px;
 }
+
+@media (max-width: 600px) {
+  .word-basics-input-card .ui-input-search {
+    flex-wrap: wrap;
+    gap: var(--ui-space-2);
+  }
+
+  .word-basics-input-card
+    .ui-input-search
+    > :is(.ui-input, .ui-input-affix-wrapper) {
+    flex-basis: 100%;
+    border-radius: var(--ui-border-radius);
+  }
+
+  .word-basics-input-card .ui-input-search-button {
+    width: 100%;
+    border-inline-start: 1px solid var(--ui-color-border);
+    border-radius: var(--ui-border-radius);
+  }
+}

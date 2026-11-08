@@ -1,3 +1,4 @@
+import { LocalLexiconError } from "../../i18n/local-error-messages";
 import {
   useLexiconEditorTranslation,
   LexiconEditorText,
@@ -64,6 +65,7 @@ function issueForCause(
   cause: unknown,
   fallback: LexiconEditorKey
 ): FormContentIssue {
+  if (cause instanceof LocalLexiconError) return { message: cause.key };
   if (cause instanceof Error)
     return cause.message ? { detail: cause.message } : null;
   return { message: fallback };

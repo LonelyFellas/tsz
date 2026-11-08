@@ -1,3 +1,4 @@
+import { speechDiagnostic } from "./diagnostics";
 import { HttpError } from "@tsz/api-client";
 import type {
   AudioAssetUrlResponse,
@@ -83,15 +84,17 @@ export const xhrDirectUpload: DirectUploader = ({
     request.send(body);
   });
 
-const MESSAGES: Record<AudioUploadErrorCode, string> = {
-  unsupported_type: `仅支持 ${AUDIO_ASSET_FORMAT_LABELS.join(" / ")}`,
-  too_large: "文件超过服务端大小上限",
-  too_many: "音频条数已达上限",
-  storage_unavailable: "音频存储尚未开通",
-  upload_failed: "上传到存储失败，请重试",
-  confirm_failed: "文件已上传但落库失败，请重试",
-  unavailable: "音频服务暂不可用，请稍后重试",
-  unknown: "上传失败，请重试"
+const MESSAGES: Record<AudioUploadErrorCode, (locale?: string) => string> = {
+  unsupported_type: speechDiagnostic("upload_type", {
+    formats: AUDIO_ASSET_FORMAT_LABELS.join(" / ")
+  }),
+  too_large: speechDiagnostic("upload_large"),
+  too_many: speechDiagnostic("upload_many"),
+  storage_unavailable: speechDiagnostic("upload_storage"),
+  upload_failed: speechDiagnostic("upload_put"),
+  confirm_failed: speechDiagnostic("upload_confirm"),
+  unavailable: speechDiagnostic("upload_unavailable"),
+  unknown: speechDiagnostic("upload_unknown")
 };
 
 function fromHttpError(
@@ -122,7 +125,7 @@ function fromHttpError(
   // 重来一遍申请许可没有副作用，比只能「移除再重选」强。
   return new AudioUploadError(
     "unknown",
-    `上传失败（HTTP ${error.status}），请重试`,
+    speechDiagnostic("upload_http", { status: error.status }),
     true
   );
 }
@@ -148,13 +151,13 @@ export function createAdminAudioUploadAdapter(
       if (gender !== "female" && gender !== "male") {
         throw new AudioUploadError(
           "confirm_failed",
-          "上传录音请选择男声或女声"
+          speechDiagnostic("upload_gender")
         );
       }
       if (locale !== "en-GB" && locale !== "en-US") {
         throw new AudioUploadError(
           "confirm_failed",
-          "上传录音仅支持英式或美式归属"
+          speechDiagnostic("upload_locale")
         );
       }
       if (storageUnavailable) {
@@ -211,7 +214,7 @@ export function createAdminAudioUploadAdapter(
         throw new AudioUploadError(
           "upload_failed",
           status
-            ? `上传到存储失败（HTTP ${status}），请重试`
+            ? speechDiagnostic("upload_put_http", { status })
             : MESSAGES.upload_failed,
           true
         );

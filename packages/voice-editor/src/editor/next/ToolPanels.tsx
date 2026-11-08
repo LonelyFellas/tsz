@@ -671,7 +671,7 @@ export function UploadPanel({
   playingAssetId,
   playbackMessage
 }: UploadPanelProps) {
-  const { t } = useVoiceEditorTranslation();
+  const { t, i18n } = useVoiceEditorTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inFlight = pending.filter((item) => !item.error).length;
   const used = assets.length + inFlight;
@@ -788,7 +788,8 @@ export function UploadPanel({
                           ? t("at_most_audio_items_allowed", { p0: limit })
                           : item.error.code === "permission_denied"
                             ? t("you_do_not_have_permission_to_upload_audio")
-                            : item.error.message}
+                            : (item.error.displayMessage?.(i18n.language) ??
+                              item.error.message)}
                   </span>
                 ) : (
                   <Progress

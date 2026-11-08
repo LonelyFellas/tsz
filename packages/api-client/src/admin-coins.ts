@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   CoinAccountPage,
   CoinAccountsQuery,
@@ -19,7 +20,7 @@ function decode<T>(
 ): T {
   const result = validateRuntimeSchema(name, value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `天生币管理响应不符合接口契约：${result.path} (${result.reason})`
     );
   if (name === "CoinAccountPage") {

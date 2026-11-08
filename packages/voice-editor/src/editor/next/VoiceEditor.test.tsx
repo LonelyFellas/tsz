@@ -4224,3 +4224,26 @@ it("英文录音说明保留口音两侧的词界", async () => {
     )
   ).toBeVisible();
 });
+
+it("损坏的原始标注诊断随语言切换，保留原正文并且不提交修复", () => {
+  const base = props();
+  const value = {
+    version: 2 as const,
+    text: "raw text 保留",
+    annotations: [{ type: "pause" as const, at: 999, duration_ms: 10 }]
+  };
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <VoiceEditor {...base} value={value} />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  expect(screen.getByText(/停顿位置必须合法/)).toBeVisible();
+  view.rerender(content("en-GB"));
+  expect(screen.getByText(/The pause position must be valid/)).toBeVisible();
+  expect(
+    document.querySelector(".tsz-ve-text")?.textContent ??
+      document.body.textContent
+  ).toContain("raw text 保留");
+  expect(base.onChange).not.toHaveBeenCalled();
+});

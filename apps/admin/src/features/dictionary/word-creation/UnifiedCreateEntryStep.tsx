@@ -890,8 +890,8 @@ export function UnifiedCreateEntryStep({
   );
   const formTypeLabel = useFormTypeLabel();
   const cards = useMemo(
-    () => aggregateLifecycleSurfaceMatchCards(snapshot, formTypeLabel),
-    [snapshot, formTypeLabel]
+    () => aggregateLifecycleSurfaceMatchCards(snapshot, formTypeLabel, t),
+    [snapshot, formTypeLabel, t]
   );
   const baseCandidates = useMemo(() => {
     if (!prepared) return [];

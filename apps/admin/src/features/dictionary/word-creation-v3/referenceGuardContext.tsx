@@ -1,3 +1,7 @@
+import {
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "../i18n/editor";
 import type { InboundReferenceV3 } from "@tsz/types";
 import { createContext, useContext } from "react";
 import { EMPTY_REFERENCE_INDEX, type V3ReferenceIndex } from "./referenceGuard";
@@ -33,6 +37,9 @@ export function useV3ReferenceGuard(): V3ReferenceGuard {
   return useContext(V3ReferenceGuardContext);
 }
 
-export function referenceBlockedHint(count: number): string {
-  return `存在 ${count} 处关联，可以修改并保存草稿；发布前请检查并处理受影响的关联内容`;
+export function referenceBlockedHint(
+  count: number,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
+): string {
+  return t("reference_edit_hint", { count });
 }

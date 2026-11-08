@@ -1,5 +1,8 @@
 import { AudioUploadError } from "../../types";
 import {
+  localVoiceEditorErrorText,
+  richTextIssueMessage,
+  voiceEditorErrorMessage,
   useVoiceEditorTranslation,
   defaultVoiceEditorTranslation,
   type VoiceEditorTranslation,
@@ -134,9 +137,7 @@ function errorMessage(
   error: unknown,
   t: VoiceEditorTranslation = defaultVoiceEditorTranslation
 ): string {
-  return error instanceof Error
-    ? error.message
-    : t("operation_failed_try_again");
+  return localVoiceEditorErrorText(error, t);
 }
 
 /**
@@ -148,10 +149,7 @@ function errorMessage(
  * ErrorBoundary 兜底。所以这里降级成「只保留正文、丢掉读不出的标注」并说明原因，
  * 让人还能继续编辑。
  */
-function parseValue(
-  value: RichText,
-  t: VoiceEditorTranslation = defaultVoiceEditorTranslation
-): { value: RichTextV2; error?: string } {
+function parseValue(value: RichText): { value: RichTextV2; error?: unknown } {
   try {
     return { value: toRichTextV2(value) };
   } catch (error) {
@@ -162,10 +160,7 @@ function parseValue(
         text: typeof raw === "string" ? raw : "",
         annotations: []
       },
-      error: t(
-        "previous_annotations_could_not_be_read_only_the_text_was_retained",
-        { p0: errorMessage(error, t) }
-      )
+      error
     };
   }
 }
@@ -285,7 +280,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 初值直接从 value 灌，而不是先置空再由 effect 补。先置空的话，首帧折算出的是
    * 空内容，实时回调会把这份空值抛给宿主——一挂载就把表单里原有的文本清掉。
    */
-  const [initial] = useState(() => parseValue(value, t));
+  const [initial] = useState(() => parseValue(value));
   const [text, setText] = useState(initial.value.text);
   const [links, setLinks] = useState<TLink[]>(textLinks ?? []);
   const [speechLinks, setSpeechLinks] = useState<GrammarFormLinkV3[]>(
@@ -547,7 +542,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     } catch (error) {
       return { value: candidate, error: errorMessage(error, t) };
     }
-  }, [marks, text]);
+  }, [marks, text, t]);
 
   const workingValue = working.value;
   const serialized = JSON.stringify({
@@ -558,7 +553,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   // 外部值变了才重新灌入；自己刚抛出去、又被父组件回灌的那一份直接跳过。
   useEffect(() => {
-    const parsed = parseValue(value, t);
+    const parsed = parseValue(value);
     const incoming = JSON.stringify({
       value: parsed.value,
       links: textLinks ?? [],
@@ -785,11 +780,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         const failed = values.find((value) => value.status === "rejected");
         setRecommendationError(
           failed?.status === "rejected"
-            ? failed.reason instanceof Error
-              ? failed.reason.message
-              : createVoiceEditorMessage(
-                  "could_not_resolve_voice_settings_for_some_accents_fix_the_configuration"
-                )
+            ? voiceEditorErrorMessage(
+                failed.reason,
+                "could_not_resolve_voice_settings_for_some_accents_fix_the_configuration"
+              )
             : ""
         );
       })
@@ -797,11 +791,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         if (!controller.signal.aborted) {
           setResolvedVoices({ key: resolutionKey, voices: [] });
           setRecommendationError(
-            error instanceof Error
-              ? error.message
-              : createVoiceEditorMessage(
-                  "could_not_resolve_effective_voice_settings_fix_the_configuration"
-                )
+            voiceEditorErrorMessage(
+              error,
+              "could_not_resolve_effective_voice_settings_fix_the_configuration"
+            )
           );
         }
       });
@@ -1079,9 +1072,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     } catch (error) {
       if (!request.signal.aborted)
         setRecommendationError(
-          error instanceof Error
-            ? error.message
-            : createVoiceEditorMessage("generation_failed_try_again_2")
+          voiceEditorErrorMessage(error, "generation_failed_try_again_2")
         );
     } finally {
       if (generationRequest.current === request)
@@ -1968,7 +1959,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       annotations: marksToAnnotations(text, { ...marks, roles })
     });
     if (issues.length > 0) {
-      setValidationMessage(issues[0]!.message);
+      setValidationMessage(richTextIssueMessage(issues[0]));
       return false;
     }
     commit((current) => ({ ...current, marks: { ...current.marks, roles } }));
@@ -2089,7 +2080,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       annotations: marksToAnnotations(text, { ...marks, passthrough })
     });
     if (issues.length > 0) {
-      setValidationMessage(issues[0]!.message);
+      setValidationMessage(richTextIssueMessage(issues[0]));
       return;
     }
     const normalized = normalizeRichTextV2({
@@ -2438,7 +2429,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       t("edits_here_will_not_be_saved_until_this_is_corrected", {
         p0: working.error
       })) ||
-    loadError;
+    (loadError
+      ? t("previous_annotations_could_not_be_read_only_the_text_was_retained", {
+          p0: errorMessage(loadError, t)
+        })
+      : "");
 
   const conflictCount = Object.keys(marks.pauses).filter((gap) =>
     marks.liaisons.some((link) => crossesGap(link, Number(gap)))
@@ -2758,7 +2753,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                         annotations: marksToAnnotations(text, nextMarks)
                       })[0];
                       if (issue) {
-                        setValidationMessage(issue.message);
+                        setValidationMessage(richTextIssueMessage(issue));
                         return;
                       }
                       commit((current) => ({

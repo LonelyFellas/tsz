@@ -19,7 +19,11 @@ import { Drawer, FloatButton } from "@tsz/ui/admin/overlays";
 import { Input, type TextAreaRef } from "@tsz/ui/admin/forms";
 import { BotIcon, SendIcon, SquareIcon } from "lucide-react";
 
-import { HttpError } from "@tsz/api-client";
+import {
+  HttpError,
+  LexiconAssistantResponseError,
+  LexiconAssistantInterruptedError
+} from "@tsz/api-client";
 import type {
   LexiconAssistantHistory,
   LexiconAssistantResponse,
@@ -44,13 +48,17 @@ interface Turn {
 }
 
 function errorMessage(error: unknown) {
+  if (error instanceof LexiconAssistantResponseError)
+    return uiMessage(`assistant_client_${error.diagnostic}`);
   if (error instanceof HttpError) {
     if (error.status === 409) return uiMessage("assistant_revision");
     if (error.status === 403) return uiMessage("assistant_forbidden");
     if (error.status === 429) return uiMessage("assistant_rate_limit");
     if (error.status === 404 || error.status === 503)
       return uiMessage("assistant_unavailable");
-    return error.message;
+    return error instanceof LexiconAssistantInterruptedError
+      ? uiMessage("assistant_client_interrupted")
+      : error.message;
   }
   return uiMessage("assistant_failed");
 }

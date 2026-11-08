@@ -1,6 +1,7 @@
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const workspaceMessages = {
+  comparison_content: ["内容", "內容", "Content"],
   backup_filename: [
     "编辑内容备份.json",
     "編輯內容備份.json",

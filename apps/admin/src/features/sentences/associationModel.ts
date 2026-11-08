@@ -122,7 +122,11 @@ export function currentSentenceCandidates(
   return result;
 }
 
-export function savedSenseTargets(word: AdminWordV3, senseId: string) {
+export function savedSenseTargets(
+  word: AdminWordV3,
+  senseId: string,
+  emptyGloss = "暂无释义"
+) {
   const pos = word.meanings.pos.find((row) =>
     row.senses.some((sense) => sense.id === senseId)
   );
@@ -140,7 +144,7 @@ export function savedSenseTargets(word: AdminWordV3, senseId: string) {
     definition?.definition_mode === "zh_definition" ||
     definition?.definition_mode === "zh_sentence"
       ? definition.content.text
-      : "暂无释义";
+      : emptyGloss;
   // 快捷入口不经过后端候选接口，使用相同的组/成员顺序与历史词形兜底规则。
   const byId = new Map(forms.forms.map((form) => [form.id, form]));
   const orderedIds = new Set([

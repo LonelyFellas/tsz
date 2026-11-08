@@ -27,6 +27,7 @@ export interface PendingUpload {
   progress: number;
   error?: {
     message: string;
+    displayMessage?: (locale?: string) => string;
     retryable: boolean;
     code?: AudioUploadErrorCode | "permission_denied";
   };
@@ -101,10 +102,15 @@ export function describeUploadError(
   t: VoiceEditorTranslation = defaultVoiceEditorTranslation
 ): {
   message: string;
+  displayMessage?: (locale?: string) => string;
   retryable: boolean;
 } {
   if (error instanceof AudioUploadError) {
-    return { message: error.message, retryable: error.retryable };
+    return {
+      message: error.message,
+      displayMessage: error.displayMessage,
+      retryable: error.retryable
+    };
   }
   return { message: t("upload_failed_try_again"), retryable: true };
 }

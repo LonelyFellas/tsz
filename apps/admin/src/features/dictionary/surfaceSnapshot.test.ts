@@ -387,3 +387,27 @@ describe("surface snapshot selectors", () => {
     expect(requiresNewIdempotencyKey(status, code)).toBe(expected);
   });
 });
+
+it("同形来源标签可翻译，词条身份、原拼写、原释义和确认 token 不变", async () => {
+  const { createInterfaceI18n } = await import("@tsz/shared/i18n");
+  const { lexiconEditorResources } = await import("./i18n/editor");
+  const item = v3Item("entry-1", "variant-1", "原文-Spelling");
+  const state = surfaceSnapshotReducer(
+    createEmptySurfaceSnapshotState<SurfaceMatchPageV3>(),
+    { type: "start", generation: 1, page: v3Page([item], null) }
+  );
+  const original = JSON.stringify(state);
+  const instance = createInterfaceI18n("en-US", lexiconEditorResources);
+  const t: import("./i18n/editor").LexiconEditorTranslation = (key, values) =>
+    instance.t(key, { ns: "adminLexiconEditor", ...values });
+  const cards = aggregateLifecycleSurfaceMatchCards(state, (code) => code, t);
+  expect(cards[0]).toMatchObject({
+    key: "entry-1",
+    entry_id: "entry-1",
+    pos_labels: ["Noun"],
+    gloss_previews: ["释义"]
+  });
+  expect(cards[0]!.source_labels[0]).toContain("Form · 原文-Spelling");
+  expect(cards[0]!.source_labels[0]).not.toContain("英美");
+  expect(JSON.stringify(state)).toBe(original);
+});

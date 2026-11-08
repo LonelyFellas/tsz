@@ -1,3 +1,4 @@
+import { speechDiagnostic } from "./diagnostics";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminSpeechPreviewResponse,
@@ -34,15 +35,15 @@ const PREVIEW_RETRY_DELAY_MS = 250;
 
 function safePreviewError(error: HttpError): VoicePreviewError {
   const code = errorCode(error);
-  const messages: Record<VoicePreviewErrorCode, string> = {
-    invalid_content: "试听内容或语音参数无效，请检查后重新生成",
-    voice_not_found: "所选发音人不可用，请重新选择",
-    preview_in_progress: "相同试听正在生成，请稍后重试",
-    option_not_supported: "所选发音参数不受支持，请调整后重试",
-    rate_limited: "试听请求过于频繁，请稍后手动重试",
-    quota_exceeded: "试听额度暂不可用，请稍后重试",
-    unavailable: "语音或存储服务暂不可用，请稍后手动重试",
-    unknown: "试听请求失败，请重试"
+  const messages: Record<VoicePreviewErrorCode, (locale?: string) => string> = {
+    invalid_content: speechDiagnostic("preview_invalid"),
+    voice_not_found: speechDiagnostic("preview_voice"),
+    preview_in_progress: speechDiagnostic("preview_pending"),
+    option_not_supported: speechDiagnostic("preview_options"),
+    rate_limited: speechDiagnostic("preview_rate"),
+    quota_exceeded: speechDiagnostic("preview_quota"),
+    unavailable: speechDiagnostic("preview_unavailable"),
+    unknown: speechDiagnostic("preview_unknown")
   };
   return new VoicePreviewError(
     code,
@@ -197,13 +198,16 @@ export function createAdminVoicePreviewAdapter(
     async synthesize(input, options) {
       try {
         if (input.language !== "en") {
-          throw new VoicePreviewError("invalid_content", "当前仅支持英语试听");
+          throw new VoicePreviewError(
+            "invalid_content",
+            speechDiagnostic("preview_english")
+          );
         }
         const capabilities = catalog.get(input.voiceId);
         if (!capabilities) {
           throw new VoicePreviewError(
             "voice_not_found",
-            "所选发音人不可用，请重新选择"
+            speechDiagnostic("preview_voice")
           );
         }
         const ratePercent =
@@ -250,7 +254,7 @@ export function createAdminVoicePreviewAdapter(
         ) {
           throw new VoicePreviewError(
             "option_not_supported",
-            "所选发音参数不受支持，请调整后重试"
+            speechDiagnostic("preview_options")
           );
         }
         const request = {
@@ -289,7 +293,7 @@ export function createAdminVoicePreviewAdapter(
         }
         throw new VoicePreviewError(
           "preview_in_progress",
-          "相同试听正在生成，请稍后重试",
+          speechDiagnostic("preview_pending"),
           true
         );
       } catch (error) {

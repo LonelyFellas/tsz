@@ -1,3 +1,4 @@
+import { LocalLexiconError } from "../i18n/local-error-messages";
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { env } from "../../../lib/env";
 import type {
@@ -1364,7 +1365,7 @@ export function editSpellingList(
     .flatMap((pos) => pos.forms)
     .find((row) => row.id === formId);
   if (!form || form.regional_variants.mode === "common")
-    throw new Error("请先开启英美拼写区别");
+    throw new LocalLexiconError("local_distinguish_first");
   if (form.regional_variants.mode === "uk_us")
     form.regional_variants = {
       mode: "uk_us_many",
@@ -1373,9 +1374,10 @@ export function editSpellingList(
     };
   const rows = form.regional_variants[dialect];
   if (action.type === "add") {
-    if (rows.length >= 2000) throw new Error("拼写数量已达上限");
+    if (rows.length >= 2000)
+      throw new LocalLexiconError("local_spelling_limit");
     const index = rows.findIndex((row) => row.id === action.afterId);
-    if (index < 0) throw new Error("拼写已不存在");
+    if (index < 0) throw new LocalLexiconError("local_spelling_missing");
     const row = {
       id: idFactory(),
       dialect,
@@ -1397,9 +1399,9 @@ export function editSpellingList(
       form.regional_variants.us.splice(index + 1, 0, { ...row, dialect: "us" });
   } else {
     const index = rows.findIndex((row) => row.id === action.id);
-    if (index < 0) throw new Error("拼写已不存在");
+    if (index < 0) throw new LocalLexiconError("local_spelling_missing");
     if (action.type === "remove") {
-      if (rows.length <= 1) throw new Error("每侧至少保留一条拼写");
+      if (rows.length <= 1) throw new LocalLexiconError("local_one_spelling");
       rows.splice(index, 1);
     } else {
       if (
@@ -1407,7 +1409,7 @@ export function editSpellingList(
         action.toIndex < 0 ||
         action.toIndex >= rows.length
       )
-        throw new Error("拼写排序位置无效");
+        throw new LocalLexiconError("local_spelling_order");
       const [moved] = rows.splice(index, 1);
       // Separate arrays carry literal dialect types; the source row belongs to this side.
       if (dialect === "uk")

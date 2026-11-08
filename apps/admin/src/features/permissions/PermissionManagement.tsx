@@ -1,3 +1,4 @@
+import { AdminRequestError } from "@/components/AdminRequestError";
 import {
   useAccessTranslation,
   AccessText,
@@ -85,7 +86,9 @@ function GrantedAdmins({
       title={t("administrators_with_access")}
       onClose={onClose}
     >
-      {query.isError && <Alert type="error" title={query.error.message} />}
+      {query.isError && (
+        <Alert type="error" title={<AdminRequestError error={query.error} />} />
+      )}
       <Table
         tableId="permission-admins"
         locale={{
@@ -220,7 +223,12 @@ function BatchTargets({
           allowClear
           style={{ flexShrink: 0 }}
         />
-        {query.isError && <Alert type="error" title={query.error.message} />}
+        {query.isError && (
+          <Alert
+            type="error"
+            title={<AdminRequestError error={query.error} />}
+          />
+        )}
         <div ref={listRef} style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
           <Table
             tableId="permission-admin-picker"
@@ -331,7 +339,9 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
       title={t("permission_and_tag_change_history")}
       onClose={onClose}
     >
-      {query.isError && <Alert type="error" title={query.error.message} />}
+      {query.isError && (
+        <Alert type="error" title={<AdminRequestError error={query.error} />} />
+      )}
       <Table
         toolbar={
           <Space wrap key={filterResetKey}>
@@ -483,7 +493,7 @@ export function PermissionManagement() {
       } else {
         message.error(
           error instanceof Error ? (
-            error.message
+            <AdminRequestError error={error} />
           ) : (
             <AccessText message="operation_failed" />
           )
@@ -632,7 +642,7 @@ export function PermissionManagement() {
             type="error"
             showIcon
             title={t("could_not_load_permissions_9d864c")}
-            description={catalog.error.message}
+            description={<AdminRequestError error={catalog.error} />}
             style={{ marginBottom: 12 }}
             action={
               <Button size="small" onClick={() => void catalog.refetch()}>

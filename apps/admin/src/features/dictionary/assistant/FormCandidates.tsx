@@ -20,7 +20,7 @@ import { App, Modal } from "@tsz/ui/admin/overlays";
 import { Checkbox } from "@tsz/ui/admin/forms";
 import { Table } from "@tsz/ui/admin/table";
 import { ImportIcon, RotateCwIcon } from "lucide-react";
-import { HttpError } from "@tsz/api-client";
+import { HttpError, LexiconAssistantResponseError } from "@tsz/api-client";
 import type { LexiconFormCandidatesResponse } from "@tsz/types";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
 import { api } from "@/lib/auth";
@@ -126,11 +126,13 @@ export function FormCandidates({
     } catch (cause) {
       if (request.current === controller && !controller.signal.aborted)
         setError(
-          cause instanceof HttpError && cause.status === 409
-            ? uiMessage("candidate_conflict")
-            : cause instanceof HttpError
-              ? cause.message
-              : uiMessage("candidate_failed")
+          cause instanceof LexiconAssistantResponseError
+            ? uiMessage(`assistant_client_${cause.diagnostic}`)
+            : cause instanceof HttpError && cause.status === 409
+              ? uiMessage("candidate_conflict")
+              : cause instanceof HttpError
+                ? cause.message
+                : uiMessage("candidate_failed")
         );
     } finally {
       if (request.current === controller) {

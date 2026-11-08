@@ -6,7 +6,15 @@ import type {
   SurfacePolicyBlockCodeV2,
   SurfacePolicyNameV2
 } from "@tsz/types";
-import { dialectLabel, formTypeLabel } from "./word-creation-v3/presentation";
+import {
+  defaultLexiconEditorTranslation,
+  type LexiconEditorTranslation
+} from "./i18n/editor";
+import {
+  dialectLabel,
+  formTypeLabel,
+  partOfSpeechLabel
+} from "./word-creation-v3/presentation";
 
 export type SurfaceSnapshotPhase =
   "idle" | "loading" | "ready" | "disabled" | "error" | "expired";
@@ -278,14 +286,21 @@ const POS_LABELS: Record<string, string> = {
   interjection: "感叹词"
 };
 
-function productPosLabels(values: string[]): string[] {
+function productPosLabels(
+  values: string[],
+  t?: LexiconEditorTranslation
+): string[] {
   return uniqueBy(
     values.map((value) =>
       POS_LABELS[value]
-        ? POS_LABELS[value]
+        ? t
+          ? partOfSpeechLabel(value, t)
+          : POS_LABELS[value]
         : /[\u3400-\u9fff]/u.test(value)
           ? value
-          : "其他词性"
+          : t
+            ? t("creation_other_part_of_speech")
+            : "其他词性"
     ),
     (value) => value
   );
@@ -293,15 +308,21 @@ function productPosLabels(values: string[]): string[] {
 
 function v3SourceLabel(
   item: SurfaceMatchItemV3,
-  label: (code: string) => string
+  label: (code: string) => string,
+  t: LexiconEditorTranslation
 ): string {
-  return `词形 · ${item.match.spelling} · ${label(item.match.form_type)} · ${dialectLabel(item.match.dialect)}`;
+  return t("surface_source_form", {
+    spelling: item.match.spelling,
+    type: label(item.match.form_type),
+    dialect: dialectLabel(item.match.dialect, t)
+  });
 }
 
 /** Lifecycle confirmation uses each schema's real source and presentation fields. */
 export function aggregateLifecycleSurfaceMatchCards(
   state: SurfaceSnapshotState<SurfaceMatchPageV3>,
-  typeLabel = formTypeLabel
+  typeLabel = formTypeLabel,
+  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
 ): LifecycleSurfaceMatchCard[] {
   const contexts = new Map(
     (state.matched_entry_contexts as MatchedEntryContextV3[]).map((context) => [
@@ -315,7 +336,7 @@ export function aggregateLifecycleSurfaceMatchCards(
     const context = contexts.get(entryId);
     const label = context?.presentation.label ?? item.match.spelling;
     const status = item.match.status;
-    const sourceLabel = v3SourceLabel(item, typeLabel);
+    const sourceLabel = v3SourceLabel(item, typeLabel, t);
     const existing = cards.get(entryId);
     if (existing) {
       existing.match_count += 1;
@@ -335,7 +356,7 @@ export function aggregateLifecycleSurfaceMatchCards(
       match_count: 1,
       membership: membership(state.confirmation_reasons),
       source_labels: [sourceLabel],
-      pos_labels: productPosLabels(context?.pos_labels ?? []),
+      pos_labels: productPosLabels(context?.pos_labels ?? [], t),
       gloss_previews: context?.gloss_previews ?? []
     });
   }

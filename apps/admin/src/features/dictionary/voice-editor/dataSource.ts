@@ -1,3 +1,5 @@
+import { VoiceEditorDisplayError } from "@tsz/voice-editor/types";
+import { speechDiagnostic } from "./diagnostics";
 import type {
   AudioUploadAdapter,
   VoicePreviewAdapter,
@@ -146,7 +148,8 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
     };
   },
   async resolveVoices(input, options) {
-    if (voicePreviewIsMock) throw new Error("模拟试听不支持服务端推荐解析");
+    if (voicePreviewIsMock)
+      throw new VoiceEditorDisplayError(speechDiagnostic("mock_resolve"));
     const result = await api.speech.resolve(
       {
         profile: input.profile,
@@ -158,7 +161,8 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
     return result.voices;
   },
   async generateAudio(input, options) {
-    if (voicePreviewIsMock) throw new Error("模拟试听不支持生成正式音频");
+    if (voicePreviewIsMock)
+      throw new VoiceEditorDisplayError(speechDiagnostic("mock_generate"));
     const response = await api.speech.generateAudio(
       {
         request_id: input.requestId,
@@ -185,7 +189,7 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
   },
   async synthesize(input, options) {
     if (!hasAdminPermission(useAuthStore.getState().profile, "speech.generate"))
-      throw new Error("没有生成语音的权限");
+      throw new VoiceEditorDisplayError(speechDiagnostic("generate_forbidden"));
     return (await resolveAdapter()).synthesize(input, options);
   }
 };
@@ -215,7 +219,7 @@ export const adminAudioUploadAdapter: AudioUploadAdapter = {
         "sentences.edit"
       ])
     )
-      throw new Error("没有上传音频的权限");
+      throw new VoiceEditorDisplayError(speechDiagnostic("upload_forbidden"));
     return (await resolveAudioAdapter()).upload(input);
   },
   async resolveUrl(assetId, options) {

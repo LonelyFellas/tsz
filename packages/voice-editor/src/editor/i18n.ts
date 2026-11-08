@@ -1,3 +1,14 @@
+import {
+  RichTextValidationError,
+  type RichTextValidationIssue
+} from "../core/normalize";
+import {
+  MAX_RICH_TEXT_CODE_POINTS,
+  MAX_RICH_TEXT_ANNOTATIONS,
+  MIN_PAUSE_MS,
+  MAX_PAUSE_MS,
+  phonemeCodePointLimit
+} from "../core/limits";
 import { VoiceEditorDisplayError } from "../types";
 import { useState, useMemo } from "react";
 import { useInterfaceInstance, useTranslation } from "@tsz/shared/i18n/react";
@@ -57,13 +68,13 @@ export function createVoiceEditorMessage(
   return { key, values };
 }
 export function useVoiceEditorMessageState(initial = "") {
-  const { t } = useVoiceEditorTranslation();
+  const { t, i18n } = useVoiceEditorTranslation();
   const [message, setMessage] = useState<
     string | VoiceEditorMessage | VoiceEditorDisplayError | undefined
   >(initial);
   return [
     message instanceof VoiceEditorDisplayError
-      ? message.displayMessage()
+      ? message.displayMessage(i18n.language)
       : typeof message === "object"
         ? t(message.key, message.values ?? {})
         : (message ?? ""),
@@ -75,9 +86,38 @@ export function voiceEditorErrorMessage(
   error: unknown,
   fallback: VoiceEditorKey
 ) {
+  if (error instanceof RichTextValidationError)
+    return richTextIssueMessage(error.issues[0]);
   return error instanceof VoiceEditorDisplayError
     ? error
     : error instanceof Error
       ? error.message
       : createVoiceEditorMessage(fallback);
+}
+
+export function richTextIssueMessage(
+  issue?: RichTextValidationIssue
+): VoiceEditorMessage {
+  return createVoiceEditorMessage(
+    issue ? `local_${issue.code}` : "local_rich_text_invalid",
+    {
+      limit: MAX_RICH_TEXT_CODE_POINTS,
+      annotations: MAX_RICH_TEXT_ANNOTATIONS,
+      min: MIN_PAUSE_MS,
+      max: MAX_PAUSE_MS,
+      ipa: phonemeCodePointLimit("ipa"),
+      ups: phonemeCodePointLimit("ups")
+    }
+  );
+}
+export function localVoiceEditorErrorText(
+  error: unknown,
+  t: VoiceEditorTranslation
+) {
+  const message = voiceEditorErrorMessage(error, "operation_failed_try_again");
+  return message instanceof VoiceEditorDisplayError
+    ? message.message
+    : typeof message === "object"
+      ? t(message.key, message.values)
+      : message;
 }

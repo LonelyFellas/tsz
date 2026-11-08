@@ -1,3 +1,4 @@
+import { LocalLexiconError } from "../i18n/local-error-messages";
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import type {
   DraftFormsStepContentV3,
@@ -552,12 +553,10 @@ function replaceSharedContentInPlace(
           (content.regional_variants.mode === "common") &&
         variants.some((row) => row.component_usages?.length)
       )
-        throw new Error(
-          "这个标签保留了旧版词形成分用词，暂不能切换英美地区。请先处理成分用词，避免改变已有引用身份。"
-        );
+        throw new LocalLexiconError("local_legacy_components_region");
       if (old.mode === "uk_us" && content.regional_variants.mode === "common") {
         if (old.uk.is_regular !== old.us.is_regular)
-          throw new Error("请先统一每个标签的英美规则变化设置，再合并内容。");
+          throw new LocalLexiconError("local_unify_regular");
         const values = (row: FormVariantBindingV3) =>
           JSON.stringify(
             (row.component_usages ?? []).map(({ id, ...value }) => {
@@ -566,7 +565,7 @@ function replaceSharedContentInPlace(
             })
           );
         if (values(old.uk) !== values(old.us))
-          throw new Error("请先统一标签的英美成分用词，再合并内容。");
+          throw new LocalLexiconError("local_unify_components");
       }
       if (content.regional_variants.mode === "uk_us_many") {
         const slots = new Set(
@@ -578,9 +577,7 @@ function replaceSharedContentInPlace(
               row.component_usages?.length && !slots.has(row.content_slot_id)
           )
         )
-          throw new Error(
-            "这个标签保留了旧版词形成分，请先处理成分用词，再移除或替换这条拼写。"
-          );
+          throw new LocalLexiconError("local_legacy_components_remove");
       }
       const reference = (
         slot: FormContentVariantV3,
@@ -657,8 +654,7 @@ export function assignSharedFormContent(
     .flatMap((pos) => pos.forms)
     .find((row) => row.id === formId);
   const content = next.contents.find((row) => row.id === contentId);
-  if (!binding || !content)
-    throw new Error("词形或内容已不存在，请重新打开后再试");
+  if (!binding || !content) throw new LocalLexiconError("local_form_missing");
   const pos = next.pos.find((row) => row.forms.includes(binding))!;
   const group = pos.form_groups.find((row) =>
     row.members.some((member) => member.form_id === formId)
@@ -674,7 +670,7 @@ export function assignSharedFormContent(
       )
     )
   ) {
-    throw new Error("同组已有同类型词形共用这份内容，不能重复指派");
+    throw new LocalLexiconError("local_duplicate_assignment");
   }
   binding.content_id = contentId;
   const updated = replaceSharedContentInPlace(

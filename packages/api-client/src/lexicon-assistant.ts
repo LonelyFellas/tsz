@@ -13,10 +13,37 @@ import {
   type RuntimeSchemaRoot
 } from "./runtime-schema";
 
+/** Locally generated protocol diagnostics; server errors remain HttpError. */
+export class LexiconAssistantResponseError extends Error {
+  constructor(
+    readonly diagnostic:
+      | "contract"
+      | "candidates_mismatch"
+      | "stream_format"
+      | "ended"
+      | "too_long"
+      | "mismatch"
+      | "format"
+      | "ask_mismatch",
+    message: string
+  ) {
+    super(message);
+    this.name = "LexiconAssistantResponseError";
+  }
+}
+
+export class LexiconAssistantInterruptedError extends HttpError {
+  constructor(status: number) {
+    super(status, "助手回答中断，请重试");
+    this.name = "LexiconAssistantInterruptedError";
+  }
+}
+
 function decode<T>(root: RuntimeSchemaRoot, value: unknown): T {
   const result = validateRuntimeSchema(root, value);
   if (!result.valid)
-    throw new Error(
+    throw new LexiconAssistantResponseError(
+      "contract",
       `助手响应不符合接口契约：${result.path} (${result.reason})`
     );
   return value as T;
@@ -40,7 +67,10 @@ export function createLexiconAssistantEndpoints(http: HttpClient) {
             response.headword !== input.headword ||
             !response.requires_human_review
           )
-            throw new Error("候选与当前词条或版本不匹配，请重新生成");
+            throw new LexiconAssistantResponseError(
+              "candidates_mismatch",
+              "候选与当前词条或版本不匹配，请重新生成"
+            );
           return response;
         }),
     askStream: (
@@ -58,7 +88,10 @@ export function createLexiconAssistantEndpoints(http: HttpClient) {
               .get("content-type")
               ?.includes("application/x-ndjson")
           )
-            throw new Error("助手流式响应格式异常");
+            throw new LexiconAssistantResponseError(
+              "stream_format",
+              "助手流式响应格式异常"
+            );
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
           let buffer = "";
@@ -67,9 +100,17 @@ export function createLexiconAssistantEndpoints(http: HttpClient) {
             while (true) {
               const { value, done } = await reader.read();
               checkSession();
-              if (done) throw new Error("助手连接提前结束，请重试");
+              if (done)
+                throw new LexiconAssistantResponseError(
+                  "ended",
+                  "助手连接提前结束，请重试"
+                );
               total += value.byteLength;
-              if (total > 1_000_000) throw new Error("助手响应过长");
+              if (total > 1_000_000)
+                throw new LexiconAssistantResponseError(
+                  "too_long",
+                  "助手响应过长"
+                );
               buffer += decoder.decode(value, { stream: true });
               let end: number;
               while ((end = buffer.indexOf("\n")) >= 0) {
@@ -81,7 +122,7 @@ export function createLexiconAssistantEndpoints(http: HttpClient) {
                 );
                 checkSession();
                 if (event.event === "failed")
-                  throw new HttpError(event.status, "助手回答中断，请重试");
+                  throw new LexiconAssistantInterruptedError(event.status);
                 if (event.event === "complete") {
                   const result = event.response;
                   if (
@@ -89,13 +130,20 @@ export function createLexiconAssistantEndpoints(http: HttpClient) {
                     result.context_id !== input.context_id ||
                     result.requires_human_review !== true
                   )
-                    throw new Error("助手响应与当前问题不匹配");
+                    throw new LexiconAssistantResponseError(
+                      "mismatch",
+                      "助手响应与当前问题不匹配"
+                    );
                   onEvent(event);
                   return result;
                 }
                 onEvent(event);
               }
-              if (buffer.length > 100_000) throw new Error("助手响应格式异常");
+              if (buffer.length > 100_000)
+                throw new LexiconAssistantResponseError(
+                  "format",
+                  "助手响应格式异常"
+                );
             }
           } finally {
             await reader.cancel().catch(() => undefined);
@@ -129,7 +177,10 @@ export function createLexiconAssistantEndpoints(http: HttpClient) {
             response.context_id !== input.context_id ||
             response.requires_human_review !== true
           )
-            throw new Error("助手响应与当前问题不匹配，请重新提问");
+            throw new LexiconAssistantResponseError(
+              "ask_mismatch",
+              "助手响应与当前问题不匹配，请重新提问"
+            );
           return response;
         })
   };

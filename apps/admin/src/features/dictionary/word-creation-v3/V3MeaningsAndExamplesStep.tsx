@@ -311,7 +311,7 @@ function SenseEditorShell({
                     !canDelete
                       ? t("one_sense_required")
                       : referenceCount > 0
-                        ? referenceBlockedHint(referenceCount)
+                        ? referenceBlockedHint(referenceCount, t)
                         : undefined
                   }
                 >
@@ -1247,7 +1247,10 @@ function V3MeaningsAndExamplesStepContent({
                         <Tooltip
                           title={
                             posReferenceCount(posId) > 0
-                              ? referenceBlockedHint(posReferenceCount(posId))
+                              ? referenceBlockedHint(
+                                  posReferenceCount(posId),
+                                  t
+                                )
                               : undefined
                           }
                         >

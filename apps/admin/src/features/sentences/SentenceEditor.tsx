@@ -1,3 +1,4 @@
+import { lexiconRequestError } from "../dictionary/i18n/editor";
 import {
   useLexiconEditorTranslation,
   useLexiconEditorMessageState,
@@ -97,7 +98,11 @@ export function SentenceEditor({
   const sourceEntryId = sourceWord?.id;
   const currentTargets =
     sourceWord && sourceSenseId
-      ? savedSenseTargets(sourceWord, sourceSenseId)
+      ? savedSenseTargets(
+          sourceWord,
+          sourceSenseId,
+          t("panel_no_definitions_yet")
+        )
       : [];
   const contextLabel = currentTargets[0]
     ? `${currentTargets[0].surface.headword} · ${currentTargets[0].gloss}`
@@ -181,11 +186,10 @@ export function SentenceEditor({
       setError("");
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : createLexiconEditorMessage(
-              "panel_could_not_fetch_the_latest_draft_try_again"
-            )
+        lexiconRequestError(
+          e,
+          "panel_could_not_fetch_the_latest_draft_try_again"
+        )
       );
     } finally {
       setSaving(false);
@@ -390,7 +394,7 @@ export function SentenceEditor({
       }
       setError(
         e instanceof Error
-          ? e.message
+          ? lexiconRequestError(e, "panel_operation_failed_try_again")
           : createLexiconEditorMessage(
               "panel_saving_failed_input_is_retained_try_again"
             )

@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { GripVerticalIcon } from "lucide-react";
 import { Button } from "@tsz/ui/admin/display";
 import type { SortableRowsController } from "../sortableRows";
@@ -21,6 +22,7 @@ export function SortableDragHandle({
   index: number;
   dragImageSelector: string;
 }) {
+  const { t } = useLexiconEditorTranslation();
   return (
     <Button
       aria-label={label}
@@ -82,9 +84,7 @@ export function SortableDragHandle({
       }}
       onKeyDown={(event) => sorting.handleKeyDown(event, index)}
       size="small"
-      title={
-        sorting.canReorder ? "拖动排序，也可使用上下方向键" : singleItemTitle
-      }
+      title={sorting.canReorder ? t("drag_help") : singleItemTitle}
       type="text"
     />
   );

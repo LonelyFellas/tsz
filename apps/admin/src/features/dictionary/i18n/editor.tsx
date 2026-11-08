@@ -1,3 +1,5 @@
+import { ClientResponseError } from "@tsz/api-client";
+import { localLexiconErrorMessages } from "./local-error-messages";
 import { creationResidualMessages } from "./creation-residual-messages";
 import { batchPublicationMessages } from "./batch-publication-messages";
 import { publishingWorkspaceMessages } from "./publishing-workspace-messages";
@@ -10,6 +12,89 @@ export const lexiconEditorMessages = {
   ...publishingWorkspaceMessages,
   ...batchPublicationMessages,
   ...creationResidualMessages,
+  surface_source_form: [
+    "词形 · {{spelling}} · {{type}} · {{dialect}}",
+    "詞形 · {{spelling}} · {{type}} · {{dialect}}",
+    "Form · {{spelling}} · {{type}} · {{dialect}}"
+  ],
+  reference_edit_hint: [
+    "存在 {{count}} 处关联，可以修改并保存草稿；发布前请检查并处理受影响的关联内容",
+    "有 {{count}} 處關聯，可以修改並儲存草稿；發布前請檢查並處理受影響的關聯內容",
+    "There are {{count}} links. You can edit and save the draft; check and resolve affected links before publishing."
+  ],
+  client_response_invalid: [
+    "无法读取服务响应，请刷新并核对操作结果后再重试",
+    "無法讀取服務回應，請重新整理並核對操作結果後再重試",
+    "Could not read the service response. Refresh and check the result before trying again."
+  ],
+  assistant_client_interrupted: [
+    "助手回答中断，请重试",
+    "助手回答中斷，請重試",
+    "The assistant answer was interrupted. Try again."
+  ],
+  ...localLexiconErrorMessages,
+  assistant_client_contract: [
+    "助手响应不符合接口契约，请更新服务后重试",
+    "助手回應不符合介面契約，請更新服務後重試",
+    "The assistant response does not match the API contract. Update the service and try again."
+  ],
+  assistant_client_candidates_mismatch: [
+    "候选与当前词条或版本不匹配，请重新生成",
+    "候選與目前詞條或版本不符，請重新產生",
+    "The candidates do not match this entry or version. Generate them again."
+  ],
+  assistant_client_stream_format: [
+    "助手流式响应格式异常",
+    "助手串流回應格式異常",
+    "The assistant stream format is invalid."
+  ],
+  assistant_client_ended: [
+    "助手连接提前结束，请重试",
+    "助手連線提前結束，請重試",
+    "The assistant connection ended early. Try again."
+  ],
+  assistant_client_too_long: [
+    "助手响应过长",
+    "助手回應過長",
+    "The assistant response is too long."
+  ],
+  assistant_client_mismatch: [
+    "助手响应与当前问题不匹配",
+    "助手回應與目前問題不符",
+    "The assistant response does not match the current question."
+  ],
+  assistant_client_format: [
+    "助手响应格式异常",
+    "助手回應格式異常",
+    "The assistant response format is invalid."
+  ],
+  assistant_client_ask_mismatch: [
+    "助手响应与当前问题不匹配，请重新提问",
+    "助手回應與目前問題不符，請重新提問",
+    "The assistant response does not match this question. Ask again."
+  ],
+
+  phrase_spelling_first: [
+    "请先在词形步填写短语拼写",
+    "請先在詞形步填寫短語拼寫",
+    "Enter the phrase spelling in the forms step first"
+  ],
+  phrase_components_unsupported: [
+    "当前后端尚不支持释义级成分用词，暂只读；升级后端后即可编辑。",
+    "目前後端尚不支援釋義級成分用詞，暫時唯讀；升級後端後即可編輯。",
+    "This backend does not support definition-level phrase components. Update it to edit them."
+  ],
+  phrase_discovery_unsupported: [
+    "当前后端未开启词义查询能力，成分用词暂不可编辑；已有关联仍会随词义一起保存。",
+    "目前後端未開啟詞義查詢，暫時無法編輯成分用詞；現有關聯仍會隨詞義儲存。",
+    "Meaning lookup is unavailable, so phrase components cannot be edited. Existing links are still saved with the meanings."
+  ],
+  phrase_words: ["短语单词选择区", "短語單字選擇區", "Phrase word selection"],
+  phrase_link_word: [
+    "关联第 {{index}} 个词 {{token}}",
+    "關聯第 {{index}} 個詞 {{token}}",
+    "Link word {{index}}: {{token}}"
+  ],
   add_pos_group: [
     "新增{{pos}}变化组",
     "新增{{pos}}變化組",
@@ -1167,4 +1252,15 @@ export function lexiconEditorMessageText(
   return typeof message === "object"
     ? t(message.key, message.values ?? {})
     : message;
+}
+
+export function lexiconRequestError(
+  error: unknown,
+  fallback: LexiconEditorKey
+) {
+  return error instanceof ClientResponseError
+    ? createLexiconEditorMessage("client_response_invalid")
+    : error instanceof Error
+      ? error.message
+      : createLexiconEditorMessage(fallback);
 }

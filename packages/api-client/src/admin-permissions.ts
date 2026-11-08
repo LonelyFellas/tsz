@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type { HttpClient } from "./http";
 import type {
   AdminPermissions,
@@ -87,7 +88,7 @@ function decodePreview(
       input.targets.map((target) => target.admin_id)
     )
   ) {
-    throw new Error("权限调整结果不完整，请重新查看");
+    throw new ClientResponseError("权限调整结果不完整，请重新查看");
   }
   return preview;
 }
@@ -116,7 +117,7 @@ function decodeChange(
       input.targets.map((target) => target.admin_id)
     )
   ) {
-    throw new Error("保存响应不完整，请重新查看当前权限");
+    throw new ClientResponseError("保存响应不完整，请重新查看当前权限");
   }
   return result;
 }

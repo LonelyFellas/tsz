@@ -15,6 +15,7 @@ const zhHans = {
   },
   status: { loading: "加载中…", noData: "暂无数据", notEntered: "未填写" },
   controls: {
+    breadcrumb: "面包屑",
     pagination: "分页",
     previous: "上一页",
     next: "下一页",
@@ -69,6 +70,7 @@ const zhHant = {
   },
   status: { loading: "載入中…", noData: "暫無資料", notEntered: "未填寫" },
   controls: {
+    breadcrumb: "麵包屑",
     pagination: "分頁",
     previous: "上一頁",
     next: "下一頁",
@@ -123,6 +125,7 @@ const en = {
   },
   status: { loading: "Loading…", noData: "No data", notEntered: "Not entered" },
   controls: {
+    breadcrumb: "Breadcrumb",
     pagination: "Pagination",
     previous: "Previous page",
     next: "Next page",
