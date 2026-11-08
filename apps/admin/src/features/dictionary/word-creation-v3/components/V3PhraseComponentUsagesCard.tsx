@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { primaryRegionalVariant } from "@tsz/shared";
 // 释义卡内的「成分用词」区块（多维释义与多维例句之间，仅短语渲染，可选内容）。
 // 交互（2026-09-02 定稿三层级联；2026-09-04 前端临时收成单选）：点击短语中的单词 →
@@ -128,6 +129,7 @@ export function V3PhraseComponentUsagesCard({
   wordId,
   idFactory = newWordNodeId
 }: V3PhraseComponentUsagesCardProps) {
+  const { t } = useLexiconEditorTranslation();
   const tokens = useMemo(
     () => sentenceTokens(spelling ?? "").map((token) => token.text),
     [spelling]
@@ -159,26 +161,22 @@ export function V3PhraseComponentUsagesCard({
   };
 
   if (spelling === undefined || tokens.length === 0) {
-    return <Empty description="请先在词形步填写短语拼写" />;
+    return <Empty description={t("phrase_spelling_first")} />;
   }
   return (
     <Flex vertical gap="small">
       {senseComponentUsagesEnabled ? null : (
         <Alert
           showIcon
-          title="当前后端尚不支持释义级成分用词，暂只读；升级后端后即可编辑。"
+          title={t("phrase_components_unsupported")}
           type="info"
         />
       )}
       {senseComponentUsagesEnabled && !discoveryEnabled ? (
-        <Alert
-          showIcon
-          title="当前后端未开启词义查询能力，成分用词暂不可编辑；已有关联仍会随词义一起保存。"
-          type="info"
-        />
+        <Alert showIcon title={t("phrase_discovery_unsupported")} type="info" />
       ) : null}
       <div
-        aria-label="短语单词选择区"
+        aria-label={t("phrase_words")}
         className="v3-sentence-target-discovery-tokens tsz-entry-en"
         style={{
           marginTop: 9,
@@ -214,7 +212,7 @@ export function V3PhraseComponentUsagesCard({
               trigger="click"
             >
               <button
-                aria-label={`关联第 ${index + 1} 个词 ${token}`}
+                aria-label={t("phrase_link_word", { index: index + 1, token })}
                 aria-pressed={hasLinks}
                 className={
                   hasLinks || openIndex === index ? "is-selected" : undefined

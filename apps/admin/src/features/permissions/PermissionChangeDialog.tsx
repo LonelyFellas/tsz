@@ -1,3 +1,4 @@
+import { AdminRequestError } from "@/components/AdminRequestError";
 import { useAccessTranslation, AccessText } from "./i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -136,7 +137,7 @@ export function PermissionChangeDialog({
         recoveryStarted.current = true;
         await reread();
       } else {
-        message.error(error.message);
+        message.error(<AdminRequestError error={error} />);
       }
     } finally {
       busy.current = false;
@@ -246,7 +247,7 @@ export function PermissionChangeDialog({
       {preview.isError && !conflict && (
         <Alert
           type="error"
-          title={preview.error.message}
+          title={<AdminRequestError error={preview.error} />}
           action={
             <Button onClick={() => void preview.refetch()}>
               {t("reload")}

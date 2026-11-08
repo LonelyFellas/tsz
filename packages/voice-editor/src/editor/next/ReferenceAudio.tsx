@@ -2,7 +2,12 @@ import { useVoiceEditorTranslation } from "../i18n";
 import { Button, Space, Typography } from "@tsz/ui/admin/display";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioReview, type ReviewAudio } from "./AudioReview";
-import { AUDIO_UPLOAD_ACCEPT, preflightAudioFile } from "./audioAssets";
+import {
+  AUDIO_UPLOAD_ACCEPT,
+  preflightAudioFile,
+  audioFormatHint,
+  audioSizeHint
+} from "./audioAssets";
 
 export function ReferenceAudio({
   onPlay,
@@ -15,7 +20,13 @@ export function ReferenceAudio({
   const input = useRef<HTMLInputElement>(null);
   const active = useRef<ReviewAudio | undefined>(undefined);
   const [media, setMedia] = useState<ReviewAudio>();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<"unsupported_type" | "too_large">();
+  const errorText =
+    error === "unsupported_type"
+      ? audioFormatHint(t)
+      : error === "too_large"
+        ? audioSizeHint(t)
+        : "";
   const stop = useCallback(() => active.current?.audio.pause(), []);
   const clear = useCallback(() => {
     active.current?.audio.pause();
@@ -42,11 +53,13 @@ export function ReferenceAudio({
           if (!file) return;
           const issue = preflightAudioFile(file, undefined, t);
           if (issue) {
-            setError(issue.message);
+            setError(
+              issue.code === "too_large" ? "too_large" : "unsupported_type"
+            );
             return;
           }
           clear();
-          setError("");
+          setError(undefined);
           const url = URL.createObjectURL(file);
           const review = {
             audio: new Audio(url),
@@ -78,7 +91,9 @@ export function ReferenceAudio({
           </Button>
         )}
       </Space>
-      {error && <Typography.Text type="danger">{error}</Typography.Text>}
+      {errorText && (
+        <Typography.Text type="danger">{errorText}</Typography.Text>
+      )}
       {media && (
         <AudioReview
           key={media.result.audioUrl}

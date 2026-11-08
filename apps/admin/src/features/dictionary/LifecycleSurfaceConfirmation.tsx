@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "./i18n/editor";
 import { useLexiconListTranslation } from "@/features/dictionary/i18n/list";
 import { useFormTypeLabel } from "./part-of-speech/FormTypeLabels";
 import {
@@ -31,8 +32,13 @@ export function LifecycleSurfaceConfirmation({
   action?: "restore" | "restoreDraft" | "publish";
 }) {
   const { t } = useLexiconListTranslation();
+  const { t: editorT } = useLexiconEditorTranslation();
   const formTypeLabel = useFormTypeLabel();
-  const cards = aggregateLifecycleSurfaceMatchCards(state, formTypeLabel);
+  const cards = aggregateLifecycleSurfaceMatchCards(
+    state,
+    formTypeLabel,
+    editorT
+  );
   const groups = [
     ["visibility", t("visibility_only")],
     ["ordinary", t("homograph_only")],

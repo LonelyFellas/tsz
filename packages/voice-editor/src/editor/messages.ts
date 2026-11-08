@@ -1,4 +1,55 @@
 export const voiceEditorMessages = {
+  local_text_too_long: [
+    "正文不能超过 {{limit}} 个 Unicode 码点",
+    "正文不得超過 {{limit}} 個 Unicode 碼點",
+    "Text must not exceed {{limit}} Unicode code points"
+  ],
+  local_too_many_annotations: [
+    "标注不能超过 {{annotations}} 个",
+    "標註不得超過 {{annotations}} 個",
+    "No more than {{annotations}} annotations are allowed"
+  ],
+  local_invalid_range: [
+    "标注区间必须是正文内非空的 [start, end)",
+    "標註範圍必須是正文內非空的 [start, end)",
+    "Annotation ranges must be non-empty [start, end) ranges within the text"
+  ],
+  local_cross_paragraph: [
+    "标注不能跨越段落换行",
+    "標註不得跨越段落換行",
+    "Annotations cannot cross paragraph breaks"
+  ],
+  local_invalid_phoneme: [
+    "特殊读法的内容类型、替换文字或音素无效；音素不能为空，IPA 最多 {{ipa}}、UPS 最多 {{ups}} 个 Unicode 码点",
+    "特殊讀法的內容類型、替換文字或音素無效；音素不得為空，IPA 最多 {{ipa}}、UPS 最多 {{ups}} 個 Unicode 碼點",
+    "The special reading type, replacement text or phoneme is invalid. Phonemes cannot be empty. IPA allows {{ipa}} and UPS allows {{ups}} Unicode code points"
+  ],
+  local_overlapping_phoneme: [
+    "IPA 标注之间不能重叠",
+    "IPA 標註不得重疊",
+    "IPA annotations cannot overlap"
+  ],
+  local_crossing_speech_marks: [
+    "重音若与 IPA 重叠，必须完整包含 IPA 区间",
+    "重音若與 IPA 重疊，必須完整包含 IPA 範圍",
+    "Emphasis overlapping IPA must contain the entire IPA range"
+  ],
+  local_pause_inside_phoneme: [
+    "停顿不能插在 IPA 标注内部",
+    "停頓不得插在 IPA 標註內部",
+    "Pauses cannot be inserted inside IPA annotations"
+  ],
+  local_invalid_pause: [
+    "停顿位置必须合法，时长必须是 {{min}}–{{max}}ms 的整数",
+    "停頓位置必須有效，時長必須是 {{min}}–{{max}}ms 的整數",
+    "The pause position must be valid and its duration an integer from {{min}} to {{max}}ms"
+  ],
+  local_rich_text_invalid: [
+    "富文本标注不合法",
+    "富文字標註無效",
+    "Rich text annotations are invalid"
+  ],
+
   link: [
     "关联 {{p0}}（{{p1}}）",
     "關聯 {{p0}}（{{p1}}）",

@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   AdminUserCoinEntryPage,
   CoinEntriesQuery,
@@ -11,12 +12,12 @@ export function checkInteger(value: string) {
   const amount = BigInt(value);
   // Entry deltas originate from positive i64 amounts, so i64::MIN is also excluded.
   if (amount < -9223372036854775807n || amount > 9223372036854775807n)
-    throw new Error("天生币响应整数超出 BIGINT 范围");
+    throw new ClientResponseError("天生币响应整数超出 BIGINT 范围");
 }
 export function decodeCoinWallet(value: unknown): CoinWallet {
   const result = validateRuntimeSchema("CoinWallet", value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `钱包响应不符合接口契约：${result.path} (${result.reason})`
     );
   const wallet = value as CoinWallet;
@@ -26,7 +27,7 @@ export function decodeCoinWallet(value: unknown): CoinWallet {
 export function decodeCoinEntryPage(value: unknown): CoinEntryPage {
   const result = validateRuntimeSchema("CoinEntryPage", value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `流水响应不符合接口契约：${result.path} (${result.reason})`
     );
   const page = value as CoinEntryPage;
@@ -63,7 +64,7 @@ export function decodeUserCoinEntryPage(
 ): AdminUserCoinEntryPage {
   const result = validateRuntimeSchema("UserCoinEntryPage", value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `用户账单响应不符合接口契约：${result.path} (${result.reason})`
     );
   const page = value as AdminUserCoinEntryPage;

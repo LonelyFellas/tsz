@@ -1,3 +1,4 @@
+import { AdminRequestError } from "@/components/AdminRequestError";
 import {
   useLexiconEditorTranslation,
   defaultLexiconEditorTranslation,
@@ -126,9 +127,11 @@ export function WordSentences({
   };
   const failure = (error: unknown) => {
     void message.error(
-      error instanceof Error
-        ? error.message
-        : t("panel_operation_failed_try_again")
+      error instanceof Error ? (
+        <AdminRequestError error={error} />
+      ) : (
+        t("panel_operation_failed_try_again")
+      )
     );
   };
   const edit = async (item: SharedSentence) => {

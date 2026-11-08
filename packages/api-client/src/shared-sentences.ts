@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import { SENTENCE_FORMATTING_HEADERS } from "./sentence-formatting";
 import { createPublicationAudioEndpoints } from "./publication-audio";
 import { validateRuntimeSchema } from "./runtime-schema";
@@ -28,7 +29,7 @@ function decodeContract<T>(
 ): T {
   const result = validateRuntimeSchema(root, value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `例句响应不符合接口契约：${result.path} (${result.reason})`
     );
   return value as T;
@@ -36,7 +37,7 @@ function decodeContract<T>(
 function decodeSentence(value: unknown): SharedSentence {
   const result = validateRuntimeSchema("SharedSentence", value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `例句响应不符合接口契约：${result.path} (${result.reason})`
     );
   return value as SharedSentence;
@@ -44,7 +45,7 @@ function decodeSentence(value: unknown): SharedSentence {
 function decodeList(value: unknown): SharedSentenceList {
   const result = validateRuntimeSchema("SharedSentenceList", value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `例句列表响应不符合接口契约：${result.path} (${result.reason})`
     );
   return value as SharedSentenceList;
@@ -115,7 +116,8 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
           { headers: TEXT_VOICE_HEADERS }
         )
         .then((value) => {
-          if (!Array.isArray(value)) throw new Error("例句历史响应必须为数组");
+          if (!Array.isArray(value))
+            throw new ClientResponseError("例句历史响应必须为数组");
           return value.map((item) =>
             decodeContract<SentencePublication>("SentencePublication", item)
           );
@@ -177,7 +179,7 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
       return http.get<unknown>(`${root}/targets?${params}`).then((value) => {
         const result = validateRuntimeSchema("SentenceEntryTargets", value);
         if (!result.valid)
-          throw new Error(
+          throw new ClientResponseError(
             `关联候选响应不符合接口契约：${result.path} (${result.reason})`
           );
         return value as SentenceEntryTargets;

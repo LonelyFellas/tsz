@@ -1,6 +1,7 @@
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const tableMessages = {
+  unnamed_column: ["第 {{index}} 列", "第 {{index}} 欄", "Column {{index}}"],
   toolbar: ["表格操作", "表格操作", "Table actions"],
   settings: ["列设置", "欄位設定", "Columns"],
   settings_panel: ["表格列设置", "表格欄位設定", "Table column settings"],

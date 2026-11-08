@@ -95,7 +95,11 @@ describe("describeUploadError", () => {
       describeUploadError(
         new AudioUploadError("upload_failed", "网络错误", true)
       )
-    ).toEqual({ message: "网络错误", retryable: true });
+    ).toEqual({
+      message: "网络错误",
+      displayMessage: expect.any(Function),
+      retryable: true
+    });
     expect(describeUploadError(new Error("boom"))).toEqual({
       message: "上传失败，请重试",
       retryable: true

@@ -10,3 +10,10 @@ export * from "./i18n";
 export { decodeCoinWallet, decodeCoinEntryPage } from "./coins";
 
 export { createRequestDeadline, RequestTimeoutError } from "./deadline";
+
+export {
+  LexiconAssistantResponseError,
+  LexiconAssistantInterruptedError
+} from "./lexicon-assistant";
+
+export { ClientResponseError } from "./client-response-error";

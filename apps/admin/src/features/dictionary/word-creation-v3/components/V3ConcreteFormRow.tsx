@@ -1,3 +1,4 @@
+import { LocalLexiconError } from "../../i18n/local-error-messages";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
@@ -422,7 +423,7 @@ function V3DialectFormCell({
                 toRichTextV2(result.value)
               );
               if (!unified.ok)
-                throw new Error("词形拼写无法统一，请修复后保存");
+                throw new LocalLexiconError("local_spelling_unmergeable");
               next = replaceForm(next, unified.value);
             } else
               next = updateVariantSpelling(
@@ -1004,7 +1005,7 @@ export function V3ConcreteFormRow({
                     toRichTextV2(result.value)
                   );
                   if (!unified.ok)
-                    throw new Error("词形拼写无法统一，请修复后保存");
+                    throw new LocalLexiconError("local_spelling_unmergeable");
                   const next = updateSpellingVoiceProfile(
                     replaceForm(content, unified.value),
                     unifiedSpellingVariantIds,

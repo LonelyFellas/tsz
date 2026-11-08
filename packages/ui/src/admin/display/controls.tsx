@@ -1,3 +1,4 @@
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import {
   forwardRef,
   useState,
@@ -168,6 +169,7 @@ export function Alert({
   closable?: boolean | { "aria-label"?: string };
   onClose?: () => void;
 }) {
+  const { t } = useInterfaceTranslation();
   const [closed, setClosed] = useState(false);
   if (closed) return null;
   const Icon = {
@@ -196,8 +198,8 @@ export function Alert({
           className="ui-icon-action"
           aria-label={
             typeof closable === "object"
-              ? (closable["aria-label"] ?? "关闭")
-              : "关闭"
+              ? (closable["aria-label"] ?? t("actions.close"))
+              : t("actions.close")
           }
           onClick={() => {
             setClosed(true);

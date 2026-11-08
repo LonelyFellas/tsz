@@ -414,7 +414,7 @@ export function V3FormsAndPronunciationStep({
                       <Tooltip
                         title={
                           posReferences > 0
-                            ? referenceBlockedHint(posReferences)
+                            ? referenceBlockedHint(posReferences, t)
                             : undefined
                         }
                       >

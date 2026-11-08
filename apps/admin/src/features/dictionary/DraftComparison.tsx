@@ -54,7 +54,19 @@ export function DraftComparison({
           }
           scroll={{ x: 640 }}
           columns={[
-            { title: t("field_path"), dataIndex: "path", width: 220 },
+            {
+              title: t("field_path"),
+              dataIndex: "path",
+              width: 220,
+              render: (path: string) =>
+                path
+                  .replace(/^内容(?=\.|$)/u, t("comparison_content"))
+                  .replace(
+                    /^(.*?\.)(词形与发音|词义与例句)(?=\.|$)/u,
+                    (_, prefix: string, section: string) =>
+                      `${prefix}${t(section === "词形与发音" ? "forms" : "meanings")}`
+                  )
+            },
             {
               title: t("local_input"),
               dataIndex: "local",

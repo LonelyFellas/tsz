@@ -73,16 +73,20 @@ function ConfiguredTable<T extends object>({
   onFixedOverflowChange,
   ...props
 }: AdminTableProps<T>) {
+  const { t } = useTableTranslation();
   const definitions = columns.map((column, index) => {
-    const label =
+    const originalLabel =
       (typeof column.title !== "function" && titleText(column.title)) ||
       `第 ${index + 1} 列`;
+    const label =
+      (typeof column.title !== "function" && titleText(column.title)) ||
+      t("unnamed_column", { index: index + 1 });
     const dataIndex = "dataIndex" in column ? column.dataIndex : undefined;
     return {
       key: String(
         column.key ??
           (Array.isArray(dataIndex) ? dataIndex.join(".") : dataIndex) ??
-          label
+          originalLabel
       ),
       label,
       visible: !column.hidden,

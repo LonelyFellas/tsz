@@ -1,3 +1,5 @@
+import { VoiceEditorDisplayError } from "@tsz/voice-editor/types";
+import { speechDiagnostic } from "../../voice-editor/diagnostics";
 import { regionalVariants } from "@tsz/shared";
 import { useCallback, useMemo } from "react";
 import { expandFormContents } from "@tsz/shared";
@@ -46,7 +48,9 @@ export function useReadingPreviewAdapter(
                       )
                     ).publication.word;
                     if (target.schema_version !== 3)
-                      throw new Error("关联词形的数据版本不支持，请重新关联");
+                      throw new VoiceEditorDisplayError(
+                        speechDiagnostic("reading_version")
+                      );
                     return expandFormContents(target.forms);
                   })()
                 );
@@ -60,8 +64,10 @@ export function useReadingPreviewAdapter(
                 (variant) => variant.id === link.target_variant_id
               );
               if (!variant)
-                throw new Error(
-                  `“${link.source_segments[0]?.surface ?? ""}”关联的词形已失效，请重新关联`
+                throw new VoiceEditorDisplayError(
+                  speechDiagnostic("reading_stale", {
+                    surface: link.source_segments[0]?.surface ?? ""
+                  })
                 );
               return {
                 source_segments: link.source_segments,

@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 
 /** Adapter failures with known UI copy can be rendered again after a language change. */
 export class VoiceEditorDisplayError extends Error {
-  constructor(readonly displayMessage: () => string) {
+  constructor(readonly displayMessage: (locale?: string) => string) {
     super(displayMessage());
     this.name = "VoiceEditorDisplayError";
   }
@@ -102,13 +102,13 @@ export type VoicePreviewErrorCode =
   | "unavailable"
   | "unknown";
 
-export class VoicePreviewError extends Error {
+export class VoicePreviewError extends VoiceEditorDisplayError {
   constructor(
     public readonly code: VoicePreviewErrorCode,
-    message: string,
+    message: string | ((locale?: string) => string),
     public readonly retryable = false
   ) {
-    super(message);
+    super(typeof message === "function" ? message : () => message);
     this.name = "VoicePreviewError";
   }
 }
@@ -182,13 +182,13 @@ export type AudioUploadErrorCode =
   | "unavailable"
   | "unknown";
 
-export class AudioUploadError extends Error {
+export class AudioUploadError extends VoiceEditorDisplayError {
   constructor(
     public readonly code: AudioUploadErrorCode,
-    message: string,
+    message: string | ((locale?: string) => string),
     public readonly retryable = false
   ) {
-    super(message);
+    super(typeof message === "function" ? message : () => message);
     this.name = "AudioUploadError";
   }
 }

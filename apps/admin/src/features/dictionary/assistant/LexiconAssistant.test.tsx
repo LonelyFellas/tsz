@@ -436,3 +436,33 @@ it("英文起始问题仅翻译按钮标签，切换语言不改写已选择的�
   expect(input).toHaveValue("检查词义和例句还缺什么");
   expect(requests.askStream).not.toHaveBeenCalled();
 });
+
+it("本地协议诊断随语言更新且保留问题输入，未知服务端错误原文不变", async () => {
+  const { LexiconAssistantResponseError, HttpError } =
+    await import("@tsz/api-client");
+  const value = context();
+  const show = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      {surface(value)}
+    </InterfaceI18nProvider>
+  );
+  requests.askStream.mockRejectedValueOnce(
+    new LexiconAssistantResponseError("ended", "助手连接提前结束，请重试")
+  );
+  const view = render(show("zh-Hans"));
+  await openAndAsk("原文 question en-US");
+  await screen.findByText("助手连接提前结束，请重试");
+  view.rerender(show("en-GB"));
+  await screen.findByText("The assistant connection ended early. Try again.");
+  expect(
+    screen.getByRole("textbox", { name: "Ask the lexicon assistant" })
+  ).toHaveValue("原文 question en-US");
+  expect(requests.askStream).toHaveBeenCalledTimes(1);
+  requests.askStream.mockRejectedValueOnce(
+    new HttpError(418, "未知后端原文 detail 418")
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await screen.findByText("未知后端原文 detail 418");
+  view.rerender(show("zh-Hant"));
+  await screen.findByText("未知后端原文 detail 418");
+});

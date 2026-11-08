@@ -121,7 +121,8 @@ export function V3FormGroupSenseEditor({
                   <span className="v3-group-sense-option">
                     <span>
                       <Tag>{sense.level}</Tag>
-                      {index + 1}. {definitionSummary(sense)}
+                      {index + 1}.{" "}
+                      {definitionSummary(sense, t("empty_definition"))}
                     </span>
                     {unsaved ? (
                       <Typography.Text type="secondary">

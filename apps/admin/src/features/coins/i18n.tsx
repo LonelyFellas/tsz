@@ -1,3 +1,4 @@
+import { AdminRequestError } from "@/components/AdminRequestError";
 import { useAdminModuleTranslation } from "@/i18n";
 import { HttpError } from "@tsz/api-client";
 import { formatCoins } from "@tsz/shared";
@@ -70,7 +71,13 @@ export function CoinError({ error }: { error: unknown }) {
   if (key) return <>{t(key)}</>;
   return (
     <>
-      {error instanceof Error && error.message ? `${error.message} — ` : ""}
+      {error instanceof Error && error.message ? (
+        <>
+          <AdminRequestError error={error} /> —{" "}
+        </>
+      ) : (
+        ""
+      )}
       {t(rejected ? "rejected" : "uncertain")}
     </>
   );
