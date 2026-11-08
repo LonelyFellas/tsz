@@ -82,6 +82,7 @@ import {
 import { partOfSpeechLabel } from "./presentation";
 import {
   sortableRowClass,
+  sortableTabOffset,
   useSortableRows,
   type SortableRowsController
 } from "./sortableRows";
@@ -1201,81 +1202,88 @@ function V3MeaningsAndExamplesStepContent({
                     posSorting.handleDrop(event, displayPosIndex)
                   }
                 >
-                  <SortableDragHandle
-                    dragImageSelector=".word-pos-tab-handle"
-                    index={displayPosIndex}
-                    label={t("drag_item", {
-                      label: visiblePosLabel(posId, displayPosIndex)
-                    })}
-                    singleItemTitle={t("two_pos_required")}
-                    sorting={posSorting}
-                  />
-                  <span className="word-pos-tab-label">
-                    <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
-                    {pos ? (
-                      <Badge
-                        count={countV3PosMeaningIncomplete(
-                          pos,
-                          value,
-                          catalogByCode.get(formPosById.get(posId) ?? "")
-                            ?.sub_pos_required ?? true
-                        )}
-                        size="small"
-                        title={t("pos_issues")}
-                      />
-                    ) : null}
-                  </span>
                   <span
-                    className="word-pos-tab-actions"
-                    onClick={(event) => event.stopPropagation()}
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
+                    className="word-pos-tab-content"
+                    style={{
+                      transform: `translateX(${sortableTabOffset(posSorting, displayPosIndex)}px)`
+                    }}
                   >
-                    {addBasicPosSelect}
-                    {forms &&
-                    forms.pos.length > 1 &&
-                    forms.pos.some((formPos) => formPos.pos_id === posId) &&
-                    onFormsChange ? (
-                      <Tooltip
-                        title={
-                          posReferenceCount(posId) > 0
-                            ? referenceBlockedHint(posReferenceCount(posId))
-                            : undefined
-                        }
-                      >
-                        <Button
-                          aria-label={t("delete_item", {
-                            label: visiblePosLabel(posId, displayPosIndex)
-                          })}
-                          danger
-                          icon={<CircleMinusIcon />}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            modal.confirm({
-                              title: (
-                                <LexiconEditorText
-                                  message="delete_pos_title"
-                                  params={{
-                                    label: visiblePosLabel(
-                                      posId,
-                                      displayPosIndex
-                                    )
-                                  }}
-                                />
-                              ),
-                              content: (
-                                <LexiconEditorText message="remove_pos_help" />
-                              ),
-                              okText: <LexiconEditorText message="delete" />,
-                              okButtonProps: { danger: true },
-                              onOk: () => deleteBasicPos(posId)
-                            });
-                          }}
+                    <SortableDragHandle
+                      dragImageSelector=".word-pos-tab-handle"
+                      index={displayPosIndex}
+                      label={t("drag_item", {
+                        label: visiblePosLabel(posId, displayPosIndex)
+                      })}
+                      singleItemTitle={t("two_pos_required")}
+                      sorting={posSorting}
+                    />
+                    <span className="word-pos-tab-label">
+                      <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
+                      {pos ? (
+                        <Badge
+                          count={countV3PosMeaningIncomplete(
+                            pos,
+                            value,
+                            catalogByCode.get(formPosById.get(posId) ?? "")
+                              ?.sub_pos_required ?? true
+                          )}
                           size="small"
-                          type="text"
+                          title={t("pos_issues")}
                         />
-                      </Tooltip>
-                    ) : null}
+                      ) : null}
+                    </span>
+                    <span
+                      className="word-pos-tab-actions"
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      {addBasicPosSelect}
+                      {forms &&
+                      forms.pos.length > 1 &&
+                      forms.pos.some((formPos) => formPos.pos_id === posId) &&
+                      onFormsChange ? (
+                        <Tooltip
+                          title={
+                            posReferenceCount(posId) > 0
+                              ? referenceBlockedHint(posReferenceCount(posId))
+                              : undefined
+                          }
+                        >
+                          <Button
+                            aria-label={t("delete_item", {
+                              label: visiblePosLabel(posId, displayPosIndex)
+                            })}
+                            danger
+                            icon={<CircleMinusIcon />}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              modal.confirm({
+                                title: (
+                                  <LexiconEditorText
+                                    message="delete_pos_title"
+                                    params={{
+                                      label: visiblePosLabel(
+                                        posId,
+                                        displayPosIndex
+                                      )
+                                    }}
+                                  />
+                                ),
+                                content: (
+                                  <LexiconEditorText message="remove_pos_help" />
+                                ),
+                                okText: <LexiconEditorText message="delete" />,
+                                okButtonProps: { danger: true },
+                                onOk: () => deleteBasicPos(posId)
+                              });
+                            }}
+                            size="small"
+                            type="text"
+                          />
+                        </Tooltip>
+                      ) : null}
+                    </span>
                   </span>
                 </span>
               ),

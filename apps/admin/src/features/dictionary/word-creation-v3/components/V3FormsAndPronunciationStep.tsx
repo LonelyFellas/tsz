@@ -62,7 +62,11 @@ import {
 } from "../../word-creation/PronunciationPreview";
 import "../v3-forms.css";
 import "../posTabs.css";
-import { sortableRowClass, useSortableRows } from "../sortableRows";
+import {
+  sortableRowClass,
+  sortableTabOffset,
+  useSortableRows
+} from "../sortableRows";
 import { SortableDragHandle } from "./SortableDragHandle";
 import { V3FormContentModal } from "./V3FormContentModal";
 import { V3FormCopyProvider } from "./V3FormCopyProvider";
@@ -377,63 +381,70 @@ export function V3FormsAndPronunciationStep({
                 }
                 onDrop={(event) => posSorting.handleDrop(event, posIndex)}
               >
-                <SortableDragHandle
-                  dragImageSelector=".word-pos-tab-handle"
-                  index={posIndex}
-                  label={t("drag_item", { label: label })}
-                  singleItemTitle={t("two_pos_required")}
-                  sorting={posSorting}
-                />
-                <span className="word-pos-tab-label">
-                  <strong>{label}</strong>
-                  <Badge
-                    count={countV3PosFormIncomplete(pos)}
-                    size="small"
-                    title={t("pos_issues")}
-                  />
-                  <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
-                </span>
                 <span
-                  className="word-pos-tab-actions"
-                  onClick={(event) => event.stopPropagation()}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => event.stopPropagation()}
+                  className="word-pos-tab-content"
+                  style={{
+                    transform: `translateX(${sortableTabOffset(posSorting, posIndex)}px)`
+                  }}
                 >
-                  {addPosSelect}
-                  {value.pos.length > 1 ? (
-                    <Tooltip
-                      title={
-                        posReferences > 0
-                          ? referenceBlockedHint(posReferences)
-                          : undefined
-                      }
-                    >
-                      <Button
-                        aria-label={t("delete_item", { label: label })}
-                        danger
-                        icon={<CircleMinusIcon />}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          modal.confirm({
-                            title: (
-                              <LexiconEditorText
-                                message="delete_pos_title"
-                                params={{ label: label }}
-                              />
-                            ),
-                            content: (
-                              <LexiconEditorText message="remove_pos_impact" />
-                            ),
-                            okText: <LexiconEditorText message="delete" />,
-                            okButtonProps: { danger: true },
-                            onOk: () => deletePos(pos.pos_id)
-                          });
-                        }}
-                        size="small"
-                        type="text"
-                      />
-                    </Tooltip>
-                  ) : null}
+                  <SortableDragHandle
+                    dragImageSelector=".word-pos-tab-handle"
+                    index={posIndex}
+                    label={t("drag_item", { label: label })}
+                    singleItemTitle={t("two_pos_required")}
+                    sorting={posSorting}
+                  />
+                  <span className="word-pos-tab-label">
+                    <strong>{label}</strong>
+                    <Badge
+                      count={countV3PosFormIncomplete(pos)}
+                      size="small"
+                      title={t("pos_issues")}
+                    />
+                    <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
+                  </span>
+                  <span
+                    className="word-pos-tab-actions"
+                    onClick={(event) => event.stopPropagation()}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    {addPosSelect}
+                    {value.pos.length > 1 ? (
+                      <Tooltip
+                        title={
+                          posReferences > 0
+                            ? referenceBlockedHint(posReferences)
+                            : undefined
+                        }
+                      >
+                        <Button
+                          aria-label={t("delete_item", { label: label })}
+                          danger
+                          icon={<CircleMinusIcon />}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            modal.confirm({
+                              title: (
+                                <LexiconEditorText
+                                  message="delete_pos_title"
+                                  params={{ label: label }}
+                                />
+                              ),
+                              content: (
+                                <LexiconEditorText message="remove_pos_impact" />
+                              ),
+                              okText: <LexiconEditorText message="delete" />,
+                              okButtonProps: { danger: true },
+                              onOk: () => deletePos(pos.pos_id)
+                            });
+                          }}
+                          size="small"
+                          type="text"
+                        />
+                      </Tooltip>
+                    ) : null}
+                  </span>
                 </span>
               </span>
             ),

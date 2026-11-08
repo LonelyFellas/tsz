@@ -34,7 +34,50 @@ export function SortableDragHandle({
         sorting.handleDragStart(event, index);
         const row = event.currentTarget.closest<HTMLElement>(dragImageSelector);
         if (row && typeof event.dataTransfer.setDragImage === "function") {
-          event.dataTransfer.setDragImage(row, 24, 24);
+          if (dragImageSelector === ".word-pos-tab-handle") {
+            const rect = row.getBoundingClientRect();
+            const preview = row.cloneNode(true) as HTMLElement;
+            preview.classList.replace(
+              "word-pos-tab-handle",
+              "word-pos-tab-preview"
+            );
+            preview
+              .querySelectorAll("[aria-label], [id]")
+              .forEach((element) => {
+                element.removeAttribute("aria-label");
+                element.removeAttribute("id");
+              });
+            preview.inert = true;
+            const content = preview.querySelector<HTMLElement>(
+              ".word-pos-tab-content"
+            );
+            const originalContent = row.querySelector<HTMLElement>(
+              ".word-pos-tab-content"
+            );
+            preview.setAttribute("aria-hidden", "true");
+            Object.assign(preview.style, {
+              position: "fixed",
+              left: "-10000px",
+              top: "0",
+              width: `${rect.width}px`,
+              color: getComputedStyle(row).color,
+              font: getComputedStyle(row).font
+            });
+            if (content && originalContent) {
+              content.style.background =
+                getComputedStyle(originalContent).background;
+              content.style.transform = "none";
+            }
+            document.body.appendChild(preview);
+            event.dataTransfer.setDragImage(
+              preview,
+              event.clientX - rect.left,
+              event.clientY - rect.top
+            );
+            requestAnimationFrame(() => preview.remove());
+          } else {
+            event.dataTransfer.setDragImage(row, 24, 24);
+          }
         }
       }}
       onKeyDown={(event) => sorting.handleKeyDown(event, index)}
