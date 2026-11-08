@@ -169,6 +169,11 @@
   gap: 32px;
 }
 
+.admin-login__panel > .admin-language .admin-language__label,
+.admin-login__panel > .admin-language .admin-language__notice {
+  color: #d2def5;
+}
+
 .admin-login__header {
   display: flex;
   justify-content: flex-end;

@@ -47,12 +47,52 @@ vi.mock("@/lib/auth", async () => {
 
 import { AdminLoginForm } from "./AdminLoginForm";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { adminShellResources } from "@/i18n/resources";
 
 const mockLogin = vi.mocked(api.auth.login);
 const mockRequestCode = vi.mocked(api.auth.requestLoginCode);
 const mockProfile = vi.mocked(api.profile);
 const mockPersist = vi.mocked(persistSession);
 const mockSetAccessToken = vi.mocked(tokens.setAccessToken);
+
+it("切换语言保留登录输入、验证码倒计时和已出现的凭证错误", async () => {
+  mockRequestCode.mockResolvedValueOnce(undefined);
+  mockLogin.mockRejectedValueOnce(new HttpError(401, "invalid credentials"));
+  const content = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale} resources={adminShellResources}>
+      <AdminLoginForm />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.change(screen.getByPlaceholderText("请输入手机号"), {
+    target: { value: "13800138000" }
+  });
+  fireEvent.change(screen.getByPlaceholderText("请输入密码"), {
+    target: { value: "Test password unchanged" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "获取验证码" }));
+  await screen.findByRole("button", { name: "60s 后重发" });
+  fireEvent.change(screen.getByPlaceholderText("请输入验证码"), {
+    target: { value: "123456" }
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "登录" }).closest("form")!
+  );
+  await screen.findByRole("alert");
+  view.rerender(content("en-US"));
+  expect(screen.getByDisplayValue("13800138000")).toBeInTheDocument();
+  expect(
+    screen.getByDisplayValue("Test password unchanged")
+  ).toBeInTheDocument();
+  expect(screen.getByDisplayValue("123456")).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    adminShellResources.en.adminShell.auth_credentials
+  );
+  expect(screen.getByRole("button", { name: /60s/ })).toBeDisabled();
+  expect(mockRequestCode).toHaveBeenCalledOnce();
+  expect(mockLogin).toHaveBeenCalledOnce();
+});
 
 // admin login 响应对齐后端 AdminLoginResponse：admin_profile(含 role) + 平铺 token + 死线。
 // 顶层无 level、无 must_change_password（后端 must_change 守卫未落地，恒 undefined）。

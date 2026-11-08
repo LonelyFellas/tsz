@@ -6,6 +6,8 @@ import { interfacePreferences } from "./lib/interface-preferences";
 import { useAuthStore } from "./lib/auth";
 import { router } from "./router";
 import "./globals.css";
+import { adminShellResources } from "./i18n";
+import { AdminLocaleEffects } from "./i18n/effects";
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("找不到 #root 挂载点");
@@ -16,7 +18,9 @@ function AdminApp() {
     <InterfacePreferencesProvider
       controller={interfacePreferences}
       sessionKey={sessionKey}
+      resources={adminShellResources}
     >
+      <AdminLocaleEffects />
       <RouterProvider router={router} />
     </InterfacePreferencesProvider>
   );

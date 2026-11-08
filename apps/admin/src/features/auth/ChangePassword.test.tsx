@@ -31,11 +31,49 @@ vi.mock("./useAdminLogout", () => ({ useAdminLogout: () => mockLogout }));
 
 import { ChangePassword } from "./ChangePassword";
 import { api, useAuthStore } from "@/lib/auth";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { adminShellResources } from "@/i18n/resources";
 
 // 含 antd 表单校验 + 异步 mutation + message 门户，覆盖率插桩下偏慢，放宽超时。
 vi.setConfig({ testTimeout: 15000 });
 
 const mockChange = vi.mocked(api.auth.changePassword);
+
+it("切换语言保留密码值并即时翻译已显示的校验错误，不发起修改", async () => {
+  const content = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale} resources={adminShellResources}>
+      <FeedbackApp>
+        <ChangePassword />
+      </FeedbackApp>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fillCurrent("ExistingPassword2026");
+  fillNew("short", "different");
+  submit();
+  await screen.findByText(
+    adminShellResources["zh-Hans"].adminShell.password_too_short.replace(
+      "{{min}}",
+      "15"
+    )
+  );
+  view.rerender(content("en-US"));
+  expect(screen.getByDisplayValue("ExistingPassword2026")).toBeInTheDocument();
+  expect(screen.getByDisplayValue("short")).toBeInTheDocument();
+  expect(screen.getByDisplayValue("different")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      adminShellResources.en.adminShell.password_too_short.replace(
+        "{{min}}",
+        "15"
+      )
+    )
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(adminShellResources.en.adminShell.password_mismatch)
+  ).toBeInTheDocument();
+  expect(mockChange).not.toHaveBeenCalled();
+});
 
 const PROFILE = {
   id: "a1",

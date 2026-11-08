@@ -1,6 +1,7 @@
 import RcCollapse, {
   type CollapseProps as RcCollapseProps
 } from "@rc-component/collapse";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import RcImage, { type ImageProps } from "@rc-component/image";
 import RcTabs, { type TabsProps as RcTabsProps } from "@rc-component/tabs";
 import {
@@ -16,13 +17,16 @@ import {
   ZoomOut
 } from "lucide-react";
 import {
+  Children,
   cloneElement,
   createContext,
+  isValidElement,
   useContext,
   useLayoutEffect,
   useState,
   type ComponentProps,
-  type ReactElement
+  type ReactElement,
+  type ReactNode
 } from "react";
 import "@rc-component/image/assets/index.css";
 import "./disclosure.css";
@@ -38,6 +42,7 @@ export function Tabs({
   className,
   ...props
 }: TabsProps) {
+  const { t } = useInterfaceTranslation();
   const position =
     tabPlacement === "start"
       ? "left"
@@ -51,8 +56,13 @@ export function Tabs({
       tabPosition={position}
       className={[`ui-tabs-${size}`, className].filter(Boolean).join(" ")}
       animated={false}
-      locale={{ dropdownAriaLabel: "更多标签页" }}
-      more={{ icon: <Ellipsis size={18} aria-hidden="true" /> }}
+      locale={{ dropdownAriaLabel: t("controls.moreTabs"), ...props.locale }}
+      more={{
+        icon: (
+          <Ellipsis size={18} role="img" aria-label={t("controls.moreTabs")} />
+        ),
+        ...props.more
+      }}
     />
   );
 }
@@ -86,22 +96,77 @@ export function Collapse({
   );
 }
 
-const icons = {
-  close: <X size={20} aria-label="关闭预览" role="img" />,
-  prev: <ChevronLeft size={20} aria-label="上一张" role="img" />,
-  next: <ChevronRight size={20} aria-label="下一张" role="img" />,
-  flipX: <FlipHorizontal size={20} aria-label="水平翻转" role="img" />,
-  flipY: <FlipVertical size={20} aria-label="垂直翻转" role="img" />,
-  rotateLeft: <RotateCcw size={20} aria-label="向左旋转" role="img" />,
-  rotateRight: <RotateCw size={20} aria-label="向右旋转" role="img" />,
-  zoomOut: <ZoomOut size={20} aria-label="缩小" role="img" />,
-  zoomIn: <ZoomIn size={20} aria-label="放大" role="img" />
-};
+function usePreviewIcons() {
+  const { t } = useInterfaceTranslation();
+  return {
+    close: <X size={20} aria-label={t("controls.closePreview")} role="img" />,
+    prev: (
+      <ChevronLeft
+        size={20}
+        aria-label={t("controls.imagePrevious")}
+        role="img"
+      />
+    ),
+    next: (
+      <ChevronRight size={20} aria-label={t("controls.imageNext")} role="img" />
+    ),
+    flipX: (
+      <FlipHorizontal
+        size={20}
+        aria-label={t("controls.flipHorizontal")}
+        role="img"
+      />
+    ),
+    flipY: (
+      <FlipVertical
+        size={20}
+        aria-label={t("controls.flipVertical")}
+        role="img"
+      />
+    ),
+    rotateLeft: (
+      <RotateCcw size={20} aria-label={t("controls.rotateLeft")} role="img" />
+    ),
+    rotateRight: (
+      <RotateCw size={20} aria-label={t("controls.rotateRight")} role="img" />
+    ),
+    zoomOut: (
+      <ZoomOut size={20} aria-label={t("controls.zoomOut")} role="img" />
+    ),
+    zoomIn: <ZoomIn size={20} aria-label={t("controls.zoomIn")} role="img" />
+  };
+}
+
+function usePreviewActions() {
+  const { t } = useInterfaceTranslation();
+  const labels: Record<string, string> = {
+    flipX: t("controls.flipHorizontal"),
+    flipY: t("controls.flipVertical"),
+    rotateLeft: t("controls.rotateLeft"),
+    rotateRight: t("controls.rotateRight"),
+    zoomOut: t("controls.zoomOut"),
+    zoomIn: t("controls.zoomIn")
+  };
+  return (original: ReactElement) => {
+    const actions = original as ReactElement<{ children?: ReactNode }>;
+    return cloneElement(
+      actions,
+      {},
+      Children.map(actions.props.children, (child) => {
+        if (!isValidElement<{ "aria-label"?: string }>(child)) return child;
+        const label = labels[child.props["aria-label"] ?? ""];
+        return label ? cloneElement(child, { "aria-label": label }) : child;
+      })
+    );
+  };
+}
 
 // 图片组原语只把 src 传给大图回调。保留缩略图的可及名称，便于区分证书与身份材料。
 const GroupImageLabels = createContext<Map<string, string> | null>(null);
 
 export function Image({ preview, alt, src, ...props }: ImageProps) {
+  const icons = usePreviewIcons();
+  const actionsRender = usePreviewActions();
   const labels = useContext(GroupImageLabels);
   useLayoutEffect(() => {
     if (!labels || !src || !alt) return;
@@ -118,7 +183,11 @@ export function Image({ preview, alt, src, ...props }: ImageProps) {
       preview={
         preview === false
           ? false
-          : { icons, ...(typeof preview === "object" ? preview : {}) }
+          : {
+              icons,
+              actionsRender,
+              ...(typeof preview === "object" ? preview : {})
+            }
       }
     />
   );
@@ -128,6 +197,9 @@ Image.PreviewGroup = function PreviewGroup({
   preview,
   ...props
 }: ComponentProps<typeof RcImage.PreviewGroup>) {
+  const icons = usePreviewIcons();
+  const actionsRender = usePreviewActions();
+  const { t } = useInterfaceTranslation();
   const [labels] = useState(() => new Map<string, string>());
   return (
     <GroupImageLabels.Provider value={labels}>
@@ -138,7 +210,8 @@ Image.PreviewGroup = function PreviewGroup({
           preview === false
             ? false
             : {
-                alt: "图片预览",
+                alt: t("controls.imagePreview"),
+                actionsRender,
                 imageRender: (node, { image }) =>
                   cloneElement(node as ReactElement<{ alt?: string }>, {
                     alt: labels.get(image.url) ?? image.alt
