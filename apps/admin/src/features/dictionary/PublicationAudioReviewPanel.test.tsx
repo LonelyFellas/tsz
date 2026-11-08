@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import {
   act,
   fireEvent,
@@ -279,4 +281,57 @@ it("supports frontend-first rollout only when the old API endpoint is absent", a
   fireEvent.click(await screen.findByRole("button", { name: "重新检查音频" }));
   await screen.findByText("unavailable");
   expect(ready).toHaveBeenLastCalledWith(false);
+});
+
+it("共享播放器本地加载错误跨语言即时更新，不重新检查或请求音频", async () => {
+  const players: Array<{ onerror: (() => void) | null }> = [];
+  vi.stubGlobal(
+    "Audio",
+    class {
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      pause = vi.fn();
+      play = vi.fn(async () => {});
+      constructor() {
+        players.push(this);
+      }
+    }
+  );
+  const endpoint = requests(),
+    resolver = vi
+      .fn()
+      .mockResolvedValue({ url: "https://audio.example.test/final.mp3" }),
+    ready = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <PublicationAudioReviewPanel
+        owner="entry"
+        id={id}
+        revision={1}
+        canConfirm
+        onReady={ready}
+        requests={endpoint}
+        resolveAudio={resolver}
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "连续试听" })).toBeEnabled()
+  );
+  fireEvent.click(screen.getByRole("button", { name: "连续试听" }));
+  await waitFor(() => expect(resolver).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(players).toHaveLength(1));
+  await act(async () => players[0]!.onerror?.());
+  expect(await screen.findByText("正式音频加载失败，请重新检查")).toBeVisible();
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByText("Could not load final audio. Check again.")
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Confirm audio batch" })
+  ).toBeDisabled();
+  expect(endpoint.check).toHaveBeenCalledTimes(1);
+  expect(resolver).toHaveBeenCalledTimes(1);
+  expect(synthesize).not.toHaveBeenCalled();
 });

@@ -1,3 +1,8 @@
+import {
+  useLexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage as uiMessage
+} from "./i18n/editor";
 import { useCallback, useRef, useState } from "react";
 import { Alert, List, Space, Typography, Button } from "@tsz/ui/admin/display";
 import { Modal } from "@tsz/ui/admin/overlays";
@@ -41,6 +46,7 @@ export function BatchPublicationModal({
   onClose: () => void;
   onPublished: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const profile = useAuthStore((state) => state.profile);
   const canReadSentences = hasAdminPermission(profile, "sentences.access");
   const canPublishSentence = (sentence: SharedSentence) =>
@@ -85,7 +91,7 @@ export function BatchPublicationModal({
   const key = useRef(crypto.randomUUID());
   const busy = useRef(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useLexiconEditorMessageState();
   const [audioReadyScope, setAudioReadyScope] = useState<string>();
   const [attemptLocked, setAttemptLocked] = useState(false);
   const audioTargets: PublicationAudioTarget[] = [
@@ -160,16 +166,22 @@ export function BatchPublicationModal({
           setSurface(undefined);
           const name = rows.find((row) => row.id === entryId);
           const sentenceId = failure.meta?.sentence_id;
+          const message = failure.field_issues[0]?.message ?? failure.message;
           setError(
-            `${name ? `「${wordListLabel(name)}」：` : sentenceId ? `例句 ${sentenceId}：` : ""}${failure.field_issues[0]?.message ?? failure.message}`
+            name
+              ? uiMessage("batch_entry_error", {
+                  label: wordListLabel(name),
+                  message
+                })
+              : sentenceId
+                ? uiMessage("batch_sentence_error", { id: sentenceId, message })
+                : message
           );
           // Reopen from refreshed, explicitly reselected records after deterministic failures.
           setConflict(true);
         }
       } else {
-        setError(
-          "发布结果暂时未知。请再次点击「发布所选」确认结果；重试会复用同一请求，不会重复创建发布版本。"
-        );
+        setError(uiMessage("batch_unknown_result"));
       }
     } finally {
       busy.current = false;
@@ -180,18 +192,21 @@ export function BatchPublicationModal({
   return (
     <Modal
       open
-      title={`发布所选 ${rows.length} 个词条、${sentenceRows.length} 条例句`}
+      title={t("batch_title", {
+        entries: t("batch_entry_count", { count: rows.length }),
+        sentences: t("batch_sentence_count", { count: sentenceRows.length })
+      })}
       width={720}
       onCancel={onClose}
       cancelButtonProps={{ disabled: pending }}
       closable={!pending}
       keyboard={!pending}
       mask={{ closable: false }}
-      cancelText="取消"
-      okText="发布所选"
+      cancelText={t("batch_cancel")}
+      okText={t("batch_publish")}
       confirmLoading={pending}
       okButtonProps={{
-        "aria-label": "发布所选",
+        "aria-label": t("batch_publish"),
         disabled:
           !allowed ||
           !audioReady ||
@@ -205,8 +220,8 @@ export function BatchPublicationModal({
       <Space orientation="vertical" style={{ width: "100%" }}>
         <Alert
           type="info"
-          title="全部成功或全部不发布"
-          description="仅发布明确选择的词条和例句，不会自动加入依赖。合计最多 50 项，任何一项失败都不发布。"
+          title={t("batch_atomic_title")}
+          description={t("batch_atomic_help")}
         />
         <List
           size="small"
@@ -220,12 +235,10 @@ export function BatchPublicationModal({
           onStart={() => setStarted(true)}
           onReady={onAudioReady}
         />
-        <Typography.Text>
-          一起发布的例句草稿（明确选择，不自动收录）
-        </Typography.Text>
+        <Typography.Text>{t("batch_sentences")}</Typography.Text>
         <Input
-          aria-label="查找待发布例句"
-          placeholder="按 ID 或正文查找例句"
+          aria-label={t("batch_search_label")}
+          placeholder={t("batch_search_placeholder")}
           disabled={started || !canReadSentences}
           value={keyword}
           onChange={(event) => {
@@ -235,7 +248,7 @@ export function BatchPublicationModal({
         />
         <Select
           mode="multiple"
-          aria-label="选择一起发布的例句"
+          aria-label={t("batch_select_sentences")}
           style={{ width: "100%" }}
           disabled={started || !canReadSentences}
           loading={candidates.isFetching}
@@ -250,13 +263,19 @@ export function BatchPublicationModal({
           ).map((row) => ({
             value: row.id,
             disabled: !canPublishSentence(row),
-            label: `${editableEnglishText(row.content.sentence.en_text)
-              .map((variant) => variant.text)
-              .join(" / ")
-              .slice(
-                0,
-                100
-              )} · ${row.id.slice(0, 8)} · 草稿 v${row.revision}${row.withdrawn_at ? "（已下架，发布不会恢复）" : ""}`
+            label: t(
+              row.withdrawn_at
+                ? "batch_candidate_withdrawn"
+                : "batch_candidate",
+              {
+                text: editableEnglishText(row.content.sentence.en_text)
+                  .map((variant) => variant.text)
+                  .join(" / ")
+                  .slice(0, 100),
+                id: row.id.slice(0, 8),
+                revision: row.revision
+              }
+            )
           }))}
           onChange={(ids: string[]) => {
             const available = new Map(
@@ -280,9 +299,11 @@ export function BatchPublicationModal({
         {candidates.isError && (
           <Alert
             type="error"
-            title="例句候选加载失败"
+            title={t("batch_candidates_failed")}
             action={
-              <Button onClick={() => void candidates.refetch()}>重试</Button>
+              <Button onClick={() => void candidates.refetch()}>
+                {t("batch_retry")}
+              </Button>
             }
           />
         )}
@@ -296,14 +317,10 @@ export function BatchPublicationModal({
           onChange={setPage}
         />
         {rows.length + sentenceRows.length > 50 && (
-          <Alert type="warning" title="词条与例句合计不能超过 50 项" />
+          <Alert type="warning" title={t("batch_too_many")} />
         )}
         {error && <Alert type="error" title={error} />}
-        {conflict && (
-          <Typography.Text>
-            请关闭此窗口，刷新列表并重新选择、确认当前版本。
-          </Typography.Text>
-        )}
+        {conflict && <Typography.Text>{t("batch_reselect")}</Typography.Text>}
         {surface && (
           <LifecycleSurfaceConfirmation
             action="publish"
@@ -329,7 +346,7 @@ export function BatchPublicationModal({
             onRestart={() => {
               setSurface(undefined);
               setConflict(true);
-              setError("同名确认已失效，请刷新列表后重新选择。");
+              setError(uiMessage("batch_surface_expired"));
             }}
           />
         )}

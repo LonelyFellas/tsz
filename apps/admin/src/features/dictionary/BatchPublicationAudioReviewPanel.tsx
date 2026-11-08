@@ -1,4 +1,11 @@
 import {
+  useLexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage as uiMessage,
+  lexiconEditorMessageText,
+  type LexiconEditorMessage
+} from "./i18n/editor";
+import {
   Alert,
   Button,
   Card,
@@ -10,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PublicationAudioReview } from "@tsz/types";
 import { api } from "@/lib/auth";
-import { publicationAudioIssueLabels } from "./PublicationAudioReviewPanel";
+import { audioIssueLabels } from "./PublicationAudioReviewPanel";
 import {
   usePublicationAudioPlayback,
   type PublicationAudioResolver
@@ -48,7 +55,7 @@ interface Props {
 interface Row {
   target: PublicationAudioTarget;
   review?: PublicationAudioReview;
-  error?: string;
+  error?: string | LexiconEditorMessage;
   retry?: "check" | "confirm";
   legacyService?: boolean;
 }
@@ -88,11 +95,12 @@ function BatchReview({
   requestsFor = endpoints,
   resolveAudio
 }: Props) {
+  const { t } = useLexiconEditorTranslation();
   const [rows, setRows] = useState<Row[]>(() =>
     targets.map((target) => ({ target }))
   );
   const [busy, setBusy] = useState<"check" | "confirm">();
-  const [playError, setPlayError] = useState<string>();
+  const [playError, setPlayError] = useLexiconEditorMessageState();
   const request = useRef<AbortController | null>(null);
   const readyCallback = useRef(onReady);
   readyCallback.current = onReady;
@@ -190,8 +198,12 @@ function BatchReview({
                 result.manifest.manifest_hash !==
                   row.review!.manifest.manifest_hash))
           )
-            throw new Error("返回的音频清单与所选版本不一致，请重新检查");
-          next[index] = { target: row.target, review: result };
+            next[index] = {
+              ...row,
+              error: uiMessage("batch_audio_manifest_mismatch"),
+              retry: mode === "check" ? "check" : "confirm"
+            };
+          else next[index] = { target: row.target, review: result };
         } catch (failure) {
           if (controller.signal.aborted) return;
           if (
@@ -208,7 +220,7 @@ function BatchReview({
             error:
               failure instanceof Error
                 ? failure.message
-                : "音频操作失败，请重试",
+                : uiMessage("batch_audio_operation_failed"),
             retry:
               mode === "check" ||
               (failure instanceof HttpError && failure.status < 500)
@@ -226,13 +238,16 @@ function BatchReview({
   }
 
   return (
-    <Card size="small" title="所选内容的发布音频">
+    <Card size="small" title={t("batch_audio_title")}>
       <Space orientation="vertical" style={{ width: "100%" }}>
         <Typography.Text type="secondary">
-          按冻结的版本检查音频。已确认项目直接复用；其余项目集中审听后，一次确认。确认部分成功时会保留结果，正式发布仍须全部通过。
+          {t("batch_audio_help")}
         </Typography.Text>
         <Typography.Text>
-          可提交 {rows.filter(complete).length} / {rows.length} 项
+          {t("batch_audio_progress", {
+            ready: rows.filter(complete).length,
+            total: rows.length
+          })}
         </Typography.Text>
         {playError && <Alert type="error" showIcon title={playError} />}
         <List
@@ -250,27 +265,23 @@ function BatchReview({
                   }
                 >
                   {row.legacyService
-                    ? "当前服务未提供音频确认，正式发布仍由服务端检查"
-                    : (row.error ??
+                    ? t("batch_audio_legacy")
+                    : (lexiconEditorMessageText(row.error, t) ??
                       (complete(row)
-                        ? "音频已就绪"
+                        ? t("batch_audio_ready")
                         : !row.review
-                          ? "尚未检查"
+                          ? t("batch_audio_unchecked")
                           : !row.review.manifest.ready
                             ? [
                                 ...new Set(
                                   row.review.manifest.items.flatMap((item) =>
-                                    item.issue
-                                      ? [
-                                          publicationAudioIssueLabels[
-                                            item.issue
-                                          ]
-                                        ]
-                                      : []
+                                    item.issue ? [item.issue] : []
                                   )
                                 )
-                              ].join("；")
-                            : "待集中审听确认"))}
+                              ]
+                                .map((issue) => audioIssueLabels(t)[issue])
+                                .join("；")
+                            : t("batch_audio_awaiting")))}
                 </Typography.Text>
               </Space>
             </List.Item>
@@ -292,7 +303,7 @@ function BatchReview({
                     void playback.audition([index]);
                   }}
                 >
-                  试听
+                  {t("batch_audio_audition")}
                 </Button>
               ]}
             >
@@ -300,19 +311,19 @@ function BatchReview({
                 {target.label} ·{" "}
                 {item.source?.content.text ??
                   item.setting?.version_name ??
-                  `音频 ${index + 1}`}
+                  t("batch_audio_number", { index: index + 1 })}
               </Typography.Text>
             </List.Item>
           )}
         />
         <Space wrap>
           <Button
-            aria-label="检查所选音频"
+            aria-label={t("batch_audio_check")}
             disabled={!allowed || locked || !!busy || !validScope}
             loading={busy === "check"}
             onClick={() => void run("check")}
           >
-            检查所选音频
+            {t("batch_audio_check")}
           </Button>
           <Button
             disabled={locked || !!busy || pendingAudio.length === 0}
@@ -321,21 +332,21 @@ function BatchReview({
               void playback.audition(pendingAudio.map((_, index) => index));
             }}
           >
-            连续试听待确认音频
+            {t("batch_audio_play_all")}
           </Button>
           {playback.playing !== undefined && (
-            <Button onClick={stop}>停止试听</Button>
+            <Button onClick={stop}>{t("batch_audio_stop")}</Button>
           )}
           <Button
             type="primary"
-            aria-label="确认所选音频"
+            aria-label={t("batch_audio_confirm")}
             disabled={
               !allowed || locked || !!busy || !canConfirm || !!playError
             }
             loading={busy === "confirm"}
             onClick={() => void run("confirm")}
           >
-            确认所选音频
+            {t("batch_audio_confirm")}
           </Button>
         </Space>
       </Space>

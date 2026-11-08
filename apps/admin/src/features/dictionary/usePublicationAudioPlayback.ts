@@ -1,4 +1,7 @@
-import { useLexiconEditorTranslation } from "./i18n/editor";
+import {
+  createLexiconEditorMessage as uiMessage,
+  type LexiconEditorMessage
+} from "./i18n/editor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicationAudioRequirement } from "@tsz/types";
 import { api } from "@/lib/auth";
@@ -13,10 +16,9 @@ let stopActiveReview: (() => void) | undefined;
 
 export function usePublicationAudioPlayback(
   items: readonly PublicationAudioRequirement[],
-  onFailure: (message: string) => void,
+  onFailure: (message: string | LexiconEditorMessage) => void,
   resolveAudio: PublicationAudioResolver = resolveAsset
 ) {
-  const { t } = useLexiconEditorTranslation();
   const [playing, setPlaying] = useState<number>();
   const playback = useRef<AbortController | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
@@ -38,6 +40,7 @@ export function usePublicationAudioPlayback(
     };
     stopActiveReview = stopThis;
     const seen = new Set<string>();
+    let failedToLoad = false;
     try {
       for (const index of indices) {
         const item = items[index];
@@ -64,9 +67,8 @@ export function usePublicationAudioPlayback(
           };
           audio.onerror = () => {
             cleanup();
-            reject(
-              new Error(t("panel_could_not_load_final_audio_check_again"))
-            );
+            failedToLoad = true;
+            reject(new Error("Final audio failed to load"));
           };
           controller.signal.addEventListener("abort", cancelled, {
             once: true
@@ -81,9 +83,11 @@ export function usePublicationAudioPlayback(
     } catch (failure) {
       if (!controller.signal.aborted) {
         failureCallback.current(
-          failure instanceof Error
-            ? failure.message
-            : t("panel_audio_playback_failed_try_again")
+          failedToLoad
+            ? uiMessage("panel_could_not_load_final_audio_check_again")
+            : failure instanceof Error
+              ? failure.message
+              : uiMessage("panel_audio_playback_failed_try_again")
         );
       }
     } finally {

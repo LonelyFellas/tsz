@@ -1,3 +1,4 @@
+import { batchPublicationMessages } from "./batch-publication-messages";
 import { publishingWorkspaceMessages } from "./publishing-workspace-messages";
 import { useState } from "react";
 import { lexiconEditorPanelMessages } from "./editor-panel-messages";
@@ -6,6 +7,7 @@ import { useAdminModuleTranslation } from "@/i18n";
 export const lexiconEditorMessages = {
   ...lexiconEditorPanelMessages,
   ...publishingWorkspaceMessages,
+  ...batchPublicationMessages,
   add_pos_group: [
     "新增{{pos}}变化组",
     "新增{{pos}}變化組",
