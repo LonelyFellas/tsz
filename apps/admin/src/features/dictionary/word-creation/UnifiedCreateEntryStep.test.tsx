@@ -1088,7 +1088,9 @@ describe("UnifiedCreateEntryStep", () => {
     fireEvent.change(input(), { target: { value: "invented" } });
     fireEvent.click(screen.getByText("词典检测"));
     expect(await screen.findByText("确认英美主词")).toBeVisible();
-    expect(screen.getByLabelText("英美通用主词")).toHaveValue("invented");
+    expect(await screen.findByLabelText("英美通用主词")).toHaveValue(
+      "invented"
+    );
     expect(screen.getByText("来源：本次输入")).toBeVisible();
     expect(notFoundRequests.createV3).not.toHaveBeenCalled();
     unmount();
