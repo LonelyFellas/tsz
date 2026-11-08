@@ -110,21 +110,24 @@ export function meaningsRequireFormsSave(
   return false;
 }
 
-export function definitionSummary(sense: {
-  definitions: readonly WordDefinitionV3[];
-}): string {
+export function definitionSummary(
+  sense: {
+    definitions: readonly WordDefinitionV3[];
+  },
+  fallback = "待填写释义"
+): string {
   const definition = sense.definitions[0];
-  if (!definition) return "待填写释义";
+  if (!definition) return fallback;
   if (
     definition.definition_mode === "zh_definition" ||
     definition.definition_mode === "zh_sentence"
   ) {
-    return definition.content.text.trim() || "待填写释义";
+    return definition.content.text.trim() || fallback;
   }
   return (
     editableEnglishText(definition.content as EnglishTextV3).find((row) =>
       row.text.trim()
-    )?.text ?? "待填写释义"
+    )?.text ?? fallback
   );
 }
 

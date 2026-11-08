@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { Button, Tag, Typography } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
@@ -17,10 +18,11 @@ export function SenseSectionTitle({
   onToggle: () => void;
   extra?: ReactNode;
 }) {
+  const { t } = useLexiconEditorTranslation();
   return (
     <div
       aria-expanded={!collapsed}
-      aria-label={`切换${label}`}
+      aria-label={t("toggle_section", { label: label })}
       className="word-sense-section-title is-interactive"
       onClick={onToggle}
       onKeyDown={(event) => {
@@ -37,7 +39,10 @@ export function SenseSectionTitle({
         {extra}
         <Tag>{`${count} ${unit}`}</Tag>
         <Button
-          aria-label={`${collapsed ? "展开" : "收起"}${label}`}
+          aria-label={t("toggle_label", {
+            action: collapsed ? t("expand") : t("collapse"),
+            label: label
+          })}
           className="word-sense-section-collapse"
           icon={collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
           iconPlacement="end"
@@ -48,7 +53,7 @@ export function SenseSectionTitle({
           size="small"
           type="text"
         >
-          {collapsed ? "展开" : "收起"}
+          {collapsed ? t("expand") : t("collapse")}
         </Button>
       </div>
     </div>

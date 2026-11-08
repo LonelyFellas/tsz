@@ -1,3 +1,4 @@
+import { useTableTranslation } from "@/components/table-i18n";
 import { Button, Empty } from "@tsz/ui/admin/display";
 
 export function TableEmptyState({
@@ -9,13 +10,14 @@ export function TableEmptyState({
   filtered?: boolean;
   onResetFilters?: () => void;
 }) {
+  const { t } = useTableTranslation();
   return (
     <Empty
       image={Empty.PRESENTED_IMAGE_SIMPLE}
-      description={filtered ? "未找到符合条件的数据" : message}
+      description={filtered ? t("no_matches") : message}
     >
       {filtered && onResetFilters && (
-        <Button onClick={onResetFilters}>重置筛选</Button>
+        <Button onClick={onResetFilters}>{t("reset_filters")}</Button>
       )}
     </Empty>
   );

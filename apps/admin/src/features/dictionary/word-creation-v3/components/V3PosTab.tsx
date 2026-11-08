@@ -1,4 +1,6 @@
 import { primaryRegionalVariant } from "@tsz/shared";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { localizedCatalogName } from "../../part-of-speech/catalog";
 import { PlusIcon } from "lucide-react";
 import {
   Alert,
@@ -98,7 +100,10 @@ export function V3PosTab({
     groupId: string;
     message: string;
   }>();
-  const posLabel = posCatalog?.name_zh ?? partOfSpeechLabel(pos.pos);
+  const { t, i18n } = useLexiconEditorTranslation();
+  const posLabel = posCatalog
+    ? localizedCatalogName(posCatalog, i18n.language)
+    : partOfSpeechLabel(pos.pos);
   const { preference } = useDialectPreference();
   const referenceGuard = useV3ReferenceGuard();
   const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];
@@ -449,7 +454,7 @@ export function V3PosTab({
       )}
       {!posCatalog || allowedDerivedTypes.length > 0 ? (
         <Button
-          aria-label={`新增${posLabel}变化组`}
+          aria-label={t("add_pos_group", { pos: posLabel })}
           block
           className="word-form-add-group"
           icon={<PlusIcon />}
@@ -457,7 +462,7 @@ export function V3PosTab({
           size="large"
           type="dashed"
         >
-          增加一组词性变化
+          {t("add_form_group")}
         </Button>
       ) : null}
     </Flex>

@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
   ChevronDownIcon,
@@ -40,12 +41,11 @@ import { useV3ReferenceGuard } from "../referenceGuardContext";
 import {
   V3FormContentOverview,
   formOverviewTableId,
-  formOverviewColumnSettings
+  formOverviewColumnSettings,
+  formOverviewColumnMessages
 } from "./V3FormContentOverview";
 import { ColumnSettings } from "@/components/ColumnSettings";
 import { useColumnSettings } from "@/components/useColumnSettings";
-
-const BASE_REQUIRED_HINT = "第 1 组词形变化至少保留一个原形";
 
 export interface V3FormGroupCardProps {
   sharedCounts?: ReadonlyMap<string, number>;
@@ -100,6 +100,8 @@ export function V3FormGroupCard({
   onCloseSenses,
   boundSenseCount = 0
 }: V3FormGroupCardProps) {
+  const { t, i18n } = useLexiconEditorTranslation();
+  const BASE_REQUIRED_HINT = t("first_base_required");
   // 模板仅在新建或显式新增词性时初始化；展示以草稿成员为准。
   const formTypeLabel = useFormTypeLabel();
   const [blockedFormId, setBlockedFormId] = useState<string>();
@@ -108,7 +110,14 @@ export function V3FormGroupCard({
   const [columnsOverflow, setColumnsOverflow] = useState(false);
   const columns = useColumnSettings(
     formOverviewTableId,
-    formOverviewColumnSettings
+    formOverviewColumnSettings.map((column) => ({
+      ...column,
+      label: t(
+        formOverviewColumnMessages[
+          column.key as keyof typeof formOverviewColumnMessages
+        ]
+      )
+    }))
   );
   const hasOverview = !!(onEditContent && sharedCounts);
   const configuredTypes = formTypes?.length
@@ -153,9 +162,9 @@ export function V3FormGroupCard({
   const referenceGuard = useV3ReferenceGuard();
   const referenceStatusHint =
     referenceGuard.index.status === "loading"
-      ? "正在加载关联信息，暂不能删除词形"
+      ? t("references_loading")
       : referenceGuard.index.status === "unavailable"
-        ? "关联信息暂不可用，请刷新后再删除词形"
+        ? t("references_unavailable")
         : undefined;
   const lockedBaseFormIds = new Set(
     pos.form_groups.slice(0, 1).flatMap((candidate) => {
@@ -209,12 +218,12 @@ export function V3FormGroupCard({
     const formReferences = formReferenceCount(referenceGuard.index, form);
     const referenceHint =
       formReferences > 0
-        ? `存在 ${formReferences} 处关联，解除所有关联才能删除词形`
+        ? t("form_links_delete", { count: formReferences })
         : undefined;
     // 改类型的提示：告知会影响多少处引用，但不阻断编辑。
     const formTypeChangeHint =
       formReferences > 0
-        ? `存在 ${formReferences} 处关联，修改词形类型后，请检查关联内容是否正确`
+        ? t("form_links_change", { count: formReferences })
         : undefined;
     const baseLabel = formTypeLabel(form.form_type);
     const formMembershipCount = membershipCounts.get(form.id) ?? 0;
@@ -230,7 +239,7 @@ export function V3FormGroupCard({
       referenceStatusHint ??
       referenceHint ??
       (lastRequiredForm
-        ? "每个词性至少保留一个词形"
+        ? t("one_form_required")
         : member.id === soleBaseMembershipId
           ? BASE_REQUIRED_HINT
           : undefined);
@@ -239,7 +248,10 @@ export function V3FormGroupCard({
       membershipId: member.id,
       form,
       formLabel,
-      formTypeAriaLabel: `变化组 ${groupIndex + 1} 词形 ${index + 1} 类型`,
+      formTypeAriaLabel: t("form_type_label", {
+        group: groupIndex + 1,
+        index: index + 1
+      }),
       formTypeDisabled: !posCatalog || lockedBase,
       formTypeDisabledReason: lockedBase ? BASE_REQUIRED_HINT : undefined,
       formTypeChangeHint,
@@ -253,15 +265,22 @@ export function V3FormGroupCard({
           {/* 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认。 */}
           <V3DisabledReason reason={deleteReason}>
             <Popconfirm
-              cancelButtonProps={{ "aria-label": "取消删除词形并保留" }}
-              cancelText="取消"
-              description={`${(sharedCounts?.get(form.id) ?? 1) > 1 ? "只移除这个标签，其他标签继续使用同一份拼写与发音。" : "这是最后一个标签，词形内容会一并删除。"}${referenceHint ?? ""}`}
+              cancelButtonProps={{ "aria-label": t("cancel_delete_form") }}
+              cancelText={t("cancel")}
+              description={[
+                (sharedCounts?.get(form.id) ?? 1) > 1
+                  ? t("remove_shared_label")
+                  : t("remove_last_label"),
+                referenceHint
+              ]
+                .filter(Boolean)
+                .join(i18n.language.startsWith("en") ? " " : "")}
               disabled={deleteLocked}
               okButtonProps={{
-                "aria-label": "删除词形及相关发音",
+                "aria-label": t("delete_form_audio"),
                 danger: true
               }}
-              okText="删除词形"
+              okText={t("delete_form")}
               onConfirm={() => {
                 const result = deleteConcreteForm(content, pos.pos_id, form.id);
                 if (result.ok) onChange(result.value);
@@ -270,10 +289,13 @@ export function V3FormGroupCard({
                 setBlockedFormId(open ? form.id : undefined)
               }
               open={blockedFormId === form.id}
-              title="确认删除此词形？"
+              title={t("delete_form_title")}
             >
               <Button
-                aria-label={`删除变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
+                aria-label={t("delete_group_form_label", {
+                  group: groupIndex + 1,
+                  index: index + 1
+                })}
                 danger
                 disabled={deleteLocked}
                 icon={<CircleMinusIcon />}
@@ -314,7 +336,9 @@ export function V3FormGroupCard({
       data-v3-node-id={group.id}
       size="small"
       title={
-        <span className="v3-form-group-heading">{`第 ${groupIndex + 1} 组 词形变化`}</span>
+        <span className="v3-form-group-heading">
+          {t("form_group_heading", { group: groupIndex + 1 })}
+        </span>
       }
       extra={
         <Flex
@@ -351,13 +375,13 @@ export function V3FormGroupCard({
             trigger={["click"]}
           >
             <Button
-              aria-label={`为第 ${groupIndex + 1} 组增加词形`}
+              aria-label={t("add_group_form_label", { group: groupIndex + 1 })}
               disabled={formTypeOptions.length === 0}
               ghost
               icon={<CirclePlusIcon />}
               size="small"
             >
-              增加词形
+              {t("add_form")}
             </Button>
           </Dropdown>
           {onEditSenses ? (
@@ -376,12 +400,14 @@ export function V3FormGroupCard({
                 type={hasBoundSenses ? "primary" : "default"}
                 ghost={!hasBoundSenses}
                 size="small"
-                aria-label={`第 ${groupIndex + 1} 组专用词义`}
+                aria-label={t("dedicated_group_label", {
+                  group: groupIndex + 1
+                })}
                 aria-expanded={editingSenses}
               >
                 {hasBoundSenses
-                  ? `专用词义 · ${boundSenseCount}`
-                  : "设置专用词形"}
+                  ? t("dedicated_count", { count: boundSenseCount })
+                  : t("dedicated_forms")}
               </Button>
             </Popover>
           ) : null}
@@ -389,12 +415,15 @@ export function V3FormGroupCard({
             type="text"
             size="small"
             className="v3-form-group-menu word-form-card-toggle-state"
-            aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
+            aria-label={t("toggle_form_group", {
+              action: collapsed ? t("expand") : t("collapse"),
+              group: groupIndex + 1
+            })}
             aria-controls={bodyId}
             aria-expanded={!collapsed}
             onClick={() => setCollapsed((value) => !value)}
           >
-            {collapsed ? "展开" : "收起"}
+            {collapsed ? t("expand") : t("collapse")}
             {collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
           </Button>
           {onDelete || hasOverview ? (
@@ -413,7 +442,7 @@ export function V3FormGroupCard({
                       ? [
                           {
                             key: "columns",
-                            label: "列设置",
+                            label: t("column_settings"),
                             icon: <SettingsIcon />
                           },
                           { type: "divider" as const }
@@ -424,13 +453,13 @@ export function V3FormGroupCard({
                           {
                             key: "move-up",
                             icon: <ChevronUpIcon />,
-                            label: "上移本组",
+                            label: t("move_group_up"),
                             disabled: groupIndex === 0 || !onMove
                           },
                           {
                             key: "move-down",
                             icon: <ChevronDownIcon />,
-                            label: "下移本组",
+                            label: t("move_group_down"),
                             disabled: groupIndex === groupCount - 1 || !onMove
                           },
                           { type: "divider" as const },
@@ -439,10 +468,10 @@ export function V3FormGroupCard({
                             icon: <Trash2Icon />,
                             label:
                               deleteBlockedByReferences > 0
-                                ? "删除草稿词形组（发布前需处理受影响的关联）"
+                                ? t("delete_draft_group")
                                 : deleteDisabled
-                                  ? "至少保留一个词形"
-                                  : "删除本组",
+                                  ? t("keep_form")
+                                  : t("delete_form_group"),
                             danger: true,
                             disabled: deleteDisabled || !onDelete
                           }
@@ -460,7 +489,7 @@ export function V3FormGroupCard({
                 trigger={["click"]}
               >
                 <Button
-                  aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
+                  aria-label={t("manage_form_group", { group: groupIndex + 1 })}
                   className="v3-form-group-menu"
                   icon={<EllipsisIcon />}
                   type="text"
@@ -476,7 +505,7 @@ export function V3FormGroupCard({
           <div className="word-form-rules">{dialectControl}</div>
           {group.members.length === 0 ? (
             <Empty
-              description="草稿可暂时保留空变化组"
+              description={t("empty_form_group")}
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           ) : null}
@@ -514,7 +543,7 @@ export function V3FormGroupCard({
                 return (
                   <Alert
                     key={member.id}
-                    title="该变化组关联的词形已不存在，请刷新页面后重试。"
+                    title={t("missing_group_form")}
                     type="error"
                   />
                 );

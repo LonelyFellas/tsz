@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { env } from "../../../../lib/env";
@@ -44,6 +45,7 @@ import { PronunciationPreviewControls } from "../../word-creation/PronunciationP
 
 /** 拼写与多维例句标注片段对不上时即时标红（Q2）：输入框照常可编辑，保存由确认条与后端拦。 */
 function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
+  const { t, i18n } = useLexiconEditorTranslation();
   if (literals.length === 0) return null;
   return (
     <Typography.Text
@@ -51,8 +53,9 @@ function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
       role="status"
       type="danger"
     >
-      与关联内容中的文字“{literals.join("”“")}
-      ”不一致，请改回相同拼写，或先解除关联
+      {t("spelling_mismatch", {
+        spelling: literals.join(i18n.language.startsWith("en") ? "’, ‘" : "”“")
+      })}
     </Typography.Text>
   );
 }
@@ -172,6 +175,7 @@ function V3ConcreteFormTypeCell({
   actions,
   referenceBadge
 }: V3ConcreteFormTypeCellProps) {
+  const { t } = useLexiconEditorTranslation();
   const formTypeLabel = useFormTypeLabel();
   const availableFormTypes = [
     ...new Set(
@@ -243,7 +247,7 @@ function V3ConcreteFormTypeCell({
         </V3DisabledReason>
         {membershipCount > 1 ? (
           <Typography.Text type="secondary">
-            已在 {membershipCount} 个变化组中使用
+            {t("shared_form_count", { count: membershipCount })}
           </Typography.Text>
         ) : null}
         {actions}
@@ -269,14 +273,15 @@ function SpellingRegularity({
   onChange: (next: DraftFormsStepContentV3) => void;
   visible?: boolean;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const name = useId();
   if (!visible || !env.FORM_SPELLING_REGULARITY) return null;
   return (
     <Flex align="center" gap="small" className="v3-spelling-regularity">
-      <Typography.Text>是否规则变化？</Typography.Text>
+      <Typography.Text>{t("regular_question")}</Typography.Text>
       <Radio.Group
         name={`${name}-${variant.id}-regularity`}
-        aria-label={`${label}是否规则变化`}
+        aria-label={t("regular_label", { label: label })}
         value={variantRegularity(content, form.id, variant)}
         onChange={(event) =>
           onChange(
@@ -290,8 +295,8 @@ function SpellingRegularity({
           )
         }
       >
-        <Radio value>是</Radio>
-        <Radio value={false}>否</Radio>
+        <Radio value>{t("yes")}</Radio>
+        <Radio value={false}>{t("no")}</Radio>
       </Radio.Group>
     </Flex>
   );
@@ -334,6 +339,7 @@ function V3DialectFormCell({
   spellingActions,
   spellingLabel
 }: V3DialectFormCellProps) {
+  const { t } = useLexiconEditorTranslation();
   const referenceGuard = useV3ReferenceGuard();
   if (form.regional_variants.mode === "common") return null;
   const variant = regionalVariants(form.regional_variants, dialect).find(
@@ -373,7 +379,8 @@ function V3DialectFormCell({
         <Flex align="center" justify="space-between" gap="small" wrap>
           <Flex align="center" gap="small">
             <Typography.Text strong>
-              {spellingLabel ?? `${dialectLabel(dialect)}拼写`}
+              {spellingLabel ??
+                t("spelling_label", { label: dialectLabel(dialect) })}
             </Typography.Text>
             {spellingActions}
           </Flex>
@@ -383,7 +390,10 @@ function V3DialectFormCell({
             form={form}
             dialectRules={dialectRules}
             variant={variant}
-            label={`${formLabel}${dialectLabel(dialect)}拼写`}
+            label={t("dialect_spelling_label", {
+              label: formLabel,
+              dialect: dialectLabel(dialect)
+            })}
             onChange={onChange}
           />
         </Flex>
@@ -398,7 +408,10 @@ function V3DialectFormCell({
               content={spellingEditorValue(variant)}
               voiceProfile={variant.spelling_speech?.voice_profile}
               dialect={dialect}
-              ariaLabelPrefix={`${formLabel}${dialectLabel(dialect)}拼写`}
+              ariaLabelPrefix={t("dialect_spelling_label", {
+                label: formLabel,
+                dialect: dialectLabel(dialect)
+              })}
             />
           }
           onCommit={(result) => {
@@ -433,7 +446,10 @@ function V3DialectFormCell({
           }}
 
           invalid={spellingInvalid}
-          ariaLabel={`${formLabel}${dialectLabel(dialect)}拼写`}
+          ariaLabel={t("dialect_spelling_label", {
+            label: formLabel,
+            dialect: dialectLabel(dialect)
+          })}
           field="spelling"
           nodeId={variant.id}
           audioUploadEnabled
@@ -463,7 +479,7 @@ function V3DialectFormCell({
               )
             )
           }
-          placeholder={`${dialectLabel(dialect)}拼写`}
+          placeholder={t("spelling_label", { label: dialectLabel(dialect) })}
           onChange={(next) => {
             if (dialectRules.spelling_mode === "unified") {
               const result = unifyUkUsSpelling(form, next);
@@ -497,6 +513,7 @@ function V3DialectSpellingList({
   multipleSpellingsAvailable: boolean;
   spellingRemovalReason?: (slotId: string) => string | undefined;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [draggingId, setDraggingId] = useState<string>();
   const [dragOverId, setDragOverId] = useState<string>();
   const { form, dialect, content, onChange, idFactory } = props;
@@ -517,9 +534,12 @@ function V3DialectSpellingList({
       {rows.map((variant, index) => {
         const removalReason =
           rows.length <= 1
-            ? "每侧至少保留一条拼写"
+            ? t("one_spelling_per_side")
             : spellingRemovalReason?.(variant.id);
-        const label = `${dialectLabel(dialect)}第 ${index + 1} 条拼写`;
+        const label = t("spelling_index_label", {
+          label: dialectLabel(dialect),
+          index: index + 1
+        });
         return (
           <div
             key={variant.id}
@@ -561,25 +581,24 @@ function V3DialectSpellingList({
               {...props}
               formLabel={
                 rows.length > 1
-                  ? `${props.formLabel}第 ${index + 1} 条`
+                  ? t("spelling_index", {
+                      label: props.formLabel,
+                      index: index + 1
+                    })
                   : props.formLabel
               }
               variantId={variant.id}
-              spellingLabel="词形拼写"
+              spellingLabel={t("spelling")}
               spellingActions={
                 <Flex gap={2}>
                   <Tooltip
-                    title={
-                      rows.length > 1
-                        ? "拖动排序，也可使用上下方向键"
-                        : "仅一条拼写"
-                    }
+                    title={rows.length > 1 ? t("drag_help") : t("one_spelling")}
                   >
                     <Button
                       type="text"
                       size="small"
                       icon={<GripVerticalIcon />}
-                      aria-label={`移动${label}`}
+                      aria-label={t("move_item", { label: label })}
                       disabled={rows.length < 2}
                       draggable={rows.length > 1}
                       onDragStart={(event) => {
@@ -611,15 +630,15 @@ function V3DialectSpellingList({
                   <Tooltip
                     title={
                       multipleSpellingsAvailable
-                        ? "在此条后新增拼写"
-                        : "当前服务暂不支持多条拼写，请更新后重试"
+                        ? t("add_spelling_after")
+                        : t("multiple_spellings_unavailable")
                     }
                   >
                     <Button
                       type="text"
                       size="small"
                       icon={<CirclePlusIcon />}
-                      aria-label={`在${label}后新增拼写`}
+                      aria-label={t("insert_spelling", { label: label })}
                       disabled={
                         !multipleSpellingsAvailable || rows.length >= 2000
                       }
@@ -636,12 +655,12 @@ function V3DialectSpellingList({
                       }
                     />
                   </Tooltip>
-                  <Tooltip title={removalReason ?? "删除拼写及其发音"}>
+                  <Tooltip title={removalReason ?? t("delete_spelling_audio")}>
                     <Button
                       type="text"
                       size="small"
                       icon={<CircleMinusIcon />}
-                      aria-label={`删除${label}`}
+                      aria-label={t("delete_item", { label: label })}
                       disabled={Boolean(removalReason)}
                       onClick={() =>
                         onChange(
@@ -670,8 +689,8 @@ export function V3ConcreteFormRow({
   content,
   dialectRules,
   form,
-  formLabel = "词形",
-  formTypeAriaLabel = `${formLabel}类型`,
+  formLabel: providedFormLabel,
+  formTypeAriaLabel: providedFormTypeAriaLabel,
   formTypeDisabled = false,
   formTypeDisabledReason,
   formTypeChangeHint,
@@ -691,6 +710,10 @@ export function V3ConcreteFormRow({
   actions,
   referenceBadge
 }: V3ConcreteFormRowProps) {
+  const { t } = useLexiconEditorTranslation();
+  const formLabel = providedFormLabel ?? t("form");
+  const formTypeAriaLabel =
+    providedFormTypeAriaLabel ?? t("type_label", { label: formLabel });
   const referenceGuard = useV3ReferenceGuard();
   const variants: Array<
     WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3
@@ -759,39 +782,41 @@ export function V3ConcreteFormRow({
         {showMatrixHeader ? (
           <>
             {presentation === "matrix" ? (
-              <div className="word-form-matrix-type-header">词形类型</div>
+              <div className="word-form-matrix-type-header">
+                {t("form_type")}
+              </div>
             ) : null}
             {presentation === "content" ? (
               <div className="word-form-matrix-shared-header">
                 <span className="word-form-matrix-shared-header-uk">
-                  BrE 英式
+                  {t("british_short")}
                 </span>
                 <span className="word-form-matrix-shared-header-us">
-                  AmE 美式
+                  {t("american_short")}
                 </span>
               </div>
             ) : commonVariant ? (
               <div className="word-form-matrix-shared-header">
                 <span className="word-form-matrix-shared-header-common">
-                  英美通用
+                  {t("common")}
                 </span>
               </div>
             ) : unifiedSpellingVariants ? (
               <div className="word-form-matrix-shared-header">
                 <span className="word-form-matrix-shared-header-uk">
-                  英式英语
+                  {t("british")}
                 </span>
                 <span className="word-form-matrix-shared-header-us">
-                  美式英语
+                  {t("american")}
                 </span>
               </div>
             ) : (
               <>
                 <div className="word-form-matrix-dialect-header word-form-matrix-dialect-header-uk">
-                  英式英语
+                  {t("british")}
                 </div>
                 <div className="word-form-matrix-dialect-header word-form-matrix-dialect-header-us">
-                  美式英语
+                  {t("american")}
                 </div>
               </>
             )}
@@ -820,14 +845,14 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <Typography.Text strong>词形拼写</Typography.Text>
+                <Typography.Text strong>{t("spelling")}</Typography.Text>
                 <SpellingRegularity
                   visible={showRegularity}
                   content={content}
                   form={form}
                   dialectRules={dialectRules}
                   variant={commonVariant}
-                  label={`${formLabel}英美通用拼写`}
+                  label={t("common_spelling_label", { label: formLabel })}
                   onChange={onChange}
                 />
               </Flex>
@@ -841,7 +866,9 @@ export function V3ConcreteFormRow({
                     content={spellingEditorValue(commonVariant)}
                     voiceProfile={commonVariant.spelling_speech?.voice_profile}
                     dialect="common"
-                    ariaLabelPrefix={`${formLabel}英美通用拼写`}
+                    ariaLabelPrefix={t("common_spelling_label", {
+                      label: formLabel
+                    })}
                   />
                 }
                 invalid={
@@ -854,7 +881,7 @@ export function V3ConcreteFormRow({
                         issue.field === "spelling_speech")
                   )
                 }
-                ariaLabel={`${formLabel}英美通用拼写`}
+                ariaLabel={t("common_spelling_label", { label: formLabel })}
                 field="spelling"
                 nodeId={commonVariant.id}
                 audioUploadEnabled
@@ -901,7 +928,7 @@ export function V3ConcreteFormRow({
                     updateVariantSpelling(content, commonVariant.id, next)
                   )
                 }
-                placeholder="词形拼写"
+                placeholder={t("spelling")}
                 value={spellingEditorValue(commonVariant)}
               />
               <SpellingConflictNote literals={commonConflictLiterals} />
@@ -925,14 +952,14 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <Typography.Text strong>词形拼写</Typography.Text>
+                <Typography.Text strong>{t("spelling")}</Typography.Text>
                 <SpellingRegularity
                   visible={showRegularity}
                   content={content}
                   form={form}
                   dialectRules={dialectRules}
                   variant={unifiedSpellingVariants.uk}
-                  label={`${formLabel}英美通用拼写`}
+                  label={t("common_spelling_label", { label: formLabel })}
                   onChange={onChange}
                 />
               </Flex>
@@ -948,11 +975,13 @@ export function V3ConcreteFormRow({
                       unifiedSpellingVariants.uk.spelling_speech?.voice_profile
                     }
                     dialect="common"
-                    ariaLabelPrefix={`${formLabel}英美通用拼写`}
+                    ariaLabelPrefix={t("common_spelling_label", {
+                      label: formLabel
+                    })}
                   />
                 }
                 invalid={unifiedSpellingInvalid}
-                ariaLabel={`${formLabel}英美通用拼写`}
+                ariaLabel={t("common_spelling_label", { label: formLabel })}
                 field="spelling"
                 nodeAliases={unifiedSpellingVariantIds.join(" ")}
                 nodeId={form.id}
@@ -1005,7 +1034,7 @@ export function V3ConcreteFormRow({
                   const result = unifyUkUsSpelling(form, next);
                   if (result.ok) onChange(replaceForm(content, result.value));
                 }}
-                placeholder="词形拼写"
+                placeholder={t("spelling")}
                 value={spellingEditorValue(unifiedSpellingVariants.uk)}
               />
               <SpellingConflictNote literals={unifiedConflictLiterals} />
@@ -1104,13 +1133,14 @@ export function V3DialectSeparatedFormMatrix({
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const columnStyle = {
     "--v3-row-span": rows.length + 1
   } as CSSProperties;
   return (
     <div className="v3-dialect-separated-matrix">
       <div className="v3-form-type-column" style={columnStyle}>
-        <div className="word-form-matrix-type-header">词形类型</div>
+        <div className="word-form-matrix-type-header">{t("form_type")}</div>
         {rows.map((row, index) => (
           <div
             className="v3-membership-row"
@@ -1150,7 +1180,7 @@ export function V3DialectSeparatedFormMatrix({
       </div>
       {(["uk", "us"] as const).map((dialect) => (
         <section
-          aria-label={dialect === "uk" ? "英式英语词形" : "美式英语词形"}
+          aria-label={dialect === "uk" ? t("british_form") : t("american_form")}
           className={`v3-dialect-panel v3-dialect-panel-${dialect}`}
           key={dialect}
           style={columnStyle}
@@ -1158,7 +1188,7 @@ export function V3DialectSeparatedFormMatrix({
           <div
             className={`v3-dialect-panel-header v3-dialect-panel-header-${dialect}`}
           >
-            {dialect === "uk" ? "英式英语" : "美式英语"}
+            {dialect === "uk" ? t("british") : t("american")}
           </div>
           {rows.map((row, index) => (
             <V3DialectFormCell

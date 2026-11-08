@@ -876,6 +876,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             readingLinks={editorState.readingLinks}
             renderReadingPicker={renderReadingPicker}
             contextLabel={ariaLabel}
+            contextKey={JSON.stringify([nodeId, field])}
             inputDataAttributes={{
               "data-v3-node-id": nodeId,
               "data-v3-field": field,

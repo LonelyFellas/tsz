@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { env } from "@/lib/env";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
@@ -25,19 +26,19 @@ import {
   updatePronunciation,
   type V3IdFactory
 } from "../operations";
-import { pronunciationStyleLabel } from "../presentation";
 import { v3IssueMessage } from "../presentationErrors";
 
 const PRONUNCIATION_DRAG_TYPE = "application/x-tsz-pronunciation";
 
 function pronunciationFieldMessage(
   issue: V3DraftValidationIssue,
-  field: "style" | "dict_phonetic" | "actual_pron"
+  field: "style" | "dict_phonetic" | "actual_pron",
+  t: ReturnType<typeof useLexiconEditorTranslation>["t"]
 ) {
   if (issue.code !== "pronunciation_required") return v3IssueMessage(issue);
-  if (field === "style") return "请选择读法";
-  if (field === "dict_phonetic") return "请填写字典音标";
-  return "请填写实际发音";
+  if (field === "style") return t("choose_reading");
+  if (field === "dict_phonetic") return t("dictionary_phonetic_required");
+  return t("actual_pronunciation_required");
 }
 
 function updateVariantPronunciations(
@@ -74,6 +75,7 @@ export function V3PronunciationList({
   idFactory,
   onChange
 }: V3PronunciationListProps) {
+  const { t } = useLexiconEditorTranslation();
   const [form] = Form.useForm();
   const inputPrefix = useId();
   const [draggingIndex, setDraggingIndex] = useState<number>();
@@ -174,7 +176,9 @@ export function V3PronunciationList({
                   >
                     <div className="word-pronunciation-actions">
                       <Button
-                        aria-label={`拖动第 ${index + 1} 条发音`}
+                        aria-label={t("drag_pronunciation", {
+                          index: index + 1
+                        })}
                         className="word-pronunciation-drag-handle"
                         disabled={fields.length < 2}
                         draggable={fields.length > 1}
@@ -221,14 +225,16 @@ export function V3PronunciationList({
                         }}
                         title={
                           fields.length > 1
-                            ? "拖动排序，也可使用上下方向键"
-                            : "仅一条发音"
+                            ? t("drag_help")
+                            : t("one_pronunciation")
                         }
                         size="small"
                         type="text"
                       />
                       <Button
-                        aria-label={`在第 ${index + 1} 条后新增发音`}
+                        aria-label={t("insert_pronunciation", {
+                          index: index + 1
+                        })}
                         icon={<CirclePlusIcon />}
                         onClick={() => {
                           const next: WordPronunciationV3 = {
@@ -254,7 +260,9 @@ export function V3PronunciationList({
                         type="text"
                       />
                       <Button
-                        aria-label={`删除第 ${index + 1} 条发音`}
+                        aria-label={t("delete_pronunciation", {
+                          index: index + 1
+                        })}
                         className="word-pronunciation-remove"
                         danger
                         disabled={fields.length === 1}
@@ -282,12 +290,14 @@ export function V3PronunciationList({
                           className="word-pronunciation-label"
                           htmlFor={`${inputPrefix}-${pronunciation.id}-style`}
                         >
-                          读法
+                          {t("reading")}
                         </label>
                         <Form.Item noStyle>
                           <Select
                             id={`${inputPrefix}-${pronunciation.id}-style`}
-                            aria-label={`第 ${index + 1} 条发音的读法`}
+                            aria-label={t("reading_label", {
+                              index: index + 1
+                            })}
                             className="word-pronunciation-style-select"
                             data-v3-field="style"
                             data-v3-node-id={pronunciation.id}
@@ -301,22 +311,22 @@ export function V3PronunciationList({
                             options={[
                               {
                                 value: "citation",
-                                label: pronunciationStyleLabel("citation")
+                                label: t("reading_citation")
                               },
                               {
                                 value: "normal",
-                                label: pronunciationStyleLabel("normal")
+                                label: t("reading_normal")
                               },
                               {
                                 value: "strong",
-                                label: pronunciationStyleLabel("strong")
+                                label: t("reading_strong")
                               },
                               {
                                 value: "weak",
-                                label: pronunciationStyleLabel("weak")
+                                label: t("reading_weak")
                               }
                             ]}
-                            placeholder="风格"
+                            placeholder={t("style")}
                             status={styleIssue ? "error" : undefined}
                             value={pronunciation.style}
                           />
@@ -326,7 +336,7 @@ export function V3PronunciationList({
                             className="word-field-help"
                             type="danger"
                           >
-                            {pronunciationFieldMessage(styleIssue, "style")}
+                            {pronunciationFieldMessage(styleIssue, "style", t)}
                           </Typography.Text>
                         ) : null}
                       </div>
@@ -335,7 +345,7 @@ export function V3PronunciationList({
                           className="word-pronunciation-label"
                           htmlFor={`${inputPrefix}-${pronunciation.id}-dict`}
                         >
-                          字典音标
+                          {t("dictionary_phonetic")}
                         </label>
                         <div className="word-pronunciation-phonetic-control">
                           <Form.Item noStyle>
@@ -344,7 +354,9 @@ export function V3PronunciationList({
                               mode="dict-phonetic"
                               editingEnabled={false}
                               dialect={variant.dialect}
-                              ariaLabel={`第 ${index + 1} 条发音的字典音标`}
+                              ariaLabel={t("dictionary_phonetic_label", {
+                                index: index + 1
+                              })}
                               nodeId={pronunciation.id}
                               field="dict_phonetic"
                               invalid={Boolean(dictPhoneticIssue)}
@@ -380,7 +392,8 @@ export function V3PronunciationList({
                             >
                               {pronunciationFieldMessage(
                                 dictPhoneticIssue,
-                                "dict_phonetic"
+                                "dict_phonetic",
+                                t
                               )}
                             </Typography.Text>
                           ) : null}
@@ -391,7 +404,7 @@ export function V3PronunciationList({
                           className="word-pronunciation-label"
                           htmlFor={`${inputPrefix}-${pronunciation.id}-actual`}
                         >
-                          实际发音
+                          {t("actual_pronunciation")}
                         </label>
                         <div className="word-actual-pronunciation-control">
                           <Form.Item noStyle>
@@ -415,7 +428,9 @@ export function V3PronunciationList({
                                 />
                               }
                               dialect={variant.dialect}
-                              ariaLabel={`第 ${index + 1} 条发音的实际发音`}
+                              ariaLabel={t("actual_pronunciation_label", {
+                                index: index + 1
+                              })}
                               field="actual_pron"
                               nodeId={pronunciation.id}
                               placeholder="Connected Speech"
@@ -452,7 +467,8 @@ export function V3PronunciationList({
                           >
                             {pronunciationFieldMessage(
                               actualPronIssue,
-                              "actual_pron"
+                              "actual_pron",
+                              t
                             )}
                           </Typography.Text>
                         ) : null}
@@ -481,9 +497,11 @@ export function V3PronunciationList({
               })}
               {fields.length === 0 ? (
                 <>
-                  <Typography.Text type="secondary">暂无发音</Typography.Text>
+                  <Typography.Text type="secondary">
+                    {t("no_pronunciation")}
+                  </Typography.Text>
                   <Button
-                    aria-label="新增发音"
+                    aria-label={t("add_pronunciation")}
                     icon={<CirclePlusIcon />}
                     onClick={() => {
                       const pronunciation: WordPronunciationV3 = {
@@ -503,7 +521,7 @@ export function V3PronunciationList({
                     }}
                     type="dashed"
                   >
-                    新增发音
+                    {t("add_pronunciation")}
                   </Button>
                 </>
               ) : null}
