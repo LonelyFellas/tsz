@@ -1,3 +1,4 @@
+import { useAdminTranslation } from "@/i18n";
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { DictionaryPartOfSpeechLabels } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import {
@@ -22,6 +23,7 @@ import "./console-shell.css";
 export const CONSOLE_HEADER_Z_INDEX = 100;
 
 export function ConsoleLayout() {
+  const { t } = useAdminTranslation();
   const identity = useAuthStore((s) => adminAccountIdentity(s.profile));
   const { pathname } = useLocation();
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -81,7 +83,7 @@ export function ConsoleLayout() {
                 <Link
                   to="/"
                   className="console-brand"
-                  aria-label="天生会背首页"
+                  aria-label={t("nav_brand_home")}
                 >
                   <span className="console-brand-mark">
                     <NotebookTextIcon size={20} aria-hidden="true" />
@@ -95,13 +97,15 @@ export function ConsoleLayout() {
                     className="console-navigation-trigger"
                   >
                     <LayoutGridIcon size={16} aria-hidden="true" />
-                    <span>后台导航</span>
+                    <span>{t("nav_menu")}</span>
                     <ChevronDownIcon size={14} aria-hidden="true" />
                   </button>
                 </Dialog.Trigger>
               </div>
               <div className="console-header-account">
-                <span className="console-platform-label">平台后台</span>
+                <span className="console-platform-label">
+                  {t("nav_platform")}
+                </span>
                 <AdminHeader />
               </div>
             </header>
@@ -127,14 +131,14 @@ export function ConsoleLayout() {
             aria-describedby={undefined}
           >
             <div className="console-navigation-heading">
-              <Dialog.Title>后台导航</Dialog.Title>
+              <Dialog.Title>{t("nav_menu")}</Dialog.Title>
               <div className="console-navigation-dismiss">
                 <kbd aria-hidden="true">Esc</kbd>
                 <Dialog.Close asChild>
                   <button
                     type="button"
                     className="console-navigation-close"
-                    aria-label="收起后台导航"
+                    aria-label={t("nav_close")}
                   >
                     <XIcon />
                   </button>

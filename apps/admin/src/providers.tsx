@@ -1,8 +1,8 @@
+import { useAdminTranslation } from "@/i18n";
 import { UnplugIcon } from "lucide-react";
 import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { ADMIN_PERMISSION_UPGRADE_MESSAGE } from "@tsz/api-client";
 import { Alert, Button } from "@tsz/ui/admin/display";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { authRuntime, useAuthStore } from "@/lib/auth";
@@ -24,6 +24,7 @@ bindAdminAuthorizationCache(useAuthStore, queryClient);
 // 挂载时用 admin refresh cookie 静默恢复会话，写入 profile / level / hydrated。
 // AntApp 提供 message/modal/notification 的 context 版（v6 起不建议再用静态方法）。
 export function RootProviders() {
+  const { t } = useAdminTranslation();
   const isLoginPage = useMatch("/login") !== null;
   const permissionModelIncompatible = useAuthStore(
     (s) => s.permissionModelIncompatible
@@ -70,15 +71,15 @@ export function RootProviders() {
         title={
           isLoginPage
             ? refreshUnconfirmed
-              ? "登录状态待确认"
+              ? t("recovery_login_pending")
               : retrying
-                ? "正在重试…"
-                : "连接暂不可用"
+                ? t("recovery_retrying")
+                : t("recovery_unavailable")
             : refreshUnconfirmed
-              ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
+              ? t("recovery_uncertain")
               : hydrated
-                ? "连接暂时中断，联网后将自动恢复；当前内容已保留"
-                : "正在恢复连接，联网后将自动继续"
+                ? t("recovery_disconnected")
+                : t("recovery_connecting")
         }
         action={
           <Button
@@ -92,10 +93,10 @@ export function RootProviders() {
             }
           >
             {refreshUnconfirmed
-              ? "重新登录"
+              ? t("recovery_sign_in")
               : isLoginPage
-                ? "重试"
-                : "重试连接"}
+                ? t("recovery_retry")
+                : t("recovery_retry_connection")}
           </Button>
         }
       />
@@ -106,11 +107,7 @@ export function RootProviders() {
         <RecoverySession />
         <FeedbackApp key={identity}>
           {permissionModelIncompatible && !isLoginPage && (
-            <Alert
-              type="error"
-              showIcon
-              title={ADMIN_PERMISSION_UPGRADE_MESSAGE}
-            />
+            <Alert type="error" showIcon title={t("auth_upgrade")} />
           )}
           {!isLoginPage && connectionNotice}
           <Outlet context={{ connectionNotice } satisfies RootOutletContext} />

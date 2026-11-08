@@ -1,6 +1,11 @@
 import RcPagination from "@rc-component/pagination";
 import type { PaginationProps as RcPaginationProps } from "@rc-component/pagination";
 import zhCN from "@rc-component/pagination/es/locale/zh_CN";
+import zhTW from "@rc-component/pagination/es/locale/zh_TW";
+import enGB from "@rc-component/pagination/es/locale/en_GB";
+import enUS from "@rc-component/pagination/es/locale/en_US";
+import { resolveInterfaceLocale } from "@tsz/shared/i18n";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import "./table.css";
 
 export interface PaginationProps extends RcPaginationProps {
@@ -13,18 +18,25 @@ export function Pagination({
   itemRender,
   ...props
 }: PaginationProps) {
+  const { t, i18n } = useInterfaceTranslation();
+  const locale = {
+    "zh-Hans": zhCN,
+    "zh-Hant": zhTW,
+    "en-GB": enGB,
+    "en-US": enUS
+  }[resolveInterfaceLocale(i18n.language)];
   return (
     <RcPagination
       {...props}
       className={[size === "small" && "ui-pagination-small", className]
         .filter(Boolean)
         .join(" ")}
-      aria-label="分页"
+      aria-label={t("controls.pagination")}
       itemRender={(page, type, original) => {
         const button =
           type === "page" ? (
             <button
-              aria-label={`第 ${page} 页`}
+              aria-label={t("pagination.page", { page })}
               aria-current={page === props.current ? "page" : undefined}
               type="button"
               tabIndex={-1}
@@ -37,15 +49,15 @@ export function Pagination({
           );
         return itemRender ? itemRender(page, type, button) : button;
       }}
-      locale={zhCN}
+      locale={locale}
       prefixCls="ui-pagination"
       prevIcon={
-        <button type="button" aria-label="上一页">
+        <button type="button" aria-label={t("controls.previous")}>
           ‹
         </button>
       }
       nextIcon={
-        <button type="button" aria-label="下一页">
+        <button type="button" aria-label={t("controls.next")}>
           ›
         </button>
       }
@@ -59,7 +71,7 @@ export function Pagination({
         className: selectClass
       }) => (
         <select
-          aria-label="每页条数"
+          aria-label={t("controls.perPage")}
           className={selectClass}
           disabled={disabled}
           value={value}

@@ -4,6 +4,7 @@ import Trigger, {
   type TriggerRef,
   type BuildInPlacements
 } from "@rc-component/trigger";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import RcMenu, {
   type MenuProps as HeadlessMenuProps
 } from "@rc-component/menu";
@@ -96,6 +97,7 @@ function Surface({
   styles,
   classNames
 }: SurfaceProps) {
+  const { t } = useInterfaceTranslation();
   const parent = useContext(OverlayLayer);
   const [internal, setInternal] = useState(false);
   const active = !disabled && (open ?? internal);
@@ -223,7 +225,9 @@ function Surface({
                   ? "group"
                   : undefined
           }
-          aria-label={kind === "popconfirm" ? "确认操作" : undefined}
+          aria-label={
+            kind === "popconfirm" ? t("controls.confirmAction") : undefined
+          }
           className={prefix + "-container " + (classNames?.container ?? "")}
           style={styles?.container}
         >
@@ -306,8 +310,8 @@ interface PopconfirmProps extends FloatingProps {
 export function Popconfirm({
   title,
   description,
-  okText = "确定",
-  cancelText = "取消",
+  okText,
+  cancelText,
   open,
   onOpenChange,
   onConfirm,
@@ -317,6 +321,7 @@ export function Popconfirm({
   children,
   ...props
 }: PopconfirmProps) {
+  const { t } = useInterfaceTranslation();
   const inheritedDisabled = useAdminDisabled();
   const disabled = props.disabled ?? inheritedDisabled;
   const [internal, setInternal] = useState(false);
@@ -370,7 +375,7 @@ export function Popconfirm({
                 setOpen(false);
               }}
             >
-              {cancelText}
+              {cancelText === undefined ? t("actions.cancel") : cancelText}
             </Button>
             <Button
               size="small"
@@ -379,7 +384,7 @@ export function Popconfirm({
               loading={pending || okButtonProps?.loading}
               onClick={confirm}
             >
-              {okText}
+              {okText === undefined ? t("actions.confirm") : okText}
             </Button>
           </div>
         </>

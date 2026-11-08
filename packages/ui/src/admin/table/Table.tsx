@@ -3,6 +3,7 @@ import RcTable, {
   type Reference,
   type TableProps as RcTableProps
 } from "@rc-component/table";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import {
   useEffect,
   useMemo,
@@ -73,6 +74,7 @@ export function Table<T extends object>({
   className,
   ...props
 }: TableProps<T>) {
+  const { t } = useInterfaceTranslation();
   const [pageState, setPage] = useState(1);
   const [sizeState, setPageSize] = useState(10);
   const [sort, setSort] = useState<{ key: Key; descending: boolean }>();
@@ -219,7 +221,7 @@ export function Table<T extends object>({
         ),
       title: (
         <input
-          aria-label="选择本页"
+          aria-label={t("controls.selectPage")}
           {...titleProps}
           type="checkbox"
           checked={checkedCount > 0 && checkedCount === selectable.length}
@@ -234,7 +236,7 @@ export function Table<T extends object>({
       ),
       render: (_, row) => (
         <input
-          aria-label={`选择 ${keyOf(row)}`}
+          aria-label={t("controls.selectRow", { id: keyOf(row) })}
           {...rowSelection.getCheckboxProps?.(row)}
           type="checkbox"
           checked={selectedKeys.includes(keyOf(row))}
@@ -256,7 +258,7 @@ export function Table<T extends object>({
         rowKey={rowKey}
         data={pageRows}
         columns={viewColumns}
-        emptyText={locale?.emptyText ?? "暂无数据"}
+        emptyText={locale?.emptyText ?? t("status.noData")}
         expandable={
           expandable && {
             ...expandable,
@@ -267,7 +269,9 @@ export function Table<T extends object>({
                   <button
                     type="button"
                     className="ui-table-row-expand-icon"
-                    aria-label={expanded ? "收起行" : "展开行"}
+                    aria-label={t(
+                      expanded ? "controls.collapseRow" : "controls.expandRow"
+                    )}
                     aria-expanded={expanded}
                     onClick={(e) => {
                       onExpand(record, e);
@@ -282,7 +286,7 @@ export function Table<T extends object>({
       />
       {loading && (
         <div className="ui-table-loading" role="status">
-          加载中…
+          {t("status.loading")}
         </div>
       )}
       {pagination !== false && total > 0 && (

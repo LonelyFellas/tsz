@@ -14,6 +14,7 @@ export interface InterfacePreferenceSnapshot {
   preference: InterfaceLocale | null;
   capabilities: InterfaceCapabilities | null;
   saving: boolean;
+  refreshing: boolean;
   error: string | null;
 }
 
@@ -24,6 +25,7 @@ const initial: InterfacePreferenceSnapshot = {
   preference: null,
   capabilities: null,
   saving: false,
+  refreshing: false,
   error: null
 };
 
@@ -53,6 +55,7 @@ export function createInterfacePreferences({
 }) {
   let snapshot = initial;
   let readEpoch = 0;
+  let guestPreference: InterfaceLocale | null | undefined;
   let pending:
     { owner: string; promise: Promise<void>; epoch: number } | undefined;
   const listeners = new Set<() => void>();
@@ -68,10 +71,11 @@ export function createInterfacePreferences({
     error instanceof Error ? error.message : "界面偏好暂不可用";
 
   function cached(accountId: string | null): InterfaceLocale | undefined {
-    if (!accountId) return undefined;
+    if (accountId === null && guestPreference !== undefined)
+      return guestPreference ?? undefined;
     try {
       const value = getStorage?.().getItem(
-        interfaceLocaleStorageKey(surface, accountId)
+        interfaceLocaleStorageKey(surface, accountId ?? "guest")
       );
       return INTERFACE_LOCALES.find((locale) => locale === value);
     } catch {
@@ -114,7 +118,11 @@ export function createInterfacePreferences({
     }
     const epoch = ++readEpoch;
     const current = () => sessionKey() === owner && epoch === readEpoch;
-    publish({ ...initial, owner });
+    publish(
+      snapshot.owner === owner && snapshot.status === "ready"
+        ? { ...snapshot, refreshing: true, error: null }
+        : { ...initial, owner, refreshing: true }
+    );
     let directoryAvailable = false;
     try {
       const directory = await capabilities();
@@ -123,7 +131,9 @@ export function createInterfacePreferences({
       if (!INTERFACE_LOCALES.includes(directory.default_locale))
         throw new Error("不支持目录默认语言");
       const { accountId } = getSession();
-      const preference = accountId ? ((await read()) ?? null) : null;
+      const preference = accountId
+        ? ((await read()) ?? null)
+        : (cached(null) ?? null);
       if (!current()) return;
       // read 的 undefined 仅兼容旧 admin profile 缺字段；其他值仍须校验。
       decodeInterfaceLocale(preference);
@@ -134,6 +144,7 @@ export function createInterfacePreferences({
         preference,
         locale: resolve(directory, preference, accountId),
         saving: false,
+        refreshing: false,
         error: null
       });
     } catch (error) {
@@ -160,6 +171,7 @@ export function createInterfacePreferences({
       !accountId ||
       snapshot.owner !== owner ||
       snapshot.status !== "ready" ||
+      snapshot.refreshing ||
       !directory
     )
       return Promise.reject(new Error("界面偏好尚不可保存"));
@@ -200,9 +212,36 @@ export function createInterfacePreferences({
     return promise;
   }
 
+  /** 登录前只保存在访客键中，不复制到账号偏好，也不发私有请求。 */
+  async function saveGuest(locale: InterfaceLocale | null): Promise<void> {
+    const owner = sessionKey();
+    const directory = snapshot.capabilities;
+    if (
+      getSession().accountId ||
+      snapshot.owner !== owner ||
+      snapshot.status !== "ready" ||
+      snapshot.refreshing ||
+      !directory
+    )
+      throw new Error("访客语言尚不可保存");
+    if (locale !== null && !directory.supported_locales.includes(locale))
+      throw new Error("该界面语言尚未开放");
+    ++readEpoch;
+    guestPreference = locale;
+    cache("guest", locale);
+    publish({
+      ...snapshot,
+      preference: locale,
+      locale: resolve(directory, locale, null),
+      error: null
+    });
+  }
+
   return {
     refresh,
     save,
+    saveGuest,
+    accountId: () => getSession().accountId,
     sessionKey,
     getSnapshot: () => snapshot,
     getServerSnapshot: () => initial,

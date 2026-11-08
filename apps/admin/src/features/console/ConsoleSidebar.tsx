@@ -1,3 +1,5 @@
+import { useAdminTranslation } from "@/i18n";
+import type { AdminShellKey } from "@/i18n/resources";
 import {
   ClipboardCheckIcon,
   BookIcon,
@@ -38,7 +40,7 @@ import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
 /** 一个菜单叶子：perm 为其权限 key；superOnly 的叶子改按 super_admin 判定（不走 key）。 */
 interface Leaf {
   key: string;
-  label: string;
+  label: AdminShellKey;
   perm?: MenuPermission;
   anyPermission?: readonly string[];
   superOnly?: boolean;
@@ -48,7 +50,7 @@ interface Leaf {
 interface Group {
   key: string;
   icon: ReactNode;
-  label: string;
+  label: AdminShellKey;
   leaves: Leaf[];
 }
 
@@ -63,7 +65,7 @@ function pageLeaf(
       superOnly?: boolean;
     };
   },
-  label: string
+  label: AdminShellKey
 ): Leaf {
   return {
     key: `/${route.path}`,
@@ -78,21 +80,21 @@ const GROUPS: Group[] = [
   {
     key: "grp-user",
     icon: <UserIcon />,
-    label: "用户管理",
+    label: "nav_users",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.users, "用户管理"),
-      pageLeaf(ADMIN_PAGE_ROUTES.admins, "管理员管理"),
-      pageLeaf(ADMIN_PAGE_ROUTES.permissions, "权限管理")
+      pageLeaf(ADMIN_PAGE_ROUTES.users, "nav_users"),
+      pageLeaf(ADMIN_PAGE_ROUTES.admins, "nav_admins"),
+      pageLeaf(ADMIN_PAGE_ROUTES.permissions, "nav_permissions")
     ]
   },
   {
     key: "grp-class",
     icon: <UsersIcon />,
-    label: "班级管理",
+    label: "nav_classes",
     leaves: [
       {
         key: "todo:classes",
-        label: "班级管理",
+        label: "nav_classes",
         perm: "classes.access",
         disabled: true
       }
@@ -101,14 +103,14 @@ const GROUPS: Group[] = [
   {
     key: "grp-dict",
     icon: <BookIcon />,
-    label: "词库管理",
+    label: "nav_dictionary",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.words, "智能词库"),
-      pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "垃圾桶"),
-      pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "词性配置"),
+      pageLeaf(ADMIN_PAGE_ROUTES.words, "nav_words"),
+      pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "nav_trash"),
+      pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "nav_parts"),
       {
         key: "todo:custom-dict",
-        label: "自定义词库",
+        label: "nav_custom_dictionary",
         perm: "customdict.access",
         disabled: true
       }
@@ -117,31 +119,31 @@ const GROUPS: Group[] = [
   {
     key: "grp-voices",
     icon: <Volume2Icon />,
-    label: "配音中心",
+    label: "nav_voice",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.voices, "分组配音"),
-      pageLeaf(ADMIN_PAGE_ROUTES.voiceLibrary, "音色库")
+      pageLeaf(ADMIN_PAGE_ROUTES.voices, "nav_dubbing"),
+      pageLeaf(ADMIN_PAGE_ROUTES.voiceLibrary, "nav_voices")
     ]
   },
   {
     key: "grp-sentences",
     icon: <BookOpenIcon />,
-    label: "例句管理",
+    label: "nav_examples",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.sentences, "多维例句"),
-      pageLeaf(ADMIN_PAGE_ROUTES.sentencesTrash, "垃圾桶")
+      pageLeaf(ADMIN_PAGE_ROUTES.sentences, "nav_sentences"),
+      pageLeaf(ADMIN_PAGE_ROUTES.sentencesTrash, "nav_trash")
     ]
   },
   {
     key: "grp-wordlist",
     icon: <ListChecksIcon />,
-    label: "词表管理",
+    label: "nav_wordlists",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "智能词表"),
-      pageLeaf(ADMIN_PAGE_ROUTES.reviews, "词表审核"),
+      pageLeaf(ADMIN_PAGE_ROUTES.wordlists, "nav_wordlists_entries"),
+      pageLeaf(ADMIN_PAGE_ROUTES.reviews, "nav_wordlist_reviews"),
       {
         key: "todo:custom-wordlist",
-        label: "自定义词表",
+        label: "nav_custom_wordlists",
         perm: "customwordlist.access",
         disabled: true
       }
@@ -150,11 +152,11 @@ const GROUPS: Group[] = [
   {
     key: "grp-task",
     icon: <CalendarDaysIcon />,
-    label: "任务管理",
+    label: "nav_tasks",
     leaves: [
       {
         key: "todo:tasks",
-        label: "任务管理",
+        label: "nav_tasks",
         perm: "tasks.access",
         disabled: true
       }
@@ -163,12 +165,12 @@ const GROUPS: Group[] = [
   {
     key: "grp-review",
     icon: <ClipboardCheckIcon />,
-    label: "审核管理",
+    label: "nav_reviews",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.teacherApplications, "教师申请审核"),
+      pageLeaf(ADMIN_PAGE_ROUTES.teacherApplications, "nav_teacher_reviews"),
       {
         key: "todo:comments",
-        label: "评论审核",
+        label: "nav_comments",
         perm: "comments.access",
         disabled: true
       }
@@ -177,16 +179,16 @@ const GROUPS: Group[] = [
   {
     key: "grp-settings",
     icon: <SettingsIcon />,
-    label: "系统设置",
-    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.aiLedger, "AI 账本")]
+    label: "nav_system",
+    leaves: [pageLeaf(ADMIN_PAGE_ROUTES.aiLedger, "nav_ai")]
   },
   {
     key: "grp-coin",
     icon: <CircleDollarSignIcon />,
-    label: "天生币",
+    label: "nav_coins",
     leaves: [
-      pageLeaf(ADMIN_PAGE_ROUTES.myCoins, "我的天生币"),
-      pageLeaf(ADMIN_PAGE_ROUTES.coins, "天生币管理")
+      pageLeaf(ADMIN_PAGE_ROUTES.myCoins, "nav_my_coins"),
+      pageLeaf(ADMIN_PAGE_ROUTES.coins, "nav_coin_management")
     ]
   }
 ];
@@ -196,7 +198,10 @@ const GROUPS: Group[] = [
  * 无权限要求时登录即可见，否则当 super_admin 或 permissions 含其 key 时可见。
  * 分组过滤掉不可见叶子后若为空则整组不渲染。
  */
-function buildNav(profile: AdminProfile | null): ConsoleNavigationItem[] {
+function buildNav(
+  profile: AdminProfile | null,
+  t: ReturnType<typeof useAdminTranslation>["t"]
+): ConsoleNavigationItem[] {
   const visible = (l: Leaf): boolean =>
     l.superOnly
       ? profile?.role === "super_admin"
@@ -207,14 +212,14 @@ function buildNav(profile: AdminProfile | null): ConsoleNavigationItem[] {
           : profile !== null;
 
   const items: ConsoleNavigationItem[] = [
-    { key: "/", icon: <HouseIcon />, label: "首页" }
+    { key: "/", icon: <HouseIcon />, label: t("nav_home") }
   ];
   for (const g of GROUPS) {
     const children = g.leaves
       .filter(visible)
-      .map((l) => ({ key: l.key, label: l.label, disabled: l.disabled }));
+      .map((l) => ({ key: l.key, label: t(l.label), disabled: l.disabled }));
     if (children.length > 0) {
-      items.push({ key: g.key, icon: g.icon, label: g.label, children });
+      items.push({ key: g.key, icon: g.icon, label: t(g.label), children });
     }
   }
   return items;
@@ -232,10 +237,11 @@ export function ConsoleSidebar({
   // 导航发生后回调（如抽屉态点菜单后关闭抽屉）。
   onNavigate?: () => void;
 }) {
+  const { t } = useAdminTranslation();
   const pathname = useLocation().pathname;
   const navigate = useNavigate();
   const profile = useAuthStore((s) => s.profile);
-  const nav = useMemo(() => buildNav(profile), [profile]);
+  const nav = useMemo(() => buildNav(profile, t), [profile, t]);
 
   const onClick: MenuProps["onClick"] = ({ key }) => {
     // 占位项以 todo: 前缀标记（且已 disabled，正常点不到），保险起见再拦一次。
