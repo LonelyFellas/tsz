@@ -103,7 +103,7 @@ export function useDraftRecovery<T>({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "编辑内容备份.json";
+    link.download = t("backup_filename");
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

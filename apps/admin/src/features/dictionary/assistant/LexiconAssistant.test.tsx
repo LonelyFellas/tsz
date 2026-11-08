@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { App } from "@tsz/ui/admin/overlays";
 import {
   act,
@@ -367,4 +369,70 @@ it("上下文去除对象地址和音频资料，超长文本明确标记截断"
   });
   expect(changed.local_content).toBe(projected.local_content);
   expect(changed.fingerprint).not.toBe(projected.fingerprint);
+});
+
+it("流式回答中切换语言保留输入、消息节点、进度原文和唯一请求，停止后提示即时翻译", async () => {
+  let onEvent!: (event: import("@tsz/types").LexiconAssistantEvent) => void;
+  requests.askStream.mockImplementationOnce((_input, onChunk) => {
+    onEvent = onChunk;
+    return new Promise(() => {});
+  });
+  const value = context();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      {surface(value)}
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await openAndAsk("保留原文 centre");
+  const sent = requests.askStream.mock.calls[0]![0] as LexiconAssistantInput;
+  const input = screen.getByRole("textbox", { name: "向词库小精灵提问" });
+  act(() => {
+    onEvent({ event: "status", message: "服务端原始进度" });
+    onEvent({ event: "delta", text: "模型原始回答 centre" });
+  });
+  const answer = screen.getByText("模型原始回答 centre");
+  for (const locale of ["en-GB", "en-US", "zh-Hant"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByText("模型原始回答 centre")).toBe(answer);
+    expect(screen.getByText("服务端原始进度")).toBeVisible();
+    expect(input).toHaveValue("保留原文 centre");
+    expect(input).toBeDisabled();
+    expect(requests.askStream).toHaveBeenCalledTimes(1);
+    expect(requests.capability).toHaveBeenCalledTimes(1);
+  }
+  view.rerender(content("en-US"));
+  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+  expect(screen.getByText(/The answer was interrupted/)).toBeVisible();
+  expect(input).toHaveValue(sent.question);
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByText("回答未完成，已保留收到的內容。")).toBeVisible();
+  expect(screen.getByText("模型原始回答 centre")).toBeVisible();
+  expect(value.forms).toEqual(sent.draft?.forms);
+});
+
+it("英文起始问题仅翻译按钮标签，切换语言不改写已选择的模型输入", async () => {
+  const value = context();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      {surface(value)}
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("en-US"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Open lexicon assistant" })
+  );
+  await waitFor(() => expect(requests.capability).toHaveBeenCalledTimes(1));
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Check for missing meanings and sentences"
+    })
+  );
+  const input = screen.getByRole("textbox", {
+    name: "Ask the lexicon assistant"
+  });
+  expect(input).toHaveValue("检查词义和例句还缺什么");
+  view.rerender(content("zh-Hant"));
+  expect(input).toHaveValue("检查词义和例句还缺什么");
+  expect(requests.askStream).not.toHaveBeenCalled();
 });

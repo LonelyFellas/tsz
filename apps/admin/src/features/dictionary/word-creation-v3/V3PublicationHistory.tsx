@@ -1,7 +1,12 @@
+import {
+  useLexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage as uiMessage
+} from "../i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { useAuthStore } from "@/lib/auth";
 import { canAdminResourceAction } from "@tsz/shared/auth";
-import { expandFormContents, pronunciationSynthesisLabel } from "@tsz/shared";
+import { expandFormContents } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError, RequestTimeoutError } from "@tsz/api-client";
@@ -14,7 +19,9 @@ import type {
   Dialect,
   EnglishTextV3,
   PronunciationSynthesisV3,
-  SurfaceMatchPageV3
+  SurfaceMatchPageV3,
+  SentenceTranslationBandV3,
+  WordDefinitionV3
 } from "@tsz/types";
 import {
   Alert,
@@ -46,8 +53,8 @@ import { V3ReferenceList } from "./components/V3ReferenceList";
 import { sentenceTranslationsV3 } from "./meaningsModel";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
-  definitionModeLabel,
   dialectLabel,
+  reviewSynthesisLabel,
   pronunciationStyleLabel,
   relationLabel,
   sentenceLinkRoleLabel
@@ -106,7 +113,7 @@ interface SnapshotMeaningLine {
   english?: EnglishTextV3;
   id: string;
   pos: string;
-  mode: string;
+  mode: WordDefinitionV3["definition_mode"];
   text: string;
 }
 
@@ -123,7 +130,11 @@ interface SnapshotSentenceLine {
   pos: string;
   level: string;
   english: Array<{ id: string; dialect: string; text: string }>;
-  chinese: Array<{ id: string; label?: string; text: string }>;
+  chinese: Array<{
+    id: string;
+    label?: SentenceTranslationBandV3;
+    text: string;
+  }>;
   roles: string[];
   associations: Array<{ id: string; target: string; gloss?: string }>;
 }
@@ -233,15 +244,10 @@ function snapshotBody(publication: AdminWordPublicationAny): {
           richEnglish: sentence.en_text,
           chinese: sentenceTranslationsV3(sentence).map((translation) => ({
             id: translation.id,
-            label:
-              translation.band === "word_for_word"
-                ? "初"
-                : translation.band === "balanced_fluency"
-                  ? "中"
-                  : "高",
+            label: translation.band,
             text: translation.content.text
           })),
-          roles: sentence.links.map((link) => sentenceLinkRoleLabel(link.role)),
+          roles: sentence.links.map((link) => link.role),
           associations: sentence.associations.map((association) => {
             const fallback = association.source_segments
               .map((segment) => segment.surface)
@@ -272,9 +278,7 @@ function snapshotBody(publication: AdminWordPublicationAny): {
           pos: posById.get(pos.pos_id) ?? pos.pos_id,
           relation: relation.relation,
           target:
-            relation.target_headword ??
-            relation.pending_target_headword ??
-            "待补充目标词条",
+            relation.target_headword ?? relation.pending_target_headword ?? "",
           ...((relation.target_gloss ?? relation.pending_target_gloss)
             ? { gloss: relation.target_gloss ?? relation.pending_target_gloss }
             : {})
@@ -289,6 +293,7 @@ function PublicationSnapshotBody({
 }: {
   publication: AdminWordPublicationAny;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const formTypeLabel = useFormTypeLabel();
   const partOfSpeechLabel = usePartOfSpeechLabel();
   const snapshot = snapshotBody(publication);
@@ -296,21 +301,23 @@ function PublicationSnapshotBody({
     <Card
       className="v3-publication-modal-content"
       size="small"
-      title="快照正文"
+      title={t("snapshot_body")}
       data-testid="publication-snapshot-body"
     >
       <Flex vertical gap="middle">
         <Flex vertical gap="small">
-          <Typography.Text strong>词形与发音</Typography.Text>
+          <Typography.Text strong>{t("snapshot_forms")}</Typography.Text>
           {snapshot.forms.length === 0 ? (
-            <Typography.Text type="secondary">无词形快照</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("snapshot_no_forms")}
+            </Typography.Text>
           ) : (
             snapshot.forms.map((form) => (
               <Flex key={form.id} vertical gap={2}>
                 <Flex align="center" gap="small" wrap>
                   <Tag>{partOfSpeechLabel(form.pos)}</Tag>
                   <Tag>{formTypeLabel(form.formType as never)}</Tag>
-                  <Tag>{dialectLabel(form.dialect as never)}</Tag>
+                  <Tag>{dialectLabel(form.dialect as never, t)}</Tag>
                   <Typography.Text
                     className="tsz-words"
                     style={{ fontWeight: 700 }}
@@ -319,23 +326,25 @@ function PublicationSnapshotBody({
                   </Typography.Text>
                 </Flex>
                 {form.pronunciations.length === 0 ? (
-                  <Typography.Text type="secondary">无发音</Typography.Text>
+                  <Typography.Text type="secondary">
+                    {t("snapshot_no_pronunciation")}
+                  </Typography.Text>
                 ) : (
                   form.pronunciations.map((pronunciation) => (
                     <Typography.Text key={pronunciation.id} type="secondary">
-                      词典音标{" "}
+                      {t("snapshot_dictionary_phonetic")}{" "}
                       <span className="tsz-phonetics">
                         {pronunciation.dictPhonetic}
                       </span>{" "}
-                      · 实际发音{" "}
+                      · {t("snapshot_actual_pronunciation")}{" "}
                       <span className="tsz-phonetics tsz-actual-pronunciation">
                         {pronunciation.actualPron}
                       </span>
                       {pronunciation.synthesis
-                        ? ` · ${pronunciationSynthesisLabel(pronunciation.synthesis, form.dialect)}`
+                        ? ` · ${reviewSynthesisLabel(pronunciation.synthesis, form.dialect, t)}`
                         : ""}
                       {pronunciation.style
-                        ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`
+                        ? ` · ${pronunciationStyleLabel(pronunciation.style as never, t)}`
                         : ""}
                     </Typography.Text>
                   ))
@@ -345,14 +354,27 @@ function PublicationSnapshotBody({
           )}
         </Flex>
         <Flex vertical gap="small">
-          <Typography.Text strong>释义</Typography.Text>
+          <Typography.Text strong>{t("snapshot_meanings")}</Typography.Text>
           {snapshot.meanings.length === 0 ? (
-            <Typography.Text type="secondary">无释义快照</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("snapshot_no_meanings")}
+            </Typography.Text>
           ) : (
             snapshot.meanings.map((meaning) => (
               <Flex key={meaning.id} align="center" gap="small" wrap>
                 <Tag>{partOfSpeechLabel(meaning.pos)}</Tag>
-                <Tag>{definitionModeLabel(meaning.mode)}</Tag>
+                <Tag>
+                  {t(
+                    (
+                      {
+                        zh_definition: "snapshot_definition_zh",
+                        en_definition: "snapshot_definition_en",
+                        zh_sentence: "snapshot_sentence_zh",
+                        en_sentence: "snapshot_sentence_en"
+                      } as const
+                    )[meaning.mode] ?? "snapshot_definition_unknown"
+                  )}
+                </Tag>
                 {meaning.english ? (
                   <V3EnglishTextPreview
                     value={meaning.english}
@@ -367,11 +389,16 @@ function PublicationSnapshotBody({
         </Flex>
         {snapshot.senseGroups.length > 0 ? (
           <Flex vertical gap="small">
-            <Typography.Text strong>释义组</Typography.Text>
+            <Typography.Text strong>
+              {t("snapshot_sense_groups")}
+            </Typography.Text>
             <Flex gap="small" wrap>
               {snapshot.senseGroups.map((group, index) => (
                 <Tag key={group.id}>
-                  释义组 {index + 1}：{group.label}
+                  {t("snapshot_group", {
+                    index: index + 1,
+                    label: group.label
+                  })}
                 </Tag>
               ))}
             </Flex>
@@ -379,11 +406,11 @@ function PublicationSnapshotBody({
         ) : null}
         {snapshot.grammar.length > 0 ? (
           <Flex vertical gap="small">
-            <Typography.Text strong>语法结构</Typography.Text>
+            <Typography.Text strong>{t("snapshot_grammar")}</Typography.Text>
             {snapshot.grammar.map((grammar) => (
               <Flex key={grammar.id} gap="small" wrap>
                 <Tag>{partOfSpeechLabel(grammar.pos)}</Tag>
-                <Tag>{dialectLabel(grammar.dialect as never)}</Tag>
+                <Tag>{dialectLabel(grammar.dialect as never, t)}</Tag>
                 <Typography.Text className="tsz-words">
                   {grammar.text}
                 </Typography.Text>
@@ -392,9 +419,11 @@ function PublicationSnapshotBody({
           </Flex>
         ) : null}
         <Flex vertical gap="small">
-          <Typography.Text strong>例句</Typography.Text>
+          <Typography.Text strong>{t("snapshot_sentences")}</Typography.Text>
           {snapshot.sentences.length === 0 ? (
-            <Typography.Text type="secondary">无例句快照</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("snapshot_no_sentences")}
+            </Typography.Text>
           ) : (
             snapshot.sentences.map((sentence) => (
               <Card key={sentence.id} size="small">
@@ -403,7 +432,9 @@ function PublicationSnapshotBody({
                     <Tag>{partOfSpeechLabel(sentence.pos)}</Tag>
                     {sentence.level ? <Tag>{sentence.level}</Tag> : null}
                     {sentence.roles.map((role, index) => (
-                      <Tag key={`${sentence.id}-role-${index}`}>{role}</Tag>
+                      <Tag key={`${sentence.id}-role-${index}`}>
+                        {sentenceLinkRoleLabel(role, t)}
+                      </Tag>
                     ))}
                   </Flex>
                   {sentence.richEnglish ? (
@@ -411,16 +442,26 @@ function PublicationSnapshotBody({
                   ) : (
                     sentence.english.map((row) => (
                       <Typography.Text className="tsz-entry-en" key={row.id}>
-                        {dialectLabel(row.dialect as never)}：{row.text}
+                        {dialectLabel(row.dialect as never, t)}：{row.text}
                       </Typography.Text>
                     ))
                   )}
                   {sentence.chinese.map((translation) => (
                     <Typography.Text key={translation.id}>
                       {translation.label ? (
-                        <Tag>{translation.label}</Tag>
+                        <Tag>
+                          {t(
+                            (
+                              {
+                                word_for_word: "panel_w",
+                                balanced_fluency: "panel_b",
+                                adapted_creation: "panel_a"
+                              } as const
+                            )[translation.label]
+                          )}
+                        </Tag>
                       ) : (
-                        "中文："
+                        t("snapshot_definition_zh")
                       )}
                       {translation.text}
                     </Typography.Text>
@@ -430,7 +471,9 @@ function PublicationSnapshotBody({
                       className="tsz-entry-en"
                       key={association.id}
                     >
-                      上下文关联：{association.target}
+                      {t("snapshot_association", {
+                        target: association.target
+                      })}
                       {association.gloss ? ` · ${association.gloss}` : ""}
                     </Typography.Text>
                   ))}
@@ -440,16 +483,18 @@ function PublicationSnapshotBody({
           )}
         </Flex>
         <Flex vertical gap="small">
-          <Typography.Text strong>关系词</Typography.Text>
+          <Typography.Text strong>{t("snapshot_relations")}</Typography.Text>
           {snapshot.relations.length === 0 ? (
-            <Typography.Text type="secondary">无关系词快照</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("snapshot_no_relations")}
+            </Typography.Text>
           ) : (
             snapshot.relations.map((relation) => (
               <Flex key={relation.id} gap="small" wrap>
                 <Tag>{partOfSpeechLabel(relation.pos)}</Tag>
-                <Tag>{relationLabel(relation.relation)}</Tag>
+                <Tag>{relationLabel(relation.relation, t)}</Tag>
                 <Typography.Text className="tsz-entry-en">
-                  {relation.target}
+                  {relation.target || t("snapshot_target_missing")}
                   {relation.gloss ? ` · ${relation.gloss}` : ""}
                 </Typography.Text>
               </Flex>
@@ -466,22 +511,29 @@ function PublicationMetadata({
 }: {
   publication: AdminWordPublicationAny;
 }) {
+  const { t } = useLexiconEditorTranslation();
   return (
     <Card
       className="v3-publication-modal-metadata"
       size="small"
-      title="发布信息"
+      title={t("publication_metadata")}
       data-testid="publication-metadata"
     >
       <Flex vertical gap={2}>
         <Typography.Text>
-          发布批次：第 {publication.publication_number} 次
+          {t("publication_batch", { number: publication.publication_number })}
         </Typography.Text>
         <Typography.Text>
-          发布时间：{dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")}
+          {t("publication_time", {
+            time: dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")
+          })}
         </Typography.Text>
         <Typography.Text>
-          当前状态：{publication.is_current ? "当前线上版本" : "历史版本"}
+          {t("publication_status", {
+            status: publication.is_current
+              ? t("publication_current")
+              : t("publication_historical")
+          })}
         </Typography.Text>
       </Flex>
     </Card>
@@ -505,42 +557,42 @@ function isCanonicalActivationConflict(error: unknown): error is HttpError {
   );
 }
 
-function surfaceActivationErrorMessage(code: string | undefined): string {
+function surfaceActivationErrorMessage(code: string | undefined) {
   if (
     code === "surface_match_snapshot_expired" ||
     code === "surface_policy_changed"
   ) {
-    return "同名词条确认已失效，请重新检查恢复条件。";
+    return uiMessage("publication_surface_expired");
   }
   if (
     code === "exact_headword_creation_temporarily_disabled" ||
     code === "multiple_active_exact_headword_publications_not_enabled"
   ) {
-    return "学习端暂不支持多个同名公开词条。";
+    return uiMessage("publication_surface_unsupported");
   }
-  return "恢复需要确认同名词条，但服务端未返回可确认快照。";
+  return uiMessage("publication_surface_missing");
 }
 
-function activationErrorMessage(error: unknown): string {
+function activationErrorMessage(error: unknown) {
   if (error instanceof HttpError) {
     switch (error.status) {
       case 403:
-        return "当前账号没有恢复历史草稿的权限。";
+        return uiMessage("publication_forbidden");
       case 404:
       case 405:
-        return "当前服务不支持历史草稿恢复，或该历史记录已不存在。请刷新页面后重试。";
+        return uiMessage("publication_unsupported");
       case 422:
-        return "恢复请求校验未通过。";
+        return uiMessage("publication_invalid");
       case 503:
-        return "恢复结果尚未确认，请刷新查看结果或原样重试确认。";
+        return uiMessage("publication_unknown_result");
       default:
-        return "恢复历史草稿失败，请稍后重试。";
+        return error.message;
     }
   }
   if (error instanceof TypeError || error instanceof RequestTimeoutError) {
-    return "网络异常，恢复状态未知，请刷新发布历史后再重试。";
+    return uiMessage("publication_network");
   }
-  return "恢复历史草稿失败，请稍后重试。";
+  return uiMessage("publication_failed");
 }
 
 export function V3PublicationHistory({
@@ -554,6 +606,7 @@ export function V3PublicationHistory({
   idempotencyKeyFactory = newWordNodeId,
   fetchSurfacePage = requests.surfacePage
 }: Props) {
+  const { t } = useLexiconEditorTranslation();
   const [publications, setPublications] = useState<AdminWordPublicationAny[]>(
     []
   );
@@ -577,7 +630,7 @@ export function V3PublicationHistory({
     "rollback",
     currentWord.created_by
   );
-  const [activationError, setActivationError] = useState<string>();
+  const [activationError, setActivationError] = useLexiconEditorMessageState();
   const [activationProblem, setActivationProblem] = useState<V3Problem>();
   const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV3>();
   const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
@@ -649,7 +702,12 @@ export function V3PublicationHistory({
     setSurfacePage(undefined);
     setSurfaceResetVersion((value) => value + 1);
     setRecovery(undefined);
-  }, [currentWord.id, currentWord.lifecycle_revision, currentWord.revision]);
+  }, [
+    currentWord.id,
+    currentWord.lifecycle_revision,
+    currentWord.revision,
+    setActivationError
+  ]);
 
   const retry = useCallback(() => setRetryVersion((value) => value + 1), []);
 
@@ -668,7 +726,7 @@ export function V3PublicationHistory({
     setActivationProblem(undefined);
     setSurfacePage(undefined);
     setSurfaceResetVersion((value) => value + 1);
-  }, []);
+  }, [setActivationError]);
 
   const closeDetail = useCallback(() => {
     if (activationLock.current) return;
@@ -753,7 +811,7 @@ export function V3PublicationHistory({
         }
       );
     },
-    [currentWord.id, requests]
+    [currentWord.id, requests, setActivationError]
   );
 
   const activate = useCallback(
@@ -847,7 +905,8 @@ export function V3PublicationHistory({
       idempotencyKeyFactory,
       onRestored,
       refreshAfterConflict,
-      requests
+      requests,
+      setActivationError
     ]
   );
 
@@ -869,21 +928,21 @@ export function V3PublicationHistory({
     setActivationError(undefined);
     setActivationProblem(undefined);
     void activate();
-  }, [activate, restoreBlockedByUnsavedChanges]);
+  }, [activate, restoreBlockedByUnsavedChanges, setActivationError]);
 
   const beginActivation = useCallback(() => {
     if (restoreBlockedByUnsavedChanges) return;
     setConfirming(true);
   }, [restoreBlockedByUnsavedChanges]);
 
-  if (loading) return <Spin aria-label="加载发布历史" />;
+  if (loading) return <Spin aria-label={t("publication_loading")} />;
   if (listError) {
     return (
       <Alert
         showIcon
         type="error"
-        title="发布历史加载失败"
-        action={<Button onClick={retry}>重 试</Button>}
+        title={t("publication_load_failed")}
+        action={<Button onClick={retry}>{t("publication_retry")}</Button>}
       />
     );
   }
@@ -896,28 +955,30 @@ export function V3PublicationHistory({
           type={recovery.phase === "error" ? "error" : "warning"}
           title={
             recovery.phase === "error"
-              ? "刷新最新词条与发布历史失败"
+              ? t("publication_refresh_failed")
               : recovery.status === 409
-                ? "词条版本已变化，正在刷新最新词条与发布历史"
-                : "确认上下文已失效，正在刷新最新词条与发布历史"
+                ? t("publication_revision_changed")
+                : t("publication_context_expired")
           }
           description={
             recovery.phase === "error"
-              ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送恢复请求。"
-              : "旧发布详情与确认已失效，正在获取最新词条和发布历史。"
+              ? t("publication_refresh_failed_help")
+              : t("publication_refresh_help")
           }
           action={
             recovery.phase === "error" ? (
               <Button onClick={() => refreshAfterConflict(recovery.status)}>
-                重新刷新词条与发布历史
+                {t("publication_refresh")}
               </Button>
             ) : null
           }
         />
       ) : null}
-      <Card className="v3-publication-history" title="发布历史">
+      <Card className="v3-publication-history" title={t("history_title")}>
         {publications.length === 0 ? (
-          <Typography.Text type="secondary">暂无发布记录</Typography.Text>
+          <Typography.Text type="secondary">
+            {t("publication_empty")}
+          </Typography.Text>
         ) : (
           <Flex vertical gap="small">
             {publications.map((publication) => (
@@ -934,13 +995,15 @@ export function V3PublicationHistory({
                       {publicationLabel(publication)}
                     </Typography.Text>
                     <Typography.Text type="secondary">
-                      第 {publication.publication_number} 次发布
+                      {t("publication_number", {
+                        number: publication.publication_number
+                      })}
                     </Typography.Text>
                     {publication.rollback_of_publication_id ? (
-                      <Tag>历史内容回退</Tag>
+                      <Tag>{t("publication_rollback")}</Tag>
                     ) : null}
                     {publication.is_current ? (
-                      <Tag color="green">当前</Tag>
+                      <Tag color="green">{t("publication_current_short")}</Tag>
                     ) : null}
                   </Flex>
                   <Typography.Text type="secondary">
@@ -948,11 +1011,13 @@ export function V3PublicationHistory({
                   </Typography.Text>
                 </Flex>
                 <Button
-                  aria-label={`查看第 ${publication.publication_number} 次发布`}
+                  aria-label={t("publication_view_number", {
+                    number: publication.publication_number
+                  })}
                   disabled={recovery !== undefined || activating}
                   onClick={() => openDetail(publication.publication_id)}
                 >
-                  查看详情
+                  {t("publication_view")}
                 </Button>
               </Flex>
             ))}
@@ -966,14 +1031,20 @@ export function V3PublicationHistory({
         mask={{ closable: !activating }}
         keyboard={!activating}
         open={selectedPublicationId !== undefined}
-        title="发布详情"
+        title={t("publication_details")}
         width={920}
         onCancel={closeDetail}
       >
         <Flex vertical gap="middle" data-testid="publication-detail">
-          {detailLoading ? <Spin aria-label="加载发布详情" /> : null}
+          {detailLoading ? (
+            <Spin aria-label={t("publication_details_loading")} />
+          ) : null}
           {detailError ? (
-            <Alert showIcon type="error" title="发布详情加载失败" />
+            <Alert
+              showIcon
+              type="error"
+              title={t("publication_details_failed")}
+            />
           ) : null}
           {detail ? (
             <>
@@ -986,25 +1057,19 @@ export function V3PublicationHistory({
                   {publicationLabel(detail)}
                 </Typography.Title>
                 <Typography.Text type="secondary">
-                  第 {detail.publication_number} 次发布
+                  {t("publication_number", {
+                    number: detail.publication_number
+                  })}
                 </Typography.Text>
               </Flex>
-              <Alert showIcon type="info" title="正在查看只读的历史发布快照" />
+              <Alert showIcon type="info" title={t("publication_readonly")} />
               <PublicationMetadata publication={detail} />
               <PublicationSnapshotBody publication={detail} />
               {currentWord.status !== "draft" ? (
-                <Alert
-                  type="info"
-                  title="只有草稿词条可以恢复历史版本，当前线上内容不会自动撤回。"
-                />
+                <Alert type="info" title={t("publication_draft_only")} />
               ) : null}
               {!allowedToRestore ? (
-                <Alert
-                  type="info"
-                  title={
-                    "需要恢复词条至历史版本权限；恢复他人草稿还需获准编辑他人词条"
-                  }
-                />
+                <Alert type="info" title={t("publication_permission_help")} />
               ) : null}
               {surfacePage ? (
                 <LifecycleSurfaceConfirmation
@@ -1027,9 +1092,9 @@ export function V3PublicationHistory({
                           <li
                             key={`${issue.node_id}:${issue.field}:${issue.code}`}
                           >
-                            {v3IssueMessage(issue)}
+                            {v3IssueMessage(issue, t)}
                             <Typography.Text type="secondary">
-                              {` · ${{ basics: "创建词条", forms: "词形与发音", meanings: "词义与例句" }[issue.step]} · ${issue.field} · ${issue.node_id}`}
+                              {` · ${t(({ basics: "assistant_step_basics", forms: "assistant_step_forms", meanings: "assistant_step_meanings" } as const)[issue.step])} · ${issue.field} · ${issue.node_id}`}
                             </Typography.Text>
                           </li>
                         ))}
@@ -1037,7 +1102,7 @@ export function V3PublicationHistory({
                     ) : activationProblem?.kind === "inbound_reference" ? (
                       <Flex vertical gap="small">
                         <Typography.Text>
-                          历史内容会影响以下关联，请先处理关联或选择其他版本。
+                          {t("publication_references_help")}
                         </Typography.Text>
                         <V3ReferenceList
                           references={activationProblem.references}
@@ -1053,13 +1118,11 @@ export function V3PublicationHistory({
                     <Alert
                       showIcon
                       type="warning"
-                      title={
-                        restoreBlockedReason ?? "请先保存或放弃未保存的草稿"
-                      }
+                      title={restoreBlockedReason ?? t("publication_unsaved")}
                       description={
                         restoreBlockedReason
-                          ? "服务更新并刷新页面后，才能恢复历史内容；查看历史详情不受影响。"
-                          : "当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容恢复到草稿；查看历史详情不受影响。"
+                          ? t("publication_service_help")
+                          : t("publication_unsaved_help")
                       }
                     />
                   ) : null}
@@ -1067,8 +1130,8 @@ export function V3PublicationHistory({
                     <Alert
                       showIcon
                       type="warning"
-                      title="确认恢复历史内容到草稿"
-                      description="将历史内容恢复到草稿，覆盖当前已保存的词形和释义；不会发布或改变线上版本。"
+                      title={t("publication_confirm_title")}
+                      description={t("publication_confirm_help")}
                       action={
                         <Button
                           disabled={
@@ -1077,7 +1140,7 @@ export function V3PublicationHistory({
                           loading={activating}
                           onClick={() => void activate()}
                         >
-                          确认恢复
+                          {t("publication_confirm")}
                         </Button>
                       }
                     />
@@ -1092,11 +1155,11 @@ export function V3PublicationHistory({
             gap="small"
           >
             <Button
-              aria-label="关闭发布详情"
+              aria-label={t("publication_close_label")}
               disabled={activating}
               onClick={closeDetail}
             >
-              关 闭
+              {t("publication_close")}
             </Button>
             {detail &&
             canRestoreV3Draft(currentWord) &&
@@ -1107,7 +1170,7 @@ export function V3PublicationHistory({
                 disabled={restoreBlockedByUnsavedChanges || !allowedToRestore}
                 onClick={() => beginActivation()}
               >
-                恢复到草稿
+                {t("publication_restore")}
               </Button>
             ) : null}
           </Flex>

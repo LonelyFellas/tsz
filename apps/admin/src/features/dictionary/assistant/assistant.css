@@ -93,6 +93,8 @@
 
 .lexicon-assistant-composer {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: var(--ui-space-3);
   padding-top: var(--ui-space-3);
   border-top: 1px solid var(--ui-color-border-secondary);
@@ -115,4 +117,10 @@
   .lexicon-assistant-transcript {
     scroll-behavior: auto;
   }
+}
+
+.lexicon-assistant-composer > .ui-btn {
+  height: auto;
+  min-height: var(--ui-control-height);
+  white-space: normal;
 }

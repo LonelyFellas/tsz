@@ -1,3 +1,10 @@
+import {
+  useLexiconEditorTranslation,
+  useLexiconEditorMessageState,
+  createLexiconEditorMessage as uiMessage
+} from "../i18n/editor";
+import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
+import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { primaryRegionalVariant } from "@tsz/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -18,7 +25,6 @@ import type { LexiconFormCandidatesResponse } from "@tsz/types";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
 import { api } from "@/lib/auth";
 import { newWordNodeId } from "../word-model/primitives";
-import { formTypeLabel } from "../word-creation-v3/presentation";
 import { assistantSnapshot, type AssistantEditorContext } from "./context";
 import {
   planFormCandidates,
@@ -40,12 +46,15 @@ export function FormCandidates({
   disabled: boolean;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
+  const formTypeLabel = useFormTypeLabel();
+  const partOfSpeechLabel = usePartOfSpeechLabel();
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [preview, setPreview] = useState<Preview>();
   const [selected, setSelected] = useState<string[]>([]);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useLexiconEditorMessageState();
   const request = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => request.current?.abort(), []);
   const allowed =
@@ -89,7 +98,7 @@ export function FormCandidates({
         context.word.presentation.label)
     ).trim();
     if (!headword || /^未命名词条/u.test(headword)) {
-      setError("请先填写词条拼写");
+      setError(uiMessage("candidate_headword_required"));
       return;
     }
     const controller = new AbortController();
@@ -118,8 +127,10 @@ export function FormCandidates({
       if (request.current === controller && !controller.signal.aborted)
         setError(
           cause instanceof HttpError && cause.status === 409
-            ? "词条或词性目录已更新，请刷新后重新生成。"
-            : "未能生成有效候选，请重试。当前草稿已保留。"
+            ? uiMessage("candidate_conflict")
+            : cause instanceof HttpError
+              ? cause.message
+              : uiMessage("candidate_failed")
         );
     } finally {
       if (request.current === controller) {
@@ -140,20 +151,22 @@ export function FormCandidates({
     if (!plan?.changed || !preview || stale || !allowed || pending || disabled)
       return;
     if (!context.applyForms?.(plan.forms, preview.formsSnapshot)) {
-      setError("草稿或编辑状态已变化，请重新生成候选。");
+      setError(uiMessage("candidate_draft_changed"));
       return;
     }
     setOpen(false);
-    void message.success(`已导入 ${plan.changed} 项词形内容，请核对后保存草稿`);
+    void message.success(t("candidate_imported", { count: plan.changed }));
   };
   const pronunciation = (side: "uk" | "us", row: CandidateImportRow) => (
     <Flex vertical gap={4}>
       <Typography.Text strong>{row[side].spelling}</Typography.Text>
       <Typography.Text>
-        {row[side].dict_phonetic || "音标待填写"}
+        {row[side].dict_phonetic || t("candidate_phonetic_missing")}
       </Typography.Text>
       <Typography.Text type="secondary">
-        实际发音：{row[`${side}_actual`] || "转换未完成，需核对"}
+        {t("candidate_actual", {
+          value: row[`${side}_actual`] || t("candidate_conversion_missing")
+        })}
       </Typography.Text>
     </Flex>
   );
@@ -167,10 +180,10 @@ export function FormCandidates({
           void generate();
         }}
       >
-        生成词性与发音候选
+        {t("candidate_generate")}
       </Button>
       <Modal
-        title="预览词性与发音候选"
+        title={t("candidate_preview")}
         centered
         styles={{
           body: { maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }
@@ -180,8 +193,8 @@ export function FormCandidates({
         width="min(960px, calc(100vw - 32px))"
         footer={
           <Space wrap>
-            <Button aria-label="取消" onClick={close}>
-              取消
+            <Button aria-label={t("candidate_cancel")} onClick={close}>
+              {t("candidate_cancel")}
             </Button>
             <Button
               icon={<RotateCwIcon />}
@@ -189,7 +202,7 @@ export function FormCandidates({
               disabled={!allowed || disabled}
               onClick={() => void generate()}
             >
-              重新生成
+              {t("candidate_regenerate")}
             </Button>
             <Button
               type="primary"
@@ -198,7 +211,9 @@ export function FormCandidates({
               }
               onClick={apply}
             >
-              导入当前草稿{plan?.changed ? `（${plan.changed}）` : ""}
+              {plan?.changed
+                ? t("candidate_import_count", { count: plan.changed })
+                : t("candidate_import")}
             </Button>
           </Space>
         }
@@ -207,36 +222,32 @@ export function FormCandidates({
           <Alert
             type="info"
             showIcon
-            title="AI 候选需人工核对"
-            description="导入所选词性下可补充的内容，保留已有填写。实际发音及 Azure IPA 使用系统转换；不会自动生成音频、保存或发布。"
+            title={t("candidate_review")}
+            description={t("candidate_review_help")}
           />
           {error && <Alert type="error" showIcon title={error} />}
           {stale && (
-            <Alert
-              type="warning"
-              showIcon
-              title="当前草稿或词性目录已变化，请重新生成候选"
-            />
+            <Alert type="warning" showIcon title={t("candidate_stale")} />
           )}
           {pending && (
-            <Spin description="正在生成词性、词形和音标候选…">
+            <Spin description={t("candidate_pending")}>
               <div style={{ minHeight: 100 }} />
             </Spin>
           )}
           {preview && (
             <>
               <Typography.Text type="secondary">
-                {preview.response.headword} · AI 建议 ·{" "}
-                {preview.response.usage.model}
+                {t("candidate_summary", {
+                  headword: preview.response.headword,
+                  model: preview.response.usage.model
+                })}
               </Typography.Text>
               <Checkbox.Group
                 value={selected}
                 onChange={(value) => setSelected(value as string[])}
                 options={preview.response.pos.map((row) => ({
                   value: row.pos,
-                  label:
-                    context.catalog?.items.find((item) => item.code === row.pos)
-                      ?.name_zh ?? row.pos
+                  label: partOfSpeechLabel(row.pos)
                 }))}
                 disabled={pending || stale}
               />
@@ -248,44 +259,38 @@ export function FormCandidates({
                 dataSource={plan?.rows ?? []}
                 columns={[
                   {
-                    title: "词性 / 词形",
+                    title: t("candidate_form"),
                     key: "form",
                     width: 140,
                     render: (_, row) => (
                       <Flex vertical>
-                        <span>
-                          {context.catalog?.items.find(
-                            (item) => item.code === row.pos
-                          )?.name_zh ?? row.pos}
-                        </span>
-                        <span>
-                          {context.catalog?.form_types?.find(
-                            (type) => type.code === row.form_type
-                          )?.name_zh ?? formTypeLabel(row.form_type)}
-                        </span>
+                        <span>{partOfSpeechLabel(row.pos)}</span>
+                        <span>{formTypeLabel(row.form_type)}</span>
                       </Flex>
                     )
                   },
                   {
-                    title: "英式",
+                    title: t("candidate_uk"),
                     key: "uk",
                     render: (_, row) => pronunciation("uk", row)
                   },
                   {
-                    title: "美式",
+                    title: t("candidate_us"),
                     key: "us",
                     render: (_, row) => pronunciation("us", row)
                   },
                   {
-                    title: "导入处理",
+                    title: t("candidate_result"),
                     key: "result",
                     width: 180,
                     render: (_, row) => (
                       <>
                         <Tag color={row.changed ? "blue" : "default"}>
-                          {row.changed ? "待导入" : "保留现有"}
+                          {row.changed
+                            ? t("candidate_to_import")
+                            : t("candidate_keep")}
                         </Tag>
-                        <div>{row.message}</div>
+                        <div>{row.message && t(row.message)}</div>
                       </>
                     )
                   }
@@ -295,13 +300,13 @@ export function FormCandidates({
                 <Alert
                   type="warning"
                   showIcon
-                  title="核查提示"
+                  title={t("candidate_notes")}
                   description={preview.response.notes.join("；")}
                 />
               )}
               {!pending && !stale && !plan?.changed && (
                 <Typography.Text type="secondary">
-                  当前没有可安全补充的内容，可在编辑器中核对后重试。
+                  {t("candidate_empty")}
                 </Typography.Text>
               )}
             </>
