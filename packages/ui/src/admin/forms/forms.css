@@ -346,6 +346,7 @@ textarea.ui-input {
   position: relative;
   display: flex;
   min-width: 0;
+  min-height: 24px;
   flex: 1;
   align-items: center;
   overflow: hidden;
@@ -365,6 +366,15 @@ textarea.ui-input {
   position: absolute;
   inset: 0;
   width: 100%;
+  visibility: visible;
+}
+.ui-select-single .ui-select-content {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ui-select-single .ui-select-content-has-search-value {
+  visibility: hidden;
 }
 .ui-select-content-value,
 .ui-select-placeholder {
@@ -407,11 +417,30 @@ textarea.ui-input {
   border-radius: 4px;
   padding: 0 5px;
   background: #eef1f5;
+  min-width: 0;
+  max-width: 100%;
+}
+.ui-select-content-item {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.ui-select-selection-item-content {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ui-select-selection-item-remove {
+  flex: none;
 }
 .ui-select-dropdown,
 .ui-picker-dropdown {
   position: absolute;
   z-index: 1200;
+}
+.ui-select-dropdown,
+.ui-picker-panel-container {
   box-sizing: border-box;
   border-radius: 8px;
   border: 1px solid var(--ui-color-border-secondary);
@@ -424,6 +453,9 @@ textarea.ui-input {
 }
 .ui-select-dropdown {
   padding: var(--ui-space-1);
+  max-width: calc(100vw - 12px);
+  max-height: calc(100dvh - 12px);
+  overflow: auto;
 }
 .ui-select-dropdown-hidden,
 .ui-picker-dropdown-hidden {
@@ -446,6 +478,7 @@ textarea.ui-input {
 .ui-select-item-option-content {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .ui-select-item-option-active:not(.ui-select-item-option-disabled),
 .ui-cascader-menu-item:hover {
@@ -655,7 +688,25 @@ textarea.ui-input {
   opacity: 1;
 }
 .ui-picker-dropdown {
+  font: inherit;
+  font-size: var(--ui-font-size);
+  line-height: 1.45;
+  pointer-events: none;
+  padding: 4px;
+}
+.ui-picker-range-wrapper {
+  display: flex;
+}
+.ui-picker-range-arrow {
+  position: absolute;
+}
+.ui-picker-panel-container {
+  /* 保持面板按内容测宽，避免范围定位的 margin 反过来改变测量结果。 */
+  display: inline-block;
+  vertical-align: top;
+  pointer-events: auto;
   max-width: calc(100vw - 12px);
+  max-height: calc(100dvh - 12px);
   overflow: auto;
   padding: 6px;
 }

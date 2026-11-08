@@ -9,6 +9,10 @@ import RcMenu, {
   type MenuProps as HeadlessMenuProps
 } from "@rc-component/menu";
 import {
+  placements as menuPlacements,
+  placementsRtl as menuPlacementsRtl
+} from "@rc-component/menu/es/placements";
+import {
   cloneElement,
   isValidElement,
   useContext,
@@ -37,19 +41,20 @@ type Side =
   | "bottomLeft"
   | "bottomRight";
 const placements: BuildInPlacements = {};
-for (const [name, points, offset] of [
-  ["top", ["bc", "tc"], [0, -6]],
-  ["bottom", ["tc", "bc"], [0, 6]],
-  ["left", ["cr", "cl"], [-6, 0]],
-  ["right", ["cl", "cr"], [6, 0]],
-  ["topLeft", ["bl", "tl"], [0, -6]],
-  ["topRight", ["br", "tr"], [0, -6]],
-  ["bottomLeft", ["tl", "bl"], [0, 6]],
-  ["bottomRight", ["tr", "br"], [0, 6]]
+for (const [name, points] of [
+  ["top", ["bc", "tc"]],
+  ["bottom", ["tc", "bc"]],
+  ["left", ["cr", "cl"]],
+  ["right", ["cl", "cr"]],
+  ["topLeft", ["bl", "tl"]],
+  ["topRight", ["br", "tr"]],
+  ["bottomLeft", ["tl", "bl"]],
+  ["bottomRight", ["tr", "br"]]
 ] as const)
   placements[name] = {
     points: [...points],
-    offset: [...offset],
+    // 间距计入浮层 padding，贴边平移时不再额外移出视口。
+    offset: [0, 0],
     overflow: { adjustX: true, adjustY: true, shiftX: 8, shiftY: 8 }
   };
 
@@ -441,8 +446,32 @@ function menuItems(items: MenuProps["items"]): HeadlessMenuProps["items"] {
     return common;
   });
 }
-export function Menu({ items, prefixCls = "ui-menu", ...props }: MenuProps) {
-  return <RcMenu {...props} prefixCls={prefixCls} items={menuItems(items)} />;
+export function Menu({
+  items,
+  prefixCls = "ui-menu",
+  direction,
+  builtinPlacements,
+  ...props
+}: MenuProps) {
+  const defaults = direction === "rtl" ? menuPlacementsRtl : menuPlacements;
+  const boundedPlacements = Object.fromEntries(
+    Object.entries(defaults).map(([name, placement]) => [
+      name,
+      {
+        ...placement,
+        overflow: { ...placement.overflow, shiftX: true, shiftY: true }
+      }
+    ])
+  );
+  return (
+    <RcMenu
+      {...props}
+      direction={direction}
+      builtinPlacements={{ ...boundedPlacements, ...builtinPlacements }}
+      prefixCls={prefixCls}
+      items={menuItems(items)}
+    />
+  );
 }
 export function Dropdown({
   menu,

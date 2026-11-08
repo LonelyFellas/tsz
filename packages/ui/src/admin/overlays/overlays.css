@@ -63,6 +63,8 @@
   font-size: 17px;
   font-weight: 650;
   line-height: 1.45;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .ui-modal-header {
   padding-inline-end: 32px;
@@ -70,6 +72,7 @@
 }
 .ui-modal-body {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .ui-modal-footer,
 .ui-modal-confirm-btns,
@@ -153,6 +156,7 @@
   min-height: 0;
   overflow: auto;
   padding: var(--ui-space-5);
+  overflow-wrap: anywhere;
 }
 .ui-drawer-footer {
   padding: var(--ui-space-3) var(--ui-space-5);
@@ -176,6 +180,15 @@
 .ui-popover-container {
   padding: var(--ui-space-3);
   border-radius: 10px;
+  box-sizing: border-box;
+  max-height: calc(100dvh - 12px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.ui-popover,
+.ui-dropdown,
+.ui-tooltip {
+  padding: 6px;
 }
 .ui-popover-title {
   margin-bottom: 6px;
@@ -196,6 +209,9 @@
 .ui-dropdown-container {
   padding: var(--ui-space-1);
   border-radius: 8px;
+  box-sizing: border-box;
+  max-height: calc(100dvh - 12px);
+  overflow: auto;
 }
 .ui-tooltip-hidden,
 .ui-popover-hidden,
@@ -227,6 +243,8 @@
   min-width: 144px;
   border-radius: 8px;
   box-shadow: 0 6px 20px rgb(16 24 40 / 16%);
+  max-height: calc(100dvh - 12px);
+  overflow: auto;
 }
 .ui-menu-item,
 .ui-menu-submenu-title,

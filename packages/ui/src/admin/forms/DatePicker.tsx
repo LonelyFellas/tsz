@@ -32,6 +32,10 @@ const calendarProps = {
   nextIcon: <ChevronRight size={14} aria-hidden="true" />,
   superPrevIcon: <ChevronsLeft size={14} aria-hidden="true" />,
   superNextIcon: <ChevronsRight size={14} aria-hidden="true" />,
+  popupAlign: {
+    offset: [0, 0],
+    overflow: { adjustX: true, adjustY: true, shiftX: true, shiftY: true }
+  },
   getPopupContainer: (anchor: HTMLElement) =>
     anchor.closest<HTMLElement>('[role="dialog"]') ?? document.body
 };
