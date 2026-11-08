@@ -11,6 +11,9 @@ import {
   workspaceResources,
   useWorkspaceTranslation
 } from "@/features/dictionary/i18n/workspace";
+import { tableResources } from "@/components/table-i18n";
+import { lexiconListResources } from "@/features/dictionary/i18n/list";
+import { lexiconEditorResources } from "@/features/dictionary/i18n/editor";
 
 it("按模块加载的资源保持键、插值及复数形式完整", () => {
   const placeholders = (value: string) =>
@@ -19,7 +22,10 @@ it("按模块加载的资源保持键、插值及复数形式完整", () => {
       .sort();
   const modules: Record<string, Record<string, Record<string, string>>>[] = [
     dashboardResources,
-    workspaceResources
+    workspaceResources,
+    tableResources,
+    lexiconListResources,
+    lexiconEditorResources
   ];
   for (const resources of modules) {
     const base = Object.values(resources["zh-Hans"]!)[0]!;
@@ -91,4 +97,6 @@ it("模块资源不进入新建的登录实例，不在多个根节点间串语�
   const fresh = createAdminI18n("en-US");
   expect(fresh.hasResourceBundle("en", "adminDashboard")).toBe(false);
   expect(fresh.hasResourceBundle("en", "adminWorkspace")).toBe(false);
+  expect(fresh.hasResourceBundle("en", "adminLexiconList")).toBe(false);
+  expect(fresh.hasResourceBundle("en", "adminLexiconEditor")).toBe(false);
 });

@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { CircleHelpIcon, TriangleAlertIcon } from "lucide-react";
 import { Button, Empty, Flex, Tag, Typography } from "@tsz/ui/admin/display";
 import { Checkbox } from "@tsz/ui/admin/forms";
@@ -29,6 +30,7 @@ export function V3FormGroupSenseEditor({
   onGoToMeanings?: () => void;
   onRestoreGeneral?: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const senses = allSenses.filter(
     (sense) =>
       savedSenseIds?.has(sense.id) ||
@@ -50,11 +52,13 @@ export function V3FormGroupSenseEditor({
   return (
     <section
       className="v3-group-sense-editor"
-      aria-label={`第 ${pos.form_groups.findIndex((item) => item.id === group.id) + 1} 组适用词义编辑`}
+      aria-label={t("dedicated_group_editor", {
+        group: pos.form_groups.findIndex((item) => item.id === group.id) + 1
+      })}
     >
       <Flex align="center" justify="space-between" gap="small" wrap>
         <Flex align="center" gap={4}>
-          <Typography.Text strong>适配专用词义</Typography.Text>
+          <Typography.Text strong>{t("dedicated_senses")}</Typography.Text>
           <Popover
             trigger="click"
             placement="bottomLeft"
@@ -70,9 +74,9 @@ export function V3FormGroupSenseEditor({
                 <Typography.Text type="warning">
                   <TriangleAlertIcon aria-hidden="true" />
                 </Typography.Text>{" "}
-                注意：该词形仅适配少量词义，请准确识别正确的词义。适配之后，该词形专属于适配词义，不用于其他词义。
+                {t("dedicated_help")}
                 <br />
-                适配条件：1）至少选一项词义才能适配，可多选。2）只可适配同一词性下的词义。
+                {t("dedicated_requirements")}
               </Typography.Paragraph>
             }
           >
@@ -80,20 +84,20 @@ export function V3FormGroupSenseEditor({
               type="text"
               size="small"
               icon={<CircleHelpIcon />}
-              aria-label="查看适配专用词义说明"
+              aria-label={t("dedicated_help_label")}
             />
           </Popover>
         </Flex>
         <Typography.Text type="secondary">
-          已选 {validIds.length} 项
+          {t("selected_meanings", { count: validIds.length })}
         </Typography.Text>
       </Flex>
       <Flex vertical gap="middle">
         {senses.length === 0 ? (
-          <Empty description="当前基本词性还没有词义，请先添加词义。">
+          <Empty description={t("no_senses_yet")}>
             {onGoToMeanings ? (
               <Button type="primary" onClick={onGoToMeanings}>
-                前往添加词义
+                {t("go_add_senses")}
               </Button>
             ) : null}
           </Empty>
@@ -121,7 +125,7 @@ export function V3FormGroupSenseEditor({
                     </span>
                     {unsaved ? (
                       <Typography.Text type="secondary">
-                        尚未保存，请先保存词义
+                        {t("save_senses_first")}
                       </Typography.Text>
                     ) : null}
                   </span>
@@ -134,12 +138,12 @@ export function V3FormGroupSenseEditor({
         senses.some((sense) => !savedSenseIds.has(sense.id)) &&
         onGoToMeanings ? (
           <Button type="link" onClick={onGoToMeanings}>
-            前往保存词义
+            {t("go_save_senses")}
           </Button>
         ) : null}
         {editing && validIds.length === 0 ? (
           <Typography.Text type="warning">
-            专用组至少保留一个词义，或选择“恢复适用全部词义”解除限制。
+            {t("dedicated_one_required")}
           </Typography.Text>
         ) : null}
       </Flex>
@@ -152,19 +156,19 @@ export function V3FormGroupSenseEditor({
       >
         {editing && onRestoreGeneral ? (
           <Button type="text" onClick={onRestoreGeneral}>
-            恢复适用全部词义
+            {t("all_meanings")}
           </Button>
         ) : (
           <span />
         )}
         <Flex gap="small">
-          <Button onClick={onCancel}>取消</Button>
+          <Button onClick={onCancel}>{t("cancel")}</Button>
           <Button
             type="primary"
             disabled={validIds.length === 0}
             onClick={() => onConfirm(validIds)}
           >
-            确认选择
+            {t("confirm_selection")}
           </Button>
         </Flex>
       </Flex>

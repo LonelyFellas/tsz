@@ -1,3 +1,8 @@
+import {
+  useLexiconEditorTranslation,
+  LexiconEditorText,
+  type LexiconEditorKey
+} from "@/features/dictionary/i18n/editor";
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
 import { flushSync } from "react-dom";
@@ -52,6 +57,18 @@ import {
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { expandFormContents } from "@tsz/shared";
 
+type FormContentIssue =
+  { message: LexiconEditorKey } | { detail: string } | null;
+
+function issueForCause(
+  cause: unknown,
+  fallback: LexiconEditorKey
+): FormContentIssue {
+  if (cause instanceof Error)
+    return cause.message ? { detail: cause.message } : null;
+  return { message: fallback };
+}
+
 export function V3FormContentModal({
   forms,
   contentReassignmentAvailable = false,
@@ -85,6 +102,9 @@ export function V3FormContentModal({
   onConfirm: (forms: SharedFormsStepContentV3) => void;
   onApply?: (forms: SharedFormsStepContentV3) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
+  const issueText = (issue: Exclude<FormContentIssue, null>) =>
+    "message" in issue ? t(issue.message) : issue.detail;
   const outerSave = useVoiceSave();
   const outerSaveRef = useRef(outerSave);
   outerSaveRef.current = outerSave;
@@ -98,15 +118,16 @@ export function V3FormContentModal({
   );
   const content = sharedContentForForm(original.current, formId)!;
   const reassignmentBlockedReason = !contentReassignmentAvailable
-    ? "当前服务暂不支持替换词形内容，请更新后重试"
+    ? t("replace_unavailable")
     : savedContentIds && !savedContentIds.has(content.id)
-      ? "请先确认当前内容并保存草稿，再指派其他词形"
+      ? t("confirm_before_assign")
       : undefined;
   const [editor, setEditor] = useState(() => contentEditorForms(content));
   const [labels, setLabels] = useState(() => structuredClone(forms));
-  const [error, setError] = useState("");
+  const [error, setError] = useState<FormContentIssue>(null);
   const [choosing, setChoosing] = useState(false);
-  const [assignmentError, setAssignmentError] = useState("");
+  const [assignmentError, setAssignmentError] =
+    useState<FormContentIssue>(null);
   const [assignment, setAssignment] = useState<SharedFormsStepContentV3>();
   const { preference } = useDialectPreference();
   const { modal } = App.useApp();
@@ -163,14 +184,14 @@ export function V3FormContentModal({
                 )
               ]
                 .filter(Boolean)
-                .join(" / ") || "未填写";
+                .join(" / ") || t("blank");
             return { binding, number, spelling, pos, group, groupIndex };
           });
           return [{ group, groupIndex, candidates }];
         })
       };
     });
-  }, [choosing, labels]);
+  }, [choosing, labels, t]);
   const assignmentCandidates = useMemo(
     () =>
       new Map(
@@ -206,17 +227,23 @@ export function V3FormContentModal({
         return [
           {
             id: binding.id,
-            text: `${partOfSpeechLabel(previous.pos.pos)}第 ${previous.groupIndex + 1} 组${label(binding.form_type)}${previous.number ? ` ${previous.number}` : ""}：${previous.spelling}`
+            text: t("replacement_summary", {
+              pos: partOfSpeechLabel(previous.pos.pos),
+              group: previous.groupIndex + 1,
+              type: label(binding.form_type),
+              index: previous.number ? ` ${previous.number}` : "",
+              spelling: previous.spelling
+            })
           }
         ];
       }),
-    [assignedForms, assignmentCandidates, content.id, label]
+    [assignedForms, assignmentCandidates, content.id, label, t]
   );
   const assignmentDirty = replacements.length > 0;
   const closeAssignment = () => {
     setChoosing(false);
     setAssignment(undefined);
-    setAssignmentError("");
+    setAssignmentError(null);
   };
   const current = contentFromEditor(editor);
   const initialEditor = useRef(JSON.stringify(current));
@@ -253,7 +280,7 @@ export function V3FormContentModal({
       onConfirm(completeForms());
       return true;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "内容尚未完成");
+      setError(issueForCause(cause, "content_incomplete"));
       return false;
     }
   };
@@ -295,15 +322,15 @@ export function V3FormContentModal({
       stored.mode === "uk_us_many" &&
       (stored.uk.length > 1 || stored.us.length > 1)
     ) {
-      setError("请先确认并保存删减后的拼写，再合并英美内容。");
+      setError({ message: "save_reduced_spellings" });
       return;
     }
     const result = normalizeDialect(editor, rules, preference);
     if (!result.ok) {
       setError(
         editor.pos[0]!.forms[0]!.regional_variants.mode === "uk_us_many"
-          ? "请先将英式和美式各整理为一条拼写，再合并。"
-          : "英美内容或配置不同，请先统一要保留的拼写、发音及设置，再合并。"
+          ? { message: "reduce_to_one_spelling" }
+          : { message: "unify_content_first" }
       );
       return;
     }
@@ -317,11 +344,11 @@ export function V3FormContentModal({
         )
       );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "标签配置不能合并");
+      setError(issueForCause(cause, "labels_unmergeable"));
       return;
     }
     setEditor(result.value);
-    setError("");
+    setError(null);
   };
   const referenceGuard = useV3ReferenceGuard();
   const expandedLabels = useMemo(
@@ -336,21 +363,21 @@ export function V3FormContentModal({
   const referenceForms = rows.map(({ binding }) =>
     expandedLabels.get(binding.id)!
   );
-  const removalReason = (
+  const removalReasonKey = (
     id: string,
     source = labels,
     expanded: ReadonlyMap<string, WordConcreteFormV3> = expandedLabels
-  ) => {
+  ): LexiconEditorKey | undefined => {
     const pos = source.pos.find((pos) =>
       pos.forms.some((form) => form.id === id)
     )!;
     const binding = pos.forms.find((form) => form.id === id)!;
     if (referenceGuard.index.status !== "loaded")
-      return "请先加载关联信息，再移除标签";
+      return "load_links_before_remove";
     const projected = expanded.get(id)!;
     if (formReferenceCount(referenceGuard.index, projected) > 0)
-      return "请先解除这个标签的关联，再移除标签";
-    if (pos.forms.length <= 1) return "每个词性至少保留一个词形";
+      return "unlink_before_remove";
+    if (pos.forms.length <= 1) return "one_form_required";
     const firstGroup = pos.form_groups[0];
     if (
       firstGroup?.members.some((member) => member.form_id === id) &&
@@ -361,13 +388,17 @@ export function V3FormContentModal({
         )
       ).length <= 1
     )
-      return "第 1 组词形变化至少保留一个原形";
+      return "first_base_required";
     return undefined;
   };
+  const removalReason = (id: string) => {
+    const key = removalReasonKey(id);
+    return key ? t(key) : undefined;
+  };
   const removeLabel = (id: string) => {
-    const reason = removalReason(id);
+    const reason = removalReasonKey(id);
     if (reason) {
-      setError(reason);
+      setError({ message: reason });
       return;
     }
     const remove = () => {
@@ -383,12 +414,24 @@ export function V3FormContentModal({
       setLabels(next);
     };
     modal.confirm({
-      title: rows.length === 1 ? "删除这份词形内容？" : "移除这个标签？",
+      title:
+        rows.length === 1 ? (
+          <LexiconEditorText message="delete_content_title" />
+        ) : (
+          <LexiconEditorText message="remove_label_title" />
+        ),
       content:
-        rows.length === 1
-          ? "这是最后一个标签。确认后标记删除；点击抽屉的确认按钮才应用到页面草稿，页面保存时会检查关联影响。"
-          : "其余标签继续使用同一份内容。页面保存时会检查这个标签的关联影响。",
-      okText: rows.length === 1 ? "删除内容" : "移除标签",
+        rows.length === 1 ? (
+          <LexiconEditorText message="delete_last_content_help" />
+        ) : (
+          <LexiconEditorText message="remove_label_help" />
+        ),
+      okText:
+        rows.length === 1 ? (
+          <LexiconEditorText message="delete_content" />
+        ) : (
+          <LexiconEditorText message="remove_label" />
+        ),
       okButtonProps: { danger: true },
       onOk: remove
     });
@@ -422,11 +465,9 @@ export function V3FormContentModal({
       );
       next.contents = labels.contents.filter((row) => used.has(row.id));
       setAssignment(next);
-      setAssignmentError("");
+      setAssignmentError(null);
     } catch (cause) {
-      setAssignmentError(
-        cause instanceof Error ? cause.message : "无法指派标签"
-      );
+      setAssignmentError(issueForCause(cause, "assignment_failed"));
     }
   };
   const rules = current.dialect_rules;
@@ -527,7 +568,7 @@ export function V3FormContentModal({
       placement="right"
       size="min(1200px, 100vw)"
       rootClassName="v3-content-drawer"
-      title={`词形 ${previewSpelling || "未填写"} 内容设置`}
+      title={t("content_settings", { index: previewSpelling || t("blank") })}
       onClose={() => void askLeaveRef.current!()}
       mask={{ closable: false }}
       destroyOnHidden
@@ -538,10 +579,10 @@ export function V3FormContentModal({
               disabled={saving}
               onClick={() => void askLeaveRef.current!()}
             >
-              取消
+              {t("cancel")}
             </Button>
             <Button type="primary" disabled={saving} onClick={confirmed}>
-              确认，应用到草稿
+              {t("apply_to_draft")}
             </Button>
           </Space>
         </Flex>
@@ -551,9 +592,11 @@ export function V3FormContentModal({
         {rows.length > 0 && (
           <div className="v3-content-rules">
             <div className="v3-content-rule-row">
-              <Typography.Text strong>拼写有英美区别？</Typography.Text>
+              <Typography.Text strong>
+                {t("distinguish_spelling_question")}
+              </Typography.Text>
               <Switch
-                aria-label="拼写有英美区别"
+                aria-label={t("distinguish_spelling")}
                 checked={rules.spelling_mode === "distinguish"}
                 onChange={(checked) =>
                   changeRules({
@@ -564,14 +607,16 @@ export function V3FormContentModal({
               />
             </div>
             <div className="v3-content-rule-row">
-              <Typography.Text strong>音标有英美区别？</Typography.Text>
+              <Typography.Text strong>
+                {t("distinguish_phonetic_question")}
+              </Typography.Text>
               <Space wrap>
                 <V3ReferenceBadge
                   nodeIds={referenceForms.flatMap(formNodeIds)}
-                  label="词形发音"
+                  label={t("form_pronunciation")}
                 />
                 <Switch
-                  aria-label="音标有英美区别"
+                  aria-label={t("distinguish_phonetic")}
                   checked={rules.phonetic_mode === "distinguish"}
                   disabled={rules.spelling_mode === "distinguish"}
                   onChange={(checked) =>
@@ -584,21 +629,23 @@ export function V3FormContentModal({
               </Space>
             </div>
             <div className="v3-content-rule-row">
-              <Typography.Text strong>词形不规则变化？</Typography.Text>
+              <Typography.Text strong>
+                {t("irregular_question")}
+              </Typography.Text>
               <Space wrap>
                 {regularity === undefined && (
                   <Typography.Text id={regularityHintId} type="secondary">
-                    各标签设置不同
+                    {t("different_label_settings")}
                   </Typography.Text>
                 )}
                 <Switch
-                  aria-label="词形不规则变化"
+                  aria-label={t("irregular")}
                   aria-describedby={
                     regularity === undefined ? regularityHintId : undefined
                   }
                   checked={regularity === false}
                   unCheckedChildren={
-                    regularity === undefined ? "未统一" : undefined
+                    regularity === undefined ? t("not_unified") : undefined
                   }
                   onChange={(checked) => changeRegularity(!checked)}
                 />
@@ -608,8 +655,10 @@ export function V3FormContentModal({
         )}
         <div className="v3-content-labels">
           <Space>
-            <Typography.Text strong>词形标签</Typography.Text>
-            <Typography.Text type="secondary">可多选</Typography.Text>
+            <Typography.Text strong>{t("form_labels")}</Typography.Text>
+            <Typography.Text type="secondary">
+              {t("multiple_selection")}
+            </Typography.Text>
           </Space>
           <Space wrap className="v3-content-label-list">
             {rows.map(({ pos, binding, group }) => {
@@ -626,7 +675,9 @@ export function V3FormContentModal({
                 <Tag
                   key={binding.id}
                   className="v3-content-label"
-                  title={`第 ${pos.form_groups.indexOf(group) + 1} 组`}
+                  title={t("group_number", {
+                    group: pos.form_groups.indexOf(group) + 1
+                  })}
                 >
                   {partOfSpeechLabel(pos.pos)}
                   {label(binding.form_type)}
@@ -638,7 +689,11 @@ export function V3FormContentModal({
                       icon={<XIcon />}
                       disabled={Boolean(removalReason(binding.id))}
                       onClick={() => removeLabel(binding.id)}
-                      aria-label={`移除${partOfSpeechLabel(pos.pos)}${label(binding.form_type)}${number ? ` ${number}` : ""}标签`}
+                      aria-label={t("remove_form_label", {
+                        group: partOfSpeechLabel(pos.pos),
+                        type: label(binding.form_type),
+                        scope: number ? ` ${number}` : ""
+                      })}
                     />
                   </Tooltip>
                 </Tag>
@@ -646,33 +701,30 @@ export function V3FormContentModal({
             })}
             <Button
               type="dashed"
-              aria-label="新增标签"
+              aria-label={t("add_label")}
               icon={<PlusIcon />}
               disabled={rows.length === 0}
               onClick={() => {
-                setAssignmentError("");
+                setAssignmentError(null);
                 setAssignment(labels);
                 setChoosing(true);
               }}
             >
-              新增标签
+              {t("add_label")}
             </Button>
           </Space>
         </div>
         {rows.length === 0 ? (
-          <Alert
-            type="warning"
-            title="这份内容已标记删除，确认后应用到页面草稿。"
-          />
+          <Alert type="warning" title={t("content_marked_deleted")} />
         ) : (
           <>
-            {error && <Alert type="error" showIcon title={error} />}
+            {error && <Alert type="error" showIcon title={issueText(error)} />}
             <div className="v3-content-editor">
               <V3ConcreteFormRow
                 content={editor}
                 form={editor.pos[0]!.forms[0]!}
                 dialectRules={rules}
-                formLabel="词形"
+                formLabel={t("form")}
                 showRegularity={false}
                 presentation="content"
                 referenceForms={referenceForms}
@@ -706,12 +758,12 @@ export function V3FormContentModal({
                   );
                   if (!nodeIds.length) return undefined;
                   if (referenceGuard.index.status !== "loaded")
-                    return "请先加载关联信息，再删除拼写";
+                    return t("load_links_before_spelling");
                   return nodesBlockingReferenceCount(
                     referenceGuard.index,
                     nodeIds
                   )
-                    ? "请先解除这条拼写及发音的关联，再删除"
+                    ? t("unlink_before_spelling")
                     : undefined;
                 }}
                 formTypeDisabled
@@ -727,7 +779,7 @@ export function V3FormContentModal({
       </div>
       <Modal
         open={leavePrompt}
-        title="词形内容尚未应用"
+        title={t("unapplied_content")}
         zIndex={2100}
         onCancel={() => finishLeave(false)}
         destroyOnHidden
@@ -740,25 +792,27 @@ export function V3FormContentModal({
                 onCancel();
               }}
             >
-              放弃修改
+              {t("discard")}
             </Button>
-            <Button onClick={() => finishLeave(false)}>继续编辑</Button>
+            <Button onClick={() => finishLeave(false)}>
+              {t("keep_editing")}
+            </Button>
             <Button
               type="primary"
               onClick={() => {
                 if (confirmed()) finishLeave(true);
               }}
             >
-              应用并离开
+              {t("apply_leave")}
             </Button>
           </Space>
         }
       >
-        确认后应用到页面草稿；放弃会丢弃本次抽屉修改。
+        {t("drawer_leave_help")}
         {assignmentDirty && (
           <Alert
             type="warning"
-            title="以下词形的拼写与发音将被替换"
+            title={t("replace_forms_title")}
             description={
               <Flex vertical>
                 {replacements.map((row) => (
@@ -768,15 +822,17 @@ export function V3FormContentModal({
             }
           />
         )}
-        {error && <Alert type="error" title={error} />}
+        {error && <Alert type="error" title={issueText(error)} />}
       </Modal>
       <Modal
         open={choosing && !leavePrompt}
-        title={`为 ${previewSpelling || "未填写"} 这种拼写形式 指派词形标签`}
+        title={t("assign_form_title", {
+          spelling: previewSpelling || t("blank")
+        })}
         className="v3-label-assignment-modal"
         width={640}
-        okText={replacements.length > 0 ? "确认替换" : "完成"}
-        cancelText="取消"
+        okText={replacements.length > 0 ? t("confirm_replace") : t("done")}
+        cancelText={t("cancel")}
         destroyOnHidden
         onCancel={closeAssignment}
         onOk={() => {
@@ -786,18 +842,16 @@ export function V3FormContentModal({
               pos.forms.some((binding) => binding.content_id === content.id)
             )
           ) {
-            setAssignmentError(
-              "请至少保留一个词形标签；删除内容请在抽屉中操作。"
-            );
+            setAssignmentError({ message: "keep_label" });
             return;
           }
           setLabels(assignment);
           closeAssignment();
-          setError("");
+          setError(null);
         }}
       >
         <Typography.Paragraph type="secondary">
-          选择要共用当前拼写与发音的已有词形，词形数量不变。同组有多个同类型词形时，请按序号和拼写选择。
+          {t("assign_label_help")}
         </Typography.Paragraph>
         {reassignmentBlockedReason && (
           <Alert type="info" title={reassignmentBlockedReason} />
@@ -806,21 +860,19 @@ export function V3FormContentModal({
           <Alert
             type="warning"
             showIcon
-            title="以下词形的拼写与发音将被替换"
+            title={t("replace_forms_title")}
             description={
               <Flex vertical gap={4}>
                 {replacements.map((row) => (
                   <span key={row.id}>{row.text}</span>
                 ))}
-                <span>
-                  确认后共用当前内容，后续修改将同步。已有关联会在保存草稿时检查。
-                </span>
+                <span>{t("assign_label_confirm")}</span>
               </Flex>
             }
           />
         )}
         {assignmentError && (
-          <Alert type="error" showIcon title={assignmentError} />
+          <Alert type="error" showIcon title={issueText(assignmentError)} />
         )}
         <div className="v3-label-assignment-columns">
           {assignmentGroups.map(({ pos, groups }) => {
@@ -828,7 +880,9 @@ export function V3FormContentModal({
             return (
               <section
                 key={pos.pos_id}
-                aria-label={`${partOfSpeechLabel(pos.pos)}词形标签`}
+                aria-label={t("form_labels_label", {
+                  label: partOfSpeechLabel(pos.pos)
+                })}
                 className="v3-label-assignment-column"
               >
                 <Typography.Title level={5}>
@@ -848,8 +902,10 @@ export function V3FormContentModal({
                     <div className="v3-label-assignment-group" key={group.id}>
                       {pos.form_groups.length > 1 && (
                         <Typography.Text type="secondary">
-                          第 {groupIndex + 1} 组
-                          {group.scope === "dedicated" ? "（专用）" : ""}
+                          {t("group_number", { group: groupIndex + 1 })}
+                          {group.scope === "dedicated"
+                            ? t("dedicated_suffix")
+                            : ""}
                         </Typography.Text>
                       )}
                       {candidates.map(
@@ -862,11 +918,11 @@ export function V3FormContentModal({
                             !selected && selectedTypes.has(candidate.form_type);
                           const blockedReason =
                             candidate.content_id === content.id
-                              ? "已共用当前内容；移除请使用外层标签的移除按钮"
+                              ? t("shared_content_hint")
                               : duplicate
-                                ? "同组已有同类型词形共用这份内容，不能重复指派"
+                                ? t("duplicate_label_hint")
                                 : reassignmentBlockedReason;
-                          const checkboxLabel = `${partOfSpeechLabel(pos.pos)}${pos.form_groups.length > 1 ? `第 ${groupIndex + 1} 组` : ""}${typeLabel}`;
+                          const checkboxLabel = `${partOfSpeechLabel(pos.pos)}${pos.form_groups.length > 1 ? t("group_number", { group: groupIndex + 1 }) : ""}${typeLabel}`;
                           return (
                             <Tooltip key={candidate.id} title={blockedReason}>
                               <span className="v3-label-assignment-option">

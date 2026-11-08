@@ -1,3 +1,4 @@
+import { useLexiconListTranslation } from "@/features/dictionary/i18n/list";
 import {
   Fragment,
   useLayoutEffect,
@@ -59,6 +60,7 @@ export function WordListTable({
   onPageChange,
   selection
 }: WordListTableProps) {
+  const { t, i18n } = useLexiconListTranslation();
   const preferences = useColumnSettings(
     tableId,
     columns.map((column) => ({
@@ -102,7 +104,8 @@ export function WordListTable({
     const label = visible.find((column) => column.key === "label");
     const actions = visible.find((column) => column.key === "action");
     if (label && actions) {
-      actions.width = tableId === "dictionary-trash" ? 168 : 132;
+      if (!i18n.language.startsWith("en"))
+        actions.width = tableId === "dictionary-trash" ? 168 : 132;
       const middleColumns = visible.some(
         (column) => column.key !== "label" && column.key !== "action"
       );
@@ -200,18 +203,20 @@ export function WordListTable({
         <div className="word-list-result-summary">
           <span>
             {loading ? (
-              "正在加载词条…"
+              t("loading")
             ) : (
               <>
-                共 <strong>{total.toLocaleString("zh-CN")}</strong> 条词条
+                {t("total_prefix")}{" "}
+                <strong>{total.toLocaleString(i18n.language)}</strong>{" "}
+                {t("entry_count_unit", { count: total })}
               </>
             )}
           </span>
           {selection && selection.keys.length > 0 && (
             <span className="word-list-selected-count" role="status">
-              已选 {selection.keys.length} 条
+              {t("selected_count", { count: selection.keys.length })}
               <button type="button" onClick={() => selection.onChange([], [])}>
-                取消选择
+                {t("clear_selection")}
               </button>
             </span>
           )}
@@ -222,7 +227,9 @@ export function WordListTable({
         <table
           className="word-table"
           style={{ width: Math.max(width, baseWidth) }}
-          aria-label={tableId === "dictionary" ? "智能词库" : "垃圾桶"}
+          aria-label={
+            tableId === "dictionary" ? t("entries") : t("status_archived")
+          }
         >
           <colgroup>
             {selection && <col style={{ width: selectionWidth }} />}
@@ -236,7 +243,7 @@ export function WordListTable({
                 <th scope="col" style={checkboxStyle}>
                   <input
                     type="checkbox"
-                    aria-label="选择本页"
+                    aria-label={t("select_page")}
                     checked={count > 0 && count === selectable.length}
                     disabled={!selectable.length}
                     ref={(el) => {
@@ -272,7 +279,9 @@ export function WordListTable({
                   <td style={checkboxStyle}>
                     <input
                       type="checkbox"
-                      aria-label={`选择「${wordListLabel(row)}」`}
+                      aria-label={t("select_entry", {
+                        label: wordListLabel(row)
+                      })}
                       checked={selection.keys.includes(row.id)}
                       disabled={selection.disabled(row)}
                       onChange={(event) => toggle([row], event.target.checked)}
@@ -295,25 +304,30 @@ export function WordListTable({
             {!rows.length && (
               <tr>
                 <td colSpan={cells.length + (selection ? 1 : 0)}>
-                  {loading ? <span role="status">加载中…</span> : emptyText}
+                  {loading ? (
+                    <span role="status">{t("loading_short")}</span>
+                  ) : (
+                    emptyText
+                  )}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-      <nav className="word-list-pagination" aria-label="词条分页">
+      <nav className="word-list-pagination" aria-label={t("pagination")}>
         <span>
-          共 {total} 条
+          {t("total_items", { count: total })}
           <span className="word-pagination-range">
-            {" "}
-            · {total === 0 ? 0 : (current - 1) * pageSize + 1}–
-            {Math.min(current * pageSize, total)} 条
+            {t("page_range", {
+              start: total === 0 ? 0 : (current - 1) * pageSize + 1,
+              end: Math.min(current * pageSize, total)
+            })}
           </span>
         </span>
         <button
           type="button"
-          aria-label="上一页"
+          aria-label={t("previous")}
           disabled={page <= 1}
           onClick={() => onPageChange(Math.min(page - 1, lastPage), pageSize)}
         >
@@ -324,7 +338,7 @@ export function WordListTable({
             {index > 0 && number - pages[index - 1]! > 1 && (
               <button
                 type="button"
-                aria-label={index === 1 ? "向前跳五页" : "向后跳五页"}
+                aria-label={index === 1 ? t("jump_back") : t("jump_forward")}
                 onClick={() =>
                   onPageChange(
                     index === 1
@@ -342,7 +356,7 @@ export function WordListTable({
               variant="ghost"
               size="compact"
               className="rounded-lg"
-              aria-label={`第 ${number} 页`}
+              aria-label={t("page", { page: number })}
               aria-current={number === page ? "page" : undefined}
               onClick={() => onPageChange(number, pageSize)}
             >
@@ -352,20 +366,20 @@ export function WordListTable({
         ))}
         <button
           type="button"
-          aria-label="下一页"
+          aria-label={t("next")}
           disabled={page >= lastPage}
           onClick={() => onPageChange(page + 1, pageSize)}
         >
           <ChevronRightIcon />
         </button>
         <select
-          aria-label="每页条数"
+          aria-label={t("per_page")}
           value={pageSize}
           onChange={(event) => onPageChange(1, Number(event.target.value))}
         >
           {[10, 20, 50, 100].map((size) => (
             <option key={size} value={size}>
-              {size} 条/页
+              {t("page_size", { size })}
             </option>
           ))}
         </select>

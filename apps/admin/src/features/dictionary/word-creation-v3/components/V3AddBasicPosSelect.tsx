@@ -1,3 +1,5 @@
+import { localizedCatalogName } from "../../part-of-speech/catalog";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { CirclePlusIcon, PlusIcon } from "lucide-react";
 import { Select } from "@tsz/ui/admin/forms";
 import type {
@@ -27,6 +29,7 @@ export function V3AddBasicPosSelect({
   isPending = false,
   onAdd
 }: V3AddBasicPosSelectProps) {
+  const { t, i18n } = useLexiconEditorTranslation();
   const usedPosCodes = new Set(forms.pos.map((pos) => pos.pos));
   // 挂错一侧后端会以 part_of_speech_kind_mismatch 拒绝，不放进候选。
   const availableItems = (catalog?.items ?? []).filter(
@@ -36,7 +39,7 @@ export function V3AddBasicPosSelect({
 
   return (
     <Select
-      aria-label="添加基本词性"
+      aria-label={t("add_pos")}
       className="word-add-basic-pos-select"
       disabled={isError || isPending}
       loading={isPending}
@@ -48,9 +51,9 @@ export function V3AddBasicPosSelect({
       }}
       options={availableItems.map((item) => ({
         value: item.code,
-        label: item.name_zh
+        label: localizedCatalogName(item, i18n.language)
       }))}
-      placeholder="添加基本词性"
+      placeholder={t("add_pos")}
       style={{ width: compact ? 24 : 190 }}
       popupMatchSelectWidth={190}
       styles={

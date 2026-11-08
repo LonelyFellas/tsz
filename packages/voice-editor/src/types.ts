@@ -319,8 +319,10 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   ) => ReactNode;
   value: RichText;
   language?: string;
-  /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
+  /** 无障碍名；未提供 contextKey 时兼容作为编辑器身份。 */
   contextLabel?: string;
+  /** 宿主的稳定编辑身份；提供后，显示标签变化不会使音频失效。 */
+  contextKey?: string;
   previewAdapter?: VoicePreviewAdapter;
   /** Catalogue reads remain available when synthesis is disabled by the host. */
   previewEnabled?: boolean;

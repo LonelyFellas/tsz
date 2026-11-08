@@ -6,7 +6,13 @@ import {
   SettingsIcon
 } from "lucide-react";
 import { App, Popover } from "@tsz/ui/admin/overlays";
-import { Button, Divider, Space, Typography } from "@tsz/ui/admin/display";
+import {
+  Button,
+  Divider,
+  Flex,
+  Space,
+  Typography
+} from "@tsz/ui/admin/display";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminText, useAdminTranslation } from "@/i18n";
@@ -79,17 +85,22 @@ export function AdminHeader() {
 
   const menu = (
     <div style={{ width: 220 }}>
-      <Space align="center" style={{ padding: "4px 4px 12px" }}>
+      <Flex align="center" gap={8} style={{ padding: "4px 4px 12px" }}>
         <AdminAvatar level={profile?.role} />
-        <div style={{ minWidth: 0 }}>
-          <Typography.Text strong ellipsis style={{ display: "block" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Typography.Text
+            strong
+            ellipsis
+            title={name}
+            style={{ display: "block" }}
+          >
             {name}
           </Typography.Text>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {roleLabel}
           </Typography.Text>
         </div>
-      </Space>
+      </Flex>
       <Divider style={{ margin: 0 }} />
       <div
         style={{

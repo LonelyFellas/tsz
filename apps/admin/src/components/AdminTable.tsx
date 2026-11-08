@@ -1,3 +1,4 @@
+import { useTableTranslation } from "@/components/table-i18n";
 import { Table, type TableProps, type TableRef } from "@tsz/ui/admin/table";
 import {
   Children,
@@ -40,9 +41,10 @@ export function AdminTableToolbar({
   extra?: ReactNode;
   columnSettings?: ReactNode;
 }) {
+  const { t } = useTableTranslation();
   if (!children && !extra && !columnSettings) return null;
   return (
-    <div className="admin-table-toolbar" role="group" aria-label="表格操作">
+    <div className="admin-table-toolbar" role="group" aria-label={t("toolbar")}>
       {children && (
         <div className="admin-table-toolbar-primary">{children}</div>
       )}

@@ -1,3 +1,4 @@
+import { useLexiconListTranslation } from "@/features/dictionary/i18n/list";
 import { useFormTypeLabel } from "./part-of-speech/FormTypeLabels";
 import {
   Alert,
@@ -29,12 +30,13 @@ export function LifecycleSurfaceConfirmation({
   confirming: boolean;
   action?: "restore" | "restoreDraft" | "publish";
 }) {
+  const { t } = useLexiconListTranslation();
   const formTypeLabel = useFormTypeLabel();
   const cards = aggregateLifecycleSurfaceMatchCards(state, formTypeLabel);
   const groups = [
-    ["visibility", "仅公开可见性"],
-    ["ordinary", "仅普通同形提示"],
-    ["composite", "公开可见性 + 普通同形提示"]
+    ["visibility", t("visibility_only")],
+    ["ordinary", t("homograph_only")],
+    ["composite", t("visibility_homograph")]
   ]
     .map(([key, title]) => ({
       key,
@@ -45,32 +47,41 @@ export function LifecycleSurfaceConfirmation({
   const disabled = state.phase === "disabled";
   const actionLabel =
     action === "publish"
-      ? "发布"
+      ? t("publish")
       : action === "restoreDraft"
-        ? "恢复草稿"
-        : "恢复";
+        ? t("restore_draft")
+        : t("restore");
   const statusLabel = {
-    draft: "草稿",
-    published: "已发布",
-    archived: "垃圾桶"
+    draft: t("status_draft"),
+    published: t("status_published"),
+    archived: t("status_archived")
   } as const;
   return (
     <Card
       size="small"
       title={
         disabled
-          ? "学习端暂不支持多个同名公开词条"
-          : `${actionLabel}前需要确认同名${action === "restoreDraft" || action === "restore" ? "词条" : "公开范围"}`
+          ? t("public_homonyms_disabled")
+          : t("confirmation_title", {
+              action: actionLabel,
+              scope:
+                action === "restoreDraft" || action === "restore"
+                  ? t("entry")
+                  : t("public_scope")
+            })
       }
     >
       <Alert
         showIcon
         type={disabled ? "error" : "warning"}
-        title={`已加载 ${state.items.length}/${state.total} 条匹配来源`}
+        title={t("matches_loaded", {
+          loaded: state.items.length,
+          total: state.total
+        })}
         description={
           disabled
-            ? `当前不能继续${actionLabel}。已保留当前选择和词条状态，请稍后重试。`
-            : `请核对全部匹配词条；确认后将按当前结果继续${actionLabel}。`
+            ? t("confirmation_disabled", { action: actionLabel })
+            : t("confirmation_help", { action: actionLabel })
         }
       />
       {groups.map((group) => (
@@ -85,10 +96,12 @@ export function LifecycleSurfaceConfirmation({
                   <Typography.Text className="tsz-words" strong>
                     {card.label}
                   </Typography.Text>
-                  <Tag>{card.kind === "word" ? "单词" : "短语"}</Tag>
+                  <Tag>
+                    {card.kind === "word" ? t("kind_word") : t("kind_phrase")}
+                  </Tag>
                   <Tag>{statusLabel[card.status]}</Tag>
                   <Typography.Text type="secondary">
-                    {card.match_count} 个来源
+                    {t("source_count", { count: card.match_count })}
                   </Typography.Text>
                 </Space>
                 <Collapse
@@ -96,7 +109,7 @@ export function LifecycleSurfaceConfirmation({
                   items={[
                     {
                       key: "details",
-                      label: "查看候选详情",
+                      label: t("candidate_details"),
                       children: (
                         <Space orientation="vertical" size="small">
                           {card.source_labels.map((source) => (
@@ -117,7 +130,8 @@ export function LifecycleSurfaceConfirmation({
                           ) : null}
                           {card.gloss_previews.map((gloss) => (
                             <Typography.Text key={gloss}>
-                              释义：{gloss}
+                              {t("gloss_prefix")}
+                              {gloss}
                             </Typography.Text>
                           ))}
                         </Space>
@@ -132,10 +146,12 @@ export function LifecycleSurfaceConfirmation({
       ))}
       <Space>
         {state.phase === "error" ? (
-          <Button onClick={state.retry}>重新加载确认快照</Button>
+          <Button onClick={state.retry}>{t("reload_snapshot")}</Button>
         ) : null}
         {state.phase === "expired" ? (
-          <Button onClick={onRestart}>{`重新检查${actionLabel}条件`}</Button>
+          <Button onClick={onRestart}>
+            {t("recheck_action", { action: actionLabel })}
+          </Button>
         ) : null}
         {!disabled && (
           <Button
@@ -144,7 +160,7 @@ export function LifecycleSurfaceConfirmation({
             disabled={!canAcknowledgeSurfaceSnapshot(state)}
             onClick={onConfirm}
           >
-            {`确认并${actionLabel}`}
+            {t("confirm_action", { action: actionLabel })}
           </Button>
         )}
       </Space>
