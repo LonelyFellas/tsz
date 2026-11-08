@@ -1,3 +1,9 @@
+import {
+  useAccessTranslation,
+  AccessText,
+  accessLabel,
+  accessLabelSearchText
+} from "./i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { XIcon, PlusIcon, RotateCwIcon } from "lucide-react";
@@ -25,7 +31,7 @@ import {
 } from "@tsz/ui/admin/forms";
 import { Pagination } from "@tsz/ui/admin/table";
 import type { Dayjs } from "dayjs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { HttpError } from "@tsz/api-client";
 import type { PermissionTag, UnifiedPermissionCatalog } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
@@ -66,28 +72,38 @@ function GrantedAdmins({
   permissionKey: string;
   onClose: () => void;
 }) {
+  const { t } = useAccessTranslation();
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: ["permission-system", "granted", permissionKey, page],
     queryFn: () => api.permissionSystem.grantedAdmins(permissionKey, page)
   });
   return (
-    <Drawer open size={640} title="管理员名单" onClose={onClose}>
+    <Drawer
+      open
+      size={640}
+      title={t("administrators_with_access")}
+      onClose={onClose}
+    >
       {query.isError && <Alert type="error" title={query.error.message} />}
       <Table
         tableId="permission-admins"
-        locale={{ emptyText: <TableEmptyState message="暂无已授权管理员" /> }}
+        locale={{
+          emptyText: (
+            <TableEmptyState message={t("no_administrators_have_access")} />
+          )
+        }}
         rowKey="admin_id"
         loading={query.isFetching}
         dataSource={query.data?.items ?? []}
         columns={[
-          { title: "管理员", dataIndex: "display_name" },
+          { title: t("administrator"), dataIndex: "display_name" },
           {
-            title: "账号 ID",
+            title: t("account_id"),
             dataIndex: "admin_id",
             render: (id: string) => <CopyableText value={id} />
           },
-          { title: "权限版本", dataIndex: "permission_version" }
+          { title: t("permission_version"), dataIndex: "permission_version" }
         ]}
         pagination={{
           current: page,
@@ -112,6 +128,7 @@ function BatchTargets({
   action: "grant" | "revoke";
   onClose: () => void;
 }) {
+  const { t } = useAccessTranslation();
   const [page, setPage] = useState(1);
   const [filterResetKey, setFilterResetKey] = useState(0);
   const [search, setSearch] = useState("");
@@ -137,7 +154,9 @@ function BatchTargets({
       open
       size={760}
       title={
-        action === "grant" ? "批量授权 · 选择管理员" : "撤销授权 · 选择管理员"
+        action === "grant"
+          ? t("grant_access_in_bulk_select_administrators")
+          : t("revoke_access_select_administrators")
       }
       onClose={onClose}
       styles={{
@@ -152,20 +171,20 @@ function BatchTargets({
               pageSize={20}
               total={query.data?.pagination.total ?? 0}
               showSizeChanger={false}
-              showTotal={(total) => `共 ${total} 人`}
+              showTotal={(total) => t("people_count", { count: total })}
               onChange={setPage}
             />
           </Flex>
           <Flex justify="space-between" align="center" gap={12} wrap>
             <Typography.Text>
-              已选 {selected.length} 人（单次最多选择 100 人）
+              {t("selected_people_limit", { count: selected.length })}
             </Typography.Text>
             <Button
               type="primary"
               disabled={!selected.length || selected.length > 100}
               onClick={() => setPreviewing(true)}
             >
-              下一步：确认权限变更
+              {t("next_confirm_permission_changes")}
             </Button>
           </Flex>
         </Flex>
@@ -180,17 +199,20 @@ function BatchTargets({
             overflowY: "auto"
           }}
         >
-          所选权限：
-          {keys
-            .map(
-              (key) =>
-                catalog.permissions.find((p) => p.key === key)?.label ?? key
-            )
-            .join("、")}
+          {t("selected_permissions", {
+            permissions: keys
+              .map((key) =>
+                accessLabel(
+                  catalog.permissions.find((p) => p.key === key)?.label ?? key,
+                  t
+                )
+              )
+              .join(t("list_separator"))
+          })}
         </Typography.Paragraph>
         <Input.Search
           key={filterResetKey}
-          placeholder="搜索管理员名称"
+          placeholder={t("search_administrator_names")}
           onSearch={(value) => {
             setSearch(value);
             setPage(1);
@@ -205,7 +227,7 @@ function BatchTargets({
             locale={{
               emptyText: (
                 <TableEmptyState
-                  message="暂无可选管理员"
+                  message={t("no_administrators_available")}
                   filtered={!!search.trim()}
                   onResetFilters={() => {
                     setSearch("");
@@ -240,9 +262,9 @@ function BatchTargets({
               })
             }}
             columns={[
-              { title: "管理员", dataIndex: "display_name" },
+              { title: t("administrator"), dataIndex: "display_name" },
               {
-                title: "手机号",
+                title: t("phone_number"),
                 dataIndex: "phone",
                 render: (phone: string) =>
                   phone.length > 7
@@ -250,11 +272,11 @@ function BatchTargets({
                     : "****"
               },
               {
-                title: "状态",
+                title: t("status"),
                 dataIndex: "status",
                 render: (status: "active" | "disabled") => (
                   <Tag color={status === "active" ? "green" : "default"}>
-                    {status === "active" ? "已启用" : "已禁用"}
+                    {status === "active" ? t("enabled") : t("disabled")}
                   </Tag>
                 )
               }
@@ -269,7 +291,7 @@ function BatchTargets({
           adminIds={selected}
           adminNames={adminNames}
           permissionLabels={Object.fromEntries(
-            catalog.permissions.map((p) => [p.key, p.label])
+            catalog.permissions.map((p) => [p.key, accessLabel(p.label, t)])
           )}
           grant={action === "grant" ? keys : []}
           revoke={action === "revoke" ? keys : []}
@@ -282,6 +304,7 @@ function BatchTargets({
 }
 
 function PermissionAudits({ onClose }: { onClose: () => void }) {
+  const { t } = useAccessTranslation();
   const [filterResetKey, setFilterResetKey] = useState(0);
   const [page, setPage] = useState(1);
   const [adminId, setAdminId] = useState("");
@@ -302,14 +325,19 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
       })
   });
   return (
-    <Drawer open size={960} title="权限与标签变更记录" onClose={onClose}>
+    <Drawer
+      open
+      size={960}
+      title={t("permission_and_tag_change_history")}
+      onClose={onClose}
+    >
       {query.isError && <Alert type="error" title={query.error.message} />}
       <Table
         toolbar={
           <Space wrap key={filterResetKey}>
             <Input.Search
               key={filterResetKey}
-              placeholder="管理员 ID"
+              placeholder={t("administrator_id")}
               onSearch={(value) => {
                 setAdminId(value);
                 setPage(1);
@@ -317,7 +345,7 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
             />
             <Input.Search
               key={filterResetKey}
-              placeholder="权限标识"
+              placeholder={t("permission_key")}
               onSearch={(value) => {
                 setKey(value);
                 setPage(1);
@@ -337,7 +365,7 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
         locale={{
           emptyText: (
             <TableEmptyState
-              message="暂无变更记录"
+              message={t("no_changes_recorded")}
               filtered={!!(adminId || key || dates)}
               onResetFilters={() => {
                 setAdminId("");
@@ -353,13 +381,14 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
         loading={query.isFetching}
         dataSource={query.data?.items ?? []}
         columns={[
-          { title: "时间", dataIndex: "occurred_at" },
-          { title: "操作者", dataIndex: "actor_admin_id" },
-          { title: "操作", dataIndex: "action" },
-          { title: "对象", dataIndex: "resource_id" },
-          { title: "请求", dataIndex: "request_id" },
+          { title: t("time"), dataIndex: "occurred_at" },
+          { title: t("actor"), dataIndex: "actor_admin_id" },
+          { title: t("actions"), dataIndex: "action" },
+          { title: t("target"), dataIndex: "resource_id" },
+          { title: t("request"), dataIndex: "request_id" },
           {
-            title: "调整内容",
+            key: "调整内容",
+            title: t("change_details"),
             render: (_, row) => JSON.stringify(row.metadata)
           }
         ]}
@@ -376,6 +405,7 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
 }
 
 export function PermissionManagement() {
+  const { t } = useAccessTranslation();
   const { message } = App.useApp();
   const client = useQueryClient();
   const catalog = useQuery({
@@ -407,7 +437,7 @@ export function PermissionManagement() {
     client.invalidateQueries({ queryKey: ["permission-system"] });
   const mutateTags = async (
     operation: () => Promise<unknown>,
-    success: string
+    success: ReactNode
   ) => {
     setBusy(true);
     try {
@@ -434,18 +464,30 @@ export function PermissionManagement() {
             current?.tags.find((tag) => tag.id === editingTag.id)?.version ===
               editingTag.version);
         if (editingTag && duplicateName && versionUnchanged) {
-          message.warning("标签名称已存在，请使用其他名称");
+          message.warning(
+            <AccessText message="this_tag_name_already_exists_use_another_name" />
+          );
         } else {
           setEditingTag(undefined);
-          message.warning("标签已被更新，请重新查看后再保存");
+          message.warning(
+            <AccessText message="this_tag_has_changed_reload_it_before_saving" />
+          );
         }
       } else if (error instanceof HttpError && error.status === 404) {
         await reload();
         setPendingTagChange(undefined);
         setEditingTag(undefined);
-        message.warning("标签已被删除，请重新选择");
+        message.warning(
+          <AccessText message="this_tag_has_been_deleted_select_another_tag" />
+        );
       } else {
-        message.error(error instanceof Error ? error.message : "操作失败");
+        message.error(
+          error instanceof Error ? (
+            error.message
+          ) : (
+            <AccessText message="operation_failed" />
+          )
+        );
       }
       return false;
     } finally {
@@ -453,7 +495,10 @@ export function PermissionManagement() {
     }
   };
   const permissionLabels = Object.fromEntries(
-    (catalog.data?.permissions ?? []).map((p) => [p.key, p.label])
+    (catalog.data?.permissions ?? []).map((p) => [
+      p.key,
+      accessLabel(p.label, t)
+    ])
   );
   const tags = catalog.data?.tags ?? [];
   const tagTargets = tagTargetKey ? [tagTargetKey] : selected;
@@ -478,7 +523,11 @@ export function PermissionManagement() {
             { tag_id: tag.id, expected_version: tag.version, add, remove }
           ]
         }),
-      checked ? "权限已加入标签" : "权限已从标签移除"
+      checked ? (
+        <AccessText message="permissions_added_to_tag" />
+      ) : (
+        <AccessText message="permissions_removed_from_tag" />
+      )
     );
   };
   const queueTagChange = (
@@ -501,7 +550,7 @@ export function PermissionManagement() {
     (permission) =>
       (!module || permissionModules(permission).includes(module)) &&
       (!search ||
-        `${permission.key} ${permission.label} ${permission.description}`
+        `${permission.key} ${accessLabelSearchText(permission.label)} ${accessLabelSearchText(permission.description)}`
           .toLowerCase()
           .includes(search.toLowerCase())) &&
       (!tagFilter.length ||
@@ -519,25 +568,25 @@ export function PermissionManagement() {
   return (
     <Flex vertical gap={16}>
       <PageHeader
-        title="权限管理"
-        breadcrumb={<Breadcrumb items={[{ title: "用户管理" }]} />}
+        title={t("permission_management")}
+        breadcrumb={<Breadcrumb items={[{ title: t("user_management") }]} />}
       />
       <Card className="admin-filter-card" size="small">
         <Form className="admin-filter-form" colon={false} layout="inline">
-          <Form.Item label="关键词">
+          <Form.Item label={t("keyword")}>
             <Input
-              placeholder="权限名称 / 说明"
+              placeholder={t("permission_name_description")}
               allowClear
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{ width: 240 }}
             />
           </Form.Item>
-          <Form.Item label="所属板块">
+          <Form.Item label={t("module")}>
             <Select
-              aria-label="所属板块"
+              aria-label={t("module")}
               allowClear
-              placeholder="全部"
+              placeholder={t("all")}
               value={module}
               onChange={setModule}
               style={{ width: 160 }}
@@ -547,16 +596,16 @@ export function PermissionManagement() {
                 )
               ].map((value) => ({
                 value,
-                label: MODULE_LABELS[value] ?? value
+                label: accessLabel(MODULE_LABELS[value] ?? value, t)
               }))}
             />
           </Form.Item>
-          <Form.Item label="权限标签">
+          <Form.Item label={t("permission_tags")}>
             <Select
-              aria-label="权限标签"
+              aria-label={t("permission_tags")}
               mode="multiple"
               allowClear
-              placeholder="全部"
+              placeholder={t("all")}
               value={tagFilter}
               onChange={setTagFilter}
               style={{ width: 200 }}
@@ -572,7 +621,7 @@ export function PermissionManagement() {
                 setTagFilter([]);
               }}
             >
-              重置
+              {t("reset")}
             </Button>
           </Form.Item>
         </Form>
@@ -582,12 +631,12 @@ export function PermissionManagement() {
           <Alert
             type="error"
             showIcon
-            title="权限列表加载失败"
+            title={t("could_not_load_permissions_9d864c")}
             description={catalog.error.message}
             style={{ marginBottom: 12 }}
             action={
               <Button size="small" onClick={() => void catalog.refetch()}>
-                重试
+                {t("try_again")}
               </Button>
             }
           />
@@ -596,28 +645,32 @@ export function PermissionManagement() {
           toolbar={
             <Space wrap>
               <Typography.Text type="secondary">
-                已选 {selected.length} 项
+                {t("selected_count", { count: selected.length })}
               </Typography.Text>
               <Button
                 type="primary"
                 disabled={!selected.length}
                 onClick={() => setBatchAction("grant")}
               >
-                批量授权
+                {t("grant_access_in_bulk")}
               </Button>
               <Button
                 danger
                 disabled={!selected.length}
                 onClick={() => setBatchAction("revoke")}
               >
-                撤销授权
+                {t("revoke_access")}
               </Button>
-              <Button onClick={() => openTagManager()}>标签管理</Button>
+              <Button onClick={() => openTagManager()}>
+                {t("manage_tags")}
+              </Button>
             </Space>
           }
           toolbarExtra={
             <Space>
-              <Button onClick={() => setAudits(true)}>变更记录</Button>
+              <Button onClick={() => setAudits(true)}>
+                {t("change_history")}
+              </Button>
             </Space>
           }
 
@@ -625,7 +678,7 @@ export function PermissionManagement() {
           locale={{
             emptyText: (
               <TableEmptyState
-                message="暂无权限"
+                message={t("no_permissions")}
                 filtered={!!(search.trim() || module || tagFilter.length)}
                 onResetFilters={() => {
                   setSearch("");
@@ -648,53 +701,62 @@ export function PermissionManagement() {
           }}
           columns={[
             {
-              title: "权限名称",
+              title: t("permission_name"),
               width: 220,
               fixed: "left",
-              dataIndex: "label"
+              dataIndex: "label",
+              render: (label: string) => accessLabel(label, t)
             },
             {
-              title: "详细说明",
+              title: t("description_b110d4"),
               dataIndex: "description",
+              render: (description: string) => accessLabel(description, t),
               width: 340
             },
             {
-              title: "所属板块",
+              key: "所属板块",
+              title: t("module"),
               width: 140,
               render: (_, p) => (
                 <>
                   <div>
                     {permissionModules(p)
-                      .map((key) => MODULE_LABELS[key] ?? key)
+                      .map((key) => accessLabel(MODULE_LABELS[key] ?? key, t))
                       .join(" / ")}
                   </div>
                   <Typography.Text type="secondary">
-                    {KIND_LABELS[p.kind] ?? p.kind}
+                    {p.kind === "action"
+                      ? t("permission_kind_action")
+                      : accessLabel(KIND_LABELS[p.kind] ?? p.kind, t)}
                   </Typography.Text>
                 </>
               )
             },
             {
-              title: "前置权限",
+              key: "前置权限",
+              title: t("required_permissions_label"),
               width: 240,
               render: (_, p) => (
-                <span title={p.requires.join("、")}>
+                <span title={p.requires.join(t("list_separator"))}>
                   {p.requires
                     .map((key) => permissionLabels[key] ?? key)
-                    .join("、") || "无"}
+                    .join(t("list_separator")) || t("none")}
                 </span>
               )
             },
             {
-              title: "风险",
+              title: t("risk"),
               width: 80,
               dataIndex: "risk_level",
               render: (risk: string) => (
-                <Tag color={RISK_COLORS[risk]}>{RISK_LABELS[risk] ?? risk}</Tag>
+                <Tag color={RISK_COLORS[risk]}>
+                  {accessLabel(RISK_LABELS[risk] ?? risk, t)}
+                </Tag>
               )
             },
             {
-              title: "标签",
+              key: "标签",
+              title: t("tags"),
               width: 260,
               render: (_, p) => {
                 const rowTags = tags.filter((tag) =>
@@ -740,8 +802,14 @@ export function PermissionManagement() {
                         </span>
                         <button
                           type="button"
-                          aria-label={`从${tag.name}移除${p.label}`}
-                          title={`仅从“${p.label}”移除“${tag.name}”标签`}
+                          aria-label={t("remove_permission_tag", {
+                            tag: tag.name,
+                            permission: accessLabel(p.label, t)
+                          })}
+                          title={t("remove_permission_tag_title", {
+                            tag: tag.name,
+                            permission: accessLabel(p.label, t)
+                          })}
                           disabled={busy}
                           onClick={(event) => {
                             event.stopPropagation();
@@ -769,8 +837,13 @@ export function PermissionManagement() {
                       <Button
                         type="text"
                         size="small"
-                        aria-label={`查看${p.label}其余${remainingTags.length}个标签`}
-                        title={remainingTags.map((tag) => tag.name).join("、")}
+                        aria-label={t("remaining_permission_tags", {
+                          permission: accessLabel(p.label, t),
+                          count: remainingTags.length
+                        })}
+                        title={remainingTags
+                          .map((tag) => tag.name)
+                          .join(t("list_separator"))}
                         disabled={busy}
                         onClick={() => openTagManager(p.key)}
                         style={{ paddingInline: 2 }}
@@ -782,8 +855,12 @@ export function PermissionManagement() {
                         type="text"
                         size="small"
                         icon={<PlusIcon />}
-                        aria-label={`设置${p.label}标签`}
-                        title={`设置${p.label}标签`}
+                        aria-label={t("configure_permission_tags", {
+                          permission: accessLabel(p.label, t)
+                        })}
+                        title={t("configure_permission_tags", {
+                          permission: accessLabel(p.label, t)
+                        })}
                         disabled={busy}
                         onClick={() => openTagManager(p.key)}
                         style={{ paddingInline: 2, minWidth: 24 }}
@@ -794,11 +871,12 @@ export function PermissionManagement() {
               }
             },
             {
-              title: "已授权管理员",
+              key: "已授权管理员",
+              title: t("administrators_with_access_845c88"),
               width: 160,
               render: (_, p) => (
                 <Button type="link" onClick={() => setGrantedKey(p.key)}>
-                  查看管理员
+                  {t("view_administrators")}
                 </Button>
               )
             }
@@ -808,7 +886,7 @@ export function PermissionManagement() {
       </Card>
       <Drawer
         open={managingTags}
-        title="标签管理"
+        title={t("manage_tags")}
         size={640}
         onClose={() => {
           setManagingTags(false);
@@ -817,22 +895,28 @@ export function PermissionManagement() {
       >
         <Flex vertical gap={16}>
           <Typography.Text type="secondary">
-            标签仅用于权限分类，不影响管理员授权。
+            {t(
+              "tags_only_categorize_permissions_and_do_not_change_administrator_"
+            )}
           </Typography.Text>
           {tagTargets.length > 0 && (
             <Flex justify="space-between" align="center" gap={12} wrap>
               <Typography.Text strong>
                 {tagTargetKey
-                  ? `设置标签 · ${permissionLabels[tagTargetKey] ?? tagTargetKey}`
-                  : `已选 ${selected.length} 项权限`}
+                  ? t("configure_tags_title", {
+                      permission: permissionLabels[tagTargetKey] ?? tagTargetKey
+                    })
+                  : t("selected_permission_count", { count: selected.length })}
               </Typography.Text>
-              <Typography.Text type="secondary">勾选后确认</Typography.Text>
+              <Typography.Text type="secondary">
+                {t("select_then_confirm")}
+              </Typography.Text>
             </Flex>
           )}
 
           <Input
-            aria-label="搜索标签"
-            placeholder="搜索标签"
+            aria-label={t("search_tags")}
+            placeholder={t("search_tags")}
             allowClear
             value={tagSearch}
             onChange={(event) => setTagSearch(event.target.value)}
@@ -840,7 +924,7 @@ export function PermissionManagement() {
           <Table<PermissionTag>
             toolbar={
               <>
-                <Typography.Text strong>标签列表</Typography.Text>
+                <Typography.Text strong>{t("tags_183f96")}</Typography.Text>
                 <Button
                   type="primary"
                   disabled={busy}
@@ -851,7 +935,7 @@ export function PermissionManagement() {
                     setCustomColor("#2053FF");
                   }}
                 >
-                  新建标签
+                  {t("create_tag")}
                 </Button>
               </>
             }
@@ -860,7 +944,7 @@ export function PermissionManagement() {
             locale={{
               emptyText: (
                 <TableEmptyState
-                  message="暂无标签"
+                  message={t("no_tags_yet")}
                   filtered={!!tagSearch.trim()}
                   onResetFilters={() => setTagSearch("")}
                 />
@@ -875,7 +959,8 @@ export function PermissionManagement() {
 
             columns={[
               {
-                title: "标签名称",
+                key: "标签名称",
+                title: t("tag_name"),
                 render: (_, tag) => {
                   const matched = tagTargets.filter((key) =>
                     tag.permissions.includes(key)
@@ -919,7 +1004,8 @@ export function PermissionManagement() {
                 }
               },
               {
-                title: "操作",
+                key: "操作",
+                title: t("actions"),
                 width: 160,
                 render: (_, tag) => (
                   <Space size={4}>
@@ -936,7 +1022,7 @@ export function PermissionManagement() {
                         );
                       }}
                     >
-                      编辑
+                      {t("edit")}
                     </Button>
                     <Button
                       type="link"
@@ -945,7 +1031,7 @@ export function PermissionManagement() {
                       disabled={busy}
                       onClick={() => setDeletingTag(tag)}
                     >
-                      删除
+                      {t("delete")}
                     </Button>
                   </Space>
                 )
@@ -956,10 +1042,18 @@ export function PermissionManagement() {
       </Drawer>
       <Modal
         open={pendingTagChange !== undefined}
-        title={pendingTagChange?.checked ? "确认添加至标签" : "确认从标签移除"}
-        okText={pendingTagChange?.checked ? "确认添加" : "确认移除"}
+        title={
+          pendingTagChange?.checked
+            ? t("confirm_adding_to_tag")
+            : t("confirm_removal_from_tag")
+        }
+        okText={
+          pendingTagChange?.checked
+            ? t("confirm_addition")
+            : t("confirm_removal")
+        }
         okButtonProps={{ danger: !pendingTagChange?.checked }}
-        cancelText="取消"
+        cancelText={t("cancel")}
         cancelButtonProps={{ disabled: busy }}
         closable={!busy}
         mask={{ closable: !busy }}
@@ -981,22 +1075,33 @@ export function PermissionManagement() {
       >
         {pendingTagChange && (
           <Typography.Text>
-            将
-            {affectedTagKeys.length === 1
-              ? `“${permissionLabels[affectedTagKeys[0]!] ?? affectedTagKeys[0]}”`
-              : `${affectedTagKeys.length} 项权限`}
-            {pendingTagChange.checked ? "添加至" : "从"}“
-            {pendingTagChange.tag.name}”标签
-            {pendingTagChange.checked ? "" : "移除"}？
+            {t(
+              pendingTagChange.checked
+                ? "add_to_tag_confirmation"
+                : "remove_from_tag_confirmation",
+              {
+                permissions:
+                  affectedTagKeys.length === 1
+                    ? t("quoted_permission", {
+                        permission:
+                          permissionLabels[affectedTagKeys[0]!] ??
+                          affectedTagKeys[0]!
+                      })
+                    : t("permission_count", { count: affectedTagKeys.length }),
+                tag: pendingTagChange.tag.name
+              }
+            )}
           </Typography.Text>
         )}
       </Modal>
       {deletingTag && (
         <Modal
           open
-          title="删除标签？管理员已分配的权限不受影响。"
-          okText="删除"
-          cancelText="取消"
+          title={t(
+            "delete_this_tag_assigned_administrator_permissions_are_unaffected"
+          )}
+          okText={t("delete")}
+          cancelText={t("cancel")}
           confirmLoading={busy}
           okButtonProps={{ danger: true }}
           cancelButtonProps={{ disabled: busy }}
@@ -1014,20 +1119,20 @@ export function PermissionManagement() {
                   deletingTag.id,
                   deletingTag.version
                 ),
-              "标签已删除，管理员权限未改变"
+              <AccessText message="tag_deleted_administrator_permissions_are_unchanged" />
             ).then((ok) => {
               if (ok) setDeletingTag(undefined);
             });
           }}
         >
-          确认删除“{deletingTag.name}”标签？
+          {t("delete_tag_confirmation", { tag: deletingTag.name })}
         </Modal>
       )}
       <Modal
         open={editingTag !== undefined}
-        title={editingTag === "new" ? "新建标签" : "编辑标签"}
-        okText="保存"
-        cancelText="取消"
+        title={editingTag === "new" ? t("create_tag") : t("edit_tag")}
+        okText={t("save")}
+        cancelText={t("cancel")}
         confirmLoading={busy}
         cancelButtonProps={{ disabled: busy }}
         closable={!busy}
@@ -1048,7 +1153,7 @@ export function PermissionManagement() {
                     tagColor,
                     editingTag.version
                   ),
-            "标签已保存"
+            <AccessText message="tag_saved" />
           ).then((ok) => {
             if (ok) setEditingTag(undefined);
           });
@@ -1056,17 +1161,17 @@ export function PermissionManagement() {
       >
         <Flex vertical gap={16}>
           <Input
-            aria-label="标签名称"
+            aria-label={t("tag_name")}
             disabled={busy}
-            placeholder="标签名称"
+            placeholder={t("tag_name")}
             value={tagName}
             onChange={(e) => setTagName(e.target.value)}
             maxLength={50}
           />
           <Flex vertical gap={8}>
-            <Typography.Text>标签颜色</Typography.Text>
+            <Typography.Text>{t("tag_color")}</Typography.Text>
             <Radio.Group
-              aria-label="标签颜色"
+              aria-label={t("tag_color")}
               disabled={busy}
               value={tagColor.startsWith("#") ? "custom" : tagColor}
               onChange={(event) =>
@@ -1090,16 +1195,16 @@ export function PermissionManagement() {
                       }
                       style={{ marginInlineEnd: 0 }}
                     >
-                      {color.label}
+                      {accessLabel(color.label, t)}
                     </Tag>
                   </Radio>
                 ))}
                 <Flex align="center" gap={8} style={{ width: "100%" }}>
                   <Radio value="custom" style={{ marginInlineEnd: 0 }}>
-                    自定义
+                    {t("custom")}
                   </Radio>
                   <ColorPicker
-                    aria-label="自定义颜色"
+                    aria-label={t("custom_color")}
                     disabled={busy}
                     value={customColor}
                     format="hex"

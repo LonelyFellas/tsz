@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,4 +76,36 @@ describe("ResetPasswordResult", () => {
     // 缓解仍在：密码明文可手动取回。
     expect(screen.getByText("Kd7mNpQ2rXt9")).toBeInTheDocument();
   });
+});
+
+it("切换语言保留一次性密码、收件人和复制原值，不关闭结果", async () => {
+  const password = "i18n3b9-local-sample!",
+    onClose = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <FeedbackApp>
+        <ResetPasswordResult
+          password={password}
+          adminName="保留原名 Admin"
+          onClose={onClose}
+        />
+      </FeedbackApp>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const secret = screen.getByText(password);
+  for (const locale of ["zh-Hant", "en-GB", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByText(password)).toBe(secret);
+    expect(screen.getByText(/保留原名 Admin/)).toBeVisible();
+    expect(mockCopy).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  }
+  mockCopy.mockResolvedValue(false);
+  fireEvent.click(screen.getByRole("button", { name: "Copy password" }));
+  await screen.findByText(
+    "Could not copy. Select and copy the password below manually."
+  );
+  expect(mockCopy).toHaveBeenCalledWith(password);
+  expect(secret).toBeVisible();
 });

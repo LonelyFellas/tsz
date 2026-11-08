@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -516,4 +518,50 @@ it("角色删除失败后确认弹窗保留目标并可重试", async () => {
   await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(2));
   expect(mockRemove).toHaveBeenLastCalledWith("r-lib");
   await waitFor(() => expect(dialog).not.toBeInTheDocument());
+});
+
+it("切换语言保留角色草稿与勾选，显式保存提交原始权限 key", async () => {
+  mockUpdate.mockResolvedValue({ ...libRole, name: "保留 Role" });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <FeedbackApp>
+          <RoleManagement />
+        </FeedbackApp>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await screen.findByText("全功能管理员");
+  fireEvent.click(screen.getAllByText("编辑")[1]!);
+  const dialog = await screen.findByRole("dialog");
+  const name = within(dialog).getByPlaceholderText("如：词库管理员");
+  await waitFor(() => expect(name).toHaveValue(libRole.name));
+  fireEvent.change(name, { target: { value: "保留 Role" } });
+  const description = within(dialog).getByPlaceholderText("这个角色能做什么");
+  fireEvent.change(description, { target: { value: "业务正文 unchanged" } });
+  const catalogCalls = mockPermissions.mock.calls.length;
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(name).toHaveValue("保留 Role");
+    expect(description).toHaveValue("业务正文 unchanged");
+    expect(
+      within(dialog)
+        .getAllByRole("checkbox")
+        .filter((c) => (c as HTMLInputElement).checked)
+    ).toHaveLength(2);
+    expect(mockPermissions).toHaveBeenCalledTimes(catalogCalls);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  }
+  fireEvent.click(within(dialog).getByText(/^保\s?存$/));
+  await waitFor(() =>
+    expect(mockUpdate).toHaveBeenCalledWith(libRole.id, {
+      name: "保留 Role",
+      description: "业务正文 unchanged",
+      permissions: libRole.permissions
+    })
+  );
 });

@@ -1,3 +1,8 @@
+import {
+  useAccessTranslation,
+  AccessText,
+  accessLabel
+} from "../permissions/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 管理员管理（super_admin 专属）：列表、筛选、验证码建号，以及行操作（启禁用 / 重置密码）。
@@ -43,6 +48,7 @@ interface FilterValues {
 }
 
 export function AdminManagement() {
+  const { t } = useAccessTranslation();
   const { message } = App.useApp();
   const [form] = Form.useForm<FilterValues>();
   const [editForm] = Form.useForm<{ display_name: string }>();
@@ -88,9 +94,10 @@ export function AdminManagement() {
     kind: "status" | "reset";
     record: Admin;
   }>();
-  const [actionError, setActionError] = useState<string>();
+  const [actionError, setActionError] = useState<{ cause: unknown }>();
   const actionPending = setStatus.isPending || resetPassword.isPending;
-  const statusVerb = confirmation?.record.status === "active" ? "禁用" : "启用";
+  const statusVerb =
+    confirmation?.record.status === "active" ? t("disable") : t("enable");
   const confirmAction = async () => {
     if (
       !confirmation ||
@@ -104,7 +111,13 @@ export function AdminManagement() {
       if (kind === "status") {
         const status = record.status === "active" ? "disabled" : "active";
         await setStatus.mutateAsync({ id: record.id, status });
-        void message.success(status === "disabled" ? "已禁用" : "已启用");
+        void message.success(
+          status === "disabled" ? (
+            <AccessText message="disabled" />
+          ) : (
+            <AccessText message="enabled" />
+          )
+        );
       } else {
         if (secretBusy) return;
         const result = await resetPassword.mutateAsync(record.id);
@@ -115,9 +128,7 @@ export function AdminManagement() {
       }
       setConfirmation(undefined);
     } catch (err) {
-      setActionError(
-        adminActionError(err, kind, kind === "status" ? "操作失败" : "重置失败")
-      );
+      setActionError({ cause: err });
     }
   };
   const confirmToggleStatus = (record: Admin) => {
@@ -130,61 +141,66 @@ export function AdminManagement() {
   };
 
   const columns: TableColumnsType<Admin> = [
-    { title: "手机号", dataIndex: "phone", width: 140, fixed: "left" },
-    { title: "昵称", dataIndex: "display_name", width: 160, ellipsis: true },
+    { title: t("phone_number"), dataIndex: "phone", width: 140, fixed: "left" },
     {
-      title: "业务权限",
+      title: t("display_name"),
+      dataIndex: "display_name",
+      width: 160,
+      ellipsis: true
+    },
+    {
+      title: t("business_permissions"),
       key: "permissions",
       width: 140,
       render: (_, record) =>
         record.role === "super_admin" ? (
-          <Tag>全部权限</Tag>
+          <Tag>{t("all_permissions")}</Tag>
         ) : (
           <Button
             type="link"
             style={{ paddingInline: 0 }}
             onClick={() => setPermissionAdmin(record)}
           >
-            设置权限
+            {t("configure_permissions")}
           </Button>
         )
     },
     {
-      title: "权限等级",
+      title: t("access_level"),
       dataIndex: "role",
       width: 130,
       render: (lv: AdminLevel) => (
         <Tag color={lv === "super_admin" ? "purple" : "blue"}>
-          {ADMIN_LEVEL_LABEL[lv]}
+          {accessLabel(ADMIN_LEVEL_LABEL[lv], t)}
         </Tag>
       )
     },
     {
-      title: "创建人",
+      title: t("created_by"),
       dataIndex: "created_by",
       width: 150,
       render: (creator: Admin["created_by"]) =>
-        creator?.display_name ?? "系统 / 历史数据"
+        creator?.display_name ?? t("system_legacy_data")
     },
     {
-      title: "状态",
+      title: t("status"),
       dataIndex: "status",
       width: 100,
       render: (s: Admin["status"]) => (
         <Badge
           status={s === "active" ? "success" : "default"}
-          text={s === "active" ? "正常" : "已禁用"}
+          text={s === "active" ? t("active") : t("disabled")}
         />
       )
     },
     {
-      title: "创建时间",
+      title: t("created_at"),
       dataIndex: "created_at",
       width: 160,
       render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "操作",
+      title: t("actions"),
       key: "action",
       width: 200,
       fixed: "right",
@@ -197,41 +213,45 @@ export function AdminManagement() {
             <GatedButton
               type="link"
               size="small"
-              reason="超级管理员不可操作"
+              reason={t("super_administrators_cannot_be_modified")}
               disabled={isSuper}
               onClick={() => {
                 editForm.setFieldsValue({ display_name: record.display_name });
                 setEditingAdmin(record);
               }}
             >
-              编辑
+              {t("edit")}
             </GatedButton>
             <GatedButton
               type="link"
               size="small"
               // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
               danger={record.status === "active"}
-              reason="超级管理员不可操作"
+              reason={t("super_administrators_cannot_be_modified")}
               disabled={isSuper}
               loading={
                 setStatus.isPending && setStatus.variables?.id === record.id
               }
               onClick={() => confirmToggleStatus(record)}
             >
-              {record.status === "active" ? "禁用" : "启用"}
+              {record.status === "active" ? t("disable") : t("enable")}
             </GatedButton>
             {/* 重置会产出一次性临时密码：超管不可重置，且另一条秘密流程进行中时也禁用。 */}
             <GatedButton
               type="link"
               size="small"
-              reason={isSuper ? "超级管理员不可操作" : "请先处理上一条临时密码"}
+              reason={
+                isSuper
+                  ? t("super_administrators_cannot_be_modified")
+                  : t("handle_the_previous_temporary_password_first")
+              }
               disabled={isSuper || secretBusy}
               loading={
                 resetPassword.isPending && resetPassword.variables === record.id
               }
               onClick={() => confirmResetPassword(record)}
             >
-              重置密码
+              {t("reset_password")}
             </GatedButton>
           </Space>
         );
@@ -246,11 +266,18 @@ export function AdminManagement() {
           open
           title={
             confirmation.kind === "reset"
-              ? `重置「${confirmation.record.display_name}」的密码`
-              : `${statusVerb}管理员「${confirmation.record.display_name}」`
+              ? t("reset_admin_title", {
+                  name: confirmation.record.display_name
+                })
+              : t(
+                  confirmation.record.status === "active"
+                    ? "disable_admin_title"
+                    : "enable_admin_title",
+                  { name: confirmation.record.display_name }
+                )
           }
-          okText={confirmation.kind === "reset" ? "重置" : statusVerb}
-          cancelText="取消"
+          okText={confirmation.kind === "reset" ? t("reset") : statusVerb}
+          cancelText={t("cancel")}
           confirmLoading={actionPending}
           cancelButtonProps={{ disabled: actionPending }}
           okButtonProps={{
@@ -268,18 +295,38 @@ export function AdminManagement() {
         >
           <p>
             {confirmation.kind === "reset"
-              ? "重置会立即吊销该管理员的全部登录会话，并生成一个只显示一次的临时密码，对方下次登录须改密。确认重置？"
+              ? t(
+                  "resetting_revokes_all_of_this_administrator_s_sessions_and_genera"
+                )
               : confirmation.record.status === "active"
-                ? "禁用后该管理员无法再登录后台，已有登录态也不能继续访问后台数据。确认禁用？"
-                : "启用后该管理员可以重新登录后台。确认启用？"}
+                ? t(
+                    "disabling_prevents_this_administrator_from_signing_in_or_accessin"
+                  )
+                : t(
+                    "enabling_lets_this_administrator_sign_in_again_enable_the_account"
+                  )}
           </p>
-          {actionError && <Alert type="error" title={actionError} />}
+          {actionError && (
+            <Alert
+              type="error"
+              title={adminActionError(
+                actionError.cause,
+                confirmation.kind,
+                t(
+                  confirmation.kind === "status"
+                    ? "operation_failed"
+                    : "reset_failed"
+                ),
+                t
+              )}
+            />
+          )}
         </Modal>
       )}
 
       <PageHeader
-        title="管理员管理"
-        breadcrumb={<Breadcrumb items={[{ title: "用户管理" }]} />}
+        title={t("administrators")}
+        breadcrumb={<Breadcrumb items={[{ title: t("user_management") }]} />}
       />
 
       <Card className="admin-filter-card" size="small">
@@ -290,24 +337,35 @@ export function AdminManagement() {
           layout="inline"
           onFinish={applyFilters}
         >
-          <Form.Item name="phone" label="手机号">
-            <Input placeholder="手机号包含" allowClear style={{ width: 160 }} />
+          <Form.Item name="phone" label={t("phone_number")}>
+            <Input
+              placeholder={t("phone_number_contains")}
+              allowClear
+              style={{ width: 160 }}
+            />
           </Form.Item>
-          <Form.Item name="display_name" label="昵称">
-            <Input placeholder="昵称包含" allowClear style={{ width: 160 }} />
+          <Form.Item name="display_name" label={t("display_name")}>
+            <Input
+              placeholder={t("display_name_contains")}
+              allowClear
+              style={{ width: 160 }}
+            />
           </Form.Item>
-          <Form.Item name="role" label="权限等级">
+          <Form.Item name="role" label={t("access_level")}>
             <Select
-              placeholder="全部"
+              placeholder={t("all")}
               allowClear
               style={{ width: 150 }}
-              options={ADMIN_LEVEL_OPTIONS}
+              options={ADMIN_LEVEL_OPTIONS.map((option) => ({
+                ...option,
+                label: accessLabel(option.label, t)
+              }))}
             />
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Space>
               <Button type="primary" icon={<SearchIcon />} htmlType="submit">
-                搜索
+                {t("search")}
               </Button>
               <Button
                 icon={<RotateCwIcon />}
@@ -316,7 +374,7 @@ export function AdminManagement() {
                   applyFilters({});
                 }}
               >
-                重置
+                {t("reset")}
               </Button>
             </Space>
           </Form.Item>
@@ -329,11 +387,11 @@ export function AdminManagement() {
             type="error"
             showIcon
             style={{ marginBottom: 12 }}
-            title="管理员列表加载失败"
+            title={t("could_not_load_administrators")}
             description={listQuery.error.message}
             action={
               <Button size="small" onClick={() => void listQuery.refetch()}>
-                重试
+                {t("try_again")}
               </Button>
             }
           />
@@ -344,11 +402,11 @@ export function AdminManagement() {
             <GatedButton
               type="primary"
               icon={<PlusIcon />}
-              reason="请先处理上一条临时密码"
+              reason={t("handle_the_previous_temporary_password_first")}
               disabled={secretBusy}
               onClick={() => setCreateOpen(true)}
             >
-              新建管理员
+              {t("create_administrator")}
             </GatedButton>
           }
 
@@ -356,7 +414,7 @@ export function AdminManagement() {
           locale={{
             emptyText: (
               <TableEmptyState
-                message="暂无管理员"
+                message={t("no_administrators_yet")}
                 filtered={
                   !!(
                     filters.role ||
@@ -382,7 +440,7 @@ export function AdminManagement() {
             pageSize,
             total,
             showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
+            showTotal: (count) => t("records_count", { count }),
             pageSizeOptions: [10, 20, 50],
             onChange: (nextPage, nextSize) => {
               setPage(nextSize !== pageSize ? 1 : nextPage);
@@ -393,12 +451,12 @@ export function AdminManagement() {
       </Card>
 
       <Modal
-        title="编辑管理员资料"
+        title={t("edit_administrator")}
         open={editingAdmin !== null}
         onCancel={() => !updateAdmin.isPending && setEditingAdmin(null)}
         onOk={() => editForm.submit()}
-        okText="保存"
-        cancelText="取消"
+        okText={t("save")}
+        cancelText={t("cancel")}
         confirmLoading={updateAdmin.isPending}
         cancelButtonProps={{ disabled: updateAdmin.isPending }}
         closable={!updateAdmin.isPending}
@@ -417,24 +475,42 @@ export function AdminManagement() {
               })
               .then(() => {
                 setEditingAdmin(null);
-                void message.success("管理员资料已更新");
+                void message.success(
+                  <AccessText message="administrator_updated" />
+                );
               })
-              .catch(() => message.error("更新管理员资料失败，请重试"));
+              .catch(() =>
+                message.error(
+                  <AccessText message="could_not_update_the_administrator_try_again" />
+                )
+              );
           }}
         >
-          <Form.Item label="手机号">
+          <Form.Item label={t("phone_number")}>
             <Input value={editingAdmin?.phone ?? ""} disabled />
           </Form.Item>
           <Form.Item
             name="display_name"
-            label="昵称"
+            label={t("display_name")}
             rules={[
-              { required: true, whitespace: true, message: "请输入昵称" },
-              { max: 50, message: "昵称最多 50 个字符" },
               {
+                required: true,
+                whitespace: true,
+                message: <AccessText message="enter_a_display_name" />
+              },
+              {
+                max: 50,
+                message: (
+                  <AccessText message="display_names_must_be_at_most_50_characters" />
+                )
+              },
+              {
+                message: (
+                  <AccessText message="display_names_cannot_contain_special_or_control_characters" />
+                ),
                 validator: (_, value: string) =>
                   value && /[<>\p{Cc}\p{Cf}]/u.test(value)
-                    ? Promise.reject(new Error("昵称不能包含特殊或控制字符"))
+                    ? Promise.reject(new Error("invalid_display_name"))
                     : Promise.resolve()
               }
             ]}
