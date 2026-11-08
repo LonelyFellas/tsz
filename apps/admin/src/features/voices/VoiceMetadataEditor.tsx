@@ -1,3 +1,9 @@
+import {
+  useVoiceTranslation,
+  VoiceText,
+  voiceMessage,
+  useVoiceMessageState
+} from "./i18n";
 import { PencilIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
@@ -36,6 +42,7 @@ export function VoiceMetadataEditor({
   onStateChange,
   children
 }: Props) {
+  const { t } = useVoiceTranslation();
   const accountId = useAuthStore((state) => state.profile?.id);
   const client = useQueryClient();
   const { message } = App.useApp();
@@ -48,9 +55,9 @@ export function VoiceMetadataEditor({
   const [action, setAction] = useState<"save" | "restore" | "reload" | null>(
     null
   );
-  const [error, setError] = useState<string>();
+  const [error, setError] = useVoiceMessageState();
   const id = `${voice.alias}:${field}`;
-  const label = field === "description" ? "介绍" : "口音";
+  const label = field === "description" ? t("description") : t("accent");
   const busy = action !== null;
   const editing = baseline !== undefined;
   const dirty = !!baseline && draft !== baseline.value;
@@ -177,18 +184,22 @@ export function VoiceMetadataEditor({
       }
       setBaseline(undefined);
       void message.success(
-        field === "accent"
-          ? "口音归属已保存。"
-          : restore
-            ? "已恢复官方介绍。"
-            : "中文介绍已保存，所有有权查看音色的管理员可见。"
+        field === "accent" ? (
+          <VoiceText message="accent_classification_saved" />
+        ) : restore ? (
+          <VoiceText message="official_description_restored" />
+        ) : (
+          <VoiceText message="chinese_description_saved_all_administrators_with_voice_viewing_p" />
+        )
       );
     } catch (cause) {
       if (currentAccount())
         setError(
           cause instanceof HttpError && cause.status === 409
-            ? "资料已在其他页面修改，当前输入已保留，请重新载入后再试。"
-            : "保存失败，当前输入已保留，请重试。"
+            ? voiceMessage(
+                "this_information_changed_in_another_page_your_input_has_been_kept"
+              )
+            : voiceMessage("could_not_save_your_input_has_been_kept_try_again")
         );
     } finally {
       setAction(null);
@@ -207,7 +218,10 @@ export function VoiceMetadataEditor({
       if (currentAccount())
         start(latest.items.find((entry) => entry.voice_alias === voice.alias));
     } catch {
-      if (currentAccount()) setError("重新载入失败，当前输入已保留，请重试。");
+      if (currentAccount())
+        setError(
+          voiceMessage("could_not_reload_your_input_has_been_kept_try_again")
+        );
     } finally {
       setAction(null);
     }
@@ -220,15 +234,18 @@ export function VoiceMetadataEditor({
         <Tooltip
           title={
             field === "accent" && item?.accent_revision == null
-              ? "当前音色暂不支持修改口音归属"
-              : `编辑${label}`
+              ? t("accent_classification_cannot_be_changed_for_this_voice_yet")
+              : t("edit_field", { field: label })
           }
         >
           <Button
             type="text"
             size="small"
             icon={<PencilIcon />}
-            aria-label={`编辑 ${voice.display_name} ${label}`}
+            aria-label={t("edit_voice_field", {
+              name: voice.display_name,
+              field: label
+            })}
             disabled={
               disabled || (field === "accent" && item?.accent_revision == null)
             }
@@ -243,7 +260,10 @@ export function VoiceMetadataEditor({
       form={form}
       layout="vertical"
       className="voice-catalog-editor"
-      aria-label={`编辑 ${voice.display_name} ${label}`}
+      aria-label={t("edit_voice_field", {
+        name: voice.display_name,
+        field: label
+      })}
       disabled={disabled || busy}
       onValuesChange={(_, values) => setDraft(values.value)}
       onFinish={() => void save()}
@@ -254,10 +274,18 @@ export function VoiceMetadataEditor({
           field === "description"
             ? [
                 {
+                  message: (
+                    <VoiceText message="descriptions_must_be_at_most_3000_characters" />
+                  ),
+
                   validator: (_, value: string) =>
                     Array.from(value ?? "").length <= 3000
                       ? Promise.resolve()
-                      : Promise.reject(new Error("介绍最多 3000 个字符"))
+                      : Promise.reject(
+                          new Error(
+                            "descriptions_must_be_at_most_3000_characters"
+                          )
+                        )
                 }
               ]
             : [{ required: true }]
@@ -265,16 +293,16 @@ export function VoiceMetadataEditor({
       >
         {field === "description" ? (
           <Input.TextArea
-            aria-label="中文介绍"
+            aria-label={t("chinese_description")}
             autoSize={{ minRows: 3, maxRows: 8 }}
           />
         ) : (
           <Select
-            aria-label="当前口音归属"
+            aria-label={t("current_accent_classification")}
             options={[
-              { value: "gb", label: "英式" },
-              { value: "us", label: "美式" },
-              { value: "none", label: "不归类" }
+              { value: "gb", label: t("british") },
+              { value: "us", label: t("american") },
+              { value: "none", label: t("unclassified") }
             ]}
           />
         )}
@@ -286,7 +314,7 @@ export function VoiceMetadataEditor({
           htmlType="submit"
           loading={action === "save"}
         >
-          {field === "description" ? "保存介绍" : "保存口音"}
+          {field === "description" ? t("save_description") : t("save_accent")}
         </Button>
         <Button
           size="small"
@@ -295,7 +323,7 @@ export function VoiceMetadataEditor({
             setError(undefined);
           }}
         >
-          取消
+          {t("cancel")}
         </Button>
         {field === "description" && item?.description_zh != null && (
           <Button
@@ -304,7 +332,7 @@ export function VoiceMetadataEditor({
             loading={action === "restore"}
             onClick={() => void save(true)}
           >
-            恢复官方介绍
+            {t("restore_official_description")}
           </Button>
         )}
       </Space>
@@ -320,7 +348,7 @@ export function VoiceMetadataEditor({
               disabled={busy}
               onClick={() => void reload()}
             >
-              重新载入
+              {t("reload")}
             </Button>
           }
         />

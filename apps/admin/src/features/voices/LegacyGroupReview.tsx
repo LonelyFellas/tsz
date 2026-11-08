@@ -1,3 +1,4 @@
+import { useVoiceTranslation } from "./i18n";
 import { useState } from "react";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Checkbox, Input } from "@tsz/ui/admin/forms";
@@ -34,6 +35,7 @@ export function LegacyGroupReview({
   onRemove: (id: string) => void;
   onComplete: (pairs: AdminDubbingRecommendationPair[]) => void;
 }) {
+  const { t } = useVoiceTranslation();
   const [name, setName] = useState("自然朗读");
   const [confirmed, setConfirmed] = useState(false);
   const rec = group.recommendations;
@@ -81,19 +83,22 @@ export function LegacyGroupReview({
   return (
     <Modal
       open={open}
-      title="确认原有声音"
+      title={t("confirm_existing_voices")}
       onCancel={onCancel}
       footer={null}
       width={720}
     >
       <Typography.Paragraph type="secondary">
-        保留原有音色与参数，确认英美两侧的对应关系。确认只更新本组草稿。
+        {t("keep_existing_voices_and_parameters_and_confirm_their_british_and")}
       </Typography.Paragraph>
       <div className="dubbing-legacy-review-columns">
         {sides.map((side) => (
-          <section key={side} aria-label={`${sideName(side)}原有声音`}>
+          <section
+            key={side}
+            aria-label={t("legacy_side", { side: sideName(side, t) })}
+          >
             <Typography.Title level={5} className={`voice-accent-${side}`}>
-              {sideName(side)}
+              {sideName(side, t)}
             </Typography.Title>
             {rec[side].map((item, index) => {
               const voice = voices.find((v) => v.alias === item.voice_alias);
@@ -103,7 +108,7 @@ export function LegacyGroupReview({
                   {!simple && (
                     <Typography.Text type="secondary">
                       {index + 1}. {item.name}
-                      {paired ? " · 已组成推荐套" : ""}
+                      {paired ? " " + t("paired") : ""}
                     </Typography.Text>
                   )}
                   <div>
@@ -111,16 +116,18 @@ export function LegacyGroupReview({
                       <VoiceName voice={voice} />
                     ) : (
                       <Typography.Text type="danger">
-                        声音已不可用：{item.voice_alias}
+                        {t("legacy_unavailable_voice", {
+                          alias: item.voice_alias
+                        })}
                       </Typography.Text>
                     )}
                   </div>
                   <Space size={16}>
                     <span>
-                      语速 <VoiceRate parameters={item.parameters} />
+                      {t("rate")} <VoiceRate parameters={item.parameters} />
                     </span>
                     <span>
-                      音量 <VoiceVolume parameters={item.parameters} />
+                      {t("volume")} <VoiceVolume parameters={item.parameters} />
                     </span>
                   </Space>
                 </div>
@@ -128,7 +135,9 @@ export function LegacyGroupReview({
             })}
             {!rec[side].length && (
               <Typography.Text type="secondary">
-                尚无原有声音，可为推荐套补充这一侧。
+                {t(
+                  "no_existing_voice_add_this_side_to_the_recommendation_pair"
+                )}
               </Typography.Text>
             )}
           </section>
@@ -136,10 +145,10 @@ export function LegacyGroupReview({
       </div>
       {simple ? (
         <div className="dubbing-simple-confirmation">
-          <label htmlFor="legacy-pair-name">推荐名称</label>
+          <label htmlFor="legacy-pair-name">{t("recommendation_name")}</label>
           <Input
             id="legacy-pair-name"
-            aria-label="原有声音推荐名称"
+            aria-label={t("existing_voice_recommendation_name")}
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={40}
@@ -150,30 +159,32 @@ export function LegacyGroupReview({
             onChange={(event) => setSelected(event.target.checked)}
             disabled={disabled}
           >
-            选用这套推荐
+            {t("select_this_recommendation_pair")}
           </Checkbox>
           <Checkbox
             checked={confirmed}
             onChange={(event) => setConfirmed(event.target.checked)}
             disabled={disabled}
           >
-            确认将这两个声音组成同一套推荐
+            {t("confirm_these_two_voices_as_one_recommendation_pair")}
           </Checkbox>
           <div className="dubbing-dialog-actions">
-            <Button onClick={onCancel}>暂不整理</Button>
+            <Button onClick={onCancel}>{t("organise_later")}</Button>
             <Button
               type="primary"
               disabled={disabled || !confirmed || !name.trim()}
               onClick={confirmSimple}
             >
-              确认组合
+              {t("confirm_pair")}
             </Button>
           </div>
         </div>
       ) : (
         <>
           <Typography.Paragraph type="secondary">
-            逐套组合现有声音，也可以补充缺少的一侧。所有声音设置都会保留，包括未选用的声音。
+            {t(
+              "pair_existing_voices_and_add_any_missing_side_all_voice_settings_"
+            )}
           </Typography.Paragraph>
           {pairs.map((pair) => (
             <div key={pair.id} className="dubbing-reviewed-pair">
@@ -183,28 +194,28 @@ export function LegacyGroupReview({
                 disabled={disabled}
                 onClick={() => onRemove(pair.id)}
               >
-                重新组合
+                {t("re_pair")}
               </Button>
             </div>
           ))}
           <Button disabled={disabled || pairs.length >= 20} onClick={onAdd}>
-            新增一套组合
+            {t("add_a_pair")}
           </Button>
           {!legacyComplete(group) && (
             <Alert
               className="dubbing-review-progress"
               type="info"
-              title={`已确认 ${pairs.length} 套，还有原有声音待安排。`}
+              title={t("legacy_progress", { count: pairs.length })}
             />
           )}
           <div className="dubbing-dialog-actions">
-            <Button onClick={onCancel}>取消</Button>
+            <Button onClick={onCancel}>{t("cancel")}</Button>
             <Button
               type="primary"
               disabled={disabled || !legacyComplete(group)}
               onClick={() => onComplete(pairs)}
             >
-              确认全部组合
+              {t("confirm_all_pairs")}
             </Button>
           </div>
         </>

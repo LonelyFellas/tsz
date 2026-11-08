@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import {
   fireEvent,
   isInaccessible,
@@ -313,4 +315,94 @@ describe("音色目录表格", () => {
     expect(screen.getByText("共享介绍")).toBeVisible();
     expect(screen.getByText("我的听感：适合慢读")).toBeVisible();
   });
+});
+
+it("界面语言切换保留目录筛选、搜索与音色身份，不触发试听或编辑", async () => {
+  const onAudition = vi.fn(),
+    onDetails = vi.fn();
+  const info = new Map([
+    [
+      "sonia",
+      {
+        voice_alias: "sonia",
+        description_zh: "共享介绍",
+        description_revision: 2,
+        notes: "适合慢读",
+        personal_revision: 3,
+        parameters: null
+      }
+    ]
+  ]);
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <VoiceCatalogTable
+        voices={voices}
+        metadata={info}
+        loading={false}
+        settingsPending={false}
+        canGenerate
+        validText
+        pendingVoice={null}
+        onAudition={onAudition}
+        onDetails={onDetails}
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await select("推荐场景", "新闻");
+  const search = visibleControl("搜索音色");
+  fireEvent.change(search, { target: { value: "溫柔" } });
+  expect(names(view.container)).toEqual(["Ava", "Sonia"]);
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(search).toHaveValue("溫柔");
+    expect(
+      [...view.container.querySelectorAll("tbody tr[data-row-key]")].map(
+        (row) => row.getAttribute("data-row-key")
+      )
+    ).toEqual(["ava", "sonia"]);
+    expect(screen.getByText("共享介绍")).toBeVisible();
+    expect(onAudition).not.toHaveBeenCalled();
+    expect(onDetails).not.toHaveBeenCalled();
+  }
+});
+
+it("下拉检索词在切换语言后仍能匹配默认风格，不改变选择或触发操作", async () => {
+  const onAudition = vi.fn(),
+    onDetails = vi.fn();
+  const data = new Map();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <VoiceCatalogTable
+        voices={voices}
+        metadata={data}
+        loading={false}
+        settingsPending={false}
+        canGenerate
+        validText
+        pendingVoice={null}
+        onAudition={onAudition}
+        onDetails={onDetails}
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = visibleControl("可选风格");
+  fireEvent.mouseDown(input);
+  fireEvent.change(input, { target: { value: "默认" } });
+  await waitFor(() =>
+    expect(
+      document.querySelector('.ui-select-item-option[title="默认"]')
+    ).not.toBeNull()
+  );
+  view.rerender(content("en-GB"));
+  expect(input).toBeInTheDocument();
+  expect(input).toHaveValue("默认");
+  await waitFor(() =>
+    expect(
+      document.querySelector('.ui-select-item-option[title="Default"]')
+    ).not.toBeNull()
+  );
+  expect(onAudition).not.toHaveBeenCalled();
+  expect(onDetails).not.toHaveBeenCalled();
 });

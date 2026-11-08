@@ -1,3 +1,8 @@
+import {
+  useVoiceTranslation,
+  voiceMessage,
+  useVoiceMessageState
+} from "./i18n";
 import { speechAccentGroup } from "@tsz/shared";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminSpeechVoice, AdminVoiceParameters } from "@tsz/types";
@@ -29,6 +34,7 @@ export function AddRecommendation({
   onClose: () => void;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const { t } = useVoiceTranslation();
   const accountId = useAuthStore((state) => state.profile?.id);
   const canEdit = usePermission("speech.global_dubbing");
   const [drafts, setDrafts] = useDubbingDrafts();
@@ -39,7 +45,7 @@ export function AddRecommendation({
   });
   const [groupId, setGroupId] = useState<string>();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useVoiceMessageState("");
   const [seed, setSeed] = useState<RecommendationSeed>();
   const [done, setDone] = useState(false);
   useEffect(() => {
@@ -64,7 +70,7 @@ export function AddRecommendation({
       return;
     const group = options.find((g) => g.id === groupId);
     if (!group) {
-      setError("请选择推荐分组。");
+      setError(voiceMessage("select_a_recommendation_group"));
       return;
     }
     const rec = group.recommendations;
@@ -77,7 +83,11 @@ export function AddRecommendation({
             group.legacyPairs?.length ?? 0
           )) >= 20
     ) {
-      setError("该组已有 20 个推荐，请先在分组配音中整理。");
+      setError(
+        voiceMessage(
+          "this_group_already_has_20_recommendations_organise_them_in_group_"
+        )
+      );
       return;
     }
     setPending(true);
@@ -90,7 +100,11 @@ export function AddRecommendation({
         [locale]: { ...newPairVoice(voice), parameters }
       });
     } catch {
-      setError("请先修正当前试听参数，输入已保留。");
+      setError(
+        voiceMessage(
+          "correct_the_preview_parameters_first_your_input_has_been_kept"
+        )
+      );
     } finally {
       setPending(false);
     }
@@ -100,8 +114,10 @@ export function AddRecommendation({
       <Alert
         type="success"
         showIcon
-        title="已应用到分组草稿，请回到工作台保存当前组后生效。"
-        action={<Button onClick={onClose}>完成</Button>}
+        title={t(
+          "applied_to_the_group_draft_return_to_the_workspace_and_save_the_g"
+        )}
+        action={<Button onClick={onClose}>{t("done")}</Button>}
       />
     );
   return (
@@ -109,14 +125,18 @@ export function AddRecommendation({
       {groups.isError && (
         <Alert
           type="error"
-          title="分组加载失败。"
-          action={<Button onClick={() => void groups.refetch()}>重试</Button>}
+          title={t("could_not_load_groups")}
+          action={
+            <Button onClick={() => void groups.refetch()}>
+              {t("try_again")}
+            </Button>
+          }
         />
       )}
       <Form component="div" layout="vertical">
-        <Form.Item label="推荐分组">
+        <Form.Item label={t("recommendation_group")}>
           <Select
-            aria-label="推荐分组"
+            aria-label={t("recommendation_group")}
             value={groupId}
             loading={groups.isPending}
             options={options.map((group) => ({
@@ -139,10 +159,10 @@ export function AddRecommendation({
             loading={pending}
             onClick={() => void add()}
           >
-            创建整套推荐
+            {t("create_recommendation_pair")}
           </Button>
           <Button disabled={pending} onClick={onClose}>
-            取消添加
+            {t("cancel_addition")}
           </Button>
         </Space>
       </Form>

@@ -1,8 +1,10 @@
+import { useVoiceTranslation } from "./i18n";
 import { splitVoiceDisplayName } from "@tsz/shared";
 import { MarsIcon, VenusIcon } from "lucide-react";
 import type { AdminSpeechVoice, AdminVoiceParameters } from "@tsz/types";
 
 export function VoiceName({ voice }: { voice: AdminSpeechVoice }) {
+  const { t } = useVoiceTranslation();
   // 目录只有显示名和官方 ID；没有中文名时不拿介绍或机器翻译补名。
   const { english, chinese } = splitVoiceDisplayName(voice.display_name);
   const gender = voice.gender.toLowerCase();
@@ -10,9 +12,9 @@ export function VoiceName({ voice }: { voice: AdminSpeechVoice }) {
     <span className="voice-shared-name" title={voice.display_name}>
       <strong>{english}</strong>{" "}
       {gender === "female" ? (
-        <VenusIcon role="img" aria-label="女声" />
+        <VenusIcon role="img" aria-label={t("female_voice")} />
       ) : gender === "male" ? (
-        <MarsIcon role="img" aria-label="男声" />
+        <MarsIcon role="img" aria-label={t("male_voice")} />
       ) : null}
       {chinese && <small>{chinese}</small>}
     </span>

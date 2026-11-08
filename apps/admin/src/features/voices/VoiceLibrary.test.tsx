@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -1652,4 +1654,78 @@ describe("配音中心", () => {
     expect(screen.queryByLabelText("Sonia 试听播放器")).toBeNull();
     expect(screen.getByLabelText("试听 Sonia")).toBeDisabled();
   });
+});
+
+it("切语言保留听感、保存冲突与已打开的放弃确认，不重新请求", async () => {
+  vi.mocked(api.speech.saveSettings).mockRejectedValue(
+    new HttpError(409, "conflict")
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  clients.push(client);
+  const router = createMemoryRouter(
+    [{ path: "/voices/library", element: <VoicesPage /> }],
+    { initialEntries: ["/voices/library"] }
+  );
+  routers.push(router);
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <App>
+          <RouterProvider router={router} />
+        </App>
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
+  const notes = notesInput();
+  const notesToggle = namedButton("我的听感");
+  expect(notesToggle).toHaveAttribute("aria-expanded", "true");
+  fireEvent.change(notes, { target: { value: "保留听感 raw notes" } });
+  const calls = [
+    vi.mocked(api.speech.voices).mock.calls.length,
+    vi.mocked(api.speech.library).mock.calls.length
+  ];
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(notes).toBeInTheDocument();
+    expect(notesToggle).toBeInTheDocument();
+    expect(notesToggle).toHaveAttribute("aria-expanded", "true");
+    expect(notes).toHaveValue("保留听感 raw notes");
+    expect(api.speech.saveSettings).not.toHaveBeenCalled();
+    expect([
+      vi.mocked(api.speech.voices).mock.calls.length,
+      vi.mocked(api.speech.library).mock.calls.length
+    ]).toEqual(calls);
+  }
+  fireEvent.click(namedButton("保存听感"));
+  await screen.findByText(
+    "设置已在其他页面修改。当前输入已保留，请重新载入最新设置后再编辑。"
+  );
+  expect(api.speech.saveSettings).toHaveBeenCalledWith(sonia.alias, {
+    parameters: null,
+    notes: "保留听感 raw notes",
+    base_revision: 0
+  });
+  fireEvent.click(within(screen.getByRole("dialog")).getByLabelText("关闭"));
+  await screen.findByText("关闭会丢弃尚未保存的听感。");
+  view.rerender(content("en-GB"));
+  const confirmation = await screen.findByText(
+    "Closing discards unsaved listening notes."
+  );
+  fireEvent.click(
+    within(confirmation.closest('[role="dialog"]')!).getByRole("button", {
+      name: "Continue editing"
+    })
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByText("Closing discards unsaved listening notes.")
+    ).toBeNull()
+  );
+  expect(notes).toHaveValue("保留听感 raw notes");
+  expect(api.speech.saveSettings).toHaveBeenCalledTimes(1);
+  await screen.findByText(/Settings changed in another page/);
 });

@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import {
   act,
   cleanup,
@@ -291,4 +293,49 @@ it("原声音不支持当前标注时明确提示，不提交不兼容的对比�
     await screen.findByText(/当前音色暂未开放指定音标或关联单词读法/)
   ).toBeVisible();
   expect(api.speech.preview).not.toHaveBeenCalled();
+});
+
+it("语言切换保留在途试听、原始参数和已有播放器，不取消或重发", async () => {
+  let resolve!: (value: AdminSpeechPreviewResponse) => void;
+  vi.mocked(api.speech.preview).mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      })
+  );
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <DubbingAudition voice={voice} parameters={parameters} side="uk" />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = screen.getByLabelText("本次试听文本");
+  fireEvent.change(input, { target: { value: "Raw preview text." } });
+  fireEvent.click(screen.getByRole("button", { name: "试听当前参数" }));
+  await waitFor(() => expect(api.speech.preview).toHaveBeenCalledTimes(1));
+  const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
+  const request = vi.mocked(api.speech.preview).mock.calls[0]![0];
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue("Raw preview text.");
+    expect(signal.aborted).toBe(false);
+    expect(api.speech.preview).toHaveBeenCalledTimes(1);
+  }
+  await act(async () => resolve(result));
+  const player = await screen.findByLabelText("Sonia 试听播放器");
+  const pauseCalls = vi.mocked(HTMLMediaElement.prototype.pause).mock.calls
+    .length;
+  for (const locale of ["en-US", "zh-Hant", "en-GB"] as const) {
+    view.rerender(content(locale));
+    expect(player).toBeVisible();
+    expect(view.container.querySelector("audio[controls]")).toBe(player);
+    expect(api.speech.preview).toHaveBeenCalledTimes(1);
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalledTimes(pauseCalls);
+  }
+  expect(request).toEqual({
+    content: { version: 2, text: "Raw preview text.", annotations: [] },
+    voice_alias: "sonia",
+    ...parameters
+  });
 });

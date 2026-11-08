@@ -1,3 +1,10 @@
+import {
+  useVoiceTranslation,
+  voiceLabel,
+  voiceSearchText,
+  defaultVoiceTranslation,
+  type VoiceTranslation
+} from "./i18n";
 import { VoiceName } from "./VoiceDisplay";
 import {
   VoiceMetadataEditor,
@@ -55,29 +62,58 @@ const none = "__none__";
 const languages = new Intl.DisplayNames(["zh-CN"], { type: "language" });
 const regions = new Intl.DisplayNames(["zh-CN"], { type: "region" });
 const englishLanguages = new Intl.DisplayNames(["en"], { type: "language" });
+const interfaceNames = {
+  "zh-Hans": { language: languages, region: regions },
+  "zh-Hant": {
+    language: new Intl.DisplayNames(["zh-Hant"], { type: "language" }),
+    region: new Intl.DisplayNames(["zh-Hant"], { type: "region" })
+  },
+  "en-GB": {
+    language: new Intl.DisplayNames(["en-GB"], { type: "language" }),
+    region: new Intl.DisplayNames(["en-GB"], { type: "region" })
+  },
+  "en-US": {
+    language: new Intl.DisplayNames(["en-US"], { type: "language" }),
+    region: new Intl.DisplayNames(["en-US"], { type: "region" })
+  }
+};
+const interfaceNamesFor = (locale: string) =>
+  interfaceNames[locale as keyof typeof interfaceNames] ??
+  interfaceNames["zh-Hans"];
 export const accentNames = { gb: "英式", us: "美式", none: "不归类" };
 export function voiceAccent(voice: AdminSpeechVoice) {
   const group = speechAccentGroup(voice.locale, voice.accent);
   return group === "uk" ? "gb" : group === "us" ? "us" : "none";
 }
-export function language(voice: AdminSpeechVoice) {
-  return languages.of(voice.locale.split("-")[0]!) ?? voice.locale;
+export function language(voice: AdminSpeechVoice, interfaceLocale = "zh-Hans") {
+  return (
+    interfaceNamesFor(interfaceLocale).language.of(
+      voice.locale.split("-")[0]!
+    ) ?? voice.locale
+  );
 }
-function region(voice: AdminSpeechVoice) {
+function region(voice: AdminSpeechVoice, interfaceLocale = "zh-Hans") {
   const code = new Intl.Locale(voice.locale).region;
-  return code ? (regions.of(code) ?? code) : "未提供";
+  return code
+    ? (interfaceNamesFor(interfaceLocale).region.of(code) ?? code)
+    : "未提供";
 }
 function list(
   values: string[] | null | undefined,
-  labels: Record<string, string> = {}
+  labels: Record<string, string> = {},
+  t: VoiceTranslation = defaultVoiceTranslation
 ) {
   return values?.length
     ? [
-        ...new Set(values.map((value) => labels[value.toLowerCase()] ?? value))
-      ].join("、")
+        ...new Set(
+          values.map((value) =>
+            voiceLabel(labels[value.toLowerCase()] ?? value, t)
+          )
+        )
+      ].join(t("list_separator"))
     : values
-      ? "无"
-      : "未提供";
+      ? t("none")
+      : t("not_provided");
 }
 
 function preview(text: string) {
@@ -176,6 +212,7 @@ export function VoiceCatalogTable({
   onAudition,
   onDetails
 }: Props) {
+  const { t, i18n } = useVoiceTranslation();
   const [query, setQuery] = useState("");
   const [commonOnly, setCommonOnly] = useState(false);
   const [sort, setSort] = useState("recommended");
@@ -194,21 +231,27 @@ export function VoiceCatalogTable({
           (!search ||
             [
               voice.display_name,
-              language(voice),
+              ...Object.keys(interfaceNames).map((locale) =>
+                language(voice, locale)
+              ),
               voice.locale,
               englishLanguages.of(voice.locale.split("-")[0]!),
               new Intl.DisplayNames([voice.locale], { type: "language" }).of(
                 voice.locale.split("-")[0]!
               ),
-              region(voice),
-              accentNames[voiceAccent(voice)],
+              ...Object.keys(interfaceNames).map((locale) =>
+                region(voice, locale)
+              ),
+              voiceSearchText(accentNames[voiceAccent(voice)]),
               voice.alias,
               voice.metadata?.provider_voice_id,
               info?.description_zh,
               info?.notes,
               voice.metadata?.description,
               ...(voice.metadata?.personalities ?? []),
-              list(voice.metadata?.personalities, personalityNames)
+              ...(voice.metadata?.personalities ?? []).map((value) =>
+                voiceSearchText(personalityNames[value.toLowerCase()] ?? value)
+              )
             ]
               .join(" ")
               .toLowerCase()
@@ -269,23 +312,45 @@ export function VoiceCatalogTable({
     return [...new Set(voices.flatMap((voice) => filterValues(voice, key)))]
       .sort()
       .map((value) => {
-        const label =
+        const canonicalLabel =
           value === missing
-            ? "未提供"
+            ? defaultVoiceTranslation("not_provided")
             : value === none
-              ? "无"
+              ? defaultVoiceTranslation("none")
               : (labels[value] ?? value);
+        const label = voiceLabel(canonicalLabel, t);
+        const matching = voices.find((voice) =>
+          filterValues(voice, key).includes(value)
+        );
+        const localizedLabel =
+          matching && key === "language"
+            ? language(matching, i18n.language)
+            : matching && key === "region"
+              ? voiceLabel(region(matching, i18n.language), t)
+              : label;
         return {
           value,
-          searchText: label,
+          searchText: [
+            localizedLabel,
+            label,
+            value,
+            voiceSearchText(canonicalLabel),
+            ...(matching && (key === "language" || key === "region")
+              ? Object.keys(interfaceNames).map((locale) =>
+                  key === "language"
+                    ? language(matching, locale)
+                    : region(matching, locale)
+                )
+              : [])
+          ].join(" "),
           label:
             key === "gender" ? (
               <Space size={6}>
                 {genderIcons[value]}
-                {label}
+                {localizedLabel}
               </Space>
             ) : (
-              label
+              localizedLabel
             )
         };
       });
@@ -303,7 +368,7 @@ export function VoiceCatalogTable({
           mode={single ? undefined : "multiple"}
           disabled={metadataEditing}
           aria-label={label}
-          placeholder="全部"
+          placeholder={t("all")}
           allowClear
           showSearch
           maxTagCount="responsive"
@@ -322,10 +387,10 @@ export function VoiceCatalogTable({
     );
   }
   return (
-    <section className="voice-catalog" aria-label="音色库">
+    <section className="voice-catalog" aria-label={t("voice_library")}>
       <Table<AdminSpeechVoice>
         className="voice-catalog-table"
-        aria-label="音色列表"
+        aria-label={t("voices")}
         rowKey="alias"
         size="small"
         tableLayout="fixed"
@@ -344,7 +409,9 @@ export function VoiceCatalogTable({
             <TableEmptyState
               filtered={hasFilters && !!voices.length}
               onResetFilters={reset}
-              message="暂无可用音色，请联系管理员检查语音服务配置。"
+              message={t(
+                "no_voices_are_available_ask_an_administrator_to_check_the_speech_"
+              )}
             />
           )
         }}
@@ -353,7 +420,7 @@ export function VoiceCatalogTable({
             key: "actions",
             title: (
               <div className="voice-catalog-heading">
-                <span>操作</span>
+                <span>{t("actions")}</span>
                 {hasFilters && (
                   <Button
                     className="voice-catalog-reset"
@@ -362,7 +429,7 @@ export function VoiceCatalogTable({
                     disabled={metadataEditing}
                     onClick={reset}
                   >
-                    清除筛选
+                    {t("clear_filters")}
                   </Button>
                 )}
               </div>
@@ -378,7 +445,7 @@ export function VoiceCatalogTable({
                   color="default"
                   variant={voice.alias === activeVoice ? "solid" : "outlined"}
                   icon={<Volume2Icon />}
-                  aria-label={`试听 ${voice.display_name}`}
+                  aria-label={t("audition_voice", { name: voice.display_name })}
                   disabled={
                     !canGenerate ||
                     !(isVoiceTextValid?.(voice) ?? validText) ||
@@ -387,23 +454,27 @@ export function VoiceCatalogTable({
                   }
                   reason={
                     voice.synthesis_available === false
-                      ? "当前音色或语种尚未开放合成，能力需验证"
+                      ? t(
+                          "synthesis_is_not_enabled_for_this_voice_or_language_its_capabilit"
+                        )
                       : !canGenerate
-                        ? "需要词库查看和语音生成权限"
+                        ? t(
+                            "lexicon_viewing_and_speech_generation_permissions_are_required"
+                          )
                         : settingsPending
-                          ? "正在加载个人音色设置"
-                          : "请输入 1–500 个字符的试听文本"
+                          ? t("loading_personal_voice_settings")
+                          : t("enter_1_500_characters_of_preview_text")
                   }
                   loading={pendingVoice === voice.alias}
                   onClick={() => onAudition(voice)}
                 />
                 <Button
                   size="small"
-                  aria-label={`调节 ${voice.display_name} 声音`}
+                  aria-label={t("adjust_voice", { name: voice.display_name })}
                   disabled={settingsPending}
                   onClick={() => onDetails(voice)}
                 >
-                  调节
+                  {t("adjust")}
                 </Button>
               </Space>
             )
@@ -413,7 +484,7 @@ export function VoiceCatalogTable({
             title: (
               <div className="voice-catalog-heading">
                 <div className="voice-catalog-heading-label">
-                  <span>音色</span>
+                  <span>{t("voice")}</span>
                   <Popover
                     trigger="click"
                     placement="bottomLeft"
@@ -427,18 +498,21 @@ export function VoiceCatalogTable({
                             setPage(1);
                           }}
                         >
-                          只看常用
+                          {t("common_voices_only")}
                         </Checkbox>
                         <Select
-                          aria-label="音色排序"
+                          aria-label={t("voice_order")}
                           disabled={metadataEditing}
                           value={sort}
                           options={[
-                            { value: "recommended", label: "常用优先" },
-                            { value: "name-asc", label: "名称升序" },
-                            { value: "name-desc", label: "名称倒序" },
-                            { value: "age-asc", label: "年龄升序" },
-                            { value: "age-desc", label: "年龄倒序" }
+                            {
+                              value: "recommended",
+                              label: t("common_voices_first")
+                            },
+                            { value: "name-asc", label: t("name_ascending") },
+                            { value: "name-desc", label: t("name_descending") },
+                            { value: "age-asc", label: t("age_ascending") },
+                            { value: "age-desc", label: t("age_descending") }
                           ]}
                           onChange={(value) => {
                             setSort(value);
@@ -452,16 +526,18 @@ export function VoiceCatalogTable({
                       type="text"
                       size="small"
                       icon={<ListFilterIcon />}
-                      aria-label="音色筛选和排序"
+                      aria-label={t("voice_filters_and_order")}
                     />
                   </Popover>
                 </div>
                 <Input
                   type="search"
                   prefix={<SearchIcon />}
-                  aria-label="搜索音色"
+                  aria-label={t("search_voices")}
                   disabled={metadataEditing}
-                  placeholder="搜索名称、介绍或听感"
+                  placeholder={t(
+                    "search_names_descriptions_or_listening_notes"
+                  )}
                   value={query}
                   allowClear
                   onChange={(event) => {
@@ -485,12 +561,16 @@ export function VoiceCatalogTable({
                 <Space size={4} wrap>
                   {voice.is_common && (
                     <Tag color="blue" variant="filled">
-                      常用
+                      {t("common")}
                     </Tag>
                   )}
                   {trialVoiceAliases?.has(voice.alias) && (
-                    <Tooltip title="已保留该音色本次页面的试听草稿">
-                      <Tag>本次试听</Tag>
+                    <Tooltip
+                      title={t(
+                        "this_voice_s_preview_draft_is_kept_for_this_page_session"
+                      )}
+                    >
+                      <Tag>{t("current_preview")}</Tag>
                     </Tooltip>
                   )}
                 </Space>
@@ -499,19 +579,19 @@ export function VoiceCatalogTable({
           },
           {
             key: "language",
-            title: filter("language", "语言"),
+            title: filter("language", t("language")),
             width: 112,
-            render: (_, voice) => language(voice)
+            render: (_, voice) => language(voice, i18n.language)
           },
           {
             key: "region",
-            title: filter("region", "官方地区"),
+            title: filter("region", t("official_region")),
             width: 128,
-            render: (_, voice) => region(voice)
+            render: (_, voice) => voiceLabel(region(voice, i18n.language), t)
           },
           {
             key: "accent",
-            title: filter("accent", "口音归属", accentNames),
+            title: filter("accent", t("accent_classification"), accentNames),
             width: 112,
             render: (_, voice) => {
               const content = (
@@ -520,7 +600,7 @@ export function VoiceCatalogTable({
                     className={`voice-accent-dot voice-accent-${voiceAccent(voice)}`}
                     aria-hidden
                   />
-                  {accentNames[voiceAccent(voice)]}
+                  {voiceLabel(accentNames[voiceAccent(voice)], t)}
                 </Space>
               );
               return canEditMetadata ? (
@@ -540,41 +620,51 @@ export function VoiceCatalogTable({
           },
           {
             key: "gender",
-            title: filter("gender", "性别", genderNames),
+            title: filter("gender", t("gender"), genderNames),
             width: 100,
             render: (_, voice) => (
               <Space size={4}>
                 {genderIcons[voice.gender.toLowerCase()]}
-                {genderNames[voice.gender.toLowerCase()] ?? "性别未提供"}
+                {voiceLabel(
+                  genderNames[voice.gender.toLowerCase()] ??
+                    t("gender_not_provided"),
+                  t
+                )}
               </Space>
             )
           },
           {
             key: "age",
-            title: filter("age", "年龄组", ageNames),
+            title: filter("age", t("age_group"), ageNames),
             width: 112,
             render: (_, voice) =>
-              ageNames[voice.metadata?.age_group ?? ""] ??
-              voice.metadata?.age_group ??
-              "年龄未提供"
+              voiceLabel(
+                ageNames[voice.metadata?.age_group ?? ""] ??
+                  voice.metadata?.age_group ??
+                  t("age_not_provided"),
+                t
+              )
           },
           {
             key: "description",
-            title: "介绍",
+            title: t("description"),
             width: 300,
             render: (_, voice) => {
               const info = metadata.get(voice.alias);
               const description =
                 info?.description_zh ??
                 voice.metadata?.description ??
-                "暂无介绍，可试听了解声音。";
+                t("no_description_yet_preview_the_voice_to_hear_it");
               return (
                 <div className="voice-catalog-summary">
                   {!!voice.metadata?.personalities?.length && (
                     <div className="voice-catalog-tags">
                       {voice.metadata.personalities.map((value) => (
                         <Tag key={value}>
-                          {personalityNames[value.toLowerCase()] ?? value}
+                          {voiceLabel(
+                            personalityNames[value.toLowerCase()] ?? value,
+                            t
+                          )}
                         </Tag>
                       ))}
                     </div>
@@ -587,14 +677,14 @@ export function VoiceCatalogTable({
                       disabled={settingsPending}
                       onStateChange={onMetadataEditorChange}
                     >
-                      {preview(description || "介绍已清空")}
+                      {preview(description || t("description_cleared"))}
                     </VoiceMetadataEditor>
                   ) : (
-                    preview(description || "介绍已清空")
+                    preview(description || t("description_cleared"))
                   )}
                   {!!info?.notes && (
                     <p className="voice-catalog-notes">
-                      {preview(`我的听感：${info.notes}`)}
+                      {preview(t("listening_notes", { notes: info.notes }))}
                     </p>
                   )}
                 </div>
@@ -603,46 +693,44 @@ export function VoiceCatalogTable({
           },
           {
             key: "scenario",
-            title: filter("scenario", "推荐场景"),
+            title: filter("scenario", t("suggested_scenarios")),
             width: 160,
             render: (_, voice) =>
-              preview(list(voice.metadata?.scenarios, scenarioNames))
+              preview(list(voice.metadata?.scenarios, scenarioNames, t))
           },
           {
             key: "model",
-            title: filter("model", "模型", modelNames),
+            title: filter("model", t("model"), modelNames),
             width: 160,
             render: (_, voice) => {
               const model =
                 voice.metadata?.model ?? voice.capability_evidence?.model;
-              return model ? (modelNames[model] ?? model) : "未提供";
+              return model
+                ? voiceLabel(modelNames[model] ?? model, t)
+                : t("not_provided");
             }
           },
           {
             key: "style",
-            title: filter("style", "可选风格", {
-              ...styleNames,
-              neutral: "默认"
-            }),
+            title: filter("style", t("available_styles"), styleNames),
             width: 160,
             render: (_, voice) =>
               preview(
-                list(["neutral", ...voice.capabilities.styles], {
-                  ...styleNames,
-                  neutral: "默认"
-                })
+                list(["neutral", ...voice.capabilities.styles], styleNames, t)
               )
           },
           {
             key: "role",
-            title: filter("role", "可选角色"),
+            title: filter("role", t("available_roles")),
             width: 160,
             render: (_, voice) =>
               preview(
                 list(
                   voice.capability_evidence
                     ? voice.capability_evidence.roles
-                    : voice.metadata?.roles
+                    : voice.metadata?.roles,
+                  {},
+                  t
                 )
               )
           }
@@ -662,7 +750,7 @@ export function VoiceCatalogTable({
             }}
             showSizeChanger
             pageSizeOptions={[10, 20, 50]}
-            showTotal={(total) => `共 ${total} 个音色`}
+            showTotal={(total) => t("voice_count", { count: total })}
           />
         </div>
       )}
