@@ -39,12 +39,19 @@ export function InterfaceLanguage({
     snapshot.preference !== null && !options.includes(snapshot.preference);
   const save = async (value: string) => {
     setFailure(null);
+    const locale = value === "browser" ? null : (value as InterfaceLocale);
     try {
-      const locale = value === "browser" ? null : (value as InterfaceLocale);
       if (controller.accountId()) await controller.save(locale);
       else await controller.saveGuest(locale);
     } catch {
-      if (controller.sessionKey() === owner) setFailure(owner);
+      if (controller.sessionKey() !== owner) return;
+      await controller.refresh();
+      if (
+        controller.sessionKey() === owner &&
+        (controller.getSnapshot().status !== "ready" ||
+          controller.getSnapshot().preference !== locale)
+      )
+        setFailure(owner);
     }
   };
   return (

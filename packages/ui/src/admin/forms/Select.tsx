@@ -89,8 +89,11 @@ export function Select<
       }
       allowClear={
         allowClear === true
-          ? { clearIcon: <X size="1em" aria-hidden="true" /> }
-          : allowClear
+          ? {
+              clearIcon: <X size="1em" aria-hidden="true" />,
+              label: t("actions.clear")
+            }
+          : allowClear && { label: t("actions.clear"), ...allowClear }
       }
       removeIcon={<X size="1em" aria-label={t("actions.remove")} />}
       notFoundContent={

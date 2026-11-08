@@ -17,13 +17,16 @@ import {
   ZoomOut
 } from "lucide-react";
 import {
+  Children,
   cloneElement,
   createContext,
+  isValidElement,
   useContext,
   useLayoutEffect,
   useState,
   type ComponentProps,
-  type ReactElement
+  type ReactElement,
+  type ReactNode
 } from "react";
 import "@rc-component/image/assets/index.css";
 import "./disclosure.css";
@@ -134,11 +137,36 @@ function usePreviewIcons() {
   };
 }
 
+function usePreviewActions() {
+  const { t } = useInterfaceTranslation();
+  const labels: Record<string, string> = {
+    flipX: t("controls.flipHorizontal"),
+    flipY: t("controls.flipVertical"),
+    rotateLeft: t("controls.rotateLeft"),
+    rotateRight: t("controls.rotateRight"),
+    zoomOut: t("controls.zoomOut"),
+    zoomIn: t("controls.zoomIn")
+  };
+  return (original: ReactElement) => {
+    const actions = original as ReactElement<{ children?: ReactNode }>;
+    return cloneElement(
+      actions,
+      {},
+      Children.map(actions.props.children, (child) => {
+        if (!isValidElement<{ "aria-label"?: string }>(child)) return child;
+        const label = labels[child.props["aria-label"] ?? ""];
+        return label ? cloneElement(child, { "aria-label": label }) : child;
+      })
+    );
+  };
+}
+
 // 图片组原语只把 src 传给大图回调。保留缩略图的可及名称，便于区分证书与身份材料。
 const GroupImageLabels = createContext<Map<string, string> | null>(null);
 
 export function Image({ preview, alt, src, ...props }: ImageProps) {
   const icons = usePreviewIcons();
+  const actionsRender = usePreviewActions();
   const labels = useContext(GroupImageLabels);
   useLayoutEffect(() => {
     if (!labels || !src || !alt) return;
@@ -155,7 +183,11 @@ export function Image({ preview, alt, src, ...props }: ImageProps) {
       preview={
         preview === false
           ? false
-          : { icons, ...(typeof preview === "object" ? preview : {}) }
+          : {
+              icons,
+              actionsRender,
+              ...(typeof preview === "object" ? preview : {})
+            }
       }
     />
   );
@@ -166,6 +198,7 @@ Image.PreviewGroup = function PreviewGroup({
   ...props
 }: ComponentProps<typeof RcImage.PreviewGroup>) {
   const icons = usePreviewIcons();
+  const actionsRender = usePreviewActions();
   const { t } = useInterfaceTranslation();
   const [labels] = useState(() => new Map<string, string>());
   return (
@@ -178,6 +211,7 @@ Image.PreviewGroup = function PreviewGroup({
             ? false
             : {
                 alt: t("controls.imagePreview"),
+                actionsRender,
                 imageRender: (node, { image }) =>
                   cloneElement(node as ReactElement<{ alt?: string }>, {
                     alt: labels.get(image.url) ?? image.alt

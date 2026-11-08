@@ -31,9 +31,12 @@ function useCalendarProps() {
   const { t, i18n } = useInterfaceTranslation();
   return {
     ...calendarProps,
-    locale: { "zh-Hans": zhCN, "zh-Hant": zhTW, "en-GB": enGB, "en-US": enUS }[
-      resolveInterfaceLocale(i18n.language)
-    ],
+    locale: {
+      ...{ "zh-Hans": zhCN, "zh-Hant": zhTW, "en-GB": enGB, "en-US": enUS }[
+        resolveInterfaceLocale(i18n.language)
+      ],
+      clear: t("controls.dateClear")
+    },
     allowClear: {
       clearIcon: <span aria-label={t("controls.dateClear")}>×</span>
     }

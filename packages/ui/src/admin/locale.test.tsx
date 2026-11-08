@@ -5,6 +5,7 @@ import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { Input } from "./forms/Input";
 import { DatePicker } from "./forms/DatePicker";
+import { Select } from "./forms/Select";
 import { Pagination } from "./table/Pagination";
 import { Modal } from "./overlays/dialog";
 
@@ -15,6 +16,12 @@ it("切换语言更新控件和门户标签，保留输入、日期值与分页�
   const content = (locale: InterfaceLocale) => (
     <InterfaceI18nProvider locale={locale}>
       <Input.Password aria-label="draft" defaultValue="词条原文" />
+      <Select
+        aria-label="selected entry"
+        allowClear
+        defaultValue="entry-id"
+        options={[{ value: "entry-id", label: "词条原文" }]}
+      />
       <DatePicker value={date} onChange={changed} />
       <Pagination current={2} pageSize={10} total={30} onChange={changed} />
       <Modal open title="词条原文">
@@ -26,12 +33,14 @@ it("切换语言更新控件和门户标签，保留输入、日期值与分页�
   expect(
     screen.getByRole("button", { name: "Show password" })
   ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Page 2" })).toHaveAttribute(
     "aria-current",
     "page"
   );
   expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   view.rerender(content("zh-Hant"));
+  expect(screen.getByRole("button", { name: "清除" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument();
   expect(screen.getByLabelText("draft")).toHaveValue("词条原文");
   expect(screen.getByText("词条原文正文")).toBeInTheDocument();
