@@ -172,7 +172,11 @@ export function createInterfacePreferences({
     const promise = (async () => {
       try {
         const saved = decodeInterfaceLocale(
-          await Promise.resolve().then(() => write(locale))
+          await Promise.resolve().then(() => {
+            if (sessionKey() !== owner)
+              throw new Error("当前会话已变化，请重试");
+            return write(locale);
+          })
         );
         if (sessionKey() !== owner) throw new Error("当前会话已变化，请重试");
         if (saved !== locale) throw new Error("偏好保存结果不一致，请重新读取");

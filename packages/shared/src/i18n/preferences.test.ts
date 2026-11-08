@@ -54,6 +54,15 @@ function fixture() {
 }
 
 describe("账号界面偏好", () => {
+  it("保存尚未发出就换号时，不得使用新账号会话执行旧账号操作", async () => {
+    const f = fixture();
+    await f.controller.refresh();
+    const saving = f.controller.save("en-US");
+    f.session("b", 2);
+    await expect(saving).rejects.toThrow("会话已变化");
+    expect(f.options.write).not.toHaveBeenCalled();
+    expect(f.values.size).toBe(0);
+  });
   it("保存结果未知时，等待中的回读仍确认服务端最终值而不产生未处理拒绝", async () => {
     const f = fixture();
     await f.controller.refresh();
@@ -130,6 +139,8 @@ describe("账号界面偏好", () => {
       const response = deferred<"en-US">();
       f.options.write.mockImplementationOnce(() => response.promise);
       const saving = f.controller.save("en-US");
+      await Promise.resolve();
+      expect(f.options.write).toHaveBeenCalledOnce();
       f.session(nextId, 2);
       await f.controller.refresh();
       response.resolve("en-US");
