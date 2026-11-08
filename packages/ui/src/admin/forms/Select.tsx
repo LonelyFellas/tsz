@@ -64,6 +64,10 @@ export function Select<
   const { root: rootClass, popup: popupClasses, ...classes } = classNames ?? {};
   return (
     <RcSelect<V, O>
+      popupAlign={{
+        offset: [0, 0],
+        overflow: { adjustX: true, adjustY: true, shiftX: true, shiftY: true }
+      }}
       {...props}
       prefixCls={prefix}
       className={[

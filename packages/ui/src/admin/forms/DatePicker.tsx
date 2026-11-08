@@ -24,6 +24,10 @@ const calendarProps = {
   nextIcon: <span aria-hidden="true">›</span>,
   superPrevIcon: <span aria-hidden="true">«</span>,
   superNextIcon: <span aria-hidden="true">»</span>,
+  popupAlign: {
+    offset: [0, 0],
+    overflow: { adjustX: true, adjustY: true, shiftX: true, shiftY: true }
+  },
   getPopupContainer: (anchor: HTMLElement) =>
     anchor.closest<HTMLElement>('[role="dialog"]') ?? document.body
 };
