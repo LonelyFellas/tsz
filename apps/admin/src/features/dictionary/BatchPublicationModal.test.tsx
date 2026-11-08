@@ -1,3 +1,7 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
+import { act } from "@testing-library/react";
+import { api } from "@/lib/auth";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,6 +81,9 @@ function mount(sentences: SharedSentence[] = []) {
   return onPublished;
 }
 beforeEach(() => {
+  vi.mocked(api.sentences.list)
+    .mockReset()
+    .mockResolvedValue({ items: [], total: 0 });
   publish.mockReset();
   checkAudio.mockReset().mockImplementation(async (owner, id, input) => ({
     manifest: {
@@ -236,4 +243,164 @@ it("混合失败定位具体例句并禁止自动换版本重发", async () => {
   await screen.findByText("例句 failed-sentence：例句版本冲突");
   expect(screen.getByRole("button", { name: "发布所选" })).toBeDisabled();
   expect(done).not.toHaveBeenCalled();
+});
+
+function selectedSentence(): SharedSentence {
+  const content = newSentence();
+  if (content.sentence.en_text.mode === "unified")
+    content.sentence.en_text.common.value.text = "Original sentence centre";
+  return {
+    id: "sentence-frozen",
+    revision: 9,
+    lifecycle_revision: 4,
+    view: "draft",
+    content,
+    entries: [],
+    created_by: "原始创建人",
+    created_by_admin_id: "11111111-1111-4111-8111-111111111111",
+    withdrawn_at: "2026-09-23T00:00:00Z",
+    created_at: "2026-09-23T00:00:00Z",
+    updated_at: "2026-09-23T00:00:00Z"
+  };
+}
+
+it("四语切换保留搜索/例句选择和冻结范围，在途及未知结果重试复用原幂等请求", async () => {
+  const sentence = selectedSentence(),
+    rows = [row("entry-frozen", 3)];
+  vi.mocked(api.sentences.list).mockResolvedValue({
+    items: [sentence],
+    total: 1
+  });
+  let reject!: (error: unknown) => void;
+  publish
+    .mockImplementationOnce(
+      () =>
+        new Promise((_, fail) => {
+          reject = fail;
+        })
+    )
+    .mockResolvedValueOnce({ words: [], sentences: [] });
+  const done = vi.fn();
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <BatchPublicationModal
+          rows={rows}
+          sentences={[sentence]}
+          onClose={vi.fn()}
+          onPublished={done}
+        />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = screen.getByRole("textbox", { name: "查找待发布例句" });
+  fireEvent.change(input, { target: { value: "原始搜索 centre" } });
+  await waitFor(() =>
+    expect(api.sentences.list).toHaveBeenLastCalledWith({
+      view: "draft",
+      q: "原始搜索 centre",
+      page: 1,
+      page_size: 20
+    })
+  );
+  const calls = vi.mocked(api.sentences.list).mock.calls.length;
+  for (const locale of ["zh-Hant", "en-GB", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(input).toHaveValue("原始搜索 centre");
+    expect(
+      screen.getAllByText(/Original sentence centre/).length
+    ).toBeGreaterThan(0);
+    expect(checkAudio).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+    expect(api.sentences.list).toHaveBeenCalledTimes(calls);
+  }
+  expect(
+    screen.getByRole("dialog", { name: "Publish 1 entry and 1 sentence" })
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Check selected audio" }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Publish selected" })
+    ).toBeEnabled()
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Publish selected" }));
+  const sent = structuredClone(publish.mock.calls[0]);
+  expect(sent).toEqual([
+    expect.any(String),
+    {
+      schema_version: 3,
+      items: [
+        {
+          entry_id: "entry-frozen",
+          base_revision: 3,
+          base_lifecycle_revision: 2
+        }
+      ],
+      sentences: [
+        {
+          sentence_id: sentence.id,
+          base_revision: 9,
+          base_lifecycle_revision: 4
+        }
+      ]
+    }
+  ]);
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+  expect(input).toBeDisabled();
+  expect(publish).toHaveBeenCalledTimes(1);
+  await act(async () => reject(new TypeError("network")));
+  expect(await screen.findByText(/發布結果暫時未知/)).toBeVisible();
+  view.rerender(content("en-US"));
+  expect(screen.getByText(/The publication result is unknown/)).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Publish selected" }));
+  await waitFor(() => expect(done).toHaveBeenCalledTimes(1));
+  expect(publish.mock.calls[1]).toEqual(sent);
+  expect(checkAudio).toHaveBeenCalledTimes(2);
+});
+
+it("确定性失败切换语言只更新定位前缀，保留后端原文和冻结范围并阻止重发", async () => {
+  publish.mockRejectedValue(
+    new HttpError(409, "后端原文 centre", [], "revision_conflict", [], {
+      sentence_id: "sentence-frozen"
+    })
+  );
+  const rows = [row("entry-frozen", 3)],
+    sentence = selectedSentence(),
+    closed = vi.fn();
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <BatchPublicationModal
+          rows={rows}
+          sentences={[sentence]}
+          onClose={closed}
+          onPublished={vi.fn()}
+        />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await prepareAudio();
+  fireEvent.click(screen.getByRole("button", { name: "发布所选" }));
+  await screen.findByText("例句 sentence-frozen：后端原文 centre");
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByText("Sentence sentence-frozen: 后端原文 centre")
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Publish selected" })
+  ).toBeDisabled();
+  expect(screen.getAllByText("entry-frozen").length).toBeGreaterThan(0);
+  expect(publish).toHaveBeenCalledTimes(1);
+  expect(checkAudio).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(closed).toHaveBeenCalledTimes(1);
 });

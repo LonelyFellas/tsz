@@ -60,7 +60,6 @@ export function audioIssueLabels(
     object_unavailable: t("panel_the_audio_file_cannot_currently_be_read")
   };
 }
-export const publicationAudioIssueLabels = audioIssueLabels();
 function audioAccentLabels(
   t: LexiconEditorTranslation = defaultLexiconEditorTranslation
 ) {
