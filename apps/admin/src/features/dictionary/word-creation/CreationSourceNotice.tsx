@@ -1,3 +1,5 @@
+import { useLexiconEditorTranslation } from "../i18n/editor";
+
 import { Alert } from "@tsz/ui/admin/display";
 
 export type CreationSource = "dictionary" | "dictionary-empty" | "blank";
@@ -25,14 +27,19 @@ export function creationSourceFromState(
 }
 
 export function CreationSourceNotice({ source }: { source?: CreationSource }) {
+  const { t } = useLexiconEditorTranslation();
   if (!source) return null;
   if (source === "dictionary") {
     return (
       <Alert
         showIcon
         type="success"
-        title="已根据内置词典预填，请核对"
-        description="词性、词形和发音以当前草稿内容为准，可继续完善后保存。"
+        title={t(
+          "creation_prefilled_from_the_built_in_dictionary_check_the_content"
+        )}
+        description={t(
+          "creation_parts_of_speech_forms_and_pronunciations_reflect_the_current_draft_continue_editing_then_s"
+        )}
       />
     );
   }
@@ -40,15 +47,23 @@ export function CreationSourceNotice({ source }: { source?: CreationSource }) {
     <Alert
       showIcon
       type="warning"
-      title="词性建议尚未写入，请手动补充"
-      description="当前草稿没有词性或词形，请使用“添加词性”入口；系统未复制重复词条的既有内容。"
+      title={t(
+        "creation_suggested_parts_of_speech_have_not_been_added_enter_them_manually"
+      )}
+      description={t(
+        "creation_this_draft_has_no_parts_of_speech_or_forms_use_add_part_of_speech_existing_content_from_du"
+      )}
     />
   ) : (
     <Alert
       showIcon
       type="info"
-      title="未找到内置词典建议，已创建空白草稿"
-      description="请在后续步骤补充词性、词形和发音。"
+      title={t(
+        "creation_no_built_in_dictionary_suggestions_found_a_blank_draft_was_created"
+      )}
+      description={t(
+        "creation_add_parts_of_speech_forms_and_pronunciation_in_the_following_steps"
+      )}
     />
   );
 }

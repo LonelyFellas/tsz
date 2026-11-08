@@ -1,3 +1,7 @@
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation
+} from "../i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import type {
   WordConcreteFormV3,
@@ -107,14 +111,18 @@ export function v3ProductProgressBadge(
   return `${rows.filter((row) => row.completed).length}/${rows.length}`;
 }
 
-export function buildV3ProductProgress({
-  language,
-  partOfSpeechCatalog = [],
-  dirtySteps = { forms: false, meanings: false },
-  completedSteps,
-  forms,
-  meanings
-}: V3ProductProgressInput): V3ProductProgressRow[] {
+export function buildV3ProductProgress(
+  {
+    language,
+    partOfSpeechCatalog = [],
+    dirtySteps = { forms: false, meanings: false },
+    completedSteps,
+    forms,
+    meanings
+  }: V3ProductProgressInput,
+  t: CreationTranslation = creationDefaultT,
+  interfaceLocale = "zh-Hans"
+): V3ProductProgressRow[] {
   const completed = new Set(completedSteps);
   const allIdentities = new Set<string>();
   let allFormsComplete = forms.pos.length > 0;
@@ -141,11 +149,13 @@ export function buildV3ProductProgress({
     sense.sentences.map((sentence) => ({ pos, sense, sentence }))
   );
 
-  const languageInfo = languageSummary(language);
+  const languageInfo = languageSummary(language, t, interfaceLocale);
   const catalogNames = new Map(
     partOfSpeechCatalog.map((part) => [
       part.code,
-      part.name_zh.trim() || part.name_en.trim()
+      interfaceLocale.startsWith("en")
+        ? part.name_en.trim() || part.name_zh.trim()
+        : part.name_zh.trim() || part.name_en.trim()
     ])
   );
   const meaningsByPos = new Map(meanings.pos.map((pos) => [pos.pos_id, pos]));
@@ -154,10 +164,7 @@ export function buildV3ProductProgress({
     ...forms.pos.map((pos) => ({
       key: pos.pos_id,
       label:
-        catalogNames.get(pos.pos) ||
-        (partOfSpeechLabel(pos.pos) === "其他词性"
-          ? pos.pos
-          : partOfSpeechLabel(pos.pos)),
+        catalogNames.get(pos.pos) || partOfSpeechLabel(pos.pos, t, pos.pos),
       forms: pos.forms,
       meanings: meaningsByPos.get(pos.pos_id)
     })),
@@ -165,7 +172,7 @@ export function buildV3ProductProgress({
       .filter((pos) => !formPosIds.has(pos.pos_id))
       .map((pos) => ({
         key: pos.pos_id,
-        label: "未识别词性",
+        label: t("creation_unrecognised_part_of_speech"),
         forms: [],
         meanings: pos
       }))
@@ -198,7 +205,13 @@ export function buildV3ProductProgress({
             { key: "us", label: "AmE", dialect: "us" }
           ] as const)
         : language === "en" && forms.pos.length > 0
-          ? [{ key: "common", label: "英美通用", dialect: "common" as const }]
+          ? [
+              {
+                key: "common",
+                label: t("presentation_dialect_label_common"),
+                dialect: "common" as const
+              }
+            ]
           : [])
     ],
     parts_of_speech: positions
@@ -213,7 +226,10 @@ export function buildV3ProductProgress({
       })),
     sense_groups: meanings.sense_groups.map((group) => ({
       key: group.id,
-      label: group.name_zh.trim() || group.name_en.trim() || "待填写语义区间",
+      label:
+        group.name_zh.trim() ||
+        group.name_en.trim() ||
+        t("creation_sense_group_not_entered"),
       pending: !group.name_zh.trim() && !group.name_en.trim(),
       count: senseEntries.filter(
         ({ sense }) => sense.sense_group_id === group.id
@@ -230,8 +246,10 @@ export function buildV3ProductProgress({
       count: pos.meanings?.senses.length ?? 0,
       items: (pos.meanings?.senses ?? []).map((sense) => ({
         key: sense.id,
-        label: definitionSummary(sense),
-        pending: definitionSummary(sense) === "待填写释义"
+        label: definitionSummary(sense, t("empty_definition")),
+        pending:
+          definitionSummary(sense, t("empty_definition")) ===
+          t("panel_definition_not_entered")
       }))
     })),
     sentences: [
@@ -243,7 +261,7 @@ export function buildV3ProductProgress({
         ? [
             {
               key: "ungraded",
-              label: "未分级",
+              label: t("creation_ungraded"),
               count: levelCounts.get("ungraded")!
             }
           ]
@@ -255,7 +273,7 @@ export function buildV3ProductProgress({
     {
       key: "dialect",
       index: 1,
-      label: "语言识别",
+      label: t("creation_language_identification"),
       completed: completed.has("basics") && languageInfo.identified,
       value:
         completed.has("basics") && languageInfo.identified ? "完成" : "未完成"
@@ -263,43 +281,45 @@ export function buildV3ProductProgress({
     {
       key: "parts_of_speech",
       index: 2,
-      label: "基本词性",
+      label: t("panel_part_of_speech"),
       completed: completed.has("forms"),
       count: forms.pos.length
     },
     {
       key: "forms",
       index: 3,
-      label: "词形变化",
+      label: t("creation_form_changes"),
       completed: allFormsComplete,
       count: allIdentities.size,
-      statusDescription: "包含原形；同类型、拼写和全部音标均相同的词形合并计数"
+      statusDescription: t(
+        "creation_includes_base_forms_forms_with_the_same_type_spelling_and_all_phonetics_are_counted_togeth"
+      )
     },
     {
       key: "sense_groups",
       index: 4,
-      label: "语义区间",
+      label: t("panel_sense_group_2"),
       completed: completed.has("meanings"),
       count: meanings.sense_groups.length
     },
     {
       key: "grammar_structures",
       index: 5,
-      label: "语法结构",
+      label: t("snapshot_grammar"),
       completed: completed.has("meanings"),
       count: grammarEntries.length
     },
     {
       key: "senses",
       index: 6,
-      label: "多维词义",
+      label: t("creation_meanings"),
       completed: completed.has("meanings"),
       count: senseEntries.length
     },
     {
       key: "sentences",
       index: 7,
-      label: "多维例句",
+      label: t("panel_examples_2"),
       completed: completed.has("meanings"),
       count: sentenceEntries.length
     }
@@ -324,8 +344,8 @@ export function buildV3ProductProgress({
         ? {
             statusDescription:
               row.key === "forms"
-                ? "按当前输入统计，尚未保存"
-                : "编辑中，完成状态待确认"
+                ? t("creation_based_on_current_unsaved_input")
+                : t("creation_editing_completion_has_not_been_confirmed")
           }
         : {})
     };

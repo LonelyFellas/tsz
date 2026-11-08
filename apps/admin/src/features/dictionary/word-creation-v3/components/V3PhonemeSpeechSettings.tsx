@@ -1,3 +1,9 @@
+import { localPhoneticDiagnostic } from "./localPhoneticDiagnostic";
+import { useLexiconEditorTranslation } from "../../i18n/editor";
+import {
+  useLexiconEditorMessageState as useCreationMessageState,
+  createLexiconEditorMessage as creationMessage
+} from "../../i18n/editor";
 import { useVoiceSave } from "../voiceSaveContext";
 import { flushSync } from "react-dom";
 import { PencilIcon } from "lucide-react";
@@ -70,6 +76,9 @@ export function V3PhonemeSpeechSettings({
     audioAssets: AudioAssetV3[]
   ) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
+  const currentT = useRef(t);
+  currentT.current = t;
   const businessSave = useVoiceSave();
   const businessSaveRef = useRef(businessSave);
   useLayoutEffect(() => {
@@ -77,7 +86,7 @@ export function V3PhonemeSpeechSettings({
   });
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const [saveError, setSaveError] = useState("");
+  const [saveError, setSaveError] = useCreationMessageState();
   const targetKey = JSON.stringify([nodeId, alphabet, locale]);
   const activeTarget = useRef<string | null>(targetKey);
   useLayoutEffect(() => {
@@ -136,9 +145,14 @@ export function V3PhonemeSpeechSettings({
     true
   )
     ? undefined
-    : "停顿须在词间，特殊读法须选完整词界；短语 UPS 请保留逐词边界或从 IPA 重新转换";
+    : t(
+        "creation_pauses_must_be_between_words_and_special_readings_must_cover_whole_words_keep_ups_word_bou"
+      );
   const inputIssue =
-    synthesisInputIssue(alphabet, draft.content.text) ?? pauseIssue;
+    localPhoneticDiagnostic(
+      synthesisInputIssue(alphabet, draft.content.text),
+      t
+    ) ?? pauseIssue;
   const resolveCandidate = (content: RichTextV2) => ({
     ...editedCandidate,
     [`${alphabet}_speech`]: {
@@ -258,7 +272,9 @@ export function V3PhonemeSpeechSettings({
             /phoneme_locale/.test(error.message)
           )
             throw new Error(
-              "当前后端尚未支持精确地区音素生成，请升级服务后重试；现有配置与音频已保留"
+              currentT.current(
+                "creation_this_backend_does_not_support_generation_for_the_exact_phoneme_locale_yet_upgrade_and_retr"
+              )
             );
           throw error;
         }
@@ -276,7 +292,9 @@ export function V3PhonemeSpeechSettings({
         });
         if (!content)
           throw new Error(
-            "音素与词形词界不一致，请检查对应音素；短语 UPS 可重新从 IPA 转换"
+            currentT.current(
+              "creation_phonemes_do_not_match_the_form_s_word_boundaries_check_them_phrase_ups_can_be_converted_ag"
+            )
           );
         return adminVoicePreviewAdapter.synthesize(
           { ...input, content },
@@ -290,7 +308,7 @@ export function V3PhonemeSpeechSettings({
     <>
       <Button
         icon={<PencilIcon />}
-        aria-label={`打开${label} TTS 设置器`}
+        aria-label={t("creation_open_tts_settings", { label })}
         data-v3-node-id={nodeId}
         data-v3-field={field}
         disabled={!canEdit}
@@ -304,7 +322,7 @@ export function V3PhonemeSpeechSettings({
       {open && (
         <VoiceEditorModal
           width={1200}
-          title={`${label} · 音标、停顿与音色`}
+          title={t("creation_phoneme_dialog", { label })}
           open
           footer={null}
           onCancel={() => {
@@ -315,7 +333,11 @@ export function V3PhonemeSpeechSettings({
         >
           {saveError && <Alert type="error" showIcon title={saveError} />}
           <Suspense
-            fallback={<Typography.Text>正在加载 TTS 设置…</Typography.Text>}
+            fallback={
+              <Typography.Text>
+                {t("creation_loading_tts_settings")}
+              </Typography.Text>
+            }
           >
             <VoiceEditor
               readOnly={!canEdit || saving || source !== sourceKey}
@@ -328,7 +350,7 @@ export function V3PhonemeSpeechSettings({
               recommendationArea="azure"
               locale={locale}
               language="en"
-              contextLabel={`${label}音标编辑`}
+              contextLabel={t("creation_phoneme_context", { label })}
               contextKey={JSON.stringify([nodeId, field, alphabet])}
               inputDataAttributes={{
                 "data-v3-node-id": nodeId,
@@ -378,16 +400,18 @@ export function V3PhonemeSpeechSettings({
               renderActions={(canComplete, prepareComplete, captureResult) => (
                 <Space>
                   <Button
-                    aria-label={`取消${label}设置`}
+                    aria-label={t("creation_cancel_settings", { label })}
                     disabled={saving}
                     onClick={() => setOpen(false)}
                   >
-                    取消
+                    {t("batch_cancel")}
                   </Button>
                   <Button
                     type="primary"
                     aria-label={
-                      businessSave ? `保存${label}修改` : `完成${label}设置`
+                      businessSave
+                        ? t("creation_save_label_changes", { label })
+                        : t("creation_finish_label_settings", { label })
                     }
                     loading={saving}
                     disabled={
@@ -435,7 +459,9 @@ export function V3PhonemeSpeechSettings({
                         ) {
                           if (activeTarget.current !== targetKey) return;
                           setSaveError(
-                            "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。"
+                            creationMessage(
+                              "panel_saving_is_incomplete_all_changes_are_retained_resolve_validation_issues_or"
+                            )
                           );
                           return;
                         }
@@ -445,7 +471,9 @@ export function V3PhonemeSpeechSettings({
                         setSaveError(
                           error instanceof Error
                             ? error.message
-                            : "保存失败，修改已保留"
+                            : creationMessage(
+                                "creation_could_not_save_your_changes_have_been_kept"
+                              )
                         );
                       } finally {
                         savingRef.current = false;
@@ -453,7 +481,7 @@ export function V3PhonemeSpeechSettings({
                       }
                     }}
                   >
-                    {businessSave ? "保存修改" : "完成"}
+                    {businessSave ? t("panel_save_changes_2") : t("panel_done")}
                   </Button>
                 </Space>
               )}

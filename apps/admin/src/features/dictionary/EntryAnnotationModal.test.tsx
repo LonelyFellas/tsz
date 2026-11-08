@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import {
   fireEvent,
   render,
@@ -338,4 +340,38 @@ describe("词条标注", () => {
     fireEvent.click(screen.getByText("保存标注"));
     expect(save).toHaveBeenLastCalledWith({ a: "" });
   });
+});
+
+it("语言切换保留数字标注会话、只读行及原始业务 ID", () => {
+  const save = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <EntryAnnotationModal
+        rows={[{ ...rows[0]!, readOnly: true }, rows[2]!]}
+        groups={groups}
+        creating
+        onSave={save}
+        onClose={vi.fn()}
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const fields = screen.getAllByRole("textbox");
+  expect(fields[0]).toBeDisabled();
+  fireEvent.change(fields[1]!, { target: { value: "abc" } });
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByText("Annotations must contain digits only")
+  ).toBeVisible();
+  expect(fields[1]).toHaveValue("abc");
+  fireEvent.change(fields[1]!, { target: { value: "0002" } });
+  for (const locale of ["zh-Hant", "en-GB", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getAllByRole("textbox")[1]).toBe(fields[1]);
+    expect(fields[1]).toHaveValue("0002");
+    expect(fields[0]).toBeDisabled();
+    expect(save).not.toHaveBeenCalled();
+  }
+  fireEvent.click(screen.getByText("保存标注并创建"));
+  expect(save).toHaveBeenCalledWith({ a: "01", incoming: "0002" });
 });

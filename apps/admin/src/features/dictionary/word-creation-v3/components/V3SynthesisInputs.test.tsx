@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { App } from "@tsz/ui/admin/overlays";
 import {
   fireEvent,
@@ -1081,3 +1083,33 @@ it.each([
     );
   }
 );
+
+it("语言切换保留待确认转换、草稿和撤销历史且不请求音频", async () => {
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <Harness dialect="uk" />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const field = screen.getByLabelText("第 1 条发音的英式 Azure IPA");
+  fireEvent.change(field, { target: { value: "edited IPA" } });
+  const before = screen.getByTestId("pronunciation-wire").textContent;
+  fireEvent.click(
+    screen.getByRole("button", { name: "第 1 条发音转换为英式 Azure IPA" })
+  );
+  await screen.findByRole("dialog");
+  for (const locale of ["en-US", "zh-Hant", "en-GB", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(field).toHaveValue("edited IPA");
+    expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
+  }
+  fireEvent.click(within(screen.getByRole("dialog")).getByText("应用转换结果"));
+  await waitFor(() => expect(field).toHaveValue("fɑː"));
+  view.rerender(content("en-US"));
+  fireEvent.keyDown(field, { key: "z", ctrlKey: true });
+  expect(field).toHaveValue("edited IPA");
+  expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
+  expect(speech.synthesize).not.toHaveBeenCalled();
+  expect(speech.generateAudio).not.toHaveBeenCalled();
+});

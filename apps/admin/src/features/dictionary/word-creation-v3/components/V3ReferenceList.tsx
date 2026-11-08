@@ -1,3 +1,8 @@
+import { useLexiconEditorTranslation } from "../../i18n/editor";
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation
+} from "../../i18n/editor";
 import { Button, Flex, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import type { InboundReferenceV3 } from "@tsz/types";
 import type { ReactNode } from "react";
@@ -5,34 +10,40 @@ import { referenceLink } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
 import { relationLabel } from "../presentation";
 
-export function referenceKindLabel(reference: InboundReferenceV3): string {
+export function referenceKindLabel(
+  reference: InboundReferenceV3,
+  t: CreationTranslation = creationDefaultT
+): string {
   switch (reference.kind) {
     case "shared_sentence":
-      return "多维例句";
+      return t("panel_examples_2");
     case "publication_sense_ref":
-      return "已发布内容";
+      return t("creation_published_content");
     case "grammar_form_link":
-      return "语法结构关联词形";
+      return t("creation_grammar_structure_form_link");
     case "draft_text_link":
-      return "草稿正文关联";
+      return t("creation_draft_text_link");
     case "draft_relation":
       return reference.source.relation_type
-        ? relationLabel(reference.source.relation_type)
-        : "关联词";
+        ? relationLabel(reference.source.relation_type, t)
+        : t("creation_related_entry");
     case "form_group_sense_binding":
-      return "词形组绑定";
+      return t("creation_form_group_binding");
     case "phrase_component":
-      return "短语成分";
+      return t("creation_phrase_component");
   }
 }
 
-function targetLabel(reference: InboundReferenceV3): string {
+function targetLabel(
+  reference: InboundReferenceV3,
+  t: CreationTranslation = creationDefaultT
+): string {
   const { target } = reference;
-  if (target.variant_id) return "词形变体";
-  if (target.form_id) return "词形";
-  if (target.sense_id) return "词义";
-  if (target.pos_id) return "词性";
-  return "内容";
+  if (target.variant_id) return t("creation_form_variant");
+  if (target.form_id) return t("presentation_impact_label_form");
+  if (target.sense_id) return t("presentation_impact_label_sense");
+  if (target.pos_id) return t("presentation_impact_label_pos");
+  return t("content");
 }
 
 /** 片段下标是码点：直接 slice 字符串会把代理对切坏。 */
@@ -61,7 +72,10 @@ function highlightSegments(reference: InboundReferenceV3): ReactNode {
   return parts.length > 0 ? parts : text;
 }
 
-function sourceSummary(reference: InboundReferenceV3): ReactNode {
+function sourceSummary(
+  reference: InboundReferenceV3,
+  t: CreationTranslation
+): ReactNode {
   const { source } = reference;
   if (reference.kind === "shared_sentence") {
     return source.sentence_text ? (
@@ -69,19 +83,23 @@ function sourceSummary(reference: InboundReferenceV3): ReactNode {
         {highlightSegments(reference)}
       </Typography.Text>
     ) : (
-      <Typography.Text type="secondary">例句原文暂不可用</Typography.Text>
+      <Typography.Text type="secondary">
+        {t("creation_the_original_sentence_is_unavailable")}
+      </Typography.Text>
     );
   }
   const status =
     source.entry_status === "published"
-      ? "已发布"
+      ? t("panel_published")
       : source.entry_status === "archived"
-        ? "垃圾桶"
-        : "草稿";
+        ? t("creation_trash")
+        : t("panel_draft");
   return (
     <Space size={4} wrap>
       <Typography.Text className="tsz-words" strong>
-        {source.entry_headword || source.entry_id || "未知词条"}
+        {source.entry_headword ||
+          source.entry_id ||
+          t("creation_unknown_entry")}
       </Typography.Text>
       {source.form_group_label ? (
         <Typography.Text>{source.form_group_label}</Typography.Text>
@@ -95,6 +113,7 @@ function sourceSummary(reference: InboundReferenceV3): ReactNode {
 }
 
 function ReferenceActions({ reference }: { reference: InboundReferenceV3 }) {
+  const { t } = useLexiconEditorTranslation();
   const guard = useV3ReferenceGuard();
   const link = referenceLink(reference);
   if (link.kind === "none") return null;
@@ -106,7 +125,7 @@ function ReferenceActions({ reference }: { reference: InboundReferenceV3 }) {
           size="small"
           type="link"
         >
-          查看例句
+          {t("creation_view_sentence")}
         </Button>
         <Button
           href={link.libraryHref}
@@ -115,7 +134,7 @@ function ReferenceActions({ reference }: { reference: InboundReferenceV3 }) {
           target="_blank"
           type="link"
         >
-          在例句库打开
+          {t("creation_open_in_sentence_library")}
         </Button>
       </Space>
     );
@@ -128,7 +147,9 @@ function ReferenceActions({ reference }: { reference: InboundReferenceV3 }) {
       target="_blank"
       type="link"
     >
-      {link.kind === "entry" ? "打开来源词条" : "在例句库打开"}
+      {link.kind === "entry"
+        ? t("creation_open_source_entry")
+        : t("creation_open_in_sentence_library")}
     </Button>
   );
 }
@@ -136,8 +157,8 @@ function ReferenceActions({ reference }: { reference: InboundReferenceV3 }) {
 export function V3ReferenceList({
   references,
   total,
-  emptyText = "暂无关联",
-  staleLabel = "已失效"
+  emptyText,
+  staleLabel
 }: {
   references: readonly InboundReferenceV3[];
   /** 完整计数；明细被截断时说明只显示了前面若干条。 */
@@ -146,14 +167,19 @@ export function V3ReferenceList({
   /** 失效标签的文案：保存预检列出的是「改了就会失效」，不是已经失效。 */
   staleLabel?: string;
 }) {
+  const { t } = useLexiconEditorTranslation();
   if (references.length === 0) {
-    return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
+    return (
+      <Typography.Text type="secondary">
+        {emptyText ?? t("creation_no_links_yet")}
+      </Typography.Text>
+    );
   }
   return (
     <Flex className="v3-reference-list" vertical gap="small">
       {total !== undefined && total > references.length ? (
         <Typography.Text type="secondary">
-          共 {total} 处，显示前 {references.length} 条
+          {t("creation_references_subset", { total, shown: references.length })}
         </Typography.Text>
       ) : null}
       {references.map((reference) => (
@@ -167,14 +193,18 @@ export function V3ReferenceList({
         >
           <Space size={4}>
             <Tag color={reference.stale ? "red" : "orange"}>
-              {referenceKindLabel(reference)}
+              {referenceKindLabel(reference, t)}
             </Tag>
-            {reference.stale ? <Tag color="red">{staleLabel}</Tag> : null}
+            {reference.stale ? (
+              <Tag color="red">{staleLabel ?? t("creation_invalid")}</Tag>
+            ) : null}
           </Space>
           <Flex vertical gap={2} style={{ flex: "1 1 240px", minWidth: 0 }}>
-            {sourceSummary(reference)}
+            {sourceSummary(reference, t)}
             <Typography.Text type="secondary">
-              关联本词条的{targetLabel(reference)}
+              {t("creation_reference_target", {
+                target: targetLabel(reference, t)
+              })}
             </Typography.Text>
           </Flex>
           <ReferenceActions reference={reference} />

@@ -1,3 +1,5 @@
+import { useLexiconEditorTranslation } from "../i18n/editor";
+
 import { regionalVariants } from "@tsz/shared";
 import { expandFormContents } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
@@ -69,17 +71,25 @@ function Pronunciations({
 }: {
   pronunciations: WordPronunciationV3[];
 }) {
+  const { t } = useLexiconEditorTranslation();
   if (pronunciations.length === 0) {
-    return <Typography.Text type="secondary">暂无词典发音建议</Typography.Text>;
+    return (
+      <Typography.Text type="secondary">
+        {t("creation_no_dictionary_pronunciation_suggestions")}
+      </Typography.Text>
+    );
   }
   return (
     <Space orientation="vertical" size={2} style={{ width: "100%" }}>
       {pronunciations.map((pronunciation, index) => (
         <Space key={pronunciation.id} size={[8, 2]} wrap>
-          <Typography.Text type="secondary">发音 {index + 1}</Typography.Text>
+          <Typography.Text type="secondary">
+            {t("presentation_impact_label_pronunciation")}
+            {index + 1}
+          </Typography.Text>
           {pronunciation.dict_phonetic ? (
             <Typography.Text>
-              词典音标：
+              {t("snapshot_dictionary_phonetic")}：
               <span className="tsz-phonetics">
                 {pronunciation.dict_phonetic}
               </span>
@@ -87,14 +97,14 @@ function Pronunciations({
           ) : null}
           {pronunciation.actual_pron ? (
             <Typography.Text>
-              实际发音：
+              {t("snapshot_actual_pronunciation")}：
               <span className="tsz-phonetics tsz-actual-pronunciation">
                 {pronunciation.actual_pron}
               </span>
             </Typography.Text>
           ) : null}
           {pronunciation.style ? (
-            <Tag>{pronunciationStyleLabel(pronunciation.style)}</Tag>
+            <Tag>{pronunciationStyleLabel(pronunciation.style, t)}</Tag>
           ) : null}
         </Space>
       ))}
@@ -181,13 +191,14 @@ function SuggestedForm({
   form: WordConcreteFormV3;
   label: string;
 }) {
+  const { t } = useLexiconEditorTranslation();
   return (
     <Space orientation="vertical" size="small" style={{ width: "100%" }}>
       <Tag color="blue">{label}</Tag>
       {form.regional_variants.mode === "common" ? (
         <VariantPanel
           className="dialect-panel-common"
-          label="英美通用拼写"
+          label={t("common_spelling")}
           spelling={form.regional_variants.common.spelling}
           pronunciations={form.regional_variants.common.pronunciations}
         />
@@ -198,7 +209,7 @@ function SuggestedForm({
               <VariantPanel
                 key={variant.id}
                 className="dialect-panel-uk"
-                label="英式英语 · BrE"
+                label={t("creation_british_english_bre")}
                 spelling={variant.spelling}
                 pronunciations={variant.pronunciations}
               />
@@ -209,7 +220,7 @@ function SuggestedForm({
               <VariantPanel
                 key={variant.id}
                 className="dialect-panel-us"
-                label="美式英语 · AmE"
+                label={t("creation_american_english_ame")}
                 spelling={variant.spelling}
                 pronunciations={variant.pronunciations}
               />
@@ -222,19 +233,22 @@ function SuggestedForm({
 }
 
 function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
+  const { t } = useLexiconEditorTranslation();
   const partOfSpeechLabel = usePartOfSpeechLabel();
   if (expandFormContents(word.forms).pos.length === 0) {
     return (
       <Card
         className="word-headword-confirmation-card"
         size="small"
-        title="确认英美主词与词形"
+        title={t("creation_confirm_headwords_and_forms")}
       >
         <Alert
           showIcon
           type="info"
-          title="未找到内置词典建议"
-          description="已创建空白草稿，请进入词形与发音补充内容。"
+          title={t("creation_no_built_in_dictionary_suggestions_found")}
+          description={t(
+            "creation_a_blank_draft_has_been_created_add_forms_and_pronunciation_next"
+          )}
         />
       </Card>
     );
@@ -243,13 +257,17 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
     <Card
       className="word-headword-confirmation-card"
       size="small"
-      title="确认英美主词与词形"
+      title={t("creation_confirm_headwords_and_forms")}
     >
       <div className="word-dialect-detection-row">
         <div>
-          <Typography.Text strong>当前草稿词形</Typography.Text>
+          <Typography.Text strong>
+            {t("creation_current_draft_forms")}
+          </Typography.Text>
           <Typography.Text type="secondary">
-            建条时已套用内置词典的英美拼写、词形和音标；下面是草稿的最新内容，在词形与发音步改动后这里同步更新。
+            {t(
+              "creation_british_and_american_spellings_forms_and_phonetics_were_applied_from_the_built_in_dictiona"
+            )}
           </Typography.Text>
         </div>
         <ShieldCheckIcon />
@@ -278,6 +296,7 @@ function V3BasicsContent({
   entryLabel: string;
   onContinue: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const partOfSpeechLabel = usePartOfSpeechLabel();
   const suggestedPos = expandFormContents(word.forms).pos.map((pos) => ({
     key: pos.pos_id,
@@ -288,37 +307,39 @@ function V3BasicsContent({
       <div className="word-step-heading">
         <span className="word-step-number">STEP 01</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          创建词条
+          {t("assistant_step_basics")}
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          录入词条，系统将判断词条类型，检测智能词库中的已有原形，并从内置词典匹配英美词形和建议词性。
+          {t(
+            "creation_enter_an_entry_to_identify_its_type_find_existing_base_forms_and_match_british_and_america"
+          )}
         </Typography.Paragraph>
       </div>
 
       <Card
         className="word-basics-input-card"
         size="small"
-        title="录入与检测"
-        extra={<Tag color="blue">仅支持英文词条</Tag>}
+        title={t("creation_input_and_detection")}
+        extra={<Tag color="blue">{t("creation_english_entries_only")}</Tag>}
       >
         <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
           <div>
-            <Typography.Text>所属语言</Typography.Text>
+            <Typography.Text>{t("creation_entry_language")}</Typography.Text>
             <Select
-              aria-label="所属语言"
+              aria-label={t("creation_entry_language")}
               disabled
               value="en"
-              options={[{ value: "en", label: "English  英语" }]}
+              options={[{ value: "en", label: t("creation_english") }]}
               style={{ width: "100%", marginTop: 8 }}
             />
           </div>
           <div>
-            <Typography.Text>录入词条</Typography.Text>
+            <Typography.Text>{t("creation_entry_text")}</Typography.Text>
             <Input
-              aria-label="录入词条"
+              aria-label={t("creation_entry_text")}
               className="tsz-words"
               readOnly
-              placeholder="暂无词条名称"
+              placeholder={t("creation_no_entry_name")}
               size="large"
               suffix={
                 <CircleCheckIcon style={{ color: "var(--ui-color-success)" }} />
@@ -327,7 +348,9 @@ function V3BasicsContent({
               style={{ marginTop: 8 }}
             />
             <Typography.Text type="secondary" className="word-field-help">
-              词典检测已完成，建议内容已应用到当前草稿。
+              {t(
+                "creation_dictionary_detection_is_complete_suggestions_have_been_applied_to_the_current_draft"
+              )}
             </Typography.Text>
           </div>
         </Space>
@@ -337,7 +360,7 @@ function V3BasicsContent({
         <Card
           className="word-detection-result-card"
           size="small"
-          title="词典检测结果"
+          title={t("creation_dictionary_detection_results")}
           extra={
             <Tag
               color={
@@ -347,22 +370,24 @@ function V3BasicsContent({
               }
             >
               {expandFormContents(word.forms).pos.length > 0
-                ? "已匹配"
-                : "未匹配"}
+                ? t("creation_matched")
+                : t("creation_not_matched")}
             </Tag>
           }
         >
           <Descriptions column={1} size="small">
-            <Descriptions.Item label="词条类型">
-              {word.kind === "phrase" ? "短语" : "单词"}
+            <Descriptions.Item label={t("creation_entry_type")}>
+              {word.kind === "phrase"
+                ? t("creation_phrase")
+                : t("creation_word")}
             </Descriptions.Item>
-            <Descriptions.Item label="原形检测">
+            <Descriptions.Item label={t("creation_base_form_detection")}>
               <Space size={6}>
                 <CircleCheckIcon style={{ color: "var(--ui-color-success)" }} />
-                已完成
+                {t("creation_completed")}
               </Space>
             </Descriptions.Item>
-            <Descriptions.Item label="建议词性">
+            <Descriptions.Item label={t("creation_suggested_parts_of_speech")}>
               {suggestedPos.length > 0 ? (
                 <Space size={[4, 4]} wrap>
                   {suggestedPos.map((pos) => (
@@ -370,7 +395,7 @@ function V3BasicsContent({
                   ))}
                 </Space>
               ) : (
-                "暂无建议"
+                t("creation_no_suggestions")
               )}
             </Descriptions.Item>
           </Descriptions>
@@ -378,9 +403,13 @@ function V3BasicsContent({
             <div className="word-detection-empty-state">
               <InfoIcon />
               <div>
-                <Typography.Text strong>未找到词典建议</Typography.Text>
+                <Typography.Text strong>
+                  {t("creation_no_dictionary_suggestions_found")}
+                </Typography.Text>
                 <Typography.Text type="secondary">
-                  可以继续进入编辑器手动补充词形与发音。
+                  {t(
+                    "creation_continue_to_the_editor_to_add_forms_and_pronunciation_manually"
+                  )}
                 </Typography.Text>
               </div>
             </div>
@@ -393,7 +422,7 @@ function V3BasicsContent({
 
       <div className="word-entry-actions">
         <Button type="primary" onClick={onContinue}>
-          进入词形与发音
+          {t("creation_edit_forms_and_pronunciation")}
         </Button>
       </div>
     </div>
@@ -409,27 +438,34 @@ export function V3BasicsStep({
   onContinue,
   onStepChange
 }: Props) {
+  const { t, i18n } = useLexiconEditorTranslation();
   const entryLabel = visibleEntryLabel(word);
-  const rows = buildV3ProductProgress({
-    wordId: word.id,
-    language: word.language,
-    completedSteps: word.completed_steps,
-    forms: draftForms ?? expandFormContents(word.forms),
-    meanings: draftMeanings ?? word.meanings,
-    dirtySteps,
-    partOfSpeechCatalog
-  });
+  const rows = buildV3ProductProgress(
+    {
+      wordId: word.id,
+      language: word.language,
+      completedSteps: word.completed_steps,
+      forms: draftForms ?? expandFormContents(word.forms),
+      meanings: draftMeanings ?? word.meanings,
+      dirtySteps,
+      partOfSpeechCatalog
+    },
+    t,
+    i18n.language
+  );
   return (
     <WordCreationLayout
       currentStep="basics"
       onStepChange={onStepChange}
       presentation={{
         wordExists: true,
-        breadcrumbTitle: entryLabel ? `${entryLabel} · 创建词条` : "创建词条",
+        breadcrumbTitle: entryLabel
+          ? t("creation_breadcrumb", { label: entryLabel })
+          : t("assistant_step_basics"),
         completedSteps: word.completed_steps,
         summaryHeadword: (
           <strong className="v3-summary-headword tsz-words">
-            {entryLabel || "新词条"}
+            {entryLabel || t("creation_new_entry")}
           </strong>
         ),
         progressBadge: v3ProductProgressBadge(rows),

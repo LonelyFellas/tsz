@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { useState } from "react";
 
 import type {
@@ -1565,4 +1567,50 @@ it("关联短语的命中词形没有可用词义时不能选择", async () => {
   expect(item.closest(".ui-cascader-menu-item")).toHaveClass(
     "ui-cascader-menu-item-disabled"
   );
+});
+
+it("词形读法待确认时切语言保留选择和 revision，不重新加载候选或目标", async () => {
+  search.mockResolvedValue(giveEntryResponse());
+  const selected: GrammarFormLinkV3 = {
+    id: "raw-link",
+    source_segments: [segments[0]!],
+    target_word_id: "entry-give",
+    target_publication_id: "pub-give",
+    target_pos_id: "pos-give",
+    target_form_id: "form-give",
+    target_variant_id: "variant-give",
+    target_dialect: "common"
+  };
+  const onSelect = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <V3GrammarFormPicker
+        kind="word"
+        segments={selected.source_segments}
+        selected={selected}
+        onSelect={onSelect}
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await chooseReading();
+  const requestsBefore = [
+    search.mock.calls.length,
+    get.mock.calls.length,
+    getPublication.mock.calls.length
+  ];
+  for (const locale of ["en-GB", "zh-Hant", "en-US", "zh-Hans"] as const) {
+    view.rerender(content(locale));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect([
+      search.mock.calls.length,
+      get.mock.calls.length,
+      getPublication.mock.calls.length
+    ]).toEqual(requestsBefore);
+  }
+  fireEvent.click(screen.getByRole("button", { name: "确认词形关联" }));
+  expect(onSelect).toHaveBeenCalledWith({
+    ...selected,
+    reading_reference: readingReference
+  });
 });

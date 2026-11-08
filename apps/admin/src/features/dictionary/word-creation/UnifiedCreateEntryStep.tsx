@@ -1,3 +1,12 @@
+import { useLexiconEditorTranslation } from "../i18n/editor";
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation,
+  type LexiconEditorKey as CreationKey,
+  useLexiconEditorMessageState as useCreationMessageState,
+  createLexiconEditorMessage as creationMessage,
+  LexiconEditorText as CreationText
+} from "../i18n/editor";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { HttpError, RequestTimeoutError } from "@tsz/api-client/http";
 import type {
@@ -53,10 +62,8 @@ import { hasHeadwordsIssue, headwordsIssues } from "./headwordValidation";
 import type { CreationNavigationState } from "./CreationSourceNotice";
 import { EntryAnnotationModal } from "../EntryAnnotationModal";
 import {
-  annotationForbiddenMessage,
   canEditConflictEntry,
-  isAnnotationOwnershipError,
-  OTHERS_ENTRY_HINT
+  isAnnotationOwnershipError
 } from "../annotationPermission";
 import { useAuthStore } from "@/lib/auth";
 import "./word-creation.css";
@@ -106,7 +113,11 @@ type RegionalDisplayState =
       value: WordHeadwordsV2;
     };
 
-class ProductError extends Error {}
+class ProductError extends Error {
+  constructor(readonly key: CreationKey) {
+    super(creationDefaultT(key));
+  }
+}
 
 const v3Requests = createV3WordRequests();
 const defaultRequests: UnifiedCreateRequests = {
@@ -118,77 +129,107 @@ const defaultRequests: UnifiedCreateRequests = {
 };
 
 const STATUS_LABEL = {
-  draft: "草稿",
-  published: "已发布",
-  archived: "垃圾桶"
-} as const;
-
-const KIND_LABEL = {
-  word: "单词",
-  phrase: "短语"
+  draft: "panel_draft",
+  published: "panel_published",
+  archived: "creation_trash"
 } as const;
 
 function initialSurfacePage(pending?: PendingCreation) {
   return pending?.detection.surface_match_page;
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown) {
   if (error instanceof HttpError) {
     if (error.status === 409 && error.code === "duplicate_word")
-      return "创建请求被服务拒绝，请重新检测。";
-    if (error.status === 401) return "登录状态已失效，请重新登录。";
+      return creationMessage(
+        "creation_the_service_rejected_this_creation_request_run_detection_again"
+      );
+    if (error.status === 401)
+      return creationMessage("creation_your_session_has_expired_sign_in_again");
     // 403 分两种：改了别人的标注 vs. 压根没有建条权限。前者刷新重试也没用，
     // 得让管理员知道是哪一行越界了。
     if (error.status === 403)
       return isAnnotationOwnershipError(error.code)
-        ? annotationForbiddenMessage(error.code)
-        : "当前账号没有创建词条的权限。";
-    if (error.status === 503) return "词条服务暂时不可用，请稍后重试。";
-    if (error.status === 410) return "检查结果已过期，请重新提交。";
+        ? creationMessage(
+            "creation_you_can_only_change_annotations_on_entries_you_created"
+          )
+        : creationMessage("creation_this_account_cannot_create_entries");
+    if (error.status === 503)
+      return creationMessage(
+        "creation_the_entry_service_is_unavailable_try_again_later"
+      );
+    if (error.status === 410)
+      return creationMessage(
+        "creation_the_detection_result_has_expired_submit_it_again"
+      );
   }
   if (error instanceof TypeError || error instanceof RequestTimeoutError) {
-    return "网络异常，创建结果未知。请原样重试。";
+    return creationMessage(
+      "creation_a_network_error_left_the_creation_result_unknown_retry_the_same_request"
+    );
   }
-  return error instanceof ProductError
+  return error instanceof HttpError
     ? error.message
-    : "创建失败，请稍后重试。";
+    : error instanceof ProductError
+      ? creationMessage(error.key)
+      : creationMessage("creation_could_not_create_the_entry_try_again_later");
 }
 
-function createErrorMessage(error: unknown): string {
+function createErrorMessage(error: unknown) {
   if (error instanceof TypeError || error instanceof RequestTimeoutError) {
-    return "网络异常，创建结果未知。请原样重试。";
+    return creationMessage(
+      "creation_a_network_error_left_the_creation_result_unknown_retry_the_same_request"
+    );
   }
   if (!(error instanceof HttpError)) {
-    return "响应异常，创建结果未知。请原样重试。";
+    return creationMessage(
+      "creation_the_response_is_invalid_and_the_creation_result_is_unknown_retry_the_same_request"
+    );
   }
   return errorMessage(error);
 }
 
 function partOfSpeechLabel(
   code: string,
-  catalog?: PartOfSpeechCatalogResponse
+  catalog?: PartOfSpeechCatalogResponse,
+  t: CreationTranslation = creationDefaultT,
+  interfaceLocale = "zh-Hans"
 ): string {
   return (
-    catalog?.items.find((item) => item.code === code)?.name_zh ?? "未识别词性"
+    ((item) =>
+      item
+        ? interfaceLocale.startsWith("en")
+          ? item.name_en || item.name_zh
+          : item.name_zh || item.name_en
+        : undefined)(catalog?.items.find((item) => item.code === code)) ??
+    t("creation_unrecognised_part_of_speech")
   );
 }
 
 function dictionaryCoverageLabel(
-  category: "词形" | "发音",
-  state: "complete" | "partial" | "missing"
+  category: "forms" | "pronunciations",
+  state: "complete" | "partial" | "missing",
+  t: CreationTranslation = creationDefaultT
 ) {
   const status = {
-    complete: "完整覆盖",
-    partial: "部分覆盖",
-    missing: "词典未提供"
+    complete: t("creation_complete_coverage"),
+    partial: t("creation_partial_coverage"),
+    missing: t("creation_not_provided_by_the_dictionary")
   }[state];
-  return `${category}：${status}`;
+  return t(
+    category === "forms"
+      ? "creation_coverage_forms"
+      : "creation_coverage_pronunciations",
+    { state: status }
+  );
 }
 
 function assertFreshDetection(expiresAt: string) {
   const expiry = Date.parse(expiresAt);
   if (!Number.isFinite(expiry) || expiry <= Date.now()) {
-    throw new ProductError("检查结果已过期，请重新提交。");
+    throw new ProductError(
+      "creation_the_detection_result_has_expired_submit_it_again"
+    );
   }
 }
 
@@ -269,6 +310,7 @@ function DetectionPresentationCard({
   snapshot: ReturnType<typeof useSurfaceSnapshot>;
   existingDraftId?: string;
 }) {
+  const { t, i18n } = useLexiconEditorTranslation();
   const [expanded, setExpanded] = useState<string>();
   const builtinStatus = pending.detection.builtin_dictionary.status;
   const builtinCoverage =
@@ -304,7 +346,7 @@ function DetectionPresentationCard({
       baseSpellings: candidate.spellings,
       otherMatches: [] as string[],
       posLabels: candidate.posLabels.map((pos) =>
-        partOfSpeechLabel(pos, catalog)
+        partOfSpeechLabel(pos, catalog, t, i18n.language)
       ),
       glossPreviews: candidate.glossPreviews
     })),
@@ -324,7 +366,9 @@ function DetectionPresentationCard({
   ];
   const builtinPosLabels = [
     ...new Set(
-      [...builtinPosCodes].map((pos) => partOfSpeechLabel(pos, catalog))
+      [...builtinPosCodes].map((pos) =>
+        partOfSpeechLabel(pos, catalog, t, i18n.language)
+      )
     )
   ];
   const smartPosLabels = [
@@ -333,38 +377,50 @@ function DetectionPresentationCard({
   const preferredPosLabels =
     smartPosLabels.length > 0 ? smartPosLabels : builtinPosLabels;
   const preferredPosSource =
-    smartPosLabels.length > 0 ? "智能词库" : "内置词典";
+    smartPosLabels.length > 0
+      ? t("creation_smart_lexicon")
+      : t("creation_built_in_dictionary");
 
   return (
     <Card
       className="word-detection-result-card"
       size="small"
-      title="检测结果"
+      title={t("creation_detection_results")}
       extra={
         <Tag color={builtinStatus === "matched" ? "success" : "default"}>
-          内置词典：{builtinStatus === "matched" ? "已匹配" : "未匹配"}
+          {t("creation_builtin_status", {
+            status: t(
+              builtinStatus === "matched"
+                ? "creation_matched"
+                : "creation_not_matched"
+            )
+          })}
         </Tag>
       }
     >
       <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <Descriptions column={1} size="small">
-          <Descriptions.Item label="词条类型">
-            {KIND_LABEL[pending.kind]}词条
+          <Descriptions.Item label={t("creation_entry_type")}>
+            {t(
+              pending.kind === "word"
+                ? "creation_word_entry"
+                : "creation_phrase_entry"
+            )}
           </Descriptions.Item>
-          <Descriptions.Item label="词库检测">
+          <Descriptions.Item label={t("creation_lexicon_detection")}>
             {hasMatches ? (
-              "已发现"
+              t("creation_found")
             ) : existingDraftId ? (
-              "同名草稿"
+              t("creation_draft_with_the_same_headword")
             ) : (
               <Space>
                 <CircleCheckIcon style={{ color: "var(--ui-color-success)" }} />
-                未发现
+                {t("creation_not_found")}
               </Space>
             )}
           </Descriptions.Item>
           {preferredPosLabels.length > 0 ? (
-            <Descriptions.Item label="建议词性">
+            <Descriptions.Item label={t("creation_suggested_parts_of_speech")}>
               <Space size={[6, 6]} wrap>
                 {preferredPosLabels.map((label) => (
                   <Tag key={label} color="blue">
@@ -372,20 +428,20 @@ function DetectionPresentationCard({
                   </Tag>
                 ))}
                 <Typography.Text type="secondary">
-                  来源：{preferredPosSource}
+                  {t("creation_source_label", { source: preferredPosSource })}
                 </Typography.Text>
               </Space>
             </Descriptions.Item>
           ) : null}
           {builtinCoverage ? (
-            <Descriptions.Item label="词典覆盖">
+            <Descriptions.Item label={t("creation_dictionary_coverage")}>
               <Space size={[4, 4]} wrap>
                 <Tag
                   color={
                     builtinCoverage.forms === "missing" ? "default" : "blue"
                   }
                 >
-                  {dictionaryCoverageLabel("词形", builtinCoverage.forms)}
+                  {dictionaryCoverageLabel("forms", builtinCoverage.forms, t)}
                 </Tag>
                 <Tag
                   color={
@@ -395,8 +451,9 @@ function DetectionPresentationCard({
                   }
                 >
                   {dictionaryCoverageLabel(
-                    "发音",
-                    builtinCoverage.pronunciations
+                    "pronunciations",
+                    builtinCoverage.pronunciations,
+                    t
                   )}
                 </Tag>
               </Space>
@@ -416,7 +473,9 @@ function DetectionPresentationCard({
                       </Typography.Text>
                       {annotations.get(entry.entryId) ? (
                         <sup
-                          title={`词条标注：${annotations.get(entry.entryId)}`}
+                          title={t("creation_annotation_label", {
+                            value: annotations.get(entry.entryId) ?? ""
+                          })}
                           style={{
                             display: "inline-block",
                             position: "relative",
@@ -442,7 +501,7 @@ function DetectionPresentationCard({
                             : "default"
                       }
                     >
-                      {STATUS_LABEL[entry.status]}
+                      {t(STATUS_LABEL[entry.status])}
                     </Tag>
                     {entry.posLabels.map((label) => (
                       <Tag key={label}>{label}</Tag>
@@ -457,7 +516,7 @@ function DetectionPresentationCard({
                           : `/words/${entry.entryId}/wizard/forms`
                       }
                     >
-                      继续创建
+                      {t("creation_continue_creating")}
                     </Button>
                   ) : (
                     <Button
@@ -468,7 +527,7 @@ function DetectionPresentationCard({
                         )
                       }
                     >
-                      查看已有原形
+                      {t("creation_view_existing_base_forms")}
                     </Button>
                   )}
                 </div>
@@ -480,7 +539,7 @@ function DetectionPresentationCard({
                         key={spelling}
                         style={{ fontWeight: 700 }}
                       >
-                        原形：{spelling}
+                        {t("creation_base_label", { text: spelling })}
                       </div>
                     ))}
                     {entry.baseSpellings.length === 0
@@ -490,14 +549,14 @@ function DetectionPresentationCard({
                             key={match}
                             style={{ fontWeight: 700 }}
                           >
-                            命中：{match}
+                            {t("creation_match_label", { text: match })}
                           </div>
                         ))
                       : null}
                     {entry.posLabels.length > 0 ? (
                       <Space size={[4, 4]} wrap>
                         <span className="word-smart-match-context-meta-label">
-                          基本词性：
+                          {t("pos")}：
                         </span>
                         {entry.posLabels.map((label) => (
                           <Tag key={label}>{label}</Tag>
@@ -505,7 +564,9 @@ function DetectionPresentationCard({
                       </Space>
                     ) : null}
                     {entry.glossPreviews.map((gloss) => (
-                      <div key={gloss}>释义：{gloss}</div>
+                      <div key={gloss}>
+                        {t("creation_gloss_label", { text: gloss })}
+                      </div>
                     ))}
                   </div>
                 ) : null}
@@ -521,17 +582,19 @@ function DetectionPresentationCard({
                     <Typography.Text className="tsz-words" strong>
                       {pending.detection.normalized_surface}
                     </Typography.Text>
-                    <Tag color="processing">未完成草稿</Tag>
+                    <Tag color="processing">
+                      {t("creation_incomplete_draft")}
+                    </Tag>
                   </Space>
                   <Button
                     type="link"
                     href={`/words/${existingDraftId}/v3/wizard/forms`}
                   >
-                    打开草稿
+                    {t("creation_open_draft")}
                   </Button>
                 </div>
                 <Typography.Text type="secondary">
-                  继续编辑草稿，或新建词条。
+                  {t("creation_continue_editing_the_draft_or_create_an_entry")}
                 </Typography.Text>
               </div>
             ) : null}
@@ -542,14 +605,18 @@ function DetectionPresentationCard({
           <Alert
             showIcon
             type="error"
-            title="匹配结果已失效，请返回修改后重新提交。"
+            title={t(
+              "creation_the_match_results_have_expired_go_back_make_changes_and_submit_again"
+            )}
           />
         ) : null}
         {snapshot.phase === "disabled" ? (
           <Alert
             showIcon
             type="error"
-            title="当前策略暂不允许继续创建该词条。"
+            title={t(
+              "creation_the_current_policy_does_not_allow_this_entry_to_be_created"
+            )}
           />
         ) : null}
       </Space>
@@ -570,14 +637,17 @@ function HeadwordConfirmationCard({
   onChange: (value: WordHeadwordsV2) => void;
   onRetry: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   if (state.status === "loading" || state.status === "idle") {
     return (
       <Card
         className="word-headword-confirmation-card"
         size="small"
-        title="确认英美主词"
+        title={t("creation_confirm_british_and_american_headwords")}
       >
-        <Typography.Text type="secondary">正在加载原形…</Typography.Text>
+        <Typography.Text type="secondary">
+          {t("creation_loading_base_forms")}
+        </Typography.Text>
       </Card>
     );
   }
@@ -586,36 +656,41 @@ function HeadwordConfirmationCard({
       <Card
         className="word-headword-confirmation-card"
         size="small"
-        title="确认英美主词"
+        title={t("creation_confirm_british_and_american_headwords")}
       >
         <Alert
           showIcon
           type="error"
-          title="原形详情加载失败"
-          description="无法确认首个数据库原形，已停止创建。"
-          action={<Button onClick={onRetry}>重新加载</Button>}
+          title={t("creation_could_not_load_base_form_details")}
+          description={t(
+            "creation_the_first_database_base_form_could_not_be_confirmed_creation_has_stopped"
+          )}
+          action={<Button onClick={onRetry}>{t("panel_reload")}</Button>}
         />
       </Card>
     );
   }
   const value = state.value;
-  const issues = headwordsIssues(value);
-  const lockedLabel = preference === "uk" ? "英式" : "美式";
+  const issues = headwordsIssues(value, t);
+  const lockedLabel =
+    preference === "uk" ? t("candidate_uk") : t("candidate_us");
   return (
     <Card
       className="word-headword-confirmation-card"
       size="small"
-      title="确认英美主词"
+      title={t("creation_confirm_british_and_american_headwords")}
     >
       <div className="word-dialect-detection-row">
         <div>
-          <Typography.Text strong>区分英美拼写</Typography.Text>
+          <Typography.Text strong>
+            {t("creation_separate_british_and_american_spellings")}
+          </Typography.Text>
           <Typography.Text type="secondary">
-            英美拼写不同时开启。
+            {t("creation_enable_when_british_and_american_spellings_differ")}
           </Typography.Text>
         </div>
         <Switch
-          aria-label="区分英美拼写"
+          aria-label={t("creation_separate_british_and_american_spellings")}
           checked={value.mode === "distinguish"}
           disabled={disabled}
           onChange={(checked) => {
@@ -637,15 +712,19 @@ function HeadwordConfirmationCard({
       {value.mode === "unified" ? (
         <div className="dialect-panel">
           <Form.Item
-            label="英美通用主词"
+            label={t("creation_common_headword")}
             required
             validateStatus={
               value.common.trim() === "" || issues.uk ? "error" : undefined
             }
-            help={value.common.trim() === "" ? "请输入英美通用主词" : issues.uk}
+            help={
+              value.common.trim() === ""
+                ? t("creation_enter_the_common_headword")
+                : issues.uk
+            }
           >
             <Input
-              aria-label="英美通用主词"
+              aria-label={t("creation_common_headword")}
               className="tsz-words"
               disabled={disabled}
               value={value.common}
@@ -661,21 +740,27 @@ function HeadwordConfirmationCard({
             type="secondary"
             className="word-field-help word-headword-lock-note"
           >
-            当前锁定{lockedLabel}拼写，可在个人偏好中切换。
+            {t("creation_locked_spelling", { side: lockedLabel })}
           </Typography.Text>
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <div className="dialect-panel dialect-panel-uk">
-                <Typography.Text strong>英式英语 · BrE</Typography.Text>
+                <Typography.Text strong>
+                  {t("creation_british_english_bre")}
+                </Typography.Text>
                 <Form.Item
                   required
                   validateStatus={
                     value.uk.trim() === "" || issues.uk ? "error" : undefined
                   }
-                  help={value.uk.trim() === "" ? "请输入英式主词" : issues.uk}
+                  help={
+                    value.uk.trim() === ""
+                      ? t("creation_enter_the_british_headword")
+                      : issues.uk
+                  }
                 >
                   <Input
-                    aria-label="英式主词"
+                    aria-label={t("creation_british_headword")}
                     className="tsz-words"
                     value={value.uk}
                     disabled={disabled || preference === "uk"}
@@ -688,16 +773,22 @@ function HeadwordConfirmationCard({
             </Col>
             <Col xs={24} md={12}>
               <div className="dialect-panel dialect-panel-us">
-                <Typography.Text strong>美式英语 · AmE</Typography.Text>
+                <Typography.Text strong>
+                  {t("creation_american_english_ame")}
+                </Typography.Text>
                 <Form.Item
                   required
                   validateStatus={
                     value.us.trim() === "" || issues.us ? "error" : undefined
                   }
-                  help={value.us.trim() === "" ? "请输入美式主词" : issues.us}
+                  help={
+                    value.us.trim() === ""
+                      ? t("creation_enter_the_american_headword")
+                      : issues.us
+                  }
                 >
                   <Input
-                    aria-label="美式主词"
+                    aria-label={t("creation_american_headword")}
                     className="tsz-words"
                     value={value.us}
                     disabled={disabled || preference === "us"}
@@ -715,12 +806,15 @@ function HeadwordConfirmationCard({
         type="secondary"
         className="word-field-help word-headword-source"
       >
-        来源：
-        {state.source === "database"
-          ? "智能词库原形"
-          : state.source === "builtin"
-            ? "内置词典"
-            : "本次输入"}
+        {t("creation_source_label", {
+          source: t(
+            state.source === "database"
+              ? "creation_smart_lexicon_base_form"
+              : state.source === "builtin"
+                ? "creation_built_in_dictionary"
+                : "creation_current_input"
+          )
+        })}
       </Typography.Text>
     </Card>
   );
@@ -730,6 +824,7 @@ export function UnifiedCreateEntryStep({
   requests = defaultRequests,
   onCreated
 }: Props) {
+  const { t } = useLexiconEditorTranslation();
   const { modal } = App.useApp();
   // 冲突弹窗里哪几行能改由归属决定；门禁保证受保护页内 profile 必有值。
   const profile = useAuthStore((s) => s.profile);
@@ -737,8 +832,12 @@ export function UnifiedCreateEntryStep({
   const catalog = usePartOfSpeechCatalog();
   const { preference } = useDialectPreference();
   const [value, setValue] = useState("");
-  const [fieldError, setFieldError] = useState<string>();
-  const [error, setError] = useState<string>();
+  const [fieldErrorValue, setFieldError] = useState<string>();
+  const fieldError =
+    fieldErrorValue === undefined
+      ? undefined
+      : validateEntryInput(fieldErrorValue, t).issue;
+  const [error, setError] = useCreationMessageState();
   const [preparationBlocked, setPreparationBlocked] = useState(false);
   const [duplicateWord, setDuplicateWord] = useState<{ wordId?: string }>();
   const [busy, setBusy] = useState<"checking" | "creating">();
@@ -957,9 +1056,13 @@ export function UnifiedCreateEntryStep({
           requestError.meta.annotation_conflict.reason ===
             "revision_conflict" ||
             requestError.meta.annotation_conflict.reason === "group_changed"
-            ? "词条标注或原型分组已更新，请重新确认。"
+            ? creationMessage(
+                "creation_entry_annotations_or_base_form_groups_have_changed_confirm_again"
+              )
             : requestError.meta.annotation_conflict.reason === "duplicate"
-              ? "标注与同原型词条重复，请修改；已有词条还可能关联其他原型。"
+              ? creationMessage(
+                  "creation_this_annotation_duplicates_another_entry_in_the_base_form_group_change_it_existing_entries"
+                )
               : undefined
         );
       } else if (
@@ -995,11 +1098,19 @@ export function UnifiedCreateEntryStep({
               surface_match_page: replacementPage
             }
           });
-          setError("匹配结果已更新，请重新确认后继续创建。");
+          setError(
+            creationMessage(
+              "creation_the_match_results_have_changed_confirm_them_again_before_creating_the_entry"
+            )
+          );
         } else {
           setPending(undefined);
           setPrepared(undefined);
-          setError("检查结果已变化，请重新提交。");
+          setError(
+            creationMessage(
+              "creation_the_detection_results_have_changed_submit_again"
+            )
+          );
         }
       } else {
         if (requestError instanceof HttpError && requestError.status < 500) {
@@ -1017,7 +1128,7 @@ export function UnifiedCreateEntryStep({
     if (locked.current) return;
     const { normalized, kind, issue } = validateEntryInput(value);
     if (issue) {
-      setFieldError(issue);
+      setFieldError(value);
       return;
     }
 
@@ -1052,7 +1163,9 @@ export function UnifiedCreateEntryStep({
         detection.request.kind !== kind ||
         detection.request.surface !== normalized
       ) {
-        throw new ProductError("词条检查结果不一致，请刷新后重试。");
+        throw new ProductError(
+          "creation_the_entry_detection_result_does_not_match_refresh_and_try_again"
+        );
       }
       assertFreshDetection(detection.expires_at);
       const target: PendingCreation = {
@@ -1063,7 +1176,9 @@ export function UnifiedCreateEntryStep({
       setPrepared(target);
       if (detection.builtin_dictionary.status === "unavailable") {
         setPreparationBlocked(true);
-        throw new ProductError("内置词典暂时不可用，请稍后重试。");
+        throw new ProductError(
+          "creation_the_built_in_dictionary_is_unavailable_try_again_later"
+        );
       }
       if (detection.builtin_dictionary.status === "matched") {
         const configuredPos = new Set(
@@ -1081,13 +1196,17 @@ export function UnifiedCreateEntryStep({
         ) {
           setPreparationBlocked(true);
           throw new ProductError(
-            `词性配置尚未就绪，暂时不能创建该${KIND_LABEL[kind]}。`
+            kind === "word"
+              ? "creation_pos_config_word"
+              : "creation_pos_config_phrase"
           );
         }
       }
       if (detection.requires_acknowledgement) {
         if (!detection.surface_match_page) {
-          throw new ProductError("匹配信息不完整，已停止创建。");
+          throw new ProductError(
+            "creation_match_information_is_incomplete_creation_has_stopped"
+          );
         }
         setPending(target);
       }
@@ -1117,7 +1236,11 @@ export function UnifiedCreateEntryStep({
       return;
     }
     if (regionalDisplay.status !== "ready") {
-      setError("请先完成原形确认后再创建。");
+      setError(
+        creationMessage(
+          "creation_confirm_the_base_forms_before_creating_the_entry"
+        )
+      );
       return;
     }
     const headwords = regionalDisplay.value;
@@ -1127,7 +1250,11 @@ export function UnifiedCreateEntryStep({
         ? headwords.common.trim() === ""
         : headwords.uk.trim() === "" || headwords.us.trim() === "";
     if (hasEmptyHeadword || hasHeadwordsIssue(headwords)) {
-      setError("请先填写合法的英文主词后再创建。");
+      setError(
+        creationMessage(
+          "creation_enter_valid_english_headwords_before_creating_the_entry"
+        )
+      );
       return;
     }
     try {
@@ -1135,7 +1262,11 @@ export function UnifiedCreateEntryStep({
     } catch {
       setPending(undefined);
       setPrepared(undefined);
-      setError("检查结果已过期，请重新检测。");
+      setError(
+        creationMessage(
+          "creation_the_detection_result_has_expired_run_detection_again"
+        )
+      );
       return;
     }
     const attempt: CreateAttempt = {
@@ -1169,12 +1300,13 @@ export function UnifiedCreateEntryStep({
     // 后端的 409 annotation_conflict 只覆盖真正同原型组的情况；词面命中但分属
     // 不同原型组时后端不拦，删掉这道确认就等于静默建重名条。
     modal.confirm({
-      title: "确认创建新的独立词条？",
+      title: <CreationText message="creation_create_a_separate_entry" />,
       icon: <CircleAlertIcon />,
-      content:
-        "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
-      okText: "继续创建",
-      cancelText: "取消",
+      content: (
+        <CreationText message="creation_the_smart_lexicon_already_contains_the_same_base_form_continuing_creates_a_separate_entry" />
+      ),
+      okText: <CreationText message="creation_continue_creating" />,
+      cancelText: <CreationText message="batch_cancel" />,
       onOk: create
     });
   };
@@ -1186,23 +1318,29 @@ export function UnifiedCreateEntryStep({
       <div className="word-step-heading">
         <span className="word-step-number">STEP 01</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          创建词条
+          {t("assistant_step_basics")}
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          利用内置词典检测单词或短语，确认主词后创建词条。
+          {t(
+            "creation_check_a_word_or_phrase_against_the_built_in_dictionary_then_confirm_the_headwords_to_creat"
+          )}
         </Typography.Paragraph>
       </div>
 
-      <Card className="word-basics-input-card" size="small" title="录入与检测">
+      <Card
+        className="word-basics-input-card"
+        size="small"
+        title={t("creation_input_and_detection")}
+      >
         <Form layout="vertical" initialValues={{ language: "en" }}>
-          <Form.Item label="所属语言" name="language">
+          <Form.Item label={t("creation_entry_language")} name="language">
             <Select
-              options={[{ value: "en", label: "English  英语" }]}
+              options={[{ value: "en", label: t("creation_english") }]}
               disabled
             />
           </Form.Item>
           <Form.Item
-            label="录入词条"
+            label={t("creation_entry_text")}
             validateStatus={fieldError ? "error" : undefined}
             help={fieldError}
           >
@@ -1218,11 +1356,11 @@ export function UnifiedCreateEntryStep({
               enterButton={
                 <Space size={6}>
                   <SearchIcon />
-                  词典检测
+                  {t("creation_dictionary_detection")}
                 </Space>
               }
               loading={busy === "checking"}
-              placeholder="例如 center 或 give up"
+              placeholder={t("creation_e_g_center_or_give_up")}
               size="large"
               value={value}
               onChange={(event) => changeValue(event.target.value)}
@@ -1230,7 +1368,7 @@ export function UnifiedCreateEntryStep({
             />
           </Form.Item>
           <Typography.Text type="secondary" className="word-field-help">
-            按 Enter 检测，确认后创建。
+            {t("creation_press_enter_to_run_detection_then_confirm_to_create")}
           </Typography.Text>
         </Form>
       </Card>
@@ -1269,7 +1407,9 @@ export function UnifiedCreateEntryStep({
 
       {pending ? (
         <div className="word-entry-actions">
-          <Button onClick={() => changeValue(value)}>重新检测</Button>
+          <Button onClick={() => changeValue(value)}>
+            {t("creation_run_detection_again")}
+          </Button>
           <Button
             type="primary"
             icon={<PlusIcon aria-hidden />}
@@ -1281,7 +1421,7 @@ export function UnifiedCreateEntryStep({
             }
             onClick={confirm}
           >
-            确认并创建，进入词形与发音
+            {t("creation_confirm_and_create_then_edit_forms_and_pronunciation")}
           </Button>
         </div>
       ) : null}
@@ -1289,7 +1429,9 @@ export function UnifiedCreateEntryStep({
       {prepared && !pending ? (
         <div className="word-entry-actions">
           {createAttempt ? (
-            <Button onClick={() => changeValue(value)}>重新检测</Button>
+            <Button onClick={() => changeValue(value)}>
+              {t("creation_run_detection_again")}
+            </Button>
           ) : null}
           <Button
             type="primary"
@@ -1302,8 +1444,8 @@ export function UnifiedCreateEntryStep({
             onClick={() => beginCreation(prepared)}
           >
             {createAttempt && busy !== "creating"
-              ? "原样重试创建"
-              : "创建并进入词形与发音"}
+              ? t("creation_retry_the_same_creation_request")
+              : t("creation_create_and_edit_forms_and_pronunciation")}
           </Button>
         </div>
       ) : null}
@@ -1340,7 +1482,9 @@ export function UnifiedCreateEntryStep({
                 referenceCount: entry.inbound_relations.total,
                 href: `/words/${entry.entry_id}/v3/wizard/forms`,
                 readOnly: !editable,
-                readOnlyHint: editable ? undefined : OTHERS_ENTRY_HINT
+                readOnlyHint: editable
+                  ? undefined
+                  : t("creation_this_account_has_read_only_access")
               };
             }),
             {

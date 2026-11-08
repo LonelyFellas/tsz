@@ -1,3 +1,8 @@
+import {
+  defaultLexiconEditorTranslation as creationDefaultT,
+  type LexiconEditorTranslation as CreationTranslation,
+  type LexiconEditorKey as CreationKey
+} from "../i18n/editor";
 import { synthesisForLocale } from "@tsz/shared";
 import {
   defaultLexiconEditorTranslation,
@@ -12,15 +17,15 @@ import type {
   WordFormTypeV3
 } from "@tsz/types";
 
-const FORM_TYPE_LABEL: Record<WordFormTypeV3, string> = {
-  base: "原形",
-  third_person_singular: "第三人称单数",
-  present_participle: "现在分词",
-  past_tense: "过去式",
-  past_participle: "过去分词",
-  plural: "复数",
-  comparative: "比较级",
-  superlative: "最高级"
+const FORM_TYPE_LABEL: Record<WordFormTypeV3, CreationKey> = {
+  base: "creation_base_form",
+  third_person_singular: "creation_third_person_singular",
+  present_participle: "creation_present_participle",
+  past_tense: "creation_past_tense",
+  past_participle: "creation_past_participle",
+  plural: "creation_plural",
+  comparative: "creation_comparative",
+  superlative: "creation_superlative"
 };
 
 const DIALECT_LABEL: Record<Dialect, LexiconEditorKey> = {
@@ -37,40 +42,40 @@ const PRONUNCIATION_STYLE_LABEL: Record<PronunciationStyle, LexiconEditorKey> =
     weak: "presentation_pronunciation_style_label_weak"
   };
 
-const PART_OF_SPEECH_LABEL: Record<string, string> = {
-  noun: "名词",
-  pronoun: "代词",
-  verb: "动词",
-  adjective: "形容词",
-  adverb: "副词",
-  preposition: "介词",
-  article: "冠词",
-  determiner: "限定词",
-  conjunction: "连词",
-  numeral: "数词",
-  interjection: "感叹词"
+const PART_OF_SPEECH_LABEL: Record<string, CreationKey> = {
+  noun: "creation_noun",
+  pronoun: "creation_pronoun",
+  verb: "creation_verb",
+  adjective: "creation_adjective",
+  adverb: "creation_adverb",
+  preposition: "creation_preposition",
+  article: "creation_article",
+  determiner: "creation_determiner",
+  conjunction: "creation_conjunction",
+  numeral: "creation_numeral",
+  interjection: "creation_interjection"
 };
 
-const SUB_PART_OF_SPEECH_LABEL: Record<string, string> = {
-  "V-T": "及物动词",
-  "V-I": "不及物动词",
-  "V-LINK": "系动词",
-  AUX: "助动词",
-  MODAL: "情态动词",
-  ADJ: "形容词",
-  ADV: "副词",
-  "N-COUNT": "可数名词",
-  "N-UNCOUNT": "不可数名词",
-  "N-PROPER": "专有名词",
-  "N-PLURAL": "复数名词",
-  "N-SING": "单数名词",
-  PRON: "代词",
-  PREP: "介词",
-  CONJ: "连词",
-  DET: "限定词",
-  ART: "冠词",
-  NUM: "数词",
-  INT: "感叹词"
+const SUB_PART_OF_SPEECH_LABEL: Record<string, CreationKey> = {
+  "V-T": "creation_transitive_verb",
+  "V-I": "creation_intransitive_verb",
+  "V-LINK": "creation_linking_verb",
+  AUX: "creation_auxiliary_verb",
+  MODAL: "creation_modal_verb",
+  ADJ: "creation_adjective",
+  ADV: "creation_adverb",
+  "N-COUNT": "creation_countable_noun",
+  "N-UNCOUNT": "creation_uncountable_noun",
+  "N-PROPER": "creation_proper_noun",
+  "N-PLURAL": "creation_plural_noun",
+  "N-SING": "creation_singular_noun",
+  PRON: "creation_pronoun",
+  PREP: "creation_preposition",
+  CONJ: "creation_conjunction",
+  DET: "creation_determiner",
+  ART: "creation_article",
+  NUM: "creation_numeral",
+  INT: "creation_interjection"
 };
 
 const RELATION_LABEL: Record<string, LexiconEditorKey> = {
@@ -107,28 +112,46 @@ const languageNamesEn = new Intl.DisplayNames(["en"], {
   fallback: "none"
 });
 
-export function languageSummary(language: string): {
+export function languageSummary(
+  language: string,
+  t: CreationTranslation = creationDefaultT,
+  interfaceLocale = "zh-Hans"
+): {
   label: string;
   identified: boolean;
 } {
   const code = language.trim();
-  if (!code) return { label: "未识别语言", identified: false };
+  if (!code)
+    return { label: t("creation_unrecognised_language"), identified: false };
   try {
     const zh = languageNamesZh.of(code);
     const en = languageNamesEn.of(code);
-    if (zh && en) return { label: `${zh} ${en}`, identified: true };
+    if (zh && en) {
+      const label = interfaceLocale.startsWith("en")
+        ? en
+        : interfaceLocale === "zh-Hans"
+          ? `${zh} ${en}`
+          : `${new Intl.DisplayNames([interfaceLocale], { type: "language", fallback: "none" }).of(code) ?? zh} ${en}`;
+      return { label, identified: true };
+    }
   } catch {
     // 未知/不合法的代码只作展示兜底，不能被显示成默认英语。
   }
-  return { label: `${code}（未识别语言）`, identified: false };
+  return {
+    label: t("creation_language_unknown_code", { code }),
+    identified: false
+  };
 }
 
-export function formTypeLabel(value: WordFormTypeV3): string {
+export function formTypeLabel(
+  value: WordFormTypeV3,
+  t: CreationTranslation = creationDefaultT
+): string {
   return Object.hasOwn(FORM_TYPE_LABEL, value)
-    ? FORM_TYPE_LABEL[value]!
+    ? t(FORM_TYPE_LABEL[value]!)
     : /^[a-z][a-z0-9_]{0,31}$/.test(value)
       ? value
-      : "未识别词形类型";
+      : t("creation_unrecognised_form_type");
 }
 
 export function dialectLabel(
@@ -147,12 +170,23 @@ export function pronunciationStyleLabel(
   return key ? t(key) : t("presentation_unknown_pronunciationStyleLabel");
 }
 
-export function partOfSpeechLabel(value: string): string {
-  return PART_OF_SPEECH_LABEL[value] ?? "其他词性";
+export function partOfSpeechLabel(
+  value: string,
+  t: CreationTranslation = creationDefaultT,
+  fallback?: string
+): string {
+  return PART_OF_SPEECH_LABEL[value]
+    ? t(PART_OF_SPEECH_LABEL[value]!)
+    : (fallback ?? t("creation_other_part_of_speech"));
 }
 
-export function subPartOfSpeechLabel(value: string): string {
-  return SUB_PART_OF_SPEECH_LABEL[value] ?? "其他细分词性";
+export function subPartOfSpeechLabel(
+  value: string,
+  t: CreationTranslation = creationDefaultT
+): string {
+  return SUB_PART_OF_SPEECH_LABEL[value]
+    ? t(SUB_PART_OF_SPEECH_LABEL[value]!)
+    : t("creation_other_subcategory");
 }
 
 export function relationLabel(
@@ -238,14 +272,17 @@ export function impactTypeLabel(
   return key ? t(key) : t("presentation_unknown_impactTypeLabel");
 }
 
-export function definitionModeLabel(value: string): string {
+export function definitionModeLabel(
+  value: string,
+  t: CreationTranslation = creationDefaultT
+): string {
   return (
     {
-      zh_definition: "中文释义",
-      zh_sentence: "中文例句",
-      en_definition: "英文释义",
-      en_sentence: "英文例句"
-    }[value] ?? "未识别内容方式"
+      zh_definition: t("snapshot_definition_zh"),
+      zh_sentence: t("snapshot_sentence_zh"),
+      en_definition: t("snapshot_definition_en"),
+      en_sentence: t("snapshot_sentence_en")
+    }[value] ?? t("creation_unrecognised_content_mode")
   );
 }
 
