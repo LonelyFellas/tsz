@@ -1,3 +1,5 @@
+import { useUserTranslation, UserText } from "./i18n";
+import { UserActionErrorText } from "./action-error";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 // 用户目录按独立权限展示资料；敏感资源在详情中按需读取。
@@ -24,23 +26,21 @@ import { GatedButton } from "@/components/GatedButton";
 import { useAuthStore, usePermission } from "@/lib/auth";
 import { useSetUserStatus, useUserList } from "./api";
 import { EditUserModal } from "./EditUserModal";
-import {
-  ROLE_LABEL,
-  ROLE_TAG_COLOR,
-  levelColor,
-  userActionError
-} from "./labels";
+import { roleLabel, ROLE_TAG_COLOR, levelColor } from "./labels";
 import type { UserFilterValues, UserRoleTab } from "./listQuery";
 import { UserDetailDrawer } from "./UserDetailDrawer";
 import { UserFilters } from "./UserFilters";
 
-const ROLE_TABS = [
-  { label: "全部", value: "all" as const },
-  { label: "老师", value: "teacher" as const },
-  { label: "学生", value: "student" as const }
-];
+function roleTabs(t: ReturnType<typeof useUserTranslation>["t"]) {
+  return [
+    { label: t("all"), value: "all" as const },
+    { label: t("role_teacher"), value: "teacher" as const },
+    { label: t("role_student"), value: "student" as const }
+  ];
+}
 
 export function UserManagement() {
+  const { t } = useUserTranslation();
   const { message } = App.useApp();
   const canReadBasic = usePermission("users.read_basic");
   const canEdit = usePermission("users.edit");
@@ -78,8 +78,8 @@ export function UserManagement() {
   };
 
   const [statusTarget, setStatusTarget] = useState<AdminUser | null>(null);
-  const [statusError, setStatusError] = useState<string>();
-  const verb = statusTarget?.status === "active" ? "禁用" : "启用";
+  const [statusError, setStatusError] = useState<{ cause: unknown }>();
+  const verb = t(statusTarget?.status === "active" ? "disable" : "enable");
   const confirmStatus = async () => {
     if (!canSetStatus || !statusTarget?.status || setStatus.isPending) return;
     const next = statusTarget.status === "active" ? "disabled" : "active";
@@ -87,10 +87,12 @@ export function UserManagement() {
     try {
       await setStatus.mutateAsync({ id: statusTarget.id, status: next });
     } catch (err) {
-      setStatusError(userActionError(err, "操作失败"));
+      setStatusError({ cause: err });
       return;
     }
-    void message.success(next === "disabled" ? "已禁用" : "已启用");
+    void message.success(
+      <UserText message={next === "disabled" ? "disabled" : "enabled"} />
+    );
     setStatusTarget(null);
   };
   const confirmToggleStatus = (record: AdminUser) => {
@@ -100,7 +102,7 @@ export function UserManagement() {
   };
   const columns: TableColumnsType<AdminUser> = [
     {
-      title: "用户ID",
+      title: t("user_id"),
       dataIndex: "id",
       width: 140,
       fixed: "left",
@@ -108,7 +110,7 @@ export function UserManagement() {
       render: (id: string) => <CopyableText value={id} ellipsis={96} />
     },
     {
-      title: "头像",
+      title: t("avatar"),
       dataIndex: "avatar_url",
       width: 64,
       render: (src: string) => (
@@ -116,7 +118,7 @@ export function UserManagement() {
       )
     },
     {
-      title: "用户昵称",
+      title: t("name"),
       dataIndex: "display_name",
       width: 130,
       ellipsis: true,
@@ -132,31 +134,31 @@ export function UserManagement() {
       )
     },
     {
-      title: "分类",
+      title: t("roles"),
       dataIndex: "roles",
       width: 110,
       render: (roles: Role[]) => (
         <Space size={[4, 4]} wrap>
           {(roles ?? []).map((r) => (
             <Tag key={r} color={ROLE_TAG_COLOR[r]} style={{ margin: 0 }}>
-              {ROLE_LABEL[r]}
+              {roleLabel(r, t)}
             </Tag>
           ))}
         </Space>
       )
     },
     {
-      title: "教师认证",
+      title: t("teacher_certification"),
       dataIndex: "teacher_verified",
       width: 110,
       render: (verified: boolean) => (
         <Tag color={verified ? "success" : "default"}>
-          {verified ? "已认证" : "未认证"}
+          {verified ? t("verified") : t("unverified")}
         </Tag>
       )
     },
     {
-      title: "学生等级",
+      title: t("level"),
       dataIndex: "learning_settings",
       width: 100,
       render: (settings: AdminUser["learning_settings"]) =>
@@ -165,48 +167,52 @@ export function UserManagement() {
             {settings.cefr_level}
           </Tag>
         ) : (
-          "未设置"
+          t("not_set")
         )
     },
     {
-      title: "绑定电话",
+      title: t("phone"),
       dataIndex: "phone",
       width: 150,
       render: (p?: string) =>
-        canReadSensitive ? <CopyableText value={p} /> : "未授权"
+        canReadSensitive ? <CopyableText value={p} /> : t("unauthorized")
     },
     {
-      title: "绑定邮箱",
+      title: t("email"),
       dataIndex: "email",
       width: 200,
       render: (e?: string) =>
-        canReadSensitive ? <CopyableText value={e} ellipsis={150} /> : "未授权"
+        canReadSensitive ? (
+          <CopyableText value={e} ellipsis={150} />
+        ) : (
+          t("unauthorized")
+        )
     },
     {
-      title: "注册时间",
+      title: t("created"),
       dataIndex: "created_at",
       width: 160,
       render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "更新时间",
+      title: t("updated"),
       dataIndex: "updated_at",
       width: 160,
       render: (t?: string) => (t ? dayjs(t).format("YYYY-MM-DD HH:mm") : "-")
     },
     {
-      title: "状态",
+      title: t("status"),
       dataIndex: "status",
       width: 90,
       render: (s: AdminUser["status"]) => (
         <Badge
           status={s === "active" ? "success" : "default"}
-          text={s === "active" ? "正常" : "已禁用"}
+          text={s === "active" ? t("active") : t("disabled")}
         />
       )
     },
     {
-      title: "操作",
+      title: t("actions"),
       key: "action",
       width: 240,
       fixed: "right",
@@ -217,30 +223,32 @@ export function UserManagement() {
             size="small"
             onClick={() => setDetailUser(record)}
           >
-            查看详情
+            {t("details")}
           </Button>
           <GatedButton
             type="link"
             size="small"
-            reason="需用户编辑权限"
+            reason={t("edit_permission")}
             disabled={!canEdit}
             onClick={() => setEditingUser(record)}
           >
-            编辑
+            {t("edit")}
           </GatedButton>
           <GatedButton
             type="link"
             size="small"
             // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
             danger={record.status === "active"}
-            reason="需用户状态变更权限"
+            reason={t("status_permission")}
             disabled={!canSetStatus || !record.status}
             loading={
               setStatus.isPending && setStatus.variables?.id === record.id
             }
             onClick={() => confirmToggleStatus(record)}
           >
-            {canReadBasic && record.status === "disabled" ? "启用" : "禁用"}
+            {canReadBasic && record.status === "disabled"
+              ? t("enable")
+              : t("disable")}
           </GatedButton>
           {/* 删除用户后端本轮 out of scope，暂无接口：占位置灰，待后端接口就绪再启用。 */}
           <GatedButton
@@ -248,9 +256,9 @@ export function UserManagement() {
             size="small"
             danger
             disabled
-            reason="删除功能暂未开放"
+            reason={t("delete_unavailable")}
           >
-            删除
+            {t("delete")}
           </GatedButton>
         </Space>
       )
@@ -276,9 +284,12 @@ export function UserManagement() {
       {statusTarget && (
         <Modal
           open
-          title={`${verb}用户「${statusTarget.display_name}」`}
+          title={t(
+            statusTarget.status === "active" ? "disable_title" : "enable_title",
+            { name: statusTarget.display_name }
+          )}
           okText={verb}
-          cancelText="取消"
+          cancelText={t("cancel")}
           confirmLoading={setStatus.isPending}
           okButtonProps={{ danger: statusTarget.status === "active" }}
           cancelButtonProps={{ disabled: setStatus.isPending }}
@@ -291,15 +302,25 @@ export function UserManagement() {
           onOk={() => void confirmStatus()}
         >
           <p>
-            {statusTarget.status === "active"
-              ? "禁用后该用户无法登录或继续访问受保护功能，原有角色和绑定信息会保留。确认禁用？"
-              : "启用后该用户可以重新登录，原有角色和绑定信息保持不变。确认启用？"}
+            {t(
+              statusTarget.status === "active" ? "disable_help" : "enable_help"
+            )}
           </p>
-          {statusError && <Alert type="error" title={statusError} />}
+          {statusError && (
+            <Alert
+              type="error"
+              title={
+                <UserActionErrorText
+                  error={statusError.cause}
+                  fallback="operation_failed"
+                />
+              }
+            />
+          )}
         </Modal>
       )}
 
-      <PageHeader title="用户管理" />
+      <PageHeader title={t("title")} />
 
       <UserFilters
         key={filterResetKey}
@@ -313,11 +334,11 @@ export function UserManagement() {
             type="error"
             showIcon
             style={{ marginBottom: 12 }}
-            title="用户列表加载失败"
+            title={t("load_failed")}
             description={listQuery.error.message}
             action={
               <Button size="small" onClick={() => void listQuery.refetch()}>
-                重试
+                {t("retry")}
               </Button>
             }
           />
@@ -327,7 +348,7 @@ export function UserManagement() {
           toolbar={
             canReadBasic && (
               <Segmented<UserRoleTab>
-                options={ROLE_TABS}
+                options={roleTabs(t)}
                 value={role}
                 onChange={changeRole}
               />
@@ -338,7 +359,7 @@ export function UserManagement() {
           locale={{
             emptyText: (
               <TableEmptyState
-                message="暂无用户"
+                message={t("empty_users")}
                 filtered={
                   !!(
                     filters.q?.trim() ||
@@ -365,7 +386,7 @@ export function UserManagement() {
             pageSize,
             total,
             showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
+            showTotal: (count) => t("total", { count }),
             pageSizeOptions: [10, 20, 50],
             onChange: (nextPage, nextSize) => {
               setPage(nextSize !== pageSize ? 1 : nextPage);
