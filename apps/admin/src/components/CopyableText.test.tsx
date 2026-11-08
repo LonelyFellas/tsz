@@ -1,3 +1,4 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CopyableText } from "./CopyableText";
@@ -69,4 +70,35 @@ describe("CopyableText", () => {
     const node = container.querySelector<HTMLElement>(".ui-typography");
     expect(node?.style.maxWidth).toBe("");
   });
+});
+
+it("复制包装沿用共享语言标签，完整业务原值不变", async () => {
+  const raw = "用户原始 ID centre 12345678";
+  const original = Object.getOwnPropertyDescriptor(document, "execCommand");
+  let copied = "";
+  Object.defineProperty(document, "execCommand", {
+    configurable: true,
+    value: () => {
+      copied = document.querySelector("textarea")?.value ?? "";
+      return true;
+    }
+  });
+  try {
+    const content = (locale: "zh-Hans" | "en-US") => (
+      <InterfaceI18nProvider locale={locale}>
+        <CopyableText value={raw} ellipsis={96} />
+      </InterfaceI18nProvider>
+    );
+    const view = render(content("zh-Hans"));
+    view.rerender(content("en-US"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeVisible();
+    expect(copied).toBe(raw);
+    view.rerender(content("zh-Hans"));
+    expect(screen.getByRole("button", { name: "已复制" })).toBeVisible();
+    expect(screen.getByText(raw)).toBeVisible();
+  } finally {
+    if (original) Object.defineProperty(document, "execCommand", original);
+    else Reflect.deleteProperty(document, "execCommand");
+  }
 });

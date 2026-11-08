@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,4 +86,116 @@ describe("用户资源独立授权", () => {
     expect(state.identityDocuments).toHaveBeenCalledWith("u1");
     expect(state.identityFile).not.toHaveBeenCalled();
   });
+});
+
+it("切换四语保留已展开资源与大整数原文，不提前读取其他资源", async () => {
+  state.keys = [
+    "users.read_coin_balance",
+    "users.read_coin_entries",
+    "users.read_identity"
+  ];
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <UserResources userId="u1" />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(screen.getByRole("button", { name: "查看天生币余额" }));
+  await screen.findByText("9007199254740993 天生币");
+  for (const locale of ["zh-Hant", "en-GB", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(state.wallet).toHaveBeenCalledTimes(1);
+    expect(state.entries).not.toHaveBeenCalled();
+    expect(state.identityDocuments).not.toHaveBeenCalled();
+    expect(state.identityFile).not.toHaveBeenCalled();
+  }
+  expect(screen.getByText("9007199254740993 coins")).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "View identity documents" })
+  );
+  await screen.findByText("No identity documents submitted");
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByText("尚無已提交的身分證件")).toBeVisible();
+  expect(state.identityDocuments).toHaveBeenCalledExactlyOnceWith("u1");
+  expect(state.identityFile).not.toHaveBeenCalled();
+});
+
+it("余额为一时使用单数，金额字符串不转为 Number", async () => {
+  state.keys = ["users.read_coin_balance"];
+  state.wallet.mockResolvedValue({ balance: "1" });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  render(
+    <InterfaceI18nProvider locale="en-US">
+      <QueryClientProvider client={client}>
+        <UserResources userId="u1" />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  fireEvent.click(screen.getByRole("button", { name: "View coin balance" }));
+  expect(await screen.findByText("1 coin")).toBeVisible();
+});
+
+it("已读取证件图片跨语言保持 blob 与文件身份，不重新下载", async () => {
+  state.keys = ["users.read_identity"];
+  state.identityDocuments.mockResolvedValue([
+    {
+      id: "file-owned",
+      kind: "id_front",
+      content_type: "image/png",
+      size_bytes: 7
+    }
+  ]);
+  state.identityFile.mockResolvedValue(
+    new Blob(["fixture"], { type: "image/png" })
+  );
+  const oldCreate = Object.getOwnPropertyDescriptor(URL, "createObjectURL"),
+    oldRevoke = Object.getOwnPropertyDescriptor(URL, "revokeObjectURL");
+  const create = vi.fn(() => "blob:owned-fixture"),
+    revoke = vi.fn();
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: create
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: revoke
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <UserResources userId="u1" />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "查看身份证件" }));
+    const image = await screen.findByAltText("身份证人像面");
+    view.rerender(content("en-US"));
+    expect(screen.getByAltText("Identity card front")).toBe(image);
+    expect(image).toHaveAttribute("src", "blob:owned-fixture");
+    expect(state.identityFile).toHaveBeenCalledExactlyOnceWith(
+      "u1",
+      "file-owned",
+      { signal: expect.any(AbortSignal) }
+    );
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(revoke).not.toHaveBeenCalled();
+  } finally {
+    view.unmount();
+    if (oldCreate) Object.defineProperty(URL, "createObjectURL", oldCreate);
+    else Reflect.deleteProperty(URL, "createObjectURL");
+    if (oldRevoke) Object.defineProperty(URL, "revokeObjectURL", oldRevoke);
+    else Reflect.deleteProperty(URL, "revokeObjectURL");
+  }
 });

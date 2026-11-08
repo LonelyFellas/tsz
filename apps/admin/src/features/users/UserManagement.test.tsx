@@ -1,3 +1,6 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
+import { act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
@@ -506,4 +509,117 @@ it("用户状态失败后确认弹窗保留目标并可重试", async () => {
   await waitFor(() => expect(mockSetStatus).toHaveBeenCalledTimes(2));
   expect(mockSetStatus).toHaveBeenLastCalledWith("1", "disabled");
   await waitFor(() => expect(dialog).not.toBeInTheDocument());
+});
+
+it("四语切换保留筛选输入、详情和旧列身份，不重发查询或读取敏感资源", async () => {
+  auth.permissions = [
+    "users.access",
+    "users.read_basic",
+    "users.read_sensitive"
+  ];
+  const key = "tsz:admin:table-columns:v1:users",
+    preference = JSON.stringify([
+      { key: "learning_settings", visible: false, fixed: false }
+    ]);
+  localStorage.setItem(key, preference);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 60000 } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <FeedbackApp>
+            <UserManagement />
+          </FeedbackApp>
+        </QueryClientProvider>
+      </MemoryRouter>
+    </InterfaceI18nProvider>
+  );
+  try {
+    const view = render(content("zh-Hans"));
+    fireEvent.click(await screen.findByText("record"));
+    const drawer = await screen.findByRole("dialog", { name: "record" });
+    const input = screen.getByPlaceholderText("手机号 / 邮箱 / 用户昵称");
+    fireEvent.change(input, { target: { value: "  record  " } });
+    const calls = mockList.mock.calls.length;
+    for (const locale of ["zh-Hant", "en-GB", "en-US"] as const) {
+      view.rerender(content(locale));
+      expect(input).toHaveValue("  record  ");
+      expect(screen.getByRole("dialog", { name: "record" })).toBe(drawer);
+      expect(drawer).toHaveTextContent(SPEC[0]!.phone!);
+      expect(mockList).toHaveBeenCalledTimes(calls);
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockSetStatus).not.toHaveBeenCalled();
+      expect(localStorage.getItem(key)).toBe(preference);
+      expect(
+        within(screen.getByRole("table")).queryByRole("columnheader", {
+          name: /^(学生等级|學生等級|Student level)$/
+        })
+      ).toBeNull();
+    }
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() =>
+      expect(mockList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 10,
+        q: "record"
+      })
+    );
+  } finally {
+    localStorage.removeItem(key);
+  }
+});
+
+it("启禁用确认和失败跨语言保留用户 ID/原状态，在途不写第二次，明确重试才提交", async () => {
+  let reject!: (error: unknown) => void;
+  mockSetStatus.mockImplementationOnce(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      })
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <FeedbackApp>
+            <UserManagement />
+          </FeedbackApp>
+        </QueryClientProvider>
+      </MemoryRouter>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const row = (await screen.findByText("record")).closest("tr")!;
+  fireEvent.click(within(row).getByRole("button", { name: "禁用" }));
+  const dialog = await screen.findByRole("dialog", {
+    name: "禁用用户「record」"
+  });
+  view.rerender(content("en-US"));
+  expect(screen.getByRole("dialog", { name: "Disable user “record”" })).toBe(
+    dialog
+  );
+  expect(mockSetStatus).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Disable" }));
+  await waitFor(() =>
+    expect(mockSetStatus).toHaveBeenCalledExactlyOnceWith("1", "disabled")
+  );
+  view.rerender(content("zh-Hant"));
+  expect(within(dialog).getByRole("button", { name: "取消" })).toBeDisabled();
+  expect(mockSetStatus).toHaveBeenCalledTimes(1);
+  await act(async () => reject(new HttpError(403, "server permission")));
+  expect(await screen.findByText("需要超級管理員權限")).toBeVisible();
+  view.rerender(content("en-GB"));
+  expect(
+    screen.getByText("Super administrator permission required")
+  ).toBeVisible();
+  expect(mockSetStatus).toHaveBeenCalledTimes(1);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Disable" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(mockSetStatus.mock.calls[1]).toEqual(mockSetStatus.mock.calls[0]);
 });

@@ -1,3 +1,4 @@
+import { useUserTranslation, UserText } from "../users/i18n";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button } from "@tsz/ui/admin/display";
 import { App, Modal } from "@tsz/ui/admin/overlays";
@@ -12,6 +13,7 @@ export function RevokeTeacherButton({
   userId: string;
   onSuccess?: () => void;
 }) {
+  const { t } = useUserTranslation();
   const allowed = usePermission("teacherapply.revoke");
   const client = useQueryClient();
   const { message } = App.useApp();
@@ -27,7 +29,7 @@ export function RevokeTeacherButton({
         client.invalidateQueries({ queryKey: ["teacher-application"] })
       ]);
       setOpen(false);
-      void message.success("教师资格已撤销，学生身份与原有数据保留");
+      void message.success(<UserText message="revoke_success" />);
       onSuccess?.();
     }
   });
@@ -42,23 +44,21 @@ export function RevokeTeacherButton({
           setOpen(true);
         }}
       >
-        撤销教师资格
+        {t("revoke_title")}
       </Button>
       <Modal
-        title="撤销教师资格"
+        title={t("revoke_title")}
         open={open}
         confirmLoading={mutation.isPending}
-        okText="确认撤销"
-        cancelText="取 消"
+        okText={t("revoke_confirm")}
+        cancelText={t("revoke_cancel")}
         onOk={() => form.submit()}
         onCancel={() => {
           if (!mutation.isPending) setOpen(false);
         }}
         destroyOnHidden
       >
-        <p>
-          撤销后不能再使用教师功能，学生身份与原有数据保留，可重新申请认证。
-        </p>
+        <p>{t("revoke_help")}</p>
         <Form
           form={form}
           layout="vertical"
@@ -67,10 +67,19 @@ export function RevokeTeacherButton({
         >
           <Form.Item
             name="reason"
-            label="撤销原因"
+            label={t("revoke_reason")}
             rules={[
-              { required: true, whitespace: true, message: "请填写撤销原因" },
-              { max: 2000 }
+              {
+                required: true,
+                whitespace: true,
+                message: <UserText message="revoke_required" />
+              },
+              {
+                max: 2000,
+                message: (
+                  <UserText message="reason_max" params={{ max: 2000 }} />
+                )
+              }
             ]}
           >
             <Input.TextArea
