@@ -1,3 +1,6 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
+import { act } from "@testing-library/react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -175,4 +178,130 @@ describe("共享例句独立发布操作", () => {
     expect(screen.getByRole("button", { name: /确\s*认/ })).toBeDisabled();
     expect(api.sentences.publish).not.toHaveBeenCalled();
   });
+});
+
+it("历史选择及未知结果重试跨语言保留 publication ID、双版本和幂等键", async () => {
+  const publication = {
+    id: "original-history",
+    sentence_id: sentence.id,
+    publication_number: 1,
+    source_revision: 2,
+    snapshot: newSentence(),
+    published_at: sentence.created_at,
+    published_by_admin_id: "admin",
+    created_by_admin_id: sentence.created_by_admin_id
+  };
+  vi.mocked(api.sentences.publications).mockResolvedValue([publication]);
+  let reject!: (error: unknown) => void;
+  vi.mocked(api.sentences.rollback)
+    .mockImplementationOnce(
+      () =>
+        new Promise((_, fail) => {
+          reject = fail;
+        })
+    )
+    .mockRejectedValueOnce(new HttpError(500, "original backend error"));
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const changed = vi.fn();
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <SentencePublicationModal
+          sentence={sentence}
+          action="history"
+          canPublish
+          onClose={vi.fn()}
+          onChanged={changed}
+        />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.click(await screen.findByRole("button", { name: "选择恢复" }));
+  const list = screen.getByRole("list");
+  for (const locale of ["zh-Hant", "en-GB", "en-US"] as const) {
+    view.rerender(content(locale));
+    expect(screen.getByRole("list")).toBe(list);
+    expect(api.sentences.publications).toHaveBeenCalledTimes(1);
+    expect(api.sentences.rollback).not.toHaveBeenCalled();
+  }
+  fireEvent.click(
+    screen.getByRole("button", { name: "Restore selected history to draft" })
+  );
+  const sent = vi.mocked(api.sentences.rollback).mock.calls[0];
+  expect(sent).toEqual([
+    sentence.id,
+    publication.id,
+    expect.any(String),
+    { base_revision: 8, base_lifecycle_revision: 3 }
+  ]);
+  view.rerender(content("zh-Hant"));
+  expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+  await act(async () => reject(new TypeError("network")));
+  view.rerender(content("en-US"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Restore selected history to draft" })
+  );
+  await waitFor(() => expect(api.sentences.rollback).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(api.sentences.rollback).mock.calls[1]).toEqual(sent);
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it("撤回原因和影响指纹跨语言保持，单项影响使用完整短语", async () => {
+  vi.mocked(api.sentences.withdrawalImpact).mockResolvedValue({
+    sentence_id: sentence.id,
+    lifecycle_revision: 3,
+    publication_id: "published",
+    fingerprint: "original-fingerprint",
+    targets: [
+      {
+        entry_id: "word-id",
+        sense_id: "sense-id",
+        lifecycle_revision: 2,
+        hidden: false
+      }
+    ]
+  });
+  vi.mocked(api.sentences.withdraw).mockResolvedValue(sentence);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <QueryClientProvider client={client}>
+        <SentencePublicationModal
+          sentence={sentence}
+          action="withdraw"
+          canPublish
+          onClose={vi.fn()}
+          onChanged={vi.fn()}
+        />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  await screen.findByText("word-id / sense-id");
+  const input = screen.getByLabelText("下架原因");
+  fireEvent.change(input, { target: { value: "原始原因 centre" } });
+  view.rerender(content("en-US"));
+  expect(input).toHaveValue("原始原因 centre");
+  expect(
+    screen.getByText("Affects 1 meaning in the current publication")
+  ).toBeVisible();
+  expect(api.sentences.withdraw).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  await waitFor(() =>
+    expect(api.sentences.withdraw).toHaveBeenCalledWith(
+      sentence.id,
+      expect.any(String),
+      {
+        base_revision: 8,
+        base_lifecycle_revision: 3,
+        reason: "原始原因 centre",
+        impact_fingerprint: "original-fingerprint"
+      }
+    )
+  );
 });

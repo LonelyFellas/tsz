@@ -1,3 +1,4 @@
+import { useSentenceTranslation } from "./i18n";
 import {
   useLexiconEditorTranslation,
   defaultLexiconEditorTranslation,
@@ -44,6 +45,7 @@ export function SentencePublicationModal({
   onChanged: () => void;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const { t: sentenceT, i18n } = useSentenceTranslation();
   const audioScope = `${sentence.id}:${sentence.revision}`;
   const [reviewedAudio, setReviewedAudio] = useState<string>();
   const audioReady = reviewedAudio === audioScope;
@@ -231,8 +233,9 @@ export function SentencePublicationModal({
             {impact.data && (
               <>
                 <Typography.Text>
-                  {t("panel_current_publication_affects")}{" "}
-                  {impact.data.targets.length} {t("panel_meanings_3")}
+                  {sentenceT("withdrawal_impact", {
+                    count: impact.data.targets.length
+                  })}
                 </Typography.Text>
                 <List
                   size="small"
@@ -292,10 +295,12 @@ export function SentencePublicationModal({
                 >
                   <Space orientation="vertical">
                     <Typography.Text>
-                      {t("panel_version")} {publication.publication_number} ·{" "}
-                      {new Date(publication.published_at).toLocaleString(
-                        "zh-CN"
-                      )}
+                      {sentenceT("publication_metadata", {
+                        number: publication.publication_number,
+                        date: new Date(publication.published_at).toLocaleString(
+                          i18n.language
+                        )
+                      })}
                     </Typography.Text>
                     <V3EnglishTextPreview
                       value={publication.snapshot.sentence.en_text}

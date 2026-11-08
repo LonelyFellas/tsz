@@ -1,3 +1,4 @@
+import { Empty, List } from "./display/surfaces";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import dayjs from "dayjs";
@@ -51,4 +52,33 @@ it("切换语言更新控件和门户标签，保留输入、日期值与分页�
   view.rerender(content("en-US"));
   fireEvent.click(screen.getByRole("button", { name: "Page 3" }));
   expect(changed).toHaveBeenCalledWith(3, 10);
+});
+
+it("默认空状态随四语更新，调用方提供的原文和显式空描述保持原值", () => {
+  const content = (locale: InterfaceLocale) => (
+    <InterfaceI18nProvider locale={locale}>
+      <section data-testid="list">
+        <List dataSource={[]} renderItem={() => null} />
+      </section>
+      <Empty description="原始业务内容 centre" />
+      <Empty data-testid="explicit-empty" description={null} />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const list = screen.getByTestId("list");
+  for (const [locale, label] of [
+    ["zh-Hans", "暂无数据"],
+    ["zh-Hant", "暫無資料"],
+    ["en-GB", "No data"],
+    ["en-US", "No data"]
+  ] as const) {
+    view.rerender(content(locale));
+    expect(list).toHaveTextContent(label);
+    expect(screen.getByText("原始业务内容 centre")).toBeVisible();
+    expect(
+      screen
+        .getByTestId("explicit-empty")
+        .querySelector(".ui-empty-description")
+    ).toBeEmptyDOMElement();
+  }
 });
