@@ -1,4 +1,5 @@
 import RcDialog, { type DialogProps } from "@rc-component/dialog";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import {
   createContext,
   useContext,
@@ -54,8 +55,8 @@ export function Modal({
   open,
   onCancel,
   onOk,
-  okText = "确定",
-  cancelText = "取消",
+  okText,
+  cancelText,
   okButtonProps,
   cancelButtonProps,
   confirmLoading,
@@ -70,6 +71,7 @@ export function Modal({
   zIndex,
   ...props
 }: ModalProps) {
+  const { t } = useInterfaceTranslation();
   const parent = useContext(OverlayLayer);
   const layer = zIndex ?? parent + 10;
   const actions = {
@@ -77,10 +79,14 @@ export function Modal({
       type: "primary" as const,
       loading: confirmLoading,
       onClick: onOk,
-      children: okText,
+      children: okText === undefined ? t("actions.confirm") : okText,
       ...okButtonProps
     },
-    cancel: { onClick: onCancel, children: cancelText, ...cancelButtonProps }
+    cancel: {
+      onClick: onCancel,
+      children: cancelText === undefined ? t("actions.cancel") : cancelText,
+      ...cancelButtonProps
+    }
   };
   const buttons = (
     <>
@@ -112,7 +118,7 @@ export function Modal({
           closable === false
             ? false
             : {
-                "aria-label": "关闭",
+                "aria-label": t("actions.close"),
                 closeIcon: <span aria-hidden="true">×</span>,
                 ...(typeof closable === "object" ? closable : {})
               }
@@ -186,6 +192,7 @@ export function Drawer({
   classNames,
   "aria-label": label
 }: DrawerProps) {
+  const { t } = useInterfaceTranslation();
   const layer = useContext(OverlayLayer) + 10;
   // Drawer 的表单可在关闭时保留挂载，但撤权或清除选择时仍须更新隐藏内容。
   const wasOpen = useRef(false);
@@ -210,7 +217,7 @@ export function Drawer({
           closable === false
             ? false
             : {
-                "aria-label": "关闭",
+                "aria-label": t("actions.close"),
                 closeIcon: <span aria-hidden="true">×</span>,
                 ...(typeof closable === "object" ? closable : {})
               }

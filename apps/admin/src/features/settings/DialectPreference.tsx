@@ -4,13 +4,28 @@ import { App } from "@tsz/ui/admin/overlays";
 import { Radio } from "@tsz/ui/admin/forms";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "./useDialectPreference";
+import { AdminText, useAdminTranslation } from "@/i18n";
 
-const OPTION_LABEL: Record<AdminDialectPreference, string> = {
-  uk: "英式（BrE）",
-  us: "美式（AmE）"
-};
+function SaveError({ error }: { error: unknown }) {
+  const { t } = useAdminTranslation();
+  const message = error instanceof Error ? error.message : "";
+  const detail =
+    message === "当前会话已变化，请重试"
+      ? t("settings_session_changed")
+      : message === "当前会话已失效，请重新登录"
+        ? t("settings_session_expired")
+        : message;
+  return (
+    <>
+      {detail
+        ? t("settings_save_error", { detail })
+        : t("settings_save_failed")}
+    </>
+  );
+}
 
 export function DialectPreference() {
+  const { t } = useAdminTranslation();
   const { preference, savePreference } = useDialectPreference();
   const { message } = App.useApp();
   const [saving, setSaving] = useState(false);
@@ -20,13 +35,9 @@ export function DialectPreference() {
     setSaving(true);
     try {
       await savePreference(value);
-      message.success("已保存");
+      message.success(<AdminText message="settings_saved" />);
     } catch (error) {
-      message.error(
-        error instanceof Error
-          ? `保存失败：${error.message}`
-          : "保存失败，请重试"
-      );
+      message.error(<SaveError error={error} />);
     } finally {
       setSaving(false);
     }
@@ -35,20 +46,20 @@ export function DialectPreference() {
   return (
     <div className="settings-row settings-dialect">
       <div>
-        <div className="settings-row__label">英语偏好</div>
-        <p className="settings-row__hint">用于录入、查看和试听。</p>
+        <div className="settings-row__label">{t("settings_english")}</div>
+        <p className="settings-row__hint">{t("settings_english_help")}</p>
       </div>
       <Radio.Group
-        aria-label="英语偏好"
+        aria-label={t("settings_english")}
         value={preference}
         disabled={saving}
         onChange={(event) =>
           void change(event.target.value as AdminDialectPreference)
         }
       >
-        <Radio.Button value="uk" aria-label={OPTION_LABEL.uk}>
+        <Radio.Button value="uk" aria-label={t("settings_british_label")}>
           <span className="settings-dialect__option">
-            <span>英式英语</span>
+            <span>{t("settings_british")}</span>
             <small>BrE</small>
           </span>
           <CheckIcon
@@ -57,9 +68,9 @@ export function DialectPreference() {
             aria-hidden="true"
           />
         </Radio.Button>
-        <Radio.Button value="us" aria-label={OPTION_LABEL.us}>
+        <Radio.Button value="us" aria-label={t("settings_american_label")}>
           <span className="settings-dialect__option">
-            <span>美式英语</span>
+            <span>{t("settings_american")}</span>
             <small>AmE</small>
           </span>
           <CheckIcon

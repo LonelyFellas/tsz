@@ -1,3 +1,4 @@
+import { useAdminTranslation } from "@/i18n";
 import { Result } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
@@ -8,6 +9,7 @@ export { canVisitAdminRoute } from "@/lib/adminPageRoutes";
 
 /** 在业务组件（包括其 Query hooks）挂载前守卫；撤权后立即卸载整个业务子树。 */
 export function BusinessPermissionGuard({ children }: { children: ReactNode }) {
+  const { t } = useAdminTranslation();
   const { pathname } = useLocation();
   const profile = useAuthStore((s) => s.profile);
   return canVisitAdminRoute(profile, pathname) ? (
@@ -15,8 +17,8 @@ export function BusinessPermissionGuard({ children }: { children: ReactNode }) {
   ) : (
     <Result
       status="403"
-      title="没有访问权限"
-      subTitle="请联系超级管理员开通权限。你仍可查看首页和个人设置。"
+      title={t("error_permission_title")}
+      subTitle={t("error_permission_help")}
     />
   );
 }

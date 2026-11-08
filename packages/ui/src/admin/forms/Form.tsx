@@ -20,6 +20,7 @@ import {
   type ReactNode
 } from "react";
 import { AdminControls, useAdminDisabled } from "../context";
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 
 type Column = { span?: number; offset?: number; flex?: CSSProperties["flex"] };
 type Layout = "horizontal" | "inline" | "vertical";
@@ -54,6 +55,7 @@ function FormRoot<Values>({
   className = "",
   ...props
 }: FormProps<Values>) {
+  const { t } = useInterfaceTranslation();
   return (
     <FormLayout.Provider
       value={{
@@ -71,8 +73,8 @@ function FormRoot<Values>({
         <Fields
           {...props}
           validateMessages={{
-            required: "请填写${label}",
-            whitespace: "${label}不能只包含空格",
+            required: t("controls.required"),
+            whitespace: t("controls.whitespace"),
             ...validateMessages
           }}
           name={name}

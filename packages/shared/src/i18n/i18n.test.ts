@@ -43,6 +43,20 @@ describe("界面语言匹配", () => {
 });
 
 describe("独立翻译实例", () => {
+  it("应用命名空间按实例注入，不污染公共资源或另一应用", () => {
+    const extra = {
+      en: { example: { title: "Account" } },
+      "zh-Hans": { example: { title: "账号" } }
+    };
+    const first = createInterfaceI18n("en-US", extra);
+    expect(first.getResource("en", "example", "title")).toBe("Account");
+    first.addResource("en", "example", "title", "Changed");
+    expect(extra.en.example.title).toBe("Account");
+    expect(
+      createInterfaceI18n("en-US").hasResourceBundle("en", "example")
+    ).toBe(false);
+    expect(first.t("actions.save")).toBe("Save");
+  });
   it("同步准备默认中文，不依赖浏览器检测或网络", () => {
     const instance = createInterfaceI18n();
     expect(instance.isInitialized).toBe(true);

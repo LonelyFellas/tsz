@@ -9,7 +9,7 @@ import { App, Popover } from "@tsz/ui/admin/overlays";
 import { Button, Divider, Space, Typography } from "@tsz/ui/admin/display";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ADMIN_LEVEL_LABEL } from "@/features/admins/labels";
+import { AdminText, useAdminTranslation } from "@/i18n";
 import { useAuthStore } from "@/lib/auth";
 import { AdminAvatar } from "./adminAvatar";
 import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
@@ -21,6 +21,7 @@ import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
  * 守卫保证进到这里时 profile 必有值，无需再单独探一次 /admin/profile。
  */
 export function AdminHeader() {
+  const { t } = useAdminTranslation();
   const { modal } = App.useApp();
   const profile = useAuthStore((s) => s.profile);
   const logout = useAdminLogout();
@@ -28,9 +29,15 @@ export function AdminHeader() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  const name = profile?.display_name ?? "管理员";
+  const name = profile?.display_name ?? t("account_admin");
   // 未映射的 role（后端将来新增等级、前端未跟上）回退「管理员」，不留空白角色行。
-  const roleLabel = (profile && ADMIN_LEVEL_LABEL[profile.role]) || "管理员";
+  const roleLabel = t(
+    profile?.role === "super_admin"
+      ? "account_super_admin"
+      : profile?.role === "admin"
+        ? "account_standard_admin"
+        : "account_admin"
+  );
 
   // 选一项后先收起 Popover，再执行动作（改密/个人设置走 SPA 导航，登出走整页跳转）。
   const goProfileSettings = () => {
@@ -49,12 +56,10 @@ export function AdminHeader() {
   const doLogoutAll = () => {
     setOpen(false);
     const confirmation = modal.confirm({
-      title: "退出所有设备",
-      content:
-        "将吊销你在全部设备上的登录会话，包括当前这台——确认后需要重新登录。确认退出？",
-      okText: "全部退出",
+      title: <AdminText message="account_sign_out_all" />,
+      content: <AdminText message="account_sign_out_all_confirm" />,
+      okText: <AdminText message="account_confirm_sign_out_all" />,
       okButtonProps: { danger: true },
-      cancelText: "取消",
       // 使用 close 回调自行收尾，避免 antd 再次抛出拒绝的 Promise。
       onOk: (close: () => void) => {
         confirmation.update({ okButtonProps: { danger: true, loading: true } });
@@ -62,7 +67,7 @@ export function AdminHeader() {
           confirmation.update({
             content: (
               <Typography.Text type="danger" role="alert">
-                未能确认所有设备已退出，请重试。
+                <AdminText message="account_sign_out_all_failed" />
               </Typography.Text>
             ),
             okButtonProps: { danger: true, loading: false }
@@ -101,7 +106,7 @@ export function AdminHeader() {
           style={{ justifyContent: "flex-start" }}
           onClick={goProfileSettings}
         >
-          个人设置
+          {t("account_settings")}
         </Button>
         <Button
           type="text"
@@ -110,7 +115,7 @@ export function AdminHeader() {
           style={{ justifyContent: "flex-start" }}
           onClick={goChangePassword}
         >
-          修改密码
+          {t("account_change_password")}
         </Button>
         <Button
           type="text"
@@ -120,7 +125,7 @@ export function AdminHeader() {
           style={{ justifyContent: "flex-start" }}
           onClick={doLogout}
         >
-          退出登录
+          {t("account_sign_out")}
         </Button>
         <Button
           type="text"
@@ -130,7 +135,7 @@ export function AdminHeader() {
           style={{ justifyContent: "flex-start" }}
           onClick={doLogoutAll}
         >
-          退出所有设备
+          {t("account_sign_out_all")}
         </Button>
       </div>
     </div>
@@ -154,7 +159,7 @@ export function AdminHeader() {
       >
         <Button
           type="text"
-          aria-label="账户菜单"
+          aria-label={t("account_menu")}
           style={{ height: "auto", padding: "4px 8px" }}
         >
           <Space size={8}>

@@ -1,3 +1,4 @@
+import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import {
   createContext,
   useCallback,
@@ -78,6 +79,7 @@ function MessageNotice({
   notice: Notice;
   onClose: () => void;
 }) {
+  const { t } = useInterfaceTranslation();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
@@ -104,7 +106,7 @@ function MessageNotice({
           type="button"
           onClick={onClose}
           className="ui-feedback-close"
-          aria-label="关闭通知"
+          aria-label={t("controls.closeNotification")}
         >
           ×
         </button>
