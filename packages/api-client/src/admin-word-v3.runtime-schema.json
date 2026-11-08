@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/i18n-preferences-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "15e13ffe6cbc74a71d0a054013c017e8645680be28769e725cc0010db80c6220",
+  "_source_sha256": "705474d93559757d86e8223586b2e7477f3e1e279b11607531981471578d00df",
   "roots": [
     "InterfaceCapabilities",
     "InterfaceLocaleV1",
