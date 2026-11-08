@@ -1,3 +1,9 @@
+import {
+  useCoinTranslation,
+  CoinText,
+  formatCoinAmount,
+  coinSourceLabel
+} from "@/features/coins/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { useState } from "react";
 import {
@@ -18,10 +24,8 @@ import type {
   ManualCoinOperation,
   ManualCoinOperationPage
 } from "@tsz/types";
-import { formatCoins } from "@tsz/shared";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { AccountLabel } from "./AccountLabel";
-import { coinSourceLabels } from "./EntriesTable";
 import "./coins.css";
 
 type Filters = Pick<
@@ -31,15 +35,17 @@ type Filters = Pick<
   time?: [Dayjs | null, Dayjs | null] | null;
 };
 function Status({ row }: { row: ManualCoinOperation }) {
+  const { t } = useCoinTranslation();
   return row.reverses_operation_id ? (
-    <Tag>已扣回</Tag>
+    <Tag>{t("deducted")}</Tag>
   ) : row.reversed_by_operation_id ? (
-    <Tag color="orange">已撤销</Tag>
+    <Tag color="orange">{t("status_reversed")}</Tag>
   ) : (
-    <Tag color="green">已发放</Tag>
+    <Tag color="green">{t("status_credited")}</Tag>
   );
 }
 function Change({ value }: { value: string }) {
+  const { t } = useCoinTranslation();
   return (
     <Typography.Text
       strong
@@ -47,7 +53,7 @@ function Change({ value }: { value: string }) {
       className="coins-amount"
     >
       {value.startsWith("-") ? "" : "+"}
-      {formatCoins(value)}
+      {formatCoinAmount(value, t)}
     </Typography.Text>
   );
 }
@@ -66,6 +72,7 @@ export function OperationHistory({
   canReverse: (row: ManualCoinOperation) => boolean;
   onReverse: (row: ManualCoinOperation) => void;
 }) {
+  const { t } = useCoinTranslation();
   const [form] = Form.useForm<Filters>();
   const [more, setMore] = useState(false);
   const [detailId, setDetailId] = useState<string>();
@@ -103,33 +110,33 @@ export function OperationHistory({
           }}
         >
           <div className="coins-filters">
-            <Form.Item name="owner_search" label="账号">
+            <Form.Item name="owner_search" label={t("account")}>
               <Input
                 allowClear
-                placeholder="输入姓名或账号编号"
+                placeholder={t("owner_placeholder")}
                 maxLength={200}
               />
             </Form.Item>
-            <Form.Item name="source_type" label="类型">
+            <Form.Item name="source_type" label={t("type")}>
               <Select
                 allowClear
-                placeholder="全部类型"
+                placeholder={t("all_types")}
                 options={[
                   "manual_purchase",
                   "manual_reward",
                   "manual_reversal"
-                ].map((value) => ({ value, label: coinSourceLabels[value] }))}
+                ].map((value) => ({ value, label: coinSourceLabel(value, t) }))}
               />
             </Form.Item>
             <Form.Item
               name="time"
-              label="时间"
+              label={t("time")}
               rules={[
                 {
                   validator: (_, value: Filters["time"]) =>
                     !value || (value[0]?.isValid() && value[1]?.isValid())
                       ? Promise.resolve()
-                      : Promise.reject(new Error("请选择完整的开始和结束时间"))
+                      : Promise.reject(<CoinText message="complete_time" />)
                 }
               ]}
             >
@@ -137,16 +144,16 @@ export function OperationHistory({
             </Form.Item>
             <Space className="coins-filter-actions" wrap>
               <Button type="primary" htmlType="submit" icon={<SearchIcon />}>
-                查询
+                {t("query")}
               </Button>
-              <Button onClick={reset}>重置</Button>
+              <Button onClick={reset}>{t("reset")}</Button>
               <Button
                 type="link"
                 icon={more ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 onClick={() => setMore(!more)}
                 aria-expanded={more}
               >
-                {more ? "收起筛选" : "更多筛选"}
+                {more ? t("fewer_filters") : t("more_filters")}
               </Button>
             </Space>
           </div>
@@ -156,20 +163,20 @@ export function OperationHistory({
             aria-hidden={!more}
             inert={!more}
           >
-            <Form.Item name="actor_search" label="操作人">
+            <Form.Item name="actor_search" label={t("actor")}>
               <Input
                 allowClear
-                placeholder="输入姓名或操作人编号"
+                placeholder={t("actor_placeholder")}
                 maxLength={200}
               />
             </Form.Item>
-            <Form.Item name="owner_type" label="账号类型">
+            <Form.Item name="owner_type" label={t("owner_type")}>
               <Select
                 allowClear
-                placeholder="全部账号"
+                placeholder={t("all_accounts")}
                 options={[
-                  { value: "user", label: "用户" },
-                  { value: "admin", label: "管理员" }
+                  { value: "user", label: t("user") },
+                  { value: "admin", label: t("admin") }
                 ]}
               />
             </Form.Item>
@@ -178,10 +185,10 @@ export function OperationHistory({
       </Card>
       <Card
         size="small"
-        title="发放记录"
+        title={t("history")}
         extra={
           <Typography.Text type="secondary">
-            共 {data?.pagination.total ?? 0} 条
+            {t("total", { count: data?.pagination.total ?? 0 })}
           </Typography.Text>
         }
       >
@@ -189,7 +196,7 @@ export function OperationHistory({
           tableId="coin-operations"
           toolbar={
             <Typography.Text type="secondary">
-              查看手动发放和撤销记录，完整单号与凭据可在详情中查看。
+              {t("history_help")}
             </Typography.Text>
           }
           rowKey="id"
@@ -200,7 +207,7 @@ export function OperationHistory({
           locale={{
             emptyText: (
               <TableEmptyState
-                message="暂无发放记录"
+                message={t("no_operations")}
                 filtered={filtered}
                 onResetFilters={reset}
               />
@@ -218,7 +225,7 @@ export function OperationHistory({
           }}
           columns={[
             {
-              title: "时间",
+              title: t("time"),
               dataIndex: "created_at",
               width: 132,
               render: (v: string) => {
@@ -234,7 +241,8 @@ export function OperationHistory({
               }
             },
             {
-              title: "账号",
+              key: "账号",
+              title: t("account"),
               width: 190,
               render: (_, row) => (
                 <AccountLabel
@@ -245,19 +253,20 @@ export function OperationHistory({
               )
             },
             {
-              title: "变动",
+              key: "变动",
+              title: t("change"),
               width: 190,
               render: (_, row) => (
                 <Flex vertical gap={4}>
                   <Change value={row.delta} />
                   <Typography.Text type="secondary">
-                    {coinSourceLabels[row.source_type] ?? "天生币调整"}
+                    {coinSourceLabel(row.source_type, t)}
                   </Typography.Text>
                 </Flex>
               )
             },
             {
-              title: "原因",
+              title: t("reason"),
               dataIndex: "reason",
               render: (value: string) => (
                 <div className="coins-reason" title={value}>
@@ -266,19 +275,22 @@ export function OperationHistory({
               )
             },
             {
-              title: "操作人",
+              key: "操作人",
+              title: t("actor"),
               width: 170,
               render: (_, row) => (
                 <AccountLabel name={row.actor_display_name} id={row.actor_id} />
               )
             },
             {
-              title: "状态",
+              key: "状态",
+              title: t("status"),
               width: 100,
               render: (_, row) => <Status row={row} />
             },
             {
-              title: "操作",
+              key: "操作",
+              title: t("action"),
               width: 100,
               fixed: "right",
               render: (_, row) => (
@@ -287,7 +299,7 @@ export function OperationHistory({
                   size="small"
                   onClick={() => setDetailId(row.id)}
                 >
-                  查看详情
+                  {t("view_details")}
                 </Button>
               )
             }
@@ -295,7 +307,7 @@ export function OperationHistory({
         />
       </Card>
       <Drawer
-        title="发放记录详情"
+        title={t("detail_title")}
         open={!!detail}
         onClose={() => setDetailId(undefined)}
         size={560}
@@ -312,7 +324,7 @@ export function OperationHistory({
                   onReverse(detail);
                 }}
               >
-                撤销发放
+                {t("manual_reversal")}
               </Button>
             </Flex>
           ) : null
@@ -329,7 +341,7 @@ export function OperationHistory({
               items={[
                 {
                   key: "owner",
-                  label: "账号",
+                  label: t("account"),
                   children: (
                     <AccountLabel
                       fullId
@@ -341,7 +353,7 @@ export function OperationHistory({
                 },
                 {
                   key: "actor",
-                  label: "操作人",
+                  label: t("actor"),
                   children: (
                     <AccountLabel
                       fullId
@@ -352,40 +364,40 @@ export function OperationHistory({
                 },
                 {
                   key: "type",
-                  label: "类型",
-                  children: coinSourceLabels[detail.source_type] ?? "天生币调整"
+                  label: t("type"),
+                  children: coinSourceLabel(detail.source_type, t)
                 },
                 {
                   key: "time",
-                  label: "操作时间",
+                  label: t("operation_time"),
                   children: new Date(detail.created_at).toLocaleString("zh-CN")
                 },
                 {
                   key: "balance",
-                  label: "变动后余额",
-                  children: formatCoins(detail.balance_after)
+                  label: t("operation_balance"),
+                  children: formatCoinAmount(detail.balance_after, t)
                 },
                 {
                   key: "reason",
-                  label: "原因",
+                  label: t("reason"),
                   children: (
                     <span className="coins-detail-text">{detail.reason}</span>
                   )
                 },
                 {
                   key: "evidence",
-                  label: "凭据备注",
+                  label: t("evidence"),
                   children: (
                     <span className="coins-detail-text">
-                      {detail.evidence_ref || "未填写"}
+                      {detail.evidence_ref || t("not_provided")}
                     </span>
                   )
                 },
                 {
                   key: "event",
                   label: detail.reverses_operation_id
-                    ? "原发放记录编号"
-                    : "业务单号",
+                    ? t("original_id")
+                    : t("event_id"),
                   children: (
                     <Typography.Text copyable className="coins-detail-text">
                       {detail.event_id}
@@ -394,7 +406,7 @@ export function OperationHistory({
                 },
                 {
                   key: "id",
-                  label: "记录编号",
+                  label: t("record_id"),
                   children: (
                     <Typography.Text copyable className="coins-detail-text">
                       {detail.id}
@@ -405,7 +417,7 @@ export function OperationHistory({
                   ? [
                       {
                         key: "reversal",
-                        label: "撤销记录编号",
+                        label: t("reversal_id"),
                         children: (
                           <Typography.Text
                             copyable
@@ -423,7 +435,7 @@ export function OperationHistory({
               !detail.reversed_by_operation_id &&
               canReverse(detail) && (
                 <Typography.Paragraph type="secondary">
-                  发错账号或数量时，可撤销这笔发放。撤销会扣回全部数量，不涉及退款。
+                  {t("reverse_help")}
                 </Typography.Paragraph>
               )}
           </Flex>

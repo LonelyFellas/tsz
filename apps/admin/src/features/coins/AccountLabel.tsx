@@ -1,3 +1,4 @@
+import { useCoinTranslation } from "@/features/coins/i18n";
 import { Flex, Typography } from "@tsz/ui/admin/display";
 
 export function AccountLabel({
@@ -11,13 +12,14 @@ export function AccountLabel({
   type?: "user" | "admin";
   fullId?: boolean;
 }) {
+  const { t } = useCoinTranslation();
   return (
     <Flex vertical gap={2} style={{ minWidth: 0 }}>
-      <Typography.Text strong>{name || "账号资料不可用"}</Typography.Text>
+      <Typography.Text strong>{name || t("account_missing")}</Typography.Text>
       <Flex gap={6} align="center" wrap>
         {type && (
           <Typography.Text type="secondary">
-            {type === "user" ? "用户" : "管理员"}
+            {type === "user" ? t("user") : t("admin")}
           </Typography.Text>
         )}
         <Typography.Text

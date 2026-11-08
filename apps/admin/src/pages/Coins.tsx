@@ -1,3 +1,9 @@
+import {
+  useCoinTranslation,
+  CoinText,
+  CoinError,
+  formatCoinAmount
+} from "@/features/coins/i18n";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { AccountLabel } from "@/features/coins/AccountLabel";
 import { OperationHistory } from "@/features/coins/OperationHistory";
@@ -15,8 +21,6 @@ import {
 } from "@tsz/ui/admin/display";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { Form, Input, Select } from "@tsz/ui/admin/forms";
-import { HttpError } from "@tsz/api-client";
-import { formatCoins } from "@tsz/shared";
 import { hasAdminPermission } from "@tsz/shared/auth";
 import type {
   AdminProfile,
@@ -27,27 +31,10 @@ import type {
   ManualCreditRequest,
   ManualReversalRequest
 } from "@tsz/types";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { api, useAuthStore } from "@/lib/auth";
 import { EntriesTable } from "@/features/coins/EntriesTable";
 
-function errorText(error: unknown) {
-  const messages: Record<string, string> = {
-    forbidden: "你没有操作权限，或正在操作自己的账号，请核对后重试",
-    coin_wallet_unavailable:
-      "该账号的天生币账户已暂停或关闭，暂时无法发放或撤销",
-    coin_account_unavailable: "该账号暂时不可用",
-    coin_source_conflict: "这笔业务已发放，或这笔发放已撤销，请查看发放记录",
-    coin_idempotency_conflict:
-      "本次提交与之前的内容不一致，请关闭窗口后重新核对",
-    coin_insufficient_balance: "该账号余额不足，无法扣回这笔天生币",
-    coin_invalid_amount: "请输入 1 至 9,223,372,036,854,775,807 之间的整数",
-    coin_reversal_invalid: "只能撤销手动发放的天生币"
-  };
-  return error instanceof HttpError && error.status < 500
-    ? (messages[error.code ?? ""] ?? "操作被拒绝，请核对输入或重试")
-    : "暂时无法确认操作结果，请先查看发放记录；也可保持内容不变后重试，不会重复处理";
-}
 function canTarget(
   profile: AdminProfile,
   target: { owner_type: string; owner_id: string }
@@ -58,6 +45,7 @@ function canTarget(
   );
 }
 export function CoinsPage() {
+  const { t } = useCoinTranslation();
   const profile = useAuthStore((s) => s.profile);
   return profile && hasAdminPermission(profile, "coins.access") ? (
     <Management
@@ -70,7 +58,7 @@ export function CoinsPage() {
       profile={profile}
     />
   ) : (
-    <Alert type="warning" title="没有天生币管理查询权限" />
+    <Alert type="warning" title={t("no_access")} />
   );
 }
 type CreditFields = Pick<
@@ -78,6 +66,7 @@ type CreditFields = Pick<
   "amount" | "category" | "event_id" | "reason" | "evidence_ref"
 >;
 function Management({ profile }: { profile: AdminProfile }) {
+  const { t } = useCoinTranslation();
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [searchForm] = Form.useForm<CoinAccountsQuery>();
@@ -91,7 +80,7 @@ function Management({ profile }: { profile: AdminProfile }) {
   const [reversing, setReversing] = useState<ManualCoinOperation>();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<ReactNode>();
   const creditIntent = useRef<{ fingerprint: string; key: string } | undefined>(
     undefined
   );
@@ -171,9 +160,9 @@ function Management({ profile }: { profile: AdminProfile }) {
       setConfirmation(undefined);
       creditForm.resetFields();
       await refresh();
-      void message.success("天生币已发放");
+      void message.success(<CoinText message="credited" />);
     } catch (e) {
-      setError(errorText(e));
+      setError(<CoinError error={e} />);
     } finally {
       setBusy(false);
     }
@@ -193,9 +182,9 @@ function Management({ profile }: { profile: AdminProfile }) {
       setReversing(undefined);
       setReason("");
       await refresh();
-      void message.success("已撤销发放，天生币已扣回");
+      void message.success(<CoinText message="reversed" />);
     } catch (e) {
-      setError(errorText(e));
+      setError(<CoinError error={e} />);
     } finally {
       setBusy(false);
     }
@@ -221,35 +210,35 @@ function Management({ profile }: { profile: AdminProfile }) {
             setSearch({ ...v, search: v.search.trim(), page: 1 });
           }}
         >
-          <Form.Item name="owner_type" label="账号类型">
+          <Form.Item name="owner_type" label={t("owner_type")}>
             <Select
               style={{ width: 140 }}
               options={[
-                { value: "user", label: "用户" },
-                { value: "admin", label: "管理员" }
+                { value: "user", label: t("user") },
+                { value: "admin", label: t("admin") }
               ]}
             />
           </Form.Item>
           <Form.Item
             name="search"
-            label="账户查找"
+            label={t("account_search")}
             rules={[
               {
                 required: true,
                 whitespace: true,
-                message: "请输入姓名、账号编号、完整手机号或邮箱"
+                message: <CoinText message="search_required" />
               }
             ]}
           >
             <Input
-              placeholder="姓名 / 账号编号 / 完整手机号或邮箱"
+              placeholder={t("search_placeholder")}
               style={{ width: 300 }}
               maxLength={200}
             />
           </Form.Item>
           <Form.Item className="admin-filter-actions">
             <Button htmlType="submit" type="primary" icon={<SearchIcon />}>
-              查找
+              {t("find")}
             </Button>
           </Form.Item>
         </Form>
@@ -257,7 +246,7 @@ function Management({ profile }: { profile: AdminProfile }) {
       {search && (
         <Card size="small">
           {accounts.isError ? (
-            <Alert type="error" title="账户查询失败，请重试" />
+            <Alert type="error" title={t("accounts_failed")} />
           ) : (
             search && (
               <Table
@@ -275,7 +264,8 @@ function Management({ profile }: { profile: AdminProfile }) {
                 }}
                 columns={[
                   {
-                    title: "账号",
+                    key: "账号",
+                    title: t("account"),
                     render: (_, r: CoinAccount) => (
                       <AccountLabel
                         name={r.display_name}
@@ -285,34 +275,36 @@ function Management({ profile }: { profile: AdminProfile }) {
                     )
                   },
                   {
-                    title: "余额",
+                    title: t("balance"),
                     dataIndex: "balance",
                     render: (v: string) => (
                       <Typography.Text strong className="coins-amount">
-                        {formatCoins(v)}
+                        {formatCoinAmount(v, t)}
                       </Typography.Text>
                     )
                   },
                   {
-                    title: "状态",
+                    key: "状态",
+                    title: t("status"),
                     render: (_, r: CoinAccount) =>
                       r.status === "closed"
-                        ? "天生币账户已关闭"
+                        ? t("closed")
                         : r.status === "deletion_pending"
-                          ? "天生币账户已暂停"
+                          ? t("suspended")
                           : r.account_status === "active"
-                            ? "正常"
-                            : "账号不可用"
+                            ? t("active")
+                            : t("unavailable")
                   },
                   {
-                    title: "操作",
+                    key: "操作",
+                    title: t("action"),
                     render: (_, r: CoinAccount) => (
                       <Button
                         type="link"
                         size="small"
                         onClick={() => choose(r)}
                       >
-                        查看账户
+                        {t("view_account")}
                       </Button>
                     )
                   }
@@ -324,24 +316,30 @@ function Management({ profile }: { profile: AdminProfile }) {
       )}
       {selected && (
         <>
-          <Card title="已选账户">
+          <Card title={t("selected")}>
             <Descriptions
               column={1}
               items={[
-                { key: "name", label: "姓名", children: selected.display_name },
+                {
+                  key: "name",
+                  label: t("name"),
+                  children: selected.display_name
+                },
                 {
                   key: "realm",
-                  label: "账号类型",
-                  children: selected.owner_type === "user" ? "用户" : "管理员"
+                  label: t("owner_type"),
+                  children:
+                    selected.owner_type === "user" ? t("user") : t("admin")
                 },
-                { key: "id", label: "账号编号", children: selected.owner_id }
+                {
+                  key: "id",
+                  label: t("account_id"),
+                  children: selected.owner_id
+                }
               ]}
             />
             {!creditAllowed ? (
-              <Alert
-                type="info"
-                title="当前账号状态或你的权限不允许发放天生币"
-              />
+              <Alert type="info" title={t("credit_unavailable")} />
             ) : (
               <Form
                 form={creditForm}
@@ -352,21 +350,29 @@ function Management({ profile }: { profile: AdminProfile }) {
               >
                 <Form.Item
                   name="category"
-                  label="发放类型"
-                  rules={[{ required: true }]}
+                  label={t("credit_type")}
+                  rules={[
+                    {
+                      required: true,
+                      message: <CoinText message="category_required" />
+                    }
+                  ]}
                 >
                   <Select
                     options={[
-                      { value: "purchase", label: "购买入账" },
-                      { value: "reward", label: "手动奖励" }
+                      { value: "purchase", label: t("manual_purchase") },
+                      { value: "reward", label: t("manual_reward") }
                     ]}
                   />
                 </Form.Item>
                 <Form.Item
                   name="amount"
-                  label="天生币数量"
+                  label={t("amount")}
                   rules={[
-                    { required: true, message: "请输入正整数" },
+                    {
+                      required: true,
+                      message: <CoinText message="positive_required" />
+                    },
                     {
                       validator: (_, v: unknown) =>
                         typeof v === "string" &&
@@ -374,9 +380,7 @@ function Management({ profile }: { profile: AdminProfile }) {
                         BigInt(v) <= 9223372036854775807n
                           ? Promise.resolve()
                           : Promise.reject(
-                              new Error(
-                                "请输入 1 至 9,223,372,036,854,775,807 之间的整数"
-                              )
+                              <CoinText message="coin_invalid_amount" />
                             )
                     }
                   ]}
@@ -385,38 +389,50 @@ function Management({ profile }: { profile: AdminProfile }) {
                 </Form.Item>
                 <Form.Item
                   name="event_id"
-                  label="业务单号"
-                  extra="每笔发放使用独立单号，例如付款单号或奖励发放单号；重试同一笔时沿用原单号。"
-                  rules={[{ required: true, whitespace: true }]}
+                  label={t("event_id")}
+                  extra={t("event_help")}
+                  rules={[
+                    {
+                      required: true,
+                      whitespace: true,
+                      message: <CoinText message="event_required" />
+                    }
+                  ]}
                   normalize={(v: string) => v.trim()}
                 >
                   <Input maxLength={200} />
                 </Form.Item>
                 <Form.Item
                   name="reason"
-                  label="发放原因"
-                  extra="仅管理员可见，请说明为什么发放。"
-                  rules={[{ required: true, whitespace: true }]}
+                  label={t("credit_reason")}
+                  extra={t("reason_help")}
+                  rules={[
+                    {
+                      required: true,
+                      whitespace: true,
+                      message: <CoinText message="reason_required" />
+                    }
+                  ]}
                   normalize={(v: string) => v.trim()}
                 >
                   <Input.TextArea rows={3} maxLength={1000} />
                 </Form.Item>
                 <Form.Item
                   name="evidence_ref"
-                  label="凭据备注（选填）"
-                  extra="可填写凭证编号或说明，仅管理员可见。"
+                  label={t("evidence_optional")}
+                  extra={t("evidence_help")}
                 >
                   <Input maxLength={500} />
                 </Form.Item>
                 <Button type="primary" htmlType="submit">
-                  核对并发放
+                  {t("review_credit")}
                 </Button>
               </Form>
             )}
           </Card>
-          <Card title="收支明细">
+          <Card title={t("entries")}>
             {entries.isError ? (
-              <Alert type="error" title="收支明细查询失败" />
+              <Alert type="error" title={t("entries_failed")} />
             ) : (
               <EntriesTable
                 data={entries.data}
@@ -435,7 +451,7 @@ function Management({ profile }: { profile: AdminProfile }) {
   const operationsPanel = (
     <Flex vertical gap={16}>
       {operations.isError && (
-        <Alert type="error" title="发放记录加载失败，请重试查询" />
+        <Alert type="error" title={t("operations_failed")} />
       )}
       <OperationHistory
         data={operations.isError ? undefined : operations.data}
@@ -456,31 +472,29 @@ function Management({ profile }: { profile: AdminProfile }) {
   );
   return (
     <Flex vertical gap={16}>
-      <PageHeader title="天生币管理" />
-      <Typography.Text type="secondary">
-        查找账号、发放天生币，或查看和撤销手动发放记录。
-      </Typography.Text>
+      <PageHeader title={t("management")} />
+      <Typography.Text type="secondary">{t("management_help")}</Typography.Text>
       <Tabs
         tabBarExtraContent={
           <Button icon={<RotateCwIcon />} onClick={() => void refresh()}>
-            刷新记录
+            {t("refresh_records")}
           </Button>
         }
         items={[
-          { key: "accounts", label: "账户与发放", children: searchPanel },
+          { key: "accounts", label: t("accounts_tab"), children: searchPanel },
           {
             key: "operations",
-            label: "发放记录",
+            label: t("history"),
             children: operationsPanel
           }
         ]}
       />
       <Modal
-        title="确认发放天生币"
+        title={t("confirm_credit_title")}
         open={!!confirmation}
         confirmLoading={busy}
-        okText="确认发放"
-        cancelText="返回修改"
+        okText={t("confirm_credit")}
+        cancelText={t("back")}
         onOk={() => void sendCredit()}
         onCancel={() => {
           if (!busy) setConfirmation(undefined);
@@ -491,47 +505,56 @@ function Management({ profile }: { profile: AdminProfile }) {
       >
         <Alert
           type="info"
-          title="确认后将增加该账号的天生币余额。购买入账前请先核实付款，本操作不会收款或退款。"
+          title={t("credit_warning")}
           style={{ marginBottom: 16 }}
         />
         {confirmation && (
           <Descriptions
             column={1}
             items={[
-              { key: "name", label: "姓名", children: selected?.display_name },
+              {
+                key: "name",
+                label: t("name"),
+                children: selected?.display_name
+              },
               {
                 key: "realm",
-                label: "账号类型",
-                children: confirmation.owner_type === "user" ? "用户" : "管理员"
+                label: t("owner_type"),
+                children:
+                  confirmation.owner_type === "user" ? t("user") : t("admin")
               },
               {
                 key: "id",
-                label: "账号编号",
+                label: t("account_id"),
                 children: confirmation.owner_id
               },
               {
                 key: "amount",
-                label: "发放数量",
-                children: formatCoins(confirmation.amount)
+                label: t("credit_amount"),
+                children: formatCoinAmount(confirmation.amount, t)
               },
               {
                 key: "event",
-                label: "业务单号",
+                label: t("event_id"),
                 children: confirmation.event_id
               },
-              { key: "reason", label: "原因", children: confirmation.reason }
+              {
+                key: "reason",
+                label: t("reason"),
+                children: confirmation.reason
+              }
             ]}
           />
         )}
         {error && <Alert type="error" title={error} />}
       </Modal>
       <Modal
-        title="确认撤销发放"
+        title={t("confirm_reverse_title")}
         open={!!reversing}
         confirmLoading={busy}
-        okText="确认扣回"
+        okText={t("confirm_reverse")}
         okButtonProps={{ danger: true, disabled: !reason.trim() }}
-        cancelText="取消"
+        cancelText={t("cancel")}
         onOk={() => void sendReversal()}
         onCancel={() => {
           if (!busy) setReversing(undefined);
@@ -544,10 +567,10 @@ function Management({ profile }: { profile: AdminProfile }) {
           <Descriptions
             column={1}
             items={[
-              { key: "original", label: "原发放记录", children: reversing.id },
+              { key: "original", label: t("original"), children: reversing.id },
               {
                 key: "owner",
-                label: "账号",
+                label: t("account"),
                 children: (
                   <AccountLabel
                     name={reversing.owner_display_name}
@@ -558,18 +581,16 @@ function Management({ profile }: { profile: AdminProfile }) {
               },
               {
                 key: "amount",
-                label: "将扣回",
-                children: formatCoins(reversing.delta)
+                label: t("deduct_amount"),
+                children: formatCoinAmount(reversing.delta, t)
               }
             ]}
           />
         )}
-        <Typography.Paragraph>
-          撤销会扣回这笔发放的全部天生币，原记录仍会保留，不涉及退款。每笔只能撤销一次；余额不足或账户暂停时无法撤销。
-        </Typography.Paragraph>
+        <Typography.Paragraph>{t("reverse_warning")}</Typography.Paragraph>
         <Input.TextArea
-          aria-label="撤销原因"
-          placeholder="请说明撤销原因，例如发错账号或数量（必填）"
+          aria-label={t("reverse_reason")}
+          placeholder={t("reverse_placeholder")}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           maxLength={1000}
