@@ -1,3 +1,8 @@
+import { localizedCatalogName } from "../../part-of-speech/catalog";
+import {
+  useLexiconEditorTranslation,
+  LexiconEditorText
+} from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
 import { CircleMinusIcon } from "lucide-react";
@@ -97,6 +102,7 @@ export interface V3FormsAndPronunciationStepProps {
 }
 
 function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
+  const { t } = useLexiconEditorTranslation();
   const dialects = Array.from(
     new Set<Dialect>(
       value.pos.flatMap((pos) =>
@@ -109,7 +115,7 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
   const notice = usePronunciationVoiceNotice(dialects);
   return notice ? (
     <Alert
-      description="音标与实际发音仍可正常填写和保存；试听语音需要平台先配置对应方言的发音人。"
+      description={t("voice_unavailable_help")}
       showIcon
       title={notice}
       type="warning"
@@ -142,6 +148,7 @@ export function V3FormsAndPronunciationStep({
   onMeaningsChange,
   onGoToMeanings
 }: V3FormsAndPronunciationStepProps) {
+  const { t, i18n } = useLexiconEditorTranslation();
   const { modal } = App.useApp();
   const [editingFormId, setEditingFormId] = useState<string>();
   const sharedCounts = new Map<string, number>();
@@ -323,7 +330,7 @@ export function V3FormsAndPronunciationStep({
       ? [
           {
             key: "empty",
-            label: "词性",
+            label: t("pos"),
             disabled: true,
             children: (
               <div className="word-forms-tabs-empty">
@@ -332,12 +339,12 @@ export function V3FormsAndPronunciationStep({
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description={
                     <Space orientation="vertical" size={4}>
-                      <Typography.Text strong>暂无词性</Typography.Text>
+                      <Typography.Text strong>{t("no_pos")}</Typography.Text>
                       <Typography.Text type="secondary">
-                        草稿可暂时不添加词性
+                        {t("draft_no_pos")}
                       </Typography.Text>
                       <Typography.Text type="secondary">
-                        请从上方“添加词性”入口添加。
+                        {t("add_pos_help")}
                       </Typography.Text>
                     </Space>
                   }
@@ -347,9 +354,12 @@ export function V3FormsAndPronunciationStep({
           }
         ]
       : value.pos.map((pos, posIndex) => {
-          const label =
-            catalog.data?.items.find((item) => item.code === pos.pos)
-              ?.name_zh ?? partOfSpeechLabel(pos.pos);
+          const catalogItem = catalog.data?.items.find(
+            (item) => item.code === pos.pos
+          );
+          const label = catalogItem
+            ? localizedCatalogName(catalogItem, i18n.language)
+            : partOfSpeechLabel(pos.pos);
           const posReferences = posReferenceCount(referenceGuard.index, pos);
           return {
             key: pos.pos_id,
@@ -370,8 +380,8 @@ export function V3FormsAndPronunciationStep({
                 <SortableDragHandle
                   dragImageSelector=".word-pos-tab-handle"
                   index={posIndex}
-                  label={`拖动${label}`}
-                  singleItemTitle="至少需要两个基本词性"
+                  label={t("drag_item", { label: label })}
+                  singleItemTitle={t("two_pos_required")}
                   sorting={posSorting}
                 />
                 <span className="word-pos-tab-label">
@@ -379,7 +389,7 @@ export function V3FormsAndPronunciationStep({
                   <Badge
                     count={countV3PosFormIncomplete(pos)}
                     size="small"
-                    title="该词性未填项"
+                    title={t("pos_issues")}
                   />
                   <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
                 </span>
@@ -399,16 +409,22 @@ export function V3FormsAndPronunciationStep({
                       }
                     >
                       <Button
-                        aria-label={`删除${label}`}
+                        aria-label={t("delete_item", { label: label })}
                         danger
                         icon={<CircleMinusIcon />}
                         onClick={(event) => {
                           event.stopPropagation();
                           modal.confirm({
-                            title: `删除词性“${label}”？`,
-                            content:
-                              "保存时会同时预览该词性下游词义、例句和关系的影响。",
-                            okText: "删除",
+                            title: (
+                              <LexiconEditorText
+                                message="delete_pos_title"
+                                params={{ label: label }}
+                              />
+                            ),
+                            content: (
+                              <LexiconEditorText message="remove_pos_impact" />
+                            ),
+                            okText: <LexiconEditorText message="delete" />,
                             okButtonProps: { danger: true },
                             onOk: () => deletePos(pos.pos_id)
                           });
@@ -485,30 +501,27 @@ export function V3FormsAndPronunciationStep({
         <div className="word-step-heading">
           <span className="word-step-number">STEP 02</span>
           <Typography.Title level={2} style={{ margin: 0 }}>
-            词形与发音
+            {t("forms_title")}
           </Typography.Title>
           <Typography.Paragraph className="word-step-description">
-            先添加基本词性，再按英美拼写、规则与不规则变化录入词形。
+            {t("forms_help")}
           </Typography.Paragraph>
           <details className="v3-pronunciation-guide">
-            <summary>发音录入说明</summary>
-            <p>
-              字典音标用于展示与转换。合成时选择 Azure IPA 或
-              UPS，实际发音按“天生之®通用英语音标字母表”录入。
-            </p>
+            <summary>{t("pronunciation_help_title")}</summary>
+            <p>{t("pronunciation_help")}</p>
           </details>
         </div>
         <V3VoiceNotice value={value} />
         {issues.length > 0 && (
           <Alert
-            description="已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
+            description={t("validation_help")}
             showIcon
-            title="词形与发音尚未完成"
+            title={t("forms_incomplete")}
             type="warning"
           />
         )}
         {catalog.isError && (
-          <Alert showIcon title="词性目录不可用，已停止新增结构" type="error" />
+          <Alert showIcon title={t("catalog_unavailable")} type="error" />
         )}
         <Tabs
           activeKey={value.pos.length === 0 ? "empty" : activePosId}

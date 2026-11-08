@@ -142,6 +142,51 @@ function props(overrides: Record<string, unknown> = {}) {
   };
 }
 
+it("稳定编辑身份下显示标签变化保留音频，实际换字段仍使音频失效", async () => {
+  const setting = {
+    version_id: "11111111-1111-4111-8111-111111111111",
+    version_name: "正式",
+    locale: "en-GB",
+    voice_id: "sonia",
+    enabled: true,
+    rate_percent: 0,
+    audio_asset_id: "saved-audio"
+  };
+  const onVoiceProfileChange = vi.fn();
+  const onChange = vi.fn();
+  const base = props({
+    previewAdapter: adapter(),
+    onVoiceProfileChange,
+    onChange,
+    voiceProfile: { voices: [setting] }
+  });
+  const view = render(
+    <VoiceEditor {...base} contextKey="field-1" contextLabel="词形拼写" />
+  );
+  openVoices();
+  await screen.findByLabelText("启用 Sonia · 英式女声");
+  onVoiceProfileChange.mockClear();
+  view.rerender(
+    <VoiceEditor {...base} contextKey="field-1" contextLabel="Form spelling" />
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Form spelling" })
+  ).toHaveTextContent(TEXT);
+  expect(onVoiceProfileChange).not.toHaveBeenCalled();
+  expect(onChange).not.toHaveBeenCalled();
+  view.rerender(
+    <VoiceEditor {...base} contextKey="field-2" contextLabel="Form spelling" />
+  );
+  await waitFor(() => expect(onVoiceProfileChange).toHaveBeenCalledOnce());
+  const saved = onVoiceProfileChange.mock.calls[0]![0];
+  expect(saved.voices[0]).not.toHaveProperty("audio_asset_id");
+  expect(saved.voices[0]).toMatchObject({
+    version_id: setting.version_id,
+    locale: "en-GB",
+    voice_id: "sonia"
+  });
+});
+
 it.each(["grammar", "actual-pron"] as const)(
   "%s 的确认操作位于对应编辑区域",
   (mode) => {

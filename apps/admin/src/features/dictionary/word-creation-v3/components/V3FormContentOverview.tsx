@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { AdminTable as Table } from "@/components/AdminTable";
 import { PencilIcon } from "lucide-react";
@@ -24,11 +25,10 @@ import {
   PronunciationPreviewControls,
   PronunciationPreviewVoiceSummary
 } from "../../word-creation/PronunciationPreview";
-import { pronunciationStyleLabel } from "../presentation";
 import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
 
 export const formOverviewTableId = "form-content-overview";
-const overviewColumnLabels = {
+const DEFAULT_OVERVIEW_COLUMN_LABELS = {
   edit: "操作",
   label: "词形名称",
   spelling: "词形拼写",
@@ -38,8 +38,18 @@ const overviewColumnLabels = {
   rate: "语速",
   volume: "音量"
 };
+export const formOverviewColumnMessages = {
+  edit: "actions",
+  label: "form_name",
+  spelling: "spelling",
+  style: "reading",
+  pronunciation: "actual_pronunciation",
+  voice: "voice",
+  rate: "rate",
+  volume: "volume"
+} as const;
 export const formOverviewColumnSettings = Object.entries(
-  overviewColumnLabels
+  DEFAULT_OVERVIEW_COLUMN_LABELS
 ).map(([key, label]) => ({
   key,
   label,
@@ -66,12 +76,17 @@ function PronunciationCell({
   reading: OverviewReading;
   settings?: "voice" | "rate" | "volume";
 }) {
+  const { t } = useLexiconEditorTranslation();
   const { dialect, pronunciation: row, pronunciationIndex } = reading;
   if (!row) {
     return (
       <div className="v3-overview-reading">
         <Typography.Text type="secondary">
-          {settings ? "—" : `${dialect === "uk" ? "英式" : "美式"}未填写`}
+          {settings
+            ? "—"
+            : t("blank_label", {
+                label: dialect === "uk" ? t("dialect_uk") : t("dialect_us")
+              })}
         </Typography.Text>
       </div>
     );
@@ -121,10 +136,13 @@ function PronunciationCell({
             disabled={!content && !assetId}
             disabledReason={
               content || !row.synthesis
-                ? "尚未保存正式音频，请返回编辑补齐"
-                : "请先填写当前口音的 Azure IPA/UPS 或选择拼写来源"
+                ? t("audio_missing")
+                : t("synthesis_source_required")
             }
-            ariaLabelPrefix={`读法 ${pronunciationIndex + 1}${dialect === "uk" ? "英式" : "美式"}`}
+            ariaLabelPrefix={t("reading_index", {
+              index: pronunciationIndex + 1,
+              details: dialect === "uk" ? t("dialect_uk") : t("dialect_us")
+            })}
             playbackOnly
           />
           {actualPron.text.trim() ? (
@@ -135,7 +153,7 @@ function PronunciationCell({
               <RichTextReadOnly value={actualPron} />
             </span>
           ) : (
-            <Typography.Text type="secondary">未填写</Typography.Text>
+            <Typography.Text type="secondary">{t("blank")}</Typography.Text>
           )}
         </div>
       )}
@@ -165,6 +183,17 @@ export function V3FormContentOverview({
   showColumnSettings?: boolean;
   onFixedOverflowChange?: (overflow: boolean) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
+  const overviewColumnLabels = {
+    edit: t("actions"),
+    label: t("form_name"),
+    spelling: t("spelling"),
+    style: t("reading"),
+    pronunciation: t("actual_pronunciation"),
+    voice: t("voice"),
+    rate: t("rate"),
+    volume: t("volume")
+  };
   const label = useFormTypeLabel();
   const copy = useV3FormCopy();
   const readings = rows.flatMap((row): OverviewReading[] => {
@@ -240,12 +269,14 @@ export function V3FormContentOverview({
             render: (_, row) => (
               <div className="v3-overview-actions">
                 {row.actions}
-                <Tooltip title="编辑词形内容">
+                <Tooltip title={t("edit_content")}>
                   <Button
                     type="text"
                     size="small"
                     className="v3-overview-edit"
-                    aria-label={`编辑${label(row.form.form_type)}内容`}
+                    aria-label={t("edit_content_label", {
+                      label: label(row.form.form_type)
+                    })}
                     icon={<PencilIcon />}
                     data-v3-node-id={row.form.id}
                     data-v3-field="form_id"
@@ -308,9 +339,11 @@ export function V3FormContentOverview({
                         size="small"
                         className="v3-overview-type-fix"
                         disabled={row.formTypeDisabled}
-                        aria-label={`调整${label(row.form.form_type)}词形类型`}
+                        aria-label={t("adjust_type_label", {
+                          label: label(row.form.form_type)
+                        })}
                       >
-                        调整词形类型
+                        {t("adjust_form_type")}
                       </Button>
                     </Dropdown>
                   )}
@@ -322,14 +355,16 @@ export function V3FormContentOverview({
                   >
                     {(sharedCounts.get(row.form.id) ?? 0) > 1 && (
                       <Typography.Text type="secondary">
-                        共用于 {sharedCounts.get(row.form.id)} 个标签
+                        {t("shared_label_count", {
+                          count: sharedCounts.get(row.form.id) ?? 0
+                        })}
                       </Typography.Text>
                     )}
                     {issues.some(
                       (issue) => issue.node_location.form_id === row.form.id
                     ) && (
                       <Typography.Text type="danger">
-                        有待填写项
+                        {t("pending_fields")}
                       </Typography.Text>
                     )}
                   </Space>
@@ -345,10 +380,10 @@ export function V3FormContentOverview({
             render: (_, { variant, spellingDialect }) => {
               const dialectLabel =
                 spellingDialect === "common"
-                  ? "英美通用拼写"
+                  ? t("common_spelling")
                   : spellingDialect === "uk"
-                    ? "英式拼写"
-                    : "美式拼写";
+                    ? t("british_spelling")
+                    : t("american_spelling");
               return (
                 <div className="v3-overview-spellings">
                   <Tooltip title={dialectLabel}>
@@ -371,7 +406,9 @@ export function V3FormContentOverview({
                       }
                     />
                   ) : (
-                    <Typography.Text type="secondary">未填写</Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("blank")}
+                    </Typography.Text>
                   )}
                 </div>
               );
@@ -384,10 +421,10 @@ export function V3FormContentOverview({
             render: (_, { pronunciation }) => (
               <div className="v3-overview-reading">
                 {pronunciation?.style ? (
-                  pronunciationStyleLabel(pronunciation.style)
+                  t(`reading_${pronunciation.style}`)
                 ) : (
                   <Typography.Text type="secondary">
-                    {pronunciation ? "未填写" : "—"}
+                    {pronunciation ? t("blank") : "—"}
                   </Typography.Text>
                 )}
               </div>

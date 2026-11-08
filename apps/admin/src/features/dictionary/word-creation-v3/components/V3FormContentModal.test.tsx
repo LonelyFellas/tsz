@@ -16,6 +16,7 @@ import type {
   SharedFormsStepContentV3
 } from "@tsz/types";
 import { V3FormContentModal } from "./V3FormContentModal";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   assignSharedFormContent,
   applyFormsStructure,
@@ -174,6 +175,59 @@ function setup({
   const { unmount } = render(<Host />);
   return { forms, onConfirm, onCancel, leave: () => leaveGuard!(), unmount };
 }
+
+it("切换语言保留抽屉未应用输入，显式确认前不写页面草稿", () => {
+  const forms = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    formsFixture({ forms: [commonFormFixture()] })
+  ) as SharedFormsStepContentV3;
+  const formId = forms.pos[0]!.forms[0]!.id;
+  const stableVariantIds = createStableVariantIdFactory(
+    expandFormContents(forms),
+    []
+  );
+  const onConfirm = vi.fn();
+  const onApply = vi.fn();
+  const onCancel = vi.fn();
+  const content = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <App>
+        <V3FormContentModal
+          forms={forms}
+          formId={formId}
+          issues={[]}
+          stableVariantIds={stableVariantIds}
+          retiredContentSlots={[]}
+          onConfirm={onConfirm}
+          onApply={onApply}
+          onCancel={onCancel}
+        />
+      </App>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  const input = screen.getByRole("textbox", { name: "内容拼写" });
+  fireEvent.change(input, { target: { value: "原文 centre" } });
+  view.rerender(content("en-US"));
+  expect(screen.getByRole("textbox", { name: "内容拼写" })).toBe(input);
+  expect(input).toHaveValue("原文 centre");
+  expect(onConfirm).not.toHaveBeenCalled();
+  expect(onApply).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Confirm and apply to draft" })
+  );
+  expect(onConfirm).toHaveBeenCalledOnce();
+  const saved = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+  expect(saved.pos[0]!.forms[0]!.id).toBe(formId);
+  expect(saved.contents.map((item) => item.id)).toEqual(
+    forms.contents.map((item) => item.id)
+  );
+  const variant = saved.contents[0]!.regional_variants;
+  expect(variant.mode).toBe("common");
+  if (variant.mode === "common")
+    expect(variant.common.spelling).toBe("原文 centre");
+  expect(onCancel).not.toHaveBeenCalled();
+});
 
 describe("词形内容弹窗的草稿边界", () => {
   it.each([

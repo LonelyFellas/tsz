@@ -30,6 +30,7 @@ import {
 } from "./meaningsModel";
 import { senseNeedsDeleteConfirmation } from "./definitionModel";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   UUIDS,
   commonFormFixture,
@@ -362,6 +363,32 @@ function value(): DraftMeaningsStepContentWritableV3 {
 function formsValue(): DraftFormsStepContentV3 {
   return JSON.parse(screen.getByTestId("forms-value").textContent ?? "");
 }
+
+it("切换语言不改变语义区间、定义与节点 ID，保存仍提交原始协议和值", async () => {
+  const initial = structuredClone(meaningsFixture);
+  const onSave = vi.fn().mockResolvedValue(undefined);
+  const content = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <Harness initial={initial} onSave={onSave} />
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.change(screen.getByRole("textbox", { name: "语义区间 1 中文" }), {
+    target: { value: "原文 中文区间" }
+  });
+  const original = structuredClone(value());
+  view.rerender(content("en-US"));
+  expect(
+    screen.getByRole("textbox", { name: "Sense group 1 Chinese" })
+  ).toHaveValue("原文 中文区间");
+  expect(value()).toEqual(original);
+  expect(onSave).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+  await waitFor(() =>
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(original, "save")
+  );
+  expect(value()).toEqual(original);
+});
 
 describe("V3MeaningsAndExamplesStep", () => {
   it.each(["common", "us"] as const)(

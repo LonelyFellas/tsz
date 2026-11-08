@@ -1,3 +1,8 @@
+import { localizedCatalogName } from "../part-of-speech/catalog";
+import {
+  useLexiconEditorTranslation,
+  LexiconEditorText
+} from "@/features/dictionary/i18n/editor";
 import { boundFormGroupIds } from "./meaningsModel";
 import {
   DEFINITION_MODE_BY_PARTS,
@@ -74,7 +79,7 @@ import {
   spellingModeForPos,
   type RelationDisplaySnapshots
 } from "./meaningsModel";
-import { dialectLabel, partOfSpeechLabel } from "./presentation";
+import { partOfSpeechLabel } from "./presentation";
 import {
   sortableRowClass,
   useSortableRows,
@@ -235,6 +240,7 @@ function SenseEditorShell({
   /** 指向本词义的引用数；大于 0 时不能删除。 */
   referenceCount?: number;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const safeLevel = /^(?:A1|A2|B1|B2|C1|C2)$/u.test(level) ? level : "A1";
   return (
@@ -270,8 +276,8 @@ function SenseEditorShell({
                     <SortableDragHandle
                       sorting={sorting}
                       index={index}
-                      label={`拖动词义 ${index + 1}`}
-                      singleItemTitle="至少需要两个词义"
+                      label={t("drag_sense", { index: index + 1 })}
+                      singleItemTitle={t("two_senses_required")}
                       dragImageSelector=".word-sense-sortable"
                     />
                   </span>
@@ -284,10 +290,10 @@ function SenseEditorShell({
                       {subPosLabel}
                     </Tag>
                   ) : null}
-                  <V3ReferenceBadge label="词义" nodeIds={[nodeId]} />
+                  <V3ReferenceBadge label={t("sense")} nodeIds={[nodeId]} />
                 </div>
                 <span className="word-form-card-toggle-state">
-                  <span>{expanded ? "收起" : "展开"}</span>
+                  <span>{expanded ? t("collapse") : t("expand")}</span>
                   {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </span>
               </div>
@@ -301,14 +307,14 @@ function SenseEditorShell({
                 <Tooltip
                   title={
                     !canDelete
-                      ? "至少保留一条词义"
+                      ? t("one_sense_required")
                       : referenceCount > 0
                         ? referenceBlockedHint(referenceCount)
                         : undefined
                   }
                 >
                   <Button
-                    aria-label={`删除词义 ${index + 1}`}
+                    aria-label={t("delete_sense", { index: index + 1 })}
                     icon={<Trash2Icon />}
                     disabled={!canDelete || undefined}
                     danger
@@ -328,12 +334,12 @@ function SenseEditorShell({
         ]}
       />
       <Modal
-        title="确定删除该词义吗？"
+        title={t("delete_sense_title")}
         open={deleteOpen}
         style={{ top: 48 }}
         maskClosable={false}
-        okText="确认删除"
-        cancelText="取消"
+        okText={t("delete_confirm")}
+        cancelText={t("cancel")}
         okButtonProps={{ danger: true, disabled: !canDelete }}
         cancelButtonProps={{ autoFocus: true }}
         onCancel={() => setDeleteOpen(false)}
@@ -348,10 +354,13 @@ function SenseEditorShell({
   );
 }
 
-const GRAMMAR_PLACEHOLDER: Record<Dialect, string> = {
-  common: "例如 a centre / the centre",
-  uk: "例如 a centre / the centre",
-  us: "例如 a center / the center"
+const GRAMMAR_PLACEHOLDER: Record<
+  Dialect,
+  "grammar_placeholder_common" | "grammar_placeholder_us"
+> = {
+  common: "grammar_placeholder_common",
+  uk: "grammar_placeholder_common",
+  us: "grammar_placeholder_us"
 };
 
 function GrammarStructuresCard({
@@ -373,6 +382,7 @@ function GrammarStructuresCard({
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const { modal } = App.useApp();
   const removeStructure = (structureId: string) =>
     change((draft) => {
@@ -401,9 +411,9 @@ function GrammarStructuresCard({
       })
   });
   return (
-    <Card className="word-grammar-card" size="small" title="语法结构">
+    <Card className="word-grammar-card" size="small" title={t("grammar")}>
       {pos.grammar_structures.length === 0 ? (
-        <Typography.Text type="secondary">暂无语法结构</Typography.Text>
+        <Typography.Text type="secondary">{t("no_grammar")}</Typography.Text>
       ) : (
         <Flex vertical gap={0}>
           {pos.grammar_structures.map((structure, structureIndex) => (
@@ -427,8 +437,8 @@ function GrammarStructuresCard({
                 <SortableDragHandle
                   dragImageSelector={SORTABLE_ROW_SELECTOR}
                   index={structureIndex}
-                  label={`拖动语法结构 ${structureIndex + 1}`}
-                  singleItemTitle="至少需要两条语法结构"
+                  label={t("drag_grammar", { index: structureIndex + 1 })}
+                  singleItemTitle={t("two_grammar_required")}
                   sorting={sorting}
                 />
                 <V3RowIndex index={structureIndex} />
@@ -450,12 +460,27 @@ function GrammarStructuresCard({
                       meanings={meanings}
                       textLinks={variant.form_links}
                       dialect={variant.dialect}
-                      ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
+                      ariaLabel={t("grammar_content", {
+                        index: structureIndex + 1,
+                        dialect: t(
+                          variant.dialect === "uk"
+                            ? "dialect_uk"
+                            : variant.dialect === "us"
+                              ? "dialect_us"
+                              : "common"
+                        )
+                      })}
                       editorTitle={
                         <V3EditorTitle
                           index={structureIndex}
-                          title="语法结构"
-                          details={dialectLabel(variant.dialect)}
+                          title={t("grammar")}
+                          details={t(
+                            variant.dialect === "uk"
+                              ? "dialect_uk"
+                              : variant.dialect === "us"
+                                ? "dialect_us"
+                                : "common"
+                          )}
                         />
                       }
                       field="content"
@@ -508,7 +533,7 @@ function GrammarStructuresCard({
                         })
                       }
                       audioAssets={variant.audio_assets}
-                      placeholder={GRAMMAR_PLACEHOLDER[variant.dialect]}
+                      placeholder={t(GRAMMAR_PLACEHOLDER[variant.dialect])}
                       value={variant.content}
                       voiceProfile={variant.voice_profile}
                     />
@@ -521,12 +546,14 @@ function GrammarStructuresCard({
                 size={8}
               >
                 <Button
-                  aria-label={`删除语法结构 ${structureIndex + 1}`}
+                  aria-label={t("delete_grammar", {
+                    index: structureIndex + 1
+                  })}
                   danger
                   disabled={pos.grammar_structures.length <= 1 || undefined}
                   title={
                     pos.grammar_structures.length <= 1
-                      ? "至少保留一条语法结构"
+                      ? t("one_grammar_required")
                       : undefined
                   }
                   icon={<Trash2Icon />}
@@ -537,11 +564,14 @@ function GrammarStructuresCard({
                       )
                     ) {
                       modal.confirm({
-                        title: "删除语法结构？",
-                        content:
-                          "删除后，词形关联会被清除，相关释义不再引用此结构。",
-                        okText: "删除",
-                        cancelText: "取消",
+                        title: (
+                          <LexiconEditorText message="delete_grammar_title" />
+                        ),
+                        content: (
+                          <LexiconEditorText message="delete_grammar_help" />
+                        ),
+                        okText: <LexiconEditorText message="delete" />,
+                        cancelText: <LexiconEditorText message="cancel" />,
                         okButtonProps: { danger: true },
                         autoFocusButton: "cancel",
                         onOk: () => removeStructure(structure.id)
@@ -571,7 +601,7 @@ function GrammarStructuresCard({
         }
         type="dashed"
       >
-        添加语法结构
+        {t("add_grammar")}
       </Button>
     </Card>
   );
@@ -607,6 +637,7 @@ function SenseGroupsCard({
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const groups = value.sense_groups;
   const sorting = useSortableRows({
     items: groups,
@@ -631,15 +662,15 @@ function SenseGroupsCard({
       data-v3-field="sense_groups"
       data-v3-node-id={wordId ?? "current-entry"}
       size="small"
-      title="语义区间"
+      title={t("sense_groups")}
     >
       <div className="word-sense-group-list">
         {/* 列名只出一次：每行都重复「中文 / 英文」会把下一行的输入框推远，
             行与行之间的留白就跟着不对称了。 */}
         <div className="word-sense-group-heads">
           <span />
-          <span>中文</span>
-          <span>英文</span>
+          <span>{t("chinese")}</span>
+          <span>{t("english")}</span>
           <span />
         </div>
         {groups.map((group, groupIndex) => (
@@ -659,12 +690,12 @@ function SenseGroupsCard({
               <SortableDragHandle
                 dragImageSelector={SORTABLE_ROW_SELECTOR}
                 index={groupIndex}
-                label={`拖动语义区间 ${groupIndex + 1}`}
-                singleItemTitle="至少需要两个语义区间"
+                label={t("drag_group", { index: groupIndex + 1 })}
+                singleItemTitle={t("two_groups_required")}
                 sorting={sorting}
               />
               <span
-                aria-label={`第 ${groupIndex + 1} 个语义区间`}
+                aria-label={t("group_index", { index: groupIndex + 1 })}
                 className="word-sense-group-index"
               >
                 {groupIndex + 1}
@@ -672,7 +703,7 @@ function SenseGroupsCard({
             </span>
             <div className="word-sense-group-field">
               <Input
-                aria-label={`语义区间 ${groupIndex + 1} 中文`}
+                aria-label={t("group_chinese", { index: groupIndex + 1 })}
                 data-v3-field="name_zh"
                 data-v3-node-id={group.id}
                 onChange={(event) =>
@@ -683,13 +714,13 @@ function SenseGroupsCard({
                     if (target) target.name_zh = event.target.value;
                   })
                 }
-                placeholder="例如 几何与物理空间核心"
+                placeholder={t("group_placeholder_zh")}
                 value={group.name_zh}
               />
             </div>
             <div className="word-sense-group-field">
               <Input
-                aria-label={`语义区间 ${groupIndex + 1} 英文`}
+                aria-label={t("group_english", { index: groupIndex + 1 })}
                 className="tsz-entry-en"
                 data-v3-field="name_en"
                 data-v3-node-id={group.id}
@@ -710,7 +741,7 @@ function SenseGroupsCard({
                     }
                   })
                 }
-                placeholder="例如 Core geometric and physical space"
+                placeholder={t("group_placeholder_en")}
                 value={group.name_en}
               />
             </div>
@@ -720,7 +751,7 @@ function SenseGroupsCard({
               size={8}
             >
               <Button
-                aria-label={`删除语义区间 ${groupIndex + 1}`}
+                aria-label={t("delete_group", { index: groupIndex + 1 })}
                 danger
                 disabled={groups.length <= 1}
                 icon={<Trash2Icon />}
@@ -763,7 +794,7 @@ function SenseGroupsCard({
         }
         type="dashed"
       >
-        添加语义区间
+        {t("add_sense_group")}
       </Button>
     </Card>
   );
@@ -889,19 +920,19 @@ function grammarStructureOptions(
 }
 
 const DEFINITION_LANGUAGE_OPTIONS: Array<{
-  label: string;
+  label: "chinese" | "english";
   value: DefinitionLanguageV3;
 }> = [
-  { label: "中文", value: "zh" },
-  { label: "英文", value: "en" }
+  { label: "chinese", value: "zh" },
+  { label: "english", value: "en" }
 ];
 
 const DEFINITION_STYLE_OPTIONS: Array<{
-  label: string;
+  label: "definition_mode" | "sentence_mode";
   value: DefinitionStyleV3;
 }> = [
-  { label: "定义释义", value: "definition" },
-  { label: "整句释义", value: "sentence" }
+  { label: "definition_mode", value: "definition" },
+  { label: "sentence_mode", value: "sentence" }
 ];
 
 const DEFINITION_TEXT_SELECT_PROPS = {
@@ -930,10 +961,10 @@ function requestDefinitionMode(
     commit(withDefinitionMode(definition, definitionMode, idFactory));
   if (definitionModeRemovesEnglishSettings(definition, definitionMode))
     modal.confirm({
-      title: "切换为中文释义",
-      content: "切换后将移除这条释义的英文关联和发音设置。",
-      okText: "切换",
-      cancelText: "取消",
+      title: <LexiconEditorText message="switch_chinese" />,
+      content: <LexiconEditorText message="switch_chinese_help" />,
+      okText: <LexiconEditorText message="switch" />,
+      cancelText: <LexiconEditorText message="cancel" />,
       onOk: apply
     });
   else apply();
@@ -963,6 +994,7 @@ function V3MeaningsAndExamplesStepContent({
   componentUsagesEnabled = false,
   textLinksEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
+  const { t, i18n } = useLexiconEditorTranslation();
   const { modal } = App.useApp();
   // 仅本次新增词义的自动继承值可视为空白；已保存的归属保守地要求确认。
   const inheritedSenseGroups = useRef(new Map<string, string | undefined>());
@@ -1017,8 +1049,11 @@ function V3MeaningsAndExamplesStepContent({
   );
   const visiblePosLabel = (posId: string, index: number) => {
     const code = formPosById.get(posId);
-    if (!code) return `词性 ${index + 1}`;
-    return catalogByCode.get(code)?.name_zh ?? partOfSpeechLabel(code);
+    if (!code) return t("pos_index", { index: index + 1 });
+    const item = catalogByCode.get(code);
+    return item
+      ? localizedCatalogName(item, i18n.language)
+      : partOfSpeechLabel(code);
   };
 
   const save = async (intent: StepSaveIntent) => {
@@ -1108,24 +1143,24 @@ function V3MeaningsAndExamplesStepContent({
       <div className="word-step-heading">
         <span className="word-step-number">STEP 03</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          词义与例句
+          {t("meanings_title")}
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          先录入词义，再补充语法结构和例句。每个词义都需填写本语言释义，每条例句都需关联单词。
+          {t("meanings_help")}
         </Typography.Paragraph>
       </div>
 
       {issues.length > 0 && (
         <Alert
-          description="已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
+          description={t("validation_help")}
           showIcon
-          title="词义与例句尚未完成"
+          title={t("meanings_incomplete")}
           type="warning"
         />
       )}
 
       {partOfSpeechCatalogError && addBasicPosSelect ? (
-        <Alert showIcon title="词性目录不可用，已停止新增结构" type="error" />
+        <Alert showIcon title={t("catalog_unavailable")} type="error" />
       ) : null}
 
       <SenseGroupsCard
@@ -1138,7 +1173,7 @@ function V3MeaningsAndExamplesStepContent({
       {visiblePosIds.length === 0 ? (
         <Flex vertical gap="small">
           <Flex>{addBasicPosSelect}</Flex>
-          <Empty description="当前还没有词性，请从上方“添加词性”入口添加。" />
+          <Empty description={t("add_pos_empty")} />
         </Flex>
       ) : (
         <Tabs
@@ -1169,8 +1204,10 @@ function V3MeaningsAndExamplesStepContent({
                   <SortableDragHandle
                     dragImageSelector=".word-pos-tab-handle"
                     index={displayPosIndex}
-                    label={`拖动${visiblePosLabel(posId, displayPosIndex)}`}
-                    singleItemTitle="至少需要两个基本词性"
+                    label={t("drag_item", {
+                      label: visiblePosLabel(posId, displayPosIndex)
+                    })}
+                    singleItemTitle={t("two_pos_required")}
                     sorting={posSorting}
                   />
                   <span className="word-pos-tab-label">
@@ -1184,7 +1221,7 @@ function V3MeaningsAndExamplesStepContent({
                             ?.sub_pos_required ?? true
                         )}
                         size="small"
-                        title="该词性未填项"
+                        title={t("pos_issues")}
                       />
                     ) : null}
                   </span>
@@ -1207,16 +1244,29 @@ function V3MeaningsAndExamplesStepContent({
                         }
                       >
                         <Button
-                          aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                          aria-label={t("delete_item", {
+                            label: visiblePosLabel(posId, displayPosIndex)
+                          })}
                           danger
                           icon={<CircleMinusIcon />}
                           onClick={(event) => {
                             event.stopPropagation();
                             modal.confirm({
-                              title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                              content:
-                                "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                              okText: "删除",
+                              title: (
+                                <LexiconEditorText
+                                  message="delete_pos_title"
+                                  params={{
+                                    label: visiblePosLabel(
+                                      posId,
+                                      displayPosIndex
+                                    )
+                                  }}
+                                />
+                              ),
+                              content: (
+                                <LexiconEditorText message="remove_pos_help" />
+                              ),
+                              okText: <LexiconEditorText message="delete" />,
                               okButtonProps: { danger: true },
                               onOk: () => deleteBasicPos(posId)
                             });
@@ -1366,16 +1416,21 @@ function V3MeaningsAndExamplesStepContent({
                                         .join(" ")
                                     : undefined
                                 }
-                                summary={definitionSummary(sense)}
+                                summary={definitionSummary(
+                                  sense,
+                                  t("empty_definition")
+                                )}
                               >
                                 <Flex vertical gap="small">
                                   <div className="word-sense-meta-grid">
                                     <label className="word-sense-field">
                                       <Typography.Text type="secondary">
-                                        词义等级
+                                        {t("sense_level")}
                                       </Typography.Text>
                                       <Select
-                                        aria-label={`释义 ${senseIndex + 1} 等级`}
+                                        aria-label={t("sense_level_label", {
+                                          index: senseIndex + 1
+                                        })}
                                         data-v3-field="level"
                                         data-v3-node-id={sense.id}
                                         onChange={(level: string) =>
@@ -1407,10 +1462,12 @@ function V3MeaningsAndExamplesStepContent({
                                     </label>
                                     <label className="word-sense-field word-sense-field-group">
                                       <Typography.Text type="secondary">
-                                        语义区间
+                                        {t("sense_groups")}
                                       </Typography.Text>
                                       <Select
-                                        aria-label={`释义 ${senseIndex + 1} 所属语义区间`}
+                                        aria-label={t("sense_group_label", {
+                                          index: senseIndex + 1
+                                        })}
                                         data-v3-field="sense_group_id"
                                         data-v3-node-id={sense.id}
                                         onChange={(nextValue: string) =>
@@ -1427,20 +1484,20 @@ function V3MeaningsAndExamplesStepContent({
                                         }
                                         options={[
                                           {
-                                            label: "不归入语义区间",
+                                            label: t("no_sense_group"),
                                             value: ""
                                           },
                                           ...senseGroupOptions
                                         ]}
                                         labelRender={({ value: selectedId }) =>
                                           selectedId === ""
-                                            ? "不归入语义区间"
+                                            ? t("no_sense_group")
                                             : (senseGroupOptions.find(
                                                 (option) =>
                                                   option.value === selectedId
                                               )?.label ?? "")
                                         }
-                                        placeholder="请选择语义区间"
+                                        placeholder={t("select_group")}
                                         value={
                                           senseGroupOptions.some(
                                             (option) =>
@@ -1457,11 +1514,14 @@ function V3MeaningsAndExamplesStepContent({
                                       Boolean(subPosIssue)) && (
                                       <label className="word-sense-field word-sense-field-pos">
                                         <Typography.Text type="secondary">
-                                          细分词性
+                                          {t("sub_pos")}
                                         </Typography.Text>
                                         {subPosExtensible ? (
                                           <Select
-                                            aria-label={`释义 ${senseIndex + 1} 子词性`}
+                                            aria-label={t(
+                                              "sense_sub_pos_label",
+                                              { index: senseIndex + 1 }
+                                            )}
                                             data-v3-field="sub_pos"
                                             data-v3-node-id={sense.id}
                                             onChange={(subPos) =>
@@ -1488,7 +1548,7 @@ function V3MeaningsAndExamplesStepContent({
                                                   ? []
                                                   : [
                                                       {
-                                                        label: "不指定子词性",
+                                                        label: t("no_sub_pos"),
                                                         value: ""
                                                       }
                                                     ]),
@@ -1496,7 +1556,9 @@ function V3MeaningsAndExamplesStepContent({
                                                   ? []
                                                   : [
                                                       {
-                                                        label: "未配置子词性",
+                                                        label: t(
+                                                          "sub_pos_unconfigured"
+                                                        ),
                                                         value: sense.sub_pos
                                                       }
                                                     ]),
@@ -1506,7 +1568,7 @@ function V3MeaningsAndExamplesStepContent({
                                                 }))
                                               ];
                                             })()}
-                                            placeholder="请选择细分词性"
+                                            placeholder={t("select_sub_pos")}
                                             status={
                                               subPosIssue ? "error" : undefined
                                             }
@@ -1529,10 +1591,12 @@ function V3MeaningsAndExamplesStepContent({
                                     )}
                                     <label className="word-sense-field word-sense-field-frequency">
                                       <Typography.Text type="secondary">
-                                        词频
+                                        {t("frequency")}
                                       </Typography.Text>
                                       <InputNumber
-                                        aria-label={`释义 ${senseIndex + 1} 频率`}
+                                        aria-label={t("sense_frequency_label", {
+                                          index: senseIndex + 1
+                                        })}
                                         data-v3-field="frequency"
                                         data-v3-node-id={sense.id}
                                         placeholder="0–100"
@@ -1567,7 +1631,7 @@ function V3MeaningsAndExamplesStepContent({
                                     </label>
                                     <div className="word-sense-context-toggle">
                                       <Typography.Text type="secondary">
-                                        是否依赖语境
+                                        {t("context_dependent")}
                                       </Typography.Text>
                                       <div
                                         className="word-sense-context-control"
@@ -1590,7 +1654,9 @@ function V3MeaningsAndExamplesStepContent({
                                         }}
                                       >
                                         <Switch
-                                          aria-label={`释义 ${senseIndex + 1} 是否依赖语境`}
+                                          aria-label={t("sense_context_label", {
+                                            index: senseIndex + 1
+                                          })}
                                           checked={sense.depends_on_context}
                                           onChange={(checked) =>
                                             change((draft) => {
@@ -1610,8 +1676,7 @@ function V3MeaningsAndExamplesStepContent({
                                         tabIndex={-1}
                                       >
                                         <Typography.Text type="secondary">
-                                          请在第 2
-                                          步「词形与发音」调整专用词义设置。
+                                          {t("dedicated_sense_help")}
                                         </Typography.Text>
                                         <FieldIssueHelp
                                           issue={formGroupIssue}
@@ -1630,11 +1695,11 @@ function V3MeaningsAndExamplesStepContent({
                                       count={sense.definitions.length}
                                       extra={
                                         <V3ReferenceBadge
-                                          label="绑定"
+                                          label={t("bind")}
                                           nodeIds={[sense.id]}
                                         />
                                       }
-                                      label="多维释义"
+                                      label={t("definitions")}
                                       onToggle={() =>
                                         toggleSenseSection(
                                           sense.id,
@@ -1642,7 +1707,9 @@ function V3MeaningsAndExamplesStepContent({
                                           definitionsCollapsed
                                         )
                                       }
-                                      unit="条"
+                                      unit={t("definition_count_unit", {
+                                        count: sense.definitions.length
+                                      })}
                                     />
                                     <SenseSectionBody
                                       collapsed={definitionsCollapsed}
@@ -1651,8 +1718,10 @@ function V3MeaningsAndExamplesStepContent({
                                         {sense.definitions.length > 0 ? (
                                           <div className="word-list-header word-definition-list-header">
                                             <span aria-hidden="true" />
-                                            <span>释义语句</span>
-                                            <span>语法结构</span>
+                                            <span>
+                                              {t("definition_sentence")}
+                                            </span>
+                                            <span>{t("grammar")}</span>
                                             <span aria-hidden="true" />
                                           </div>
                                         ) : null}
@@ -1704,8 +1773,17 @@ function V3MeaningsAndExamplesStepContent({
                                                           SORTABLE_ROW_SELECTOR
                                                         }
                                                         index={definitionIndex}
-                                                        label={`拖动定义 ${definitionIndex + 1}`}
-                                                        singleItemTitle="至少需要两条释义"
+                                                        label={t(
+                                                          "drag_definition",
+                                                          {
+                                                            index:
+                                                              definitionIndex +
+                                                              1
+                                                          }
+                                                        )}
+                                                        singleItemTitle={t(
+                                                          "two_definitions_required"
+                                                        )}
                                                         sorting={
                                                           definitionSorting
                                                         }
@@ -1717,7 +1795,14 @@ function V3MeaningsAndExamplesStepContent({
                                                     <div className="word-definition-options">
                                                       <Select
                                                         {...DEFINITION_TEXT_SELECT_PROPS}
-                                                        aria-label={`定义 ${definitionIndex + 1} 等级`}
+                                                        aria-label={t(
+                                                          "definition_level_label",
+                                                          {
+                                                            index:
+                                                              definitionIndex +
+                                                              1
+                                                          }
+                                                        )}
                                                         data-v3-field="level"
                                                         data-v3-node-id={
                                                           definition.id
@@ -1740,7 +1825,14 @@ function V3MeaningsAndExamplesStepContent({
                                                       />
                                                       <Select
                                                         {...DEFINITION_TEXT_SELECT_PROPS}
-                                                        aria-label={`定义 ${definitionIndex + 1} 语言`}
+                                                        aria-label={t(
+                                                          "definition_language_label",
+                                                          {
+                                                            index:
+                                                              definitionIndex +
+                                                              1
+                                                          }
+                                                        )}
                                                         data-v3-field="definition_mode"
                                                         data-v3-node-id={
                                                           definition.id
@@ -1773,16 +1865,28 @@ function V3MeaningsAndExamplesStepContent({
                                                               )
                                                           )
                                                         }
-                                                        options={
-                                                          DEFINITION_LANGUAGE_OPTIONS
-                                                        }
+                                                        options={DEFINITION_LANGUAGE_OPTIONS.map(
+                                                          (option) => ({
+                                                            ...option,
+                                                            label: t(
+                                                              option.label
+                                                            )
+                                                          })
+                                                        )}
                                                         value={definitionLanguageOf(
                                                           definition.definition_mode
                                                         )}
                                                       />
                                                       <Select
                                                         {...DEFINITION_TEXT_SELECT_PROPS}
-                                                        aria-label={`定义 ${definitionIndex + 1} 释义方式`}
+                                                        aria-label={t(
+                                                          "definition_mode_label",
+                                                          {
+                                                            index:
+                                                              definitionIndex +
+                                                              1
+                                                          }
+                                                        )}
                                                         data-v3-node-id={
                                                           definition.id
                                                         }
@@ -1812,9 +1916,14 @@ function V3MeaningsAndExamplesStepContent({
                                                               )
                                                           )
                                                         }
-                                                        options={
-                                                          DEFINITION_STYLE_OPTIONS
-                                                        }
+                                                        options={DEFINITION_STYLE_OPTIONS.map(
+                                                          (option) => ({
+                                                            ...option,
+                                                            label: t(
+                                                              option.label
+                                                            )
+                                                          })
+                                                        )}
                                                         value={definitionStyleOf(
                                                           definition.definition_mode
                                                         )}
@@ -1827,12 +1936,23 @@ function V3MeaningsAndExamplesStepContent({
                                                     definition.definition_mode ===
                                                       "zh_sentence" ? (
                                                       <Input.TextArea
-                                                        aria-label={`定义 ${definitionIndex + 1} 内容`}
+                                                        aria-label={t(
+                                                          "definition_content_label",
+                                                          {
+                                                            index:
+                                                              definitionIndex +
+                                                              1
+                                                          }
+                                                        )}
                                                         placeholder={
                                                           definition.definition_mode ===
                                                           "zh_sentence"
-                                                            ? "请输入中文释义句"
-                                                            : "请输入中文释义"
+                                                            ? t(
+                                                                "chinese_sentence_placeholder"
+                                                              )
+                                                            : t(
+                                                                "chinese_definition_placeholder"
+                                                              )
                                                         }
                                                         autoSize={{
                                                           maxRows: 6,
@@ -1886,8 +2006,15 @@ function V3MeaningsAndExamplesStepContent({
                                                         value={
                                                           definition.content as EnglishTextV3
                                                         }
-                                                        label={`定义 ${definitionIndex + 1}`}
-                                                        suffix="内容"
+                                                        label={t(
+                                                          "definition_index",
+                                                          {
+                                                            index:
+                                                              definitionIndex +
+                                                              1
+                                                          }
+                                                        )}
+                                                        suffix={t("content")}
                                                         renderEditorTitle={(
                                                           dialect
                                                         ) => (
@@ -1895,15 +2022,21 @@ function V3MeaningsAndExamplesStepContent({
                                                             index={
                                                               definitionIndex
                                                             }
-                                                            title="多维释义"
-                                                            details={`${definitionStyleOf(definition.definition_mode) === "sentence" ? "整句释义" : "定义释义"} · ${dialectLabel(dialect)}`}
+                                                            title={t(
+                                                              "definitions"
+                                                            )}
+                                                            details={`${definitionStyleOf(definition.definition_mode) === "sentence" ? t("sentence_mode") : t("definition_mode")} · ${t(dialect === "uk" ? "dialect_uk" : dialect === "us" ? "dialect_us" : "common")}`}
                                                           />
                                                         )}
                                                         placeholder={
                                                           definition.definition_mode ===
                                                           "en_sentence"
-                                                            ? "请输入英文释义句"
-                                                            : "请输入英文释义"
+                                                            ? t(
+                                                                "english_sentence_placeholder"
+                                                              )
+                                                            : t(
+                                                                "english_definition_placeholder"
+                                                              )
                                                         }
                                                         wordId={wordId}
                                                         forms={forms}
@@ -1944,7 +2077,13 @@ function V3MeaningsAndExamplesStepContent({
                                                   <div className="word-field-with-help">
                                                     <Select
                                                       aria-required="true"
-                                                      aria-label={`定义 ${definitionIndex + 1} 语法结构`}
+                                                      aria-label={t(
+                                                        "definition_grammar_label",
+                                                        {
+                                                          index:
+                                                            definitionIndex + 1
+                                                        }
+                                                      )}
                                                       className="tsz-words word-grammar-select"
                                                       classNames={{
                                                         popup: {
@@ -1980,7 +2119,9 @@ function V3MeaningsAndExamplesStepContent({
                                                           ? [
                                                               {
                                                                 label:
-                                                                  "未找到的语法结构",
+                                                                  t(
+                                                                    "grammar_missing"
+                                                                  ),
                                                                 value:
                                                                   definition.grammar_structure_id
                                                               }
@@ -2056,7 +2197,9 @@ function V3MeaningsAndExamplesStepContent({
                                                                 .length -
                                                                 1 ? (
                                                               <Popover
-                                                                content="填到本条及后面每条释义"
+                                                                content={t(
+                                                                  "apply_following"
+                                                                )}
                                                                 // 触发点在 Select 浮层里，气泡得压过下拉面板（默认 1050）才不被挡住。
                                                                 zIndex={1100}
                                                                 classNames={{
@@ -2070,7 +2213,18 @@ function V3MeaningsAndExamplesStepContent({
                                                                 placement="right"
                                                               >
                                                                 <Button
-                                                                  aria-label={`把「${String(option.label)}」套用到定义 ${definitionIndex + 1} 及后面每条释义`}
+                                                                  aria-label={t(
+                                                                    "apply_grammar_following",
+                                                                    {
+                                                                      label:
+                                                                        String(
+                                                                          option.label
+                                                                        ),
+                                                                      index:
+                                                                        definitionIndex +
+                                                                        1
+                                                                    }
+                                                                  )}
                                                                   className="word-grammar-option-copy"
                                                                   onMouseEnter={() =>
                                                                     setHoveredCopyKey(
@@ -2136,8 +2290,12 @@ function V3MeaningsAndExamplesStepContent({
                                                           </span>
                                                         );
                                                       }}
-                                                      notFoundContent="请先在上方填写语法结构"
-                                                      placeholder="请选择语法结构"
+                                                      notFoundContent={t(
+                                                        "grammar_first"
+                                                      )}
+                                                      placeholder={t(
+                                                        "select_grammar"
+                                                      )}
                                                       status={
                                                         fieldIssue(
                                                           issues,
@@ -2164,7 +2322,13 @@ function V3MeaningsAndExamplesStepContent({
                                                     orientation="horizontal"
                                                   >
                                                     <Button
-                                                      aria-label={`删除定义 ${definitionIndex + 1}`}
+                                                      aria-label={t(
+                                                        "delete_definition",
+                                                        {
+                                                          index:
+                                                            definitionIndex + 1
+                                                        }
+                                                      )}
                                                       danger
                                                       icon={<Trash2Icon />}
                                                       onClick={() =>
@@ -2203,7 +2367,7 @@ function V3MeaningsAndExamplesStepContent({
                                           }
                                           type="dashed"
                                         >
-                                          添加释义
+                                          {t("add_definition")}
                                         </Button>
                                       </>
                                     </SenseSectionBody>
@@ -2221,7 +2385,7 @@ function V3MeaningsAndExamplesStepContent({
                                           componentSpelling,
                                           senseComponentUsages
                                         )}
-                                        label="成分用词"
+                                        label={t("component_words")}
                                         onToggle={() =>
                                           toggleSenseSection(
                                             sense.id,
@@ -2229,7 +2393,12 @@ function V3MeaningsAndExamplesStepContent({
                                             componentUsagesCollapsed
                                           )
                                         }
-                                        unit="条"
+                                        unit={t("definition_count_unit", {
+                                          count: reachableUsageCount(
+                                            componentSpelling,
+                                            senseComponentUsages
+                                          )
+                                        })}
                                       />
                                       <SenseSectionBody
                                         collapsed={componentUsagesCollapsed}
@@ -2264,7 +2433,7 @@ function V3MeaningsAndExamplesStepContent({
                                       count={
                                         groupRelations(sense.relations).length
                                       }
-                                      label="拓展词"
+                                      label={t("related_words")}
                                       onToggle={() =>
                                         toggleSenseSection(
                                           sense.id,
@@ -2272,7 +2441,10 @@ function V3MeaningsAndExamplesStepContent({
                                           relationsCollapsed
                                         )
                                       }
-                                      unit="个"
+                                      unit={t("item_count_unit", {
+                                        count: groupRelations(sense.relations)
+                                          .length
+                                      })}
                                     />
                                     <SenseSectionBody
                                       collapsed={relationsCollapsed}
@@ -2322,7 +2494,7 @@ function V3MeaningsAndExamplesStepContent({
                         size="large"
                         type="dashed"
                       >
-                        添加词义
+                        {t("add_sense")}
                       </Button>
                     </div>
                   </Flex>
@@ -2335,17 +2507,17 @@ function V3MeaningsAndExamplesStepContent({
       )}
 
       {onSave && (
-        <V3StepActions status={saving ? "正在处理草稿…" : draftStatus}>
+        <V3StepActions status={saving ? t("processing_draft") : draftStatus}>
           {onPrevious ? (
             <Button type="text" disabled={saving} onClick={onPrevious}>
-              上一步
+              {t("previous")}
             </Button>
           ) : null}
           <Button
             disabled={saving || !canSave}
             onClick={() => void save("save")}
           >
-            保存草稿
+            {t("save_draft")}
           </Button>
           <Button
             disabled={saving}
@@ -2353,7 +2525,7 @@ function V3MeaningsAndExamplesStepContent({
             onClick={() => void save("complete")}
             type="primary"
           >
-            完成并进入预览
+            {t("complete_preview")}
           </Button>
         </V3StepActions>
       )}

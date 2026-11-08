@@ -1,3 +1,8 @@
+import {
+  useLexiconListTranslation,
+  LexiconListText,
+  type LexiconListKey
+} from "@/features/dictionary/i18n/list";
 import { Button as PilotButton } from "@tsz/ui/components/button";
 import { Input as PilotInput } from "@tsz/ui/components/input";
 import { WordListTable, type WordColumn } from "./WordListTable";
@@ -26,7 +31,14 @@ import { DatePicker, Form, Select } from "@tsz/ui/admin/forms";
 import { adminTokens } from "@tsz/ui/admin/context";
 
 import dayjs from "dayjs";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
 import { hasAdminPermission } from "@tsz/shared/auth";
@@ -56,20 +68,14 @@ import {
   adminWordsDataSourceCapabilities
 } from "./dataSource";
 import {
-  DELETE_BLOCK_REASON_TEXT,
   evaluateDeleteEligibility,
   partitionDeletableRows
 } from "./deletePermission";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
-import {
-  CEFR_OPTIONS,
-  cefrColor,
-  KIND_LABEL,
-  KIND_OPTIONS,
-  STATUS_LABEL
-} from "./labels";
+import { CEFR_OPTIONS, cefrColor, KIND_OPTIONS } from "./labels";
 import {
   availablePartOfSpeechOptions,
+  localizedCatalogName,
   createPartOfSpeechLookup,
   type PartOfSpeechLookup
 } from "./part-of-speech/catalog";
@@ -87,17 +93,12 @@ import {
   wordListLabel
 } from "./presentation";
 import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
-import {
-  getWordRowActionLabel,
-  getWordRowRoute,
-  LEGACY_SCHEMA_BLOCKED_HINT
-} from "./wordRouting";
+import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import {
   canCreateEntry,
   canModifyEntry,
   canPublishEntry,
   canTransitionEntry,
-  entryWriteForbiddenMessage,
   isEntryOwnershipError
 } from "./entryWritePermission";
 import { newWordNodeId } from "./word-model/primitives";
@@ -110,14 +111,36 @@ import { BatchPublicationModal } from "./BatchPublicationModal";
 
 const { RangePicker } = DatePicker;
 
-const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
-  relation: "关联词",
-  relation_prebound: "关联词待物化",
-  sentence_link: "例句关联",
-  publication_sense_ref: "已发布内容关联",
-  sentence_association: "例句关联待认领",
-  phrase_component: "短语成分"
+const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, LexiconListKey> = {
+  relation: "reference_relation",
+  relation_prebound: "reference_prebound",
+  sentence_link: "reference_sentence",
+  publication_sense_ref: "reference_publication",
+  sentence_association: "reference_association",
+  phrase_component: "reference_component"
 };
+
+function BlockedDeleteNotice({
+  blocked
+}: {
+  blocked: ReturnType<typeof partitionDeletableRows>["blocked"];
+}) {
+  const { t, i18n } = useLexiconListTranslation();
+  const detail = blocked
+    .slice(0, 3)
+    .map(
+      ({ row, reason }) =>
+        `「${wordListLabel(row)}」${t(`delete_block_${reason}`)}`
+    )
+    .join(i18n.language.startsWith("en") ? "; " : "；");
+  return (
+    <>
+      {blocked.length > 3
+        ? t("more_delete_blocked", { detail, count: blocked.length - 3 })
+        : detail}
+    </>
+  );
+}
 
 /** 基本词性按英文缩写展示，只斜体字母、点号保持正体（如 *adj*.）；目录里没有的编码原样显示。 */
 function PartOfSpeechAbbreviation({
@@ -190,6 +213,20 @@ export function SmartDictionary({
   reportUnknownPresentationStrategy?: PresentationStrategyReporter;
   mode?: SmartDictionaryMode;
 } = {}) {
+  const { t, i18n } = useLexiconListTranslation();
+  const kindLabel = (kind: AdminWordListItemAny["kind"]) =>
+    t(kind === "word" ? "kind_word" : "kind_phrase");
+  const rowActionLabel = (record: AdminWordListItemAny, writable = true) =>
+    t(
+      (
+        {
+          编辑: "action_edit",
+          继续创建: "action_create",
+          继续编辑: "action_resume",
+          查看: "action_view"
+        } as const
+      )[getWordRowActionLabel(record, writable)]
+    );
   const trashMode = mode === "trash";
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
@@ -279,10 +316,20 @@ export function SmartDictionary({
   );
   // 选了词汇类型就把词性候选收到同一侧：单词词条不会挂短语词性，反过来也一样，
   // 两者交叉筛选只会得到空列表。
+  const posDisplayName = (code: string) => {
+    const item = partOfSpeechLookup.byCode.get(code);
+    return item ? localizedCatalogName(item, i18n.language) : code;
+  };
   const filterKind = Form.useWatch("kind", form);
   const partOfSpeechOptions = useMemo(
-    () => availablePartOfSpeechOptions(partOfSpeechLookup, [], filterKind),
-    [partOfSpeechLookup, filterKind]
+    () =>
+      availablePartOfSpeechOptions(
+        partOfSpeechLookup,
+        [],
+        filterKind,
+        i18n.language
+      ),
+    [partOfSpeechLookup, filterKind, i18n.language]
   );
   // 收窄之后原来选中的词性可能已经不在候选里。不清掉的话 Select 会退化成显示原始编码，
   // 还会跟着新类型一起提交，搜出一个空列表而界面上看不出是哪个条件冲突。
@@ -293,8 +340,13 @@ export function SmartDictionary({
     form.setFieldValue("pos", undefined);
   }, [form, partOfSpeechOptions]);
   const kindOptions = adminWordsDataSourceCapabilities.phraseCreation
-    ? KIND_OPTIONS
-    : KIND_OPTIONS.filter((option) => option.value === "word");
+    ? KIND_OPTIONS.map((option) => ({
+        ...option,
+        label: kindLabel(option.value)
+      }))
+    : KIND_OPTIONS.filter((option) => option.value === "word").map(
+        (option) => ({ ...option, label: kindLabel(option.value) })
+      );
 
   const rows = useMemo(
     () => listQuery.data?.words ?? [],
@@ -369,14 +421,14 @@ export function SmartDictionary({
         );
         if (attemptGeneration !== restoreAttemptGeneration.current) return;
         if (latest.some((word) => !word)) {
-          message.error("无法加载所选词条的最新生命周期版本，请刷新后重试");
+          message.error(<LexiconListText message="lifecycle_load_failed" />);
           return;
         }
         const targets = latest.filter((word) => word !== undefined);
         if (targets.some((word) => word.status !== "archived")) {
           restoreSurface.clear();
           setPendingRestore(undefined);
-          message.warning("所选词条状态已变化，请重新确认选择");
+          message.warning(<LexiconListText message="selection_changed" />);
           void listQuery.refetch();
           return;
         }
@@ -424,22 +476,35 @@ export function SmartDictionary({
         setSelectedKeys([]);
         setSelectedRecords({});
         setPendingRestore(undefined);
-        message.success(`已将 ${affected} 个词条恢复为草稿`);
+        message.success(
+          <LexiconListText
+            message="restored_count"
+            params={{ count: affected }}
+          />
+        );
       } else if (
         outcome.error.code ===
         "multiple_active_exact_headword_publications_not_enabled"
       ) {
-        message.warning("学习端暂不支持多个同名公开词条");
+        message.warning(<LexiconListText message="public_homonyms_disabled" />);
       } else if (outcome.refreshRequired) {
         restoreSurface.clear();
         setPendingRestore(undefined);
         void listQuery.refetch();
-        message.warning("词条状态或确认策略已变化，请重新发起恢复");
+        message.warning(<LexiconListText message="restore_policy_changed" />);
       } else {
-        message.warning("恢复条件已变化，请查看最新确认信息");
+        message.warning(
+          <LexiconListText message="restore_conditions_changed" />
+        );
       }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "恢复失败");
+      message.error(
+        error instanceof Error ? (
+          error.message
+        ) : (
+          <LexiconListText message="restore_failed" />
+        )
+      );
     }
   };
 
@@ -458,35 +523,39 @@ export function SmartDictionary({
 
   // 永久删除的错误分流：403(越权)、409(本身不可删/版本冲突) 对管理员意味完全不同，
   // 统一提示会让人以为是同一类问题。
-  const describeDeleteFailure = (error: unknown): string => {
+  const describeDeleteFailure = (error: unknown): ReactNode => {
     const code = (error as { code?: string } | undefined)?.code;
     if (code === "entry_delete_forbidden") {
-      return "只能永久删除自己创建的词条";
+      return <LexiconListText message="delete_owner_only" />;
     }
     if (code === "entry_not_deletable") {
-      return "该词条有发布记录或仍与其他草稿有关联，不能永久删除";
+      return <LexiconListText message="delete_history_blocked" />;
     }
     if (code === "entry_has_inbound_prebound_relations") {
-      return "该词条被其他草稿的关联词选中，请先解除后再删除";
+      return <LexiconListText message="delete_relation_blocked" />;
     }
     if (code === "revision_conflict") {
-      return "词条已被他人改动，请刷新列表后重试";
+      return <LexiconListText message="revision_changed" />;
     }
     if (code === "word_not_found") {
-      return "词条已不存在，请刷新列表";
+      return <LexiconListText message="entry_missing" />;
     }
-    return error instanceof Error ? error.message : "永久删除失败";
+    return error instanceof Error ? (
+      error.message
+    ) : (
+      <LexiconListText message="delete_failed" />
+    );
   };
 
   // 归属越权（403 entry_edit_forbidden）与普通失败对管理员意味不同：前者重试也没用。
   // 后端 detail 是英文的，这里换成中文再显示。
   const describeLifecycleFailure = (
     error: unknown,
-    fallback: string
-  ): string => {
+    fallback: ReactNode
+  ): ReactNode => {
     const code = (error as { code?: string } | undefined)?.code;
     if (isEntryOwnershipError(code)) {
-      return entryWriteForbiddenMessage(code);
+      return <LexiconListText message="ownership_forbidden" />;
     }
     return error instanceof Error ? error.message : fallback;
   };
@@ -494,17 +563,20 @@ export function SmartDictionary({
   const deleteOne = (record: AdminWordListItemAny) => {
     const eligibility = evaluateDeleteEligibility(deleteActor, record);
     if (!eligibility.deletable) {
-      message.warning(DELETE_BLOCK_REASON_TEXT[eligibility.reason!]);
+      message.warning(
+        <LexiconListText message={`delete_block_${eligibility.reason!}`} />
+      );
       return;
     }
     const label = wordListLabel(record);
     modal.confirm({
-      title: `永久删除「${label}」？`,
-      content:
-        "此操作不可恢复：词条及其草稿内容会被彻底清除，占用的词头随之释放（之后可用同名重新创建）。",
-      okText: "永久删除",
+      title: (
+        <LexiconListText message="delete_title" params={{ label: label }} />
+      ),
+      content: <LexiconListText message="delete_help" />,
+      okText: <LexiconListText message="delete" />,
       okButtonProps: { danger: true },
-      cancelText: "取消",
+      cancelText: <LexiconListText message="cancel" />,
       onOk: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
@@ -516,7 +588,7 @@ export function SmartDictionary({
             setSelectedKeys((keys) =>
               keys.filter((key) => String(key) !== record.id)
             );
-            message.success("词条已永久删除");
+            message.success(<LexiconListText message="deleted" />);
           } catch (error) {
             message.error(describeDeleteFailure(error));
             void listQuery.refetch();
@@ -527,7 +599,7 @@ export function SmartDictionary({
 
   const deleteSelected = () => {
     if (selectedRows.length !== selectedKeys.length) {
-      message.error("所选词条缺少并发版本信息，请刷新列表后重试");
+      message.error(<LexiconListText message="selected_revision_missing" />);
       return;
     }
     const { deletable, blocked } = partitionDeletableRows(
@@ -536,28 +608,21 @@ export function SmartDictionary({
     );
     // 永久删除不可逆，后端也是整批原子的：与其部分成功，不如提交前就把不合格的挑明。
     if (blocked.length > 0) {
-      const detail = blocked
-        .slice(0, 3)
-        .map(
-          ({ row, reason }) =>
-            `「${wordListLabel(row)}」${DELETE_BLOCK_REASON_TEXT[reason]}`
-        )
-        .join("；");
-      message.warning(
-        blocked.length > 3
-          ? `${detail}；另有 ${blocked.length - 3} 条不可删除`
-          : detail
-      );
+      message.warning(<BlockedDeleteNotice blocked={blocked} />);
       return;
     }
     if (deletable.length === 0) return;
     modal.confirm({
-      title: `永久删除选中的 ${deletable.length} 个词条？`,
-      content:
-        "此操作不可恢复，且整批原子执行：任意一条不满足条件时全部保持原状。词条彻底清除后，占用的词头随之释放。",
-      okText: "永久删除",
+      title: (
+        <LexiconListText
+          message="delete_selected_title"
+          params={{ count: deletable.length }}
+        />
+      ),
+      content: <LexiconListText message="delete_batch_help" />,
+      okText: <LexiconListText message="delete" />,
       okButtonProps: { danger: true },
-      cancelText: "取消",
+      cancelText: <LexiconListText message="cancel" />,
       onOk: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
@@ -573,7 +638,12 @@ export function SmartDictionary({
             });
             setSelectedKeys([]);
             setSelectedRecords({});
-            message.success(`已永久删除 ${response.affected} 个词条`);
+            message.success(
+              <LexiconListText
+                message="deleted_count"
+                params={{ count: response.affected }}
+              />
+            );
           } catch (error) {
             message.error(describeDeleteFailure(error));
             void listQuery.refetch();
@@ -584,7 +654,7 @@ export function SmartDictionary({
 
   const confirmArchive = (
     entries: EntryLifecycleTarget[],
-    title: string,
+    title: ReactNode,
     onOk: () => Promise<void>
   ) => {
     let closed = false;
@@ -592,10 +662,10 @@ export function SmartDictionary({
     let loading = false;
     const dialog = modal.confirm({
       title,
-      content: "正在检查词表和练习的影响…",
-      okText: "移入垃圾桶",
+      content: <LexiconListText message="checking_impact" />,
+      okText: <LexiconListText message="archive" />,
       okButtonProps: { danger: true, disabled: true },
-      cancelText: "取消",
+      cancelText: <LexiconListText message="cancel" />,
       onCancel: () => {
         closed = true;
       },
@@ -608,7 +678,7 @@ export function SmartDictionary({
       if (loading || closed) return;
       loading = true;
       dialog.update({
-        content: "正在检查词表和练习的影响…",
+        content: <LexiconListText message="checking_impact" />,
         okButtonProps: { danger: true, disabled: true }
       });
       try {
@@ -619,14 +689,19 @@ export function SmartDictionary({
           content: (
             <div>
               <p>
-                将使 {impact.wordlist_count} 张词表中的引用不可用，可能影响{" "}
-                {impact.active_run_count} 轮尚未结束的练习。
+                <LexiconListText
+                  message="archive_impact"
+                  params={{
+                    lists: impact.wordlist_count,
+                    runs: impact.active_run_count
+                  }}
+                />
               </p>
               <p>
-                发布记录会保留。恢复后词条为草稿，不会自动公开；重新发布后词表才可展示，已失效的练习需要重新开始。
+                <LexiconListText message="archive_history" />
               </p>
               <p>
-                如果只是修正内容，请取消并编辑词条。引用数量可能随新操作变化，其他关联仍须先解除。
+                <LexiconListText message="archive_edit_instead" />
               </p>
             </div>
           ),
@@ -644,11 +719,16 @@ export function SmartDictionary({
             content: (
               <div>
                 <p role="alert">
-                  {refreshRequired
-                    ? "词条已发生变化，请刷新列表后重新确认；尚未移入垃圾桶。"
-                    : retryable
-                      ? "无法读取影响，请重试；尚未移入垃圾桶。"
-                      : describeLifecycleFailure(error, "无法读取归档影响")}
+                  {refreshRequired ? (
+                    <LexiconListText message="archive_stale" />
+                  ) : retryable ? (
+                    <LexiconListText message="archive_impact_failed" />
+                  ) : (
+                    describeLifecycleFailure(
+                      error,
+                      <LexiconListText message="archive_impact_unknown" />
+                    )
+                  )}
                 </p>
                 {refreshRequired ? (
                   <Button
@@ -660,10 +740,12 @@ export function SmartDictionary({
                       void listQuery.refetch();
                     }}
                   >
-                    刷新列表并重新确认
+                    <LexiconListText message="refresh_confirm" />
                   </Button>
                 ) : retryable ? (
-                  <Button onClick={() => void load()}>重试</Button>
+                  <Button onClick={() => void load()}>
+                    <LexiconListText message="retry" />
+                  </Button>
                 ) : null}
               </div>
             ),
@@ -682,18 +764,22 @@ export function SmartDictionary({
   ) => {
     const input = lifecycleInput(record);
     if (!input) {
-      message.error("词条缺少并发版本信息，请刷新列表后重试");
+      message.error(<LexiconListText message="revision_missing" />);
       return;
     }
     const restoring = target === "restore";
     const label = wordListLabel(record);
     const confirmation = {
-      title: `${restoring ? "恢复" : "移入垃圾桶"}「${label}」？`,
-      content:
-        "恢复后词条为草稿，不会自动公开。重新发布后词表才可展示；已失效的练习不会自动恢复。",
-      okText: restoring ? "恢 复" : "移入垃圾桶",
+      title: (
+        <LexiconListText
+          message={restoring ? "restore_title" : "archive_title"}
+          params={{ label }}
+        />
+      ),
+      content: t("restore_help"),
+      okText: restoring ? t("restore_spaced") : t("archive"),
       okButtonProps: { danger: !restoring },
-      cancelText: "取消",
+      cancelText: t("cancel"),
       onOk: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
@@ -711,13 +797,21 @@ export function SmartDictionary({
               previous.filter((key) => key !== record.id)
             );
             message.success(
-              restoring ? "词条已恢复为草稿" : "词条已移入垃圾桶"
+              restoring ? (
+                <LexiconListText message="restored" />
+              ) : (
+                <LexiconListText message="archived" />
+              )
             );
           } catch (error) {
             message.error(
               describeLifecycleFailure(
                 error,
-                restoring ? "恢复失败" : "移入垃圾桶失败"
+                restoring ? (
+                  <LexiconListText message="restore_failed" />
+                ) : (
+                  <LexiconListText message="archive_failed" />
+                )
               )
             );
           }
@@ -738,13 +832,13 @@ export function SmartDictionary({
       selectedRows.length !== selectedKeys.length ||
       selectedRows.some((row) => lifecycleInput(row) === undefined)
     ) {
-      message.error("所选词条缺少并发版本信息，请刷新列表后重试");
+      message.error(<LexiconListText message="selected_revision_missing" />);
       return;
     }
     const hasArchived = selectedRows.some((row) => row.status === "archived");
     const hasActive = selectedRows.some((row) => row.status !== "archived");
     if (hasArchived && hasActive) {
-      message.warning("垃圾桶与正常词条不能在同一批次处理");
+      message.warning(<LexiconListText message="mixed_lifecycle" />);
       return;
     }
     // 整批原子：任意一条没有生命周期操作权限，后端会拒绝整批。
@@ -759,9 +853,7 @@ export function SmartDictionary({
           )
       )
     ) {
-      message.warning(
-        "当前账号缺少所选词条的归档或恢复权限，普通管理员仅可操作本人词条"
-      );
+      message.warning(<LexiconListText message="lifecycle_forbidden" />);
       return;
     }
     const restoring = restoringSelection;
@@ -771,13 +863,12 @@ export function SmartDictionary({
     }));
     const confirmation = {
       title: restoring
-        ? `恢复选中的 ${selectedKeys.length} 个词条？`
-        : `将选中的 ${selectedKeys.length} 个词条移入垃圾桶？`,
-      content:
-        "该批次将原子恢复为草稿，不会自动公开；任意一条冲突时全部保持原状。已失效的练习不会自动恢复。",
-      okText: restoring ? "恢 复" : "移入垃圾桶",
+        ? t("restore_selected_title", { count: selectedKeys.length })
+        : t("archive_selected_title", { count: selectedKeys.length }),
+      content: t("restore_batch_help"),
+      okText: restoring ? t("restore_spaced") : t("archive"),
       okButtonProps: { danger: !restoring },
-      cancelText: "取消",
+      cancelText: t("cancel"),
       onOk: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
@@ -795,15 +886,27 @@ export function SmartDictionary({
             });
             setSelectedKeys([]);
             message.success(
-              restoring
-                ? `已将 ${response.affected} 个词条恢复为草稿`
-                : `已将 ${response.affected} 个词条移入垃圾桶`
+              restoring ? (
+                <LexiconListText
+                  message="restored_count"
+                  params={{ count: response.affected }}
+                />
+              ) : (
+                <LexiconListText
+                  message="archived_count"
+                  params={{ count: response.affected }}
+                />
+              )
             );
           } catch (error) {
             message.error(
               describeLifecycleFailure(
                 error,
-                restoring ? "批量恢复失败" : "批量移入垃圾桶失败"
+                restoring ? (
+                  <LexiconListText message="restore_batch_failed" />
+                ) : (
+                  <LexiconListText message="archive_batch_failed" />
+                )
               )
             );
           }
@@ -815,7 +918,7 @@ export function SmartDictionary({
 
   const columns: WordColumn[] = [
     {
-      title: "词条名称",
+      title: t("entry_name"),
       key: "label",
       width: 180,
       fixed: "left",
@@ -844,7 +947,9 @@ export function SmartDictionary({
                         key={dialect}
                         className={`word-list-dialect-dot word-list-dialect-dot-${dialect}`}
                         role="img"
-                        aria-label={dialect === "uk" ? "英式拼写" : "美式拼写"}
+                        aria-label={
+                          dialect === "uk" ? t("spelling_uk") : t("spelling_us")
+                        }
                         data-spelling-dialect={dialect}
                       />
                     ))}
@@ -852,23 +957,23 @@ export function SmartDictionary({
               ))}
             </div>
             <span className="word-list-type-compact">
-              {KIND_LABEL[record.kind]}
+              {kindLabel(record.kind)}
             </span>
           </div>
         );
       }
     },
     {
-      title: "类型",
+      title: t("kind"),
       key: "kind",
       width: 76,
       wideOnly: true,
       render: ({ kind: k }) => (
-        <span className="word-list-type">{KIND_LABEL[k]}</span>
+        <span className="word-list-type">{kindLabel(k)}</span>
       )
     },
     {
-      title: "常见释义",
+      title: t("gloss"),
       key: "gloss",
       render: (row) =>
         row.gloss || <span className="word-list-empty-value">—</span>,
@@ -877,7 +982,7 @@ export function SmartDictionary({
       wideOnly: true
     },
     {
-      title: "基本词性",
+      title: t("pos"),
       key: "pos_list",
       width: 100,
       wideOnly: true,
@@ -885,7 +990,12 @@ export function SmartDictionary({
         <Space size={[4, 4]} wrap>
           {list.map((p) => (
             // 缩写不直观，悬停补正式中文；目录里没有的编码无名可补，不出浮层。
-            <Tooltip key={p} title={partOfSpeechLookup.byCode.get(p)?.name_zh}>
+            <Tooltip
+              key={p}
+              title={
+                partOfSpeechLookup.byCode.has(p) ? posDisplayName(p) : undefined
+              }
+            >
               <Tag style={{ margin: 0 }}>
                 <PartOfSpeechAbbreviation
                   lookup={partOfSpeechLookup}
@@ -898,7 +1008,7 @@ export function SmartDictionary({
       )
     },
     {
-      title: "难度",
+      title: t("level"),
       key: "levels",
       width: 80,
       wideOnly: true,
@@ -913,14 +1023,14 @@ export function SmartDictionary({
       )
     },
     {
-      title: "创建时间",
+      title: t("created_at"),
       key: "created_at",
       width: 150,
       wideOnly: true,
       render: (row) => dayjs(row.created_at).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "创建人",
+      title: t("creator"),
       key: "created_by_name",
       width: 140,
       ellipsis: true,
@@ -935,7 +1045,7 @@ export function SmartDictionary({
       }
     },
     {
-      title: "关联",
+      title: t("references"),
       key: "references",
       width: 80,
       wideOnly: true,
@@ -955,27 +1065,29 @@ export function SmartDictionary({
               >
                 {preview.source_headword || preview.source_word_id}
                 <Typography.Text type="secondary">
-                  {` · ${ENTRY_REFERENCE_KIND_LABEL[preview.source_kind]}`}
+                  {` · ${t(ENTRY_REFERENCE_KIND_LABEL[preview.source_kind])}`}
                 </Typography.Text>
               </Typography.Text>
             ))}
             {summary.truncated && (
               <Typography.Text type="secondary">
-                {`…共 ${total} 条，仅显示前 ${summary.previews.length} 条`}
+                {t("reference_summary", {
+                  total: total,
+                  shown: summary.previews.length
+                })}
               </Typography.Text>
             )}
           </Space>
         );
         return (
-          <Popover
-            content={content}
-            title="以下内容关联了此词条"
-            trigger="click"
-          >
+          <Popover content={content} title={t("inbound_title")} trigger="click">
             <Button
               type="link"
               size="small"
-              aria-label={`查看「${wordListLabel(record)}」的 ${total} 处关联`}
+              aria-label={t("view_references", {
+                label: wordListLabel(record),
+                count: total
+              })}
             >
               {total}
             </Button>
@@ -984,7 +1096,7 @@ export function SmartDictionary({
       }
     },
     {
-      title: "状态",
+      title: t("status"),
       key: "status",
       width: 156,
       wideOnly: true,
@@ -999,23 +1111,23 @@ export function SmartDictionary({
                   : "default"
             }
           >
-            {STATUS_LABEL[record.status]}
+            {t(`status_${record.status}`)}
           </Tag>
           {record.has_unpublished_changes && (
-            <Tag color="processing">有未发布修改</Tag>
+            <Tag color="processing">{t("unpublished_changes")}</Tag>
           )}
         </Space>
       )
     },
     {
-      title: "更新时间",
+      title: t("updated_at"),
       key: "updated_at",
       width: 165,
       wideOnly: true,
       render: (row) => dayjs(row.updated_at).format("YYYY-MM-DD HH:mm")
     },
     {
-      title: "最后更新人",
+      title: t("updated_by"),
       key: "updated_by_name",
       width: 140,
       ellipsis: true,
@@ -1033,7 +1145,7 @@ export function SmartDictionary({
       }
     },
     {
-      title: "操作",
+      title: t("actions"),
       key: "action",
       width: 190,
       fixed: "right",
@@ -1050,9 +1162,9 @@ export function SmartDictionary({
         const transitionDisabled =
           !transitionAllowed || lifecycleInput(record) === undefined;
         const transitionHint = !transitionAllowed
-          ? "需要相应的归档或恢复权限；普通管理员仅可操作本人词条"
+          ? t("lifecycle_permission")
           : lifecycleInput(record) === undefined
-            ? "该行缺少并发版本信息，请刷新列表后重试"
+            ? t("delete_block_missing_revision")
             : undefined;
         const rowLifecyclePending =
           lifecyclePending &&
@@ -1064,7 +1176,11 @@ export function SmartDictionary({
         if (canEditRowAnnotation(annotationActor, record)) {
           items.push({
             key: "annotation",
-            label: <span aria-label={`编辑标注${rowName}`}>标注</span>,
+            label: (
+              <span aria-label={t("edit_annotation", { label: rowName })}>
+                {t("annotation")}
+              </span>
+            ),
             onClick: () => setAnnotationEntry(record)
           });
         }
@@ -1078,9 +1194,9 @@ export function SmartDictionary({
               <Tooltip title={transitionHint}>
                 <span
                   aria-busy={rowLifecyclePending}
-                  aria-label={`移入垃圾桶${rowName}`}
+                  aria-label={t("archive_label", { label: rowName })}
                 >
-                  移入垃圾桶
+                  {t("archive")}
                 </span>
               </Tooltip>
             ),
@@ -1099,14 +1215,14 @@ export function SmartDictionary({
                 title={
                   eligibility.deletable
                     ? undefined
-                    : DELETE_BLOCK_REASON_TEXT[eligibility.reason!]
+                    : t(`delete_block_${eligibility.reason!}`)
                 }
               >
                 <span
                   aria-busy={rowDeletePending}
-                  aria-label={`永久删除${rowName}`}
+                  aria-label={t("delete_label", { label: rowName })}
                 >
-                  永久删除
+                  {t("delete")}
                 </span>
               </Tooltip>
             ),
@@ -1120,10 +1236,10 @@ export function SmartDictionary({
             className="word-list-row-action"
 
             disabled={route === undefined}
-            aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
+            aria-label={`${rowActionLabel(record, rowWritable)}${rowName}`}
             onClick={() => route && navigate(route)}
           >
-            {getWordRowActionLabel(record, rowWritable)}
+            {rowActionLabel(record, rowWritable)}
           </Button>
         );
         return (
@@ -1137,18 +1253,18 @@ export function SmartDictionary({
                       size="small"
                       className="word-list-row-action"
 
-                      aria-label={`恢复${rowName}`}
+                      aria-label={t("restore_label", { label: rowName })}
                       disabled={transitionDisabled}
                       loading={rowLifecyclePending}
                       onClick={() => transitionOne(record, "restore")}
                     >
-                      恢复
+                      {t("restore")}
                     </Button>
                   </span>
                 </Tooltip>
               )}
               {route === undefined ? (
-                <Tooltip title={LEGACY_SCHEMA_BLOCKED_HINT}>
+                <Tooltip title={t("legacy_blocked")}>
                   <span>{routeButton}</span>
                 </Tooltip>
               ) : (
@@ -1180,12 +1296,13 @@ export function SmartDictionary({
                   size="small"
                   className="word-list-more-action"
 
-                  aria-label={`更多操作${rowName}`}
+                  aria-label={t("more_actions", { label: rowName })}
                   aria-haspopup="menu"
                   aria-expanded={openActionRow === record.id}
                   onFocus={() => setOpenActionRow(record.id)}
                 >
-                  更多 <ChevronDownIcon />
+                  {t("more")}
+                  <ChevronDownIcon />
                 </Button>
               </Dropdown>
             )}
@@ -1201,32 +1318,56 @@ export function SmartDictionary({
         ? [
             {
               key: "headword" as const,
-              label: `词条：${filters.headword || filters.keyword}`
+              label: t("filter_entry", {
+                value: filters.headword || filters.keyword
+              })
             }
           ]
         : []),
       ...(filters.gloss
-        ? [{ key: "gloss" as const, label: `词义：${filters.gloss}` }]
+        ? [
+            {
+              key: "gloss" as const,
+              label: t("filter_gloss", { value: filters.gloss })
+            }
+          ]
         : []),
       ...(filters.kind
-        ? [{ key: "kind" as const, label: `类型：${KIND_LABEL[filters.kind]}` }]
+        ? [
+            {
+              key: "kind" as const,
+              label: t("filter_kind", { value: kindLabel(filters.kind) })
+            }
+          ]
         : []),
       ...(filters.pos
         ? [
             {
               key: "pos" as const,
-              label: `词性：${partOfSpeechLookup.byCode.get(filters.pos)?.name_zh ?? filters.pos}`
+              label: t("filter_pos", {
+                value: posDisplayName(filters.pos)
+              })
             }
           ]
         : []),
       ...(filters.level
-        ? [{ key: "level" as const, label: `难度：${filters.level}` }]
+        ? [
+            {
+              key: "level" as const,
+              label: t("filter_level", { value: filters.level })
+            }
+          ]
         : []),
       ...(filters.createdBy
         ? [
             {
               key: "createdBy" as const,
-              label: `创建人：${creatorOptions.find((item) => item.value === filters.createdBy)?.label ?? filters.createdBy.slice(-8)}`
+              label: t("filter_creator", {
+                value:
+                  creatorOptions.find(
+                    (item) => item.value === filters.createdBy
+                  )?.label ?? filters.createdBy.slice(-8)
+              })
             }
           ]
         : []),
@@ -1234,7 +1375,11 @@ export function SmartDictionary({
         ? [
             {
               key: "range" as const,
-              label: `创建时间${filters.rangeTimezone ? "（北京时间）" : ""}：${filters.range[0]?.format("YYYY-MM-DD") ?? "不限"} 至 ${filters.range[1]?.format("YYYY-MM-DD") ?? "不限"}`
+              label: t("filter_date", {
+                zone: filters.rangeTimezone ? t("beijing_parenthesis") : "",
+                start: filters.range[0]?.format("YYYY-MM-DD") ?? t("unlimited"),
+                end: filters.range[1]?.format("YYYY-MM-DD") ?? t("unlimited")
+              })
             }
           ]
         : [])
@@ -1274,11 +1419,11 @@ export function SmartDictionary({
       className={`word-list-page ${trashMode ? "word-list-page--trash" : "word-list-page--library"}`}
     >
       <header className="word-list-heading">
-        <h1>{trashMode ? "垃圾桶" : "智能词库"}</h1>
+        <h1>{trashMode ? t("status_archived") : t("entries")}</h1>
         <div className="word-list-page-actions">
           <Link to={trashMode ? "/words" : "/words/trash"}>
             {trashMode ? <Undo2Icon /> : <Trash2Icon />}
-            {trashMode ? "返回智能词库" : "查看垃圾桶"}
+            {trashMode ? t("back_entries") : t("view_trash")}
           </Link>
           {!trashMode && canCreateEntry(writeActor) && (
             <Button
@@ -1286,26 +1431,26 @@ export function SmartDictionary({
               icon={<PlusIcon />}
               onClick={() => navigate("/words/new")}
             >
-              创建词条
+              {t("create")}
             </Button>
           )}
         </div>
         {!trashMode && (
           <Space size={16} wrap className="word-list-stats">
             <Typography.Text type="secondary">
-              累计智能词条:
+              {t("total_stat")}
               <Typography.Text strong>
                 {stats.data?.total ?? "-"}
               </Typography.Text>
             </Typography.Text>
             <Typography.Text type="secondary">
-              今日创编:
+              {t("today_stat")}
               <Typography.Text strong>
                 {stats.data?.today ?? "-"}
               </Typography.Text>
             </Typography.Text>
             <Typography.Text type="secondary">
-              本月创编:
+              {t("month_stat")}
               <Typography.Text strong>
                 {stats.data?.month ?? "-"}
               </Typography.Text>
@@ -1316,23 +1461,23 @@ export function SmartDictionary({
 
       <section
         className="word-list-panel word-list-filter-panel"
-        aria-label="词条筛选"
+        aria-label={t("filters")}
       >
         {!trashMode && (
           <div
             className="word-status-filters"
             role="group"
-            aria-label="词条状态快捷筛选"
+            aria-label={t("status_filters")}
           >
             {(
               [
-                { value: undefined, label: "全部词条" },
-                { value: "draft", label: "草稿" },
-                { value: "published", label: "已发布" }
+                { value: undefined, label: t("all_entries") },
+                { value: "draft", label: t("status_draft") },
+                { value: "published", label: t("status_published") }
               ] as const
             ).map((item) => (
               <button
-                key={item.label}
+                key={item.value ?? "all"}
                 type="button"
                 aria-pressed={filters.status === item.value}
                 onClick={() =>
@@ -1344,7 +1489,7 @@ export function SmartDictionary({
             ))}
             {filters.status === "archived" && (
               <button type="button" aria-pressed="true">
-                垃圾桶
+                {t("status_archived")}
               </button>
             )}
           </div>
@@ -1364,18 +1509,26 @@ export function SmartDictionary({
           className="word-search-form"
         >
           <div className="word-search-main">
-            <Form.Item name="headword" label="词条" labelCol={{ flex: "none" }}>
+            <Form.Item
+              name="headword"
+              label={t("entry")}
+              labelCol={{ flex: "none" }}
+            >
               <PilotInput
                 type="search"
                 className="min-h-9 rounded-lg px-3 py-1"
-                placeholder="请输入词条名称"
+                placeholder={t("search_entry")}
               />
             </Form.Item>
-            <Form.Item name="gloss" label="词义" labelCol={{ flex: "none" }}>
+            <Form.Item
+              name="gloss"
+              label={t("meaning")}
+              labelCol={{ flex: "none" }}
+            >
               <PilotInput
                 type="search"
                 className="min-h-9 rounded-lg px-3 py-1"
-                placeholder="请输入词义"
+                placeholder={t("search_meaning")}
               />
             </Form.Item>
             <div className="word-search-actions">
@@ -1386,7 +1539,7 @@ export function SmartDictionary({
                 type="submit"
               >
                 <SearchIcon />
-                搜索
+                {t("search")}
               </PilotButton>
               <PilotButton
                 type="button"
@@ -1398,7 +1551,7 @@ export function SmartDictionary({
                   applyFilters({});
                 }}
               >
-                重置
+                {t("reset")}
               </PilotButton>
               <PilotButton
                 type="button"
@@ -1410,7 +1563,7 @@ export function SmartDictionary({
                 onClick={() => setAdvancedExpanded((value) => !value)}
               >
                 <SlidersHorizontalIcon />
-                {advancedExpanded ? "收起筛选" : "更多筛选"}
+                {advancedExpanded ? t("collapse_filters") : t("more_filters")}
                 {advancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
               </PilotButton>
             </div>
@@ -1425,20 +1578,24 @@ export function SmartDictionary({
               borderTop: `1px solid ${token.colorSplit}`
             }}
           >
-            <Form.Item name="kind" label="词条类型">
-              <Select placeholder="全部" options={kindOptions} allowClear />
+            <Form.Item name="kind" label={t("entry_kind")}>
+              <Select placeholder={t("all")} options={kindOptions} allowClear />
             </Form.Item>
-            <Form.Item name="pos" label="基本词性">
+            <Form.Item name="pos" label={t("pos")}>
               <Select
-                placeholder="全部"
+                placeholder={t("all")}
                 options={partOfSpeechOptions}
                 loading={partOfSpeechCatalog.isPending}
                 disabled={partOfSpeechCatalog.isError}
                 allowClear
               />
             </Form.Item>
-            <Form.Item name="level" label="词义难度">
-              <Select placeholder="全部" options={CEFR_OPTIONS} allowClear />
+            <Form.Item name="level" label={t("meaning_level")}>
+              <Select
+                placeholder={t("all")}
+                options={CEFR_OPTIONS}
+                allowClear
+              />
             </Form.Item>
             {!trashMode && (
               <Form.Item name="status" hidden>
@@ -1447,24 +1604,24 @@ export function SmartDictionary({
             )}
             <Form.Item
               name="createdBy"
-              label="创建人"
+              label={t("creator")}
               help={
                 creators.isError ? (
                   <span>
-                    创建人加载失败
+                    {t("creators_failed")}
                     <Button
                       type="link"
                       size="small"
                       onClick={() => void creators.refetch()}
                     >
-                      重新加载创建人
+                      {t("reload_creators")}
                     </Button>
                   </span>
                 ) : undefined
               }
             >
               <Select
-                placeholder="不限"
+                placeholder={t("unlimited")}
                 options={creatorOptions}
                 allowClear
                 showSearch={{ optionFilterProp: "label" }}
@@ -1476,27 +1633,27 @@ export function SmartDictionary({
             </Form.Item>
             <Form.Item
               name="range"
-              label="创建时间"
+              label={t("created_at")}
               className="word-search-date"
-              help={filters.rangeTimezone ? "北京时间（UTC+8）" : undefined}
+              help={filters.rangeTimezone ? t("beijing_time") : undefined}
             >
               <RangePicker style={{ width: "100%" }} />
             </Form.Item>
             <div className="word-search-advanced-actions">
               <Button htmlType="submit" type="primary" size="small">
-                应用筛选
+                {t("apply_filters")}
               </Button>
             </div>
           </div>
         </Form>
         {filterSummaries.length > 0 && (
-          <div className="word-active-filters" aria-label="已应用筛选">
-            <span>已筛选</span>
+          <div className="word-active-filters" aria-label={t("active_filters")}>
+            <span>{t("filtered")}</span>
             {filterSummaries.map((item) => (
               <button
                 type="button"
                 key={item.key}
-                aria-label={`移除${item.label}`}
+                aria-label={t("remove_filter", { label: item.label })}
                 onClick={() => {
                   const next = { ...filters };
                   delete next[item.key];
@@ -1517,7 +1674,7 @@ export function SmartDictionary({
                 applyFilters({});
               }}
             >
-              清空条件
+              {t("clear_filters")}
             </button>
           </div>
         )}
@@ -1525,7 +1682,7 @@ export function SmartDictionary({
 
       <section
         className="word-list-panel word-list-results-panel"
-        aria-label="词条列表"
+        aria-label={t("entry_list")}
       >
         {restoreSurface.page && pendingRestore && (
           <div style={{ marginBottom: 12 }}>
@@ -1557,11 +1714,11 @@ export function SmartDictionary({
             type="error"
             showIcon
             style={{ marginBottom: 12 }}
-            title="词条列表加载失败"
+            title={t("list_failed")}
             description={listQuery.error.message}
             action={
               <Button size="small" onClick={() => void listQuery.refetch()}>
-                重试
+                {t("retry")}
               </Button>
             }
           />
@@ -1572,14 +1729,14 @@ export function SmartDictionary({
             type="warning"
             showIcon
             style={{ marginBottom: 12 }}
-            title="词性目录暂时不可用"
-            description="现有词条将回退显示稳定编码，基本词性筛选暂不可用。"
+            title={t("catalog_failed")}
+            description={t("catalog_failed_help")}
             action={
               <Button
                 size="small"
                 onClick={() => void partOfSpeechCatalog.refetch()}
               >
-                重 试
+                {t("retry_spaced")}
               </Button>
             }
           />
@@ -1610,7 +1767,7 @@ export function SmartDictionary({
             <div hidden={selectedKeys.length === 0}>
               <Space wrap>
                 {!trashMode && canBatchPublish && (
-                  <Tooltip title="选择 1–50 个有发布权限的词条，集中审听并确认后发布">
+                  <Tooltip title={t("batch_publish_help")}>
                     <Button
                       disabled={
                         selectedKeys.length === 0 ||
@@ -1625,7 +1782,7 @@ export function SmartDictionary({
                       }
                       onClick={() => setPublicationRows([...selectedRows])}
                     >
-                      批量审听与发布
+                      {t("batch_publish")}
                       {selectedKeys.length > 0
                         ? `(${selectedKeys.length})`
                         : ""}
@@ -1650,7 +1807,7 @@ export function SmartDictionary({
                     loading={archiveBatch.isPending || restoreBatch.isPending}
                     onClick={transitionSelected}
                   >
-                    {showRestoreAction ? "恢 复" : "移入垃圾桶"}
+                    {showRestoreAction ? t("restore_spaced") : t("archive")}
                     {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
                   </Button>
                 )}
@@ -1666,7 +1823,7 @@ export function SmartDictionary({
                       loading={deleteBatch.isPending}
                       onClick={deleteSelected}
                     >
-                      永久删除
+                      {t("delete")}
                       {selectedKeys.length > 0
                         ? `(${selectedKeys.length})`
                         : ""}
@@ -1677,7 +1834,7 @@ export function SmartDictionary({
           }
           emptyText={
             <TableEmptyState
-              message={trashMode ? "垃圾桶暂无词条" : "暂无词条"}
+              message={trashMode ? t("trash_empty") : t("empty")}
               filtered={Object.values(filters).some(Boolean)}
               onResetFilters={() => {
                 form.resetFields();

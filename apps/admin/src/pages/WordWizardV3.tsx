@@ -1,4 +1,8 @@
 import {
+  useLexiconEditorTranslation,
+  LexiconEditorText
+} from "@/features/dictionary/i18n/editor";
+import {
   ContentEditPermissions,
   useContentEditPermissions,
   onlyTextAssociationsChanged
@@ -106,6 +110,7 @@ function isStep(value: unknown): value is WordCreationStep {
 
 /** 引用索引不可用 / 已失效引用的顶部提示，词形步与词义步共用。 */
 function V3ReferenceNotices() {
+  const { t } = useLexiconEditorTranslation();
   const { index } = useV3ReferenceGuard();
   return (
     <>
@@ -113,23 +118,21 @@ function V3ReferenceNotices() {
         <Alert
           showIcon
           type="info"
-          title="暂时无法查看关联信息"
-          description="请刷新页面后重试。你可以继续编辑和保存草稿，发布时系统会再次检查关联内容是否正确。"
+          title={t("references_unavailable_title")}
+          description={t("references_retry_help")}
         />
       ) : null}
       {index.stale.length > 0 ? (
         <Alert
           showIcon
           type="error"
-          title={`存在 ${index.stale.length} 处关联失效，处理后才能发布`}
+          title={t("stale_references_count", { count: index.stale.length })}
           description={
             <Flex vertical gap={4}>
-              <span>
-                以下内容关联的词形或词义已发生变化，请打开对应内容，重新选择或解除关联。你可以继续保存草稿，已发布的内容不受影响；处理完这些关联后才能发布。
-              </span>
+              <span>{t("stale_references_help")}</span>
               <V3ReferenceList
                 references={index.stale}
-                staleLabel="草稿内不成立"
+                staleLabel={t("stale_in_draft")}
               />
             </Flex>
           }
@@ -145,18 +148,20 @@ function V3BlockedReferencesAlert({
 }: {
   references: readonly InboundReferenceV3[];
 }) {
+  const { t } = useLexiconEditorTranslation();
   if (references.length === 0) return null;
   return (
     <Alert
       showIcon
       type="error"
-      title={`本次词形修改会影响 ${references.length} 处关联，处理后才能发布`}
+      title={t("affected_references_count", { count: references.length })}
       description={
         <Flex vertical gap={4}>
-          <span>
-            可以先保存草稿，再打开以下关联内容，重新选择或解除关联；处理完成后才能发布。
-          </span>
-          <V3ReferenceList references={references} staleLabel="将失效" />
+          <span>{t("affected_references_help")}</span>
+          <V3ReferenceList
+            references={references}
+            staleLabel={t("will_invalidate")}
+          />
         </Flex>
       }
     />
@@ -164,6 +169,7 @@ function V3BlockedReferencesAlert({
 }
 
 function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
+  const { t } = useLexiconEditorTranslation();
   const referenceGuard = useV3ReferenceGuard();
   // 草稿可编辑；即时列出拼写影响，发布前必须修复引用。
   const conflicts = spellingConflicts(referenceGuard.index, context.draftForms);
@@ -209,12 +215,10 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         <Alert
           showIcon
           type="error"
-          title="修改后的拼写与关联内容不一致，处理后才能发布"
+          title={t("spelling_conflict_title")}
           description={
             <Flex vertical gap={4}>
-              <span>
-                可以先保存草稿，再打开以下关联内容，调整文字或重新选择关联词形。处理完成后才能发布，已发布的内容不受草稿修改影响。
-              </span>
+              <span>{t("spelling_conflict_help")}</span>
               <V3ReferenceList references={conflictNoticeReferences} />
             </Flex>
           }
@@ -289,10 +293,10 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
       <V3StepActions
         status={
           busy
-            ? "正在处理草稿…"
+            ? t("processing_draft")
             : context.hasUnsavedChanges || bindingsDirty
-              ? "词条草稿有未保存修改"
-              : `当前草稿 · 第 ${context.word.revision} 版`
+              ? t("unsaved_draft_status")
+              : t("draft_revision", { revision: context.word.revision })
         }
       >
         <Button
@@ -300,7 +304,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           loading={busy}
           onClick={() => void saveDraft()}
         >
-          保存草稿
+          {t("save_draft")}
         </Button>
         <Button
           type="primary"
@@ -309,7 +313,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
             context.setActiveStep("meanings");
           }}
         >
-          进入词义与例句
+          {t("next_meanings")}
         </Button>
       </V3StepActions>
     </Flex>
@@ -344,6 +348,7 @@ function V3MeaningsSlot({
   focusSentence?: V3FocusSentence;
   onFocusSentenceHandled?: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const permissions = useContentEditPermissions();
   const { message } = App.useApp();
   const [sentenceEditor, setSentenceEditor] = useState<{
@@ -415,10 +420,7 @@ function V3MeaningsSlot({
   return (
     <Flex vertical gap="middle">
       {!permissions.edit && (
-        <Alert
-          type="info"
-          title="仅可编辑单词与短语关联，文本、音频及其他内容只读"
-        />
+        <Alert type="info" title={t("association_only_help")} />
       )}
       <V3ReferenceNotices />
       <V3BlockedReferencesAlert references={blockedReferences} />
@@ -426,18 +428,20 @@ function V3MeaningsSlot({
         <Alert
           showIcon
           type="warning"
-          title="请先保存词形变更"
-          description="本次词形改动触发了同形匹配核对，请回到「词形与发音」保存一次，再回来完成词义。"
+          title={t("save_forms_first")}
+          description={t("homograph_check_required")}
           action={
             <Flex gap="small">
-              <Button onClick={() => setSurfaceBlocked(false)}>知道了</Button>
+              <Button onClick={() => setSurfaceBlocked(false)}>
+                {t("understood")}
+              </Button>
               <Button
                 onClick={() => {
                   setSurfaceBlocked(false);
                   context.setActiveStep("forms");
                 }}
               >
-                去词形与发音
+                {t("go_forms")}
               </Button>
             </Flex>
           }
@@ -447,10 +451,14 @@ function V3MeaningsSlot({
         <Alert
           showIcon
           type="warning"
-          title="保存前请确认词形影响"
+          title={t("confirm_impact_title")}
           description={
             <Flex vertical gap={4}>
-              <span>{`本次词形修改会影响 ${context.impact.affected.length} 项关联内容。`}</span>
+              <span>
+                {t("confirm_impact_count", {
+                  count: context.impact.affected.length
+                })}
+              </span>
               {summarizeFormsImpact(context.impact.affected).map((group) => (
                 <Typography.Text key={group.reason} type="secondary">
                   {group.reasonLabel}：
@@ -463,9 +471,11 @@ function V3MeaningsSlot({
           }
           action={
             <Flex gap="small">
-              <Button onClick={() => setPendingIntent(undefined)}>取 消</Button>
+              <Button onClick={() => setPendingIntent(undefined)}>
+                {t("cancel_spaced")}
+              </Button>
               <Button onClick={() => void confirmAndSave()}>
-                确认影响并完成
+                {t("confirm_impact_complete")}
               </Button>
             </Flex>
           }
@@ -524,7 +534,9 @@ function V3MeaningsSlot({
               !permissions.edit &&
               !onlyTextAssociationsChanged(context.draftMeanings, next)
             ) {
-              void message.warning("当前仅有单词与短语关联权限");
+              void message.warning(
+                <LexiconEditorText message="association_permission" />
+              );
               return;
             }
             if (
@@ -559,8 +571,8 @@ function V3MeaningsSlot({
           onSave={saveMeanings}
           draftStatus={
             context.hasUnsavedChanges
-              ? "词条草稿有未保存修改"
-              : `当前草稿 · 第 ${context.word.revision} 版`
+              ? t("unsaved_draft_status")
+              : t("draft_revision", { revision: context.word.revision })
           }
           canSave={
             context.dirtySteps.meanings ||
@@ -644,12 +656,13 @@ function V3ReadOnlyPreview({
   word: AdminWordV3;
   onEdit?: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   return (
     <V3LiveReview
       actions={
         onEdit ? (
           <Button type="primary" onClick={onEdit}>
-            继续编辑
+            {t("keep_editing")}
           </Button>
         ) : undefined
       }
@@ -659,13 +672,14 @@ function V3ReadOnlyPreview({
 }
 
 function V3PreviewSlot({ context }: { context: V3WizardSlotContext }) {
+  const { t } = useLexiconEditorTranslation();
   if (context.hasUnsavedChanges) {
     return (
       <Alert
         showIcon
         type="warning"
-        title="请先保存未保存的草稿"
-        description="当前预览只显示最近一次已保存内容。请先返回对应步骤保存草稿，再重新检查发布条件。"
+        title={t("unsaved_before_preview")}
+        description={t("preview_saved_only")}
       />
     );
   }
@@ -716,6 +730,7 @@ function V3WizardSlots({
   requests: V3WordRequests;
   onActivated: (word: AdminWordV3) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const referenceGuard = useV3ReferenceGuard();
@@ -820,9 +835,9 @@ function V3WizardSlots({
         <V3FormsSlot context={context} />
       ) : (
         <Flex vertical gap="middle">
-          <Alert type="info" title="当前仅有单词与短语关联权限" />
+          <Alert type="info" title={t("association_permission")} />
           <Button onClick={() => context.setActiveStep("meanings")}>
-            进入词义与例句关联
+            {t("next_associations")}
           </Button>
         </Flex>
       );
@@ -848,6 +863,7 @@ export function WordWizardV3Page({
   requests?: V3WordRequests;
   renderMeaningsStep?: V3MeaningsStepRenderer;
 } = {}) {
+  const { t } = useLexiconEditorTranslation();
   const canReadSentences = usePermission("sentences.access");
   const { wordId = "", step } = useParams();
   const sharedSentences = useQuery({
@@ -967,7 +983,7 @@ export function WordWizardV3Page({
   if (detail.isPending) {
     return (
       <Flex justify="center" align="center" style={{ minHeight: 420 }}>
-        <Spin size="large" description="正在加载词条" />
+        <Spin size="large" description={t("loading_entry")} />
       </Flex>
     );
   }
@@ -981,7 +997,7 @@ export function WordWizardV3Page({
         extra={
           presentation.retryable ? (
             <Button type="primary" onClick={() => void detail.refetch()}>
-              重试
+              {t("retry")}
             </Button>
           ) : undefined
         }
@@ -1017,8 +1033,8 @@ export function WordWizardV3Page({
         <Alert
           type="warning"
           showIcon
-          title="词形编辑暂不可用"
-          description="当前服务尚未提供共享词形内容，请在服务更新后刷新页面。现有内容仍可查看。"
+          title={t("forms_unavailable")}
+          description={t("shared_forms_required")}
         />
       )}
       <CreationSourceNotice
@@ -1033,8 +1049,8 @@ export function WordWizardV3Page({
           <Alert
             showIcon
             type="warning"
-            title="未找到关联来源内容"
-            description="来源内容可能已被删除或修改，但关联不一定已解除。请检查来源词条的草稿和已发布内容，重新选择或解除关联后，返回本词条刷新页面。"
+            title={t("reference_source_missing")}
+            description={t("reference_source_missing_help")}
           />
         )}
       <ContentEditPermissions
@@ -1076,7 +1092,7 @@ export function WordWizardV3Page({
                     }
                     restoreBlockedReason={
                       !sharedFormsReady
-                        ? "当前服务尚未支持共享词形，暂不能恢复历史内容"
+                        ? t("restore_shared_forms_required")
                         : undefined
                     }
                     currentWord={context.word}

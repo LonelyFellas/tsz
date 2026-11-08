@@ -102,12 +102,64 @@ vi.mock("./BatchPublicationModal", () => ({
 }));
 
 import { SmartDictionary } from "./SmartDictionary";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 
 function render(ui: Parameters<typeof testingLibraryRender>[0]) {
   return testingLibraryRender(ui, {
     wrapper: ({ children }) => <>{children}</>
   });
 }
+
+it("切换语言保留筛选、选择与列偏好，不改变查询或触发生命周期写入", async () => {
+  const content = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <FeedbackApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </FeedbackApp>
+    </InterfaceI18nProvider>
+  );
+  const view = render(content("zh-Hans"));
+  fireEvent.change(screen.getByRole("searchbox", { name: "词条" }), {
+    target: { value: "原文 centre" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "搜索" }));
+  await waitFor(() =>
+    expect(apiMocks.useWordList.mock.calls.at(-1)![0]).toMatchObject({
+      headword: "原文 centre"
+    })
+  );
+  fireEvent.click(screen.getByRole("checkbox", { name: "选择「first」" }));
+  expect(screen.getByRole("checkbox", { name: "选择「first」" })).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "列设置" }));
+  const panel = await screen.findByRole("region", { name: "表格列设置" });
+  fireEvent.click(within(panel).getByRole("checkbox", { name: "常见释义" }));
+  const preferences = localStorage.getItem(
+    "tsz:admin:table-columns:v1:dictionary"
+  );
+  const query = structuredClone(apiMocks.useWordList.mock.calls.at(-1)![0]);
+  view.rerender(content("en-US"));
+  expect(screen.getByRole("searchbox", { name: "Entry" })).toHaveValue(
+    "原文 centre"
+  );
+  expect(
+    screen.getByRole("checkbox", { name: "Select ‘first’" })
+  ).toBeChecked();
+  const translated = screen.getByRole("region", {
+    name: "Table column settings"
+  });
+  expect(
+    within(translated).getByRole("checkbox", { name: "Common definitions" })
+  ).not.toBeChecked();
+  expect(localStorage.getItem("tsz:admin:table-columns:v1:dictionary")).toBe(
+    preferences
+  );
+  expect(apiMocks.useWordList.mock.calls.at(-1)![0]).toEqual(query);
+  expect(
+    apiMocks.useArchiveWordsBatch.mock.results.at(-1)!.value.mutateAsync
+  ).not.toHaveBeenCalled();
+});
 
 /** 列表默认行：产品只剩 V3，默认 fixture 就按 V3 出。 */
 function word(id: string, headword: string): AdminWordListItemV3 {

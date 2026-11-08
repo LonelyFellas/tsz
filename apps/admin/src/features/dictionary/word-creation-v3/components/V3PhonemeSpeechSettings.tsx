@@ -329,6 +329,7 @@ export function V3PhonemeSpeechSettings({
               locale={locale}
               language="en"
               contextLabel={`${label}音标编辑`}
+              contextKey={JSON.stringify([nodeId, field, alphabet])}
               inputDataAttributes={{
                 "data-v3-node-id": nodeId,
                 "data-v3-field": field

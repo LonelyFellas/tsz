@@ -177,6 +177,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   onValidationChange,
   language = "en",
   contextLabel = "语音编辑器",
+  contextKey,
   previewAdapter,
   previewEnabled = true,
   loadRecommendations,
@@ -883,7 +884,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     onVoiceProfileChange(profile);
   }
   const audioContentKey = JSON.stringify([
-    contextLabel,
+    contextKey ?? contextLabel,
     inputDataAttributes,
     locale,
     recommendationArea,

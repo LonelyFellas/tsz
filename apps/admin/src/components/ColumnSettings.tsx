@@ -1,3 +1,4 @@
+import { useTableTranslation } from "@/components/table-i18n";
 import { CheckIcon, GripVerticalIcon, SettingsIcon } from "lucide-react";
 import { Button, Typography } from "@tsz/ui/admin/display";
 import { Checkbox, Segmented } from "@tsz/ui/admin/forms";
@@ -12,10 +13,10 @@ import {
 import type { ConfigurableColumn } from "./column-settings";
 import "./ColumnSettings.css";
 
-const columnGroups = [
-  { fixed: "left", label: "左侧固定", icon: "left" },
-  { fixed: false, label: "不固定", icon: "none" },
-  { fixed: "right", label: "右侧固定", icon: "right" }
+const COLUMN_GROUPS = [
+  { fixed: "left", label: "fixed_left", icon: "left" },
+  { fixed: false, label: "fixed_none", icon: "none" },
+  { fixed: "right", label: "fixed_right", icon: "right" }
 ] as const;
 
 export function ColumnSettings({
@@ -37,6 +38,11 @@ export function ColumnSettings({
   onOpenChange?: (open: boolean) => void;
   children?: ReactNode;
 }) {
+  const { t } = useTableTranslation();
+  const columnGroups = COLUMN_GROUPS.map((group) => ({
+    ...group,
+    label: t(group.label)
+  }));
   const controlId = useId();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -103,21 +109,24 @@ export function ColumnSettings({
           <section
             ref={panelRef}
             className="admin-column-settings"
-            aria-label="表格列设置"
+            aria-label={t("settings_panel")}
           >
             <div className="admin-column-settings-heading">
               <div className="admin-column-settings-title">
-                <Typography.Text strong>列设置</Typography.Text>
+                <Typography.Text strong>{t("settings")}</Typography.Text>
                 <Typography.Text
                   type="secondary"
                   className="admin-column-settings-count"
                   aria-live="polite"
                 >
-                  {visibleCount} / {columns.length} 列
+                  {t("visible_columns", {
+                    visible: visibleCount,
+                    total: columns.length
+                  })}
                 </Typography.Text>
               </div>
               <Button type="link" size="small" onClick={onReset}>
-                恢复默认
+                {t("reset")}
               </Button>
             </div>
             {fixedOverflow && (
@@ -125,7 +134,7 @@ export function ColumnSettings({
                 type="secondary"
                 className="admin-column-settings-overflow"
               >
-                固定列超出可视宽度，已临时改为横向滚动；表格变宽后恢复固定。
+                {t("overflow")}
               </Typography.Paragraph>
             )}
             <div className="admin-column-settings-list">
@@ -137,7 +146,7 @@ export function ColumnSettings({
                   <section
                     key={group.icon}
                     role="group"
-                    aria-label={`${group.label}列`}
+                    aria-label={t("group_columns", { group: group.label })}
                     className="admin-column-settings-group"
                   >
                     <div className="admin-column-settings-group-heading">
@@ -154,8 +163,8 @@ export function ColumnSettings({
                         className="admin-column-settings-empty"
                       >
                         {group.fixed === false
-                          ? "所有列均已固定"
-                          : "暂无固定列"}
+                          ? t("all_pinned")
+                          : t("none_pinned")}
                       </Typography.Text>
                     )}
                     {groupColumns.map((column) => {
@@ -208,8 +217,10 @@ export function ColumnSettings({
                             type="text"
                             className="admin-column-drag-handle"
                             icon={<GripVerticalIcon />}
-                            aria-label={`拖动${column.label}排序`}
-                            title="拖动排序，也可使用上下方向键"
+                            aria-label={t("drag_column", {
+                              label: column.label
+                            })}
+                            title={t("drag_help")}
                             disabled={!canReorder}
                             draggable={canReorder}
                             onDragStart={(event) => {
@@ -266,12 +277,14 @@ export function ColumnSettings({
                             data-column-key={column.key}
                             size="small"
                             className="admin-column-pin-control"
-                            aria-label={`${column.label}固定位置`}
+                            aria-label={t("pin_position", {
+                              label: column.label
+                            })}
                             value={column.fixed || "none"}
                             options={[
-                              { value: "left", label: "左侧" },
-                              { value: "none", label: "不固定" },
-                              { value: "right", label: "右侧" }
+                              { value: "left", label: t("side_left") },
+                              { value: "none", label: t("fixed_none") },
+                              { value: "right", label: t("side_right") }
                             ]}
                             onChange={(value) => {
                               fixedFocusKey.current = column.key;
@@ -295,9 +308,10 @@ export function ColumnSettings({
               })}
             </div>
             <div className="admin-column-settings-footer">
-              <span>组内拖动排序</span>
+              <span>{t("drag_group")}</span>
               <span>
-                <CheckIcon aria-hidden="true" /> 仅当前浏览器自动保存
+                <CheckIcon aria-hidden="true" />
+                {t("browser_saved")}
               </span>
             </div>
           </section>
@@ -311,7 +325,7 @@ export function ColumnSettings({
             icon={<SettingsIcon />}
             aria-expanded={open}
           >
-            列设置
+            {t("settings")}
           </Button>
         )}
       </Popover>

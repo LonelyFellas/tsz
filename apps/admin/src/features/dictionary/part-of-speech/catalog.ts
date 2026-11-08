@@ -73,13 +73,27 @@ export function subPartOfSpeechLabel(
 export function availablePartOfSpeechOptions(
   lookup: PartOfSpeechLookup,
   used: Iterable<PartOfSpeechCode> = [],
-  kind?: AdminWordKind
+  kind?: AdminWordKind,
+  interfaceLanguage = "zh-Hans"
 ) {
   const usedCodes = new Set(used);
   return lookup.items
     .filter((item) => !usedCodes.has(item.code))
     .filter((item) => !kind || item.kind === kind)
-    .map((item) => ({ value: item.code, label: item.name_zh }));
+    .map((item) => ({
+      value: item.code,
+      label: localizedCatalogName(item, interfaceLanguage)
+    }));
+}
+
+/** 仅选择目录已有的显示名，不转换目录内容或稳定编码。 */
+export function localizedCatalogName(
+  item: { name_zh: string; name_en: string },
+  interfaceLanguage: string
+) {
+  return interfaceLanguage.startsWith("en")
+    ? item.name_en || item.name_zh
+    : item.name_zh;
 }
 
 /**
