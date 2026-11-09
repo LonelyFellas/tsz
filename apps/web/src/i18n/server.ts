@@ -40,12 +40,16 @@ export const getWebLocale = cache(async () => {
   const hint = (await cookies()).get(GUEST_LOCALE_COOKIE)?.value;
   try {
     const directory = await getDirectory();
+    const requestHeaders = await headers();
     const supported = directory.supported_locales.filter((locale) =>
       INTERFACE_LOCALES.includes(locale)
     );
-    const selected = supported.find((locale) => locale === hint);
+    const publicHint = requestHeaders.get("x-tsz-public-locale");
+    const selected =
+      supported.find((locale) => locale === publicHint) ??
+      supported.find((locale) => locale === hint);
     if (selected) return selected;
-    const languages = ((await headers()).get("accept-language") ?? "")
+    const languages = (requestHeaders.get("accept-language") ?? "")
       .split(",")
       .map((entry) => {
         const [tag, ...parameters] = entry.trim().split(";");

@@ -57,12 +57,81 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
       }
     | undefined;
   let queued: Notice | undefined;
+  let currentNotice: Notice | undefined;
+  const messages: Record<string, readonly [string, string, string]> = {
+    "可能有未保存的输入。请先保存；刷新后可在原编辑页面恢复已备份内容。仍要刷新吗？":
+      [
+        "可能有未保存的输入。请先保存；刷新后可在原编辑页面恢复已备份内容。仍要刷新吗？",
+        "可能有未儲存的輸入。請先儲存；重新整理後可在原編輯頁面恢復已備份內容。仍要重新整理嗎？",
+        "You may have unsaved input. Save it first; backed-up content can be restored on the original page after reloading. Reload anyway?"
+      ],
+    有新版本可用: [
+      "有新版本可用",
+      "有新版本可用",
+      "A new version is available"
+    ],
+    "请先保存当前修改，再刷新更新。": [
+      "请先保存当前修改，再刷新更新。",
+      "請先儲存目前修改，再重新整理更新。",
+      "Save your changes before reloading."
+    ],
+    "刷新即可使用最新内容。": [
+      "刷新即可使用最新内容。",
+      "重新整理即可使用最新內容。",
+      "Reload to use the latest version."
+    ],
+    刷新更新: ["刷新更新", "重新整理更新", "Reload"],
+    刷新重试: ["刷新重试", "重新整理重試", "Reload and retry"],
+    关闭提示: ["关闭提示", "關閉提示", "Dismiss notice"],
+    页面资源加载失败: [
+      "页面资源加载失败",
+      "頁面資源載入失敗",
+      "Page resources could not be loaded"
+    ],
+    "请检查网络后重试；已备份的编辑内容可在原页面恢复。": [
+      "请检查网络后重试；已备份的编辑内容可在原页面恢复。",
+      "請檢查網路後重試；已備份的編輯內容可在原頁面恢復。",
+      "Check your connection and retry. Backed-up edits can be restored on the original page."
+    ],
+    暂时无法连接到服务器: [
+      "暂时无法连接到服务器",
+      "暫時無法連接伺服器",
+      "Could not connect to the server"
+    ],
+    "请检查网络后重试，并保留未保存的输入。": [
+      "请检查网络后重试，并保留未保存的输入。",
+      "請檢查網路後重試，並保留未儲存的輸入。",
+      "Check your connection and retry; preserve any unsaved input."
+    ],
+    "正在检查版本，请保留未保存的输入。": [
+      "正在检查版本，请保留未保存的输入。",
+      "正在檢查版本，請保留未儲存的輸入。",
+      "Checking the version. Preserve any unsaved input."
+    ]
+  };
+  const text = (source: string) => {
+    if (!document.documentElement.hasAttribute("data-interface-locale-ready"))
+      return "";
+    const row = messages[source];
+    if (!row) return "";
+    const language = document.documentElement.lang;
+    return row[
+      language === "zh-Hant"
+        ? 1
+        : language === "en-GB" || language === "en-US"
+          ? 2
+          : 0
+    ];
+  };
   const dirty = () => touched || [...edits.values()].some(Boolean);
   const reload = () => {
     if (
       dirty() &&
       !window.confirm(
-        "可能有未保存的输入。请先保存；刷新后可在原编辑页面恢复已备份内容。仍要刷新吗？"
+        text(
+          "可能有未保存的输入。请先保存；刷新后可在原编辑页面恢复已备份内容。仍要刷新吗？"
+        ) ||
+          "Unsaved input may be lost. Reload? / 未保存的输入可能丢失，仍要刷新吗？"
       )
     )
       return;
@@ -108,9 +177,13 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
       notice.tone === "danger" ? "assertive" : "polite"
     );
     layout.icon.innerHTML = notice.tone === "danger" ? iconAlert : iconArrow;
-    layout.title.textContent = notice.title;
-    layout.body.textContent = notice.body;
-    layout.action.textContent = notice.action;
+    layout.title.textContent = text(notice.title);
+    layout.body.textContent = text(notice.body);
+    layout.action.textContent = text(notice.action) || "↻";
+    layout.action.setAttribute(
+      "aria-label",
+      text(notice.action) || "Reload / 重新加载"
+    );
     banner.style.display = "";
     if (!banner.isConnected)
       (document.body ?? document.documentElement).append(banner);
@@ -118,6 +191,7 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
   const show = (notice: Notice) => {
     // 用户关掉过这个版本：不再重复打扰，直到下一次发布或页面真的出错。
     if (notice.dismissible && dismissed(notice.version)) return;
+    currentNotice = notice;
     if (!banner) {
       const style = document.createElement("style");
       style.id = stylesId;
@@ -134,13 +208,13 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
       banner.style.display = "none";
       const icon = document.createElement("span");
       icon.className = "tsz-recovery-icon";
-      const text = document.createElement("div");
-      text.className = "tsz-recovery-text";
+      const textNode = document.createElement("div");
+      textNode.className = "tsz-recovery-text";
       const title = document.createElement("p");
       title.className = "tsz-recovery-title";
       const body = document.createElement("p");
       body.className = "tsz-recovery-body";
-      text.append(title, body);
+      textNode.append(title, body);
       const action = document.createElement("button");
       action.type = "button";
       action.className = "tsz-recovery-action";
@@ -148,7 +222,7 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
       const close = document.createElement("button");
       close.type = "button";
       close.className = "tsz-recovery-close";
-      close.setAttribute("aria-label", "关闭提示");
+      close.setAttribute("aria-label", text("关闭提示") || "Dismiss / 关闭");
       close.innerHTML = iconClose;
       close.onclick = () => {
         try {
@@ -157,8 +231,9 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
           /* 存储不可用时本次照样关闭，只是不记忆，下次探测可能再提示。 */
         }
         if (banner) banner.style.display = "none";
+        currentNotice = undefined;
       };
-      banner.append(icon, text, action, close);
+      banner.append(icon, textNode, action, close);
       layout = { icon, title, body, action };
       (document.body ?? document.documentElement).append(banner);
       queued = notice;
@@ -175,6 +250,17 @@ export function installResourceRecovery(releaseId: string, prefixes: string[]) {
     }
     paint(notice);
   };
+  new MutationObserver(() => {
+    if (currentNotice && banner && layout) {
+      paint(currentNotice);
+      banner
+        .querySelector(".tsz-recovery-close")
+        ?.setAttribute("aria-label", text("关闭提示") || "Dismiss / 关闭");
+    }
+  }).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["lang", "data-interface-locale-ready"]
+  });
   const probe = (force = false) => {
     if (pending) return pending;
     if (!force && Date.now() - lastCheck < 30_000) return Promise.resolve();

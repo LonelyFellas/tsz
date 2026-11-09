@@ -6,7 +6,7 @@ async function boot(
   latest = "B",
   pathname = "/words",
   stored = false,
-  session: { dismissed?: string; versionDown?: boolean } = {}
+  session: { dismissed?: string; versionDown?: boolean; unready?: boolean } = {}
 ) {
   const dom = new JSDOM("<!doctype html><html><body></body></html>", {
     url: `https://example.test${pathname}`,
@@ -21,6 +21,13 @@ async function boot(
       : new Response(null, { status: 204 })
   );
   dom.window.fetch = fetch;
+  if (!session.unready) {
+    dom.window.document.documentElement.lang = "zh-Hans";
+    dom.window.document.documentElement.setAttribute(
+      "data-interface-locale-ready",
+      ""
+    );
+  }
   dom.window.AbortSignal.timeout = () =>
     new dom.window.AbortController().signal;
   if (stored) dom.window.sessionStorage.setItem("tsz:resource-reload", "1");
@@ -38,21 +45,45 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const bannerIn = (dom: JSDOM) =>
   dom.window.document.querySelector<HTMLElement>("[data-resource-recovery]");
 it("boot failure shows a native fallback even when the entry module never starts", async () => {
-  const { dom, fetch } = await boot();
+  const { dom, fetch } = await boot("B", "/words", false, { unready: true });
   const script = dom.window.document.createElement("script");
   script.src = "/assets/entry.js";
   dom.window.document.body.append(script);
   script.dispatchEvent(new dom.window.Event("error"));
   await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(bannerIn(dom)?.textContent).not.toMatch(/[\u4e00-\u9fff]/);
   expect(
-    dom.window.document.querySelector("[data-resource-recovery]")?.textContent
-  ).toContain("新版本");
+    bannerIn(dom)?.querySelector("button")?.getAttribute("aria-label")
+  ).toBe("Reload / 重新加载");
   expect(
     fetch.mock.calls.some(([url]) =>
       String(url).includes("client-resource-error")
     )
   ).toBe(true);
   expect(dom.window.sessionStorage.getItem("tsz:resource-reload")).toBeNull();
+  dom.window.close();
+});
+it("语言确认后更新恢复提示，换身份等待期间保留无语言重试入口", async () => {
+  const { dom } = await boot("A", "/words", false, { unready: true });
+  dom.window.dispatchEvent(new dom.window.Event("vite:preloadError"));
+  await tick();
+  expect(bannerIn(dom)?.textContent).not.toMatch(/[\u4e00-\u9fff]/);
+  const html = dom.window.document.documentElement;
+  html.lang = "en-US";
+  html.setAttribute("data-interface-locale-ready", "");
+  await tick();
+  expect(bannerIn(dom)?.textContent).toContain(
+    "Page resources could not be loaded"
+  );
+  expect(bannerIn(dom)?.textContent).toContain("Reload and retry");
+  html.removeAttribute("data-interface-locale-ready");
+  await tick();
+  expect(bannerIn(dom)?.textContent).not.toMatch(/[\u4e00-\u9fffA-Za-z]/);
+  html.lang = "zh-Hant";
+  html.setAttribute("data-interface-locale-ready", "");
+  await tick();
+  expect(bannerIn(dom)?.textContent).toContain("頁面資源載入失敗");
+  expect(bannerIn(dom)?.textContent).toContain("重新整理重試");
   dom.window.close();
 });
 it("有新版本提示可关闭，并按版本记忆", async () => {

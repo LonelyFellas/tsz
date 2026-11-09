@@ -203,10 +203,9 @@ export function LoginForm() {
       ) {
         setError(securityErrorMessage(e));
       } else {
-        const msg = e instanceof Error ? e.message : "";
         setError(
           translateAuthError(
-            msg,
+            e instanceof Error ? e : "",
             LOGIN_ERRORS,
             localText(
               webAuth,

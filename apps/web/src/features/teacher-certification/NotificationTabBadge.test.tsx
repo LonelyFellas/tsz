@@ -40,7 +40,8 @@ vi.mock("@/lib/interface-preferences", () => ({
   }
 }));
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/account/notifications"
+  usePathname: () => "/account/notifications",
+  useSearchParams: () => new URLSearchParams()
 }));
 const session = vi.hoisted(() => ({
   user: { id: "user-1" } as { id: string } | null,

@@ -165,7 +165,7 @@ export function RegisterForm({
         }
       );
     return translateAuthError(
-      message,
+      value instanceof Error ? value : "",
       {
         ...REGISTER_ERRORS
       },

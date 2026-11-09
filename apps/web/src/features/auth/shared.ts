@@ -22,10 +22,16 @@ import { useUserStore } from "@/stores/user";
 
 // 保留现有 legacy 错误分类；Web 返回显式本地消息，未知服务端文字保持原文。
 export function translateAuthError(
-  msg: string,
+  error: unknown,
   map: Record<string, WebNotice>,
   fallback: WebNotice
 ): WebNotice {
+  const msg =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : "";
   const common: Record<string, WebNotice> = {
     "session expired": localText(webCommon, "webCommon:session_expired"),
     "missing refresh token": localText(webCommon, "webCommon:session_expired"),
@@ -35,7 +41,11 @@ export function translateAuthError(
   return (
     lookupWebNotice(map, msg.toLowerCase().trim()) ??
     lookupWebNotice(common, msg.toLowerCase().trim()) ??
-    (msg ? originalText(msg) : fallback)
+    (error instanceof Error
+      ? webErrorText(error, fallback)
+      : msg
+        ? originalText(msg)
+        : fallback)
   );
 }
 export function passwordErrorMessage(

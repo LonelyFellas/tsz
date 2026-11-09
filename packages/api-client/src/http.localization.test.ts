@@ -106,3 +106,33 @@ it("records the response language even if the selection changes while the reques
     message: "旧语言错误"
   });
 });
+
+it("captures display context for a request sent without a localization header", async () => {
+  let display = "zh-Hans" as "zh-Hans" | "en-US";
+  let resolve!: (response: Response) => void;
+  const fetcher = vi.fn<typeof fetch>(
+    () =>
+      new Promise<Response>((done) => {
+        resolve = done;
+      })
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const http = createHttpClient({
+    baseUrl: "/api/v1",
+    getInterfaceLocale: () => undefined,
+    getDisplayLocale: () => display
+  });
+  const pending = http.post("/start", {}).catch((error: unknown) => error);
+  await vi.waitFor(() => expect(resolve).toBeDefined());
+  display = "en-US";
+  resolve(
+    new Response(JSON.stringify({ detail: "原始错误" }), { status: 409 })
+  );
+  expect(await pending).toMatchObject({
+    requestLocale: "zh-Hans",
+    message: "原始错误"
+  });
+  expect(
+    new Headers(fetcher.mock.calls[0]![1]?.headers).has("Accept-Language")
+  ).toBe(false);
+});

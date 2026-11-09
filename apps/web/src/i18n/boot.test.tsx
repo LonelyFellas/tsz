@@ -22,7 +22,10 @@ import { WebLocaleBoundary, useWebLocaleReady } from "./boot";
 import { webLocaleBootScript, webLocaleBootStyle } from "./snapshot";
 import GlobalError from "@/app/global-error";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/login" }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/login",
+  useSearchParams: () => new URLSearchParams()
+}));
 const restore = vi.hoisted(() =>
   vi.fn(() => ({ retry: vi.fn(), retrying: false }))
 );
@@ -99,6 +102,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   authRuntime.clearSession();
   document.documentElement.removeAttribute("data-locale-pending");
+  window.history.replaceState(null, "", "/");
 });
 it("根错误页启动会话恢复并等待账号语言", async () => {
   const preference = deferred<"en-US">();
@@ -126,6 +130,18 @@ it("根错误页启动会话恢复并等待账号语言", async () => {
     await screen.findByText("Page resources could not be loaded")
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Reload" })).toBeEnabled();
+});
+
+it("根错误服务端输出保留无需 JavaScript 的重试入口", () => {
+  const html = renderToString(
+    <GlobalError
+      error={new Error("Failed to fetch dynamically imported module")}
+      reset={vi.fn()}
+    />
+  );
+  expect(html).toContain('href=""');
+  expect(html).toContain('aria-label="Reload / 重新加载"');
+  expect(html).not.toContain("页面资源加载失败");
 });
 it("身份与账号偏好未确认时无可见默认文案，首个已确认画面为英文", async () => {
   const preference = deferred<"en-US">();
@@ -305,6 +321,7 @@ it("身份等待同时遮挡body portal并禁止焦点进入，恢复后重新�
 });
 
 it("首次ready后登录再次pending，标题立即回品牌并拒绝迟到的旧语言标题", async () => {
+  window.history.replaceState(null, "", "/login?returnTo=%2Faccount#section");
   useUserStore.setState({ hydrated: true });
   function Tree() {
     const owner = useUserStore(() => interfacePreferences.sessionKey());
@@ -322,6 +339,11 @@ it("首次ready后登录再次pending，标题立即回品牌并拒绝迟到的�
   }
   render(<Tree />);
   await waitFor(() => expect(document.title).toBe("Sign in | 天生会背"));
+  expect(new URL(window.location.href).searchParams.get("lang")).toBe("en-US");
+  expect(new URL(window.location.href).searchParams.get("returnTo")).toBe(
+    "/account"
+  );
+  expect(window.location.hash).toBe("#section");
   const slowDirectory = deferred<typeof directory>();
   vi.mocked(fetch).mockImplementationOnce(async () =>
     Response.json(await slowDirectory.promise)

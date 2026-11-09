@@ -123,10 +123,9 @@ export function OnboardingForm({
           )
         );
       } else {
-        const msg = e instanceof Error ? e.message : "";
         setError(
           translateAuthError(
-            msg,
+            e instanceof Error ? e : "",
             ONBOARDING_ERRORS,
             localText(
               webAuth,

@@ -2,7 +2,7 @@
 import { useWebText } from "@/i18n/client";
 import { webApp } from "@/i18n/messages/app";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
 import { interfacePreferences } from "@/lib/interface-preferences";
 import { useUserStore } from "@/stores/user";
@@ -47,8 +47,12 @@ function GlobalErrorContent({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
     if (resourceError) window.dispatchEvent(new Event("tsz:resource-error"));
   }, [resourceError]);
-  useEffect(() => {
-    if (ready) document.documentElement.lang = locale;
+  useLayoutEffect(() => {
+    if (ready) {
+      document.documentElement.lang = locale;
+      document.documentElement.setAttribute("data-interface-locale-ready", "");
+    } else
+      document.documentElement.removeAttribute("data-interface-locale-ready");
   }, [locale, ready]);
   if (!ready)
     return (
@@ -65,6 +69,9 @@ function GlobalErrorContent({ error, reset }: GlobalErrorProps) {
             borderRadius: "50%"
           }}
         />
+        <a href="" aria-label="Reload / 重新加载" title="Reload / 重新加载">
+          ↻
+        </a>
       </div>
     );
   return (
