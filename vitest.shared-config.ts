@@ -21,6 +21,7 @@ export const coverageCollectionConfig = {
     "apps/web/src/features/auth/**",
     "apps/web/src/features/placement/**",
     "apps/web/src/lib/**",
+    "apps/web/src/i18n/**",
     "apps/web/src/stores/**",
     "apps/admin/src/features/**",
     "apps/admin/src/lib/**",

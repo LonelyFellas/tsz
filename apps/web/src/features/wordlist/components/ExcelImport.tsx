@@ -1,4 +1,12 @@
 "use client";
+import {
+  LocalWebError,
+  type WebNotice,
+  webErrorText,
+  localText
+} from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webWordlistExcel as webWordlist } from "@/i18n/messages/wordlist/excel";
 
 import { useEffect, useRef, useState } from "react";
 import type {
@@ -38,17 +46,18 @@ export function ExcelImport({
   onAppend: (words: ImportedWord[]) => void;
   onCancel: () => void;
 }) {
+  const uiText = useWebText(webWordlist);
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<PreviewRow[]>([]);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState("");
+  const [error, setError] = useState<WebNotice>("");
+  const [busy, setBusy] = useState<WebNotice>("");
   const [page, setPage] = useState(1);
   const [onlyProblems, setOnlyProblems] = useState(false);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
 
   async function perform(
-    label: string,
+    label: WebNotice,
     task: (signal: AbortSignal) => Promise<void>
   ) {
     controller.current?.abort();
@@ -60,7 +69,7 @@ export function ExcelImport({
       await task(operation.signal);
     } catch (cause) {
       if (!operation.signal.aborted)
-        setError(cause instanceof Error ? cause.message : "操作失败，请重试");
+        setError(webErrorText(cause, "操作失败，请重试"));
     } finally {
       if (!operation.signal.aborted) setBusy("");
     }
@@ -71,19 +80,21 @@ export function ExcelImport({
   for (const row of rows) {
     const messages = Object.entries(validateExcelRow(row)).map(
       ([field, message]) =>
-        `${importFieldLabels[field as ImportField]}：${message}`
+        `${uiText(importFieldLabels[field as ImportField])}: ${uiText(message)}`
     );
     if (row.custom) {
       if ([...row.word].length > 50)
-        messages.push("自定义词条名称不能超过 50 字");
-      if (!row.gloss.trim()) messages.push("自定义释义不能为空");
+        messages.push(uiText("自定义词条名称不能超过 50 字"));
+      if (!row.gloss.trim()) messages.push(uiText("自定义释义不能为空"));
     } else if (!row.selected)
-      messages.push(row.match ? "尚未选定平台词条" : "尚未匹配词条");
+      messages.push(uiText(row.match ? "尚未选定平台词条" : "尚未匹配词条"));
     else {
       const id = row.selected.entry_id;
-      if (existingIds.has(id)) messages.push("与编辑器已有词条重复");
+      if (existingIds.has(id)) messages.push(uiText("与编辑器已有词条重复"));
       if (positions.has(id))
-        messages.push(`与文件第 ${positions.get(id)} 行重复`);
+        messages.push(
+          uiText("与文件第 {{v0}} 行重复", { v0: positions.get(id) })
+        );
       else positions.set(id, row.rowNumber);
     }
     if (messages.length) problems.set(row.rowNumber, messages);
@@ -132,7 +143,7 @@ export function ExcelImport({
             (item.status === "unmatched" && item.candidates.length !== 0)
         )
       )
-        throw new Error("匹配结果不完整，请重试");
+        throw new LocalWebError("匹配结果不完整，请重试");
       const matches = new Map(
         batch.map((row, index) => [row.rowNumber, result.items[index]!])
       );
@@ -150,7 +161,10 @@ export function ExcelImport({
         })
       );
       setBusy(
-        `正在匹配 ${Math.min(start + 100, unmatched.length)} / ${unmatched.length} 行…`
+        localText("正在匹配 {{v0}} / {{v1}} 行…", {
+          v0: Math.min(start + 100, unmatched.length),
+          v1: unmatched.length
+        })
       );
     }
   }
@@ -158,12 +172,12 @@ export function ExcelImport({
   return (
     <section aria-labelledby="excel-import-title" className="space-y-6">
       <h1 id="excel-import-title" className="text-3xl font-bold tracking-tight">
-        Excel 导入
+        {uiText("Excel 导入")}
       </h1>
       <p className="text-sm leading-6 text-foreground-muted">
-        使用一个工作表，表头为「词条名称 / 释义 / 注释」。支持 .xls、.xlsx，最多
-        10 MB、10000 行。
-        匹配平台词条时释义仅供核对；未匹配的行可选择创建自定义词条并填写释义。注释会随词表展示给读者。
+        {uiText(
+          "使用一个工作表，表头为「词条名称 / 释义 / 注释」。支持 .xls、.xlsx，最多 10 MB、10000 行。 匹配平台词条时释义仅供核对；未匹配的行可选择创建自定义词条并填写释义。注释会随词表展示给读者。"
+        )}
       </p>
       <fieldset disabled={!!busy} className="flex flex-wrap items-center gap-3">
         <Button
@@ -175,10 +189,12 @@ export function ExcelImport({
             })
           }
         >
-          下载 Excel 模板
+          {uiText("下载 Excel 模板")}
         </Button>
         <label className="min-w-0 text-sm">
-          <span className="mb-2 block font-medium">选择 Excel 文件</span>
+          <span className="mb-2 block font-medium">
+            {uiText("选择 Excel 文件")}
+          </span>
           <input
             type="file"
             accept=".xls,.xlsx"
@@ -189,7 +205,9 @@ export function ExcelImport({
               if (!file) return;
               if (
                 rows.length &&
-                !window.confirm("重新选择文件将清除当前导入预览，是否继续？")
+                !window.confirm(
+                  uiText("重新选择文件将清除当前导入预览，是否继续？")
+                )
               )
                 return;
               setRows([]);
@@ -205,26 +223,31 @@ export function ExcelImport({
         </label>
       </fieldset>
       {fileName && (
-        <p className="break-all text-sm font-medium">文件：{fileName}</p>
+        <p className="break-all text-sm font-medium">
+          {uiText("文件：{{v0}}", { v0: fileName })}
+        </p>
       )}
       {error && (
         <p
           role="alert"
           className="rounded-2xl bg-danger/5 p-4 text-sm text-danger"
         >
-          {error}
+          {uiText(error)}
         </p>
       )}
       {busy && (
         <p role="status" className="text-sm text-foreground-muted">
-          {busy}
+          {uiText(busy)}
         </p>
       )}
       {rows.length > 0 && (
         <>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span>
-              共 {rows.length} 行，{problems.size} 行待处理
+              {uiText("共 {{v0}} 行，{{v1}} 行待处理", {
+                v0: rows.length,
+                v1: problems.size
+              })}
             </span>
             <Button
               type="button"
@@ -233,7 +256,7 @@ export function ExcelImport({
               disabled={!!busy || invalid || unmatched.length === 0}
               onClick={() => void perform("正在匹配词条…", matchRows)}
             >
-              匹配词条
+              {uiText("匹配词条")}
             </Button>
             <label className="flex items-center gap-2">
               <input
@@ -244,23 +267,25 @@ export function ExcelImport({
                   setPage(1);
                 }}
               />
-              仅看待处理行
+              {uiText("仅看待处理行")}
             </label>
           </div>
           {rows.length > remaining && (
             <p role="alert" className="text-sm text-danger">
-              追加后超过 10000 个词条，请删除部分导入行。
+              {uiText("追加后超过 10000 个词条，请删除部分导入行。")}
             </p>
           )}
           <fieldset disabled={!!busy} className="space-y-4">
             {visible.map((row) => (
               <section
                 key={row.rowNumber}
-                aria-label={`文件第 ${row.rowNumber} 行`}
+                aria-label={uiText("文件第 {{v0}} 行", { v0: row.rowNumber })}
                 className="glass space-y-3 rounded-3xl p-5"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-medium">第 {row.rowNumber} 行</h2>
+                  <h2 className="font-medium">
+                    {uiText("第 {{v0}} 行", { v0: row.rowNumber })}
+                  </h2>
                   <Button
                     type="button"
                     variant="ghost"
@@ -268,7 +293,9 @@ export function ExcelImport({
                     onClick={() => {
                       if (
                         window.confirm(
-                          `删除文件第 ${row.rowNumber} 行及其注释？`
+                          uiText("删除文件第 {{v0}} 行及其注释？", {
+                            v0: row.rowNumber
+                          })
                         )
                       )
                         setRows((current) =>
@@ -278,17 +305,21 @@ export function ExcelImport({
                         );
                     }}
                   >
-                    删除此行
+                    {uiText("删除此行")}
                   </Button>
                 </div>
                 {(["word", "gloss", "note"] as const).map((field) => (
                   <label key={field} className="block text-sm font-medium">
-                    {importFieldLabels[field]}
+                    {uiText(importFieldLabels[field])}
                     {field === "gloss" &&
-                      (row.custom ? "（自定义释义，必填）" : "（仅供核对）")}
+                      (row.custom
+                        ? uiText("（自定义释义，必填）")
+                        : uiText("（仅供核对）"))}
                     {field === "note" ? (
                       <textarea
-                        aria-label={`第 ${row.rowNumber} 行注释`}
+                        aria-label={uiText("第 {{v0}} 行注释", {
+                          v0: row.rowNumber
+                        })}
                         value={row.note}
                         className="mt-2 min-h-24 w-full rounded-2xl border border-border bg-surface p-3 text-sm font-normal"
                         onChange={(event) =>
@@ -297,7 +328,10 @@ export function ExcelImport({
                       />
                     ) : (
                       <Input
-                        aria-label={`第 ${row.rowNumber} 行${importFieldLabels[field]}`}
+                        aria-label={uiText("第 {{v0}} 行{{v1}}", {
+                          v0: row.rowNumber,
+                          v1: uiText(importFieldLabels[field])
+                        })}
                         className="mt-2 font-normal"
                         value={row[field]}
                         onChange={(event) =>
@@ -309,23 +343,25 @@ export function ExcelImport({
                 ))}
                 {row.custom ? (
                   <p className="text-sm text-foreground-muted">
-                    自定义词条，可用于拼写练习。
+                    {uiText("自定义词条，可用于拼写练习。")}
                   </p>
                 ) : row.selected ? (
                   <p className="text-sm text-success">
-                    已选定：{row.selected.label} ·{" "}
-                    {row.selected.glosses.join("；") || "暂无释义"}
+                    {uiText("已选定：{{v0}}· ", { v0: row.selected.label })}
+                    {row.selected.glosses.join("；") || uiText("暂无释义")}
                   </p>
                 ) : (
                   <>
                     {row.match?.status === "ambiguous" && (
                       <p className="text-sm text-foreground-muted">
-                        请人工选择词条；也可修改词条名称后重新匹配。
+                        {uiText("请人工选择词条；也可修改词条名称后重新匹配。")}
                       </p>
                     )}
                     {row.match?.status === "unmatched" && (
                       <p className="text-sm text-foreground-muted">
-                        没有精确匹配，可创建自定义词条、查找候选或修改词条名称。
+                        {uiText(
+                          "没有精确匹配，可创建自定义词条、查找候选或修改词条名称。"
+                        )}
                       </p>
                     )}
                     {row.match?.status === "unmatched" && (
@@ -343,7 +379,7 @@ export function ExcelImport({
                           )
                         }
                       >
-                        创建自定义词条
+                        {uiText("创建自定义词条")}
                       </Button>
                     )}
                     {row.match?.candidates.map((candidate) => (
@@ -372,7 +408,9 @@ export function ExcelImport({
                       disabled={!!validateExcelRow(row).word}
                       onClick={() =>
                         void perform(
-                          `正在查找第 ${row.rowNumber} 行候选…`,
+                          localText("正在查找第 {{v0}} 行候选…", {
+                            v0: row.rowNumber
+                          }),
                           async (signal) => {
                             const result = await api.wordList.suggestions(
                               { q: row.word },
@@ -398,7 +436,7 @@ export function ExcelImport({
                         )
                       }
                     >
-                      查找候选
+                      {uiText("查找候选")}
                     </Button>
                   </>
                 )}
@@ -418,10 +456,10 @@ export function ExcelImport({
               disabled={currentPage <= 1}
               onClick={() => setPage(currentPage - 1)}
             >
-              上一页
+              {uiText("上一页")}
             </Button>
             <span>
-              {currentPage} / {pages} 页
+              {uiText("{{v0}}/{{v1}} 页", { v0: currentPage, v1: pages })}
             </span>
             <Button
               type="button"
@@ -430,7 +468,7 @@ export function ExcelImport({
               disabled={currentPage >= pages}
               onClick={() => setPage(currentPage + 1)}
             >
-              下一页
+              {uiText("下一页")}
             </Button>
           </div>
         </>
@@ -455,14 +493,14 @@ export function ExcelImport({
             )
           }
         >
-          确认追加到词表
+          {uiText("确认追加到词表")}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          取消导入
+          {uiText("取消导入")}
         </Button>
       </div>
       <p className="text-sm text-foreground-muted">
-        确认追加后仍需保存词表。取消导入不会修改编辑器中的内容。
+        {uiText("确认追加后仍需保存词表。取消导入不会修改编辑器中的内容。")}
       </p>
     </section>
   );

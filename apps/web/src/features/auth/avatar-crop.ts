@@ -1,3 +1,4 @@
+import { LocalWebError } from "@/i18n/catalog";
 import { contentTypeOf } from "./avatar";
 
 export type AvatarPosition = { x: number; y: number };
@@ -31,7 +32,8 @@ export async function exportAvatarCrop(
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 512;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("当前浏览器无法处理图片，请更换浏览器后重试");
+  if (!context)
+    throw new LocalWebError("当前浏览器无法处理图片，请更换浏览器后重试");
   context.imageSmoothingQuality = "high";
   context.drawImage(
     image,
@@ -47,7 +49,7 @@ export async function exportAvatarCrop(
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/webp", 0.82)
   );
-  if (!blob) throw new Error("图片处理失败，请重新选择");
+  if (!blob) throw new LocalWebError("图片处理失败，请重新选择");
   // 不支持 WebP 编码的浏览器会导出 PNG，上传类型以实际 Blob 为准。
   return new File(
     [blob],

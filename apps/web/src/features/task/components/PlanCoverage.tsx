@@ -1,4 +1,8 @@
 "use client";
+import { type WebNotice, webErrorText } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webTask } from "@/i18n/messages/task";
+
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChoiceScopePreview } from "./ChoiceScopePreview";
@@ -34,11 +38,12 @@ export function PlanCoverage({
   userId: string;
   refresh: () => Promise<unknown>;
 }) {
+  const uiText = useWebText(webTask);
   const [preview, setPreview] = useState<LearningCyclePreview | null>(null);
   const [acceptedPreview, setAcceptedPreview] = useState<string | null>(null);
   const [operation, setOperation] = useState<CycleOperation>("next");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const [unknown, setUnknown] = useState(false);
   const intent = useRef<CreateLearningCycle | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -86,7 +91,7 @@ export function PlanCoverage({
       );
       if (current()) setPreview(p);
     } catch (e) {
-      if (current()) setError(e instanceof Error ? e.message : "预览失败");
+      if (current()) setError(webErrorText(e, "预览失败"));
     } finally {
       if (current()) setBusy(false);
     }
@@ -125,7 +130,7 @@ export function PlanCoverage({
       }
     } catch (e) {
       if (current()) {
-        setError(e instanceof Error ? e.message : "创建失败");
+        setError(webErrorText(e, "创建失败"));
         const definite =
           e instanceof HttpError && e.status < 500 && e.status !== 408;
         setUnknown(!definite);
@@ -143,41 +148,58 @@ export function PlanCoverage({
     <LibraryDialog
       title={
         operation === "refresh_sources"
-          ? "重新确认来源"
+          ? uiText("重新确认来源")
           : operation === "next"
-            ? "开启下一轮"
-            : "放弃受阻轮次"
+            ? uiText("开启下一轮")
+            : uiText("放弃受阻轮次")
       }
       busy={busy || unknown}
       onClose={() => setPreview(null)}
     >
       <div className="space-y-4 text-sm">
         <p>
-          {operation === "refresh_sources" ? "当前已跨天确认：" : "原轮进度："}
-          {preview.previous_covered_count}/{preview.previous_total_count}
-          ，不可用 {preview.previous_blocked_count} 题。
+          {operation === "refresh_sources"
+            ? uiText("当前已跨天确认：")
+            : uiText("原轮进度：")}
+          {uiText("{{v0}}/{{v1}}，不可用 {{v2}} 题。", {
+            v0: preview.previous_covered_count,
+            v1: preview.previous_total_count,
+            v2: preview.previous_blocked_count
+          })}
         </p>
         {operation === "restart_blocked" && (
-          <p>确认后将取消本轮及未完成批次，历史记录保留；新轮进度从零开始。</p>
+          <p>
+            {uiText(
+              "确认后将取消本轮及未完成批次，历史记录保留；新轮进度从零开始。"
+            )}
+          </p>
         )}
         {operation === "refresh_sources" ? (
           <>
             <p>
-              将结束当前未完成批次，保留所有作答历史。内容未变的掌握状态和复习日期保持，内容有变的词义需要重新练习。
+              {uiText(
+                "将结束当前未完成批次，保留所有作答历史。内容未变的掌握状态和复习日期保持，内容有变的词义需要重新练习。"
+              )}
             </p>
             {preview.source_refresh && (
               <p>
-                可重新确认 {preview.source_refresh.refreshed_count} 个词义，其中{" "}
-                {preview.source_refresh.changed_content_count}{" "}
-                个内容有变；仍不可用 {preview.source_refresh.unavailable_count}{" "}
-                个，继续保留原进度。
+                {uiText(
+                  "可重新确认 {{v0}} 个词义，其中 {{v1}} 个内容有变；仍不可用 {{v2}} 个，继续保留原进度。",
+                  {
+                    v0: preview.source_refresh.refreshed_count,
+                    v1: preview.source_refresh.changed_content_count,
+                    v2: preview.source_refresh.unavailable_count
+                  }
+                )}
               </p>
             )}
           </>
         ) : (
           <p>
-            新轮共 {preview.preview.eligible_count} 题，最早从{" "}
-            {preview.earliest_day} 开始。
+            {uiText("新轮共 {{v0}} 题，最早从 {{v1}} 开始。", {
+              v0: preview.preview.eligible_count,
+              v1: preview.earliest_day
+            })}
           </p>
         )}
         {preview.preview.choice && (
@@ -204,7 +226,9 @@ export function PlanCoverage({
                   )
                 }
               />
-              仅使用可出单选的内容开启新轮，暂不可用内容不纳入新轮学习范围
+              {uiText(
+                "仅使用可出单选的内容开启新轮，暂不可用内容不纳入新轮学习范围"
+              )}
             </label>
           )}
         {preview.preview.reasons.map((r) => (
@@ -214,29 +238,29 @@ export function PlanCoverage({
         ))}
         {error && (
           <p role="alert" className="text-danger">
-            {error}
+            {uiText(error)}
           </p>
         )}
-        {unknown && <p>结果未确认；请重试原请求。</p>}
+        {unknown && <p>{uiText("结果未确认；请重试原请求。")}</p>}
         <div className="flex justify-end gap-3">
           <Button
             variant="outline"
             disabled={busy || unknown}
             onClick={() => setPreview(null)}
           >
-            取消
+            {uiText("取消")}
           </Button>
           <Button
             disabled={busy || !preview.preview.can_create}
             onClick={() => void create()}
           >
             {busy
-              ? "正在创建…"
+              ? uiText("正在创建…")
               : unknown
-                ? "重试原请求"
+                ? uiText("重试原请求")
                 : operation === "refresh_sources"
-                  ? "确认更新来源"
-                  : "确认开启新轮"}
+                  ? uiText("确认更新来源")
+                  : uiText("确认开启新轮")}
           </Button>
         </div>
       </div>
@@ -244,32 +268,37 @@ export function PlanCoverage({
   );
   if (plan.mastery)
     return (
-      <section aria-label="单词掌握情况" className="space-y-4">
+      <section aria-label={uiText("单词掌握情况")} className="space-y-4">
         <h2 className="text-lg font-semibold">
-          {planStatusLabels[plan.status]}
+          {uiText(planStatusLabels[plan.status])}
         </h2>
         <LearningProgressBar
-          label="跨天确认进度"
+          label={uiText("跨天确认进度")}
           max={c?.total_count ?? 1}
           value={plan.mastery.mastered_count}
         />
         <p className="text-sm text-foreground-muted">
-          未学词义 {plan.mastery.new_count} · 待巩固{" "}
-          {plan.mastery.learning_count} · 已跨天确认{" "}
-          {plan.mastery.mastered_count}
+          {uiText("未学词义 {{v0}} · 待巩固 {{v1}} · 已跨天确认 {{v2}}", {
+            v0: plan.mastery.new_count,
+            v1: plan.mastery.learning_count,
+            v2: plan.mastery.mastered_count
+          })}
         </p>
         <p className="text-sm text-foreground-muted">
-          到期复习 {plan.mastery.due_count} 题
+          {uiText("到期复习 {{v0}} 题", { v0: plan.mastery.due_count })}
           {plan.mastery.next_review_day &&
-            ` · 下次复习：${plan.mastery.next_review_day}`}
+            uiText("· 下次复习：{{v0}}", { v0: plan.mastery.next_review_day })}
         </p>
         <p className="text-sm text-foreground-muted">
-          每次最多 20 个新词，含错题重练最多 30
-          题。当天答对先记熟悉，跨天再次答对后延长复习间隔。
+          {uiText(
+            "每次最多 20 个新词，含错题重练最多 30 题。当天答对先记熟悉，跨天再次答对后延长复习间隔。"
+          )}
         </p>
         {!!c?.blocked_count && (
           <p className="text-sm text-danger">
-            有 {c.blocked_count} 题来源不可用，掌握进度已保留。
+            {uiText("有 {{v0}} 题来源不可用，掌握进度已保留。", {
+              v0: c.blocked_count
+            })}
           </p>
         )}
         <Button
@@ -278,7 +307,7 @@ export function PlanCoverage({
           disabled={busy || unknown}
           onClick={() => void refresh()}
         >
-          刷新学习安排
+          {uiText("刷新学习安排")}
         </Button>
         {plan.task.state === "active" && plan.status !== "schedule_ended" && (
           <Button
@@ -287,12 +316,12 @@ export function PlanCoverage({
             disabled={busy || unknown || !c}
             onClick={() => void inspect("refresh_sources")}
           >
-            重新确认来源
+            {uiText("重新确认来源")}
           </Button>
         )}
         {error && !preview && (
           <p role="alert" className="text-sm text-danger">
-            {error}
+            {uiText(error)}
           </p>
         )}
         {confirmation}
@@ -301,51 +330,72 @@ export function PlanCoverage({
   if (!c)
     return (
       <p className="text-sm text-foreground-muted">
-        原有抽题模式 · 保留原任务与历史行为。
+        {uiText("原有抽题模式 · 保留原任务与历史行为。")}
       </p>
     );
   return (
-    <section className="space-y-4" aria-label="覆盖轮次">
+    <section className="space-y-4" aria-label={uiText("覆盖轮次")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">
-          第 {c.cycle_number} 轮 · {planStatusLabels[plan.status]}
+          {uiText("第 {{v0}} 轮 ·{{v1}}", {
+            v0: c.cycle_number,
+            v1: uiText(planStatusLabels[plan.status])
+          })}
         </h2>
         <p className="text-sm text-foreground-muted">
-          本轮已覆盖 {c.covered_count}/{c.total_count} 题
+          {uiText("本轮已覆盖 {{v0}}/{{v1}} 题", {
+            v0: c.covered_count,
+            v1: c.total_count
+          })}
         </p>
       </div>
       <LearningProgressBar
-        label="本轮覆盖进度"
+        label={uiText("本轮覆盖进度")}
         max={c.total_count}
         value={c.covered_count}
       />
       <p className="text-sm text-foreground-muted">
-        已覆盖 {c.covered_count} · 仍可答 {c.available_remaining_count} · 不可用{" "}
-        {c.blocked_count}
+        {uiText("已覆盖 {{v0}} · 仍可答 {{v1}} · 不可用 {{v2}}", {
+          v0: c.covered_count,
+          v1: c.available_remaining_count,
+          v2: c.blocked_count
+        })}
       </p>
       {plan.task.task_type === "daily" && (
         <p className="text-sm text-foreground-muted">
           {plan.current_run
-            ? `今日已答 ${plan.current_run.answered_count}/${plan.current_run.target_count} 题`
+            ? uiText("今日已答 {{v0}}/{{v1}} 题", {
+                v0: plan.current_run.answered_count,
+                v1: plan.current_run.target_count
+              })
             : plan.can_start
-              ? `今日尚未开始，可答 ${plan.today_available_count} 题`
-              : "今日尚不可开始"}
+              ? uiText("今日尚未开始，可答 {{v0}} 题", {
+                  v0: plan.today_available_count
+                })
+              : uiText("今日尚不可开始")}
           {plan.estimated_learning_days !== null &&
-            ` · 从 ${plan.estimate_from_day} 起还需 ${plan.estimated_learning_days} 个学习日`}
+            uiText("· 从 {{v0}} 起还需 {{v1}} 个学习日", {
+              v0: plan.estimate_from_day,
+              v1: plan.estimated_learning_days
+            })}
         </p>
       )}
       {plan.status === "not_started" && (
-        <p className="text-sm">开始学习日：{c.earliest_day}</p>
+        <p className="text-sm">
+          {uiText("开始学习日：{{v0}}", { v0: c.earliest_day })}
+        </p>
       )}
       {plan.schedule && (
         <p className="text-sm text-foreground-muted">
-          日期计划：{plan.schedule.start_date} 至 {plan.schedule.end_date}
-          ，北京时间 04:00 换日。
+          {uiText("日期计划：{{v0}} 至 {{v1}}，北京时间 04:00 换日。", {
+            v0: plan.schedule.start_date,
+            v1: plan.schedule.end_date
+          })}
         </p>
       )}
       {plan.schedule_at_risk && (
         <p className="text-sm text-danger">
-          按今日实际剩余额度，可能无法在计划结束前覆盖全部内容。
+          {uiText("按今日实际剩余额度，可能无法在计划结束前覆盖全部内容。")}
         </p>
       )}
       {plan.reasons.map((reason) => (
@@ -355,7 +405,9 @@ export function PlanCoverage({
       ))}
       {c.blocked_count > 0 && (
         <p className="text-sm text-foreground-muted">
-          不可用题目仍保留在本轮总数中；其余合法题目可以继续。检查来源不会重置进度。
+          {uiText(
+            "不可用题目仍保留在本轮总数中；其余合法题目可以继续。检查来源不会重置进度。"
+          )}
         </p>
       )}
       <div className="flex flex-wrap gap-3">
@@ -365,7 +417,7 @@ export function PlanCoverage({
           disabled={busy || unknown}
           onClick={() => void refresh()}
         >
-          检查来源
+          {uiText("检查来源")}
         </Button>
         {plan.can_start_next_cycle && (
           <Button
@@ -373,7 +425,7 @@ export function PlanCoverage({
             disabled={busy || unknown}
             onClick={() => void inspect("next")}
           >
-            开启下一轮
+            {uiText("开启下一轮")}
           </Button>
         )}
         {plan.can_restart_blocked_cycle && (
@@ -383,35 +435,38 @@ export function PlanCoverage({
             disabled={busy || unknown}
             onClick={() => void inspect("restart_blocked")}
           >
-            放弃本轮并重新生成
+            {uiText("放弃本轮并重新生成")}
           </Button>
         )}
       </div>
       {error && !preview && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {uiText(error)}
         </p>
       )}
       {confirmation}
       <details className="border-t border-border/60 pt-4">
         <summary className="cursor-pointer text-sm font-medium">
-          覆盖轮次历史
+          {uiText("覆盖轮次历史")}
         </summary>
         {history.isError ? (
           <p role="alert" className="mt-3 text-sm text-danger">
-            轮次历史读取失败
+            {uiText("轮次历史读取失败")}
           </p>
         ) : (
           <ul className="mt-3 space-y-2 text-sm">
             {history.data?.items.map((h) => (
               <li key={h.id}>
-                第 {h.cycle_number} 轮 ·{" "}
+                {uiText("第 {{v0}} 轮 · ", { v0: h.cycle_number })}
                 {h.state === "completed"
-                  ? "已完成"
+                  ? uiText("已完成")
                   : h.state === "cancelled"
-                    ? "已取消"
-                    : "进行中"}{" "}
-                · 覆盖 {h.covered_count}/{h.total_count} 题
+                    ? uiText("已取消")
+                    : uiText("进行中")}
+                {uiText(" · 覆盖 {{v0}}/{{v1}} 题", {
+                  v0: h.covered_count,
+                  v1: h.total_count
+                })}
               </li>
             ))}
           </ul>
@@ -429,16 +484,16 @@ export function PlanCoverage({
           {plan.sources.map((s) => (
             <li key={s.id} className="rounded-2xl bg-muted/70 p-3 text-sm">
               <p className="line-clamp-2 break-words">
-                {s.name ?? "来源不可用"}
+                {s.name ?? uiText("来源不可用")}
               </p>
               {s.available && (
                 <p className="text-xs text-foreground-muted">
                   {s.personal_note &&
                     s.personal_note !== s.name &&
-                    `备注：${s.personal_note} · `}
+                    uiText("备注：{{v0}} ·", { v0: s.personal_note })}
                   {s.author_name} ·{" "}
-                  {s.state === "published" ? "公开" : "非公开"} · {s.item_count}{" "}
-                  个词条
+                  {s.state === "published" ? uiText("公开") : uiText("非公开")}
+                  {uiText(" · {{v0}} 个词条", { v0: s.item_count })}
                 </p>
               )}
             </li>

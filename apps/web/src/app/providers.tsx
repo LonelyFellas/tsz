@@ -1,7 +1,11 @@
 "use client";
 
+import { WebLocaleEffects } from "@/i18n/effects";
+import { useWebText } from "@/i18n/client";
+import { webApp } from "@/i18n/messages/app";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
+import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { interfacePreferences } from "@/lib/interface-preferences";
 import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect } from "react";
@@ -37,6 +41,7 @@ const ReactQueryDevtools = dynamic(
 );
 
 function SessionRestorer() {
+  const uiText = useWebText(webApp);
   const { retry, retrying } = useSessionRestore();
   const refreshUnconfirmed = useUserStore((s) => s.refreshUnconfirmed);
   const connectionError = useUserStore((s) => s.connectionError);
@@ -53,10 +58,10 @@ function SessionRestorer() {
     >
       <p className="text-sm leading-6">
         {refreshUnconfirmed
-          ? "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果"
+          ? uiText("会话刷新结果尚未确认，请重新登录；当前操作请先查看结果")
           : hydrated
-            ? "连接暂时中断，联网后将自动恢复；当前内容已保留"
-            : "正在恢复连接，联网后将自动继续"}
+            ? uiText("连接暂时中断，联网后将自动恢复；当前内容已保留")
+            : uiText("正在恢复连接，联网后将自动继续")}
       </p>
       <button
         type="button"
@@ -66,13 +71,23 @@ function SessionRestorer() {
         }
         className="mt-4 inline-flex min-h-10 items-center rounded-full bg-primary px-5 text-sm font-medium tracking-wide text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
       >
-        {refreshUnconfirmed ? "重新登录" : retrying ? "重试中…" : "重试连接"}
+        {refreshUnconfirmed
+          ? uiText("重新登录")
+          : retrying
+            ? uiText("重试中…")
+            : uiText("重试连接")}
       </button>
     </div>
   );
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  initialLocale
+}: {
+  children: React.ReactNode;
+  initialLocale: InterfaceLocale;
+}) {
   const interfaceSessionKey = useUserStore(() =>
     interfacePreferences.sessionKey()
   );
@@ -113,9 +128,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <InterfacePreferencesProvider
       controller={interfacePreferences}
       sessionKey={interfaceSessionKey}
+      initialLocale={initialLocale}
     >
       <QueryClientProvider client={queryClient}>
         <ThemeSync />
+        <WebLocaleEffects />
         <SessionRestorer />
         <DailyLoginReward />
         <NotificationTabBadge />

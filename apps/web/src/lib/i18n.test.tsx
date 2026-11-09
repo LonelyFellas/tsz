@@ -104,3 +104,110 @@ describe("界面翻译 Provider", () => {
     expect(html).not.toContain("<img");
   });
 });
+
+it("首屏提示在目录恢复期间保持，恢复另一账号时不沿用访客提示", async () => {
+  let accountId: string | null = null;
+  let resolveDirectory!: (value: {
+    schema_version: 1;
+    preference_version: 1;
+    default_locale: "zh-Hans";
+    supported_locales: ("zh-Hans" | "en-GB")[];
+  }) => void;
+  const directory = new Promise<{
+    schema_version: 1;
+    preference_version: 1;
+    default_locale: "zh-Hans";
+    supported_locales: ("zh-Hans" | "en-GB")[];
+  }>((resolve) => {
+    resolveDirectory = resolve;
+  });
+  const controller = createInterfacePreferences({
+    surface: "web",
+    getSession: () => ({ accountId, generation: 1 }),
+    capabilities: () => directory,
+    read: () => new Promise(() => {}),
+    write: async (value) => value,
+    getStorage: () => ({
+      getItem: (key) => (key.endsWith(":guest") ? "en-GB" : null),
+      setItem: () => {},
+      removeItem: () => {}
+    })
+  });
+  const tree = () => (
+    <InterfacePreferencesProvider
+      controller={controller}
+      sessionKey={controller.sessionKey()}
+      initialLocale="en-GB"
+    >
+      <SaveLabel />
+    </InterfacePreferencesProvider>
+  );
+  const view = render(tree());
+  expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  expect(controller.getSnapshot().refreshing).toBe(true);
+  await act(async () =>
+    resolveDirectory({
+      schema_version: 1,
+      preference_version: 1,
+      default_locale: "zh-Hans",
+      supported_locales: ["zh-Hans", "en-GB"]
+    })
+  );
+  expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  accountId = "account-b";
+  view.rerender(tree());
+  expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+});
+
+it("目录失败后重试不重新使用已经消费的首屏语言提示", async () => {
+  const supported = {
+    schema_version: 1 as const,
+    preference_version: 1 as const,
+    default_locale: "zh-Hans" as const,
+    supported_locales: ["zh-Hans", "en-US"] as ("zh-Hans" | "en-US")[]
+  };
+  const capabilities = vi.fn(async () => supported);
+  const controller = createInterfacePreferences({
+    surface: "web",
+    getSession: () => ({ accountId: null, generation: 1 }),
+    capabilities,
+    read: async () => null,
+    write: async (value) => value,
+    getStorage: () => ({
+      getItem: () => "en-US",
+      setItem: () => {},
+      removeItem: () => {}
+    })
+  });
+  render(
+    <InterfacePreferencesProvider
+      controller={controller}
+      sessionKey={controller.sessionKey()}
+      initialLocale="en-US"
+    >
+      <SaveLabel />
+    </InterfacePreferencesProvider>
+  );
+  await waitFor(() => expect(controller.getSnapshot().status).toBe("ready"));
+  capabilities.mockRejectedValueOnce(new Error("directory unavailable"));
+  await act(async () => controller.refresh());
+  expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+  let resolveRetry!: (value: typeof supported) => void;
+  capabilities.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveRetry = resolve;
+      })
+  );
+  let retry!: Promise<void>;
+  act(() => {
+    retry = controller.refresh();
+  });
+  expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+  await act(async () => {
+    resolveRetry({ ...supported, supported_locales: ["zh-Hans"] });
+    await retry;
+  });
+  expect(controller.getSnapshot().preference).toBe("en-US");
+  expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+});

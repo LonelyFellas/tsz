@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { originalText } from "@/i18n/catalog";
 import type { User } from "@tsz/types";
 import {
   completeAuthentication,
@@ -46,8 +47,8 @@ describe("translateAuthError", () => {
   });
 
   it("未知错误原样透出", () => {
-    expect(translateAuthError("too many requests", map, "兜底")).toBe(
-      "too many requests"
+    expect(translateAuthError("too many requests", map, "兜底")).toEqual(
+      originalText("too many requests")
     );
   });
 

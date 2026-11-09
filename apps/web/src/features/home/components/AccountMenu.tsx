@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webHomeAccount as webHome } from "@/i18n/messages/home/account";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -27,6 +29,7 @@ export function AccountMenu({
   AccountMenuPopoverProps,
   "open" | "onOpenChange" | "disableHover" | "preferences"
 > = {}) {
+  const uiText = useWebText(webHome);
   const user = useUserStore((s) => s.user);
   const router = useRouter();
   const pointerType = useRef("mouse");
@@ -134,7 +137,7 @@ export function AccountMenu({
     <button
       ref={trigger}
       type="button"
-      aria-label="账户菜单"
+      aria-label={uiText("账户菜单")}
       aria-haspopup="menu"
       aria-expanded={false}
       aria-busy={loadingUser === user.id && controlledOpen !== false}
@@ -185,7 +188,7 @@ export function AccountMenu({
       <AccountAvatar user={user} />
       {loadingUser === user.id && controlledOpen !== false && (
         <span className="sr-only" role="status">
-          正在加载账户菜单…
+          {uiText("正在加载账户菜单…")}
         </span>
       )}
     </button>

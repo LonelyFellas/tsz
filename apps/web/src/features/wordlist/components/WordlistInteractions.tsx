@@ -1,4 +1,8 @@
 "use client";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webWordlistInteractions as webWordlist } from "@/i18n/messages/wordlist/interactions";
+
 import { LibraryDialog } from "./LibraryDialog";
 import { LibraryFolderPicker } from "./LibraryFolderPicker";
 import { useEffect, useRef, useState } from "react";
@@ -58,9 +62,10 @@ function InteractionControls({
   onRetry: () => void;
   userId?: string;
 }) {
+  const uiText = useWebText(webWordlist);
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const [tipOpen, setTipOpen] = useState(false);
   const [favoriteOpen, setFavoriteOpen] = useState(false);
   const request = useRef<AbortController | null>(null);
@@ -131,7 +136,7 @@ function InteractionControls({
     <div className="mt-5">
       <div
         className="flex flex-wrap items-center gap-x-6 gap-y-1"
-        aria-label="词表互动"
+        aria-label={uiText("词表互动")}
         aria-busy={busy}
       >
         {controls.map(({ kind, label, activeLabel, active, count, Icon }) =>
@@ -141,12 +146,28 @@ function InteractionControls({
               type="button"
               className={interactionClass}
               data-tooltip={
-                own ? `不能给自己的词表${label}` : active ? activeLabel : label
+                own
+                  ? uiText(
+                      kind === "like"
+                        ? "不能给自己的词表点赞"
+                        : "不能给自己的词表收藏"
+                    )
+                  : active
+                    ? uiText(activeLabel)
+                    : uiText(label)
               }
               disabled={busy || own || !stats || !state || failed}
               aria-pressed={active ?? false}
               aria-label={
-                own ? `不能给自己的词表${label}` : active ? activeLabel : label
+                own
+                  ? uiText(
+                      kind === "like"
+                        ? "不能给自己的词表点赞"
+                        : "不能给自己的词表收藏"
+                    )
+                  : active
+                    ? uiText(activeLabel)
+                    : uiText(label)
               }
               onClick={() =>
                 kind === "favorite"
@@ -164,9 +185,11 @@ function InteractionControls({
             <Link
               key={kind}
               className={interactionClass}
-              data-tooltip={`登录后${label}`}
+              data-tooltip={uiText(
+                kind === "like" ? "登录后点赞" : "登录后收藏"
+              )}
               href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
-              aria-label={`登录后${label}`}
+              aria-label={uiText(kind === "like" ? "登录后点赞" : "登录后收藏")}
             >
               <Icon className="size-5" aria-hidden />
               {count ?? "—"}
@@ -179,12 +202,12 @@ function InteractionControls({
             className={interactionClass}
             data-tooltip={
               list.owner_user_id === null
-                ? "平台词表不可投币"
+                ? uiText("平台词表不可投币")
                 : own
-                  ? "不能给自己的词表投币"
+                  ? uiText("不能给自己的词表投币")
                   : tipState && BigInt(tipState.tip_amount) > 0n
-                    ? "已投币"
-                    : "投币"
+                    ? uiText("已投币")
+                    : uiText("投币")
             }
             disabled={list.owner_user_id === null || own || !stats || busy}
             aria-haspopup="dialog"
@@ -192,8 +215,8 @@ function InteractionControls({
             aria-pressed={!!tipState && BigInt(tipState.tip_amount) > 0n}
             aria-label={
               own
-                ? "不能给自己的词表投币"
-                : `${tipState && BigInt(tipState.tip_amount) > 0n ? "已投币" : "投币"} ${stats?.tip_amount ?? "—"}`
+                ? uiText("不能给自己的词表投币")
+                : `${tipState && BigInt(tipState.tip_amount) > 0n ? uiText("已投币") : uiText("投币")} ${stats?.tip_amount ?? "—"}`
             }
             onClick={() => setTipOpen(true)}
           >
@@ -203,9 +226,9 @@ function InteractionControls({
         ) : (
           <Link
             className={interactionClass}
-            data-tooltip="登录后投币"
+            data-tooltip={uiText("登录后投币")}
             href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
-            aria-label="登录后投币"
+            aria-label={uiText("登录后投币")}
           >
             <Coins className="size-5" aria-hidden />
             {stats?.tip_amount ?? "—"}
@@ -214,43 +237,47 @@ function InteractionControls({
       </div>
       {failed && (
         <p role="alert" className="mt-2 text-sm text-danger">
-          互动状态加载失败。
+          {uiText("互动状态加载失败。")}
           <button type="button" className={buttonClass} onClick={onRetry}>
-            重试
+            {uiText("重试")}
           </button>
         </p>
       )}
       {error && (
         <p role="alert" className="mt-2 text-sm text-danger">
-          {error}
+          {uiText(error)}
         </p>
       )}
       {favoriteOpen && (
         <LibraryDialog
-          title={state?.favorited ? "移入收藏回收站" : "收藏到文件夹"}
+          title={
+            state?.favorited ? uiText("移入收藏回收站") : uiText("收藏到文件夹")
+          }
           busy={busy}
           onClose={() => setFavoriteOpen(false)}
         >
           {error && (
             <p role="alert" className="mb-3 text-sm text-danger">
-              {error}
+              {uiText(error)}
             </p>
           )}
           {state?.favorited ? (
             <>
-              <p className="mb-4">这份收藏将移入「收藏」回收站，可以恢复。</p>
+              <p className="mb-4">
+                {uiText("这份收藏将移入「收藏」回收站，可以恢复。")}
+              </p>
               <button
                 disabled={busy}
                 className={buttonClass}
                 onClick={() => void change("favorite", false)}
               >
-                确认移入回收站
+                {uiText("确认移入回收站")}
               </button>
               <Link
                 className={buttonClass}
                 href={`/account/wordlists?space=favorites&wordlist=${list.id}`}
               >
-                定位已收藏词表
+                {uiText("定位已收藏词表")}
               </Link>
             </>
           ) : (

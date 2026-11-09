@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webAudio } from "@/i18n/messages/audio";
 
 import { useEffect, useRef, useState } from "react";
 import { Volume2 } from "lucide-react";
@@ -16,6 +18,7 @@ export function AudioButton(props: AudioButtonProps) {
 }
 
 function AudioPlayback({ label, sign, resourceKey }: AudioButtonProps) {
+  const uiText = useWebText(webAudio);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const player = useRef<HTMLAudioElement | null>(null);
@@ -104,7 +107,7 @@ function AudioPlayback({ label, sign, resourceKey }: AudioButtonProps) {
       </Button>
       {error && (
         <span role="alert" className="text-xs text-danger">
-          播放失败，请重试
+          {uiText("播放失败，请重试")}
         </span>
       )}
     </span>

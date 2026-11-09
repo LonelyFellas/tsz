@@ -1,4 +1,5 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
@@ -176,4 +177,19 @@ describe("OnboardingForm", () => {
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(useUserStore.getState().onboarded).toBe(true);
   });
+});
+
+it("selected badges do not change radio names when interface language changes", () => {
+  const tree = (locale: "en-GB" | "zh-Hant") => (
+    <InterfaceI18nProvider locale={locale}>
+      <OnboardingForm />
+    </InterfaceI18nProvider>
+  );
+  const view = renderWithProviders(tree("en-GB"));
+  fireEvent.click(screen.getByRole("radio", { name: "B1 Senior secondary" }));
+  expect(
+    screen.getByRole("radio", { name: "B1 Senior secondary" })
+  ).toBeChecked();
+  view.rerender(tree("zh-Hant"));
+  expect(screen.getByRole("radio", { name: "B1 高中" })).toBeChecked();
 });

@@ -1,4 +1,7 @@
 "use client";
+import { localText, type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webPlacement } from "@/i18n/messages/placement";
 
 import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { useEffect, useRef, useState } from "react";
@@ -27,12 +30,13 @@ type Screen = "welcome" | "quiz" | "result" | "invalid";
 
 interface ConfirmState {
   title: string;
-  desc: string;
+  desc: WebNotice;
   ok: string;
   action: () => void;
 }
 
 export function PlacementFlow() {
+  const uiText = useWebText(webPlacement);
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = postAuthPath(true, searchParams.get("redirect"));
@@ -155,8 +159,14 @@ export function PlacementFlow() {
       setConfirm({
         title: "重新测试？",
         desc: onboarded
-          ? `新的测评结果仅供参考，不会修改已保存的学习难度。剩余 ${left} 次机会。`
-          : `新结果将覆盖当前的 ${quota.last.band} 等级，以最后一次为准。剩余 ${left} 次机会。`,
+          ? localText(
+              "新的测评结果仅供参考，不会修改已保存的学习难度。剩余 {{v0}} 次机会。",
+              { v0: left }
+            )
+          : localText(
+              "新结果将覆盖当前的 {{v0}} 等级，以最后一次为准。剩余 {{v1}} 次机会。",
+              { v0: quota.last.band, v1: left }
+            ),
         ok: "确认重测",
         action: () => void startTest()
       });
@@ -243,7 +253,7 @@ export function PlacementFlow() {
         open={confirm !== null}
         title={confirm?.title ?? ""}
         desc={confirm?.desc ?? ""}
-        okLabel={confirm?.ok ?? "确认"}
+        okLabel={confirm?.ok ?? uiText("确认")}
         onOk={() => confirm?.action()}
         onCancel={() => setConfirm(null)}
       />

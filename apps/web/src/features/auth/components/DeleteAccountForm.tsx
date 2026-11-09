@@ -1,4 +1,9 @@
 "use client";
+import { useWebLocale } from "@/i18n/client";
+import { localText } from "@/i18n/catalog";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthSecurity as webAuth } from "@/i18n/messages/auth/security";
 
 import { Button } from "@tsz/ui/components";
 import type {
@@ -42,7 +47,7 @@ const ERROR_BY_CODE: Record<string, string> = {
   internal_error: "服务暂时异常，请稍后重试"
 };
 
-function accountDeletionError(error: unknown): string {
+function accountDeletionError(error: unknown): WebNotice {
   if (error instanceof RequestTimeoutError) return error.message;
   if (!(error instanceof HttpError))
     return "网络异常，操作结果尚未确认，请先刷新查看状态";
@@ -62,6 +67,8 @@ export function DeleteAccountForm() {
 }
 
 function AccountDeletionForm() {
+  const locale = useWebLocale();
+  const uiText = useWebText(webAuth);
   const user = useUserStore((state) => state.user);
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -82,8 +89,8 @@ function AccountDeletionForm() {
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState<WebNotice>("");
+  const [error, setError] = useState<WebNotice>("");
   const [deletionState, setDeletionState] =
     useState<AccountDeletionState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,7 +199,11 @@ function AccountDeletionForm() {
       await api.auth.requestDeletionCode({ channel });
       setCodeRequested(true);
       setCountdown(CODE_COUNTDOWN);
-      setMessage(`验证码已发送至绑定的${CHANNEL_LABEL[channel]}，请查收。`);
+      setMessage(
+        localText("验证码已发送至绑定的{{v0}}，请查收。", {
+          v0: localText(CHANNEL_LABEL[channel], {})
+        })
+      );
     } catch (cause: unknown) {
       handleRequestError(cause);
     } finally {
@@ -287,15 +298,15 @@ function AccountDeletionForm() {
   if (loading || !deletionState) {
     return (
       <PageShell size="sm">
-        <PageHeader eyebrow="账号安全" title="注销账号" />
+        <PageHeader eyebrow={uiText("账号安全")} title={uiText("注销账号")} />
         {loading ? (
           <p role="status" className="text-sm text-foreground-muted">
-            正在读取注销状态…
+            {uiText("正在读取注销状态…")}
           </p>
         ) : (
           <>
             <p role="alert" className="text-sm text-danger">
-              {error}
+              {uiText(error)}
             </p>
             <Button
               className="mt-4"
@@ -308,7 +319,7 @@ function AccountDeletionForm() {
                   .finally(() => setLoading(false));
               }}
             >
-              重新加载
+              {uiText("重新加载")}
             </Button>
           </>
         )}
@@ -319,36 +330,45 @@ function AccountDeletionForm() {
     const request = deletionState.request;
     return (
       <PageShell size="sm">
-        <PageHeader eyebrow="账号安全" title="注销申请等待生效" />
+        <PageHeader
+          eyebrow={uiText("账号安全")}
+          title={uiText("注销申请等待生效")}
+        />
         <div className="glass rounded-3xl p-2">
           <div className="rounded-[20px] bg-surface/70 p-6 text-sm leading-6 sm:p-8">
-            <p>申请成功后等待连续 72 小时，期间可继续登录并撤销申请。</p>
+            <p>
+              {uiText("申请成功后等待连续 72 小时，期间可继续登录并撤销申请。")}
+            </p>
             <p className="mt-3">
-              生效时间：
+              {uiText("生效时间：")}
               <time dateTime={request.effective_at}>
-                {new Date(request.effective_at).toLocaleString("zh-CN", {
+                {new Date(request.effective_at).toLocaleString(locale, {
                   timeZoneName: "short"
                 })}
               </time>
             </p>
             <p className="mt-3">
-              已确认天生币余额：{request.confirmed_balance}
-              。钱包全部收支已暂停，撤销后余额保持不变。
+              {uiText(
+                "已确认天生币余额：{{v0}}。钱包全部收支已暂停，撤销后余额保持不变。",
+                { v0: request.confirmed_balance }
+              )}
             </p>
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-foreground-muted">
-              到期后账号不可再使用，剩余天生币作废，个人数据随后完成清理。是否仍可撤销以服务器判定为准。
+              {uiText(
+                "到期后账号不可再使用，剩余天生币作废，个人数据随后完成清理。是否仍可撤销以服务器判定为准。"
+              )}
             </p>
             {error && (
               <p role="alert" className="mt-3 text-danger">
-                {error}
+                {uiText(error)}
               </p>
             )}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Button disabled={deleting} onClick={cancelDeletion}>
-                {deleting ? "正在撤销…" : "撤销注销申请"}
+                {deleting ? uiText("正在撤销…") : uiText("撤销注销申请")}
               </Button>
               <Button variant="outline" onClick={() => router.back()}>
-                返回
+                {uiText("返回")}
               </Button>
             </div>
           </div>
@@ -361,12 +381,14 @@ function AccountDeletionForm() {
     return (
       <PageShell size="sm">
         <PageHeader
-          eyebrow="账号安全"
-          title="无法注销账号"
-          description="当前账号没有已绑定的手机号或邮箱，请先联系客服处理。"
+          eyebrow={uiText("账号安全")}
+          title={uiText("无法注销账号")}
+          description={uiText(
+            "当前账号没有已绑定的手机号或邮箱，请先联系客服处理。"
+          )}
         />
         <Button variant="outline" onClick={() => router.back()}>
-          返回
+          {uiText("返回")}
         </Button>
       </PageShell>
     );
@@ -387,13 +409,13 @@ function AccountDeletionForm() {
             onClick={() => router.back()}
           >
             <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
-            返回
+            {uiText("返回")}
           </Button>
           <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-            账号安全
+            {uiText("账号安全")}
           </p>
           <h1 className="mb-8 text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-            注销账号
+            {uiText("注销账号")}
           </h1>
 
           <div className="glass rounded-3xl p-2">
@@ -403,18 +425,19 @@ function AccountDeletionForm() {
                 className="mb-7 rounded-2xl border border-danger/20 bg-danger/5 p-4 text-danger"
               >
                 <h2 id="deletion-warning-title" className="font-semibold">
-                  注销前请确认
+                  {uiText("注销前请确认")}
                 </h2>
                 <p className="mt-2 text-sm leading-6">
-                  提交申请后 72 小时生效，期间可撤销，天生币收支将暂停。
-                  注销生效后，账号无法使用，剩余天生币作废，个人数据将被清理。
+                  {uiText(
+                    "提交申请后 72 小时生效，期间可撤销，天生币收支将暂停。 注销生效后，账号无法使用，剩余天生币作废，个人数据将被清理。"
+                  )}
                 </p>
               </section>
 
               <form className="space-y-6" onSubmit={continueDeletion}>
                 <fieldset disabled={sending || deleting}>
                   <legend className="mb-3 text-sm font-medium text-foreground">
-                    1. 选择验证方式
+                    {uiText("1. 选择验证方式")}
                   </legend>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {channels.map((item) => (
@@ -437,7 +460,9 @@ function AccountDeletionForm() {
                         />
                         <span className="min-w-0">
                           <span className="block font-medium">
-                            {CHANNEL_LABEL[item]}验证
+                            {uiText("{{v0}}验证", {
+                              v0: uiText(CHANNEL_LABEL[item])
+                            })}
                           </span>
                           <span className="block truncate text-xs text-foreground-subtle">
                             {item === "phone" ? user?.phone : user?.email}
@@ -453,7 +478,7 @@ function AccountDeletionForm() {
                     htmlFor="account-deletion-code"
                     className="mb-2 block text-sm font-medium text-foreground"
                   >
-                    2. 输入验证码
+                    {uiText("2. 输入验证码")}
                   </label>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <input
@@ -463,7 +488,7 @@ function AccountDeletionForm() {
                       autoComplete="one-time-code"
                       maxLength={6}
                       pattern="[0-9]{6}"
-                      placeholder="6 位数字验证码"
+                      placeholder={uiText("6 位数字验证码")}
                       value={code}
                       aria-describedby="deletion-code-help"
                       disabled={sending || deleting}
@@ -480,30 +505,30 @@ function AccountDeletionForm() {
                       disabled={!canSendCode}
                     >
                       {sending
-                        ? "发送中…"
+                        ? uiText("发送中…")
                         : countdown > 0
-                          ? `${countdown} 秒后重发`
+                          ? uiText("{{v0}} 秒后重发", { v0: countdown })
                           : codeRequested
-                            ? "重新发送"
-                            : "获取验证码"}
+                            ? uiText("重新发送")
+                            : uiText("获取验证码")}
                     </Button>
                   </div>
                   <p
                     id="deletion-code-help"
                     className="mt-2 px-5 text-xs leading-5 text-foreground-muted"
                   >
-                    请先获取验证码，再填写收到的 6 位数字。
+                    {uiText("请先获取验证码，再填写收到的 6 位数字。")}
                   </p>
                 </div>
 
                 {message && (
                   <p role="status" className="text-sm text-success">
-                    {message}
+                    {uiText(message)}
                   </p>
                 )}
                 {error && !confirmOpen && (
                   <p role="alert" className="text-sm text-danger">
-                    {error}
+                    {uiText(error)}
                   </p>
                 )}
 
@@ -513,7 +538,7 @@ function AccountDeletionForm() {
                   className="w-full"
                   disabled={!canContinue}
                 >
-                  下一步
+                  {uiText("下一步")}
                 </Button>
               </form>
             </div>
@@ -572,7 +597,7 @@ function AccountDeletionForm() {
               id="confirm-deletion-title"
               className="text-xl font-bold tracking-tight text-foreground"
             >
-              确认提交注销申请？
+              {uiText("确认提交注销申请？")}
             </h2>
             <p
               id="confirm-deletion-description"
@@ -581,7 +606,9 @@ function AccountDeletionForm() {
               {deletionState.consent_text}
             </p>
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm font-medium">
-              本次确认余额：{deletionState.coin_balance} 天生币
+              {uiText("本次确认余额：{{v0}} 天生币", {
+                v0: deletionState.coin_balance
+              })}
             </p>
             <label className="mt-4 flex items-start gap-3 text-sm leading-6">
               <input
@@ -592,16 +619,18 @@ function AccountDeletionForm() {
                 onChange={(event) => setConsentChecked(event.target.checked)}
               />
               <span>
-                我已阅读并同意以上注销规则
+                {uiText("我已阅读并同意以上注销规则")}
                 {deletionState.coin_balance !== "0"
-                  ? `，主动放弃本次确认的 ${deletionState.coin_balance} 天生币`
-                  : "，确认零余额也等待连续 72 小时"}
+                  ? uiText("，主动放弃本次确认的 {{v0}} 天生币", {
+                      v0: deletionState.coin_balance
+                    })
+                  : uiText("，确认零余额也等待连续 72 小时")}
                 。
               </span>
             </label>
             {error && (
               <p role="alert" className="mt-3 text-sm text-danger">
-                {error}
+                {uiText(error)}
               </p>
             )}
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -611,7 +640,7 @@ function AccountDeletionForm() {
                 disabled={deleting}
                 onClick={() => setConfirmOpen(false)}
               >
-                取消
+                {uiText("取消")}
               </Button>
               <Button
                 type="button"
@@ -619,7 +648,7 @@ function AccountDeletionForm() {
                 disabled={deleting || !consentChecked}
                 onClick={confirmDeletion}
               >
-                {deleting ? "正在提交…" : "提交注销申请"}
+                {deleting ? uiText("正在提交…") : uiText("提交注销申请")}
               </Button>
             </div>
           </div>

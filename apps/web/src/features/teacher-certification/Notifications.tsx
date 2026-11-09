@@ -1,4 +1,8 @@
 "use client";
+import { webErrorText } from "@/i18n/catalog";
+import { useWebLocale } from "@/i18n/client";
+import { useWebText } from "@/i18n/client";
+import { webTeacherCertificationNotifications as webTeacherCertification } from "@/i18n/messages/teacher-certification/notifications";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -26,6 +30,8 @@ const titles = {
 };
 
 export function Notifications() {
+  const locale = useWebLocale();
+  const uiText = useWebText(webTeacherCertification);
   const userId = useUserStore((state) => state.user?.id);
   const [page, setPage] = useState(1);
   const client = useQueryClient();
@@ -36,30 +42,32 @@ export function Notifications() {
       client.invalidateQueries({ queryKey: ["notifications", userId] })
   });
   return (
-    <section aria-label="站内通知" className="space-y-6">
+    <section aria-label={uiText("站内通知")} className="space-y-6">
       {query.isPending ? (
-        <PageNotice>正在读取通知…</PageNotice>
+        <PageNotice>{uiText("正在读取通知…")}</PageNotice>
       ) : query.isError ? (
         <PageNotice tone="error">
-          <p>{query.error.message}</p>
+          <p>
+            {uiText(webErrorText(query.error, "数据暂不可用，请刷新后重试"))}
+          </p>
           <button
             type="button"
             onClick={() => void query.refetch()}
             className={cn(textButtonClass, "mt-3")}
           >
-            重试
+            {uiText("重试")}
           </button>
         </PageNotice>
       ) : (
         <>
           <p className="text-sm text-foreground-muted">
             {query.data.unread_count
-              ? `${query.data.unread_count} 条未读通知`
-              : "暂无未读通知"}
+              ? uiText("{{v0}} 条未读通知", { v0: query.data.unread_count })
+              : uiText("暂无未读通知")}
           </p>
           {query.data.items.length === 0 ? (
             <PageNotice>
-              暂无站内通知，词表互动和认证结果会显示在这里。
+              {uiText("暂无站内通知，词表互动和认证结果会显示在这里。")}
             </PageNotice>
           ) : (
             <ul className="space-y-3">
@@ -73,7 +81,7 @@ export function Notifications() {
                           className="size-2 rounded-full bg-primary"
                         />
                       )}
-                      {titles[item.kind]}
+                      {uiText(titles[item.kind])}
                     </h2>
                     <span
                       className={cn(
@@ -83,34 +91,39 @@ export function Notifications() {
                           : "bg-primary-muted text-primary"
                       )}
                     >
-                      {item.read_at ? "已读" : "未读"}
+                      {item.read_at ? uiText("已读") : uiText("未读")}
                     </span>
                   </div>
                   <time
                     dateTime={item.created_at}
                     className="mt-1 block text-xs text-foreground-muted"
                   >
-                    {new Date(item.created_at).toLocaleString()}
+                    {new Date(item.created_at).toLocaleString(locale, {
+                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    })}
                   </time>
                   {item.kind === "teacher_approved" && (
                     <p className="mt-3 text-sm leading-6">
-                      你已获得教师身份，可在账号菜单中切换工作台，原有学生身份保持不变。
+                      {uiText(
+                        "你已获得教师身份，可在账号菜单中切换工作台，原有学生身份保持不变。"
+                      )}
                     </p>
                   )}
                   {(item.kind === "wordlist_liked" ||
                     item.kind === "wordlist_tipped") && (
                     <p className="mt-3 text-sm leading-6">
-                      {item.actor_name ?? "账号已注销"}
-                      {item.kind === "wordlist_liked"
-                        ? "赞了你的词表"
-                        : "向你的词表"}
-                      {item.wordlist_name
-                        ? `「${item.wordlist_name}」`
-                        : "（已删除）"}
-                      {item.kind === "wordlist_tipped" && item.amount
-                        ? `投了 ${formatCoins(item.amount)}`
-                        : ""}
-                      。
+                      {uiText(
+                        item.kind === "wordlist_liked"
+                          ? "{{actor}}赞了你的词表「{{wordlist}}」。"
+                          : item.amount
+                            ? "{{actor}}向你的词表「{{wordlist}}」投了 {{amount}}。"
+                            : "{{actor}}向你的词表「{{wordlist}}」投币。",
+                        {
+                          actor: item.actor_name ?? uiText("账号已注销"),
+                          wordlist: item.wordlist_name ?? uiText("（已删除）"),
+                          amount: item.amount ? formatCoins(item.amount) : ""
+                        }
+                      )}
                     </p>
                   )}
                   {item.reason && (
@@ -124,7 +137,7 @@ export function Notifications() {
                         href={`/account/wordlists/${encodeURIComponent(item.wordlist_id)}`}
                         className={buttonClass}
                       >
-                        查看词表
+                        {uiText("查看词表")}
                       </Link>
                     )}
                     {item.kind === "wordlist_tipped" && (
@@ -132,12 +145,12 @@ export function Notifications() {
                         href="/account/wordlist-tips"
                         className={buttonClass}
                       >
-                        查看收币记录
+                        {uiText("查看收币记录")}
                       </Link>
                     )}
                     {item.kind === "wordlist_deleted" && (
                       <Link href="/student/practice" className={buttonClass}>
-                        查看学习任务
+                        {uiText("查看学习任务")}
                       </Link>
                     )}
                     {item.application_id && (
@@ -145,7 +158,7 @@ export function Notifications() {
                         href={`/account/teacher-applications/${encodeURIComponent(item.application_id)}`}
                         className={buttonClass}
                       >
-                        查看对应申请
+                        {uiText("查看对应申请")}
                       </Link>
                     )}
                     {!item.read_at && (
@@ -155,7 +168,7 @@ export function Notifications() {
                         onClick={() => read.mutate(item.id)}
                         className={buttonClass}
                       >
-                        标为已读
+                        {uiText("标为已读")}
                       </button>
                     )}
                   </div>
@@ -172,7 +185,7 @@ export function Notifications() {
       )}
       {read.error && (
         <p role="alert" className="text-sm text-danger">
-          {read.error.message}
+          {uiText(webErrorText(read.error, "数据暂不可用，请刷新后重试"))}
         </p>
       )}
     </section>

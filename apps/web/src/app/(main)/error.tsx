@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webApp } from "@/i18n/messages/app";
 
 import { useEffect } from "react";
 import { isResourceError } from "@tsz/shared/recovery";
@@ -16,6 +18,7 @@ export default function MainError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const uiText = useWebText(webApp);
   const resourceError = isResourceError(error);
   useEffect(() => {
     if (resourceError) window.dispatchEvent(new Event("tsz:resource-error"));
@@ -39,22 +42,24 @@ export default function MainError({
           </svg>
         </span>
         <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          {resourceError ? "页面资源加载失败" : "页面暂时无法显示"}
+          {resourceError
+            ? uiText("页面资源加载失败")
+            : uiText("页面暂时无法显示")}
         </h2>
         <p>
           {resourceError
-            ? "请检查网络后重新加载；已备份的编辑内容可在原页面恢复。"
-            : "重新加载即可继续；如果反复出现，请稍后再试。"}
+            ? uiText("请检查网络后重新加载；已备份的编辑内容可在原页面恢复。")
+            : uiText("重新加载即可继续；如果反复出现，请稍后再试。")}
         </p>
         <div className="mt-1 flex flex-wrap items-center justify-center gap-3">
           {/* 资源已失效时 reset() 会再撞一次同一个 chunk,必须整页重载。 */}
           <Button
             onClick={resourceError ? () => window.location.reload() : reset}
           >
-            {resourceError ? "重新加载" : "重试"}
+            {resourceError ? uiText("重新加载") : uiText("重试")}
           </Button>
           <Button variant="ghost" asChild>
-            <Link href="/">返回首页</Link>
+            <Link href="/">{uiText("返回首页")}</Link>
           </Button>
         </div>
       </div>

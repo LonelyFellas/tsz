@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webShell } from "@/i18n/messages/shell";
 
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { Settings, X } from "lucide-react";
@@ -12,6 +14,7 @@ import { useUserStore } from "@/stores/user";
 import { AccountMenu } from "@/features/home/components/AccountMenu";
 import { LearningPreferences } from "@/features/student-home/LearningPreferences";
 import { ThemeModeControl } from "@/features/theme/ThemeModeControl";
+import { InterfaceLanguage } from "@/i18n/InterfaceLanguage";
 import { NotificationLink } from "./NotificationLink";
 
 export type TopbarPanel = "navigation" | "settings" | "account" | null;
@@ -27,6 +30,7 @@ export function AccountControls({
   studying: boolean;
   guestPreferences?: boolean;
 }) {
+  const uiText = useWebText(webShell);
   const user = useUserStore((state) => state.user);
   const hydrated = useUserStore((state) => state.hydrated);
   const setAccountOpen = useCallback(
@@ -51,7 +55,10 @@ export function AccountControls({
               studying ? (
                 <LearningPreferences userId={user.id} />
               ) : (
-                <ThemeModeControl />
+                <div className="space-y-6">
+                  <ThemeModeControl />
+                  <InterfaceLanguage />
+                </div>
               )
             }
           />
@@ -66,7 +73,7 @@ export function AccountControls({
           }
         >
           <PopoverTrigger
-            aria-label="偏好设置"
+            aria-label={uiText("偏好设置")}
             className="inline-flex size-11 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[state=open]:bg-surface data-[state=open]:text-primary data-[state=open]:shadow-glass"
           >
             <Settings className="size-5" strokeWidth={1.5} aria-hidden />
@@ -74,19 +81,24 @@ export function AccountControls({
           <PopoverContent
             align="end"
             sideOffset={8}
-            aria-label="偏好设置"
+            aria-label={uiText("偏好设置")}
             className="tsz-drawer w-[330px] rounded-3xl border-border/60 bg-surface/90 p-5 shadow-float backdrop-blur-xl"
           >
             <div className="mb-5 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold tracking-tight">偏好设置</h2>
+              <h2 className="text-lg font-bold tracking-tight">
+                {uiText("偏好设置")}
+              </h2>
               <PopoverClose
-                aria-label="关闭偏好设置"
+                aria-label={uiText("关闭偏好设置")}
                 className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 <X className="size-[18px]" strokeWidth={1.5} aria-hidden />
               </PopoverClose>
             </div>
-            <ThemeModeControl />
+            <div className="space-y-6">
+              <ThemeModeControl />
+              <InterfaceLanguage />
+            </div>
           </PopoverContent>
         </Popover>
       ) : null}

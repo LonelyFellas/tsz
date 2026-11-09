@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webHomeLanding as webHome } from "@/i18n/messages/home/landing";
 
 import Image from "next/image";
 import { useState } from "react";
@@ -48,6 +50,7 @@ const WORDS = [
 ] as const;
 
 export function HeroVisual() {
+  const uiText = useWebText(webHome);
   const [{ index, requestedIndices }, setPreview] = useState({
     index: 0,
     requestedIndices: [0]
@@ -70,7 +73,7 @@ export function HeroVisual() {
   }
 
   return (
-    <section className={styles.preview} aria-label="词汇预览">
+    <section className={styles.preview} aria-label={uiText("词汇预览")}>
       <div className={styles.picture}>
         {WORDS.map((word, wordIndex) => (
           <picture
@@ -92,7 +95,7 @@ export function HeroVisual() {
                 />
                 <Image
                   src={word.image.fallback}
-                  alt={word.imageAlt}
+                  alt={uiText(word.imageAlt)}
                   aria-hidden={wordIndex !== index}
                   fill
                   unoptimized
@@ -120,10 +123,13 @@ export function HeroVisual() {
       </div>
       <div className={styles.wordPanel}>
         <div className="flex items-center justify-between gap-4 text-xs text-foreground-muted">
-          <span>词汇预览</span>
+          <span>{uiText("词汇预览")}</span>
           <span
             className="tabular-nums"
-            aria-label={`第 ${index + 1} 个，共 ${WORDS.length} 个示例单词`}
+            aria-label={uiText("第 {{v0}} 个，共 {{v1}} 个示例单词", {
+              v0: index + 1,
+              v1: WORDS.length
+            })}
           >
             {index + 1} / {WORDS.length}
           </span>
@@ -132,7 +138,7 @@ export function HeroVisual() {
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="上一个单词"
+              aria-label={uiText("上一个单词")}
               onClick={() => changeWord(-1)}
             >
               <ArrowLeft className="size-4" aria-hidden />
@@ -142,7 +148,7 @@ export function HeroVisual() {
               variant="ghost"
               size="icon"
               className="text-primary"
-              aria-label="下一个单词"
+              aria-label={uiText("下一个单词")}
               onClick={() => changeWord(1)}
             >
               <ArrowRight className="size-4" aria-hidden />
@@ -177,7 +183,7 @@ export function HeroVisual() {
             </div>
             {!showDefinition && (
               <p className={styles.recallHint}>
-                先想一想，这个单词是什么意思？
+                {uiText("先想一想，这个单词是什么意思？")}
               </p>
             )}
           </div>
@@ -196,13 +202,16 @@ export function HeroVisual() {
             ) : (
               <Eye className="size-4" aria-hidden />
             )}
-            {showDefinition ? "隐藏释义" : "查看释义"}
+            {showDefinition ? uiText("隐藏释义") : uiText("查看释义")}
           </Button>
         </div>
-        <p
-          className="sr-only"
-          role="status"
-        >{`词汇预览：${current.word}，第 ${index + 1} 个，共 ${WORDS.length} 个示例单词。`}</p>
+        <p className="sr-only" role="status">
+          {uiText("词汇预览：{{v0}}，第 {{v1}} 个，共 {{v2}} 个示例单词。", {
+            v0: current.word,
+            v1: index + 1,
+            v2: WORDS.length
+          })}
+        </p>
       </div>
     </section>
   );

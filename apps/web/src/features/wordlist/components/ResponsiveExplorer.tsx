@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
+
 import {
   useEffect,
   useLayoutEffect,
@@ -29,6 +32,7 @@ export function ResponsiveExplorer({
   children: (controls: { closeDrawer: () => void }) => ReactNode;
   overlayActive?: boolean;
 }) {
+  const uiText = useWebText(webWordlist);
   const wide = useMedia("(min-width: 1024px)");
   const hover = useMedia("(hover: hover) and (pointer: fine)");
   const drawer = !wide && !hover;
@@ -217,7 +221,7 @@ export function ResponsiveExplorer({
         <button
           ref={trigger}
           type="button"
-          aria-label="目录"
+          aria-label={uiText("目录")}
           aria-expanded={open}
           aria-controls="responsive-wordlist-explorer"
           onPointerEnter={(event) => {
@@ -241,10 +245,12 @@ export function ResponsiveExplorer({
           className="flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
         >
           <FolderTree className="size-4" aria-hidden />
-          目录
+          {uiText("目录")}
         </button>
         <span className="text-xs text-foreground-subtle">
-          {hover ? "悬停展开 · 点击保持打开" : "点击查看文件夹和词表"}
+          {hover
+            ? uiText("悬停展开 · 点击保持打开")
+            : uiText("点击查看文件夹和词表")}
         </span>
       </div>
       {drawer && open && (
@@ -293,7 +299,13 @@ export function ResponsiveExplorer({
           hidden={!visible}
           role={drawer && open ? "dialog" : !wide ? "region" : undefined}
           aria-modal={drawer && open ? true : undefined}
-          aria-label={wide ? "目录区域" : drawer ? "目录抽屉" : "目录浮层"}
+          aria-label={
+            wide
+              ? uiText("目录区域")
+              : drawer
+                ? uiText("目录抽屉")
+                : uiText("目录浮层")
+          }
           onPointerEnter={() => clearTimeout(closeTimer.current)}
           className={`${visible ? "flex" : "hidden"} flex-col outline-none ${wide ? "sticky top-20 h-[var(--explorer-height,calc(100dvh-6rem))]" : drawer ? "fixed inset-y-0 left-0 z-50 w-[min(88vw,360px)] border-r border-border bg-surface shadow-float" : "fixed left-[var(--explorer-left)] top-[var(--explorer-top)] z-50 max-h-[calc(100dvh-var(--explorer-top)-16px)] w-[360px] max-w-[calc(100vw-2rem)] overflow-visible rounded-3xl border border-border bg-surface shadow-float"}`}
         >
@@ -301,15 +313,17 @@ export function ResponsiveExplorer({
             <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2">
               <span className="text-xs text-foreground-muted">
                 {drawer
-                  ? "文件夹与词表"
+                  ? uiText("文件夹与词表")
                   : pinned
-                    ? "目录已保持打开"
-                    : "快速浏览目录"}
+                    ? uiText("目录已保持打开")
+                    : uiText("快速浏览目录")}
               </span>
               <div className="flex gap-1">
                 {!drawer && (
                   <button
-                    aria-label={pinned ? "取消固定目录" : "固定目录"}
+                    aria-label={
+                      pinned ? uiText("取消固定目录") : uiText("固定目录")
+                    }
                     aria-pressed={pinned}
                     onClick={() => setPinned(!pinned)}
                     className="flex size-11 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
@@ -322,7 +336,7 @@ export function ResponsiveExplorer({
                   </button>
                 )}
                 <button
-                  aria-label="关闭目录"
+                  aria-label={uiText("关闭目录")}
                   onClick={close}
                   className="flex size-11 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
                 >

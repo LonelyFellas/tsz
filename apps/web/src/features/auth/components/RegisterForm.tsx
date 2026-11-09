@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice, localText } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthAccess as webAuth } from "@/i18n/messages/auth/access";
 
 import { HttpError } from "@tsz/api-client";
 import { passwordErrorMessage } from "@tsz/shared/auth";
@@ -55,6 +58,7 @@ export function RegisterForm({
   initialInviteCode?: string;
   redirect?: string;
 }) {
+  const uiText = useWebText(webAuth);
   const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [method, setMethod] = useState(initialMethod);
   const [contact, setContact] = useState("");
@@ -65,7 +69,7 @@ export function RegisterForm({
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const pendingRequest = useRef<AbortController | null>(null);
   useEffect(() => () => pendingRequest.current?.abort(), []);
 
@@ -100,7 +104,7 @@ export function RegisterForm({
     !loading &&
     !sending;
 
-  function translateError(value: unknown, fallback: string): string {
+  function translateError(value: unknown, fallback: string): WebNotice {
     if (value instanceof HttpError) {
       if (value.code === "invalid_invitation_code")
         return "邀请码无效，请修改或清空后重试";
@@ -108,11 +112,14 @@ export function RegisterForm({
       if (passwordMessage) return passwordMessage;
     }
     const message = value instanceof Error ? value.message : "";
+    if (message.toLowerCase().trim() === "user already exists")
+      return localText("该{{v0}}已注册，请直接登录", {
+        v0: localText(method === "email" ? "邮箱" : "手机号", {})
+      });
     return translateAuthError(
       message,
       {
-        ...REGISTER_ERRORS,
-        "user already exists": `该${method === "email" ? "邮箱" : "手机号"}已注册，请直接登录`
+        ...REGISTER_ERRORS
       },
       fallback
     );
@@ -207,10 +214,10 @@ export function RegisterForm({
         className="mb-6 inline-flex items-center gap-2.5 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
       >
         <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.5} />
-        返回
+        {uiText("返回")}
       </button>
       <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-        注册账号
+        {uiText("注册账号")}
       </h1>
 
       <Tabs
@@ -218,14 +225,14 @@ export function RegisterForm({
         onValueChange={(value) => switchMethod(value as typeof method)}
         activationMode="manual"
       >
-        <TabsList className="mb-7" aria-label="注册方式">
+        <TabsList className="mb-7" aria-label={uiText("注册方式")}>
           {(["phone", "email"] as const).map((value) => (
             <TabsTrigger
               key={value}
               value={value}
               disabled={sending || loading || registered}
             >
-              {value === "phone" ? "手机" : "邮箱"}
+              {value === "phone" ? uiText("手机") : uiText("邮箱")}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -235,15 +242,19 @@ export function RegisterForm({
           <form noValidate className="space-y-5" onSubmit={handleRegister}>
             <FormField
               htmlFor="register-contact"
-              label={method === "email" ? "邮箱" : "手机号码"}
-              error={contactError}
+              label={method === "email" ? uiText("邮箱") : uiText("手机号码")}
+              error={uiText(contactError)}
             >
               <Input
                 id="register-contact"
                 type={method === "email" ? "email" : "tel"}
                 inputMode={method === "email" ? "email" : "tel"}
                 autoComplete={method === "email" ? "email" : "tel"}
-                placeholder={method === "email" ? "请输入邮箱" : "请输入手机号"}
+                placeholder={
+                  method === "email"
+                    ? uiText("请输入邮箱")
+                    : uiText("请输入手机号")
+                }
                 value={contact}
                 disabled={sending || loading || registered}
                 onChange={(event) => handleContactChange(event.target.value)}
@@ -254,14 +265,18 @@ export function RegisterForm({
               />
             </FormField>
 
-            <FormField htmlFor="register-code" label="验证码" error={codeError}>
+            <FormField
+              htmlFor="register-code"
+              label={uiText("验证码")}
+              error={uiText(codeError)}
+            >
               <div className="flex gap-3">
                 <Input
                   id="register-code"
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder="请输入验证码"
+                  placeholder={uiText("请输入验证码")}
                   value={code}
                   disabled={loading || registered}
                   onChange={(event) => setCode(event.target.value)}
@@ -279,26 +294,26 @@ export function RegisterForm({
                   className="shrink-0 px-4 font-medium"
                 >
                   {sending
-                    ? "发送中..."
+                    ? uiText("发送中...")
                     : countdown > 0
-                      ? `${countdown}s 后重发`
-                      : "获取验证码"}
+                      ? uiText("{{v0}}s 后重发", { v0: countdown })
+                      : uiText("获取验证码")}
                 </Button>
               </div>
             </FormField>
 
             <FormField
               htmlFor="register-password"
-              label="密码"
-              hint={AUTH_PASSWORD_HINT}
-              error={passwordError}
+              label={uiText("密码")}
+              hint={uiText(AUTH_PASSWORD_HINT)}
+              error={uiText(passwordError)}
             >
               <div className="relative">
                 <Input
                   id="register-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
-                  placeholder="请输入登录密码"
+                  placeholder={uiText("请输入登录密码")}
                   value={password}
                   disabled={loading || registered}
                   onChange={(event) => setPassword(event.target.value)}
@@ -313,18 +328,23 @@ export function RegisterForm({
                   onClick={() => setShowPassword((value) => !value)}
                   disabled={loading || registered}
                   className="absolute right-1 top-1/2 -translate-y-1/2"
-                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  aria-label={
+                    showPassword ? uiText("隐藏密码") : uiText("显示密码")
+                  }
                 >
                   <PasswordVisibilityIcon visible={showPassword} />
                 </Button>
               </div>
             </FormField>
 
-            <FormField htmlFor="register-invite" label="邀请码（选填）">
+            <FormField
+              htmlFor="register-invite"
+              label={uiText("邀请码（选填）")}
+            >
               <Input
                 id="register-invite"
                 value={inviteCode}
-                placeholder="请输入邀请码"
+                placeholder={uiText("请输入邀请码")}
                 autoComplete="off"
                 disabled={loading || registered}
                 onChange={(event) => setInviteCode(event.target.value)}
@@ -333,22 +353,22 @@ export function RegisterForm({
 
             {error && (
               <p role="alert" className="mx-4 text-sm leading-5 text-danger">
-                {error}
+                {uiText(error)}
               </p>
             )}
 
             <Button type="submit" disabled={!canSubmit} className="w-full">
               {loading
                 ? registered
-                  ? "加载中..."
-                  : "注册中..."
+                  ? uiText("加载中...")
+                  : uiText("注册中...")
                 : registered
-                  ? "重试加载"
-                  : "立即注册"}
+                  ? uiText("重试加载")
+                  : uiText("立即注册")}
             </Button>
 
             <p className="pt-2 text-center text-sm text-foreground-muted">
-              已有账号？{" "}
+              {uiText("已有账号？")}{" "}
               <button
                 type="button"
                 disabled={sending || loading}
@@ -361,9 +381,9 @@ export function RegisterForm({
                   router.push(params.size ? `/login?${params}` : "/login");
                 }}
                 className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-                aria-label="已有账号,去登录"
+                aria-label={uiText("已有账号,去登录")}
               >
-                登录
+                {uiText("登录")}
               </button>
             </p>
           </form>

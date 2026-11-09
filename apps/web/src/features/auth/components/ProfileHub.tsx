@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webAuthProfile as webAuth } from "@/i18n/messages/auth/profile";
 
 import type { MeResponse } from "@tsz/types";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,6 +47,7 @@ const TILES: { label: string; href: string; icon: ReactNode }[] = [
 ];
 
 export function ProfileHub() {
+  const uiText = useWebText(webAuth);
   const router = useRouter();
   const queryClient = useQueryClient();
   const { identity, ready, error } = useTeacherIdentity();
@@ -90,7 +93,7 @@ export function ProfileHub() {
   if (loadError) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-foreground-subtle">
-        资料加载失败,请刷新重试。
+        {uiText("资料加载失败,请刷新重试。")}
       </div>
     );
   }
@@ -98,13 +101,13 @@ export function ProfileHub() {
   if (!me) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-foreground-subtle">
-        加载中…
+        {uiText("加载中…")}
       </div>
     );
   }
 
   const { user, learning_settings } = me;
-  const displayName = displayNameOf(user);
+  const displayName = displayNameOf(user, uiText("用户"));
   const initial = Array.from(displayName)[0]!.toUpperCase();
   const contact = user.phone ?? user.email ?? "";
 
@@ -121,14 +124,14 @@ export function ProfileHub() {
         className="-ml-3 mb-5 inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
-        返回工作台
+        {uiText("返回工作台")}
       </button>
       {error && (
         <div
           role="alert"
           className="mb-4 flex flex-wrap items-center gap-3 text-sm text-foreground-muted"
         >
-          <p>暂时无法确认工作台身份。</p>
+          <p>{uiText("暂时无法确认工作台身份。")}</p>
           <button
             type="button"
             onClick={() =>
@@ -138,15 +141,15 @@ export function ProfileHub() {
             }
             className="text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            重新核验身份
+            {uiText("重新核验身份")}
           </button>
         </div>
       )}
       <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-        我的账户
+        {uiText("我的账户")}
       </p>
       <h1 className="mb-8 text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-        个人中心
+        {uiText("个人中心")}
       </h1>
 
       <div className="glass rounded-3xl p-2">
@@ -185,17 +188,19 @@ export function ProfileHub() {
                 <button
                   type="button"
                   onClick={() => copyId(user.id)}
-                  aria-label="复制 ID"
+                  aria-label={uiText("复制 ID")}
                   className="flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                   {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
                 </button>
               </span>
               {copyState === "copied" && (
-                <span className="text-xs text-primary">已复制</span>
+                <span className="text-xs text-primary">{uiText("已复制")}</span>
               )}
               {copyState === "failed" && (
-                <span className="text-xs text-danger">复制失败</span>
+                <span className="text-xs text-danger">
+                  {uiText("复制失败")}
+                </span>
               )}
               {learning_settings && (
                 <>
@@ -203,7 +208,7 @@ export function ProfileHub() {
                     {learning_settings.cefr_level}
                   </span>
                   <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-foreground-muted">
-                    {VARIANT_LABEL[learning_settings.english_variant]}
+                    {uiText(VARIANT_LABEL[learning_settings.english_variant])}
                   </span>
                 </>
               )}
@@ -212,7 +217,7 @@ export function ProfileHub() {
               href="/account/profile"
               className="inline-flex min-h-10 shrink-0 items-center justify-center self-end rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground tracking-wide transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:self-auto"
             >
-              编辑资料
+              {uiText("编辑资料")}
             </Link>
           </div>
         </div>
@@ -229,7 +234,7 @@ export function ProfileHub() {
               {tile.icon}
             </span>
             <span className="flex-1 text-sm font-medium text-foreground">
-              {tile.label}
+              {uiText(tile.label)}
             </span>
             <svg
               width="16"

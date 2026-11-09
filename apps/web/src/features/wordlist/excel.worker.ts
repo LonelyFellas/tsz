@@ -1,3 +1,4 @@
+import { LocalWebError } from "@/i18n/catalog";
 import { createExcelTemplate, parseExcel } from "./excel";
 
 self.onmessage = (
@@ -17,7 +18,8 @@ self.onmessage = (
       error:
         error instanceof Error
           ? error.message
-          : "无法读取文件，请检查是否损坏或加密"
+          : "无法读取文件，请检查是否损坏或加密",
+      local: error instanceof LocalWebError || !(error instanceof Error)
     });
   }
 };

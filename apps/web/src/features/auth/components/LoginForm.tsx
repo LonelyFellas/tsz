@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthAccess as webAuth } from "@/i18n/messages/auth/access";
 
 import { isPhone, isValidAccount } from "@tsz/shared";
 import {
@@ -45,6 +48,7 @@ function savedCooldown(phone: string): number {
 }
 
 export function LoginForm() {
+  const uiText = useWebText(webAuth);
   const [method, setMethod] = useState<"password" | "code">("password");
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(0);
@@ -55,7 +59,7 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const pendingRequest = useRef<AbortController | null>(null);
   useEffect(() => () => pendingRequest.current?.abort(), []);
 
@@ -193,7 +197,7 @@ export function LoginForm() {
   return (
     <AuthShell>
       <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-        欢迎回来
+        {uiText("登录")}
       </h1>
 
       {securitySuccess && (
@@ -201,7 +205,7 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。
+          {uiText("账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。")}
         </p>
       )}
       {resetSuccess && (
@@ -209,7 +213,7 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          密码重置成功，请用新密码登录。
+          {uiText("密码重置成功，请用新密码登录。")}
         </p>
       )}
       {deletedSuccess && (
@@ -217,7 +221,7 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          账号已注销成功。
+          {uiText("账号已注销成功。")}
         </p>
       )}
       {registeredSuccess && (
@@ -225,7 +229,7 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          注册成功，请用刚设置的账号密码登录。
+          {uiText("注册成功，请用刚设置的账号密码登录。")}
         </p>
       )}
 
@@ -240,20 +244,20 @@ export function LoginForm() {
           setError("");
         }}
       >
-        <TabsList className="mb-7" aria-label="登录方式">
+        <TabsList className="mb-7" aria-label={uiText("登录方式")}>
           <TabsTrigger
             value="password"
             disabled={loading || sending || authenticated}
             className={sending ? "disabled:opacity-100" : undefined}
           >
-            密码登录
+            {uiText("密码登录")}
           </TabsTrigger>
           <TabsTrigger
             value="code"
             disabled={loading || sending || authenticated}
             className={sending ? "disabled:opacity-100" : undefined}
           >
-            验证码登录
+            {uiText("验证码登录")}
           </TabsTrigger>
         </TabsList>
         <TabsContent value={method === "password" ? "code" : "password"} />
@@ -267,13 +271,17 @@ export function LoginForm() {
           >
             <FormField
               htmlFor="login-account"
-              label={codeLogin ? "手机号" : "手机号或邮箱"}
+              label={codeLogin ? uiText("手机号") : uiText("手机号或邮箱")}
             >
               <Input
                 id="login-account"
                 type={codeLogin ? "tel" : "text"}
                 autoComplete="username"
-                placeholder={codeLogin ? "请输入手机号" : "请输入手机号或邮箱"}
+                placeholder={
+                  codeLogin
+                    ? uiText("请输入手机号")
+                    : uiText("请输入手机号或邮箱")
+                }
                 value={account}
                 readOnly={sending}
                 disabled={loading || authenticated}
@@ -289,14 +297,14 @@ export function LoginForm() {
               />
             </FormField>
             {codeLogin ? (
-              <FormField htmlFor="login-code" label="验证码">
+              <FormField htmlFor="login-code" label={uiText("验证码")}>
                 <div className="flex gap-2">
                   <Input
                     id="login-code"
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     maxLength={6}
-                    placeholder="请输入 6 位验证码"
+                    placeholder={uiText("请输入 6 位验证码")}
                     value={code}
                     readOnly={sending}
                     disabled={loading || authenticated}
@@ -313,21 +321,21 @@ export function LoginForm() {
                     onClick={() => void sendCode()}
                   >
                     {sending
-                      ? "发送中…"
+                      ? uiText("发送中…")
                       : countdown
-                        ? `${countdown}s 后重发`
-                        : "获取验证码"}
+                        ? uiText("{{v0}}s 后重发", { v0: countdown })
+                        : uiText("获取验证码")}
                   </Button>
                 </div>
               </FormField>
             ) : (
-              <FormField htmlFor="login-password" label="密码">
+              <FormField htmlFor="login-password" label={uiText("密码")}>
                 <div className="relative">
                   <Input
                     id="login-password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
-                    placeholder="请输入登录密码"
+                    placeholder={uiText("请输入登录密码")}
                     value={password}
                     disabled={loading || sending || authenticated}
                     onChange={(e) => {
@@ -343,7 +351,9 @@ export function LoginForm() {
                     onClick={() => setShowPassword((v) => !v)}
                     disabled={loading || sending || authenticated}
                     className="absolute right-1 top-1/2 -translate-y-1/2"
-                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                    aria-label={
+                      showPassword ? uiText("隐藏密码") : uiText("显示密码")
+                    }
                   >
                     <PasswordVisibilityIcon visible={showPassword} />
                   </Button>
@@ -352,11 +362,15 @@ export function LoginForm() {
             )}
             {error && (
               <p role="alert" className="mx-4 text-sm leading-5 text-danger">
-                {error}
+                {uiText(error)}
               </p>
             )}
             <Button type="submit" disabled={!canSubmit} className="w-full">
-              {loading ? "登录中..." : authenticated ? "重试加载" : "立即登录"}
+              {loading
+                ? uiText("登录中...")
+                : authenticated
+                  ? uiText("重试加载")
+                  : uiText("立即登录")}
             </Button>
           </form>
         </TabsContent>
@@ -364,15 +378,15 @@ export function LoginForm() {
 
       <div className="mt-7 flex items-center justify-between gap-4 text-sm">
         <div className="text-foreground-muted">
-          没有账号？{" "}
+          {uiText("没有账号？")}{" "}
           <button
             type="button"
             onClick={openRegistration}
             disabled={loading || sending || authenticated}
-            aria-label="没有账号，立即注册"
+            aria-label={uiText("没有账号，立即注册")}
             className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
           >
-            注册账号
+            {uiText("注册账号")}
           </button>
         </div>
         <button
@@ -384,7 +398,7 @@ export function LoginForm() {
           }}
           className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
         >
-          忘记密码
+          {uiText("忘记密码")}
         </button>
       </div>
     </AuthShell>

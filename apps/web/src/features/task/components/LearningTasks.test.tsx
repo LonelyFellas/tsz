@@ -1,5 +1,12 @@
 import { HttpError } from "@tsz/api-client";
-import { screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import {
+  act,
+  screen,
+  fireEvent,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 const mocks = vi.hoisted(() => ({
@@ -841,4 +848,48 @@ it("existing coverage cycle confirmation keeps its original operation", async ()
     operation: "next",
     after_cycle_id: "cycle"
   });
+});
+
+it("language changes preserve the live answer, selection and pending request", async () => {
+  let rejectAnswer!: (error: Error) => void;
+  mocks.answer.mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        rejectAnswer = reject;
+      })
+  );
+  const tree = (locale: "en-GB" | "zh-Hant" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <LearningPractice id="run" />
+    </InterfaceI18nProvider>
+  );
+  const view = renderWithProviders(tree("en-GB"));
+  const input = (await screen.findByLabelText(
+    "English spelling"
+  )) as HTMLInputElement;
+  fireEvent.change(input, { target: { value: "draft spelling" } });
+  input.focus();
+  input.setSelectionRange(2, 7);
+  const reads = mocks.questions.mock.calls.length;
+  view.rerender(tree("zh-Hant"));
+  expect(screen.getByLabelText("英文拼寫")).toBe(input);
+  expect(input).toHaveValue("draft spelling");
+  expect(input).toHaveFocus();
+  expect([input.selectionStart, input.selectionEnd]).toEqual([2, 7]);
+  expect(screen.getByRole("heading", { name: /苹果/ })).toBeInTheDocument();
+  expect(mocks.questions).toHaveBeenCalledTimes(reads);
+  expect(mocks.answer).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "提交答案" }));
+  await waitFor(() => expect(mocks.answer).toHaveBeenCalledTimes(1));
+  const intent = mocks.answer.mock.calls[0]![1];
+  view.rerender(tree("en-US"));
+  expect(screen.getByLabelText("English spelling")).toBe(input);
+  expect(input).toBeDisabled();
+  expect(input).toHaveValue("draft spelling");
+  expect(mocks.answer.mock.calls[0]![1]).toEqual(intent);
+  await act(async () => rejectAnswer(new Error("original backend detail")));
+  expect(
+    await screen.findByRole("button", { name: "Retry original answer" })
+  ).toBeEnabled();
+  expect(mocks.answer).toHaveBeenCalledTimes(1);
 });

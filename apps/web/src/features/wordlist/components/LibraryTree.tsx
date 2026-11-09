@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
+
 import { LIBRARY_DRAG_TYPE, libraryDragIds } from "../library-drag";
 import { useEffect, useState, type DragEvent, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -52,6 +55,7 @@ type TreeProps = Props & {
 const iconButton =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-xl lg:size-7 lg:rounded-lg text-foreground-muted hover:bg-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40";
 export function LibraryTree(props: Props) {
+  const uiText = useWebText(webWordlist);
   const [expansion, setExpansion] = useState(() => new Map<string, boolean>());
   const [dropTarget, setDropTarget] = useState<string | null>();
   const rootDragOver = dropTarget === null;
@@ -120,7 +124,7 @@ export function LibraryTree(props: Props) {
   }
   return (
     <nav
-      aria-label="工程目录"
+      aria-label={uiText("工程目录")}
       className={`flex min-h-full min-w-0 flex-col ${rootDragOver ? "bg-primary-muted outline outline-1 -outline-offset-1 outline-primary" : ""}`}
       onKeyDown={navigate}
       onDragOver={dragOverRoot}
@@ -137,14 +141,18 @@ export function LibraryTree(props: Props) {
         >
           <ChevronDown className="size-3.5 shrink-0" aria-hidden />
           <span className="truncate">
-            {props.trash ? "回收站" : props.space === "owned" ? "创建" : "收藏"}
+            {props.trash
+              ? uiText("回收站")
+              : props.space === "owned"
+                ? uiText("创建")
+                : uiText("收藏")}
           </span>
         </button>
         {!props.trash && (
           <button
             className={iconButton}
-            aria-label="在当前目录新建文件夹"
-            title="新建文件夹"
+            aria-label={uiText("在当前目录新建文件夹")}
+            title={uiText("新建文件夹")}
             disabled={props.disabled}
             onClick={() => props.onCreateFolder(props.selectedFolder)}
           >
@@ -153,8 +161,8 @@ export function LibraryTree(props: Props) {
         )}
         <button
           className={iconButton}
-          aria-label="刷新目录"
-          title="刷新目录"
+          aria-label={uiText("刷新目录")}
+          title={uiText("刷新目录")}
           disabled={props.disabled}
           onClick={props.onRefresh}
         >
@@ -162,8 +170,8 @@ export function LibraryTree(props: Props) {
         </button>
         <button
           className={iconButton}
-          aria-label="全部折叠"
-          title="全部折叠"
+          aria-label={uiText("全部折叠")}
+          title={uiText("全部折叠")}
           onClick={() =>
             setExpansion(new Map([...expanded].map((id) => [id, false])))
           }
@@ -183,15 +191,16 @@ export function LibraryTree(props: Props) {
       </div>
       <div
         role="region"
-        aria-label="根目录放置区域"
+        aria-label={uiText("根目录放置区域")}
         className={`min-h-32 flex-1 px-3 py-4 text-center text-xs ${rootDragOver ? "text-primary" : ""}`}
       >
-        {rootDragOver && "松开以移到根目录"}
+        {rootDragOver && uiText("松开以移到根目录")}
       </div>
     </nav>
   );
 }
 function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
+  const uiText = useWebText(webWordlist);
   const [page, setPage] = useState(1);
   const result = useQuery({
     queryKey: [
@@ -212,18 +221,24 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
   if (result.isError)
     return (
       <Button size="sm" variant="ghost" onClick={() => void result.refetch()}>
-        重试目录
+        {uiText("重试目录")}
       </Button>
     );
   if (!result.data)
-    return <p className="px-6 py-2 text-xs text-foreground-subtle">加载中…</p>;
+    return (
+      <p className="px-6 py-2 text-xs text-foreground-subtle">
+        {uiText("加载中…")}
+      </p>
+    );
   return (
     <ul className={props.depth ? "ml-3 border-l border-border/70" : ""}>
       {result.data.items.map((item) => (
         <TreeItem key={item.id} {...props} item={item} />
       ))}
       {!result.data.items.length && (
-        <li className="px-6 py-2 text-xs text-foreground-subtle">空文件夹</li>
+        <li className="px-6 py-2 text-xs text-foreground-subtle">
+          {uiText("空文件夹")}
+        </li>
       )}
       {result.data.pagination.total_pages > 1 && (
         <li className="flex items-center justify-between px-2 py-1">
@@ -233,7 +248,7 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
             disabled={page === 1}
             onClick={() => setPage(page - 1)}
           >
-            上一页
+            {uiText("上一页")}
           </Button>
           <span className="text-xs">
             {page}/{result.data.pagination.total_pages}
@@ -244,7 +259,7 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
             disabled={page === result.data.pagination.total_pages}
             onClick={() => setPage(page + 1)}
           >
-            下一页
+            {uiText("下一页")}
           </Button>
         </li>
       )}
@@ -252,6 +267,7 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
   );
 }
 function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
+  const uiText = useWebText(webWordlist);
   const { item } = props;
   const folder = !item.wordlist_id;
   const open = props.expanded.has(item.id);
@@ -314,7 +330,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
           {folder ? (
             <button
               tabIndex={-1}
-              aria-label={`${open ? "收起" : "展开"} ${item.name}`}
+              aria-label={`${open ? uiText("收起") : uiText("展开")} ${item.name}`}
               aria-expanded={open}
               className="flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground-muted focus-visible:outline-2 focus-visible:outline-primary lg:size-7"
               onClick={() => props.toggle(item.id)}
@@ -376,7 +392,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
             <button
               data-explorer-menu
               className={`${iconButton} size-11 lg:size-7 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 data-[state=open]:opacity-100`}
-              aria-label={`${item.name}的操作`}
+              aria-label={uiText("{{v0}}的操作", { v0: item.name })}
               disabled={props.disabled}
             >
               <MoreHorizontal className="size-3.5" aria-hidden />
@@ -407,11 +423,11 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
                   data-leaves-page
                   onSelect={() => props.onCreateWordlist(item.id)}
                 >
-                  新建词表
+                  {uiText("新建词表")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onSelect={() => props.onCreateFolder(item.id)}>
-                新建子文件夹
+                {uiText("新建子文件夹")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
@@ -419,13 +435,13 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
           {props.trash ? (
             <>
               <DropdownMenuItem onSelect={() => action("restore")}>
-                恢复…
+                {uiText("恢复…")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => action("purge")}
                 className="text-danger"
               >
-                彻底删除…
+                {uiText("彻底删除…")}
               </DropdownMenuItem>
             </>
           ) : (
@@ -435,11 +451,11 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
                 onSelect={() => action("rename")}
               >
                 {props.space === "favorites" && !folder
-                  ? "修改备注名…"
-                  : "重命名…"}
+                  ? uiText("修改备注名…")
+                  : uiText("重命名…")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => action("move")}>
-                移动到…
+                {uiText("移动到…")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -447,7 +463,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
                 onSelect={() => action("trash")}
                 className="text-danger"
               >
-                移入回收站
+                {uiText("移入回收站")}
               </DropdownMenuItem>
             </>
           )}

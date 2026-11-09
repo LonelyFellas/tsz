@@ -1,4 +1,7 @@
 import { createInterfacePreferences } from "@tsz/shared/i18n/preferences";
+import { GUEST_LOCALE_COOKIE } from "@/i18n/snapshot";
+import { interfaceLocaleStorageKey } from "@tsz/shared/i18n/preferences";
+import { INTERFACE_LOCALES } from "@tsz/shared/i18n";
 import { authRuntime } from "./auth";
 
 export const interfacePreferences = createInterfacePreferences({
@@ -14,6 +17,24 @@ export const interfacePreferences = createInterfacePreferences({
   write: async (interface_locale) =>
     (await authRuntime.api.interfacePreferences.update({ interface_locale }))
       .preferences.interface_locale,
-  getStorage: () => window.localStorage,
+  getStorage: () => ({
+    getItem: (key) => {
+      let stored: string | null = null;
+      try {
+        stored = window.localStorage.getItem(key);
+      } catch {
+        /* cookie 仍可提供访客显示提示。 */
+      }
+      if (stored || key !== interfaceLocaleStorageKey("web", "guest"))
+        return stored;
+      const hint = document.cookie
+        .split("; ")
+        .find((part) => part.startsWith(`${GUEST_LOCALE_COOKIE}=`))
+        ?.split("=")[1];
+      return INTERFACE_LOCALES.find((locale) => locale === hint) ?? null;
+    },
+    setItem: (key, value) => window.localStorage.setItem(key, value),
+    removeItem: (key) => window.localStorage.removeItem(key)
+  }),
   browserLanguages: () => navigator.languages
 });

@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webStudentHomeDashboard as webStudentHome } from "@/i18n/messages/student-home/dashboard";
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -10,15 +12,16 @@ import { useUserStore } from "@/stores/user";
 import { AppTopbar } from "@/features/shell/AppTopbar";
 
 export function StudentHome() {
+  const uiText = useWebText(webStudentHome);
   const user = useUserStore((state) => state.user);
   if (!user) return null;
   if (!user.roles.includes("student"))
     return (
       <main className="mx-auto max-w-2xl space-y-5 px-6 py-16">
-        <h1 className="text-3xl font-semibold">学习首页</h1>
-        <p role="alert">需要学生身份才能使用学习首页。</p>
+        <h1 className="text-3xl font-semibold">{uiText("学习首页")}</h1>
+        <p role="alert">{uiText("需要学生身份才能使用学习首页。")}</p>
         <Button asChild variant="outline">
-          <Link href="/">返回网站首页</Link>
+          <Link href="/">{uiText("返回网站首页")}</Link>
         </Button>
       </main>
     );
@@ -26,6 +29,7 @@ export function StudentHome() {
 }
 
 function HomeWorkspace({ userId }: { userId: string }) {
+  const uiText = useWebText(webStudentHome);
   const tasks = useQuery({
     queryKey: ["learning-plans", userId, "v1-with-legacy", "home"],
     queryFn: ({ signal }) =>
@@ -62,41 +66,47 @@ function HomeWorkspace({ userId }: { userId: string }) {
                 id="learning-home-title"
                 className="text-2xl font-bold tracking-tight"
               >
-                从这里，继续积累。
+                {uiText("学习首页")}
               </h1>
-              <p className="mt-2 text-[13px] text-foreground-muted">
-                {featured
-                  ? `${featured.task.task_type === "daily" ? "每日任务" : "长期任务"} · ${featured.task.wordlist_ids.length} 个词表`
-                  : "学习首页"}
+              <p className="mt-2 min-h-5 text-[13px] text-foreground-muted">
+                {featured &&
+                  uiText("{{v0}} · {{v1}} 个词表", {
+                    v0: uiText(
+                      featured.task.task_type === "daily"
+                        ? "每日任务"
+                        : "长期任务"
+                    ),
+                    v1: featured.task.wordlist_ids.length
+                  })}
               </p>
             </div>
 
             <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
               {tasks.isPending ? (
                 <p role="status" className="text-foreground-muted">
-                  正在读取学习任务…
+                  {uiText("正在读取学习任务…")}
                 </p>
               ) : tasks.isError ? (
                 <div role="alert" className="space-y-4">
-                  <p>学习任务读取失败，请重试。</p>
+                  <p>{uiText("学习任务读取失败，请重试。")}</p>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => void tasks.refetch()}
                   >
-                    重新读取
+                    {uiText("重新读取")}
                   </Button>
                 </div>
               ) : featured ? (
                 <>
                   <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
                     {continuing
-                      ? "继续这一轮"
+                      ? uiText("继续这一轮")
                       : featured.mode !== "legacy_v1"
-                        ? planStatusLabels[featured.status]
+                        ? uiText(planStatusLabels[featured.status])
                         : completed
-                          ? "本轮已完成"
-                          : "你的学习任务"}
+                          ? uiText("本轮已完成")
+                          : uiText("你的学习任务")}
                   </p>
                   <h2 className="mt-5 max-w-full break-words text-5xl font-bold leading-none tracking-tight sm:text-7xl">
                     {featured.task.name}
@@ -107,12 +117,19 @@ function HomeWorkspace({ userId }: { userId: string }) {
                   />
                   {featured.current_cycle ? (
                     <div className="mt-8 text-sm text-foreground-muted">
-                      {featured.mastery ? "已跨天确认" : "本轮已覆盖"}{" "}
-                      {featured.current_cycle.covered_count}/
-                      {featured.current_cycle.total_count} 题
+                      {featured.mastery
+                        ? uiText("已跨天确认")
+                        : uiText("本轮已覆盖")}
+                      {uiText(" {{v0}}/{{v1}} 题", {
+                        v0: featured.current_cycle.covered_count,
+                        v1: featured.current_cycle.total_count
+                      })}
                       {featured.task.task_type === "daily" && run && (
                         <p className="mt-2">
-                          今日已答 {run.answered_count}/{run.target_count} 题
+                          {uiText("今日已答 {{v0}}/{{v1}} 题", {
+                            v0: run.answered_count,
+                            v1: run.target_count
+                          })}
                         </p>
                       )}
                     </div>
@@ -120,14 +137,14 @@ function HomeWorkspace({ userId }: { userId: string }) {
                     run && (
                       <div className="mt-8 w-full max-w-xs space-y-3">
                         <p className="text-sm text-foreground-muted">
-                          本轮已答{" "}
+                          {uiText("本轮已答")}{" "}
                           <span className="text-xl font-bold tabular-nums text-foreground">
                             {run.answered_count}
-                          </span>{" "}
-                          / {run.target_count} 题
+                          </span>
+                          {uiText(" /{{v0}} 题", { v0: run.target_count })}
                         </p>
                         <progress
-                          aria-label="本轮答题进度"
+                          aria-label={uiText("本轮答题进度")}
                           className="h-1.5 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
                           value={run.answered_count}
                           max={run.target_count}
@@ -148,10 +165,10 @@ function HomeWorkspace({ userId }: { userId: string }) {
                       }
                     >
                       {continuing
-                        ? "继续练习"
+                        ? uiText("继续练习")
                         : showRun
-                          ? "查看记录"
-                          : "查看任务"}
+                          ? uiText("查看记录")
+                          : uiText("查看任务")}
                       <ArrowRight className="size-4" aria-hidden />
                     </Link>
                   </Button>
@@ -166,10 +183,10 @@ function HomeWorkspace({ userId }: { userId: string }) {
                     />
                   </span>
                   <h2 className="mt-6 text-2xl font-bold tracking-tight">
-                    从第一份学习任务开始
+                    {uiText("从第一份学习任务开始")}
                   </h2>
                   <p className="mt-3 max-w-sm text-sm leading-6 text-foreground-muted">
-                    选择想学的词表，创建适合自己的任务。
+                    {uiText("选择想学的词表，创建适合自己的任务。")}
                   </p>
                   <Button
                     asChild
@@ -177,7 +194,7 @@ function HomeWorkspace({ userId }: { userId: string }) {
                     size="lg"
                   >
                     <Link href="/student/tasks/new">
-                      创建学习任务
+                      {uiText("创建学习任务")}
                       <ArrowRight className="size-4" aria-hidden />
                     </Link>
                   </Button>
@@ -186,13 +203,13 @@ function HomeWorkspace({ userId }: { userId: string }) {
             </div>
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
               <Button asChild variant="link" size="sm">
-                <Link href="/student/practice">查看全部任务</Link>
+                <Link href="/student/practice">{uiText("查看全部任务")}</Link>
               </Button>
               <Button asChild variant="link" size="sm">
-                <Link href="/student/review">今日复习</Link>
+                <Link href="/student/review">{uiText("今日复习")}</Link>
               </Button>
               <Button asChild variant="link" size="sm">
-                <Link href="/wordlists">浏览词库广场</Link>
+                <Link href="/wordlists">{uiText("浏览词库广场")}</Link>
               </Button>
             </div>
           </div>

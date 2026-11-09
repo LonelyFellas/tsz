@@ -19,8 +19,11 @@ export function speechSelectionGroup(
   return group === "other" ? locale : group;
 }
 
-const regions = new Intl.DisplayNames(["zh-CN"], { type: "region" });
-export function speechRegionLabel(locale: string): string {
+export function speechRegionLabel(
+  locale: string,
+  interfaceLocale = "zh-Hans"
+): string {
+  const regions = new Intl.DisplayNames([interfaceLocale], { type: "region" });
   return /^en-[A-Z]{2}$/.test(locale)
     ? (regions.of(locale.slice(3)) ?? locale)
     : locale;

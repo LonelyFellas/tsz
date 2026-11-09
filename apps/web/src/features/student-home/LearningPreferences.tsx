@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webStudentHomePreferences as webStudentHome } from "@/i18n/messages/student-home/preferences";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -8,10 +10,12 @@ import type { EnglishVariant, LearningSettings } from "@tsz/types";
 import { Button } from "@tsz/ui/components";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
+import { InterfaceLanguage } from "@/i18n/InterfaceLanguage";
 import { ThemeModeControl } from "@/features/theme/ThemeModeControl";
 import { wordListKeys } from "@/features/wordlist/hooks/useWordLists";
 
 export function LearningPreferences({ userId }: { userId: string }) {
+  const uiText = useWebText(webStudentHome);
   const client = useQueryClient();
   const [draft, setDraft] = useState<EnglishVariant | null>(null);
   const key = ["student-home", userId, "profile"];
@@ -43,25 +47,26 @@ export function LearningPreferences({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <ThemeModeControl />
+      <InterfaceLanguage />
       <div>
         {profile.isPending ? (
-          <p role="status">正在读取学习偏好…</p>
+          <p role="status">{uiText("正在读取学习偏好…")}</p>
         ) : profile.isError ? (
           <div role="alert" className="space-y-3 text-sm">
-            <p>学习偏好读取失败，请重试。</p>
+            <p>{uiText("学习偏好读取失败，请重试。")}</p>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => void profile.refetch()}
             >
-              重试
+              {uiText("重试")}
             </Button>
           </div>
         ) : !settings ? (
           <Button asChild variant="outline">
             <Link href="/onboarding?redirect=%2Fstudent%2Fhome">
-              完成学习设置
+              {uiText("完成学习设置")}
             </Link>
           </Button>
         ) : (
@@ -81,7 +86,9 @@ export function LearningPreferences({ userId }: { userId: string }) {
             }}
           >
             <fieldset disabled={save.isPending} className="space-y-2">
-              <legend className="ml-4 text-sm font-medium">英美偏好</legend>
+              <legend className="ml-4 text-sm font-medium">
+                {uiText("英美偏好")}
+              </legend>
               <div className="grid grid-cols-2 gap-1 rounded-full border border-border/60 bg-muted p-1">
                 {(
                   [
@@ -104,14 +111,14 @@ export function LearningPreferences({ userId }: { userId: string }) {
                         save.reset();
                       }}
                     />
-                    {label}
+                    {uiText(label)}
                   </label>
                 ))}
               </div>
             </fieldset>
             <div className="pl-4 text-xs text-foreground-muted">
               <p>
-                当前难度：
+                {uiText("当前难度：")}
                 <span className="font-medium text-foreground">
                   {settings.cefr_level}
                 </span>
@@ -121,13 +128,13 @@ export function LearningPreferences({ userId }: { userId: string }) {
               <p role="alert" className="text-sm text-danger">
                 {save.error instanceof HttpError &&
                 save.error.code === "cefr_level_locked"
-                  ? "难度已在其他页面确认，请关闭并重新打开设置。"
-                  : "保存失败，请重试。"}
+                  ? uiText("难度已在其他页面确认，请关闭并重新打开设置。")
+                  : uiText("保存失败，请重试。")}
               </p>
             )}
             {save.isSuccess && (
               <p role="status" className="text-sm text-success">
-                英美偏好已保存
+                {uiText("英美偏好已保存")}
               </p>
             )}
             <div className="flex justify-end">
@@ -142,7 +149,7 @@ export function LearningPreferences({ userId }: { userId: string }) {
                   save.isPending || variant === settings.english_variant
                 }
               >
-                {save.isPending ? "保存中…" : "保存学习偏好"}
+                {save.isPending ? uiText("保存中…") : uiText("保存学习偏好")}
               </Button>
             </div>
           </form>

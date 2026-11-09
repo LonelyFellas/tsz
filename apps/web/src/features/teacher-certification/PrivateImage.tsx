@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webTeacherCertificationDocuments as webTeacherCertification } from "@/i18n/messages/teacher-certification/documents";
 
 import Image from "next/image";
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
@@ -7,6 +9,7 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
 export function PrivateImage({ id, label }: { id: string; label: string }) {
+  const uiText = useWebText(webTeacherCertification);
   const userId = useUserStore((s) => s.user?.id);
   const [preview, setPreview] = useState<{
     id: string;
@@ -45,7 +48,7 @@ export function PrivateImage({ id, label }: { id: string; label: string }) {
         {current?.url ? (
           <button
             type="button"
-            aria-label={`预览${label}`}
+            aria-label={uiText("预览{{v0}}", { v0: label })}
             aria-haspopup="dialog"
             onClick={() => setExpandedUrl(current.url!)}
             className="group relative h-full w-full cursor-zoom-in rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -58,7 +61,7 @@ export function PrivateImage({ id, label }: { id: string; label: string }) {
               className="object-contain"
             />
             <span className="absolute bottom-2 right-2 rounded-full bg-foreground/80 px-2.5 py-1 text-xs text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100">
-              预览
+              {uiText("预览")}
             </span>
           </button>
         ) : current?.failed ? (
@@ -67,10 +70,12 @@ export function PrivateImage({ id, label }: { id: string; label: string }) {
             className="px-3 text-xs text-primary"
             onClick={() => setAttempt((value) => value + 1)}
           >
-            图片加载失败，点击重试
+            {uiText("图片加载失败，点击重试")}
           </button>
         ) : (
-          <span className="text-xs text-foreground-muted">正在读取材料…</span>
+          <span className="text-xs text-foreground-muted">
+            {uiText("正在读取材料…")}
+          </span>
         )}
       </div>
       {expanded && (
@@ -99,6 +104,7 @@ function ImagePreview({
   label: string;
   onClose: () => void;
 }) {
+  const uiText = useWebText(webTeacherCertification);
   const dialog = useRef<HTMLDialogElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -254,8 +260,8 @@ function ImagePreview({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            aria-label="旋转图片"
-            title="旋转图片"
+            aria-label={uiText("旋转图片")}
+            title={uiText("旋转图片")}
             className={TOOL_BUTTON}
             onClick={() => {
               pointers.current.clear();
@@ -278,8 +284,8 @@ function ImagePreview({
           </button>
           <button
             type="button"
-            aria-label="缩小图片"
-            title="缩小图片"
+            aria-label={uiText("缩小图片")}
+            title={uiText("缩小图片")}
             disabled={view.zoom <= 1}
             className={TOOL_BUTTON}
             onClick={() => zoomBy(1 / 1.5)}
@@ -298,17 +304,19 @@ function ImagePreview({
           </button>
           <button
             type="button"
-            aria-label="适应屏幕"
-            title="适应屏幕"
+            aria-label={uiText("适应屏幕")}
+            title={uiText("适应屏幕")}
             className={`${TOOL_BUTTON} text-xs tabular-nums`}
             onClick={() => update({ ...view, zoom: 1, x: 0, y: 0 })}
           >
-            {view.zoom === 1 ? "适应" : `${Math.round(view.zoom * 100)}%`}
+            {view.zoom === 1
+              ? uiText("适应")
+              : `${Math.round(view.zoom * 100)}%`}
           </button>
           <button
             type="button"
-            aria-label="放大图片"
-            title="放大图片"
+            aria-label={uiText("放大图片")}
+            title={uiText("放大图片")}
             disabled={view.zoom >= 5}
             className={TOOL_BUTTON}
             onClick={() => zoomBy(1.5)}
@@ -327,8 +335,8 @@ function ImagePreview({
           </button>
           <button
             type="button"
-            aria-label="关闭预览"
-            title="关闭预览"
+            aria-label={uiText("关闭预览")}
+            title={uiText("关闭预览")}
             autoFocus
             className={TOOL_BUTTON}
             onClick={() => dialog.current?.close()}
@@ -350,7 +358,7 @@ function ImagePreview({
       <div
         ref={frame}
         role="group"
-        aria-label="图片查看区域"
+        aria-label={uiText("图片查看区域")}
         className={`relative min-h-0 touch-none overflow-hidden bg-muted ${view.zoom > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
         onPointerDown={(event) => {
           if (event.button !== 0) return;

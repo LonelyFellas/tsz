@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   MemoryOverview,
   MemoryPage,
@@ -15,7 +16,7 @@ import {
 type Options = { signal?: AbortSignal };
 function decode<T>(root: RuntimeSchemaRoot, value: unknown): T {
   if (!validateRuntimeSchema(root, value).valid)
-    throw new Error("复习内容暂时无法读取，请稍后重试");
+    throw new ClientResponseError("复习内容暂时无法读取，请稍后重试");
   return value as T;
 }
 export function createLearningMemoryEndpoints(http: HttpClient) {

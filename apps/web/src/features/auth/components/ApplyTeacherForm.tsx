@@ -1,4 +1,8 @@
 "use client";
+import { localText } from "@/i18n/catalog";
+import { LocalWebError, type WebNotice, webErrorText } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthCertification as webAuth } from "@/i18n/messages/auth/certification";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -25,6 +29,7 @@ const inputClass =
   "mt-2 min-h-12 w-full rounded-full border border-border bg-surface px-5 py-3 text-sm font-normal text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15";
 
 export function ApplyTeacherForm() {
+  const uiText = useWebText(webAuth);
   const userId = useUserStore((s) => s.user?.id);
   const query = useQuery({
     queryKey: ["teacher-certification", userId],
@@ -35,20 +40,20 @@ export function ApplyTeacherForm() {
   if (query.isPending)
     return (
       <div role="status">
-        <PageNotice>加载中…</PageNotice>
+        <PageNotice>{uiText("加载中…")}</PageNotice>
       </div>
     );
   if (query.isError)
     return (
       <PageNotice tone="error">
-        <p>认证信息加载失败，请重试。</p>
+        <p>{uiText("认证信息加载失败，请重试。")}</p>
         <Button
           variant="outline"
           size="sm"
           className="mt-4"
           onClick={() => void query.refetch()}
         >
-          重新加载
+          {uiText("重新加载")}
         </Button>
       </PageNotice>
     );
@@ -58,21 +63,31 @@ export function ApplyTeacherForm() {
       <section className="glass rounded-3xl p-2">
         <div className="space-y-6 rounded-[20px] bg-surface/70 p-6 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight">
-            {data.teacher_verified ? "教师认证已通过" : "审核中"}
+            {data.teacher_verified
+              ? uiText("教师认证已通过")
+              : uiText("审核中")}
           </h2>
           <p className="text-sm leading-6 text-foreground-muted">
             {data.teacher_verified
-              ? "点击右上角头像，可切换到教师工作台，也可以继续用学生身份学习。"
-              : "申请已提交。审核期间不能修改或再次提交，结果会发到站内通知。"}
+              ? uiText(
+                  "点击右上角头像，可切换到教师工作台，也可以继续用学生身份学习。"
+                )
+              : uiText(
+                  "申请已提交。审核期间不能修改或再次提交，结果会发到站内通知。"
+                )}
           </p>
           {data.application && (
             <dl className="space-y-2 text-sm">
               <div>
-                <dt className="inline text-foreground-muted">姓名：</dt>
+                <dt className="inline text-foreground-muted">
+                  {uiText("姓名：")}
+                </dt>
                 <dd className="inline">{data.application.real_name}</dd>
               </div>
               <div>
-                <dt className="inline text-foreground-muted">联系方式：</dt>
+                <dt className="inline text-foreground-muted">
+                  {uiText("联系方式：")}
+                </dt>
                 <dd className="inline">{data.application.contact}</dd>
               </div>
             </dl>
@@ -82,9 +97,9 @@ export function ApplyTeacherForm() {
               <PrivateImage
                 key={file.id}
                 id={file.id}
-                label={
+                label={uiText(
                   groups.find((g) => g.kind === file.kind)?.label ?? "认证材料"
-                }
+                )}
               />
             ))}
           </div>
@@ -108,6 +123,7 @@ function ApplicationEditor({
   userId: string;
   initial: TeacherCertification;
 }) {
+  const uiText = useWebText(webAuth);
   const client = useQueryClient();
   const [realName, setRealName] = useState(
     initial.application?.real_name ?? ""
@@ -119,7 +135,7 @@ function ApplicationEditor({
   const [files, setFiles] = useState(initial.files);
   const [pendingCleanup, setPendingCleanup] = useState<CertificationFile[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [fileError, setFileError] = useState("");
+  const [fileError, setFileError] = useState<WebNotice>("");
   const temporary = useRef(new Set<string>());
   const reason =
     initial.application?.revoke_reason ?? initial.application?.review_reason;
@@ -165,7 +181,12 @@ function ApplicationEditor({
     const group = groups.find((value) => value.kind === kind)!;
     const previous = files.filter((file) => file.kind === kind);
     if (group.limit > 1 && previous.length + selected.length > group.limit) {
-      setFileError(`${group.label}最多上传${group.limit}张`);
+      setFileError(
+        localText("{{v0}}最多上传{{v1}}张", {
+          v0: localText(group.label, {}),
+          v1: group.limit
+        })
+      );
       return;
     }
     setUploading(true);
@@ -177,7 +198,9 @@ function ApplicationEditor({
           file.size > 10 * 1024 * 1024 ||
           file.size === 0
         )
-          throw new Error("请选择 JPG、PNG 或 WebP 图片，每张不超过 10MB");
+          throw new LocalWebError(
+            "请选择 JPG、PNG 或 WebP 图片，每张不超过 10MB"
+          );
         const uploaded = await api.teacherCertification.upload(kind, file);
         temporary.current.add(uploaded.id);
         setFiles((current) => [
@@ -199,7 +222,7 @@ function ApplicationEditor({
         }
       }
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : "上传失败，请重试");
+      setFileError(webErrorText(error, "上传失败，请重试"));
     } finally {
       setUploading(false);
     }
@@ -218,7 +241,7 @@ function ApplicationEditor({
         current.filter((item) => item.id !== file.id)
       );
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : "移除失败，请重试");
+      setFileError(webErrorText(error, "移除失败，请重试"));
     } finally {
       setUploading(false);
     }
@@ -242,12 +265,12 @@ function ApplicationEditor({
           >
             <p className="font-medium">
               {initial.application?.status === "revoked"
-                ? "教师资格已撤销"
-                : "上次申请未通过"}
+                ? uiText("教师资格已撤销")
+                : uiText("上次申请未通过")}
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm">{reason}</p>
             <p className="mt-2 text-sm text-foreground-muted">
-              修改后可重新提交申请。
+              {uiText("修改后可重新提交申请。")}
             </p>
           </div>
         )}
@@ -266,40 +289,42 @@ function ApplicationEditor({
             <path d="M8 10V7a4 4 0 0 1 8 0v3" />
             <path d="M12 14v3" />
           </svg>
-          <p>本页信息均需填写。上传的材料仅你和负责审核的管理员可见。</p>
+          <p>
+            {uiText("本页信息均需填写。上传的材料仅你和负责审核的管理员可见。")}
+          </p>
         </div>
         <section
           aria-labelledby="cert-basic-heading"
           className="grid gap-5 md:grid-cols-[176px_minmax(0,1fr)] md:gap-8"
         >
           <h2 id="cert-basic-heading" className="text-base font-semibold">
-            个人信息
+            {uiText("个人信息")}
           </h2>
           <fieldset
             disabled={mutation.isPending || uploading}
             className="grid min-w-0 gap-4 sm:grid-cols-2 sm:gap-5"
           >
             <label className="text-sm font-medium">
-              真实姓名
+              {uiText("真实姓名")}
               <input
                 className={inputClass}
                 required
                 maxLength={50}
                 value={realName}
                 onChange={(event) => setRealName(event.target.value)}
-                placeholder="填写身份证上的姓名"
+                placeholder={uiText("填写身份证上的姓名")}
                 autoComplete="name"
               />
             </label>
             <label className="text-sm font-medium">
-              联系方式
+              {uiText("联系方式")}
               <input
                 className={inputClass}
                 required
                 maxLength={254}
                 value={contact}
                 onChange={(event) => setContact(event.target.value)}
-                placeholder="手机号或邮箱"
+                placeholder={uiText("手机号或邮箱")}
                 autoComplete="off"
               />
             </label>
@@ -311,14 +336,14 @@ function ApplicationEditor({
         >
           <div>
             <h2 id="cert-material-heading" className="text-base font-semibold">
-              认证材料
+              {uiText("认证材料")}
             </h2>
             <p className="mt-2 text-pretty text-sm leading-6 text-foreground-muted">
-              拍全材料，文字要看得清。
+              {uiText("拍全材料，文字要看得清。")}
             </p>
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
               JPG、PNG、WebP
-              <span className="block">单张不超过 10MB</span>
+              <span className="block">{uiText("单张不超过 10MB")}</span>
             </p>
           </div>
           <div className="grid min-w-0 gap-x-5 gap-y-6 sm:grid-cols-2">
@@ -331,9 +356,9 @@ function ApplicationEditor({
                 <label
                   title={
                     multiple
-                      ? `添加${group.label}照片`
+                      ? uiText("添加{{v0}}照片", { v0: uiText(group.label) })
                       : groupFiles.length
-                        ? `更换${group.label}`
+                        ? uiText("更换{{v0}}", { v0: uiText(group.label) })
                         : undefined
                   }
                   className={cn(
@@ -350,7 +375,7 @@ function ApplicationEditor({
                 >
                   <input
                     id={`cert-${group.kind}`}
-                    aria-label={group.label}
+                    aria-label={uiText(group.label)}
                     aria-describedby={
                       group.limit > 1 ? `cert-${group.kind}-hint` : undefined
                     }
@@ -391,14 +416,14 @@ function ApplicationEditor({
                     )}
                   >
                     {groupFiles.length === 0
-                      ? "选择照片"
+                      ? uiText("选择照片")
                       : group.limit === 1
-                        ? "更换照片"
-                        : "添加照片"}
+                        ? uiText("更换照片")
+                        : uiText("添加照片")}
                   </span>
                   {multiple && (
                     <span id={`cert-${group.kind}-hint`} className="sr-only">
-                      最多 {group.limit} 张
+                      {uiText("最多 {{v0}} 张", { v0: group.limit })}
                     </span>
                   )}
                 </label>
@@ -412,13 +437,18 @@ function ApplicationEditor({
                   )}
                 >
                   <div className="flex min-h-11 items-center justify-between gap-3">
-                    <h3 className="text-sm font-medium">{group.label}</h3>
+                    <h3 className="text-sm font-medium">
+                      {uiText(group.label)}
+                    </h3>
                     {!multiple && groupFiles.length > 0 && picker}
                     {multiple && (
                       <span className="text-sm text-foreground-muted">
                         {groupFiles.length > 0
-                          ? `${groupFiles.length} 张 · 最多 ${group.limit} 张`
-                          : `最多 ${group.limit} 张`}
+                          ? uiText("{{v0}} 张 · 最多 {{v1}} 张", {
+                              v0: groupFiles.length,
+                              v1: group.limit
+                            })
+                          : uiText("最多 {{v0}} 张", { v0: group.limit })}
                       </span>
                     )}
                   </div>
@@ -426,14 +456,21 @@ function ApplicationEditor({
                     <div className="mt-3 grid grid-cols-[repeat(auto-fill,8rem)] gap-3">
                       {groupFiles.map((file) => (
                         <div key={file.id} className="relative min-w-0">
-                          <PrivateImage id={file.id} label={group.label} />
+                          <PrivateImage
+                            id={file.id}
+                            label={uiText(group.label)}
+                          />
                           <button
                             type="button"
                             disabled={uploading || mutation.isPending}
                             onClick={() => void remove(file)}
                             className="group absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-                            aria-label={`移除${group.label}`}
-                            title={`移除${group.label}`}
+                            aria-label={uiText("移除{{v0}}", {
+                              v0: uiText(group.label)
+                            })}
+                            title={uiText("移除{{v0}}", {
+                              v0: uiText(group.label)
+                            })}
                           >
                             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface/95 text-foreground-muted transition group-hover:bg-surface group-hover:text-danger">
                               <svg
@@ -463,13 +500,13 @@ function ApplicationEditor({
         <section className="grid gap-5 border-t border-border/60 pt-7 md:grid-cols-[176px_minmax(0,1fr)] md:gap-8">
           <div>
             <h2 className="text-base font-semibold">
-              <label htmlFor="cert-statement">认证说明</label>
+              <label htmlFor="cert-statement">{uiText("认证说明")}</label>
             </h2>
             <p
               id="cert-statement-hint"
               className="mt-2 text-pretty text-sm leading-6 text-foreground-muted"
             >
-              填写专业、教学经历或英语成绩。
+              {uiText("填写专业、教学经历或英语成绩。")}
             </p>
           </div>
           <div className="min-w-0">
@@ -479,7 +516,9 @@ function ApplicationEditor({
               required
               maxLength={2000}
               rows={4}
-              placeholder="例如：英语专业毕业，有两年初中英语教学经验。"
+              placeholder={uiText(
+                "例如：英语专业毕业，有两年初中英语教学经验。"
+              )}
               className={cn(inputClass, "mt-0 min-h-36 resize-y rounded-2xl")}
               value={statement}
               disabled={mutation.isPending}
@@ -498,7 +537,7 @@ function ApplicationEditor({
             role="status"
             className="space-y-2 rounded-2xl border border-border/60 bg-muted/70 p-4 text-sm"
           >
-            <p>旧材料删除失败，新材料已上传，不影响提交申请。</p>
+            <p>{uiText("旧材料删除失败，新材料已上传，不影响提交申请。")}</p>
             {pendingCleanup.map((file) => (
               <button
                 key={file.id}
@@ -507,32 +546,39 @@ function ApplicationEditor({
                 onClick={() => void remove(file)}
                 className="block text-primary disabled:opacity-50"
               >
-                重试删除
-                {groups.find((group) => group.kind === file.kind)?.label}
+                {uiText("重试删除{{v0}}", {
+                  v0: uiText(
+                    groups.find((group) => group.kind === file.kind)?.label
+                  )
+                })}
               </button>
             ))}
           </div>
         )}
         {fileError && (
           <p role="alert" className="text-sm text-danger">
-            {fileError}
+            {uiText(fileError)}
           </p>
         )}
         {mutation.error && (
           <p role="alert" className="text-sm text-danger">
-            {mutation.error.message || "提交失败，请重试"}
+            {uiText(
+              webErrorText(mutation.error, "数据暂不可用，请刷新后重试")
+            ) || uiText("提交失败，请重试")}
           </p>
         )}
         <div className="flex flex-col gap-4 border-t border-border/60 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm leading-6 text-foreground-muted">
-            {uploading ? "材料处理中…" : "审核中不能修改，结果见站内通知。"}
+            {uploading
+              ? uiText("材料处理中…")
+              : uiText("审核中不能修改，结果见站内通知。")}
           </p>
           <Button
             type="submit"
             disabled={!canSubmit}
             className="w-full shrink-0 whitespace-nowrap px-8 sm:w-auto"
           >
-            {mutation.isPending ? "提交中…" : "提交申请"}
+            {mutation.isPending ? uiText("提交中…") : uiText("提交申请")}
           </Button>
         </div>
       </form>

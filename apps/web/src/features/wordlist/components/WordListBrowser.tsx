@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webWordlistBrowser as webWordlist } from "@/i18n/messages/wordlist/browser";
+
 import Link from "next/link";
 import { useState } from "react";
 import { Plus } from "lucide-react";
@@ -18,6 +21,7 @@ import {
   listCardClass
 } from "@/features/shell/Page";
 export function WordListBrowser({ mine = false }: { mine?: boolean }) {
+  const uiText = useWebText(webWordlist);
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [recommended, setRecommended] = useState(false);
@@ -29,12 +33,14 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
   return (
     <PageShell size="lg">
       <PageHeader
-        eyebrow={mine ? "我的学习" : "词库广场"}
-        title={mine ? "我的词表" : "公开词表"}
+        eyebrow={mine ? uiText("我的学习") : uiText("词库广场")}
+        title={mine ? uiText("我的词表") : uiText("公开词表")}
         description={
           mine
-            ? "管理自己创建和收藏的词表。收藏引用原词表，内容随作者更新。"
-            : "浏览平台精选和其他用户公开的词表，挑一份开始学习。"
+            ? uiText(
+                "管理自己创建和收藏的词表。收藏引用原词表，内容随作者更新。"
+              )
+            : uiText("浏览平台精选和其他用户公开的词表，挑一份开始学习。")
         }
         actions={
           <>
@@ -42,14 +48,14 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
               className={buttonClass}
               href={mine ? "/wordlists" : "/account/wordlists"}
             >
-              {mine ? "浏览公开词表" : "我的词表"}
+              {mine ? uiText("浏览公开词表") : uiText("我的词表")}
             </Link>
             <Link
               className={cn(primaryButtonClass, "min-h-10 px-5")}
               href="/wordlists/new"
             >
               <Plus className="size-4" strokeWidth={2} aria-hidden />
-              创建词表
+              {uiText("创建词表")}
             </Link>
           </>
         }
@@ -57,11 +63,11 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         {mine && (
           <Segmented
-            label="我的词表分类"
+            label={uiText("我的词表分类")}
             value={favorites}
             options={[
-              { value: false, label: "创建" },
-              { value: true, label: "收藏" }
+              { value: false, label: uiText("创建") },
+              { value: true, label: uiText("收藏") }
             ]}
             onChange={(value) => {
               setFavorites(value);
@@ -71,11 +77,11 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
         )}
         {!mine && (
           <Segmented
-            label="词表分类"
+            label={uiText("词表分类")}
             value={recommended}
             options={[
-              { value: false, label: "全部公开词表" },
-              { value: true, label: "系统推荐" }
+              { value: false, label: uiText("全部公开词表") },
+              { value: true, label: uiText("系统推荐") }
             ]}
             onChange={(value) => {
               setRecommended(value);
@@ -85,8 +91,8 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
         )}
         <SearchField
           className="flex-1"
-          aria-label="搜索词表"
-          placeholder="搜索词表名称"
+          aria-label={uiText("搜索词表")}
+          placeholder={uiText("搜索词表名称")}
           value={q}
           onValueChange={(value) => {
             setQ(value);
@@ -98,18 +104,18 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
         <WordlistFavorites page={page} q={q} onPageChange={setPage} />
       ) : result.isError ? (
         <PageNotice tone="error">
-          词表加载失败，请
+          {uiText("词表加载失败，请")}
           <button
             className="mx-1 font-medium text-primary underline-offset-4 hover:underline"
             onClick={() => void result.refetch()}
           >
-            重试
+            {uiText("重试")}
           </button>
           。
         </PageNotice>
       ) : result.isPending ? (
         <div className="grid gap-4 sm:grid-cols-2" aria-busy>
-          <p className="sr-only">正在加载词表…</p>
+          <p className="sr-only">{uiText("正在加载词表…")}</p>
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
@@ -121,7 +127,9 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
         <>
           {result.data.items.length === 0 ? (
             <PageNotice>
-              {q ? `没有找到包含「${q}」的词表` : "暂无词表"}
+              {q
+                ? uiText("没有找到包含「{{v0}}」的词表", { v0: q })
+                : uiText("暂无词表")}
             </PageNotice>
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
@@ -137,7 +145,7 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
                           {list.name}
                         </h2>
                         <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
-                          {STATE_LABEL[list.state]}
+                          {uiText(STATE_LABEL[list.state])}
                         </span>
                       </div>
                       <p className="mt-6 flex items-baseline gap-1.5">
@@ -145,12 +153,12 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
                           {list.item_count}
                         </span>
                         <span className="text-sm text-foreground-muted">
-                          个词条
+                          {uiText("个词条")}
                         </span>
                       </p>
                       <p className="mt-2 truncate text-sm text-foreground-muted">
                         {list.owner_user_id === null
-                          ? `平台 · ${list.owner_name}`
+                          ? uiText("平台 · {{v0}}", { v0: list.owner_name })
                           : list.owner_name}
                       </p>
                     </Link>

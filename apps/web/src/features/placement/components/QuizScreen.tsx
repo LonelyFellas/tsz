@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webPlacement } from "@/i18n/messages/placement";
 
 import { useEffect, useRef } from "react";
 import { cn } from "@tsz/ui/lib/cn";
@@ -35,6 +37,7 @@ export function QuizScreen({
   onRetry,
   onExit
 }: QuizScreenProps) {
+  const uiText = useWebText(webPlacement);
   const cardRef = useRef<SwipeCardHandle>(null);
   const busy = submitting || submitError;
 
@@ -55,7 +58,7 @@ export function QuizScreen({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          aria-label="退出测试"
+          aria-label={uiText("退出测试")}
           onClick={onExit}
           // 块提交在途时禁用退出:此刻退出无法兑现「不消耗测试机会」的承诺
           // (最后一块的提交可能已在服务端完成计次)。
@@ -72,8 +75,8 @@ export function QuizScreen({
         </div>
         <span className="shrink-0 font-mono text-xs tabular-nums text-foreground-muted">
           {/* 块数不固定,长会话(最多 6×5=30 题)会超过预估值:题号封顶,避免「26 / 约 25」 */}
-          {String(Math.min(answered + 1, EST_TOTAL)).padStart(2, "0")} / 约{" "}
-          {EST_TOTAL}
+          {String(Math.min(answered + 1, EST_TOTAL)).padStart(2, "0")}
+          {uiText(" / 约 {{v0}}", { v0: EST_TOTAL })}
         </span>
       </div>
 
@@ -91,16 +94,18 @@ export function QuizScreen({
 
           {submitError ? (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-3xl border border-border/60 bg-surface p-6 text-center shadow-float">
-              <p className="text-sm font-medium">提交失败，请检查网络</p>
+              <p className="text-sm font-medium">
+                {uiText("提交失败，请检查网络")}
+              </p>
               <p className="text-xs text-foreground-muted">
-                这一组作答已保留，重试即可继续
+                {uiText("这一组作答已保留，重试即可继续")}
               </p>
               <button
                 type="button"
                 onClick={onRetry}
                 className={cn(primaryButtonClass, "min-h-10")}
               >
-                重试
+                {uiText("重试")}
               </button>
             </div>
           ) : submitting ? (
@@ -108,7 +113,7 @@ export function QuizScreen({
               <div className="h-3 w-24 rounded bg-muted" />
               <div className="h-3 w-16 rounded bg-muted" />
               <p className="mt-2 text-xs text-foreground-subtle">
-                正在准备下一组…
+                {uiText("正在准备下一组…")}
               </p>
             </div>
           ) : (
@@ -134,7 +139,7 @@ export function QuizScreen({
               "min-h-12 hover:bg-primary-muted hover:text-primary"
             )}
           >
-            ← 认识
+            {uiText("← 认识")}
           </button>
           <button
             type="button"
@@ -142,11 +147,11 @@ export function QuizScreen({
             onClick={() => cardRef.current?.fly(false)}
             className={cn(buttonClass, "min-h-12")}
           >
-            不认识 →
+            {uiText("不认识 →")}
           </button>
         </div>
         <p className="mt-3 text-center text-xs text-foreground-subtle">
-          滑动卡片作答 · 左滑 认识 · 右滑 不认识
+          {uiText("滑动卡片作答 · 左滑 认识 · 右滑 不认识")}
         </p>
       </div>
     </div>

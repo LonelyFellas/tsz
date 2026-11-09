@@ -1,4 +1,9 @@
 "use client";
+import { useWebLocale } from "@/i18n/client";
+import { noticeSource, type WebNotice, webErrorText } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webTask } from "@/i18n/messages/task";
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -65,15 +70,18 @@ export const runLabels: Record<LearningRunState, string> = {
 export function learningError(error: unknown) {
   if (error instanceof HttpError && error.status === 404)
     return "学习功能尚未就绪或该记录不存在，请稍后重试。";
-  return error instanceof Error ? error.message : "请求失败，请重试。";
+  return webErrorText(error, "请求失败，请重试。");
 }
 function Student({ children }: { children: (id: string) => ReactNode }) {
+  const uiText = useWebText(webTask);
   const user = useUserStore((s) => s.user);
   if (!user) return null;
   if (!user.roles.includes("student"))
     return (
       <PageShell>
-        <PageNotice tone="error">需要学生身份才能使用学习任务。</PageNotice>
+        <PageNotice tone="error">
+          {uiText("需要学生身份才能使用学习任务。")}
+        </PageNotice>
       </PageShell>
     );
   return children(user.id);
@@ -96,6 +104,7 @@ export function LearningTaskList() {
   return <Student>{(id) => <TaskList key={id} userId={id} />}</Student>;
 }
 function TaskList({ userId }: { userId: string }) {
+  const uiText = useWebText(webTask);
   const [page, setPage] = useState(1);
   const [archived, setArchived] = useState(false);
   const q = useQuery({
@@ -115,26 +124,28 @@ function TaskList({ userId }: { userId: string }) {
   return (
     <PageShell>
       <PageHeader
-        eyebrow="我的学习"
-        title="我的学习任务"
-        description="看中文释义，练习拼写或选择英文。每题有效作答后计入进度，正确率单独统计。每日北京时间 04:00 换日。"
+        eyebrow={uiText("我的学习")}
+        title={uiText("我的学习任务")}
+        description={uiText(
+          "看中文释义，练习拼写或选择英文。每题有效作答后计入进度，正确率单独统计。每日北京时间 04:00 换日。"
+        )}
         actions={
           <Link
             className={cn(primaryButtonClass, "min-h-10 px-5")}
             href="/student/tasks/new"
           >
-            创建任务
+            {uiText("创建任务")}
           </Link>
         }
       />
       <div className="space-y-6">
         <LearningRewardSummary key={userId} userId={userId} taskList />
         <Segmented
-          label="任务状态"
+          label={uiText("任务状态")}
           value={archived}
           options={[
-            { value: false, label: "进行中" },
-            { value: true, label: "已归档" }
+            { value: false, label: uiText("进行中") },
+            { value: true, label: uiText("已归档") }
           ]}
           onChange={(value) => {
             setArchived(value);
@@ -143,17 +154,19 @@ function TaskList({ userId }: { userId: string }) {
         />
         {q.isError ? (
           <PageNotice tone="error">
-            {learningError(q.error)}
+            {uiText(learningError(q.error))}
             <button className={retryLink} onClick={() => void q.refetch()}>
-              重试
+              {uiText("重试")}
             </button>
           </PageNotice>
         ) : q.isPending ? (
-          <PageNotice>正在读取任务…</PageNotice>
+          <PageNotice>{uiText("正在读取任务…")}</PageNotice>
         ) : (
           <>
             {q.data.items.length === 0 && (
-              <PageNotice>暂无任务，先选择词表创建一个吧。</PageNotice>
+              <PageNotice>
+                {uiText("暂无任务，先选择词表创建一个吧。")}
+              </PageNotice>
             )}
             <ul className="space-y-4">
               {q.data.items.map((plan) => {
@@ -168,15 +181,17 @@ function TaskList({ userId }: { userId: string }) {
                         <div className="min-w-0">
                           <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
                             {task.task_type === "daily"
-                              ? "每日任务"
-                              : "长期任务"}
-                            {" · "}
-                            {questionTypeLabel(
-                              task.question_type,
-                              plan.question_types
-                            )}
-                            {" · "}
-                            {task.wordlist_ids.length} 个词表
+                              ? uiText("每日任务")
+                              : uiText("长期任务")}
+                            {uiText(" · {{v0}} · {{v1}} 个词表", {
+                              v0: uiText(
+                                questionTypeLabel(
+                                  task.question_type,
+                                  plan.question_types
+                                )
+                              ),
+                              v1: task.wordlist_ids.length
+                            })}
                           </p>
                           <h2 className="mt-2 truncate text-xl font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
                             {task.name}
@@ -184,12 +199,12 @@ function TaskList({ userId }: { userId: string }) {
                         </div>
                         <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
                           {plan.mode !== "legacy_v1"
-                            ? planStatusLabels[plan.status]
+                            ? uiText(planStatusLabels[plan.status])
                             : r
-                              ? runLabels[r.state]
+                              ? uiText(runLabels[r.state])
                               : task.task_type === "daily"
-                                ? "今日未开始"
-                                : "尚未开始"}
+                                ? uiText("今日未开始")
+                                : uiText("尚未开始")}
                         </span>
                       </div>
                       {c ? (
@@ -197,18 +212,27 @@ function TaskList({ userId }: { userId: string }) {
                           <ProgressBar
                             value={c.covered_count}
                             max={c.total_count}
-                            label={`${task.name} 本轮覆盖进度`}
+                            label={uiText("{{v0}} 本轮覆盖进度", {
+                              v0: task.name
+                            })}
                           />
                           <p className="text-sm text-foreground-muted">
-                            {plan.mastery ? "已跨天确认" : "本轮已覆盖"}{" "}
+                            {plan.mastery
+                              ? uiText("已跨天确认")
+                              : uiText("本轮已覆盖")}{" "}
                             {c.covered_count}/{c.total_count}{" "}
-                            {plan.mastery ? "个词义" : "题"}
+                            {plan.mastery ? uiText("个词义") : uiText("题")}
                             {c.blocked_count > 0 &&
-                              ` · 不可用 ${c.blocked_count} 题`}
+                              uiText("· 不可用 {{v0}} 题", {
+                                v0: c.blocked_count
+                              })}
                           </p>
                           {task.task_type === "daily" && r && (
                             <p className="text-sm text-foreground-muted">
-                              今日已答 {r.answered_count}/{r.target_count} 题
+                              {uiText("今日已答 {{v0}}/{{v1}} 题", {
+                                v0: r.answered_count,
+                                v1: r.target_count
+                              })}
                             </p>
                           )}
                         </div>
@@ -217,16 +241,21 @@ function TaskList({ userId }: { userId: string }) {
                           <ProgressBar
                             value={r.answered_count}
                             max={r.target_count}
-                            label={`${task.name} 本轮进度`}
+                            label={uiText("{{v0}} 本轮进度", { v0: task.name })}
                           />
                           <p className="text-sm tabular-nums text-foreground-muted">
-                            {r.answered_count}/{r.target_count} 题
+                            {uiText("{{v0}}/{{v1}} 题", {
+                              v0: r.answered_count,
+                              v1: r.target_count
+                            })}
                           </p>
                         </div>
                       ) : (
                         task.task_type === "daily" && (
                           <p className="mt-5 text-sm text-foreground-muted">
-                            每日 {task.daily_question_count} 题
+                            {uiText("每日 {{v0}} 题", {
+                              v0: task.daily_question_count
+                            })}
                           </p>
                         )
                       )}
@@ -279,12 +308,14 @@ export function LearningTaskPage({ id }: { id: string }) {
   );
 }
 function TaskDetail({ userId, id }: { userId: string; id: string }) {
+  const locale = useWebLocale();
+  const uiText = useWebText(webTask);
   const router = useRouter();
   const op = useOperation(userId);
   const [page, setPage] = useState(1);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const intent = useRef<StartLearningRun | null>(null);
   const q = useQuery({
     queryKey: ["learning-plans", userId, "v1-with-legacy", "task", id],
@@ -359,9 +390,9 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
     return (
       <PageShell>
         <PageNotice tone="error">
-          {learningError(q.error)}
+          {uiText(learningError(q.error))}
           <button className={retryLink} onClick={() => void q.refetch()}>
-            重试
+            {uiText("重试")}
           </button>
         </PageNotice>
       </PageShell>
@@ -369,31 +400,35 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
   if (!q.data)
     return (
       <PageShell>
-        <PageNotice>正在读取任务…</PageNotice>
+        <PageNotice>{uiText("正在读取任务…")}</PageNotice>
       </PageShell>
     );
   const { task, current_run: r } = q.data;
   return (
     <PageShell>
       <PageHeader
-        back={{ href: "/student/practice", label: "我的任务" }}
-        eyebrow={`${task.task_type === "daily" ? "每日任务" : "长期任务"} · ${questionTypeLabel(task.question_type, q.data.question_types)}`}
+        back={{ href: "/student/practice", label: uiText("我的任务") }}
+        eyebrow={`${task.task_type === "daily" ? uiText("每日任务") : uiText("长期任务")} · ${uiText(questionTypeLabel(task.question_type, q.data.question_types))}`}
         title={task.name}
         description={
           <>
             {q.data.mastery
-              ? "按单词掌握情况安排新学与到期复习，每次含重练最多 30 题。"
+              ? uiText(
+                  "按单词掌握情况安排新学与到期复习，每次含重练最多 30 题。"
+                )
               : task.task_type === "daily"
-                ? `每日 ${task.daily_question_count} 题 · 北京时间 04:00 换日`
-                : "长期任务 · 每轮覆盖全部可出题内容"}
+                ? uiText("每日 {{v0}} 题 · 北京时间 04:00 换日", {
+                    v0: task.daily_question_count
+                  })
+                : uiText("长期任务 · 每轮覆盖全部可出题内容")}
             {task.ends_at && (
               <>
                 <br />
-                结束时间：
-                {new Date(task.ends_at).toLocaleString("zh-CN", {
+                {uiText("结束时间：")}
+                {new Date(task.ends_at).toLocaleString(locale, {
                   timeZone: "Asia/Shanghai"
                 })}
-                （北京时间）
+                {uiText("（北京时间）")}
               </>
             )}
           </>
@@ -409,30 +444,36 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
           {q.data.mode === "legacy_v1" && (
             <>
               <div className="flex items-center justify-between gap-3">
-                <h2 className={sectionTitle}>本轮进度</h2>
+                <h2 className={sectionTitle}>{uiText("本轮进度")}</h2>
                 <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground-muted">
-                  {r ? runLabels[r.state] : "尚未开始"}
+                  {r ? uiText(runLabels[r.state]) : uiText("尚未开始")}
                 </span>
               </div>
               {r ? (
                 <>
                   <dl className="grid grid-cols-3 gap-3">
-                    <Stat label="已答" value={r.answered_count} />
-                    <Stat label="目标" value={r.target_count} />
-                    <Stat label="答对" value={r.correct_count} />
+                    <Stat label={uiText("已答")} value={r.answered_count} />
+                    <Stat label={uiText("目标")} value={r.target_count} />
+                    <Stat label={uiText("答对")} value={r.correct_count} />
                   </dl>
                   <ProgressBar
                     value={r.answered_count}
                     max={r.target_count}
-                    label={r.practice_mode ? "本次进度" : "本轮进度"}
+                    label={
+                      r.practice_mode ? uiText("本次进度") : uiText("本轮进度")
+                    }
                   />
                 </>
               ) : (
-                <p className={hintText}>开始后，进度和正确率会显示在这里。</p>
+                <p className={hintText}>
+                  {uiText("开始后，进度和正确率会显示在这里。")}
+                </p>
               )}
               {r?.state === "invalidated" && (
                 <p className={hintText}>
-                  本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；请检查来源后重新开始一轮。恢复词条不会自动恢复旧轮次。
+                  {uiText(
+                    "本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；请检查来源后重新开始一轮。恢复词条不会自动恢复旧轮次。"
+                  )}
                 </p>
               )}
             </>
@@ -448,8 +489,8 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                 href={`/student/practice/${r.id}`}
               >
                 {r.state === "active" && q.data.can_start
-                  ? "继续练习"
-                  : "查看记录"}
+                  ? uiText("继续练习")
+                  : uiText("查看记录")}
               </Link>
             )}
             {task.state === "active" &&
@@ -473,21 +514,21 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                 >
                   {r
                     ? q.data.mode === "mastery_v1"
-                      ? "开始下次练习"
-                      : "重新开始一轮"
-                    : "开始练习"}
+                      ? uiText("开始下次练习")
+                      : uiText("重新开始一轮")
+                    : uiText("开始练习")}
                 </button>
               )}
           </div>
           {error && (
             <p role="alert" className={alertText}>
-              {error}
+              {uiText(error)}
             </p>
           )}
           {task.state === "active" && (
             <details className="group border-t border-border/60 pt-5">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-foreground-muted transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
-                管理任务
+                {uiText("管理任务")}
                 <span
                   className="transition-transform group-open:rotate-90"
                   aria-hidden
@@ -500,8 +541,8 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                   <input
                     className={cn(field, "mt-0 flex-1")}
                     maxLength={q.data.mode !== "legacy_v1" ? undefined : 100}
-                    aria-label="新任务名称"
-                    placeholder="新任务名称"
+                    aria-label={uiText("新任务名称")}
+                    placeholder={uiText("新任务名称")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
@@ -510,19 +551,19 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                     className={buttonClass}
                     onClick={() => void update()}
                   >
-                    重命名
+                    {uiText("重命名")}
                   </button>
                 </div>
                 <div className="flex flex-col gap-3 rounded-2xl bg-muted/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className={hintText}>
-                    归档会取消未完成轮次，已完成历史保留。
+                    {uiText("归档会取消未完成轮次，已完成历史保留。")}
                   </p>
                   <button
                     disabled={busy}
                     className={cn(buttonClass, "text-danger")}
                     onClick={() => void update(true)}
                   >
-                    归档任务
+                    {uiText("归档任务")}
                   </button>
                 </div>
               </div>
@@ -530,13 +571,13 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
           )}
         </div>
         <div className={box}>
-          <h2 className={sectionTitle}>学习历史</h2>
+          <h2 className={sectionTitle}>{uiText("学习历史")}</h2>
           {history.isError ? (
             <p role="alert" className={alertText}>
-              历史读取失败
+              {uiText("历史读取失败")}
             </p>
           ) : history.data?.items.length === 0 ? (
-            <p className={hintText}>还没有学习记录。</p>
+            <p className={hintText}>{uiText("还没有学习记录。")}</p>
           ) : (
             <ul className="divide-y divide-border/60">
               {history.data?.items.map(({ run: h, cycle_id }) => (
@@ -548,19 +589,25 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
                     <span className="min-w-0">
                       <span className="block text-sm font-medium tabular-nums text-foreground">
                         {h.business_day ??
-                          new Date(h.started_at).toLocaleDateString("zh-CN")}
+                          new Date(h.started_at).toLocaleDateString(locale, {
+                            timeZone:
+                              Intl.DateTimeFormat().resolvedOptions().timeZone
+                          })}
                       </span>
                       <span className="text-xs text-foreground-muted">
-                        {runLabels[h.state]}
+                        {uiText(runLabels[h.state])}
                         {cycle_id &&
                           (h.practice_mode
-                            ? " · 按掌握情况练习"
-                            : " · 覆盖计划批次")}
+                            ? uiText("· 按掌握情况练习")
+                            : uiText("· 覆盖计划批次"))}
                       </span>
                     </span>
                     <span className="shrink-0 text-sm tabular-nums text-foreground-muted">
-                      {h.answered_count}/{h.target_count} 题，答对{" "}
-                      {h.correct_count} 题
+                      {uiText("{{v0}}/{{v1}} 题，答对 {{v2}} 题", {
+                        v0: h.answered_count,
+                        v1: h.target_count,
+                        v2: h.correct_count
+                      })}
                     </span>
                   </Link>
                 </li>
@@ -587,6 +634,8 @@ export function LearningPractice({ id }: { id: string }) {
   );
 }
 function Practice({ userId, id }: { userId: string; id: string }) {
+  const locale = useWebLocale();
+  const uiText = useWebText(webTask);
   const client = useQueryClient();
   const op = useOperation(userId);
   const [page, setPage] = useState(1);
@@ -594,7 +643,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     questionId: string;
     value: string;
   } | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
@@ -723,12 +772,12 @@ function Practice({ userId, id }: { userId: string; id: string }) {
     return (
       <PageShell>
         <PageNotice tone="error">
-          {learningError(run.error ?? qs.error)}
+          {uiText(learningError(run.error ?? qs.error))}
           <button
             className={retryLink}
             onClick={() => void Promise.all([run.refetch(), qs.refetch()])}
           >
-            重试
+            {uiText("重试")}
           </button>
         </PageNotice>
       </PageShell>
@@ -736,7 +785,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
   if (!run.data || !qs.data)
     return (
       <PageShell>
-        <PageNotice>正在恢复服务器进度…</PageNotice>
+        <PageNotice>{uiText("正在恢复服务器进度…")}</PageNotice>
       </PageShell>
     );
   const r = run.data;
@@ -754,33 +803,39 @@ function Practice({ userId, id }: { userId: string; id: string }) {
       <PageHeader
         back={{
           href: `/student/tasks/${r.task_id}`,
-          label: r.state === "invalidated" ? "返回任务重新开始" : "任务与历史"
+          label:
+            r.state === "invalidated"
+              ? uiText("返回任务重新开始")
+              : uiText("任务与历史")
         }}
-        eyebrow={`${runLabels[r.state]} · ${r.settings.cefr_level} / ${r.settings.english_variant}`}
+        eyebrow={`${uiText(runLabels[r.state])} · ${r.settings.cefr_level} / ${r.settings.english_variant}`}
         title={
           r.state === "completed"
-            ? "本批次已完成"
+            ? uiText("本批次已完成")
             : choiceTask && next && !choice
-              ? "中文释义拼写"
-              : questionTypeLabel(r.question_type)
+              ? uiText("中文释义拼写")
+              : uiText(questionTypeLabel(r.question_type))
         }
         description={
           <>
             {r.practice_mode
-              ? "每次含重练最多 30 题，错题隔至少 3 道其他题再出现。跨天复习才能确认掌握。"
-              : "完成以有效作答数量为准。"}
-            {choice && "选择一个英文选项后提交，单选成绩不影响拼写掌握度。"}
+              ? uiText(
+                  "每次含重练最多 30 题，错题隔至少 3 道其他题再出现。跨天复习才能确认掌握。"
+                )
+              : uiText("完成以有效作答数量为准。")}
+            {choice &&
+              uiText("选择一个英文选项后提交，单选成绩不影响拼写掌握度。")}
             {choiceTask &&
               next &&
               !choice &&
-              "本题没有合适的单选选项，已自动改为拼写练习。"}
+              uiText("本题没有合适的单选选项，已自动改为拼写练习。")}
             {r.expires_at && (
               <>
-                截止：
-                {new Date(r.expires_at).toLocaleString("zh-CN", {
+                {uiText("截止：")}
+                {new Date(r.expires_at).toLocaleString(locale, {
                   timeZone: "Asia/Shanghai"
                 })}
-                （北京时间）
+                {uiText("（北京时间）")}
               </>
             )}
           </>
@@ -789,7 +844,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
       <div className="space-y-6">
         {r.state === "completed" && includesSpelling && (
           <Link className={buttonClass} href="/student/review">
-            查看待巩固内容与复习安排
+            {uiText("查看待巩固内容与复习安排")}
           </Link>
         )}
         {r.task_type === "daily" &&
@@ -797,14 +852,21 @@ function Practice({ userId, id }: { userId: string; id: string }) {
           !r.practice_mode && (
             <div className="rounded-2xl bg-muted/70 p-4 text-sm">
               <p>
-                任务当前第 {plan.data.current_cycle.cycle_number} 轮已覆盖{" "}
-                {plan.data.current_cycle.covered_count}/
-                {plan.data.current_cycle.total_count} 题 · 不可用{" "}
-                {plan.data.current_cycle.blocked_count} 题
+                {uiText(
+                  "任务当前第 {{v0}} 轮已覆盖 {{v1}}/{{v2}} 题 · 不可用 {{v3}} 题",
+                  {
+                    v0: plan.data.current_cycle.cycle_number,
+                    v1: plan.data.current_cycle.covered_count,
+                    v2: plan.data.current_cycle.total_count,
+                    v3: plan.data.current_cycle.blocked_count
+                  }
+                )}
               </p>
               {r.task_type === "daily" && (
                 <p>
-                  今日批次与本轮覆盖分开统计；部分有效作答会保留覆盖，奖励仅统计完成批次。
+                  {uiText(
+                    "今日批次与本轮覆盖分开统计；部分有效作答会保留覆盖，奖励仅统计完成批次。"
+                  )}
                 </p>
               )}
             </div>
@@ -815,18 +877,23 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               <ProgressBar
                 value={r.answered_count}
                 max={r.target_count}
-                label={r.practice_mode ? "本次进度" : "本轮进度"}
+                label={
+                  r.practice_mode ? uiText("本次进度") : uiText("本轮进度")
+                }
               />
               <div className="flex flex-wrap justify-between gap-2 text-sm tabular-nums text-foreground-muted">
                 <p>
-                  已答 {r.answered_count}/{r.target_count} 题 · 答对{" "}
-                  {r.correct_count} 题
+                  {uiText("已答 {{v0}}/{{v1}} 题 · 答对 {{v2}} 题", {
+                    v0: r.answered_count,
+                    v1: r.target_count,
+                    v2: r.correct_count
+                  })}
                   {r.practice_mode &&
                     r.state === "active" &&
-                    " · 本次最多 30 题"}
+                    uiText("· 本次最多 30 题")}
                 </p>
                 <p className="font-medium text-foreground">
-                  正确率{" "}
+                  {uiText("正确率")}{" "}
                   {r.answered_count
                     ? Math.round((r.correct_count / r.answered_count) * 100)
                     : 0}
@@ -845,11 +912,11 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                 <div>
                   <h2 className="mx-auto max-w-xl text-balance">
                     <span className="block text-xs font-medium tracking-[0.2em] text-foreground-muted">
-                      第 {next.position + 1} 题
+                      {uiText("第 {{v0}} 题", { v0: next.position + 1 })}
                       {next.practice_kind === "retry"
-                        ? " · 错题重练"
+                        ? uiText("· 错题重练")
                         : next.practice_kind === "review"
-                          ? " · 到期复习"
+                          ? uiText("· 到期复习")
                           : ""}
                       {next.prompt?.part_of_speech &&
                         ` · ${next.prompt.part_of_speech}`}
@@ -875,8 +942,8 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                 ) : (
                   <input
                     className="mx-auto block min-h-14 w-full max-w-md rounded-full border border-border bg-surface px-6 text-center text-xl font-medium tracking-wide text-foreground transition-shadow placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-foreground-subtle focus-visible:border-primary/50 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/15 disabled:opacity-50"
-                    aria-label="英文拼写"
-                    placeholder="输入英文拼写"
+                    aria-label={uiText("英文拼写")}
+                    placeholder={uiText("输入英文拼写")}
                     autoComplete="off"
                     autoCapitalize="none"
                     spellCheck={false}
@@ -895,7 +962,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     disabled={busy}
                     onClick={() => void submit(true)}
                   >
-                    不确定
+                    {uiText("不确定")}
                   </button>
                 )}
                 {!uncertain && (
@@ -904,21 +971,29 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     disabled={busy || !answer.trim()}
                     type="submit"
                   >
-                    {busy ? "提交中…" : "提交答案"}
+                    {busy ? uiText("提交中…") : uiText("提交答案")}
                   </button>
                 )}
               </form>
             ) : (
               <p className="py-6 text-center text-base text-foreground-muted">
                 {r.state === "active"
-                  ? "本页没有合法待答题；可定位其他页面的待答题，或检查来源。"
+                  ? uiText(
+                      "本页没有合法待答题；可定位其他页面的待答题，或检查来源。"
+                    )
                   : r.state === "invalidated"
-                    ? "本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；返回任务页可检查来源后重新开始。恢复词条不会自动恢复旧轮次。"
+                    ? uiText(
+                        "本轮词条或词表来源发生变化，无法继续。已提交的作答记录仍保留；返回任务页可检查来源后重新开始。恢复词条不会自动恢复旧轮次。"
+                      )
                     : r.state !== "completed"
-                      ? "本轮无法继续。已答记录仍可查看；返回任务页可检查来源后重新开始。"
+                      ? uiText(
+                          "本轮无法继续。已答记录仍可查看；返回任务页可检查来源后重新开始。"
+                        )
                       : r.practice_mode
-                        ? "本次练习已完成。正确词留待跨天确认，未完成的错题将在后续复习优先安排。"
-                        : "已保存本轮完成记录。"}
+                        ? uiText(
+                            "本次练习已完成。正确词留待跨天确认，未完成的错题将在后续复习优先安排。"
+                          )
+                        : uiText("已保存本轮完成记录。")}
               </p>
             )}
             {r.state === "active" && !next && (
@@ -929,7 +1004,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                   disabled={busy || uncertain || locating}
                   onClick={() => void locate()}
                 >
-                  {locating ? "正在定位…" : "定位可答题"}
+                  {locating ? uiText("正在定位…") : uiText("定位可答题")}
                 </button>
                 <button
                   type="button"
@@ -943,28 +1018,28 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     ])
                   }
                 >
-                  检查来源
+                  {uiText("检查来源")}
                 </button>
               </div>
             )}
             {error && !pendingAccepted && (
               <p role="alert" className={`${alertText} text-center`}>
-                {error}
+                {uiText(error)}
               </p>
             )}
-            {error.includes("刷新") && (
+            {noticeSource(error).includes("刷新") && (
               <button
                 className={buttonClass}
                 type="button"
                 onClick={() => {
                   if (
                     !draft?.value ||
-                    window.confirm("刷新会丢弃未提交答案。确认刷新？")
+                    window.confirm(uiText("刷新会丢弃未提交答案。确认刷新？"))
                   )
                     window.location.reload();
                 }}
               >
-                刷新页面
+                {uiText("刷新页面")}
               </button>
             )}
             {uncertain && (
@@ -974,10 +1049,10 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                   type="button"
                   onClick={() => void submit()}
                 >
-                  重试原答案
+                  {uiText("重试原答案")}
                 </button>
                 <p className={hintText}>
-                  结果未确认，原答案已保留；重试将沿用原请求。
+                  {uiText("结果未确认，原答案已保留；重试将沿用原请求。")}
                 </p>
               </div>
             )}
@@ -993,10 +1068,10 @@ function Practice({ userId, id }: { userId: string; id: string }) {
         )}
         <div className={box}>
           <h2 className={sectionTitle}>
-            {r.practice_mode ? "本次记录" : "本轮记录"}
+            {r.practice_mode ? uiText("本次记录") : uiText("本轮记录")}
           </h2>
           {records.length === 0 && (
-            <p className={hintText}>本页还没有作答记录。</p>
+            <p className={hintText}>{uiText("本页还没有作答记录。")}</p>
           )}
           <ul className="space-y-3" aria-live="polite">
             {records.map((q) => (
@@ -1015,7 +1090,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                     <span className="mr-2 tabular-nums text-foreground-muted">
                       {q.position + 1}.
                     </span>
-                    {q.prompt?.definition ?? "来源内容当前不可访问"}
+                    {q.prompt?.definition ?? uiText("来源内容当前不可访问")}
                   </p>
                   {q.feedback && (
                     <span
@@ -1023,13 +1098,15 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                         q.feedback.is_correct ? "text-success" : "text-danger"
                       }`}
                     >
-                      {q.feedback.is_correct ? "正确" : "回答有误"}
+                      {q.feedback.is_correct
+                        ? uiText("正确")
+                        : uiText("回答有误")}
                     </span>
                   )}
                 </div>
                 {q.feedback && (
                   <p className="mt-2 text-xs leading-5 text-foreground-muted">
-                    你的答案：
+                    {uiText("你的答案：")}
                     <span className="font-medium text-foreground">
                       {q.options
                         ? (q.options?.find(
@@ -1039,7 +1116,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                         : q.feedback.submitted_answer}
                     </span>
                     <span className="mx-2">·</span>
-                    {q.options ? "正确答案：" : "可接受拼写："}
+                    {q.options ? uiText("正确答案：") : uiText("可接受拼写：")}
                     {q.feedback.accepted_answers.join(" / ")}
                   </p>
                 )}

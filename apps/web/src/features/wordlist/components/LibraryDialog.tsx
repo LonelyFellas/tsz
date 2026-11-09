@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
+
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { X } from "lucide-react";
 import { Button } from "@tsz/ui/components";
@@ -16,6 +19,7 @@ export function LibraryDialog({
   busy?: boolean;
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
+  const uiText = useWebText(webWordlist);
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -54,7 +58,7 @@ export function LibraryDialog({
           type="button"
           variant="ghost"
           size="icon"
-          aria-label="关闭"
+          aria-label={uiText("关闭")}
           disabled={busy}
           onClick={onClose}
         >

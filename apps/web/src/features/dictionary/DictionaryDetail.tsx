@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webDictionary } from "@/i18n/messages/dictionary";
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@tsz/ui/components";
@@ -16,6 +19,7 @@ export function DictionaryDetail({
   id: string;
   back?: string;
 }) {
+  const uiText = useWebText(webDictionary);
   const userId = useUserStore((s) => s.user?.id);
   const result = useQuery({
     queryKey: ["dictionary", userId, "entry", id],
@@ -35,16 +39,18 @@ export function DictionaryDetail({
   return (
     <div className="animate-in mx-auto max-w-3xl px-6 py-10 sm:py-14">
       <Button asChild variant="ghost" className="mb-6">
-        <Link href={back}>返回查询结果</Link>
+        <Link href={back}>{uiText("返回查询结果")}</Link>
       </Button>
       {(result.isPending || profile.isPending) && (
-        <p role="status">加载词条详情…</p>
+        <p role="status">{uiText("加载词条详情…")}</p>
       )}
       {(result.isError || profile.isError) && (
         <div role="alert">
-          <h1 className="text-3xl font-semibold">词条详情暂不可用</h1>
+          <h1 className="text-3xl font-semibold">
+            {uiText("词条详情暂不可用")}
+          </h1>
           <p className="mt-3 text-sm text-foreground-muted">
-            词条可能已撤回，或网络暂时不可用。
+            {uiText("词条可能已撤回，或网络暂时不可用。")}
           </p>
           <Button
             type="button"
@@ -55,7 +61,7 @@ export function DictionaryDetail({
               void profile.refetch();
             }}
           >
-            重试
+            {uiText("重试")}
           </Button>
         </div>
       )}
@@ -66,7 +72,9 @@ export function DictionaryDetail({
           </h1>
           {dictionarySpellings(item.content, variant).alternate && (
             <p className="mt-2 text-sm text-foreground-muted">
-              其他拼写：{dictionarySpellings(item.content, variant).alternate}
+              {uiText("其他拼写：{{v0}}", {
+                v0: dictionarySpellings(item.content, variant).alternate
+              })}
             </p>
           )}
           <div className="mt-8 space-y-6">
@@ -86,10 +94,10 @@ export function DictionaryDetail({
                       <div key={v.id} className="text-sm">
                         <span className="mr-3 text-foreground-muted">
                           {v.dialect === "uk"
-                            ? "英式"
+                            ? uiText("英式")
                             : v.dialect === "us"
-                              ? "美式"
-                              : "通用"}{" "}
+                              ? uiText("美式")
+                              : uiText("通用")}{" "}
                           · {v.spelling}
                         </span>
                         <TargetAudio
@@ -98,7 +106,7 @@ export function DictionaryDetail({
                           targetId={v.id}
                           sourceDialects={[v.dialect]}
                           variant={variant}
-                          label={`播放 ${v.spelling} 拼写`}
+                          label={uiText("播放 {{v0}} 拼写", { v0: v.spelling })}
                         />
                         {v.pronunciations.map((p) => {
                           const [left, right] = phoneticDelimiters(
@@ -139,7 +147,9 @@ export function DictionaryDetail({
                                     : [v.dialect]
                                 }
                                 variant={variant}
-                                label={`播放 ${v.spelling} 发音`}
+                                label={uiText("播放 {{v0}} 发音", {
+                                  v0: v.spelling
+                                })}
                               />
                             </div>
                           );
@@ -165,7 +175,7 @@ export function DictionaryDetail({
                         className="border-t border-border pt-5 text-sm leading-7"
                       >
                         <h3 className="mb-2 font-medium">
-                          词义 {index + 1}
+                          {uiText("词义 {{v0}}", { v0: index + 1 })}
                           {sense.sub_pos_label && ` · ${sense.sub_pos_label}`}
                         </h3>
                         {definition ? (
@@ -187,15 +197,19 @@ export function DictionaryDetail({
                                 variant
                               ).map((text) => text.dialect)}
                               variant={variant}
-                              label="播放英文释义"
+                              label={uiText("播放英文释义")}
                             />
                           </>
                         ) : (
-                          <p className="text-foreground-muted">暂无释义</p>
+                          <p className="text-foreground-muted">
+                            {uiText("暂无释义")}
+                          </p>
                         )}
                         {grammar && (
                           <div className="mt-4 rounded-2xl bg-muted p-4">
-                            <h4 className="mb-1 font-medium">语法结构</h4>
+                            <h4 className="mb-1 font-medium">
+                              {uiText("语法结构")}
+                            </h4>
                             <Texts texts={grammar.variants} variant={variant} />
                             <TargetAudio
                               entryId={id}
@@ -206,13 +220,13 @@ export function DictionaryDetail({
                                 variant
                               ).map((text) => text.dialect)}
                               variant={variant}
-                              label="播放语法结构"
+                              label={uiText("播放语法结构")}
                             />
                           </div>
                         )}
                         {examples.length > 0 && (
                           <div className="mt-4 space-y-4">
-                            <h4 className="font-medium">例句</h4>
+                            <h4 className="font-medium">{uiText("例句")}</h4>
                             {examples.map((e) => (
                               <div key={e.id}>
                                 <Texts
@@ -229,7 +243,7 @@ export function DictionaryDetail({
                                     variant
                                   ).map((text) => text.dialect)}
                                   variant={variant}
-                                  label="播放例句"
+                                  label={uiText("播放例句")}
                                 />
                                 <div className="mt-1 text-foreground-muted">
                                   <RichTextReadOnly

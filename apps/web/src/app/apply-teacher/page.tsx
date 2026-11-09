@@ -1,14 +1,23 @@
+import { getServerWebText } from "@/i18n/server";
+import { webApp } from "@/i18n/messages/app";
 import type { Metadata } from "next";
-import { ApplyTeacherForm, RouteGuard } from "@/features/auth";
+import { ApplyTeacherForm } from "@/features/auth/components/ApplyTeacherForm";
+import { RouteGuard } from "@/features/auth/components/RouteGuard";
 import { AppTopbar } from "@/features/shell/AppTopbar";
-import { PageHeader, PageShell } from "@/features/shell/Page";
+import { AppPageHeader } from "@/i18n/AppText";
+import { PageShell } from "@/features/shell/Page";
 
-export const metadata: Metadata = {
-  title: "申请成为老师",
-  description: "在天生会背提交教师认证资料，通过站内通知查看审核结果。",
-  alternates: { canonical: "/apply-teacher" },
-  robots: { index: false, follow: false }
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const uiText = await getServerWebText(webApp);
+  return {
+    title: uiText("申请成为老师"),
+    description: uiText(
+      "在天生会背提交教师认证资料，通过站内通知查看审核结果。"
+    ),
+    alternates: { canonical: "/apply-teacher" },
+    robots: { index: false, follow: false }
+  };
+}
 
 // 申请成为老师:填写资料 → 提交审核 →(被拒)查看拒绝原因。
 export default function ApplyTeacherPage() {
@@ -17,7 +26,7 @@ export default function ApplyTeacherPage() {
       <AppTopbar />
       <main className="mx-auto w-full max-w-5xl">
         <PageShell size="lg">
-          <PageHeader
+          <AppPageHeader
             back={{ href: "/account", label: "返回个人中心" }}
             eyebrow="教师认证"
             title="申请成为老师"

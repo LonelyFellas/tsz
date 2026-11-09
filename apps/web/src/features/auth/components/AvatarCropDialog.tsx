@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice, webErrorText } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthProfile as webAuth } from "@/i18n/messages/auth/profile";
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@tsz/ui/components";
@@ -19,12 +22,13 @@ export function AvatarCropDialog({
   onCancel: () => void;
   onConfirm: (file: File) => void;
 }) {
+  const uiText = useWebText(webAuth);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState<AvatarPosition>({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const drag = useRef<{
     id: number;
     x: number;
@@ -83,7 +87,7 @@ export function AvatarCropDialog({
     try {
       onConfirm(await exportAvatarCrop(image, crop));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "图片处理失败，请重试");
+      setError(webErrorText(cause, "图片处理失败，请重试"));
       setBusy(false);
     }
   }
@@ -100,19 +104,19 @@ export function AvatarCropDialog({
       className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-3xl border border-border bg-surface p-6 text-foreground shadow-float backdrop:bg-foreground/30 backdrop:backdrop-blur-sm"
     >
       <h2 id="avatar-crop-title" className="text-xl font-bold tracking-tight">
-        裁剪头像
+        {uiText("裁剪头像")}
       </h2>
       <p
         id="avatar-crop-description"
         className="mt-2 text-sm leading-6 text-foreground-muted"
       >
-        拖动图片或使用方向键调整位置，缩放后确认圆形预览。
+        {uiText("拖动图片或使用方向键调整位置，缩放后确认圆形预览。")}
       </p>
       {image && crop ? (
         <div className="my-6 flex justify-center">
           <div
             role="group"
-            aria-label="调整头像位置"
+            aria-label={uiText("调整头像位置")}
             tabIndex={0}
             aria-disabled={busy}
             className="relative aspect-square w-64 max-w-full touch-none overflow-hidden rounded-full bg-white ring-4 ring-primary/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary cursor-grab active:cursor-grabbing"
@@ -171,7 +175,7 @@ export function AvatarCropDialog({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image.src}
-              alt="圆形头像预览"
+              alt={uiText("圆形头像预览")}
               draggable={false}
               className="pointer-events-none absolute select-none max-w-none"
               style={{
@@ -188,14 +192,14 @@ export function AvatarCropDialog({
           role="status"
           className="my-6 text-center text-sm text-foreground-muted"
         >
-          正在读取图片…
+          {uiText("正在读取图片…")}
         </p>
       ) : null}
       <label
         htmlFor="avatar-crop-zoom"
         className="flex items-center justify-between text-sm font-medium"
       >
-        缩放{" "}
+        {uiText("缩放")}{" "}
         <span className="text-foreground-muted">{Math.round(zoom * 100)}%</span>
       </label>
       <input
@@ -214,7 +218,7 @@ export function AvatarCropDialog({
       />
       {error && (
         <p role="alert" className="mt-3 text-sm text-danger">
-          {error}
+          {uiText(error)}
         </p>
       )}
       <div className="mt-5 flex gap-3">
@@ -225,7 +229,7 @@ export function AvatarCropDialog({
           disabled={busy}
           onClick={onCancel}
         >
-          取消
+          {uiText("取消")}
         </Button>
         <Button
           type="button"
@@ -233,7 +237,7 @@ export function AvatarCropDialog({
           disabled={!image || busy}
           onClick={() => void confirm()}
         >
-          {busy ? "正在处理…" : "确认并上传"}
+          {busy ? uiText("正在处理…") : uiText("确认并上传")}
         </Button>
       </div>
     </dialog>

@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webPlacement } from "@/i18n/messages/placement";
 
 import { cn } from "@tsz/ui/lib/cn";
 import { primaryButtonClass } from "@/features/shell/Page";
@@ -26,6 +28,7 @@ export function ResultScreen({
   onApply,
   onRetest
 }: ResultScreenProps) {
+  const uiText = useWebText(webPlacement);
   const left = MAX_TESTS - quota.used;
   const bandIdx = BANDS.indexOf(band);
 
@@ -33,7 +36,7 @@ export function ResultScreen({
     <div className="flex min-h-full flex-1 flex-col text-center">
       <div className="flex-1" />
       <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
-        你的词汇等级
+        {uiText("你的词汇等级")}
       </p>
       <div className="relative mx-auto mt-5 mb-4 flex h-36 w-36 items-center justify-center rounded-full bg-primary-muted">
         <span
@@ -45,13 +48,13 @@ export function ResultScreen({
         </span>
       </div>
       <p className="text-base font-semibold tabular-nums">
-        {VOCAB_RANGE[band]}
+        {uiText(VOCAB_RANGE[band])}
       </p>
       <p className="mx-auto mt-2 max-w-[30ch] text-sm text-foreground-muted">
-        {BAND_DESC[band]}
+        {uiText(BAND_DESC[band])}
       </p>
       <p className="mt-1 text-xs text-foreground-subtle">
-        第 {quota.used}/{MAX_TESTS} 次测试
+        {uiText("第 {{v0}}/{{v1}} 次测试", { v0: quota.used, v1: MAX_TESTS })}
       </p>
 
       <div className="mt-6 mb-1 grid grid-cols-6 gap-1.5">
@@ -83,11 +86,11 @@ export function ResultScreen({
         onClick={onApply}
         className={cn(primaryButtonClass, "w-full")}
       >
-        {onboarded ? "返回学习" : "应用该等级，继续设置"}
+        {onboarded ? uiText("返回学习") : uiText("应用该等级，继续设置")}
       </button>
       {onboarded && (
         <p className="mt-3 text-xs leading-6 text-foreground-muted">
-          测评结果仅供参考，不会修改已保存的学习难度。
+          {uiText("测评结果仅供参考，不会修改已保存的学习难度。")}
         </p>
       )}
       {left > 0 ? (
@@ -96,15 +99,15 @@ export function ResultScreen({
           onClick={onRetest}
           className="mt-2 min-h-11 w-full rounded-full text-sm text-foreground-muted transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
-          重新测试
+          {uiText("重新测试")}
         </button>
       ) : null}
       <p className="mt-3 text-xs text-foreground-subtle">
         {left > 0
-          ? `剩余 ${left} 次机会 · 以最后一次结果为准`
+          ? uiText("剩余 {{v0}} 次机会 · 以最后一次结果为准", { v0: left })
           : fresh
-            ? "测试机会已用完 · 以本次结果为准"
-            : "测试机会已用完 · 以最后一次结果为准"}
+            ? uiText("测试机会已用完 · 以本次结果为准")
+            : uiText("测试机会已用完 · 以最后一次结果为准")}
       </p>
     </div>
   );

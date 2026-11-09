@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type { LoginRewardDay } from "@tsz/types";
 import type { HttpClient } from "./http";
 import { validateRuntimeSchema } from "./runtime-schema";
@@ -5,7 +6,7 @@ import { validateRuntimeSchema } from "./runtime-schema";
 export function decodeLoginRewardDay(value: unknown): LoginRewardDay {
   const result = validateRuntimeSchema("LoginRewardDay", value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `登录奖励响应不符合接口契约：${result.path} (${result.reason})`
     );
   const day = value as LoginRewardDay;
@@ -23,7 +24,7 @@ export function decodeLoginRewardDay(value: unknown): LoginRewardDay {
       ? day.awarded_amount !== "1" || !day.operation_id
       : day.awarded_amount !== "0" || day.operation_id !== null)
   )
-    throw new Error("登录奖励状态与账目不一致");
+    throw new ClientResponseError("登录奖励状态与账目不一致");
   return day;
 }
 

@@ -1,4 +1,8 @@
 "use client";
+import { webErrorText } from "@/i18n/catalog";
+import { LocalWebError, type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webWordlistEditor as webWordlist } from "@/i18n/messages/wordlist/editor";
 
 import { unavailableReasonLabels } from "../availability";
 import { useEffect, useRef, useState } from "react";
@@ -86,6 +90,7 @@ export function WordListCreator({
   onSaved?: (id: string) => void;
   onCancel?: () => void;
 }) {
+  const uiText = useWebText(webWordlist);
   const userId = useUserStore((s) => s.user?.id);
   const snapshot = useQuery({
     queryKey: [...wordListKeys.mine(userId), "edit", id],
@@ -107,7 +112,7 @@ export function WordListCreator({
     return (
       <PageShell size="lg" embedded={embedded}>
         <PageNotice tone="error">
-          读取编辑数据失败。
+          {uiText("读取编辑数据失败。")}
           <Button
             type="button"
             variant="outline"
@@ -115,7 +120,7 @@ export function WordListCreator({
             className="ml-2"
             onClick={() => void snapshot.refetch()}
           >
-            重试
+            {uiText("重试")}
           </Button>
         </PageNotice>
       </PageShell>
@@ -123,7 +128,7 @@ export function WordListCreator({
   if (id && !snapshot.data && !hasPending)
     return (
       <PageShell size="lg" embedded={embedded}>
-        <PageNotice>正在读取词表…</PageNotice>
+        <PageNotice>{uiText("正在读取词表…")}</PageNotice>
       </PageShell>
     );
   return (
@@ -156,6 +161,7 @@ function Editor({
   id?: string;
   initial?: WordlistEditSnapshot;
 }) {
+  const uiText = useWebText(webWordlist);
   const storageKey = pendingSaveKey(userId, id, folderId);
   const [recovery] = useState(() => {
     try {
@@ -199,7 +205,7 @@ function Editor({
   const [dirty, setDirty] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(
+  const [error, setError] = useState<WebNotice>(
     recovery.error ||
       (recovery.saved ? "上次保存结果未确认，请重试保存以确认结果。" : "")
   );
@@ -253,7 +259,7 @@ function Editor({
             (item, offset) => itemKey(item) !== ids[items.length + offset]
           )
         ) {
-          throw new Error("词表版本已变化，请重新打开后编辑。");
+          throw new LocalWebError("词表版本已变化，请重新打开后编辑。");
         }
         items.push(...data.items);
       }
@@ -330,7 +336,10 @@ function Editor({
         e.altKey
       )
         return;
-      if (savingRef.current || !window.confirm("尚未保存，确定离开？")) {
+      if (
+        savingRef.current ||
+        !window.confirm(uiText("尚未保存，确定离开？"))
+      ) {
         e.preventDefault();
         e.stopPropagation();
       } else {
@@ -345,7 +354,7 @@ function Editor({
         !e.cancelable
       )
         return;
-      if (savingRef.current || !window.confirm("尚未保存，确定离开？"))
+      if (savingRef.current || !window.confirm(uiText("尚未保存，确定离开？")))
         e.preventDefault();
       else allowLeave.current = true;
     };
@@ -363,7 +372,7 @@ function Editor({
       document.removeEventListener("click", click, true);
       window.navigation?.removeEventListener("navigate", navigate);
     };
-  }, [dirty, importOpen, saving, uncertain]);
+  }, [dirty, importOpen, saving, uncertain, uiText]);
   function change(rowId: string, patch: Partial<Row>) {
     setRows((current) =>
       current.map((row) => (row.id === rowId ? { ...row, ...patch } : row))
@@ -704,7 +713,10 @@ function Editor({
     !rows[0]!.note &&
     !rows[0]!.authorNote;
   function cancel() {
-    if (savingRef.current || (dirty && !window.confirm("尚未保存，确定离开？")))
+    if (
+      savingRef.current ||
+      (dirty && !window.confirm(uiText("尚未保存，确定离开？")))
+    )
       return;
     allowLeave.current = true;
     if (onCancel) onCancel();
@@ -753,27 +765,27 @@ function Editor({
           onClick={cancel}
         >
           <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
-          返回
+          {uiText("返回")}
         </button>
       )}
       <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-        {id ? "编辑词表" : "创建词表"}
+        {id ? uiText("编辑词表") : uiText("创建词表")}
       </h1>
       {locked && (
         <p className="mt-3 text-sm leading-6 text-foreground-muted">
-          公开或审核中的词表仅可修改已有私密备注；编辑内容需先撤回。
+          {uiText("公开或审核中的词表仅可修改已有私密备注；编辑内容需先撤回。")}
         </p>
       )}
       <header className="mt-6 flex flex-wrap items-end gap-3">
         <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
-          <FormField htmlFor="wordlist-name" label="词表名称">
+          <FormField htmlFor="wordlist-name" label={uiText("词表名称")}>
             <Input
               id="wordlist-name"
               ref={nameInput}
-              aria-label="词表名称"
+              aria-label={uiText("词表名称")}
               aria-invalid={nameInvalid}
               aria-describedby={error ? "wordlist-save-error" : undefined}
-              placeholder="输入词表名称"
+              placeholder={uiText("输入词表名称")}
               value={name}
               maxLength={100}
               disabled={locked || saving || uncertain}
@@ -793,7 +805,7 @@ function Editor({
             disabled={saving}
             onClick={cancel}
           >
-            取消
+            {uiText("取消")}
           </Button>
         )}
       </header>
@@ -804,9 +816,9 @@ function Editor({
         >
           {loaded.isError
             ? loaded.error instanceof Error
-              ? loaded.error.message
-              : "词义和备注读取失败"
-            : "正在读取词条…"}
+              ? uiText(webErrorText(loaded.error, "数据暂不可用，请刷新后重试"))
+              : uiText("词义和备注读取失败")
+            : uiText("正在读取词条…")}
           {loaded.isError && (
             <Button
               type="button"
@@ -814,24 +826,24 @@ function Editor({
               size="sm"
               onClick={() => void loaded.refetch()}
             >
-              重试读取
+              {uiText("重试读取")}
             </Button>
           )}
         </p>
       )}
       <section
-        aria-label="词条编辑"
+        aria-label={uiText("词条编辑")}
         aria-busy={saving}
         className="sticky top-16 z-20 my-6 border-b border-border/70 bg-surface py-3"
       >
         <div className="flex flex-wrap items-center gap-3">
           <Input
             id="wordlist-filter"
-            aria-label="表内搜索"
+            aria-label={uiText("表内搜索")}
             className="min-w-40 flex-1 sm:max-w-sm"
             value={filter}
             disabled={loadingItems}
-            placeholder="搜索词条、释义或备注"
+            placeholder={uiText("搜索词条、释义或备注")}
             onChange={(e) => {
               setFilter(e.target.value);
               setPage(1);
@@ -843,7 +855,7 @@ function Editor({
                 <Button
                   type="button"
                   variant="outline"
-                  aria-label="Excel 导入"
+                  aria-label={uiText("Excel 导入")}
                   className="min-h-11 px-2 sm:px-3"
                   disabled={
                     locked ||
@@ -854,8 +866,10 @@ function Editor({
                   }
                   onClick={() => setImportOpen(true)}
                 >
-                  <span className="hidden sm:inline">Excel 导入</span>
-                  <span className="sm:hidden">导入</span>
+                  <span className="hidden sm:inline">
+                    {uiText("Excel 导入")}
+                  </span>
+                  <span className="sm:hidden">{uiText("导入")}</span>
                 </Button>
                 <Button
                   type="button"
@@ -882,7 +896,7 @@ function Editor({
                   }}
                 >
                   <Plus className="size-4" aria-hidden />
-                  添加词条
+                  {uiText("添加词条")}
                 </Button>
               </>
             )}
@@ -904,29 +918,36 @@ function Editor({
               onClick={() => void save()}
             >
               {saving
-                ? "保存中…"
+                ? uiText("保存中…")
                 : uncertain
-                  ? "重试保存"
+                  ? uiText("重试保存")
                   : locked
-                    ? "保存备注"
+                    ? uiText("保存备注")
                     : selectedAudio.length
-                      ? `支付 ${audioCost.toString()} 天生币并保存`
-                      : "保存"}
+                      ? uiText("支付 {{v0}} 天生币并保存", {
+                          v0: audioCost.toString()
+                        })
+                      : uiText("保存")}
             </Button>
           </div>
         </div>
         {!locked && rows.some((row) => row.customWord) && (
           <div className="mt-3 text-sm leading-6 text-foreground-muted">
             <p>
-              语音费用：{audioCost.toString()} 天生币。每词英式、美式各一条，共
-              2 天生币，点击保存时扣款。
+              {uiText("语音费用：")}
+              {audioCost.toString()}{" "}
+              {uiText(
+                "天生币。每词英式、美式各一条，共 2 天生币，点击保存时扣款。"
+              )}
             </p>
             <p>
               {wallet.isError
-                ? "余额读取失败，当前余额未知。"
+                ? uiText("余额读取失败，当前余额未知。")
                 : wallet.data
-                  ? `余额：${formatCoins(wallet.data.balance)}`
-                  : "正在读取余额…"}
+                  ? uiText("余额：{{v0}}", {
+                      v0: formatCoins(wallet.data.balance)
+                    })
+                  : uiText("正在读取余额…")}
               <Button
                 type="button"
                 size="sm"
@@ -934,25 +955,29 @@ function Editor({
                 disabled={wallet.isFetching}
                 onClick={() => void wallet.refetch()}
               >
-                刷新余额
+                {uiText("刷新余额")}
               </Button>
             </p>
             {insufficient && (
-              <p role="status">余额不足，输入已保留。补充天生币后可保存。</p>
+              <p role="status">
+                {uiText("余额不足，输入已保留。补充天生币后可保存。")}
+              </p>
             )}
             {wallet.data && wallet.data.status !== "open" && (
-              <p role="status">账户当前暂停收支，暂不能生成语音。</p>
+              <p role="status">
+                {uiText("账户当前暂停收支，暂不能生成语音。")}
+              </p>
             )}
             {audio.isError && (
               <p role="status">
-                语音暂不可用，仍可编辑文本。
+                {uiText("语音暂不可用，仍可编辑文本。")}
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
                   onClick={() => void audio.refetch()}
                 >
-                  重试读取语音
+                  {uiText("重试读取语音")}
                 </Button>
               </p>
             )}
@@ -964,13 +989,13 @@ function Editor({
             role="alert"
             className="mt-3 rounded-2xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger"
           >
-            {error}
+            {uiText(error)}
           </p>
         )}
       </section>
       {matches.length === 0 && (
         <PageNotice>
-          {filter.trim() ? "未找到匹配词条" : "暂无词条"}
+          {filter.trim() ? uiText("未找到匹配词条") : uiText("暂无词条")}
           {filter.trim() && (
             <Button
               type="button"
@@ -981,7 +1006,7 @@ function Editor({
                 setPage(1);
               }}
             >
-              清空搜索
+              {uiText("清空搜索")}
             </Button>
           )}
         </PageNotice>
@@ -994,21 +1019,28 @@ function Editor({
         autoScroll={{ threshold: { x: 0, y: 0.12 }, acceleration: 8 }}
         accessibility={{
           screenReaderInstructions: {
-            draggable:
+            draggable: uiText(
               "按空格键拿起词条，用上下方向键排序，再按空格键放下，Esc 取消。"
+            )
           },
           announcements: {
             onDragStart: ({ active }) =>
-              `已拿起第 ${rows.findIndex((row) => row.id === active.id) + 1} 个词条。`,
+              uiText("已拿起第 {{v0}} 个词条。", {
+                v0: rows.findIndex((row) => row.id === active.id) + 1
+              }),
             onDragOver: ({ over }) =>
               over
-                ? `目标位置：第 ${rows.findIndex((row) => row.id === over.id) + 1} 位。`
+                ? uiText("目标位置：第 {{v0}} 位。", {
+                    v0: rows.findIndex((row) => row.id === over.id) + 1
+                  })
                 : undefined,
             onDragEnd: ({ over }) =>
               over
-                ? `已放到第 ${rows.findIndex((row) => row.id === over.id) + 1} 位。`
-                : "已取消排序。",
-            onDragCancel: () => "已取消排序。"
+                ? uiText("已放到第 {{v0}} 位。", {
+                    v0: rows.findIndex((row) => row.id === over.id) + 1
+                  })
+                : uiText("已取消排序。"),
+            onDragCancel: () => uiText("已取消排序。")
           }
         }}
         onDragStart={({ active }) => {
@@ -1057,7 +1089,7 @@ function Editor({
                   move(row.id, rows[rows.indexOf(row) + direction]!.id)
                 }
                 onRemove={() => {
-                  if (!window.confirm("删除此词条及其备注？")) return;
+                  if (!window.confirm(uiText("删除此词条及其备注？"))) return;
                   const next = rows.filter((r) => r.id !== row.id);
                   const target =
                     next[Math.min(rows.indexOf(row), next.length - 1)]!;
@@ -1104,7 +1136,7 @@ function Editor({
       </DndContext>
       {!loadingItems && (
         <p className="mt-4 text-right text-xs tabular-nums text-foreground-muted">
-          共 {rows.length} 个词条
+          {uiText("共 {{v0}} 个词条", { v0: rows.length })}
         </p>
       )}
       <Pager page={currentPage} total={pages} onChange={setPage} />
@@ -1132,6 +1164,7 @@ function WordRow({
   index: number;
   change: (patch: Partial<Row>) => void;
 }) {
+  const uiText = useWebText(webWordlist);
   const userId = useUserStore((s) => s.user?.id);
   const inputRef = useRef<HTMLInputElement>(null);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -1143,6 +1176,11 @@ function WordRow({
     stored?.entry?.label ??
     stored?.entry_label ??
     (stored ? "内容不可用" : row.entryId ? "正在读取词条…" : "");
+  const hasSourceText =
+    row.customWord?.word != null ||
+    row.text != null ||
+    stored?.entry?.label != null ||
+    stored?.entry_label != null;
   const [searchText, setSearchText] = useState(text);
   useEffect(() => {
     if (composing) return;
@@ -1201,15 +1239,15 @@ function WordRow({
       <Input
         id={`word-${row.id}`}
         ref={inputRef}
-        aria-label={`词条 ${index}`}
+        aria-label={uiText("词条 {{v0}}", { v0: index })}
         aria-invalid={invalidField === "word"}
         aria-describedby={
           invalidField === "word" ? "wordlist-save-error" : undefined
         }
         className="tsz-words mt-1"
-        value={text}
+        value={hasSourceText ? text : uiText(text)}
         disabled={locked}
-        placeholder="输入单词或短语"
+        placeholder={uiText("输入单词或短语")}
         maxLength={row.customWord ? 50 : undefined}
         onCompositionStart={() => setComposing(true)}
         onCompositionEnd={() => setComposing(false)}
@@ -1263,7 +1301,7 @@ function WordRow({
         searchText === text &&
         search.isFetching && (
           <p role="status" className="mt-2 text-sm text-foreground-muted">
-            正在搜索…
+            {uiText("正在搜索…")}
           </p>
         )}
       {!row.entryId &&
@@ -1273,12 +1311,12 @@ function WordRow({
         searchText === text &&
         search.isError && (
           <p role="alert" className="mt-2 text-sm text-danger">
-            搜索失败，请重试输入。
+            {uiText("搜索失败，请重试输入。")}
           </p>
         )}
       {suggestions.length > 0 && (
         <div
-          aria-label="候选词条"
+          aria-label={uiText("候选词条")}
           className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-border bg-surface p-1"
         >
           {suggestions.map((candidate, candidateIndex) => (
@@ -1325,7 +1363,7 @@ function WordRow({
         !search.isFetching &&
         search.data.items.length === 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-foreground-muted">
-            <span>没有匹配词条。</span>
+            <span>{uiText("没有匹配词条。")}</span>
             <Button
               type="button"
               variant="outline"
@@ -1343,18 +1381,18 @@ function WordRow({
                 );
               }}
             >
-              创建自定义词条
+              {uiText("创建自定义词条")}
             </Button>
           </div>
         )}
       {row.customWord && (
         <div className="mt-4">
           <label className="block text-sm font-medium">
-            自定义释义（必填）
+            {uiText("自定义释义（必填）")}
             <textarea
               className={cn(field, "mt-2")}
               id={`definition-${row.id}`}
-              aria-label={`自定义释义 ${index}`}
+              aria-label={uiText("自定义释义 {{v0}}", { v0: index })}
               aria-invalid={invalidField === "definition"}
               aria-describedby={
                 invalidField === "definition"
@@ -1364,7 +1402,7 @@ function WordRow({
               maxLength={200}
               disabled={locked}
               value={row.customWord.definition}
-              placeholder="填写词条的释义"
+              placeholder={uiText("填写词条的释义")}
               onChange={(event) =>
                 change({
                   customWord: {
@@ -1376,13 +1414,13 @@ function WordRow({
             />
           </label>
           <p className="mt-2 text-xs text-foreground-muted">
-            自定义词条可阅读，也可用于拼写练习。
+            {uiText("自定义词条可阅读，也可用于拼写练习。")}
           </p>
           {audio &&
             (audio.word === wordlistAudioWord(row.customWord.word) ||
               audio.status === "refunding") && (
               <p className="mt-2 text-sm text-foreground-muted">
-                {audioStatusLabels[audio.status]}
+                {uiText(audioStatusLabels[audio.status])}
               </p>
             )}
           {!locked &&
@@ -1396,7 +1434,7 @@ function WordRow({
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
-                  aria-label={`生成语音 ${index}`}
+                  aria-label={uiText("生成语音 {{v0}}", { v0: index })}
                   checked={!!row.generateAudio}
                   disabled={audioUnavailable && !row.generateAudio}
                   onChange={(event) =>
@@ -1404,8 +1442,8 @@ function WordRow({
                   }
                 />
                 {audio?.status === "refunded"
-                  ? "重新生成英式和美式语音（2 天生币）"
-                  : "生成英式和美式语音（2 天生币）"}
+                  ? uiText("重新生成英式和美式语音（2 天生币）")
+                  : uiText("生成英式和美式语音（2 天生币）")}
               </label>
             )}
         </div>
@@ -1417,11 +1455,11 @@ function WordRow({
       )}
       {stored && !stored.entry && !stored.custom_word && (
         <p className="mt-3 text-sm text-danger">
-          内容不可用
+          {uiText("内容不可用")}
           {stored.unavailable_reason
-            ? `（${unavailableReasonLabels[stored.unavailable_reason]}）`
+            ? `（${uiText(unavailableReasonLabels[stored.unavailable_reason])}）`
             : ""}
-          ，请删除或替换此项。
+          {uiText("，请删除或替换此项。")}
         </p>
       )}
       <div
@@ -1432,11 +1470,11 @@ function WordRow({
       >
         {showAuthorNote ? (
           <div className="min-w-0 text-sm font-medium">
-            <label htmlFor={`author-note-${row.id}`}>注</label>
+            <label htmlFor={`author-note-${row.id}`}>{uiText("注")}</label>
             <textarea
               className={cn(field, "mt-2")}
               id={`author-note-${row.id}`}
-              aria-label={`注 ${index}`}
+              aria-label={uiText("注 {{v0}}", { v0: index })}
               aria-invalid={invalidField === "author-note"}
               aria-describedby={
                 invalidField === "author-note"
@@ -1445,7 +1483,7 @@ function WordRow({
               }
               maxLength={1000}
               disabled={locked}
-              placeholder="给读者的补充说明"
+              placeholder={uiText("给读者的补充说明")}
               value={authorNote}
               onChange={(e) => {
                 setNoteOpen(true);
@@ -1453,14 +1491,16 @@ function WordRow({
               }}
             />
             <div className="mt-2 flex items-center justify-between gap-2 text-xs text-foreground-muted">
-              <span id={`author-note-${row.id}-message`}>随词表公开。</span>
+              <span id={`author-note-${row.id}-message`}>
+                {uiText("随词表公开。")}
+              </span>
               {!authorNote && !locked && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="min-h-11 px-3 text-xs"
-                  aria-label={`收起注释 ${index}`}
+                  aria-label={uiText("收起注释 {{v0}}", { v0: index })}
                   onClick={() => {
                     setNoteOpen(false);
                     requestAnimationFrame(() =>
@@ -1468,7 +1508,7 @@ function WordRow({
                     );
                   }}
                 >
-                  收起
+                  {uiText("收起")}
                 </Button>
               )}
             </div>
@@ -1488,16 +1528,16 @@ function WordRow({
             }}
           >
             <Pencil className="size-4" aria-hidden />
-            添加注释
+            {uiText("添加注释")}
           </Button>
         ) : null}
         {hasPrivateNote && (
           <label className="block min-w-0 text-sm font-medium">
-            已有私密备注（仅自己可见）
+            {uiText("已有私密备注（仅自己可见）")}
             <textarea
               className={cn(field, "mt-2")}
               id={`private-note-${row.id}`}
-              aria-label={`私密备注 ${index}`}
+              aria-label={uiText("私密备注 {{v0}}", { v0: index })}
               aria-invalid={invalidField === "private-note"}
               aria-describedby={
                 invalidField === "private-note"
@@ -1506,7 +1546,9 @@ function WordRow({
               }
               maxLength={1000}
               disabled={!!unloaded}
-              placeholder={unloaded ? "正在读取备注…" : "仅自己可见"}
+              placeholder={
+                unloaded ? uiText("正在读取备注…") : uiText("仅自己可见")
+              }
               value={note}
               onChange={(e) =>
                 change({

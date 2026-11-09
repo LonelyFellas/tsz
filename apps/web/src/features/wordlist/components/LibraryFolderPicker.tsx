@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, Folder, FolderInput, LoaderCircle } from "lucide-react";
@@ -26,6 +29,7 @@ export function LibraryFolderPicker({
   onCancel?: () => void;
   onPick: (id: string | null) => void;
 }) {
+  const uiText = useWebText(webWordlist);
   const userId = useUserStore((s) => s.user?.id);
   const [parent, setParent] = useState<string | undefined>();
   const [page, setPage] = useState(1);
@@ -46,11 +50,11 @@ export function LibraryFolderPicker({
     setParent(id);
     setPage(1);
   };
-  const currentName = result.data?.ancestors.at(-1)?.name ?? "根目录";
+  const currentName = result.data?.ancestors.at(-1)?.name ?? uiText("根目录");
   return (
     <div className="space-y-4" aria-busy={busy || result.isFetching}>
       <nav
-        aria-label="目标文件夹路径"
+        aria-label={uiText("目标文件夹路径")}
         className="-ml-2 flex flex-wrap items-center gap-1 text-sm"
       >
         <button
@@ -60,7 +64,7 @@ export function LibraryFolderPicker({
           aria-current={!parent ? "location" : undefined}
           className="min-h-11 rounded-lg px-2 text-foreground-muted hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary aria-[current=location]:text-foreground disabled:opacity-50"
         >
-          根目录
+          {uiText("根目录")}
         </button>
         {result.data?.ancestors.map((crumb) => (
           <span key={crumb.id} className="flex min-w-0 items-center gap-1">
@@ -82,22 +86,22 @@ export function LibraryFolderPicker({
       </nav>
       {result.isError ? (
         <PageNotice tone="error">
-          目录加载失败。
+          {uiText("目录加载失败。")}
           <Button
             type="button"
             variant="ghost"
             disabled={busy}
             onClick={() => void result.refetch()}
           >
-            重试
+            {uiText("重试")}
           </Button>
         </PageNotice>
       ) : result.isPending ? (
-        <PageNotice>正在加载文件夹…</PageNotice>
+        <PageNotice>{uiText("正在加载文件夹…")}</PageNotice>
       ) : (
         <>
           <ul
-            aria-label="目标文件夹"
+            aria-label={uiText("目标文件夹")}
             className="max-h-64 space-y-1 overflow-y-auto rounded-2xl border border-border/60 p-1"
           >
             {result.data.items
@@ -110,7 +114,9 @@ export function LibraryFolderPicker({
                       type="button"
                       disabled={busy || excluded}
                       onClick={() => go(item.id)}
-                      title={excluded ? "不能移入自身或子文件夹" : undefined}
+                      title={
+                        excluded ? uiText("不能移入自身或子文件夹") : undefined
+                      }
                       className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-primary-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Folder
@@ -130,7 +136,7 @@ export function LibraryFolderPicker({
               })}
             {!result.data.items.some((item) => !item.wordlist_id) && (
               <li className="px-4 py-8 text-center text-sm text-foreground-muted">
-                此页没有子文件夹，可以使用当前位置。
+                {uiText("此页没有子文件夹，可以使用当前位置。")}
               </li>
             )}
           </ul>
@@ -146,9 +152,12 @@ export function LibraryFolderPicker({
               aria-hidden
             />
             <div className="min-w-0">
-              <p className="text-xs text-foreground-muted">目标位置</p>
+              <p className="text-xs text-foreground-muted">
+                {uiText("目标位置")}
+              </p>
               <p className="mt-1 break-words font-medium">
-                {space === "owned" ? "创建" : "收藏"} / {currentName}
+                {space === "owned" ? uiText("创建") : uiText("收藏")} /{" "}
+                {currentName}
               </p>
             </div>
           </div>
@@ -162,7 +171,7 @@ export function LibraryFolderPicker({
             disabled={busy}
             onClick={onCancel}
           >
-            取消
+            {uiText("取消")}
           </Button>
         )}
         <Button
@@ -176,7 +185,7 @@ export function LibraryFolderPicker({
               aria-hidden
             />
           )}
-          {busy ? pendingLabel : actionLabel}
+          {uiText(busy ? pendingLabel : actionLabel)}
         </Button>
       </div>
     </div>

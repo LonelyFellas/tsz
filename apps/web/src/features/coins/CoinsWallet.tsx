@@ -1,4 +1,7 @@
 "use client";
+import { useWebLocale } from "@/i18n/client";
+import { useWebText } from "@/i18n/client";
+import { webCoinsWallet as webCoins } from "@/i18n/messages/coins/wallet";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCoins } from "@tsz/shared";
@@ -38,6 +41,8 @@ export function CoinsWallet() {
   return id ? <Wallet key={id} id={id} /> : null;
 }
 function Wallet({ id }: { id: string }) {
+  const locale = useWebLocale();
+  const uiText = useWebText(webCoins);
   const client = useQueryClient();
   const isStudent = useUserStore((s) => s.user?.roles.includes("student"));
   const [page, setPage] = useState(1);
@@ -71,8 +76,8 @@ function Wallet({ id }: { id: string }) {
   return (
     <PageShell>
       <PageHeader
-        back={{ href: "/account", label: "返回个人中心" }}
-        title="我的天生币"
+        back={{ href: "/account", label: uiText("返回个人中心") }}
+        title={uiText("我的天生币")}
         actions={
           <Button
             type="button"
@@ -81,13 +86,13 @@ function Wallet({ id }: { id: string }) {
             onClick={refresh}
           >
             <RefreshCw className="size-4" strokeWidth={1.8} aria-hidden />
-            刷新
+            {uiText("刷新")}
           </Button>
         }
       />
       <div className="glass rounded-3xl p-2">
         <section
-          aria-label="钱包余额"
+          aria-label={uiText("钱包余额")}
           className="rounded-[20px] bg-surface/70 p-5 sm:p-8"
         >
           <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8">
@@ -100,17 +105,17 @@ function Wallet({ id }: { id: string }) {
                   <Coins className="size-5" strokeWidth={1.8} />
                 </span>
                 <h2 className="text-sm font-medium text-foreground-muted">
-                  当前余额
+                  {uiText("当前余额")}
                 </h2>
               </div>
               <div className="mt-3 flex min-h-16 items-center">
                 {wallet.isError ? (
                   <p role="alert" className="text-sm leading-6 text-danger">
-                    余额加载失败，请重试。当前余额未知。
+                    {uiText("余额加载失败，请重试。当前余额未知。")}
                   </p>
                 ) : wallet.isPending ? (
                   <p role="status" className="text-sm text-foreground-muted">
-                    正在读取余额…
+                    {uiText("正在读取余额…")}
                   </p>
                 ) : (
                   <p
@@ -119,25 +124,25 @@ function Wallet({ id }: { id: string }) {
                   >
                     {formatCoins(wallet.data.balance).replace(" 天生币", "")}
                     <span className="ml-2 inline-block text-sm font-normal tracking-normal text-foreground-muted">
-                      {" 天生币"}
+                      {uiText("天生币")}
                     </span>
                   </p>
                 )}
               </div>
               <p className="mt-3 text-xs leading-5 text-foreground-muted">
-                学生与教师身份共用
+                {uiText("学生与教师身份共用")}
               </p>
               <p
                 role="status"
                 className="text-xs leading-5 text-foreground-muted"
               >
                 {wallet.isFetching && wallet.data && !wallet.isError
-                  ? "正在更新余额…"
+                  ? uiText("正在更新余额…")
                   : null}
               </p>
             </div>
             <nav
-              aria-label="天生币相关页面"
+              aria-label={uiText("天生币相关页面")}
               className="grid gap-1 border-t border-border/60 pt-3 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"
             >
               {[
@@ -165,7 +170,7 @@ function Wallet({ id }: { id: string }) {
                       strokeWidth={1.8}
                       aria-hidden
                     />
-                    {label}
+                    {uiText(label)}
                     <ChevronRight
                       className="ml-auto size-4 text-foreground-muted"
                       strokeWidth={1.8}
@@ -181,17 +186,21 @@ function Wallet({ id }: { id: string }) {
               role="status"
               className="mt-5 rounded-2xl bg-muted p-4 text-sm leading-6"
             >
-              账号正在等待注销，钱包已暂停全部入账和支出。撤销后可恢复原余额。
+              {uiText(
+                "账号正在等待注销，钱包已暂停全部入账和支出。撤销后可恢复原余额。"
+              )}
               <Link
                 className="ml-2 rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                 href="/account/delete"
               >
-                查看注销申请
+                {uiText("查看注销申请")}
               </Link>
             </div>
           )}
           {!wallet.isError && wallet.data?.status === "closed" && (
-            <p className="mt-4 text-sm text-foreground-muted">钱包已关闭。</p>
+            <p className="mt-4 text-sm text-foreground-muted">
+              {uiText("钱包已关闭。")}
+            </p>
           )}
         </section>
         <section
@@ -202,7 +211,7 @@ function Wallet({ id }: { id: string }) {
             id="wallet-rewards"
             className="text-sm font-semibold text-foreground"
           >
-            每日奖励
+            {uiText("每日奖励")}
           </h2>
           <div
             className={
@@ -236,31 +245,35 @@ function Wallet({ id }: { id: string }) {
             id="wallet-entries"
             className="text-xl font-semibold tracking-tight text-foreground"
           >
-            收支记录
+            {uiText("收支记录")}
           </h2>
-          <span className="text-xs text-foreground-muted">按时间从新到旧</span>
+          <span className="text-xs text-foreground-muted">
+            {uiText("按时间从新到旧")}
+          </span>
         </div>
         {entries.isError ? (
           <PageNotice tone="error">
-            <p>收支记录加载失败，请重试。</p>
+            <p>{uiText("收支记录加载失败，请重试。")}</p>
             <Button
               type="button"
               variant="link"
               size="compact"
               onClick={() => void entries.refetch()}
             >
-              重新加载
+              {uiText("重新加载")}
             </Button>
           </PageNotice>
         ) : entries.isPending ? (
-          <PageNotice>正在读取收支记录…</PageNotice>
+          <PageNotice>{uiText("正在读取收支记录…")}</PageNotice>
         ) : (
           <>
             {entries.data.items.length === 0 ? (
               <PageNotice>
-                <p className="font-medium text-foreground">暂无收支记录</p>
+                <p className="font-medium text-foreground">
+                  {uiText("暂无收支记录")}
+                </p>
                 <p className="mt-1">
-                  奖励到账或使用天生币后，会在这里留下记录。
+                  {uiText("奖励到账或使用天生币后，会在这里留下记录。")}
                 </p>
               </PageNotice>
             ) : (
@@ -282,26 +295,23 @@ function Wallet({ id }: { id: string }) {
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm font-medium leading-6 text-foreground">
-                            {SOURCES[entry.source_type] ??
+                            {uiText(SOURCES[entry.source_type]) ||
                               (entry.kind === "transfer"
-                                ? "天生币转入 / 转出"
-                                : "天生币收支")}
+                                ? uiText("天生币转入 / 转出")
+                                : uiText("天生币收支"))}
                           </p>
                           <time
                             dateTime={entry.created_at}
                             className="mt-1 block text-xs leading-5 text-foreground-muted"
                           >
-                            {new Date(entry.created_at).toLocaleString(
-                              "zh-CN",
-                              {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: false
-                              }
-                            )}
+                            {new Date(entry.created_at).toLocaleString(locale, {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: false
+                            })}
                           </time>
                         </div>
                       </div>
@@ -315,7 +325,9 @@ function Wallet({ id }: { id: string }) {
                           {formatCoins(entry.delta)}
                         </p>
                         <p className="mt-1 break-all text-xs leading-5 tabular-nums text-foreground-muted">
-                          余额 {formatCoins(entry.balance_after)}
+                          {uiText("余额{{v0}}", {
+                            v0: formatCoins(entry.balance_after)
+                          })}
                         </p>
                       </div>
                     </li>
@@ -325,7 +337,7 @@ function Wallet({ id }: { id: string }) {
             )}
             {(entries.data.pagination.total_pages > 1 || page > 1) && (
               <nav
-                aria-label="收支记录分页"
+                aria-label={uiText("收支记录分页")}
                 className="mt-5 flex items-center justify-center gap-3"
               >
                 <Button
@@ -336,10 +348,10 @@ function Wallet({ id }: { id: string }) {
                   disabled={page === 1 || entries.isFetching}
                   onClick={() => setPage(page - 1)}
                 >
-                  上一页
+                  {uiText("上一页")}
                 </Button>
                 <span className="min-w-16 text-center text-sm tabular-nums text-foreground-muted">
-                  第 {page} 页
+                  {uiText("第 {{v0}} 页", { v0: page })}
                 </span>
                 <Button
                   type="button"
@@ -355,7 +367,7 @@ function Wallet({ id }: { id: string }) {
                     setPage(page + 1);
                   }}
                 >
-                  下一页
+                  {uiText("下一页")}
                 </Button>
               </nav>
             )}
@@ -364,7 +376,7 @@ function Wallet({ id }: { id: string }) {
       </section>
       <details className="group mt-7 border-t border-border/60 pt-2">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl text-sm text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
-          天生币用途与购买说明
+          {uiText("天生币用途与购买说明")}
           <ChevronDown
             className="size-4 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
             strokeWidth={1.8}
@@ -373,17 +385,25 @@ function Wallet({ id }: { id: string }) {
         </summary>
         <div className="space-y-4 pb-3 pt-1 text-sm leading-6 text-foreground-muted">
           <p>
-            可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。
+            {uiText(
+              "可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。"
+            )}
           </p>
           <div>
-            <h3 className="font-medium text-foreground">联系客服购买</h3>
+            <h3 className="font-medium text-foreground">
+              {uiText("联系客服购买")}
+            </h3>
             {contact ? (
               <p className="mt-1 break-words">{contact}</p>
             ) : (
-              <p className="mt-1">客服联系方式暂未配置，请等待平台公告。</p>
+              <p className="mt-1">
+                {uiText("客服联系方式暂未配置，请等待平台公告。")}
+              </p>
             )}
             <p className="mt-2">
-              购买由客服人工核验，不支持在线支付或提现。建议在首个消费场景开放后再购买。
+              {uiText(
+                "购买由客服人工核验，不支持在线支付或提现。建议在首个消费场景开放后再购买。"
+              )}
             </p>
           </div>
         </div>

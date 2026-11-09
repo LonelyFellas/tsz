@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthProfile as webAuth } from "@/i18n/messages/auth/profile";
 
 import { HttpError } from "@tsz/api-client";
 import {
@@ -82,6 +85,7 @@ const AVATAR_ERRORS: Record<string, string> = {
 const NICKNAME_MAX = DISPLAY_NAME_MAX;
 
 export function EditProfileForm() {
+  const uiText = useWebText(webAuth);
   const router = useRouter();
   const setUser = useUserStore((s) => s.setUser);
 
@@ -90,7 +94,7 @@ export function EditProfileForm() {
   const [loadError, setLoadError] = useState(false);
   const [variant, setVariant] = useState<EnglishVariant | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
-  const [settingsError, setSettingsError] = useState("");
+  const [settingsError, setSettingsError] = useState<WebNotice>("");
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [difficultyHelpOpen, setDifficultyHelpOpen] = useState(false);
   const difficultyHelpRef = useRef<HTMLDivElement>(null);
@@ -118,14 +122,14 @@ export function EditProfileForm() {
   // 表单字段。
   const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [nameError, setNameError] = useState("");
+  const [nameError, setNameError] = useState<WebNotice>("");
   const [success, setSuccess] = useState(false);
 
   // 头像上传。整个三步流程是一个不可重入的提交动作(uploading 期间按钮禁用)。
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState("");
+  const [avatarError, setAvatarError] = useState<WebNotice>("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   // 记录「哪个 URL」加载失败(与 AccountMenu 同模式):换头像后 URL 变化,新图自动重试。
   const [avatarFailedUrl, setAvatarFailedUrl] = useState("");
@@ -152,7 +156,9 @@ export function EditProfileForm() {
   if (loadError) {
     return (
       <PageShell size="sm">
-        <PageNotice tone="error">资料加载失败,请刷新重试。</PageNotice>
+        <PageNotice tone="error">
+          {uiText("资料加载失败,请刷新重试。")}
+        </PageNotice>
       </PageShell>
     );
   }
@@ -160,7 +166,7 @@ export function EditProfileForm() {
   if (!me) {
     return (
       <PageShell size="sm">
-        <PageNotice>加载中…</PageNotice>
+        <PageNotice>{uiText("加载中…")}</PageNotice>
       </PageShell>
     );
   }
@@ -175,7 +181,9 @@ export function EditProfileForm() {
   const validationError = nameChanged ? displayNameError(displayName) : null;
   const nameMessage = validationError ?? nameError;
   const topContact = user.phone ?? user.email ?? "";
-  const avatarInitial = Array.from(displayNameOf(user))[0]!.toUpperCase();
+  const avatarInitial = Array.from(
+    displayNameOf(user, uiText("用户"))
+  )[0]!.toUpperCase();
 
   const canSubmit =
     nameChanged &&
@@ -329,10 +337,10 @@ export function EditProfileForm() {
   return (
     <PageShell size="sm">
       <PageHeader
-        back={{ href: "/account", label: "返回个人中心" }}
-        eyebrow="个人中心"
-        title="编辑资料"
-        description="修改头像、昵称和英美偏好。"
+        back={{ href: "/account", label: uiText("返回个人中心") }}
+        eyebrow={uiText("个人中心")}
+        title={uiText("编辑资料")}
+        description={uiText("修改头像、昵称和英美偏好。")}
       />
 
       <div className="glass rounded-3xl p-2">
@@ -344,7 +352,7 @@ export function EditProfileForm() {
               type="file"
               accept={AVATAR_ACCEPT}
               className="hidden"
-              aria-label="选择头像图片"
+              aria-label={uiText("选择头像图片")}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 // 立即清空 value:同一张图重选(失败重试)也要触发 change。
@@ -357,7 +365,7 @@ export function EditProfileForm() {
               type="button"
               onClick={handleAvatar}
               disabled={avatarUploading || saving || !!avatarFile}
-              aria-label="更换头像"
+              aria-label={uiText("更换头像")}
               aria-busy={avatarUploading}
               className="group relative size-24 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-wait"
             >
@@ -366,7 +374,7 @@ export function EditProfileForm() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={user.avatar_url}
-                    alt="头像"
+                    alt={uiText("头像")}
                     className="h-full w-full bg-white object-cover"
                     onError={() => setAvatarFailedUrl(user.avatar_url)}
                   />
@@ -386,7 +394,7 @@ export function EditProfileForm() {
               </span>
             </button>
             {avatarError && (
-              <p className="text-sm text-danger">{avatarError}</p>
+              <p className="text-sm text-danger">{uiText(avatarError)}</p>
             )}
             {topContact && (
               <p className="text-sm font-medium text-foreground-muted">
@@ -396,7 +404,7 @@ export function EditProfileForm() {
           </div>
 
           <form
-            aria-label="修改昵称"
+            aria-label={uiText("修改昵称")}
             className="space-y-5"
             onSubmit={handleSubmit}
           >
@@ -406,13 +414,13 @@ export function EditProfileForm() {
                 htmlFor="profile-display-name"
                 className="mb-2 block px-4 text-sm font-medium text-foreground"
               >
-                昵称
+                {uiText("昵称")}
               </label>
               <div className="relative">
                 <input
                   id="profile-display-name"
                   type="text"
-                  placeholder="请输入昵称"
+                  placeholder={uiText("请输入昵称")}
                   value={displayName}
                   disabled={saving}
                   aria-invalid={Boolean(nameMessage)}
@@ -435,7 +443,7 @@ export function EditProfileForm() {
                   id="profile-display-name-error"
                   className="mt-2 px-4 text-sm text-danger"
                 >
-                  {nameMessage}
+                  {uiText(nameMessage)}
                 </p>
               )}
             </div>
@@ -443,7 +451,7 @@ export function EditProfileForm() {
             {success && (
               <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
                 <CheckIcon />
-                已保存
+                {uiText("已保存")}
               </p>
             )}
 
@@ -453,14 +461,14 @@ export function EditProfileForm() {
                 onClick={() => router.back()}
                 className={cn(buttonClass, "min-h-12 flex-1")}
               >
-                取消
+                {uiText("取消")}
               </button>
               <button
                 type="submit"
                 disabled={!canSubmit}
                 className={cn(primaryButtonClass, "flex-1")}
               >
-                {saving ? "保存中..." : "保存"}
+                {saving ? uiText("保存中...") : uiText("保存")}
               </button>
             </div>
           </form>
@@ -474,7 +482,7 @@ export function EditProfileForm() {
                 id="learning-settings-title"
                 className="text-xl font-semibold tracking-tight"
               >
-                个人学习配置
+                {uiText("个人学习配置")}
               </h2>
               {learning_settings ? (
                 <form
@@ -485,13 +493,15 @@ export function EditProfileForm() {
                     ref={difficultyHelpRef}
                     className="relative flex items-center gap-2 text-sm"
                   >
-                    <span className="text-foreground-muted">难度级别</span>
+                    <span className="text-foreground-muted">
+                      {uiText("难度级别")}
+                    </span>
                     <span className="font-semibold text-foreground">
                       {learning_settings.cefr_level}
                     </span>
                     <button
                       type="button"
-                      aria-label="难度级别说明"
+                      aria-label={uiText("难度级别说明")}
                       aria-expanded={difficultyHelpOpen}
                       aria-controls="difficulty-help"
                       onClick={() => setDifficultyHelpOpen((open) => !open)}
@@ -518,13 +528,13 @@ export function EditProfileForm() {
                         role="tooltip"
                         className="absolute left-0 top-full z-10 mt-2 w-60 max-w-full rounded-2xl border border-border/60 bg-surface px-4 py-3 text-xs leading-6 text-foreground shadow-float"
                       >
-                        如需修改，请联系官方客服
+                        {uiText("如需修改，请联系官方客服")}
                       </div>
                     )}
                   </div>
                   <fieldset disabled={settingsSaving}>
                     <legend className="mb-2 text-sm font-medium text-foreground-muted">
-                      英美偏好
+                      {uiText("英美偏好")}
                     </legend>
                     <div className="flex flex-wrap gap-2">
                       {(["BrE", "AmE"] as const).map((value) => (
@@ -544,19 +554,22 @@ export function EditProfileForm() {
                             }}
                             className="size-4 accent-primary"
                           />
-                          {VARIANT_LABEL[value]}英语（{value}）
+                          {uiText("{{v0}}英语（{{v1}}）", {
+                            v0: uiText(VARIANT_LABEL[value]),
+                            v1: value
+                          })}
                         </label>
                       ))}
                     </div>
                   </fieldset>
                   {settingsError && (
                     <p role="alert" className="text-sm text-danger">
-                      {settingsError}
+                      {uiText(settingsError)}
                     </p>
                   )}
                   {settingsSuccess && (
                     <p role="status" className="text-sm text-success">
-                      偏好已保存
+                      {uiText("偏好已保存")}
                     </p>
                   )}
                   <button
@@ -568,7 +581,7 @@ export function EditProfileForm() {
                     }
                     className={cn(primaryButtonClass, "min-h-10 px-5")}
                   >
-                    {settingsSaving ? "保存中…" : "保存偏好"}
+                    {settingsSaving ? uiText("保存中…") : uiText("保存偏好")}
                   </button>
                 </form>
               ) : (
@@ -576,7 +589,7 @@ export function EditProfileForm() {
                   href="/onboarding"
                   className="mt-3 inline-block text-sm text-primary hover:underline"
                 >
-                  完成学习配置
+                  {uiText("完成学习配置")}
                 </Link>
               )}
             </section>

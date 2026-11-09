@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webTheme } from "@/i18n/messages/theme";
 
 import { cn } from "@tsz/ui/lib/cn";
 import { useTheme } from "./useTheme";
@@ -7,6 +9,7 @@ import { useTheme } from "./useTheme";
 // 图标由 useTheme 驱动:SSR 与水合首帧都是浅色快照(月亮),水合完成后
 // useSyncExternalStore 以真实主题重渲染 —— 快照一致,无需 suppressHydrationWarning。
 export function ThemeToggle({ className = "" }: { className?: string }) {
+  const uiText = useWebText(webTheme);
   const { resolved, toggle } = useTheme();
   const isDark = resolved === "dark";
 
@@ -14,8 +17,8 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={toggle}
-      aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
-      title={isDark ? "浅色模式" : "深色模式"}
+      aria-label={isDark ? uiText("切换到浅色模式") : uiText("切换到深色模式")}
+      title={isDark ? uiText("浅色模式") : uiText("深色模式")}
       className={cn(
         "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted transition hover:bg-muted hover:text-foreground",
         className

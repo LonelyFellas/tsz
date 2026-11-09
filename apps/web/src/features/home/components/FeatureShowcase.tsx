@@ -1,3 +1,7 @@
+"use client";
+
+import { useWebText } from "@/i18n/client";
+import { webHomeLanding as webHome } from "@/i18n/messages/home/landing";
 import { ChartNoAxesCombined, Coins, ListChecks, Users } from "lucide-react";
 import { MemoryVisual, WordbankVisual } from "./featureVisuals";
 import { SectionHeading } from "./SectionHeading";
@@ -26,20 +30,21 @@ const FEATURES = [
 ];
 
 export function FeatureShowcase() {
+  const uiText = useWebText(webHome);
   return (
     <section className="bg-muted py-16 sm:py-24">
       <div className="mx-auto w-full max-w-6xl px-6">
         <SectionHeading
-          title="学习，自有章法。"
-          desc="覆盖从词表到练习的完整学习闭环。"
+          title={uiText("学习，自有章法。")}
+          desc={uiText("覆盖从词表到练习的完整学习闭环。")}
         />
         <div className="grid gap-6 md:grid-cols-2">
           <article className="rounded-3xl bg-surface p-6 sm:p-10">
             <h3 className="text-2xl font-semibold tracking-tight text-foreground">
-              智能记忆
+              {uiText("智能记忆")}
             </h3>
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
-              按遗忘曲线安排每一次复习，记得牢、忘得慢。
+              {uiText("按遗忘曲线安排每一次复习，记得牢、忘得慢。")}
             </p>
             <div className="mt-8">
               <MemoryVisual />
@@ -47,10 +52,10 @@ export function FeatureShowcase() {
           </article>
           <article className="rounded-3xl bg-surface p-6 sm:p-10">
             <h3 className="text-2xl font-semibold tracking-tight text-foreground">
-              海量词库
+              {uiText("海量词库")}
             </h3>
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
-              名校教材同步词表，支持自建与共享。
+              {uiText("名校教材同步词表，支持自建与共享。")}
             </p>
             <div className="mt-8">
               <WordbankVisual />
@@ -66,10 +71,10 @@ export function FeatureShowcase() {
                 aria-hidden
               />
               <h3 className="mt-4 text-base font-semibold text-foreground">
-                {title}
+                {uiText(title)}
               </h3>
               <p className="mt-2 text-sm leading-6 text-foreground-muted">
-                {desc}
+                {uiText(desc)}
               </p>
             </li>
           ))}

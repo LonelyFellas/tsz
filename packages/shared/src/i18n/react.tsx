@@ -4,6 +4,7 @@ import {
   useEffect,
   useContext,
   useMemo,
+  useRef,
   useSyncExternalStore,
   type ReactNode
 } from "react";
@@ -55,24 +56,59 @@ export function InterfaceI18nProvider({
 export function InterfacePreferencesProvider({
   controller,
   sessionKey,
+  initialLocale = DEFAULT_INTERFACE_LOCALE,
   resources,
   children
 }: {
   controller: InterfacePreferences;
   sessionKey: string;
+  initialLocale?: InterfaceLocale;
   resources?: InterfaceResourceBundles;
   children: ReactNode;
 }) {
-  const snapshot = useSyncExternalStore(
-    controller.subscribe,
-    controller.getSnapshot,
-    controller.getServerSnapshot
+  const initialOwner = useRef(sessionKey).current;
+  const localeStore = useMemo(() => {
+    let initialPending = true;
+    const observe = () => {
+      const value = controller.getSnapshot();
+      if (
+        value.status !== "idle" ||
+        (value.owner !== "" && value.owner !== initialOwner)
+      )
+        initialPending = false;
+    };
+    return {
+      subscribe: (listener: () => void) => {
+        observe();
+        return controller.subscribe(() => {
+          observe();
+          listener();
+        });
+      },
+      getSnapshot: () => {
+        const value = controller.getSnapshot();
+        if (
+          initialPending &&
+          sessionKey === initialOwner &&
+          value.status === "idle" &&
+          (!value.owner || value.owner === sessionKey)
+        )
+          return initialLocale;
+        return value.owner === sessionKey
+          ? value.locale
+          : DEFAULT_INTERFACE_LOCALE;
+      },
+      getServerSnapshot: () => initialLocale
+    };
+  }, [controller, initialLocale, initialOwner, sessionKey]);
+  const locale = useSyncExternalStore(
+    localeStore.subscribe,
+    localeStore.getSnapshot,
+    localeStore.getServerSnapshot
   );
   useEffect(() => {
     void controller.refresh();
   }, [controller, sessionKey]);
-  const locale =
-    snapshot.owner === sessionKey ? snapshot.locale : DEFAULT_INTERFACE_LOCALE;
   return (
     <InterfaceI18nProvider locale={locale} resources={resources}>
       {children}
