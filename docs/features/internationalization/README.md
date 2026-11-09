@@ -590,3 +590,28 @@ Codex 内置浏览器（实例 ID 可连接，iab 别名不可用）完成两端
 独立审查首轮发现 Web 首次 ready 后再次 pending 时仍保留旧语言标题。已先以失败回归复现，再让现有标题 observer 在每次等待期间持续维护品牌标题，并复用未读前缀比较以避免角标 observer 循环；增量复查与最终 SHA 见本批 PR。首轮审查：确认缺陷 1；证据排除误报 0；关联回归/回退未知，最终轮次与精确版本以 PR 为准。
 
 第二轮增量审查发现首次 boot 的严格品牌标题比较仍会与非零未读角标互写，属于新增 P1 阻断。已先用真实 boot 字符串、语言 Effects 和真实角标组件复现（失控时保护性断开 observer，防止测试进程卡死），再统一为去除单一未读前缀后的比较。两处标题 writer 的比较规则已核对，原 P2 与该 P1 分别累计为 2 个缺陷；未解决前不推送，最终复查轮次与 SHA 记录在 PR。
+
+## 常见系统错误四语补齐（第二批）
+
+本批从后端 `392f55a02e94d294f1364742424f8c8facff764d`、前端 `03026748fc1f0b8058d8af534932b5806b940e7f` 开始，复用已合并的第一批首屏结果。只补常见系统错误详细说明，不开展 Web 存量翻译键迁移，也不重做第一批。实现与发布见 [后端 #390](https://github.com/LonelyFellas/tsz-rust/pull/390)，本主记录交付及前端原生发布回执见 [前端 #710](https://github.com/LonelyFellas/tsz/pull/710)。
+
+覆盖学习题量不足、计划拒绝、来源/轮次/状态变化、单选选项与干扰项失效、客户端能力门禁；登录、密码、联系渠道、refresh 与注销；词表编辑/目录/投币、余额及版本冲突。固定说明按精确 code/source 登记，同 code 的不同原因和“更新客户端 / 检查来源 / 重新生成”等恢复动作分别保留。动态题量用内部 `LearningInsufficientQuestions { available: usize, required: i32 }`，组合计划原因用内部文本参数列表逐条输出；领域层不查语言，也不从中文解析数字。
+
+沿用显式 `X-TSZ-Localization: v1` + `Accept-Language` 与请求作用域，内部上下文复用 AppError 原有 box，保持体积门禁。无标记保留 legacy 安全 detail；HTTP/type/code/field/field_issues/meta、Retry-After、事务、公开 DTO/OpenAPI、SQLx 查询及迁移均不变，不新增显示 params/meta，不增加查询或重写历史数据。Web 既有原文通道按文本显示后端 detail，前端严格 ProblemDetails validator 接受实际响应，无前端运行时配套改动。正式语言目录、学习/方言设置及 UI 体系均未改。
+
+验证包含旧实现两个失败回归，以及审查后来源恢复遗漏的独立失败基线；修复后国际化 13 项、错误适配 9 项、既有任务/轮次 handler 39+15 项、Web 目录/消费者 37 项和两端生产 build 通过。正常 SQLx prepare 无差异、全 targets/features Clippy、fmt 与前端原生 typecheck 均通过。可复验命令及判据：
+
+- `SQLX_OFFLINE=true cargo test --locked --lib i18n::`：13 项通过，覆盖四语精确数量/纠错意义、组合原因、并发隔离、legacy、未知原文、内部脱敏与大整数。
+- `SQLX_OFFLINE=true cargo test --locked --lib error::tests`：9 项通过，保留状态、code、机器字段及错误适配。
+- `DATABASE_URL="${TASK_DATABASE_URL:?}" TEST_REDIS_URL="${TASK_REDIS_URL:?}" REDIS_URL="${TASK_REDIS_URL:?}" SQLX_OFFLINE=true cargo test --locked --test learning_tasks_handler --test learning_runs_handler`：先按 dev-env 核实专属 PG/Redis，再执行；39+15 项通过。
+- `python3 -m unittest ops/test_ci_identity_profile.py`：15 项通过；identity/lexicon-handler 两个原生 prepare 的 locked/offline metadata、包身份与完整锁文件校验也已实际通过，完整运行由 CI 承接。
+
+真实批次 `tsz-common-errors-20261109-8853c8f4` 使用独立 UTF-8 PG/Redis、真实 API、Web build + next start 和 Admin 生产静态预览，mock/worker 关闭，无真实短信、OSS、AI/TTS。私有最终二进制 SHA-256 `e7bfd4225e8fdd575f339c15b78cae17e8622aa27b6ab1f4feed925b9766ab52` 的 48 份四语实际 HTTP 响应通过严格前端 validator，状态和除 title/detail 外的结构一致；同一二进制在最后 CI 兼容修复重建后摘要不变。Codex 内置浏览器实际登录并点击旧任务开始，英文/繁体均显示 0/20 数量和预览排除指引；独立 GET 确认偏好保存为 zh-Hant，轮次仍为 0。Admin 实际 401/invalid_credentials 显示英文纠错提示，未发送验证码，控制台无 warn/error。数量错误路径的 AppError、learning service 与 typed renderer 自浏览器验收提交至最终 main 完全一致，复用其有效页面证据。
+
+本批 CI 必要兼容修复：原生 audit 命中 [RUSTSEC-2026-0459](https://raw.githubusercontent.com/rustsec/advisory-db/main/crates/libsqlite3-sys/RUSTSEC-2026-0459.md)。仅 pin [SQLx 官方 SQLite 上限修复 10462fa](https://github.com/launchbadge/sqlx/commit/10462fa4414c6c7f1ed1d39bb31678e3b726878c)，锁定未启用的 libsqlite3-sys 0.39.1，并将 core 别名精确回指 crates.io 0.9.0，消除重复包身份；全 features/targets 的启用依赖树前后逐字节一致。CI 计时副本仅合并无关 SQLite patch，已审核官方 Git core 别名指向同一个计时副本，未知计时包覆盖/来源/版本别名仍拒绝；源码 archive checksum、原迁移路径、完整包集合/版本/依赖及仅两项来源变化边界保留。没有 advisory 忽略、CI 定义/测试清单/原断言变更；未来启用 SQLite 的兼容性不在本批验收范围。
+
+后端 [PR CI 42605197037](https://github.com/LonelyFellas/tsz-rust/actions/runs/42605197037) 全绿后合并为 `01114dc76d46585f8ff56bfacb4f316fe080455b`，tree `da10eeafeb31d2cac294a0a35ec0f94f9dee770d`；[main CI 42608152726](https://github.com/LonelyFellas/tsz-rust/actions/runs/42608152726) attempt 1 的完整检查及 8 项制品 smoke/cleanup 均通过。原生 controller 事务 `46b9420e-4ea7-421d-9511-0c4dd61a167c` 于 `2026-11-09T11:44:07.778343Z` accepted，独立复查通过；binary/manifest/进程/唯一监听、health/ready、TLS、候选与正式完整 auth、草稿创建与修改后新请求回读均通过，原 163 条迁移账本不变。正式两端默认 zh-Hans、支持四语；8 份无凭据 HTTPS 请求均直出对应 Content-Language，保持 401/invalid_token/Problem Details 结构。apply 47.550 秒，停服 intent 至正式 ready 上界 7.708 秒，server build=0；定时备份正常、旧 binary/manifest 备份保留，无迁移/数据库恢复，真实回退未演练，仅账本不变时允许兼容 binary/manifest 恢复。
+
+清理：本地 2 用户/1 管理员、词表/任务及全部专属依赖、PG/Redis、私有二进制、凭据、原始服务日志和计时源码副本已删除，59821–59826 复查关闭。两端专属 Cookie/localStorage/sessionStorage/CacheStorage/IndexedDB/service worker 均为 0，tab 关闭；仅保留脱敏截图与 validation/cleanup 回执。测试线上 controller 的 3 个独占 fixture 及所有 UUID/UUID 数组引用、Redis 精确账号键均无残留，候选进程/18383 和两端 owner 锁已释放；配置/nginx、正常词条/词表样本和前端指纹未变，无 OSS 测试对象。后端验收时 Web/Admin 实际均为 03026748；本次前端仅文档追加，原生 main CI 仍会自动发布双端，最终来源及独立 HTTP/manifest 结果记录在 #710 回执，避免与后端事务交错。
+
+边界：上述选定链路的精确系统 detail 已补齐；其他领域错误、成功预览 reasons、用户/词表正文、审核原因、历史记录和供应商安全原文不自动翻译。后端独立审查 4 轮，确认同根因覆盖缺陷 1 项已修复、误报 0；两类 CI 兼容阻断另有失败与修复证据。最终文档事实增量另做只读复核，精确 SHA/轮数以 #710 为准；关联回归/回退未知。
