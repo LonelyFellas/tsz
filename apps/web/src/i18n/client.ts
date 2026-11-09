@@ -6,7 +6,7 @@ import { useInterfaceInstance, useTranslation } from "@tsz/shared/i18n/react";
 import { webCommon, addWebCatalog, webText, type WebCatalog } from "./catalog";
 
 /** 功能资源随调用方分块加载，每个 Provider 的实例单独装配。 */
-export function useWebText(catalog: WebCatalog) {
+export function useWebText<C extends WebCatalog>(catalog: C) {
   const instance = useInterfaceInstance();
   useMemo(() => {
     addWebCatalog(instance, webCommon);

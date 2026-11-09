@@ -1,6 +1,6 @@
 "use client";
-import { useWebLocale } from "@/i18n/client";
-import { useWebText } from "@/i18n/client";
+import { useWebLocale, useWebText } from "@/i18n/client";
+
 import { webShell } from "@/i18n/messages/shell";
 
 import Link from "next/link";
@@ -28,10 +28,10 @@ export function NotificationLink({ onNavigate }: { onNavigate: () => void }) {
       onClick={onNavigate}
       aria-label={
         count > 0
-          ? uiText("站内通知，{{v0}} 条未读", { v0: count })
-          : uiText("站内通知")
+          ? uiText("webShell:notifications_v0_unread", { v0: count })
+          : uiText("webShell:notifications")
       }
-      title={uiText("站内通知")}
+      title={uiText("webShell:notifications")}
       className="relative inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
     >
       <Bell className="size-5" strokeWidth={1.5} aria-hidden />

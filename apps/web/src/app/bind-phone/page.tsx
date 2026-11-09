@@ -8,7 +8,7 @@ import { RouteGuard } from "@/features/auth/components/RouteGuard";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("绑定手机号"),
+    title: uiText("webApp:bind_phone_number"),
     robots: { index: false, follow: false }
   };
 }

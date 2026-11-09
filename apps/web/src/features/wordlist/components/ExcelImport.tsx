@@ -18,11 +18,16 @@ import { Button, Input } from "@tsz/ui/components";
 import { api } from "@/lib/request";
 import { downloadExcelTemplate, readExcelFile } from "../excel-client";
 import {
-  importFieldLabels,
   validateExcelRow,
   type ExcelRow,
   type ImportField
 } from "../excel-rows";
+
+const importFieldMessages = {
+  word: localText(webWordlist, "webWordlistExcel:entry_name"),
+  gloss: localText(webWordlist, "webWordlistExcel:definitions"),
+  note: localText(webWordlist, "webWordlistExcel:note_3")
+};
 
 type PreviewRow = ExcelRow & {
   match?: WordlistImportMatch;
@@ -69,7 +74,15 @@ export function ExcelImport({
       await task(operation.signal);
     } catch (cause) {
       if (!operation.signal.aborted)
-        setError(webErrorText(cause, "操作失败，请重试"));
+        setError(
+          webErrorText(
+            cause,
+            localText(
+              webWordlist,
+              "webWordlistExcel:operation_failed_try_again"
+            )
+          )
+        );
     } finally {
       if (!operation.signal.aborted) setBusy("");
     }
@@ -80,20 +93,38 @@ export function ExcelImport({
   for (const row of rows) {
     const messages = Object.entries(validateExcelRow(row)).map(
       ([field, message]) =>
-        `${uiText(importFieldLabels[field as ImportField])}: ${uiText(message)}`
+        `${uiText(importFieldMessages[field as ImportField])}: ${uiText(message)}`
     );
     if (row.custom) {
       if ([...row.word].length > 50)
-        messages.push(uiText("自定义词条名称不能超过 50 字"));
-      if (!row.gloss.trim()) messages.push(uiText("自定义释义不能为空"));
+        messages.push(
+          uiText(
+            "webWordlistExcel:custom_entry_names_must_not_exceed_50_characters"
+          )
+        );
+      if (!row.gloss.trim())
+        messages.push(
+          uiText("webWordlistExcel:a_custom_definition_is_required")
+        );
     } else if (!row.selected)
-      messages.push(uiText(row.match ? "尚未选定平台词条" : "尚未匹配词条"));
+      messages.push(
+        uiText(
+          row.match
+            ? "webWordlistExcel:no_platform_entry_selected"
+            : "webWordlistExcel:no_entry_matched"
+        )
+      );
     else {
       const id = row.selected.entry_id;
-      if (existingIds.has(id)) messages.push(uiText("与编辑器已有词条重复"));
+      if (existingIds.has(id))
+        messages.push(
+          uiText("webWordlistExcel:duplicates_an_existing_editor_entry")
+        );
       if (positions.has(id))
         messages.push(
-          uiText("与文件第 {{v0}} 行重复", { v0: positions.get(id) })
+          uiText("webWordlistExcel:duplicates_file_row_v0", {
+            v0: positions.get(id)!
+          })
         );
       else positions.set(id, row.rowNumber);
     }
@@ -143,7 +174,12 @@ export function ExcelImport({
             (item.status === "unmatched" && item.candidates.length !== 0)
         )
       )
-        throw new LocalWebError("匹配结果不完整，请重试");
+        throw new LocalWebError(
+          localText(
+            webWordlist,
+            "webWordlistExcel:matching_results_are_incomplete_try_again"
+          )
+        );
       const matches = new Map(
         batch.map((row, index) => [row.rowNumber, result.items[index]!])
       );
@@ -161,7 +197,7 @@ export function ExcelImport({
         })
       );
       setBusy(
-        localText("正在匹配 {{v0}} / {{v1}} 行…", {
+        localText(webWordlist, "webWordlistExcel:matching_row_v0_v1", {
           v0: Math.min(start + 100, unmatched.length),
           v1: unmatched.length
         })
@@ -172,11 +208,11 @@ export function ExcelImport({
   return (
     <section aria-labelledby="excel-import-title" className="space-y-6">
       <h1 id="excel-import-title" className="text-3xl font-bold tracking-tight">
-        {uiText("Excel 导入")}
+        {uiText("webWordlistExcel:excel_import")}
       </h1>
       <p className="text-sm leading-6 text-foreground-muted">
         {uiText(
-          "使用一个工作表，表头为「词条名称 / 释义 / 注释」。支持 .xls、.xlsx，最多 10 MB、10000 行。 匹配平台词条时释义仅供核对；未匹配的行可选择创建自定义词条并填写释义。注释会随词表展示给读者。"
+          "webWordlistExcel:use_one_worksheet_with_the_headers_accepts_xls_and_xlsx_up_to_10_mb_and"
         )}
       </p>
       <fieldset disabled={!!busy} className="flex flex-wrap items-center gap-3">
@@ -184,16 +220,19 @@ export function ExcelImport({
           type="button"
           variant="outline"
           onClick={() =>
-            void perform("正在生成模板…", async (signal) => {
-              await downloadExcelTemplate(signal);
-            })
+            void perform(
+              localText(webWordlist, "webWordlistExcel:generating_template"),
+              async (signal) => {
+                await downloadExcelTemplate(signal);
+              }
+            )
           }
         >
-          {uiText("下载 Excel 模板")}
+          {uiText("webWordlistExcel:download_excel_template")}
         </Button>
         <label className="min-w-0 text-sm">
           <span className="mb-2 block font-medium">
-            {uiText("选择 Excel 文件")}
+            {uiText("webWordlistExcel:choose_excel_file")}
           </span>
           <input
             type="file"
@@ -206,7 +245,9 @@ export function ExcelImport({
               if (
                 rows.length &&
                 !window.confirm(
-                  uiText("重新选择文件将清除当前导入预览，是否继续？")
+                  uiText(
+                    "webWordlistExcel:choosing_another_file_clears_the_current_import_preview_continue"
+                  )
                 )
               )
                 return;
@@ -214,17 +255,20 @@ export function ExcelImport({
               setPage(1);
               setOnlyProblems(false);
               setFileName(file.name);
-              void perform("正在读取文件…", async (signal) => {
-                const parsed = await readExcelFile(file, signal);
-                if (!signal.aborted) setRows(parsed);
-              });
+              void perform(
+                localText(webWordlist, "webWordlistExcel:reading_file"),
+                async (signal) => {
+                  const parsed = await readExcelFile(file, signal);
+                  if (!signal.aborted) setRows(parsed);
+                }
+              );
             }}
           />
         </label>
       </fieldset>
       {fileName && (
         <p className="break-all text-sm font-medium">
-          {uiText("文件：{{v0}}", { v0: fileName })}
+          {uiText("webWordlistExcel:file_v0", { v0: fileName })}
         </p>
       )}
       {error && (
@@ -244,7 +288,7 @@ export function ExcelImport({
         <>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span>
-              {uiText("共 {{v0}} 行，{{v1}} 行待处理", {
+              {uiText("webWordlistExcel:v0_rows_in_total_v1_need_attention", {
                 v0: rows.length,
                 v1: problems.size
               })}
@@ -254,9 +298,14 @@ export function ExcelImport({
               variant="outline"
               size="sm"
               disabled={!!busy || invalid || unmatched.length === 0}
-              onClick={() => void perform("正在匹配词条…", matchRows)}
+              onClick={() =>
+                void perform(
+                  localText(webWordlist, "webWordlistExcel:matching_entries"),
+                  matchRows
+                )
+              }
             >
-              {uiText("匹配词条")}
+              {uiText("webWordlistExcel:match_entries")}
             </Button>
             <label className="flex items-center gap-2">
               <input
@@ -267,24 +316,28 @@ export function ExcelImport({
                   setPage(1);
                 }}
               />
-              {uiText("仅看待处理行")}
+              {uiText("webWordlistExcel:show_only_rows_needing_attention")}
             </label>
           </div>
           {rows.length > remaining && (
             <p role="alert" className="text-sm text-danger">
-              {uiText("追加后超过 10000 个词条，请删除部分导入行。")}
+              {uiText(
+                "webWordlistExcel:appending_would_exceed_10_000_entries_remove_some_import_rows"
+              )}
             </p>
           )}
           <fieldset disabled={!!busy} className="space-y-4">
             {visible.map((row) => (
               <section
                 key={row.rowNumber}
-                aria-label={uiText("文件第 {{v0}} 行", { v0: row.rowNumber })}
+                aria-label={uiText("webWordlistExcel:file_row_v0", {
+                  v0: row.rowNumber
+                })}
                 className="glass space-y-3 rounded-3xl p-5"
               >
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="font-medium">
-                    {uiText("第 {{v0}} 行", { v0: row.rowNumber })}
+                    {uiText("webWordlistExcel:row_v0", { v0: row.rowNumber })}
                   </h2>
                   <Button
                     type="button"
@@ -293,9 +346,12 @@ export function ExcelImport({
                     onClick={() => {
                       if (
                         window.confirm(
-                          uiText("删除文件第 {{v0}} 行及其注释？", {
-                            v0: row.rowNumber
-                          })
+                          uiText(
+                            "webWordlistExcel:delete_file_row_v0_and_its_notes",
+                            {
+                              v0: row.rowNumber
+                            }
+                          )
                         )
                       )
                         setRows((current) =>
@@ -305,21 +361,26 @@ export function ExcelImport({
                         );
                     }}
                   >
-                    {uiText("删除此行")}
+                    {uiText("webWordlistExcel:delete_row")}
                   </Button>
                 </div>
                 {(["word", "gloss", "note"] as const).map((field) => (
                   <label key={field} className="block text-sm font-medium">
-                    {uiText(importFieldLabels[field])}
+                    {uiText(importFieldMessages[field])}
                     {field === "gloss" &&
                       (row.custom
-                        ? uiText("（自定义释义，必填）")
-                        : uiText("（仅供核对）"))}
+                        ? uiText(
+                            "webWordlistExcel:custom_definition_required_2"
+                          )
+                        : uiText("webWordlistExcel:for_verification_only"))}
                     {field === "note" ? (
                       <textarea
-                        aria-label={uiText("第 {{v0}} 行注释", {
-                          v0: row.rowNumber
-                        })}
+                        aria-label={uiText(
+                          "webWordlistExcel:notes_for_row_v0",
+                          {
+                            v0: row.rowNumber
+                          }
+                        )}
                         value={row.note}
                         className="mt-2 min-h-24 w-full rounded-2xl border border-border bg-surface p-3 text-sm font-normal"
                         onChange={(event) =>
@@ -328,9 +389,9 @@ export function ExcelImport({
                       />
                     ) : (
                       <Input
-                        aria-label={uiText("第 {{v0}} 行{{v1}}", {
+                        aria-label={uiText("webWordlistExcel:row_v0_v1", {
                           v0: row.rowNumber,
-                          v1: uiText(importFieldLabels[field])
+                          v1: uiText(importFieldMessages[field])
                         })}
                         className="mt-2 font-normal"
                         value={row[field]}
@@ -343,24 +404,31 @@ export function ExcelImport({
                 ))}
                 {row.custom ? (
                   <p className="text-sm text-foreground-muted">
-                    {uiText("自定义词条，可用于拼写练习。")}
+                    {uiText(
+                      "webWordlistExcel:custom_entry_eligible_for_spelling_practice"
+                    )}
                   </p>
                 ) : row.selected ? (
                   <p className="text-sm text-success">
-                    {uiText("已选定：{{v0}}· ", { v0: row.selected.label })}
-                    {row.selected.glosses.join("；") || uiText("暂无释义")}
+                    {uiText("webWordlistExcel:selected_v0", {
+                      v0: row.selected.label
+                    })}
+                    {row.selected.glosses.join("；") ||
+                      uiText("webWordlistExcel:no_definitions_yet")}
                   </p>
                 ) : (
                   <>
                     {row.match?.status === "ambiguous" && (
                       <p className="text-sm text-foreground-muted">
-                        {uiText("请人工选择词条；也可修改词条名称后重新匹配。")}
+                        {uiText(
+                          "webWordlistExcel:select_an_entry_manually_or_edit_its_name_and_match_again"
+                        )}
                       </p>
                     )}
                     {row.match?.status === "unmatched" && (
                       <p className="text-sm text-foreground-muted">
                         {uiText(
-                          "没有精确匹配，可创建自定义词条、查找候选或修改词条名称。"
+                          "webWordlistExcel:no_exact_match_create_a_custom_entry_find_candidates_or_edit_the_entry_n"
                         )}
                       </p>
                     )}
@@ -379,7 +447,7 @@ export function ExcelImport({
                           )
                         }
                       >
-                        {uiText("创建自定义词条")}
+                        {uiText("webWordlistExcel:create_custom_entry")}
                       </Button>
                     )}
                     {row.match?.candidates.map((candidate) => (
@@ -408,9 +476,13 @@ export function ExcelImport({
                       disabled={!!validateExcelRow(row).word}
                       onClick={() =>
                         void perform(
-                          localText("正在查找第 {{v0}} 行候选…", {
-                            v0: row.rowNumber
-                          }),
+                          localText(
+                            webWordlist,
+                            "webWordlistExcel:finding_candidates_for_row_v0",
+                            {
+                              v0: row.rowNumber
+                            }
+                          ),
                           async (signal) => {
                             const result = await api.wordList.suggestions(
                               { q: row.word },
@@ -436,7 +508,7 @@ export function ExcelImport({
                         )
                       }
                     >
-                      {uiText("查找候选")}
+                      {uiText("webWordlistExcel:find_candidates")}
                     </Button>
                   </>
                 )}
@@ -456,10 +528,13 @@ export function ExcelImport({
               disabled={currentPage <= 1}
               onClick={() => setPage(currentPage - 1)}
             >
-              {uiText("上一页")}
+              {uiText("webWordlistExcel:previous_page")}
             </Button>
             <span>
-              {uiText("{{v0}}/{{v1}} 页", { v0: currentPage, v1: pages })}
+              {uiText("webWordlistExcel:page_v0_of_v1", {
+                v0: currentPage,
+                v1: pages
+              })}
             </span>
             <Button
               type="button"
@@ -468,7 +543,7 @@ export function ExcelImport({
               disabled={currentPage >= pages}
               onClick={() => setPage(currentPage + 1)}
             >
-              {uiText("下一页")}
+              {uiText("webWordlistExcel:next_page")}
             </Button>
           </div>
         </>
@@ -493,14 +568,16 @@ export function ExcelImport({
             )
           }
         >
-          {uiText("确认追加到词表")}
+          {uiText("webWordlistExcel:confirm_append_to_word_list")}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          {uiText("取消导入")}
+          {uiText("webWordlistExcel:cancel_import")}
         </Button>
       </div>
       <p className="text-sm text-foreground-muted">
-        {uiText("确认追加后仍需保存词表。取消导入不会修改编辑器中的内容。")}
+        {uiText(
+          "webWordlistExcel:you_still_need_to_save_the_list_after_appending_cancelling_import_does_n"
+        )}
       </p>
     </section>
   );

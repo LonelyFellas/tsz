@@ -1,5 +1,7 @@
+import { createInterfaceI18n } from "@tsz/shared/i18n";
+import { webWordlistExcel } from "@/i18n/messages/wordlist/excel";
 import { describe, expect, it } from "vitest";
-import { LocalWebError } from "@/i18n/catalog";
+import { LocalWebError, webText } from "@/i18n/catalog";
 import { read, utils, write } from "xlsx";
 import { createExcelTemplate, parseExcel } from "./excel";
 import { validateExcelRow } from "./excel-rows";
@@ -9,6 +11,10 @@ function workbook(rows: unknown[][], type: "xlsx" | "biff8" = "xlsx") {
   utils.book_append_sheet(book, utils.aoa_to_sheet(rows), "词表");
   return write(book, { type: "array", bookType: type }) as ArrayBuffer;
 }
+const text = webText(
+  createInterfaceI18n("zh-Hans", webWordlistExcel.resources),
+  webWordlistExcel
+);
 const header = ["词条名称", "释义", "注释"];
 describe.each(["xlsx", "biff8"] as const)("%s Excel 导入", (format) => {
   const name = format === "biff8" ? "词表.xls" : "词表.xlsx";
@@ -57,9 +63,9 @@ describe.each(["xlsx", "biff8"] as const)("%s Excel 导入", (format) => {
       name
     );
     expect(rows).toHaveLength(3);
-    expect(validateExcelRow(rows[0]!).word).toContain("文本");
-    expect(validateExcelRow(rows[1]!).word).toContain("不能为空");
-    expect(validateExcelRow(rows[2]!).word).toContain("公式");
+    expect(text(validateExcelRow(rows[0]!).word)).toContain("文本");
+    expect(text(validateExcelRow(rows[1]!).word)).toContain("不能为空");
+    expect(text(validateExcelRow(rows[2]!).word)).toContain("公式");
   });
   it("拒绝超限物理行、额外列及错误表头", () => {
     expect(() =>
@@ -70,13 +76,15 @@ describe.each(["xlsx", "biff8"] as const)("%s Excel 导入", (format) => {
         ),
         name
       )
-    ).toThrow("10000");
+    ).toThrow(
+      "webWordlistExcel:import_at_most_10_000_rows_at_a_time_excluding_the_header"
+    );
     expect(() =>
       parseExcel(
         workbook([header, ["apple", "", "", "额外数据"]], format),
         name
       )
-    ).toThrow("三列");
+    ).toThrow("webWordlistExcel:only_columns_are_supported_use_the_template");
     expect(() =>
       parseExcel(workbook([["单词", "释义", "注释"], ["apple"]], format), name)
     ).toThrow(LocalWebError);
@@ -97,25 +105,29 @@ it("模板使用词条名称表头，填入内容后可以导入", () => {
 });
 it("模板可读取；拒绝空模板、伪装格式、过大、合并和多工作表", () => {
   expect(() => parseExcel(createExcelTemplate(), "模板.xlsx")).toThrow(
-    "没有可导入"
+    "webWordlistExcel:no_entries_to_import"
   );
   expect(() =>
     parseExcel(new TextEncoder().encode("apple,苹果").buffer, "伪装.xlsx")
-  ).toThrow("扩展名不符");
+  ).toThrow(
+    "webWordlistExcel:file_content_does_not_match_its_extension_save_it_as_an_excel_file"
+  );
   expect(() =>
     parseExcel(new ArrayBuffer(10 * 1024 * 1024 + 1), "过大.xlsx")
-  ).toThrow("10 MB");
+  ).toThrow(
+    "webWordlistExcel:the_file_must_be_larger_than_0_and_no_more_than_10_mb"
+  );
   const book = utils.book_new();
   const sheet = utils.aoa_to_sheet([header, ["apple"]]);
   sheet["!merges"] = [utils.decode_range("A2:B2")];
   utils.book_append_sheet(book, sheet, "词表");
   expect(() =>
     parseExcel(write(book, { type: "array", bookType: "xlsx" }), "合并.xlsx")
-  ).toThrow("合并");
+  ).toThrow("webWordlistExcel:unmerge_cells_and_import_again");
   utils.book_append_sheet(book, utils.aoa_to_sheet([header]), "另一个表");
   expect(() =>
     parseExcel(write(book, { type: "array", bookType: "xlsx" }), "多表.xlsx")
-  ).toThrow("一个工作表");
+  ).toThrow("webWordlistExcel:keep_one_worksheet_and_import_again");
 });
 it("按 Unicode 字符检查字段上限及控制字符", () => {
   const row = {
@@ -126,7 +138,7 @@ it("按 Unicode 字符检查字段上限及控制字符", () => {
     invalidFields: {}
   };
   expect(Object.keys(validateExcelRow(row))).toEqual(["word", "gloss", "note"]);
-  expect(validateExcelRow({ ...row, word: "apple\n" }).word).toContain(
+  expect(text(validateExcelRow({ ...row, word: "apple\n" }).word)).toContain(
     "控制字符"
   );
 });

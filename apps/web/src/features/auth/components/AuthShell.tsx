@@ -18,7 +18,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           className="inline-flex items-center gap-2.5 rounded-sm text-2xl font-bold tracking-tight text-foreground transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         >
           <BrandMark />
-          {uiText("天生会背")}
+          {uiText("webAuthAccess:brand")}
         </Link>
       </header>
       <div className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-16 px-4 pb-16 pt-4 sm:px-8 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-20 lg:pb-24">
@@ -33,7 +33,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <footer className="pb-6 text-center text-xs text-foreground-subtle">
-        {uiText("天生会背 · 智能英语单词学习平台")}
+        {uiText("webAuthAccess:english_vocabulary_learning")}
       </footer>
     </main>
   );

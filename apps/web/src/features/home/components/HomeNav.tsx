@@ -37,12 +37,12 @@ function HomeNavContent() {
           className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-sm text-base sm:text-xl font-bold tracking-tight text-foreground transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         >
           <BrandMark />
-          {uiText("天生会背")}
+          {uiText("webHomeLanding:brand")}
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-3">
           <nav
-            aria-label={uiText("主导航")}
+            aria-label={uiText("webHomeLanding:main_navigation")}
             className="flex items-center gap-0 sm:gap-2"
           >
             <Link
@@ -50,14 +50,14 @@ function HomeNavContent() {
               prefetch={hydrated ? null : false}
               className="inline-flex min-h-11 items-center rounded-full px-1.5 text-sm sm:px-3 font-medium tracking-normal sm:tracking-wide text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
-              {uiText("词表")}
+              {uiText("webHomeLanding:word_lists")}
             </Link>
             <Link
               href="/dictionary"
               prefetch={hydrated ? null : false}
               className="inline-flex min-h-11 items-center rounded-full px-1.5 text-sm sm:px-3 font-medium tracking-normal sm:tracking-wide text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
-              {uiText("词典")}
+              {uiText("webHomeLanding:dictionary")}
             </Link>
             {/* 会话恢复完成前占位,避免登录态闪烁与布局抖动 */}
             {!hydrated ? (
@@ -68,7 +68,7 @@ function HomeNavContent() {
                   href="/login"
                   className="inline-flex min-h-11 items-center rounded-full bg-muted px-1.5 text-sm sm:px-4 font-medium tracking-normal sm:tracking-wide text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
                 >
-                  {uiText("登录")}
+                  {uiText("webHomeLanding:sign_in")}
                 </Link>
               )
             )}

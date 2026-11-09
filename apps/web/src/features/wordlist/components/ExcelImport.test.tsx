@@ -1,3 +1,5 @@
+import { webWordlistExcel } from "@/i18n/messages/wordlist/excel";
+import { localText } from "@/i18n/catalog";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
@@ -92,7 +94,16 @@ it("重复按词条 ID 检查，指出文件位置和已有词条，不自动丢
 });
 it("校验错误可在预览修正；改词后撤销旧匹配；多精确候选不能自动选择", async () => {
   vi.mocked(readExcelFile).mockResolvedValue([
-    { ...row(2), word: "123", invalidFields: { word: "请改为文本" } },
+    {
+      ...row(2),
+      word: "123",
+      invalidFields: {
+        word: localText(
+          webWordlistExcel,
+          "webWordlistExcel:use_text_formulas_numbers_and_dates_are_not_allowed"
+        )
+      }
+    },
     row(4, "shared")
   ]);
   vi.mocked(api.wordList.matchImport).mockResolvedValue({

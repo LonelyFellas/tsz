@@ -124,7 +124,7 @@ export function LibraryTree(props: Props) {
   }
   return (
     <nav
-      aria-label={uiText("工程目录")}
+      aria-label={uiText("webWordlistLibrary:directory")}
       className={`flex min-h-full min-w-0 flex-col ${rootDragOver ? "bg-primary-muted outline outline-1 -outline-offset-1 outline-primary" : ""}`}
       onKeyDown={navigate}
       onDragOver={dragOverRoot}
@@ -142,17 +142,17 @@ export function LibraryTree(props: Props) {
           <ChevronDown className="size-3.5 shrink-0" aria-hidden />
           <span className="truncate">
             {props.trash
-              ? uiText("回收站")
+              ? uiText("webWordlistLibrary:recycle_bin")
               : props.space === "owned"
-                ? uiText("创建")
-                : uiText("收藏")}
+                ? uiText("webWordlistLibrary:create")
+                : uiText("webWordlistLibrary:favourites")}
           </span>
         </button>
         {!props.trash && (
           <button
             className={iconButton}
-            aria-label={uiText("在当前目录新建文件夹")}
-            title={uiText("新建文件夹")}
+            aria-label={uiText("webWordlistLibrary:create_folder_here")}
+            title={uiText("webWordlistLibrary:new_folder")}
             disabled={props.disabled}
             onClick={() => props.onCreateFolder(props.selectedFolder)}
           >
@@ -161,8 +161,8 @@ export function LibraryTree(props: Props) {
         )}
         <button
           className={iconButton}
-          aria-label={uiText("刷新目录")}
-          title={uiText("刷新目录")}
+          aria-label={uiText("webWordlistLibrary:refresh_directory")}
+          title={uiText("webWordlistLibrary:refresh_directory")}
           disabled={props.disabled}
           onClick={props.onRefresh}
         >
@@ -170,8 +170,8 @@ export function LibraryTree(props: Props) {
         </button>
         <button
           className={iconButton}
-          aria-label={uiText("全部折叠")}
-          title={uiText("全部折叠")}
+          aria-label={uiText("webWordlistLibrary:collapse_all")}
+          title={uiText("webWordlistLibrary:collapse_all")}
           onClick={() =>
             setExpansion(new Map([...expanded].map((id) => [id, false])))
           }
@@ -191,10 +191,11 @@ export function LibraryTree(props: Props) {
       </div>
       <div
         role="region"
-        aria-label={uiText("根目录放置区域")}
+        aria-label={uiText("webWordlistLibrary:root_folder_drop_area")}
         className={`min-h-32 flex-1 px-3 py-4 text-center text-xs ${rootDragOver ? "text-primary" : ""}`}
       >
-        {rootDragOver && uiText("松开以移到根目录")}
+        {rootDragOver &&
+          uiText("webWordlistLibrary:release_to_move_to_root_folder")}
       </div>
     </nav>
   );
@@ -221,13 +222,13 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
   if (result.isError)
     return (
       <Button size="sm" variant="ghost" onClick={() => void result.refetch()}>
-        {uiText("重试目录")}
+        {uiText("webWordlistLibrary:retry_directory")}
       </Button>
     );
   if (!result.data)
     return (
       <p className="px-6 py-2 text-xs text-foreground-subtle">
-        {uiText("加载中…")}
+        {uiText("webWordlistLibrary:loading_2")}
       </p>
     );
   return (
@@ -237,7 +238,7 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
       ))}
       {!result.data.items.length && (
         <li className="px-6 py-2 text-xs text-foreground-subtle">
-          {uiText("空文件夹")}
+          {uiText("webWordlistLibrary:empty_folder")}
         </li>
       )}
       {result.data.pagination.total_pages > 1 && (
@@ -248,7 +249,7 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
             disabled={page === 1}
             onClick={() => setPage(page - 1)}
           >
-            {uiText("上一页")}
+            {uiText("webWordlistLibrary:previous_page")}
           </Button>
           <span className="text-xs">
             {page}/{result.data.pagination.total_pages}
@@ -259,7 +260,7 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
             disabled={page === result.data.pagination.total_pages}
             onClick={() => setPage(page + 1)}
           >
-            {uiText("下一页")}
+            {uiText("webWordlistLibrary:next_page")}
           </Button>
         </li>
       )}
@@ -330,7 +331,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
           {folder ? (
             <button
               tabIndex={-1}
-              aria-label={`${open ? uiText("收起") : uiText("展开")} ${item.name}`}
+              aria-label={`${open ? uiText("webWordlistLibrary:collapse") : uiText("webWordlistLibrary:expand")} ${item.name}`}
               aria-expanded={open}
               className="flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground-muted focus-visible:outline-2 focus-visible:outline-primary lg:size-7"
               onClick={() => props.toggle(item.id)}
@@ -392,7 +393,9 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
             <button
               data-explorer-menu
               className={`${iconButton} size-11 lg:size-7 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 data-[state=open]:opacity-100`}
-              aria-label={uiText("{{v0}}的操作", { v0: item.name })}
+              aria-label={uiText("webWordlistLibrary:actions_for_v0", {
+                v0: item.name
+              })}
               disabled={props.disabled}
             >
               <MoreHorizontal className="size-3.5" aria-hidden />
@@ -423,11 +426,11 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
                   data-leaves-page
                   onSelect={() => props.onCreateWordlist(item.id)}
                 >
-                  {uiText("新建词表")}
+                  {uiText("webWordlistLibrary:new_word_list")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onSelect={() => props.onCreateFolder(item.id)}>
-                {uiText("新建子文件夹")}
+                {uiText("webWordlistLibrary:new_subfolder")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
@@ -435,13 +438,13 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
           {props.trash ? (
             <>
               <DropdownMenuItem onSelect={() => action("restore")}>
-                {uiText("恢复…")}
+                {uiText("webWordlistLibrary:restore")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => action("purge")}
                 className="text-danger"
               >
-                {uiText("彻底删除…")}
+                {uiText("webWordlistLibrary:delete_permanently_2")}
               </DropdownMenuItem>
             </>
           ) : (
@@ -451,11 +454,11 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
                 onSelect={() => action("rename")}
               >
                 {props.space === "favorites" && !folder
-                  ? uiText("修改备注名…")
-                  : uiText("重命名…")}
+                  ? uiText("webWordlistLibrary:change_private_label")
+                  : uiText("webWordlistLibrary:rename")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => action("move")}>
-                {uiText("移动到…")}
+                {uiText("webWordlistLibrary:move_to_2")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -463,7 +466,7 @@ function TreeItem(props: TreeProps & { item: LibraryItem; depth: number }) {
                 onSelect={() => action("trash")}
                 className="text-danger"
               >
-                {uiText("移入回收站")}
+                {uiText("webWordlistLibrary:move_to_recycle_bin")}
               </DropdownMenuItem>
             </>
           )}

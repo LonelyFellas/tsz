@@ -2,11 +2,11 @@
 import { useWebText } from "@/i18n/client";
 import { webApp } from "@/i18n/messages/app";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { validatedWebLocale } from "@/i18n/snapshot";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
-import { useEffect } from "react";
+
 import { isResourceError } from "@tsz/shared/recovery";
 import Link from "next/link";
 
@@ -64,12 +64,18 @@ function GlobalErrorContent({
           </svg>
         </span>
         <h1 className="text-xl font-semibold tracking-tight">
-          {resourceError ? uiText("页面资源加载失败") : uiText("页面出错了")}
+          {resourceError
+            ? uiText("webApp:page_resources_could_not_be_loaded")
+            : uiText("webApp:something_went_wrong")}
         </h1>
         <p className="text-sm leading-6 text-foreground-muted">
           {resourceError
-            ? uiText("请检查网络后重新加载；已备份的编辑内容可在原页面恢复。")
-            : uiText("页面暂时无法显示，请刷新后重试。")}
+            ? uiText(
+                "webApp:check_your_connection_and_reload_backed_up_edits_can_be_restored_on_the"
+              )
+            : uiText(
+                "webApp:this_page_cannot_be_displayed_reload_and_try_again"
+              )}
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
           <button
@@ -77,14 +83,14 @@ function GlobalErrorContent({
             className="inline-flex min-h-12 items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             onClick={resourceError ? () => window.location.reload() : reset}
           >
-            {resourceError ? uiText("重新加载") : uiText("重试")}
+            {resourceError ? uiText("webApp:reload") : uiText("webApp:retry")}
           </button>
           {/* 根 layout 已失败，这里用 Link 只是为了 href 语义：router 不存在时它会整页跳转。 */}
           <Link
             href="/"
             className="inline-flex min-h-12 items-center justify-center rounded-full px-5 py-3 text-sm font-medium text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            {uiText("返回首页")}
+            {uiText("webApp:go_to_home")}
           </Link>
         </div>
       </body>

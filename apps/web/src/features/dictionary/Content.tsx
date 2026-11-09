@@ -100,18 +100,20 @@ export function TargetAudio({
       sourceDialects &&
       !sourceDialects.includes("common") ? (
       <span className="text-xs text-foreground-muted">
-        {uiText("当前正文的音频来源未确认，暂不可播放")}
+        {uiText(
+          "webDictionary:audio_provenance_for_this_content_is_unconfirmed_playback_is_unavailable"
+        )}
       </span>
     ) : (
       <span className="text-xs text-foreground-muted">
-        {uiText("当前口音暂无正式音频")}
+        {uiText("webDictionary:no_published_audio_for_this_accent")}
       </span>
     );
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {!primary && (
         <span className="text-xs text-foreground-muted">
-          {uiText("当前口音暂无正式音频")}
+          {uiText("webDictionary:no_published_audio_for_this_accent")}
         </span>
       )}
       {primary && (
@@ -124,7 +126,7 @@ export function TargetAudio({
       {supplemental.length > 0 && (
         <details className="text-sm text-foreground-muted">
           <summary className="min-h-11 cursor-pointer content-center rounded-lg px-2 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
-            {uiText("其他音色")}
+            {uiText("webDictionary:other_voice")}
           </summary>
           <div className="flex flex-wrap items-center gap-2 py-1">
             {supplemental.map((item) => (
@@ -133,7 +135,7 @@ export function TargetAudio({
                 <AudioButton
                   entryId={entryId}
                   audio={item}
-                  label={uiText("{{v0}}（{{v1}}补充音色 {{v2}}）", {
+                  label={uiText("webDictionary:v0_v1_additional_voice_v2", {
                     v0: label,
                     v1: speechRegionLabel(item.locale, locale),
                     v2: supplemental.indexOf(item) + 1

@@ -1,5 +1,6 @@
 "use client";
-import { type WebNotice, webErrorText } from "@/i18n/catalog";
+import { localText, type WebNotice, webErrorText } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthProfile as webAuth } from "@/i18n/messages/auth/profile";
 
@@ -60,13 +61,24 @@ export function AvatarCropDialog({
         source.naturalHeight > 8192 ||
         source.naturalWidth * source.naturalHeight > 32_000_000
       ) {
-        setError("图片像素过大，请先缩小图片后重试");
+        setError(
+          localText(
+            webAuth,
+            "webAuthProfile:the_image_has_too_many_pixels_resize_it_and_try_again"
+          )
+        );
         return;
       }
       setImage(source);
     };
     source.onerror = () => {
-      if (alive) setError("图片无法读取，请选择有效的 JPG / PNG / WebP 图片");
+      if (alive)
+        setError(
+          localText(
+            webAuth,
+            "webAuthProfile:cannot_read_this_image_choose_a_valid_jpg_png_or_webp_image"
+          )
+        );
     };
     source.src = url;
     return () => {
@@ -87,7 +99,15 @@ export function AvatarCropDialog({
     try {
       onConfirm(await exportAvatarCrop(image, crop));
     } catch (cause) {
-      setError(webErrorText(cause, "图片处理失败，请重试"));
+      setError(
+        webErrorText(
+          cause,
+          localText(
+            webAuth,
+            "webAuthProfile:could_not_process_the_image_try_again"
+          )
+        )
+      );
       setBusy(false);
     }
   }
@@ -104,19 +124,21 @@ export function AvatarCropDialog({
       className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-3xl border border-border bg-surface p-6 text-foreground shadow-float backdrop:bg-foreground/30 backdrop:backdrop-blur-sm"
     >
       <h2 id="avatar-crop-title" className="text-xl font-bold tracking-tight">
-        {uiText("裁剪头像")}
+        {uiText("webAuthProfile:crop_avatar")}
       </h2>
       <p
         id="avatar-crop-description"
         className="mt-2 text-sm leading-6 text-foreground-muted"
       >
-        {uiText("拖动图片或使用方向键调整位置，缩放后确认圆形预览。")}
+        {uiText(
+          "webAuthProfile:drag_the_image_or_use_the_arrow_keys_to_position_it_zoom_then_confirm_th"
+        )}
       </p>
       {image && crop ? (
         <div className="my-6 flex justify-center">
           <div
             role="group"
-            aria-label={uiText("调整头像位置")}
+            aria-label={uiText("webAuthProfile:adjust_avatar_position")}
             tabIndex={0}
             aria-disabled={busy}
             className="relative aspect-square w-64 max-w-full touch-none overflow-hidden rounded-full bg-white ring-4 ring-primary/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary cursor-grab active:cursor-grabbing"
@@ -175,7 +197,7 @@ export function AvatarCropDialog({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image.src}
-              alt={uiText("圆形头像预览")}
+              alt={uiText("webAuthProfile:circular_avatar_preview")}
               draggable={false}
               className="pointer-events-none absolute select-none max-w-none"
               style={{
@@ -192,14 +214,14 @@ export function AvatarCropDialog({
           role="status"
           className="my-6 text-center text-sm text-foreground-muted"
         >
-          {uiText("正在读取图片…")}
+          {uiText("webAuthProfile:reading_image")}
         </p>
       ) : null}
       <label
         htmlFor="avatar-crop-zoom"
         className="flex items-center justify-between text-sm font-medium"
       >
-        {uiText("缩放")}{" "}
+        {uiText("webAuthProfile:zoom")}{" "}
         <span className="text-foreground-muted">{Math.round(zoom * 100)}%</span>
       </label>
       <input
@@ -229,7 +251,7 @@ export function AvatarCropDialog({
           disabled={busy}
           onClick={onCancel}
         >
-          {uiText("取消")}
+          {uiText("webAuthProfile:cancel")}
         </Button>
         <Button
           type="button"
@@ -237,7 +259,9 @@ export function AvatarCropDialog({
           disabled={!image || busy}
           onClick={() => void confirm()}
         >
-          {busy ? uiText("正在处理…") : uiText("确认并上传")}
+          {busy
+            ? uiText("webAuthProfile:processing")
+            : uiText("webAuthProfile:confirm_and_upload")}
         </Button>
       </div>
     </dialog>

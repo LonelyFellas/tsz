@@ -1,5 +1,6 @@
 "use client";
-import { type WebNotice, webErrorText } from "@/i18n/catalog";
+import { localText, type WebNotice, webErrorText } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webTask } from "@/i18n/messages/task";
 
@@ -19,15 +20,15 @@ import { Button } from "@tsz/ui/components";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { LibraryDialog } from "@/features/wordlist/components/LibraryDialog";
-export const planStatusLabels: Record<LearningPlan["status"], string> = {
-  archived: "已归档",
-  schedule_ended: "计划已结束",
-  cycle_completed: "本轮已完成",
-  not_started: "尚未开始",
-  today_completed: "今日已完成",
-  source_blocked: "来源阻塞",
-  ready: "可以学习",
-  review_waiting: "等待下次复习"
+export const planStatusLabels: Record<LearningPlan["status"], WebNotice> = {
+  archived: localText(webTask, "webTask:archived"),
+  schedule_ended: localText(webTask, "webTask:plan_ended"),
+  cycle_completed: localText(webTask, "webTask:round_completed"),
+  not_started: localText(webTask, "webTask:not_started"),
+  today_completed: localText(webTask, "webTask:completed_today"),
+  source_blocked: localText(webTask, "webTask:source_blocked"),
+  ready: localText(webTask, "webTask:ready_to_learn"),
+  review_waiting: localText(webTask, "webTask:waiting_for_the_next_review")
 };
 export function PlanCoverage({
   plan,
@@ -91,7 +92,8 @@ export function PlanCoverage({
       );
       if (current()) setPreview(p);
     } catch (e) {
-      if (current()) setError(webErrorText(e, "预览失败"));
+      if (current())
+        setError(webErrorText(e, localText(webTask, "webTask:preview_failed")));
     } finally {
       if (current()) setBusy(false);
     }
@@ -103,7 +105,12 @@ export function PlanCoverage({
       acceptedPreview !== preview.preview.preview_fingerprint &&
       !intent.current
     ) {
-      setError("请确认仅使用可用内容开启新轮。");
+      setError(
+        localText(
+          webTask,
+          "webTask:confirm_that_the_new_cycle_will_use_only_available_content"
+        )
+      );
       return;
     }
     setBusy(true);
@@ -130,7 +137,9 @@ export function PlanCoverage({
       }
     } catch (e) {
       if (current()) {
-        setError(webErrorText(e, "创建失败"));
+        setError(
+          webErrorText(e, localText(webTask, "webTask:creation_failed"))
+        );
         const definite =
           e instanceof HttpError && e.status < 500 && e.status !== 408;
         setUnknown(!definite);
@@ -148,10 +157,10 @@ export function PlanCoverage({
     <LibraryDialog
       title={
         operation === "refresh_sources"
-          ? uiText("重新确认来源")
+          ? uiText("webTask:reconfirm_sources")
           : operation === "next"
-            ? uiText("开启下一轮")
-            : uiText("放弃受阻轮次")
+            ? uiText("webTask:start_next_cycle")
+            : uiText("webTask:abandon_blocked_cycle")
       }
       busy={busy || unknown}
       onClose={() => setPreview(null)}
@@ -159,9 +168,9 @@ export function PlanCoverage({
       <div className="space-y-4 text-sm">
         <p>
           {operation === "refresh_sources"
-            ? uiText("当前已跨天确认：")
-            : uiText("原轮进度：")}
-          {uiText("{{v0}}/{{v1}}，不可用 {{v2}} 题。", {
+            ? uiText("webTask:confirmed_across_days")
+            : uiText("webTask:previous_cycle_progress")}
+          {uiText("webTask:v0_v1_with_v2_unavailable_questions", {
             v0: preview.previous_covered_count,
             v1: preview.previous_total_count,
             v2: preview.previous_blocked_count
@@ -170,7 +179,7 @@ export function PlanCoverage({
         {operation === "restart_blocked" && (
           <p>
             {uiText(
-              "确认后将取消本轮及未完成批次，历史记录保留；新轮进度从零开始。"
+              "webTask:this_cancels_the_current_cycle_and_unfinished_batches_while_preserving_h"
             )}
           </p>
         )}
@@ -178,13 +187,13 @@ export function PlanCoverage({
           <>
             <p>
               {uiText(
-                "将结束当前未完成批次，保留所有作答历史。内容未变的掌握状态和复习日期保持，内容有变的词义需要重新练习。"
+                "webTask:this_ends_the_unfinished_batch_and_preserves_all_answer_history_mastery"
               )}
             </p>
             {preview.source_refresh && (
               <p>
                 {uiText(
-                  "可重新确认 {{v0}} 个词义，其中 {{v1}} 个内容有变；仍不可用 {{v2}} 个，继续保留原进度。",
+                  "webTask:v0_meanings_can_be_reconfirmed_including_v1_with_changed_content_v2_rema",
                   {
                     v0: preview.source_refresh.refreshed_count,
                     v1: preview.source_refresh.changed_content_count,
@@ -196,10 +205,13 @@ export function PlanCoverage({
           </>
         ) : (
           <p>
-            {uiText("新轮共 {{v0}} 题，最早从 {{v1}} 开始。", {
-              v0: preview.preview.eligible_count,
-              v1: preview.earliest_day
-            })}
+            {uiText(
+              "webTask:new_cycle_v0_questions_starting_no_earlier_than_v1",
+              {
+                v0: preview.preview.eligible_count,
+                v1: preview.earliest_day
+              }
+            )}
           </p>
         )}
         {preview.preview.choice && (
@@ -227,7 +239,7 @@ export function PlanCoverage({
                 }
               />
               {uiText(
-                "仅使用可出单选的内容开启新轮，暂不可用内容不纳入新轮学习范围"
+                "webTask:start_a_new_cycle_using_only_content_suitable_for_multiple_choice_exclud"
               )}
             </label>
           )}
@@ -241,26 +253,32 @@ export function PlanCoverage({
             {uiText(error)}
           </p>
         )}
-        {unknown && <p>{uiText("结果未确认；请重试原请求。")}</p>}
+        {unknown && (
+          <p>
+            {uiText(
+              "webTask:the_result_is_unconfirmed_retry_the_original_request"
+            )}
+          </p>
+        )}
         <div className="flex justify-end gap-3">
           <Button
             variant="outline"
             disabled={busy || unknown}
             onClick={() => setPreview(null)}
           >
-            {uiText("取消")}
+            {uiText("webTask:cancel")}
           </Button>
           <Button
             disabled={busy || !preview.preview.can_create}
             onClick={() => void create()}
           >
             {busy
-              ? uiText("正在创建…")
+              ? uiText("webTask:creating")
               : unknown
-                ? uiText("重试原请求")
+                ? uiText("webTask:retry_original_request")
                 : operation === "refresh_sources"
-                  ? uiText("确认更新来源")
-                  : uiText("确认开启新轮")}
+                  ? uiText("webTask:confirm_source_update")
+                  : uiText("webTask:confirm_new_cycle")}
           </Button>
         </div>
       </div>
@@ -268,37 +286,48 @@ export function PlanCoverage({
   );
   if (plan.mastery)
     return (
-      <section aria-label={uiText("单词掌握情况")} className="space-y-4">
+      <section
+        aria-label={uiText("webTask:word_mastery")}
+        className="space-y-4"
+      >
         <h2 className="text-lg font-semibold">
           {uiText(planStatusLabels[plan.status])}
         </h2>
         <LearningProgressBar
-          label={uiText("跨天确认进度")}
+          label={uiText("webTask:progress_confirmed_across_days")}
           max={c?.total_count ?? 1}
           value={plan.mastery.mastered_count}
         />
         <p className="text-sm text-foreground-muted">
-          {uiText("未学词义 {{v0}} · 待巩固 {{v1}} · 已跨天确认 {{v2}}", {
-            v0: plan.mastery.new_count,
-            v1: plan.mastery.learning_count,
-            v2: plan.mastery.mastered_count
-          })}
+          {uiText(
+            "webTask:unstudied_v0_needs_consolidation_v1_confirmed_across_days_v2",
+            {
+              v0: plan.mastery.new_count,
+              v1: plan.mastery.learning_count,
+              v2: plan.mastery.mastered_count
+            }
+          )}
         </p>
         <p className="text-sm text-foreground-muted">
-          {uiText("到期复习 {{v0}} 题", { v0: plan.mastery.due_count })}
+          {uiText("webTask:due_for_review_v0", { v0: plan.mastery.due_count })}
           {plan.mastery.next_review_day &&
-            uiText("· 下次复习：{{v0}}", { v0: plan.mastery.next_review_day })}
+            uiText("webTask:next_review_v0", {
+              v0: plan.mastery.next_review_day
+            })}
         </p>
         <p className="text-sm text-foreground-muted">
           {uiText(
-            "每次最多 20 个新词，含错题重练最多 30 题。当天答对先记熟悉，跨天再次答对后延长复习间隔。"
+            "webTask:up_to_20_new_words_per_practice_and_30_questions_including_retries_corre"
           )}
         </p>
         {!!c?.blocked_count && (
           <p className="text-sm text-danger">
-            {uiText("有 {{v0}} 题来源不可用，掌握进度已保留。", {
-              v0: c.blocked_count
-            })}
+            {uiText(
+              "webTask:v0_questions_have_unavailable_sources_mastery_progress_is_preserved",
+              {
+                v0: c.blocked_count
+              }
+            )}
           </p>
         )}
         <Button
@@ -307,7 +336,7 @@ export function PlanCoverage({
           disabled={busy || unknown}
           onClick={() => void refresh()}
         >
-          {uiText("刷新学习安排")}
+          {uiText("webTask:refresh_learning_schedule")}
         </Button>
         {plan.task.state === "active" && plan.status !== "schedule_ended" && (
           <Button
@@ -316,7 +345,7 @@ export function PlanCoverage({
             disabled={busy || unknown || !c}
             onClick={() => void inspect("refresh_sources")}
           >
-            {uiText("重新确认来源")}
+            {uiText("webTask:reconfirm_sources")}
           </Button>
         )}
         {error && !preview && (
@@ -330,32 +359,37 @@ export function PlanCoverage({
   if (!c)
     return (
       <p className="text-sm text-foreground-muted">
-        {uiText("原有抽题模式 · 保留原任务与历史行为。")}
+        {uiText(
+          "webTask:original_question_mode_existing_task_and_history_behaviour_is_preserved"
+        )}
       </p>
     );
   return (
-    <section className="space-y-4" aria-label={uiText("覆盖轮次")}>
+    <section
+      className="space-y-4"
+      aria-label={uiText("webTask:coverage_cycle")}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">
-          {uiText("第 {{v0}} 轮 ·{{v1}}", {
+          {uiText("webTask:cycle_v0_v1", {
             v0: c.cycle_number,
             v1: uiText(planStatusLabels[plan.status])
           })}
         </h2>
         <p className="text-sm text-foreground-muted">
-          {uiText("本轮已覆盖 {{v0}}/{{v1}} 题", {
+          {uiText("webTask:covered_this_cycle_v0_v1", {
             v0: c.covered_count,
             v1: c.total_count
           })}
         </p>
       </div>
       <LearningProgressBar
-        label={uiText("本轮覆盖进度")}
+        label={uiText("webTask:coverage_progress_this_cycle")}
         max={c.total_count}
         value={c.covered_count}
       />
       <p className="text-sm text-foreground-muted">
-        {uiText("已覆盖 {{v0}} · 仍可答 {{v1}} · 不可用 {{v2}}", {
+        {uiText("webTask:covered_v0_answerable_v1_unavailable_v2", {
           v0: c.covered_count,
           v1: c.available_remaining_count,
           v2: c.blocked_count
@@ -364,38 +398,43 @@ export function PlanCoverage({
       {plan.task.task_type === "daily" && (
         <p className="text-sm text-foreground-muted">
           {plan.current_run
-            ? uiText("今日已答 {{v0}}/{{v1}} 题", {
+            ? uiText("webTask:answered_today_v0_v1", {
                 v0: plan.current_run.answered_count,
                 v1: plan.current_run.target_count
               })
             : plan.can_start
-              ? uiText("今日尚未开始，可答 {{v0}} 题", {
+              ? uiText("webTask:not_started_today_v0_questions_available", {
                   v0: plan.today_available_count
                 })
-              : uiText("今日尚不可开始")}
+              : uiText("webTask:cannot_start_today_yet")}
           {plan.estimated_learning_days !== null &&
-            uiText("· 从 {{v0}} 起还需 {{v1}} 个学习日", {
-              v0: plan.estimate_from_day,
+            uiText("webTask:v1_more_learning_days_from_v0", {
+              v0: String(plan.estimate_from_day),
               v1: plan.estimated_learning_days
             })}
         </p>
       )}
       {plan.status === "not_started" && (
         <p className="text-sm">
-          {uiText("开始学习日：{{v0}}", { v0: c.earliest_day })}
+          {uiText("webTask:first_learning_day_v0", { v0: c.earliest_day })}
         </p>
       )}
       {plan.schedule && (
         <p className="text-sm text-foreground-muted">
-          {uiText("日期计划：{{v0}} 至 {{v1}}，北京时间 04:00 换日。", {
-            v0: plan.schedule.start_date,
-            v1: plan.schedule.end_date
-          })}
+          {uiText(
+            "webTask:scheduled_dates_v0_to_v1_the_business_day_changes_at_04_00_beijing_time",
+            {
+              v0: plan.schedule.start_date,
+              v1: plan.schedule.end_date
+            }
+          )}
         </p>
       )}
       {plan.schedule_at_risk && (
         <p className="text-sm text-danger">
-          {uiText("按今日实际剩余额度，可能无法在计划结束前覆盖全部内容。")}
+          {uiText(
+            "webTask:today_s_remaining_allowance_may_be_insufficient_to_cover_all_content_bef"
+          )}
         </p>
       )}
       {plan.reasons.map((reason) => (
@@ -406,7 +445,7 @@ export function PlanCoverage({
       {c.blocked_count > 0 && (
         <p className="text-sm text-foreground-muted">
           {uiText(
-            "不可用题目仍保留在本轮总数中；其余合法题目可以继续。检查来源不会重置进度。"
+            "webTask:unavailable_questions_remain_in_the_cycle_total_other_valid_questions_ca"
           )}
         </p>
       )}
@@ -417,7 +456,7 @@ export function PlanCoverage({
           disabled={busy || unknown}
           onClick={() => void refresh()}
         >
-          {uiText("检查来源")}
+          {uiText("webTask:check_sources")}
         </Button>
         {plan.can_start_next_cycle && (
           <Button
@@ -425,7 +464,7 @@ export function PlanCoverage({
             disabled={busy || unknown}
             onClick={() => void inspect("next")}
           >
-            {uiText("开启下一轮")}
+            {uiText("webTask:start_next_cycle")}
           </Button>
         )}
         {plan.can_restart_blocked_cycle && (
@@ -435,7 +474,7 @@ export function PlanCoverage({
             disabled={busy || unknown}
             onClick={() => void inspect("restart_blocked")}
           >
-            {uiText("放弃本轮并重新生成")}
+            {uiText("webTask:abandon_this_cycle_and_regenerate")}
           </Button>
         )}
       </div>
@@ -447,23 +486,23 @@ export function PlanCoverage({
       {confirmation}
       <details className="border-t border-border/60 pt-4">
         <summary className="cursor-pointer text-sm font-medium">
-          {uiText("覆盖轮次历史")}
+          {uiText("webTask:coverage_cycle_history")}
         </summary>
         {history.isError ? (
           <p role="alert" className="mt-3 text-sm text-danger">
-            {uiText("轮次历史读取失败")}
+            {uiText("webTask:could_not_load_cycle_history")}
           </p>
         ) : (
           <ul className="mt-3 space-y-2 text-sm">
             {history.data?.items.map((h) => (
               <li key={h.id}>
-                {uiText("第 {{v0}} 轮 · ", { v0: h.cycle_number })}
+                {uiText("webTask:cycle_v0", { v0: h.cycle_number })}
                 {h.state === "completed"
-                  ? uiText("已完成")
+                  ? uiText("webTask:completed")
                   : h.state === "cancelled"
-                    ? uiText("已取消")
-                    : uiText("进行中")}
-                {uiText(" · 覆盖 {{v0}}/{{v1}} 题", {
+                    ? uiText("webTask:cancelled")
+                    : uiText("webTask:in_progress")}
+                {uiText("webTask:coverage_v0_v1", {
                   v0: h.covered_count,
                   v1: h.total_count
                 })}
@@ -484,16 +523,18 @@ export function PlanCoverage({
           {plan.sources.map((s) => (
             <li key={s.id} className="rounded-2xl bg-muted/70 p-3 text-sm">
               <p className="line-clamp-2 break-words">
-                {s.name ?? uiText("来源不可用")}
+                {s.name ?? uiText("webTask:source_unavailable")}
               </p>
               {s.available && (
                 <p className="text-xs text-foreground-muted">
                   {s.personal_note &&
                     s.personal_note !== s.name &&
-                    uiText("备注：{{v0}} ·", { v0: s.personal_note })}
+                    uiText("webTask:note_v0", { v0: s.personal_note })}
                   {s.author_name} ·{" "}
-                  {s.state === "published" ? uiText("公开") : uiText("非公开")}
-                  {uiText(" · {{v0}} 个词条", { v0: s.item_count })}
+                  {s.state === "published"
+                    ? uiText("webTask:public")
+                    : uiText("webTask:private")}
+                  {uiText("webTask:v0_entries", { v0: s.item_count! })}
                 </p>
               )}
             </li>

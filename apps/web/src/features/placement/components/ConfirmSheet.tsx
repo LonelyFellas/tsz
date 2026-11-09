@@ -11,9 +11,9 @@ import { buttonClass, primaryButtonClass } from "@/features/shell/Page";
 
 interface ConfirmSheetProps {
   open: boolean;
-  title: string;
+  title: WebNotice;
   desc: WebNotice;
-  okLabel: string;
+  okLabel: WebNotice;
   onOk: () => void;
   onCancel: () => void;
 }
@@ -59,7 +59,7 @@ export function ConfirmSheet({
             onClick={onCancel}
             className={cn(buttonClass, "min-h-12")}
           >
-            {uiText("取消")}
+            {uiText("webPlacement:cancel")}
           </button>
           <button
             type="button"

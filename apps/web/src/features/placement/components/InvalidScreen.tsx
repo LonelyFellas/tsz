@@ -25,11 +25,11 @@ export function InvalidScreen({
         ?
       </div>
       <h1 className="mt-5 text-2xl font-bold tracking-tight">
-        {uiText("这次作答不太稳定")}
+        {uiText("webPlacement:these_answers_were_inconsistent")}
       </h1>
       <p className="mx-auto mt-2 max-w-[28ch] text-sm leading-relaxed text-foreground-muted">
         {uiText(
-          "部分题目的作答模式不一致，结果可能不准。认真再测一次，只需 1 分钟。"
+          "webPlacement:some_answer_patterns_were_inconsistent_so_the_result_may_be_inaccurate_t"
         )}
       </p>
       <div className="flex-1" />
@@ -38,17 +38,19 @@ export function InvalidScreen({
         onClick={onRetry}
         className={cn(primaryButtonClass, "w-full")}
       >
-        {uiText("再测一次")}
+        {uiText("webPlacement:try_again")}
       </button>
       <button
         type="button"
         onClick={onManual}
         className="mt-2 min-h-11 w-full rounded-full text-sm text-foreground-muted transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
-        {onboarded ? uiText("返回学习") : uiText("跳过，手动选择等级")}
+        {onboarded
+          ? uiText("webPlacement:back_to_learning")
+          : uiText("webPlacement:skip_and_choose_a_level")}
       </button>
       <p className="mt-3 text-xs text-foreground-subtle">
-        {uiText("无效测试不计入次数")}
+        {uiText("webPlacement:invalid_assessments_do_not_use_an_attempt")}
       </p>
     </div>
   );

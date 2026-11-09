@@ -1,11 +1,21 @@
 "use client";
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webPlacement } from "@/i18n/messages/placement";
 
 import { cn } from "@tsz/ui/lib/cn";
 import { primaryButtonClass } from "@/features/shell/Page";
-import { VOCAB_RANGE } from "../lib/content";
+
 import { MAX_TESTS, type QuotaState } from "../lib/quota";
+
+const vocabularyRangeMessages = {
+  A1: localText(webPlacement, "webPlacement:about_500_1_000_words"),
+  A2: localText(webPlacement, "webPlacement:about_1_000_2_000_words"),
+  B1: localText(webPlacement, "webPlacement:about_2_000_3_000_words"),
+  B2: localText(webPlacement, "webPlacement:about_3_000_4_500_words"),
+  C1: localText(webPlacement, "webPlacement:about_4_500_8_000_words"),
+  C2: localText(webPlacement, "webPlacement:8_000_words")
+};
 
 // 引导屏两态:新用户看卖点;已有结果的用户看词汇档案 + 重测入口。
 
@@ -32,7 +42,7 @@ const FAN_CARDS = [
 interface WelcomeScreenProps {
   quota: QuotaState;
   starting: boolean;
-  error: string;
+  error: import("@/i18n/catalog").WebNotice;
   onboarded: boolean;
   onStart: () => void;
   onSkip: () => void;
@@ -53,7 +63,7 @@ export function WelcomeScreen({
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
-        {uiText("词汇定级")}
+        {uiText("webPlacement:vocabulary_assessment")}
       </p>
 
       {/* 三张示例词卡:一眼传达测试覆盖 A1 → C2 */}
@@ -78,12 +88,16 @@ export function WelcomeScreen({
       {hasResult && quota.last ? (
         <>
           <h1 className="text-3xl font-bold tracking-tight">
-            {uiText("你的词汇档案")}
+            {uiText("webPlacement:your_vocabulary_profile")}
           </h1>
           <p className="mt-2 text-sm leading-6 text-foreground-muted">
             {onboarded
-              ? uiText("测评记录仅作参考，不会修改已保存的学习难度。")
-              : uiText("等级决定词书推荐与每日计划。")}
+              ? uiText(
+                  "webPlacement:assessment_records_are_a_guide_and_do_not_change_your_saved_learning_lev"
+                )
+              : uiText(
+                  "webPlacement:your_level_guides_book_recommendations_and_daily_plans"
+                )}
           </p>
           <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/70 p-4">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-muted font-serif text-lg font-bold text-primary">
@@ -91,13 +105,13 @@ export function WelcomeScreen({
             </span>
             <div className="min-w-0 text-sm">
               <div className="font-medium">
-                {uiText("当前等级 {{v0}}· {{v1}}", {
+                {uiText("webPlacement:current_level_v0_v1", {
                   v0: quota.last.band,
-                  v1: uiText(VOCAB_RANGE[quota.last.band])
+                  v1: uiText(vocabularyRangeMessages[quota.last.band])
                 })}
               </div>
               <div className="text-xs text-foreground-subtle">
-                {uiText("第 {{v0}}/{{v1}} 次测试", {
+                {uiText("webPlacement:assessment_v0_of_v1", {
                   v0: quota.used,
                   v1: MAX_TESTS
                 })}
@@ -108,20 +122,48 @@ export function WelcomeScreen({
       ) : (
         <>
           <h1 className="text-balance text-3xl font-bold tracking-tight">
-            {uiText("1 分钟，测出你的词汇量")}
+            {uiText("webPlacement:check_your_vocabulary_in_one_minute")}
           </h1>
           <p className="mt-2 text-sm leading-6 text-foreground-muted">
             {onboarded
-              ? uiText("了解当前词汇水平，学习难度不会随测评结果改变。")
-              : uiText("根据结果为你推荐合适的难度与学习计划。")}
+              ? uiText(
+                  "webPlacement:check_your_current_vocabulary_the_result_does_not_change_your_learning_l"
+                )
+              : uiText(
+                  "webPlacement:get_a_suggested_level_and_learning_plan_based_on_your_result"
+                )}
           </p>
           <ul className="mt-6 space-y-3 text-sm leading-6">
             {[
-              ["看词滑卡，凭直觉作答", "认识左滑，不认识右滑"],
-              ["15–30 题，难度自动调整", "答得越稳，结束得越快"],
-              ["请如实作答", "系统能识别乱猜，结果只影响推荐"]
+              [
+                localText(
+                  webPlacement,
+                  "webPlacement:swipe_word_cards_and_answer_from_instinct"
+                ),
+                localText(
+                  webPlacement,
+                  "webPlacement:swipe_left_if_you_know_it_right_if_you_don_t"
+                )
+              ],
+              [
+                localText(
+                  webPlacement,
+                  "webPlacement:15_30_questions_with_adaptive_difficulty"
+                ),
+                localText(
+                  webPlacement,
+                  "webPlacement:consistent_answers_finish_the_assessment_sooner"
+                )
+              ],
+              [
+                localText(webPlacement, "webPlacement:answer_honestly"),
+                localText(
+                  webPlacement,
+                  "webPlacement:random_guessing_can_be_detected_results_only_affect_recommendations"
+                )
+              ]
             ].map(([title, sub]) => (
-              <li key={title} className="flex gap-3">
+              <li key={title!.key} className="flex gap-3">
                 <span
                   className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                   aria-hidden
@@ -150,12 +192,12 @@ export function WelcomeScreen({
           className={cn(primaryButtonClass, "w-full")}
         >
           {starting
-            ? uiText("准备中...")
+            ? uiText("webPlacement:preparing")
             : hasResult
               ? left > 0
-                ? uiText("重新测试")
-                : uiText("查看结果")
-              : uiText("开始测试")}
+                ? uiText("webPlacement:retake_assessment")
+                : uiText("webPlacement:view_result")
+              : uiText("webPlacement:start_assessment")}
         </button>
         {!hasResult && (
           <button
@@ -163,16 +205,18 @@ export function WelcomeScreen({
             onClick={onSkip}
             className="mt-2 min-h-11 w-full rounded-full text-sm text-foreground-muted transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            {onboarded ? uiText("返回学习") : uiText("跳过，手动选择等级")}
+            {onboarded
+              ? uiText("webPlacement:back_to_learning")
+              : uiText("webPlacement:skip_and_choose_a_level")}
           </button>
         )}
         <p className="mt-3 text-center text-xs text-foreground-subtle">
           {left > 0
             ? uiText(
-                "共 {{v0}} 次测试机会，剩余 {{v1}} 次 · 以最后一次结果为准",
+                "webPlacement:v0_total_attempts_v1_left_the_latest_result_is_used",
                 { v0: MAX_TESTS, v1: left }
               )
-            : uiText("测试机会已用完 · 以最后一次结果为准")}
+            : uiText("webPlacement:no_attempts_left_the_latest_result_is_used")}
         </p>
       </div>
     </div>

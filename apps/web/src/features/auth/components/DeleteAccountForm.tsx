@@ -1,8 +1,7 @@
 "use client";
-import { useWebLocale } from "@/i18n/client";
-import { localText } from "@/i18n/catalog";
-import { type WebNotice } from "@/i18n/catalog";
-import { useWebText } from "@/i18n/client";
+import { useWebLocale, useWebText } from "@/i18n/client";
+import { webErrorText, localText, type WebNotice } from "@/i18n/catalog";
+
 import { webAuthSecurity as webAuth } from "@/i18n/messages/auth/security";
 
 import { Button } from "@tsz/ui/components";
@@ -24,41 +23,95 @@ import { PageHeader, PageShell } from "@/features/shell/Page";
 
 const CODE_COUNTDOWN = 60;
 
-const CHANNEL_LABEL: Record<AccountDeletionChannel, string> = {
-  phone: "手机",
-  email: "邮箱"
+const CHANNEL_LABEL: Record<AccountDeletionChannel, WebNotice> = {
+  phone: localText(webAuth, "webAuthSecurity:phone"),
+  email: localText(webAuth, "webAuthSecurity:email")
 };
 
-const ERROR_BY_CODE: Record<string, string> = {
-  account_deletion_unsettled_audio:
-    "词表语音仍在生成或退款中，请等待处理完成后再申请注销",
-  account_deletion_balance_changed: "余额已变化，请核对最新金额并重新签署",
-  account_deletion_consent_outdated: "注销声明已更新，请重新阅读并签署",
-  account_deletion_pending: "已有待生效的注销申请，请查看当前状态",
-  account_deletion_expired: "已到注销生效时间，无法撤销",
-  account_deletion_consent_required: "请主动确认注销规则及余额放弃声明",
-  invalid_account_deletion_code: "验证码错误、已失效或已使用，请重新获取",
-  account_deletion_channel_unavailable:
-    "当前账号没有可用于验证的该渠道，请选择其他方式",
-  otp_rate_limited: "验证码申请过于频繁，请稍后再试",
-  otp_unavailable: "验证码服务暂时不可用，请稍后重试",
-  invalid_json: "请求格式错误，请刷新页面后重试",
-  invalid_request_body: "提交内容不完整，请检查后重试",
-  internal_error: "服务暂时异常，请稍后重试"
+const ERROR_BY_CODE: Record<string, WebNotice> = {
+  account_deletion_unsettled_audio: localText(
+    webAuth,
+    "webAuthSecurity:word_list_audio_is_still_being_generated_or_refunded_wait_until_processi"
+  ),
+  account_deletion_balance_changed: localText(
+    webAuth,
+    "webAuthSecurity:your_balance_has_changed_check_the_latest_amount_and_agree_again"
+  ),
+  account_deletion_consent_outdated: localText(
+    webAuth,
+    "webAuthSecurity:the_deletion_declaration_has_changed_read_and_agree_again"
+  ),
+  account_deletion_pending: localText(
+    webAuth,
+    "webAuthSecurity:you_already_have_a_pending_deletion_request_check_its_status"
+  ),
+  account_deletion_expired: localText(
+    webAuth,
+    "webAuthSecurity:deletion_has_taken_effect_and_can_no_longer_be_cancelled"
+  ),
+  account_deletion_consent_required: localText(
+    webAuth,
+    "webAuthSecurity:confirm_the_deletion_rules_and_balance_waiver"
+  ),
+  invalid_account_deletion_code: localText(
+    webAuth,
+    "webAuthSecurity:the_code_is_incorrect_expired_or_already_used_request_a_new_one"
+  ),
+  account_deletion_channel_unavailable: localText(
+    webAuth,
+    "webAuthSecurity:this_verification_method_is_not_bound_to_your_account_choose_another"
+  ),
+  otp_rate_limited: localText(
+    webAuth,
+    "webAuthSecurity:too_many_code_requests_try_again_later_2"
+  ),
+  otp_unavailable: localText(
+    webAuth,
+    "webAuthSecurity:verification_codes_are_unavailable_try_again_later_2"
+  ),
+  invalid_json: localText(
+    webAuth,
+    "webAuthSecurity:invalid_request_reload_and_try_again"
+  ),
+  invalid_request_body: localText(
+    webAuth,
+    "webAuthSecurity:some_information_is_missing_check_and_try_again"
+  ),
+  internal_error: localText(
+    webAuth,
+    "webAuthSecurity:the_service_is_unavailable_try_again_later"
+  )
 };
 
 function accountDeletionError(error: unknown): WebNotice {
-  if (error instanceof RequestTimeoutError) return error.message;
+  if (error instanceof RequestTimeoutError) return webErrorText(error, "");
   if (!(error instanceof HttpError))
-    return "网络异常，操作结果尚未确认，请先刷新查看状态";
-  if (error.status === 404) return "注销申请服务暂不可用，请稍后重试";
+    return localText(
+      webAuth,
+      "webAuthSecurity:network_error_the_result_is_unconfirmed_reload_to_check_the_status_first"
+    );
+  if (error.status === 404)
+    return localText(
+      webAuth,
+      "webAuthSecurity:account_deletion_requests_are_unavailable_try_again_later"
+    );
   const mapped = error.code ? ERROR_BY_CODE[error.code] : undefined;
   if (mapped) return mapped;
   if (error.status === 400 || error.status === 422) {
-    return "提交内容有误，请检查后重试";
+    return localText(
+      webAuth,
+      "webAuthSecurity:invalid_submission_check_and_try_again"
+    );
   }
-  if (error.status === 500) return "服务暂时异常，请稍后重试";
-  return "操作失败，请稍后重试";
+  if (error.status === 500)
+    return localText(
+      webAuth,
+      "webAuthSecurity:the_service_is_unavailable_try_again_later"
+    );
+  return localText(
+    webAuth,
+    "webAuthSecurity:the_action_failed_try_again_later"
+  );
 }
 
 export function DeleteAccountForm() {
@@ -135,7 +188,12 @@ function AccountDeletionForm() {
       setCode("");
       setCodeRequested(false);
       setConsentChecked(false);
-      setMessage("注销申请已撤销，天生币余额保持不变。");
+      setMessage(
+        localText(
+          webAuth,
+          "webAuthSecurity:deletion_request_cancelled_your_balance_is_unchanged"
+        )
+      );
     } catch (cause: unknown) {
       handleRequestError(cause);
     } finally {
@@ -200,9 +258,13 @@ function AccountDeletionForm() {
       setCodeRequested(true);
       setCountdown(CODE_COUNTDOWN);
       setMessage(
-        localText("验证码已发送至绑定的{{v0}}，请查收。", {
-          v0: localText(CHANNEL_LABEL[channel], {})
-        })
+        localText(
+          webAuth,
+          "webAuthSecurity:a_code_was_sent_to_your_bound_v0_check_for_it",
+          {
+            v0: CHANNEL_LABEL[channel]
+          }
+        )
       );
     } catch (cause: unknown) {
       handleRequestError(cause);
@@ -243,7 +305,12 @@ function AccountDeletionForm() {
       setDeletionState({ ...deletionState, request });
       setConfirmOpen(false);
       if (request.status === "pending") {
-        setMessage("注销申请已保存，当前会话保留。");
+        setMessage(
+          localText(
+            webAuth,
+            "webAuthSecurity:deletion_request_saved_your_current_session_remains_active"
+          )
+        );
       } else {
         // A replay can return a historical request cancelled in another tab.
         intentRef.current = null;
@@ -252,8 +319,14 @@ function AccountDeletionForm() {
         setConsentChecked(false);
         setMessage(
           request.status === "cancelled"
-            ? "这份注销申请已撤销。如需重新申请，请重新获取验证码并签署。"
-            : "这份注销申请已结束，请重新读取账号状态。"
+            ? localText(
+                webAuth,
+                "webAuthSecurity:this_deletion_request_was_cancelled_request_a_new_code_and_agree_again_t"
+              )
+            : localText(
+                webAuth,
+                "webAuthSecurity:this_deletion_request_has_ended_reload_your_account_status"
+              )
         );
       }
     } catch (cause: unknown) {
@@ -282,7 +355,12 @@ function AccountDeletionForm() {
               "account_deletion_consent_outdated"
             ].includes(cause.code ?? ""))
         ) {
-          setError("余额或注销声明已变化，请核对最新内容并重新签署");
+          setError(
+            localText(
+              webAuth,
+              "webAuthSecurity:your_balance_or_deletion_declaration_has_changed_check_the_latest_detail"
+            )
+          );
           setConsentChecked(false);
           intentRef.current = null;
           setConfirmOpen(false);
@@ -298,10 +376,13 @@ function AccountDeletionForm() {
   if (loading || !deletionState) {
     return (
       <PageShell size="sm">
-        <PageHeader eyebrow={uiText("账号安全")} title={uiText("注销账号")} />
+        <PageHeader
+          eyebrow={uiText("webAuthSecurity:account_security")}
+          title={uiText("webAuthSecurity:delete_account")}
+        />
         {loading ? (
           <p role="status" className="text-sm text-foreground-muted">
-            {uiText("正在读取注销状态…")}
+            {uiText("webAuthSecurity:loading_deletion_status")}
           </p>
         ) : (
           <>
@@ -319,7 +400,7 @@ function AccountDeletionForm() {
                   .finally(() => setLoading(false));
               }}
             >
-              {uiText("重新加载")}
+              {uiText("webAuthSecurity:reload")}
             </Button>
           </>
         )}
@@ -331,16 +412,18 @@ function AccountDeletionForm() {
     return (
       <PageShell size="sm">
         <PageHeader
-          eyebrow={uiText("账号安全")}
-          title={uiText("注销申请等待生效")}
+          eyebrow={uiText("webAuthSecurity:account_security")}
+          title={uiText("webAuthSecurity:account_deletion_pending")}
         />
         <div className="glass rounded-3xl p-2">
           <div className="rounded-[20px] bg-surface/70 p-6 text-sm leading-6 sm:p-8">
             <p>
-              {uiText("申请成功后等待连续 72 小时，期间可继续登录并撤销申请。")}
+              {uiText(
+                "webAuthSecurity:deletion_takes_effect_after_72_consecutive_hours_you_can_still_sign_in_a"
+              )}
             </p>
             <p className="mt-3">
-              {uiText("生效时间：")}
+              {uiText("webAuthSecurity:takes_effect")}
               <time dateTime={request.effective_at}>
                 {new Date(request.effective_at).toLocaleString(locale, {
                   timeZoneName: "short"
@@ -349,13 +432,13 @@ function AccountDeletionForm() {
             </p>
             <p className="mt-3">
               {uiText(
-                "已确认天生币余额：{{v0}}。钱包全部收支已暂停，撤销后余额保持不变。",
+                "webAuthSecurity:confirmed_balance_v0_all_wallet_transactions_are_paused_cancelling_keeps",
                 { v0: request.confirmed_balance }
               )}
             </p>
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-foreground-muted">
               {uiText(
-                "到期后账号不可再使用，剩余天生币作废，个人数据随后完成清理。是否仍可撤销以服务器判定为准。"
+                "webAuthSecurity:once_deletion_takes_effect_the_account_cannot_be_used_remaining_expire_a"
               )}
             </p>
             {error && (
@@ -365,10 +448,12 @@ function AccountDeletionForm() {
             )}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Button disabled={deleting} onClick={cancelDeletion}>
-                {deleting ? uiText("正在撤销…") : uiText("撤销注销申请")}
+                {deleting
+                  ? uiText("webAuthSecurity:cancelling")
+                  : uiText("webAuthSecurity:cancel_deletion_request")}
               </Button>
               <Button variant="outline" onClick={() => router.back()}>
-                {uiText("返回")}
+                {uiText("webAuthSecurity:back")}
               </Button>
             </div>
           </div>
@@ -381,14 +466,14 @@ function AccountDeletionForm() {
     return (
       <PageShell size="sm">
         <PageHeader
-          eyebrow={uiText("账号安全")}
-          title={uiText("无法注销账号")}
+          eyebrow={uiText("webAuthSecurity:account_security")}
+          title={uiText("webAuthSecurity:cannot_delete_account")}
           description={uiText(
-            "当前账号没有已绑定的手机号或邮箱，请先联系客服处理。"
+            "webAuthSecurity:no_phone_number_or_email_is_bound_to_this_account_contact_support_first"
           )}
         />
         <Button variant="outline" onClick={() => router.back()}>
-          {uiText("返回")}
+          {uiText("webAuthSecurity:back")}
         </Button>
       </PageShell>
     );
@@ -409,13 +494,13 @@ function AccountDeletionForm() {
             onClick={() => router.back()}
           >
             <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
-            {uiText("返回")}
+            {uiText("webAuthSecurity:back")}
           </Button>
           <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-            {uiText("账号安全")}
+            {uiText("webAuthSecurity:account_security")}
           </p>
           <h1 className="mb-8 text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-            {uiText("注销账号")}
+            {uiText("webAuthSecurity:delete_account")}
           </h1>
 
           <div className="glass rounded-3xl p-2">
@@ -425,11 +510,11 @@ function AccountDeletionForm() {
                 className="mb-7 rounded-2xl border border-danger/20 bg-danger/5 p-4 text-danger"
               >
                 <h2 id="deletion-warning-title" className="font-semibold">
-                  {uiText("注销前请确认")}
+                  {uiText("webAuthSecurity:before_deleting_your_account")}
                 </h2>
                 <p className="mt-2 text-sm leading-6">
                   {uiText(
-                    "提交申请后 72 小时生效，期间可撤销，天生币收支将暂停。 注销生效后，账号无法使用，剩余天生币作废，个人数据将被清理。"
+                    "webAuthSecurity:deletion_takes_effect_after_72_hours_and_can_be_cancelled_before_then_tr"
                   )}
                 </p>
               </section>
@@ -437,7 +522,7 @@ function AccountDeletionForm() {
               <form className="space-y-6" onSubmit={continueDeletion}>
                 <fieldset disabled={sending || deleting}>
                   <legend className="mb-3 text-sm font-medium text-foreground">
-                    {uiText("1. 选择验证方式")}
+                    {uiText("webAuthSecurity:1_choose_a_verification_method")}
                   </legend>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {channels.map((item) => (
@@ -460,7 +545,7 @@ function AccountDeletionForm() {
                         />
                         <span className="min-w-0">
                           <span className="block font-medium">
-                            {uiText("{{v0}}验证", {
+                            {uiText("webAuthSecurity:verify_by_v0", {
                               v0: uiText(CHANNEL_LABEL[item])
                             })}
                           </span>
@@ -478,7 +563,7 @@ function AccountDeletionForm() {
                     htmlFor="account-deletion-code"
                     className="mb-2 block text-sm font-medium text-foreground"
                   >
-                    {uiText("2. 输入验证码")}
+                    {uiText("webAuthSecurity:2_enter_the_verification_code")}
                   </label>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <input
@@ -488,7 +573,9 @@ function AccountDeletionForm() {
                       autoComplete="one-time-code"
                       maxLength={6}
                       pattern="[0-9]{6}"
-                      placeholder={uiText("6 位数字验证码")}
+                      placeholder={uiText(
+                        "webAuthSecurity:6_digit_verification_code"
+                      )}
                       value={code}
                       aria-describedby="deletion-code-help"
                       disabled={sending || deleting}
@@ -505,19 +592,23 @@ function AccountDeletionForm() {
                       disabled={!canSendCode}
                     >
                       {sending
-                        ? uiText("发送中…")
+                        ? uiText("webAuthSecurity:sending_2")
                         : countdown > 0
-                          ? uiText("{{v0}} 秒后重发", { v0: countdown })
+                          ? uiText("webAuthSecurity:resend_in_v0_seconds", {
+                              v0: countdown
+                            })
                           : codeRequested
-                            ? uiText("重新发送")
-                            : uiText("获取验证码")}
+                            ? uiText("webAuthSecurity:resend")
+                            : uiText("webAuthSecurity:get_code")}
                     </Button>
                   </div>
                   <p
                     id="deletion-code-help"
                     className="mt-2 px-5 text-xs leading-5 text-foreground-muted"
                   >
-                    {uiText("请先获取验证码，再填写收到的 6 位数字。")}
+                    {uiText(
+                      "webAuthSecurity:request_a_code_first_then_enter_the_6_digits_you_receive"
+                    )}
                   </p>
                 </div>
 
@@ -538,7 +629,7 @@ function AccountDeletionForm() {
                   className="w-full"
                   disabled={!canContinue}
                 >
-                  {uiText("下一步")}
+                  {uiText("webAuthSecurity:next")}
                 </Button>
               </form>
             </div>
@@ -597,7 +688,7 @@ function AccountDeletionForm() {
               id="confirm-deletion-title"
               className="text-xl font-bold tracking-tight text-foreground"
             >
-              {uiText("确认提交注销申请？")}
+              {uiText("webAuthSecurity:submit_account_deletion_request")}
             </h2>
             <p
               id="confirm-deletion-description"
@@ -606,7 +697,7 @@ function AccountDeletionForm() {
               {deletionState.consent_text}
             </p>
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm font-medium">
-              {uiText("本次确认余额：{{v0}} 天生币", {
+              {uiText("webAuthSecurity:confirmed_balance_v0", {
                 v0: deletionState.coin_balance
               })}
             </p>
@@ -619,12 +710,16 @@ function AccountDeletionForm() {
                 onChange={(event) => setConsentChecked(event.target.checked)}
               />
               <span>
-                {uiText("我已阅读并同意以上注销规则")}
+                {uiText(
+                  "webAuthSecurity:i_have_read_and_agree_to_the_account_deletion_rules_above"
+                )}
                 {deletionState.coin_balance !== "0"
-                  ? uiText("，主动放弃本次确认的 {{v0}} 天生币", {
+                  ? uiText("webAuthSecurity:and_give_up_the_confirmed_v0", {
                       v0: deletionState.coin_balance
                     })
-                  : uiText("，确认零余额也等待连续 72 小时")}
+                  : uiText(
+                      "webAuthSecurity:and_confirm_that_a_zero_balance_also_requires_72_consecutive_hours"
+                    )}
                 。
               </span>
             </label>
@@ -640,7 +735,7 @@ function AccountDeletionForm() {
                 disabled={deleting}
                 onClick={() => setConfirmOpen(false)}
               >
-                {uiText("取消")}
+                {uiText("webAuthSecurity:cancel")}
               </Button>
               <Button
                 type="button"
@@ -648,7 +743,9 @@ function AccountDeletionForm() {
                 disabled={deleting || !consentChecked}
                 onClick={confirmDeletion}
               >
-                {deleting ? uiText("正在提交…") : uiText("提交注销申请")}
+                {deleting
+                  ? uiText("webAuthSecurity:submitting_2")
+                  : uiText("webAuthSecurity:submit_deletion_request")}
               </Button>
             </div>
           </div>

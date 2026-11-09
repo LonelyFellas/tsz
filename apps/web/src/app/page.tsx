@@ -17,7 +17,7 @@ export default function HomePage() {
         href="#home-content"
         className="sr-only fixed left-4 top-4 z-[60] rounded-full bg-surface px-5 py-3 text-primary shadow-float focus:not-sr-only focus:fixed focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <AppText source="跳到主要内容" />
+        <AppText message="webApp:skip_to_main_content" />
       </a>
       <HomeNav />
       <main

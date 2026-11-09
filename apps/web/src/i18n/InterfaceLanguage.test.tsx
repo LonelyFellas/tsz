@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
 import {
@@ -127,4 +133,45 @@ describe("Web 语言选择", () => {
     expect(f.controller.getSnapshot().preference).toBe("en-US");
     expect(f.write).not.toHaveBeenCalled();
   });
+  it.each([false, true])(
+    "保存禁用导致 blur 后恢复原选择器焦点；移到其他控件=%s 时保留新焦点",
+    async (moveFocus) => {
+      const f = fixture();
+      f.login();
+      let finish!: () => void;
+      f.write.mockImplementationOnce(async (locale) => {
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        return locale;
+      });
+      render(
+        <>
+          {f.tree()}
+          <button type="button">其他操作</button>
+        </>
+      );
+      const select = await screen.findByRole("combobox", { name: "界面语言" });
+      await waitFor(() => expect(select).not.toBeDisabled());
+      select.focus();
+      expect(select).toHaveFocus();
+      fireEvent.change(select, { target: { value: "en-GB" } });
+      await waitFor(() => expect(select).toBeDisabled());
+      // jsdom 不执行原生 disabled 的失焦，补上浏览器已经实测的同一行为。
+      document.body.tabIndex = -1;
+      document.body.focus();
+      document.body.removeAttribute("tabindex");
+      expect(document.activeElement).toBe(document.body);
+      const other = screen.getByRole("button", { name: "其他操作" });
+      if (moveFocus) other.focus();
+      await act(async () => {
+        finish();
+      });
+      await waitFor(() => expect(select).not.toBeDisabled());
+      await waitFor(() => expect(moveFocus ? other : select).toHaveFocus());
+      expect(screen.getByRole("combobox", { name: "Interface language" })).toBe(
+        select
+      );
+    }
+  );
 });

@@ -8,9 +8,10 @@ export function HomeFooter() {
   return (
     <footer className="mx-auto w-full max-w-6xl px-6">
       <div className="flex flex-col items-center gap-1 border-t border-border/60 py-10 text-xs text-foreground-subtle sm:flex-row sm:justify-between">
-        <p>{uiText("天生会背 · 词汇学习平台")}</p>
+        <p>{uiText("webHomeLanding:vocabulary_learning")}</p>
         <p>
-          © {new Date().getFullYear()} {uiText("保留所有权利")}
+          © {new Date().getFullYear()}{" "}
+          {uiText("webHomeLanding:all_rights_reserved")}
         </p>
       </div>
     </footer>

@@ -1,5 +1,6 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import { localText, type WebNotice } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthAccess as webAuth } from "@/i18n/messages/auth/access";
 
@@ -27,10 +28,19 @@ import {
 } from "../shared";
 
 // 后端对「账号不存在」与「密码错误」返回相同的 401，避免账号枚举。
-const LOGIN_ERRORS: Record<string, string> = {
-  "invalid credentials": "账号或密码错误，请重新输入",
-  "identifier is invalid": "手机号或邮箱格式错误，请检查后重试",
-  forbidden: "该账号已被禁用，请联系客服"
+const LOGIN_ERRORS: Record<string, WebNotice> = {
+  "invalid credentials": localText(
+    webAuth,
+    "webAuthAccess:incorrect_account_or_password_try_again"
+  ),
+  "identifier is invalid": localText(
+    webAuth,
+    "webAuthAccess:invalid_phone_number_or_email_check_and_try_again"
+  ),
+  forbidden: localText(
+    webAuth,
+    "webAuthAccess:this_account_is_disabled_contact_support"
+  )
 };
 
 const CODE_COUNTDOWN = 60;
@@ -141,7 +151,13 @@ export function LoginForm() {
     try {
       await completeAuthentication(signal);
     } catch {
-      if (!signal.aborted) setError("登录成功，但加载账号信息失败，请重试");
+      if (!signal.aborted)
+        setError(
+          localText(
+            webAuth,
+            "webAuthAccess:signed_in_but_account_details_could_not_be_loaded_try_again"
+          )
+        );
     }
   }
 
@@ -174,7 +190,10 @@ export function LoginForm() {
       if (codeLogin && e instanceof HttpError) {
         setError(
           e.code === "invalid_credentials"
-            ? "手机号或验证码错误，请检查后重试"
+            ? localText(
+                webAuth,
+                "webAuthAccess:incorrect_phone_number_or_verification_code_check_and_try_again"
+              )
             : securityErrorMessage(e)
         );
         setCode("");
@@ -185,7 +204,16 @@ export function LoginForm() {
         setError(securityErrorMessage(e));
       } else {
         const msg = e instanceof Error ? e.message : "";
-        setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
+        setError(
+          translateAuthError(
+            msg,
+            LOGIN_ERRORS,
+            localText(
+              webAuth,
+              "webAuthAccess:could_not_sign_in_try_again_later"
+            )
+          )
+        );
       }
     } finally {
       pending.current = false;
@@ -197,7 +225,7 @@ export function LoginForm() {
   return (
     <AuthShell>
       <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-        {uiText("登录")}
+        {uiText("webAuthAccess:sign_in")}
       </h1>
 
       {securitySuccess && (
@@ -205,7 +233,9 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          {uiText("账号安全信息已更新，请使用当前绑定的手机号或邮箱重新登录。")}
+          {uiText(
+            "webAuthAccess:account_security_details_updated_sign_in_again_with_your_currently_bound"
+          )}
         </p>
       )}
       {resetSuccess && (
@@ -213,7 +243,9 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          {uiText("密码重置成功，请用新密码登录。")}
+          {uiText(
+            "webAuthAccess:password_reset_sign_in_with_your_new_password"
+          )}
         </p>
       )}
       {deletedSuccess && (
@@ -221,7 +253,7 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          {uiText("账号已注销成功。")}
+          {uiText("webAuthAccess:account_deleted")}
         </p>
       )}
       {registeredSuccess && (
@@ -229,7 +261,9 @@ export function LoginForm() {
           role="status"
           className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success"
         >
-          {uiText("注册成功，请用刚设置的账号密码登录。")}
+          {uiText(
+            "webAuthAccess:account_created_sign_in_with_the_password_you_just_set"
+          )}
         </p>
       )}
 
@@ -244,20 +278,23 @@ export function LoginForm() {
           setError("");
         }}
       >
-        <TabsList className="mb-7" aria-label={uiText("登录方式")}>
+        <TabsList
+          className="mb-7"
+          aria-label={uiText("webAuthAccess:sign_in_method")}
+        >
           <TabsTrigger
             value="password"
             disabled={loading || sending || authenticated}
             className={sending ? "disabled:opacity-100" : undefined}
           >
-            {uiText("密码登录")}
+            {uiText("webAuthAccess:password_sign_in")}
           </TabsTrigger>
           <TabsTrigger
             value="code"
             disabled={loading || sending || authenticated}
             className={sending ? "disabled:opacity-100" : undefined}
           >
-            {uiText("验证码登录")}
+            {uiText("webAuthAccess:code_sign_in")}
           </TabsTrigger>
         </TabsList>
         <TabsContent value={method === "password" ? "code" : "password"} />
@@ -271,7 +308,11 @@ export function LoginForm() {
           >
             <FormField
               htmlFor="login-account"
-              label={codeLogin ? uiText("手机号") : uiText("手机号或邮箱")}
+              label={
+                codeLogin
+                  ? uiText("webAuthAccess:phone_number")
+                  : uiText("webAuthAccess:phone_number_or_email")
+              }
             >
               <Input
                 id="login-account"
@@ -279,8 +320,8 @@ export function LoginForm() {
                 autoComplete="username"
                 placeholder={
                   codeLogin
-                    ? uiText("请输入手机号")
-                    : uiText("请输入手机号或邮箱")
+                    ? uiText("webAuthAccess:enter_a_phone_number")
+                    : uiText("webAuthAccess:enter_your_phone_number_or_email")
                 }
                 value={account}
                 readOnly={sending}
@@ -297,14 +338,17 @@ export function LoginForm() {
               />
             </FormField>
             {codeLogin ? (
-              <FormField htmlFor="login-code" label={uiText("验证码")}>
+              <FormField
+                htmlFor="login-code"
+                label={uiText("webAuthAccess:verification_code")}
+              >
                 <div className="flex gap-2">
                   <Input
                     id="login-code"
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     maxLength={6}
-                    placeholder={uiText("请输入 6 位验证码")}
+                    placeholder={uiText("webAuthAccess:enter_the_6_digit_code")}
                     value={code}
                     readOnly={sending}
                     disabled={loading || authenticated}
@@ -321,21 +365,28 @@ export function LoginForm() {
                     onClick={() => void sendCode()}
                   >
                     {sending
-                      ? uiText("发送中…")
+                      ? uiText("webAuthAccess:sending_2")
                       : countdown
-                        ? uiText("{{v0}}s 后重发", { v0: countdown })
-                        : uiText("获取验证码")}
+                        ? uiText("webAuthAccess:resend_in_v0_s", {
+                            v0: countdown
+                          })
+                        : uiText("webAuthAccess:get_code")}
                   </Button>
                 </div>
               </FormField>
             ) : (
-              <FormField htmlFor="login-password" label={uiText("密码")}>
+              <FormField
+                htmlFor="login-password"
+                label={uiText("webAuthAccess:password_2")}
+              >
                 <div className="relative">
                   <Input
                     id="login-password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
-                    placeholder={uiText("请输入登录密码")}
+                    placeholder={uiText(
+                      "webAuthAccess:enter_your_sign_in_password"
+                    )}
                     value={password}
                     disabled={loading || sending || authenticated}
                     onChange={(e) => {
@@ -352,7 +403,9 @@ export function LoginForm() {
                     disabled={loading || sending || authenticated}
                     className="absolute right-1 top-1/2 -translate-y-1/2"
                     aria-label={
-                      showPassword ? uiText("隐藏密码") : uiText("显示密码")
+                      showPassword
+                        ? uiText("webAuthAccess:hide_password")
+                        : uiText("webAuthAccess:show_password")
                     }
                   >
                     <PasswordVisibilityIcon visible={showPassword} />
@@ -367,10 +420,10 @@ export function LoginForm() {
             )}
             <Button type="submit" disabled={!canSubmit} className="w-full">
               {loading
-                ? uiText("登录中...")
+                ? uiText("webAuthAccess:signing_in")
                 : authenticated
-                  ? uiText("重试加载")
-                  : uiText("立即登录")}
+                  ? uiText("webAuthAccess:retry_loading")
+                  : uiText("webAuthAccess:sign_in_3")}
             </Button>
           </form>
         </TabsContent>
@@ -378,15 +431,15 @@ export function LoginForm() {
 
       <div className="mt-7 flex items-center justify-between gap-4 text-sm">
         <div className="text-foreground-muted">
-          {uiText("没有账号？")}{" "}
+          {uiText("webAuthAccess:no_account_yet")}{" "}
           <button
             type="button"
             onClick={openRegistration}
             disabled={loading || sending || authenticated}
-            aria-label={uiText("没有账号，立即注册")}
+            aria-label={uiText("webAuthAccess:no_account_create_one")}
             className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
           >
-            {uiText("注册账号")}
+            {uiText("webAuthAccess:create_account")}
           </button>
         </div>
         <button
@@ -398,7 +451,7 @@ export function LoginForm() {
           }}
           className="shrink-0 rounded-sm text-foreground-muted hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
         >
-          {uiText("忘记密码")}
+          {uiText("webAuthAccess:forgot_password")}
         </button>
       </div>
     </AuthShell>

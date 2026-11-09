@@ -60,7 +60,7 @@ export function SearchHistory({
     <div className={`relative mt-4 ${styles.root}`}>
       <div
         ref={scrollRef}
-        aria-label={uiText("搜索历史")}
+        aria-label={uiText("webDictionary:search_history")}
         className={`max-w-full scroll-px-12 overflow-x-auto pb-2 ${styles.scroller}`}
         style={{
           maskImage:
@@ -87,7 +87,9 @@ export function SearchHistory({
                 type="button"
                 size="icon"
                 variant="ghost"
-                aria-label={uiText("删除历史 {{v0}}", { v0: term })}
+                aria-label={uiText("webDictionary:delete_history_item_v0", {
+                  v0: term
+                })}
                 className="focus-visible:-outline-offset-2"
                 onClick={() => onRemove(term)}
               >
@@ -103,7 +105,7 @@ export function SearchHistory({
             type="button"
             size="icon"
             variant="ghost"
-            aria-label={uiText("向左滚动搜索历史")}
+            aria-label={uiText("webDictionary:scroll_search_history_left")}
             aria-disabled={!edges.left}
             tabIndex={edges.left ? 0 : -1}
             onClick={() => handleScroll(-1)}
@@ -117,7 +119,7 @@ export function SearchHistory({
             type="button"
             size="icon"
             variant="ghost"
-            aria-label={uiText("向右滚动搜索历史")}
+            aria-label={uiText("webDictionary:scroll_search_history_right")}
             aria-disabled={!edges.right}
             tabIndex={edges.right ? 0 : -1}
             onClick={() => handleScroll(1)}

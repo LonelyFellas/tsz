@@ -1,12 +1,13 @@
 "use client";
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webShell } from "@/i18n/messages/shell";
 
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
 import {
+  type LucideIcon,
   BarChart3,
   BookOpen,
   BookSearch,
@@ -20,6 +21,7 @@ import {
   Wallet,
   X
 } from "lucide-react";
+
 import {
   Popover,
   PopoverClose,
@@ -31,54 +33,146 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 import { BrandMark } from "@/features/home/components/BrandMark";
 import { AccountControls, type TopbarPanel } from "./AccountControls";
 
-type NavItem = { href: string; label: string; icon: LucideIcon };
+type NavItem = {
+  href: string;
+  label: import("@/i18n/catalog").WebNotice;
+  icon: LucideIcon;
+};
 
 const STUDENT_NAV: NavItem[][] = [
   [
-    { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
-    { href: "/student/practice", label: "我的任务", icon: ClipboardList },
-    { href: "/student/review", label: "今日复习", icon: BookOpen },
-    { href: "/dictionary", label: "词典", icon: BookSearch },
-    { href: "/wordlists", label: "词库广场", icon: Globe }
+    {
+      href: "/account/wordlists",
+      label: localText(webShell, "webShell:my_word_lists"),
+      icon: BookOpen
+    },
+    {
+      href: "/student/practice",
+      label: localText(webShell, "webShell:my_tasks"),
+      icon: ClipboardList
+    },
+    {
+      href: "/student/review",
+      label: localText(webShell, "webShell:review_today"),
+      icon: BookOpen
+    },
+    {
+      href: "/dictionary",
+      label: localText(webShell, "webShell:dictionary"),
+      icon: BookSearch
+    },
+    {
+      href: "/wordlists",
+      label: localText(webShell, "webShell:word_list_library"),
+      icon: Globe
+    }
   ],
   [
-    { href: "/student/home", label: "学习首页", icon: LayoutGrid },
-    { href: "/account/coins", label: "天生币", icon: Wallet },
-    { href: "/account/profile", label: "个人资料", icon: UserRound }
+    {
+      href: "/student/home",
+      label: localText(webShell, "webShell:learning_home"),
+      icon: LayoutGrid
+    },
+    {
+      href: "/account/coins",
+      label: localText(webShell, "webShell:coins"),
+      icon: Wallet
+    },
+    {
+      href: "/account/profile",
+      label: localText(webShell, "webShell:profile"),
+      icon: UserRound
+    }
   ]
 ];
 
 const TEACHER_NAV: NavItem[][] = [
   [
-    { href: "/teacher/classes", label: "我的班级", icon: Users },
-    { href: "/teacher/tasks", label: "教学任务", icon: ClipboardList },
-    { href: "/teacher/stats", label: "学习数据", icon: BarChart3 }
+    {
+      href: "/teacher/classes",
+      label: localText(webShell, "webShell:my_classes"),
+      icon: Users
+    },
+    {
+      href: "/teacher/tasks",
+      label: localText(webShell, "webShell:teaching_tasks"),
+      icon: ClipboardList
+    },
+    {
+      href: "/teacher/stats",
+      label: localText(webShell, "webShell:learning_data"),
+      icon: BarChart3
+    }
   ],
   [
-    { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
-    { href: "/dictionary", label: "词典", icon: BookSearch },
-    { href: "/wordlists", label: "词库广场", icon: Globe },
-    { href: "/account/profile", label: "个人资料", icon: UserRound }
+    {
+      href: "/account/wordlists",
+      label: localText(webShell, "webShell:my_word_lists"),
+      icon: BookOpen
+    },
+    {
+      href: "/dictionary",
+      label: localText(webShell, "webShell:dictionary"),
+      icon: BookSearch
+    },
+    {
+      href: "/wordlists",
+      label: localText(webShell, "webShell:word_list_library"),
+      icon: Globe
+    },
+    {
+      href: "/account/profile",
+      label: localText(webShell, "webShell:profile"),
+      icon: UserRound
+    }
   ]
 ];
 
 // 已登录但既非学生、也不在教学工作台：只保留与学习身份无关的入口。
 const ACCOUNT_NAV: NavItem[][] = [
   [
-    { href: "/account/wordlists", label: "我的词表", icon: BookOpen },
-    { href: "/dictionary", label: "词典", icon: BookSearch },
-    { href: "/wordlists", label: "词库广场", icon: Globe }
+    {
+      href: "/account/wordlists",
+      label: localText(webShell, "webShell:my_word_lists"),
+      icon: BookOpen
+    },
+    {
+      href: "/dictionary",
+      label: localText(webShell, "webShell:dictionary"),
+      icon: BookSearch
+    },
+    {
+      href: "/wordlists",
+      label: localText(webShell, "webShell:word_list_library"),
+      icon: Globe
+    }
   ],
   [
-    { href: "/account/coins", label: "天生币", icon: Wallet },
-    { href: "/account/profile", label: "个人资料", icon: UserRound }
+    {
+      href: "/account/coins",
+      label: localText(webShell, "webShell:coins"),
+      icon: Wallet
+    },
+    {
+      href: "/account/profile",
+      label: localText(webShell, "webShell:profile"),
+      icon: UserRound
+    }
   ]
 ];
 
 const GUEST_NAV: NavItem[][] = [
   [
-    { href: "/dictionary", label: "词典", icon: BookSearch },
-    { href: "/wordlists", label: "词库广场", icon: Globe }
+    {
+      href: "/dictionary",
+      label: localText(webShell, "webShell:dictionary"),
+      icon: BookSearch
+    },
+    {
+      href: "/wordlists",
+      label: localText(webShell, "webShell:word_list_library"),
+      icon: Globe
+    }
   ]
 ];
 
@@ -91,7 +185,7 @@ function PanelHeading({ title }: { title: string }) {
     <div className="mb-5 flex items-center justify-between gap-3">
       <h2 className="text-lg font-bold tracking-tight">{title}</h2>
       <PopoverClose
-        aria-label={uiText("关闭{{v0}}", { v0: title })}
+        aria-label={uiText("webShell:close_v0", { v0: title })}
         className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <X className="size-[18px]" strokeWidth={1.5} aria-hidden />
@@ -134,7 +228,11 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
         ? STUDENT_NAV
         : ACCOUNT_NAV;
   const menuTitle = uiText(
-    teaching ? "教学菜单" : studying ? "学习菜单" : "网站菜单"
+    teaching
+      ? "webShell:teaching_menu"
+      : studying
+        ? "webShell:learning_menu"
+        : "webShell:website_menu"
   );
 
   function toggle(name: "navigation" | "settings", open: boolean) {
@@ -153,7 +251,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
             className="group inline-flex h-11 items-center gap-2.5 rounded-full px-3 text-base font-bold tracking-tight text-foreground transition-colors hover:bg-surface/80 focus-visible:outline-2 focus-visible:outline-primary data-[state=open]:bg-surface data-[state=open]:shadow-glass"
           >
             <BrandMark />
-            {uiText("天生会背")}
+            {uiText("webShell:brand")}
             <ChevronDown
               className="size-4 text-foreground-muted transition-transform duration-200 group-data-[state=open]:rotate-180"
               strokeWidth={1.8}
@@ -171,7 +269,9 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
             }}
           >
             <PanelHeading title={menuTitle} />
-            <nav aria-label={uiText("{{v0}}导航", { v0: menuTitle })}>
+            <nav
+              aria-label={uiText("webShell:v0_navigation", { v0: menuTitle })}
+            >
               {groups.map((items, index) => (
                 <ul
                   key={index}
@@ -205,7 +305,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
                 className="mt-3 flex min-h-11 items-center gap-2.5 rounded-xl border-t border-border/70 px-3 pt-3 text-sm text-foreground-muted outline-hidden transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <Home className="size-[18px]" strokeWidth={1.5} aria-hidden />
-                {uiText("返回网站首页")}
+                {uiText("webShell:go_to_website_home")}
               </Link>
             </nav>
           </PopoverContent>
@@ -225,7 +325,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
               href="/login"
               className="glass inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium tracking-wide text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
             >
-              {uiText("登录")}
+              {uiText("webShell:sign_in")}
             </Link>
           ) : null}
         </div>

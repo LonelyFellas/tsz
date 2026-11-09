@@ -66,9 +66,9 @@ describe("Web 请求语言输入", () => {
     mocks.hint = "zh-Hant";
     const second = getServerWebText(webApp);
     const [english, traditional] = await Promise.all([first, second]);
-    expect(english("登录")).toBe("Sign in");
-    expect(traditional("登录")).toBe("登入");
-    expect(english("登录")).toBe("Sign in");
+    expect(english("webApp:sign_in")).toBe("Sign in");
+    expect(traditional("webApp:sign_in")).toBe("登入");
+    expect(english("webApp:sign_in")).toBe("Sign in");
   });
 });
 

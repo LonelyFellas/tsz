@@ -1,7 +1,7 @@
 "use client";
-import { useWebLocale } from "@/i18n/client";
+import { useWebLocale, useWebText } from "@/i18n/client";
 import { localText, type WebNotice } from "@/i18n/catalog";
-import { useWebText } from "@/i18n/client";
+
 import { webWordlistInteractions as webWordlist } from "@/i18n/messages/wordlist/interactions";
 
 import { useEffect, useRef, useState } from "react";
@@ -115,7 +115,12 @@ function TipForm({
   const [like, setLike] = useState(recovery.pending?.like ?? !recovery.pending);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<WebNotice>(
-    recovery.error ? "无法读取本机的投币重试记录，请先到投币记录核对结果。" : ""
+    recovery.error
+      ? localText(
+          webWordlist,
+          "webWordlistInteractions:cannot_read_this_device_s_pending_tip_record_check_your_tip_history_firs"
+        )
+      : ""
   );
   const [success, setSuccess] = useState<string | null>(null);
   const mounted = useRef(false);
@@ -222,9 +227,13 @@ function TipForm({
       setPending(null);
       setSuccess(receipt.amount);
       setMessage(
-        localText("已投出 {{v0}}，作者已收到。", {
-          v0: formatCoins(receipt.amount)
-        })
+        localText(
+          webWordlist,
+          "webWordlistInteractions:tipped_v0_the_author_has_received_it",
+          {
+            v0: formatCoins(receipt.amount)
+          }
+        )
       );
       void client
         .invalidateQueries({ queryKey: wordListKeys.all })
@@ -243,25 +252,62 @@ function TipForm({
       ) {
         sessionStorage.removeItem(storageKey);
         setPending(null);
-        const messages: Record<string, string> = {
-          coin_insufficient_balance: "余额不足，请查看钱包。",
-          coin_wallet_unavailable: "你或作者的账户当前暂停收支。",
-          coin_account_unavailable: "你或作者的账户当前不可用。",
-          coin_invalid_amount: "每次可投 1 枚或 2 枚，请重新选择。",
-          word_list_tip_limit: "这份词表累计最多投 2 枚，请刷新投币状态。",
-          word_list_conflict: "词条曾不可用，作者修复并重新审核后才能投币。",
-          word_list_entry_unavailable: "词表含不可用词条，暂不能投币。",
-          validation_failed: "词表含不可用词条，暂不能投币。",
-          not_found: "词表已下架或不可访问。",
-          forbidden: "不能给自己的词表投币。"
+        const messages: Record<string, WebNotice> = {
+          coin_insufficient_balance: localText(
+            webWordlist,
+            "webWordlistInteractions:insufficient_balance_check_your_wallet"
+          ),
+          coin_wallet_unavailable: localText(
+            webWordlist,
+            "webWordlistInteractions:your_account_or_the_author_s_account_has_transactions_paused"
+          ),
+          coin_account_unavailable: localText(
+            webWordlist,
+            "webWordlistInteractions:your_account_or_the_author_s_account_is_unavailable"
+          ),
+          coin_invalid_amount: localText(
+            webWordlist,
+            "webWordlistInteractions:you_can_tip_1_or_2_coins_at_a_time_choose_again"
+          ),
+          word_list_tip_limit: localText(
+            webWordlist,
+            "webWordlistInteractions:this_list_can_receive_at_most_2_coins_from_you_refresh_the_tip_status"
+          ),
+          word_list_conflict: localText(
+            webWordlist,
+            "webWordlistInteractions:some_entries_were_unavailable_the_author_must_fix_the_list_and_have_it_r"
+          ),
+          word_list_entry_unavailable: localText(
+            webWordlist,
+            "webWordlistInteractions:this_list_contains_unavailable_entries_and_cannot_receive_tips_yet"
+          ),
+          validation_failed: localText(
+            webWordlist,
+            "webWordlistInteractions:this_list_contains_unavailable_entries_and_cannot_receive_tips_yet"
+          ),
+          not_found: localText(
+            webWordlist,
+            "webWordlistInteractions:the_list_was_withdrawn_or_is_inaccessible"
+          ),
+          forbidden: localText(
+            webWordlist,
+            "webWordlistInteractions:you_cannot_tip_your_own_word_list"
+          )
         };
         setMessage(
-          messages[error.code ?? ""] ?? "投币被拒绝，请刷新词表并检查账户状态。"
+          messages[error.code ?? ""] ??
+            localText(
+              webWordlist,
+              "webWordlistInteractions:tip_rejected_refresh_the_word_list_and_check_your_account_status"
+            )
         );
         onRetry();
       } else
         setMessage(
-          "结果尚未确认，请使用原请求重试，或先查看投币记录；不要重复发起新投币。"
+          localText(
+            webWordlist,
+            "webWordlistInteractions:the_result_is_unconfirmed_retry_the_original_request_or_check_your_tip_h"
+          )
         );
     } finally {
       if (activeRequest.current === controller) activeRequest.current = null;
@@ -269,16 +315,22 @@ function TipForm({
     }
   }
   return (
-    <LibraryDialog title={uiText("给作者投币")} busy={busy} onClose={onClose}>
+    <LibraryDialog
+      title={uiText("webWordlistInteractions:tip_the_author")}
+      busy={busy}
+      onClose={onClose}
+    >
       <p className="break-words text-center text-sm leading-6 text-foreground-muted">
-        {uiText("给 {{v0}} 投出 ", { v0: list.owner_name })}
+        {uiText("webWordlistInteractions:tip_v0", { v0: list.owner_name })}
         <strong className="text-2xl font-semibold tabular-nums text-primary">
           {amount}
         </strong>{" "}
-        {uiText("枚天生币")}
+        {uiText("webWordlistInteractions:brand")}
       </p>
       <p className="mt-2 text-center text-xs leading-5 text-foreground-muted">
-        {uiText("每份词表累计最多投 2 枚，全额进入作者钱包。")}
+        {uiText(
+          "webWordlistInteractions:you_can_tip_at_most_2_coins_per_list_in_total_the_author_receives_the_fu"
+        )}
       </p>
       {!success && (
         <>
@@ -292,7 +344,9 @@ function TipForm({
               remaining === null
             }
           >
-            <legend className="sr-only">{uiText("投币数量")}</legend>
+            <legend className="sr-only">
+              {uiText("webWordlistInteractions:tip_amount")}
+            </legend>
             {[1, 2].map((value) => (
               <label
                 key={value}
@@ -311,7 +365,9 @@ function TipForm({
                   checked={amount === String(value)}
                   disabled={remaining !== null && value > remaining}
                   onChange={() => setSelected(String(value))}
-                  aria-label={uiText("{{v0}} 枚天生币", { v0: value })}
+                  aria-label={uiText("webWordlistInteractions:v0", {
+                    v0: value
+                  })}
                 />
                 <span className="flex gap-1" aria-hidden>
                   {Array.from({ length: value }, (_, i) => (
@@ -319,7 +375,7 @@ function TipForm({
                   ))}
                 </span>
                 <span className="text-sm font-medium">
-                  {uiText("{{v0}} 枚天生币", { v0: value })}
+                  {uiText("webWordlistInteractions:v0", { v0: value })}
                 </span>
                 {amount === String(value) && (
                   <Check
@@ -338,12 +394,12 @@ function TipForm({
               disabled={busy || !!pending || recovery.error}
               onChange={(e) => setLike(e.target.checked)}
             />
-            {uiText("同时点赞内容")}
+            {uiText("webWordlistInteractions:also_like_this_content")}
           </label>
           {pending && (
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
               {uiText(
-                "有一笔 {{v0}} 枚天生币的投币待确认，将先核对这次结果。",
+                "webWordlistInteractions:a_tip_of_v0_is_pending_its_result_will_be_checked_first",
                 {
                   v0: pending.amount
                 }
@@ -353,8 +409,12 @@ function TipForm({
           {!pending && !failed && remaining !== null && remaining < 2 && (
             <p className="mt-2 text-sm text-foreground-muted">
               {remaining === 0
-                ? uiText("这份词表已投满 2 枚。")
-                : uiText("已投 1 枚，还可投 1 枚。")}
+                ? uiText(
+                    "webWordlistInteractions:you_have_tipped_the_maximum_2_coins_for_this_list"
+                  )
+                : uiText(
+                    "webWordlistInteractions:you_have_tipped_1_coin_and_can_tip_1_more"
+                  )}
             </p>
           )}
           {!pending && (failed || remaining === null) && (
@@ -363,15 +423,15 @@ function TipForm({
               className="mt-2 text-sm text-foreground-muted"
             >
               {failed
-                ? uiText("投币状态加载失败。")
-                : uiText("正在读取投币状态…")}
+                ? uiText("webWordlistInteractions:could_not_load_tip_status")
+                : uiText("webWordlistInteractions:loading_tip_status")}
               {failed && (
                 <button
                   type="button"
                   className={textButtonClass}
                   onClick={onRetry}
                 >
-                  {uiText("重试")}
+                  {uiText("webWordlistInteractions:retry")}
                 </button>
               )}
             </p>
@@ -403,23 +463,23 @@ function TipForm({
           onClick={success ? onClose : () => void send()}
         >
           {busy
-            ? uiText("正在确认…")
+            ? uiText("webWordlistInteractions:confirming")
             : success
-              ? uiText("完成")
+              ? uiText("webWordlistInteractions:done")
               : pending
-                ? uiText("重试这次投币")
-                : uiText("确认投出")}
+                ? uiText("webWordlistInteractions:retry_this_tip")
+                : uiText("webWordlistInteractions:confirm_tip")}
         </Button>
       </div>
       <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
         <Link className="text-primary hover:underline" href="/account/coins">
-          {uiText("查看钱包")}
+          {uiText("webWordlistInteractions:view_wallet")}
         </Link>
         <Link
           className="text-primary hover:underline"
           href="/account/wordlist-tips"
         >
-          {uiText("查看我的投币记录 →")}
+          {uiText("webWordlistInteractions:view_my_tip_history")}
         </Link>
       </div>
     </LibraryDialog>
@@ -441,24 +501,29 @@ function TipHistory({ userId }: { userId: string }) {
   return (
     <PageShell>
       <PageHeader
-        back={{ href: "/account/coins", label: uiText("我的天生币") }}
-        eyebrow={uiText("天生币")}
-        title={uiText("词表投币记录")}
-        description={uiText("投出和收到的记录均来自实际转账。")}
+        back={{
+          href: "/account/coins",
+          label: uiText("webWordlistInteractions:my_coins")
+        }}
+        eyebrow={uiText("webWordlistInteractions:coins")}
+        title={uiText("webWordlistInteractions:word_list_tips")}
+        description={uiText(
+          "webWordlistInteractions:sent_and_received_records_reflect_actual_transfers"
+        )}
       />
       {query.isError ? (
         <PageNotice tone="error">
-          {uiText("记录读取失败，")}
+          {uiText("webWordlistInteractions:could_not_load_records")}
           <button
             className={textButtonClass}
             onClick={() => void query.refetch()}
           >
-            {uiText("重试")}
+            {uiText("webWordlistInteractions:retry")}
           </button>
           。
         </PageNotice>
       ) : query.isPending ? (
-        <PageNotice>{uiText("正在加载…")}</PageNotice>
+        <PageNotice>{uiText("webWordlistInteractions:loading")}</PageNotice>
       ) : (
         <>
           {query.data.items.length ? (
@@ -469,7 +534,9 @@ function TipHistory({ userId }: { userId: string }) {
                   <li key={tip.event_id} className={panelClass}>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                       <p className="text-lg font-bold tabular-nums tracking-tight">
-                        {sent ? uiText("投出") : uiText("收到")}{" "}
+                        {sent
+                          ? uiText("webWordlistInteractions:tip")
+                          : uiText("webWordlistInteractions:received")}{" "}
                         {formatCoins(tip.amount)}
                       </p>
                       <p className="text-xs text-foreground-muted">
@@ -480,8 +547,12 @@ function TipHistory({ userId }: { userId: string }) {
                       </p>
                     </div>
                     <p className="mt-3 text-sm">
-                      {sent ? uiText("作者") : uiText("投币人")}：
-                      {tip.counterparty_name ?? uiText("账号已注销")}
+                      {sent
+                        ? uiText("webWordlistInteractions:author")
+                        : uiText("webWordlistInteractions:tipper")}
+                      ：
+                      {tip.counterparty_name ??
+                        uiText("webWordlistInteractions:deleted_account")}
                     </p>
                     {tip.wordlist_accessible ? (
                       <Link
@@ -492,18 +563,24 @@ function TipHistory({ userId }: { userId: string }) {
                       </Link>
                     ) : (
                       <p className="mt-1 text-sm text-foreground-muted">
-                        {uiText("词表已删除或不可访问")}
+                        {uiText(
+                          "webWordlistInteractions:word_list_deleted_or_inaccessible"
+                        )}
                       </p>
                     )}
                     <p className="mt-3 break-all text-xs text-foreground-subtle">
-                      {uiText("事件 ID：{{v0}}", { v0: tip.event_id })}
+                      {uiText("webWordlistInteractions:event_id_v0", {
+                        v0: tip.event_id
+                      })}
                     </p>
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <PageNotice>{uiText("暂无投币记录")}</PageNotice>
+            <PageNotice>
+              {uiText("webWordlistInteractions:no_tip_records_yet")}
+            </PageNotice>
           )}
           <Pager
             page={page}

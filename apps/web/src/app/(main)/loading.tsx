@@ -3,7 +3,7 @@ import { AppText } from "@/i18n/AppText";
 export default function MainLoading() {
   return (
     <p className="py-16 text-center text-foreground-muted">
-      <AppText source="加载中…" />
+      <AppText message="webApp:loading" />
     </p>
   );
 }

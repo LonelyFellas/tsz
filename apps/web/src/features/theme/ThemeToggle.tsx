@@ -17,8 +17,14 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={toggle}
-      aria-label={isDark ? uiText("切换到浅色模式") : uiText("切换到深色模式")}
-      title={isDark ? uiText("浅色模式") : uiText("深色模式")}
+      aria-label={
+        isDark
+          ? uiText("webTheme:switch_to_light_mode")
+          : uiText("webTheme:switch_to_dark_mode")
+      }
+      title={
+        isDark ? uiText("webTheme:light_mode") : uiText("webTheme:dark_mode")
+      }
       className={cn(
         "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted transition hover:bg-muted hover:text-foreground",
         className

@@ -2,6 +2,11 @@ import { defineWebMessages } from "../../catalog";
 export const webWordlistEditor = /* @__PURE__ */ defineWebMessages(
   "webWordlistEditor",
   {
+    pending_save_unreadable: [
+      "待确认的词表保存记录无法读取，请保留此页面并联系支持。",
+      "無法讀取待確認的詞表儲存記錄，請保留此頁面並聯絡支援。",
+      "Could not read the pending word list save. Keep this page open and contact support."
+    ],
     audio_queued: ["语音等待生成", "語音等待產生", "Audio queued"],
     generating_audio: ["语音生成中", "語音產生中", "Generating audio"],
     audio_generated: ["语音已生成", "語音已生成", "Audio generated"],

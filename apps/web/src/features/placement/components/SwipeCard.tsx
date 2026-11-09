@@ -172,20 +172,20 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(
           aria-hidden
           className="pointer-events-none absolute left-5 top-5 -rotate-12 rounded-lg border-2 border-primary bg-primary-muted px-3 py-1 text-lg font-bold text-primary opacity-0"
         >
-          {uiText("认识")}
+          {uiText("webPlacement:know_it")}
         </span>
         <span
           ref={idkRef}
           aria-hidden
           className="pointer-events-none absolute right-5 top-5 rotate-12 rounded-lg border-2 border-foreground-subtle bg-muted px-3 py-1 text-lg font-bold text-foreground-muted opacity-0"
         >
-          {uiText("不认识")}
+          {uiText("webPlacement:don_t_know_it")}
         </span>
         <span className="tsz-words max-w-full break-words px-6 text-center">
           {word}
         </span>
         <span className="text-xs text-foreground-subtle">
-          {uiText("你认识这个单词吗？")}
+          {uiText("webPlacement:do_you_know_this_word")}
         </span>
       </div>
     );

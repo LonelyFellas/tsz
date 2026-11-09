@@ -1,7 +1,8 @@
 "use client";
-import { webErrorText } from "@/i18n/catalog";
-import { useWebLocale } from "@/i18n/client";
-import { useWebText } from "@/i18n/client";
+import { webCommon, localText, webErrorText } from "@/i18n/catalog";
+
+import { useWebLocale, useWebText } from "@/i18n/client";
+
 import { webTeacherCertificationDocuments as webTeacherCertification } from "@/i18n/messages/teacher-certification/documents";
 
 import { useQuery } from "@tanstack/react-query";
@@ -17,16 +18,40 @@ import {
 } from "@/features/shell/Page";
 
 const statuses = {
-  pending: "待审核",
-  approved: "已通过",
-  rejected: "已驳回",
-  revoked: "已撤销"
+  pending: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:pending_review"
+  ),
+  approved: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:approved"
+  ),
+  rejected: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:rejected"
+  ),
+  revoked: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:reversed"
+  )
 };
 const kinds = {
-  id_front: "身份证人像面",
-  id_back: "身份证国徽面",
-  education: "学历证书",
-  language: "语言成绩"
+  id_front: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:identity_card_front"
+  ),
+  id_back: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:identity_card_back"
+  ),
+  education: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:education_certificate"
+  ),
+  language: localText(
+    webTeacherCertification,
+    "webTeacherCertificationDocuments:language_test_results"
+  )
 };
 
 export function ApplicationDetail({ id }: { id: string }) {
@@ -39,27 +64,68 @@ export function ApplicationDetail({ id }: { id: string }) {
     enabled: !!userId
   });
   if (query.isPending)
-    return <PageNotice>{uiText("正在读取申请…")}</PageNotice>;
+    return (
+      <PageNotice>
+        {uiText("webTeacherCertificationDocuments:loading_application")}
+      </PageNotice>
+    );
   if (query.isError)
     return (
       <PageNotice tone="error">
-        <p>{uiText(webErrorText(query.error, "数据暂不可用，请刷新后重试"))}</p>
+        <p>
+          {uiText(
+            webErrorText(
+              query.error,
+              localText(webCommon, "webCommon:response_unavailable")
+            )
+          )}
+        </p>
         <button
           type="button"
           className={cn(textButtonClass, "mt-3")}
           onClick={() => void query.refetch()}
         >
-          {uiText("重试")}
+          {uiText("webTeacherCertificationDocuments:retry")}
         </button>
       </PageNotice>
     );
   const { application, files } = query.data;
-  const fields: [string, string | null][] = [
-    ["真实姓名", application.real_name],
-    ["联系方式", application.contact],
-    ["认证说明", application.statement],
-    ["审核原因", application.review_reason],
-    ["撤销原因", application.revoke_reason]
+  const fields: [import("@/i18n/catalog").LocalText, string | null][] = [
+    [
+      localText(
+        webTeacherCertification,
+        "webTeacherCertificationDocuments:full_name"
+      ),
+      application.real_name
+    ],
+    [
+      localText(
+        webTeacherCertification,
+        "webTeacherCertificationDocuments:contact_details"
+      ),
+      application.contact
+    ],
+    [
+      localText(
+        webTeacherCertification,
+        "webTeacherCertificationDocuments:certification_statement"
+      ),
+      application.statement
+    ],
+    [
+      localText(
+        webTeacherCertification,
+        "webTeacherCertificationDocuments:review_reason"
+      ),
+      application.review_reason
+    ],
+    [
+      localText(
+        webTeacherCertification,
+        "webTeacherCertificationDocuments:reason_for_reversal"
+      ),
+      application.revoke_reason
+    ]
   ];
   return (
     <div className="space-y-6">
@@ -83,7 +149,7 @@ export function ApplicationDetail({ id }: { id: string }) {
               ([label, value]) =>
                 value && (
                   <div
-                    key={label}
+                    key={label.key}
                     className="grid gap-1 py-4 first:pt-0 last:pb-0 sm:grid-cols-[96px_1fr] sm:gap-4"
                   >
                     <dt className="text-sm text-foreground-muted">
@@ -110,7 +176,9 @@ export function ApplicationDetail({ id }: { id: string }) {
         </div>
       )}
       <Link href="/apply-teacher" className={buttonClass}>
-        {uiText("查看当前认证状态")}
+        {uiText(
+          "webTeacherCertificationDocuments:view_current_certification_status"
+        )}
       </Link>
     </div>
   );

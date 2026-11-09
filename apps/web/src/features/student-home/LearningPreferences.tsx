@@ -1,4 +1,5 @@
 "use client";
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webStudentHomePreferences as webStudentHome } from "@/i18n/messages/student-home/preferences";
 
@@ -50,23 +51,29 @@ export function LearningPreferences({ userId }: { userId: string }) {
       <InterfaceLanguage />
       <div>
         {profile.isPending ? (
-          <p role="status">{uiText("正在读取学习偏好…")}</p>
+          <p role="status">
+            {uiText("webStudentHomePreferences:loading_learning_preferences")}
+          </p>
         ) : profile.isError ? (
           <div role="alert" className="space-y-3 text-sm">
-            <p>{uiText("学习偏好读取失败，请重试。")}</p>
+            <p>
+              {uiText(
+                "webStudentHomePreferences:could_not_load_learning_preferences_try_again"
+              )}
+            </p>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => void profile.refetch()}
             >
-              {uiText("重试")}
+              {uiText("webStudentHomePreferences:retry")}
             </Button>
           </div>
         ) : !settings ? (
           <Button asChild variant="outline">
             <Link href="/onboarding?redirect=%2Fstudent%2Fhome">
-              {uiText("完成学习设置")}
+              {uiText("webStudentHomePreferences:complete_learning_settings")}
             </Link>
           </Button>
         ) : (
@@ -87,13 +94,25 @@ export function LearningPreferences({ userId }: { userId: string }) {
           >
             <fieldset disabled={save.isPending} className="space-y-2">
               <legend className="ml-4 text-sm font-medium">
-                {uiText("英美偏好")}
+                {uiText("webStudentHomePreferences:english_preference")}
               </legend>
               <div className="grid grid-cols-2 gap-1 rounded-full border border-border/60 bg-muted p-1">
                 {(
                   [
-                    ["BrE", "英式英语"],
-                    ["AmE", "美式英语"]
+                    [
+                      "BrE",
+                      localText(
+                        webStudentHome,
+                        "webStudentHomePreferences:british_english"
+                      )
+                    ],
+                    [
+                      "AmE",
+                      localText(
+                        webStudentHome,
+                        "webStudentHomePreferences:american_english"
+                      )
+                    ]
                   ] as const
                 ).map(([value, label]) => (
                   <label
@@ -118,7 +137,7 @@ export function LearningPreferences({ userId }: { userId: string }) {
             </fieldset>
             <div className="pl-4 text-xs text-foreground-muted">
               <p>
-                {uiText("当前难度：")}
+                {uiText("webStudentHomePreferences:current_level")}
                 <span className="font-medium text-foreground">
                   {settings.cefr_level}
                 </span>
@@ -128,13 +147,17 @@ export function LearningPreferences({ userId }: { userId: string }) {
               <p role="alert" className="text-sm text-danger">
                 {save.error instanceof HttpError &&
                 save.error.code === "cefr_level_locked"
-                  ? uiText("难度已在其他页面确认，请关闭并重新打开设置。")
-                  : uiText("保存失败，请重试。")}
+                  ? uiText(
+                      "webStudentHomePreferences:your_level_was_confirmed_on_another_page_close_and_reopen_settings"
+                    )
+                  : uiText(
+                      "webStudentHomePreferences:could_not_save_try_again"
+                    )}
               </p>
             )}
             {save.isSuccess && (
               <p role="status" className="text-sm text-success">
-                {uiText("英美偏好已保存")}
+                {uiText("webStudentHomePreferences:english_preference_saved")}
               </p>
             )}
             <div className="flex justify-end">
@@ -149,7 +172,11 @@ export function LearningPreferences({ userId }: { userId: string }) {
                   save.isPending || variant === settings.english_variant
                 }
               >
-                {save.isPending ? uiText("保存中…") : uiText("保存学习偏好")}
+                {save.isPending
+                  ? uiText("webStudentHomePreferences:saving")
+                  : uiText(
+                      "webStudentHomePreferences:save_learning_preferences"
+                    )}
               </Button>
             </div>
           </form>

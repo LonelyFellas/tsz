@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("我的词表"),
+    title: uiText("webApp:my_word_lists"),
     robots: { index: false, follow: false }
   };
 }

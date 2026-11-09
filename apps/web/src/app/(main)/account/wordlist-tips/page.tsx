@@ -6,7 +6,7 @@ import { WordlistTips } from "@/features/wordlist/components/WordlistTips";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("词表投币记录"),
+    title: uiText("webApp:word_list_tips"),
     robots: { index: false, follow: false }
   };
 }

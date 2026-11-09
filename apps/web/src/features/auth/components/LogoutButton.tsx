@@ -21,7 +21,9 @@ export function LogoutButton() {
       disabled={loading}
       className="text-sm text-foreground-muted hover:text-foreground disabled:opacity-40 transition-colors"
     >
-      {loading ? uiText("退出中...") : uiText("退出登录")}
+      {loading
+        ? uiText("webAuthAccess:signing_out")
+        : uiText("webAuthAccess:sign_out")}
     </button>
   );
 }

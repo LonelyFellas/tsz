@@ -1,5 +1,6 @@
 "use client";
-import { LocalWebError } from "@/i18n/catalog";
+import { localText, LocalWebError } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webTask } from "@/i18n/messages/task";
 
@@ -32,32 +33,34 @@ export function LearningAnswerAudio({
   return (
     <div className="mt-2 flex min-h-11 items-center gap-2 text-xs text-foreground-muted">
       {available && audio.isPending ? (
-        uiText("正在读取正式音频…")
+        uiText("webTask:loading_final_audio")
       ) : !available || !audio.data?.audio ? (
         <span>
           {audio.isError ? (
             <>
-              <span>{uiText("正式音频读取失败")}</span>
+              <span>{uiText("webTask:could_not_load_published_audio")}</span>
               <button
                 type="button"
                 className="ml-2 min-h-11 text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => void audio.refetch()}
               >
-                {uiText("重试音频")}
+                {uiText("webTask:retry_audio")}
               </button>
             </>
           ) : (
-            uiText("暂无可用的正式音频")
+            uiText("webTask:no_published_audio_available")
           )}
         </span>
       ) : (
         <>
           <span>
-            {accent === "uk" ? uiText("英式") : uiText("美式")}
-            {uiText("发音")}
+            {accent === "uk"
+              ? uiText("webTask:british")
+              : uiText("webTask:american")}
+            {uiText("webTask:pronunciation")}
           </span>
           <AudioButton
-            label={uiText("播放答案发音")}
+            label={uiText("webTask:play_answer_pronunciation")}
             resourceKey={`learning:${runId}:${questionId}:${accent}`}
             sign={async (signal) => {
               const result = await api.learning.audio(
@@ -66,7 +69,10 @@ export function LearningAnswerAudio({
                 accent,
                 { signal }
               );
-              if (!result.audio) throw new LocalWebError("正式音频暂不可用");
+              if (!result.audio)
+                throw new LocalWebError(
+                  localText(webTask, "webTask:published_audio_is_unavailable")
+                );
               return result.audio;
             }}
           />

@@ -1,12 +1,48 @@
 "use client";
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webPlacement } from "@/i18n/messages/placement";
 
 import { cn } from "@tsz/ui/lib/cn";
 import { primaryButtonClass } from "@/features/shell/Page";
-import { BAND_DESC, VOCAB_RANGE } from "../lib/content";
+
 import { MAX_TESTS, type QuotaState } from "../lib/quota";
 import { BANDS, type Band } from "../lib/types";
+
+const vocabularyRangeMessages = {
+  A1: localText(webPlacement, "webPlacement:about_500_1_000_words"),
+  A2: localText(webPlacement, "webPlacement:about_1_000_2_000_words"),
+  B1: localText(webPlacement, "webPlacement:about_2_000_3_000_words"),
+  B2: localText(webPlacement, "webPlacement:about_3_000_4_500_words"),
+  C1: localText(webPlacement, "webPlacement:about_4_500_8_000_words"),
+  C2: localText(webPlacement, "webPlacement:8_000_words")
+};
+const bandDescriptionMessages = {
+  A1: localText(
+    webPlacement,
+    "webPlacement:start_with_common_basic_words_to_build_a_foundation"
+  ),
+  A2: localText(
+    webPlacement,
+    "webPlacement:you_know_common_everyday_words_move_on_to_consolidation"
+  ),
+  B1: localText(
+    webPlacement,
+    "webPlacement:you_can_manage_most_everyday_contexts_explore_academic_vocabulary"
+  ),
+  B2: localText(
+    webPlacement,
+    "webPlacement:a_solid_vocabulary_try_reading_original_english_texts"
+  ),
+  C1: localText(
+    webPlacement,
+    "webPlacement:close_to_a_native_speaker_s_everyday_vocabulary"
+  ),
+  C2: localText(
+    webPlacement,
+    "webPlacement:your_vocabulary_is_advanced_refine_less_common_words"
+  )
+};
 
 // 结果屏:定级徽章 + 六档刻度 + 应用等级 CTA。
 // fresh=false 表示查看留存结果(次数用尽后从引导屏进入)。
@@ -36,7 +72,7 @@ export function ResultScreen({
     <div className="flex min-h-full flex-1 flex-col text-center">
       <div className="flex-1" />
       <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
-        {uiText("你的词汇等级")}
+        {uiText("webPlacement:your_vocabulary_level")}
       </p>
       <div className="relative mx-auto mt-5 mb-4 flex h-36 w-36 items-center justify-center rounded-full bg-primary-muted">
         <span
@@ -48,13 +84,16 @@ export function ResultScreen({
         </span>
       </div>
       <p className="text-base font-semibold tabular-nums">
-        {uiText(VOCAB_RANGE[band])}
+        {uiText(vocabularyRangeMessages[band])}
       </p>
       <p className="mx-auto mt-2 max-w-[30ch] text-sm text-foreground-muted">
-        {uiText(BAND_DESC[band])}
+        {uiText(bandDescriptionMessages[band])}
       </p>
       <p className="mt-1 text-xs text-foreground-subtle">
-        {uiText("第 {{v0}}/{{v1}} 次测试", { v0: quota.used, v1: MAX_TESTS })}
+        {uiText("webPlacement:assessment_v0_of_v1", {
+          v0: quota.used,
+          v1: MAX_TESTS
+        })}
       </p>
 
       <div className="mt-6 mb-1 grid grid-cols-6 gap-1.5">
@@ -86,11 +125,15 @@ export function ResultScreen({
         onClick={onApply}
         className={cn(primaryButtonClass, "w-full")}
       >
-        {onboarded ? uiText("返回学习") : uiText("应用该等级，继续设置")}
+        {onboarded
+          ? uiText("webPlacement:back_to_learning")
+          : uiText("webPlacement:use_this_level_and_continue_setup")}
       </button>
       {onboarded && (
         <p className="mt-3 text-xs leading-6 text-foreground-muted">
-          {uiText("测评结果仅供参考，不会修改已保存的学习难度。")}
+          {uiText(
+            "webPlacement:assessment_results_are_a_guide_and_do_not_change_your_saved_learning_lev"
+          )}
         </p>
       )}
       {left > 0 ? (
@@ -99,15 +142,17 @@ export function ResultScreen({
           onClick={onRetest}
           className="mt-2 min-h-11 w-full rounded-full text-sm text-foreground-muted transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
-          {uiText("重新测试")}
+          {uiText("webPlacement:retake_assessment")}
         </button>
       ) : null}
       <p className="mt-3 text-xs text-foreground-subtle">
         {left > 0
-          ? uiText("剩余 {{v0}} 次机会 · 以最后一次结果为准", { v0: left })
+          ? uiText("webPlacement:v0_attempts_left_the_latest_result_is_used", {
+              v0: left
+            })
           : fresh
-            ? uiText("测试机会已用完 · 以本次结果为准")
-            : uiText("测试机会已用完 · 以最后一次结果为准")}
+            ? uiText("webPlacement:no_attempts_left_this_result_is_used")
+            : uiText("webPlacement:no_attempts_left_the_latest_result_is_used")}
       </p>
     </div>
   );

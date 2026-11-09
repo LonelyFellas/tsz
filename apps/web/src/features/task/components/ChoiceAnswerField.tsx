@@ -21,7 +21,9 @@ export function ChoiceAnswerField({
       disabled={disabled}
       className="mx-auto grid max-w-xl gap-3 text-left sm:grid-cols-2"
     >
-      <legend className="sr-only">{uiText("选择英文答案")}</legend>
+      <legend className="sr-only">
+        {uiText("webTask:choose_an_english_answer")}
+      </legend>
       {question.options?.map((option, index) => (
         <label
           key={option.option_id}

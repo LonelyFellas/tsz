@@ -6,8 +6,8 @@ import { ForgotPasswordForm } from "@/features/auth/components/ForgotPasswordFor
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("找回密码"),
-    description: uiText("通过手机号验证码重置天生会背账号密码。"),
+    title: uiText("webApp:reset_password"),
+    description: uiText("webApp:reset_your_password_using_a_verification_code"),
     alternates: { canonical: "/forgot-password" }
   };
 }

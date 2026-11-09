@@ -27,12 +27,22 @@ export const PASSWORD_MIN_LENGTH = 15;
 export const PASSWORD_MAX_LENGTH = 128;
 export const PASSWORD_HINT = "15–128 个字符，区分大小写，支持符号和空格";
 
-export function passwordLengthError(value: string): string | null {
+export function passwordLengthErrorCode(value: string) {
   const length = Array.from(value).length;
-  if (!length) return "请输入密码";
-  if (length < PASSWORD_MIN_LENGTH) return "密码至少需要 15 个字符";
-  if (length > PASSWORD_MAX_LENGTH) return "密码不能超过 128 个字符";
+  if (!length) return "password_missing" as const;
+  if (length < PASSWORD_MIN_LENGTH) return "password_too_short" as const;
+  if (length > PASSWORD_MAX_LENGTH) return "password_too_long" as const;
   return null;
+}
+
+export function passwordLengthError(value: string): string | null {
+  const code = passwordLengthErrorCode(value);
+  const messages = {
+    password_missing: "请输入密码",
+    password_too_short: "密码至少需要 15 个字符",
+    password_too_long: "密码不能超过 128 个字符"
+  };
+  return code ? messages[code] : null;
 }
 
 // 前端只检查长度，弱密码和泄露名单由后端权威校验。
@@ -62,14 +72,24 @@ export function displayNameLength(value: string): number {
   return Array.from(normalizeDisplayName(value)).length;
 }
 
-export function displayNameError(value: string): string | null {
+export function displayNameErrorCode(value: string) {
   const normalized = normalizeDisplayName(value);
   const length = displayNameLength(normalized);
-  if (!length) return "昵称需为 1–50 个字符";
-  if (length > DISPLAY_NAME_MAX) return "昵称不能超过 50 个字符";
+  if (!length) return "display_name_required" as const;
+  if (length > DISPLAY_NAME_MAX) return "display_name_too_long" as const;
   if (hasDisplayNameForbiddenChars(normalized))
-    return "昵称不能包含 < > 或不可见字符";
+    return "display_name_forbidden" as const;
   return null;
+}
+
+export function displayNameError(value: string): string | null {
+  const code = displayNameErrorCode(value);
+  const messages = {
+    display_name_required: "昵称需为 1–50 个字符",
+    display_name_too_long: "昵称不能超过 50 个字符",
+    display_name_forbidden: "昵称不能包含 < > 或不可见字符"
+  };
+  return code ? messages[code] : null;
 }
 
 export function hasDisplayNameForbiddenChars(v: string): boolean {

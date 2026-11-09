@@ -1,5 +1,6 @@
 "use client";
 
+import { localText, originalText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webHomeLanding as webHome } from "@/i18n/messages/home/landing";
 import styles from "./home.module.css";
@@ -10,14 +11,16 @@ export function MemoryVisual() {
   return (
     <div>
       <div className="flex justify-between text-xs text-foreground-muted">
-        <span>{uiText("记忆强度")}</span>
-        <span>{uiText("复习节点示意")}</span>
+        <span>{uiText("webHomeLanding:memory_strength")}</span>
+        <span>{uiText("webHomeLanding:review_schedule_illustration")}</span>
       </div>
       <svg
         viewBox="0 0 360 140"
         className="mt-4 w-full text-primary"
         role="img"
-        aria-label={uiText("每次复习后，记忆强度重新提升的示意曲线")}
+        aria-label={uiText(
+          "webHomeLanding:illustrative_curve_showing_memory_strength_recovering_after_each_review"
+        )}
       >
         <path
           d="M8 116H352 M8 70H352 M8 24H352"
@@ -40,9 +43,9 @@ export function MemoryVisual() {
         <circle cx="222" cy="30" r="5" fill="currentColor" />
       </svg>
       <div className="mt-3 flex justify-between text-xs text-foreground-muted">
-        <span>{uiText("开始学习")}</span>
-        <span>{uiText("再次复习")}</span>
-        <span>{uiText("持续巩固")}</span>
+        <span>{uiText("webHomeLanding:start_learning")}</span>
+        <span>{uiText("webHomeLanding:review_again")}</span>
+        <span>{uiText("webHomeLanding:keep_consolidating")}</span>
       </div>
     </div>
   );
@@ -51,12 +54,23 @@ export function MemoryVisual() {
 export function WordbankVisual() {
   const uiText = useWebText(webHome);
   const rows = [
-    { word: "abandon", definition: "vt. 放弃", tag: "CET-4" },
-    { word: "benefit", definition: "n. 益处", tag: "考研" },
-    { word: "via", definition: "prep. 经由", tag: "高中" }
+    { word: "abandon", definition: "vt. 放弃", tag: originalText("CET-4") },
+    {
+      word: "benefit",
+      definition: "n. 益处",
+      tag: localText(webHome, "webHomeLanding:postgraduate_entrance")
+    },
+    {
+      word: "via",
+      definition: "prep. 经由",
+      tag: localText(webHome, "webHomeLanding:senior_secondary")
+    }
   ];
   return (
-    <ul className="divide-y divide-border/60" aria-label={uiText("词表示例")}>
+    <ul
+      className="divide-y divide-border/60"
+      aria-label={uiText("webHomeLanding:example_word_list")}
+    >
       {rows.map(({ word, definition, tag }) => (
         <li
           key={word}

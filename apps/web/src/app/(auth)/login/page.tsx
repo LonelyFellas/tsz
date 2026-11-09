@@ -7,8 +7,10 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("登录"),
-    description: uiText("登录天生会背,继续你的英语单词学习计划。"),
+    title: uiText("webApp:sign_in"),
+    description: uiText(
+      "webApp:sign_in_to_and_continue_your_english_vocabulary_learning_plan"
+    ),
     alternates: { canonical: "/login" }
   };
 }

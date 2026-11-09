@@ -1,4 +1,8 @@
-import { HttpError } from "@tsz/api-client";
+import {
+  ClientResponseError,
+  RequestTimeoutError,
+  HttpError
+} from "@tsz/api-client";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   act,
@@ -48,6 +52,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 import { PlanCoverage } from "./PlanCoverage";
 import type { LearningPlan } from "@tsz/types";
 import {
+  learningReloadSuggested,
   LearningPractice,
   LearningTaskList,
   LearningTaskPage
@@ -892,4 +897,29 @@ it("language changes preserve the live answer, selection and pending request", a
     await screen.findByRole("button", { name: "Retry original answer" })
   ).toBeEnabled();
   expect(mocks.answer).toHaveBeenCalledTimes(1);
+});
+
+it("刷新恢复动作由错误类型和稳定 code 决定，后端原文与语言不参与分类", () => {
+  for (const detail of [
+    "任务已变化，请刷新",
+    "The task has changed.",
+    "任務已變更"
+  ]) {
+    expect(
+      learningReloadSuggested(
+        new HttpError(409, detail, [], "learning_task_conflict")
+      )
+    ).toBe(true);
+    expect(
+      learningReloadSuggested(
+        new HttpError(409, detail, [], "learning_insufficient_questions")
+      )
+    ).toBe(false);
+  }
+  expect(learningReloadSuggested(new Error("请刷新页面"))).toBe(false);
+  expect(
+    learningReloadSuggested(new ClientResponseError("private schema"))
+  ).toBe(true);
+  expect(learningReloadSuggested(new RequestTimeoutError("POST"))).toBe(true);
+  expect(learningReloadSuggested(new RequestTimeoutError("GET"))).toBe(false);
 });

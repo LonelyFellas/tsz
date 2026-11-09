@@ -1,12 +1,23 @@
+import { webText } from "@/i18n/catalog";
+import { createInterfaceI18n } from "@tsz/shared/i18n";
+import { webAuthProfile } from "@/i18n/messages/auth/profile";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  avatarSourceError,
+  avatarSourceError as avatarSourceNotice,
   exportAvatarCrop,
   getAvatarCrop
 } from "./avatar-crop";
 
 afterEach(() => vi.restoreAllMocks());
 
+const avatarText = webText(
+  createInterfaceI18n("zh-Hans", webAuthProfile.resources),
+  webAuthProfile
+);
+const avatarSourceError = (file: File) => {
+  const notice = avatarSourceNotice(file);
+  return notice ? avatarText(notice) : undefined;
+};
 describe("头像裁剪", () => {
   it("横图、竖图和缩放后的边缘均填满裁剪框", () => {
     expect(getAvatarCrop(4000, 2000, 1, { x: 0, y: 0 })).toEqual({
@@ -98,6 +109,8 @@ describe("头像裁剪", () => {
     );
     await expect(
       exportAvatarCrop(new Image(), { x: 0, y: 0, size: 100 })
-    ).rejects.toThrow("图片处理失败");
+    ).rejects.toThrow(
+      "webAuthProfile:could_not_process_the_image_choose_another_image"
+    );
   });
 });

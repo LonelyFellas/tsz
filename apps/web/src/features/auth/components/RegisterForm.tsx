@@ -1,16 +1,16 @@
 "use client";
-import { type WebNotice, localText } from "@/i18n/catalog";
+import { webCommon, type WebNotice, localText } from "@/i18n/catalog";
+import {
+  passwordErrorMessage,
+  passwordLengthError
+} from "@/features/auth/shared";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthAccess as webAuth } from "@/i18n/messages/auth/access";
 
 import { HttpError } from "@tsz/api-client";
-import { passwordErrorMessage } from "@tsz/shared/auth";
-import {
-  isEmail,
-  isPhone,
-  isRegisterPassword,
-  passwordLengthError
-} from "@tsz/shared";
+
+import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
 import {
   Button,
   FormField,
@@ -36,17 +36,43 @@ import {
 const CODE_COUNTDOWN = 60;
 const REGISTER_CODE_RE = /^\d{6}$/;
 
-const REGISTER_ERRORS: Record<string, string> = {
-  "invalid code": "验证码错误或已失效，请重新获取",
-  "invalid email": "邮箱格式错误，请检查后重试",
-  "invalid phone": "手机号码错误，请检查后重试",
-  "password is too short": "密码须为 15–128 个字符，区分大小写，支持符号和空格",
-  "password is too long": "密码须为 15–128 个字符，区分大小写，支持符号和空格",
-  "password must contain letters and digits only":
-    "密码须为 15–128 个字符，区分大小写，支持符号和空格",
-  "otp unavailable": "验证码服务暂时不可用，请稍后再试",
-  "too many requests": "验证码发送过于频繁，请稍后再试",
-  "service unavailable": "验证码服务暂时不可用，请稍后再试"
+const REGISTER_ERRORS: Record<string, WebNotice> = {
+  "invalid code": localText(
+    webAuth,
+    "webAuthAccess:incorrect_or_expired_code_request_a_new_one"
+  ),
+  "invalid email": localText(
+    webAuth,
+    "webAuthAccess:invalid_email_address_check_and_try_again"
+  ),
+  "invalid phone": localText(
+    webAuth,
+    "webAuthAccess:invalid_phone_number_check_and_try_again"
+  ),
+  "password is too short": localText(
+    webCommon,
+    "webCommon:shared_use_15_128_characters_case_sensitive_symbols_and_spaces_allowed"
+  ),
+  "password is too long": localText(
+    webCommon,
+    "webCommon:shared_use_15_128_characters_case_sensitive_symbols_and_spaces_allowed"
+  ),
+  "password must contain letters and digits only": localText(
+    webCommon,
+    "webCommon:shared_use_15_128_characters_case_sensitive_symbols_and_spaces_allowed"
+  ),
+  "otp unavailable": localText(
+    webAuth,
+    "webAuthAccess:verification_codes_are_unavailable_try_again_later"
+  ),
+  "too many requests": localText(
+    webCommon,
+    "webCommon:shared_too_many_code_requests_try_again_later"
+  ),
+  "service unavailable": localText(
+    webAuth,
+    "webAuthAccess:verification_codes_are_unavailable_try_again_later"
+  )
 };
 
 export function RegisterForm({
@@ -90,10 +116,13 @@ export function RegisterForm({
   const contactError =
     contact && !contactValid
       ? method === "email"
-        ? "邮箱格式错误"
-        : "手机号码错误"
+        ? localText(webAuth, "webAuthAccess:invalid_email_address")
+        : localText(webAuth, "webAuthAccess:invalid_phone_number")
       : undefined;
-  const codeError = code && !codeValid ? "请输入 6 位数字验证码" : undefined;
+  const codeError =
+    code && !codeValid
+      ? localText(webAuth, "webAuthAccess:enter_the_6_digit_verification_code")
+      : undefined;
   const passwordError = password
     ? (passwordLengthError(password) ?? undefined)
     : undefined;
@@ -104,10 +133,13 @@ export function RegisterForm({
     !loading &&
     !sending;
 
-  function translateError(value: unknown, fallback: string): WebNotice {
+  function translateError(value: unknown, fallback: WebNotice): WebNotice {
     if (value instanceof HttpError) {
       if (value.code === "invalid_invitation_code")
-        return "邀请码无效，请修改或清空后重试";
+        return localText(
+          webAuth,
+          "webAuthAccess:invalid_invitation_code_change_it_or_clear_it_and_try_again"
+        );
       const passwordMessage = passwordErrorMessage(value.code);
       if (passwordMessage) return passwordMessage;
     }
@@ -120,9 +152,18 @@ export function RegisterForm({
       (!(value instanceof HttpError && value.code) &&
         message.toLowerCase().trim() === "user already exists")
     )
-      return localText("该{{v0}}已注册，请直接登录", {
-        v0: localText(method === "email" ? "邮箱" : "手机号", {})
-      });
+      return localText(
+        webAuth,
+        "webAuthAccess:this_v0_is_already_registered_sign_in_instead",
+        {
+          v0: localText(
+            webAuth,
+            method === "email"
+              ? "webAuthAccess:email"
+              : "webAuthAccess:phone_number"
+          )
+        }
+      );
     return translateAuthError(
       message,
       {
@@ -163,7 +204,15 @@ export function RegisterForm({
       await api.auth.sendCode(identifier, "register");
       setCountdown(CODE_COUNTDOWN);
     } catch (cause: unknown) {
-      setError(translateError(cause, "验证码发送失败，请稍后重试"));
+      setError(
+        translateError(
+          cause,
+          localText(
+            webAuth,
+            "webAuthAccess:could_not_send_the_code_try_again_later"
+          )
+        )
+      );
     } finally {
       setSending(false);
     }
@@ -201,8 +250,17 @@ export function RegisterForm({
       if (signal.aborted) return;
       setError(
         accountCreated
-          ? "注册成功，但加载账号信息失败，请重试"
-          : translateError(cause, "注册失败，请稍后重试")
+          ? localText(
+              webAuth,
+              "webAuthAccess:registered_but_account_details_could_not_be_loaded_try_again"
+            )
+          : translateError(
+              cause,
+              localText(
+                webAuth,
+                "webAuthAccess:could_not_register_try_again_later"
+              )
+            )
       );
     } finally {
       if (!signal.aborted) setLoading(false);
@@ -221,10 +279,10 @@ export function RegisterForm({
         className="mb-6 inline-flex items-center gap-2.5 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
       >
         <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.5} />
-        {uiText("返回")}
+        {uiText("webAuthAccess:back")}
       </button>
       <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-        {uiText("注册账号")}
+        {uiText("webAuthAccess:create_account")}
       </h1>
 
       <Tabs
@@ -232,14 +290,19 @@ export function RegisterForm({
         onValueChange={(value) => switchMethod(value as typeof method)}
         activationMode="manual"
       >
-        <TabsList className="mb-7" aria-label={uiText("注册方式")}>
+        <TabsList
+          className="mb-7"
+          aria-label={uiText("webAuthAccess:registration_method")}
+        >
           {(["phone", "email"] as const).map((value) => (
             <TabsTrigger
               key={value}
               value={value}
               disabled={sending || loading || registered}
             >
-              {value === "phone" ? uiText("手机") : uiText("邮箱")}
+              {value === "phone"
+                ? uiText("webAuthAccess:phone")
+                : uiText("webAuthAccess:email")}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -249,7 +312,11 @@ export function RegisterForm({
           <form noValidate className="space-y-5" onSubmit={handleRegister}>
             <FormField
               htmlFor="register-contact"
-              label={method === "email" ? uiText("邮箱") : uiText("手机号码")}
+              label={
+                method === "email"
+                  ? uiText("webAuthAccess:email")
+                  : uiText("webAuthAccess:phone_number_2")
+              }
               error={uiText(contactError)}
             >
               <Input
@@ -259,8 +326,8 @@ export function RegisterForm({
                 autoComplete={method === "email" ? "email" : "tel"}
                 placeholder={
                   method === "email"
-                    ? uiText("请输入邮箱")
-                    : uiText("请输入手机号")
+                    ? uiText("webAuthAccess:enter_your_email")
+                    : uiText("webAuthAccess:enter_a_phone_number")
                 }
                 value={contact}
                 disabled={sending || loading || registered}
@@ -274,7 +341,7 @@ export function RegisterForm({
 
             <FormField
               htmlFor="register-code"
-              label={uiText("验证码")}
+              label={uiText("webAuthAccess:verification_code")}
               error={uiText(codeError)}
             >
               <div className="flex gap-3">
@@ -283,7 +350,9 @@ export function RegisterForm({
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder={uiText("请输入验证码")}
+                  placeholder={uiText(
+                    "webAuthAccess:enter_the_verification_code"
+                  )}
                   value={code}
                   disabled={loading || registered}
                   onChange={(event) => setCode(event.target.value)}
@@ -301,17 +370,19 @@ export function RegisterForm({
                   className="shrink-0 px-4 font-medium"
                 >
                   {sending
-                    ? uiText("发送中...")
+                    ? uiText("webAuthAccess:sending")
                     : countdown > 0
-                      ? uiText("{{v0}}s 后重发", { v0: countdown })
-                      : uiText("获取验证码")}
+                      ? uiText("webAuthAccess:resend_in_v0_s", {
+                          v0: countdown
+                        })
+                      : uiText("webAuthAccess:get_code")}
                 </Button>
               </div>
             </FormField>
 
             <FormField
               htmlFor="register-password"
-              label={uiText("密码")}
+              label={uiText("webAuthAccess:password_2")}
               hint={uiText(AUTH_PASSWORD_HINT)}
               error={uiText(passwordError)}
             >
@@ -320,7 +391,9 @@ export function RegisterForm({
                   id="register-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
-                  placeholder={uiText("请输入登录密码")}
+                  placeholder={uiText(
+                    "webAuthAccess:enter_your_sign_in_password"
+                  )}
                   value={password}
                   disabled={loading || registered}
                   onChange={(event) => setPassword(event.target.value)}
@@ -336,7 +409,9 @@ export function RegisterForm({
                   disabled={loading || registered}
                   className="absolute right-1 top-1/2 -translate-y-1/2"
                   aria-label={
-                    showPassword ? uiText("隐藏密码") : uiText("显示密码")
+                    showPassword
+                      ? uiText("webAuthAccess:hide_password")
+                      : uiText("webAuthAccess:show_password")
                   }
                 >
                   <PasswordVisibilityIcon visible={showPassword} />
@@ -346,12 +421,12 @@ export function RegisterForm({
 
             <FormField
               htmlFor="register-invite"
-              label={uiText("邀请码（选填）")}
+              label={uiText("webAuthAccess:invitation_code_optional")}
             >
               <Input
                 id="register-invite"
                 value={inviteCode}
-                placeholder={uiText("请输入邀请码")}
+                placeholder={uiText("webAuthAccess:enter_an_invitation_code")}
                 autoComplete="off"
                 disabled={loading || registered}
                 onChange={(event) => setInviteCode(event.target.value)}
@@ -367,15 +442,15 @@ export function RegisterForm({
             <Button type="submit" disabled={!canSubmit} className="w-full">
               {loading
                 ? registered
-                  ? uiText("加载中...")
-                  : uiText("注册中...")
+                  ? uiText("webAuthAccess:loading")
+                  : uiText("webAuthAccess:creating_account")
                 : registered
-                  ? uiText("重试加载")
-                  : uiText("立即注册")}
+                  ? uiText("webAuthAccess:retry_loading")
+                  : uiText("webAuthAccess:create_account_2")}
             </Button>
 
             <p className="pt-2 text-center text-sm text-foreground-muted">
-              {uiText("已有账号？")}{" "}
+              {uiText("webAuthAccess:already_have_an_account")}{" "}
               <button
                 type="button"
                 disabled={sending || loading}
@@ -388,9 +463,11 @@ export function RegisterForm({
                   router.push(params.size ? `/login?${params}` : "/login");
                 }}
                 className="rounded-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-                aria-label={uiText("已有账号,去登录")}
+                aria-label={uiText(
+                  "webAuthAccess:already_have_an_account_sign_in"
+                )}
               >
-                {uiText("登录")}
+                {uiText("webAuthAccess:sign_in")}
               </button>
             </p>
           </form>

@@ -6,7 +6,7 @@ import { RouteGuard } from "@/features/auth/components/RouteGuard";
 
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
-  return { title: uiText("账号安全") };
+  return { title: uiText("webApp:account_security") };
 }
 
 export default function AccountSecurityPage() {

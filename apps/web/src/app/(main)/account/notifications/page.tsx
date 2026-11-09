@@ -9,7 +9,7 @@ import { Notifications } from "@/features/teacher-certification/Notifications";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("站内通知"),
+    title: uiText("webApp:notifications"),
     robots: { index: false, follow: false }
   };
 }
@@ -19,9 +19,9 @@ export default function NotificationsPage() {
     <RouteGuard>
       <PageShell>
         <AppPageHeader
-          back={{ href: "/account", label: "返回个人中心" }}
-          eyebrow="个人中心"
-          title="站内通知"
+          back={{ href: "/account", label: "webApp:back_to_account" }}
+          eyebrow="webApp:account"
+          title="webApp:notifications"
         />
         <Notifications />
       </PageShell>

@@ -6,7 +6,7 @@ import { Invitations } from "@/features/invitations/Invitations";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("邀请好友"),
+    title: uiText("webApp:invite_friends"),
     robots: { index: false, follow: false }
   };
 }

@@ -1,13 +1,27 @@
-import { LocalWebError } from "@/i18n/catalog";
+import { webAuthProfile } from "@/i18n/messages/auth/profile";
+import { type LocalText, localText, LocalWebError } from "@/i18n/catalog";
+
 import { contentTypeOf } from "./avatar";
 
 export type AvatarPosition = { x: number; y: number };
 export type AvatarCrop = { x: number; y: number; size: number };
 
-export function avatarSourceError(file: File): string | undefined {
-  if (!contentTypeOf(file)) return "仅支持 JPG / PNG / WebP 格式图片";
-  if (!file.size) return "图片大小无效，请重新选择";
-  if (file.size > 20 * 1024 * 1024) return "原图不能超过 20 MiB";
+export function avatarSourceError(file: File): LocalText | undefined {
+  if (!contentTypeOf(file))
+    return localText(
+      webAuthProfile,
+      "webAuthProfile:only_jpg_png_and_webp_images_are_supported"
+    );
+  if (!file.size)
+    return localText(
+      webAuthProfile,
+      "webAuthProfile:invalid_image_size_choose_another_image"
+    );
+  if (file.size > 20 * 1024 * 1024)
+    return localText(
+      webAuthProfile,
+      "webAuthProfile:the_original_image_must_not_exceed_20_mib"
+    );
 }
 
 // position 为 [-1, 1]，两端分别对应图片边缘，保证裁剪框始终被图片填满。
@@ -33,7 +47,12 @@ export async function exportAvatarCrop(
   canvas.width = canvas.height = 512;
   const context = canvas.getContext("2d");
   if (!context)
-    throw new LocalWebError("当前浏览器无法处理图片，请更换浏览器后重试");
+    throw new LocalWebError(
+      localText(
+        webAuthProfile,
+        "webAuthProfile:this_browser_cannot_process_the_image_try_another_browser"
+      )
+    );
   context.imageSmoothingQuality = "high";
   context.drawImage(
     image,
@@ -49,7 +68,13 @@ export async function exportAvatarCrop(
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/webp", 0.82)
   );
-  if (!blob) throw new LocalWebError("图片处理失败，请重新选择");
+  if (!blob)
+    throw new LocalWebError(
+      localText(
+        webAuthProfile,
+        "webAuthProfile:could_not_process_the_image_choose_another_image"
+      )
+    );
   // 不支持 WebP 编码的浏览器会导出 PNG，上传类型以实际 Blob 为准。
   return new File(
     [blob],

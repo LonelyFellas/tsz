@@ -1,7 +1,8 @@
 "use client";
-import { webErrorText } from "@/i18n/catalog";
-import { useWebLocale } from "@/i18n/client";
-import { useWebText } from "@/i18n/client";
+import { webCommon, localText, webErrorText } from "@/i18n/catalog";
+
+import { useWebLocale, useWebText } from "@/i18n/client";
+
 import { webTeacherCertificationNotifications as webTeacherCertification } from "@/i18n/messages/teacher-certification/notifications";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,12 +22,30 @@ import {
 } from "@/features/shell/Page";
 
 const titles = {
-  teacher_approved: "教师认证已通过",
-  teacher_rejected: "教师申请已驳回",
-  teacher_revoked: "教师资格已撤销",
-  wordlist_liked: "词表收到点赞",
-  wordlist_tipped: "词表收到投币",
-  wordlist_deleted: "使用中的词表已删除"
+  teacher_approved: localText(
+    webTeacherCertification,
+    "webTeacherCertificationNotifications:teacher_certification_approved"
+  ),
+  teacher_rejected: localText(
+    webTeacherCertification,
+    "webTeacherCertificationNotifications:teacher_application_rejected"
+  ),
+  teacher_revoked: localText(
+    webTeacherCertification,
+    "webTeacherCertificationNotifications:teacher_qualification_revoked"
+  ),
+  wordlist_liked: localText(
+    webTeacherCertification,
+    "webTeacherCertificationNotifications:word_list_liked"
+  ),
+  wordlist_tipped: localText(
+    webTeacherCertification,
+    "webTeacherCertificationNotifications:word_list_tipped"
+  ),
+  wordlist_deleted: localText(
+    webTeacherCertification,
+    "webTeacherCertificationNotifications:a_word_list_you_use_was_deleted"
+  )
 };
 
 export function Notifications() {
@@ -42,32 +61,49 @@ export function Notifications() {
       client.invalidateQueries({ queryKey: ["notifications", userId] })
   });
   return (
-    <section aria-label={uiText("站内通知")} className="space-y-6">
+    <section
+      aria-label={uiText("webTeacherCertificationNotifications:notifications")}
+      className="space-y-6"
+    >
       {query.isPending ? (
-        <PageNotice>{uiText("正在读取通知…")}</PageNotice>
+        <PageNotice>
+          {uiText("webTeacherCertificationNotifications:loading_notifications")}
+        </PageNotice>
       ) : query.isError ? (
         <PageNotice tone="error">
           <p>
-            {uiText(webErrorText(query.error, "数据暂不可用，请刷新后重试"))}
+            {uiText(
+              webErrorText(
+                query.error,
+                localText(webCommon, "webCommon:response_unavailable")
+              )
+            )}
           </p>
           <button
             type="button"
             onClick={() => void query.refetch()}
             className={cn(textButtonClass, "mt-3")}
           >
-            {uiText("重试")}
+            {uiText("webTeacherCertificationNotifications:retry")}
           </button>
         </PageNotice>
       ) : (
         <>
           <p className="text-sm text-foreground-muted">
             {query.data.unread_count
-              ? uiText("{{v0}} 条未读通知", { v0: query.data.unread_count })
-              : uiText("暂无未读通知")}
+              ? uiText(
+                  "webTeacherCertificationNotifications:v0_unread_notifications",
+                  { v0: query.data.unread_count }
+                )
+              : uiText(
+                  "webTeacherCertificationNotifications:no_unread_notifications"
+                )}
           </p>
           {query.data.items.length === 0 ? (
             <PageNotice>
-              {uiText("暂无站内通知，词表互动和认证结果会显示在这里。")}
+              {uiText(
+                "webTeacherCertificationNotifications:no_notifications_yet_word_list_interactions_and_certification_results_ap"
+              )}
             </PageNotice>
           ) : (
             <ul className="space-y-3">
@@ -93,7 +129,9 @@ export function Notifications() {
                           : "bg-primary-muted text-primary"
                       )}
                     >
-                      {item.read_at ? uiText("已读") : uiText("未读")}
+                      {item.read_at
+                        ? uiText("webTeacherCertificationNotifications:read")
+                        : uiText("webTeacherCertificationNotifications:unread")}
                     </span>
                   </div>
                   <time
@@ -111,7 +149,7 @@ export function Notifications() {
                   ) : item.kind === "teacher_approved" ? (
                     <p className="mt-3 text-sm leading-6">
                       {uiText(
-                        "你已获得教师身份，可在账号菜单中切换工作台，原有学生身份保持不变。"
+                        "webTeacherCertificationNotifications:you_now_have_a_teacher_role_switch_workspaces_in_the_account_menu_your_s"
                       )}
                     </p>
                   ) : null}
@@ -122,14 +160,21 @@ export function Notifications() {
                       <p className="mt-3 text-sm leading-6">
                         {uiText(
                           item.kind === "wordlist_liked"
-                            ? "{{actor}}赞了你的词表「{{wordlist}}」。"
+                            ? "webTeacherCertificationNotifications:wordlist_liked_body"
                             : item.amount
-                              ? "{{actor}}向你的词表「{{wordlist}}」投了 {{amount}}。"
-                              : "{{actor}}向你的词表「{{wordlist}}」投币。",
+                              ? "webTeacherCertificationNotifications:wordlist_tipped_body"
+                              : "webTeacherCertificationNotifications:wordlist_tipped_without_amount",
                           {
-                            actor: item.actor_name ?? uiText("账号已注销"),
+                            actor:
+                              item.actor_name ??
+                              uiText(
+                                "webTeacherCertificationNotifications:deleted_account"
+                              ),
                             wordlist:
-                              item.wordlist_name ?? uiText("（已删除）"),
+                              item.wordlist_name ??
+                              uiText(
+                                "webTeacherCertificationNotifications:deleted"
+                              ),
                             amount: item.amount ? formatCoins(item.amount) : ""
                           }
                         )}
@@ -151,7 +196,9 @@ export function Notifications() {
                         href={`/account/wordlists/${encodeURIComponent(item.wordlist_id)}`}
                         className={buttonClass}
                       >
-                        {uiText("查看词表")}
+                        {uiText(
+                          "webTeacherCertificationNotifications:view_word_list"
+                        )}
                       </Link>
                     )}
                     {item.kind === "wordlist_tipped" && (
@@ -159,12 +206,16 @@ export function Notifications() {
                         href="/account/wordlist-tips"
                         className={buttonClass}
                       >
-                        {uiText("查看收币记录")}
+                        {uiText(
+                          "webTeacherCertificationNotifications:view_received_tips"
+                        )}
                       </Link>
                     )}
                     {item.kind === "wordlist_deleted" && (
                       <Link href="/student/practice" className={buttonClass}>
-                        {uiText("查看学习任务")}
+                        {uiText(
+                          "webTeacherCertificationNotifications:view_learning_task"
+                        )}
                       </Link>
                     )}
                     {item.application_id && (
@@ -172,7 +223,9 @@ export function Notifications() {
                         href={`/account/teacher-applications/${encodeURIComponent(item.application_id)}`}
                         className={buttonClass}
                       >
-                        {uiText("查看对应申请")}
+                        {uiText(
+                          "webTeacherCertificationNotifications:view_application"
+                        )}
                       </Link>
                     )}
                     {!item.read_at && (
@@ -182,7 +235,9 @@ export function Notifications() {
                         onClick={() => read.mutate(item.id)}
                         className={buttonClass}
                       >
-                        {uiText("标为已读")}
+                        {uiText(
+                          "webTeacherCertificationNotifications:mark_as_read"
+                        )}
                       </button>
                     )}
                   </div>
@@ -199,7 +254,12 @@ export function Notifications() {
       )}
       {read.error && (
         <p role="alert" className="text-sm text-danger">
-          {uiText(webErrorText(read.error, "数据暂不可用，请刷新后重试"))}
+          {uiText(
+            webErrorText(
+              read.error,
+              localText(webCommon, "webCommon:response_unavailable")
+            )
+          )}
         </p>
       )}
     </section>

@@ -1,5 +1,6 @@
 "use client";
-import { LocalWebError } from "@/i18n/catalog";
+import { localText, LocalWebError } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webTeacherCertificationIdentity as webTeacherCertification } from "@/i18n/messages/teacher-certification/identity";
 
@@ -132,12 +133,27 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
       const result = await query.refetch();
       if (currentUser.current !== userId) return;
       if (result.isError)
-        throw new LocalWebError("暂时无法核验教师资格，请重试");
+        throw new LocalWebError(
+          localText(
+            webTeacherCertification,
+            "webTeacherCertificationIdentity:could_not_verify_your_teacher_qualification_try_again"
+          )
+        );
       if (!result.data?.teacher_verified)
-        throw new LocalWebError("当前账号尚未通过教师认证");
+        throw new LocalWebError(
+          localText(
+            webTeacherCertification,
+            "webTeacherCertificationIdentity:this_account_has_not_passed_teacher_certification"
+          )
+        );
     }
     if (!writeWorkspaceIdentity(userId, next))
-      throw new LocalWebError("无法保存工作台偏好，请检查浏览器存储设置后重试");
+      throw new LocalWebError(
+        localText(
+          webTeacherCertification,
+          "webTeacherCertificationIdentity:could_not_save_workspace_preferences_check_browser_storage_settings_and"
+        )
+      );
     router.push(next === "teacher" ? "/teacher/classes" : "/student/home");
   }
 
@@ -163,7 +179,11 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
     return (
       <PageShell>
         <PageNotice tone="error">
-          <p>{uiText("无法核验教师资格，请重试。")}</p>
+          <p>
+            {uiText(
+              "webTeacherCertificationIdentity:could_not_verify_your_teacher_qualification_try_again_2"
+            )}
+          </p>
           <button
             className={cn(textButtonClass, "mt-3")}
             onClick={() =>
@@ -172,7 +192,7 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
               })
             }
           >
-            {uiText("重新核验")}
+            {uiText("webTeacherCertificationIdentity:check_again")}
           </button>
         </PageNotice>
       </PageShell>
@@ -181,7 +201,11 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
     return (
       <PageShell>
         <div role="status">
-          <PageNotice>{uiText("正在核验教师资格…")}</PageNotice>
+          <PageNotice>
+            {uiText(
+              "webTeacherCertificationIdentity:checking_teacher_qualification"
+            )}
+          </PageNotice>
         </div>
       </PageShell>
     );

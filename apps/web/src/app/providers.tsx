@@ -60,10 +60,16 @@ function SessionRestorer() {
     >
       <p className="text-sm leading-6">
         {refreshUnconfirmed
-          ? uiText("会话刷新结果尚未确认，请重新登录；当前操作请先查看结果")
+          ? uiText(
+              "webApp:could_not_confirm_the_session_refresh_sign_in_again_and_check_the_result"
+            )
           : hydrated
-            ? uiText("连接暂时中断，联网后将自动恢复；当前内容已保留")
-            : uiText("正在恢复连接，联网后将自动继续")}
+            ? uiText(
+                "webApp:connection_lost_your_content_is_preserved_reconnection_will_be_automatic"
+              )
+            : uiText(
+                "webApp:reconnecting_work_will_resume_when_the_connection_returns"
+              )}
       </p>
       <button
         type="button"
@@ -74,10 +80,10 @@ function SessionRestorer() {
         className="mt-4 inline-flex min-h-10 items-center rounded-full bg-primary px-5 text-sm font-medium tracking-wide text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
       >
         {refreshUnconfirmed
-          ? uiText("重新登录")
+          ? uiText("webApp:sign_in_again")
           : retrying
-            ? uiText("重试中…")
-            : uiText("重试连接")}
+            ? uiText("webApp:retrying")
+            : uiText("webApp:retry_connection")}
       </button>
     </div>
   );

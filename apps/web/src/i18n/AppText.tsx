@@ -1,30 +1,38 @@
 "use client";
-
 import type { ComponentProps } from "react";
 import { PageHeader } from "@/features/shell/Page";
 import { useWebText } from "./client";
 import { webApp } from "./messages/app";
-
-export function AppText({ source }: { source: string }) {
+import type { WebStaticKey } from "./types";
+type AppKey = WebStaticKey<typeof webApp>;
+export function AppText({ message }: { message: AppKey }) {
   const uiText = useWebText(webApp);
-  return <>{uiText(source)}</>;
+  return <>{uiText(message)}</>;
 }
-
-export function AppPageHeader(props: ComponentProps<typeof PageHeader>) {
+type AppHeaderProps = Omit<
+  ComponentProps<typeof PageHeader>,
+  "back" | "title" | "eyebrow" | "description"
+> & {
+  back?: { href: string; label: AppKey };
+  title: AppKey;
+  eyebrow?: AppKey;
+  description?: AppKey;
+};
+export function AppPageHeader({
+  back,
+  title,
+  eyebrow,
+  description,
+  ...props
+}: AppHeaderProps) {
   const uiText = useWebText(webApp);
   return (
     <PageHeader
       {...props}
-      back={props.back && { ...props.back, label: uiText(props.back.label) }}
-      title={
-        typeof props.title === "string" ? uiText(props.title) : props.title
-      }
-      eyebrow={props.eyebrow && uiText(props.eyebrow)}
-      description={
-        typeof props.description === "string"
-          ? uiText(props.description)
-          : props.description
-      }
+      back={back && { ...back, label: uiText(back.label) }}
+      title={uiText(title)}
+      eyebrow={eyebrow && uiText(eyebrow)}
+      description={description && uiText(description)}
     />
   );
 }

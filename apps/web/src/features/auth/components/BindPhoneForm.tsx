@@ -27,15 +27,17 @@ export function BindPhoneForm() {
   return (
     <main className="animate-in mx-auto max-w-xl px-6 py-16 sm:py-20">
       <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-        {uiText("绑定手机号")}
+        {uiText("webAuthAccess:bind_phone_number")}
       </h1>
       <p className="mt-3 text-sm leading-6 text-foreground-muted">
         {uiText(
-          "使用前需验证并绑定手机号。完成后，可使用手机号验证码登录；你的邮箱和账号资料会保留。"
+          "webAuthAccess:verify_and_bind_a_phone_number_before_continuing_you_can_then_sign_in_wi"
         )}
       </p>
       <p className="mt-2 text-sm leading-6 text-foreground-muted">
-        {uiText("绑定后，所有设备需重新登录。")}
+        {uiText(
+          "webAuthAccess:you_will_need_to_sign_in_again_on_every_device_after_binding"
+        )}
       </p>
       <div className="mt-8 rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-8">
         <ContactForm
@@ -55,7 +57,7 @@ export function BindPhoneForm() {
           href="/account/delete"
           className="text-foreground-muted hover:text-foreground"
         >
-          {uiText("注销账号")}
+          {uiText("webAuthAccess:delete_account")}
         </Link>
       </div>
     </main>

@@ -12,12 +12,14 @@ export function HomeHero() {
     <section aria-labelledby="home-title" className={styles.hero}>
       <div className={styles.heroCopy}>
         <h1 id="home-title" className={styles.headline}>
-          {uiText("记住单词。")}
+          {uiText("webHomeLanding:remember_words")}
           <br />
-          {uiText("看见更大的世界。")}
+          {uiText("webHomeLanding:explore_a_wider_world")}
         </h1>
         <p className={styles.heroDescription}>
-          {uiText("从词表到练习，让每一次复习都有方向。")}
+          {uiText(
+            "webHomeLanding:from_word_lists_to_practice_give_every_review_a_purpose"
+          )}
         </p>
         <div className="mt-6 flex justify-center">
           <HeroCTA />

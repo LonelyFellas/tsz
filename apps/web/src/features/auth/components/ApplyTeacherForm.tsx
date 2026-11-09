@@ -1,6 +1,12 @@
 "use client";
-import { localText } from "@/i18n/catalog";
-import { LocalWebError, type WebNotice, webErrorText } from "@/i18n/catalog";
+import {
+  webCommon,
+  localText,
+  LocalWebError,
+  type WebNotice,
+  webErrorText
+} from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthCertification as webAuth } from "@/i18n/messages/auth/certification";
 
@@ -18,13 +24,32 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { PrivateImage } from "@/features/teacher-certification/PrivateImage";
 
-const groups: { kind: CertificationFileKind; label: string; limit: number }[] =
-  [
-    { kind: "id_front", label: "身份证人像面", limit: 1 },
-    { kind: "id_back", label: "身份证国徽面", limit: 1 },
-    { kind: "education", label: "学历证书", limit: 10 },
-    { kind: "language", label: "语言成绩", limit: 10 }
-  ];
+const groups: {
+  kind: CertificationFileKind;
+  label: WebNotice;
+  limit: number;
+}[] = [
+  {
+    kind: "id_front",
+    label: localText(webAuth, "webAuthCertification:identity_card_front"),
+    limit: 1
+  },
+  {
+    kind: "id_back",
+    label: localText(webAuth, "webAuthCertification:identity_card_back"),
+    limit: 1
+  },
+  {
+    kind: "education",
+    label: localText(webAuth, "webAuthCertification:education_certificate"),
+    limit: 10
+  },
+  {
+    kind: "language",
+    label: localText(webAuth, "webAuthCertification:language_test_results"),
+    limit: 10
+  }
+];
 const inputClass =
   "mt-2 min-h-12 w-full rounded-full border border-border bg-surface px-5 py-3 text-sm font-normal text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15";
 
@@ -40,20 +65,24 @@ export function ApplyTeacherForm() {
   if (query.isPending)
     return (
       <div role="status">
-        <PageNotice>{uiText("加载中…")}</PageNotice>
+        <PageNotice>{uiText("webAuthCertification:loading_2")}</PageNotice>
       </div>
     );
   if (query.isError)
     return (
       <PageNotice tone="error">
-        <p>{uiText("认证信息加载失败，请重试。")}</p>
+        <p>
+          {uiText(
+            "webAuthCertification:could_not_load_certification_details_try_again"
+          )}
+        </p>
         <Button
           variant="outline"
           size="sm"
           className="mt-4"
           onClick={() => void query.refetch()}
         >
-          {uiText("重新加载")}
+          {uiText("webAuthCertification:reload")}
         </Button>
       </PageNotice>
     );
@@ -64,29 +93,29 @@ export function ApplyTeacherForm() {
         <div className="space-y-6 rounded-[20px] bg-surface/70 p-6 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight">
             {data.teacher_verified
-              ? uiText("教师认证已通过")
-              : uiText("审核中")}
+              ? uiText("webAuthCertification:teacher_certification_approved")
+              : uiText("webAuthCertification:under_review")}
           </h2>
           <p className="text-sm leading-6 text-foreground-muted">
             {data.teacher_verified
               ? uiText(
-                  "点击右上角头像，可切换到教师工作台，也可以继续用学生身份学习。"
+                  "webAuthCertification:use_the_avatar_menu_to_switch_to_the_teaching_workspace_or_continue_lear"
                 )
               : uiText(
-                  "申请已提交。审核期间不能修改或再次提交，结果会发到站内通知。"
+                  "webAuthCertification:application_submitted_you_cannot_change_or_resubmit_it_during_review_the"
                 )}
           </p>
           {data.application && (
             <dl className="space-y-2 text-sm">
               <div>
                 <dt className="inline text-foreground-muted">
-                  {uiText("姓名：")}
+                  {uiText("webAuthCertification:name")}
                 </dt>
                 <dd className="inline">{data.application.real_name}</dd>
               </div>
               <div>
                 <dt className="inline text-foreground-muted">
-                  {uiText("联系方式：")}
+                  {uiText("webAuthCertification:contact")}
                 </dt>
                 <dd className="inline">{data.application.contact}</dd>
               </div>
@@ -98,7 +127,11 @@ export function ApplyTeacherForm() {
                 key={file.id}
                 id={file.id}
                 label={uiText(
-                  groups.find((g) => g.kind === file.kind)?.label ?? "认证材料"
+                  groups.find((g) => g.kind === file.kind)?.label ??
+                    localText(
+                      webAuth,
+                      "webAuthCertification:certification_documents"
+                    )
                 )}
               />
             ))}
@@ -182,10 +215,14 @@ function ApplicationEditor({
     const previous = files.filter((file) => file.kind === kind);
     if (group.limit > 1 && previous.length + selected.length > group.limit) {
       setFileError(
-        localText("{{v0}}最多上传{{v1}}张", {
-          v0: localText(group.label, {}),
-          v1: group.limit
-        })
+        localText(
+          webAuth,
+          "webAuthCertification:upload_up_to_v1_images_for_v0",
+          {
+            v0: group.label,
+            v1: group.limit
+          }
+        )
       );
       return;
     }
@@ -199,7 +236,10 @@ function ApplicationEditor({
           file.size === 0
         )
           throw new LocalWebError(
-            "请选择 JPG、PNG 或 WebP 图片，每张不超过 10MB"
+            localText(
+              webAuth,
+              "webAuthCertification:choose_jpg_png_or_webp_images_up_to_10_mb_each"
+            )
           );
         const uploaded = await api.teacherCertification.upload(kind, file);
         temporary.current.add(uploaded.id);
@@ -222,7 +262,12 @@ function ApplicationEditor({
         }
       }
     } catch (error) {
-      setFileError(webErrorText(error, "上传失败，请重试"));
+      setFileError(
+        webErrorText(
+          error,
+          localText(webAuth, "webAuthCertification:upload_failed_try_again_2")
+        )
+      );
     } finally {
       setUploading(false);
     }
@@ -241,7 +286,12 @@ function ApplicationEditor({
         current.filter((item) => item.id !== file.id)
       );
     } catch (error) {
-      setFileError(webErrorText(error, "移除失败，请重试"));
+      setFileError(
+        webErrorText(
+          error,
+          localText(webAuth, "webAuthCertification:could_not_remove_try_again")
+        )
+      );
     } finally {
       setUploading(false);
     }
@@ -265,12 +315,14 @@ function ApplicationEditor({
           >
             <p className="font-medium">
               {initial.application?.status === "revoked"
-                ? uiText("教师资格已撤销")
-                : uiText("上次申请未通过")}
+                ? uiText("webAuthCertification:teacher_qualification_revoked")
+                : uiText("webAuthCertification:previous_application_rejected")}
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm">{reason}</p>
             <p className="mt-2 text-sm text-foreground-muted">
-              {uiText("修改后可重新提交申请。")}
+              {uiText(
+                "webAuthCertification:you_can_update_and_resubmit_your_application"
+              )}
             </p>
           </div>
         )}
@@ -290,7 +342,9 @@ function ApplicationEditor({
             <path d="M12 14v3" />
           </svg>
           <p>
-            {uiText("本页信息均需填写。上传的材料仅你和负责审核的管理员可见。")}
+            {uiText(
+              "webAuthCertification:complete_every_field_uploaded_documents_are_visible_only_to_you_and_the"
+            )}
           </p>
         </div>
         <section
@@ -298,33 +352,37 @@ function ApplicationEditor({
           className="grid gap-5 md:grid-cols-[176px_minmax(0,1fr)] md:gap-8"
         >
           <h2 id="cert-basic-heading" className="text-base font-semibold">
-            {uiText("个人信息")}
+            {uiText("webAuthCertification:personal_details")}
           </h2>
           <fieldset
             disabled={mutation.isPending || uploading}
             className="grid min-w-0 gap-4 sm:grid-cols-2 sm:gap-5"
           >
             <label className="text-sm font-medium">
-              {uiText("真实姓名")}
+              {uiText("webAuthCertification:full_name")}
               <input
                 className={inputClass}
                 required
                 maxLength={50}
                 value={realName}
                 onChange={(event) => setRealName(event.target.value)}
-                placeholder={uiText("填写身份证上的姓名")}
+                placeholder={uiText(
+                  "webAuthCertification:enter_the_name_on_your_identity_document"
+                )}
                 autoComplete="name"
               />
             </label>
             <label className="text-sm font-medium">
-              {uiText("联系方式")}
+              {uiText("webAuthCertification:contact_details")}
               <input
                 className={inputClass}
                 required
                 maxLength={254}
                 value={contact}
                 onChange={(event) => setContact(event.target.value)}
-                placeholder={uiText("手机号或邮箱")}
+                placeholder={uiText(
+                  "webAuthCertification:phone_number_or_email"
+                )}
                 autoComplete="off"
               />
             </label>
@@ -336,14 +394,18 @@ function ApplicationEditor({
         >
           <div>
             <h2 id="cert-material-heading" className="text-base font-semibold">
-              {uiText("认证材料")}
+              {uiText("webAuthCertification:certification_documents")}
             </h2>
             <p className="mt-2 text-pretty text-sm leading-6 text-foreground-muted">
-              {uiText("拍全材料，文字要看得清。")}
+              {uiText(
+                "webAuthCertification:include_the_entire_document_and_keep_the_text_legible"
+              )}
             </p>
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
               JPG、PNG、WebP
-              <span className="block">{uiText("单张不超过 10MB")}</span>
+              <span className="block">
+                {uiText("webAuthCertification:up_to_10_mb_per_image")}
+              </span>
             </p>
           </div>
           <div className="grid min-w-0 gap-x-5 gap-y-6 sm:grid-cols-2">
@@ -356,9 +418,13 @@ function ApplicationEditor({
                 <label
                   title={
                     multiple
-                      ? uiText("添加{{v0}}照片", { v0: uiText(group.label) })
+                      ? uiText("webAuthCertification:add_a_photo_of_v0", {
+                          v0: uiText(group.label)
+                        })
                       : groupFiles.length
-                        ? uiText("更换{{v0}}", { v0: uiText(group.label) })
+                        ? uiText("webAuthCertification:replace_v0", {
+                            v0: uiText(group.label)
+                          })
                         : undefined
                   }
                   className={cn(
@@ -416,14 +482,16 @@ function ApplicationEditor({
                     )}
                   >
                     {groupFiles.length === 0
-                      ? uiText("选择照片")
+                      ? uiText("webAuthCertification:choose_photo")
                       : group.limit === 1
-                        ? uiText("更换照片")
-                        : uiText("添加照片")}
+                        ? uiText("webAuthCertification:replace_photo")
+                        : uiText("webAuthCertification:add_photo")}
                   </span>
                   {multiple && (
                     <span id={`cert-${group.kind}-hint`} className="sr-only">
-                      {uiText("最多 {{v0}} 张", { v0: group.limit })}
+                      {uiText("webAuthCertification:up_to_v0_images", {
+                        v0: group.limit
+                      })}
                     </span>
                   )}
                 </label>
@@ -444,11 +512,13 @@ function ApplicationEditor({
                     {multiple && (
                       <span className="text-sm text-foreground-muted">
                         {groupFiles.length > 0
-                          ? uiText("{{v0}} 张 · 最多 {{v1}} 张", {
+                          ? uiText("webAuthCertification:v0_images_up_to_v1", {
                               v0: groupFiles.length,
                               v1: group.limit
                             })
-                          : uiText("最多 {{v0}} 张", { v0: group.limit })}
+                          : uiText("webAuthCertification:up_to_v0_images", {
+                              v0: group.limit
+                            })}
                       </span>
                     )}
                   </div>
@@ -465,10 +535,13 @@ function ApplicationEditor({
                             disabled={uploading || mutation.isPending}
                             onClick={() => void remove(file)}
                             className="group absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-                            aria-label={uiText("移除{{v0}}", {
-                              v0: uiText(group.label)
-                            })}
-                            title={uiText("移除{{v0}}", {
+                            aria-label={uiText(
+                              "webAuthCertification:remove_v0",
+                              {
+                                v0: uiText(group.label)
+                              }
+                            )}
+                            title={uiText("webAuthCertification:remove_v0", {
                               v0: uiText(group.label)
                             })}
                           >
@@ -500,13 +573,17 @@ function ApplicationEditor({
         <section className="grid gap-5 border-t border-border/60 pt-7 md:grid-cols-[176px_minmax(0,1fr)] md:gap-8">
           <div>
             <h2 className="text-base font-semibold">
-              <label htmlFor="cert-statement">{uiText("认证说明")}</label>
+              <label htmlFor="cert-statement">
+                {uiText("webAuthCertification:certification_statement")}
+              </label>
             </h2>
             <p
               id="cert-statement-hint"
               className="mt-2 text-pretty text-sm leading-6 text-foreground-muted"
             >
-              {uiText("填写专业、教学经历或英语成绩。")}
+              {uiText(
+                "webAuthCertification:enter_your_subject_teaching_experience_or_english_test_results"
+              )}
             </p>
           </div>
           <div className="min-w-0">
@@ -517,7 +594,7 @@ function ApplicationEditor({
               maxLength={2000}
               rows={4}
               placeholder={uiText(
-                "例如：英语专业毕业，有两年初中英语教学经验。"
+                "webAuthCertification:for_example_english_graduate_with_two_years_of_lower_secondary_english_t"
               )}
               className={cn(inputClass, "mt-0 min-h-36 resize-y rounded-2xl")}
               value={statement}
@@ -537,7 +614,11 @@ function ApplicationEditor({
             role="status"
             className="space-y-2 rounded-2xl border border-border/60 bg-muted/70 p-4 text-sm"
           >
-            <p>{uiText("旧材料删除失败，新材料已上传，不影响提交申请。")}</p>
+            <p>
+              {uiText(
+                "webAuthCertification:the_new_document_was_uploaded_but_the_old_one_could_not_be_deleted_you_c"
+              )}
+            </p>
             {pendingCleanup.map((file) => (
               <button
                 key={file.id}
@@ -546,7 +627,7 @@ function ApplicationEditor({
                 onClick={() => void remove(file)}
                 className="block text-primary disabled:opacity-50"
               >
-                {uiText("重试删除{{v0}}", {
+                {uiText("webAuthCertification:retry_deleting_v0", {
                   v0: uiText(
                     groups.find((group) => group.kind === file.kind)?.label
                   )
@@ -563,22 +644,29 @@ function ApplicationEditor({
         {mutation.error && (
           <p role="alert" className="text-sm text-danger">
             {uiText(
-              webErrorText(mutation.error, "数据暂不可用，请刷新后重试")
-            ) || uiText("提交失败，请重试")}
+              webErrorText(
+                mutation.error,
+                localText(webCommon, "webCommon:response_unavailable")
+              )
+            ) || uiText("webAuthCertification:could_not_submit_try_again")}
           </p>
         )}
         <div className="flex flex-col gap-4 border-t border-border/60 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm leading-6 text-foreground-muted">
             {uploading
-              ? uiText("材料处理中…")
-              : uiText("审核中不能修改，结果见站内通知。")}
+              ? uiText("webAuthCertification:processing_documents")
+              : uiText(
+                  "webAuthCertification:changes_are_unavailable_during_review_see_notifications_for_the_result"
+                )}
           </p>
           <Button
             type="submit"
             disabled={!canSubmit}
             className="w-full shrink-0 whitespace-nowrap px-8 sm:w-auto"
           >
-            {mutation.isPending ? uiText("提交中…") : uiText("提交申请")}
+            {mutation.isPending
+              ? uiText("webAuthCertification:submitting")
+              : uiText("webAuthCertification:submit_application")}
           </Button>
         </div>
       </form>

@@ -17,24 +17,30 @@ export function HomeJsonLd() {
         name: site.name,
         url: site.url,
         logo: `${site.url}/icon`,
-        description: uiText(site.description)
+        description: uiText(
+          "webApp:helps_students_and_teachers_learn_english_vocabulary_with_reviews_based"
+        )
       },
       {
         "@type": "WebSite",
         "@id": `${site.url}/#website`,
         url: site.url,
         name: site.name,
-        description: uiText(site.description),
+        description: uiText(
+          "webApp:helps_students_and_teachers_learn_english_vocabulary_with_reviews_based"
+        ),
         inLanguage: locale,
         publisher: { "@id": `${site.url}/#organization` }
       },
       {
         "@type": "EducationalApplication",
-        name: uiText(site.fullName),
+        name: uiText("webApp:english_vocabulary_learning"),
         applicationCategory: "EducationalApplication",
         operatingSystem: "Web",
         url: site.url,
-        description: uiText(site.description),
+        description: uiText(
+          "webApp:helps_students_and_teachers_learn_english_vocabulary_with_reviews_based"
+        ),
         inLanguage: locale,
         offers: {
           "@type": "Offer",

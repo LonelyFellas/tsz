@@ -120,24 +120,33 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
     onAward?.();
   }, [operation, onAward]);
   return (
-    <section aria-label={uiText("每日登录奖励")} className="min-w-0 space-y-3">
+    <section
+      aria-label={uiText("webCoinsRewards:daily_sign_in_reward")}
+      className="min-w-0 space-y-3"
+    >
       <div className="flex items-center gap-2 text-foreground">
         <CalendarCheck
           className="size-4 text-foreground-muted"
           strokeWidth={1.8}
           aria-hidden
         />
-        <h3 className="text-sm font-medium">{uiText("每日登录奖励")}</h3>
+        <h3 className="text-sm font-medium">
+          {uiText("webCoinsRewards:daily_sign_in_reward")}
+        </h3>
       </div>
       {!phone ? (
         <p className="text-sm text-foreground-muted">
-          {uiText("绑定手机号后，每日首次访问自动领取 1 天生币。")}
+          {uiText(
+            "webCoinsRewards:bind_a_phone_number_to_receive_1_automatically_on_your_first_visit_each"
+          )}
         </p>
       ) : q.isError ? (
         <p role="alert" className="text-sm text-foreground-muted">
           {q.error instanceof HttpError && q.error.status === 404
-            ? uiText("登录奖励功能尚未就绪。")
-            : uiText("登录奖励结算暂未确认，登录和学习不受影响。")}
+            ? uiText("webCoinsRewards:login_rewards_are_not_available_yet")
+            : uiText(
+                "webCoinsRewards:login_reward_settlement_is_unconfirmed_sign_in_and_learning_are_unaffect"
+              )}
           <Button
             type="button"
             variant="link"
@@ -145,16 +154,16 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
             disabled={q.isFetching}
             onClick={() => void q.refetch()}
           >
-            {uiText("重试")}
+            {uiText("webCoinsRewards:retry")}
           </Button>
         </p>
       ) : !q.data ? (
         <p className="text-sm text-foreground-muted">
-          {uiText("正在确认今日登录奖励…")}
+          {uiText("webCoinsRewards:checking_today_s_login_reward")}
         </p>
       ) : q.data.status === "reward_disabled" ? (
         <p className="text-sm text-foreground-muted">
-          {uiText("每日登录奖励暂未开启。")}
+          {uiText("webCoinsRewards:daily_login_rewards_are_disabled")}
         </p>
       ) : q.data.status === "awarded" ? (
         <p
@@ -167,7 +176,7 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
             aria-hidden
           />
           <span>
-            {uiText("{{v0}} 登录奖励已到账 1 天生币。", {
+            {uiText("webCoinsRewards:v0_login_reward_credited_1", {
               v0: q.data.business_day
             })}
           </span>
@@ -175,13 +184,13 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
       ) : (
         <p role="status" className="text-sm text-foreground-muted">
           {uiText(
-            "钱包暂停或关闭，暂不能获得登录奖励；恢复后当天再次访问可领取。"
+            "webCoinsRewards:your_wallet_is_paused_or_closed_so_login_rewards_are_unavailable_visit_a"
           )}
         </p>
       )}
       <details className="group/login-rules">
         <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:min-h-8 [&::-webkit-details-marker]:hidden">
-          {uiText("登录奖励规则")}
+          {uiText("webCoinsRewards:login_reward_rules")}
           <ChevronDown
             className="size-3.5 group-open/login-rules:rotate-180"
             aria-hidden
@@ -189,7 +198,7 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
         </summary>
         <p className="mt-1 text-xs leading-5 text-foreground-muted">
           {uiText(
-            "北京时间 04:00 换日，每个账号每天最多 1 币；当天打开、返回页面或操作时自动结算，无需退出重登。"
+            "webCoinsRewards:the_business_day_changes_at_04_00_beijing_time_each_account_can_receive"
           )}
         </p>
       </details>

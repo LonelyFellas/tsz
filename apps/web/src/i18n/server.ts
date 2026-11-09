@@ -54,7 +54,7 @@ export const getWebLocale = cache(async () => {
   }
 });
 
-export async function getServerWebText(catalog: WebCatalog) {
+export async function getServerWebText<C extends WebCatalog>(catalog: C) {
   const instance = createInterfaceI18n(await getWebLocale());
   addWebCatalog(instance, webCommon);
   addWebCatalog(instance, catalog);

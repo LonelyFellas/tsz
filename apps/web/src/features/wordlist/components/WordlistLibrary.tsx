@@ -1,6 +1,6 @@
 "use client";
-import { localText } from "@/i18n/catalog";
-import { type WebNotice } from "@/i18n/catalog";
+import { localText, type WebNotice } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
 
@@ -72,7 +72,7 @@ function Library({ userId }: { userId: string }) {
   const [name, setName] = useState("");
   const nameInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<WebNotice>("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<WebNotice>("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (
@@ -145,7 +145,7 @@ function Library({ userId }: { userId: string }) {
     mounted.current && useUserStore.getState().user?.id === userId;
   async function run(
     task: () => Promise<unknown>,
-    message: string,
+    message: WebNotice,
     close = true
   ) {
     if (working.current || !alive()) return;
@@ -167,8 +167,13 @@ function Library({ userId }: { userId: string }) {
         e instanceof Error ? e.message.trim().replace(/[。.!！]+$/u, "") : "";
       setError(
         detail
-          ? localText("操作未完成：{{v0}}。", { v0: detail })
-          : "操作未完成，请稍后重试。"
+          ? localText(webWordlist, "webWordlistLibrary:action_incomplete_v0", {
+              v0: detail
+            })
+          : localText(
+              webWordlist,
+              "webWordlistLibrary:the_action_did_not_complete_try_again_later"
+            )
       );
       await result.refetch();
     } finally {
@@ -213,7 +218,7 @@ function Library({ userId }: { userId: string }) {
           ...operation("move", ids),
           target_id: target
         }),
-      "已移动"
+      localText(webWordlist, "webWordlistLibrary:moved")
     );
   }
   const items = result.data?.items ?? [];
@@ -265,11 +270,13 @@ function Library({ userId }: { userId: string }) {
     >
       {!locateId && mode !== "new" && (
         <PageHeader
-          eyebrow={uiText("我的学习")}
-          title={uiText("我的词表")}
+          eyebrow={uiText("webWordlistLibrary:my_learning")}
+          title={uiText("webWordlistLibrary:my_word_lists")}
           actions={
             <Button asChild variant="ghost" size="compact">
-              <Link href="/wordlists">{uiText("浏览公开词表")}</Link>
+              <Link href="/wordlists">
+                {uiText("webWordlistLibrary:browse_public_word_lists")}
+              </Link>
             </Button>
           }
         />
@@ -283,16 +290,22 @@ function Library({ userId }: { userId: string }) {
             <>
               <div className="flex h-11 items-center px-4">
                 <h2 className="text-[11px] font-medium tracking-[0.12em] text-foreground-muted">
-                  {uiText("词表目录")}
+                  {uiText("webWordlistLibrary:word_list_directory")}
                 </h2>
               </div>
               <div data-leaves-page className="px-3 pb-4">
                 <Segmented
-                  label={uiText("我的词表分类")}
+                  label={uiText("webWordlistLibrary:my_word_list_categories")}
                   value={space}
                   options={[
-                    { value: "owned", label: uiText("创建") },
-                    { value: "favorites", label: uiText("收藏") }
+                    {
+                      value: "owned",
+                      label: uiText("webWordlistLibrary:create")
+                    },
+                    {
+                      value: "favorites",
+                      label: uiText("webWordlistLibrary:favourites")
+                    }
                   ]}
                   disabled={busy}
                   onChange={(value) => go(undefined, false, value)}
@@ -373,7 +386,9 @@ function Library({ userId }: { userId: string }) {
                       aria-hidden
                     />
                   )}
-                  {trash ? uiText("返回词表") : uiText("回收站")}
+                  {trash
+                    ? uiText("webWordlistLibrary:back_to_word_list")
+                    : uiText("webWordlistLibrary:recycle_bin")}
                 </button>
                 {trash && (
                   <Button
@@ -386,13 +401,13 @@ function Library({ userId }: { userId: string }) {
                     onClick={() => void confirm("purge", [], true)}
                   >
                     <Trash2 className="size-4 shrink-0" aria-hidden />
-                    {uiText("清空回收站")}
+                    {uiText("webWordlistLibrary:empty_recycle_bin")}
                   </Button>
                 )}
               </div>
               <div
                 role="separator"
-                aria-label={uiText("调整目录宽度")}
+                aria-label={uiText("webWordlistLibrary:resize_directory")}
                 aria-orientation="vertical"
                 aria-valuemin={200}
                 aria-valuemax={420}
@@ -443,7 +458,7 @@ function Library({ userId }: { userId: string }) {
           )}
         </ResponsiveExplorer>
         <section
-          aria-label={uiText("内容区域")}
+          aria-label={uiText("webWordlistLibrary:content_area")}
           className="min-w-0 p-4 sm:p-6 lg:p-8"
           aria-busy={busy || result.isFetching}
         >
@@ -464,7 +479,7 @@ function Library({ userId }: { userId: string }) {
                 type="button"
                 size="icon"
                 variant="ghost"
-                aria-label={uiText("关闭操作提示")}
+                aria-label={uiText("webWordlistLibrary:dismiss_action_notice")}
                 onClick={() => setNotice("")}
               >
                 <X className="size-4" aria-hidden />
@@ -482,12 +497,13 @@ function Library({ userId }: { userId: string }) {
                   />
                   <span className="truncate">
                     {mode === "new"
-                      ? uiText("新建词表")
-                      : (activeItem?.name ?? uiText("词表"))}
+                      ? uiText("webWordlistLibrary:new_word_list")
+                      : (activeItem?.name ??
+                        uiText("webWordlistLibrary:word_list"))}
                   </span>
                   {mode === "edit" && (
                     <span className="shrink-0 whitespace-nowrap text-xs text-foreground-muted">
-                      {uiText("编辑")}
+                      {uiText("webWordlistLibrary:edit")}
                     </span>
                   )}
                 </span>
@@ -497,7 +513,7 @@ function Library({ userId }: { userId: string }) {
                   size="sm"
                   onClick={() => go(currentFolder ?? undefined)}
                 >
-                  {uiText("关闭词表")}
+                  {uiText("webWordlistLibrary:close_word_list")}
                 </Button>
               </div>
               {mode === "new" && space === "owned" && !trash ? (
@@ -508,14 +524,20 @@ function Library({ userId }: { userId: string }) {
                   onCancel={() => go(currentFolder ?? undefined)}
                 />
               ) : result.isPending ? (
-                <PageNotice>{uiText("正在读取词表…")}</PageNotice>
+                <PageNotice>
+                  {uiText("webWordlistLibrary:loading_word_list")}
+                </PageNotice>
               ) : !activeItem ? (
                 <PageNotice tone="error">
-                  {uiText("词表不存在或已移入回收站，请在左侧重新选择。")}
+                  {uiText(
+                    "webWordlistLibrary:the_word_list_does_not_exist_or_is_in_the_recycle_bin_select_another_on"
+                  )}
                 </PageNotice>
               ) : trash ? (
                 <PageNotice>
-                  {uiText("此词表在回收站中，恢复后可以打开。")}
+                  {uiText(
+                    "webWordlistLibrary:this_list_is_in_the_recycle_bin_restore_it_to_open_it"
+                  )}
                   <Button
                     variant="outline"
                     onClick={() =>
@@ -526,12 +548,14 @@ function Library({ userId }: { userId: string }) {
                       })
                     }
                   >
-                    {uiText("恢复词表")}
+                    {uiText("webWordlistLibrary:restore_word_list")}
                   </Button>
                 </PageNotice>
               ) : !activeItem.wordlist ? (
                 <PageNotice>
-                  {uiText("原词表暂不可用，收藏位置和个人备注仍然保留。")}
+                  {uiText(
+                    "webWordlistLibrary:the_original_list_is_unavailable_your_favourite_location_and_private_not"
+                  )}
                 </PageNotice>
               ) : mode === "edit" && space === "owned" ? (
                 <WordListCreator
@@ -557,20 +581,26 @@ function Library({ userId }: { userId: string }) {
                 aria-hidden
               />
               <h2 className="text-lg font-semibold">
-                {uiText("从左侧选择词表")}
+                {uiText("webWordlistLibrary:select_a_word_list_on_the_left")}
               </h2>
               <p className="mt-2 text-sm leading-6 text-foreground-muted">
                 {trash
-                  ? uiText("恢复词表后即可查看内容。")
+                  ? uiText(
+                      "webWordlistLibrary:restore_the_word_list_to_view_its_content"
+                    )
                   : space === "favorites"
-                    ? uiText("打开词表后，在这里查看词条内容。")
-                    : uiText("打开词表后，在这里查看和编辑词条内容。")}
+                    ? uiText(
+                        "webWordlistLibrary:open_a_word_list_to_view_entries_here"
+                      )
+                    : uiText(
+                        "webWordlistLibrary:open_a_word_list_to_view_and_edit_entries_here"
+                      )}
               </p>
               {!trash && space === "owned" && (
                 <Button asChild className="mt-6" size="sm">
                   <Link href={workspaceHref(undefined, "new")}>
                     <Plus className="size-4" aria-hidden />
-                    {uiText("创建词表")}
+                    {uiText("webWordlistLibrary:create_word_list")}
                   </Link>
                 </Button>
               )}
@@ -584,16 +614,16 @@ function Library({ userId }: { userId: string }) {
           busy={busy}
           title={
             modal.kind === "create"
-              ? uiText("新建文件夹")
+              ? uiText("webWordlistLibrary:new_folder")
               : modal.kind === "rename"
-                ? uiText("修改名称")
+                ? uiText("webWordlistLibrary:change_name")
                 : modal.kind === "move"
-                  ? uiText("移动到")
+                  ? uiText("webWordlistLibrary:move_to")
                   : modal.kind === "restore"
-                    ? uiText("恢复到")
+                    ? uiText("webWordlistLibrary:restore_to")
                     : modal.input.action === "trash"
-                      ? uiText("移入回收站")
-                      : uiText("彻底删除")
+                      ? uiText("webWordlistLibrary:move_to_recycle_bin")
+                      : uiText("webWordlistLibrary:delete_permanently")
           }
           onClose={() => setModal(null)}
         >
@@ -631,7 +661,7 @@ function Library({ userId }: { userId: string }) {
                           expected_version: modal.expectedVersion,
                           name
                         }),
-                  "已保存名称"
+                  localText(webWordlist, "webWordlistLibrary:name_saved")
                 );
               }}
             >
@@ -639,7 +669,7 @@ function Library({ userId }: { userId: string }) {
                 className="mb-2 block px-4 text-sm font-medium"
                 htmlFor="library-name"
               >
-                {uiText("名称")}
+                {uiText("webWordlistLibrary:name")}
               </label>
               <Input
                 id="library-name"
@@ -659,8 +689,10 @@ function Library({ userId }: { userId: string }) {
                 {modal.kind === "rename" &&
                 space === "favorites" &&
                 modal.item.wordlist_id
-                  ? uiText("备注名仅自己可见，不会修改原词表。")
-                  : uiText("最多 100 个字符。")}
+                  ? uiText(
+                      "webWordlistLibrary:your_private_label_is_visible_only_to_you_and_does_not_rename_the_origin"
+                    )
+                  : uiText("webWordlistLibrary:up_to_100_characters")}
               </p>
               <div className="mt-6 flex justify-end gap-2 border-t border-border/60 pt-4">
                 <Button
@@ -669,7 +701,7 @@ function Library({ userId }: { userId: string }) {
                   disabled={busy}
                   onClick={() => setModal(null)}
                 >
-                  {uiText("取消")}
+                  {uiText("webWordlistLibrary:cancel")}
                 </Button>
                 <Button
                   disabled={
@@ -685,7 +717,9 @@ function Library({ userId }: { userId: string }) {
                       aria-hidden
                     />
                   )}
-                  {busy ? uiText("保存中…") : uiText("保存")}
+                  {busy
+                    ? uiText("webWordlistLibrary:saving")
+                    : uiText("webWordlistLibrary:save")}
                 </Button>
               </div>
             </form>
@@ -693,9 +727,12 @@ function Library({ userId }: { userId: string }) {
           {(modal.kind === "move" || modal.kind === "restore") && (
             <>
               <p className="mb-3 text-sm text-foreground-muted">
-                {uiText("已选择 {{v0}} 项，浏览文件夹后确认目标位置。", {
-                  v0: modal.ids.length
-                })}
+                {uiText(
+                  "webWordlistLibrary:v0_items_selected_browse_folders_and_confirm_the_destination",
+                  {
+                    v0: modal.ids.length
+                  }
+                )}
               </p>
               {modal.kind === "restore" && (
                 <Button
@@ -713,21 +750,26 @@ function Library({ userId }: { userId: string }) {
                           ),
                           original_location: true
                         }),
-                      "已恢复；原位置不可用时放回根目录"
+                      localText(
+                        webWordlist,
+                        "webWordlistLibrary:restored_items_without_a_valid_original_location_return_to_the_root_fold"
+                      )
                     )
                   }
                 >
-                  {uiText("恢复到原位置")}
+                  {uiText("webWordlistLibrary:restore_to_original_location")}
                 </Button>
               )}
               <LibraryFolderPicker
                 actionLabel={
                   modal.kind === "move"
-                    ? uiText("移动到这里")
-                    : uiText("恢复到这里")
+                    ? uiText("webWordlistLibrary:move_here")
+                    : uiText("webWordlistLibrary:restore_here")
                 }
                 pendingLabel={
-                  modal.kind === "move" ? uiText("移动中…") : uiText("恢复中…")
+                  modal.kind === "move"
+                    ? uiText("webWordlistLibrary:moving")
+                    : uiText("webWordlistLibrary:restoring")
                 }
                 onCancel={() => setModal(null)}
                 space={space}
@@ -744,7 +786,9 @@ function Library({ userId }: { userId: string }) {
                         ),
                         target_id: target
                       }),
-                    modal.kind === "move" ? "已移动" : "已恢复"
+                    modal.kind === "move"
+                      ? localText(webWordlist, "webWordlistLibrary:moved")
+                      : localText(webWordlist, "webWordlistLibrary:restored")
                   )
                 }
               />
@@ -755,8 +799,8 @@ function Library({ userId }: { userId: string }) {
               <p className="mb-3">
                 {uiText(
                   modal.input.action === "trash"
-                    ? "将移入回收站 {{v0}} 个文件夹和 {{v1}} 份词表。"
-                    : "将彻底删除 {{v0}} 个文件夹和 {{v1}} 份词表。",
+                    ? "webWordlistLibrary:trash_impact"
+                    : "webWordlistLibrary:purge_impact",
                   {
                     v0: modal.impact.folder_count,
                     v1: modal.impact.wordlist_count
@@ -765,10 +809,14 @@ function Library({ userId }: { userId: string }) {
               </p>
               <p className="mb-5 text-sm text-foreground-muted">
                 {modal.input.action === "purge"
-                  ? uiText("此操作不可恢复。")
+                  ? uiText("webWordlistLibrary:this_action_cannot_be_undone")
                   : space === "owned"
-                    ? uiText("公开词表将停止公开，恢复后为私密状态。")
-                    : uiText("只移除你的收藏，不影响原作者词表。")}
+                    ? uiText(
+                        "webWordlistLibrary:public_word_lists_will_be_withdrawn_and_restored_as_private_lists"
+                      )
+                    : uiText(
+                        "webWordlistLibrary:only_your_favourite_is_removed_the_author_s_original_list_is_unaffected"
+                      )}
               </p>
               <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4">
                 <Button
@@ -777,7 +825,7 @@ function Library({ userId }: { userId: string }) {
                   disabled={busy}
                   onClick={() => setModal(null)}
                 >
-                  {uiText("取消")}
+                  {uiText("webWordlistLibrary:cancel")}
                 </Button>
                 <Button
                   variant="destructive"
@@ -792,8 +840,14 @@ function Library({ userId }: { userId: string }) {
                           );
                       },
                       modal.input.action === "trash"
-                        ? "已移入回收站"
-                        : "已彻底删除"
+                        ? localText(
+                            webWordlist,
+                            "webWordlistLibrary:moved_to_recycle_bin"
+                          )
+                        : localText(
+                            webWordlist,
+                            "webWordlistLibrary:deleted_permanently"
+                          )
                     )
                   }
                 >
@@ -804,10 +858,12 @@ function Library({ userId }: { userId: string }) {
                     />
                   )}
                   {busy
-                    ? uiText("删除中…")
-                    : uiText("确认{{v0}}", {
+                    ? uiText("webWordlistLibrary:deleting")
+                    : uiText("webWordlistLibrary:confirm_v0", {
                         v0: uiText(
-                          modal.input.action === "trash" ? "删除" : "彻底删除"
+                          modal.input.action === "trash"
+                            ? "webWordlistLibrary:delete"
+                            : "webWordlistLibrary:delete_permanently"
                         )
                       })}
                 </Button>

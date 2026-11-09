@@ -1,6 +1,13 @@
 "use client";
-import { webErrorText } from "@/i18n/catalog";
-import { originalText, type WebNotice, type WebText } from "@/i18n/catalog";
+import {
+  webCommon,
+  localText,
+  webErrorText,
+  originalText,
+  type WebNotice,
+  type WebText
+} from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webTask } from "@/i18n/messages/task";
 
@@ -68,9 +75,12 @@ function PreselectedPlan({
   const back = directPractice
     ? {
         href: `${owned ? "/account" : ""}/wordlists/${wordlistId}`,
-        label: "返回词表"
+        label: localText(webTask, "webTask:back_to_word_list")
       }
-    : { href: "/student/practice", label: "我的任务" };
+    : {
+        href: "/student/practice",
+        label: localText(webTask, "webTask:my_tasks")
+      };
   const source = useQuery({
     queryKey: ["learning-plan-source", userId, wordlistId, owned],
     queryFn: ({ signal }) =>
@@ -84,23 +94,29 @@ function PreselectedPlan({
     return (
       <PageShell>
         <PageHeader
-          title={directPractice ? uiText("开始练习") : uiText("创建任务")}
+          title={
+            directPractice
+              ? uiText("webTask:start_practice")
+              : uiText("webTask:create_task")
+          }
           back={{ ...back, label: uiText(back.label) }}
         />
         {source.isError ? (
           <PageNotice tone="error">
-            {uiText("词表不存在、不可访问或暂时无法加载。")}
+            {uiText(
+              "webTask:the_word_list_does_not_exist_is_inaccessible_or_cannot_be_loaded"
+            )}
             <Button variant="link" onClick={() => void source.refetch()}>
-              {uiText("重试")}
+              {uiText("webTask:retry")}
             </Button>
             <Button asChild variant="link">
               <Link href={directPractice ? "/wordlists" : "/student/tasks/new"}>
-                {uiText("重新选择词表")}
+                {uiText("webTask:choose_another_word_list")}
               </Link>
             </Button>
           </PageNotice>
         ) : (
-          <PageNotice>{uiText("正在读取当前词表…")}</PageNotice>
+          <PageNotice>{uiText("webTask:loading_current_word_list")}</PageNotice>
         )}
       </PageShell>
     );
@@ -115,9 +131,9 @@ function PreselectedPlan({
     />
   );
 }
-function suggestedPracticeName(source: string, text: WebText) {
-  const suffixLength = [...text("{{v0}}练习", { v0: "" })].length;
-  return text("{{v0}}练习", {
+function suggestedPracticeName(source: string, text: WebText<typeof webTask>) {
+  const suffixLength = [...text("webTask:v0_practice", { v0: "" })].length;
+  return text("webTask:v0_practice", {
     v0: [...source].slice(0, Math.max(0, 50 - suffixLength)).join("")
   });
 }
@@ -128,14 +144,17 @@ function PlanForm({
   sourceError = false,
   onRetrySource,
   directPractice = false,
-  back = { href: "/student/practice", label: "我的任务" }
+  back = {
+    href: "/student/practice",
+    label: localText(webTask, "webTask:my_tasks")
+  }
 }: {
   userId: string;
   initialWordlist?: Wordlist;
   sourceError?: boolean;
   onRetrySource?: () => void;
   directPractice?: boolean;
-  back?: { href: string; label: string };
+  back?: { href: string; label: WebNotice };
 }) {
   const uiText = useWebText(webTask);
   const router = useRouter();
@@ -258,16 +277,18 @@ function PlanForm({
       count.trim() !== "");
   const errors: Record<string, string | undefined> = {
     "question-types": !validQuestionTypes
-      ? uiText("请至少选择一种练习题型。")
+      ? uiText("webTask:select_at_least_one_question_type")
       : undefined,
     name:
       submitted && (!name.trim() || [...name.trim()].length > 50)
-        ? uiText("请输入 1–50 字的任务名称。")
+        ? uiText("webTask:enter_a_task_name_of_1_50_characters")
         : undefined,
     sources:
-      submitted && !selected.length ? uiText("请选择 1–5 份词表。") : undefined,
+      submitted && !selected.length
+        ? uiText("webTask:select_1_5_word_lists")
+        : undefined,
     count: !validCount
-      ? uiText("每日题量须为 1–{{v0}} 的整数。", {
+      ? uiText("webTask:daily_question_count_must_be_an_integer_from_1_to_v0", {
           v0: masterySupported ? 20 : 200
         })
       : undefined
@@ -346,16 +367,28 @@ function PlanForm({
       if (!preview.data?.can_create || pendingPreview) {
         setError(
           directPractice
-            ? "请等待有效题量预览后再开始。"
-            : "请等待有效题量预览后再创建。"
+            ? localText(
+                webTask,
+                "webTask:wait_for_the_eligible_question_preview_before_starting"
+              )
+            : localText(
+                webTask,
+                "webTask:wait_for_the_eligible_question_preview_before_creating"
+              )
         );
         return;
       }
       if (partialChoice && !acceptedChoice) {
         setError(
           directPractice
-            ? "请先核对暂不可用内容，并确认仅练习可用内容。"
-            : "请先核对暂不可用内容，并确认仅使用可用内容创建。"
+            ? localText(
+                webTask,
+                "webTask:check_unavailable_content_and_confirm_you_will_practise_only_available_c"
+              )
+            : localText(
+                webTask,
+                "webTask:check_unavailable_content_and_confirm_the_task_will_use_only_available_c"
+              )
         );
         return;
       }
@@ -409,13 +442,19 @@ function PlanForm({
         setError(
           missingPlans(e)
             ? directPractice
-              ? "练习功能尚未就绪，请稍后重试。"
-              : "覆盖任务功能尚未就绪，草稿已保留。请稍后重试。"
+              ? localText(
+                  webTask,
+                  "webTask:practice_is_not_available_yet_try_again_later"
+                )
+              : localText(
+                  webTask,
+                  "webTask:coverage_tasks_are_not_available_yet_your_draft_is_preserved_try_again_l"
+                )
             : e instanceof Error
               ? originalText(e.message)
               : directPractice
-                ? "开始失败，请重试。"
-                : "创建失败，请重试。"
+                ? localText(webTask, "webTask:could_not_start_try_again")
+                : localText(webTask, "webTask:could_not_create_try_again")
         );
         const definite =
           e instanceof HttpError && e.status < 500 && e.status !== 408;
@@ -443,24 +482,39 @@ function PlanForm({
     "grid gap-3 border-b border-border/60 py-4 sm:grid-cols-[112px_minmax(0,1fr)] sm:gap-4";
   const captionClass = "text-sm font-medium sm:pt-3";
   const exclusionLabels = {
-    unavailable_entries: "词条不可用",
-    context_dependent: "需要上下文",
-    no_chinese_definition: "缺少中文释义",
-    no_base_form: "词面无法用于拼写",
-    answer_in_prompt: "题干包含答案"
+    unavailable_entries: localText(webTask, "webTask:entry_unavailable"),
+    context_dependent: localText(webTask, "webTask:context_required"),
+    no_chinese_definition: localText(
+      webTask,
+      "webTask:missing_chinese_definition"
+    ),
+    no_base_form: localText(
+      webTask,
+      "webTask:the_spelling_cannot_be_used_for_practice"
+    ),
+    answer_in_prompt: localText(
+      webTask,
+      "webTask:the_prompt_contains_the_answer"
+    )
   };
   return (
     <PageShell size="lg">
       <div className="mx-auto max-w-[800px]">
         <PageHeader
           back={{ ...back, label: uiText(back.label) }}
-          title={directPractice ? initialWordlist!.name : uiText("创建任务")}
+          title={
+            directPractice
+              ? initialWordlist!.name
+              : uiText("webTask:create_task")
+          }
         />
         {capabilitiesFailed && (
           <PageNotice tone="error">
-            {uiText("练习选项暂时无法加载，请重试后再开始。")}
+            {uiText(
+              "webTask:could_not_load_practice_options_retry_before_starting"
+            )}
             <Button variant="link" onClick={() => void capabilities.refetch()}>
-              {uiText("重新加载练习选项")}
+              {uiText("webTask:reload_practice_options")}
             </Button>
           </PageNotice>
         )}
@@ -469,13 +523,21 @@ function PlanForm({
           unsupportedSelection && (
             <PageNotice tone="error">
               {directPractice && !directSupported
-                ? uiText("当前服务尚未支持词表续练，请从我的任务继续已有练习。")
+                ? uiText(
+                    "webTask:this_service_does_not_support_resuming_word_list_practice_yet_continue_e"
+                  )
                 : !choiceSupported
-                  ? uiText("当前服务尚未支持单选题，请先选择拼写题。")
-                  : uiText("当前服务尚未支持组合题型，请先单独选择一种题型。")}
+                  ? uiText(
+                      "webTask:this_service_does_not_support_multiple_choice_yet_choose_spelling_first"
+                    )
+                  : uiText(
+                      "webTask:this_service_does_not_support_combined_question_types_yet_choose_one_typ"
+                    )}
               {directPractice && !directSupported && (
                 <Button asChild variant="link">
-                  <Link href="/student/practice">{uiText("我的任务")}</Link>
+                  <Link href="/student/practice">
+                    {uiText("webTask:my_tasks")}
+                  </Link>
                 </Button>
               )}
             </PageNotice>
@@ -483,12 +545,14 @@ function PlanForm({
         {sourceUnavailable && (
           <PageNotice tone="error">
             {directPractice
-              ? uiText("暂时无法确认词表是否可用，请重试。")
+              ? uiText(
+                  "webTask:could_not_confirm_word_list_availability_try_again"
+                )
               : uiText(
-                  "暂时无法确认词表是否可用，草稿已保留。请重试或移除此词表后再创建。"
+                  "webTask:could_not_confirm_word_list_availability_your_draft_is_preserved_retry_o"
                 )}
             <Button variant="link" onClick={onRetrySource}>
-              {uiText("重试")}
+              {uiText("webTask:retry")}
             </Button>
           </PageNotice>
         )}
@@ -505,7 +569,7 @@ function PlanForm({
             <>
               <section aria-labelledby="sources-title" className={rowClass}>
                 <h2 id="sources-title" className={captionClass}>
-                  {uiText("词表")}
+                  {uiText("webTask:word_lists_2")}
                 </h2>
                 <div className="min-w-0">
                   {selected.length > 0 && (
@@ -524,11 +588,15 @@ function PlanForm({
                             </p>
                             {personalName && personalName !== w.name && (
                               <p className="truncate text-xs text-foreground-muted">
-                                {uiText("备注：{{v0}}", { v0: personalName })}
+                                {uiText("webTask:note_v0_2", {
+                                  v0: personalName
+                                })}
                               </p>
                             )}
                             <p className="mt-1 text-xs text-foreground-muted">
-                              {uiText("{{v0}} 个词条", { v0: w.item_count })}
+                              {uiText("webTask:v0_entries_2", {
+                                v0: w.item_count
+                              })}
                             </p>
                           </div>
                           <Button
@@ -536,7 +604,9 @@ function PlanForm({
                             variant="ghost"
                             size="icon"
                             disabled={locked}
-                            aria-label={uiText("移除 {{v0}}", { v0: w.name })}
+                            aria-label={uiText("webTask:remove_v0", {
+                              v0: w.name
+                            })}
                             onClick={() =>
                               setSelected((old) =>
                                 old.filter((s) => s.wordlist.id !== w.id)
@@ -563,8 +633,10 @@ function PlanForm({
                     }
                   >
                     {selected.length
-                      ? uiText("更换词表（{{v0}}/5）", { v0: selected.length })
-                      : uiText("选择词表")}
+                      ? uiText("webTask:change_word_lists_v0_5", {
+                          v0: selected.length
+                        })
+                      : uiText("webTask:choose_word_lists")}
                   </Button>
                   {errors.sources && (
                     <p
@@ -577,21 +649,26 @@ function PlanForm({
                 </div>
               </section>
               <section className={rowClass}>
-                <h2 className={captionClass}>{uiText("任务类型")}</h2>
+                <h2 className={captionClass}>{uiText("webTask:task_type")}</h2>
                 <div>
                   <Segmented
-                    label={uiText("任务类型")}
+                    label={uiText("webTask:task_type")}
                     value={kind}
                     options={[
-                      { value: "daily", label: uiText("每日任务") },
-                      { value: "longterm", label: uiText("长期任务") }
+                      { value: "daily", label: uiText("webTask:daily_task") },
+                      {
+                        value: "longterm",
+                        label: uiText("webTask:long_term_task")
+                      }
                     ]}
                     onChange={setKind}
                     disabled={locked}
                   />
                   {kind === "longterm" && (
                     <p className="mt-2 text-xs text-foreground-muted">
-                      {uiText("不设每日题量，随时接着练")}
+                      {uiText(
+                        "webTask:no_daily_limit_continue_whenever_you_like"
+                      )}
                     </p>
                   )}
                 </div>
@@ -601,10 +678,10 @@ function PlanForm({
           <section className={rowClass}>
             <div className="flex items-center justify-between sm:block">
               <h2 id="plan-types-label" className={captionClass}>
-                {uiText("题型")}
+                {uiText("webTask:question_types")}
               </h2>
               <span className="text-xs text-foreground-muted sm:mt-1 sm:block">
-                {uiText("可多选")}
+                {uiText("webTask:select_one_or_more")}
               </span>
             </div>
             <div>
@@ -620,8 +697,16 @@ function PlanForm({
               >
                 {(
                   [
-                    ["choice_zh_to_en", "单选", "看中文，选英文"],
-                    ["spelling_zh_to_en", "拼写", "看中文，写英文"]
+                    [
+                      "choice_zh_to_en",
+                      localText(webTask, "webTask:multiple_choice"),
+                      localText(webTask, "webTask:read_chinese_choose_english")
+                    ],
+                    [
+                      "spelling_zh_to_en",
+                      localText(webTask, "webTask:spelling"),
+                      localText(webTask, "webTask:read_chinese_write_english")
+                    ]
                   ] as const
                 ).map(([value, label, description]) => (
                   <label
@@ -663,10 +748,14 @@ function PlanForm({
               {!choiceSupported && !capabilitiesFailed && (
                 <p className="mt-2 text-xs text-foreground-muted">
                   {capabilities.isPending
-                    ? uiText("正在确认单选题是否可用…")
+                    ? uiText("webTask:checking_multiple_choice_availability")
                     : directPractice
-                      ? uiText("当前单选题功能尚未就绪，可先进行拼写练习。")
-                      : uiText("当前单选题功能尚未就绪，可先创建拼写任务。")}
+                      ? uiText(
+                          "webTask:multiple_choice_is_not_ready_yet_you_can_practise_spelling"
+                        )
+                      : uiText(
+                          "webTask:multiple_choice_is_not_ready_yet_you_can_create_a_spelling_task"
+                        )}
                 </p>
               )}
               {errors["question-types"] && (
@@ -683,7 +772,7 @@ function PlanForm({
             <>
               <section className={rowClass}>
                 <label htmlFor="plan-count" className={captionClass}>
-                  {uiText("每日题量")}
+                  {uiText("webTask:daily_questions")}
                 </label>
                 <div>
                   <div className="flex items-center gap-3">
@@ -693,7 +782,7 @@ function PlanForm({
                         variant="ghost"
                         size="icon"
                         className="rounded-none"
-                        aria-label={uiText("减少每日题量")}
+                        aria-label={uiText("webTask:reduce_daily_questions")}
                         disabled={locked || (validCount && n <= 1)}
                         onClick={() =>
                           setCount(
@@ -728,7 +817,7 @@ function PlanForm({
                         variant="ghost"
                         size="icon"
                         className="rounded-none"
-                        aria-label={uiText("增加每日题量")}
+                        aria-label={uiText("webTask:increase_daily_questions")}
                         disabled={
                           locked ||
                           (validCount && n >= (masterySupported ? 20 : 200))
@@ -751,7 +840,7 @@ function PlanForm({
                       </Button>
                     </div>
                     <span className="text-sm text-foreground-muted">
-                      {uiText("题 / 天")}
+                      {uiText("webTask:questions_day")}
                     </span>
                   </div>
                   <p
@@ -760,18 +849,22 @@ function PlanForm({
                   >
                     {errors.count ??
                       (masterySupported
-                        ? uiText("错题重练另计")
+                        ? uiText(
+                            "webTask:retries_of_incorrect_answers_are_additional"
+                          )
                         : uiText(
-                            "每天 1–200 题；本轮不足一天时只做剩余题量。"
+                            "webTask:1_200_questions_per_day_if_fewer_remain_in_a_cycle_complete_only_those"
                           ))}
                   </p>
                 </div>
               </section>
               <section className={rowClass}>
                 <div className="flex items-center justify-between sm:block">
-                  <h2 className={captionClass}>{uiText("起止日期")}</h2>
+                  <h2 className={captionClass}>
+                    {uiText("webTask:start_and_end_dates")}
+                  </h2>
                   <span className="text-xs text-foreground-muted sm:mt-1 sm:block">
-                    {uiText("可选")}
+                    {uiText("webTask:optional")}
                   </span>
                 </div>
                 <PlanDateRange
@@ -785,7 +878,7 @@ function PlanForm({
           {!directPractice && (
             <section className={rowClass}>
               <label htmlFor="plan-name" className={captionClass}>
-                {uiText("任务名称")}
+                {uiText("webTask:task_name")}
               </label>
               <div>
                 <div className="flex min-w-0 items-center gap-2">
@@ -795,7 +888,7 @@ function PlanForm({
                     readOnly={!editingName && !errors.name}
                     value={name}
                     disabled={locked}
-                    placeholder={uiText("填写任务名称")}
+                    placeholder={uiText("webTask:enter_a_task_name")}
                     className={`min-w-0 flex-1 rounded-xl ${!editingName && !errors.name ? "border-transparent bg-transparent px-0 text-foreground-muted shadow-none" : ""}`}
                     onChange={(e) => {
                       nameEdited.current = true;
@@ -822,7 +915,9 @@ function PlanForm({
                       }
                     }}
                   >
-                    {editingName ? uiText("完成") : uiText("编辑")}
+                    {editingName
+                      ? uiText("webTask:done")
+                      : uiText("webTask:edit")}
                   </Button>
                 </div>
                 {(errors.name || [...name].length >= 40) && (
@@ -831,7 +926,9 @@ function PlanForm({
                     className={`mt-1 text-xs ${errors.name ? "text-danger" : "text-foreground-muted"}`}
                   >
                     {errors.name ??
-                      uiText("{{v0}}/50 字", { v0: [...name].length })}
+                      uiText("webTask:v0_50_characters", {
+                        v0: [...name].length
+                      })}
                   </p>
                 )}
               </div>
@@ -841,34 +938,41 @@ function PlanForm({
             !capabilitiesFailed &&
             !unsupportedSelection && (
               <section
-                aria-label={uiText("题量预览")}
+                aria-label={uiText("webTask:question_preview")}
                 aria-live="polite"
                 className="border-b border-border py-4 text-sm"
               >
                 {pendingPreview ? (
                   <p role="status" className="text-foreground-muted">
-                    {uiText("正在计算可出题数量…")}
+                    {uiText("webTask:calculating_eligible_questions")}
                   </p>
                 ) : preview.isError ? (
                   <PageNotice tone="error">
                     {missingPlans(preview.error)
                       ? directPractice
-                        ? uiText("练习功能尚未就绪，请稍后重试。")
-                        : uiText("覆盖任务功能尚未就绪，草稿已保留。")
+                        ? uiText(
+                            "webTask:practice_is_not_available_yet_try_again_later"
+                          )
+                        : uiText(
+                            "webTask:coverage_tasks_are_not_ready_yet_your_draft_is_preserved"
+                          )
                       : preview.error instanceof Error
                         ? uiText(
                             webErrorText(
                               preview.error,
-                              "数据暂不可用，请刷新后重试"
+                              localText(
+                                webCommon,
+                                "webCommon:response_unavailable"
+                              )
                             )
                           )
-                        : uiText("预览失败")}
+                        : uiText("webTask:preview_failed")}
                     <Button
                       variant="link"
                       type="button"
                       onClick={() => void preview.refetch()}
                     >
-                      {uiText("重新计算")}
+                      {uiText("webTask:recalculate")}
                     </Button>
                   </PageNotice>
                 ) : (
@@ -876,24 +980,24 @@ function PlanForm({
                     <>
                       <div className="flex flex-wrap items-start gap-x-4 gap-y-1">
                         <p className="pt-1 font-medium">
-                          {uiText("可练习 {{v0}} 项内容", {
+                          {uiText("webTask:available_for_practice_v0", {
                             v0: preview.data.eligible_count
                           })}
                         </p>
                         <details className="min-w-0 flex-1 basis-44 text-xs text-foreground-muted">
                           <summary className="w-fit cursor-pointer py-1">
-                            {uiText("查看未纳入内容与规则")}
+                            {uiText("webTask:view_excluded_content_and_rules")}
                           </summary>
                           <div className="mt-2 space-y-2 rounded-xl bg-muted p-3">
                             {Object.entries(preview.data.exclusions)
                               .filter(([, v]) => v > 0)
                               .map(([key, count]) => (
                                 <p key={key}>
-                                  {
+                                  {uiText(
                                     exclusionLabels[
                                       key as keyof typeof exclusionLabels
                                     ]
-                                  }
+                                  )}
                                   ：{count}
                                 </p>
                               ))}
@@ -903,23 +1007,26 @@ function PlanForm({
                               />
                             )}
                             <p>
-                              {uiText("{{v0}}/ {{v1}} · 含 {{v2}} 个自定义词", {
-                                v0: preview.data.settings.cefr_level,
-                                v1: preview.data.settings.english_variant,
-                                v2: preview.data.custom_word_count
-                              })}
+                              {uiText(
+                                "webTask:v0_v1_includes_v2_custom_words",
+                                {
+                                  v0: preview.data.settings.cefr_level,
+                                  v1: preview.data.settings.english_variant,
+                                  v2: preview.data.custom_word_count
+                                }
+                              )}
                             </p>
                             {mixedPractice ? (
                               <p>
                                 {uiText(
-                                  "优先出单选题，无法可靠出单选的内容使用拼写题。"
+                                  "webTask:multiple_choice_is_preferred_content_without_reliable_options_uses_spell"
                                 )}
                               </p>
                             ) : (
                               questionType === "choice_zh_to_en" && (
                                 <p>
                                   {uiText(
-                                    "仅练习可出单选的内容，不改为拼写。单选成绩不影响拼写掌握度。"
+                                    "webTask:practise_only_content_with_reliable_multiple_choice_options_without_swit"
                                   )}
                                 </p>
                               )
@@ -927,19 +1034,21 @@ function PlanForm({
                             <p>
                               {masterySupported
                                 ? uiText(
-                                    "按掌握情况安排新学、复习和错题重练；每次先安排最多 20 题，含重练最多 30 题。"
+                                    "webTask:new_words_reviews_and_retries_follow_mastery_each_practice_starts_with_u"
                                   )
                                 : kind === "daily"
                                   ? uiText(
-                                      "按每日题量覆盖一轮，最后一天只练剩余内容。"
+                                      "webTask:cover_a_cycle_using_the_daily_question_count_the_final_day_covers_only_t"
                                     )
-                                  : uiText("完整覆盖一轮，可跨天继续。")}
+                                  : uiText(
+                                      "webTask:cover_a_full_cycle_continue_across_days"
+                                    )}
                             </p>
                             {kind === "daily" &&
                               preview.data.estimated_learning_days != null && (
                                 <p>
                                   {uiText(
-                                    "按每天完成计划量，预计 {{v0}} 个学习日完成本轮。",
+                                    "webTask:at_the_planned_daily_rate_this_cycle_takes_about_v0_learning_days",
                                     { v0: preview.data.estimated_learning_days }
                                   )}
                                 </p>
@@ -962,9 +1071,12 @@ function PlanForm({
                               )
                             }
                           />
-                          {uiText("仅使用这 {{v0}} 项可出单选的内容", {
-                            v0: preview.data.eligible_count
-                          })}
+                          {uiText(
+                            "webTask:use_only_these_v0_items_eligible_for_multiple_choice",
+                            {
+                              v0: preview.data.eligible_count
+                            }
+                          )}
                         </label>
                       )}
                       {preview.data.reasons.map((reason) => (
@@ -986,22 +1098,24 @@ function PlanForm({
             {unknown && (
               <p className="text-sm text-foreground-muted">
                 {directPractice
-                  ? uiText("开始结果尚未确认，请重试，不会重复创建练习。")
+                  ? uiText(
+                      "webTask:the_start_result_is_unconfirmed_retry_no_duplicate_practice_will_be_crea"
+                    )
                   : uiText(
-                      "创建结果尚未确认，草稿已锁定；重试沿用同一请求，不会重复创建。"
+                      "webTask:the_creation_result_is_unconfirmed_your_draft_is_locked_retrying_uses_th"
                     )}
               </p>
             )}
             {directPractice && createdPlan && error && (
               <Button asChild variant="link">
                 <Link href={`/student/tasks/${createdPlan.task.id}`}>
-                  {uiText("查看已保存的练习")}
+                  {uiText("webTask:view_saved_practice")}
                 </Link>
               </Button>
             )}
             <div className="flex justify-end gap-2">
               <Button asChild variant="ghost">
-                <Link href={back.href}>{uiText("取消")}</Link>
+                <Link href={back.href}>{uiText("webTask:cancel")}</Link>
               </Button>
               <Button
                 type="submit"
@@ -1020,15 +1134,15 @@ function PlanForm({
               >
                 {directPractice
                   ? busy
-                    ? uiText("正在开始…")
+                    ? uiText("webTask:starting")
                     : unknown || createdPlan
-                      ? uiText("重试开始练习")
-                      : uiText("开始练习")
+                      ? uiText("webTask:retry_starting_practice")
+                      : uiText("webTask:start_practice")
                   : busy
-                    ? uiText("正在创建…")
+                    ? uiText("webTask:creating")
                     : unknown
-                      ? uiText("重试原创建请求")
-                      : uiText("创建任务")}
+                      ? uiText("webTask:retry_original_creation_request")
+                      : uiText("webTask:create_task")}
               </Button>
             </div>
           </div>

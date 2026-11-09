@@ -61,14 +61,14 @@ export function LearningRewardSummary({
   const rules = d && d.status !== "reward_disabled" && (
     <p className="text-xs leading-5 text-foreground-muted">
       {uiText(
-        "已完成的每日任务累计 {{v0}} 道不同题目，每个业务日最多获得 {{v1}}。北京时间 04:00 换日，合法错误作答也计入。",
-        { v0: d.minimum_units, v1: formatCoins(d.daily_amount!) }
+        "webCoinsRewards:complete_v0_different_questions_across_completed_daily_tasks_to_earn_up",
+        { v0: d.minimum_units!, v1: formatCoins(d.daily_amount!) }
       )}
     </p>
   );
   return (
     <section
-      aria-label={uiText("每日学习奖励")}
+      aria-label={uiText("webCoinsRewards:daily_learning_reward")}
       className={
         embedded ? "space-y-3" : "glass space-y-4 rounded-3xl p-5 sm:p-6"
       }
@@ -99,7 +99,7 @@ export function LearningRewardSummary({
               : "text-base font-bold tracking-tight text-foreground"
           }
         >
-          {uiText("每日学习奖励")}
+          {uiText("webCoinsRewards:daily_learning_reward")}
           {d && !q.isError && (
             <span className="ml-2 text-sm font-normal tabular-nums text-foreground-muted">
               <span className="sr-only"> · </span>
@@ -111,22 +111,26 @@ export function LearningRewardSummary({
       {q.isError ? (
         <p role="alert" className="text-sm text-foreground-muted">
           {q.error instanceof HttpError && q.error.status === 404
-            ? uiText("奖励功能尚未就绪。")
-            : uiText("奖励状态暂时无法读取，学习进度不受影响。")}
+            ? uiText("webCoinsRewards:rewards_are_not_available_yet")
+            : uiText(
+                "webCoinsRewards:could_not_read_reward_status_your_learning_progress_is_unaffected"
+              )}
           <button
             className="ml-2 font-medium text-primary underline-offset-4 hover:underline"
             onClick={() => void q.refetch()}
           >
-            {uiText("重试")}
+            {uiText("webCoinsRewards:retry")}
           </button>
         </p>
       ) : !d ? (
         <p className="text-sm text-foreground-muted">
-          {uiText("正在读取奖励状态…")}
+          {uiText("webCoinsRewards:loading_reward_status")}
         </p>
       ) : d.status === "reward_disabled" ? (
         <p className="text-sm text-foreground-muted">
-          {uiText("每日学习奖励暂未开启，学习完成仍正常记录。")}
+          {uiText(
+            "webCoinsRewards:daily_learning_rewards_are_disabled_completed_learning_is_still_recorded"
+          )}
         </p>
       ) : (
         <>
@@ -139,9 +143,12 @@ export function LearningRewardSummary({
                   : "rounded-2xl bg-success/10 px-4 py-3 text-sm font-medium text-success"
               }
             >
-              {uiText("该日奖励已到账 {{v0}}，继续学习不会重复发放。", {
-                v0: formatCoins(d.awarded_amount)
-              })}
+              {uiText(
+                "webCoinsRewards:this_day_s_reward_of_v0_has_been_credited_further_learning_will_not_earn",
+                {
+                  v0: formatCoins(d.awarded_amount)
+                }
+              )}
             </p>
           ) : d.status === "wallet_unavailable" ? (
             <p
@@ -149,7 +156,7 @@ export function LearningRewardSummary({
               className="rounded-2xl bg-muted px-4 py-3 text-sm text-foreground-muted"
             >
               {uiText(
-                "达标时钱包暂停或关闭，尚未发奖励；恢复后当天再完成一次每日任务可重新结算，过去日期不补发。"
+                "webCoinsRewards:your_wallet_was_paused_or_closed_when_you_qualified_so_no_reward_was_iss"
               )}
             </p>
           ) : (
@@ -168,20 +175,24 @@ export function LearningRewardSummary({
                 />
               </div>
               <p className="text-sm font-medium tabular-nums text-foreground">
-                {uiText("奖励进度 {{v0}}/{{v1}}", {
+                {uiText("webCoinsRewards:reward_progress_v0_v1", {
                   v0: d.qualifying_units,
-                  v1: d.minimum_units
+                  v1: String(d.minimum_units)
                 })}
                 {d.status === "threshold_not_met"
-                  ? uiText("，该日未达标。")
-                  : uiText("，达标后自动结算。")}
+                  ? uiText(
+                      "webCoinsRewards:this_day_s_threshold_was_not_reached"
+                    )
+                  : uiText(
+                      "webCoinsRewards:the_reward_settles_automatically_when_you_qualify"
+                    )}
               </p>
             </div>
           )}
           {embedded || taskList ? (
             <details className="group/learning-rules">
               <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:min-h-8 [&::-webkit-details-marker]:hidden">
-                {uiText("学习奖励规则")}
+                {uiText("webCoinsRewards:learning_reward_rules")}
                 <ChevronDown
                   className="size-3.5 group-open/learning-rules:rotate-180"
                   aria-hidden
@@ -197,14 +208,16 @@ export function LearningRewardSummary({
       {!taskList &&
         (embedded ? (
           <Button asChild size="compact">
-            <Link href="/student/practice">{uiText("去学习")}</Link>
+            <Link href="/student/practice">
+              {uiText("webCoinsRewards:start_learning")}
+            </Link>
           </Button>
         ) : (
           <Link
             href="/student/practice"
             className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
-            {uiText("查看每日学习任务 →")}
+            {uiText("webCoinsRewards:view_daily_learning_tasks")}
           </Link>
         ))}
     </section>

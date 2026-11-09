@@ -1,5 +1,6 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import { localText, type WebNotice } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webWordlistBrowser as webWordlist } from "@/i18n/messages/wordlist/browser";
 
@@ -47,25 +48,29 @@ function Favorites({
   if (result.isError)
     return (
       <PageNotice tone="error">
-        {uiText("收藏加载失败。")}
+        {uiText("webWordlistBrowser:could_not_load_favourites")}
         <button
           type="button"
           className={buttonClass}
           onClick={() => void result.refetch()}
         >
-          {uiText("重试")}
+          {uiText("webWordlistBrowser:retry")}
         </button>
       </PageNotice>
     );
   if (result.isPending)
-    return <PageNotice>{uiText("正在加载收藏…")}</PageNotice>;
+    return (
+      <PageNotice>{uiText("webWordlistBrowser:loading_favourites")}</PageNotice>
+    );
   return (
     <>
       {!result.data.items.length ? (
         <PageNotice>
           {q
-            ? uiText("没有找到匹配的收藏")
-            : uiText("暂无收藏，去公开词表收藏感兴趣的内容吧。")}
+            ? uiText("webWordlistBrowser:no_matching_favourites")
+            : uiText(
+                "webWordlistBrowser:no_favourites_yet_browse_public_word_lists_and_save_some"
+              )}
         </PageNotice>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
@@ -80,7 +85,7 @@ function Favorites({
                     <h2 className="text-lg font-bold">{wordlist.name}</h2>
                   </Link>
                   <p className="mt-2 text-sm text-foreground-muted">
-                    {uiText("{{v0}} 个词条 · {{v1}}", {
+                    {uiText("webWordlistBrowser:v0_entries_v1", {
                       v0: wordlist.item_count,
                       v1: wordlist.owner_name
                     })}
@@ -139,21 +144,27 @@ function UnavailableFavorite({ id, userId }: { id: string; userId: string }) {
       if (useUserStore.getState().user?.id === userId)
         await client.invalidateQueries({ queryKey: wordListKeys.all });
     } catch {
-      setError("移除失败，请重试。");
+      setError(
+        localText(webWordlist, "webWordlistBrowser:could_not_remove_try_again")
+      );
     } finally {
       setBusy(false);
     }
   }
   return (
     <>
-      <h2 className="font-medium">{uiText("词表暂不可用")}</h2>
+      <h2 className="font-medium">
+        {uiText("webWordlistBrowser:word_list_unavailable")}
+      </h2>
       <button
         type="button"
         className={`${buttonClass} mt-4`}
         disabled={busy}
         onClick={() => void remove()}
       >
-        {busy ? uiText("移除中…") : uiText("取消收藏")}
+        {busy
+          ? uiText("webWordlistBrowser:removing")
+          : uiText("webWordlistBrowser:remove_favourite")}
       </button>
       {error && (
         <p role="alert" className="mt-2 text-sm text-danger">
