@@ -16,6 +16,8 @@ import { WebVitals } from "./web-vitals";
 
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
+  const locale = await getWebLocale();
+  const image = `/share-image/${locale}`;
   return {
     // 为相对路径的 OG/canonical/图标提供绝对基地址。
     metadataBase: new URL(site.url),
@@ -40,6 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
       ] as const
     ).map((keyword) => uiText(keyword)),
     applicationName: site.name,
+    manifest: `/manifest/${locale}`,
     // 首页规范地址;子页面各自覆盖。
     alternates: { canonical: "/" },
     openGraph: {
@@ -50,10 +53,21 @@ export async function generateMetadata(): Promise<Metadata> {
         "webApp:helps_students_and_teachers_learn_english_vocabulary_with_reviews_based"
       ),
       url: site.url,
-      locale: openGraphLocale[await getWebLocale()]
+      locale: openGraphLocale[locale],
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: uiText("webApp:english_vocabulary_learning")
+        }
+      ]
     },
     twitter: {
       card: "summary_large_image",
+      images: [
+        { url: image, alt: uiText("webApp:english_vocabulary_learning") }
+      ],
       title: uiText("webApp:english_vocabulary_learning"),
       description: uiText(
         "webApp:helps_students_and_teachers_learn_english_vocabulary_with_reviews_based"

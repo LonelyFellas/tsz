@@ -63,6 +63,7 @@ it("captures a language for a logical request and preserves code and field issue
   expect(error).toBeInstanceOf(HttpError);
   expect(error).toMatchObject({
     status: 409,
+    requestLocale: "en-US",
     code: "revision_conflict",
     message: "內容已變更",
     meta: { current_revision: 3 },
@@ -73,4 +74,35 @@ it("captures a language for a logical request and preserves code and field issue
       new Headers(call[1].headers).get("Accept-Language")
     )
   ).toEqual(["en-US", "en-US"]);
+});
+
+it("records the response language even if the selection changes while the request is pending", async () => {
+  let locale = "zh-Hans";
+  let resolve!: (response: Response) => void;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done;
+        })
+    )
+  );
+  const http = createHttpClient({
+    baseUrl: "/api/v1",
+    getInterfaceLocale: () => locale
+  });
+  const pending = http.post("/start", {}).catch((error: unknown) => error);
+  await vi.waitFor(() => expect(resolve).toBeDefined());
+  locale = "en-US";
+  resolve(
+    new Response(JSON.stringify({ detail: "旧语言错误" }), {
+      status: 409,
+      headers: { "Content-Language": "zh-Hans" }
+    })
+  );
+  expect(await pending).toMatchObject({
+    requestLocale: "zh-Hans",
+    message: "旧语言错误"
+  });
 });

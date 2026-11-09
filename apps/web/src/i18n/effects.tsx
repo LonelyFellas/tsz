@@ -85,6 +85,9 @@ export function WebLocaleEffects() {
       if (document.title.replace(/^\(\d+\)\s*/, "") !== title)
         document.title = title;
       if (!ready) return;
+      document.head
+        .querySelector('link[rel="manifest"]')
+        ?.setAttribute("href", `/manifest/${locale}`);
       for (const [selector, content] of [
         ['meta[name="description"]', description],
         [
@@ -98,6 +101,16 @@ export function WebLocaleEffects() {
           )
         ],
         ['meta[property="og:locale"]', openGraphLocale[locale]],
+        ['meta[property="og:image"]', `${site.url}/share-image/${locale}`],
+        [
+          'meta[property="og:image:alt"]',
+          uiText("webApp:english_vocabulary_learning")
+        ],
+        ['meta[name="twitter:image"]', `${site.url}/share-image/${locale}`],
+        [
+          'meta[name="twitter:image:alt"]',
+          uiText("webApp:english_vocabulary_learning")
+        ],
         [
           'meta[name="twitter:title"]',
           uiText("webApp:english_vocabulary_learning")

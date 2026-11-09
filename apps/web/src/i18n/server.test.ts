@@ -11,7 +11,11 @@ vi.mock("next/headers", () => ({
     return { get: () => (hint ? { value: hint } : undefined) };
   }
 }));
-import { getWebLocale, getServerWebText } from "./server";
+import {
+  getWebLocale,
+  getServerWebText,
+  getPublicResourceLocale
+} from "./server";
 import { webApp } from "./messages/app";
 const directory = {
   schema_version: 1,
@@ -91,4 +95,27 @@ it("英文浏览器首访按权重与客户端相同规则匹配，停用项不�
     )
   );
   expect(await getWebLocale()).toBe("zh-Hans");
+});
+
+it("公开资源只使用 URL 指定且目录开放的语言，不读取 cookie", async () => {
+  mocks.hint = "en-US";
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json(directory))
+  );
+  for (const locale of directory.supported_locales)
+    expect(await getPublicResourceLocale(locale)).toBe(locale);
+  expect(await getPublicResourceLocale("invalid")).toBe("zh-Hans");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ ...directory, supported_locales: ["zh-Hans"] })
+    )
+  );
+  expect(await getPublicResourceLocale("en-US")).toBe("zh-Hans");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(null, { status: 503 }))
+  );
+  expect(await getPublicResourceLocale("en-US")).toBe("zh-Hans");
 });

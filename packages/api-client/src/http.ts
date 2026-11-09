@@ -36,6 +36,8 @@ export interface HttpClientOptions {
 }
 
 export class HttpError extends Error {
+  /** 请求时使用的界面语言；仅客户端状态，不属于 wire 格式。 */
+  public requestLocale?: string;
   /** 完整 RFC 9457 响应；响应不完整或畸形时为空。 */
   public problem?: ProblemDetails;
   /** V2/V3 分步保存/发布的字段级问题；legacy 错误为空数组。 */
@@ -250,7 +252,7 @@ export function createHttpClient({
         parsedError;
       // 403 全局通知(如 must_change_password → 跳改密页)。只作副作用,不吞错:仍照常抛出。
       if (res.status === 403) onForbidden?.(code, path);
-      throw new HttpError(
+      const error = new HttpError(
         res.status,
         message,
         details,
@@ -259,6 +261,12 @@ export function createHttpClient({
         meta,
         problem
       );
+      if (headers.get("X-TSZ-Localization") === "v1")
+        error.requestLocale =
+          res.headers.get("Content-Language") ??
+          headers.get("Accept-Language") ??
+          undefined;
+      throw error;
     }
 
     if (consumeStream) {

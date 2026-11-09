@@ -2,6 +2,7 @@ import {
   lookupWebNotice,
   webCommon,
   originalText,
+  webErrorText,
   localText,
   type WebNotice
 } from "@/i18n/catalog";
@@ -190,7 +191,7 @@ export function securityErrorMessage(error: unknown): WebNotice {
       "webCommon:shared_your_account_details_have_changed_reload_and_try_again"
     )
   };
-  return lookupWebNotice(messages, error.code) ?? originalText(error.message);
+  return lookupWebNotice(messages, error.code) ?? webErrorText(error, "");
 }
 
 export function postAuthPath(

@@ -12,6 +12,7 @@
     "./i18n/react": "./src/i18n/react.tsx",
     "./i18n/preferences": "./src/i18n/preferences.ts",
     "./auth": "./src/auth/index.ts",
+    "./auth/tokenManager": "./src/auth/tokenManager.ts",
     "./recovery": "./src/recovery/index.ts",
     "./fonts.css": "./src/fonts.css"
   },

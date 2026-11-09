@@ -20,8 +20,15 @@ import { interfacePreferences } from "@/lib/interface-preferences";
 import { WebLocaleEffects } from "./effects";
 import { WebLocaleBoundary, useWebLocaleReady } from "./boot";
 import { webLocaleBootScript, webLocaleBootStyle } from "./snapshot";
+import GlobalError from "@/app/global-error";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/login" }));
+const restore = vi.hoisted(() =>
+  vi.fn(() => ({ retry: vi.fn(), retrying: false }))
+);
+vi.mock("@/features/auth/hooks/useSessionRestore", () => ({
+  useSessionRestore: restore
+}));
 
 const directory = {
   schema_version: 1,
@@ -92,6 +99,33 @@ afterEach(() => {
   vi.restoreAllMocks();
   authRuntime.clearSession();
   document.documentElement.removeAttribute("data-locale-pending");
+});
+it("根错误页启动会话恢复并等待账号语言", async () => {
+  const preference = deferred<"en-US">();
+  vi.spyOn(authRuntime.api.interfacePreferences, "get").mockImplementation(
+    async () => ({
+      preferences: { interface_locale: await preference.promise }
+    })
+  );
+  render(
+    <GlobalError
+      error={new Error("Failed to fetch dynamically imported module")}
+      reset={vi.fn()}
+    />
+  );
+  expect(restore).toHaveBeenCalled();
+  expect(screen.queryByText("页面资源加载失败")).toBeNull();
+  act(() =>
+    useUserStore.setState({
+      user: { ...user, roles: ["student"] },
+      hydrated: true
+    })
+  );
+  await act(async () => preference.resolve("en-US"));
+  expect(
+    await screen.findByText("Page resources could not be loaded")
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reload" })).toBeEnabled();
 });
 it("身份与账号偏好未确认时无可见默认文案，首个已确认画面为英文", async () => {
   const preference = deferred<"en-US">();
