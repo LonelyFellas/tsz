@@ -1,5 +1,5 @@
 "use client";
-import { type WebNotice, localText } from "@/i18n/catalog";
+import { lookupWebNotice, type WebNotice, localText } from "@/i18n/catalog";
 
 import { useWebLocale, useWebText } from "@/i18n/client";
 
@@ -322,7 +322,9 @@ function Wallet({ id }: { id: string }) {
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm font-medium leading-6 text-foreground">
-                            {uiText(SOURCES[entry.source_type]) ||
+                            {uiText(
+                              lookupWebNotice(SOURCES, entry.source_type)
+                            ) ||
                               (entry.kind === "transfer"
                                 ? uiText("webCoinsWallet:credit_debit")
                                 : uiText("webCoinsWallet:coin_entry"))}

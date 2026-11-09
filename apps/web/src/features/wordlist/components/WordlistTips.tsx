@@ -1,6 +1,6 @@
 "use client";
+import { lookupWebNotice, localText, type WebNotice } from "@/i18n/catalog";
 import { useWebLocale, useWebText } from "@/i18n/client";
-import { localText, type WebNotice } from "@/i18n/catalog";
 
 import { webWordlistInteractions as webWordlist } from "@/i18n/messages/wordlist/interactions";
 
@@ -295,7 +295,7 @@ function TipForm({
           )
         };
         setMessage(
-          messages[error.code ?? ""] ??
+          lookupWebNotice(messages, error.code) ??
             localText(
               webWordlist,
               "webWordlistInteractions:tip_rejected_refresh_the_word_list_and_check_your_account_status"

@@ -25,6 +25,15 @@ export type LocalText = {
 };
 export type WebValues = Record<string, WebParameterValue>;
 export type WebNotice = "" | OriginalText | LocalText;
+/** 只读取作者登记的诊断映射，未知 code/原文不能命中 Object 原型。 */
+export function lookupWebNotice(
+  notices: Readonly<Record<string, WebNotice>>,
+  key: string | undefined
+): WebNotice | undefined {
+  return key !== undefined && Object.hasOwn(notices, key)
+    ? notices[key]
+    : undefined;
+}
 export function localText<C extends WebCatalog, K extends WebCatalogKey<C>>(
   catalog: C,
   key: K,

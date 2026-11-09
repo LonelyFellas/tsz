@@ -1,6 +1,11 @@
 "use client";
+import {
+  lookupWebNotice,
+  webErrorText,
+  localText,
+  type WebNotice
+} from "@/i18n/catalog";
 import { useWebLocale, useWebText } from "@/i18n/client";
-import { webErrorText, localText, type WebNotice } from "@/i18n/catalog";
 
 import { webAuthSecurity as webAuth } from "@/i18n/messages/auth/security";
 
@@ -95,7 +100,7 @@ function accountDeletionError(error: unknown): WebNotice {
       webAuth,
       "webAuthSecurity:account_deletion_requests_are_unavailable_try_again_later"
     );
-  const mapped = error.code ? ERROR_BY_CODE[error.code] : undefined;
+  const mapped = lookupWebNotice(ERROR_BY_CODE, error.code);
   if (mapped) return mapped;
   if (error.status === 400 || error.status === 422) {
     return localText(

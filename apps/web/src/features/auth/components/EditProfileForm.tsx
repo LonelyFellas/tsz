@@ -1,5 +1,11 @@
 "use client";
-import { webCommon, localText, type WebNotice } from "@/i18n/catalog";
+import {
+  lookupWebNotice,
+  webCommon,
+  localText,
+  type WebNotice
+} from "@/i18n/catalog";
+
 import { displayNameError } from "@/features/auth/shared";
 
 import { useWebText } from "@/i18n/client";
@@ -299,7 +305,7 @@ export function EditProfileForm() {
       const msg = e instanceof Error ? e.message : "";
       setAvatarError(
         (e instanceof HttpError && e.code
-          ? AVATAR_CODE_ERRORS[e.code]
+          ? lookupWebNotice(AVATAR_CODE_ERRORS, e.code)
           : undefined) ??
           translateAuthError(
             msg,
@@ -398,7 +404,7 @@ export function EditProfileForm() {
           const msg = e instanceof Error ? e.message : "";
           if (e instanceof HttpError && e.code === "invalid_display_name") {
             setNameError(
-              PROFILE_ERRORS[msg] ??
+              lookupWebNotice(PROFILE_ERRORS, msg) ??
                 localText(
                   webAuth,
                   "webAuthProfile:use_1_50_characters_and_invisible_characters_are_not_allowed"
@@ -406,7 +412,7 @@ export function EditProfileForm() {
             );
           } else {
             setNameError(
-              PROFILE_ERRORS[msg] ??
+              lookupWebNotice(PROFILE_ERRORS, msg) ??
                 (e instanceof HttpError && e.status === 404
                   ? localText(webCommon, "webCommon:feature_unavailable")
                   : localText(

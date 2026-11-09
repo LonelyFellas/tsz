@@ -1,3 +1,4 @@
+import { HttpError } from "@tsz/api-client";
 import { webAuthAccess } from "@/i18n/messages/auth/access";
 import { webCommon, localText, originalText } from "@/i18n/catalog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +8,9 @@ import {
   completeAuthentication,
   postAuthPath,
   persistSession,
-  translateAuthError
+  translateAuthError,
+  passwordErrorMessage,
+  securityErrorMessage
 } from "./shared";
 import * as request from "@/lib/request";
 import { useUserStore } from "@/stores/user";
@@ -64,6 +67,18 @@ describe("translateAuthError", () => {
       translateAuthError("", map, originalText("登录失败，请稍后重试"))
     ).toEqual(originalText("登录失败，请稍后重试"));
   });
+  it.each(["constructor", "__proto__"])(
+    "未知错误 %s 保留原文，不把对象原型成员当作本地消息",
+    (message) => {
+      expect(translateAuthError(message, map, fallback)).toEqual(
+        originalText(message)
+      );
+      expect(passwordErrorMessage(message)).toBeUndefined();
+      expect(
+        securityErrorMessage(new HttpError(400, message, [], message))
+      ).toEqual(originalText(message));
+    }
+  );
 });
 
 describe("persistSession", () => {

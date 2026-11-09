@@ -1,9 +1,11 @@
 import {
+  lookupWebNotice,
   webCommon,
   originalText,
   localText,
   type WebNotice
 } from "@/i18n/catalog";
+
 import { HttpError, type AuthResponse } from "@tsz/api-client";
 
 import {
@@ -30,8 +32,8 @@ export function translateAuthError(
     "not found": localText(webCommon, "webCommon:feature_unavailable")
   };
   return (
-    map[msg.toLowerCase().trim()] ??
-    common[msg.toLowerCase().trim()] ??
+    lookupWebNotice(map, msg.toLowerCase().trim()) ??
+    lookupWebNotice(common, msg.toLowerCase().trim()) ??
     (msg ? originalText(msg) : fallback)
   );
 }
@@ -53,7 +55,7 @@ export function passwordErrorMessage(
       "webCommon:shared_the_password_service_is_unavailable_try_again_later"
     )
   };
-  return messages[code ?? ""];
+  return lookupWebNotice(messages, code);
 }
 export function passwordLengthError(value: string): WebNotice | null {
   const code = passwordLengthErrorCode(value);
@@ -188,7 +190,7 @@ export function securityErrorMessage(error: unknown): WebNotice {
       "webCommon:shared_your_account_details_have_changed_reload_and_try_again"
     )
   };
-  return messages[error.code ?? ""] ?? originalText(error.message);
+  return lookupWebNotice(messages, error.code) ?? originalText(error.message);
 }
 
 export function postAuthPath(

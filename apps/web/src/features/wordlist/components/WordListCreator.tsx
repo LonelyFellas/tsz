@@ -1,5 +1,6 @@
 "use client";
 import {
+  lookupWebNotice,
   webCommon,
   localText,
   webErrorText,
@@ -770,8 +771,8 @@ function Editor({
                   webWordlist,
                   "webWordlistEditor:audio_is_unavailable_nothing_was_saved_or_charged_your_input_is_preserve"
                 )
-              : e instanceof HttpError && messages[e.code ?? ""]
-                ? messages[e.code!]!
+              : e instanceof HttpError && lookupWebNotice(messages, e.code)
+                ? lookupWebNotice(messages, e.code)!
                 : e instanceof HttpError && e.status === 413
                   ? localText(
                       webWordlist,
