@@ -180,3 +180,49 @@ it("keeps deleted wordlist notifications readable without a broken wordlist link
     screen.getByRole("link", { name: "查看收币记录" })
   ).toBeInTheDocument();
 });
+
+it("uses a matching server template as plain text while preserving the review reason", async () => {
+  vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
+    items: [
+      {
+        ...notification,
+        localized: {
+          locale: "zh-Hans",
+          title: "服务端固定标题",
+          body: "原名称 <b> {{actor}}"
+        }
+      }
+    ],
+    total: 1,
+    unread_count: 1
+  });
+  show();
+  expect(
+    await screen.findByRole("heading", { name: "服务端固定标题" })
+  ).toBeInTheDocument();
+  expect(screen.getByText("原名称 <b> {{actor}}")).toBeInTheDocument();
+  expect(screen.getByText(notification.reason)).toBeInTheDocument();
+  expect(document.querySelector("b")).toBeNull();
+});
+
+it("does not use a server template cached in a different language", async () => {
+  vi.mocked(api.teacherCertification.notifications).mockResolvedValue({
+    items: [
+      {
+        ...notification,
+        localized: {
+          locale: "en-US",
+          title: "Cached English title",
+          body: "Cached English body"
+        }
+      }
+    ],
+    total: 1,
+    unread_count: 1
+  });
+  show();
+  expect(
+    await screen.findByRole("heading", { name: "教师申请已驳回" })
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Cached English title")).not.toBeInTheDocument();
+});

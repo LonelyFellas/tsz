@@ -10,6 +10,17 @@ import type {
   UserNotification
 } from "@tsz/types";
 import type { HttpClient } from "./http";
+import { validateRuntimeSchema } from "./runtime-schema";
+import { ClientResponseError } from "./client-response-error";
+
+function decodeNotification(item: UserNotification): UserNotification {
+  if (
+    item.localized !== undefined &&
+    !validateRuntimeSchema("LocalizedNotification", item.localized).valid
+  )
+    throw new ClientResponseError("通知本地化响应不符合接口契约");
+  return item;
+}
 
 export function createTeacherCertificationEndpoints(http: HttpClient) {
   return {
@@ -39,13 +50,20 @@ export function createTeacherCertificationEndpoints(http: HttpClient) {
         `/me/teacher-certification/files/${encodeURIComponent(id)}`
       ),
     notifications: (page = 1, pageSize = 20) =>
-      http.get<NotificationList>(
-        `/me/notifications?page=${page}&page_size=${pageSize}`
-      ),
+      http
+        .get<NotificationList>(
+          `/me/notifications?page=${page}&page_size=${pageSize}`
+        )
+        .then((page) => ({
+          ...page,
+          items: page.items.map(decodeNotification)
+        })),
     readNotification: (id: string) =>
-      http.patch<UserNotification>(
-        `/me/notifications/${encodeURIComponent(id)}/read`
-      )
+      http
+        .patch<UserNotification>(
+          `/me/notifications/${encodeURIComponent(id)}/read`
+        )
+        .then(decodeNotification)
   };
 }
 

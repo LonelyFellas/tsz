@@ -1,10 +1,11 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/i18n-preferences-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "705474d93559757d86e8223586b2e7477f3e1e279b11607531981471578d00df",
+  "_source": "/Users/darwish/.codex/worktrees/backend-i18n-phase5/tsz-rust/docs/openapi.json",
+  "_source_sha256": "2f18ff86fd43f429d705ddfdafedb33c3f98d5703012334529b033c1395b717b",
   "roots": [
     "InterfaceCapabilities",
     "InterfaceLocaleV1",
+    "LocalizedNotification",
     "UserInterfacePreferencesResponse",
     "LexiconAssistantCapability",
     "LexiconAssistantResponse",
@@ -3287,6 +3288,16 @@
           "type": "array",
           "items": { "$ref": "#/$defs/Wordlist" }
         }
+      },
+      "additionalProperties": false
+    },
+    "LocalizedNotification": {
+      "type": "object",
+      "required": ["locale", "title", "body"],
+      "properties": {
+        "body": { "type": "string" },
+        "locale": { "$ref": "#/$defs/InterfaceLocaleV1" },
+        "title": { "type": "string" }
       },
       "additionalProperties": false
     },

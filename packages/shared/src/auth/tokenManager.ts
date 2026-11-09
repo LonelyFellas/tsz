@@ -26,6 +26,7 @@ export interface TokenManager {
 
 export interface TokenManagerOptions {
   baseUrl: string;
+  getInterfaceLocale?: () => import("@tsz/types").InterfaceLocaleV1 | undefined;
   loginPath?: string;
   onRefreshError?: (error: unknown | null) => void;
   onSessionChanged?: () => void;
@@ -49,6 +50,7 @@ function tokenIdentity(token: string | null): string | null {
 
 export function createTokenManager({
   baseUrl,
+  getInterfaceLocale,
   loginPath = "/login",
   onRefreshError,
   onSessionChanged
@@ -283,6 +285,10 @@ export function createTokenManager({
       "POST",
       refreshController.signal
     );
+    const locale = getInterfaceLocale?.();
+    const localizationHeaders = locale
+      ? { "X-TSZ-Localization": "v1", "Accept-Language": locale }
+      : undefined;
     const rotate = async () => {
       assertCurrent();
       let stored: string | null = null;
@@ -296,6 +302,7 @@ export function createTokenManager({
       if (recovering || legacyUnconfirmed) {
         const capability = await fetch(`${baseUrl}/auth/refresh`, {
           method: "HEAD",
+          headers: localizationHeaders,
           credentials: "include",
           signal: deadline.signal
         });
@@ -325,6 +332,7 @@ export function createTokenManager({
         method: "POST",
         credentials: "include",
         headers: {
+          ...localizationHeaders,
           "X-Refresh-Request-Id": requestId,
           ...(legacyUnconfirmed ? { "X-Refresh-Current-Only": "v1" } : {})
         },

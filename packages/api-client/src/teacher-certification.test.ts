@@ -96,3 +96,38 @@ it.each(["wordlist_liked", "wordlist_tipped"] as const)(
     expect(fetch.mock.calls[1]![1].method).toBe("PATCH");
   }
 );
+
+it("accepts optional localized output and rejects a malformed nested contract", async () => {
+  const item: UserNotification = {
+    id: "n1",
+    application_id: null,
+    kind: "teacher_rejected",
+    reason: "保留原文",
+    created_at: "2026-11-09T00:00:00Z",
+    read_at: null,
+    localized: { locale: "zh-Hant", title: "教師申請已駁回", body: "" }
+  };
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [item], total: 1, unread_count: 1 }))
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...item,
+          localized: { ...item.localized, locale: "unknown" }
+        })
+      )
+    );
+  vi.stubGlobal("fetch", fetcher);
+  const api = createEndpoints(createHttpClient({ baseUrl: "/api/v1" }));
+  expect((await api.teacherCertification.notifications()).items[0]).toEqual(
+    item
+  );
+  await expect(api.teacherCertification.readNotification("n1")).rejects.toThrow(
+    "通知本地化响应不符合接口契约"
+  );
+  expect(snapshot.schemas).toHaveProperty("LocalizedNotification");
+  expect(snapshot.schemas.UserNotification.required).not.toContain("localized");
+});

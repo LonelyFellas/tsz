@@ -113,14 +113,18 @@ it("keeps page titles on navigation and restores the original icon and title at 
   expect(fillText).toHaveBeenCalledWith("3", 49, 16);
   document.title = "通知 | 天生会背";
   await waitFor(() => expect(document.title).toBe("(3) 通知 | 天生会背"));
-  act(() => client.setQueryData(["notifications", "user-1", 1], data(123)));
+  act(() =>
+    client.setQueryData(["notifications", "user-1", "zh-Hans", 1], data(123))
+  );
   await waitFor(() => expect(document.title).toBe("(123) 通知 | 天生会背"));
   expect(
     screen.getByRole("link", { name: "站内通知，123 条未读" })
   ).toHaveTextContent("99+");
   act(() => images.at(-1)?.onload?.());
   expect(fillText).toHaveBeenLastCalledWith("99+", 40, 16);
-  act(() => client.setQueryData(["notifications", "user-1", 1], data(0)));
+  act(() =>
+    client.setQueryData(["notifications", "user-1", "zh-Hans", 1], data(0))
+  );
   await waitFor(() => expect(document.title).toBe("通知 | 天生会背"));
   expect(document.querySelectorAll('link[rel="icon"]')).toHaveLength(1);
   expect(document.querySelector('link[rel="icon"]')).toHaveAttribute(

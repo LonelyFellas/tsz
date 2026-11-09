@@ -60,6 +60,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 const RUNTIME_SCHEMA_ROOTS = [
   "InterfaceCapabilities",
   "InterfaceLocaleV1",
+  "LocalizedNotification",
   "UserInterfacePreferencesResponse",
   "LexiconAssistantCapability",
   "LexiconAssistantResponse",
@@ -237,6 +238,7 @@ const contractSchemaNames = [
   "LoginRewardRequest",
   "LoginRewardDay",
   "LoginRewardStatus",
+  "LocalizedNotification",
   "UserNotification",
   "NotificationList",
   "WordlistView",

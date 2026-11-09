@@ -296,3 +296,13 @@ it("语言切换保留校验、在途建号和字段冲突，不重发验证码�
   });
   expect(onCreated).not.toHaveBeenCalled();
 });
+
+it("uses the stable OTP code when the server detail is localized", async () => {
+  mockCreate.mockRejectedValue(
+    new HttpError(400, "驗證資料已失效", [], "invalid_otp_code")
+  );
+  renderModal();
+  fill({ phone: "13900001555", display_name: "测试", code: "123456" });
+  fireEvent.click(screen.getByRole("button", { name: CREATE }));
+  expect(await screen.findByText("验证码无效或已过期")).toBeInTheDocument();
+});

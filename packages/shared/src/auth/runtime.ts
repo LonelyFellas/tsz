@@ -27,6 +27,7 @@ export interface AuthRuntime {
 export interface AuthRuntimeOptions {
   baseUrl: string;
   getTestResourceRun?: () => string | undefined;
+  getInterfaceLocale?: () => import("@tsz/types").InterfaceLocaleV1 | undefined;
   /** refresh 失败后跳转的登录页路径。默认 /login。 */
   loginPath?: string;
 }
@@ -34,6 +35,7 @@ export interface AuthRuntimeOptions {
 export function createAuthRuntime({
   baseUrl,
   getTestResourceRun,
+  getInterfaceLocale,
   loginPath
 }: AuthRuntimeOptions): AuthRuntime {
   const store = createAuthStore();
@@ -47,6 +49,7 @@ export function createAuthRuntime({
     });
   const tokens = createTokenManager({
     baseUrl,
+    getInterfaceLocale,
     loginPath,
     onSessionChanged: clearUser,
     onRefreshError: (error) => {
@@ -64,6 +67,7 @@ export function createAuthRuntime({
   const http = createHttpClient({
     baseUrl,
     getTestResourceRun,
+    getInterfaceLocale,
     getToken: tokens.getToken,
     getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,

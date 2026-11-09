@@ -32,6 +32,7 @@ export interface AdminAuthRuntimeOptions {
   /** 必须指向后台前缀（如 /api/v1/admin），refresh 与各端点据此拼接。 */
   baseUrl: string;
   getTestResourceRun?: () => string | undefined;
+  getInterfaceLocale?: () => import("@tsz/types").InterfaceLocaleV1 | undefined;
   /** refresh 失败后跳转的登录页路径。默认 /login。 */
   loginPath?: string;
   /** 待改密（403 code:must_change_password）时整页跳转的改密页路径。默认 /change-password。 */
@@ -57,6 +58,7 @@ export function redirectToChangePassword(
 export function createAdminAuthRuntime({
   baseUrl,
   getTestResourceRun,
+  getInterfaceLocale,
   loginPath,
   changePasswordPath = "/change-password"
 }: AdminAuthRuntimeOptions): AdminAuthRuntime {
@@ -67,6 +69,7 @@ export function createAdminAuthRuntime({
   };
   const tokens = createTokenManager({
     baseUrl,
+    getInterfaceLocale,
     loginPath,
     onSessionChanged: clearProfile,
     onRefreshError: (error) => {
@@ -86,6 +89,7 @@ export function createAdminAuthRuntime({
   const http = createHttpClient({
     baseUrl,
     getTestResourceRun,
+    getInterfaceLocale,
     getToken: tokens.getToken,
     getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,

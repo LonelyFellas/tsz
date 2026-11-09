@@ -112,7 +112,14 @@ export function RegisterForm({
       if (passwordMessage) return passwordMessage;
     }
     const message = value instanceof Error ? value.message : "";
-    if (message.toLowerCase().trim() === "user already exists")
+    if (
+      (value instanceof HttpError &&
+        ["user_already_exists", "phone_already_registered"].includes(
+          value.code ?? ""
+        )) ||
+      (!(value instanceof HttpError && value.code) &&
+        message.toLowerCase().trim() === "user already exists")
+    )
       return localText("该{{v0}}已注册，请直接登录", {
         v0: localText(method === "email" ? "邮箱" : "手机号", {})
       });

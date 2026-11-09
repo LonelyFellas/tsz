@@ -3,10 +3,12 @@
 import { createAuthRuntime } from "@tsz/shared/auth";
 import { env } from "./env";
 import { readTestResourceRun } from "@tsz/shared";
+import { interfacePreferences } from "./interface-preferences";
 
 export const authRuntime = createAuthRuntime({
   baseUrl: env.NEXT_PUBLIC_API_BASE_URL,
-  getTestResourceRun: readTestResourceRun
+  getTestResourceRun: readTestResourceRun,
+  getInterfaceLocale: () => interfacePreferences.getRequestLocale()
 });
 
 let initialRestore: { generation: number; promise: Promise<void> } | undefined;

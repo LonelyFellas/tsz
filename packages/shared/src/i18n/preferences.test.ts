@@ -249,3 +249,18 @@ describe("账号界面偏好", () => {
     expect(f.controller.getSnapshot().preference).toBe("en-US");
   });
 });
+
+it("exposes only the current identity's verified request language", async () => {
+  const f = fixture();
+  expect(f.controller.getRequestLocale()).toBeUndefined();
+  await f.controller.refresh();
+  await f.controller.save("en-US");
+  expect(f.controller.getRequestLocale()).toBe("en-US");
+  f.session("b", 2);
+  expect(f.controller.getRequestLocale()).toBeUndefined();
+  await f.controller.refresh();
+  expect(f.controller.getRequestLocale()).toBe("zh-Hans");
+  f.options.capabilities.mockRejectedValue(new Error("offline"));
+  await f.controller.refresh();
+  expect(f.controller.getRequestLocale()).toBeUndefined();
+});
