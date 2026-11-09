@@ -137,6 +137,10 @@ export const webWordlistBrowser = /* @__PURE__ */ defineWebMessages(
       "Manage your own and favourited lists. Favorites refer to the original list and follow author updates."
   },
   {
+    entries_2: {
+      parameter: "count",
+      one: "entry"
+    },
     v0_entries_v1: {
       parameter: "v0",
       one: "{{v0}} entry · {{v1}}"

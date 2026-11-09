@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { WordListBrowser } from "./WordListBrowser";
@@ -81,3 +82,38 @@ it("system recommendations use their own server query", async () => {
   );
   expect(screen.getByText(/平台 · 管理员/)).toBeInTheDocument();
 });
+
+it.each(["en-GB", "en-US"] as const)(
+  "pluralizes the card entry unit without repeating the count in %s",
+  async (locale) => {
+    const { api } = await import("@/lib/request");
+    vi.mocked(api.wordList.list).mockResolvedValue({
+      items: [0, 1, 2].map((count) => ({
+        id: `list-${count}`,
+        owner_user_id: null,
+        owner_name: "Author",
+        name: `List ${count}`,
+        state: "published" as const,
+        revision: 1,
+        item_count: count,
+        created_at: "",
+        updated_at: ""
+      })),
+      pagination: { page: 1, page_size: 50, total: 3, total_pages: 1 }
+    });
+    renderWithProviders(
+      <InterfaceI18nProvider locale={locale}>
+        <WordListBrowser />
+      </InterfaceI18nProvider>
+    );
+    for (const count of [0, 1, 2]) {
+      const card = await screen.findByRole("link", {
+        name: new RegExp(`^List ${count} `)
+      });
+      expect(within(card).getByText(String(count))).toBeVisible();
+      expect(
+        within(card).getByText(count === 1 ? "entry" : "entries")
+      ).toBeVisible();
+    }
+  }
+);

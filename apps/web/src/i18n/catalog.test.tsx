@@ -67,7 +67,9 @@ describe("Web 界面目录", () => {
         const plural = catalog.plurals[key];
         if (plural) {
           expect(placeholders(plural.one)).toEqual(placeholders(row[0]));
-          expect(row[0]).toContain(`{{${plural.parameter}}}`);
+          // 数量可以只决定单位的单复数，不必插入文本。
+          if (placeholders(row[0]).length > 0)
+            expect(row[0]).toContain(`{{${plural.parameter}}}`);
           const instance = createInterfaceI18n("en-GB", catalog.resources);
           const text = webText(instance, catalog);
           expect(text(row[0], { [plural.parameter]: 1 })).toBe(
