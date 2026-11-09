@@ -237,14 +237,19 @@ it("跨页同词条合并词形和词义，不重复第一列或丢后页词义"
 });
 
 it("追加失败保留当前路径，重试复用同一游标而不重取首页", async () => {
+  const firstPage = pending<SearchComponentTargetsV3Response>();
   search
-    .mockResolvedValueOnce(response([candidate(0)], "next"))
+    .mockReturnValueOnce(firstPage.promise)
     .mockRejectedValueOnce(new Error("offline"))
     .mockResolvedValueOnce(response([candidate(1)]));
   const onReplace = vi.fn();
   render(
     <V3TargetCascader literal="give" targets={[]} onReplace={onReplace} />
   );
+  // 首批结果与级联初始化完成后再操作，避免 mount effect 清空展开路径。
+  await act(async () => {
+    firstPage.resolve(response([candidate(0)], "next"));
+  });
   fireEvent.click(await screen.findByText("give 0"));
   fireEvent.click(await screen.findByText("原形 give"));
   fireEvent.click(screen.getByRole("button", { name: "加载更多" }));
