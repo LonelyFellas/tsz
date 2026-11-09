@@ -11,6 +11,9 @@ import { ADMIN_PERMISSION_UPGRADE_MESSAGE } from "@tsz/api-client";
 
 const sessionRestore = vi.hoisted(() => ({ retry: vi.fn(), retrying: false }));
 
+// 此文件只验证已完成语言初始化后的授权与连接恢复行为。
+vi.mock("@/i18n/boot", () => ({ useAdminLocaleReady: () => true }));
+
 vi.mock("@/features/recovery/RecoverySession", () => ({
   RecoverySession: () => null
 }));

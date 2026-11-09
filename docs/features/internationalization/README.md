@@ -568,3 +568,21 @@ placement 仍直接使用既有 mock client；国际化不将其记为真实测�
 清理回执：两个独立批次的 PG/Redis、2 个普通用户/1 个管理员、6 条通知及全部专属会话/依赖、二进制副本、凭据/原始日志与临时工具均已删除；59601–59607 复查关闭。两个专用浏览器站点的 Cookie/localStorage/sessionStorage/CacheStorage/IndexedDB/service worker 均为 0，标签页关闭；无 OSS 或共享数据变更。脱敏回执 `/tmp/tsz-i18n-phase5-20261109-2fa4304d-cleanup.json`、`/tmp/tsz-i18n-phase5-20261109-e897f560-cleanup.json`；保留的通知截图只含合成数据与脱敏界面。临时旧 API managed checkout 只含干净代码，因桌面工具检测到活动子任务引用而未能归档，保留原状，不含测试数据或凭据。
 
 第五批收尾 [#706](https://github.com/LonelyFellas/tsz/pull/706) 修正发布顺序记录。首个文档提交 `3dff9366` 的 CI `42567041712` 在既有 `V3TargetCascader.pagination` 的“追加失败保留当前路径”用例失败：首批候选已显示，但控件 mount effect 随后清空了刚展开的路径，尚未进入追加请求。该用例本机单文件覆盖率和完整 `admin-2`（61 文件、794 项）基线均通过，未宣称本地复现。收尾按同文件既有初始化模式，用受控首批 Promise 和 `await act` 等待初始化完成；保留原重试/游标/路径断言，不改业务逻辑、超时或覆盖率门槛。修复后检查及独立增量审查以本 PR 的精确提交记录为准。
+
+## 首屏语言一致性修复（第一批）
+
+基线 `2cc8a7b9494b2860049b00e94398a02fc92f7de1`；复用 `codex/admin-locale-first-paint` 的 Admin 修复。本批只处理 Admin/Web 首屏、身份恢复与临时读取失败，不扩展错误翻译或翻译键迁移，不改 API/wire 或正式语言目录。
+
+- Admin 等当前会话及首次偏好读取结束后显示业务界面，初始化与路由 chunk 等待均为无文案占位，标题等待期间仅品牌；后台刷新保留草稿。
+- Web 服务端优先已开放的精确访客 Cookie，再按 Accept-Language 权重使用与客户端相同的标签匹配。公开 SSR HTML、metadata 与请求级实例隔离保留，无 JS 时直接显示服务端语言；启用 JS 时，在当前身份和语言确认前遮挡业务内容并使用品牌标题。服务端无法读取受限路径 refresh cookie，HTML/metadata 可能使用访客提示，而首个可见账号画面使用账号偏好；代价是恢复期间先显示无文案占位，不改为纯客户端渲染。
+- Web 等待时保留组件，避免 token 代次变化中止登录后的资料请求；账号 ID 变化重建界面。portal 同步遮挡并设 inert，恢复时还原原状态；入口资源恢复通道保持可用。同身份目录/偏好临时失败保留已确认语言，新目录停用与明确旧 API 404/405 仍按目录/默认值处理，请求层不发送失效目录语言。
+
+验证：定向国际化、两端首屏与会话恢复 101 项通过；追加 portal/资源恢复例外及服务端匹配修正后，相关 14 项通过，计数重叠。两端生产 build、相关 lint/Prettier 与 diff 检查通过，Web lint 只有既有两条整页跳转警告；最终类型检查由正常 pre-push 承接，全量测试由 PR/main CI 承接。
+
+真实联调批次 `tsz-locale-first-paint-20261109-01a1bf93` 使用专属 PG/Redis/API/Web/Admin 与只读帧探针代理，端口 `59721`–`59727`。API 私有二进制 SHA-256 `b89fb39fdc70b7157fecf423b875ba0cdb25175ce6cdf20fcf7cad802a300846`，来源后端 `e2c8eced`，源码树与已部署 main `392f55a0` 相同。Web 为 build + next start，Admin 为生产包 preview，真实 API mock 关闭、worker 关闭，无 OSS/AI/TTS 凭据；管理员验证码使用既有固定码 sender，无真实短信。
+
+Codex 内置浏览器（实例 ID 可连接，iab 别名不可用）完成两端专属账号登录、刷新和退出。rAF 探针仅记录可见文案，不改 API 响应；客户端目录/偏好延迟约 1 秒时，英文首访、英文账号加旧中文 Cookie、两端英文账号刷新均从空画面直接进入英文。Web 目录/偏好 503 故障注入保留同一输入节点、焦点和未保存草稿；404/405 兼容为独立故障注入，不冒充真实旧二进制。实际私有 API 收缩 Web 目录后首屏直接简体，独立 GET 仍保存 en-US；恢复目录后切至第二账号，显示其简体、A2/AmE，不继承账号 A 的英文、B1/BrE。管理员 uk 方言、用户学习设置与正文均未改写。正常真实链路未观察到水合警告；故障注入 HTTP 失败与正常链路分开记录。
+
+当前阶段：实施及上述联调已完成，正在按已授权 ship/CI/合并/部署流程交付；精确 SHA、独立审查与最终发布回执记录于本批 PR 和交付说明。后端现网 `392f55a0` 已满足本批契约，无后端代码或配套部署变更。
+
+清理：本批私有 PG/Redis、2 个用户和 1 个管理员及全部专属依赖、二进制副本、凭据、原始日志和探针均已删除，`59721`–`59727` 复查关闭；专用浏览器 Cookie/localStorage/sessionStorage/CacheStorage/IndexedDB/service worker 均为 0，标签页已关闭。无 OSS 或共享业务数据变更。脱敏回执 `/tmp/tsz-locale-first-paint-20261109-01a1bf93-cleanup.json`。

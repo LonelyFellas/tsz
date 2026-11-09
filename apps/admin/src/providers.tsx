@@ -1,4 +1,5 @@
 import { useAdminTranslation } from "@/i18n";
+import { AdminBootFallback, useAdminLocaleReady } from "@/i18n/boot";
 import { UnplugIcon } from "lucide-react";
 import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -60,6 +61,7 @@ export function RootProviders() {
   const refreshUnconfirmed = useAuthStore((s) => s.refreshUnconfirmed);
   const connectionError = useAuthStore((s) => s.connectionError);
   const hydrated = useAuthStore((s) => s.hydrated);
+  const localeReady = useAdminLocaleReady();
   const connectionNotice = !permissionModelIncompatible &&
     (connectionError || refreshUnconfirmed) && (
       <Alert
@@ -101,6 +103,7 @@ export function RootProviders() {
         }
       />
     );
+  if (!localeReady) return <AdminBootFallback />;
   return (
     <QueryClientProvider client={queryClient}>
       <>

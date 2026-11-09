@@ -264,3 +264,33 @@ it("exposes only the current identity's verified request language", async () => 
   await f.controller.refresh();
   expect(f.controller.getRequestLocale()).toBeUndefined();
 });
+
+it("同身份短暂目录或偏好读取失败保留已确认语言，换号与目录停用仍重新决定", async () => {
+  const f = fixture();
+  f.options.read.mockResolvedValue("en-US");
+  await f.controller.refresh();
+  f.options.capabilities.mockRejectedValueOnce(new Error("offline"));
+  await f.controller.refresh();
+  expect(f.controller.getSnapshot()).toMatchObject({
+    locale: "en-US",
+    status: "error",
+    refreshing: false
+  });
+  f.options.read.mockRejectedValueOnce(new Error("offline"));
+  await f.controller.refresh();
+  expect(f.controller.getSnapshot().locale).toBe("en-US");
+  f.options.capabilities.mockResolvedValue({
+    ...directory,
+    supported_locales: ["zh-Hans"]
+  });
+  f.options.read.mockRejectedValueOnce(new Error("offline"));
+  await f.controller.refresh();
+  expect(f.controller.getSnapshot().locale).toBe("zh-Hans");
+  f.session("b", 2);
+  f.options.capabilities.mockRejectedValueOnce(new Error("offline"));
+  await f.controller.refresh();
+  expect(f.controller.getSnapshot()).toMatchObject({
+    locale: "zh-Hans",
+    preference: null
+  });
+});

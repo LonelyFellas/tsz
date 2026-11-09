@@ -6,6 +6,7 @@ import { interfacePreferences } from "@/lib/interface-preferences";
 import { useUserStore } from "@/stores/user";
 import { site } from "@/lib/site";
 import { useWebLocale, useWebText } from "./client";
+import { useWebLocaleReady } from "./boot";
 import { webApp } from "./messages/app";
 import { GUEST_LOCALE_COOKIE, openGraphLocale } from "./snapshot";
 
@@ -45,6 +46,7 @@ const descriptions: [RegExp, string][] = [
 
 export function WebLocaleEffects() {
   const locale = useWebLocale();
+  const ready = useWebLocaleReady();
   const uiText = useWebText(webApp);
   const pathname = usePathname();
   const hydrated = useUserStore((state) => state.hydrated);
@@ -54,6 +56,7 @@ export function WebLocaleEffects() {
     interfacePreferences.getServerSnapshot
   );
   useLayoutEffect(() => {
+    if (!ready) return;
     document.documentElement.lang = locale;
     const pageTitle = titles.find(([pattern]) => pattern.test(pathname))?.[1];
     const title = pageTitle
@@ -85,7 +88,7 @@ export function WebLocaleEffects() {
       characterData: true
     });
     return () => observer.disconnect();
-  }, [locale, pathname, uiText]);
+  }, [locale, pathname, ready, uiText]);
   useEffect(() => {
     if (
       !hydrated ||

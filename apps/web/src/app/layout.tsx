@@ -5,7 +5,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { site } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
-import { openGraphLocale } from "@/i18n/snapshot";
+import {
+  openGraphLocale,
+  webLocaleBootScript,
+  webLocaleBootStyle
+} from "@/i18n/snapshot";
 import { getWebLocale } from "@/i18n/server";
 import { Providers } from "./providers";
 import { WebVitals } from "./web-vitals";
@@ -62,6 +66,8 @@ export default async function RootLayout({
   return (
     <html lang={initialLocale} suppressHydrationWarning>
       <head>
+        <style dangerouslySetInnerHTML={{ __html: webLocaleBootStyle }} />
+        <script dangerouslySetInnerHTML={{ __html: webLocaleBootScript }} />
         <script
           dangerouslySetInnerHTML={{
             __html: resourceRecoveryScript(
