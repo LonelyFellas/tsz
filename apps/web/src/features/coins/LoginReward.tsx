@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webCoinsRewards as webCoins } from "@/i18n/messages/coins/rewards";
 
 import { useEffect, useRef } from "react";
 import { CalendarCheck, Check, ChevronDown } from "lucide-react";
@@ -107,6 +109,7 @@ export function DailyLoginReward() {
 }
 
 export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
+  const uiText = useWebText(webCoins);
   const q = useLoginReward();
   const phone = useUserStore((s) => s.user?.phone);
   const seen = useRef<string | null>(null);
@@ -117,24 +120,24 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
     onAward?.();
   }, [operation, onAward]);
   return (
-    <section aria-label="每日登录奖励" className="min-w-0 space-y-3">
+    <section aria-label={uiText("每日登录奖励")} className="min-w-0 space-y-3">
       <div className="flex items-center gap-2 text-foreground">
         <CalendarCheck
           className="size-4 text-foreground-muted"
           strokeWidth={1.8}
           aria-hidden
         />
-        <h3 className="text-sm font-medium">每日登录奖励</h3>
+        <h3 className="text-sm font-medium">{uiText("每日登录奖励")}</h3>
       </div>
       {!phone ? (
         <p className="text-sm text-foreground-muted">
-          绑定手机号后，每日首次访问自动领取 1 天生币。
+          {uiText("绑定手机号后，每日首次访问自动领取 1 天生币。")}
         </p>
       ) : q.isError ? (
         <p role="alert" className="text-sm text-foreground-muted">
           {q.error instanceof HttpError && q.error.status === 404
-            ? "登录奖励功能尚未就绪。"
-            : "登录奖励结算暂未确认，登录和学习不受影响。"}
+            ? uiText("登录奖励功能尚未就绪。")
+            : uiText("登录奖励结算暂未确认，登录和学习不受影响。")}
           <Button
             type="button"
             variant="link"
@@ -142,13 +145,17 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
             disabled={q.isFetching}
             onClick={() => void q.refetch()}
           >
-            重试
+            {uiText("重试")}
           </Button>
         </p>
       ) : !q.data ? (
-        <p className="text-sm text-foreground-muted">正在确认今日登录奖励…</p>
+        <p className="text-sm text-foreground-muted">
+          {uiText("正在确认今日登录奖励…")}
+        </p>
       ) : q.data.status === "reward_disabled" ? (
-        <p className="text-sm text-foreground-muted">每日登录奖励暂未开启。</p>
+        <p className="text-sm text-foreground-muted">
+          {uiText("每日登录奖励暂未开启。")}
+        </p>
       ) : q.data.status === "awarded" ? (
         <p
           role="status"
@@ -159,24 +166,31 @@ export function LoginRewardSummary({ onAward }: { onAward?: () => void }) {
             strokeWidth={1.8}
             aria-hidden
           />
-          <span>{q.data.business_day} 登录奖励已到账 1 天生币。</span>
+          <span>
+            {uiText("{{v0}} 登录奖励已到账 1 天生币。", {
+              v0: q.data.business_day
+            })}
+          </span>
         </p>
       ) : (
         <p role="status" className="text-sm text-foreground-muted">
-          钱包暂停或关闭，暂不能获得登录奖励；恢复后当天再次访问可领取。
+          {uiText(
+            "钱包暂停或关闭，暂不能获得登录奖励；恢复后当天再次访问可领取。"
+          )}
         </p>
       )}
       <details className="group/login-rules">
         <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:min-h-8 [&::-webkit-details-marker]:hidden">
-          登录奖励规则
+          {uiText("登录奖励规则")}
           <ChevronDown
             className="size-3.5 group-open/login-rules:rotate-180"
             aria-hidden
           />
         </summary>
         <p className="mt-1 text-xs leading-5 text-foreground-muted">
-          北京时间 04:00 换日，每个账号每天最多 1
-          币；当天打开、返回页面或操作时自动结算，无需退出重登。
+          {uiText(
+            "北京时间 04:00 换日，每个账号每天最多 1 币；当天打开、返回页面或操作时自动结算，无需退出重登。"
+          )}
         </p>
       </details>
     </section>

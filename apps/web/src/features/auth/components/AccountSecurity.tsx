@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthSecurity as webAuth } from "@/i18n/messages/auth/security";
 
 import { HttpError } from "@tsz/api-client";
 import {
@@ -21,6 +24,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, clearSession } from "@/lib/request";
 import { AUTH_INPUT_CLASS, securityErrorMessage } from "../shared";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
+import type { WebText } from "@/i18n/catalog";
 import { cn } from "@tsz/ui/lib/cn";
 import {
   PageHeader,
@@ -37,8 +41,19 @@ const CODE_BUTTON =
   "min-h-12 shrink-0 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50";
 type ContactAction = { channel: ContactChannel; operation: "bind" | "unbind" };
 
-function contactActionTitle(user: User, action: ContactAction) {
-  return `${action.operation === "unbind" ? "解绑" : user[action.channel] ? "换绑" : "绑定"}${LABELS[action.channel]}`;
+function contactActionTitle(
+  user: User,
+  action: ContactAction,
+  uiText: WebText
+) {
+  return uiText(
+    action.operation === "unbind"
+      ? "解绑{{channel}}"
+      : user[action.channel]
+        ? "换绑{{channel}}"
+        : "绑定{{channel}}",
+    { channel: uiText(LABELS[action.channel]).toLowerCase() }
+  );
 }
 
 function finishSecurityChange() {
@@ -55,6 +70,7 @@ function handleSecurityError(error: unknown) {
 }
 
 export function AccountSecurity() {
+  const uiText = useWebText(webAuth);
   const [user, setUser] = useState<User | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -79,24 +95,32 @@ export function AccountSecurity() {
     action === "password"
       ? "修改密码"
       : action && user
-        ? contactActionTitle(user, action)
+        ? contactActionTitle(user, action, uiText)
         : "账号安全";
 
   return (
     <PageShell size="sm">
       <PageHeader
-        back={action ? undefined : { href: "/account", label: "返回个人中心" }}
-        eyebrow={action ? `账号安全 / ${title}` : "个人中心"}
-        title={title}
+        back={
+          action
+            ? undefined
+            : { href: "/account", label: uiText("返回个人中心") }
+        }
+        eyebrow={
+          action
+            ? uiText("账号安全 / {{v0}}", { v0: title })
+            : uiText("个人中心")
+        }
+        title={uiText(title)}
         description={
           action
-            ? "完成后，所有设备需重新登录。"
-            : "管理登录方式与密码。修改后，所有设备需重新登录。"
+            ? uiText("完成后，所有设备需重新登录。")
+            : uiText("管理登录方式与密码。修改后，所有设备需重新登录。")
         }
       />
       {loadError ? (
         <PageNotice tone="error">
-          资料加载失败。
+          {uiText("资料加载失败。")}
           <button
             type="button"
             className={textButtonClass}
@@ -105,12 +129,12 @@ export function AccountSecurity() {
               setAttempt((v) => v + 1);
             }}
           >
-            重新加载
+            {uiText("重新加载")}
           </button>
         </PageNotice>
       ) : !user ? (
         <div role="status">
-          <PageNotice>加载中…</PageNotice>
+          <PageNotice>{uiText("加载中…")}</PageNotice>
         </div>
       ) : (
         <div className="glass rounded-3xl p-2">
@@ -132,22 +156,30 @@ export function AccountSecurity() {
                   >
                     <div className="min-w-0 flex-1 basis-32">
                       <h2 className="text-sm font-medium text-foreground">
-                        {LABELS[channel]}
+                        {uiText(LABELS[channel])}
                       </h2>
                       <p className="mt-1 break-all text-sm text-foreground-muted">
-                        {user[channel] || "尚未绑定"}
+                        {user[channel] || uiText("尚未绑定")}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
                       <button
                         type="button"
                         className={buttonClass}
-                        aria-label={`${user[channel] ? "换绑" : "绑定"}${LABELS[channel]}`}
+                        aria-label={contactActionTitle(
+                          user,
+                          { channel, operation: "bind" },
+                          uiText
+                        )}
                         onClick={() =>
                           setAction({ channel, operation: "bind" })
                         }
                       >
-                        {user[channel] ? "换绑" : `绑定${LABELS[channel]}`}
+                        {user[channel]
+                          ? uiText("换绑")
+                          : uiText("绑定{{v0}}", {
+                              v0: uiText(LABELS[channel]).toLowerCase()
+                            })}
                       </button>
                       {channel === "email" && user[channel] && (
                         <button
@@ -157,12 +189,14 @@ export function AccountSecurity() {
                             buttonClass,
                             "text-danger hover:bg-danger/5"
                           )}
-                          aria-label={`解绑${LABELS[channel]}`}
+                          aria-label={uiText("解绑{{v0}}", {
+                            v0: uiText(LABELS[channel]).toLowerCase()
+                          })}
                           onClick={() =>
                             setAction({ channel, operation: "unbind" })
                           }
                         >
-                          解绑
+                          {uiText("解绑")}
                         </button>
                       )}
                     </div>
@@ -171,10 +205,10 @@ export function AccountSecurity() {
                 <section className="flex flex-wrap items-center justify-between gap-4 pb-0 pt-6">
                   <div className="min-w-0 flex-1 basis-32">
                     <h2 className="text-sm font-medium text-foreground">
-                      登录密码
+                      {uiText("登录密码")}
                     </h2>
                     <p className="mt-1 text-sm text-foreground-muted">
-                      用于账号密码登录
+                      {uiText("用于账号密码登录")}
                     </p>
                   </div>
                   <button
@@ -182,7 +216,7 @@ export function AccountSecurity() {
                     className={cn(buttonClass, "shrink-0")}
                     onClick={() => setAction("password")}
                   >
-                    修改密码
+                    {uiText("修改密码")}
                   </button>
                 </section>
               </div>
@@ -193,9 +227,11 @@ export function AccountSecurity() {
       {!action && (
         <section className="mt-6 flex flex-col gap-4 rounded-3xl border border-border/60 bg-muted/50 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-medium text-foreground">注销账号</h2>
+            <h2 className="text-sm font-medium text-foreground">
+              {uiText("注销账号")}
+            </h2>
             <p className="mt-1 text-sm text-foreground-muted">
-              提交申请后 72 小时生效，期间可撤销。
+              {uiText("提交申请后 72 小时生效，期间可撤销。")}
             </p>
           </div>
           <Link
@@ -205,7 +241,7 @@ export function AccountSecurity() {
               "shrink-0 self-start text-danger hover:bg-danger/5 sm:self-auto"
             )}
           >
-            申请注销
+            {uiText("申请注销")}
           </Link>
         </section>
       )}
@@ -224,6 +260,7 @@ export function ContactForm({
   onCancel?: () => void;
   onSuccess?: () => void;
 }) {
+  const uiText = useWebText(webAuth);
   const [contact, setContact] = useState("");
   const [verificationChannel, setVerificationChannel] =
     useState<ContactChannel>(user.phone ? "phone" : "email");
@@ -240,7 +277,7 @@ export function ContactForm({
       mounted.current = false;
     };
   }, []);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const unbind = action.operation === "unbind";
   const target = unbind
     ? user[action.channel]!
@@ -251,7 +288,7 @@ export function ContactForm({
     unbind ||
     ((action.channel === "email" ? isEmail(target) : isPhone(target)) &&
       target !== user[action.channel]);
-  const title = contactActionTitle(user, action);
+  const title = contactActionTitle(user, action, uiText);
   const availableChannels = (["phone", "email"] as const).filter(
     (channel) => user[channel]
   );
@@ -340,30 +377,38 @@ export function ContactForm({
           disabled={busy}
           className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
-          ← 返回账号安全
+          {uiText("← 返回账号安全")}
         </button>
       )}
       <p className="text-sm leading-6 text-foreground-muted">
         {unbind
-          ? "先验证已绑定的联系方式。解绑后，该联系方式将不能用于登录或找回密码。"
-          : "先验证已绑定的联系方式，再验证新联系方式。两组验证码分别发送。"}
+          ? uiText(
+              "先验证已绑定的联系方式。解绑后，该联系方式将不能用于登录或找回密码。"
+            )
+          : uiText(
+              "先验证已绑定的联系方式，再验证新联系方式。两组验证码分别发送。"
+            )}
       </p>
       <fieldset disabled={busy} className="space-y-5 disabled:opacity-60">
         {unbind ? (
           <p className="break-all text-sm text-foreground-muted">
-            将解绑：{target}
+            {uiText("将解绑：{{v0}}", { v0: target })}
           </p>
         ) : (
           <label className="block space-y-2 text-sm">
             <span className="ml-4 block font-medium text-foreground">
-              新{LABELS[action.channel]}
+              {uiText("新{{channel}}", {
+                channel: uiText(LABELS[action.channel]).toLowerCase()
+              })}
             </span>
             <input
               className={AUTH_INPUT_CLASS}
               type={action.channel === "phone" ? "tel" : "email"}
               autoComplete={action.channel === "phone" ? "tel" : "email"}
               placeholder={
-                action.channel === "phone" ? "请输入新手机号" : "请输入新邮箱"
+                action.channel === "phone"
+                  ? uiText("请输入新手机号")
+                  : uiText("请输入新邮箱")
               }
               value={contact}
               onChange={(e) => {
@@ -386,12 +431,13 @@ export function ContactForm({
           {availableChannels.length === 1 ? (
             <>
               <p className="ml-4 font-medium text-foreground">
-                当前账号的验证方式
+                {uiText("当前账号的验证方式")}
               </p>
               <p
                 className={cn(AUTH_INPUT_CLASS, "flex items-center break-all")}
               >
-                {LABELS[verificationChannel]}：{user[verificationChannel]}
+                {uiText(LABELS[verificationChannel])}：
+                {user[verificationChannel]}
               </p>
             </>
           ) : (
@@ -400,7 +446,7 @@ export function ContactForm({
                 htmlFor="security-verification-channel"
                 className="ml-4 block font-medium text-foreground"
               >
-                当前账号的验证方式
+                {uiText("当前账号的验证方式")}
               </label>
               <Select
                 value={verificationChannel}
@@ -418,7 +464,7 @@ export function ContactForm({
                 <SelectContent>
                   {availableChannels.map((channel) => (
                     <SelectItem key={channel} value={channel}>
-                      {LABELS[channel]}：{user[channel]}
+                      {uiText(LABELS[channel])}：{user[channel]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -431,7 +477,9 @@ export function ContactForm({
             htmlFor="security-old-code"
             className="ml-4 block font-medium text-foreground"
           >
-            {LABELS[verificationChannel]}验证码
+            {uiText("{{v0}}验证码", {
+              v0: uiText(LABELS[verificationChannel])
+            })}
           </label>
           <div className="flex gap-2">
             <input
@@ -439,7 +487,7 @@ export function ContactForm({
               className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
               inputMode="numeric"
               autoComplete="one-time-code"
-              placeholder="请输入 6 位验证码"
+              placeholder={uiText("请输入 6 位验证码")}
               maxLength={6}
               value={verificationCode}
               onChange={(e) => setVerificationCode(e.target.value)}
@@ -452,10 +500,14 @@ export function ContactForm({
               aria-label={
                 oldCountdown
                   ? undefined
-                  : `向已绑定${LABELS[verificationChannel]}发送验证码`
+                  : uiText("向已绑定{{v0}}发送验证码", {
+                      v0: uiText(LABELS[verificationChannel])
+                    })
               }
             >
-              {oldCountdown ? `${oldCountdown}s 后重发` : "验证"}
+              {oldCountdown
+                ? uiText("{{v0}}s 后重发", { v0: oldCountdown })
+                : uiText("验证")}
             </button>
           </div>
         </div>
@@ -465,7 +517,7 @@ export function ContactForm({
               htmlFor="security-new-code"
               className="ml-4 block font-medium text-foreground"
             >
-              新{LABELS[action.channel]}验证码
+              {uiText("新{{v0}}验证码", { v0: uiText(LABELS[action.channel]) })}
             </label>
             <div className="flex gap-2">
               <input
@@ -473,7 +525,7 @@ export function ContactForm({
                 className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="请输入 6 位验证码"
+                placeholder={uiText("请输入 6 位验证码")}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
               />
@@ -485,20 +537,26 @@ export function ContactForm({
                 aria-label={
                   newCountdown
                     ? undefined
-                    : `向新${LABELS[action.channel]}发送验证码`
+                    : uiText("向新{{v0}}发送验证码", {
+                        v0: uiText(LABELS[action.channel])
+                      })
                 }
               >
-                {newCountdown ? `${newCountdown}s 后重发` : "验证"}
+                {newCountdown
+                  ? uiText("{{v0}}s 后重发", { v0: newCountdown })
+                  : uiText("验证")}
               </button>
             </div>
           </div>
         )}
         <p className="text-xs leading-5 text-foreground-muted">
-          验证码仅可使用一次。若所有已绑定联系方式都无法接收验证码，暂不能自助操作。
+          {uiText(
+            "验证码仅可使用一次。若所有已绑定联系方式都无法接收验证码，暂不能自助操作。"
+          )}
         </p>
         {error && (
           <p role="alert" className="text-sm text-danger">
-            {error}
+            {uiText(error)}
           </p>
         )}
         <div className="flex gap-3 border-t border-border pt-5">
@@ -508,7 +566,7 @@ export function ContactForm({
               className={cn(buttonClass, "min-h-12 px-5")}
               onClick={onCancel}
             >
-              取消
+              {uiText("取消")}
             </button>
           )}
           <button
@@ -516,13 +574,13 @@ export function ContactForm({
             className={cn(BUTTON, "flex-1")}
             disabled={!targetValid || !codesValid}
           >
-            确认{title}
+            {uiText("确认{{v0}}", { v0: uiText(title) })}
           </button>
         </div>
       </fieldset>
       {busy && (
         <p role="status" className="text-sm text-foreground-subtle">
-          处理中，请稍候…
+          {uiText("处理中，请稍候…")}
         </p>
       )}
     </form>
@@ -550,12 +608,13 @@ function SecurityPasswordField({
   invalid?: boolean;
   describedBy?: string;
 }) {
+  const uiText = useWebText(webAuth);
   const [visible, setVisible] = useState(false);
 
   return (
     <div className="space-y-2 text-sm">
       <label htmlFor={id} className="ml-4 block font-medium text-foreground">
-        {label}
+        {uiText(label)}
       </label>
       <div className="relative">
         <input
@@ -574,7 +633,9 @@ function SecurityPasswordField({
           disabled={disabled}
           onClick={() => setVisible((shown) => !shown)}
           className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-          aria-label={`${visible ? "隐藏" : "显示"}${label}`}
+          aria-label={uiText(visible ? "隐藏{{label}}" : "显示{{label}}", {
+            label: uiText(label)
+          })}
         >
           <PasswordVisibilityIcon visible={visible} />
         </button>
@@ -584,12 +645,13 @@ function SecurityPasswordField({
 }
 
 function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
+  const uiText = useWebText(webAuth);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const newPasswordError = newPassword
     ? passwordLengthError(newPassword)
     : null;
@@ -626,29 +688,29 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
         disabled={busy}
         className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
       >
-        ← 返回账号安全
+        {uiText("← 返回账号安全")}
       </button>
       <p className="text-sm leading-6 text-foreground-muted">
-        填写当前密码，再设置新的登录密码。
+        {uiText("填写当前密码，再设置新的登录密码。")}
       </p>
       <fieldset disabled={busy} className="space-y-5 disabled:opacity-60">
         <SecurityPasswordField
           id="security-current-password"
-          label="当前密码"
+          label={uiText("当前密码")}
           value={currentPassword}
           onChange={setCurrentPassword}
           autoComplete="current-password"
-          placeholder="请输入当前密码"
+          placeholder={uiText("请输入当前密码")}
           disabled={busy}
         />
         <div className="border-t border-border pt-5">
           <SecurityPasswordField
             id="security-new-password"
-            label="新密码"
+            label={uiText("新密码")}
             value={newPassword}
             onChange={setNewPassword}
             autoComplete="new-password"
-            placeholder="请输入新密码"
+            placeholder={uiText("请输入新密码")}
             disabled={busy}
             invalid={!!newPasswordError}
             describedBy="security-new-password-message"
@@ -660,17 +722,17 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
               newPasswordError ? "text-danger" : "text-foreground-muted"
             )}
           >
-            {newPasswordError ?? PASSWORD_HINT}
+            {uiText(newPasswordError ?? PASSWORD_HINT)}
           </p>
         </div>
         <div>
           <SecurityPasswordField
             id="security-confirm-password"
-            label="确认新密码"
+            label={uiText("确认新密码")}
             value={confirmation}
             onChange={setConfirmation}
             autoComplete="new-password"
-            placeholder="请再次输入新密码"
+            placeholder={uiText("请再次输入新密码")}
             disabled={busy}
             invalid={confirmationError}
             describedBy={
@@ -684,16 +746,16 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
               id="security-confirm-password-message"
               className="mt-3 ml-4 text-xs text-danger"
             >
-              两次输入的密码不一致
+              {uiText("两次输入的密码不一致")}
             </p>
           )}
         </div>
         <p className="text-xs leading-5 text-foreground-muted">
-          忘记当前密码？退出登录后，可通过登录页的「忘记密码」重置。
+          {uiText("忘记当前密码？退出登录后，可通过登录页的「忘记密码」重置。")}
         </p>
         {error && (
           <p role="alert" className="text-sm text-danger">
-            {error}
+            {uiText(error)}
           </p>
         )}
         <div className="flex gap-3 border-t border-border pt-5">
@@ -702,14 +764,14 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
             className={cn(buttonClass, "min-h-12 px-5")}
             onClick={onCancel}
           >
-            取消
+            {uiText("取消")}
           </button>
           <button
             type="submit"
             className={cn(BUTTON, "flex-1")}
             disabled={!valid}
           >
-            {busy ? "修改中…" : "确认修改密码"}
+            {busy ? uiText("修改中…") : uiText("确认修改密码")}
           </button>
         </div>
       </fieldset>

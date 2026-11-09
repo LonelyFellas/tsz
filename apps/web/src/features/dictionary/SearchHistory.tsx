@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webDictionary } from "@/i18n/messages/dictionary";
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -14,6 +16,7 @@ export function SearchHistory({
   onSearch: (term: string) => void;
   onRemove: (term: string) => void;
 }) {
+  const uiText = useWebText(webDictionary);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: false });
 
@@ -57,7 +60,7 @@ export function SearchHistory({
     <div className={`relative mt-4 ${styles.root}`}>
       <div
         ref={scrollRef}
-        aria-label="搜索历史"
+        aria-label={uiText("搜索历史")}
         className={`max-w-full scroll-px-12 overflow-x-auto pb-2 ${styles.scroller}`}
         style={{
           maskImage:
@@ -84,7 +87,7 @@ export function SearchHistory({
                 type="button"
                 size="icon"
                 variant="ghost"
-                aria-label={`删除历史 ${term}`}
+                aria-label={uiText("删除历史 {{v0}}", { v0: term })}
                 className="focus-visible:-outline-offset-2"
                 onClick={() => onRemove(term)}
               >
@@ -100,7 +103,7 @@ export function SearchHistory({
             type="button"
             size="icon"
             variant="ghost"
-            aria-label="向左滚动搜索历史"
+            aria-label={uiText("向左滚动搜索历史")}
             aria-disabled={!edges.left}
             tabIndex={edges.left ? 0 : -1}
             onClick={() => handleScroll(-1)}
@@ -114,7 +117,7 @@ export function SearchHistory({
             type="button"
             size="icon"
             variant="ghost"
-            aria-label="向右滚动搜索历史"
+            aria-label={uiText("向右滚动搜索历史")}
             aria-disabled={!edges.right}
             tabIndex={edges.right ? 0 : -1}
             onClick={() => handleScroll(1)}

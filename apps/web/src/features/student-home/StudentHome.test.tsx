@@ -194,9 +194,7 @@ it("左右面板互斥，Esc 关闭后返回触发器，外部点击关闭", asy
   );
   expect(screen.getByRole("button", { name: "账户菜单" })).toHaveFocus();
   await actions.click(screen.getByRole("button", { name: "学习菜单" }));
-  await actions.click(
-    screen.getByRole("heading", { name: "从这里，继续积累。" })
-  );
+  await actions.click(screen.getByRole("heading", { level: 1 }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 

@@ -1,4 +1,6 @@
 import { HttpError, type AuthResponse } from "@tsz/api-client";
+import { originalText, localText, type WebNotice } from "@/i18n/catalog";
+import { translateAuthError as translateSharedAuthError } from "@tsz/shared/auth";
 import { passwordErrorMessage } from "@tsz/shared/auth";
 import { PASSWORD_MIN_LENGTH } from "@tsz/shared";
 import { safeRedirectPath } from "@tsz/shared/auth";
@@ -7,12 +9,21 @@ import { api, persistSession as persistRuntimeSession } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 
 // 后端错误翻译下沉到 @tsz/shared/auth（与 admin 共用通用会话错误映射）。
-export { translateAuthError } from "@tsz/shared/auth";
+export function translateAuthError(
+  msg: string,
+  map: Record<string, string>,
+  fallback: string
+): WebNotice {
+  const translated = translateSharedAuthError(msg, map, fallback);
+  return msg && translated === msg ? originalText(msg) : translated;
+}
 
 /** 新用户引导页路径（选择难度等级 + 英式/美式）。 */
 export const ONBOARDING_PATH = "/onboarding";
 
-export const AUTH_PASSWORD_HINT = `密码至少 ${PASSWORD_MIN_LENGTH} 位`;
+export const AUTH_PASSWORD_HINT = localText("密码至少 {{v0}} 位", {
+  v0: PASSWORD_MIN_LENGTH
+});
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
@@ -35,7 +46,7 @@ export async function completeAuthentication(
   useUserStore.getState().setSession(me.user, me.onboarded);
 }
 
-export function securityErrorMessage(error: unknown): string {
+export function securityErrorMessage(error: unknown): WebNotice {
   if (!(error instanceof HttpError)) return "网络异常，请稍后重试";
   const passwordMessage = passwordErrorMessage(error.code);
   if (passwordMessage) return passwordMessage;
@@ -58,7 +69,7 @@ export function securityErrorMessage(error: unknown): string {
     phone_unbind_forbidden: "手机号不能解绑，请使用换绑手机号",
     revision_conflict: "账号信息已变化，请刷新页面后重试"
   };
-  return messages[error.code ?? ""] ?? "操作失败，请稍后重试";
+  return messages[error.code ?? ""] ?? originalText(error.message);
 }
 
 export function postAuthPath(

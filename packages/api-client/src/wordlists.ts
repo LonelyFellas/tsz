@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import { createWordlistLibraryEndpoints } from "./wordlist-library";
 import { customAudio, customAudioUrl } from "./wordlist-custom-audio";
 import type { WordlistAudioLocale } from "@tsz/types";
@@ -51,7 +52,7 @@ export function decodeWordlistResponse<T>(
 ): T {
   const result = validateRuntimeSchema(name, value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `词表响应不符合接口契约：${result.path} (${result.reason})`
     );
   return value as T;

@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webCoinsRewards as webCoins } from "@/i18n/messages/coins/rewards";
+
 import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
@@ -24,6 +27,7 @@ export function LearningRewardSummary({
   embedded?: boolean;
   taskList?: boolean;
 }) {
+  const uiText = useWebText(webCoins);
   const client = useQueryClient();
   const seen = useRef<string | null>(null);
   const q = useQuery({
@@ -56,13 +60,15 @@ export function LearningRewardSummary({
   const Heading = embedded ? "h3" : "h2";
   const rules = d && d.status !== "reward_disabled" && (
     <p className="text-xs leading-5 text-foreground-muted">
-      已完成的每日任务累计 {d.minimum_units} 道不同题目，每个业务日最多获得{" "}
-      {formatCoins(d.daily_amount!)}。北京时间 04:00 换日，合法错误作答也计入。
+      {uiText(
+        "已完成的每日任务累计 {{v0}} 道不同题目，每个业务日最多获得 {{v1}}。北京时间 04:00 换日，合法错误作答也计入。",
+        { v0: d.minimum_units, v1: formatCoins(d.daily_amount!) }
+      )}
     </p>
   );
   return (
     <section
-      aria-label="每日学习奖励"
+      aria-label={uiText("每日学习奖励")}
       className={
         embedded ? "space-y-3" : "glass space-y-4 rounded-3xl p-5 sm:p-6"
       }
@@ -93,7 +99,7 @@ export function LearningRewardSummary({
               : "text-base font-bold tracking-tight text-foreground"
           }
         >
-          每日学习奖励
+          {uiText("每日学习奖励")}
           {d && !q.isError && (
             <span className="ml-2 text-sm font-normal tabular-nums text-foreground-muted">
               <span className="sr-only"> · </span>
@@ -105,20 +111,22 @@ export function LearningRewardSummary({
       {q.isError ? (
         <p role="alert" className="text-sm text-foreground-muted">
           {q.error instanceof HttpError && q.error.status === 404
-            ? "奖励功能尚未就绪。"
-            : "奖励状态暂时无法读取，学习进度不受影响。"}
+            ? uiText("奖励功能尚未就绪。")
+            : uiText("奖励状态暂时无法读取，学习进度不受影响。")}
           <button
             className="ml-2 font-medium text-primary underline-offset-4 hover:underline"
             onClick={() => void q.refetch()}
           >
-            重试
+            {uiText("重试")}
           </button>
         </p>
       ) : !d ? (
-        <p className="text-sm text-foreground-muted">正在读取奖励状态…</p>
+        <p className="text-sm text-foreground-muted">
+          {uiText("正在读取奖励状态…")}
+        </p>
       ) : d.status === "reward_disabled" ? (
         <p className="text-sm text-foreground-muted">
-          每日学习奖励暂未开启，学习完成仍正常记录。
+          {uiText("每日学习奖励暂未开启，学习完成仍正常记录。")}
         </p>
       ) : (
         <>
@@ -131,15 +139,18 @@ export function LearningRewardSummary({
                   : "rounded-2xl bg-success/10 px-4 py-3 text-sm font-medium text-success"
               }
             >
-              该日奖励已到账 {formatCoins(d.awarded_amount)}
-              ，继续学习不会重复发放。
+              {uiText("该日奖励已到账 {{v0}}，继续学习不会重复发放。", {
+                v0: formatCoins(d.awarded_amount)
+              })}
             </p>
           ) : d.status === "wallet_unavailable" ? (
             <p
               role="status"
               className="rounded-2xl bg-muted px-4 py-3 text-sm text-foreground-muted"
             >
-              达标时钱包暂停或关闭，尚未发奖励；恢复后当天再完成一次每日任务可重新结算，过去日期不补发。
+              {uiText(
+                "达标时钱包暂停或关闭，尚未发奖励；恢复后当天再完成一次每日任务可重新结算，过去日期不补发。"
+              )}
             </p>
           ) : (
             <div className="space-y-2">
@@ -157,17 +168,20 @@ export function LearningRewardSummary({
                 />
               </div>
               <p className="text-sm font-medium tabular-nums text-foreground">
-                奖励进度 {d.qualifying_units}/{d.minimum_units}
+                {uiText("奖励进度 {{v0}}/{{v1}}", {
+                  v0: d.qualifying_units,
+                  v1: d.minimum_units
+                })}
                 {d.status === "threshold_not_met"
-                  ? "，该日未达标。"
-                  : "，达标后自动结算。"}
+                  ? uiText("，该日未达标。")
+                  : uiText("，达标后自动结算。")}
               </p>
             </div>
           )}
           {embedded || taskList ? (
             <details className="group/learning-rules">
               <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary sm:min-h-8 [&::-webkit-details-marker]:hidden">
-                学习奖励规则
+                {uiText("学习奖励规则")}
                 <ChevronDown
                   className="size-3.5 group-open/learning-rules:rotate-180"
                   aria-hidden
@@ -183,14 +197,14 @@ export function LearningRewardSummary({
       {!taskList &&
         (embedded ? (
           <Button asChild size="compact">
-            <Link href="/student/practice">去学习</Link>
+            <Link href="/student/practice">{uiText("去学习")}</Link>
           </Button>
         ) : (
           <Link
             href="/student/practice"
             className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
-            查看每日学习任务 →
+            {uiText("查看每日学习任务 →")}
           </Link>
         ))}
     </section>

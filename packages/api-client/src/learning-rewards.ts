@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type { LearningRewardDay } from "@tsz/types";
 import type { HttpClient } from "./http";
 import { checkInteger } from "./coins";
@@ -6,7 +7,7 @@ import { validateRuntimeSchema } from "./runtime-schema";
 export function decodeLearningRewardDay(value: unknown): LearningRewardDay {
   const result = validateRuntimeSchema("LearningRewardDay", value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `奖励响应不符合接口契约：${result.path} (${result.reason})`
     );
   const day = value as LearningRewardDay;
@@ -29,7 +30,7 @@ export function decodeLearningRewardDay(value: unknown): LearningRewardDay {
         day.qualifying_units !== day.minimum_units
       : day.awarded_amount !== "0" || day.operation_id !== null)
   )
-    throw new Error("奖励响应状态与账目不一致");
+    throw new ClientResponseError("奖励响应状态与账目不一致");
   return day;
 }
 export function createLearningRewardEndpoints(http: HttpClient) {

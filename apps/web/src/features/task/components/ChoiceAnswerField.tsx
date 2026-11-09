@@ -1,3 +1,7 @@
+"use client";
+
+import { useWebText } from "@/i18n/client";
+import { webTask } from "@/i18n/messages/task";
 import type { LearningQuestion } from "@tsz/types";
 
 export function ChoiceAnswerField({
@@ -11,12 +15,13 @@ export function ChoiceAnswerField({
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
+  const uiText = useWebText(webTask);
   return (
     <fieldset
       disabled={disabled}
       className="mx-auto grid max-w-xl gap-3 text-left sm:grid-cols-2"
     >
-      <legend className="sr-only">选择英文答案</legend>
+      <legend className="sr-only">{uiText("选择英文答案")}</legend>
       {question.options?.map((option, index) => (
         <label
           key={option.option_id}

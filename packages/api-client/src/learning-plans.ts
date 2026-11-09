@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   CreateLearningPlan,
   PreviewLearningPlan,
@@ -24,7 +25,7 @@ type Options = { signal?: AbortSignal };
 function decode<T>(root: RuntimeSchemaRoot, value: unknown): T {
   const result = validateRuntimeSchema(root, value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `学习计划响应不符合接口契约：${result.path} (${result.reason})`
     );
   return value as T;

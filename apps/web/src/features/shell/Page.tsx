@@ -1,3 +1,7 @@
+"use client";
+
+import { useWebText } from "@/i18n/client";
+import { webShell } from "@/i18n/messages/shell";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -162,6 +166,7 @@ export function Pager({
   onChange: (page: number) => void;
   disabled?: boolean;
 }) {
+  const uiText = useWebText(webShell);
   const total = Math.max(totalPages, 1);
   if (total <= 1 && page <= 1) return null;
   const button =
@@ -169,7 +174,7 @@ export function Pager({
   return (
     <nav
       className="mt-8 flex items-center justify-center gap-3"
-      aria-label="分页"
+      aria-label={uiText("分页")}
     >
       <button
         type="button"
@@ -177,7 +182,7 @@ export function Pager({
         disabled={disabled || page <= 1}
         onClick={() => onChange(Math.min(page - 1, total))}
       >
-        上一页
+        {uiText("上一页")}
       </button>
       <span className="min-w-16 text-center text-sm tabular-nums text-foreground-muted">
         {page} / {total}
@@ -188,7 +193,7 @@ export function Pager({
         disabled={disabled || page >= total}
         onClick={() => onChange(page + 1)}
       >
-        下一页
+        {uiText("下一页")}
       </button>
     </nav>
   );

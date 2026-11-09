@@ -1,4 +1,6 @@
 "use client";
+import { useWebLocale, useWebText } from "@/i18n/client";
+import { webTask } from "@/i18n/messages/task";
 
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
@@ -11,8 +13,13 @@ const shift = (day: string, days: number) => {
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 };
-const dayLabel = (day: string) =>
-  day.replace(/^(\d+)-0?(\d+)-0?(\d+)$/, "$1年$2月$3日");
+const dayLabel = (day: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(`${day}T00:00:00Z`));
 
 export function PlanDateRange({
   value,
@@ -23,6 +30,7 @@ export function PlanDateRange({
   disabled: boolean;
   onChange: (value: PlanDates | null) => void;
 }) {
+  const uiText = useWebText(webTask);
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -39,9 +47,9 @@ export function PlanDateRange({
           <CalendarDays className="size-4 text-foreground-muted" aria-hidden />
           {value
             ? `${value.start_date.replaceAll("-", "/")} — ${value.end_date.replaceAll("-", "/")}`
-            : "不限日期"}{" "}
+            : uiText("不限日期")}{" "}
           <span className="text-xs text-foreground-muted">
-            {value ? "更改" : "设置"}
+            {value ? uiText("更改") : uiText("设置")}
           </span>
         </Button>
         {value && (
@@ -52,7 +60,7 @@ export function PlanDateRange({
             disabled={disabled}
             onClick={() => onChange(null)}
           >
-            清除日期
+            {uiText("清除日期")}
           </Button>
         )}
       </div>
@@ -79,6 +87,8 @@ function RangeCalendar({
   onClose: () => void;
   onApply: (value: PlanDates | null) => void;
 }) {
+  const uiText = useWebText(webTask);
+  const locale = useWebLocale();
   // 北京时间 04:00 换日，即 UTC 日期加四小时。
   const [today] = useState(() =>
     new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -104,17 +114,21 @@ function RangeCalendar({
     setFocusDay(next);
   }
   return (
-    <LibraryDialog title="选择起止日期" onClose={onClose}>
+    <LibraryDialog title={uiText("选择起止日期")} onClose={onClose}>
       <p role="status" className="mb-3 text-xs text-foreground-muted">
         {!start
-          ? "先选开始日期"
+          ? uiText("先选开始日期")
           : !end
-            ? "再选结束日期"
-            : `${dayLabel(start)} — ${dayLabel(end)}`}
+            ? uiText("再选结束日期")
+            : `${dayLabel(start, locale)} — ${dayLabel(end, locale)}`}
       </p>
       <div className="mb-3 flex items-center justify-between gap-3">
         <strong className="text-sm">
-          {month.replace(/^(\d+)-0?(\d+)$/, "$1年$2月")}
+          {new Intl.DateTimeFormat(locale, {
+            year: "numeric",
+            month: "long",
+            timeZone: "UTC"
+          }).format(new Date(`${month}-01T00:00:00Z`))}
         </strong>
         <div className="flex gap-1">
           {([-1, 1] as const).map((offset) => (
@@ -123,7 +137,7 @@ function RangeCalendar({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={offset < 0 ? "上个月" : "下个月"}
+              aria-label={offset < 0 ? uiText("上个月") : uiText("下个月")}
               onClick={() => moveMonth(offset)}
             >
               {offset < 0 ? (
@@ -140,13 +154,13 @@ function RangeCalendar({
         aria-hidden
       >
         {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
-          <span key={day}>{day}</span>
+          <span key={day}>{uiText(day)}</span>
         ))}
       </div>
       <div
         ref={grid}
         role="group"
-        aria-label="选择日期"
+        aria-label={uiText("选择日期")}
         className="grid grid-cols-7"
       >
         {Array.from({ length: 42 }, (_, index) => {
@@ -159,7 +173,7 @@ function RangeCalendar({
               type="button"
               data-day={day}
               tabIndex={day === focusDay ? 0 : -1}
-              aria-label={dayLabel(day)}
+              aria-label={dayLabel(day, locale)}
               aria-pressed={boundary}
               aria-current={day === today ? "date" : undefined}
               className={`min-h-11 rounded-lg text-sm tabular-nums outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-primary ${boundary ? "bg-primary text-primary-foreground" : inside ? "bg-primary-muted text-primary" : day.startsWith(month) ? "text-foreground hover:bg-muted" : "text-foreground-muted hover:bg-muted"}`}
@@ -204,7 +218,7 @@ function RangeCalendar({
               setFocusDay(today);
             }}
           >
-            未来 {days} 天
+            {uiText("未来 {{v0}} 天", { v0: days })}
           </Button>
         ))}
         <Button
@@ -213,22 +227,22 @@ function RangeCalendar({
           variant="ghost"
           onClick={() => onApply(null)}
         >
-          不限日期
+          {uiText("不限日期")}
         </Button>
       </div>
       <p className="mt-2 text-xs text-foreground-muted">
-        含首尾两天；以北京时间 04:00 划分学习日。
+        {uiText("含首尾两天；以北京时间 04:00 划分学习日。")}
       </p>
       <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
         <Button type="button" variant="ghost" onClick={onClose}>
-          取消
+          {uiText("取消")}
         </Button>
         <Button
           type="button"
           disabled={!start || !end}
           onClick={() => onApply({ start_date: start, end_date: end })}
         >
-          应用日期
+          {uiText("应用日期")}
         </Button>
       </div>
     </LibraryDialog>

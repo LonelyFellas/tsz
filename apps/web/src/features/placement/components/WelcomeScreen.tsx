@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webPlacement } from "@/i18n/messages/placement";
 
 import { cn } from "@tsz/ui/lib/cn";
 import { primaryButtonClass } from "@/features/shell/Page";
@@ -44,13 +46,14 @@ export function WelcomeScreen({
   onStart,
   onSkip
 }: WelcomeScreenProps) {
+  const uiText = useWebText(webPlacement);
   const left = MAX_TESTS - quota.used;
   const hasResult = quota.last !== null;
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <p className="text-xs font-medium tracking-[0.2em] text-foreground-muted">
-        词汇定级
+        {uiText("词汇定级")}
       </p>
 
       {/* 三张示例词卡:一眼传达测试覆盖 A1 → C2 */}
@@ -74,11 +77,13 @@ export function WelcomeScreen({
 
       {hasResult && quota.last ? (
         <>
-          <h1 className="text-3xl font-bold tracking-tight">你的词汇档案</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {uiText("你的词汇档案")}
+          </h1>
           <p className="mt-2 text-sm leading-6 text-foreground-muted">
             {onboarded
-              ? "测评记录仅作参考，不会修改已保存的学习难度。"
-              : "等级决定词书推荐与每日计划。"}
+              ? uiText("测评记录仅作参考，不会修改已保存的学习难度。")
+              : uiText("等级决定词书推荐与每日计划。")}
           </p>
           <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/70 p-4">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-muted font-serif text-lg font-bold text-primary">
@@ -86,10 +91,16 @@ export function WelcomeScreen({
             </span>
             <div className="min-w-0 text-sm">
               <div className="font-medium">
-                当前等级 {quota.last.band} · {VOCAB_RANGE[quota.last.band]}
+                {uiText("当前等级 {{v0}}· {{v1}}", {
+                  v0: quota.last.band,
+                  v1: uiText(VOCAB_RANGE[quota.last.band])
+                })}
               </div>
               <div className="text-xs text-foreground-subtle">
-                第 {quota.used}/{MAX_TESTS} 次测试
+                {uiText("第 {{v0}}/{{v1}} 次测试", {
+                  v0: quota.used,
+                  v1: MAX_TESTS
+                })}
               </div>
             </div>
           </div>
@@ -97,12 +108,12 @@ export function WelcomeScreen({
       ) : (
         <>
           <h1 className="text-balance text-3xl font-bold tracking-tight">
-            1 分钟，测出你的词汇量
+            {uiText("1 分钟，测出你的词汇量")}
           </h1>
           <p className="mt-2 text-sm leading-6 text-foreground-muted">
             {onboarded
-              ? "了解当前词汇水平，学习难度不会随测评结果改变。"
-              : "根据结果为你推荐合适的难度与学习计划。"}
+              ? uiText("了解当前词汇水平，学习难度不会随测评结果改变。")
+              : uiText("根据结果为你推荐合适的难度与学习计划。")}
           </p>
           <ul className="mt-6 space-y-3 text-sm leading-6">
             {[
@@ -116,8 +127,11 @@ export function WelcomeScreen({
                   aria-hidden
                 />
                 <span>
-                  <b className="font-semibold">{title}</b>
-                  <span className="text-foreground-muted"> · {sub}</span>
+                  <b className="font-semibold">{uiText(title)}</b>
+                  <span className="text-foreground-muted">
+                    {" "}
+                    · {uiText(sub)}
+                  </span>
                 </span>
               </li>
             ))}
@@ -126,7 +140,7 @@ export function WelcomeScreen({
       )}
 
       <div className="mt-auto pt-8">
-        {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+        {error && <p className="mb-3 text-sm text-danger">{uiText(error)}</p>}
         <button
           type="button"
           onClick={onStart}
@@ -136,12 +150,12 @@ export function WelcomeScreen({
           className={cn(primaryButtonClass, "w-full")}
         >
           {starting
-            ? "准备中..."
+            ? uiText("准备中...")
             : hasResult
               ? left > 0
-                ? "重新测试"
-                : "查看结果"
-              : "开始测试"}
+                ? uiText("重新测试")
+                : uiText("查看结果")
+              : uiText("开始测试")}
         </button>
         {!hasResult && (
           <button
@@ -149,13 +163,16 @@ export function WelcomeScreen({
             onClick={onSkip}
             className="mt-2 min-h-11 w-full rounded-full text-sm text-foreground-muted transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            {onboarded ? "返回学习" : "跳过，手动选择等级"}
+            {onboarded ? uiText("返回学习") : uiText("跳过，手动选择等级")}
           </button>
         )}
         <p className="mt-3 text-center text-xs text-foreground-subtle">
           {left > 0
-            ? `共 ${MAX_TESTS} 次测试机会，剩余 ${left} 次 · 以最后一次结果为准`
-            : "测试机会已用完 · 以最后一次结果为准"}
+            ? uiText(
+                "共 {{v0}} 次测试机会，剩余 {{v1}} 次 · 以最后一次结果为准",
+                { v0: MAX_TESTS, v1: left }
+              )
+            : uiText("测试机会已用完 · 以最后一次结果为准")}
         </p>
       </div>
     </div>

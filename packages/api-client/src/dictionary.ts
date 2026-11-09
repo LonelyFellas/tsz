@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   DictionaryEntry,
   DictionaryPage,
@@ -10,7 +11,8 @@ import {
 } from "./runtime-schema";
 function decode<T>(name: RuntimeSchemaRoot, value: unknown): T {
   const result = validateRuntimeSchema(name, value);
-  if (!result.valid) throw new Error("词典内容暂不可用，请稍后重试");
+  if (!result.valid)
+    throw new ClientResponseError("词典内容暂不可用，请稍后重试");
   return value as T;
 }
 export function createDictionaryEndpoints(http: HttpClient) {

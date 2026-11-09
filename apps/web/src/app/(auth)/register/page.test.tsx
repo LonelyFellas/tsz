@@ -1,5 +1,8 @@
 import { expect, it, vi } from "vitest";
-vi.mock("@/features/auth", () => ({ RegisterForm: () => null }));
+vi.mock("@/i18n/server", () => ({ getServerWebText: vi.fn() }));
+vi.mock("@/features/auth/components/RegisterForm", () => ({
+  RegisterForm: () => null
+}));
 import RegisterPage from "./page";
 it("normalizes repeated invite query parameters to one visible editable value", async () => {
   const result = await RegisterPage({

@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthAccess as webAuth } from "@/i18n/messages/auth/access";
 
 import {
   isEmail,
@@ -33,6 +36,7 @@ const TABS: { id: Tab; label: string }[] = [
 const CODE_COUNTDOWN = 60;
 
 export function ForgotPasswordForm() {
+  const uiText = useWebText(webAuth);
   const [tab, setTab] = useState<Tab>("phone");
   const [account, setAccount] = useState("");
   const [code, setCode] = useState("");
@@ -41,7 +45,7 @@ export function ForgotPasswordForm() {
   const [countdown, setCountdown] = useState(0);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
 
   const router = useRouter();
 
@@ -121,13 +125,13 @@ export function ForgotPasswordForm() {
         className="mb-6 inline-flex items-center gap-2.5 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
       >
         <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.5} />
-        返回登录
+        {uiText("返回登录")}
       </button>
       <h1 className="mb-3 text-2xl font-bold tracking-tight text-foreground">
-        找回密码
+        {uiText("找回密码")}
       </h1>
       <p className="mb-8 text-sm leading-6 text-foreground-muted">
-        使用账号绑定的手机号或邮箱验证身份。
+        {uiText("使用账号绑定的手机号或邮箱验证身份。")}
       </p>
 
       <Tabs
@@ -135,10 +139,10 @@ export function ForgotPasswordForm() {
         onValueChange={(value) => switchTab(value as Tab)}
         activationMode="manual"
       >
-        <TabsList className="mb-7" aria-label="验证方式">
+        <TabsList className="mb-7" aria-label={uiText("验证方式")}>
           {TABS.map(({ id, label }) => (
             <TabsTrigger key={id} value={id} disabled={busy}>
-              {label}
+              {uiText(label)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -149,14 +153,18 @@ export function ForgotPasswordForm() {
             {/* 账号 */}
             <FormField
               htmlFor="reset-account"
-              label={tab === "phone" ? "手机号码" : "邮箱"}
-              error={accountError}
+              label={tab === "phone" ? uiText("手机号码") : uiText("邮箱")}
+              error={uiText(accountError)}
             >
               <Input
                 id="reset-account"
                 type={tab === "phone" ? "tel" : "email"}
                 autoComplete={tab === "phone" ? "tel" : "email"}
-                placeholder={tab === "phone" ? "请输入手机号" : "请输入邮箱"}
+                placeholder={
+                  tab === "phone"
+                    ? uiText("请输入手机号")
+                    : uiText("请输入邮箱")
+                }
                 value={account}
                 disabled={busy}
                 onChange={(e) => {
@@ -176,14 +184,14 @@ export function ForgotPasswordForm() {
             </FormField>
 
             {/* 验证码 */}
-            <FormField htmlFor="reset-code" label="验证码">
+            <FormField htmlFor="reset-code" label={uiText("验证码")}>
               <div className="flex gap-3">
                 <Input
                   id="reset-code"
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder="请输入验证码"
+                  placeholder={uiText("请输入验证码")}
                   value={code}
                   maxLength={6}
                   disabled={busy}
@@ -198,10 +206,10 @@ export function ForgotPasswordForm() {
                   className="shrink-0 px-4 font-medium"
                 >
                   {countdown > 0
-                    ? `${countdown}s 后重发`
+                    ? uiText("{{v0}}s 后重发", { v0: countdown })
                     : sending
-                      ? "发送中..."
-                      : "获取验证码"}
+                      ? uiText("发送中...")
+                      : uiText("获取验证码")}
                 </Button>
               </div>
             </FormField>
@@ -209,15 +217,15 @@ export function ForgotPasswordForm() {
             {/* 新密码 */}
             <FormField
               htmlFor="reset-password"
-              label="新密码"
-              hint={AUTH_PASSWORD_HINT}
-              error={passwordError}
+              label={uiText("新密码")}
+              hint={uiText(AUTH_PASSWORD_HINT)}
+              error={uiText(passwordError)}
             >
               <div className="relative">
                 <Input
                   id="reset-password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="请输入新密码"
+                  placeholder={uiText("请输入新密码")}
                   value={password}
                   disabled={busy}
                   autoComplete="new-password"
@@ -233,7 +241,9 @@ export function ForgotPasswordForm() {
                   onClick={() => setShowPassword((v) => !v)}
                   disabled={busy}
                   className="absolute right-1 top-1/2 -translate-y-1/2"
-                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  aria-label={
+                    showPassword ? uiText("隐藏密码") : uiText("显示密码")
+                  }
                 >
                   <PasswordVisibilityIcon visible={showPassword} />
                 </Button>
@@ -242,12 +252,12 @@ export function ForgotPasswordForm() {
 
             {error && (
               <p role="alert" className="mx-4 text-sm leading-5 text-danger">
-                {error}
+                {uiText(error)}
               </p>
             )}
 
             <Button type="submit" disabled={!canSubmit} className="w-full">
-              {loading ? "重置中..." : "重置密码"}
+              {loading ? uiText("重置中...") : uiText("重置密码")}
             </Button>
           </form>
         </TabsContent>

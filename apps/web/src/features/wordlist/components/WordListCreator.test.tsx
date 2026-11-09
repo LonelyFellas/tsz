@@ -1,3 +1,4 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   act,
   fireEvent,
@@ -1179,4 +1180,26 @@ it("将已有高版本私密备注的平台行改为自定义词时使用新项�
       })
     )
   );
+});
+
+it("界面切换保留词表草稿、焦点与选区且不隐式保存", async () => {
+  const tree = (locale: "en-GB" | "zh-Hant") => (
+    <InterfaceI18nProvider locale={locale}>
+      <WordListCreator />
+    </InterfaceI18nProvider>
+  );
+  const view = renderWithProviders(tree("en-GB"));
+  const name = screen.getByRole("textbox", {
+    name: "Word list name"
+  }) as HTMLInputElement;
+  fireEvent.change(name, { target: { value: "draft 原文" } });
+  name.focus();
+  name.setSelectionRange(1, 5);
+  view.rerender(tree("zh-Hant"));
+  expect(screen.getByRole("textbox", { name: "詞表名稱" })).toBe(name);
+  expect(name).toHaveValue("draft 原文");
+  expect(name).toHaveFocus();
+  expect([name.selectionStart, name.selectionEnd]).toEqual([1, 5]);
+  expect(api.wordList.create).not.toHaveBeenCalled();
+  expect(api.wordList.update).not.toHaveBeenCalled();
 });

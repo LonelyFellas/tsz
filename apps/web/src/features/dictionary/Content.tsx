@@ -1,4 +1,7 @@
 "use client";
+import { useWebLocale, useWebText } from "@/i18n/client";
+import { webDictionary } from "@/i18n/messages/dictionary";
+
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import type { TextRole } from "@tsz/voice-editor/types";
 import { AudioButton as SignedAudioButton } from "@/features/audio/AudioButton";
@@ -74,6 +77,8 @@ export function TargetAudio({
   label: string;
   sourceDialects?: ("common" | "uk" | "us")[];
 }) {
+  const uiText = useWebText(webDictionary);
+  const locale = useWebLocale();
   const matching = audio.filter((item) =>
     !item.source_dialect
       ? !sourceDialects || sourceDialects.includes("common")
@@ -95,40 +100,44 @@ export function TargetAudio({
       sourceDialects &&
       !sourceDialects.includes("common") ? (
       <span className="text-xs text-foreground-muted">
-        当前正文的音频来源未确认，暂不可播放
+        {uiText("当前正文的音频来源未确认，暂不可播放")}
       </span>
     ) : (
       <span className="text-xs text-foreground-muted">
-        当前口音暂无正式音频
+        {uiText("当前口音暂无正式音频")}
       </span>
     );
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {!primary && (
         <span className="text-xs text-foreground-muted">
-          当前口音暂无正式音频
+          {uiText("当前口音暂无正式音频")}
         </span>
       )}
       {primary && (
         <AudioButton
           entryId={entryId}
           audio={primary}
-          label={`${label}（${speechRegionLabel(primary.locale)}）`}
+          label={`${label}（${speechRegionLabel(primary.locale, locale)}）`}
         />
       )}
       {supplemental.length > 0 && (
         <details className="text-sm text-foreground-muted">
           <summary className="min-h-11 cursor-pointer content-center rounded-lg px-2 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
-            其他音色
+            {uiText("其他音色")}
           </summary>
           <div className="flex flex-wrap items-center gap-2 py-1">
             {supplemental.map((item) => (
               <div key={item.asset_id} className="flex items-center gap-1">
-                <span>{speechRegionLabel(item.locale)}</span>
+                <span>{speechRegionLabel(item.locale, locale)}</span>
                 <AudioButton
                   entryId={entryId}
                   audio={item}
-                  label={`${label}（${speechRegionLabel(item.locale)}补充音色 ${supplemental.indexOf(item) + 1}）`}
+                  label={uiText("{{v0}}（{{v1}}补充音色 {{v2}}）", {
+                    v0: label,
+                    v1: speechRegionLabel(item.locale, locale),
+                    v2: supplemental.indexOf(item) + 1
+                  })}
                 />
               </div>
             ))}

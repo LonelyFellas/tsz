@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   speechAccentGroup,
+  speechRegionLabel,
   speechLocaleMatchesScope,
   speechSelectionGroup
 } from "./speech-locale";
@@ -31,4 +32,10 @@ describe("英语音色地区分类", () => {
     expect(speechLocaleMatchesScope("en-IN", "en-US")).toBe(true);
     expect(speechLocaleMatchesScope("en-CA", "en-GB")).toBe(false);
   });
+});
+
+it("region labels use the explicit interface locale without changing speech matching", () => {
+  expect(speechRegionLabel("en-GB", "en-US")).toBe("United Kingdom");
+  expect(speechRegionLabel("en-US", "zh-Hant")).toBe("美國");
+  expect(speechAccentGroup("en-GB")).toBe("uk");
 });

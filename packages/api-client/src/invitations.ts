@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   InvitationCode,
   InvitationOverview,
@@ -13,7 +14,7 @@ function validate(
 ) {
   const result = validateRuntimeSchema(name, value);
   if (!result.valid)
-    throw new Error(
+    throw new ClientResponseError(
       `邀请响应不符合接口契约：${result.path} (${result.reason})`
     );
 }
@@ -29,7 +30,7 @@ export function decodeInvitationRecords(value: unknown): InvitationRecordPage {
   for (const item of result.items) {
     checkInteger(item.reward_amount);
     if ((item.reward_status === "awarded") !== BigInt(item.reward_amount) > 0n)
-      throw new Error("邀请奖励状态与金额不一致");
+      throw new ClientResponseError("邀请奖励状态与金额不一致");
   }
   return result;
 }

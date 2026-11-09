@@ -1,18 +1,24 @@
+import { getServerWebText } from "@/i18n/server";
+import { webApp } from "@/i18n/messages/app";
 import type { Metadata } from "next";
-import { RouteGuard } from "@/features/auth";
-import { PageHeader, PageShell } from "@/features/shell/Page";
+import { RouteGuard } from "@/features/auth/components/RouteGuard";
+import { AppPageHeader } from "@/i18n/AppText";
+import { PageShell } from "@/features/shell/Page";
 import { Notifications } from "@/features/teacher-certification/Notifications";
 
-export const metadata: Metadata = {
-  title: "站内通知",
-  robots: { index: false, follow: false }
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const uiText = await getServerWebText(webApp);
+  return {
+    title: uiText("站内通知"),
+    robots: { index: false, follow: false }
+  };
+}
 
 export default function NotificationsPage() {
   return (
     <RouteGuard>
       <PageShell>
-        <PageHeader
+        <AppPageHeader
           back={{ href: "/account", label: "返回个人中心" }}
           eyebrow="个人中心"
           title="站内通知"

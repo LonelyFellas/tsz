@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   LibrarySpace,
   LibraryQuery,
@@ -17,7 +18,9 @@ import {
 function decode<T>(schema: RuntimeSchemaRoot, value: unknown): T {
   const check = validateRuntimeSchema(schema, value);
   if (!check.valid)
-    throw new Error(`目录响应不符合接口契约：${check.path} (${check.reason})`);
+    throw new ClientResponseError(
+      `目录响应不符合接口契约：${check.path} (${check.reason})`
+    );
   return value as T;
 }
 export function createWordlistLibraryEndpoints(http: HttpClient) {

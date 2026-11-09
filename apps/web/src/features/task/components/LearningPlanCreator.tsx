@@ -1,4 +1,9 @@
 "use client";
+import { webErrorText } from "@/i18n/catalog";
+import { originalText, type WebNotice, type WebText } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webTask } from "@/i18n/messages/task";
+
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -59,6 +64,7 @@ function PreselectedPlan({
   owned: boolean;
   directPractice: boolean;
 }) {
+  const uiText = useWebText(webTask);
   const back = directPractice
     ? {
         href: `${owned ? "/account" : ""}/wordlists/${wordlistId}`,
@@ -78,23 +84,23 @@ function PreselectedPlan({
     return (
       <PageShell>
         <PageHeader
-          title={directPractice ? "开始练习" : "创建任务"}
-          back={back}
+          title={directPractice ? uiText("开始练习") : uiText("创建任务")}
+          back={{ ...back, label: uiText(back.label) }}
         />
         {source.isError ? (
           <PageNotice tone="error">
-            词表不存在、不可访问或暂时无法加载。
+            {uiText("词表不存在、不可访问或暂时无法加载。")}
             <Button variant="link" onClick={() => void source.refetch()}>
-              重试
+              {uiText("重试")}
             </Button>
             <Button asChild variant="link">
               <Link href={directPractice ? "/wordlists" : "/student/tasks/new"}>
-                重新选择词表
+                {uiText("重新选择词表")}
               </Link>
             </Button>
           </PageNotice>
         ) : (
-          <PageNotice>正在读取当前词表…</PageNotice>
+          <PageNotice>{uiText("正在读取当前词表…")}</PageNotice>
         )}
       </PageShell>
     );
@@ -109,6 +115,13 @@ function PreselectedPlan({
     />
   );
 }
+function suggestedPracticeName(source: string, text: WebText) {
+  const suffixLength = [...text("{{v0}}练习", { v0: "" })].length;
+  return text("{{v0}}练习", {
+    v0: [...source].slice(0, Math.max(0, 50 - suffixLength)).join("")
+  });
+}
+
 function PlanForm({
   userId,
   initialWordlist,
@@ -124,12 +137,11 @@ function PlanForm({
   directPractice?: boolean;
   back?: { href: string; label: string };
 }) {
+  const uiText = useWebText(webTask);
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
-  const [name, setName] = useState(
-    initialWordlist
-      ? `${[...initialWordlist.name].slice(0, 48).join("")}练习`
-      : ""
+  const [name, setName] = useState(() =>
+    initialWordlist ? suggestedPracticeName(initialWordlist.name, uiText) : ""
   );
   const [editingName, setEditingName] = useState(!initialWordlist);
   const nameEdited = useRef(false);
@@ -220,7 +232,7 @@ function PlanForm({
   const [picker, setPicker] = useState(false);
   const [count, setCount] = useState("10");
   const [dates, setDates] = useState<PlanDates | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const [acceptedPreview, setAcceptedPreview] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -246,15 +258,18 @@ function PlanForm({
       count.trim() !== "");
   const errors: Record<string, string | undefined> = {
     "question-types": !validQuestionTypes
-      ? "请至少选择一种练习题型。"
+      ? uiText("请至少选择一种练习题型。")
       : undefined,
     name:
       submitted && (!name.trim() || [...name.trim()].length > 50)
-        ? "请输入 1–50 字的任务名称。"
+        ? uiText("请输入 1–50 字的任务名称。")
         : undefined,
-    sources: submitted && !selected.length ? "请选择 1–5 份词表。" : undefined,
+    sources:
+      submitted && !selected.length ? uiText("请选择 1–5 份词表。") : undefined,
     count: !validCount
-      ? `每日题量须为 1–${masterySupported ? 20 : 200} 的整数。`
+      ? uiText("每日题量须为 1–{{v0}} 的整数。", {
+          v0: masterySupported ? 20 : 200
+        })
       : undefined
   };
   const input: PreviewLearningPlan = {
@@ -397,7 +412,7 @@ function PlanForm({
               ? "练习功能尚未就绪，请稍后重试。"
               : "覆盖任务功能尚未就绪，草稿已保留。请稍后重试。"
             : e instanceof Error
-              ? e.message
+              ? originalText(e.message)
               : directPractice
                 ? "开始失败，请重试。"
                 : "创建失败，请重试。"
@@ -438,14 +453,14 @@ function PlanForm({
     <PageShell size="lg">
       <div className="mx-auto max-w-[800px]">
         <PageHeader
-          back={back}
-          title={directPractice ? initialWordlist!.name : "创建任务"}
+          back={{ ...back, label: uiText(back.label) }}
+          title={directPractice ? initialWordlist!.name : uiText("创建任务")}
         />
         {capabilitiesFailed && (
           <PageNotice tone="error">
-            练习选项暂时无法加载，请重试后再开始。
+            {uiText("练习选项暂时无法加载，请重试后再开始。")}
             <Button variant="link" onClick={() => void capabilities.refetch()}>
-              重新加载练习选项
+              {uiText("重新加载练习选项")}
             </Button>
           </PageNotice>
         )}
@@ -454,13 +469,13 @@ function PlanForm({
           unsupportedSelection && (
             <PageNotice tone="error">
               {directPractice && !directSupported
-                ? "当前服务尚未支持词表续练，请从我的任务继续已有练习。"
+                ? uiText("当前服务尚未支持词表续练，请从我的任务继续已有练习。")
                 : !choiceSupported
-                  ? "当前服务尚未支持单选题，请先选择拼写题。"
-                  : "当前服务尚未支持组合题型，请先单独选择一种题型。"}
+                  ? uiText("当前服务尚未支持单选题，请先选择拼写题。")
+                  : uiText("当前服务尚未支持组合题型，请先单独选择一种题型。")}
               {directPractice && !directSupported && (
                 <Button asChild variant="link">
-                  <Link href="/student/practice">我的任务</Link>
+                  <Link href="/student/practice">{uiText("我的任务")}</Link>
                 </Button>
               )}
             </PageNotice>
@@ -468,10 +483,12 @@ function PlanForm({
         {sourceUnavailable && (
           <PageNotice tone="error">
             {directPractice
-              ? "暂时无法确认词表是否可用，请重试。"
-              : "暂时无法确认词表是否可用，草稿已保留。请重试或移除此词表后再创建。"}
+              ? uiText("暂时无法确认词表是否可用，请重试。")
+              : uiText(
+                  "暂时无法确认词表是否可用，草稿已保留。请重试或移除此词表后再创建。"
+                )}
             <Button variant="link" onClick={onRetrySource}>
-              重试
+              {uiText("重试")}
             </Button>
           </PageNotice>
         )}
@@ -488,7 +505,7 @@ function PlanForm({
             <>
               <section aria-labelledby="sources-title" className={rowClass}>
                 <h2 id="sources-title" className={captionClass}>
-                  词表
+                  {uiText("词表")}
                 </h2>
                 <div className="min-w-0">
                   {selected.length > 0 && (
@@ -507,11 +524,11 @@ function PlanForm({
                             </p>
                             {personalName && personalName !== w.name && (
                               <p className="truncate text-xs text-foreground-muted">
-                                备注：{personalName}
+                                {uiText("备注：{{v0}}", { v0: personalName })}
                               </p>
                             )}
                             <p className="mt-1 text-xs text-foreground-muted">
-                              {w.item_count} 个词条
+                              {uiText("{{v0}} 个词条", { v0: w.item_count })}
                             </p>
                           </div>
                           <Button
@@ -519,7 +536,7 @@ function PlanForm({
                             variant="ghost"
                             size="icon"
                             disabled={locked}
-                            aria-label={`移除 ${w.name}`}
+                            aria-label={uiText("移除 {{v0}}", { v0: w.name })}
                             onClick={() =>
                               setSelected((old) =>
                                 old.filter((s) => s.wordlist.id !== w.id)
@@ -546,8 +563,8 @@ function PlanForm({
                     }
                   >
                     {selected.length
-                      ? `更换词表（${selected.length}/5）`
-                      : "选择词表"}
+                      ? uiText("更换词表（{{v0}}/5）", { v0: selected.length })
+                      : uiText("选择词表")}
                   </Button>
                   {errors.sources && (
                     <p
@@ -560,21 +577,21 @@ function PlanForm({
                 </div>
               </section>
               <section className={rowClass}>
-                <h2 className={captionClass}>任务类型</h2>
+                <h2 className={captionClass}>{uiText("任务类型")}</h2>
                 <div>
                   <Segmented
-                    label="任务类型"
+                    label={uiText("任务类型")}
                     value={kind}
                     options={[
-                      { value: "daily", label: "每日任务" },
-                      { value: "longterm", label: "长期任务" }
+                      { value: "daily", label: uiText("每日任务") },
+                      { value: "longterm", label: uiText("长期任务") }
                     ]}
                     onChange={setKind}
                     disabled={locked}
                   />
                   {kind === "longterm" && (
                     <p className="mt-2 text-xs text-foreground-muted">
-                      不设每日题量，随时接着练
+                      {uiText("不设每日题量，随时接着练")}
                     </p>
                   )}
                 </div>
@@ -584,10 +601,10 @@ function PlanForm({
           <section className={rowClass}>
             <div className="flex items-center justify-between sm:block">
               <h2 id="plan-types-label" className={captionClass}>
-                题型
+                {uiText("题型")}
               </h2>
               <span className="text-xs text-foreground-muted sm:mt-1 sm:block">
-                可多选
+                {uiText("可多选")}
               </span>
             </div>
             <div>
@@ -633,9 +650,11 @@ function PlanForm({
                       }}
                     />
                     <span>
-                      <span className="block text-sm font-medium">{label}</span>{" "}
+                      <span className="block text-sm font-medium">
+                        {uiText(label)}
+                      </span>{" "}
                       <span className="mt-1 block text-xs text-foreground-muted">
-                        {description}
+                        {uiText(description)}
                       </span>
                     </span>
                   </label>
@@ -644,10 +663,10 @@ function PlanForm({
               {!choiceSupported && !capabilitiesFailed && (
                 <p className="mt-2 text-xs text-foreground-muted">
                   {capabilities.isPending
-                    ? "正在确认单选题是否可用…"
+                    ? uiText("正在确认单选题是否可用…")
                     : directPractice
-                      ? "当前单选题功能尚未就绪，可先进行拼写练习。"
-                      : "当前单选题功能尚未就绪，可先创建拼写任务。"}
+                      ? uiText("当前单选题功能尚未就绪，可先进行拼写练习。")
+                      : uiText("当前单选题功能尚未就绪，可先创建拼写任务。")}
                 </p>
               )}
               {errors["question-types"] && (
@@ -664,7 +683,7 @@ function PlanForm({
             <>
               <section className={rowClass}>
                 <label htmlFor="plan-count" className={captionClass}>
-                  每日题量
+                  {uiText("每日题量")}
                 </label>
                 <div>
                   <div className="flex items-center gap-3">
@@ -674,7 +693,7 @@ function PlanForm({
                         variant="ghost"
                         size="icon"
                         className="rounded-none"
-                        aria-label="减少每日题量"
+                        aria-label={uiText("减少每日题量")}
                         disabled={locked || (validCount && n <= 1)}
                         onClick={() =>
                           setCount(
@@ -709,7 +728,7 @@ function PlanForm({
                         variant="ghost"
                         size="icon"
                         className="rounded-none"
-                        aria-label="增加每日题量"
+                        aria-label={uiText("增加每日题量")}
                         disabled={
                           locked ||
                           (validCount && n >= (masterySupported ? 20 : 200))
@@ -732,7 +751,7 @@ function PlanForm({
                       </Button>
                     </div>
                     <span className="text-sm text-foreground-muted">
-                      题 / 天
+                      {uiText("题 / 天")}
                     </span>
                   </div>
                   <p
@@ -741,16 +760,18 @@ function PlanForm({
                   >
                     {errors.count ??
                       (masterySupported
-                        ? "错题重练另计"
-                        : "每天 1–200 题；本轮不足一天时只做剩余题量。")}
+                        ? uiText("错题重练另计")
+                        : uiText(
+                            "每天 1–200 题；本轮不足一天时只做剩余题量。"
+                          ))}
                   </p>
                 </div>
               </section>
               <section className={rowClass}>
                 <div className="flex items-center justify-between sm:block">
-                  <h2 className={captionClass}>起止日期</h2>
+                  <h2 className={captionClass}>{uiText("起止日期")}</h2>
                   <span className="text-xs text-foreground-muted sm:mt-1 sm:block">
-                    可选
+                    {uiText("可选")}
                   </span>
                 </div>
                 <PlanDateRange
@@ -764,7 +785,7 @@ function PlanForm({
           {!directPractice && (
             <section className={rowClass}>
               <label htmlFor="plan-name" className={captionClass}>
-                任务名称
+                {uiText("任务名称")}
               </label>
               <div>
                 <div className="flex min-w-0 items-center gap-2">
@@ -774,7 +795,7 @@ function PlanForm({
                     readOnly={!editingName && !errors.name}
                     value={name}
                     disabled={locked}
-                    placeholder="填写任务名称"
+                    placeholder={uiText("填写任务名称")}
                     className={`min-w-0 flex-1 rounded-xl ${!editingName && !errors.name ? "border-transparent bg-transparent px-0 text-foreground-muted shadow-none" : ""}`}
                     onChange={(e) => {
                       nameEdited.current = true;
@@ -801,7 +822,7 @@ function PlanForm({
                       }
                     }}
                   >
-                    {editingName ? "完成" : "编辑"}
+                    {editingName ? uiText("完成") : uiText("编辑")}
                   </Button>
                 </div>
                 {(errors.name || [...name].length >= 40) && (
@@ -809,7 +830,8 @@ function PlanForm({
                     id="plan-name-message"
                     className={`mt-1 text-xs ${errors.name ? "text-danger" : "text-foreground-muted"}`}
                   >
-                    {errors.name ?? `${[...name].length}/50 字`}
+                    {errors.name ??
+                      uiText("{{v0}}/50 字", { v0: [...name].length })}
                   </p>
                 )}
               </div>
@@ -819,29 +841,34 @@ function PlanForm({
             !capabilitiesFailed &&
             !unsupportedSelection && (
               <section
-                aria-label="题量预览"
+                aria-label={uiText("题量预览")}
                 aria-live="polite"
                 className="border-b border-border py-4 text-sm"
               >
                 {pendingPreview ? (
                   <p role="status" className="text-foreground-muted">
-                    正在计算可出题数量…
+                    {uiText("正在计算可出题数量…")}
                   </p>
                 ) : preview.isError ? (
                   <PageNotice tone="error">
                     {missingPlans(preview.error)
                       ? directPractice
-                        ? "练习功能尚未就绪，请稍后重试。"
-                        : "覆盖任务功能尚未就绪，草稿已保留。"
+                        ? uiText("练习功能尚未就绪，请稍后重试。")
+                        : uiText("覆盖任务功能尚未就绪，草稿已保留。")
                       : preview.error instanceof Error
-                        ? preview.error.message
-                        : "预览失败"}
+                        ? uiText(
+                            webErrorText(
+                              preview.error,
+                              "数据暂不可用，请刷新后重试"
+                            )
+                          )
+                        : uiText("预览失败")}
                     <Button
                       variant="link"
                       type="button"
                       onClick={() => void preview.refetch()}
                     >
-                      重新计算
+                      {uiText("重新计算")}
                     </Button>
                   </PageNotice>
                 ) : (
@@ -849,11 +876,13 @@ function PlanForm({
                     <>
                       <div className="flex flex-wrap items-start gap-x-4 gap-y-1">
                         <p className="pt-1 font-medium">
-                          可练习 {preview.data.eligible_count} 项内容
+                          {uiText("可练习 {{v0}} 项内容", {
+                            v0: preview.data.eligible_count
+                          })}
                         </p>
                         <details className="min-w-0 flex-1 basis-44 text-xs text-foreground-muted">
                           <summary className="w-fit cursor-pointer py-1">
-                            查看未纳入内容与规则
+                            {uiText("查看未纳入内容与规则")}
                           </summary>
                           <div className="mt-2 space-y-2 rounded-xl bg-muted p-3">
                             {Object.entries(preview.data.exclusions)
@@ -874,34 +903,45 @@ function PlanForm({
                               />
                             )}
                             <p>
-                              {preview.data.settings.cefr_level} /{" "}
-                              {preview.data.settings.english_variant} · 含{" "}
-                              {preview.data.custom_word_count} 个自定义词
+                              {uiText("{{v0}}/ {{v1}} · 含 {{v2}} 个自定义词", {
+                                v0: preview.data.settings.cefr_level,
+                                v1: preview.data.settings.english_variant,
+                                v2: preview.data.custom_word_count
+                              })}
                             </p>
                             {mixedPractice ? (
                               <p>
-                                优先出单选题，无法可靠出单选的内容使用拼写题。
+                                {uiText(
+                                  "优先出单选题，无法可靠出单选的内容使用拼写题。"
+                                )}
                               </p>
                             ) : (
                               questionType === "choice_zh_to_en" && (
                                 <p>
-                                  仅练习可出单选的内容，不改为拼写。单选成绩不影响拼写掌握度。
+                                  {uiText(
+                                    "仅练习可出单选的内容，不改为拼写。单选成绩不影响拼写掌握度。"
+                                  )}
                                 </p>
                               )
                             )}
                             <p>
                               {masterySupported
-                                ? "按掌握情况安排新学、复习和错题重练；每次先安排最多 20 题，含重练最多 30 题。"
+                                ? uiText(
+                                    "按掌握情况安排新学、复习和错题重练；每次先安排最多 20 题，含重练最多 30 题。"
+                                  )
                                 : kind === "daily"
-                                  ? "按每日题量覆盖一轮，最后一天只练剩余内容。"
-                                  : "完整覆盖一轮，可跨天继续。"}
+                                  ? uiText(
+                                      "按每日题量覆盖一轮，最后一天只练剩余内容。"
+                                    )
+                                  : uiText("完整覆盖一轮，可跨天继续。")}
                             </p>
                             {kind === "daily" &&
                               preview.data.estimated_learning_days != null && (
                                 <p>
-                                  按每天完成计划量，预计{" "}
-                                  {preview.data.estimated_learning_days}{" "}
-                                  个学习日完成本轮。
+                                  {uiText(
+                                    "按每天完成计划量，预计 {{v0}} 个学习日完成本轮。",
+                                    { v0: preview.data.estimated_learning_days }
+                                  )}
                                 </p>
                               )}
                           </div>
@@ -922,8 +962,9 @@ function PlanForm({
                               )
                             }
                           />
-                          仅使用这 {preview.data.eligible_count}{" "}
-                          项可出单选的内容
+                          {uiText("仅使用这 {{v0}} 项可出单选的内容", {
+                            v0: preview.data.eligible_count
+                          })}
                         </label>
                       )}
                       {preview.data.reasons.map((reason) => (
@@ -939,26 +980,28 @@ function PlanForm({
           <div className="space-y-3 py-4">
             {error && (
               <p role="alert" className="text-sm text-danger">
-                {error}
+                {uiText(error)}
               </p>
             )}
             {unknown && (
               <p className="text-sm text-foreground-muted">
                 {directPractice
-                  ? "开始结果尚未确认，请重试，不会重复创建练习。"
-                  : "创建结果尚未确认，草稿已锁定；重试沿用同一请求，不会重复创建。"}
+                  ? uiText("开始结果尚未确认，请重试，不会重复创建练习。")
+                  : uiText(
+                      "创建结果尚未确认，草稿已锁定；重试沿用同一请求，不会重复创建。"
+                    )}
               </p>
             )}
             {directPractice && createdPlan && error && (
               <Button asChild variant="link">
                 <Link href={`/student/tasks/${createdPlan.task.id}`}>
-                  查看已保存的练习
+                  {uiText("查看已保存的练习")}
                 </Link>
               </Button>
             )}
             <div className="flex justify-end gap-2">
               <Button asChild variant="ghost">
-                <Link href={back.href}>取消</Link>
+                <Link href={back.href}>{uiText("取消")}</Link>
               </Button>
               <Button
                 type="submit"
@@ -977,15 +1020,15 @@ function PlanForm({
               >
                 {directPractice
                   ? busy
-                    ? "正在开始…"
+                    ? uiText("正在开始…")
                     : unknown || createdPlan
-                      ? "重试开始练习"
-                      : "开始练习"
+                      ? uiText("重试开始练习")
+                      : uiText("开始练习")
                   : busy
-                    ? "正在创建…"
+                    ? uiText("正在创建…")
                     : unknown
-                      ? "重试原创建请求"
-                      : "创建任务"}
+                      ? uiText("重试原创建请求")
+                      : uiText("创建任务")}
               </Button>
             </div>
           </div>
@@ -999,9 +1042,7 @@ function PlanForm({
           onConfirm={(items) => {
             setSelected(items);
             if (!nameEdited.current && !name && items[0]) {
-              setName(
-                `${[...items[0].wordlist.name].slice(0, 48).join("")}练习`
-              );
+              setName(suggestedPracticeName(items[0].wordlist.name, uiText));
               setEditingName(false);
             }
             setPicker(false);

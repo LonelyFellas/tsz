@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webHomeLanding as webHome } from "@/i18n/messages/home/landing";
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -9,6 +11,7 @@ import { useUserStore } from "@/stores/user";
 // Hero 主行动区——只保留「向前」的动作。
 // 账户/危险操作(退出、注销)在 HomeNav,不污染落地页焦点。
 export function HeroCTA() {
+  const uiText = useWebText(webHome);
   const identity = useTeacherIdentity();
   const user = useUserStore((s) => s.user);
   const hydrated = useUserStore((s) => s.hydrated);
@@ -24,7 +27,9 @@ export function HeroCTA() {
     const studyHref = teaching ? "/teacher/classes" : "/student/home";
     return (
       <Button asChild size="lg">
-        <Link href={studyHref}>{teaching ? "进入教学" : "进入学习"}</Link>
+        <Link href={studyHref}>
+          {teaching ? uiText("进入教学") : uiText("进入学习")}
+        </Link>
       </Button>
     );
   }
@@ -33,11 +38,11 @@ export function HeroCTA() {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button asChild size="lg">
-        <Link href="/login">开始学习</Link>
+        <Link href="/login">{uiText("开始学习")}</Link>
       </Button>
       <Button asChild size="lg" variant="link">
         <Link href="/wordlists">
-          浏览词表
+          {uiText("浏览词表")}
           <ArrowRight className="size-4" aria-hidden />
         </Link>
       </Button>

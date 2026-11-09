@@ -1,4 +1,9 @@
 "use client";
+import { webErrorText } from "@/i18n/catalog";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webWordlistDetail as webWordlist } from "@/i18n/messages/wordlist/detail";
+
 import { unavailableReasonLabels } from "../availability";
 import { DetailInteractions } from "./WordlistInteractions";
 import { useEffect, useRef, useState } from "react";
@@ -81,6 +86,7 @@ function Detail({
   embedded?: boolean;
   editHref?: string;
 }) {
+  const uiText = useWebText(webWordlist);
   const client = useQueryClient();
   const identity = useTeacherIdentity();
   const hydrated = useUserStore((s) => s.hydrated);
@@ -99,7 +105,7 @@ function Detail({
   const requestView = view === "full" ? "full" : "standard";
   const [sort, setSort] = useState<WordlistSort>("author");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const [submit, setSubmit] = useState<SubmitWordlist | null>(null);
   const keys = mine ? wordListKeys.mine(userId) : wordListKeys.public;
   const meta = useQuery({
@@ -310,7 +316,9 @@ function Detail({
     if (
       kind === "withdraw" &&
       !window.confirm(
-        "撤回后将立即转为私密并取消推荐。修改完成后可再次申请公开。继续？"
+        uiText(
+          "撤回后将立即转为私密并取消推荐。修改完成后可再次申请公开。继续？"
+        )
       )
     )
       return;
@@ -375,14 +383,14 @@ function Detail({
   if (meta.isError)
     return (
       <PageShell size="lg" embedded={embedded}>
-        <PageHeader back={back} title="词表" />
+        <PageHeader back={back} title={uiText("词表")} />
         <PageNotice tone="error">
-          词表不存在、不可访问或暂时无法加载。
+          {uiText("词表不存在、不可访问或暂时无法加载。")}
           <button
             className={textButtonClass}
             onClick={() => void meta.refetch()}
           >
-            重试
+            {uiText("重试")}
           </button>
         </PageNotice>
       </PageShell>
@@ -390,7 +398,7 @@ function Detail({
   if (!meta.data)
     return (
       <PageShell size="lg" embedded={embedded}>
-        <PageNotice>正在读取词表…</PageNotice>
+        <PageNotice>{uiText("正在读取词表…")}</PageNotice>
       </PageShell>
     );
   const list = meta.data;
@@ -398,10 +406,18 @@ function Detail({
     <PageShell size="xl" embedded={embedded}>
       <PageHeader
         back={embedded ? undefined : back}
-        eyebrow={embedded ? undefined : mine ? "我的词表" : "词库广场"}
+        eyebrow={
+          embedded ? undefined : mine ? uiText("我的词表") : uiText("词库广场")
+        }
         title={list.name}
         description={
-          <span className="break-words">{`${list.owner_name} · ${STATE_LABEL[list.state]} · ${list.item_count} 个词条`}</span>
+          <span className="break-words">
+            {uiText("{{v0}} · {{v1}} · {{v2}} 个词条", {
+              v0: list.owner_name,
+              v1: uiText(STATE_LABEL[list.state]),
+              v2: list.item_count
+            })}
+          </span>
         }
         actions={
           <>
@@ -409,15 +425,15 @@ function Detail({
               <Link
                 href={`/student/practice/new?${new URLSearchParams({ wordlist: id, source: mine ? "owned" : "public" })}`}
               >
-                开始练习
+                {uiText("开始练习")}
               </Link>
             </Button>
             {mine && (
               <Button asChild variant="outline">
                 <Link href={editHref ?? `/account/wordlists/${id}/edit`}>
                   {list.state === "pending" || list.state === "published"
-                    ? "查看与编辑"
-                    : "编辑词表"}
+                    ? uiText("查看与编辑")
+                    : uiText("编辑词表")}
                 </Link>
               </Button>
             )}
@@ -426,7 +442,7 @@ function Detail({
       />
       <section className="border-b border-border/70 pb-5">
         <div>
-          <h2 className="sr-only">词表概况</h2>
+          <h2 className="sr-only">{uiText("词表概况")}</h2>
           <div className="flex flex-wrap gap-2 empty:hidden">
             {mine ? (
               <>
@@ -436,7 +452,7 @@ function Detail({
                     disabled={busy}
                     onClick={() => void action("withdraw")}
                   >
-                    {busy ? "处理中…" : "撤回为私密"}
+                    {busy ? uiText("处理中…") : uiText("撤回为私密")}
                   </button>
                 ) : (
                   <button
@@ -449,19 +465,19 @@ function Detail({
                     }
                     onClick={() => void action("submit")}
                   >
-                    {busy ? "提交中…" : "申请公开"}
+                    {busy ? uiText("提交中…") : uiText("申请公开")}
                   </button>
                 )}
                 {list.state === "published" && (
                   <Link className={buttonClass} href={`/wordlists/${id}`}>
-                    查看公开页面
+                    {uiText("查看公开页面")}
                   </Link>
                 )}
               </>
             ) : (
               list.owner_user_id === userId && (
                 <Link className={buttonClass} href={`/account/wordlists/${id}`}>
-                  管理我的词表
+                  {uiText("管理我的词表")}
                 </Link>
               )
             )}
@@ -471,8 +487,8 @@ function Detail({
             (list.state === "pending" || canSubmit) && (
               <p className="mt-4 text-sm leading-6 text-foreground-muted">
                 {list.state === "pending"
-                  ? "公开申请正在审核中，审核通过前仅你可见。"
-                  : "公开后可被其他用户搜索和使用，需审核。"}
+                  ? uiText("公开申请正在审核中，审核通过前仅你可见。")
+                  : uiText("公开后可被其他用户搜索和使用，需审核。")}
               </p>
             )}
           {showPublicationCheck && !canSubmit && (
@@ -482,48 +498,56 @@ function Detail({
               className="mt-4 text-sm text-foreground-muted"
             >
               {publicationHasUnavailable
-                ? "有不可用词条，移除或替换后可申请公开。"
+                ? uiText("有不可用词条，移除或替换后可申请公开。")
                 : availability.isError ||
                     (availability.isSuccess && !availabilityData)
-                  ? "暂时无法确认词条是否全部可用，请在下方重试后再申请。"
-                  : "正在检查词条可用性，请稍候。"}
+                  ? uiText(
+                      "暂时无法确认词条是否全部可用，请在下方重试后再申请。"
+                    )
+                  : uiText("正在检查词条可用性，请稍候。")}
             </p>
           )}
           {error && (
             <p role="alert" className="mt-4 text-sm text-danger">
-              {error}
+              {uiText(error)}
             </p>
           )}
           {mine && reviews.data?.withdraw_reason && (
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
-              下架原因：{reviews.data.withdraw_reason}
+              {uiText("下架原因：{{v0}}", { v0: reviews.data.withdraw_reason })}
             </p>
           )}
           {mine && reviews.data?.items[0]?.reason && (
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
-              审核意见：{reviews.data.items[0].reason}
+              {uiText("审核意见：{{v0}}", { v0: reviews.data.items[0].reason })}
             </p>
           )}
           {mine && reviews.isError && (
             <p role="alert" className="mt-4 text-sm text-danger">
-              审核记录加载失败。
+              {uiText("审核记录加载失败。")}
             </p>
           )}
           {availabilityData && (
             <p className="mt-4 text-sm text-foreground-muted">
-              整张词表：{availabilityData.available_count} 个可用词条
+              {uiText("整张词表：{{v0}} 个可用词条", {
+                v0: availabilityData.available_count
+              })}
               {!!availabilityData.custom_count &&
-                `，其中 ${availabilityData.custom_count} 个自定义词条，可用于拼写练习`}
+                uiText("，其中 {{v0}} 个自定义词条，可用于拼写练习", {
+                  v0: availabilityData.custom_count
+                })}
               {availabilityData.unavailable_count > 0 &&
-                `，${availabilityData.unavailable_count} 个暂不可用，不参与出题`}
+                uiText("，{{v0}} 个暂不可用，不参与出题", {
+                  v0: availabilityData.unavailable_count
+                })}
             </p>
           )}
           {(availability.isError ||
             (availability.isSuccess && !availabilityData)) && (
             <p role="alert" className="mt-4 text-sm text-foreground-muted">
               {availabilityVersionChanged
-                ? "词表内容已变化，请重新加载词表。"
-                : "可用数量暂时无法读取，已加载的词条仍可阅读。"}{" "}
+                ? uiText("词表内容已变化，请重新加载词表。")
+                : uiText("可用数量暂时无法读取，已加载的词条仍可阅读。")}{" "}
               <button
                 className={textButtonClass}
                 disabled={availabilityFetching}
@@ -533,7 +557,9 @@ function Detail({
                     : refetchAvailability())
                 }
               >
-                {availabilityVersionChanged ? "重新加载词表" : "重试"}
+                {availabilityVersionChanged
+                  ? uiText("重新加载词表")
+                  : uiText("重试")}
               </button>
             </p>
           )}
@@ -545,8 +571,8 @@ function Detail({
       <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchField
           className="min-w-40 flex-1 sm:max-w-sm"
-          aria-label="搜索词条"
-          placeholder="搜索词面"
+          aria-label={uiText("搜索词条")}
+          placeholder={uiText("搜索词面")}
           value={query}
           onCompositionStart={() => setComposing(true)}
           onCompositionEnd={(event) => {
@@ -557,19 +583,19 @@ function Detail({
         />
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
-            label="阅读模式"
+            label={uiText("阅读模式")}
             value={view}
             options={[
-              { value: "simple", label: "简洁模式" },
-              { value: "standard", label: "标准模式" },
-              { value: "full", label: "完整模式" }
+              { value: "simple", label: uiText("简洁模式") },
+              { value: "standard", label: uiText("标准模式") },
+              { value: "full", label: uiText("完整模式") }
             ]}
             onChange={setView}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className={buttonClass}>
-                排序：{SORT_LABELS[sort]}
+                {uiText("排序：{{v0}}", { v0: uiText(SORT_LABELS[sort]) })}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -582,47 +608,54 @@ function Detail({
                     setSort(value as WordlistSort);
                   }}
                 >
-                  {label}
+                  {uiText(label)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
           {ready && (
             <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium tracking-wide text-foreground-muted">
-              {`释义等级 ${level}${!profile.data?.learning_settings && identity.identity !== "teacher" ? " 预览" : ""}`}
+              {uiText("释义等级 {{v0}}{{v1}}", {
+                v0: level,
+                v1:
+                  !profile.data?.learning_settings &&
+                  identity.identity !== "teacher"
+                    ? uiText(" 预览")
+                    : ""
+              })}
             </span>
           )}
         </div>
       </div>
       {updatingSearch && (
         <p role="status" className="mb-5 text-xs text-foreground-muted">
-          正在搜索…
+          {uiText("正在搜索…")}
         </p>
       )}
       {!ready ? (
         profile.isError || identity.error ? (
           <PageNotice tone="error">
-            阅读设置读取失败，请刷新；尚未显示未确认等级的释义。
+            {uiText("阅读设置读取失败，请刷新；尚未显示未确认等级的释义。")}
           </PageNotice>
         ) : (
-          <PageNotice>正在读取阅读设置…</PageNotice>
+          <PageNotice>{uiText("正在读取阅读设置…")}</PageNotice>
         )
       ) : items.isError && loadedItems.length === 0 ? (
         <PageNotice tone="error">
           {view === "full"
-            ? "完整内容暂不可用，可切回标准模式，或"
-            : "条目加载失败，"}
+            ? uiText("完整内容暂不可用，可切回标准模式，或")
+            : uiText("条目加载失败，")}
           <button
             className={textButtonClass}
             disabled={items.isFetching}
             onClick={() => void items.refetch()}
           >
-            {items.isFetching ? "重试中…" : "重试"}
+            {items.isFetching ? uiText("重试中…") : uiText("重试")}
           </button>
           。
         </PageNotice>
       ) : !items.data ? (
-        <PageNotice>正在读取条目…</PageNotice>
+        <PageNotice>{uiText("正在读取条目…")}</PageNotice>
       ) : (
         <>
           {(unavailableItems.length > 0 ||
@@ -633,13 +666,17 @@ function Detail({
               onToggle={(event) => setUnavailableOpen(event.currentTarget.open)}
             >
               <summary className="cursor-pointer font-medium">
-                查看暂不可用的词条
+                {uiText("查看暂不可用的词条")}
                 {availabilityData
-                  ? `（整张词表共 ${availabilityData.unavailable_count} 个）`
-                  : `（已加载 ${unavailableItems.length} 个）`}
+                  ? uiText("（整张词表共 {{v0}} 个）", {
+                      v0: availabilityData.unavailable_count
+                    })
+                  : uiText("（已加载 {{v0}} 个）", {
+                      v0: unavailableItems.length
+                    })}
               </summary>
               <p className="mt-3 text-foreground-muted">
-                引用和备注已保留，词条恢复后可继续阅读。
+                {uiText("引用和备注已保留，词条恢复后可继续阅读。")}
               </p>
               {mine && (
                 <p className="mt-2">
@@ -647,10 +684,10 @@ function Detail({
                     className={textButtonClass}
                     href={editHref ?? `/account/wordlists/${id}/edit`}
                   >
-                    移除或替换
+                    {uiText("移除或替换")}
                   </Link>
                   {(list.state === "published" || list.state === "pending") &&
-                    " · 请先撤回为私密，再编辑词表。"}
+                    uiText("· 请先撤回为私密，再编辑词表。")}
                 </p>
               )}
               {unavailableExpanded && (
@@ -667,27 +704,32 @@ function Detail({
                             {(item as MyWordlistItem).entry_label} ·{" "}
                           </span>
                         )}
-                      原位置 {item.position + 1} · 词条暂不可用
+                      {uiText("原位置 {{v0}} · 词条暂不可用", {
+                        v0: item.position + 1
+                      })}
                       {mine && (item as MyWordlistItem).unavailable_reason && (
                         <p className="text-foreground-muted">
-                          原因：
-                          {
-                            unavailableReasonLabels[
-                              (item as MyWordlistItem).unavailable_reason!
-                            ]
-                          }
+                          {uiText("原因：{{v0}}", {
+                            v0: uiText(
+                              unavailableReasonLabels[
+                                (item as MyWordlistItem).unavailable_reason!
+                              ]
+                            )
+                          })}
                         </p>
                       )}
                       {item.author_note && (
                         <p className="whitespace-pre-wrap">
-                          注：{item.author_note}
+                          {uiText("注：{{v0}}", { v0: item.author_note })}
                         </p>
                       )}
                       {mine &&
                         "private_note" in item &&
                         (item as MyWordlistItem).private_note && (
                           <p className="whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-foreground-muted">
-                            私密备注：{(item as MyWordlistItem).private_note}
+                            {uiText("私密备注：{{v0}}", {
+                              v0: (item as MyWordlistItem).private_note
+                            })}
                           </p>
                         )}
                     </li>
@@ -707,14 +749,16 @@ function Detail({
                     onClick={() => void fetchNextPage({ cancelRefetch: false })}
                   >
                     {allUnavailable
-                      ? "加载更多不可用词条"
-                      : "加载更多词条以查看原因"}
+                      ? uiText("加载更多不可用词条")
+                      : uiText("加载更多词条以查看原因")}
                   </button>
                 )}
               {(availabilityData?.unavailable_count ?? 0) >
                 unavailableItems.length && (
                 <p className="mt-2 text-foreground-muted">
-                  这里只列出当前已加载且符合搜索条件的项目；其他项目会随词条加载显示。
+                  {uiText(
+                    "这里只列出当前已加载且符合搜索条件的项目；其他项目会随词条加载显示。"
+                  )}
                   {showPublicationCheck && q.trim() && (
                     <button
                       className={textButtonClass}
@@ -723,7 +767,7 @@ function Detail({
                         setQ("");
                       }}
                     >
-                      清空搜索查看原因
+                      {uiText("清空搜索查看原因")}
                     </button>
                   )}
                 </p>
@@ -732,14 +776,14 @@ function Detail({
           )}
           {audio.isError && customIds.length > 0 && (
             <p role="status" className="mb-4 text-sm text-foreground-muted">
-              语音暂不可用，词表内容仍可阅读。
+              {uiText("语音暂不可用，词表内容仍可阅读。")}
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
                 onClick={() => void audio.refetch()}
               >
-                重试读取语音
+                {uiText("重试读取语音")}
               </Button>
             </p>
           )}
@@ -767,9 +811,16 @@ function Detail({
                                     key={locale}
                                     className="inline-flex items-center text-xs text-foreground-muted"
                                   >
-                                    {locale === "en-GB" ? "英式" : "美式"}
+                                    {locale === "en-GB"
+                                      ? uiText("英式")
+                                      : uiText("美式")}
                                     <AudioButton
-                                      label={`播放 ${item.custom_word!.word} ${locale === "en-GB" ? "英式" : "美式"}语音`}
+                                      label={uiText("播放 {{v0}} {{v1}}语音", {
+                                        v0: item.custom_word!.word,
+                                        v1: uiText(
+                                          locale === "en-GB" ? "英式" : "美式"
+                                        )
+                                      })}
                                       sign={(signal) =>
                                         mine
                                           ? api.wordList.myCustomAudioUrl(
@@ -791,15 +842,15 @@ function Detail({
                               </div>
                             ) : (
                               <p className="mt-2 text-xs text-foreground-muted">
-                                {
+                                {uiText(
                                   audioStatusLabels[
                                     audioByItem.get(item.item_id!)!.status
                                   ]
-                                }
+                                )}
                               </p>
                             ))}
                           <p className="mt-2 text-xs text-foreground-muted">
-                            自定义词条
+                            {uiText("自定义词条")}
                           </p>
                         </td>
                         <td />
@@ -837,15 +888,16 @@ function Detail({
                         >
                           {item.author_note && (
                             <p className="whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3">
-                              注：{item.author_note}
+                              {uiText("注：{{v0}}", { v0: item.author_note })}
                             </p>
                           )}
                           {mine &&
                             "private_note" in item &&
                             (item as MyWordlistItem).private_note && (
                               <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-foreground-muted">
-                                私密备注：
-                                {(item as MyWordlistItem).private_note}
+                                {uiText("私密备注：{{v0}}", {
+                                  v0: (item as MyWordlistItem).private_note
+                                })}
                               </p>
                             )}
                         </td>
@@ -858,11 +910,11 @@ function Detail({
           </div>
           {loadedItems.length > 0 &&
             loadedItems.every((item) => !item.entry && !item.custom_word) && (
-              <PageNotice>当前已加载的词条均不可用。</PageNotice>
+              <PageNotice>{uiText("当前已加载的词条均不可用。")}</PageNotice>
             )}
           {loadedItems.length === 0 ? (
             <PageNotice>
-              {q ? "未找到匹配词条" : "暂无词条"}
+              {q ? uiText("未找到匹配词条") : uiText("暂无词条")}
               {q && (
                 <Button
                   type="button"
@@ -873,7 +925,7 @@ function Detail({
                     setQ("");
                   }}
                 >
-                  清空搜索
+                  {uiText("清空搜索")}
                 </Button>
               )}
             </PageNotice>
@@ -884,9 +936,11 @@ function Detail({
             >
               {items.isError ? (
                 <p role="alert">
-                  {items.error.message === CONTENT_CHANGED
+                  {uiText(
+                    webErrorText(items.error, "数据暂不可用，请刷新后重试")
+                  ) === CONTENT_CHANGED
                     ? CONTENT_CHANGED
-                    : "后续词条加载失败，已加载的内容仍可阅读。"}{" "}
+                    : uiText("后续词条加载失败，已加载的内容仍可阅读。")}{" "}
                   <button
                     className={textButtonClass}
                     disabled={items.isFetching}
@@ -897,20 +951,24 @@ function Detail({
                         : items.refetch())
                     }
                   >
-                    {items.error.message === CONTENT_CHANGED
-                      ? "重新加载"
-                      : "重试"}
+                    {uiText(
+                      webErrorText(items.error, "数据暂不可用，请刷新后重试")
+                    ) === CONTENT_CHANGED
+                      ? uiText("重新加载")
+                      : uiText("重试")}
                   </button>
                 </p>
               ) : (
                 <p role="status">
                   {items.isFetchingNextPage
-                    ? "正在加载更多词条…"
+                    ? uiText("正在加载更多词条…")
                     : items.hasNextPage
                       ? allUnavailable
-                        ? "展开上方列表，按需加载不可用词条"
-                        : "继续向下滚动，自动加载更多词条"
-                      : `已加载全部 ${loadedItems.length} 个词条`}
+                        ? uiText("展开上方列表，按需加载不可用词条")
+                        : uiText("继续向下滚动，自动加载更多词条")
+                      : uiText("已加载全部 {{v0}} 个词条", {
+                          v0: loadedItems.length
+                        })}
                 </p>
               )}
             </div>

@@ -2,8 +2,11 @@
 import type { EnglishVariant, User } from "@tsz/types";
 
 /** 昵称展示兜底:display_name 理论必有,仍防御运行时缺失/纯空格。 */
-export function displayNameOf(user: Pick<User, "display_name">): string {
-  return user.display_name?.trim() || "用户";
+export function displayNameOf(
+  user: Pick<User, "display_name">,
+  fallback = "用户"
+): string {
+  return user.display_name?.trim() || fallback;
 }
 
 /** 英式 / 美式口音的中文标签。 */

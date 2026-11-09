@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webTheme } from "@/i18n/messages/theme";
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "./useTheme";
@@ -11,10 +13,13 @@ const MODES = [
 
 // 外观三段切换：浅色 / 深色 / 跟随系统。
 export function ThemeModeControl() {
+  const uiText = useWebText(webTheme);
   const { theme, setTheme } = useTheme();
   return (
     <fieldset>
-      <legend className="mb-2 ml-4 text-sm font-medium">外观</legend>
+      <legend className="mb-2 ml-4 text-sm font-medium">
+        {uiText("外观")}
+      </legend>
       <div className="grid grid-cols-3 gap-1 rounded-full border border-border/60 bg-muted p-1">
         {MODES.map(({ value, label, Icon }) => (
           <button
@@ -25,7 +30,7 @@ export function ThemeModeControl() {
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium text-foreground-muted transition-[color,background-color,box-shadow] duration-200 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-9 aria-pressed:bg-surface aria-pressed:text-foreground aria-pressed:shadow-[0_2px_8px_rgb(0_0_0/0.06)]"
           >
             <Icon className="size-4" strokeWidth={1.5} aria-hidden />
-            {label}
+            {uiText(label)}
           </button>
         ))}
       </div>

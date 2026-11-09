@@ -1,3 +1,4 @@
+import { LocalWebError } from "@/i18n/catalog";
 import type {
   CreateWordlist,
   UpdateWordlist,
@@ -69,7 +70,9 @@ export function readPendingSave(
     !["create", "update"].includes(value.request.kind) ||
     !value.form
   )
-    throw new Error("待确认的词表保存记录无法读取，请保留此页面并联系支持。");
+    throw new LocalWebError(
+      "待确认的词表保存记录无法读取，请保留此页面并联系支持。"
+    );
   const items = requestItems(value.request);
   const initial = value.form.initial && {
     ...value.form.initial,

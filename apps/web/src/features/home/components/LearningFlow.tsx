@@ -1,3 +1,7 @@
+"use client";
+
+import { useWebText } from "@/i18n/client";
+import { webHomeLanding as webHome } from "@/i18n/messages/home/landing";
 import { SectionHeading } from "./SectionHeading";
 
 const STEPS = [
@@ -8,11 +12,12 @@ const STEPS = [
 ] as const;
 
 export function LearningFlow() {
+  const uiText = useWebText(webHome);
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-16 sm:py-24">
       <SectionHeading
-        title="从第一词，到每一天。"
-        desc="形成可持续的学习闭环。"
+        title={uiText("从第一词，到每一天。")}
+        desc={uiText("形成可持续的学习闭环。")}
       />
       <ol className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map(({ step, title, desc }) => (
@@ -27,10 +32,10 @@ export function LearningFlow() {
               <span className="hidden h-px flex-1 bg-border sm:block" />
             </div>
             <h3 className="text-lg font-semibold text-foreground sm:mt-5">
-              {title}
+              {uiText(title)}
             </h3>
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
-              {desc}
+              {uiText(desc)}
             </p>
           </li>
         ))}

@@ -1,3 +1,4 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   act,
   fireEvent,
@@ -1275,4 +1276,33 @@ it("opts into mastery only when supported and caps the initial queue at twenty",
       expect.anything()
     )
   );
+});
+
+it("localized suggested names stay within 50 code points and become a stable draft", async () => {
+  mocks.myDetail.mockResolvedValue({
+    ...wordlist,
+    state: "draft",
+    name: "🙂".repeat(48)
+  });
+  const tree = (locale: "en-GB" | "zh-Hant") => (
+    <InterfaceI18nProvider locale={locale}>
+      <LearningPlanCreator
+        userId={mocks.user.id}
+        wordlistId="list"
+        owned
+        directPractice
+      />
+    </InterfaceI18nProvider>
+  );
+  const view = renderWithProviders(tree("en-GB"));
+  await screen.findByText("Available for practice: 35");
+  const reads = mocks.preview.mock.calls.length;
+  view.rerender(tree("zh-Hant"));
+  expect(mocks.preview).toHaveBeenCalledTimes(reads);
+  expect(mocks.create).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "開始練習" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+  const draft = mocks.create.mock.calls[0]![0].name;
+  expect([...draft]).toHaveLength(50);
+  expect(draft).toBe("🙂".repeat(41) + " practice");
 });

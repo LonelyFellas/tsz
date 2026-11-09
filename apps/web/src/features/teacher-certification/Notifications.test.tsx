@@ -171,7 +171,7 @@ it("keeps deleted wordlist notifications readable without a broken wordlist link
   });
   show();
   expect(
-    await screen.findByText(/账号已注销向你的词表（已删除）投了/)
+    await screen.findByText(/账号已注销向你的词表.*已删除.*投了/)
   ).toBeInTheDocument();
   expect(
     screen.queryByRole("link", { name: "查看词表" })

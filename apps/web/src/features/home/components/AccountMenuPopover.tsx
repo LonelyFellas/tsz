@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice, webErrorText } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webHomeAccount as webHome } from "@/i18n/messages/home/account";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -57,6 +60,7 @@ function MenuIcon({ children }: { children: ReactNode }) {
 
 // 随菜单浮层挂载，关闭菜单时不额外请求；与钱包页面共用账号级缓存。
 function CoinBalance({ id }: { id: string }) {
+  const uiText = useWebText(webHome);
   const wallet = useQuery({
     queryKey: ["coins", "user", id, "wallet"],
     queryFn: ({ signal }) => api.coins.wallet({ signal }),
@@ -66,10 +70,12 @@ function CoinBalance({ id }: { id: string }) {
   return (
     <span className="min-w-0 break-all" aria-live="polite">
       {wallet.isError
-        ? "余额暂不可用"
+        ? uiText("余额暂不可用")
         : wallet.isPending || wallet.isFetching
-          ? "读取余额…"
-          : `天生币：${formatCoins(wallet.data.balance).replace(" 天生币", "")}`}
+          ? uiText("读取余额…")
+          : uiText("天生币：{{v0}}", {
+              v0: formatCoins(wallet.data.balance).replace(" 天生币", "")
+            })}
     </span>
   );
 }
@@ -97,13 +103,14 @@ export function AccountMenuPopover({
   disableHover = false,
   preferences
 }: AccountMenuPopoverProps = {}) {
+  const uiText = useWebText(webHome);
   const user = useUserStore((s) => s.user);
   const router = useRouter();
   const pointerType = useRef("mouse");
   const logout = useLogout();
   const teacher = useTeacherIdentity();
   const [switching, setSwitching] = useState(false);
-  const [switchError, setSwitchError] = useState("");
+  const [switchError, setSwitchError] = useState<WebNotice>("");
   const [internalOpen, setInternalOpen] = useState(initialOpen);
   const open = controlledOpen ?? internalOpen;
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -246,7 +253,7 @@ export function AccountMenuPopover({
     if (busy) event.preventDefault();
   }
 
-  const displayName = displayNameOf(user);
+  const displayName = displayNameOf(user, uiText("用户"));
 
   async function handleLogout() {
     setLoading(true);
@@ -267,7 +274,7 @@ export function AccountMenuPopover({
         <button
           ref={triggerRef}
           type="button"
-          aria-label="账户菜单"
+          aria-label={uiText("账户菜单")}
           onPointerEnter={openOnHover}
           onPointerLeave={closeAfterHover}
           onPointerDown={(event) => {
@@ -384,9 +391,9 @@ export function AccountMenuPopover({
                 strokeLinejoin="round"
                 className="shrink-0 text-primary"
                 role="img"
-                aria-label="已认证教师"
+                aria-label={uiText("已认证教师")}
               >
-                <title>已认证教师</title>
+                <title>{uiText("已认证教师")}</title>
                 <circle cx="12" cy="12" r="9" />
                 <path d="m8 12 3 3 5-6" />
               </svg>
@@ -423,7 +430,9 @@ export function AccountMenuPopover({
               <rect x="3" y="14" width="7" height="7" rx="1.5" />
               <rect x="14" y="14" width="7" height="7" rx="1.5" />
             </MenuIcon>
-            {teacher.identity === "teacher" ? "教学工作台" : "学习工作台"}
+            {teacher.identity === "teacher"
+              ? uiText("教学工作台")
+              : uiText("学习工作台")}
             <ChevronRight
               className="ml-auto size-4 text-foreground-muted"
               strokeWidth={1.5}
@@ -441,7 +450,7 @@ export function AccountMenuPopover({
               <circle cx="12" cy="8" r="4" />
               <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
             </MenuIcon>
-            个人中心
+            {uiText("个人中心")}
             <ChevronRight
               className="ml-auto size-4 text-foreground-muted"
               strokeWidth={1.5}
@@ -463,7 +472,7 @@ export function AccountMenuPopover({
               strokeWidth={1.5}
               aria-hidden
             />
-            偏好设置
+            {uiText("偏好设置")}
             <ChevronRight
               className="ml-auto size-4 text-foreground-muted"
               strokeWidth={1.5}
@@ -480,7 +489,7 @@ export function AccountMenuPopover({
               // 父菜单的鼠标离开逻辑会临时聚焦容器，仍保留子菜单的指针宽限区。
               if (event.target === contentRef.current) event.preventDefault();
             }}
-            aria-label="偏好设置"
+            aria-label={uiText("偏好设置")}
             className="w-[330px] rounded-3xl border-border/60 bg-surface/95 p-5 backdrop-blur-xl"
             onPointerEnter={(event) => {
               if (event.pointerType === "mouse") clearHoverTimers();
@@ -508,10 +517,12 @@ export function AccountMenuPopover({
               }}
             >
               <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-bold tracking-tight">偏好设置</h2>
+                <h2 className="text-lg font-bold tracking-tight">
+                  {uiText("偏好设置")}
+                </h2>
                 <button
                   type="button"
-                  aria-label="关闭偏好设置"
+                  aria-label={uiText("关闭偏好设置")}
                   onClick={() => {
                     setPreferencesOpen(false);
                     preferencesTriggerRef.current?.focus();
@@ -540,9 +551,7 @@ export function AccountMenuPopover({
                 );
                 setOpen(false);
               } catch (error) {
-                setSwitchError(
-                  error instanceof Error ? error.message : "切换失败，请重试"
-                );
+                setSwitchError(webErrorText(error, "切换失败，请重试"));
               } finally {
                 // A failed or cancelled switch may leave an unsaved editor open.
                 window.dispatchEvent(new Event("tsz:page-leave-finished"));
@@ -565,15 +574,15 @@ export function AccountMenuPopover({
               )}
             </MenuIcon>
             {switching
-              ? "正在切换…"
+              ? uiText("正在切换…")
               : teacher.identity === "teacher"
-                ? "切换为学生"
-                : "切换为教师"}
+                ? uiText("切换为学生")
+                : uiText("切换为教师")}
           </DropdownMenuItem>
         )}
         {switchError && (
           <p role="alert" className="px-3 py-2 text-xs text-danger">
-            {switchError}
+            {uiText(switchError)}
           </p>
         )}
         {!teacher.verified && (
@@ -588,7 +597,7 @@ export function AccountMenuPopover({
                 <path d="M6 11v5c3 3 9 3 12 0v-5" />
                 <path d="M22 9v6" />
               </MenuIcon>
-              申请教师认证
+              {uiText("申请教师认证")}
               <ChevronRight
                 className="ml-auto size-4 text-foreground-muted"
                 strokeWidth={1.5}
@@ -611,7 +620,7 @@ export function AccountMenuPopover({
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <path d="m16 17 5-5-5-5M21 12H9" />
           </MenuIcon>
-          {loading ? "退出中…" : "退出登录"}
+          {loading ? uiText("退出中…") : uiText("退出登录")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

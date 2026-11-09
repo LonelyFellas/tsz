@@ -1,3 +1,7 @@
+"use client";
+
+import { useWebText } from "@/i18n/client";
+import { webTask } from "@/i18n/messages/task";
 import type { ChoicePlanPreview } from "@tsz/types";
 
 const reasons: Record<
@@ -18,16 +22,20 @@ export function ChoiceScopePreview({
   preview: ChoicePlanPreview;
   eligibleCount: number;
 }) {
+  const uiText = useWebText(webTask);
   return (
     <div className="space-y-3">
       <p className="text-lg font-semibold">
-        {preview.total_count} 个目标词义 · {eligibleCount} 个可出单选 ·{" "}
-        {preview.unavailable_count} 个暂不可用
+        {uiText("{{v0}} 个目标词义 ·{{v1}} 个可出单选 · {{v2}} 个暂不可用", {
+          v0: preview.total_count,
+          v1: eligibleCount,
+          v2: preview.unavailable_count
+        })}
       </p>
       {preview.unavailable_count > 0 && (
         <details className="rounded-2xl border border-border p-4">
           <summary className="cursor-pointer text-sm font-medium">
-            查看暂不可用内容与原因
+            {uiText("查看暂不可用内容与原因")}
           </summary>
           <ChoiceUnavailableItems preview={preview} />
         </details>
@@ -41,6 +49,7 @@ export function ChoiceUnavailableItems({
 }: {
   preview: ChoicePlanPreview;
 }) {
+  const uiText = useWebText(webTask);
   return (
     <>
       <ul className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-2 text-sm">
@@ -49,14 +58,18 @@ export function ChoiceUnavailableItems({
             <p className="font-medium">
               {item.spelling} · {item.definition}
             </p>
-            <p className="text-foreground-muted">{reasons[item.reason]}</p>
+            <p className="text-foreground-muted">
+              {uiText(reasons[item.reason])}
+            </p>
           </li>
         ))}
       </ul>
       {preview.unavailable_truncated && (
         <p className="mt-3 text-xs text-foreground-muted">
-          当前列出前 {preview.unavailable_items.length} 项，共{" "}
-          {preview.unavailable_count} 项暂不可用。
+          {uiText("当前列出前 {{v0}} 项，共 {{v1}} 项暂不可用。", {
+            v0: preview.unavailable_items.length,
+            v1: preview.unavailable_count
+          })}
         </p>
       )}
     </>

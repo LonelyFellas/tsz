@@ -1,4 +1,7 @@
 "use client";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webAuthOnboarding as webAuth } from "@/i18n/messages/auth/onboarding";
 
 import { HttpError } from "@tsz/api-client";
 import type { CEFRLevel, EnglishVariant } from "@tsz/types";
@@ -51,11 +54,12 @@ export function OnboardingForm({
   initialLevel,
   returnTo = "/"
 }: OnboardingFormProps = {}) {
+  const uiText = useWebText(webAuth);
   const [level, setLevel] = useState<CEFRLevel | null>(initialLevel ?? null);
   const [variant, setVariant] = useState<EnglishVariant | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   const setOnboarded = useUserStore((s) => s.setOnboarded);
   const router = useRouter();
   const canSubmit = level !== null && variant !== null && !loading;
@@ -101,21 +105,21 @@ export function OnboardingForm({
             className="inline-flex h-11 items-center gap-2.5 rounded-full px-3 text-base font-bold tracking-tight text-foreground transition-colors hover:bg-surface/80 focus-visible:outline-2 focus-visible:outline-primary"
           >
             <BrandMark />
-            天生会背
+            {uiText("天生会背")}
           </Link>
           <div className="flex items-center gap-2 text-xs">
             <span className="rounded-full bg-muted px-3 py-1.5 text-foreground-muted">
               {variant === null
-                ? "待选择"
+                ? uiText("待选择")
                 : variant === "AmE"
-                  ? "美式"
-                  : "英式"}
+                  ? uiText("美式")
+                  : uiText("英式")}
             </span>
             <Link
               href="/account"
               className="glass inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium tracking-wide text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
             >
-              个人中心
+              {uiText("个人中心")}
             </Link>
           </div>
         </div>
@@ -123,22 +127,24 @@ export function OnboardingForm({
 
       <main className="animate-in mx-auto max-w-5xl px-6 pb-16 pt-8 sm:pt-12">
         <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-          新手引导
+          {uiText("新手引导")}
         </p>
         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-          先确定你的学习起点
+          {uiText("先确定你的学习起点")}
         </h1>
         <p className="mb-8 mt-3 max-w-xl text-sm leading-6 text-foreground-muted">
-          选择适合自己的难度，再确定习惯的英语发音与拼写。
+          {uiText("选择适合自己的难度，再确定习惯的英语发音与拼写。")}
         </p>
         <div className="grid gap-6 md:grid-cols-2">
           <section className="glass rounded-3xl p-2">
             <div className="h-full rounded-[20px] bg-surface/70 p-6 sm:p-8">
               <h2 className="text-xl font-semibold tracking-tight">
-                1. 选择难度级别
+                {uiText("1. 选择难度级别")}
               </h2>
               <p className="mt-3 text-sm leading-6 text-foreground-muted">
-                根据自身水平选择。难度首次确认后不可修改，请慎重选择。
+                {uiText(
+                  "根据自身水平选择。难度首次确认后不可修改，请慎重选择。"
+                )}
               </p>
               <Link
                 href={
@@ -148,12 +154,12 @@ export function OnboardingForm({
                 }
                 className="mt-2 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
-                不确定选哪个？1 分钟测一测
+                {uiText("不确定选哪个？1 分钟测一测")}
               </Link>
               <div
                 className="mt-6 space-y-2"
                 role="radiogroup"
-                aria-label="难度级别"
+                aria-label={uiText("难度级别")}
               >
                 {LEVELS.map(({ level: lv, stage, band }) => {
                   const active = level === lv;
@@ -172,6 +178,9 @@ export function OnboardingForm({
                       <input
                         type="radio"
                         name="cefr-level"
+                        aria-label={[uiText(band ?? ""), lv, uiText(stage)]
+                          .filter(Boolean)
+                          .join(" ")}
                         value={lv}
                         checked={active}
                         onChange={() => setLevel(lv)}
@@ -179,7 +188,7 @@ export function OnboardingForm({
                         className="sr-only"
                       />
                       <span className="w-8 shrink-0 text-xs text-foreground-muted">
-                        {band ?? ""}
+                        {uiText(band ?? "")}
                       </span>
                       <span
                         className={cn(
@@ -192,11 +201,14 @@ export function OnboardingForm({
                         {lv}
                       </span>
                       <span className="text-sm text-foreground-muted">
-                        {stage}
+                        {uiText(stage)}
                       </span>
                       {active && (
-                        <span className="ml-auto pr-2 text-xs font-medium text-primary">
-                          已选
+                        <span
+                          aria-hidden="true"
+                          className="ml-auto pr-2 text-xs font-medium text-primary"
+                        >
+                          {uiText("已选")}
                         </span>
                       )}
                     </label>
@@ -204,15 +216,16 @@ export function OnboardingForm({
                 })}
               </div>
               <p className="mt-4 text-xs leading-5 text-foreground-muted">
-                学段仅作参考，请以实际英语水平为准。
+                {uiText("学段仅作参考，请以实际英语水平为准。")}
               </p>
               <details className="mt-5 rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm text-foreground-muted">
                 <summary className="cursor-pointer font-medium text-primary">
-                  什么是 CEFR 难度等级？
+                  {uiText("什么是 CEFR 难度等级？")}
                 </summary>
                 <p className="mt-2 text-xs leading-6">
-                  CEFR 是欧洲语言共同参考框架。A1、A2 为基础使用，B1、B2
-                  为独立使用，C1、C2 为熟练使用；由 A1 到 C2，难度逐级提高。
+                  {uiText(
+                    "CEFR 是欧洲语言共同参考框架。A1、A2 为基础使用，B1、B2 为独立使用，C1、C2 为熟练使用；由 A1 到 C2，难度逐级提高。"
+                  )}
                 </p>
               </details>
             </div>
@@ -221,15 +234,17 @@ export function OnboardingForm({
           <section className="glass rounded-3xl p-2">
             <div className="flex h-full flex-col rounded-[20px] bg-surface/70 p-6 sm:p-8">
               <h2 className="text-xl font-semibold tracking-tight">
-                2. 英式还是美式？
+                {uiText("2. 英式还是美式？")}
               </h2>
               <p className="mt-3 text-sm leading-6 text-foreground-muted">
-                选择你习惯的英语发音和拼写。英美偏好之后可以在个人中心修改。
+                {uiText(
+                  "选择你习惯的英语发音和拼写。英美偏好之后可以在个人中心修改。"
+                )}
               </p>
               <div
                 className="mt-6 space-y-3"
                 role="radiogroup"
-                aria-label="英美偏好"
+                aria-label={uiText("英美偏好")}
               >
                 {VARIANTS.map(({ variant: v, short, label }) => {
                   const active = variant === v;
@@ -248,6 +263,7 @@ export function OnboardingForm({
                       <input
                         type="radio"
                         name="english-variant"
+                        aria-label={`${short} ${uiText(label)}`}
                         value={v}
                         checked={active}
                         onChange={() => setVariant(v)}
@@ -257,10 +273,15 @@ export function OnboardingForm({
                       <span className="text-xl font-bold tracking-tight">
                         {short}
                       </span>
-                      <span className="text-base font-medium">{label}</span>
+                      <span className="text-base font-medium">
+                        {uiText(label)}
+                      </span>
                       {active && (
-                        <span className="ml-auto text-sm font-medium">
-                          已选
+                        <span
+                          aria-hidden="true"
+                          className="ml-auto text-sm font-medium"
+                        >
+                          {uiText("已选")}
                         </span>
                       )}
                     </label>
@@ -268,8 +289,9 @@ export function OnboardingForm({
                 })}
               </div>
               <p className="mt-5 text-xs leading-6 text-foreground-muted">
-                BrE = British English（英式英语）；AmE = American
-                English（美式英语）。请选择其中一种作为个人偏好。
+                {uiText(
+                  "BrE = British English（英式英语）；AmE = American English（美式英语）。请选择其中一种作为个人偏好。"
+                )}
               </p>
               <div className="mt-auto pt-8">
                 {error && (
@@ -277,21 +299,25 @@ export function OnboardingForm({
                     role="alert"
                     className="mb-4 text-sm leading-6 text-danger"
                   >
-                    {error}
+                    {uiText(error)}
                   </p>
                 )}
                 {confirming ? (
                   <section
-                    aria-label="确认学习配置"
+                    aria-label={uiText("确认学习配置")}
                     className="rounded-2xl border border-border/60 bg-muted/70 p-4"
                   >
-                    <p className="text-sm font-semibold">确认你的学习配置</p>
+                    <p className="text-sm font-semibold">
+                      {uiText("确认你的学习配置")}
+                    </p>
                     <p className="mt-2 text-sm text-foreground-muted">
-                      难度 {level}，
-                      {variant === "AmE" ? "美式英语" : "英式英语"}。
+                      {uiText("难度")} {level} ·
+                      {variant === "AmE"
+                        ? uiText("美式英语")
+                        : uiText("英式英语")}
                     </p>
                     <p className="mt-2 text-xs leading-6 text-foreground-muted">
-                      难度确认后不可修改；英美偏好之后仍可调整。
+                      {uiText("难度确认后不可修改；英美偏好之后仍可调整。")}
                     </p>
                     <div className="mt-4 flex gap-3">
                       <button
@@ -303,7 +329,7 @@ export function OnboardingForm({
                         disabled={loading}
                         className={cn(buttonClass, "min-h-12 px-5")}
                       >
-                        返回调整
+                        {uiText("返回调整")}
                       </button>
                       <button
                         type="button"
@@ -311,7 +337,9 @@ export function OnboardingForm({
                         disabled={!canSubmit}
                         className={cn(primaryButtonClass, "flex-1 px-4")}
                       >
-                        {loading ? "保存中..." : "确认并开始学习"}
+                        {loading
+                          ? uiText("保存中...")
+                          : uiText("确认并开始学习")}
                       </button>
                     </div>
                   </section>
@@ -322,7 +350,7 @@ export function OnboardingForm({
                     disabled={!canSubmit}
                     className={cn(primaryButtonClass, "w-full")}
                   >
-                    完成，开始学习
+                    {uiText("完成，开始学习")}
                   </button>
                 )}
               </div>

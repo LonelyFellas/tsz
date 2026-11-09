@@ -1,4 +1,8 @@
 "use client";
+import { webErrorText } from "@/i18n/catalog";
+import { useWebLocale } from "@/i18n/client";
+import { useWebText } from "@/i18n/client";
+import { webTeacherCertificationDocuments as webTeacherCertification } from "@/i18n/messages/teacher-certification/documents";
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -26,23 +30,26 @@ const kinds = {
 };
 
 export function ApplicationDetail({ id }: { id: string }) {
+  const locale = useWebLocale();
+  const uiText = useWebText(webTeacherCertification);
   const userId = useUserStore((state) => state.user?.id);
   const query = useQuery({
     queryKey: ["teacher-certification", userId, "application", id],
     queryFn: () => api.teacherCertification.detail(id),
     enabled: !!userId
   });
-  if (query.isPending) return <PageNotice>正在读取申请…</PageNotice>;
+  if (query.isPending)
+    return <PageNotice>{uiText("正在读取申请…")}</PageNotice>;
   if (query.isError)
     return (
       <PageNotice tone="error">
-        <p>{query.error.message}</p>
+        <p>{uiText(webErrorText(query.error, "数据暂不可用，请刷新后重试"))}</p>
         <button
           type="button"
           className={cn(textButtonClass, "mt-3")}
           onClick={() => void query.refetch()}
         >
-          重试
+          {uiText("重试")}
         </button>
       </PageNotice>
     );
@@ -60,13 +67,15 @@ export function ApplicationDetail({ id }: { id: string }) {
         <div className="rounded-[20px] bg-surface/70 p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="rounded-full bg-primary-muted px-3 py-1 text-sm font-medium text-primary">
-              {statuses[application.status]}
+              {uiText(statuses[application.status])}
             </p>
             <time
               dateTime={application.submitted_at}
               className="text-sm text-foreground-muted"
             >
-              {new Date(application.submitted_at).toLocaleString()}
+              {new Date(application.submitted_at).toLocaleString(locale, {
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              })}
             </time>
           </div>
           <dl className="mt-6 divide-y divide-border/60">
@@ -77,7 +86,9 @@ export function ApplicationDetail({ id }: { id: string }) {
                     key={label}
                     className="grid gap-1 py-4 first:pt-0 last:pb-0 sm:grid-cols-[96px_1fr] sm:gap-4"
                   >
-                    <dt className="text-sm text-foreground-muted">{label}</dt>
+                    <dt className="text-sm text-foreground-muted">
+                      {uiText(label)}
+                    </dt>
                     <dd className="whitespace-pre-wrap break-words text-sm leading-6">
                       {value}
                     </dd>
@@ -90,12 +101,16 @@ export function ApplicationDetail({ id }: { id: string }) {
       {files.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">
           {files.map((file) => (
-            <PrivateImage key={file.id} id={file.id} label={kinds[file.kind]} />
+            <PrivateImage
+              key={file.id}
+              id={file.id}
+              label={uiText(kinds[file.kind])}
+            />
           ))}
         </div>
       )}
       <Link href="/apply-teacher" className={buttonClass}>
-        查看当前认证状态
+        {uiText("查看当前认证状态")}
       </Link>
     </div>
   );

@@ -1,4 +1,7 @@
 "use client";
+import { LocalWebError } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webTeacherCertificationIdentity as webTeacherCertification } from "@/i18n/messages/teacher-certification/identity";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
@@ -128,12 +131,13 @@ export function TeacherIdentityProvider({ children }: { children: ReactNode }) {
     if (next === "teacher") {
       const result = await query.refetch();
       if (currentUser.current !== userId) return;
-      if (result.isError) throw new Error("暂时无法核验教师资格，请重试");
+      if (result.isError)
+        throw new LocalWebError("暂时无法核验教师资格，请重试");
       if (!result.data?.teacher_verified)
-        throw new Error("当前账号尚未通过教师认证");
+        throw new LocalWebError("当前账号尚未通过教师认证");
     }
     if (!writeWorkspaceIdentity(userId, next))
-      throw new Error("无法保存工作台偏好，请检查浏览器存储设置后重试");
+      throw new LocalWebError("无法保存工作台偏好，请检查浏览器存储设置后重试");
     router.push(next === "teacher" ? "/teacher/classes" : "/student/home");
   }
 
@@ -151,6 +155,7 @@ export function useTeacherIdentity() {
 }
 
 export function TeacherAccessGuard({ children }: { children: ReactNode }) {
+  const uiText = useWebText(webTeacherCertification);
   const identity = useTeacherIdentity();
   const client = useQueryClient();
   const userId = useUserStore((s) => s.user?.id);
@@ -158,7 +163,7 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
     return (
       <PageShell>
         <PageNotice tone="error">
-          <p>无法核验教师资格，请重试。</p>
+          <p>{uiText("无法核验教师资格，请重试。")}</p>
           <button
             className={cn(textButtonClass, "mt-3")}
             onClick={() =>
@@ -167,7 +172,7 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
               })
             }
           >
-            重新核验
+            {uiText("重新核验")}
           </button>
         </PageNotice>
       </PageShell>
@@ -176,7 +181,7 @@ export function TeacherAccessGuard({ children }: { children: ReactNode }) {
     return (
       <PageShell>
         <div role="status">
-          <PageNotice>正在核验教师资格…</PageNotice>
+          <PageNotice>{uiText("正在核验教师资格…")}</PageNotice>
         </div>
       </PageShell>
     );

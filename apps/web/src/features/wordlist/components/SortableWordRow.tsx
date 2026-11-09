@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webWordlistEditor as webWordlist } from "@/i18n/messages/wordlist/editor";
 
 import type { CSSProperties, ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
@@ -28,6 +30,7 @@ export function SortableWordRow({
   onRemove: () => void;
   children: ReactNode;
 }) {
+  const uiText = useWebText(webWordlist);
   const {
     attributes,
     listeners,
@@ -63,9 +66,9 @@ export function SortableWordRow({
             {...attributes}
             {...listeners}
             disabled={disabled}
-            aria-label={`拖动排序词条 ${index}`}
-            aria-roledescription="可排序词条"
-            title="拖动排序"
+            aria-label={uiText("拖动排序词条 {{v0}}", { v0: index })}
+            aria-roledescription={uiText("可排序词条")}
+            title={uiText("拖动排序")}
             className="-ml-2 inline-flex h-11 min-w-11 touch-manipulation select-none items-center gap-1 rounded-lg px-2 text-xs tabular-nums text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary enabled:cursor-grab enabled:active:cursor-grabbing disabled:cursor-default"
           >
             <GripVertical
@@ -80,7 +83,7 @@ export function SortableWordRow({
           </span>
         )}
         <label htmlFor={`word-${id}`} className="sr-only">
-          词条 {index}
+          {uiText("词条 {{v0}}", { v0: index })}
         </label>
         {editable && (
           <div className="flex shrink-0 items-center">
@@ -88,8 +91,8 @@ export function SortableWordRow({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="上移"
-              title="上移"
+              aria-label={uiText("上移")}
+              title={uiText("上移")}
               disabled={disabled || index === 1}
               onClick={() => onMove(-1)}
             >
@@ -99,8 +102,8 @@ export function SortableWordRow({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="下移"
-              title="下移"
+              aria-label={uiText("下移")}
+              title={uiText("下移")}
               disabled={disabled || index === total}
               onClick={() => onMove(1)}
             >
@@ -110,8 +113,8 @@ export function SortableWordRow({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="删除"
-              title="删除词条"
+              aria-label={uiText("删除")}
+              title={uiText("删除词条")}
               className="text-foreground-muted hover:bg-danger/10 hover:text-danger"
               disabled={total === 1}
               onClick={onRemove}

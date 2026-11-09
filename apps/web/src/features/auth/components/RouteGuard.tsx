@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webAuthSession as webAuth } from "@/i18n/messages/auth/session";
 
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -25,6 +27,7 @@ export function RouteGuard({
   requireOnboarding = false,
   preserveSearch = false
 }: RouteGuardProps) {
+  const uiText = useWebText(webAuth);
   const user = useUserStore((s) => s.user);
   const onboarded = useUserStore((s) => s.onboarded);
   const hydrated = useUserStore((s) => s.hydrated);
@@ -59,7 +62,7 @@ export function RouteGuard({
   if (!hydrated || needsLogin || bindingTarget || needsOnboarding) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-foreground-subtle">
-        加载中...
+        {uiText("加载中...")}
       </div>
     );
   }

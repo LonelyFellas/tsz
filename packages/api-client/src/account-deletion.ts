@@ -1,3 +1,4 @@
+import { ClientResponseError } from "./client-response-error";
 import type {
   AccountDeletionRequest,
   AccountDeletionState,
@@ -7,18 +8,20 @@ import type { HttpClient } from "./http";
 import { validateRuntimeSchema } from "./runtime-schema";
 function decodeRequest(value: unknown): AccountDeletionRequest {
   const result = validateRuntimeSchema("AccountDeletionRequest", value);
-  if (!result.valid) throw new Error(`注销申请响应不符合契约：${result.path}`);
+  if (!result.valid)
+    throw new ClientResponseError(`注销申请响应不符合契约：${result.path}`);
   const request = value as AccountDeletionRequest;
   if (BigInt(request.confirmed_balance) > 9223372036854775807n)
-    throw new Error("注销金额超出范围");
+    throw new ClientResponseError("注销金额超出范围");
   return request;
 }
 function decodeState(value: unknown): AccountDeletionState {
   const result = validateRuntimeSchema("AccountDeletionState", value);
-  if (!result.valid) throw new Error(`注销状态响应不符合契约：${result.path}`);
+  if (!result.valid)
+    throw new ClientResponseError(`注销状态响应不符合契约：${result.path}`);
   const state = value as AccountDeletionState;
   if (BigInt(state.coin_balance) > 9223372036854775807n)
-    throw new Error("注销金额超出范围");
+    throw new ClientResponseError("注销金额超出范围");
   if (state.request) decodeRequest(state.request);
   return state;
 }

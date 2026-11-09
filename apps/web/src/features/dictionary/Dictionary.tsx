@@ -1,4 +1,7 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webDictionary } from "@/i18n/messages/dictionary";
+
 import { selectTexts } from "@/features/wordlist/reading";
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
@@ -46,6 +49,7 @@ function DictionaryBody({
   query: string;
   page: number;
 }) {
+  const uiText = useWebText(webDictionary);
   const router = useRouter();
   const [input, setInput] = useState(query);
   const snapshot = useSyncExternalStore(
@@ -92,7 +96,9 @@ function DictionaryBody({
       className={`animate-in px-6 pb-16 ${query ? "pt-8 sm:pt-12" : "flex min-h-[70vh] flex-col justify-center py-12"}`}
     >
       <div className={query ? "" : "mx-auto w-full max-w-2xl"}>
-        <h1 className="mb-6 text-3xl font-semibold tracking-tight">词典</h1>
+        <h1 className="mb-6 text-3xl font-semibold tracking-tight">
+          {uiText("词典")}
+        </h1>
         <form
           role="search"
           onSubmit={(e) => {
@@ -105,7 +111,7 @@ function DictionaryBody({
             htmlFor="dictionary-search"
             className="mb-2 block px-4 text-sm font-medium"
           >
-            查找英文词条
+            {uiText("查找英文词条")}
           </label>
           <div className="flex gap-2">
             <SearchField
@@ -116,7 +122,7 @@ function DictionaryBody({
                 setInput(value);
                 setInvalid(false);
               }}
-              placeholder="输入词条关键词，快速查词"
+              placeholder={uiText("输入词条关键词，快速查词")}
               autoComplete="off"
               aria-invalid={invalid}
               aria-describedby={
@@ -124,9 +130,9 @@ function DictionaryBody({
               }
               className="min-w-0 flex-1"
             />
-            <Button type="submit" aria-label="查询">
+            <Button type="submit" aria-label={uiText("查询")}>
               <Search className="size-5" aria-hidden />
-              <span className="hidden sm:inline">查询</span>
+              <span className="hidden sm:inline">{uiText("查询")}</span>
             </Button>
           </div>
           {invalid && (
@@ -135,7 +141,7 @@ function DictionaryBody({
               role="alert"
               className="mt-2 px-4 text-sm text-danger"
             >
-              请输入 1–100 个字符的词条关键词
+              {uiText("请输入 1–100 个字符的词条关键词")}
             </p>
           )}
         </form>
@@ -145,13 +151,13 @@ function DictionaryBody({
       </div>
       {query && (
         <section
-          aria-label="查询结果"
+          aria-label={uiText("查询结果")}
           aria-busy={results.isFetching}
           className="mt-8"
         >
           {(results.isPending || profile.isPending) && (
             <p role="status" className="text-sm text-foreground-muted">
-              查询中…
+              {uiText("查询中…")}
             </p>
           )}
           {(results.isError || profile.isError) && (
@@ -159,7 +165,7 @@ function DictionaryBody({
               role="alert"
               className="rounded-2xl border border-border bg-surface p-6"
             >
-              <p>查询暂时失败，请重试。</p>
+              <p>{uiText("查询暂时失败，请重试。")}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -169,7 +175,7 @@ function DictionaryBody({
                   void profile.refetch();
                 }}
               >
-                重新查询
+                {uiText("重新查询")}
               </Button>
             </div>
           )}
@@ -177,8 +183,12 @@ function DictionaryBody({
             <>
               <p role="status" className="mb-4 text-sm text-foreground-muted">
                 {results.data.pagination.total
-                  ? `找到 ${results.data.pagination.total} 条词条`
-                  : `没有找到“${query}”，试试其他拼写或更短的关键词。`}
+                  ? uiText("找到 {{v0}} 条词条", {
+                      v0: results.data.pagination.total
+                    })
+                  : uiText("没有找到“{{v0}}”，试试其他拼写或更短的关键词。", {
+                      v0: query
+                    })}
               </p>
               {results.data.items.length > 0 && (
                 <div className="overflow-hidden rounded-3xl border border-border bg-surface">
@@ -186,12 +196,12 @@ function DictionaryBody({
                     aria-hidden
                     className="hidden grid-cols-[1fr_1fr_3fr] gap-5 border-b border-border bg-muted px-6 py-4 text-sm font-medium md:grid"
                   >
-                    <span>名称</span>
-                    <span>其他拼写形式</span>
+                    <span>{uiText("名称")}</span>
+                    <span>{uiText("其他拼写形式")}</span>
                     <div className="grid grid-cols-[3rem_1fr_1fr] gap-4">
-                      <span>词性</span>
-                      <span>多维释义</span>
-                      <span>语法结构</span>
+                      <span>{uiText("词性")}</span>
+                      <span>{uiText("多维释义")}</span>
+                      <span>{uiText("语法结构")}</span>
                     </div>
                   </div>
                   {results.data.items.map((item) => (
@@ -208,7 +218,7 @@ function DictionaryBody({
               )}
               {results.data.pagination.total_pages > 1 && (
                 <nav
-                  aria-label="结果分页"
+                  aria-label={uiText("结果分页")}
                   className="mt-6 flex items-center justify-center gap-4"
                 >
                   <Button asChild variant="outline" disabled={page <= 1}>
@@ -220,7 +230,7 @@ function DictionaryBody({
                       }
                       href={`/dictionary?${new URLSearchParams({ q: query, page: String(Math.max(1, page - 1)) })}`}
                     >
-                      上一页
+                      {uiText("上一页")}
                     </Link>
                   </Button>
                   <span className="text-sm">
@@ -243,7 +253,7 @@ function DictionaryBody({
                       }
                       href={`/dictionary?${new URLSearchParams({ q: query, page: String(page + 1) })}`}
                     >
-                      下一页
+                      {uiText("下一页")}
                     </Link>
                   </Button>
                 </nav>
@@ -268,6 +278,7 @@ function Result({
   query: string;
   page: number;
 }) {
+  const uiText = useWebText(webDictionary);
   const entry = item.content;
   const spelling = dictionarySpellings(entry, variant);
   return (
@@ -277,7 +288,7 @@ function Result({
         className="tsz-words break-words font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
       >
         {spelling.primary}
-        <span className="sr-only">，查看词条详情</span>
+        <span className="sr-only">{uiText("，查看词条详情")}</span>
       </Link>
       <p
         className={cn(
@@ -317,13 +328,13 @@ function Result({
                     />
                   </>
                 ) : (
-                  <p className="text-foreground-muted">暂无释义</p>
+                  <p className="text-foreground-muted">{uiText("暂无释义")}</p>
                 )}
               </div>
               <div className="col-span-2 md:col-span-1">
                 {grammar && (
                   <p className="mb-1 text-xs text-foreground-muted md:hidden">
-                    语法结构
+                    {uiText("语法结构")}
                   </p>
                 )}
                 {grammar && (
@@ -338,7 +349,7 @@ function Result({
                       (text) => text.dialect
                     )}
                     variant={variant}
-                    label="播放语法结构"
+                    label={uiText("播放语法结构")}
                   />
                 )}
               </div>

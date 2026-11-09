@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webShell } from "@/i18n/messages/shell";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -84,11 +86,12 @@ const PANEL_CLASS =
   "tsz-drawer w-[330px] rounded-3xl border-border/60 bg-surface/90 p-5 shadow-float backdrop-blur-xl";
 
 function PanelHeading({ title }: { title: string }) {
+  const uiText = useWebText(webShell);
   return (
     <div className="mb-5 flex items-center justify-between gap-3">
       <h2 className="text-lg font-bold tracking-tight">{title}</h2>
       <PopoverClose
-        aria-label={`关闭${title}`}
+        aria-label={uiText("关闭{{v0}}", { v0: title })}
         className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <X className="size-[18px]" strokeWidth={1.5} aria-hidden />
@@ -109,6 +112,7 @@ export function AppTopbar() {
 }
 
 function TopbarPanels({ hydrated }: { hydrated: boolean }) {
+  const uiText = useWebText(webShell);
   const user = useUserStore((s) => s.user);
   const identity = useTeacherIdentity();
   const pathname = usePathname() ?? "";
@@ -129,7 +133,9 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
       : studying
         ? STUDENT_NAV
         : ACCOUNT_NAV;
-  const menuTitle = teaching ? "教学菜单" : studying ? "学习菜单" : "网站菜单";
+  const menuTitle = uiText(
+    teaching ? "教学菜单" : studying ? "学习菜单" : "网站菜单"
+  );
 
   function toggle(name: "navigation" | "settings", open: boolean) {
     setPanel((current) => (open ? name : current === name ? null : current));
@@ -147,7 +153,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
             className="group inline-flex h-11 items-center gap-2.5 rounded-full px-3 text-base font-bold tracking-tight text-foreground transition-colors hover:bg-surface/80 focus-visible:outline-2 focus-visible:outline-primary data-[state=open]:bg-surface data-[state=open]:shadow-glass"
           >
             <BrandMark />
-            天生会背
+            {uiText("天生会背")}
             <ChevronDown
               className="size-4 text-foreground-muted transition-transform duration-200 group-data-[state=open]:rotate-180"
               strokeWidth={1.8}
@@ -165,7 +171,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
             }}
           >
             <PanelHeading title={menuTitle} />
-            <nav aria-label={`${menuTitle}导航`}>
+            <nav aria-label={uiText("{{v0}}导航", { v0: menuTitle })}>
               {groups.map((items, index) => (
                 <ul
                   key={index}
@@ -186,7 +192,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
                             strokeWidth={1.5}
                             aria-hidden
                           />
-                          {label}
+                          {uiText(label)}
                         </Link>
                       </li>
                     );
@@ -199,7 +205,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
                 className="mt-3 flex min-h-11 items-center gap-2.5 rounded-xl border-t border-border/70 px-3 pt-3 text-sm text-foreground-muted outline-hidden transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <Home className="size-[18px]" strokeWidth={1.5} aria-hidden />
-                返回网站首页
+                {uiText("返回网站首页")}
               </Link>
             </nav>
           </PopoverContent>
@@ -219,7 +225,7 @@ function TopbarPanels({ hydrated }: { hydrated: boolean }) {
               href="/login"
               className="glass inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium tracking-wide text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
             >
-              登录
+              {uiText("登录")}
             </Link>
           ) : null}
         </div>

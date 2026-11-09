@@ -1,3 +1,5 @@
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { WebLocaleEffects } from "@/i18n/effects";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -13,6 +15,32 @@ import { NotificationTabBadge } from "./NotificationTabBadge";
 import { Notifications } from "./Notifications";
 import { NotificationLink } from "@/features/shell/NotificationLink";
 
+const localeController = vi.hoisted(() => ({
+  snapshot: {
+    owner: "",
+    status: "idle",
+    locale: "zh-Hans",
+    preference: null,
+    capabilities: null,
+    saving: false,
+    refreshing: false,
+    error: null
+  },
+  refresh: vi.fn()
+}));
+vi.mock("@/lib/interface-preferences", () => ({
+  interfacePreferences: {
+    subscribe: () => () => {},
+    getSnapshot: () => localeController.snapshot,
+    getServerSnapshot: () => localeController.snapshot,
+    sessionKey: () => "",
+    accountId: () => null,
+    refresh: localeController.refresh
+  }
+}));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/account/notifications"
+}));
 const session = vi.hoisted(() => ({
   user: { id: "user-1" } as { id: string } | null,
   hydrated: true
@@ -156,4 +184,30 @@ it("clears the previous account badge and ignores late image loads after logout"
   expect(
     screen.queryByRole("link", { name: /站内通知/ })
   ).not.toBeInTheDocument();
+});
+
+it("language updates preserve one unread prefix and the existing theme", async () => {
+  const localeTree = (locale: "en-GB" | "zh-Hant") => (
+    <InterfaceI18nProvider locale={locale}>
+      <WebLocaleEffects />
+      {tree()}
+    </InterfaceI18nProvider>
+  );
+  document.documentElement.classList.add("dark");
+  const view = render(localeTree("en-GB"));
+  try {
+    await waitFor(() =>
+      expect(document.title).toBe("(3) Notifications | 天生会背")
+    );
+    view.rerender(localeTree("zh-Hant"));
+    await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
+    document.title = "站内通知 | 天生会背";
+    await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
+    expect(document.documentElement.lang).toBe("zh-Hant");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(localeController.refresh).not.toHaveBeenCalled();
+  } finally {
+    view.unmount();
+    document.documentElement.classList.remove("dark");
+  }
 });

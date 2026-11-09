@@ -1,3 +1,7 @@
+"use client";
+
+import { useWebText } from "@/i18n/client";
+import { webAuthAccess as webAuth } from "@/i18n/messages/auth/access";
 import type { ReactNode } from "react";
 
 const HIGHLIGHTS: { title: string; desc: string; icon: ReactNode }[] = [
@@ -30,15 +34,16 @@ const HIGHLIGHTS: { title: string; desc: string; icon: ReactNode }[] = [
 
 // 认证页桌面左栏：大标题 + 要点卡片；小屏隐藏，让表单独占屏幕。
 export function AuthBranding() {
+  const uiText = useWebText(webAuth);
   return (
     <section className="animate-in hidden lg:block">
       <h2 className="text-[40px] font-bold leading-tight tracking-tight text-foreground">
-        把学过的，
+        {uiText("把学过的，")}
         <br />
-        真正记住。
+        {uiText("真正记住。")}
       </h2>
       <p className="mt-3 text-sm font-medium tracking-[0.2em] text-foreground-muted">
-        科学记忆 · 师生合一
+        {uiText("科学记忆 · 师生合一")}
       </p>
       <ul className="mt-12 max-w-md space-y-3">
         {HIGHLIGHTS.map((item) => (
@@ -61,10 +66,10 @@ export function AuthBranding() {
             </span>
             <div className="pt-0.5">
               <p className="text-sm font-semibold text-foreground">
-                {item.title}
+                {uiText(item.title)}
               </p>
               <p className="mt-1 text-[13px] leading-relaxed text-foreground-muted">
-                {item.desc}
+                {uiText(item.desc)}
               </p>
             </div>
           </li>

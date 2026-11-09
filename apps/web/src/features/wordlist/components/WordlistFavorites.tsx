@@ -1,4 +1,8 @@
 "use client";
+import { type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webWordlistBrowser as webWordlist } from "@/i18n/messages/wordlist/browser";
+
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +33,7 @@ function Favorites({
   onPageChange: (page: number) => void;
   userId: string;
 }) {
+  const uiText = useWebText(webWordlist);
   const result = useQuery({
     queryKey: [...wordListKeys.mine(userId), "favorites", page, q],
     refetchOnMount: "always",
@@ -42,24 +47,25 @@ function Favorites({
   if (result.isError)
     return (
       <PageNotice tone="error">
-        收藏加载失败。
+        {uiText("收藏加载失败。")}
         <button
           type="button"
           className={buttonClass}
           onClick={() => void result.refetch()}
         >
-          重试
+          {uiText("重试")}
         </button>
       </PageNotice>
     );
-  if (result.isPending) return <PageNotice>正在加载收藏…</PageNotice>;
+  if (result.isPending)
+    return <PageNotice>{uiText("正在加载收藏…")}</PageNotice>;
   return (
     <>
       {!result.data.items.length ? (
         <PageNotice>
           {q
-            ? "没有找到匹配的收藏"
-            : "暂无收藏，去公开词表收藏感兴趣的内容吧。"}
+            ? uiText("没有找到匹配的收藏")
+            : uiText("暂无收藏，去公开词表收藏感兴趣的内容吧。")}
         </PageNotice>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
@@ -74,7 +80,10 @@ function Favorites({
                     <h2 className="text-lg font-bold">{wordlist.name}</h2>
                   </Link>
                   <p className="mt-2 text-sm text-foreground-muted">
-                    {wordlist.item_count} 个词条 · {wordlist.owner_name}
+                    {uiText("{{v0}} 个词条 · {{v1}}", {
+                      v0: wordlist.item_count,
+                      v1: wordlist.owner_name
+                    })}
                   </p>
                   <WordlistInteractions
                     list={wordlist}
@@ -114,9 +123,10 @@ function Favorites({
   );
 }
 function UnavailableFavorite({ id, userId }: { id: string; userId: string }) {
+  const uiText = useWebText(webWordlist);
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WebNotice>("");
   async function remove() {
     if (busy || useUserStore.getState().user?.id !== userId) return;
     setBusy(true);
@@ -136,18 +146,18 @@ function UnavailableFavorite({ id, userId }: { id: string; userId: string }) {
   }
   return (
     <>
-      <h2 className="font-medium">词表暂不可用</h2>
+      <h2 className="font-medium">{uiText("词表暂不可用")}</h2>
       <button
         type="button"
         className={`${buttonClass} mt-4`}
         disabled={busy}
         onClick={() => void remove()}
       >
-        {busy ? "移除中…" : "取消收藏"}
+        {busy ? uiText("移除中…") : uiText("取消收藏")}
       </button>
       {error && (
         <p role="alert" className="mt-2 text-sm text-danger">
-          {error}
+          {uiText(error)}
         </p>
       )}
     </>

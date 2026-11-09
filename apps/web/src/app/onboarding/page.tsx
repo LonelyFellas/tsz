@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { OnboardingForm } from "@/features/auth";
+import { OnboardingForm } from "@/features/auth/components/OnboardingForm";
 import { RouteGuard } from "@/features/auth/components/RouteGuard";
 import { isBand } from "@/features/placement";
 

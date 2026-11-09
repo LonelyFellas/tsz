@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webShell } from "@/i18n/messages/shell";
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
@@ -7,6 +9,7 @@ import { useUserStore } from "@/stores/user";
 import { notificationQuery } from "@/features/teacher-certification/notification-query";
 
 export function NotificationLink({ onNavigate }: { onNavigate: () => void }) {
+  const uiText = useWebText(webShell);
   const userId = useUserStore((state) => state.user?.id);
   const hydrated = useUserStore((state) => state.hydrated);
   const query = useQuery({
@@ -21,8 +24,12 @@ export function NotificationLink({ onNavigate }: { onNavigate: () => void }) {
     <Link
       href="/account/notifications"
       onClick={onNavigate}
-      aria-label={count > 0 ? `站内通知，${count} 条未读` : "站内通知"}
-      title="站内通知"
+      aria-label={
+        count > 0
+          ? uiText("站内通知，{{v0}} 条未读", { v0: count })
+          : uiText("站内通知")
+      }
+      title={uiText("站内通知")}
       className="relative inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
     >
       <Bell className="size-5" strokeWidth={1.5} aria-hidden />

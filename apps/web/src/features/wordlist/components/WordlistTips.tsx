@@ -1,4 +1,9 @@
 "use client";
+import { useWebLocale } from "@/i18n/client";
+import { localText, type WebNotice } from "@/i18n/catalog";
+import { useWebText } from "@/i18n/client";
+import { webWordlistInteractions as webWordlist } from "@/i18n/messages/wordlist/interactions";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -95,6 +100,7 @@ function TipForm({
   onRetry: () => void;
   onClose: () => void;
 }) {
+  const uiText = useWebText(webWordlist);
   const client = useQueryClient();
   const storageKey = `wordlist-tip:${userId}:${list.id}`;
   const [recovery] = useState(() => {
@@ -108,7 +114,7 @@ function TipForm({
   const [selected, setSelected] = useState<string | null>(null);
   const [like, setLike] = useState(recovery.pending?.like ?? !recovery.pending);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState(
+  const [message, setMessage] = useState<WebNotice>(
     recovery.error ? "无法读取本机的投币重试记录，请先到投币记录核对结果。" : ""
   );
   const [success, setSuccess] = useState<string | null>(null);
@@ -215,7 +221,11 @@ function TipForm({
       sessionStorage.removeItem(storageKey);
       setPending(null);
       setSuccess(receipt.amount);
-      setMessage(`已投出 ${formatCoins(receipt.amount)}，作者已收到。`);
+      setMessage(
+        localText("已投出 {{v0}}，作者已收到。", {
+          v0: formatCoins(receipt.amount)
+        })
+      );
       void client
         .invalidateQueries({ queryKey: wordListKeys.all })
         .catch(() => {});
@@ -259,16 +269,16 @@ function TipForm({
     }
   }
   return (
-    <LibraryDialog title="给作者投币" busy={busy} onClose={onClose}>
+    <LibraryDialog title={uiText("给作者投币")} busy={busy} onClose={onClose}>
       <p className="break-words text-center text-sm leading-6 text-foreground-muted">
-        给 {list.owner_name} 投出{" "}
+        {uiText("给 {{v0}} 投出 ", { v0: list.owner_name })}
         <strong className="text-2xl font-semibold tabular-nums text-primary">
           {amount}
         </strong>{" "}
-        枚天生币
+        {uiText("枚天生币")}
       </p>
       <p className="mt-2 text-center text-xs leading-5 text-foreground-muted">
-        每份词表累计最多投 2 枚，全额进入作者钱包。
+        {uiText("每份词表累计最多投 2 枚，全额进入作者钱包。")}
       </p>
       {!success && (
         <>
@@ -282,7 +292,7 @@ function TipForm({
               remaining === null
             }
           >
-            <legend className="sr-only">投币数量</legend>
+            <legend className="sr-only">{uiText("投币数量")}</legend>
             {[1, 2].map((value) => (
               <label
                 key={value}
@@ -301,14 +311,16 @@ function TipForm({
                   checked={amount === String(value)}
                   disabled={remaining !== null && value > remaining}
                   onChange={() => setSelected(String(value))}
-                  aria-label={`${value} 枚天生币`}
+                  aria-label={uiText("{{v0}} 枚天生币", { v0: value })}
                 />
                 <span className="flex gap-1" aria-hidden>
                   {Array.from({ length: value }, (_, i) => (
                     <Coins key={i} className="size-9" strokeWidth={1.5} />
                   ))}
                 </span>
-                <span className="text-sm font-medium">{value} 枚天生币</span>
+                <span className="text-sm font-medium">
+                  {uiText("{{v0}} 枚天生币", { v0: value })}
+                </span>
                 {amount === String(value) && (
                   <Check
                     className="absolute right-3 top-3 size-4"
@@ -326,18 +338,23 @@ function TipForm({
               disabled={busy || !!pending || recovery.error}
               onChange={(e) => setLike(e.target.checked)}
             />
-            同时点赞内容
+            {uiText("同时点赞内容")}
           </label>
           {pending && (
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
-              有一笔 {pending.amount} 枚天生币的投币待确认，将先核对这次结果。
+              {uiText(
+                "有一笔 {{v0}} 枚天生币的投币待确认，将先核对这次结果。",
+                {
+                  v0: pending.amount
+                }
+              )}
             </p>
           )}
           {!pending && !failed && remaining !== null && remaining < 2 && (
             <p className="mt-2 text-sm text-foreground-muted">
               {remaining === 0
-                ? "这份词表已投满 2 枚。"
-                : "已投 1 枚，还可投 1 枚。"}
+                ? uiText("这份词表已投满 2 枚。")
+                : uiText("已投 1 枚，还可投 1 枚。")}
             </p>
           )}
           {!pending && (failed || remaining === null) && (
@@ -345,14 +362,16 @@ function TipForm({
               role={failed ? "alert" : "status"}
               className="mt-2 text-sm text-foreground-muted"
             >
-              {failed ? "投币状态加载失败。" : "正在读取投币状态…"}
+              {failed
+                ? uiText("投币状态加载失败。")
+                : uiText("正在读取投币状态…")}
               {failed && (
                 <button
                   type="button"
                   className={textButtonClass}
                   onClick={onRetry}
                 >
-                  重试
+                  {uiText("重试")}
                 </button>
               )}
             </p>
@@ -367,7 +386,7 @@ function TipForm({
             success ? "text-success" : "text-danger"
           )}
         >
-          {message}
+          {uiText(message)}
         </p>
       )}
       <div className="mt-6 flex justify-center">
@@ -384,23 +403,23 @@ function TipForm({
           onClick={success ? onClose : () => void send()}
         >
           {busy
-            ? "正在确认…"
+            ? uiText("正在确认…")
             : success
-              ? "完成"
+              ? uiText("完成")
               : pending
-                ? "重试这次投币"
-                : "确认投出"}
+                ? uiText("重试这次投币")
+                : uiText("确认投出")}
         </Button>
       </div>
       <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
         <Link className="text-primary hover:underline" href="/account/coins">
-          查看钱包
+          {uiText("查看钱包")}
         </Link>
         <Link
           className="text-primary hover:underline"
           href="/account/wordlist-tips"
         >
-          查看我的投币记录 →
+          {uiText("查看我的投币记录 →")}
         </Link>
       </div>
     </LibraryDialog>
@@ -411,6 +430,8 @@ export function WordlistTips() {
   return id ? <TipHistory key={id} userId={id} /> : null;
 }
 function TipHistory({ userId }: { userId: string }) {
+  const locale = useWebLocale();
+  const uiText = useWebText(webWordlist);
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: [...wordListKeys.mine(userId), "tips", page],
@@ -420,24 +441,24 @@ function TipHistory({ userId }: { userId: string }) {
   return (
     <PageShell>
       <PageHeader
-        back={{ href: "/account/coins", label: "我的天生币" }}
-        eyebrow="天生币"
-        title="词表投币记录"
-        description="投出和收到的记录均来自实际转账。"
+        back={{ href: "/account/coins", label: uiText("我的天生币") }}
+        eyebrow={uiText("天生币")}
+        title={uiText("词表投币记录")}
+        description={uiText("投出和收到的记录均来自实际转账。")}
       />
       {query.isError ? (
         <PageNotice tone="error">
-          记录读取失败，
+          {uiText("记录读取失败，")}
           <button
             className={textButtonClass}
             onClick={() => void query.refetch()}
           >
-            重试
+            {uiText("重试")}
           </button>
           。
         </PageNotice>
       ) : query.isPending ? (
-        <PageNotice>正在加载…</PageNotice>
+        <PageNotice>{uiText("正在加载…")}</PageNotice>
       ) : (
         <>
           {query.data.items.length ? (
@@ -448,15 +469,19 @@ function TipHistory({ userId }: { userId: string }) {
                   <li key={tip.event_id} className={panelClass}>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                       <p className="text-lg font-bold tabular-nums tracking-tight">
-                        {sent ? "投出" : "收到"} {formatCoins(tip.amount)}
+                        {sent ? uiText("投出") : uiText("收到")}{" "}
+                        {formatCoins(tip.amount)}
                       </p>
                       <p className="text-xs text-foreground-muted">
-                        {new Date(tip.created_at).toLocaleString("zh-CN")}
+                        {new Date(tip.created_at).toLocaleString(locale, {
+                          timeZone:
+                            Intl.DateTimeFormat().resolvedOptions().timeZone
+                        })}
                       </p>
                     </div>
                     <p className="mt-3 text-sm">
-                      {sent ? "作者" : "投币人"}：
-                      {tip.counterparty_name ?? "账号已注销"}
+                      {sent ? uiText("作者") : uiText("投币人")}：
+                      {tip.counterparty_name ?? uiText("账号已注销")}
                     </p>
                     {tip.wordlist_accessible ? (
                       <Link
@@ -467,18 +492,18 @@ function TipHistory({ userId }: { userId: string }) {
                       </Link>
                     ) : (
                       <p className="mt-1 text-sm text-foreground-muted">
-                        词表已删除或不可访问
+                        {uiText("词表已删除或不可访问")}
                       </p>
                     )}
                     <p className="mt-3 break-all text-xs text-foreground-subtle">
-                      事件 ID：{tip.event_id}
+                      {uiText("事件 ID：{{v0}}", { v0: tip.event_id })}
                     </p>
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <PageNotice>暂无投币记录</PageNotice>
+            <PageNotice>{uiText("暂无投币记录")}</PageNotice>
           )}
           <Pager
             page={page}

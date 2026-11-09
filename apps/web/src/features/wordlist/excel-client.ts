@@ -1,3 +1,4 @@
+import { LocalWebError } from "@/i18n/catalog";
 import type { ExcelRow } from "./excel-rows";
 
 function runWorker<T>(request: object, signal?: AbortSignal): Promise<T> {
@@ -16,16 +17,23 @@ function runWorker<T>(request: object, signal?: AbortSignal): Promise<T> {
     };
     const timer = setTimeout(() => {
       finish();
-      reject(new Error("文件处理超时，请拆分后重试"));
+      reject(new LocalWebError("文件处理超时，请拆分后重试"));
     }, 15000);
-    worker.onmessage = (event: MessageEvent<{ result: T; error?: string }>) => {
+    worker.onmessage = (
+      event: MessageEvent<{ result: T; error?: string; local?: boolean }>
+    ) => {
       finish();
-      if (event.data.error) reject(new Error(event.data.error));
+      if (event.data.error)
+        reject(
+          event.data.local
+            ? new LocalWebError(event.data.error)
+            : new Error(event.data.error)
+        );
       else resolve(event.data.result);
     };
     worker.onerror = () => {
       finish();
-      reject(new Error("文件读取失败，请重新选择文件"));
+      reject(new LocalWebError("文件读取失败，请重新选择文件"));
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
@@ -35,9 +43,9 @@ function runWorker<T>(request: object, signal?: AbortSignal): Promise<T> {
 
 export async function readExcelFile(file: File, signal: AbortSignal) {
   if (!/\.(xls|xlsx)$/i.test(file.name))
-    throw new Error("请选择 .xls 或 .xlsx 文件");
+    throw new LocalWebError("请选择 .xls 或 .xlsx 文件");
   if (!file.size || file.size > 10 * 1024 * 1024)
-    throw new Error("文件须大于 0 且不超过 10 MB");
+    throw new LocalWebError("文件须大于 0 且不超过 10 MB");
   const buffer = await file.arrayBuffer();
   return runWorker<ExcelRow[]>(
     { type: "parse", buffer, fileName: file.name },

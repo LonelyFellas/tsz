@@ -1,4 +1,6 @@
 "use client";
+import { useWebText } from "@/i18n/client";
+import { webShell } from "@/i18n/messages/shell";
 
 import { forwardRef, useRef, type InputHTMLAttributes } from "react";
 import { Search, X } from "lucide-react";
@@ -30,6 +32,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
     },
     ref
   ) {
+    const uiText = useWebText(webShell);
     const input = useRef<HTMLInputElement | null>(null);
     const composing = useRef(false);
     function clear() {
@@ -90,7 +93,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
             variant="ghost"
             size="icon"
             disabled={disabled || readOnly}
-            aria-label="清除搜索"
+            aria-label={uiText("清除搜索")}
             onClick={clear}
             className="absolute right-0.5 top-0.5"
           >
