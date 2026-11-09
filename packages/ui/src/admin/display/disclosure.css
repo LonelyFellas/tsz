@@ -60,7 +60,7 @@
   opacity: 0.5;
 }
 .ui-tabs-tab-btn:focus-visible,
-.ui-tabs-tab-focus {
+.ui-tabs-tab-focus > .ui-tabs-tab-btn {
   outline: var(--ui-focus-ring);
 }
 .ui-tabs-body-holder {
