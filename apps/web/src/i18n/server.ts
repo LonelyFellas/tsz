@@ -1,12 +1,13 @@
 import "server-only";
 
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { decodeInterfaceCapabilities } from "@tsz/api-client";
 import {
   createInterfaceI18n,
   DEFAULT_INTERFACE_LOCALE,
-  INTERFACE_LOCALES
+  INTERFACE_LOCALES,
+  normalizeInterfaceLocale
 } from "@tsz/shared/i18n";
 import { webCommon, addWebCatalog, webText, type WebCatalog } from "./catalog";
 import { GUEST_LOCALE_COOKIE } from "./snapshot";
@@ -22,11 +23,32 @@ export const getWebLocale = cache(async () => {
     });
     if (!response.ok) return DEFAULT_INTERFACE_LOCALE;
     const directory = decodeInterfaceCapabilities(await response.json());
-    return (
-      directory.supported_locales
-        .filter((locale) => INTERFACE_LOCALES.includes(locale))
-        .find((locale) => locale === hint) ?? directory.default_locale
+    const supported = directory.supported_locales.filter((locale) =>
+      INTERFACE_LOCALES.includes(locale)
     );
+    const selected = supported.find((locale) => locale === hint);
+    if (selected) return selected;
+    const languages = ((await headers()).get("accept-language") ?? "")
+      .split(",")
+      .map((entry) => {
+        const [tag, ...parameters] = entry.trim().split(";");
+        const weight = parameters.find((parameter) =>
+          parameter.trim().startsWith("q=")
+        );
+        return {
+          tag: tag?.trim(),
+          quality: weight ? Number(weight.trim().slice(2)) : 1
+        };
+      })
+      .filter(
+        ({ quality }) => Number.isFinite(quality) && quality > 0 && quality <= 1
+      )
+      .sort((a, b) => b.quality - a.quality);
+    for (const { tag } of languages) {
+      const locale = normalizeInterfaceLocale(tag);
+      if (locale && supported.includes(locale)) return locale;
+    }
+    return directory.default_locale;
   } catch {
     return DEFAULT_INTERFACE_LOCALE;
   }

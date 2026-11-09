@@ -6,6 +6,7 @@ import { interfacePreferences } from "@/lib/interface-preferences";
 import { useUserStore } from "@/stores/user";
 import { site } from "@/lib/site";
 import { useWebLocale, useWebText } from "./client";
+import { useWebLocaleReady } from "./boot";
 import { webApp } from "./messages/app";
 import { GUEST_LOCALE_COOKIE, openGraphLocale } from "./snapshot";
 
@@ -45,6 +46,7 @@ const descriptions: [RegExp, string][] = [
 
 export function WebLocaleEffects() {
   const locale = useWebLocale();
+  const ready = useWebLocaleReady();
   const uiText = useWebText(webApp);
   const pathname = usePathname();
   const hydrated = useUserStore((state) => state.hydrated);
@@ -54,11 +56,13 @@ export function WebLocaleEffects() {
     interfacePreferences.getServerSnapshot
   );
   useLayoutEffect(() => {
-    document.documentElement.lang = locale;
+    if (ready) document.documentElement.lang = locale;
     const pageTitle = titles.find(([pattern]) => pattern.test(pathname))?.[1];
-    const title = pageTitle
-      ? `${uiText(pageTitle)} | ${site.name}`
-      : uiText(site.fullName);
+    const title = !ready
+      ? site.name
+      : pageTitle
+        ? `${uiText(pageTitle)} | ${site.name}`
+        : uiText(site.fullName);
     const description = uiText(
       descriptions.find(([pattern]) => pattern.test(pathname))?.[1] ??
         site.description
@@ -67,6 +71,7 @@ export function WebLocaleEffects() {
       // 未读角标由原组件维护；写入无角标标题后让它更新自己的基准。
       if (document.title.replace(/^\(\d+\)\s*/, "") !== title)
         document.title = title;
+      if (!ready) return;
       for (const [selector, content] of [
         ['meta[name="description"]', description],
         ['meta[property="og:title"]', uiText(site.fullName)],
@@ -85,7 +90,7 @@ export function WebLocaleEffects() {
       characterData: true
     });
     return () => observer.disconnect();
-  }, [locale, pathname, uiText]);
+  }, [locale, pathname, ready, uiText]);
   useEffect(() => {
     if (
       !hydrated ||

@@ -1,27 +1,12 @@
-import { Spin, Typography } from "@tsz/ui/admin/display";
-import { useAdminTranslation } from "@/i18n";
+import { AdminBootFallback } from "@/i18n/boot";
 import {
   createBrowserRouter,
   redirect,
   type RouteObject
 } from "react-router-dom";
-import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { RouteErrorPage } from "@/pages/RouteError";
 import { RootProviders } from "./providers";
 import { ADMIN_PAGE_ROUTES } from "@/lib/adminPageRoutes";
-
-// 首屏兜底：路由全部走 route.lazy，首个匹配的 chunk 就绪前 react-router 需要
-// HydrateFallback（缺省会告警）。渲染在 RootProviders 之外（无 ConfigProvider，
-// antd token 走默认值），视觉与门禁加载态一致，启动时不闪变。
-function BootFallback() {
-  const { t } = useAdminTranslation();
-  return (
-    <FullscreenCenter>
-      <Spin size="small" />
-      <Typography.Text type="secondary">{t("loading")}</Typography.Text>
-    </FullscreenCenter>
-  );
-}
 
 /** Shared by browser routing and MemoryRouter contract tests. */
 export const wordRoutes: RouteObject[] = [
@@ -68,7 +53,7 @@ export const router = createBrowserRouter([
     // 兜底：任一子路由渲染/loader 抛错（含 lazy chunk 加载失败）时渲染此页，
     // 而非 react-router 的空白默认错误页。
     errorElement: <RouteErrorPage />,
-    hydrateFallbackElement: <BootFallback />,
+    hydrateFallbackElement: <AdminBootFallback />,
     children: [
       {
         path: "/login",

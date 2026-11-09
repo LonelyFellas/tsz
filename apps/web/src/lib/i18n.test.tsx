@@ -159,7 +159,7 @@ it("首屏提示在目录恢复期间保持，恢复另一账号时不沿用访�
   expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
 });
 
-it("目录失败后重试不重新使用已经消费的首屏语言提示", async () => {
+it("目录失败保留已确认语言，重试目录收缩后才回退", async () => {
   const supported = {
     schema_version: 1 as const,
     preference_version: 1 as const,
@@ -191,7 +191,7 @@ it("目录失败后重试不重新使用已经消费的首屏语言提示", asyn
   await waitFor(() => expect(controller.getSnapshot().status).toBe("ready"));
   capabilities.mockRejectedValueOnce(new Error("directory unavailable"));
   await act(async () => controller.refresh());
-  expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   let resolveRetry!: (value: typeof supported) => void;
   capabilities.mockImplementationOnce(
     () =>
@@ -203,7 +203,7 @@ it("目录失败后重试不重新使用已经消费的首屏语言提示", asyn
   act(() => {
     retry = controller.refresh();
   });
-  expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   await act(async () => {
     resolveRetry({ ...supported, supported_locales: ["zh-Hans"] });
     await retry;
