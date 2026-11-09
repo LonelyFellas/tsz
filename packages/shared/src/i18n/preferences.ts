@@ -243,6 +243,11 @@ export function createInterfacePreferences({
     saveGuest,
     accountId: () => getSession().accountId,
     sessionKey,
+    /** Never reuse another identity's locale or infer output support from a stale directory. */
+    getRequestLocale: () =>
+      snapshot.owner === sessionKey() && snapshot.status === "ready"
+        ? snapshot.locale
+        : undefined,
     getSnapshot: () => snapshot,
     getServerSnapshot: () => initial,
     subscribe: (listener: () => void) => {

@@ -35,7 +35,7 @@ export function Notifications() {
   const userId = useUserStore((state) => state.user?.id);
   const [page, setPage] = useState(1);
   const client = useQueryClient();
-  const query = useQuery(notificationQuery(userId, page));
+  const query = useQuery(notificationQuery(userId, page, locale));
   const read = useMutation({
     mutationFn: (id: string) => api.teacherCertification.readNotification(id),
     onSuccess: () =>
@@ -81,7 +81,9 @@ export function Notifications() {
                           className="size-2 rounded-full bg-primary"
                         />
                       )}
-                      {uiText(titles[item.kind])}
+                      {item.localized?.locale === locale
+                        ? item.localized.title
+                        : uiText(titles[item.kind])}
                     </h2>
                     <span
                       className={cn(
@@ -102,35 +104,47 @@ export function Notifications() {
                       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                     })}
                   </time>
-                  {item.kind === "teacher_approved" && (
+                  {item.localized?.locale === locale && item.localized.body ? (
+                    <p className="mt-3 text-sm leading-6">
+                      {item.localized.body}
+                    </p>
+                  ) : item.kind === "teacher_approved" ? (
                     <p className="mt-3 text-sm leading-6">
                       {uiText(
                         "你已获得教师身份，可在账号菜单中切换工作台，原有学生身份保持不变。"
                       )}
                     </p>
-                  )}
-                  {(item.kind === "wordlist_liked" ||
-                    item.kind === "wordlist_tipped") && (
-                    <p className="mt-3 text-sm leading-6">
-                      {uiText(
-                        item.kind === "wordlist_liked"
-                          ? "{{actor}}赞了你的词表「{{wordlist}}」。"
-                          : item.amount
-                            ? "{{actor}}向你的词表「{{wordlist}}」投了 {{amount}}。"
-                            : "{{actor}}向你的词表「{{wordlist}}」投币。",
-                        {
-                          actor: item.actor_name ?? uiText("账号已注销"),
-                          wordlist: item.wordlist_name ?? uiText("（已删除）"),
-                          amount: item.amount ? formatCoins(item.amount) : ""
-                        }
-                      )}
-                    </p>
-                  )}
-                  {item.reason && (
-                    <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
-                      {item.reason}
-                    </p>
-                  )}
+                  ) : null}
+                  {(item.localized?.locale !== locale ||
+                    !item.localized.body) &&
+                    (item.kind === "wordlist_liked" ||
+                      item.kind === "wordlist_tipped") && (
+                      <p className="mt-3 text-sm leading-6">
+                        {uiText(
+                          item.kind === "wordlist_liked"
+                            ? "{{actor}}赞了你的词表「{{wordlist}}」。"
+                            : item.amount
+                              ? "{{actor}}向你的词表「{{wordlist}}」投了 {{amount}}。"
+                              : "{{actor}}向你的词表「{{wordlist}}」投币。",
+                          {
+                            actor: item.actor_name ?? uiText("账号已注销"),
+                            wordlist:
+                              item.wordlist_name ?? uiText("（已删除）"),
+                            amount: item.amount ? formatCoins(item.amount) : ""
+                          }
+                        )}
+                      </p>
+                    )}
+                  {item.reason &&
+                    !(
+                      item.kind === "wordlist_deleted" &&
+                      item.localized?.locale === locale &&
+                      item.localized.body
+                    ) && (
+                      <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
+                        {item.reason}
+                      </p>
+                    )}
                   <div className="mt-4 flex flex-wrap gap-2 empty:hidden">
                     {item.wordlist_id && item.wordlist_name && (
                       <Link

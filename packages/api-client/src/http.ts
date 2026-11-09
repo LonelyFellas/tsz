@@ -3,13 +3,16 @@
 import type {
   V3DraftValidationIssue,
   ProblemDetails,
-  ProblemMeta
+  ProblemMeta,
+  InterfaceLocaleV1
 } from "@tsz/types";
 import { createRequestDeadline } from "./deadline";
 import { validateRuntimeSchema } from "./runtime-schema";
 
 export interface HttpClientOptions {
   baseUrl: string;
+  /** Already resolved against the surface capability directory; absent disables opt-in. */
+  getInterfaceLocale?: () => InterfaceLocaleV1 | undefined;
   /** 每次请求动态获取 access token。 */
   getToken?: () => string | undefined | Promise<string | undefined>;
   /** 仅测试批次使用；后端仍须验证账号白名单。不会附加到 OSS 直传请求。 */
@@ -161,6 +164,7 @@ export function createHttpClient({
   baseUrl,
   getToken,
   getTestResourceRun,
+  getInterfaceLocale,
   getSessionGeneration,
   onRefresh,
   onSessionExpired,
@@ -290,6 +294,15 @@ export function createHttpClient({
     responseType: "json" | "blob" = "json",
     consumeStream?: (response: Response, checkSession: () => void) => Promise<T>
   ): Promise<T> {
+    if (!retrying) {
+      const locale = getInterfaceLocale?.();
+      if (locale) {
+        const headers = new Headers(init.headers);
+        headers.set("X-TSZ-Localization", "v1");
+        headers.set("Accept-Language", locale);
+        init = { ...init, headers };
+      }
+    }
     const method = init.method ?? "GET";
     const longOperation =
       init.body instanceof Blob ||

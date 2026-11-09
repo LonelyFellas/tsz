@@ -100,12 +100,13 @@ export function CreateAdminModal({
           setFieldErrors({ phone: "phone_taken" });
           return;
         }
-        if (err instanceof HttpError && err.status === 400) {
-          const detail = err.message.toLowerCase();
-          if (detail.includes("验证码") || detail.includes("code")) {
-            setFieldErrors({ code: "invalid_code" });
-            return;
-          }
+        if (
+          err instanceof HttpError &&
+          (err.code === "invalid_otp_code" ||
+            (!err.code && err.status === 400 && err.message === "invalid code"))
+        ) {
+          setFieldErrors({ code: "invalid_code" });
+          return;
         }
         message.error(
           err instanceof Error && err.message ? (

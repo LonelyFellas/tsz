@@ -1,4 +1,5 @@
 "use client";
+import { useWebLocale } from "@/i18n/client";
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -6,10 +7,11 @@ import { useUserStore } from "@/stores/user";
 import { notificationQuery } from "./notification-query";
 
 export function NotificationTabBadge() {
+  const locale = useWebLocale();
   const userId = useUserStore((state) => state.user?.id);
   const hydrated = useUserStore((state) => state.hydrated);
   const query = useQuery({
-    ...notificationQuery(userId),
+    ...notificationQuery(userId, 1, locale),
     enabled: hydrated && !!userId,
     refetchInterval: 60_000,
     refetchIntervalInBackground: true,

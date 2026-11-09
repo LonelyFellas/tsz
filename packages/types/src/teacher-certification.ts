@@ -46,6 +46,11 @@ export interface SubmitTeacherApplication {
 }
 
 export interface UserNotification {
+  localized?: {
+    locale: import("./i18n").InterfaceLocaleV1;
+    title: string;
+    body: string;
+  };
   id: string;
   application_id: string | null;
   kind:

@@ -37,6 +37,7 @@ const runtimeSchemaBundle =
 const ROOTS = [
   "InterfaceCapabilities",
   "InterfaceLocaleV1",
+  "LocalizedNotification",
   "UserInterfacePreferencesResponse",
   "LexiconAssistantCapability",
   "LexiconAssistantResponse",

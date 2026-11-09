@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/i18n-preferences-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-08T00:06:27.111Z",
+  "_source": "/Users/darwish/.codex/worktrees/backend-i18n-phase5/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-09T04:23:26.756Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -4233,6 +4233,16 @@
       "type": "string",
       "enum": ["awarded", "wallet_unavailable", "reward_disabled"]
     },
+    "LocalizedNotification": {
+      "type": "object",
+      "required": ["locale", "title", "body"],
+      "properties": {
+        "body": { "type": "string" },
+        "locale": { "$ref": "#/components/schemas/InterfaceLocaleV1" },
+        "title": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "UserNotification": {
       "type": "object",
       "required": ["id", "kind", "created_at"],
@@ -4246,6 +4256,10 @@
         "created_at": { "type": "string", "format": "date-time" },
         "id": { "type": "string", "format": "uuid" },
         "kind": { "type": "string" },
+        "localized": {
+          "$ref": "#/components/schemas/LocalizedNotification",
+          "description": "Present only for explicitly negotiated V1 output; never stored in the notification row."
+        },
         "read_at": { "type": ["string", "null"], "format": "date-time" },
         "reason": { "type": ["string", "null"] },
         "wordlist_id": { "type": ["string", "null"], "format": "uuid" },

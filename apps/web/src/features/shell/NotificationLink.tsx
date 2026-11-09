@@ -1,4 +1,5 @@
 "use client";
+import { useWebLocale } from "@/i18n/client";
 import { useWebText } from "@/i18n/client";
 import { webShell } from "@/i18n/messages/shell";
 
@@ -10,10 +11,11 @@ import { notificationQuery } from "@/features/teacher-certification/notification
 
 export function NotificationLink({ onNavigate }: { onNavigate: () => void }) {
   const uiText = useWebText(webShell);
+  const locale = useWebLocale();
   const userId = useUserStore((state) => state.user?.id);
   const hydrated = useUserStore((state) => state.hydrated);
   const query = useQuery({
-    ...notificationQuery(userId),
+    ...notificationQuery(userId, 1, locale),
     enabled: hydrated && !!userId
   });
   const count = hydrated && userId ? (query.data?.unread_count ?? 0) : 0;
