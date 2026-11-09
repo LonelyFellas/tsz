@@ -3,7 +3,7 @@ import { audioAssetContentTypeOf } from "@tsz/types";
 import { AudioUploadError } from "../../types";
 import {
   AUDIO_UPLOAD_ACCEPT,
-  AUDIO_UPLOAD_HINT,
+  audioUploadHint,
   describeUploadError,
   isSignedUrlFresh,
   preflightAudioFile,
@@ -82,7 +82,7 @@ describe("audioAssetContentTypeOf", () => {
     expect(AUDIO_UPLOAD_ACCEPT.split(",")).toEqual(
       expect.arrayContaining(["audio/mp4", ".m4a", ".mp3", ".wav", ".ogg"])
     );
-    expect(AUDIO_UPLOAD_HINT).toBe(
+    expect(audioUploadHint()).toBe(
       "支持 mp3 / m4a / wav / ogg，单个不超过 10 MiB"
     );
     expect(progressPercent(0.456)).toBe(46);

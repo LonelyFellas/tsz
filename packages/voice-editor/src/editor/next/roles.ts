@@ -18,9 +18,6 @@ export function grammarRoleDefinitions(
     pos_indicator: { level: "grammar", label: t("part_of_speech_indicator") }
   } as const;
 }
-export const GRAMMAR_ROLE_DEFINITIONS = grammarRoleDefinitions();
-export const GRAMMAR_ROLES: ReadonlyArray<{ level: string; label: string }> =
-  Object.values(GRAMMAR_ROLE_DEFINITIONS);
 
 /** 历史数据里的 emphasis 等级，视作「核心词」。 */
 export const LEGACY_GRAMMAR_LEVEL = "strong";
@@ -111,7 +108,6 @@ export function voiceGenderLabels(
     { gender: "male", label: t("male_2") }
   ];
 }
-export const VOICE_GENDERS = voiceGenderLabels();
 
 /**
  * 停顿时长展示：不足 1 秒用 ms，1 秒及以上用 s 且不补小数零。
