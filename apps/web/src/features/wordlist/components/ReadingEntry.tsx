@@ -111,7 +111,8 @@ export function ReadingTable({
                     simple && "whitespace-nowrap",
                     [
                       "webWordlistReader:part_of_speech",
-                      "webWordlistReader:basic_part_of_speech"
+                      "webWordlistReader:basic_part_of_speech",
+                      "webWordlistReader:subcategory"
                     ].includes(heading.key) && "text-right",
                     heading.key === "webWordlistReader:english_entry" &&
                       "sticky left-0 z-20 border-r border-border/60 bg-surface"

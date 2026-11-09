@@ -633,3 +633,9 @@ Codex 内置浏览器（实例 ID 可连接，iab 别名不可用）完成两端
 主窗口内置浏览器已验证登录页四语选择及整页刷新、账号/通知四语、真实 409 题量错误（可用 0 / 需要 20），同源 API/Content-Language 正确。账号原名「保存」、词表名「取消」与包含 `{{v0}}`/`$t(...)` 的释义和注释均保留原文；既有词表私密备注修改后，在四语切换中 textarea 同一 DOM、内容和选区保持，保存后整页重开回读一致，语音生成始终关闭。Admin 四语保存/刷新和真实登录拒绝提示正常；两端 console warn/error 为空。初轮浏览器证据及专用站点存储清理回执在 `/Users/darwish/.codex/visualizations/2026/11/09/i18n-phase3/`。
 
 初轮页面验收另外发现既有语言选择器保存期间 `disabled` 导致原生失焦：主线与迁移前后禁用条件相同。本批为满足焦点验收做最小修复，保留禁用与串行保存，只在保存/回读结束、原控件仍连接且当前焦点落在 body 时恢复；用户已聚焦其他控件或换账号时不抢焦点。以浏览器实测前置建立组件失败回归（jsdom 显式模拟原生禁用后的失焦），修复后 5 项语言选择回归通过；最终生产包原路径复验待续。拖动项简体资源与主线逐字相同，AX 的转码显示待以真实 DOM 属性/码点核对，不扩大到拖动界面重设计。
+
+最终浏览器焦点复验基于干净提交 `180d29c7296f13241ea6f8ef1ac7addd719fcdfd`（tree `92c2628654f51eefb1ae444cd5da6ef02328595c`），原生生产 BUILD_ID `build-TfctsWXpff2fKS`。语言选择器保存前后均保持真实 focus、同一 DOM；改为简体也恢复。尝试真实网络延迟后保存仍在观察 pending 前完成，因此“保存中用户移焦”竞态未冒充实机通过，沿用组件回归；已移焦后的控件保持焦点。DOM 拖动项 `aria-roledescription` 为正确「可排序词条」（U+53EF U+6392 U+5E8F U+8BCD U+6761），AX 乱码仅工具显示。最终 console warn/error 为空，证据 `i18n-phase3/final-focus-verification.json`，专用站点清理 `final-browser-cleanup.json`。
+
+独立精确提交首轮审查覆盖上述 SHA 完整差异，无确认 P0–P2，发现 1 项 P3：完整模式「细分词性」表头的原右对齐条件迁移漏键，已补回既有 `subcategory`，不改布局体系。定向边界复查还先以失败用例证明原型继承键 `toString` 会绕过运行时存在检查，再改为目录 own-key 检查；合法键及译文均不变。修复与最终回执将交同一 reviewer 增量复查，不重跑未变范围的完整审查。
+
+清理回执 `/tmp/tsz-web-keys-20261109-eaf27f66-cleanup.json`：删除前以精确 UUID/批次归属核实仅 1 用户、1 词表、1 任务、0 轮次；私有 UTF-8 PG 与 Redis 的全部会话/OTP/审计/限流/幂等及关联数据随专属进程和目录彻底删除。两轮浏览器专用 origin 的 Cookie/localStorage/sessionStorage/CacheStorage/IndexedDB/service worker 均为 0；59931–59935 独立复查无监听，凭据、私有二进制副本和原始日志已删除。无 OSS 对象、无共享数据库或正常账号数据变更；仅保留脱敏截图、验证证据和清理回执。

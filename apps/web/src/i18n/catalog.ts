@@ -367,7 +367,7 @@ export function webText<C extends WebCatalog>(
     if (
       separator < 1 ||
       namespace !== selected.namespace ||
-      !(key in selected.messages)
+      !Object.hasOwn(selected.messages, key)
     )
       throw new Error(`Unregistered Web translation: ${source}`);
     addWebCatalog(instance, selected);

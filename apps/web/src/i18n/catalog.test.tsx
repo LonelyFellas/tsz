@@ -335,11 +335,10 @@ describe("Web 界面目录", () => {
     expect(
       webText(createInterfaceI18n("zh-Hans"), after)("webCopyChange:label")
     ).toBe("新译文");
-    expect(() =>
-      Reflect.apply(webText(createInterfaceI18n(), before), null, [
-        "未知界面文案"
-      ])
-    ).toThrow("Unregistered Web translation");
+    for (const unknown of ["未知界面文案", "webCopyChange:toString"])
+      expect(() =>
+        Reflect.apply(webText(createInterfaceI18n(), before), null, [unknown])
+      ).toThrow("Unregistered Web translation");
   });
 });
 
