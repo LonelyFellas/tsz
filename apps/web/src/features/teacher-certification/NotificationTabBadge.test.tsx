@@ -191,6 +191,7 @@ it("clears the previous account badge and ignores late image loads after logout"
 });
 
 it("language updates preserve one unread prefix and the existing theme", async () => {
+  localeController.snapshot.status = "ready";
   const localeTree = (locale: "en-GB" | "zh-Hant") => (
     <InterfaceI18nProvider locale={locale}>
       <WebLocaleEffects />
@@ -207,11 +208,20 @@ it("language updates preserve one unread prefix and the existing theme", async (
     await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
     document.title = "站内通知 | 天生会背";
     await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
+    localeController.snapshot.status = "idle";
+    view.rerender(localeTree("zh-Hant"));
+    await waitFor(() => expect(document.title).toBe("(3) 天生会背"));
+    document.title = "登录 | 天生会背";
+    await waitFor(() => expect(document.title).toBe("(3) 天生会背"));
+    localeController.snapshot.status = "ready";
+    view.rerender(localeTree("zh-Hant"));
+    await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
     expect(document.documentElement.lang).toBe("zh-Hant");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localeController.refresh).not.toHaveBeenCalled();
   } finally {
     view.unmount();
     document.documentElement.classList.remove("dark");
+    localeController.snapshot.status = "idle";
   }
 });

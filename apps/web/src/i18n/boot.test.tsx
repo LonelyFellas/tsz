@@ -17,8 +17,11 @@ import {
 import { authRuntime } from "@/lib/auth";
 import { useUserStore } from "@/stores/user";
 import { interfacePreferences } from "@/lib/interface-preferences";
+import { WebLocaleEffects } from "./effects";
 import { WebLocaleBoundary, useWebLocaleReady } from "./boot";
 import { webLocaleBootScript, webLocaleBootStyle } from "./snapshot";
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/login" }));
 
 const directory = {
   schema_version: 1,
@@ -265,4 +268,45 @@ it("身份等待同时遮挡body portal并禁止焦点进入，恢复后重新�
     portal.remove();
     style.remove();
   }
+});
+
+it("首次ready后登录再次pending，标题立即回品牌并拒绝迟到的旧语言标题", async () => {
+  useUserStore.setState({ hydrated: true });
+  function Tree() {
+    const owner = useUserStore(() => interfacePreferences.sessionKey());
+    return (
+      <InterfacePreferencesProvider
+        controller={interfacePreferences}
+        sessionKey={owner}
+      >
+        <WebLocaleEffects />
+        <WebLocaleBoundary>
+          <Probe />
+        </WebLocaleBoundary>
+      </InterfacePreferencesProvider>
+    );
+  }
+  render(<Tree />);
+  await waitFor(() => expect(document.title).toBe("Sign in | 天生会背"));
+  const slowDirectory = deferred<typeof directory>();
+  vi.mocked(fetch).mockImplementationOnce(async () =>
+    Response.json(await slowDirectory.promise)
+  );
+  act(() =>
+    authRuntime.persistSession({
+      access_token: "fixture-title-login",
+      expires_in: 900
+    })
+  );
+  expect(document.title).toBe("天生会背");
+  await act(async () => {
+    document.title = "(2) 天生会背";
+  });
+  expect(document.title).toBe("(2) 天生会背");
+  await act(async () => {
+    document.title = "登录 | 天生会背";
+  });
+  expect(document.title).toBe("天生会背");
+  await act(async () => slowDirectory.resolve(directory));
+  await waitFor(() => expect(document.title).toBe("Sign in | 天生会背"));
 });

@@ -56,12 +56,13 @@ export function WebLocaleEffects() {
     interfacePreferences.getServerSnapshot
   );
   useLayoutEffect(() => {
-    if (!ready) return;
-    document.documentElement.lang = locale;
+    if (ready) document.documentElement.lang = locale;
     const pageTitle = titles.find(([pattern]) => pattern.test(pathname))?.[1];
-    const title = pageTitle
-      ? `${uiText(pageTitle)} | ${site.name}`
-      : uiText(site.fullName);
+    const title = !ready
+      ? site.name
+      : pageTitle
+        ? `${uiText(pageTitle)} | ${site.name}`
+        : uiText(site.fullName);
     const description = uiText(
       descriptions.find(([pattern]) => pattern.test(pathname))?.[1] ??
         site.description
@@ -70,6 +71,7 @@ export function WebLocaleEffects() {
       // 未读角标由原组件维护；写入无角标标题后让它更新自己的基准。
       if (document.title.replace(/^\(\d+\)\s*/, "") !== title)
         document.title = title;
+      if (!ready) return;
       for (const [selector, content] of [
         ['meta[name="description"]', description],
         ['meta[property="og:title"]', uiText(site.fullName)],
