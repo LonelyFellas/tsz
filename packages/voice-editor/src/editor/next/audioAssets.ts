@@ -51,14 +51,12 @@ export function audioFormatHint(
 ) {
   return t("only_supported", { p0: FORMAT_LIST });
 }
-export const AUDIO_FORMAT_HINT = audioFormatHint();
 /** 面板上的说明，与预检用的是同一份常量，改上限不会出现两处口径不一。 */
 export function audioUploadHint(
   t: VoiceEditorTranslation = defaultVoiceEditorTranslation
 ) {
   return t("supports_maximum_mib_per_file", { p0: FORMAT_LIST, p1: MAX_MIB });
 }
-export const AUDIO_UPLOAD_HINT = audioUploadHint();
 export function audioSizeHint(
   t: VoiceEditorTranslation = defaultVoiceEditorTranslation
 ) {
