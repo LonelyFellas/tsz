@@ -597,7 +597,7 @@ Codex 内置浏览器（实例 ID 可连接，iab 别名不可用）完成两端
 
 复用显式 `X-TSZ-Localization: v1` + `Accept-Language` 协商和请求作用域。精确登记学习任务的参数校验、来源失效、版本/轮次冲突及恢复动作，登录与账号安全（含联系渠道、密码、注销），词表编辑/目录及投币，余额操作和版本冲突说明。同一 code 的不同原因分别保留；未知、用户正文、审核原因及供应商原文不猜测翻译。动态题量使用内部 `LearningInsufficientQuestions { available: usize, required: i32 }` 模板，组合的计划拒绝原因使用内部文本参数列表逐条输出；领域层不读取语言，不从中文中解析数字。
 
-内部上下文复用 `AppError` 的现有 box，保持体积门禁；不增加 wire 字段，不改变状态码、type/code/field/field_issues/meta、重试头或事务行为。无显式标记保留 legacy 安全 detail；OpenAPI、DTO、SQLx 查询、依赖、迁移和正式语言目录均未变。Web 已有 `webErrorText` 原文通道按文本显示服务端说明，当前严格 `ProblemDetails` validator 接受实际四语响应，无前端运行时配套变更。本批只发布后端；Web/Admin 无需重复部署，回退后端不会改变数据库或客户端契约。
+内部上下文复用 `AppError` 的现有 box，保持体积门禁；不增加 wire 字段，不改变状态码、type/code/field/field_issues/meta、重试头或事务行为。无显式标记保留 legacy 安全 detail；OpenAPI、DTO、SQLx 查询、迁移和正式语言目录均未变。Web 已有 `webErrorText` 原文通道按文本显示服务端说明，当前严格 `ProblemDetails` validator 接受实际四语响应，无前端运行时配套变更。本批只发布后端；Web/Admin 无需重复部署，回退后端不会改变数据库或客户端契约。
 
 失败基线：旧实现中“任务版本已变化”和动态题量英文说明两个回归失败；修复后国际化定向 13 项、错误适配 9 项、现有学习任务 handler 39 项及轮次 handler 15 项通过。Web 目录/消费者定向 37 项、Web 生产 build + next start、Admin 生产静态 build 通过。真实独立 HTTP 共 32 份响应覆盖四语题量不足、任务冲突、登录/注册标识、词表同 code 多原因、余额不足和多条计划原因组合；前端严格 schema 全部接受。实际 HTTP 保留状态码及除 title/detail 外的结构，拒绝启动后重新查询确认未创建轮次；单元测试另证并发语言隔离、无标记原文、内部错误脱敏、未知文本不二次插值及大整数精度。
 
@@ -606,3 +606,5 @@ Codex 内置浏览器（实例 ID 可连接，iab 别名不可用）完成两端
 边界：本批覆盖上述真实错误链路中精确登记的系统 detail；未将全部领域错误、成功响应中的预览 `reasons`/其他正文、用户输入、历史通知或第三方输出自动翻译。专属 fixture 账号/会话/词表/任务和依赖、私有服务/凭据/日志由第二批执行者最终清理；主窗口负责其新建浏览器 tab 及站点数据。无 OSS 对象或共享业务数据修改。
 
 独立审查首轮确认 1 项同根因 P2：来源重新确认、单选策略/客户端能力/选项/干扰项校验、refresh 请求校验及词表语音分支的系统 detail 仍有遗漏。新增来源恢复原因先得到失败回归，再于后端 `c8fa7aa51647e8eb1b49a9816f9fcc7671aed9d7` 补齐精确登记，并分别断言客户端升级与检查来源的纠错动作；13 项国际化回归及原生 SQLx prepare/Clippy 再次通过。最终同一 reviewer 增量复查、后端候选实际 HTTP 与部署来源记录于交付 PR；其余未变链路复用上述有效证据。
+
+后端 PR CI 的 `cargo audit --deny warnings` 首次因新收录的 [RUSTSEC-2026-0459](https://raw.githubusercontent.com/rustsec/advisory-db/main/crates/libsqlite3-sys/RUSTSEC-2026-0459.md) 阻断：锁文件保留未启用的 SQLx SQLite driver，发布版约束不允许安全的 `libsqlite3-sys >=0.39.0`。仅对该未启用 driver 固定 [SQLx 官方上限修复提交 10462fa](https://github.com/launchbadge/sqlx/commit/10462fa4414c6c7f1ed1d39bb31678e3b726878c)，锁定 `libsqlite3-sys 0.39.1`，未增加 advisory 忽略或改变 CI 门禁。修复前后 `cargo tree --locked --all-features --target all` 的实际启用依赖树完全一致；PostgreSQL 的 SQLx/core/macros 保持 crates.io 0.9.0，新增 Git core 仅为未启用 SQLite 的锁文件依赖。本地原生 audit 通过；相关最终 hooks/独立增量审查及 CI 以交付 PR 精确 SHA 为准。
