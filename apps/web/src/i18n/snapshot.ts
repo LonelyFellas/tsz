@@ -26,7 +26,7 @@ export const webLocaleBootScript = `(() => {
         observer.disconnect();
         return;
       }
-      if (document.title !== "天生会背") document.title = "天生会背";
+      if (document.title.replace(/^\\(\\d+\\)\\s*/, "") !== "天生会背") document.title = "天生会背";
     };
     const observer = new MutationObserver(sync);
     observer.observe(document.head, { childList: true, subtree: true, characterData: true });

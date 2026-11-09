@@ -588,3 +588,5 @@ Codex 内置浏览器（实例 ID 可连接，iab 别名不可用）完成两端
 清理：本批私有 PG/Redis、2 个用户和 1 个管理员及全部专属依赖、二进制副本、凭据、原始日志和探针均已删除，`59721`–`59727` 复查关闭；专用浏览器 Cookie/localStorage/sessionStorage/CacheStorage/IndexedDB/service worker 均为 0，标签页已关闭。无 OSS 或共享业务数据变更。脱敏回执 `/tmp/tsz-locale-first-paint-20261109-01a1bf93-cleanup.json`。
 
 独立审查首轮发现 Web 首次 ready 后再次 pending 时仍保留旧语言标题。已先以失败回归复现，再让现有标题 observer 在每次等待期间持续维护品牌标题，并复用未读前缀比较以避免角标 observer 循环；增量复查与最终 SHA 见本批 PR。首轮审查：确认缺陷 1；证据排除误报 0；关联回归/回退未知，最终轮次与精确版本以 PR 为准。
+
+第二轮增量审查发现首次 boot 的严格品牌标题比较仍会与非零未读角标互写，属于新增 P1 阻断。已先用真实 boot 字符串、语言 Effects 和真实角标组件复现（失控时保护性断开 observer，防止测试进程卡死），再统一为去除单一未读前缀后的比较。两处标题 writer 的比较规则已核对，原 P2 与该 P1 分别累计为 2 个缺陷；未解决前不推送，最终复查轮次与 SHA 记录在 PR。
