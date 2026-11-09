@@ -153,7 +153,7 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
                           {list.item_count}
                         </span>
                         <span className="text-sm text-foreground-muted">
-                          {uiText("个词条")}
+                          {uiText("个词条", { count: list.item_count })}
                         </span>
                       </p>
                       <p className="mt-2 truncate text-sm text-foreground-muted">

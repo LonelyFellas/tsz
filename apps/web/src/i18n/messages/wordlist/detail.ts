@@ -333,6 +333,10 @@ export const webWordlistDetail = /* @__PURE__ */ defineWebMessages(
   } as const,
   {},
   {
+    entire_word_list_v0_available_entries: {
+      parameter: "v0",
+      one: "Entire word list: {{v0}} available entry"
+    },
     v0_v1_v2_entries: {
       parameter: "v2",
       one: "{{v0}} · {{v1}} · {{v2}} entry"

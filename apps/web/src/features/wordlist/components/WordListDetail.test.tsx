@@ -206,7 +206,7 @@ it.each([false, true])(
 function open(
   mine = false,
   staleTime = 0,
-  locale: "zh-Hans" | "en-GB" = "zh-Hans"
+  locale: "zh-Hans" | "en-GB" | "en-US" = "zh-Hans"
 ) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime } }
@@ -221,6 +221,46 @@ function open(
   const result = render(element());
   return { client, ...result, refresh: () => result.rerender(element()) };
 }
+
+it.each(["en-GB", "en-US"] as const)(
+  "pluralizes the whole-list available count in %s",
+  async (locale) => {
+    for (const count of [0, 1, 2]) {
+      vi.mocked(api.wordList.get).mockResolvedValue({
+        ...list,
+        item_count: count
+      });
+      vi.mocked(api.wordList.availability).mockResolvedValue({
+        revision: 1,
+        available_count: count,
+        unavailable_count: 0
+      });
+      vi.mocked(api.wordList.items).mockResolvedValue({
+        ...pageResult(1),
+        items: Array.from({ length: count }, (_, index) => ({
+          ...pageResult(1).items[0]!,
+          entry_id: `entry-${index}`,
+          position: index,
+          entry: { ...entry, entry_id: `entry-${index}` }
+        })),
+        pagination: {
+          page: 1,
+          page_size: 50,
+          total: count,
+          total_pages: count === 0 ? 0 : 1
+        }
+      });
+      const view = open(false, 0, locale);
+      expect(
+        await screen.findByText(
+          `Entire word list: ${count} available ${count === 1 ? "entry" : "entries"}`
+        )
+      ).toBeVisible();
+      view.unmount();
+    }
+  }
+);
+
 it("清空详情搜索后恢复全部词条且保留输入焦点", async () => {
   open();
   await screen.findByRole("heading", { name: "apple" });
