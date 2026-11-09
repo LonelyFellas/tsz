@@ -1,5 +1,10 @@
 "use client";
-import { localText, type WebNotice, webErrorText } from "@/i18n/catalog";
+import {
+  lookupWebNotice,
+  localText,
+  type WebNotice,
+  webErrorText
+} from "@/i18n/catalog";
 
 import { useWebLocale, useWebText } from "@/i18n/client";
 import { webReview } from "@/i18n/messages/review";
@@ -408,9 +413,8 @@ function Overview({ userId }: { userId: string }) {
                           <p className="mt-1 text-xs leading-6 text-foreground-muted">
                             {item.paused
                               ? uiText("webReview:paused")
-                              : stages[item.stage]
-                                ? uiText(stages[item.stage])
-                                : item.stage}{" "}
+                              : uiText(lookupWebNotice(stages, item.stage)) ||
+                                item.stage}{" "}
                             ·{" "}
                             {item.content_available
                               ? uiText("webReview:next_v0", {
