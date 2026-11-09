@@ -1,5 +1,4 @@
 "use client";
-import { webErrorText } from "@/i18n/catalog";
 import { type WebNotice } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webWordlistDetail as webWordlist } from "@/i18n/messages/wordlist/detail";
@@ -378,7 +377,7 @@ function Detail({
   }
   const back = {
     href: mine ? "/account/wordlists" : "/wordlists",
-    label: "返回词表"
+    label: uiText("返回词表")
   };
   if (meta.isError)
     return (
@@ -936,10 +935,8 @@ function Detail({
             >
               {items.isError ? (
                 <p role="alert">
-                  {uiText(
-                    webErrorText(items.error, "数据暂不可用，请刷新后重试")
-                  ) === CONTENT_CHANGED
-                    ? CONTENT_CHANGED
+                  {items.error.message === CONTENT_CHANGED
+                    ? uiText(CONTENT_CHANGED)
                     : uiText("后续词条加载失败，已加载的内容仍可阅读。")}{" "}
                   <button
                     className={textButtonClass}
@@ -951,9 +948,7 @@ function Detail({
                         : items.refetch())
                     }
                   >
-                    {uiText(
-                      webErrorText(items.error, "数据暂不可用，请刷新后重试")
-                    ) === CONTENT_CHANGED
+                    {items.error.message === CONTENT_CHANGED
                       ? uiText("重新加载")
                       : uiText("重试")}
                   </button>

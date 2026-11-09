@@ -78,7 +78,7 @@ export function parseExcel(buffer: ArrayBuffer, fileName: string): ExcelRow[] {
       (String(cell.v).trim() !== label &&
         !(column === 0 && String(cell.v).trim() === "词汇"))
     )
-      throw new Error(`第 1 行表头须依次为「词条名称 / 释义 / 注释」`);
+      throw new LocalWebError("第 1 行表头须依次为「词条名称 / 释义 / 注释」");
   }
   const rows: ExcelRow[] = [];
   for (let r = 1; r <= range.e.r; r++) {

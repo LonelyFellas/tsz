@@ -1,4 +1,5 @@
 import { HttpError } from "@tsz/api-client";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -202,13 +203,19 @@ it.each([false, true])(
     expect(api.wordList.publish).not.toHaveBeenCalled();
   }
 );
-function open(mine = false, staleTime = 0) {
+function open(
+  mine = false,
+  staleTime = 0,
+  locale: "zh-Hans" | "en-GB" = "zh-Hans"
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime } }
   });
   const element = () => (
     <QueryClientProvider client={client}>
-      <WordListDetail id="list" mine={mine} />
+      <InterfaceI18nProvider locale={locale}>
+        <WordListDetail id="list" mine={mine} />
+      </InterfaceI18nProvider>
     </QueryClientProvider>
   );
   const result = render(element());
@@ -847,25 +854,42 @@ it("does not append a late page from the previous search and starts new reading 
   );
 });
 
-it("rejects changed content versions and reloads before appending the new version", async () => {
-  open();
-  await screen.findByRole("heading", { name: "apple" });
-  vi.mocked(api.wordList.items).mockImplementation(async (_id, query) =>
-    pageResult(query?.page ?? 1, 2)
-  );
-  reachBottom();
-  await screen.findByText(/词表内容已变化/);
-  expect(
-    screen.queryByRole("heading", { name: "banana" })
-  ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "重新加载" }));
-  await waitFor(() =>
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
-  );
-  reachBottom();
-  await screen.findByRole("heading", { name: "banana" });
-  expect(screen.getByText("已加载全部 2 个词条")).toBeVisible();
-});
+it.each(["zh-Hans", "en-GB"] as const)(
+  "rejects changed content versions and reloads before appending the new version in %s",
+  async (locale) => {
+    const english = locale === "en-GB";
+    open(false, 0, locale);
+    expect(
+      await screen.findByRole("link", {
+        name: english ? "Back to word list" : "返回词表"
+      })
+    ).toHaveAttribute("href", "/wordlists");
+    await screen.findByRole("heading", { name: "apple" });
+    vi.mocked(api.wordList.items).mockImplementation(async (_id, query) =>
+      pageResult(query?.page ?? 1, 2)
+    );
+    reachBottom();
+    await screen.findByText(
+      english
+        ? "The word list changed. Reload its entries."
+        : "词表内容已变化，请重新加载词条。"
+    );
+    expect(
+      screen.queryByRole("heading", { name: "banana" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: english ? "Reload" : "重新加载" })
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    );
+    reachBottom();
+    await screen.findByRole("heading", { name: "banana" });
+    expect(
+      screen.getByText(english ? "All 2 entries loaded" : "已加载全部 2 个词条")
+    ).toBeVisible();
+  }
+);
 
 it("keeps a publication application private until manual approval", async () => {
   vi.mocked(api.wordList.myDetail).mockResolvedValueOnce({

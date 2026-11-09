@@ -81,7 +81,7 @@ export const webInvitations = /* @__PURE__ */ defineWebMessages(
       "Loading invitation history…"
     ],
     no_invitations_yet: ["暂无邀请记录", "暫無邀請記錄", "No invitations yet"],
-    deleted_user: ["已注销用户", "已登出使用者", "Deleted user"],
+    deleted_user: ["已注销用户", "已註銷使用者", "Deleted user"],
     issued_v0: ["已发放 {{v0}}", "已發放 {{v0}}", "Issued {{v0}}"],
     pending_your_friend_must_bind_a_phone_number_and_first_meet_the_learning: [
       "待达标：好友需绑定手机号并首次学习达标",

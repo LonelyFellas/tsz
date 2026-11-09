@@ -97,10 +97,9 @@ export function ApplyTeacherForm() {
               <PrivateImage
                 key={file.id}
                 id={file.id}
-                label={
-                  groups.find((g) => g.kind === file.kind)?.label ??
-                  uiText("认证材料")
-                }
+                label={uiText(
+                  groups.find((g) => g.kind === file.kind)?.label ?? "认证材料"
+                )}
               />
             ))}
           </div>
@@ -357,9 +356,9 @@ function ApplicationEditor({
                 <label
                   title={
                     multiple
-                      ? uiText("添加{{v0}}照片", { v0: group.label })
+                      ? uiText("添加{{v0}}照片", { v0: uiText(group.label) })
                       : groupFiles.length
-                        ? uiText("更换{{v0}}", { v0: group.label })
+                        ? uiText("更换{{v0}}", { v0: uiText(group.label) })
                         : undefined
                   }
                   className={cn(
@@ -467,9 +466,11 @@ function ApplicationEditor({
                             onClick={() => void remove(file)}
                             className="group absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
                             aria-label={uiText("移除{{v0}}", {
-                              v0: group.label
+                              v0: uiText(group.label)
                             })}
-                            title={uiText("移除{{v0}}", { v0: group.label })}
+                            title={uiText("移除{{v0}}", {
+                              v0: uiText(group.label)
+                            })}
                           >
                             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface/95 text-foreground-muted transition group-hover:bg-surface group-hover:text-danger">
                               <svg

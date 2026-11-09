@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LocalWebError } from "@/i18n/catalog";
 import { read, utils, write } from "xlsx";
 import { createExcelTemplate, parseExcel } from "./excel";
 import { validateExcelRow } from "./excel-rows";
@@ -78,7 +79,7 @@ describe.each(["xlsx", "biff8"] as const)("%s Excel 导入", (format) => {
     ).toThrow("三列");
     expect(() =>
       parseExcel(workbook([["单词", "释义", "注释"], ["apple"]], format), name)
-    ).toThrow("表头");
+    ).toThrow(LocalWebError);
   });
 });
 it("模板使用词条名称表头，填入内容后可以导入", () => {

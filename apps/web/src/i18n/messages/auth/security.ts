@@ -6,7 +6,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     back_to_account: ["返回个人中心", "返回個人中心", "Back to account"],
     account: ["个人中心", "個人中心", "Account"],
     cancel: ["取消", "取消", "Cancel"],
-    delete_account: ["注销账号", "登出賬號", "Delete account"],
+    delete_account: ["注销账号", "註銷賬號", "Delete account"],
     account_security: ["账号安全", "帳號安全", "Account security"],
     phone_number: ["手机号", "手機號碼", "Phone number"],
     email: ["邮箱", "郵箱", "Email"],
@@ -50,7 +50,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     ],
     request_account_deletion: [
       "申请注销",
-      "申請登出",
+      "申請註銷",
       "Request account deletion"
     ],
     back_to_account_security: [
@@ -159,7 +159,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     get_code: ["获取验证码", "取得驗證碼", "Get code"],
     word_list_audio_is_still_being_generated_or_refunded_wait_until_processi: [
       "词表语音仍在生成或退款中，请等待处理完成后再申请注销",
-      "詞表語音仍在生成或退款中，請等待處理完成後再申請登出",
+      "詞表語音仍在生成或退款中，請等待處理完成後再申請註銷",
       "Word list audio is still being generated or refunded. Wait until processing finishes before requesting account deletion."
     ],
     your_balance_has_changed_check_the_latest_amount_and_agree_again: [
@@ -169,22 +169,22 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     ],
     the_deletion_declaration_has_changed_read_and_agree_again: [
       "注销声明已更新，请重新阅读并签署",
-      "登出宣告已更新，請重新閱讀並簽署",
+      "註銷宣告已更新，請重新閱讀並簽署",
       "The deletion declaration has changed. Read and agree again."
     ],
     you_already_have_a_pending_deletion_request_check_its_status: [
       "已有待生效的注销申请，请查看当前状态",
-      "已有待生效的登出申請，請檢視當前狀態",
+      "已有待生效的註銷申請，請檢視當前狀態",
       "You already have a pending deletion request. Check its status."
     ],
     deletion_has_taken_effect_and_can_no_longer_be_cancelled: [
       "已到注销生效时间，无法撤销",
-      "已到登出生效時間，無法撤銷",
+      "已到註銷生效時間，無法撤銷",
       "Deletion has taken effect and can no longer be cancelled"
     ],
     confirm_the_deletion_rules_and_balance_waiver: [
       "请主动确认注销规则及余额放弃声明",
-      "請主動確認登出規則及餘額放棄宣告",
+      "請主動確認註銷規則及餘額放棄宣告",
       "Confirm the deletion rules and balance waiver"
     ],
     the_code_is_incorrect_expired_or_already_used_request_a_new_one: [
@@ -229,7 +229,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     ],
     account_deletion_requests_are_unavailable_try_again_later: [
       "注销申请服务暂不可用，请稍后重试",
-      "登出申請服務暫不可用，請稍後重試",
+      "註銷申請服務暫不可用，請稍後重試",
       "Account deletion requests are unavailable. Try again later."
     ],
     invalid_submission_check_and_try_again: [
@@ -244,7 +244,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     ],
     deletion_request_cancelled_your_balance_is_unchanged: [
       "注销申请已撤销，天生币余额保持不变。",
-      "登出申請已撤銷，天生币餘額保持不變。",
+      "註銷申請已撤銷，天生币餘額保持不變。",
       "Deletion request cancelled. Your 天生币 balance is unchanged."
     ],
     a_code_was_sent_to_your_bound_v0_check_for_it: [
@@ -254,32 +254,32 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     ],
     deletion_request_saved_your_current_session_remains_active: [
       "注销申请已保存，当前会话保留。",
-      "登出申請已儲存，當前會話保留。",
+      "註銷申請已儲存，當前會話保留。",
       "Deletion request saved. Your current session remains active."
     ],
     this_deletion_request_was_cancelled_request_a_new_code_and_agree_again_t: [
       "这份注销申请已撤销。如需重新申请，请重新获取验证码并签署。",
-      "這份登出申請已撤銷。如需重新申請，請重新獲取驗證碼並簽署。",
+      "這份註銷申請已撤銷。如需重新申請，請重新獲取驗證碼並簽署。",
       "This deletion request was cancelled. Request a new code and agree again to reapply."
     ],
     this_deletion_request_has_ended_reload_your_account_status: [
       "这份注销申请已结束，请重新读取账号状态。",
-      "這份登出申請已結束，請重新讀取賬號狀態。",
+      "這份註銷申請已結束，請重新讀取賬號狀態。",
       "This deletion request has ended. Reload your account status."
     ],
     your_balance_or_deletion_declaration_has_changed_check_the_latest_detail: [
       "余额或注销声明已变化，请核对最新内容并重新签署",
-      "餘額或登出宣告已變化，請核對最新內容並重新簽署",
+      "餘額或註銷宣告已變化，請核對最新內容並重新簽署",
       "Your balance or deletion declaration has changed. Check the latest details and agree again."
     ],
     loading_deletion_status: [
       "正在读取注销状态…",
-      "正在讀取登出狀態…",
+      "正在讀取註銷狀態…",
       "Loading deletion status…"
     ],
     account_deletion_pending: [
       "注销申请等待生效",
-      "登出申請等待生效",
+      "註銷申請等待生效",
       "Account deletion pending"
     ],
     deletion_takes_effect_after_72_consecutive_hours_you_can_still_sign_in_a: [
@@ -306,12 +306,12 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     cancelling: ["正在撤销…", "正在撤銷…", "Cancelling…"],
     cancel_deletion_request: [
       "撤销注销申请",
-      "撤銷登出申請",
+      "撤銷註銷申請",
       "Cancel deletion request"
     ],
     cannot_delete_account: [
       "无法注销账号",
-      "無法登出賬號",
+      "無法註銷賬號",
       "Cannot delete account"
     ],
     no_phone_number_or_email_is_bound_to_this_account_contact_support_first: [
@@ -321,12 +321,12 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     ],
     before_deleting_your_account: [
       "注销前请确认",
-      "登出前請確認",
+      "註銷前請確認",
       "Before deleting your account"
     ],
     deletion_takes_effect_after_72_hours_and_can_be_cancelled_before_then_tr: [
       "提交申请后 72 小时生效，期间可撤销，天生币收支将暂停。 注销生效后，账号无法使用，剩余天生币作废，个人数据将被清理。",
-      "提交申請後 72 小時生效，期間可撤銷，天生币收支將暫停。 登出生效後，賬號無法使用，剩餘天生币作廢，個人資料將被清理。",
+      "提交申請後 72 小時生效，期間可撤銷，天生币收支將暫停。 註銷生效後，賬號無法使用，剩餘天生币作廢，個人資料將被清理。",
       "Deletion takes effect after 72 hours and can be cancelled before then. 天生币 transactions will be paused. Once effective, the account cannot be used, remaining 天生币 expire and personal data are deleted."
     ],
     "1_choose_a_verification_method": [
@@ -359,7 +359,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     next: ["下一步", "下一步", "Next"],
     submit_account_deletion_request: [
       "确认提交注销申请？",
-      "確認提交登出申請？",
+      "確認提交註銷申請？",
       "Submit account deletion request?"
     ],
     confirmed_balance_2: [
@@ -370,7 +370,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     coins: ["天生币", "天生币", "天生币"],
     i_have_read_and_agree_to_the_account_deletion_rules_above: [
       "我已阅读并同意以上注销规则",
-      "我已閱讀並同意以上登出規則",
+      "我已閱讀並同意以上註銷規則",
       "I have read and agree to the account deletion rules above"
     ],
     and_give_up_the_confirmed_v0: [
@@ -386,7 +386,7 @@ export const webAuthSecurity = /* @__PURE__ */ defineWebMessages(
     submitting_2: ["正在提交…", "正在提交…", "Submitting…"],
     submit_deletion_request: [
       "提交注销申请",
-      "提交登出申請",
+      "提交註銷申請",
       "Submit deletion request"
     ],
     use_at_least_v0_characters_for_your_password: [

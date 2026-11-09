@@ -56,7 +56,7 @@ export const webTeacherCertificationNotifications =
           "你已獲得教師身份，可在賬號選單中切換工作臺，原有學生身份保持不變。",
           "You now have a teacher role. Switch workspaces in the account menu; your student role is unchanged."
         ],
-      deleted_account: ["账号已注销", "賬號已登出", "Deleted account"],
+      deleted_account: ["账号已注销", "賬號已註銷", "Deleted account"],
       deleted: ["（已删除）", "（已刪除）", "(deleted)"],
       view_word_list: ["查看词表", "檢視詞表", "View word list"],
       view_received_tips: [

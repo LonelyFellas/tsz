@@ -59,12 +59,12 @@ export const webCoinsWallet = /* @__PURE__ */ defineWebMessages(
     word_list_tips: ["词表投币记录", "詞表投幣記錄", "Word list tips"],
     your_account_is_awaiting_deletion_all_wallet_credits_and_spending_are_pa: [
       "账号正在等待注销，钱包已暂停全部入账和支出。撤销后可恢复原余额。",
-      "賬號正在等待登出，錢包已暫停全部入賬和支出。撤銷後可恢復原餘額。",
+      "賬號正在等待註銷，錢包已暫停全部入賬和支出。撤銷後可恢復原餘額。",
       "Your account is awaiting deletion. All wallet credits and spending are paused. Cancelling restores access to your unchanged balance."
     ],
     view_deletion_request: [
       "查看注销申请",
-      "檢視登出申請",
+      "檢視註銷申請",
       "View deletion request"
     ],
     your_wallet_is_closed: [

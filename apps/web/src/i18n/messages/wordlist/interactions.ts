@@ -161,7 +161,7 @@ export const webWordlistInteractions = /* @__PURE__ */ defineWebMessages(
     received: ["收到", "收到", "Received"],
     author: ["作者", "作者", "Author"],
     tipper: ["投币人", "投幣人", "Tipper"],
-    deleted_account: ["账号已注销", "賬號已登出", "Deleted account"],
+    deleted_account: ["账号已注销", "賬號已註銷", "Deleted account"],
     word_list_deleted_or_inaccessible: [
       "词表已删除或不可访问",
       "詞表已刪除或不可訪問",

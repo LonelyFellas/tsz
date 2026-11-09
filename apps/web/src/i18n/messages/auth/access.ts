@@ -15,7 +15,7 @@ export const webAuthAccess = /* @__PURE__ */ defineWebMessages(
       "繫結後，所有裝置需重新登入。",
       "You will need to sign in again on every device after binding."
     ],
-    delete_account: ["注销账号", "登出賬號", "Delete account"],
+    delete_account: ["注销账号", "註銷賬號", "Delete account"],
     english_vocabulary_learning: [
       "天生会背 · 智能英语单词学习平台",
       "天生会背 · 智慧英語單詞學習平臺",
@@ -243,7 +243,7 @@ export const webAuthAccess = /* @__PURE__ */ defineWebMessages(
     ],
     account_deleted: [
       "账号已注销成功。",
-      "賬號已登出成功。",
+      "賬號已註銷成功。",
       "Account deleted."
     ],
     account_created_sign_in_with_the_password_you_just_set: [
