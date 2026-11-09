@@ -639,3 +639,5 @@ Codex 内置浏览器（实例 ID 可连接，iab 别名不可用）完成两端
 独立精确提交首轮审查覆盖上述 SHA 完整差异，无确认 P0–P2，发现 1 项 P3：完整模式「细分词性」表头的原右对齐条件迁移漏键，已补回既有 `subcategory`，不改布局体系。定向边界复查还先以失败用例证明原型继承键 `toString` 会绕过运行时存在检查，再改为目录 own-key 检查；合法键及译文均不变。修复与最终回执将交同一 reviewer 增量复查，不重跑未变范围的完整审查。
 
 清理回执 `/tmp/tsz-web-keys-20261109-eaf27f66-cleanup.json`：删除前以精确 UUID/批次归属核实仅 1 用户、1 词表、1 任务、0 轮次；私有 UTF-8 PG 与 Redis 的全部会话/OTP/审计/限流/幂等及关联数据随专属进程和目录彻底删除。两轮浏览器专用 origin 的 Cookie/localStorage/sessionStorage/CacheStorage/IndexedDB/service worker 均为 0；59931–59935 独立复查无监听，凭据、私有二进制副本和原始日志已删除。无 OSS 对象、无共享数据库或正常账号数据变更；仅保留脱敏截图、验证证据和清理回执。
+
+本批 [PR #711](https://github.com/LonelyFellas/tsz/pull/711) 已创建。代码增量审查覆盖 `903b7ae212ec39540498dfe1d1e6996a5e566912`：2 轮，确认缺陷 1（P3，已修复），误报 0，关联回归/回退未知；原型键检查属于边界补强，无确认现有业务触发路径。原生提交 hooks、commitlint 与 pre-push 全仓类型检查正常通过。该 PR 的检查与交付记录持续登记最终 CI、main/测试两端的精确版本、制品来源及 manifest 验收回执；后端保持 `01114dc7`，不重复发布。
