@@ -119,6 +119,7 @@
 }
 .settings-dialect .ui-radio-group {
   display: flex;
+  align-items: stretch;
   gap: 10px;
   flex-shrink: 0;
   max-width: 100%;
