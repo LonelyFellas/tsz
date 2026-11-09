@@ -1,3 +1,6 @@
+import { webText, webErrorText, webCommon } from "@/i18n/catalog";
+import { createInterfaceI18n } from "@tsz/shared/i18n";
+
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
@@ -41,7 +44,14 @@ function Harness() {
         onClick={() =>
           void value
             .select("teacher")
-            .catch((error: Error) => setError(error.message))
+            .catch((error: Error) =>
+              setError(
+                webText(
+                  createInterfaceI18n(),
+                  webCommon
+                )(webErrorText(error, ""))
+              )
+            )
         }
       >
         切换

@@ -43,23 +43,27 @@ export default function MainError({
         </span>
         <h2 className="text-lg font-semibold tracking-tight text-foreground">
           {resourceError
-            ? uiText("页面资源加载失败")
-            : uiText("页面暂时无法显示")}
+            ? uiText("webApp:page_resources_could_not_be_loaded")
+            : uiText("webApp:this_page_cannot_be_displayed")}
         </h2>
         <p>
           {resourceError
-            ? uiText("请检查网络后重新加载；已备份的编辑内容可在原页面恢复。")
-            : uiText("重新加载即可继续；如果反复出现，请稍后再试。")}
+            ? uiText(
+                "webApp:check_your_connection_and_reload_backed_up_edits_can_be_restored_on_the"
+              )
+            : uiText(
+                "webApp:reload_to_continue_if_the_problem_persists_try_again_later"
+              )}
         </p>
         <div className="mt-1 flex flex-wrap items-center justify-center gap-3">
           {/* 资源已失效时 reset() 会再撞一次同一个 chunk,必须整页重载。 */}
           <Button
             onClick={resourceError ? () => window.location.reload() : reset}
           >
-            {resourceError ? uiText("重新加载") : uiText("重试")}
+            {resourceError ? uiText("webApp:reload") : uiText("webApp:retry")}
           </Button>
           <Button variant="ghost" asChild>
-            <Link href="/">{uiText("返回首页")}</Link>
+            <Link href="/">{uiText("webApp:go_to_home")}</Link>
           </Button>
         </div>
       </div>

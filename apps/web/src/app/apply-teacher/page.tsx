@@ -10,9 +10,9 @@ import { PageShell } from "@/features/shell/Page";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("申请成为老师"),
+    title: uiText("webApp:apply_to_teach"),
     description: uiText(
-      "在天生会背提交教师认证资料，通过站内通知查看审核结果。"
+      "webApp:submit_teacher_certification_documents_on_and_check_the_review_result_in"
     ),
     alternates: { canonical: "/apply-teacher" },
     robots: { index: false, follow: false }
@@ -27,10 +27,10 @@ export default function ApplyTeacherPage() {
       <main className="mx-auto w-full max-w-5xl">
         <PageShell size="lg">
           <AppPageHeader
-            back={{ href: "/account", label: "返回个人中心" }}
-            eyebrow="教师认证"
-            title="申请成为老师"
-            description="提交资料申请教师认证，审核结果通过站内通知送达。班级与教学任务暂未开放；你仍可使用学生身份学习。"
+            back={{ href: "/account", label: "webApp:back_to_account" }}
+            eyebrow="webApp:teacher_certification"
+            title="webApp:apply_to_teach"
+            description="webApp:submit_documents_for_teacher_certification_the_result_appears_in_notific"
           />
           <ApplyTeacherForm />
         </PageShell>

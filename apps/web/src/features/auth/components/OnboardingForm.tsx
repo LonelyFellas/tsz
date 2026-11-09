@@ -1,5 +1,6 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import { localText, type WebNotice } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthOnboarding as webAuth } from "@/i18n/messages/auth/onboarding";
 
@@ -17,32 +18,64 @@ import { buttonClass, primaryButtonClass } from "@/features/shell/Page";
 
 const LEVELS: {
   level: CEFRLevel;
-  stage: string;
-  band?: string;
+  stage: WebNotice;
+  band?: WebNotice;
 }[] = [
-  { level: "C2", stage: "英专", band: "高级" },
-  { level: "C1", stage: "英专" },
-  { level: "B2", stage: "高中", band: "中级" },
-  { level: "B1", stage: "高中" },
-  { level: "A2", stage: "初中", band: "初级" },
-  { level: "A1", stage: "小学", band: "入门" }
+  {
+    level: "C2",
+    stage: localText(webAuth, "webAuthOnboarding:english_degree"),
+    band: localText(webAuth, "webAuthOnboarding:advanced")
+  },
+  {
+    level: "C1",
+    stage: localText(webAuth, "webAuthOnboarding:english_degree")
+  },
+  {
+    level: "B2",
+    stage: localText(webAuth, "webAuthOnboarding:senior_secondary"),
+    band: localText(webAuth, "webAuthOnboarding:intermediate")
+  },
+  {
+    level: "B1",
+    stage: localText(webAuth, "webAuthOnboarding:senior_secondary")
+  },
+  {
+    level: "A2",
+    stage: localText(webAuth, "webAuthOnboarding:lower_secondary"),
+    band: localText(webAuth, "webAuthOnboarding:elementary")
+  },
+  {
+    level: "A1",
+    stage: localText(webAuth, "webAuthOnboarding:primary_school"),
+    band: localText(webAuth, "webAuthOnboarding:beginner")
+  }
 ];
 
 const VARIANTS: {
   variant: EnglishVariant;
   short: string;
-  label: string;
+  label: WebNotice;
 }[] = [
-  { variant: "BrE", short: "BrE", label: "英式英语" },
-  { variant: "AmE", short: "AmE", label: "美式英语" }
+  {
+    variant: "BrE",
+    short: "BrE",
+    label: localText(webAuth, "webAuthOnboarding:british_english")
+  },
+  {
+    variant: "AmE",
+    short: "AmE",
+    label: localText(webAuth, "webAuthOnboarding:american_english")
+  }
 ];
 
 const OPTION_CLASS =
   "flex items-center gap-4 rounded-2xl border bg-surface transition-[border-color,background-color,box-shadow] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary";
 
-const ONBOARDING_ERRORS: Record<string, string> = {
-  "learning settings require a student profile":
-    "当前账号没有学生身份，无法设置学习偏好"
+const ONBOARDING_ERRORS: Record<string, WebNotice> = {
+  "learning settings require a student profile": localText(
+    webAuth,
+    "webAuthOnboarding:this_account_needs_a_student_role_to_set_learning_preferences"
+  )
 };
 
 interface OnboardingFormProps {
@@ -83,11 +116,23 @@ export function OnboardingForm({
           router.replace("/account/profile");
           return;
         }
-        setError("难度已在其他页面确认，请刷新查看已保存的配置。");
+        setError(
+          localText(
+            webAuth,
+            "webAuthOnboarding:your_level_was_confirmed_on_another_page_reload_to_view_the_saved_settin"
+          )
+        );
       } else {
         const msg = e instanceof Error ? e.message : "";
         setError(
-          translateAuthError(msg, ONBOARDING_ERRORS, "保存失败，请稍后重试")
+          translateAuthError(
+            msg,
+            ONBOARDING_ERRORS,
+            localText(
+              webAuth,
+              "webAuthOnboarding:could_not_save_try_again_later"
+            )
+          )
         );
       }
     } finally {
@@ -105,21 +150,21 @@ export function OnboardingForm({
             className="inline-flex h-11 items-center gap-2.5 rounded-full px-3 text-base font-bold tracking-tight text-foreground transition-colors hover:bg-surface/80 focus-visible:outline-2 focus-visible:outline-primary"
           >
             <BrandMark />
-            {uiText("天生会背")}
+            {uiText("webAuthOnboarding:brand")}
           </Link>
           <div className="flex items-center gap-2 text-xs">
             <span className="rounded-full bg-muted px-3 py-1.5 text-foreground-muted">
               {variant === null
-                ? uiText("待选择")
+                ? uiText("webAuthOnboarding:not_selected")
                 : variant === "AmE"
-                  ? uiText("美式")
-                  : uiText("英式")}
+                  ? uiText("webAuthOnboarding:american")
+                  : uiText("webAuthOnboarding:british")}
             </span>
             <Link
               href="/account"
               className="glass inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium tracking-wide text-foreground transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
             >
-              {uiText("个人中心")}
+              {uiText("webAuthOnboarding:account")}
             </Link>
           </div>
         </div>
@@ -127,23 +172,25 @@ export function OnboardingForm({
 
       <main className="animate-in mx-auto max-w-5xl px-6 pb-16 pt-8 sm:pt-12">
         <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-          {uiText("新手引导")}
+          {uiText("webAuthOnboarding:getting_started")}
         </p>
         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-          {uiText("先确定你的学习起点")}
+          {uiText("webAuthOnboarding:choose_your_starting_level")}
         </h1>
         <p className="mb-8 mt-3 max-w-xl text-sm leading-6 text-foreground-muted">
-          {uiText("选择适合自己的难度，再确定习惯的英语发音与拼写。")}
+          {uiText(
+            "webAuthOnboarding:choose_a_suitable_level_and_your_preferred_english_pronunciation_and_spe"
+          )}
         </p>
         <div className="grid gap-6 md:grid-cols-2">
           <section className="glass rounded-3xl p-2">
             <div className="h-full rounded-[20px] bg-surface/70 p-6 sm:p-8">
               <h2 className="text-xl font-semibold tracking-tight">
-                {uiText("1. 选择难度级别")}
+                {uiText("webAuthOnboarding:1_choose_a_difficulty_level")}
               </h2>
               <p className="mt-3 text-sm leading-6 text-foreground-muted">
                 {uiText(
-                  "根据自身水平选择。难度首次确认后不可修改，请慎重选择。"
+                  "webAuthOnboarding:choose_according_to_your_ability_the_level_cannot_be_changed_once_confir"
                 )}
               </p>
               <Link
@@ -154,12 +201,14 @@ export function OnboardingForm({
                 }
                 className="mt-2 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
-                {uiText("不确定选哪个？1 分钟测一测")}
+                {uiText(
+                  "webAuthOnboarding:not_sure_take_a_one_minute_assessment"
+                )}
               </Link>
               <div
                 className="mt-6 space-y-2"
                 role="radiogroup"
-                aria-label={uiText("难度级别")}
+                aria-label={uiText("webAuthOnboarding:difficulty_level")}
               >
                 {LEVELS.map(({ level: lv, stage, band }) => {
                   const active = level === lv;
@@ -208,7 +257,7 @@ export function OnboardingForm({
                           aria-hidden="true"
                           className="ml-auto pr-2 text-xs font-medium text-primary"
                         >
-                          {uiText("已选")}
+                          {uiText("webAuthOnboarding:selected")}
                         </span>
                       )}
                     </label>
@@ -216,15 +265,17 @@ export function OnboardingForm({
                 })}
               </div>
               <p className="mt-4 text-xs leading-5 text-foreground-muted">
-                {uiText("学段仅作参考，请以实际英语水平为准。")}
+                {uiText(
+                  "webAuthOnboarding:school_stages_are_a_guide_choose_based_on_your_english_ability"
+                )}
               </p>
               <details className="mt-5 rounded-2xl border border-border/60 bg-muted/70 px-4 py-3 text-sm text-foreground-muted">
                 <summary className="cursor-pointer font-medium text-primary">
-                  {uiText("什么是 CEFR 难度等级？")}
+                  {uiText("webAuthOnboarding:what_are_cefr_levels")}
                 </summary>
                 <p className="mt-2 text-xs leading-6">
                   {uiText(
-                    "CEFR 是欧洲语言共同参考框架。A1、A2 为基础使用，B1、B2 为独立使用，C1、C2 为熟练使用；由 A1 到 C2，难度逐级提高。"
+                    "webAuthOnboarding:cefr_is_the_common_european_framework_of_reference_for_languages_a1_and"
                   )}
                 </p>
               </details>
@@ -234,17 +285,17 @@ export function OnboardingForm({
           <section className="glass rounded-3xl p-2">
             <div className="flex h-full flex-col rounded-[20px] bg-surface/70 p-6 sm:p-8">
               <h2 className="text-xl font-semibold tracking-tight">
-                {uiText("2. 英式还是美式？")}
+                {uiText("webAuthOnboarding:2_british_or_american_english")}
               </h2>
               <p className="mt-3 text-sm leading-6 text-foreground-muted">
                 {uiText(
-                  "选择你习惯的英语发音和拼写。英美偏好之后可以在个人中心修改。"
+                  "webAuthOnboarding:choose_your_preferred_pronunciation_and_spelling_you_can_change_this_lat"
                 )}
               </p>
               <div
                 className="mt-6 space-y-3"
                 role="radiogroup"
-                aria-label={uiText("英美偏好")}
+                aria-label={uiText("webAuthOnboarding:english_preference")}
               >
                 {VARIANTS.map(({ variant: v, short, label }) => {
                   const active = variant === v;
@@ -281,7 +332,7 @@ export function OnboardingForm({
                           aria-hidden="true"
                           className="ml-auto text-sm font-medium"
                         >
-                          {uiText("已选")}
+                          {uiText("webAuthOnboarding:selected")}
                         </span>
                       )}
                     </label>
@@ -290,7 +341,7 @@ export function OnboardingForm({
               </div>
               <p className="mt-5 text-xs leading-6 text-foreground-muted">
                 {uiText(
-                  "BrE = British English（英式英语）；AmE = American English（美式英语）。请选择其中一种作为个人偏好。"
+                  "webAuthOnboarding:bre_means_british_english_ame_means_american_english_choose_one_as_your"
                 )}
               </p>
               <div className="mt-auto pt-8">
@@ -304,20 +355,26 @@ export function OnboardingForm({
                 )}
                 {confirming ? (
                   <section
-                    aria-label={uiText("确认学习配置")}
+                    aria-label={uiText(
+                      "webAuthOnboarding:confirm_learning_settings"
+                    )}
                     className="rounded-2xl border border-border/60 bg-muted/70 p-4"
                   >
                     <p className="text-sm font-semibold">
-                      {uiText("确认你的学习配置")}
+                      {uiText(
+                        "webAuthOnboarding:confirm_your_learning_settings"
+                      )}
                     </p>
                     <p className="mt-2 text-sm text-foreground-muted">
-                      {uiText("难度")} {level} ·
+                      {uiText("webAuthOnboarding:level")} {level} ·
                       {variant === "AmE"
-                        ? uiText("美式英语")
-                        : uiText("英式英语")}
+                        ? uiText("webAuthOnboarding:american_english")
+                        : uiText("webAuthOnboarding:british_english")}
                     </p>
                     <p className="mt-2 text-xs leading-6 text-foreground-muted">
-                      {uiText("难度确认后不可修改；英美偏好之后仍可调整。")}
+                      {uiText(
+                        "webAuthOnboarding:your_level_cannot_be_changed_once_confirmed_your_english_preference_can"
+                      )}
                     </p>
                     <div className="mt-4 flex gap-3">
                       <button
@@ -329,7 +386,7 @@ export function OnboardingForm({
                         disabled={loading}
                         className={cn(buttonClass, "min-h-12 px-5")}
                       >
-                        {uiText("返回调整")}
+                        {uiText("webAuthOnboarding:go_back")}
                       </button>
                       <button
                         type="button"
@@ -338,8 +395,10 @@ export function OnboardingForm({
                         className={cn(primaryButtonClass, "flex-1 px-4")}
                       >
                         {loading
-                          ? uiText("保存中...")
-                          : uiText("确认并开始学习")}
+                          ? uiText("webAuthOnboarding:saving")
+                          : uiText(
+                              "webAuthOnboarding:confirm_and_start_learning"
+                            )}
                       </button>
                     </div>
                   </section>
@@ -350,7 +409,7 @@ export function OnboardingForm({
                     disabled={!canSubmit}
                     className={cn(primaryButtonClass, "w-full")}
                   >
-                    {uiText("完成，开始学习")}
+                    {uiText("webAuthOnboarding:done_start_learning")}
                   </button>
                 )}
               </div>

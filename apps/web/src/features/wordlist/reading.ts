@@ -2,7 +2,6 @@ import type {
   CEFRLevel,
   WordlistDefinition,
   WordlistText,
-  WordlistState,
   EnglishVariant
 } from "@tsz/types";
 const LEVELS: readonly string[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
@@ -31,13 +30,6 @@ export function selectTexts<T extends Pick<WordlistText, "dialect">>(
   );
   return selected.length ? selected : texts;
 }
-export const STATE_LABEL: Record<WordlistState, string> = {
-  draft: "私密草稿",
-  pending: "待审核",
-  published: "已公开",
-  rejected: "审核未通过",
-  withdrawn: "已下架"
-};
 export {
   buttonClass,
   inputClass,

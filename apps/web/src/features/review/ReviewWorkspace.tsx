@@ -1,5 +1,11 @@
 "use client";
-import { type WebNotice, webErrorText } from "@/i18n/catalog";
+import {
+  lookupWebNotice,
+  localText,
+  type WebNotice,
+  webErrorText
+} from "@/i18n/catalog";
+
 import { useWebLocale, useWebText } from "@/i18n/client";
 import { webReview } from "@/i18n/messages/review";
 
@@ -27,9 +33,18 @@ function errorText(
 ) {
   if (error instanceof HttpError && error.status === 404)
     return context === "session"
-      ? "本次复习不存在或已不可访问，请返回今日复习。"
-      : "复习功能尚未开放，原有学习任务仍可继续。";
-  return webErrorText(error, "操作未完成，请重试。");
+      ? localText(
+          webReview,
+          "webReview:this_review_does_not_exist_or_is_no_longer_accessible_return_to_today_s"
+        )
+      : localText(
+          webReview,
+          "webReview:reviews_are_not_available_yet_existing_learning_tasks_can_continue"
+        );
+  return webErrorText(
+    error,
+    localText(webReview, "webReview:the_action_did_not_complete_try_again")
+  );
 }
 function time(value: string, locale: InterfaceLocale) {
   return new Date(value).toLocaleString(locale, {
@@ -40,11 +55,14 @@ function time(value: string, locale: InterfaceLocale) {
     minute: "2-digit"
   });
 }
-const stages: Record<string, string> = {
-  unverified: "内容更新，待验证",
-  learning: "学习中",
-  reviewing: "复习中",
-  relearning: "待巩固"
+const stages: Record<string, WebNotice> = {
+  unverified: localText(
+    webReview,
+    "webReview:content_updated_verification_pending"
+  ),
+  learning: localText(webReview, "webReview:learning"),
+  reviewing: localText(webReview, "webReview:reviewing"),
+  relearning: localText(webReview, "webReview:needs_consolidation")
 };
 
 export function ReviewWorkspace({ sessionId }: { sessionId?: string }) {
@@ -54,7 +72,9 @@ export function ReviewWorkspace({ sessionId }: { sessionId?: string }) {
   if (!user.roles.includes("student"))
     return (
       <PageShell>
-        <PageNotice tone="error">{uiText("需要学生身份才能复习。")}</PageNotice>
+        <PageNotice tone="error">
+          {uiText("webReview:you_need_a_student_role_to_review")}
+        </PageNotice>
       </PageShell>
     );
   return sessionId ? (
@@ -191,26 +211,29 @@ function Overview({ userId }: { userId: string }) {
   return (
     <PageShell>
       <PageHeader
-        title={uiText("今日复习")}
-        back={{ href: "/student/home", label: uiText("学习首页") }}
+        title={uiText("webReview:review_today")}
+        back={{
+          href: "/student/home",
+          label: uiText("webReview:learning_home")
+        }}
         description={uiText(
-          "把学过的词，再记牢一点。换一本词表，也能接着积累。"
+          "webReview:strengthen_the_words_you_have_learnt_your_progress_continues_across_word"
         )}
       />
       {overview.isPending ? (
-        <PageNotice>{uiText("正在读取复习安排…")}</PageNotice>
+        <PageNotice>{uiText("webReview:loading_review_schedule")}</PageNotice>
       ) : overview.isError ? (
         <PageNotice tone="error">
           {uiText(errorText(overview.error))}{" "}
           <Button variant="link" onClick={() => void overview.refetch()}>
-            {uiText("重新读取")}
+            {uiText("webReview:reload_image")}
           </Button>
         </PageNotice>
       ) : !data?.available ? (
         <PageNotice>
-          {uiText("复习功能尚未开放。")}
+          {uiText("webReview:reviews_are_not_available_yet")}
           <Link className="ml-2 text-primary" href="/student/practice">
-            {uiText("继续学习任务")}
+            {uiText("webReview:continue_learning_tasks")}
           </Link>
         </PageNotice>
       ) : (
@@ -223,18 +246,22 @@ function Overview({ userId }: { userId: string }) {
           {!data.enabled ? (
             <section className={`${panelClass} space-y-5`}>
               <h2 className="text-xl font-semibold">
-                {uiText("从下一次作答开始记住你的进度")}
+                {uiText(
+                  "webReview:remember_your_progress_from_your_next_answer"
+                )}
               </h2>
               <p className="text-sm leading-7 text-foreground-muted">
                 {uiText(
-                  "开启后，任务中的首次作答会形成个人记忆，答错的内容会安排巩固。任务结束后仍会提醒复习，你可以随时暂停。"
+                  "webReview:when_enabled_first_answers_in_tasks_form_personal_memories_and_incorrect"
                 )}
               </p>
               <Button disabled={busy} onClick={() => void toggle(true)}>
-                {uiText("开启个人记忆")}
+                {uiText("webReview:enable_personal_memory")}
               </Button>
               <p className="text-xs text-foreground-muted">
-                {uiText("独立复习和错题重测暂不计天生币，原任务奖励不变。")}
+                {uiText(
+                  "webReview:independent_reviews_and_retries_do_not_earn_yet_existing_task_rewards_ar"
+                )}
               </p>
             </section>
           ) : (
@@ -242,35 +269,45 @@ function Overview({ userId }: { userId: string }) {
               <section className={`${panelClass} space-y-6`}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-xl font-semibold">
-                    {uiText("这次，从需要再想一想的开始")}
+                    {uiText(
+                      "webReview:start_with_words_that_need_another_look"
+                    )}
                   </h2>
                   <span className="text-sm text-foreground-muted">
                     {data.answer_profile === "BrE"
-                      ? uiText("英式拼写")
-                      : uiText("美式拼写")}
+                      ? uiText("webReview:british_spelling")
+                      : uiText("webReview:american_spelling")}
                   </span>
                 </div>
                 <dl className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <dt>{uiText("已到期")}</dt>
-                    <dd>{uiText("{{v0}} 项", { v0: data.due_count })}</dd>
+                    <dt>{uiText("webReview:due")}</dt>
+                    <dd>
+                      {uiText("webReview:v0_items", { v0: data.due_count })}
+                    </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt>{uiText("可重测的错题")}</dt>
+                    <dt>
+                      {uiText("webReview:incorrect_answers_ready_for_retry")}
+                    </dt>
                     <dd>
-                      {uiText("{{v0}} 项", { v0: data.relearning_count })}
+                      {uiText("webReview:v0_items", {
+                        v0: data.relearning_count
+                      })}
                     </dd>
                   </div>
                   <div className="flex justify-between text-foreground-muted">
-                    <dt>{uiText("稍后再复习")}</dt>
-                    <dd>{uiText("{{v0}} 项", { v0: data.later_count })}</dd>
+                    <dt>{uiText("webReview:review_later")}</dt>
+                    <dd>
+                      {uiText("webReview:v0_items", { v0: data.later_count })}
+                    </dd>
                   </div>
                 </dl>
                 <div className="flex flex-wrap gap-3">
                   {data.current_session_id && (
                     <Button asChild>
                       <Link href={`/student/review/${data.current_session_id}`}>
-                        {uiText("继续本次复习")}
+                        {uiText("webReview:continue_this_review")}
                       </Link>
                     </Button>
                   )}
@@ -280,45 +317,51 @@ function Overview({ userId }: { userId: string }) {
                     }
                     onClick={() => void start("due")}
                   >
-                    {uiText("开始复习，最多 20 项")}
+                    {uiText("webReview:start_review_up_to_20_items")}
                   </Button>
                   <Button
                     variant="outline"
                     disabled={busy || !data.relearning_count}
                     onClick={() => void start("retest")}
                   >
-                    {uiText("只练待巩固内容")}
+                    {uiText("webReview:practise_only_consolidation_items")}
                   </Button>
                 </div>
                 {!data.due_count && !data.relearning_count && (
                   <p className="text-sm text-foreground-muted">
                     {uiText(
-                      "现在没有到期内容。新学的词会按间隔回来，错题至少 10 分钟后可重测。"
+                      "webReview:nothing_is_due_now_new_words_return_on_a_schedule_incorrect_answers_can"
                     )}
                   </p>
                 )}
                 {!!data.unavailable_count && (
                   <p className="text-sm text-foreground-muted">
-                    {uiText("{{v0}} 项来源暂不可用，已保留记忆，暂不出题。", {
-                      v0: data.unavailable_count
-                    })}
+                    {uiText(
+                      "webReview:v0_items_have_unavailable_sources_memories_are_preserved_and_questions_a",
+                      {
+                        v0: data.unavailable_count
+                      }
+                    )}
                   </p>
                 )}
                 <p className="text-xs leading-6 text-foreground-muted">
                   {uiText(
-                    "独立复习和错题重测暂不计天生币，也不会改变原任务的首次正确率。"
+                    "webReview:independent_reviews_and_retries_do_not_earn_yet_or_change_the_original_t"
                   )}
                 </p>
               </section>
-              <section className="space-y-4" aria-label={uiText("个人记忆")}>
+              <section
+                className="space-y-4"
+                aria-label={uiText("webReview:personal_memory")}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-xl font-semibold">
-                    {uiText("学过的内容")}
+                    {uiText("webReview:studied_content")}
                   </h2>
                   <label className="text-sm">
-                    {uiText("筛选")}{" "}
+                    {uiText("webReview:filter")}{" "}
                     <select
-                      aria-label={uiText("记忆筛选")}
+                      aria-label={uiText("webReview:memory_filter")}
                       className="ml-2 rounded-xl border border-border bg-surface p-2"
                       value={filter}
                       onChange={(e) => {
@@ -326,29 +369,33 @@ function Overview({ userId }: { userId: string }) {
                         setAfter(undefined);
                       }}
                     >
-                      <option value="all">{uiText("全部")}</option>
-                      <option value="relearning">{uiText("待巩固")}</option>
-                      <option value="paused">{uiText("已暂停")}</option>
+                      <option value="all">{uiText("webReview:all")}</option>
+                      <option value="relearning">
+                        {uiText("webReview:needs_consolidation")}
+                      </option>
+                      <option value="paused">
+                        {uiText("webReview:paused")}
+                      </option>
                     </select>
                   </label>
                 </div>
                 {items.isPending ? (
-                  <PageNotice>{uiText("正在读取…")}</PageNotice>
+                  <PageNotice>{uiText("webReview:loading")}</PageNotice>
                 ) : items.isError ? (
                   <PageNotice tone="error">
                     {uiText(errorText(items.error))}{" "}
                     <Button variant="link" onClick={() => void items.refetch()}>
-                      {uiText("重试")}
+                      {uiText("webReview:retry")}
                     </Button>
                   </PageNotice>
                 ) : !items.data?.items.length ? (
                   <PageNotice>
-                    {uiText("这里还没有内容。")}
+                    {uiText("webReview:no_content_here_yet")}
                     <Link
                       className="ml-2 text-primary"
                       href="/student/practice"
                     >
-                      {uiText("去做一次学习任务")}
+                      {uiText("webReview:complete_a_learning_task")}
                     </Link>
                   </PageNotice>
                 ) : (
@@ -360,20 +407,22 @@ function Overview({ userId }: { userId: string }) {
                       >
                         <div className="min-w-0">
                           <p className="tsz-words break-words font-semibold">
-                            {item.label ?? uiText("内容暂不可用")}
+                            {item.label ??
+                              uiText("webReview:content_unavailable")}
                           </p>
                           <p className="mt-1 text-xs leading-6 text-foreground-muted">
                             {item.paused
-                              ? uiText("已暂停")
-                              : stages[item.stage]
-                                ? uiText(stages[item.stage])
-                                : item.stage}{" "}
+                              ? uiText("webReview:paused")
+                              : uiText(lookupWebNotice(stages, item.stage)) ||
+                                item.stage}{" "}
                             ·{" "}
                             {item.content_available
-                              ? uiText("下次 {{v0}}", {
+                              ? uiText("webReview:next_v0", {
                                   v0: time(item.due_at, locale)
                                 })
-                              : uiText("来源不可用，已保留进度")}
+                              : uiText(
+                                  "webReview:source_unavailable_progress_preserved"
+                                )}
                           </p>
                         </div>
                         <Button
@@ -385,8 +434,8 @@ function Overview({ userId }: { userId: string }) {
                           }
                         >
                           {item.paused
-                            ? uiText("恢复复习")
-                            : uiText("暂停此项")}
+                            ? uiText("webReview:resume_review")
+                            : uiText("webReview:pause_this_item")}
                         </Button>
                       </li>
                     ))}
@@ -398,7 +447,7 @@ function Overview({ userId }: { userId: string }) {
                       variant="outline"
                       onClick={() => setAfter(undefined)}
                     >
-                      {uiText("返回第一页")}
+                      {uiText("webReview:back_to_first_page")}
                     </Button>
                   )}
                   {items.data?.next_cursor && (
@@ -406,7 +455,7 @@ function Overview({ userId }: { userId: string }) {
                       variant="outline"
                       onClick={() => setAfter(items.data!.next_cursor!)}
                     >
-                      {uiText("下一页")}
+                      {uiText("webReview:next_page")}
                     </Button>
                   )}
                 </div>
@@ -416,7 +465,7 @@ function Overview({ userId }: { userId: string }) {
                 disabled={busy}
                 onClick={() => void toggle(false)}
               >
-                {uiText("暂停个人记忆与复习")}
+                {uiText("webReview:pause_personal_memory_and_reviews")}
               </Button>
             </>
           )}
@@ -527,33 +576,38 @@ function Practice({ userId, id }: { userId: string; id: string }) {
       <PageHeader
         title={
           data?.state === "completed"
-            ? uiText("本次复习已完成")
-            : uiText("再想一想这个词")
+            ? uiText("webReview:review_completed")
+            : uiText("webReview:think_about_this_word_again")
         }
-        back={{ href: "/student/review", label: uiText("今日复习") }}
-        description={uiText("每次作答都会保存。随时离开，下次接着来。")}
+        back={{
+          href: "/student/review",
+          label: uiText("webReview:review_today")
+        }}
+        description={uiText(
+          "webReview:each_answer_is_saved_leave_at_any_time_and_continue_next_time"
+        )}
       />
       {session.isPending ? (
-        <PageNotice>{uiText("正在恢复复习进度…")}</PageNotice>
+        <PageNotice>{uiText("webReview:restoring_review_progress")}</PageNotice>
       ) : session.isError ? (
         <PageNotice tone="error">
           {uiText(errorText(session.error, "session"))}{" "}
           <Button variant="link" onClick={() => void session.refetch()}>
-            {uiText("重新读取")}
+            {uiText("webReview:reload_image")}
           </Button>
         </PageNotice>
       ) : (
         data && (
           <div className="space-y-6">
             <p className="text-sm text-foreground-muted">
-              {uiText("本批已答 {{v0}}/{{v1}} 项 · ", {
+              {uiText("webReview:answered_this_batch_v0_v1", {
                 v0: data.answered_count,
                 v1: data.target_count
               })}
               {data.settings.english_variant === "BrE"
-                ? uiText("英式拼写")
-                : uiText("美式拼写")}
-              {uiText("（本批次固定）")}
+                ? uiText("webReview:british_spelling")
+                : uiText("webReview:american_spelling")}
+              {uiText("webReview:fixed_for_this_batch")}
             </p>
             {error && (
               <p role="alert" className="text-sm text-danger">
@@ -564,8 +618,8 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               <section className={`${panelClass} space-y-5`} aria-live="polite">
                 <h2 className="text-2xl font-semibold">
                   {feedback.is_correct
-                    ? uiText("答对了")
-                    : uiText("这次还没记牢")}
+                    ? uiText("webReview:correct")
+                    : uiText("webReview:not_remembered_yet")}
                 </h2>
                 <p className="tsz-words text-xl">
                   {data.items
@@ -574,20 +628,26 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                 </p>
                 <p className="text-sm text-foreground-muted">
                   {feedback.memory_effect === "practice_assisted"
-                    ? uiText("已查看答案，本次记作辅助练习。")
+                    ? uiText(
+                        "webReview:you_viewed_the_answer_this_counts_as_assisted_practice"
+                      )
                     : feedback.memory_effect === "practice_only_stale"
-                      ? uiText("该项已在其他地方更新，保留这次练习记录。")
+                      ? uiText(
+                          "webReview:this_item_was_updated_elsewhere_this_practice_record_is_kept"
+                        )
                       : feedback.memory_effect ===
                           "practice_only_content_changed"
-                        ? uiText("内容已更新，下次将重新验证。")
-                        : uiText("下次安排：{{v0}}", {
+                        ? uiText(
+                            "webReview:content_updated_it_will_be_verified_again_next_time"
+                          )
+                        : uiText("webReview:next_scheduled_review_v0", {
                             v0: time(feedback.next_due_at, locale)
                           })}
                 </p>
                 <Button onClick={() => setFeedback(null)}>
                   {data.state === "completed"
-                    ? uiText("查看本次结果")
-                    : uiText("继续下一项")}
+                    ? uiText("webReview:view_results")
+                    : uiText("webReview:continue_to_next_item")}
                 </Button>
               </section>
             ) : data.state === "active" && next ? (
@@ -602,8 +662,8 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                   <div>
                     <p className="text-sm text-foreground-muted">
                       {next.kind === "retest"
-                        ? uiText("错题巩固")
-                        : uiText("到期复习")}{" "}
+                        ? uiText("webReview:consolidate_incorrect_answers")
+                        : uiText("webReview:due_review")}{" "}
                       · {next.prompt?.part_of_speech}
                     </p>
                     <h2 className="mt-4 text-2xl font-semibold leading-relaxed">
@@ -615,7 +675,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                       htmlFor="review-answer"
                       className="mb-2 block text-sm"
                     >
-                      {uiText("英文拼写")}
+                      {uiText("webReview:english_spelling")}
                     </label>
                     <Input
                       id="review-answer"
@@ -641,10 +701,10 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                       disabled={busy || (!pending && !answer.trim())}
                     >
                       {busy
-                        ? uiText("正在保存…")
+                        ? uiText("webReview:saving")
                         : pending
-                          ? uiText("核对并重试上次答案")
-                          : uiText("确认答案")}
+                          ? uiText("webReview:check_and_retry_previous_answer")
+                          : uiText("webReview:confirm_answer")}
                     </Button>
                     <Button
                       type="button"
@@ -652,13 +712,13 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                       disabled={busy || !!pending || next.revealed}
                       onClick={() => void reveal()}
                     >
-                      {uiText("查看答案")}
+                      {uiText("webReview:show_answer")}
                     </Button>
                   </div>
                   {pending && (
                     <p className="text-xs leading-6 text-foreground-muted">
                       {uiText(
-                        "上次结果尚未确认，重试使用同一请求，不会重复记录。"
+                        "webReview:the_previous_result_is_unconfirmed_retrying_uses_the_same_request_withou"
                       )}
                     </p>
                   )}
@@ -667,11 +727,17 @@ function Practice({ userId, id }: { userId: string; id: string }) {
             ) : (
               <PageNotice>
                 {data.state === "completed"
-                  ? uiText("这一批已记录。错题会在合适的间隔后再次出现。")
-                  : uiText("本批内容已过期或暂不可用，已保存的作答仍保留。")}
+                  ? uiText(
+                      "webReview:this_batch_is_recorded_incorrect_answers_return_after_a_suitable_interva"
+                    )
+                  : uiText(
+                      "webReview:this_batch_has_expired_or_is_unavailable_saved_answers_are_preserved"
+                    )}
                 <div className="mt-4">
                   <Button asChild>
-                    <Link href="/student/review">{uiText("返回今日复习")}</Link>
+                    <Link href="/student/review">
+                      {uiText("webReview:back_to_today_s_review")}
+                    </Link>
                   </Button>
                 </div>
               </PageNotice>
@@ -679,7 +745,7 @@ function Practice({ userId, id }: { userId: string; id: string }) {
             {data.items.some((i) => i.answered) && (
               <details className="rounded-2xl border border-border p-5">
                 <summary className="cursor-pointer text-sm font-medium">
-                  {uiText("本次作答记录")}
+                  {uiText("webReview:answer_records")}
                 </summary>
                 <ul className="mt-4 space-y-4">
                   {data.items
@@ -691,18 +757,23 @@ function Practice({ userId, id }: { userId: string; id: string }) {
                             <p>
                               {i.prompt?.definition} —{" "}
                               {i.feedback.is_correct
-                                ? uiText("回答正确")
-                                : uiText("回答有误")}
+                                ? uiText("webReview:correct_answer")
+                                : uiText("webReview:incorrect_answer")}
                             </p>
                             <p className="text-foreground-muted">
-                              {uiText("你的答案：{{v0}}；可接受拼写：", {
-                                v0: i.feedback.submitted_answer
-                              })}
+                              {uiText(
+                                "webReview:your_answer_v0_accepted_spellings",
+                                {
+                                  v0: i.feedback.submitted_answer
+                                }
+                              )}
                               {i.feedback.accepted_answers.join(" / ")}
                             </p>
                           </>
                         ) : (
-                          uiText("该项来源暂不可用，已保留作答统计。")
+                          uiText(
+                            "webReview:this_source_is_unavailable_answer_statistics_are_preserved"
+                          )
                         )}
                       </li>
                     ))}
@@ -710,7 +781,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               </details>
             )}
             <p className="text-xs text-foreground-muted">
-              {uiText("本次复习不改变原任务首次正确率，暂不计天生币。")}
+              {uiText(
+                "webReview:this_review_does_not_change_the_original_task_s_first_answer_accuracy_an"
+              )}
             </p>
           </div>
         )

@@ -1,4 +1,6 @@
-import { LocalWebError } from "@/i18n/catalog";
+import { webWordlistExcel } from "@/i18n/messages/wordlist/excel";
+import { localText, type LocalText, LocalWebError } from "@/i18n/catalog";
+
 import type { ExcelRow } from "./excel-rows";
 
 function runWorker<T>(request: object, signal?: AbortSignal): Promise<T> {
@@ -17,23 +19,33 @@ function runWorker<T>(request: object, signal?: AbortSignal): Promise<T> {
     };
     const timer = setTimeout(() => {
       finish();
-      reject(new LocalWebError("文件处理超时，请拆分后重试"));
+      reject(
+        new LocalWebError(
+          localText(
+            webWordlistExcel,
+            "webWordlistExcel:file_processing_timed_out_split_it_and_try_again"
+          )
+        )
+      );
     }, 15000);
     worker.onmessage = (
-      event: MessageEvent<{ result: T; error?: string; local?: boolean }>
+      event: MessageEvent<{ result: T; error?: string; notice?: LocalText }>
     ) => {
       finish();
-      if (event.data.error)
-        reject(
-          event.data.local
-            ? new LocalWebError(event.data.error)
-            : new Error(event.data.error)
-        );
+      if (event.data.notice) reject(new LocalWebError(event.data.notice));
+      else if (event.data.error) reject(new Error(event.data.error));
       else resolve(event.data.result);
     };
     worker.onerror = () => {
       finish();
-      reject(new LocalWebError("文件读取失败，请重新选择文件"));
+      reject(
+        new LocalWebError(
+          localText(
+            webWordlistExcel,
+            "webWordlistExcel:could_not_read_the_file_choose_it_again"
+          )
+        )
+      );
     };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
@@ -43,9 +55,16 @@ function runWorker<T>(request: object, signal?: AbortSignal): Promise<T> {
 
 export async function readExcelFile(file: File, signal: AbortSignal) {
   if (!/\.(xls|xlsx)$/i.test(file.name))
-    throw new LocalWebError("请选择 .xls 或 .xlsx 文件");
+    throw new LocalWebError(
+      localText(webWordlistExcel, "webWordlistExcel:choose_an_xls_or_xlsx_file")
+    );
   if (!file.size || file.size > 10 * 1024 * 1024)
-    throw new LocalWebError("文件须大于 0 且不超过 10 MB");
+    throw new LocalWebError(
+      localText(
+        webWordlistExcel,
+        "webWordlistExcel:the_file_must_be_larger_than_0_and_no_more_than_10_mb"
+      )
+    );
   const buffer = await file.arrayBuffer();
   return runWorker<ExcelRow[]>(
     { type: "parse", buffer, fileName: file.name },

@@ -15,6 +15,7 @@ import {
   webCommon,
   webErrorText,
   webText,
+  type WebValues,
   type WebCatalog
 } from "./catalog";
 import {
@@ -22,6 +23,8 @@ import {
   HttpError,
   RequestTimeoutError
 } from "@tsz/api-client";
+import { webTeacherCertificationNotifications } from "./messages/teacher-certification/notifications";
+import { webTask } from "./messages/task";
 import { useWebText } from "./client";
 import { webWordlistInteractions as webWordlist } from "./messages/wordlist/interactions";
 
@@ -42,9 +45,10 @@ describe("Web 界面目录", () => {
     for (const catalog of catalogs) {
       expect(namespaces.has(catalog.namespace), catalog.namespace).toBe(false);
       namespaces.add(catalog.namespace);
-      expect(catalog.keys.size, catalog.namespace).toBe(
-        Object.keys(catalog.messages).length
-      );
+      expect(
+        Object.keys(catalog.messages).length,
+        catalog.namespace
+      ).toBeGreaterThan(0);
       for (const [key, row] of Object.entries(catalog.messages)) {
         expect(key).toMatch(/^[a-z0-9][a-z0-9_]*$/);
         for (const value of row) {
@@ -71,69 +75,44 @@ describe("Web 界面目录", () => {
           if (placeholders(row[0]).length > 0)
             expect(row[0]).toContain(`{{${plural.parameter}}}`);
           const instance = createInterfaceI18n("en-GB", catalog.resources);
-          const text = webText(instance, catalog);
-          expect(text(row[0], { [plural.parameter]: 1 })).toBe(
-            plural.one.replaceAll(`{{${plural.parameter}}}`, "1")
-          );
-          expect(text(row[0], { [plural.parameter]: 2 })).toBe(
-            row[2].replaceAll(`{{${plural.parameter}}}`, "2")
-          );
+          // 该循环只使用刚从目录枚举、校验的键和参数，覆盖运行时资源边界。
+          const text = webText(instance, catalog) as (
+            key: string,
+            values?: WebValues
+          ) => string;
+          expect(
+            text(`${catalog.namespace}:${key}`, { [plural.parameter]: 1 })
+          ).toBe(plural.one.replaceAll(`{{${plural.parameter}}}`, "1"));
+          expect(
+            text(`${catalog.namespace}:${key}`, { [plural.parameter]: 2 })
+          ).toBe(row[2].replaceAll(`{{${plural.parameter}}}`, "2"));
         }
       }
     }
   });
 
-  it("共用鉴权、校验和用户标签的固定提示均有通用翻译", () => {
-    const repo = fileURLToPath(new NodeURL("../../../../", import.meta.url));
-    const missing: string[] = [];
-    for (const helper of [
-      "apps/web/src/features/auth/shared.ts",
-      "packages/shared/src/auth/errors.ts",
-      "packages/shared/src/validate.ts",
-      "apps/web/src/lib/user.ts"
-    ]) {
-      const parsed = ts.createSourceFile(
-        helper,
-        readFileSync(`${repo}/${helper}`, "utf8"),
-        ts.ScriptTarget.Latest,
-        true
-      );
-      const visit = (node: ts.Node) => {
-        if (
-          ts.isStringLiteral(node) &&
-          /[\p{Script=Han}]/u.test(node.text) &&
-          !webCommon.keys.has(node.text)
-        )
-          missing.push(`${helper}: ${node.text}`);
-        ts.forEachChild(node, visit);
-      };
-      visit(parsed);
-    }
-    expect(missing).toEqual([]);
-  });
-
-  it("直接调用的固定文案存在于调用方命名空间，拆包不产生漏译", () => {
+  it("所有作者文案使用已登记稳定键；插值中的作者标签显式翻译，React key 保持稳定", () => {
     const base = fileURLToPath(new NodeURL("../", import.meta.url));
     const missing: string[] = [];
+    const known = new Set(
+      catalogs.flatMap((catalog) =>
+        Object.keys(catalog.messages).map(
+          (key) => `${catalog.namespace}:${key}`
+        )
+      )
+    );
+    const registrations = readFileSync(`${base}/i18n/types.ts`, "utf8");
+    for (const catalog of catalogs)
+      expect(registrations).toContain(`${catalog.namespace}:`);
     for (const file of globSync("**/*.{ts,tsx}", { cwd: base })) {
       if (
         file.includes(".test.") ||
+        file.includes(".type-test.") ||
         file.includes(".fixture.") ||
         file.startsWith("i18n/messages/")
       )
         continue;
       const source = readFileSync(`${base}/${file}`, "utf8");
-      const catalogsForFile = [
-        ...source.matchAll(/from "@\/i18n\/messages\/([^";]+)"/g)
-      ].flatMap((match) =>
-        Object.values(modules[`./messages/${match[1]}.ts`] ?? {})
-      );
-      if (!catalogsForFile.length) continue;
-      const known = new Set(
-        [webCommon, ...catalogsForFile].flatMap((catalog) => [
-          ...catalog.keys.keys()
-        ])
-      );
       const parsed = ts.createSourceFile(
         file,
         source,
@@ -143,7 +122,9 @@ describe("Web 界面目录", () => {
       const auditParams = (node: ts.Node) => {
         if (
           ts.isCallExpression(node) &&
-          ["uiText", "localText"].includes(node.expression.getText(parsed))
+          ["uiText", "localText", "originalText"].includes(
+            node.expression.getText(parsed)
+          )
         )
           return;
         if (
@@ -152,21 +133,18 @@ describe("Web 界面目录", () => {
           !["天生币", "天生会背"].includes(node.text.trim())
         )
           missing.push(`${file}: untranslated interpolation ${node.text}`);
-        if (
-          ts.isElementAccessExpression(node) &&
-          [
-            "LABELS",
-            "CHANNEL_LABEL",
-            "STATE_LABEL",
-            "VARIANT_LABEL",
-            "importFieldLabels",
-            "runLabels",
-            "planStatusLabels",
-            "SORT_LABELS"
-          ].includes(node.expression.getText(parsed))
-        )
-          missing.push(`${file}: untranslated label map interpolation`);
         ts.forEachChild(node, auditParams);
+      };
+      const fixed = (value: ts.Node) => {
+        if (ts.isConditionalExpression(value)) {
+          fixed(value.whenTrue);
+          fixed(value.whenFalse);
+        } else if (
+          ts.isStringLiteral(value) &&
+          value.text &&
+          !known.has(value.text)
+        )
+          missing.push(`${file}: ${value.text}`);
       };
       const visit = (node: ts.Node) => {
         if (
@@ -179,33 +157,12 @@ describe("Web 界面目录", () => {
           ts.isCallExpression(node) &&
           ["uiText", "localText"].includes(node.expression.getText(parsed))
         ) {
-          const first = node.arguments[0];
-          const fixed = (value: ts.Node) => {
-            if (ts.isCallExpression(value)) return;
-            if (ts.isConditionalExpression(value)) {
-              fixed(value.whenTrue);
-              fixed(value.whenFalse);
-              return;
-            }
-            if (ts.isStringLiteral(value) && !known.has(value.text))
-              missing.push(`${file}: ${value.text}`);
-            ts.forEachChild(value, fixed);
-          };
-          if (
-            first &&
-            (ts.isStringLiteral(first) || ts.isConditionalExpression(first))
-          )
-            fixed(first);
-          if (node.arguments[1]) auditParams(node.arguments[1]);
+          const offset =
+            node.expression.getText(parsed) === "localText" ? 1 : 0;
+          if (node.arguments[offset]) fixed(node.arguments[offset]!);
+          if (node.arguments[offset + 1])
+            auditParams(node.arguments[offset + 1]!);
         }
-        if (
-          ts.isCallExpression(node) &&
-          node.expression.getText(parsed) === "uiText" &&
-          node.arguments[0] &&
-          ts.isStringLiteral(node.arguments[0]) &&
-          !known.has(node.arguments[0].text)
-        )
-          missing.push(`${file}: ${node.arguments[0].text}`);
         ts.forEachChild(node, visit);
       };
       visit(parsed);
@@ -218,35 +175,43 @@ describe("Web 界面目录", () => {
     const second = createInterfaceI18n("en-GB");
     addWebCatalog(first, webWordlist);
     addWebCatalog(second, webWordlist);
-    const key = webWordlist.keys.get("收藏")!;
+    const key = "favourites";
     first.addResource(
       "en",
       webWordlist.namespace,
       key,
       "changed in one request"
     );
-    expect(webText(second, webWordlist)("收藏")).toBe("Favourite");
+    expect(
+      webText(second, webWordlist)("webWordlistInteractions:favourites")
+    ).toBe("Favourite");
     expect(webWordlist.messages[key]?.[2]).toBe("Favourite");
   });
 
   it("通知复数和整句插值保留原始昵称、词表名与精确金额", () => {
-    const catalog = catalogs.find(
-      (value) => value.namespace === "webTeacherCertificationNotifications"
-    )!;
+    const catalog = webTeacherCertificationNotifications;
     const text = webText(
       createInterfaceI18n("en-GB", catalog.resources),
       catalog
     );
-    expect(text("{{v0}} 条未读通知", { v0: 1 })).toBe("1 unread notification");
-    expect(text("{{v0}} 条未读通知", { v0: 2 })).toBe("2 unread notifications");
     expect(
-      text("{{actor}}赞了你的词表「{{wordlist}}」。", {
+      text("webTeacherCertificationNotifications:v0_unread_notifications", {
+        v0: 1
+      })
+    ).toBe("1 unread notification");
+    expect(
+      text("webTeacherCertificationNotifications:v0_unread_notifications", {
+        v0: 2
+      })
+    ).toBe("2 unread notifications");
+    expect(
+      text("webTeacherCertificationNotifications:wordlist_liked_body", {
         actor: "保存",
         wordlist: "取消"
       })
     ).toBe("保存 liked your word list “取消”.");
     expect(
-      text("{{actor}}向你的词表「{{wordlist}}」投了 {{amount}}。", {
+      text("webTeacherCertificationNotifications:wordlist_tipped_body", {
         actor: "原名",
         wordlist: "原文",
         amount: "9,223,372,036,854,775,807 天生币"
@@ -258,12 +223,15 @@ describe("Web 界面目录", () => {
     const instance = createInterfaceI18n("en-US", webWordlist.resources);
     addWebCatalog(instance, webCommon);
     const text = webText(instance, webWordlist);
-    expect(text("余额不足，请查看钱包。")).toBe(
-      "Insufficient balance. Check your wallet."
-    );
+    expect(
+      text("webWordlistInteractions:insufficient_balance_check_your_wallet")
+    ).toBe("Insufficient balance. Check your wallet.");
     expect(
       text(
-        webErrorText(new HttpError(422, "余额不足，请查看钱包。"), "fallback")
+        webErrorText(
+          new HttpError(422, "余额不足，请查看钱包。"),
+          originalText("fallback")
+        )
       )
     ).toBe("余额不足，请查看钱包。");
     expect(text(originalText("<img src=x> 用户正文"))).toBe(
@@ -273,32 +241,104 @@ describe("Web 界面目录", () => {
       text(
         webErrorText(
           new ClientResponseError("private protocol path"),
-          "fallback"
+          originalText("fallback")
         )
       )
     ).toBe("Data are unavailable. Reload and try again.");
     expect(
-      text(webErrorText(new RequestTimeoutError("POST"), "fallback"))
+      text(
+        webErrorText(new RequestTimeoutError("POST"), originalText("fallback"))
+      )
     ).toContain("result is unconfirmed");
   });
 
   it("本地模板和原始插值保留到显示时，英美覆盖保持独立", () => {
-    const notice = localText("已投出 {{v0}}，作者已收到。", {
-      v0: "9,223,372,036,854,775,807"
-    });
+    const notice = localText(
+      webWordlist,
+      "webWordlistInteractions:tipped_v0_the_author_has_received_it",
+      {
+        v0: "9,223,372,036,854,775,807"
+      }
+    );
     const uk = createInterfaceI18n("en-GB", webWordlist.resources);
     const us = createInterfaceI18n("en-US", webWordlist.resources);
     expect(webText(uk, webWordlist)(notice)).toContain(
       "9,223,372,036,854,775,807"
     );
-    expect(webText(uk, webWordlist)("收藏")).toBe("Favourite");
-    expect(webText(us, webWordlist)("收藏")).toBe("Favorite");
+    expect(webText(uk, webWordlist)("webWordlistInteractions:favourites")).toBe(
+      "Favourite"
+    );
+    expect(webText(us, webWordlist)("webWordlistInteractions:favourites")).toBe(
+      "Favorite"
+    );
     expect(
       webText(
         createInterfaceI18n("zh-Hant", webWordlist.resources),
         webWordlist
       )(notice)
     ).toContain("已投出");
+  });
+  it("跨模块本地通知显式携带目录，跨线程后按需装配且不污染另一实例", () => {
+    const notice = structuredClone(
+      localText(webTask, "webTask:v0_practice", {
+        v0: originalText("保存 {{v0}} $t(webCommon:user)")
+      })
+    );
+    const first = createInterfaceI18n("en-US");
+    const second = createInterfaceI18n("en-US");
+    expect(first.hasResourceBundle("en", webTask.namespace)).toBe(false);
+    expect(webText(first, webWordlist)(notice)).toBe(
+      "保存 {{v0}} $t(webCommon:user) practice"
+    );
+    expect(first.hasResourceBundle("en", webTask.namespace)).toBe(true);
+    expect(second.hasResourceBundle("en", webTask.namespace)).toBe(false);
+    expect(
+      webText(first, webWordlist)(originalText("webTask:v0_practice"))
+    ).toBe("webTask:v0_practice");
+  });
+
+  it("嵌套作者标签只翻译显式本地消息，精确大整数复数不丢失文本", () => {
+    const instance = createInterfaceI18n("en-US");
+    const text = webText(instance, webWordlist);
+    expect(
+      text(
+        localText(webCommon, "webCommon:show_field", {
+          label: localText(webWordlist, "webWordlistInteractions:favourites")
+        })
+      )
+    ).toBe("Show Favorite");
+    const count = BigInt("9223372036854775807");
+    expect(
+      webText(instance, webTeacherCertificationNotifications)(
+        "webTeacherCertificationNotifications:v0_unread_notifications",
+        { v0: count }
+      )
+    ).toBe("9223372036854775807 unread notifications");
+    expect(
+      webText(instance, webTeacherCertificationNotifications)(
+        "webTeacherCertificationNotifications:v0_unread_notifications",
+        { v0: 1n }
+      )
+    ).toBe("1 unread notification");
+  });
+
+  it("中文译文修改不改变调用键，运行时拒绝未知键而非静默显示源文", () => {
+    const before = defineWebMessages("webCopyChange", {
+      label: ["旧译文", "原譯文", "Label"]
+    });
+    const after = defineWebMessages("webCopyChange", {
+      label: ["新译文", "新譯文", "Label"]
+    });
+    expect(
+      webText(createInterfaceI18n("zh-Hans"), before)("webCopyChange:label")
+    ).toBe("旧译文");
+    expect(
+      webText(createInterfaceI18n("zh-Hans"), after)("webCopyChange:label")
+    ).toBe("新译文");
+    for (const unknown of ["未知界面文案", "webCopyChange:toString"])
+      expect(() =>
+        Reflect.apply(webText(createInterfaceI18n(), before), null, [unknown])
+      ).toThrow("Unregistered Web translation");
   });
 });
 
@@ -311,10 +351,10 @@ function InputSample() {
   return (
     <>
       <label>
-        {text("输入")}
+        {text("webHydrationSample:label")}
         <input defaultValue="原始 word" />
       </label>
-      <span>{text("保存中…")}</span>
+      <span>{text("webHydrationSample:saving")}</span>
     </>
   );
 }

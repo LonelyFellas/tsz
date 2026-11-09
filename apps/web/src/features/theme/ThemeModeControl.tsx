@@ -1,4 +1,5 @@
 "use client";
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webTheme } from "@/i18n/messages/theme";
 
@@ -6,9 +7,13 @@ import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "./useTheme";
 
 const MODES = [
-  { value: "light", label: "浅色", Icon: Sun },
-  { value: "dark", label: "深色", Icon: Moon },
-  { value: "system", label: "跟随系统", Icon: Monitor }
+  { value: "light", label: localText(webTheme, "webTheme:light"), Icon: Sun },
+  { value: "dark", label: localText(webTheme, "webTheme:dark"), Icon: Moon },
+  {
+    value: "system",
+    label: localText(webTheme, "webTheme:system"),
+    Icon: Monitor
+  }
 ] as const;
 
 // 外观三段切换：浅色 / 深色 / 跟随系统。
@@ -18,7 +23,7 @@ export function ThemeModeControl() {
   return (
     <fieldset>
       <legend className="mb-2 ml-4 text-sm font-medium">
-        {uiText("外观")}
+        {uiText("webTheme:appearance")}
       </legend>
       <div className="grid grid-cols-3 gap-1 rounded-full border border-border/60 bg-muted p-1">
         {MODES.map(({ value, label, Icon }) => (

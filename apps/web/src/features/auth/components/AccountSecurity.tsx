@@ -1,16 +1,15 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import {
+  passwordLengthError,
+  WEB_PASSWORD_HINT as PASSWORD_HINT
+} from "@/features/auth/shared";
+import { localText, type WebNotice, type WebText } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthSecurity as webAuth } from "@/i18n/messages/auth/security";
 
 import { HttpError } from "@tsz/api-client";
-import {
-  isEmail,
-  isPhone,
-  isRegisterPassword,
-  PASSWORD_HINT,
-  passwordLengthError
-} from "@tsz/shared";
+import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
 import type { ContactChannel, User } from "@tsz/types";
 import {
   Select,
@@ -24,7 +23,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, clearSession } from "@/lib/request";
 import { AUTH_INPUT_CLASS, securityErrorMessage } from "../shared";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
-import type { WebText } from "@/i18n/catalog";
+
 import { cn } from "@tsz/ui/lib/cn";
 import {
   PageHeader,
@@ -35,7 +34,10 @@ import {
   textButtonClass
 } from "@/features/shell/Page";
 
-const LABELS = { phone: "手机号", email: "邮箱" };
+const LABELS = {
+  phone: localText(webAuth, "webAuthSecurity:phone_number"),
+  email: localText(webAuth, "webAuthSecurity:email")
+};
 const BUTTON = primaryButtonClass;
 const CODE_BUTTON =
   "min-h-12 shrink-0 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50";
@@ -44,14 +46,14 @@ type ContactAction = { channel: ContactChannel; operation: "bind" | "unbind" };
 function contactActionTitle(
   user: User,
   action: ContactAction,
-  uiText: WebText
+  uiText: WebText<typeof webAuth>
 ) {
   return uiText(
     action.operation === "unbind"
-      ? "解绑{{channel}}"
+      ? "webCommon:unbind_contact"
       : user[action.channel]
-        ? "换绑{{channel}}"
-        : "绑定{{channel}}",
+        ? "webCommon:change_contact"
+        : "webCommon:bind_contact",
     { channel: uiText(LABELS[action.channel]).toLowerCase() }
   );
 }
@@ -93,10 +95,10 @@ export function AccountSecurity() {
 
   const title =
     action === "password"
-      ? "修改密码"
+      ? uiText("webAuthSecurity:change_password")
       : action && user
         ? contactActionTitle(user, action, uiText)
-        : "账号安全";
+        : uiText("webAuthSecurity:account_security");
 
   return (
     <PageShell size="sm">
@@ -104,23 +106,30 @@ export function AccountSecurity() {
         back={
           action
             ? undefined
-            : { href: "/account", label: uiText("返回个人中心") }
+            : {
+                href: "/account",
+                label: uiText("webAuthSecurity:back_to_account")
+              }
         }
         eyebrow={
           action
-            ? uiText("账号安全 / {{v0}}", { v0: title })
-            : uiText("个人中心")
+            ? uiText("webAuthSecurity:account_security_v0", { v0: title })
+            : uiText("webAuthSecurity:account")
         }
-        title={uiText(title)}
+        title={title}
         description={
           action
-            ? uiText("完成后，所有设备需重新登录。")
-            : uiText("管理登录方式与密码。修改后，所有设备需重新登录。")
+            ? uiText(
+                "webAuthSecurity:you_will_need_to_sign_in_again_on_every_device_afterwards"
+              )
+            : uiText(
+                "webAuthSecurity:manage_sign_in_methods_and_your_password_changes_require_signing_in_agai"
+              )
         }
       />
       {loadError ? (
         <PageNotice tone="error">
-          {uiText("资料加载失败。")}
+          {uiText("webAuthSecurity:could_not_load_your_profile")}
           <button
             type="button"
             className={textButtonClass}
@@ -129,12 +138,12 @@ export function AccountSecurity() {
               setAttempt((v) => v + 1);
             }}
           >
-            {uiText("重新加载")}
+            {uiText("webAuthSecurity:reload")}
           </button>
         </PageNotice>
       ) : !user ? (
         <div role="status">
-          <PageNotice>{uiText("加载中…")}</PageNotice>
+          <PageNotice>{uiText("webAuthSecurity:loading_2")}</PageNotice>
         </div>
       ) : (
         <div className="glass rounded-3xl p-2">
@@ -159,7 +168,7 @@ export function AccountSecurity() {
                         {uiText(LABELS[channel])}
                       </h2>
                       <p className="mt-1 break-all text-sm text-foreground-muted">
-                        {user[channel] || uiText("尚未绑定")}
+                        {user[channel] || uiText("webAuthSecurity:not_bound")}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -176,8 +185,8 @@ export function AccountSecurity() {
                         }
                       >
                         {user[channel]
-                          ? uiText("换绑")
-                          : uiText("绑定{{v0}}", {
+                          ? uiText("webAuthSecurity:change")
+                          : uiText("webAuthSecurity:bind_v0", {
                               v0: uiText(LABELS[channel]).toLowerCase()
                             })}
                       </button>
@@ -189,14 +198,14 @@ export function AccountSecurity() {
                             buttonClass,
                             "text-danger hover:bg-danger/5"
                           )}
-                          aria-label={uiText("解绑{{v0}}", {
+                          aria-label={uiText("webAuthSecurity:unbind_v0", {
                             v0: uiText(LABELS[channel]).toLowerCase()
                           })}
                           onClick={() =>
                             setAction({ channel, operation: "unbind" })
                           }
                         >
-                          {uiText("解绑")}
+                          {uiText("webAuthSecurity:unbind")}
                         </button>
                       )}
                     </div>
@@ -205,10 +214,12 @@ export function AccountSecurity() {
                 <section className="flex flex-wrap items-center justify-between gap-4 pb-0 pt-6">
                   <div className="min-w-0 flex-1 basis-32">
                     <h2 className="text-sm font-medium text-foreground">
-                      {uiText("登录密码")}
+                      {uiText("webAuthSecurity:password")}
                     </h2>
                     <p className="mt-1 text-sm text-foreground-muted">
-                      {uiText("用于账号密码登录")}
+                      {uiText(
+                        "webAuthSecurity:used_to_sign_in_with_your_account_and_password"
+                      )}
                     </p>
                   </div>
                   <button
@@ -216,7 +227,7 @@ export function AccountSecurity() {
                     className={cn(buttonClass, "shrink-0")}
                     onClick={() => setAction("password")}
                   >
-                    {uiText("修改密码")}
+                    {uiText("webAuthSecurity:change_password")}
                   </button>
                 </section>
               </div>
@@ -228,10 +239,12 @@ export function AccountSecurity() {
         <section className="mt-6 flex flex-col gap-4 rounded-3xl border border-border/60 bg-muted/50 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-medium text-foreground">
-              {uiText("注销账号")}
+              {uiText("webAuthSecurity:delete_account")}
             </h2>
             <p className="mt-1 text-sm text-foreground-muted">
-              {uiText("提交申请后 72 小时生效，期间可撤销。")}
+              {uiText(
+                "webAuthSecurity:takes_effect_72_hours_after_applying_you_can_cancel_before_then"
+              )}
             </p>
           </div>
           <Link
@@ -241,7 +254,7 @@ export function AccountSecurity() {
               "shrink-0 self-start text-danger hover:bg-danger/5 sm:self-auto"
             )}
           >
-            {uiText("申请注销")}
+            {uiText("webAuthSecurity:request_account_deletion")}
           </Link>
         </section>
       )}
@@ -377,27 +390,27 @@ export function ContactForm({
           disabled={busy}
           className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {uiText("← 返回账号安全")}
+          {uiText("webAuthSecurity:back_to_account_security")}
         </button>
       )}
       <p className="text-sm leading-6 text-foreground-muted">
         {unbind
           ? uiText(
-              "先验证已绑定的联系方式。解绑后，该联系方式将不能用于登录或找回密码。"
+              "webAuthSecurity:verify_a_bound_contact_method_first_once_unbound_it_cannot_be_used_to_si"
             )
           : uiText(
-              "先验证已绑定的联系方式，再验证新联系方式。两组验证码分别发送。"
+              "webAuthSecurity:verify_your_existing_contact_method_then_the_new_one_each_receives_a_sep"
             )}
       </p>
       <fieldset disabled={busy} className="space-y-5 disabled:opacity-60">
         {unbind ? (
           <p className="break-all text-sm text-foreground-muted">
-            {uiText("将解绑：{{v0}}", { v0: target })}
+            {uiText("webAuthSecurity:to_unbind_v0", { v0: target })}
           </p>
         ) : (
           <label className="block space-y-2 text-sm">
             <span className="ml-4 block font-medium text-foreground">
-              {uiText("新{{channel}}", {
+              {uiText("webCommon:new_contact", {
                 channel: uiText(LABELS[action.channel]).toLowerCase()
               })}
             </span>
@@ -407,8 +420,8 @@ export function ContactForm({
               autoComplete={action.channel === "phone" ? "tel" : "email"}
               placeholder={
                 action.channel === "phone"
-                  ? uiText("请输入新手机号")
-                  : uiText("请输入新邮箱")
+                  ? uiText("webAuthSecurity:enter_your_new_phone_number")
+                  : uiText("webAuthSecurity:enter_your_new_email")
               }
               value={contact}
               onChange={(e) => {
@@ -431,7 +444,7 @@ export function ContactForm({
           {availableChannels.length === 1 ? (
             <>
               <p className="ml-4 font-medium text-foreground">
-                {uiText("当前账号的验证方式")}
+                {uiText("webAuthSecurity:verify_your_current_account")}
               </p>
               <p
                 className={cn(AUTH_INPUT_CLASS, "flex items-center break-all")}
@@ -446,7 +459,7 @@ export function ContactForm({
                 htmlFor="security-verification-channel"
                 className="ml-4 block font-medium text-foreground"
               >
-                {uiText("当前账号的验证方式")}
+                {uiText("webAuthSecurity:verify_your_current_account")}
               </label>
               <Select
                 value={verificationChannel}
@@ -477,7 +490,7 @@ export function ContactForm({
             htmlFor="security-old-code"
             className="ml-4 block font-medium text-foreground"
           >
-            {uiText("{{v0}}验证码", {
+            {uiText("webAuthSecurity:verification_code_for_v0", {
               v0: uiText(LABELS[verificationChannel])
             })}
           </label>
@@ -487,7 +500,7 @@ export function ContactForm({
               className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
               inputMode="numeric"
               autoComplete="one-time-code"
-              placeholder={uiText("请输入 6 位验证码")}
+              placeholder={uiText("webAuthSecurity:enter_the_6_digit_code")}
               maxLength={6}
               value={verificationCode}
               onChange={(e) => setVerificationCode(e.target.value)}
@@ -500,14 +513,14 @@ export function ContactForm({
               aria-label={
                 oldCountdown
                   ? undefined
-                  : uiText("向已绑定{{v0}}发送验证码", {
+                  : uiText("webAuthSecurity:send_a_code_to_your_bound_v0", {
                       v0: uiText(LABELS[verificationChannel])
                     })
               }
             >
               {oldCountdown
-                ? uiText("{{v0}}s 后重发", { v0: oldCountdown })
-                : uiText("验证")}
+                ? uiText("webAuthSecurity:resend_in_v0_s", { v0: oldCountdown })
+                : uiText("webAuthSecurity:verify")}
             </button>
           </div>
         </div>
@@ -517,7 +530,9 @@ export function ContactForm({
               htmlFor="security-new-code"
               className="ml-4 block font-medium text-foreground"
             >
-              {uiText("新{{v0}}验证码", { v0: uiText(LABELS[action.channel]) })}
+              {uiText("webAuthSecurity:verification_code_for_new_v0", {
+                v0: uiText(LABELS[action.channel])
+              })}
             </label>
             <div className="flex gap-2">
               <input
@@ -525,7 +540,7 @@ export function ContactForm({
                 className={cn(AUTH_INPUT_CLASS, "min-w-0 flex-1")}
                 inputMode="numeric"
                 maxLength={6}
-                placeholder={uiText("请输入 6 位验证码")}
+                placeholder={uiText("webAuthSecurity:enter_the_6_digit_code")}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
               />
@@ -537,21 +552,23 @@ export function ContactForm({
                 aria-label={
                   newCountdown
                     ? undefined
-                    : uiText("向新{{v0}}发送验证码", {
+                    : uiText("webAuthSecurity:send_a_code_to_your_new_v0", {
                         v0: uiText(LABELS[action.channel])
                       })
                 }
               >
                 {newCountdown
-                  ? uiText("{{v0}}s 后重发", { v0: newCountdown })
-                  : uiText("验证")}
+                  ? uiText("webAuthSecurity:resend_in_v0_s", {
+                      v0: newCountdown
+                    })
+                  : uiText("webAuthSecurity:verify")}
               </button>
             </div>
           </div>
         )}
         <p className="text-xs leading-5 text-foreground-muted">
           {uiText(
-            "验证码仅可使用一次。若所有已绑定联系方式都无法接收验证码，暂不能自助操作。"
+            "webAuthSecurity:each_code_can_be_used_once_self_service_changes_are_unavailable_if_you_c"
           )}
         </p>
         {error && (
@@ -566,7 +583,7 @@ export function ContactForm({
               className={cn(buttonClass, "min-h-12 px-5")}
               onClick={onCancel}
             >
-              {uiText("取消")}
+              {uiText("webAuthSecurity:cancel")}
             </button>
           )}
           <button
@@ -574,13 +591,13 @@ export function ContactForm({
             className={cn(BUTTON, "flex-1")}
             disabled={!targetValid || !codesValid}
           >
-            {uiText("确认{{v0}}", { v0: uiText(title) })}
+            {uiText("webAuthSecurity:confirm_v0", { v0: title })}
           </button>
         </div>
       </fieldset>
       {busy && (
         <p role="status" className="text-sm text-foreground-subtle">
-          {uiText("处理中，请稍候…")}
+          {uiText("webAuthSecurity:processing_please_wait")}
         </p>
       )}
     </form>
@@ -614,7 +631,7 @@ function SecurityPasswordField({
   return (
     <div className="space-y-2 text-sm">
       <label htmlFor={id} className="ml-4 block font-medium text-foreground">
-        {uiText(label)}
+        {label}
       </label>
       <div className="relative">
         <input
@@ -633,9 +650,12 @@ function SecurityPasswordField({
           disabled={disabled}
           onClick={() => setVisible((shown) => !shown)}
           className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-          aria-label={uiText(visible ? "隐藏{{label}}" : "显示{{label}}", {
-            label: uiText(label)
-          })}
+          aria-label={uiText(
+            visible ? "webCommon:hide_field" : "webCommon:show_field",
+            {
+              label
+            }
+          )}
         >
           <PasswordVisibilityIcon visible={visible} />
         </button>
@@ -688,29 +708,31 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
         disabled={busy}
         className="rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {uiText("← 返回账号安全")}
+        {uiText("webAuthSecurity:back_to_account_security")}
       </button>
       <p className="text-sm leading-6 text-foreground-muted">
-        {uiText("填写当前密码，再设置新的登录密码。")}
+        {uiText(
+          "webAuthSecurity:enter_your_current_password_then_set_a_new_one"
+        )}
       </p>
       <fieldset disabled={busy} className="space-y-5 disabled:opacity-60">
         <SecurityPasswordField
           id="security-current-password"
-          label={uiText("当前密码")}
+          label={uiText("webAuthSecurity:current_password")}
           value={currentPassword}
           onChange={setCurrentPassword}
           autoComplete="current-password"
-          placeholder={uiText("请输入当前密码")}
+          placeholder={uiText("webAuthSecurity:enter_your_current_password")}
           disabled={busy}
         />
         <div className="border-t border-border pt-5">
           <SecurityPasswordField
             id="security-new-password"
-            label={uiText("新密码")}
+            label={uiText("webAuthSecurity:new_password")}
             value={newPassword}
             onChange={setNewPassword}
             autoComplete="new-password"
-            placeholder={uiText("请输入新密码")}
+            placeholder={uiText("webAuthSecurity:enter_a_new_password")}
             disabled={busy}
             invalid={!!newPasswordError}
             describedBy="security-new-password-message"
@@ -728,11 +750,11 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
         <div>
           <SecurityPasswordField
             id="security-confirm-password"
-            label={uiText("确认新密码")}
+            label={uiText("webAuthSecurity:confirm_new_password")}
             value={confirmation}
             onChange={setConfirmation}
             autoComplete="new-password"
-            placeholder={uiText("请再次输入新密码")}
+            placeholder={uiText("webAuthSecurity:enter_the_new_password_again")}
             disabled={busy}
             invalid={confirmationError}
             describedBy={
@@ -746,12 +768,14 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
               id="security-confirm-password-message"
               className="mt-3 ml-4 text-xs text-danger"
             >
-              {uiText("两次输入的密码不一致")}
+              {uiText("webAuthSecurity:the_passwords_do_not_match")}
             </p>
           )}
         </div>
         <p className="text-xs leading-5 text-foreground-muted">
-          {uiText("忘记当前密码？退出登录后，可通过登录页的「忘记密码」重置。")}
+          {uiText(
+            "webAuthSecurity:forgot_your_current_password_sign_out_and_use_forgot_password_on_the_sig"
+          )}
         </p>
         {error && (
           <p role="alert" className="text-sm text-danger">
@@ -764,14 +788,16 @@ function ChangePasswordForm({ onCancel }: { onCancel: () => void }) {
             className={cn(buttonClass, "min-h-12 px-5")}
             onClick={onCancel}
           >
-            {uiText("取消")}
+            {uiText("webAuthSecurity:cancel")}
           </button>
           <button
             type="submit"
             className={cn(BUTTON, "flex-1")}
             disabled={!valid}
           >
-            {busy ? uiText("修改中…") : uiText("确认修改密码")}
+            {busy
+              ? uiText("webAuthSecurity:changing")
+              : uiText("webAuthSecurity:change_password_2")}
           </button>
         </div>
       </fieldset>

@@ -1,6 +1,8 @@
 "use client";
-import { useWebLocale } from "@/i18n/client";
-import { useWebText } from "@/i18n/client";
+import { lookupWebNotice, type WebNotice, localText } from "@/i18n/catalog";
+
+import { useWebLocale, useWebText } from "@/i18n/client";
+
 import { webCoinsWallet as webCoins } from "@/i18n/messages/coins/wallet";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,17 +26,29 @@ import { LoginRewardSummary } from "./LoginReward";
 import { LearningRewardSummary } from "./LearningRewardSummary";
 import { useUserStore } from "@/stores/user";
 
-const SOURCES: Record<string, string> = {
-  wordlist_tip: "词表投币",
-  wordlist_custom_audio: "自定义词条语音",
-  wordlist_custom_audio_refund: "自定义词条语音退款",
-  invitation_reward: "邀请奖励",
-  learning_reward: "每日学习奖励",
-  daily_login_reward: "每日登录奖励",
-  manual_purchase: "购买入账",
-  manual_reward: "人工奖励",
-  manual_reversal: "人工入账冲正",
-  account_closure: "注销余额作废"
+const SOURCES: Record<string, WebNotice> = {
+  wordlist_tip: localText(webCoins, "webCoinsWallet:word_list_tip"),
+  wordlist_custom_audio: localText(
+    webCoins,
+    "webCoinsWallet:custom_entry_audio"
+  ),
+  wordlist_custom_audio_refund: localText(
+    webCoins,
+    "webCoinsWallet:custom_entry_audio_refund"
+  ),
+  invitation_reward: localText(webCoins, "webCoinsWallet:invitation_reward"),
+  learning_reward: localText(webCoins, "webCoinsWallet:daily_learning_reward"),
+  daily_login_reward: localText(
+    webCoins,
+    "webCoinsWallet:daily_sign_in_reward"
+  ),
+  manual_purchase: localText(webCoins, "webCoinsWallet:purchase_credit"),
+  manual_reward: localText(webCoins, "webCoinsWallet:manual_reward"),
+  manual_reversal: localText(webCoins, "webCoinsWallet:reverse_manual_credits"),
+  account_closure: localText(
+    webCoins,
+    "webCoinsWallet:balance_forfeited_on_account_closure"
+  )
 };
 export function CoinsWallet() {
   const id = useUserStore((s) => s.user?.id);
@@ -76,8 +90,11 @@ function Wallet({ id }: { id: string }) {
   return (
     <PageShell>
       <PageHeader
-        back={{ href: "/account", label: uiText("返回个人中心") }}
-        title={uiText("我的天生币")}
+        back={{
+          href: "/account",
+          label: uiText("webCoinsWallet:back_to_account")
+        }}
+        title={uiText("webCoinsWallet:my_coins")}
         actions={
           <Button
             type="button"
@@ -86,13 +103,13 @@ function Wallet({ id }: { id: string }) {
             onClick={refresh}
           >
             <RefreshCw className="size-4" strokeWidth={1.8} aria-hidden />
-            {uiText("刷新")}
+            {uiText("webCoinsWallet:refresh")}
           </Button>
         }
       />
       <div className="glass rounded-3xl p-2">
         <section
-          aria-label={uiText("钱包余额")}
+          aria-label={uiText("webCoinsWallet:wallet_balance")}
           className="rounded-[20px] bg-surface/70 p-5 sm:p-8"
         >
           <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8">
@@ -105,17 +122,19 @@ function Wallet({ id }: { id: string }) {
                   <Coins className="size-5" strokeWidth={1.8} />
                 </span>
                 <h2 className="text-sm font-medium text-foreground-muted">
-                  {uiText("当前余额")}
+                  {uiText("webCoinsWallet:current_balance")}
                 </h2>
               </div>
               <div className="mt-3 flex min-h-16 items-center">
                 {wallet.isError ? (
                   <p role="alert" className="text-sm leading-6 text-danger">
-                    {uiText("余额加载失败，请重试。当前余额未知。")}
+                    {uiText(
+                      "webCoinsWallet:could_not_load_your_balance_try_again_the_current_balance_is_unknown"
+                    )}
                   </p>
                 ) : wallet.isPending ? (
                   <p role="status" className="text-sm text-foreground-muted">
-                    {uiText("正在读取余额…")}
+                    {uiText("webCoinsWallet:loading_balance")}
                   </p>
                 ) : (
                   <p
@@ -124,36 +143,38 @@ function Wallet({ id }: { id: string }) {
                   >
                     {formatCoins(wallet.data.balance).replace(" 天生币", "")}
                     <span className="ml-2 inline-block text-sm font-normal tracking-normal text-foreground-muted">
-                      {uiText("天生币")}
+                      {uiText("webCoinsWallet:coins")}
                     </span>
                   </p>
                 )}
               </div>
               <p className="mt-3 text-xs leading-5 text-foreground-muted">
-                {uiText("学生与教师身份共用")}
+                {uiText(
+                  "webCoinsWallet:shared_by_your_student_and_teacher_roles"
+                )}
               </p>
               <p
                 role="status"
                 className="text-xs leading-5 text-foreground-muted"
               >
                 {wallet.isFetching && wallet.data && !wallet.isError
-                  ? uiText("正在更新余额…")
+                  ? uiText("webCoinsWallet:updating_balance")
                   : null}
               </p>
             </div>
             <nav
-              aria-label={uiText("天生币相关页面")}
+              aria-label={uiText("webCoinsWallet:pages")}
               className="grid gap-1 border-t border-border/60 pt-3 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"
             >
               {[
                 {
                   href: "/account/invitations",
-                  label: "邀请好友",
+                  label: localText(webCoins, "webCoinsWallet:invite_friends"),
                   icon: Users
                 },
                 {
                   href: "/account/wordlist-tips",
-                  label: "词表投币记录",
+                  label: localText(webCoins, "webCoinsWallet:word_list_tips"),
                   icon: BookOpen
                 }
               ].map(({ href, label, icon: Icon }) => (
@@ -187,19 +208,19 @@ function Wallet({ id }: { id: string }) {
               className="mt-5 rounded-2xl bg-muted p-4 text-sm leading-6"
             >
               {uiText(
-                "账号正在等待注销，钱包已暂停全部入账和支出。撤销后可恢复原余额。"
+                "webCoinsWallet:your_account_is_awaiting_deletion_all_wallet_credits_and_spending_are_pa"
               )}
               <Link
                 className="ml-2 rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                 href="/account/delete"
               >
-                {uiText("查看注销申请")}
+                {uiText("webCoinsWallet:view_deletion_request")}
               </Link>
             </div>
           )}
           {!wallet.isError && wallet.data?.status === "closed" && (
             <p className="mt-4 text-sm text-foreground-muted">
-              {uiText("钱包已关闭。")}
+              {uiText("webCoinsWallet:your_wallet_is_closed")}
             </p>
           )}
         </section>
@@ -211,7 +232,7 @@ function Wallet({ id }: { id: string }) {
             id="wallet-rewards"
             className="text-sm font-semibold text-foreground"
           >
-            {uiText("每日奖励")}
+            {uiText("webCoinsWallet:daily_rewards")}
           </h2>
           <div
             className={
@@ -245,35 +266,41 @@ function Wallet({ id }: { id: string }) {
             id="wallet-entries"
             className="text-xl font-semibold tracking-tight text-foreground"
           >
-            {uiText("收支记录")}
+            {uiText("webCoinsWallet:account_history")}
           </h2>
           <span className="text-xs text-foreground-muted">
-            {uiText("按时间从新到旧")}
+            {uiText("webCoinsWallet:newest_first")}
           </span>
         </div>
         {entries.isError ? (
           <PageNotice tone="error">
-            <p>{uiText("收支记录加载失败，请重试。")}</p>
+            <p>
+              {uiText("webCoinsWallet:could_not_load_transactions_try_again")}
+            </p>
             <Button
               type="button"
               variant="link"
               size="compact"
               onClick={() => void entries.refetch()}
             >
-              {uiText("重新加载")}
+              {uiText("webCoinsWallet:reload")}
             </Button>
           </PageNotice>
         ) : entries.isPending ? (
-          <PageNotice>{uiText("正在读取收支记录…")}</PageNotice>
+          <PageNotice>
+            {uiText("webCoinsWallet:loading_transactions")}
+          </PageNotice>
         ) : (
           <>
             {entries.data.items.length === 0 ? (
               <PageNotice>
                 <p className="font-medium text-foreground">
-                  {uiText("暂无收支记录")}
+                  {uiText("webCoinsWallet:no_transactions_yet")}
                 </p>
                 <p className="mt-1">
-                  {uiText("奖励到账或使用天生币后，会在这里留下记录。")}
+                  {uiText(
+                    "webCoinsWallet:rewards_and_spending_will_appear_here"
+                  )}
                 </p>
               </PageNotice>
             ) : (
@@ -295,10 +322,12 @@ function Wallet({ id }: { id: string }) {
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm font-medium leading-6 text-foreground">
-                            {uiText(SOURCES[entry.source_type]) ||
+                            {uiText(
+                              lookupWebNotice(SOURCES, entry.source_type)
+                            ) ||
                               (entry.kind === "transfer"
-                                ? uiText("天生币转入 / 转出")
-                                : uiText("天生币收支"))}
+                                ? uiText("webCoinsWallet:credit_debit")
+                                : uiText("webCoinsWallet:coin_entry"))}
                           </p>
                           <time
                             dateTime={entry.created_at}
@@ -325,7 +354,7 @@ function Wallet({ id }: { id: string }) {
                           {formatCoins(entry.delta)}
                         </p>
                         <p className="mt-1 break-all text-xs leading-5 tabular-nums text-foreground-muted">
-                          {uiText("余额{{v0}}", {
+                          {uiText("webCoinsWallet:balance_v0", {
                             v0: formatCoins(entry.balance_after)
                           })}
                         </p>
@@ -337,7 +366,7 @@ function Wallet({ id }: { id: string }) {
             )}
             {(entries.data.pagination.total_pages > 1 || page > 1) && (
               <nav
-                aria-label={uiText("收支记录分页")}
+                aria-label={uiText("webCoinsWallet:transaction_pages")}
                 className="mt-5 flex items-center justify-center gap-3"
               >
                 <Button
@@ -348,10 +377,10 @@ function Wallet({ id }: { id: string }) {
                   disabled={page === 1 || entries.isFetching}
                   onClick={() => setPage(page - 1)}
                 >
-                  {uiText("上一页")}
+                  {uiText("webCoinsWallet:previous_page")}
                 </Button>
                 <span className="min-w-16 text-center text-sm tabular-nums text-foreground-muted">
-                  {uiText("第 {{v0}} 页", { v0: page })}
+                  {uiText("webCoinsWallet:page_v0", { v0: page })}
                 </span>
                 <Button
                   type="button"
@@ -367,7 +396,7 @@ function Wallet({ id }: { id: string }) {
                     setPage(page + 1);
                   }}
                 >
-                  {uiText("下一页")}
+                  {uiText("webCoinsWallet:next_page")}
                 </Button>
               </nav>
             )}
@@ -376,7 +405,7 @@ function Wallet({ id }: { id: string }) {
       </section>
       <details className="group mt-7 border-t border-border/60 pt-2">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl text-sm text-foreground-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
-          {uiText("天生币用途与购买说明")}
+          {uiText("webCoinsWallet:use_and_purchase_information")}
           <ChevronDown
             className="size-4 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
             strokeWidth={1.8}
@@ -386,23 +415,25 @@ function Wallet({ id }: { id: string }) {
         <div className="space-y-4 pb-3 pt-1 text-sm leading-6 text-foreground-muted">
           <p>
             {uiText(
-              "可向他人已公开且全部词条可用的词表投币，数量由你确认，全额进入作者钱包。"
+              "webCoinsWallet:tip_another_author_s_published_word_list_when_all_its_entries_are_availa"
             )}
           </p>
           <div>
             <h3 className="font-medium text-foreground">
-              {uiText("联系客服购买")}
+              {uiText("webCoinsWallet:contact_support_to_purchase")}
             </h3>
             {contact ? (
               <p className="mt-1 break-words">{contact}</p>
             ) : (
               <p className="mt-1">
-                {uiText("客服联系方式暂未配置，请等待平台公告。")}
+                {uiText(
+                  "webCoinsWallet:support_contact_details_are_not_configured_check_platform_announcements"
+                )}
               </p>
             )}
             <p className="mt-2">
               {uiText(
-                "购买由客服人工核验，不支持在线支付或提现。建议在首个消费场景开放后再购买。"
+                "webCoinsWallet:purchases_are_verified_manually_by_support_online_payments_and_withdrawa"
               )}
             </p>
           </div>

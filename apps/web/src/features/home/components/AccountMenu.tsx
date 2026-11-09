@@ -137,7 +137,7 @@ export function AccountMenu({
     <button
       ref={trigger}
       type="button"
-      aria-label={uiText("账户菜单")}
+      aria-label={uiText("webHomeAccount:account_menu")}
       aria-haspopup="menu"
       aria-expanded={false}
       aria-busy={loadingUser === user.id && controlledOpen !== false}
@@ -188,7 +188,7 @@ export function AccountMenu({
       <AccountAvatar user={user} />
       {loadingUser === user.id && controlledOpen !== false && (
         <span className="sr-only" role="status">
-          {uiText("正在加载账户菜单…")}
+          {uiText("webHomeAccount:loading_account_menu")}
         </span>
       )}
     </button>

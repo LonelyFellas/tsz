@@ -6,7 +6,7 @@ import { Dictionary } from "@/features/dictionary/Dictionary";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("词典"),
+    title: uiText("webApp:dictionary"),
     robots: { index: false, follow: false }
   };
 }

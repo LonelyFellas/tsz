@@ -93,7 +93,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
             variant="ghost"
             size="icon"
             disabled={disabled || readOnly}
-            aria-label={uiText("清除搜索")}
+            aria-label={uiText("webShell:clear_search")}
             onClick={clear}
             className="absolute right-0.5 top-0.5"
           >

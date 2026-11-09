@@ -62,7 +62,7 @@ export function RouteGuard({
   if (!hydrated || needsLogin || bindingTarget || needsOnboarding) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-foreground-subtle">
-        {uiText("加载中...")}
+        {uiText("webAuthSession:loading")}
       </div>
     );
   }

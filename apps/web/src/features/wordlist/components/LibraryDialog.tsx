@@ -58,7 +58,7 @@ export function LibraryDialog({
           type="button"
           variant="ghost"
           size="icon"
-          aria-label={uiText("关闭")}
+          aria-label={uiText("webWordlistLibrary:close")}
           disabled={busy}
           onClick={onClose}
         >

@@ -39,18 +39,22 @@ export function DictionaryDetail({
   return (
     <div className="animate-in mx-auto max-w-3xl px-6 py-10 sm:py-14">
       <Button asChild variant="ghost" className="mb-6">
-        <Link href={back}>{uiText("返回查询结果")}</Link>
+        <Link href={back}>
+          {uiText("webDictionary:back_to_search_results")}
+        </Link>
       </Button>
       {(result.isPending || profile.isPending) && (
-        <p role="status">{uiText("加载词条详情…")}</p>
+        <p role="status">{uiText("webDictionary:loading_entry_details")}</p>
       )}
       {(result.isError || profile.isError) && (
         <div role="alert">
           <h1 className="text-3xl font-semibold">
-            {uiText("词条详情暂不可用")}
+            {uiText("webDictionary:entry_details_unavailable")}
           </h1>
           <p className="mt-3 text-sm text-foreground-muted">
-            {uiText("词条可能已撤回，或网络暂时不可用。")}
+            {uiText(
+              "webDictionary:the_entry_may_have_been_withdrawn_or_the_network_is_unavailable"
+            )}
           </p>
           <Button
             type="button"
@@ -61,7 +65,7 @@ export function DictionaryDetail({
               void profile.refetch();
             }}
           >
-            {uiText("重试")}
+            {uiText("webDictionary:retry")}
           </Button>
         </div>
       )}
@@ -72,7 +76,7 @@ export function DictionaryDetail({
           </h1>
           {dictionarySpellings(item.content, variant).alternate && (
             <p className="mt-2 text-sm text-foreground-muted">
-              {uiText("其他拼写：{{v0}}", {
+              {uiText("webDictionary:other_spellings_v0", {
                 v0: dictionarySpellings(item.content, variant).alternate
               })}
             </p>
@@ -94,10 +98,10 @@ export function DictionaryDetail({
                       <div key={v.id} className="text-sm">
                         <span className="mr-3 text-foreground-muted">
                           {v.dialect === "uk"
-                            ? uiText("英式")
+                            ? uiText("webDictionary:british")
                             : v.dialect === "us"
-                              ? uiText("美式")
-                              : uiText("通用")}{" "}
+                              ? uiText("webDictionary:american")
+                              : uiText("webDictionary:common")}{" "}
                           · {v.spelling}
                         </span>
                         <TargetAudio
@@ -106,7 +110,9 @@ export function DictionaryDetail({
                           targetId={v.id}
                           sourceDialects={[v.dialect]}
                           variant={variant}
-                          label={uiText("播放 {{v0}} 拼写", { v0: v.spelling })}
+                          label={uiText("webDictionary:play_v0_spelling", {
+                            v0: v.spelling
+                          })}
                         />
                         {v.pronunciations.map((p) => {
                           const [left, right] = phoneticDelimiters(
@@ -147,9 +153,12 @@ export function DictionaryDetail({
                                     : [v.dialect]
                                 }
                                 variant={variant}
-                                label={uiText("播放 {{v0}} 发音", {
-                                  v0: v.spelling
-                                })}
+                                label={uiText(
+                                  "webDictionary:play_v0_pronunciation",
+                                  {
+                                    v0: v.spelling
+                                  }
+                                )}
                               />
                             </div>
                           );
@@ -175,7 +184,9 @@ export function DictionaryDetail({
                         className="border-t border-border pt-5 text-sm leading-7"
                       >
                         <h3 className="mb-2 font-medium">
-                          {uiText("词义 {{v0}}", { v0: index + 1 })}
+                          {uiText("webDictionary:meaning_v0", {
+                            v0: index + 1
+                          })}
                           {sense.sub_pos_label && ` · ${sense.sub_pos_label}`}
                         </h3>
                         {definition ? (
@@ -197,18 +208,20 @@ export function DictionaryDetail({
                                 variant
                               ).map((text) => text.dialect)}
                               variant={variant}
-                              label={uiText("播放英文释义")}
+                              label={uiText(
+                                "webDictionary:play_english_definition"
+                              )}
                             />
                           </>
                         ) : (
                           <p className="text-foreground-muted">
-                            {uiText("暂无释义")}
+                            {uiText("webDictionary:no_definitions_yet")}
                           </p>
                         )}
                         {grammar && (
                           <div className="mt-4 rounded-2xl bg-muted p-4">
                             <h4 className="mb-1 font-medium">
-                              {uiText("语法结构")}
+                              {uiText("webDictionary:grammar_structures")}
                             </h4>
                             <Texts texts={grammar.variants} variant={variant} />
                             <TargetAudio
@@ -220,13 +233,17 @@ export function DictionaryDetail({
                                 variant
                               ).map((text) => text.dialect)}
                               variant={variant}
-                              label={uiText("播放语法结构")}
+                              label={uiText(
+                                "webDictionary:play_grammar_structure"
+                              )}
                             />
                           </div>
                         )}
                         {examples.length > 0 && (
                           <div className="mt-4 space-y-4">
-                            <h4 className="font-medium">{uiText("例句")}</h4>
+                            <h4 className="font-medium">
+                              {uiText("webDictionary:sentences")}
+                            </h4>
                             {examples.map((e) => (
                               <div key={e.id}>
                                 <Texts
@@ -243,7 +260,7 @@ export function DictionaryDetail({
                                     variant
                                   ).map((text) => text.dialect)}
                                   variant={variant}
-                                  label={uiText("播放例句")}
+                                  label={uiText("webDictionary:play_example")}
                                 />
                                 <div className="mt-1 text-foreground-muted">
                                   <RichTextReadOnly

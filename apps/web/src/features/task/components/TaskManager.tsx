@@ -10,16 +10,24 @@ export function TaskManager() {
   const uiText = useWebText(webTask);
   return (
     <ComingSoon
-      eyebrow={uiText("教学工作台")}
-      title={uiText("任务管理")}
+      eyebrow={uiText("webTask:teaching_workspace")}
+      title={uiText("webTask:task_management")}
       icon={ClipboardList}
-      heading={uiText("教师布置任务暂未开放")}
+      heading={uiText("webTask:teacher_assigned_tasks_are_not_available_yet")}
       links={[
-        { href: "/account/wordlists", label: uiText("整理我的词表") },
-        { href: "/wordlists", label: uiText("浏览词库广场") }
+        {
+          href: "/account/wordlists",
+          label: uiText("webTask:organise_my_word_lists")
+        },
+        {
+          href: "/wordlists",
+          label: uiText("webTask:browse_word_list_library")
+        }
       ]}
     >
-      {uiText("学生可在“我的学习任务”中创建个人任务。")}
+      {uiText(
+        "webTask:students_can_create_personal_tasks_in_my_learning_tasks"
+      )}
     </ComingSoon>
   );
 }

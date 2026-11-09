@@ -1,4 +1,6 @@
-import { LocalWebError } from "@/i18n/catalog";
+import { webWordlistEditor } from "@/i18n/messages/wordlist/editor";
+import { localText, LocalWebError } from "@/i18n/catalog";
+
 import type {
   CreateWordlist,
   UpdateWordlist,
@@ -71,7 +73,7 @@ export function readPendingSave(
     !value.form
   )
     throw new LocalWebError(
-      "待确认的词表保存记录无法读取，请保留此页面并联系支持。"
+      localText(webWordlistEditor, "webWordlistEditor:pending_save_unreadable")
     );
   const items = requestItems(value.request);
   const initial = value.form.initial && {

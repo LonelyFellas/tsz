@@ -24,7 +24,7 @@ export function AccountAvatar({
   const uiText = useWebText(webHome);
   const [errorUrl, setErrorUrl] = useState("");
   const [loadedUrl, setLoadedUrl] = useState("");
-  const displayName = displayNameOf(user, uiText("用户"));
+  const displayName = displayNameOf(user, uiText("webCommon:user"));
   const initial = Array.from(displayName)[0]!.toUpperCase();
   const showImage = !!user.avatar_url && user.avatar_url !== errorUrl;
   // 本站原图走 Next 的内部 API 代理，避免缩略图回取再次占用公网出口。
@@ -69,7 +69,9 @@ export function AccountAvatar({
           aria-hidden
           className={`absolute -right-0.5 -bottom-0.5 flex size-2.5 items-center justify-center rounded-full text-[7px] leading-none font-semibold text-white ring-[1.5px] ring-surface ${identity === "teacher" ? "bg-role-teacher" : "bg-role-student"}`}
         >
-          {identity === "teacher" ? uiText("师") : uiText("学")}
+          {identity === "teacher"
+            ? uiText("webHomeAccount:t")
+            : uiText("webHomeAccount:l")}
         </span>
       )}
     </span>

@@ -1,10 +1,16 @@
 "use client";
-import { webErrorText } from "@/i18n/catalog";
-import { LocalWebError, type WebNotice } from "@/i18n/catalog";
+import {
+  lookupWebNotice,
+  webCommon,
+  localText,
+  webErrorText,
+  LocalWebError,
+  type WebNotice
+} from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webWordlistEditor as webWordlist } from "@/i18n/messages/wordlist/editor";
 
-import { unavailableReasonLabels } from "../availability";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -37,7 +43,7 @@ import type {
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { wordListKeys } from "../hooks/useWordLists";
-import { audioStatusLabels, useCustomAudio } from "../hooks/useCustomAudio";
+import { useCustomAudio } from "../hooks/useCustomAudio";
 import {
   pendingSaveKey,
   readPendingSave,
@@ -54,6 +60,28 @@ import { PageNotice, PageShell, Pager } from "@/features/shell/Page";
 import { ExcelImport } from "./ExcelImport";
 import { SortableWordRow } from "./SortableWordRow";
 import { createWordRowPreview, WordRowDragPreview } from "./WordRowDragPreview";
+
+const audioStatusMessages = {
+  queued: localText(webWordlist, "webWordlistEditor:audio_queued"),
+  processing: localText(webWordlist, "webWordlistEditor:generating_audio"),
+  ready: localText(webWordlist, "webWordlistEditor:audio_generated"),
+  refunding: localText(
+    webWordlist,
+    "webWordlistEditor:audio_incomplete_refund_processing"
+  ),
+  refunded: localText(
+    webWordlist,
+    "webWordlistEditor:audio_incomplete_refunded"
+  )
+};
+const unavailableReasonMessages = {
+  archived: localText(webWordlist, "webWordlistEditor:moved_to_trash"),
+  unpublished: localText(webWordlist, "webWordlistEditor:not_published"),
+  unsupported_schema: localText(
+    webWordlist,
+    "webWordlistEditor:this_publication_version_is_not_supported_yet"
+  )
+};
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 type RowField = "word" | "definition" | "author-note" | "private-note";
 const rowKey = (row: Row) => row.entryId ?? row.itemId!;
@@ -112,7 +140,7 @@ export function WordListCreator({
     return (
       <PageShell size="lg" embedded={embedded}>
         <PageNotice tone="error">
-          {uiText("读取编辑数据失败。")}
+          {uiText("webWordlistEditor:could_not_load_editing_data")}
           <Button
             type="button"
             variant="outline"
@@ -120,7 +148,7 @@ export function WordListCreator({
             className="ml-2"
             onClick={() => void snapshot.refetch()}
           >
-            {uiText("重试")}
+            {uiText("webWordlistEditor:retry")}
           </Button>
         </PageNotice>
       </PageShell>
@@ -128,7 +156,7 @@ export function WordListCreator({
   if (id && !snapshot.data && !hasPending)
     return (
       <PageShell size="lg" embedded={embedded}>
-        <PageNotice>{uiText("正在读取词表…")}</PageNotice>
+        <PageNotice>{uiText("webWordlistEditor:loading_word_list")}</PageNotice>
       </PageShell>
     );
   return (
@@ -165,11 +193,14 @@ function Editor({
   const storageKey = pendingSaveKey(userId, id, folderId);
   const [recovery] = useState(() => {
     try {
-      return { saved: readPendingSave(storageKey), error: "" };
+      return { saved: readPendingSave(storageKey), error: "" as const };
     } catch {
       return {
         saved: null,
-        error: "待确认的保存记录无法读取，请保留此页面并联系支持。"
+        error: localText(
+          webWordlist,
+          "webWordlistEditor:cannot_read_the_pending_save_record_keep_this_page_open_and_contact_supp"
+        )
       };
     }
   });
@@ -207,7 +238,12 @@ function Editor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<WebNotice>(
     recovery.error ||
-      (recovery.saved ? "上次保存结果未确认，请重试保存以确认结果。" : "")
+      (recovery.saved
+        ? localText(
+            webWordlist,
+            "webWordlistEditor:the_previous_save_is_unconfirmed_retry_saving_to_check_the_result"
+          )
+        : "")
   );
   const [nameInvalid, setNameInvalid] = useState(false);
   const [uncertain, setUncertain] = useState(
@@ -259,7 +295,12 @@ function Editor({
             (item, offset) => itemKey(item) !== ids[items.length + offset]
           )
         ) {
-          throw new LocalWebError("词表版本已变化，请重新打开后编辑。");
+          throw new LocalWebError(
+            localText(
+              webWordlist,
+              "webWordlistEditor:the_list_version_changed_reopen_it_before_editing"
+            )
+          );
         }
         items.push(...data.items);
       }
@@ -338,7 +379,9 @@ function Editor({
         return;
       if (
         savingRef.current ||
-        !window.confirm(uiText("尚未保存，确定离开？"))
+        !window.confirm(
+          uiText("webWordlistEditor:you_have_unsaved_changes_leave")
+        )
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -354,7 +397,12 @@ function Editor({
         !e.cancelable
       )
         return;
-      if (savingRef.current || !window.confirm(uiText("尚未保存，确定离开？")))
+      if (
+        savingRef.current ||
+        !window.confirm(
+          uiText("webWordlistEditor:you_have_unsaved_changes_leave")
+        )
+      )
         e.preventDefault();
       else allowLeave.current = true;
     };
@@ -393,7 +441,7 @@ function Editor({
     });
     setDirty(true);
   }
-  function invalidRow(message: string, row: Row, target: RowField = "word") {
+  function invalidRow(message: WebNotice, row: Row, target: RowField = "word") {
     setError(message);
     setErrorRow(row.id);
     setErrorField(target);
@@ -412,26 +460,46 @@ function Editor({
     ) {
       setError(
         insufficient
-          ? "余额不足，当前输入已保留。请补充天生币后重试。"
-          : "暂时无法使用钱包，请刷新余额后重试。当前输入已保留。"
+          ? localText(
+              webWordlist,
+              "webWordlistEditor:insufficient_balance_your_input_is_preserved_add_and_try_again"
+            )
+          : localText(
+              webWordlist,
+              "webWordlistEditor:the_wallet_is_unavailable_refresh_your_balance_and_retry_your_input_is_p"
+            )
       );
       return;
     }
     if (selectedAudio.length && id && customIds.length && !audio.isSuccess) {
       setError(
-        "语音服务暂不可用，当前输入已保留。可稍后重试，或主动取消生成语音后保存文本。"
+        localText(
+          webWordlist,
+          "webWordlistEditor:audio_is_unavailable_your_input_is_preserved_retry_later_or_explicitly_c"
+        )
       );
       return;
     }
     if (!name.trim() || [...name].length > 100) {
-      setError("名称须为 1–100 字");
+      setError(
+        localText(
+          webWordlist,
+          "webWordlistEditor:use_1_100_characters_for_the_name"
+        )
+      );
       setNameInvalid(true);
       nameInput.current?.focus();
       return;
     }
     const unmatched = rows.find((r) => !r.entryId && !r.customWord);
     if (unmatched) {
-      invalidRow("每行都需选定平台词条或填写自定义词条", unmatched);
+      invalidRow(
+        localText(
+          webWordlist,
+          "webWordlistEditor:select_a_platform_entry_or_enter_a_custom_entry_in_every_row"
+        ),
+        unmatched
+      );
       return;
     }
     const invalidCustom = rows.find(
@@ -444,7 +512,10 @@ function Editor({
     );
     if (invalidCustom) {
       invalidRow(
-        "自定义词条须为 1–50 字，释义须为 1–200 字",
+        localText(
+          webWordlist,
+          "webWordlistEditor:use_1_50_characters_for_custom_entries_and_1_200_for_their_definitions"
+        ),
         invalidCustom,
         !invalidCustom.customWord!.word.trim() ||
           [...invalidCustom.customWord!.word].length > 50
@@ -460,7 +531,13 @@ function Editor({
       return false;
     });
     if (duplicate) {
-      invalidRow("词条不能重复", duplicate);
+      invalidRow(
+        localText(
+          webWordlist,
+          "webWordlistEditor:entries_must_not_be_duplicated"
+        ),
+        duplicate
+      );
       return;
     }
     const longNote = rows.find(
@@ -469,7 +546,10 @@ function Editor({
     );
     if (longNote) {
       invalidRow(
-        "备注不能超过 1000 字",
+        localText(
+          webWordlist,
+          "webWordlistEditor:notes_must_not_exceed_1_000_characters"
+        ),
         longNote,
         [...authorNoteFor(longNote)].length > 1000
           ? "author-note"
@@ -485,7 +565,12 @@ function Editor({
           (r.noteRevision ?? noteRevisionFor(rowKey(r))) === undefined
       )
     ) {
-      setError("词义和备注尚未读取完成，请稍后重试");
+      setError(
+        localText(
+          webWordlist,
+          "webWordlistEditor:meanings_and_notes_are_still_loading_try_again_shortly"
+        )
+      );
       return;
     }
     const audioGeneration = selectedAudio.length
@@ -591,7 +676,10 @@ function Editor({
       });
     } catch {
       setError(
-        "无法保留保存记录，尚未提交。请允许浏览器存储后重试，当前输入已保留。"
+        localText(
+          webWordlist,
+          "webWordlistEditor:cannot_preserve_the_save_record_so_nothing_was_submitted_allow_browser_s"
+        )
       );
       return;
     }
@@ -640,15 +728,27 @@ function Editor({
         pending.current = null;
       }
       setUncertain(unknown);
-      const messages: Record<string, string> = {
-        coin_insufficient_balance:
-          "余额不足，保存未完成。当前输入已保留，请补充天生币后重试。",
-        coin_wallet_unavailable:
-          "账户当前暂停收支，保存未完成。当前输入已保留。",
-        coin_idempotency_conflict: "保存记录不一致，请先核对词表和天生币流水。",
-        coin_source_conflict: "本次扣款已处理，请先核对词表和天生币流水。",
-        word_list_audio_cost_changed:
-          "语音费用已变化，本次未保存。请核对刷新后的语音状态与费用，再点击保存。"
+      const messages: Record<string, WebNotice> = {
+        coin_insufficient_balance: localText(
+          webWordlist,
+          "webWordlistEditor:insufficient_balance_save_incomplete_your_input_is_preserved_add_and_ret"
+        ),
+        coin_wallet_unavailable: localText(
+          webWordlist,
+          "webWordlistEditor:your_account_has_transactions_paused_save_incomplete_your_input_is_prese"
+        ),
+        coin_idempotency_conflict: localText(
+          webWordlist,
+          "webWordlistEditor:save_records_are_inconsistent_check_your_word_list_and_transactions_firs"
+        ),
+        coin_source_conflict: localText(
+          webWordlist,
+          "webWordlistEditor:this_charge_has_already_been_processed_check_your_word_list_and_transact"
+        ),
+        word_list_audio_cost_changed: localText(
+          webWordlist,
+          "webWordlistEditor:audio_pricing_changed_and_nothing_was_saved_check_the_refreshed_audio_st"
+        )
       };
       if (e instanceof HttpError && e.code?.startsWith("coin_"))
         void client.invalidateQueries({ queryKey: ["coins", "user", userId] });
@@ -657,20 +757,38 @@ function Editor({
       }
       setError(
         unknown
-          ? "保存结果未确认，请重试保存。确认前无法修改本次内容，刷新后仍可继续确认。"
+          ? localText(
+              webWordlist,
+              "webWordlistEditor:the_save_result_is_unconfirmed_retry_saving_this_content_is_locked_until"
+            )
           : uncertain && !canReplay
-            ? "上次保存结果仍未确认，当前版本无法继续重试。请重新打开词表核对保存结果，当前输入已保留。"
+            ? localText(
+                webWordlist,
+                "webWordlistEditor:the_previous_save_is_still_unconfirmed_and_cannot_be_retried_in_this_ver"
+              )
             : audioUnavailable
-              ? "语音服务暂不可用，本次未保存、未扣款。输入已保留，可稍后重试，或主动取消生成语音后保存文本。"
-              : e instanceof HttpError && messages[e.code ?? ""]
-                ? messages[e.code!]!
+              ? localText(
+                  webWordlist,
+                  "webWordlistEditor:audio_is_unavailable_nothing_was_saved_or_charged_your_input_is_preserve"
+                )
+              : e instanceof HttpError && lookupWebNotice(messages, e.code)
+                ? lookupWebNotice(messages, e.code)!
                 : e instanceof HttpError && e.status === 413
-                  ? "词表内容过大，请减少词条或缩短注释后重试。当前编辑内容仍保留。"
+                  ? localText(
+                      webWordlist,
+                      "webWordlistEditor:the_list_is_too_large_remove_entries_or_shorten_notes_and_retry_your_edi"
+                    )
                   : request.body.audio_generation &&
                       e instanceof HttpError &&
                       [400, 404, 422, 501].includes(e.status)
-                    ? "语音服务暂不可用或请求被拒绝，当前输入已保留。可稍后重试，或主动取消生成语音后保存文本。"
-                    : "保存失败：内容、版本或词条状态已变化。请检查输入；版本冲突时重新打开词表。"
+                    ? localText(
+                        webWordlist,
+                        "webWordlistEditor:audio_is_unavailable_or_the_request_was_rejected_your_input_is_preserved"
+                      )
+                    : localText(
+                        webWordlist,
+                        "webWordlistEditor:save_failed_content_version_or_entry_status_changed_check_your_input_reo"
+                      )
       );
     } finally {
       savingRef.current = false;
@@ -715,7 +833,10 @@ function Editor({
   function cancel() {
     if (
       savingRef.current ||
-      (dirty && !window.confirm(uiText("尚未保存，确定离开？")))
+      (dirty &&
+        !window.confirm(
+          uiText("webWordlistEditor:you_have_unsaved_changes_leave")
+        ))
     )
       return;
     allowLeave.current = true;
@@ -765,27 +886,34 @@ function Editor({
           onClick={cancel}
         >
           <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
-          {uiText("返回")}
+          {uiText("webWordlistEditor:back")}
         </button>
       )}
       <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-        {id ? uiText("编辑词表") : uiText("创建词表")}
+        {id
+          ? uiText("webWordlistEditor:edit_word_list")
+          : uiText("webWordlistEditor:create_word_list")}
       </h1>
       {locked && (
         <p className="mt-3 text-sm leading-6 text-foreground-muted">
-          {uiText("公开或审核中的词表仅可修改已有私密备注；编辑内容需先撤回。")}
+          {uiText(
+            "webWordlistEditor:public_lists_and_lists_under_review_allow_changes_only_to_existing_priva"
+          )}
         </p>
       )}
       <header className="mt-6 flex flex-wrap items-end gap-3">
         <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
-          <FormField htmlFor="wordlist-name" label={uiText("词表名称")}>
+          <FormField
+            htmlFor="wordlist-name"
+            label={uiText("webWordlistEditor:word_list_name")}
+          >
             <Input
               id="wordlist-name"
               ref={nameInput}
-              aria-label={uiText("词表名称")}
+              aria-label={uiText("webWordlistEditor:word_list_name")}
               aria-invalid={nameInvalid}
               aria-describedby={error ? "wordlist-save-error" : undefined}
-              placeholder={uiText("输入词表名称")}
+              placeholder={uiText("webWordlistEditor:enter_a_word_list_name")}
               value={name}
               maxLength={100}
               disabled={locked || saving || uncertain}
@@ -805,7 +933,7 @@ function Editor({
             disabled={saving}
             onClick={cancel}
           >
-            {uiText("取消")}
+            {uiText("webWordlistEditor:cancel")}
           </Button>
         )}
       </header>
@@ -816,9 +944,14 @@ function Editor({
         >
           {loaded.isError
             ? loaded.error instanceof Error
-              ? uiText(webErrorText(loaded.error, "数据暂不可用，请刷新后重试"))
-              : uiText("词义和备注读取失败")
-            : uiText("正在读取词条…")}
+              ? uiText(
+                  webErrorText(
+                    loaded.error,
+                    localText(webCommon, "webCommon:response_unavailable")
+                  )
+                )
+              : uiText("webWordlistEditor:could_not_load_meanings_and_notes")
+            : uiText("webWordlistEditor:loading_entries_2")}
           {loaded.isError && (
             <Button
               type="button"
@@ -826,24 +959,26 @@ function Editor({
               size="sm"
               onClick={() => void loaded.refetch()}
             >
-              {uiText("重试读取")}
+              {uiText("webWordlistEditor:retry_loading")}
             </Button>
           )}
         </p>
       )}
       <section
-        aria-label={uiText("词条编辑")}
+        aria-label={uiText("webWordlistEditor:entry_editor")}
         aria-busy={saving}
         className="sticky top-16 z-20 my-6 border-b border-border/70 bg-surface py-3"
       >
         <div className="flex flex-wrap items-center gap-3">
           <Input
             id="wordlist-filter"
-            aria-label={uiText("表内搜索")}
+            aria-label={uiText("webWordlistEditor:search_within_list")}
             className="min-w-40 flex-1 sm:max-w-sm"
             value={filter}
             disabled={loadingItems}
-            placeholder={uiText("搜索词条、释义或备注")}
+            placeholder={uiText(
+              "webWordlistEditor:search_entries_definitions_or_notes"
+            )}
             onChange={(e) => {
               setFilter(e.target.value);
               setPage(1);
@@ -855,7 +990,7 @@ function Editor({
                 <Button
                   type="button"
                   variant="outline"
-                  aria-label={uiText("Excel 导入")}
+                  aria-label={uiText("webWordlistEditor:excel_import")}
                   className="min-h-11 px-2 sm:px-3"
                   disabled={
                     locked ||
@@ -867,9 +1002,11 @@ function Editor({
                   onClick={() => setImportOpen(true)}
                 >
                   <span className="hidden sm:inline">
-                    {uiText("Excel 导入")}
+                    {uiText("webWordlistEditor:excel_import")}
                   </span>
-                  <span className="sm:hidden">{uiText("导入")}</span>
+                  <span className="sm:hidden">
+                    {uiText("webWordlistEditor:import")}
+                  </span>
                 </Button>
                 <Button
                   type="button"
@@ -896,7 +1033,7 @@ function Editor({
                   }}
                 >
                   <Plus className="size-4" aria-hidden />
-                  {uiText("添加词条")}
+                  {uiText("webWordlistEditor:add_entry")}
                 </Button>
               </>
             )}
@@ -918,36 +1055,38 @@ function Editor({
               onClick={() => void save()}
             >
               {saving
-                ? uiText("保存中…")
+                ? uiText("webWordlistEditor:saving")
                 : uncertain
-                  ? uiText("重试保存")
+                  ? uiText("webWordlistEditor:retry_save")
                   : locked
-                    ? uiText("保存备注")
+                    ? uiText("webWordlistEditor:save_notes")
                     : selectedAudio.length
-                      ? uiText("支付 {{v0}} 天生币并保存", {
+                      ? uiText("webWordlistEditor:pay_v0_and_save", {
                           v0: audioCost.toString()
                         })
-                      : uiText("保存")}
+                      : uiText("webWordlistEditor:save")}
             </Button>
           </div>
         </div>
         {!locked && rows.some((row) => row.customWord) && (
           <div className="mt-3 text-sm leading-6 text-foreground-muted">
             <p>
-              {uiText("语音费用：")}
+              {uiText("webWordlistEditor:audio_cost")}
               {audioCost.toString()}{" "}
               {uiText(
-                "天生币。每词英式、美式各一条，共 2 天生币，点击保存时扣款。"
+                "webWordlistEditor:one_british_and_one_american_recording_per_word_costing_2_in_total_charg"
               )}
             </p>
             <p>
               {wallet.isError
-                ? uiText("余额读取失败，当前余额未知。")
+                ? uiText(
+                    "webWordlistEditor:could_not_read_your_balance_the_current_balance_is_unknown"
+                  )
                 : wallet.data
-                  ? uiText("余额：{{v0}}", {
+                  ? uiText("webWordlistEditor:balance_v0", {
                       v0: formatCoins(wallet.data.balance)
                     })
-                  : uiText("正在读取余额…")}
+                  : uiText("webWordlistEditor:loading_balance")}
               <Button
                 type="button"
                 size="sm"
@@ -955,29 +1094,35 @@ function Editor({
                 disabled={wallet.isFetching}
                 onClick={() => void wallet.refetch()}
               >
-                {uiText("刷新余额")}
+                {uiText("webWordlistEditor:refresh_balance")}
               </Button>
             </p>
             {insufficient && (
               <p role="status">
-                {uiText("余额不足，输入已保留。补充天生币后可保存。")}
+                {uiText(
+                  "webWordlistEditor:insufficient_balance_your_input_is_preserved_add_to_save"
+                )}
               </p>
             )}
             {wallet.data && wallet.data.status !== "open" && (
               <p role="status">
-                {uiText("账户当前暂停收支，暂不能生成语音。")}
+                {uiText(
+                  "webWordlistEditor:your_account_has_transactions_paused_audio_generation_is_unavailable"
+                )}
               </p>
             )}
             {audio.isError && (
               <p role="status">
-                {uiText("语音暂不可用，仍可编辑文本。")}
+                {uiText(
+                  "webWordlistEditor:audio_is_unavailable_you_can_still_edit_text"
+                )}
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
                   onClick={() => void audio.refetch()}
                 >
-                  {uiText("重试读取语音")}
+                  {uiText("webWordlistEditor:retry_loading_audio")}
                 </Button>
               </p>
             )}
@@ -995,7 +1140,9 @@ function Editor({
       </section>
       {matches.length === 0 && (
         <PageNotice>
-          {filter.trim() ? uiText("未找到匹配词条") : uiText("暂无词条")}
+          {filter.trim()
+            ? uiText("webWordlistEditor:no_matching_entries")
+            : uiText("webWordlistEditor:no_entries_yet")}
           {filter.trim() && (
             <Button
               type="button"
@@ -1006,7 +1153,7 @@ function Editor({
                 setPage(1);
               }}
             >
-              {uiText("清空搜索")}
+              {uiText("webWordlistEditor:clear_search")}
             </Button>
           )}
         </PageNotice>
@@ -1020,27 +1167,27 @@ function Editor({
         accessibility={{
           screenReaderInstructions: {
             draggable: uiText(
-              "按空格键拿起词条，用上下方向键排序，再按空格键放下，Esc 取消。"
+              "webWordlistEditor:press_space_to_pick_up_an_entry_use_up_or_down_to_reorder_then_space_to"
             )
           },
           announcements: {
             onDragStart: ({ active }) =>
-              uiText("已拿起第 {{v0}} 个词条。", {
+              uiText("webWordlistEditor:picked_up_entry_v0", {
                 v0: rows.findIndex((row) => row.id === active.id) + 1
               }),
             onDragOver: ({ over }) =>
               over
-                ? uiText("目标位置：第 {{v0}} 位。", {
+                ? uiText("webWordlistEditor:destination_position_v0", {
                     v0: rows.findIndex((row) => row.id === over.id) + 1
                   })
                 : undefined,
             onDragEnd: ({ over }) =>
               over
-                ? uiText("已放到第 {{v0}} 位。", {
+                ? uiText("webWordlistEditor:dropped_at_position_v0", {
                     v0: rows.findIndex((row) => row.id === over.id) + 1
                   })
-                : uiText("已取消排序。"),
-            onDragCancel: () => uiText("已取消排序。")
+                : uiText("webWordlistEditor:reordering_cancelled"),
+            onDragCancel: () => uiText("webWordlistEditor:reordering_cancelled")
           }
         }}
         onDragStart={({ active }) => {
@@ -1089,7 +1236,14 @@ function Editor({
                   move(row.id, rows[rows.indexOf(row) + direction]!.id)
                 }
                 onRemove={() => {
-                  if (!window.confirm(uiText("删除此词条及其备注？"))) return;
+                  if (
+                    !window.confirm(
+                      uiText(
+                        "webWordlistEditor:delete_this_entry_and_its_notes"
+                      )
+                    )
+                  )
+                    return;
                   const next = rows.filter((r) => r.id !== row.id);
                   const target =
                     next[Math.min(rows.indexOf(row), next.length - 1)]!;
@@ -1136,7 +1290,7 @@ function Editor({
       </DndContext>
       {!loadingItems && (
         <p className="mt-4 text-right text-xs tabular-nums text-foreground-muted">
-          {uiText("共 {{v0}} 个词条", { v0: rows.length })}
+          {uiText("webWordlistEditor:v0_entries_in_total", { v0: rows.length })}
         </p>
       )}
       <Pager page={currentPage} total={pages} onChange={setPage} />
@@ -1239,15 +1393,23 @@ function WordRow({
       <Input
         id={`word-${row.id}`}
         ref={inputRef}
-        aria-label={uiText("词条 {{v0}}", { v0: index })}
+        aria-label={uiText("webWordlistEditor:entry_v0", { v0: index })}
         aria-invalid={invalidField === "word"}
         aria-describedby={
           invalidField === "word" ? "wordlist-save-error" : undefined
         }
         className="tsz-words mt-1"
-        value={hasSourceText ? text : uiText(text)}
+        value={
+          hasSourceText
+            ? text
+            : stored
+              ? uiText("webWordlistEditor:content_unavailable")
+              : row.entryId
+                ? uiText("webWordlistEditor:loading_entries_2")
+                : ""
+        }
         disabled={locked}
-        placeholder={uiText("输入单词或短语")}
+        placeholder={uiText("webWordlistEditor:enter_a_word_or_phrase")}
         maxLength={row.customWord ? 50 : undefined}
         onCompositionStart={() => setComposing(true)}
         onCompositionEnd={() => setComposing(false)}
@@ -1301,7 +1463,7 @@ function WordRow({
         searchText === text &&
         search.isFetching && (
           <p role="status" className="mt-2 text-sm text-foreground-muted">
-            {uiText("正在搜索…")}
+            {uiText("webWordlistEditor:searching")}
           </p>
         )}
       {!row.entryId &&
@@ -1311,12 +1473,14 @@ function WordRow({
         searchText === text &&
         search.isError && (
           <p role="alert" className="mt-2 text-sm text-danger">
-            {uiText("搜索失败，请重试输入。")}
+            {uiText(
+              "webWordlistEditor:search_failed_try_entering_your_search_again"
+            )}
           </p>
         )}
       {suggestions.length > 0 && (
         <div
-          aria-label={uiText("候选词条")}
+          aria-label={uiText("webWordlistEditor:candidate_entries")}
           className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-border bg-surface p-1"
         >
           {suggestions.map((candidate, candidateIndex) => (
@@ -1363,7 +1527,7 @@ function WordRow({
         !search.isFetching &&
         search.data.items.length === 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-foreground-muted">
-            <span>{uiText("没有匹配词条。")}</span>
+            <span>{uiText("webWordlistEditor:no_matching_entries_2")}</span>
             <Button
               type="button"
               variant="outline"
@@ -1381,18 +1545,20 @@ function WordRow({
                 );
               }}
             >
-              {uiText("创建自定义词条")}
+              {uiText("webWordlistEditor:create_custom_entry")}
             </Button>
           </div>
         )}
       {row.customWord && (
         <div className="mt-4">
           <label className="block text-sm font-medium">
-            {uiText("自定义释义（必填）")}
+            {uiText("webWordlistEditor:custom_definition_required")}
             <textarea
               className={cn(field, "mt-2")}
               id={`definition-${row.id}`}
-              aria-label={uiText("自定义释义 {{v0}}", { v0: index })}
+              aria-label={uiText("webWordlistEditor:custom_definition_v0", {
+                v0: index
+              })}
               aria-invalid={invalidField === "definition"}
               aria-describedby={
                 invalidField === "definition"
@@ -1402,7 +1568,9 @@ function WordRow({
               maxLength={200}
               disabled={locked}
               value={row.customWord.definition}
-              placeholder={uiText("填写词条的释义")}
+              placeholder={uiText(
+                "webWordlistEditor:enter_the_entry_s_definition"
+              )}
               onChange={(event) =>
                 change({
                   customWord: {
@@ -1414,13 +1582,15 @@ function WordRow({
             />
           </label>
           <p className="mt-2 text-xs text-foreground-muted">
-            {uiText("自定义词条可阅读，也可用于拼写练习。")}
+            {uiText(
+              "webWordlistEditor:custom_entries_can_be_read_and_used_for_spelling_practice"
+            )}
           </p>
           {audio &&
             (audio.word === wordlistAudioWord(row.customWord.word) ||
               audio.status === "refunding") && (
               <p className="mt-2 text-sm text-foreground-muted">
-                {uiText(audioStatusLabels[audio.status])}
+                {uiText(audioStatusMessages[audio.status])}
               </p>
             )}
           {!locked &&
@@ -1434,7 +1604,10 @@ function WordRow({
                 <input
                   type="checkbox"
                   className="size-4 accent-primary"
-                  aria-label={uiText("生成语音 {{v0}}", { v0: index })}
+                  aria-label={uiText(
+                    "webWordlistEditor:generate_audio_for_v0",
+                    { v0: index }
+                  )}
                   checked={!!row.generateAudio}
                   disabled={audioUnavailable && !row.generateAudio}
                   onChange={(event) =>
@@ -1442,8 +1615,12 @@ function WordRow({
                   }
                 />
                 {audio?.status === "refunded"
-                  ? uiText("重新生成英式和美式语音（2 天生币）")
-                  : uiText("生成英式和美式语音（2 天生币）")}
+                  ? uiText(
+                      "webWordlistEditor:regenerate_british_and_american_audio_2"
+                    )
+                  : uiText(
+                      "webWordlistEditor:generate_british_and_american_audio_2"
+                    )}
               </label>
             )}
         </div>
@@ -1455,11 +1632,11 @@ function WordRow({
       )}
       {stored && !stored.entry && !stored.custom_word && (
         <p className="mt-3 text-sm text-danger">
-          {uiText("内容不可用")}
+          {uiText("webWordlistEditor:content_unavailable")}
           {stored.unavailable_reason
-            ? `（${uiText(unavailableReasonLabels[stored.unavailable_reason])}）`
+            ? `（${uiText(unavailableReasonMessages[stored.unavailable_reason])}）`
             : ""}
-          {uiText("，请删除或替换此项。")}
+          {uiText("webWordlistEditor:delete_or_replace_this_item")}
         </p>
       )}
       <div
@@ -1470,11 +1647,13 @@ function WordRow({
       >
         {showAuthorNote ? (
           <div className="min-w-0 text-sm font-medium">
-            <label htmlFor={`author-note-${row.id}`}>{uiText("注")}</label>
+            <label htmlFor={`author-note-${row.id}`}>
+              {uiText("webWordlistEditor:note_2")}
+            </label>
             <textarea
               className={cn(field, "mt-2")}
               id={`author-note-${row.id}`}
-              aria-label={uiText("注 {{v0}}", { v0: index })}
+              aria-label={uiText("webWordlistEditor:note_v0", { v0: index })}
               aria-invalid={invalidField === "author-note"}
               aria-describedby={
                 invalidField === "author-note"
@@ -1483,7 +1662,9 @@ function WordRow({
               }
               maxLength={1000}
               disabled={locked}
-              placeholder={uiText("给读者的补充说明")}
+              placeholder={uiText(
+                "webWordlistEditor:additional_information_for_readers"
+              )}
               value={authorNote}
               onChange={(e) => {
                 setNoteOpen(true);
@@ -1492,7 +1673,7 @@ function WordRow({
             />
             <div className="mt-2 flex items-center justify-between gap-2 text-xs text-foreground-muted">
               <span id={`author-note-${row.id}-message`}>
-                {uiText("随词表公开。")}
+                {uiText("webWordlistEditor:published_with_the_word_list")}
               </span>
               {!authorNote && !locked && (
                 <Button
@@ -1500,7 +1681,10 @@ function WordRow({
                   variant="ghost"
                   size="sm"
                   className="min-h-11 px-3 text-xs"
-                  aria-label={uiText("收起注释 {{v0}}", { v0: index })}
+                  aria-label={uiText(
+                    "webWordlistEditor:collapse_notes_for_v0",
+                    { v0: index }
+                  )}
                   onClick={() => {
                     setNoteOpen(false);
                     requestAnimationFrame(() =>
@@ -1508,7 +1692,7 @@ function WordRow({
                     );
                   }}
                 >
-                  {uiText("收起")}
+                  {uiText("webWordlistEditor:collapse")}
                 </Button>
               )}
             </div>
@@ -1528,16 +1712,20 @@ function WordRow({
             }}
           >
             <Pencil className="size-4" aria-hidden />
-            {uiText("添加注释")}
+            {uiText("webWordlistEditor:add_note")}
           </Button>
         ) : null}
         {hasPrivateNote && (
           <label className="block min-w-0 text-sm font-medium">
-            {uiText("已有私密备注（仅自己可见）")}
+            {uiText(
+              "webWordlistEditor:existing_private_note_visible_only_to_you"
+            )}
             <textarea
               className={cn(field, "mt-2")}
               id={`private-note-${row.id}`}
-              aria-label={uiText("私密备注 {{v0}}", { v0: index })}
+              aria-label={uiText("webWordlistEditor:private_note_v0", {
+                v0: index
+              })}
               aria-invalid={invalidField === "private-note"}
               aria-describedby={
                 invalidField === "private-note"
@@ -1547,7 +1735,9 @@ function WordRow({
               maxLength={1000}
               disabled={!!unloaded}
               placeholder={
-                unloaded ? uiText("正在读取备注…") : uiText("仅自己可见")
+                unloaded
+                  ? uiText("webWordlistEditor:loading_notes")
+                  : uiText("webWordlistEditor:visible_only_to_you")
               }
               value={note}
               onChange={(e) =>

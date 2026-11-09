@@ -9,7 +9,7 @@ import { ApplicationDetail } from "@/features/teacher-certification/ApplicationD
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("教师认证申请详情"),
+    title: uiText("webApp:teacher_application_details"),
     robots: { index: false, follow: false }
   };
 }
@@ -24,9 +24,12 @@ export default async function TeacherApplicationPage({
     <RouteGuard>
       <PageShell>
         <AppPageHeader
-          back={{ href: "/account/notifications", label: "返回站内通知" }}
-          eyebrow="教师认证"
-          title="教师认证申请详情"
+          back={{
+            href: "/account/notifications",
+            label: "webApp:back_to_notifications"
+          }}
+          eyebrow="webApp:teacher_certification"
+          title="webApp:teacher_application_details"
         />
         <ApplicationDetail id={id} />
       </PageShell>

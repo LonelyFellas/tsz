@@ -38,7 +38,8 @@ export function InterfaceLanguage({
   const options = snapshot.capabilities?.supported_locales ?? [];
   const unavailable =
     snapshot.preference !== null && !options.includes(snapshot.preference);
-  async function save(value: string) {
+  async function save(value: string, select: HTMLSelectElement) {
+    const preserveFocus = document.activeElement === select;
     const locale = value === "browser" ? null : (value as InterfaceLocale);
     setFailure(null);
     try {
@@ -53,23 +54,34 @@ export function InterfaceLanguage({
           controller.getSnapshot().preference !== locale)
       )
         setFailure(owner);
+    } finally {
+      if (preserveFocus)
+        requestAnimationFrame(() => {
+          if (
+            controller.sessionKey() === owner &&
+            select.isConnected &&
+            !select.disabled &&
+            document.activeElement === document.body
+          )
+            select.focus({ preventScroll: true });
+        });
     }
   }
   return (
     <div className="space-y-2">
       <label htmlFor={id} className="ml-4 block text-sm font-medium">
-        {uiText("界面语言")}
+        {uiText("webPreferences:language")}
       </label>
       {snapshot.status === "error" ? (
         <div role="status" className="text-sm">
-          {uiText("语言设置暂不可用")}
+          {uiText("webPreferences:read_failed")}
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => void controller.refresh()}
           >
-            {uiText("重试")}
+            {uiText("webPreferences:retry")}
           </Button>
         </div>
       ) : (
@@ -79,9 +91,11 @@ export function InterfaceLanguage({
             className="min-h-12 w-full rounded-2xl border border-border bg-surface px-4 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"
             value={snapshot.preference ?? "browser"}
             disabled={snapshot.saving || snapshot.refreshing}
-            onChange={(event) => void save(event.target.value)}
+            onChange={(event) =>
+              void save(event.target.value, event.currentTarget)
+            }
           >
-            <option value="browser">{uiText("跟随浏览器")}</option>
+            <option value="browser">{uiText("webPreferences:browser")}</option>
             {options.map((locale) => (
               <option key={locale} value={locale}>
                 {names[locale]}
@@ -89,7 +103,8 @@ export function InterfaceLanguage({
             ))}
             {unavailable && snapshot.preference && (
               <option value={snapshot.preference} disabled>
-                {names[snapshot.preference]} ({uiText("暂不可用")})
+                {names[snapshot.preference]} (
+                {uiText("webPreferences:unavailable")})
               </option>
             )}
           </select>
@@ -98,14 +113,14 @@ export function InterfaceLanguage({
               role="status"
               className="mx-4 text-xs leading-5 text-foreground-muted"
             >
-              {uiText("所选语言暂不可用，当前显示{{language}}。", {
+              {uiText("webPreferences:fallback", {
                 language: names[snapshot.locale]
               })}
             </p>
           )}
           {failure === owner && (
             <p role="alert" className="mx-4 text-xs leading-5 text-danger">
-              {uiText("未能确认语言已保存，请重试")}
+              {uiText("webPreferences:save_failed")}
             </p>
           )}
         </>

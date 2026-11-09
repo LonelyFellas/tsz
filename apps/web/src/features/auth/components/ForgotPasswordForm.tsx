@@ -1,14 +1,11 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import { passwordLengthError } from "@/features/auth/shared";
+import { localText, type WebNotice } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthAccess as webAuth } from "@/i18n/messages/auth/access";
 
-import {
-  isEmail,
-  isPhone,
-  isRegisterPassword,
-  passwordLengthError
-} from "@tsz/shared";
+import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
 import {
   Button,
   FormField,
@@ -28,9 +25,9 @@ import { AUTH_PASSWORD_HINT, securityErrorMessage } from "../shared";
 
 type Tab = "phone" | "email";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "phone", label: "手机" },
-  { id: "email", label: "邮箱" }
+const TABS: { id: Tab; label: WebNotice }[] = [
+  { id: "phone", label: localText(webAuth, "webAuthAccess:phone") },
+  { id: "email", label: localText(webAuth, "webAuthAccess:email") }
 ];
 
 const CODE_COUNTDOWN = 60;
@@ -65,8 +62,8 @@ export function ForgotPasswordForm() {
   const accountError =
     account && !accountValid
       ? tab === "phone"
-        ? "手机号码错误"
-        : "邮箱格式错误"
+        ? localText(webAuth, "webAuthAccess:invalid_phone_number")
+        : localText(webAuth, "webAuthAccess:invalid_email_address")
       : undefined;
   const passwordError = password
     ? (passwordLengthError(password) ?? undefined)
@@ -125,13 +122,15 @@ export function ForgotPasswordForm() {
         className="mb-6 inline-flex items-center gap-2.5 rounded-sm text-sm text-foreground-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
       >
         <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.5} />
-        {uiText("返回登录")}
+        {uiText("webAuthAccess:back_to_sign_in")}
       </button>
       <h1 className="mb-3 text-2xl font-bold tracking-tight text-foreground">
-        {uiText("找回密码")}
+        {uiText("webAuthAccess:reset_password")}
       </h1>
       <p className="mb-8 text-sm leading-6 text-foreground-muted">
-        {uiText("使用账号绑定的手机号或邮箱验证身份。")}
+        {uiText(
+          "webAuthAccess:verify_your_identity_using_the_phone_number_or_email_bound_to_your_accou"
+        )}
       </p>
 
       <Tabs
@@ -139,7 +138,10 @@ export function ForgotPasswordForm() {
         onValueChange={(value) => switchTab(value as Tab)}
         activationMode="manual"
       >
-        <TabsList className="mb-7" aria-label={uiText("验证方式")}>
+        <TabsList
+          className="mb-7"
+          aria-label={uiText("webAuthAccess:verification_method")}
+        >
           {TABS.map(({ id, label }) => (
             <TabsTrigger key={id} value={id} disabled={busy}>
               {uiText(label)}
@@ -153,7 +155,11 @@ export function ForgotPasswordForm() {
             {/* 账号 */}
             <FormField
               htmlFor="reset-account"
-              label={tab === "phone" ? uiText("手机号码") : uiText("邮箱")}
+              label={
+                tab === "phone"
+                  ? uiText("webAuthAccess:phone_number_2")
+                  : uiText("webAuthAccess:email")
+              }
               error={uiText(accountError)}
             >
               <Input
@@ -162,8 +168,8 @@ export function ForgotPasswordForm() {
                 autoComplete={tab === "phone" ? "tel" : "email"}
                 placeholder={
                   tab === "phone"
-                    ? uiText("请输入手机号")
-                    : uiText("请输入邮箱")
+                    ? uiText("webAuthAccess:enter_a_phone_number")
+                    : uiText("webAuthAccess:enter_your_email")
                 }
                 value={account}
                 disabled={busy}
@@ -184,14 +190,19 @@ export function ForgotPasswordForm() {
             </FormField>
 
             {/* 验证码 */}
-            <FormField htmlFor="reset-code" label={uiText("验证码")}>
+            <FormField
+              htmlFor="reset-code"
+              label={uiText("webAuthAccess:verification_code")}
+            >
               <div className="flex gap-3">
                 <Input
                   id="reset-code"
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder={uiText("请输入验证码")}
+                  placeholder={uiText(
+                    "webAuthAccess:enter_the_verification_code"
+                  )}
                   value={code}
                   maxLength={6}
                   disabled={busy}
@@ -206,10 +217,10 @@ export function ForgotPasswordForm() {
                   className="shrink-0 px-4 font-medium"
                 >
                   {countdown > 0
-                    ? uiText("{{v0}}s 后重发", { v0: countdown })
+                    ? uiText("webAuthAccess:resend_in_v0_s", { v0: countdown })
                     : sending
-                      ? uiText("发送中...")
-                      : uiText("获取验证码")}
+                      ? uiText("webAuthAccess:sending")
+                      : uiText("webAuthAccess:get_code")}
                 </Button>
               </div>
             </FormField>
@@ -217,7 +228,7 @@ export function ForgotPasswordForm() {
             {/* 新密码 */}
             <FormField
               htmlFor="reset-password"
-              label={uiText("新密码")}
+              label={uiText("webAuthAccess:new_password")}
               hint={uiText(AUTH_PASSWORD_HINT)}
               error={uiText(passwordError)}
             >
@@ -225,7 +236,7 @@ export function ForgotPasswordForm() {
                 <Input
                   id="reset-password"
                   type={showPassword ? "text" : "password"}
-                  placeholder={uiText("请输入新密码")}
+                  placeholder={uiText("webAuthAccess:enter_a_new_password")}
                   value={password}
                   disabled={busy}
                   autoComplete="new-password"
@@ -242,7 +253,9 @@ export function ForgotPasswordForm() {
                   disabled={busy}
                   className="absolute right-1 top-1/2 -translate-y-1/2"
                   aria-label={
-                    showPassword ? uiText("隐藏密码") : uiText("显示密码")
+                    showPassword
+                      ? uiText("webAuthAccess:hide_password")
+                      : uiText("webAuthAccess:show_password")
                   }
                 >
                   <PasswordVisibilityIcon visible={showPassword} />
@@ -257,7 +270,9 @@ export function ForgotPasswordForm() {
             )}
 
             <Button type="submit" disabled={!canSubmit} className="w-full">
-              {loading ? uiText("重置中...") : uiText("重置密码")}
+              {loading
+                ? uiText("webAuthAccess:resetting")
+                : uiText("webAuthAccess:reset_password_2")}
             </Button>
           </form>
         </TabsContent>

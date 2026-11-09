@@ -1,4 +1,6 @@
 "use client";
+import { webCommon, type WebNotice, localText } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthProfile as webAuth } from "@/i18n/messages/auth/profile";
 
@@ -9,8 +11,13 @@ import { ArrowLeft, UserPlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
-import { VARIANT_LABEL, displayNameOf } from "@/lib/user";
+import { displayNameOf } from "@/lib/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
+
+const variantMessages = {
+  BrE: localText(webCommon, "webCommon:shared_british"),
+  AmE: localText(webCommon, "webCommon:shared_american")
+};
 
 // 个人中心:头像菜单进入的中转页。聚合资料卡 + 常用入口 + 申请成为老师。
 // 资料卡的「编辑资料」跳 /account/profile(EditProfileForm)。
@@ -18,16 +25,24 @@ import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIden
 
 // 常用快捷入口。仅保留有真实去处的项;工作台和申请认证在头像菜单中,
 // 不在本页重复。占位类(我的任务 / 设置)待后端就绪再加。
-const TILES: { label: string; href: string; icon: ReactNode }[] = [
+const TILES: { label: WebNotice; href: string; icon: ReactNode }[] = [
   {
-    label: "邀请好友",
+    label: localText(webAuth, "webAuthProfile:invite_friends"),
     href: "/account/invitations",
     icon: <UserPlus strokeWidth={1.6} aria-hidden />
   },
-  { label: "我的天生币", href: "/account/coins", icon: <CoinIcon /> },
-  { label: "我的词表", href: "/account/wordlists", icon: <ListIcon /> },
   {
-    label: "账号安全",
+    label: localText(webAuth, "webAuthProfile:my_coins"),
+    href: "/account/coins",
+    icon: <CoinIcon />
+  },
+  {
+    label: localText(webAuth, "webAuthProfile:my_word_lists"),
+    href: "/account/wordlists",
+    icon: <ListIcon />
+  },
+  {
+    label: localText(webAuth, "webAuthProfile:account_security"),
     href: "/account/security",
     icon: (
       <svg
@@ -93,7 +108,9 @@ export function ProfileHub() {
   if (loadError) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-foreground-subtle">
-        {uiText("资料加载失败,请刷新重试。")}
+        {uiText(
+          "webAuthProfile:could_not_load_your_profile_reload_and_try_again"
+        )}
       </div>
     );
   }
@@ -101,13 +118,13 @@ export function ProfileHub() {
   if (!me) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-foreground-subtle">
-        {uiText("加载中…")}
+        {uiText("webAuthProfile:loading_2")}
       </div>
     );
   }
 
   const { user, learning_settings } = me;
-  const displayName = displayNameOf(user, uiText("用户"));
+  const displayName = displayNameOf(user, uiText("webCommon:user"));
   const initial = Array.from(displayName)[0]!.toUpperCase();
   const contact = user.phone ?? user.email ?? "";
 
@@ -124,14 +141,16 @@ export function ProfileHub() {
         className="-ml-3 mb-5 inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm text-foreground-muted transition-colors hover:bg-surface/80 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ArrowLeft className="size-4" strokeWidth={1.8} aria-hidden />
-        {uiText("返回工作台")}
+        {uiText("webAuthProfile:back_to_workspace")}
       </button>
       {error && (
         <div
           role="alert"
           className="mb-4 flex flex-wrap items-center gap-3 text-sm text-foreground-muted"
         >
-          <p>{uiText("暂时无法确认工作台身份。")}</p>
+          <p>
+            {uiText("webAuthProfile:could_not_confirm_your_workspace_role")}
+          </p>
           <button
             type="button"
             onClick={() =>
@@ -141,15 +160,15 @@ export function ProfileHub() {
             }
             className="text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            {uiText("重新核验身份")}
+            {uiText("webAuthProfile:check_role_again")}
           </button>
         </div>
       )}
       <p className="mb-3 text-xs font-medium tracking-[0.2em] text-foreground-muted">
-        {uiText("我的账户")}
+        {uiText("webAuthProfile:my_account")}
       </p>
       <h1 className="mb-8 text-3xl font-bold tracking-tight text-foreground sm:text-[34px]">
-        {uiText("个人中心")}
+        {uiText("webAuthProfile:account")}
       </h1>
 
       <div className="glass rounded-3xl p-2">
@@ -188,18 +207,20 @@ export function ProfileHub() {
                 <button
                   type="button"
                   onClick={() => copyId(user.id)}
-                  aria-label={uiText("复制 ID")}
+                  aria-label={uiText("webAuthProfile:copy_id")}
                   className="flex size-11 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                   {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
                 </button>
               </span>
               {copyState === "copied" && (
-                <span className="text-xs text-primary">{uiText("已复制")}</span>
+                <span className="text-xs text-primary">
+                  {uiText("webAuthProfile:copied")}
+                </span>
               )}
               {copyState === "failed" && (
                 <span className="text-xs text-danger">
-                  {uiText("复制失败")}
+                  {uiText("webAuthProfile:copy_failed")}
                 </span>
               )}
               {learning_settings && (
@@ -208,7 +229,7 @@ export function ProfileHub() {
                     {learning_settings.cefr_level}
                   </span>
                   <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-foreground-muted">
-                    {uiText(VARIANT_LABEL[learning_settings.english_variant])}
+                    {uiText(variantMessages[learning_settings.english_variant])}
                   </span>
                 </>
               )}
@@ -217,7 +238,7 @@ export function ProfileHub() {
               href="/account/profile"
               className="inline-flex min-h-10 shrink-0 items-center justify-center self-end rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground tracking-wide transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:self-auto"
             >
-              {uiText("编辑资料")}
+              {uiText("webAuthProfile:edit_profile")}
             </Link>
           </div>
         </div>
@@ -226,7 +247,7 @@ export function ProfileHub() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {TILES.map((tile) => (
           <Link
-            key={tile.label}
+            key={tile.href}
             href={tile.href}
             className="glass group flex min-h-20 items-center gap-4 rounded-3xl px-5 transition-[box-shadow,border-color] duration-300 hover:border-primary/30 hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >

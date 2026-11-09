@@ -97,7 +97,7 @@ function DictionaryBody({
     >
       <div className={query ? "" : "mx-auto w-full max-w-2xl"}>
         <h1 className="mb-6 text-3xl font-semibold tracking-tight">
-          {uiText("词典")}
+          {uiText("webDictionary:dictionary")}
         </h1>
         <form
           role="search"
@@ -111,7 +111,7 @@ function DictionaryBody({
             htmlFor="dictionary-search"
             className="mb-2 block px-4 text-sm font-medium"
           >
-            {uiText("查找英文词条")}
+            {uiText("webDictionary:find_english_entries")}
           </label>
           <div className="flex gap-2">
             <SearchField
@@ -122,7 +122,9 @@ function DictionaryBody({
                 setInput(value);
                 setInvalid(false);
               }}
-              placeholder={uiText("输入词条关键词，快速查词")}
+              placeholder={uiText(
+                "webDictionary:enter_a_keyword_to_look_up_a_word"
+              )}
               autoComplete="off"
               aria-invalid={invalid}
               aria-describedby={
@@ -130,9 +132,11 @@ function DictionaryBody({
               }
               className="min-w-0 flex-1"
             />
-            <Button type="submit" aria-label={uiText("查询")}>
+            <Button type="submit" aria-label={uiText("webDictionary:search")}>
               <Search className="size-5" aria-hidden />
-              <span className="hidden sm:inline">{uiText("查询")}</span>
+              <span className="hidden sm:inline">
+                {uiText("webDictionary:search")}
+              </span>
             </Button>
           </div>
           {invalid && (
@@ -141,7 +145,9 @@ function DictionaryBody({
               role="alert"
               className="mt-2 px-4 text-sm text-danger"
             >
-              {uiText("请输入 1–100 个字符的词条关键词")}
+              {uiText(
+                "webDictionary:enter_an_entry_keyword_of_1_100_characters"
+              )}
             </p>
           )}
         </form>
@@ -151,13 +157,13 @@ function DictionaryBody({
       </div>
       {query && (
         <section
-          aria-label={uiText("查询结果")}
+          aria-label={uiText("webDictionary:search_results")}
           aria-busy={results.isFetching}
           className="mt-8"
         >
           {(results.isPending || profile.isPending) && (
             <p role="status" className="text-sm text-foreground-muted">
-              {uiText("查询中…")}
+              {uiText("webDictionary:searching")}
             </p>
           )}
           {(results.isError || profile.isError) && (
@@ -165,7 +171,7 @@ function DictionaryBody({
               role="alert"
               className="rounded-2xl border border-border bg-surface p-6"
             >
-              <p>{uiText("查询暂时失败，请重试。")}</p>
+              <p>{uiText("webDictionary:search_failed_try_again")}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -175,7 +181,7 @@ function DictionaryBody({
                   void profile.refetch();
                 }}
               >
-                {uiText("重新查询")}
+                {uiText("webDictionary:search_again")}
               </Button>
             </div>
           )}
@@ -183,12 +189,15 @@ function DictionaryBody({
             <>
               <p role="status" className="mb-4 text-sm text-foreground-muted">
                 {results.data.pagination.total
-                  ? uiText("找到 {{v0}} 条词条", {
+                  ? uiText("webDictionary:v0_entries_found", {
                       v0: results.data.pagination.total
                     })
-                  : uiText("没有找到“{{v0}}”，试试其他拼写或更短的关键词。", {
-                      v0: query
-                    })}
+                  : uiText(
+                      "webDictionary:no_results_for_v0_try_another_spelling_or_a_shorter_keyword",
+                      {
+                        v0: query
+                      }
+                    )}
               </p>
               {results.data.items.length > 0 && (
                 <div className="overflow-hidden rounded-3xl border border-border bg-surface">
@@ -196,12 +205,12 @@ function DictionaryBody({
                     aria-hidden
                     className="hidden grid-cols-[1fr_1fr_3fr] gap-5 border-b border-border bg-muted px-6 py-4 text-sm font-medium md:grid"
                   >
-                    <span>{uiText("名称")}</span>
-                    <span>{uiText("其他拼写形式")}</span>
+                    <span>{uiText("webDictionary:name")}</span>
+                    <span>{uiText("webDictionary:other_spellings")}</span>
                     <div className="grid grid-cols-[3rem_1fr_1fr] gap-4">
-                      <span>{uiText("词性")}</span>
-                      <span>{uiText("多维释义")}</span>
-                      <span>{uiText("语法结构")}</span>
+                      <span>{uiText("webDictionary:part_of_speech")}</span>
+                      <span>{uiText("webDictionary:definitions")}</span>
+                      <span>{uiText("webDictionary:grammar_structures")}</span>
                     </div>
                   </div>
                   {results.data.items.map((item) => (
@@ -218,7 +227,7 @@ function DictionaryBody({
               )}
               {results.data.pagination.total_pages > 1 && (
                 <nav
-                  aria-label={uiText("结果分页")}
+                  aria-label={uiText("webDictionary:search_result_pages")}
                   className="mt-6 flex items-center justify-center gap-4"
                 >
                   <Button asChild variant="outline" disabled={page <= 1}>
@@ -230,7 +239,7 @@ function DictionaryBody({
                       }
                       href={`/dictionary?${new URLSearchParams({ q: query, page: String(Math.max(1, page - 1)) })}`}
                     >
-                      {uiText("上一页")}
+                      {uiText("webDictionary:previous_page")}
                     </Link>
                   </Button>
                   <span className="text-sm">
@@ -253,7 +262,7 @@ function DictionaryBody({
                       }
                       href={`/dictionary?${new URLSearchParams({ q: query, page: String(page + 1) })}`}
                     >
-                      {uiText("下一页")}
+                      {uiText("webDictionary:next_page")}
                     </Link>
                   </Button>
                 </nav>
@@ -288,7 +297,9 @@ function Result({
         className="tsz-words break-words font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
       >
         {spelling.primary}
-        <span className="sr-only">{uiText("，查看词条详情")}</span>
+        <span className="sr-only">
+          {uiText("webDictionary:view_entry_details")}
+        </span>
       </Link>
       <p
         className={cn(
@@ -328,13 +339,15 @@ function Result({
                     />
                   </>
                 ) : (
-                  <p className="text-foreground-muted">{uiText("暂无释义")}</p>
+                  <p className="text-foreground-muted">
+                    {uiText("webDictionary:no_definitions_yet")}
+                  </p>
                 )}
               </div>
               <div className="col-span-2 md:col-span-1">
                 {grammar && (
                   <p className="mb-1 text-xs text-foreground-muted md:hidden">
-                    {uiText("语法结构")}
+                    {uiText("webDictionary:grammar_structures")}
                   </p>
                 )}
                 {grammar && (
@@ -349,7 +362,7 @@ function Result({
                       (text) => text.dialect
                     )}
                     variant={variant}
-                    label={uiText("播放语法结构")}
+                    label={uiText("webDictionary:play_grammar_structure")}
                   />
                 )}
               </div>

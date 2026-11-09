@@ -1,58 +1,106 @@
 import { ClientResponseError, RequestTimeoutError } from "@tsz/api-client";
-import type { createInterfaceI18n } from "@tsz/shared/i18n";
+import {
+  type createInterfaceI18n,
+  type InterfaceResourceBundles
+} from "@tsz/shared/i18n";
 type i18n = ReturnType<typeof createInterfaceI18n>;
-import type { InterfaceResourceBundles } from "@tsz/shared/i18n";
+
+import type {
+  CatalogArguments,
+  WebCatalogKey,
+  WebParameterValue
+} from "./types";
+export type { WebKey } from "./types";
 
 export type WebMessages = Record<string, readonly [string, string, string]>;
 export type OriginalText = { readonly original: string };
 export const originalText = (original: string): OriginalText => ({ original });
+/** 只能经类型安全的 localText 创建，原文参数不会再次查译文。 */
+const localTextBrand = Symbol("Web local message");
 export type LocalText = {
-  readonly source: string;
-  readonly values: WebValues;
+  readonly [localTextBrand]: true;
+  readonly key: string;
+  readonly catalog: WebCatalog;
+  readonly values?: WebValues;
 };
-export type WebValues = Record<
-  string,
-  string | number | null | undefined | LocalText
->;
-export type WebNotice = string | OriginalText | LocalText;
-export const localText = (
-  source: string,
-  values: LocalText["values"]
-): LocalText => ({ source, values });
-export class LocalWebError extends Error {}
-export const webErrorText = (error: unknown, fallback: string): WebNotice =>
+export type WebValues = Record<string, WebParameterValue>;
+export type WebNotice = "" | OriginalText | LocalText;
+/** 只读取作者登记的诊断映射，未知 code/原文不能命中 Object 原型。 */
+export function lookupWebNotice(
+  notices: Readonly<Record<string, WebNotice>>,
+  key: string | undefined
+): WebNotice | undefined {
+  return key !== undefined && Object.hasOwn(notices, key)
+    ? notices[key]
+    : undefined;
+}
+export function localText<C extends WebCatalog, K extends WebCatalogKey<C>>(
+  catalog: C,
+  key: K,
+  ...args: CatalogArguments<C, K>
+): LocalText {
+  return { [localTextBrand]: true, catalog, key, values: args[0] };
+}
+export class LocalWebError extends Error {
+  constructor(readonly notice: LocalText) {
+    super(notice.key);
+  }
+}
+export const webErrorText = (error: unknown, fallback: WebNotice): WebNotice =>
   error instanceof ClientResponseError
-    ? "数据暂不可用，请刷新后重试"
-    : error instanceof LocalWebError || error instanceof RequestTimeoutError
-      ? error.message
-      : error instanceof Error
-        ? originalText(error.message)
-        : fallback;
-export const noticeSource = (value: WebNotice): string =>
-  typeof value === "string"
-    ? value
-    : "original" in value
-      ? value.original
-      : value.source;
-export type WebText = (
-  source: WebNotice | null | undefined,
-  values?: WebValues
-) => string;
-
-export interface WebCatalog {
-  namespace: string;
-  messages: WebMessages;
-  plurals: Partial<Record<string, { parameter: string; one: string }>>;
-  keys: Map<string, string>;
+    ? localText(webCommon, "webCommon:response_unavailable")
+    : error instanceof LocalWebError
+      ? error.notice
+      : error instanceof RequestTimeoutError
+        ? localText(
+            webCommon,
+            error.method === "GET" || error.method === "HEAD"
+              ? "webCommon:request_timeout"
+              : "webCommon:request_timeout_unknown"
+          )
+        : error instanceof Error
+          ? originalText(error.message)
+          : fallback;
+export interface WebText<C extends WebCatalog> {
+  <K extends WebCatalogKey<C>>(key: K, ...args: CatalogArguments<C, K>): string;
+  (notice: WebNotice | null | undefined): string;
+}
+export interface WebCatalog<
+  N extends string = string,
+  M extends WebMessages = WebMessages,
+  P extends Partial<Record<keyof M, { parameter: string; one: string }>> =
+    Partial<Record<keyof M, { parameter: string; one: string }>>
+> {
+  namespace: N;
+  messages: M;
+  plurals: P;
   resources: InterfaceResourceBundles;
 }
 
-/** 只接收界面作者提供的文案；业务正文与服务端原文不送入查找。 */
-export function defineWebMessages<N extends string, M extends WebMessages>(
+/** 保留命名空间、稳定键和模板参数的字面量类型。 */
+export function defineWebMessages<
+  const N extends string,
+  const M extends WebMessages
+>(
   namespace: N,
   messages: M,
-  american: Partial<Record<keyof M, string>> = {},
-  plurals: Partial<Record<keyof M, { parameter: string; one: string }>> = {}
+  american?: Partial<Record<keyof M, string>>
+): WebCatalog<N, M, Record<never, never>>;
+export function defineWebMessages<
+  const N extends string,
+  const M extends WebMessages,
+  const P extends Partial<Record<keyof M, { parameter: string; one: string }>>
+>(
+  namespace: N,
+  messages: M,
+  american: Partial<Record<keyof M, string>>,
+  plurals: P
+): WebCatalog<N, M, P>;
+export function defineWebMessages(
+  namespace: string,
+  messages: WebMessages,
+  american: Partial<Record<string, string>> = {},
+  plurals: WebCatalog["plurals"] = {}
 ): WebCatalog {
   const column = (index: 0 | 1 | 2) =>
     Object.fromEntries(
@@ -62,7 +110,9 @@ export function defineWebMessages<N extends string, M extends WebMessages>(
   const regional: Record<string, string> = {};
   for (const [key, value] of Object.entries(american))
     if (typeof value === "string") regional[key] = value;
-  for (const [key, value] of Object.entries(plurals)) {
+  for (const [key, value] of Object.entries<
+    { parameter: string; one: string } | undefined
+  >(plurals)) {
     if (!value) continue;
     english[`${key}_one`] = value.one;
     english[`${key}_other`] = messages[key]![2];
@@ -71,11 +121,10 @@ export function defineWebMessages<N extends string, M extends WebMessages>(
       regional[`${key}_other`] = regional[key];
     }
   }
-  return {
+  const catalog = {
     namespace,
     messages,
     plurals,
-    keys: new Map(Object.entries(messages).map(([key, row]) => [row[0], key])),
     resources: {
       "zh-Hans": { [namespace]: column(0) },
       "zh-Hant": { [namespace]: column(1) },
@@ -83,6 +132,7 @@ export function defineWebMessages<N extends string, M extends WebMessages>(
       "en-US": { [namespace]: regional }
     }
   };
+  return catalog;
 }
 
 export function addWebCatalog(instance: i18n, catalog: WebCatalog) {
@@ -293,35 +343,56 @@ export const webCommon = /* @__PURE__ */ defineWebMessages("webCommon", {
   shared_american: ["美式", "美式", "American"]
 } as const);
 
-export function webText(instance: i18n, catalog: WebCatalog): WebText {
-  return (source, values) => {
-    if (source == null) return "";
+export function webText<C extends WebCatalog>(
+  instance: i18n,
+  catalog: C
+): WebText<C> {
+  // 调用方的键由目录字面量类型约束；localText 只接收已登记的完整键。
+  // i18next 的动态命名空间重载在此受控边界收窄，不把断言传播到业务调用点。
+  const translate = instance.t as unknown as (
+    key: string,
+    options: { ns: string; count?: number } & Record<
+      string,
+      string | number | bigint
+    >
+  ) => string;
+  const render = (
+    source: string | OriginalText | LocalText | null | undefined,
+    values?: WebValues,
+    scope: WebCatalog = catalog
+  ): string => {
+    if (!source) return "";
     if (typeof source !== "string") {
       if ("original" in source) return source.original;
+      scope = source.catalog;
       values = source.values;
-      source = source.source;
+      source = source.key;
     }
-    const selected = catalog.keys.has(source) ? catalog : webCommon;
-    const key = selected.keys.get(source);
-    if (!key) return source;
-    // 命名空间由本模块静态登记，键来自受控目录。
+    const separator = source.indexOf(":");
+    const namespace = source.slice(0, separator);
+    const key = source.slice(separator + 1);
+    const selected: WebCatalog =
+      namespace === webCommon.namespace ? webCommon : scope;
+    if (
+      separator < 1 ||
+      namespace !== selected.namespace ||
+      !Object.hasOwn(selected.messages, key)
+    )
+      throw new Error(`Unregistered Web translation: ${source}`);
+    addWebCatalog(instance, selected);
+    const plural = selected.plurals[key];
     return String(
-      instance.t(key as never, {
-        ns: selected.namespace as never,
-        ...(selected.plurals[key]
-          ? { count: Number(values?.[selected.plurals[key].parameter]) }
-          : {}),
+      translate(key, {
+        ns: namespace,
+        ...(plural ? { count: Number(values?.[plural.parameter]) } : {}),
         ...Object.fromEntries(
-          Object.entries(values ?? {}).map(([key, value]) => [
-            key,
-            typeof value === "object" && value !== null
-              ? webText(instance, catalog)(value)
-              : value == null
-                ? String(value)
-                : value
+          Object.entries(values ?? {}).map(([parameter, value]) => [
+            parameter,
+            typeof value === "object" ? render(value) : value
           ])
         )
       })
     );
   };
+  return render as WebText<C>;
 }

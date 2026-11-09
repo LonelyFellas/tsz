@@ -6,9 +6,9 @@ import { RegisterForm } from "@/features/auth/components/RegisterForm";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("注册"),
+    title: uiText("webApp:create_account"),
     description: uiText(
-      "免费注册天生会背,按遗忘曲线科学背单词,开启高效英语学习。"
+      "webApp:create_a_free_account_and_learn_english_vocabulary_using_the_forgetting"
     ),
     alternates: { canonical: "/register" }
   };

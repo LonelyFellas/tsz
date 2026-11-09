@@ -1,5 +1,12 @@
 "use client";
-import { LocalWebError, type WebNotice, webErrorText } from "@/i18n/catalog";
+import {
+  webCommon,
+  localText,
+  LocalWebError,
+  type WebNotice,
+  webErrorText
+} from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webTask } from "@/i18n/messages/task";
 
@@ -82,7 +89,12 @@ export function PlanSourcePicker({
         if (!chosen.length) continue;
         const versions = new Set(chosen.map(([, n]) => n.version));
         if (versions.size !== 1)
-          throw new LocalWebError("目录已变化，请取消文件夹选择并重新选择。");
+          throw new LocalWebError(
+            localText(
+              webTask,
+              "webTask:the_directory_changed_cancel_the_folder_selection_and_select_again"
+            )
+          );
         const expanded = await api.wordList.library.selection(
           s,
           {
@@ -94,7 +106,12 @@ export function PlanSourcePicker({
         for (const w of expanded.wordlists) result.set(w.id, { wordlist: w });
       }
       if (result.size > 5)
-        throw new LocalWebError("最多选择 5 份词表，请减少选择。");
+        throw new LocalWebError(
+          localText(
+            webTask,
+            "webTask:select_at_most_five_word_lists_reduce_your_selection"
+          )
+        );
       if (current()) {
         if (Object.keys(nodes).length) {
           setDraft([...result.values()]);
@@ -103,21 +120,31 @@ export function PlanSourcePicker({
         } else onConfirm([...result.values()]);
       }
     } catch (e) {
-      if (current()) setError(webErrorText(e, "选择失败，请重试。"));
+      if (current())
+        setError(
+          webErrorText(
+            e,
+            localText(webTask, "webTask:could_not_select_try_again")
+          )
+        );
     } finally {
       if (current()) setBusy(false);
     }
   }
   return (
-    <LibraryDialog title={uiText("选择词表")} busy={busy} onClose={onClose}>
+    <LibraryDialog
+      title={uiText("webTask:choose_word_lists")}
+      busy={busy}
+      onClose={onClose}
+    >
       <div className="space-y-5">
         <Segmented
-          label={uiText("词表来源")}
+          label={uiText("webTask:word_list_sources")}
           value={space}
           options={[
-            { value: "owned", label: uiText("我创建的") },
-            { value: "favorites", label: uiText("我收藏的") },
-            { value: "public", label: uiText("公开词表") }
+            { value: "owned", label: uiText("webTask:created_by_me") },
+            { value: "favorites", label: uiText("webTask:my_favourites") },
+            { value: "public", label: uiText("webTask:public_word_lists") }
           ]}
           onChange={(s) => {
             setSpace(s);
@@ -127,10 +154,10 @@ export function PlanSourcePicker({
           }}
         />
         <Input
-          aria-label={uiText("搜索词表或文件夹")}
+          aria-label={uiText("webTask:search_word_lists_or_folders")}
           value={search}
           disabled={busy}
-          placeholder={uiText("搜索词表或文件夹")}
+          placeholder={uiText("webTask:search_word_lists_or_folders")}
           onChange={(e) => {
             setSearch(e.target.value);
             setPage(1);
@@ -138,7 +165,7 @@ export function PlanSourcePicker({
         />
         {space !== "public" && (
           <nav
-            aria-label={uiText("词表目录")}
+            aria-label={uiText("webTask:word_list_directory")}
             className="flex flex-wrap gap-2 text-sm"
           >
             <button
@@ -148,7 +175,7 @@ export function PlanSourcePicker({
                 setPage(1);
               }}
             >
-              {uiText("根目录")}
+              {uiText("webTask:root_folder")}
             </button>
             {library.data?.ancestors.map((c) => (
               <button
@@ -168,14 +195,19 @@ export function PlanSourcePicker({
         {data.isError ? (
           <PageNotice tone="error">
             {data.error instanceof Error
-              ? uiText(webErrorText(data.error, "数据暂不可用，请刷新后重试"))
-              : uiText("读取失败")}
+              ? uiText(
+                  webErrorText(
+                    data.error,
+                    localText(webCommon, "webCommon:response_unavailable")
+                  )
+                )
+              : uiText("webTask:could_not_load")}
             <Button variant="link" onClick={() => void data.refetch()}>
-              {uiText("重试")}
+              {uiText("webTask:retry")}
             </Button>
           </PageNotice>
         ) : data.isPending ? (
-          <PageNotice>{uiText("正在读取词表…")}</PageNotice>
+          <PageNotice>{uiText("webTask:loading_word_lists")}</PageNotice>
         ) : (
           <ul className="space-y-3">
             {space === "public"
@@ -195,7 +227,7 @@ export function PlanSourcePicker({
                       <div className="flex items-center gap-3 rounded-2xl border border-border p-3">
                         <input
                           type="checkbox"
-                          aria-label={uiText("选择文件夹 {{v0}}", {
+                          aria-label={uiText("webTask:select_folder_v0", {
                             v0: n.name
                           })}
                           checked={!!nodes[n.id]}
@@ -223,7 +255,7 @@ export function PlanSourcePicker({
                             setPage(1);
                           }}
                         >
-                          {uiText("文件夹 · {{v0}}→", { v0: n.name })}
+                          {uiText("webTask:folder_v0", { v0: n.name })}
                         </button>
                       </div>
                     ) : n.wordlist ? (
@@ -237,7 +269,9 @@ export function PlanSourcePicker({
                       />
                     ) : (
                       <p className="text-sm text-foreground-muted">
-                        {uiText("{{v0}} · 来源不可用", { v0: n.name })}
+                        {uiText("webTask:v0_source_unavailable", {
+                          v0: n.name
+                        })}
                       </p>
                     )}
                   </li>
@@ -253,8 +287,13 @@ export function PlanSourcePicker({
           />
         )}
         {draft.length > 0 && (
-          <section aria-label={uiText("待确认词表")} className="space-y-2">
-            <h3 className="text-sm font-medium">{uiText("待确认词表")}</h3>
+          <section
+            aria-label={uiText("webTask:word_lists_to_confirm")}
+            className="space-y-2"
+          >
+            <h3 className="text-sm font-medium">
+              {uiText("webTask:word_lists_to_confirm")}
+            </h3>
             <ul className="space-y-2">
               {draft.map((s) => (
                 <li
@@ -266,7 +305,7 @@ export function PlanSourcePicker({
                       {s.wordlist.name}
                     </p>
                     <p className="text-xs text-foreground-muted">
-                      {uiText("{{v0}}· {{v1}} 个词条", {
+                      {uiText("webTask:v0_v1_entries", {
                         v0: s.wordlist.owner_name,
                         v1: s.wordlist.item_count
                       })}
@@ -277,7 +316,7 @@ export function PlanSourcePicker({
                     size="sm"
                     variant="ghost"
                     disabled={busy}
-                    aria-label={uiText("取消选择 {{v0}}", {
+                    aria-label={uiText("webTask:deselect_v0", {
                       v0: s.wordlist.name
                     })}
                     onClick={() =>
@@ -286,7 +325,7 @@ export function PlanSourcePicker({
                       )
                     }
                   >
-                    {uiText("移除")}
+                    {uiText("webTask:remove")}
                   </Button>
                 </li>
               ))}
@@ -295,16 +334,20 @@ export function PlanSourcePicker({
         )}
         {expandedNotice && (
           <p role="status" className="text-sm text-foreground-muted">
-            {uiText("文件夹已展开，请核对待确认词表后再次确认选择。")}
+            {uiText(
+              "webTask:folders_expanded_check_the_word_lists_and_confirm_your_selection_again"
+            )}
           </p>
         )}
         <p className="text-sm text-foreground-muted">
-          {uiText("已选 {{v0}} 份词表", { v0: draft.length })}
+          {uiText("webTask:selected_word_lists_v0", { v0: draft.length })}
           {Object.keys(nodes).length > 0 &&
-            uiText("，另有 {{v0}} 个文件夹待展开", {
+            uiText("webTask:with_v0_more_folders_to_expand", {
               v0: Object.keys(nodes).length
             })}
-          {uiText("。确认时展开全部子文件夹并去重，最多 5 份。")}
+          {uiText(
+            "webTask:confirmation_expands_all_subfolders_and_removes_duplicates_up_to_five_li"
+          )}
         </p>
         {Object.entries(nodes).map(([id, n]) => (
           <Button
@@ -319,7 +362,7 @@ export function PlanSourcePicker({
               })
             }
           >
-            {uiText("移除文件夹 {{v0}}", { v0: n.name })}
+            {uiText("webTask:remove_folder_v0", { v0: n.name })}
           </Button>
         ))}
         {error && (
@@ -329,10 +372,12 @@ export function PlanSourcePicker({
         )}
         <div className="sticky bottom-0 flex justify-end gap-3 bg-surface py-3">
           <Button variant="outline" disabled={busy} onClick={onClose}>
-            {uiText("取消")}
+            {uiText("webTask:cancel")}
           </Button>
           <Button disabled={busy} onClick={() => void confirm()}>
-            {busy ? uiText("正在展开…") : uiText("确认选择")}
+            {busy
+              ? uiText("webTask:expanding")
+              : uiText("webTask:confirm_selection")}
           </Button>
         </div>
       </div>
@@ -365,13 +410,15 @@ export function SourceChoice({
         <span className="line-clamp-2 break-words font-medium">{w.name}</span>
         {item.personalName && item.personalName !== w.name && (
           <span className="block text-sm text-foreground-muted">
-            {uiText("备注：{{v0}}", { v0: item.personalName })}
+            {uiText("webTask:note_v0_2", { v0: item.personalName })}
           </span>
         )}
         <span className="mt-1 block text-xs text-foreground-muted">
           {w.owner_name} ·{" "}
-          {w.state === "published" ? uiText("公开") : uiText("非公开")}{" "}
-          {uiText("· {{v0}} 个词条", { v0: w.item_count })}
+          {w.state === "published"
+            ? uiText("webTask:public")
+            : uiText("webTask:private")}{" "}
+          {uiText("webTask:v0_entries_3", { v0: w.item_count })}
         </span>
       </span>
     </label>

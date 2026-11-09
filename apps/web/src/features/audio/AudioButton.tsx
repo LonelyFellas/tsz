@@ -107,7 +107,7 @@ function AudioPlayback({ label, sign, resourceKey }: AudioButtonProps) {
       </Button>
       {error && (
         <span role="alert" className="text-xs text-danger">
-          {uiText("播放失败，请重试")}
+          {uiText("webAudio:playback_failed_try_again")}
         </span>
       )}
     </span>

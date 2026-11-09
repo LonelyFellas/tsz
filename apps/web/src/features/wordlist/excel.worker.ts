@@ -1,4 +1,5 @@
-import { LocalWebError } from "@/i18n/catalog";
+import { webWordlistExcel } from "@/i18n/messages/wordlist/excel";
+import { localText, LocalWebError } from "@/i18n/catalog";
 import { createExcelTemplate, parseExcel } from "./excel";
 
 self.onmessage = (
@@ -14,12 +15,17 @@ self.onmessage = (
         : parseExcel(event.data.buffer, event.data.fileName);
     self.postMessage({ result });
   } catch (error) {
-    self.postMessage({
-      error:
-        error instanceof Error
-          ? error.message
-          : "无法读取文件，请检查是否损坏或加密",
-      local: error instanceof LocalWebError || !(error instanceof Error)
-    });
+    self.postMessage(
+      error instanceof LocalWebError
+        ? { notice: error.notice }
+        : error instanceof Error
+          ? { error: error.message }
+          : {
+              notice: localText(
+                webWordlistExcel,
+                "webWordlistExcel:cannot_read_the_file_check_whether_it_is_damaged_or_encrypted"
+              )
+            }
+    );
   }
 };

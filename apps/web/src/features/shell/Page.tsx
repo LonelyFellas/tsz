@@ -174,7 +174,7 @@ export function Pager({
   return (
     <nav
       className="mt-8 flex items-center justify-center gap-3"
-      aria-label={uiText("分页")}
+      aria-label={uiText("webShell:pagination")}
     >
       <button
         type="button"
@@ -182,7 +182,7 @@ export function Pager({
         disabled={disabled || page <= 1}
         onClick={() => onChange(Math.min(page - 1, total))}
       >
-        {uiText("上一页")}
+        {uiText("webShell:previous_page")}
       </button>
       <span className="min-w-16 text-center text-sm tabular-nums text-foreground-muted">
         {page} / {total}
@@ -193,7 +193,7 @@ export function Pager({
         disabled={disabled || page >= total}
         onClick={() => onChange(page + 1)}
       >
-        {uiText("下一页")}
+        {uiText("webShell:next_page")}
       </button>
     </nav>
   );

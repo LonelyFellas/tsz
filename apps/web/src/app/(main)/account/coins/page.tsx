@@ -6,7 +6,7 @@ import { CoinsWallet } from "@/features/coins/CoinsWallet";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("我的天生币"),
+    title: uiText("webApp:my_coins"),
     robots: { index: false, follow: false }
   };
 }

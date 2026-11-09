@@ -27,7 +27,7 @@ export function PhoneBindingGuard({ children }: { children: ReactNode }) {
   if (target)
     return (
       <p role="status" className="py-20 text-center text-foreground-muted">
-        {uiText("正在前往手机号绑定…")}
+        {uiText("webAuthSession:redirecting_to_phone_binding")}
       </p>
     );
   return children;

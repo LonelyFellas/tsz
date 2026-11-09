@@ -10,13 +10,20 @@ export function StatsDashboard() {
   const uiText = useWebText(webStats);
   return (
     <ComingSoon
-      eyebrow={uiText("教学工作台")}
-      title={uiText("数据统计")}
+      eyebrow={uiText("webStats:teaching_workspace")}
+      title={uiText("webStats:learning_statistics")}
       icon={BarChart3}
-      heading={uiText("学习数据即将开放")}
-      links={[{ href: "/account/wordlists", label: uiText("整理我的词表") }]}
+      heading={uiText("webStats:learning_data_are_not_available_yet")}
+      links={[
+        {
+          href: "/account/wordlists",
+          label: uiText("webStats:organise_my_word_lists")
+        }
+      ]}
     >
-      {uiText("开放后可以查看学生的完成率、打卡情况和词表使用汇总。")}
+      {uiText(
+        "webStats:when_available_you_will_be_able_to_view_student_completion_rates_check_i"
+      )}
     </ComingSoon>
   );
 }

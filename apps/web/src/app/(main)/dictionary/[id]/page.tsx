@@ -6,7 +6,7 @@ import { DictionaryDetail } from "@/features/dictionary/DictionaryDetail";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("词条详情"),
+    title: uiText("webApp:entry_details"),
     robots: { index: false, follow: false }
   };
 }

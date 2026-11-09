@@ -1,9 +1,9 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import { localText, type WebNotice } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webWordlistDetail as webWordlist } from "@/i18n/messages/wordlist/detail";
 
-import { unavailableReasonLabels } from "../availability";
 import { DetailInteractions } from "./WordlistInteractions";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -16,7 +16,7 @@ import {
 } from "@tanstack/react-query";
 import { ReadingEntry, ReadingTable } from "./ReadingEntry";
 import { AudioButton } from "@/features/audio/AudioButton";
-import { audioStatusLabels, useCustomAudio } from "../hooks/useCustomAudio";
+import { useCustomAudio } from "../hooks/useCustomAudio";
 import {
   Button,
   DropdownMenu,
@@ -35,7 +35,7 @@ import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { useTeacherIdentity } from "@/features/teacher-certification/TeacherIdentityProvider";
 import { wordListKeys } from "../hooks/useWordLists";
-import { STATE_LABEL, buttonClass, textButtonClass } from "../reading";
+import { buttonClass, textButtonClass } from "../reading";
 import { SearchField } from "@/features/shell/SearchField";
 import {
   PageHeader,
@@ -43,12 +43,45 @@ import {
   PageShell,
   Segmented
 } from "@/features/shell/Page";
-const SORT_LABELS: Record<WordlistSort, string> = {
-  author: "作者顺序",
-  label_asc: "词面 A–Z",
-  label_desc: "词面 Z–A"
+
+const stateMessages = {
+  draft: localText(webWordlist, "webWordlistDetail:private_draft"),
+  pending: localText(webWordlist, "webWordlistDetail:pending_review"),
+  published: localText(webWordlist, "webWordlistDetail:published"),
+  rejected: localText(webWordlist, "webWordlistDetail:rejected"),
+  withdrawn: localText(webWordlist, "webWordlistDetail:withdrawn")
 };
-const CONTENT_CHANGED = "词表内容已变化，请重新加载词条。";
+const audioStatusMessages = {
+  queued: localText(webWordlist, "webWordlistDetail:audio_queued"),
+  processing: localText(webWordlist, "webWordlistDetail:generating_audio"),
+  ready: localText(webWordlist, "webWordlistDetail:audio_generated"),
+  refunding: localText(
+    webWordlist,
+    "webWordlistDetail:audio_incomplete_refund_processing"
+  ),
+  refunded: localText(
+    webWordlist,
+    "webWordlistDetail:audio_incomplete_refunded"
+  )
+};
+const unavailableReasonMessages = {
+  archived: localText(webWordlist, "webWordlistDetail:moved_to_trash"),
+  unpublished: localText(webWordlist, "webWordlistDetail:not_published"),
+  unsupported_schema: localText(
+    webWordlist,
+    "webWordlistDetail:this_publication_version_is_not_supported_yet"
+  )
+};
+const SORT_LABELS: Record<WordlistSort, WebNotice> = {
+  author: localText(webWordlist, "webWordlistDetail:author_order"),
+  label_asc: localText(webWordlist, "webWordlistDetail:spelling_a_z"),
+  label_desc: localText(webWordlist, "webWordlistDetail:spelling_z_a")
+};
+class WordlistContentChangedError extends Error {}
+const CONTENT_CHANGED = localText(
+  webWordlist,
+  "webWordlistDetail:the_word_list_changed_reload_its_entries"
+);
 export function WordListDetail({
   id,
   mine = false,
@@ -163,7 +196,7 @@ function Detail({
             { signal }
           ));
       if (pageParam.revision !== null && result.revision !== pageParam.revision)
-        throw new Error(CONTENT_CHANGED);
+        throw new WordlistContentChangedError();
       return result;
     },
     getNextPageParam: (lastPage) =>
@@ -316,7 +349,7 @@ function Detail({
       kind === "withdraw" &&
       !window.confirm(
         uiText(
-          "撤回后将立即转为私密并取消推荐。修改完成后可再次申请公开。继续？"
+          "webWordlistDetail:withdrawing_makes_this_list_private_and_removes_recommendations_immediat"
         )
       )
     )
@@ -349,8 +382,14 @@ function Detail({
       if (!rejected) {
         setError(
           kind === "submit"
-            ? "暂时无法确认申请是否成功，请刷新页面查看词表状态后再试。"
-            : "暂时无法确认是否已撤回，请刷新页面查看词表状态后再试。"
+            ? localText(
+                webWordlist,
+                "webWordlistDetail:could_not_confirm_the_publication_request_reload_to_check_the_list_statu"
+              )
+            : localText(
+                webWordlist,
+                "webWordlistDetail:could_not_confirm_withdrawal_reload_to_check_the_list_status_before_tryi"
+              )
         );
       } else if (
         kind === "submit" &&
@@ -358,17 +397,31 @@ function Detail({
         cause.code === "validation_failed"
       ) {
         setError(
-          "申请公开失败：词表中有暂不可用的词条。请在下方查看原因，移除或替换后再申请。"
+          localText(
+            webWordlist,
+            "webWordlistDetail:cannot_request_publication_the_list_contains_unavailable_entries_check_t"
+          )
         );
         setUnavailableOpen(true);
         void client.invalidateQueries({ queryKey: wordListKeys.all });
       } else if (cause.status === 409) {
-        setError("词表已发生变化，请刷新页面后再操作。");
+        setError(
+          localText(
+            webWordlist,
+            "webWordlistDetail:the_word_list_changed_reload_before_continuing"
+          )
+        );
       } else {
         setError(
           kind === "submit"
-            ? "申请公开失败，请刷新页面后再试。"
-            : "撤回失败，请刷新页面后再试。"
+            ? localText(
+                webWordlist,
+                "webWordlistDetail:could_not_request_publication_reload_and_try_again"
+              )
+            : localText(
+                webWordlist,
+                "webWordlistDetail:could_not_withdraw_reload_and_try_again"
+              )
         );
       }
     } finally {
@@ -377,19 +430,21 @@ function Detail({
   }
   const back = {
     href: mine ? "/account/wordlists" : "/wordlists",
-    label: uiText("返回词表")
+    label: uiText("webWordlistDetail:back_to_word_list")
   };
   if (meta.isError)
     return (
       <PageShell size="lg" embedded={embedded}>
-        <PageHeader back={back} title={uiText("词表")} />
+        <PageHeader back={back} title={uiText("webWordlistDetail:word_list")} />
         <PageNotice tone="error">
-          {uiText("词表不存在、不可访问或暂时无法加载。")}
+          {uiText(
+            "webWordlistDetail:the_word_list_does_not_exist_is_inaccessible_or_cannot_be_loaded"
+          )}
           <button
             className={textButtonClass}
             onClick={() => void meta.refetch()}
           >
-            {uiText("重试")}
+            {uiText("webWordlistDetail:retry")}
           </button>
         </PageNotice>
       </PageShell>
@@ -397,7 +452,7 @@ function Detail({
   if (!meta.data)
     return (
       <PageShell size="lg" embedded={embedded}>
-        <PageNotice>{uiText("正在读取词表…")}</PageNotice>
+        <PageNotice>{uiText("webWordlistDetail:loading_word_list")}</PageNotice>
       </PageShell>
     );
   const list = meta.data;
@@ -406,14 +461,18 @@ function Detail({
       <PageHeader
         back={embedded ? undefined : back}
         eyebrow={
-          embedded ? undefined : mine ? uiText("我的词表") : uiText("词库广场")
+          embedded
+            ? undefined
+            : mine
+              ? uiText("webWordlistDetail:my_word_lists")
+              : uiText("webWordlistDetail:word_list_library")
         }
         title={list.name}
         description={
           <span className="break-words">
-            {uiText("{{v0}} · {{v1}} · {{v2}} 个词条", {
+            {uiText("webWordlistDetail:v0_v1_v2_entries", {
               v0: list.owner_name,
-              v1: uiText(STATE_LABEL[list.state]),
+              v1: uiText(stateMessages[list.state]),
               v2: list.item_count
             })}
           </span>
@@ -424,15 +483,15 @@ function Detail({
               <Link
                 href={`/student/practice/new?${new URLSearchParams({ wordlist: id, source: mine ? "owned" : "public" })}`}
               >
-                {uiText("开始练习")}
+                {uiText("webWordlistDetail:start_practice")}
               </Link>
             </Button>
             {mine && (
               <Button asChild variant="outline">
                 <Link href={editHref ?? `/account/wordlists/${id}/edit`}>
                   {list.state === "pending" || list.state === "published"
-                    ? uiText("查看与编辑")
-                    : uiText("编辑词表")}
+                    ? uiText("webWordlistDetail:view_and_edit")
+                    : uiText("webWordlistDetail:edit_word_list")}
                 </Link>
               </Button>
             )}
@@ -441,7 +500,9 @@ function Detail({
       />
       <section className="border-b border-border/70 pb-5">
         <div>
-          <h2 className="sr-only">{uiText("词表概况")}</h2>
+          <h2 className="sr-only">
+            {uiText("webWordlistDetail:word_list_overview")}
+          </h2>
           <div className="flex flex-wrap gap-2 empty:hidden">
             {mine ? (
               <>
@@ -451,7 +512,9 @@ function Detail({
                     disabled={busy}
                     onClick={() => void action("withdraw")}
                   >
-                    {busy ? uiText("处理中…") : uiText("撤回为私密")}
+                    {busy
+                      ? uiText("webWordlistDetail:processing")
+                      : uiText("webWordlistDetail:withdraw_to_private")}
                   </button>
                 ) : (
                   <button
@@ -464,19 +527,21 @@ function Detail({
                     }
                     onClick={() => void action("submit")}
                   >
-                    {busy ? uiText("提交中…") : uiText("申请公开")}
+                    {busy
+                      ? uiText("webWordlistDetail:submitting")
+                      : uiText("webWordlistDetail:request_publication")}
                   </button>
                 )}
                 {list.state === "published" && (
                   <Link className={buttonClass} href={`/wordlists/${id}`}>
-                    {uiText("查看公开页面")}
+                    {uiText("webWordlistDetail:view_public_page")}
                   </Link>
                 )}
               </>
             ) : (
               list.owner_user_id === userId && (
                 <Link className={buttonClass} href={`/account/wordlists/${id}`}>
-                  {uiText("管理我的词表")}
+                  {uiText("webWordlistDetail:manage_my_word_lists")}
                 </Link>
               )
             )}
@@ -486,8 +551,12 @@ function Detail({
             (list.state === "pending" || canSubmit) && (
               <p className="mt-4 text-sm leading-6 text-foreground-muted">
                 {list.state === "pending"
-                  ? uiText("公开申请正在审核中，审核通过前仅你可见。")
-                  : uiText("公开后可被其他用户搜索和使用，需审核。")}
+                  ? uiText(
+                      "webWordlistDetail:publication_is_under_review_only_you_can_view_the_list_until_approved"
+                    )
+                  : uiText(
+                      "webWordlistDetail:once_approved_other_users_can_find_and_use_this_list"
+                    )}
               </p>
             )}
           {showPublicationCheck && !canSubmit && (
@@ -497,13 +566,17 @@ function Detail({
               className="mt-4 text-sm text-foreground-muted"
             >
               {publicationHasUnavailable
-                ? uiText("有不可用词条，移除或替换后可申请公开。")
+                ? uiText(
+                    "webWordlistDetail:remove_or_replace_unavailable_entries_before_requesting_publication"
+                  )
                 : availability.isError ||
                     (availability.isSuccess && !availabilityData)
                   ? uiText(
-                      "暂时无法确认词条是否全部可用，请在下方重试后再申请。"
+                      "webWordlistDetail:could_not_confirm_all_entries_are_available_retry_below_before_applying"
                     )
-                  : uiText("正在检查词条可用性，请稍候。")}
+                  : uiText(
+                      "webWordlistDetail:checking_entry_availability_please_wait"
+                    )}
             </p>
           )}
           {error && (
@@ -513,40 +586,55 @@ function Detail({
           )}
           {mine && reviews.data?.withdraw_reason && (
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
-              {uiText("下架原因：{{v0}}", { v0: reviews.data.withdraw_reason })}
+              {uiText("webWordlistDetail:withdrawal_reason_v0", {
+                v0: reviews.data.withdraw_reason
+              })}
             </p>
           )}
           {mine && reviews.data?.items[0]?.reason && (
             <p className="mt-4 rounded-2xl bg-muted/70 px-4 py-3 text-sm leading-6">
-              {uiText("审核意见：{{v0}}", { v0: reviews.data.items[0].reason })}
+              {uiText("webWordlistDetail:review_comments_v0", {
+                v0: reviews.data.items[0].reason
+              })}
             </p>
           )}
           {mine && reviews.isError && (
             <p role="alert" className="mt-4 text-sm text-danger">
-              {uiText("审核记录加载失败。")}
+              {uiText("webWordlistDetail:could_not_load_review_history")}
             </p>
           )}
           {availabilityData && (
             <p className="mt-4 text-sm text-foreground-muted">
-              {uiText("整张词表：{{v0}} 个可用词条", {
-                v0: availabilityData.available_count
-              })}
+              {uiText(
+                "webWordlistDetail:entire_word_list_v0_available_entries",
+                {
+                  v0: availabilityData.available_count
+                }
+              )}
               {!!availabilityData.custom_count &&
-                uiText("，其中 {{v0}} 个自定义词条，可用于拼写练习", {
-                  v0: availabilityData.custom_count
-                })}
+                uiText(
+                  "webWordlistDetail:including_v0_custom_entries_eligible_for_spelling_practice",
+                  {
+                    v0: availabilityData.custom_count
+                  }
+                )}
               {availabilityData.unavailable_count > 0 &&
-                uiText("，{{v0}} 个暂不可用，不参与出题", {
-                  v0: availabilityData.unavailable_count
-                })}
+                uiText(
+                  "webWordlistDetail:v0_unavailable_and_excluded_from_questions",
+                  {
+                    v0: availabilityData.unavailable_count
+                  }
+                )}
             </p>
           )}
           {(availability.isError ||
             (availability.isSuccess && !availabilityData)) && (
             <p role="alert" className="mt-4 text-sm text-foreground-muted">
               {availabilityVersionChanged
-                ? uiText("词表内容已变化，请重新加载词表。")
-                : uiText("可用数量暂时无法读取，已加载的词条仍可阅读。")}{" "}
+                ? uiText("webWordlistDetail:the_word_list_changed_reload_it")
+                : uiText(
+                    "webWordlistDetail:could_not_read_the_available_count_loaded_entries_can_still_be_read"
+                  )}{" "}
               <button
                 className={textButtonClass}
                 disabled={availabilityFetching}
@@ -557,8 +645,8 @@ function Detail({
                 }
               >
                 {availabilityVersionChanged
-                  ? uiText("重新加载词表")
-                  : uiText("重试")}
+                  ? uiText("webWordlistDetail:reload_word_list")
+                  : uiText("webWordlistDetail:retry")}
               </button>
             </p>
           )}
@@ -570,8 +658,8 @@ function Detail({
       <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchField
           className="min-w-40 flex-1 sm:max-w-sm"
-          aria-label={uiText("搜索词条")}
-          placeholder={uiText("搜索词面")}
+          aria-label={uiText("webWordlistDetail:search_entries")}
+          placeholder={uiText("webWordlistDetail:search_spellings")}
           value={query}
           onCompositionStart={() => setComposing(true)}
           onCompositionEnd={(event) => {
@@ -582,19 +670,24 @@ function Detail({
         />
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
-            label={uiText("阅读模式")}
+            label={uiText("webWordlistDetail:reading_mode")}
             value={view}
             options={[
-              { value: "simple", label: uiText("简洁模式") },
-              { value: "standard", label: uiText("标准模式") },
-              { value: "full", label: uiText("完整模式") }
+              { value: "simple", label: uiText("webWordlistDetail:compact") },
+              {
+                value: "standard",
+                label: uiText("webWordlistDetail:standard")
+              },
+              { value: "full", label: uiText("webWordlistDetail:full") }
             ]}
             onChange={setView}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className={buttonClass}>
-                {uiText("排序：{{v0}}", { v0: uiText(SORT_LABELS[sort]) })}
+                {uiText("webWordlistDetail:sort_v0", {
+                  v0: uiText(SORT_LABELS[sort])
+                })}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -614,12 +707,12 @@ function Detail({
           </DropdownMenu>
           {ready && (
             <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium tracking-wide text-foreground-muted">
-              {uiText("释义等级 {{v0}}{{v1}}", {
+              {uiText("webWordlistDetail:definition_level_v0_v1", {
                 v0: level,
                 v1:
                   !profile.data?.learning_settings &&
                   identity.identity !== "teacher"
-                    ? uiText(" 预览")
+                    ? uiText("webWordlistDetail:preview_suffix")
                     : ""
               })}
             </span>
@@ -628,33 +721,41 @@ function Detail({
       </div>
       {updatingSearch && (
         <p role="status" className="mb-5 text-xs text-foreground-muted">
-          {uiText("正在搜索…")}
+          {uiText("webWordlistDetail:searching")}
         </p>
       )}
       {!ready ? (
         profile.isError || identity.error ? (
           <PageNotice tone="error">
-            {uiText("阅读设置读取失败，请刷新；尚未显示未确认等级的释义。")}
+            {uiText(
+              "webWordlistDetail:could_not_read_reading_settings_reload_definitions_for_unconfirmed_level"
+            )}
           </PageNotice>
         ) : (
-          <PageNotice>{uiText("正在读取阅读设置…")}</PageNotice>
+          <PageNotice>
+            {uiText("webWordlistDetail:loading_reading_settings")}
+          </PageNotice>
         )
       ) : items.isError && loadedItems.length === 0 ? (
         <PageNotice tone="error">
           {view === "full"
-            ? uiText("完整内容暂不可用，可切回标准模式，或")
-            : uiText("条目加载失败，")}
+            ? uiText(
+                "webWordlistDetail:full_content_is_unavailable_switch_to_standard_mode_or"
+              )
+            : uiText("webWordlistDetail:could_not_load_entries")}
           <button
             className={textButtonClass}
             disabled={items.isFetching}
             onClick={() => void items.refetch()}
           >
-            {items.isFetching ? uiText("重试中…") : uiText("重试")}
+            {items.isFetching
+              ? uiText("webWordlistDetail:retrying")
+              : uiText("webWordlistDetail:retry")}
           </button>
           。
         </PageNotice>
       ) : !items.data ? (
-        <PageNotice>{uiText("正在读取条目…")}</PageNotice>
+        <PageNotice>{uiText("webWordlistDetail:loading_entries")}</PageNotice>
       ) : (
         <>
           {(unavailableItems.length > 0 ||
@@ -665,17 +766,19 @@ function Detail({
               onToggle={(event) => setUnavailableOpen(event.currentTarget.open)}
             >
               <summary className="cursor-pointer font-medium">
-                {uiText("查看暂不可用的词条")}
+                {uiText("webWordlistDetail:view_unavailable_entries")}
                 {availabilityData
-                  ? uiText("（整张词表共 {{v0}} 个）", {
+                  ? uiText("webWordlistDetail:v0_in_the_entire_list", {
                       v0: availabilityData.unavailable_count
                     })
-                  : uiText("（已加载 {{v0}} 个）", {
+                  : uiText("webWordlistDetail:v0_loaded", {
                       v0: unavailableItems.length
                     })}
               </summary>
               <p className="mt-3 text-foreground-muted">
-                {uiText("引用和备注已保留，词条恢复后可继续阅读。")}
+                {uiText(
+                  "webWordlistDetail:references_and_notes_are_preserved_reading_resumes_when_entries_return"
+                )}
               </p>
               {mine && (
                 <p className="mt-2">
@@ -683,10 +786,12 @@ function Detail({
                     className={textButtonClass}
                     href={editHref ?? `/account/wordlists/${id}/edit`}
                   >
-                    {uiText("移除或替换")}
+                    {uiText("webWordlistDetail:remove_or_replace")}
                   </Link>
                   {(list.state === "published" || list.state === "pending") &&
-                    uiText("· 请先撤回为私密，再编辑词表。")}
+                    uiText(
+                      "webWordlistDetail:withdraw_to_private_before_editing_the_list"
+                    )}
                 </p>
               )}
               {unavailableExpanded && (
@@ -703,14 +808,17 @@ function Detail({
                             {(item as MyWordlistItem).entry_label} ·{" "}
                           </span>
                         )}
-                      {uiText("原位置 {{v0}} · 词条暂不可用", {
-                        v0: item.position + 1
-                      })}
+                      {uiText(
+                        "webWordlistDetail:original_position_v0_entry_unavailable",
+                        {
+                          v0: item.position + 1
+                        }
+                      )}
                       {mine && (item as MyWordlistItem).unavailable_reason && (
                         <p className="text-foreground-muted">
-                          {uiText("原因：{{v0}}", {
+                          {uiText("webWordlistDetail:reason_v0", {
                             v0: uiText(
-                              unavailableReasonLabels[
+                              unavailableReasonMessages[
                                 (item as MyWordlistItem).unavailable_reason!
                               ]
                             )
@@ -719,14 +827,16 @@ function Detail({
                       )}
                       {item.author_note && (
                         <p className="whitespace-pre-wrap">
-                          {uiText("注：{{v0}}", { v0: item.author_note })}
+                          {uiText("webWordlistDetail:note_v0", {
+                            v0: item.author_note
+                          })}
                         </p>
                       )}
                       {mine &&
                         "private_note" in item &&
                         (item as MyWordlistItem).private_note && (
                           <p className="whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-foreground-muted">
-                            {uiText("私密备注：{{v0}}", {
+                            {uiText("webWordlistDetail:private_note_v0", {
                               v0: (item as MyWordlistItem).private_note
                             })}
                           </p>
@@ -748,15 +858,19 @@ function Detail({
                     onClick={() => void fetchNextPage({ cancelRefetch: false })}
                   >
                     {allUnavailable
-                      ? uiText("加载更多不可用词条")
-                      : uiText("加载更多词条以查看原因")}
+                      ? uiText(
+                          "webWordlistDetail:load_more_unavailable_entries"
+                        )
+                      : uiText(
+                          "webWordlistDetail:load_more_entries_to_see_reasons"
+                        )}
                   </button>
                 )}
               {(availabilityData?.unavailable_count ?? 0) >
                 unavailableItems.length && (
                 <p className="mt-2 text-foreground-muted">
                   {uiText(
-                    "这里只列出当前已加载且符合搜索条件的项目；其他项目会随词条加载显示。"
+                    "webWordlistDetail:only_loaded_items_matching_the_current_search_are_shown_here_other_items"
                   )}
                   {showPublicationCheck && q.trim() && (
                     <button
@@ -766,7 +880,7 @@ function Detail({
                         setQ("");
                       }}
                     >
-                      {uiText("清空搜索查看原因")}
+                      {uiText("webWordlistDetail:clear_search_to_see_reasons")}
                     </button>
                   )}
                 </p>
@@ -775,14 +889,16 @@ function Detail({
           )}
           {audio.isError && customIds.length > 0 && (
             <p role="status" className="mb-4 text-sm text-foreground-muted">
-              {uiText("语音暂不可用，词表内容仍可阅读。")}
+              {uiText(
+                "webWordlistDetail:audio_is_unavailable_the_list_content_can_still_be_read"
+              )}
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
                 onClick={() => void audio.refetch()}
               >
-                {uiText("重试读取语音")}
+                {uiText("webWordlistDetail:retry_loading_audio")}
               </Button>
             </p>
           )}
@@ -811,15 +927,20 @@ function Detail({
                                     className="inline-flex items-center text-xs text-foreground-muted"
                                   >
                                     {locale === "en-GB"
-                                      ? uiText("英式")
-                                      : uiText("美式")}
+                                      ? uiText("webWordlistDetail:british")
+                                      : uiText("webWordlistDetail:american")}
                                     <AudioButton
-                                      label={uiText("播放 {{v0}} {{v1}}语音", {
-                                        v0: item.custom_word!.word,
-                                        v1: uiText(
-                                          locale === "en-GB" ? "英式" : "美式"
-                                        )
-                                      })}
+                                      label={uiText(
+                                        "webWordlistDetail:play_v0_v1_audio",
+                                        {
+                                          v0: item.custom_word!.word,
+                                          v1: uiText(
+                                            locale === "en-GB"
+                                              ? "webWordlistDetail:british"
+                                              : "webWordlistDetail:american"
+                                          )
+                                        }
+                                      )}
                                       sign={(signal) =>
                                         mine
                                           ? api.wordList.myCustomAudioUrl(
@@ -842,14 +963,14 @@ function Detail({
                             ) : (
                               <p className="mt-2 text-xs text-foreground-muted">
                                 {uiText(
-                                  audioStatusLabels[
+                                  audioStatusMessages[
                                     audioByItem.get(item.item_id!)!.status
                                   ]
                                 )}
                               </p>
                             ))}
                           <p className="mt-2 text-xs text-foreground-muted">
-                            {uiText("自定义词条")}
+                            {uiText("webWordlistDetail:custom_entry")}
                           </p>
                         </td>
                         <td />
@@ -887,14 +1008,16 @@ function Detail({
                         >
                           {item.author_note && (
                             <p className="whitespace-pre-wrap rounded-2xl bg-muted/70 px-4 py-3">
-                              {uiText("注：{{v0}}", { v0: item.author_note })}
+                              {uiText("webWordlistDetail:note_v0", {
+                                v0: item.author_note
+                              })}
                             </p>
                           )}
                           {mine &&
                             "private_note" in item &&
                             (item as MyWordlistItem).private_note && (
                               <p className="mt-3 whitespace-pre-wrap rounded-2xl border border-dashed border-border px-4 py-3 text-foreground-muted">
-                                {uiText("私密备注：{{v0}}", {
+                                {uiText("webWordlistDetail:private_note_v0", {
                                   v0: (item as MyWordlistItem).private_note
                                 })}
                               </p>
@@ -909,11 +1032,15 @@ function Detail({
           </div>
           {loadedItems.length > 0 &&
             loadedItems.every((item) => !item.entry && !item.custom_word) && (
-              <PageNotice>{uiText("当前已加载的词条均不可用。")}</PageNotice>
+              <PageNotice>
+                {uiText("webWordlistDetail:all_loaded_entries_are_unavailable")}
+              </PageNotice>
             )}
           {loadedItems.length === 0 ? (
             <PageNotice>
-              {q ? uiText("未找到匹配词条") : uiText("暂无词条")}
+              {q
+                ? uiText("webWordlistDetail:no_matching_entries")
+                : uiText("webWordlistDetail:no_entries_yet")}
               {q && (
                 <Button
                   type="button"
@@ -924,7 +1051,7 @@ function Detail({
                     setQ("");
                   }}
                 >
-                  {uiText("清空搜索")}
+                  {uiText("webWordlistDetail:clear_search")}
                 </Button>
               )}
             </PageNotice>
@@ -935,33 +1062,39 @@ function Detail({
             >
               {items.isError ? (
                 <p role="alert">
-                  {items.error.message === CONTENT_CHANGED
+                  {items.error instanceof WordlistContentChangedError
                     ? uiText(CONTENT_CHANGED)
-                    : uiText("后续词条加载失败，已加载的内容仍可阅读。")}{" "}
+                    : uiText(
+                        "webWordlistDetail:could_not_load_more_entries_loaded_content_can_still_be_read"
+                      )}{" "}
                   <button
                     className={textButtonClass}
                     disabled={items.isFetching}
                     onClick={() =>
                       void (items.isFetchNextPageError &&
-                      items.error.message !== CONTENT_CHANGED
+                      !(items.error instanceof WordlistContentChangedError)
                         ? items.fetchNextPage({ cancelRefetch: false })
                         : items.refetch())
                     }
                   >
-                    {items.error.message === CONTENT_CHANGED
-                      ? uiText("重新加载")
-                      : uiText("重试")}
+                    {items.error instanceof WordlistContentChangedError
+                      ? uiText("webWordlistDetail:reload")
+                      : uiText("webWordlistDetail:retry")}
                   </button>
                 </p>
               ) : (
                 <p role="status">
                   {items.isFetchingNextPage
-                    ? uiText("正在加载更多词条…")
+                    ? uiText("webWordlistDetail:loading_more_entries")
                     : items.hasNextPage
                       ? allUnavailable
-                        ? uiText("展开上方列表，按需加载不可用词条")
-                        : uiText("继续向下滚动，自动加载更多词条")
-                      : uiText("已加载全部 {{v0}} 个词条", {
+                        ? uiText(
+                            "webWordlistDetail:expand_the_list_above_to_load_unavailable_entries_as_needed"
+                          )
+                        : uiText(
+                            "webWordlistDetail:scroll_down_to_load_more_entries_automatically"
+                          )
+                      : uiText("webWordlistDetail:all_v0_entries_loaded", {
                           v0: loadedItems.length
                         })}
                 </p>

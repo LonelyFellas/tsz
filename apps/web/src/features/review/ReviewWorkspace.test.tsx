@@ -363,3 +363,27 @@ it("切换拼写档案后从新档案第一页读取", async () => {
     )
   );
 });
+
+it.each(["constructor", "__proto__"])(
+  "未知记忆阶段 %s 按原文显示，不能命中原型成员",
+  async (stage) => {
+    mocks.overview.mockResolvedValue(summary);
+    mocks.items.mockResolvedValue({
+      items: [
+        {
+          id: "m",
+          label: "apple",
+          stage,
+          due_at: base.server_time,
+          paused: false,
+          content_available: true,
+          revision: 1
+        }
+      ],
+      next_cursor: null
+    });
+    renderWithProviders(<ReviewWorkspace />);
+    expect(await screen.findByText(new RegExp(stage))).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "暂停此项" })).toBeEnabled();
+  }
+);

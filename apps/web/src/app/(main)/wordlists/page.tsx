@@ -6,9 +6,9 @@ import { WordListBrowser } from "@/features/wordlist";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("单词表"),
+    title: uiText("webApp:word_lists"),
     description: uiText(
-      "浏览天生会背的英语单词表,按教材与主题分组,科学记忆每一个词。"
+      "webApp:browse_english_word_lists_on_grouped_by_textbook_and_topic"
     ),
     alternates: { canonical: "/wordlists" }
   };

@@ -7,7 +7,7 @@ import { StudentHome } from "@/features/student-home/StudentHome";
 export async function generateMetadata(): Promise<Metadata> {
   const uiText = await getServerWebText(webApp);
   return {
-    title: uiText("学习首页"),
+    title: uiText("webApp:learning_home"),
     robots: { index: false, follow: false }
   };
 }

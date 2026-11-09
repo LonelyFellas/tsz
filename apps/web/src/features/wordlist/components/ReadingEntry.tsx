@@ -1,5 +1,6 @@
 "use client";
 
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webWordlistReader as webWordlist } from "@/i18n/messages/wordlist/reader";
 import type { ReactNode } from "react";
@@ -29,10 +30,26 @@ export function ReadingTable({
 }) {
   const uiText = useWebText(webWordlist);
   const headings = full
-    ? ["英文词条", "基本词性", "词形变化", "细分词性", "多维词义", "语法结构"]
+    ? [
+        localText(webWordlist, "webWordlistReader:english_entry"),
+        localText(webWordlist, "webWordlistReader:basic_part_of_speech"),
+        localText(webWordlist, "webWordlistReader:form_type"),
+        localText(webWordlist, "webWordlistReader:subcategory"),
+        localText(webWordlist, "webWordlistReader:meanings"),
+        localText(webWordlist, "webWordlistReader:grammar_structures")
+      ]
     : simple
-      ? ["英文词条", "词性", "多维词义"]
-      : ["英文词条", "词性", "多维词义", "语法结构"];
+      ? [
+          localText(webWordlist, "webWordlistReader:english_entry"),
+          localText(webWordlist, "webWordlistReader:part_of_speech"),
+          localText(webWordlist, "webWordlistReader:meanings")
+        ]
+      : [
+          localText(webWordlist, "webWordlistReader:english_entry"),
+          localText(webWordlist, "webWordlistReader:part_of_speech"),
+          localText(webWordlist, "webWordlistReader:meanings"),
+          localText(webWordlist, "webWordlistReader:grammar_structures")
+        ];
   const widths = full
     ? [14, 9, 29, 12, 18, 18]
     : simple
@@ -50,12 +67,14 @@ export function ReadingTable({
               : "@min-[640px]:hidden"
         )}
       >
-        {uiText("左右滑动查看完整内容，词条固定在左侧。")}
+        {uiText(
+          "webWordlistReader:swipe_horizontally_for_full_content_entries_stay_pinned_on_the_left"
+        )}
       </p>
       <div
         className="overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         role="region"
-        aria-label={uiText("词条列表")}
+        aria-label={uiText("webWordlistReader:entry_list")}
         tabIndex={0}
       >
         <table
@@ -68,10 +87,10 @@ export function ReadingTable({
         >
           <caption className="sr-only">
             {full
-              ? uiText("完整模式词条列表")
+              ? uiText("webWordlistReader:full_mode_entry_list")
               : simple
-                ? uiText("简洁模式词条列表")
-                : uiText("标准模式词条列表")}
+                ? uiText("webWordlistReader:compact_mode_entry_list")
+                : uiText("webWordlistReader:standard_mode_entry_list")}
           </caption>
           <colgroup>
             {widths.map((width, index) => (
@@ -85,13 +104,17 @@ export function ReadingTable({
             <tr>
               {headings.map((heading) => (
                 <th
-                  key={heading}
+                  key={heading.key}
                   scope="col"
                   className={cn(
                     "px-3 py-4 font-semibold",
                     simple && "whitespace-nowrap",
-                    heading.endsWith("词性") && "text-right",
-                    heading === "英文词条" &&
+                    [
+                      "webWordlistReader:part_of_speech",
+                      "webWordlistReader:basic_part_of_speech",
+                      "webWordlistReader:subcategory"
+                    ].includes(heading.key) && "text-right",
+                    heading.key === "webWordlistReader:english_entry" &&
                       "sticky left-0 z-20 border-r border-border/60 bg-surface"
                   )}
                 >
@@ -123,7 +146,9 @@ function Texts({
         <div key={`${text.dialect}:${i}`} className="break-words">
           {text.dialect !== "common" && (
             <span className="mr-2 text-xs text-foreground-muted">
-              {text.dialect === "uk" ? uiText("英") : uiText("美")}
+              {text.dialect === "uk"
+                ? uiText("webWordlistReader:uk")
+                : uiText("webWordlistReader:us")}
             </span>
           )}
           <RichTextReadOnly value={text.content} textRole={textRole} />
@@ -186,7 +211,9 @@ export function ReadingEntry({
         {wordCell}
         <td colSpan={5}>
           <p role="alert" className="text-danger">
-            {uiText("完整内容暂不可用，请切回标准模式。")}
+            {uiText(
+              "webWordlistReader:full_content_is_unavailable_switch_to_standard_mode"
+            )}
           </p>
         </td>
       </tr>
@@ -272,7 +299,7 @@ export function ReadingEntry({
                         {senseIndex === 0 && unassociatedForms.length > 0 && (
                           <div className="mt-2">
                             <p className="text-xs text-foreground-muted">
-                              {uiText("未关联义项")}
+                              {uiText("webWordlistReader:no_linked_meaning")}
                             </p>
                             <Forms
                               forms={unassociatedForms}
@@ -307,7 +334,9 @@ export function ReadingEntry({
                         />
                         {definition.texts.length === 0 && (
                           <p className="text-foreground-muted">
-                            {uiText("此释义暂无可用文本")}
+                            {uiText(
+                              "webWordlistReader:no_text_available_for_this_definition"
+                            )}
                           </p>
                         )}
                       </div>
@@ -315,7 +344,9 @@ export function ReadingEntry({
                   ) : (
                     sense && (
                       <p className="text-foreground-muted">
-                        {uiText("暂无适合当前等级的释义")}
+                        {uiText(
+                          "webWordlistReader:no_definitions_for_the_current_level"
+                        )}
                       </p>
                     )
                   )}
@@ -358,7 +389,9 @@ function Pronunciations({
           >
             {regionalVariants.length > 1 && regional.dialect !== "common" && (
               <span className="text-xs text-foreground-muted">
-                {regional.dialect === "uk" ? uiText("英") : uiText("美")}
+                {regional.dialect === "uk"
+                  ? uiText("webWordlistReader:uk")
+                  : uiText("webWordlistReader:us")}
               </span>
             )}
             <span className="tsz-words font-semibold">{regional.spelling}</span>

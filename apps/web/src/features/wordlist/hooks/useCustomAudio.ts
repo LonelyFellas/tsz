@@ -6,14 +6,6 @@ import type { WordlistCustomAudio } from "@tsz/types";
 import { api } from "@/lib/request";
 import { wordListKeys } from "./useWordLists";
 
-export const audioStatusLabels: Record<WordlistCustomAudio["status"], string> =
-  {
-    queued: "语音等待生成",
-    processing: "语音生成中",
-    ready: "语音已生成",
-    refunding: "语音未完成，退款处理中",
-    refunded: "语音未完成，已退款"
-  };
 export function useCustomAudio(
   id: string | undefined,
   itemIds: string[],

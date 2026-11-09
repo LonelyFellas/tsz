@@ -66,9 +66,11 @@ export function SortableWordRow({
             {...attributes}
             {...listeners}
             disabled={disabled}
-            aria-label={uiText("拖动排序词条 {{v0}}", { v0: index })}
-            aria-roledescription={uiText("可排序词条")}
-            title={uiText("拖动排序")}
+            aria-label={uiText("webWordlistEditor:drag_to_reorder_entry_v0", {
+              v0: index
+            })}
+            aria-roledescription={uiText("webWordlistEditor:sortable_entries")}
+            title={uiText("webWordlistEditor:drag_to_reorder")}
             className="-ml-2 inline-flex h-11 min-w-11 touch-manipulation select-none items-center gap-1 rounded-lg px-2 text-xs tabular-nums text-foreground-muted transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary enabled:cursor-grab enabled:active:cursor-grabbing disabled:cursor-default"
           >
             <GripVertical
@@ -83,7 +85,7 @@ export function SortableWordRow({
           </span>
         )}
         <label htmlFor={`word-${id}`} className="sr-only">
-          {uiText("词条 {{v0}}", { v0: index })}
+          {uiText("webWordlistEditor:entry_v0", { v0: index })}
         </label>
         {editable && (
           <div className="flex shrink-0 items-center">
@@ -91,8 +93,8 @@ export function SortableWordRow({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={uiText("上移")}
-              title={uiText("上移")}
+              aria-label={uiText("webWordlistEditor:move_up")}
+              title={uiText("webWordlistEditor:move_up")}
               disabled={disabled || index === 1}
               onClick={() => onMove(-1)}
             >
@@ -102,8 +104,8 @@ export function SortableWordRow({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={uiText("下移")}
-              title={uiText("下移")}
+              aria-label={uiText("webWordlistEditor:move_down")}
+              title={uiText("webWordlistEditor:move_down")}
               disabled={disabled || index === total}
               onClick={() => onMove(1)}
             >
@@ -113,8 +115,8 @@ export function SortableWordRow({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={uiText("删除")}
-              title={uiText("删除词条")}
+              aria-label={uiText("webWordlistEditor:delete")}
+              title={uiText("webWordlistEditor:delete_entries")}
               className="text-foreground-muted hover:bg-danger/10 hover:text-danger"
               disabled={total === 1}
               onClick={onRemove}

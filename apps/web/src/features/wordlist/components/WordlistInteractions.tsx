@@ -1,5 +1,6 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import { localText, type WebNotice } from "@/i18n/catalog";
+
 import { useWebText } from "@/i18n/client";
 import { webWordlistInteractions as webWordlist } from "@/i18n/messages/wordlist/interactions";
 
@@ -104,7 +105,12 @@ function InteractionControls({
         !controller.signal.aborted &&
         useUserStore.getState().user?.id === userId
       ) {
-        setError("操作结果未确认，请刷新状态后重试。");
+        setError(
+          localText(
+            webWordlist,
+            "webWordlistInteractions:the_result_is_unconfirmed_refresh_the_status_and_try_again"
+          )
+        );
         onRetry();
       }
     } finally {
@@ -117,16 +123,19 @@ function InteractionControls({
   const controls = [
     {
       kind: "like" as const,
-      label: "点赞",
-      activeLabel: "取消点赞",
+      label: localText(webWordlist, "webWordlistInteractions:like"),
+      activeLabel: localText(webWordlist, "webWordlistInteractions:unlike"),
       active: state?.liked,
       count: stats?.like_count,
       Icon: Heart
     },
     {
       kind: "favorite" as const,
-      label: "收藏",
-      activeLabel: "取消收藏",
+      label: localText(webWordlist, "webWordlistInteractions:favourites"),
+      activeLabel: localText(
+        webWordlist,
+        "webWordlistInteractions:remove_favourite"
+      ),
       active: state?.favorited,
       count: stats?.favorite_count,
       Icon: Bookmark
@@ -136,7 +145,7 @@ function InteractionControls({
     <div className="mt-5">
       <div
         className="flex flex-wrap items-center gap-x-6 gap-y-1"
-        aria-label={uiText("词表互动")}
+        aria-label={uiText("webWordlistInteractions:word_list_interactions")}
         aria-busy={busy}
       >
         {controls.map(({ kind, label, activeLabel, active, count, Icon }) =>
@@ -149,8 +158,8 @@ function InteractionControls({
                 own
                   ? uiText(
                       kind === "like"
-                        ? "不能给自己的词表点赞"
-                        : "不能给自己的词表收藏"
+                        ? "webWordlistInteractions:own_like"
+                        : "webWordlistInteractions:own_favourite"
                     )
                   : active
                     ? uiText(activeLabel)
@@ -162,8 +171,8 @@ function InteractionControls({
                 own
                   ? uiText(
                       kind === "like"
-                        ? "不能给自己的词表点赞"
-                        : "不能给自己的词表收藏"
+                        ? "webWordlistInteractions:own_like"
+                        : "webWordlistInteractions:own_favourite"
                     )
                   : active
                     ? uiText(activeLabel)
@@ -186,10 +195,16 @@ function InteractionControls({
               key={kind}
               className={interactionClass}
               data-tooltip={uiText(
-                kind === "like" ? "登录后点赞" : "登录后收藏"
+                kind === "like"
+                  ? "webWordlistInteractions:sign_in_like"
+                  : "webWordlistInteractions:sign_in_favourite"
               )}
               href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
-              aria-label={uiText(kind === "like" ? "登录后点赞" : "登录后收藏")}
+              aria-label={uiText(
+                kind === "like"
+                  ? "webWordlistInteractions:sign_in_like"
+                  : "webWordlistInteractions:sign_in_favourite"
+              )}
             >
               <Icon className="size-5" aria-hidden />
               {count ?? "—"}
@@ -202,12 +217,16 @@ function InteractionControls({
             className={interactionClass}
             data-tooltip={
               list.owner_user_id === null
-                ? uiText("平台词表不可投币")
+                ? uiText(
+                    "webWordlistInteractions:platform_word_lists_cannot_receive_tips"
+                  )
                 : own
-                  ? uiText("不能给自己的词表投币")
+                  ? uiText(
+                      "webWordlistInteractions:you_cannot_tip_your_own_word_list_2"
+                    )
                   : tipState && BigInt(tipState.tip_amount) > 0n
-                    ? uiText("已投币")
-                    : uiText("投币")
+                    ? uiText("webWordlistInteractions:tipped")
+                    : uiText("webWordlistInteractions:tip_2")
             }
             disabled={list.owner_user_id === null || own || !stats || busy}
             aria-haspopup="dialog"
@@ -215,8 +234,10 @@ function InteractionControls({
             aria-pressed={!!tipState && BigInt(tipState.tip_amount) > 0n}
             aria-label={
               own
-                ? uiText("不能给自己的词表投币")
-                : `${tipState && BigInt(tipState.tip_amount) > 0n ? uiText("已投币") : uiText("投币")} ${stats?.tip_amount ?? "—"}`
+                ? uiText(
+                    "webWordlistInteractions:you_cannot_tip_your_own_word_list_2"
+                  )
+                : `${tipState && BigInt(tipState.tip_amount) > 0n ? uiText("webWordlistInteractions:tipped") : uiText("webWordlistInteractions:tip_2")} ${stats?.tip_amount ?? "—"}`
             }
             onClick={() => setTipOpen(true)}
           >
@@ -226,9 +247,9 @@ function InteractionControls({
         ) : (
           <Link
             className={interactionClass}
-            data-tooltip={uiText("登录后投币")}
+            data-tooltip={uiText("webWordlistInteractions:sign_in_to_tip")}
             href={`/login?redirect=${encodeURIComponent(`/wordlists/${list.id}`)}`}
-            aria-label={uiText("登录后投币")}
+            aria-label={uiText("webWordlistInteractions:sign_in_to_tip")}
           >
             <Coins className="size-5" aria-hidden />
             {stats?.tip_amount ?? "—"}
@@ -237,9 +258,9 @@ function InteractionControls({
       </div>
       {failed && (
         <p role="alert" className="mt-2 text-sm text-danger">
-          {uiText("互动状态加载失败。")}
+          {uiText("webWordlistInteractions:could_not_load_interaction_status")}
           <button type="button" className={buttonClass} onClick={onRetry}>
-            {uiText("重试")}
+            {uiText("webWordlistInteractions:retry")}
           </button>
         </p>
       )}
@@ -251,7 +272,9 @@ function InteractionControls({
       {favoriteOpen && (
         <LibraryDialog
           title={
-            state?.favorited ? uiText("移入收藏回收站") : uiText("收藏到文件夹")
+            state?.favorited
+              ? uiText("webWordlistInteractions:move_favourite_to_recycle_bin")
+              : uiText("webWordlistInteractions:save_favourite_to_folder")
           }
           busy={busy}
           onClose={() => setFavoriteOpen(false)}
@@ -264,20 +287,22 @@ function InteractionControls({
           {state?.favorited ? (
             <>
               <p className="mb-4">
-                {uiText("这份收藏将移入「收藏」回收站，可以恢复。")}
+                {uiText(
+                  "webWordlistInteractions:this_favourite_will_move_to_the_favourites_recycle_bin_and_can_be_restor"
+                )}
               </p>
               <button
                 disabled={busy}
                 className={buttonClass}
                 onClick={() => void change("favorite", false)}
               >
-                {uiText("确认移入回收站")}
+                {uiText("webWordlistInteractions:confirm_move_to_recycle_bin")}
               </button>
               <Link
                 className={buttonClass}
                 href={`/account/wordlists?space=favorites&wordlist=${list.id}`}
               >
-                {uiText("定位已收藏词表")}
+                {uiText("webWordlistInteractions:locate_favourited_list")}
               </Link>
             </>
           ) : (

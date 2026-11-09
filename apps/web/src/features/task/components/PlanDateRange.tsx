@@ -1,4 +1,5 @@
 "use client";
+import { localText } from "@/i18n/catalog";
 import { useWebLocale, useWebText } from "@/i18n/client";
 import { webTask } from "@/i18n/messages/task";
 
@@ -47,9 +48,9 @@ export function PlanDateRange({
           <CalendarDays className="size-4 text-foreground-muted" aria-hidden />
           {value
             ? `${value.start_date.replaceAll("-", "/")} — ${value.end_date.replaceAll("-", "/")}`
-            : uiText("不限日期")}{" "}
+            : uiText("webTask:no_date_limit")}{" "}
           <span className="text-xs text-foreground-muted">
-            {value ? uiText("更改") : uiText("设置")}
+            {value ? uiText("webTask:change") : uiText("webTask:set")}
           </span>
         </Button>
         {value && (
@@ -60,7 +61,7 @@ export function PlanDateRange({
             disabled={disabled}
             onClick={() => onChange(null)}
           >
-            {uiText("清除日期")}
+            {uiText("webTask:clear_dates")}
           </Button>
         )}
       </div>
@@ -114,12 +115,15 @@ function RangeCalendar({
     setFocusDay(next);
   }
   return (
-    <LibraryDialog title={uiText("选择起止日期")} onClose={onClose}>
+    <LibraryDialog
+      title={uiText("webTask:choose_start_and_end_dates")}
+      onClose={onClose}
+    >
       <p role="status" className="mb-3 text-xs text-foreground-muted">
         {!start
-          ? uiText("先选开始日期")
+          ? uiText("webTask:choose_the_start_date_first")
           : !end
-            ? uiText("再选结束日期")
+            ? uiText("webTask:then_choose_the_end_date")
             : `${dayLabel(start, locale)} — ${dayLabel(end, locale)}`}
       </p>
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -137,7 +141,11 @@ function RangeCalendar({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={offset < 0 ? uiText("上个月") : uiText("下个月")}
+              aria-label={
+                offset < 0
+                  ? uiText("webTask:previous_month")
+                  : uiText("webTask:next_month")
+              }
               onClick={() => moveMonth(offset)}
             >
               {offset < 0 ? (
@@ -153,14 +161,22 @@ function RangeCalendar({
         className="mb-1 grid grid-cols-7 text-center text-xs text-foreground-muted"
         aria-hidden
       >
-        {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
-          <span key={day}>{uiText(day)}</span>
+        {[
+          localText(webTask, "webTask:mon"),
+          localText(webTask, "webTask:tue"),
+          localText(webTask, "webTask:wed"),
+          localText(webTask, "webTask:thu"),
+          localText(webTask, "webTask:fri"),
+          localText(webTask, "webTask:sat"),
+          localText(webTask, "webTask:sun")
+        ].map((day) => (
+          <span key={day.key}>{uiText(day)}</span>
         ))}
       </div>
       <div
         ref={grid}
         role="group"
-        aria-label={uiText("选择日期")}
+        aria-label={uiText("webTask:choose_date")}
         className="grid grid-cols-7"
       >
         {Array.from({ length: 42 }, (_, index) => {
@@ -218,7 +234,7 @@ function RangeCalendar({
               setFocusDay(today);
             }}
           >
-            {uiText("未来 {{v0}} 天", { v0: days })}
+            {uiText("webTask:next_v0_days", { v0: days })}
           </Button>
         ))}
         <Button
@@ -227,22 +243,24 @@ function RangeCalendar({
           variant="ghost"
           onClick={() => onApply(null)}
         >
-          {uiText("不限日期")}
+          {uiText("webTask:no_date_limit")}
         </Button>
       </div>
       <p className="mt-2 text-xs text-foreground-muted">
-        {uiText("含首尾两天；以北京时间 04:00 划分学习日。")}
+        {uiText(
+          "webTask:includes_both_dates_learning_days_change_at_04_00_beijing_time"
+        )}
       </p>
       <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
         <Button type="button" variant="ghost" onClick={onClose}>
-          {uiText("取消")}
+          {uiText("webTask:cancel")}
         </Button>
         <Button
           type="button"
           disabled={!start || !end}
           onClick={() => onApply({ start_date: start, end_date: end })}
         >
-          {uiText("应用日期")}
+          {uiText("webTask:apply_dates")}
         </Button>
       </div>
     </LibraryDialog>

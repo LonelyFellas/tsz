@@ -1,14 +1,40 @@
 "use client";
 
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webHomeLanding as webHome } from "@/i18n/messages/home/landing";
 import { SectionHeading } from "./SectionHeading";
 
 const STEPS = [
-  { step: "01", title: "选词表", desc: "浏览或创建词表，确定学习范围。" },
-  { step: "02", title: "建任务", desc: "按自己的目标，创建每日或长期任务。" },
-  { step: "03", title: "做练习", desc: "按记忆算法完成当日练习。" },
-  { step: "04", title: "每日打卡", desc: "坚持打卡，获得天生币奖励。" }
+  {
+    step: "01",
+    title: localText(webHome, "webHomeLanding:choose_word_lists_2"),
+    desc: localText(
+      webHome,
+      "webHomeLanding:browse_or_create_word_lists_to_choose_what_to_learn"
+    )
+  },
+  {
+    step: "02",
+    title: localText(webHome, "webHomeLanding:create_a_task"),
+    desc: localText(
+      webHome,
+      "webHomeLanding:create_daily_or_long_term_tasks_for_your_goals"
+    )
+  },
+  {
+    step: "03",
+    title: localText(webHome, "webHomeLanding:practise"),
+    desc: localText(
+      webHome,
+      "webHomeLanding:complete_daily_practice_using_the_memory_schedule"
+    )
+  },
+  {
+    step: "04",
+    title: localText(webHome, "webHomeLanding:daily_check_in"),
+    desc: localText(webHome, "webHomeLanding:keep_checking_in_to_earn")
+  }
 ] as const;
 
 export function LearningFlow() {
@@ -16,8 +42,8 @@ export function LearningFlow() {
   return (
     <section className="mx-auto w-full max-w-6xl px-6 py-16 sm:py-24">
       <SectionHeading
-        title={uiText("从第一词，到每一天。")}
-        desc={uiText("形成可持续的学习闭环。")}
+        title={uiText("webHomeLanding:from_your_first_word_to_a_daily_habit")}
+        desc={uiText("webHomeLanding:build_a_learning_routine_you_can_keep")}
       />
       <ol className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map(({ step, title, desc }) => (

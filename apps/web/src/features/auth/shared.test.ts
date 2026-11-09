@@ -1,11 +1,16 @@
+import { HttpError } from "@tsz/api-client";
+import { webAuthAccess } from "@/i18n/messages/auth/access";
+import { webCommon, localText, originalText } from "@/i18n/catalog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { originalText } from "@/i18n/catalog";
+
 import type { User } from "@tsz/types";
 import {
   completeAuthentication,
   postAuthPath,
   persistSession,
-  translateAuthError
+  translateAuthError,
+  passwordErrorMessage,
+  securityErrorMessage
 } from "./shared";
 import * as request from "@/lib/request";
 import { useUserStore } from "@/stores/user";
@@ -20,43 +25,60 @@ const ME_USER: User = {
 };
 
 describe("translateAuthError", () => {
-  const map = { "invalid credentials": "账号或密码错误，请重新输入" };
+  const invalid = localText(
+    webAuthAccess,
+    "webAuthAccess:incorrect_account_or_password_try_again"
+  );
+  const fallback = originalText("兜底");
+  const map = { "invalid credentials": invalid };
 
   it("命中调用方传入的 map", () => {
-    expect(translateAuthError("invalid credentials", map, "兜底")).toBe(
-      "账号或密码错误，请重新输入"
+    expect(translateAuthError("invalid credentials", map, fallback)).toEqual(
+      invalid
     );
   });
 
   it("回退到通用会话错误映射", () => {
-    expect(translateAuthError("session expired", map, "兜底")).toBe(
-      "登录已过期，请重新登录"
+    expect(translateAuthError("session expired", map, fallback)).toEqual(
+      localText(webCommon, "webCommon:session_expired")
     );
-    expect(translateAuthError("invalid refresh token", map, "兜底")).toBe(
-      "登录已过期，请重新登录"
+    expect(translateAuthError("invalid refresh token", map, fallback)).toEqual(
+      localText(webCommon, "webCommon:session_expired")
     );
-    expect(translateAuthError("missing refresh token", map, "兜底")).toBe(
-      "登录已过期，请重新登录"
+    expect(translateAuthError("missing refresh token", map, fallback)).toEqual(
+      localText(webCommon, "webCommon:session_expired")
     );
   });
 
   it("大小写与空白归一化后再匹配", () => {
-    expect(translateAuthError("  Invalid Credentials  ", map, "兜底")).toBe(
-      "账号或密码错误，请重新输入"
-    );
+    expect(
+      translateAuthError("  Invalid Credentials  ", map, fallback)
+    ).toEqual(invalid);
   });
 
   it("未知错误原样透出", () => {
-    expect(translateAuthError("too many requests", map, "兜底")).toEqual(
+    expect(translateAuthError("too many requests", map, fallback)).toEqual(
       originalText("too many requests")
     );
   });
 
   it("空消息使用兜底文案", () => {
-    expect(translateAuthError("", map, "登录失败，请稍后重试")).toBe(
-      "登录失败，请稍后重试"
-    );
+    expect(
+      translateAuthError("", map, originalText("登录失败，请稍后重试"))
+    ).toEqual(originalText("登录失败，请稍后重试"));
   });
+  it.each(["constructor", "__proto__"])(
+    "未知错误 %s 保留原文，不把对象原型成员当作本地消息",
+    (message) => {
+      expect(translateAuthError(message, map, fallback)).toEqual(
+        originalText(message)
+      );
+      expect(passwordErrorMessage(message)).toBeUndefined();
+      expect(
+        securityErrorMessage(new HttpError(400, message, [], message))
+      ).toEqual(originalText(message));
+    }
+  );
 });
 
 describe("persistSession", () => {

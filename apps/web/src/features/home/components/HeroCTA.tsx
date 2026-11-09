@@ -28,7 +28,9 @@ export function HeroCTA() {
     return (
       <Button asChild size="lg">
         <Link href={studyHref}>
-          {teaching ? uiText("进入教学") : uiText("进入学习")}
+          {teaching
+            ? uiText("webHomeLanding:open_teaching_workspace")
+            : uiText("webHomeLanding:open_learning_workspace")}
         </Link>
       </Button>
     );
@@ -38,11 +40,11 @@ export function HeroCTA() {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button asChild size="lg">
-        <Link href="/login">{uiText("开始学习")}</Link>
+        <Link href="/login">{uiText("webHomeLanding:start_learning")}</Link>
       </Button>
       <Button asChild size="lg" variant="link">
         <Link href="/wordlists">
-          {uiText("浏览词表")}
+          {uiText("webHomeLanding:browse_word_lists")}
           <ArrowRight className="size-4" aria-hidden />
         </Link>
       </Button>

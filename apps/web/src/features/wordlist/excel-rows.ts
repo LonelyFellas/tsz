@@ -1,3 +1,5 @@
+import { webWordlistExcel } from "@/i18n/messages/wordlist/excel";
+import { localText, type LocalText } from "@/i18n/catalog";
 export const MAX_IMPORT_ROWS = 10000;
 export const MAX_EXCEL_BYTES = 10 * 1024 * 1024;
 export type ImportField = "word" | "gloss" | "note";
@@ -6,18 +8,20 @@ export type ExcelRow = {
   word: string;
   gloss: string;
   note: string;
-  invalidFields: Partial<Record<ImportField, string>>;
+  invalidFields: Partial<Record<ImportField, LocalText>>;
 };
-export const importFieldLabels = {
-  word: "词条名称",
-  gloss: "释义",
-  note: "注释"
-};
-
 export function validateExcelRow(row: ExcelRow) {
   const errors = { ...row.invalidFields };
-  if (!row.word.trim()) errors.word = "词条名称不能为空";
-  else if ([...row.word].length > 200) errors.word = "词条名称不能超过 200 字";
+  if (!row.word.trim())
+    errors.word = localText(
+      webWordlistExcel,
+      "webWordlistExcel:entry_name_is_required"
+    );
+  else if ([...row.word].length > 200)
+    errors.word = localText(
+      webWordlistExcel,
+      "webWordlistExcel:entry_names_must_not_exceed_200_characters"
+    );
   else if (
     [...row.word].some(
       (char) =>
@@ -25,8 +29,19 @@ export function validateExcelRow(row: ExcelRow) {
         (char.codePointAt(0)! >= 127 && char.codePointAt(0)! <= 159)
     )
   )
-    errors.word = "词条名称不能包含控制字符";
-  if ([...row.gloss].length > 200) errors.gloss = "释义不能超过 200 字";
-  if ([...row.note].length > 1000) errors.note = "注释不能超过 1000 字";
+    errors.word = localText(
+      webWordlistExcel,
+      "webWordlistExcel:entry_names_cannot_contain_control_characters"
+    );
+  if ([...row.gloss].length > 200)
+    errors.gloss = localText(
+      webWordlistExcel,
+      "webWordlistExcel:definitions_must_not_exceed_200_characters"
+    );
+  if ([...row.note].length > 1000)
+    errors.note = localText(
+      webWordlistExcel,
+      "webWordlistExcel:notes_must_not_exceed_1_000_characters_2"
+    );
   return errors;
 }

@@ -10,17 +10,23 @@ export function ClassManager() {
   const uiText = useWebText(webClass);
   return (
     <ComingSoon
-      eyebrow={uiText("教学工作台")}
-      title={uiText("班级管理")}
+      eyebrow={uiText("webClass:teaching_workspace")}
+      title={uiText("webClass:class_management")}
       icon={Users}
-      heading={uiText("班级功能即将开放")}
+      heading={uiText("webClass:classes_are_not_available_yet")}
       links={[
-        { href: "/account/wordlists", label: uiText("整理我的词表") },
-        { href: "/wordlists", label: uiText("浏览词库广场") }
+        {
+          href: "/account/wordlists",
+          label: uiText("webClass:organise_my_word_lists")
+        },
+        {
+          href: "/wordlists",
+          label: uiText("webClass:browse_word_list_library")
+        }
       ]}
     >
       {uiText(
-        "开放后可以创建班级、管理成员，并把词表添加为班级的长期任务。现在可以先整理好要用的词表。"
+        "webClass:when_available_you_will_be_able_to_create_classes_manage_members_and_add"
       )}
     </ComingSoon>
   );

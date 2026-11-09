@@ -1,6 +1,5 @@
 "use client";
 import { localText, type WebNotice } from "@/i18n/catalog";
-import { useWebText } from "@/i18n/client";
 import { webPlacement } from "@/i18n/messages/placement";
 
 import { useUnsavedChanges } from "@tsz/shared/recovery";
@@ -29,14 +28,13 @@ import { WelcomeScreen } from "./WelcomeScreen";
 type Screen = "welcome" | "quiz" | "result" | "invalid";
 
 interface ConfirmState {
-  title: string;
+  title: WebNotice;
   desc: WebNotice;
-  ok: string;
+  ok: WebNotice;
   action: () => void;
 }
 
 export function PlacementFlow() {
-  const uiText = useWebText(webPlacement);
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = postAuthPath(true, searchParams.get("redirect"));
@@ -53,7 +51,7 @@ export function PlacementFlow() {
   const [idx, setIdx] = useState(0);
   const [answered, setAnswered] = useState(0);
   const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState("");
+  const [startError, setStartError] = useState<WebNotice>("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
   useUnsavedChanges("placement", screen === "quiz" || starting || submitting);
@@ -87,7 +85,12 @@ export function PlacementFlow() {
         setQuota(readQuota());
         setScreen("welcome");
       } else {
-        setStartError("开始测试失败，请稍后重试");
+        setStartError(
+          localText(
+            webPlacement,
+            "webPlacement:could_not_start_the_assessment_try_again_later"
+          )
+        );
       }
     } finally {
       setStarting(false);
@@ -157,17 +160,19 @@ export function PlacementFlow() {
     }
     if (quota.last) {
       setConfirm({
-        title: "重新测试？",
+        title: localText(webPlacement, "webPlacement:retake_the_assessment"),
         desc: onboarded
           ? localText(
-              "新的测评结果仅供参考，不会修改已保存的学习难度。剩余 {{v0}} 次机会。",
+              webPlacement,
+              "webPlacement:results_are_a_guide_and_do_not_change_your_saved_learning_level_v0_attem",
               { v0: left }
             )
           : localText(
-              "新结果将覆盖当前的 {{v0}} 等级，以最后一次为准。剩余 {{v1}} 次机会。",
+              webPlacement,
+              "webPlacement:the_new_result_replaces_your_current_v0_level_v1_attempts_left",
               { v0: quota.last.band, v1: left }
             ),
-        ok: "确认重测",
+        ok: localText(webPlacement, "webPlacement:confirm_retake"),
         action: () => void startTest()
       });
       return;
@@ -177,9 +182,12 @@ export function PlacementFlow() {
 
   function requestExit() {
     setConfirm({
-      title: "退出测试？",
-      desc: "本次作答不会保存，也不消耗测试机会。",
-      ok: "退出",
+      title: localText(webPlacement, "webPlacement:leave_assessment"),
+      desc: localText(
+        webPlacement,
+        "webPlacement:your_answers_will_not_be_saved_and_no_attempt_will_be_used"
+      ),
+      ok: localText(webPlacement, "webPlacement:leave"),
       action: () => {
         setConfirm(null);
         sessionRef.current = null;
@@ -253,7 +261,7 @@ export function PlacementFlow() {
         open={confirm !== null}
         title={confirm?.title ?? ""}
         desc={confirm?.desc ?? ""}
-        okLabel={confirm?.ok ?? uiText("确认")}
+        okLabel={confirm?.ok ?? localText(webPlacement, "webPlacement:confirm")}
         onOk={() => confirm?.action()}
         onCancel={() => setConfirm(null)}
       />

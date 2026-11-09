@@ -1,12 +1,19 @@
 "use client";
-import { type WebNotice } from "@/i18n/catalog";
+import {
+  lookupWebNotice,
+  webCommon,
+  localText,
+  type WebNotice
+} from "@/i18n/catalog";
+
+import { displayNameError } from "@/features/auth/shared";
+
 import { useWebText } from "@/i18n/client";
 import { webAuthProfile as webAuth } from "@/i18n/messages/auth/profile";
 
 import { HttpError } from "@tsz/api-client";
 import {
   DISPLAY_NAME_MAX,
-  displayNameError,
   displayNameLength,
   normalizeDisplayName
 } from "@tsz/shared";
@@ -16,7 +23,7 @@ import { useRouter } from "next/navigation";
 import type { EnglishVariant, MeResponse, User } from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
-import { VARIANT_LABEL, displayNameOf } from "@/lib/user";
+import { displayNameOf } from "@/lib/user";
 import {
   AVATAR_ACCEPT,
   isAvatarStorageUnavailable,
@@ -34,51 +41,119 @@ import {
   primaryButtonClass
 } from "@/features/shell/Page";
 
+const variantMessages = {
+  BrE: localText(webCommon, "webCommon:shared_british"),
+  AmE: localText(webCommon, "webCommon:shared_american")
+};
+
 // 精细化输入框:Apple 风圆角 + 品牌蓝聚焦环,贴合落地页设计体系。
 const INPUT_CLASS =
   "min-h-12 w-full rounded-full border border-border bg-surface px-5 text-sm text-foreground outline-hidden transition-shadow placeholder:text-foreground-subtle focus:border-primary/50 focus:ring-4 focus:ring-primary/15 aria-invalid:border-danger disabled:cursor-not-allowed disabled:opacity-50";
 
 // 昵称禁字符提示:前端预检与后端 400 兜底共用同一句(规则见 @tsz/shared 的
 // hasDisplayNameForbiddenChars,与后端 validateDisplayName 对齐)。
-const NICKNAME_FORBIDDEN_MSG = "昵称不能包含 < > 或不可见字符";
+const NICKNAME_FORBIDDEN_MSG = localText(
+  webCommon,
+  "webCommon:shared_your_nickname_cannot_contain_or_invisible_characters"
+);
 
-const PROFILE_ERRORS: Record<string, string> = {
-  "display name cannot be empty": "昵称需为 1–50 个字符",
-  "display name cannot be longer than 50 characters": "昵称不能超过 50 个字符",
+const PROFILE_ERRORS: Record<string, WebNotice> = {
+  "display name cannot be empty": localText(
+    webCommon,
+    "webCommon:shared_use_1_50_characters_for_your_nickname"
+  ),
+  "display name cannot be longer than 50 characters": localText(
+    webCommon,
+    "webCommon:shared_your_nickname_must_not_exceed_50_characters"
+  ),
   "display name contains forbidden characters": NICKNAME_FORBIDDEN_MSG,
-  "display name cannot be blank": "昵称需为 1–50 个字符",
+  "display name cannot be blank": localText(
+    webCommon,
+    "webCommon:shared_use_1_50_characters_for_your_nickname"
+  ),
   "display name cannot contain < > or invisible characters":
     NICKNAME_FORBIDDEN_MSG,
-  "user not found": "账号不存在,请重新登录"
+  "user not found": localText(
+    webAuth,
+    "webAuthProfile:account_not_found_sign_in_again"
+  )
 };
 
 // 501 存储未开通的提示,「首次探测到」与「会话内已知」两条路径共用同一份。
-const AVATAR_UNAVAILABLE_MSG = "头像功能即将上线";
+const AVATAR_UNAVAILABLE_MSG = localText(
+  webAuth,
+  "webAuthProfile:avatars_are_not_available_yet"
+);
 
 // 头像上传三步流程错误(对接文档 §5;前端预检抛的文案与后端一致,共用此表)。
-const AVATAR_CODE_ERRORS: Record<string, string> = {
-  unsupported_avatar_content_type: "仅支持 JPG / PNG / WebP 格式图片",
-  invalid_avatar_size: "图片大小无效,请重新选择",
-  avatar_invalid_image: "图片损坏或像素过大,请重新选择",
-  avatar_file_too_large: "图片不能超过 5MB",
-  invalid_avatar_key: "上传凭证已失效,请重试",
-  avatar_upload_not_completed: "上传未完成,请重试",
-  avatar_upload_rate_limited: "上传过于频繁,请稍后再试",
+const AVATAR_CODE_ERRORS: Record<string, WebNotice> = {
+  unsupported_avatar_content_type: localText(
+    webAuth,
+    "webAuthProfile:only_jpg_png_and_webp_images_are_supported"
+  ),
+  invalid_avatar_size: localText(
+    webAuth,
+    "webAuthProfile:invalid_image_size_choose_another_image_2"
+  ),
+  avatar_invalid_image: localText(
+    webAuth,
+    "webAuthProfile:the_image_is_damaged_or_too_large_choose_another_image"
+  ),
+  avatar_file_too_large: localText(
+    webAuth,
+    "webAuthProfile:the_image_must_not_exceed_5_mb"
+  ),
+  invalid_avatar_key: localText(
+    webAuth,
+    "webAuthProfile:upload_authorisation_expired_try_again"
+  ),
+  avatar_upload_not_completed: localText(
+    webAuth,
+    "webAuthProfile:upload_incomplete_try_again"
+  ),
+  avatar_upload_rate_limited: localText(
+    webAuth,
+    "webAuthProfile:too_many_uploads_try_again_later"
+  ),
   avatar_storage_not_configured: AVATAR_UNAVAILABLE_MSG,
-  avatar_storage_unavailable: "头像存储暂不可用,请稍后重试"
+  avatar_storage_unavailable: localText(
+    webAuth,
+    "webAuthProfile:avatar_storage_is_unavailable_try_again_later"
+  )
 };
 
-const AVATAR_ERRORS: Record<string, string> = {
+const AVATAR_ERRORS: Record<string, WebNotice> = {
   "invalid avatar size": AVATAR_CODE_ERRORS.invalid_avatar_size!,
-  "unsupported avatar content type": "仅支持 JPG / PNG / WebP 格式图片",
-  "avatar file too large": "图片不能超过 5MB",
+  "unsupported avatar content type": localText(
+    webAuth,
+    "webAuthProfile:only_jpg_png_and_webp_images_are_supported"
+  ),
+  "avatar file too large": localText(
+    webAuth,
+    "webAuthProfile:the_image_must_not_exceed_5_mb"
+  ),
   "avatar storage not configured": AVATAR_UNAVAILABLE_MSG,
-  "oss upload failed": "上传失败,请重试",
-  "avatar upload not completed": "上传未完成,请重试",
-  "invalid avatar key": "上传凭证已失效,请重试",
+  "oss upload failed": localText(
+    webAuth,
+    "webAuthProfile:upload_failed_try_again"
+  ),
+  "avatar upload not completed": localText(
+    webAuth,
+    "webAuthProfile:upload_incomplete_try_again"
+  ),
+  "invalid avatar key": localText(
+    webAuth,
+    "webAuthProfile:upload_authorisation_expired_try_again"
+  ),
   // confirm 500:暂存仍在,重试即可(§5 最后一行)。
-  "internal error": "保存失败,请重试",
-  "user not found": "账号不存在,请重新登录"
+  "internal error": localText(
+    webAuth,
+    "webAuthProfile:could_not_save_try_again"
+  ),
+  "user not found": localText(
+    webAuth,
+    "webAuthProfile:account_not_found_sign_in_again"
+  )
 };
 
 // 昵称上限与后端一致,单一来源在 @tsz/shared。
@@ -157,7 +232,9 @@ export function EditProfileForm() {
     return (
       <PageShell size="sm">
         <PageNotice tone="error">
-          {uiText("资料加载失败,请刷新重试。")}
+          {uiText(
+            "webAuthProfile:could_not_load_your_profile_reload_and_try_again"
+          )}
         </PageNotice>
       </PageShell>
     );
@@ -166,7 +243,7 @@ export function EditProfileForm() {
   if (!me) {
     return (
       <PageShell size="sm">
-        <PageNotice>{uiText("加载中…")}</PageNotice>
+        <PageNotice>{uiText("webAuthProfile:loading_2")}</PageNotice>
       </PageShell>
     );
   }
@@ -182,7 +259,7 @@ export function EditProfileForm() {
   const nameMessage = validationError ?? nameError;
   const topContact = user.phone ?? user.email ?? "";
   const avatarInitial = Array.from(
-    displayNameOf(user, uiText("用户"))
+    displayNameOf(user, uiText("webCommon:user"))
   )[0]!.toUpperCase();
 
   const canSubmit =
@@ -228,9 +305,16 @@ export function EditProfileForm() {
       const msg = e instanceof Error ? e.message : "";
       setAvatarError(
         (e instanceof HttpError && e.code
-          ? AVATAR_CODE_ERRORS[e.code]
+          ? lookupWebNotice(AVATAR_CODE_ERRORS, e.code)
           : undefined) ??
-          translateAuthError(msg, AVATAR_ERRORS, "头像上传失败,请稍后再试")
+          translateAuthError(
+            msg,
+            AVATAR_ERRORS,
+            localText(
+              webAuth,
+              "webAuthProfile:could_not_upload_your_avatar_try_again_later"
+            )
+          )
       );
     } finally {
       setAvatarUploading(false);
@@ -280,8 +364,14 @@ export function EditProfileForm() {
     } catch (error: unknown) {
       setSettingsError(
         error instanceof HttpError && error.code === "cefr_level_locked"
-          ? "难度首次确认后不可修改，请刷新页面后重试"
-          : "英美偏好保存失败，请稍后重试"
+          ? localText(
+              webAuth,
+              "webAuthProfile:the_level_cannot_be_changed_after_confirmation_reload_and_try_again"
+            )
+          : localText(
+              webAuth,
+              "webAuthProfile:could_not_save_your_english_preference_try_again_later"
+            )
       );
     } finally {
       setSettingsSaving(false);
@@ -296,7 +386,7 @@ export function EditProfileForm() {
     clearMessages();
 
     if (!nameChanged) {
-      setNameError("没有需要保存的修改");
+      setNameError(localText(webAuth, "webAuthProfile:no_changes_to_save"));
       return;
     }
     if (validationError) {
@@ -314,15 +404,21 @@ export function EditProfileForm() {
           const msg = e instanceof Error ? e.message : "";
           if (e instanceof HttpError && e.code === "invalid_display_name") {
             setNameError(
-              PROFILE_ERRORS[msg] ??
-                "昵称需为 1–50 个字符，且不能包含 < > 或不可见字符"
+              lookupWebNotice(PROFILE_ERRORS, msg) ??
+                localText(
+                  webAuth,
+                  "webAuthProfile:use_1_50_characters_and_invisible_characters_are_not_allowed"
+                )
             );
           } else {
             setNameError(
-              PROFILE_ERRORS[msg] ??
+              lookupWebNotice(PROFILE_ERRORS, msg) ??
                 (e instanceof HttpError && e.status === 404
-                  ? "该功能暂未开放，敬请期待"
-                  : "昵称保存失败，请稍后再试")
+                  ? localText(webCommon, "webCommon:feature_unavailable")
+                  : localText(
+                      webAuth,
+                      "webAuthProfile:could_not_save_your_nickname_try_again_later"
+                    ))
             );
           }
           return;
@@ -337,10 +433,15 @@ export function EditProfileForm() {
   return (
     <PageShell size="sm">
       <PageHeader
-        back={{ href: "/account", label: uiText("返回个人中心") }}
-        eyebrow={uiText("个人中心")}
-        title={uiText("编辑资料")}
-        description={uiText("修改头像、昵称和英美偏好。")}
+        back={{
+          href: "/account",
+          label: uiText("webAuthProfile:back_to_account")
+        }}
+        eyebrow={uiText("webAuthProfile:account")}
+        title={uiText("webAuthProfile:edit_profile")}
+        description={uiText(
+          "webAuthProfile:change_your_avatar_nickname_and_english_preference"
+        )}
       />
 
       <div className="glass rounded-3xl p-2">
@@ -352,7 +453,7 @@ export function EditProfileForm() {
               type="file"
               accept={AVATAR_ACCEPT}
               className="hidden"
-              aria-label={uiText("选择头像图片")}
+              aria-label={uiText("webAuthProfile:choose_an_avatar_image")}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 // 立即清空 value:同一张图重选(失败重试)也要触发 change。
@@ -365,7 +466,7 @@ export function EditProfileForm() {
               type="button"
               onClick={handleAvatar}
               disabled={avatarUploading || saving || !!avatarFile}
-              aria-label={uiText("更换头像")}
+              aria-label={uiText("webAuthProfile:change_avatar")}
               aria-busy={avatarUploading}
               className="group relative size-24 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-wait"
             >
@@ -374,7 +475,7 @@ export function EditProfileForm() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={user.avatar_url}
-                    alt={uiText("头像")}
+                    alt={uiText("webAuthProfile:avatar")}
                     className="h-full w-full bg-white object-cover"
                     onError={() => setAvatarFailedUrl(user.avatar_url)}
                   />
@@ -404,7 +505,7 @@ export function EditProfileForm() {
           </div>
 
           <form
-            aria-label={uiText("修改昵称")}
+            aria-label={uiText("webAuthProfile:change_nickname")}
             className="space-y-5"
             onSubmit={handleSubmit}
           >
@@ -414,13 +515,13 @@ export function EditProfileForm() {
                 htmlFor="profile-display-name"
                 className="mb-2 block px-4 text-sm font-medium text-foreground"
               >
-                {uiText("昵称")}
+                {uiText("webAuthProfile:display_name")}
               </label>
               <div className="relative">
                 <input
                   id="profile-display-name"
                   type="text"
-                  placeholder={uiText("请输入昵称")}
+                  placeholder={uiText("webAuthProfile:enter_a_display_name")}
                   value={displayName}
                   disabled={saving}
                   aria-invalid={Boolean(nameMessage)}
@@ -451,7 +552,7 @@ export function EditProfileForm() {
             {success && (
               <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
                 <CheckIcon />
-                {uiText("已保存")}
+                {uiText("webAuthProfile:saved")}
               </p>
             )}
 
@@ -461,14 +562,16 @@ export function EditProfileForm() {
                 onClick={() => router.back()}
                 className={cn(buttonClass, "min-h-12 flex-1")}
               >
-                {uiText("取消")}
+                {uiText("webAuthProfile:cancel")}
               </button>
               <button
                 type="submit"
                 disabled={!canSubmit}
                 className={cn(primaryButtonClass, "flex-1")}
               >
-                {saving ? uiText("保存中...") : uiText("保存")}
+                {saving
+                  ? uiText("webAuthProfile:saving")
+                  : uiText("webAuthProfile:save")}
               </button>
             </div>
           </form>
@@ -482,7 +585,7 @@ export function EditProfileForm() {
                 id="learning-settings-title"
                 className="text-xl font-semibold tracking-tight"
               >
-                {uiText("个人学习配置")}
+                {uiText("webAuthProfile:learning_settings")}
               </h2>
               {learning_settings ? (
                 <form
@@ -494,14 +597,16 @@ export function EditProfileForm() {
                     className="relative flex items-center gap-2 text-sm"
                   >
                     <span className="text-foreground-muted">
-                      {uiText("难度级别")}
+                      {uiText("webAuthProfile:difficulty_level")}
                     </span>
                     <span className="font-semibold text-foreground">
                       {learning_settings.cefr_level}
                     </span>
                     <button
                       type="button"
-                      aria-label={uiText("难度级别说明")}
+                      aria-label={uiText(
+                        "webAuthProfile:about_difficulty_levels"
+                      )}
                       aria-expanded={difficultyHelpOpen}
                       aria-controls="difficulty-help"
                       onClick={() => setDifficultyHelpOpen((open) => !open)}
@@ -528,13 +633,15 @@ export function EditProfileForm() {
                         role="tooltip"
                         className="absolute left-0 top-full z-10 mt-2 w-60 max-w-full rounded-2xl border border-border/60 bg-surface px-4 py-3 text-xs leading-6 text-foreground shadow-float"
                       >
-                        {uiText("如需修改，请联系官方客服")}
+                        {uiText(
+                          "webAuthProfile:contact_support_to_request_a_change"
+                        )}
                       </div>
                     )}
                   </div>
                   <fieldset disabled={settingsSaving}>
                     <legend className="mb-2 text-sm font-medium text-foreground-muted">
-                      {uiText("英美偏好")}
+                      {uiText("webAuthProfile:english_preference")}
                     </legend>
                     <div className="flex flex-wrap gap-2">
                       {(["BrE", "AmE"] as const).map((value) => (
@@ -554,8 +661,8 @@ export function EditProfileForm() {
                             }}
                             className="size-4 accent-primary"
                           />
-                          {uiText("{{v0}}英语（{{v1}}）", {
-                            v0: uiText(VARIANT_LABEL[value]),
+                          {uiText("webAuthProfile:v0_english_v1", {
+                            v0: uiText(variantMessages[value]),
                             v1: value
                           })}
                         </label>
@@ -569,7 +676,7 @@ export function EditProfileForm() {
                   )}
                   {settingsSuccess && (
                     <p role="status" className="text-sm text-success">
-                      {uiText("偏好已保存")}
+                      {uiText("webAuthProfile:preference_saved")}
                     </p>
                   )}
                   <button
@@ -581,7 +688,9 @@ export function EditProfileForm() {
                     }
                     className={cn(primaryButtonClass, "min-h-10 px-5")}
                   >
-                    {settingsSaving ? uiText("保存中…") : uiText("保存偏好")}
+                    {settingsSaving
+                      ? uiText("webAuthProfile:saving_2")
+                      : uiText("webAuthProfile:save_preferences")}
                   </button>
                 </form>
               ) : (
@@ -589,7 +698,7 @@ export function EditProfileForm() {
                   href="/onboarding"
                   className="mt-3 inline-block text-sm text-primary hover:underline"
                 >
-                  {uiText("完成学习配置")}
+                  {uiText("webAuthProfile:complete_learning_settings")}
                 </Link>
               )}
             </section>

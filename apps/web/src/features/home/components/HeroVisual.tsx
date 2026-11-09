@@ -1,4 +1,5 @@
 "use client";
+import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webHomeLanding as webHome } from "@/i18n/messages/home/landing";
 
@@ -17,7 +18,10 @@ const WORDS = [
   {
     word: "ocean",
     image: HOME_IMAGES.ocean,
-    imageAlt: "俯瞰蓝色海洋，白色海浪涌向浅色沙岸",
+    imageAlt: localText(
+      webHome,
+      "webHomeLanding:a_blue_ocean_seen_from_above_with_white_waves_reaching_a_pale_sandy_shor"
+    ),
     phonetic: "/ˈəʊʃən/",
     definition: "海洋",
     exampleBefore: "The ",
@@ -28,7 +32,10 @@ const WORDS = [
   {
     word: "wave",
     image: HOME_IMAGES.wave,
-    imageAlt: "近距离看一道卷起的蓝色海浪，浪尖溅起白色水花",
+    imageAlt: localText(
+      webHome,
+      "webHomeLanding:a_curling_blue_wave_seen_close_up_with_white_spray_at_its_crest"
+    ),
     phonetic: "/weɪv/",
     definition: "海浪；波浪",
     exampleBefore: "A ",
@@ -39,7 +46,10 @@ const WORDS = [
   {
     word: "shore",
     image: HOME_IMAGES.shore,
-    imageAlt: "平静海水与浅色沙滩交接，海岸线向远处延伸",
+    imageAlt: localText(
+      webHome,
+      "webHomeLanding:calm_water_meets_pale_sand_with_the_shoreline_stretching_into_the_distan"
+    ),
     phonetic: "/ʃɔː/",
     definition: "岸；滨",
     exampleBefore: "We walked along the ",
@@ -73,7 +83,10 @@ export function HeroVisual() {
   }
 
   return (
-    <section className={styles.preview} aria-label={uiText("词汇预览")}>
+    <section
+      className={styles.preview}
+      aria-label={uiText("webHomeLanding:vocabulary_preview")}
+    >
       <div className={styles.picture}>
         {WORDS.map((word, wordIndex) => (
           <picture
@@ -123,10 +136,10 @@ export function HeroVisual() {
       </div>
       <div className={styles.wordPanel}>
         <div className="flex items-center justify-between gap-4 text-xs text-foreground-muted">
-          <span>{uiText("词汇预览")}</span>
+          <span>{uiText("webHomeLanding:vocabulary_preview")}</span>
           <span
             className="tabular-nums"
-            aria-label={uiText("第 {{v0}} 个，共 {{v1}} 个示例单词", {
+            aria-label={uiText("webHomeLanding:example_word_v0_of_v1", {
               v0: index + 1,
               v1: WORDS.length
             })}
@@ -138,7 +151,7 @@ export function HeroVisual() {
               type="button"
               variant="ghost"
               size="icon"
-              aria-label={uiText("上一个单词")}
+              aria-label={uiText("webHomeLanding:previous_word")}
               onClick={() => changeWord(-1)}
             >
               <ArrowLeft className="size-4" aria-hidden />
@@ -148,7 +161,7 @@ export function HeroVisual() {
               variant="ghost"
               size="icon"
               className="text-primary"
-              aria-label={uiText("下一个单词")}
+              aria-label={uiText("webHomeLanding:next_word")}
               onClick={() => changeWord(1)}
             >
               <ArrowRight className="size-4" aria-hidden />
@@ -183,7 +196,7 @@ export function HeroVisual() {
             </div>
             {!showDefinition && (
               <p className={styles.recallHint}>
-                {uiText("先想一想，这个单词是什么意思？")}
+                {uiText("webHomeLanding:what_do_you_think_this_word_means")}
               </p>
             )}
           </div>
@@ -202,15 +215,20 @@ export function HeroVisual() {
             ) : (
               <Eye className="size-4" aria-hidden />
             )}
-            {showDefinition ? uiText("隐藏释义") : uiText("查看释义")}
+            {showDefinition
+              ? uiText("webHomeLanding:hide_meaning")
+              : uiText("webHomeLanding:show_meaning")}
           </Button>
         </div>
         <p className="sr-only" role="status">
-          {uiText("词汇预览：{{v0}}，第 {{v1}} 个，共 {{v2}} 个示例单词。", {
-            v0: current.word,
-            v1: index + 1,
-            v2: WORDS.length
-          })}
+          {uiText(
+            "webHomeLanding:vocabulary_preview_v0_example_word_v1_of_v2",
+            {
+              v0: current.word,
+              v1: index + 1,
+              v2: WORDS.length
+            }
+          )}
         </p>
       </div>
     </section>
