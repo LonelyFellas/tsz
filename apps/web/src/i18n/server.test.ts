@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ hint: undefined as string | undefined }));
+const mocks = vi.hoisted(() => ({
+  hint: undefined as string | undefined,
+  acceptLanguage: ""
+}));
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ "accept-language": mocks.acceptLanguage }),
   cookies: async () => {
     const hint = mocks.hint;
     return { get: () => (hint ? { value: hint } : undefined) };
@@ -17,6 +21,7 @@ const directory = {
 };
 beforeEach(() => {
   mocks.hint = undefined;
+  mocks.acceptLanguage = "";
   vi.unstubAllGlobals();
 });
 
@@ -65,4 +70,25 @@ describe("Web 请求语言输入", () => {
     expect(traditional("登录")).toBe("登入");
     expect(english("登录")).toBe("Sign in");
   });
+});
+
+it("英文浏览器首访按权重与客户端相同规则匹配，停用项不启用", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json(directory))
+  );
+  mocks.acceptLanguage = "fr;q=1, en-US;q=0.9, en-GB;q=0.8";
+  expect(await getWebLocale()).toBe("en-US");
+  mocks.hint = "zh-Hant";
+  expect(await getWebLocale()).toBe("zh-Hant");
+  mocks.hint = undefined;
+  mocks.acceptLanguage = "en-US;q=0, en-GB;q=0.7";
+  expect(await getWebLocale()).toBe("en-GB");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ ...directory, supported_locales: ["zh-Hans"] })
+    )
+  );
+  expect(await getWebLocale()).toBe("zh-Hans");
 });

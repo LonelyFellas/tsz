@@ -118,15 +118,15 @@ export function createInterfacePreferences({
     }
     const epoch = ++readEpoch;
     const current = () => sessionKey() === owner && epoch === readEpoch;
+    const previous = snapshot.owner === owner ? snapshot : initial;
     publish(
-      snapshot.owner === owner && snapshot.status === "ready"
+      previous.capabilities !== null
         ? { ...snapshot, refreshing: true, error: null }
         : { ...initial, owner, refreshing: true }
     );
-    let directoryAvailable = false;
+    let directory: InterfaceCapabilities | undefined;
     try {
-      const directory = await capabilities();
-      directoryAvailable = true;
+      directory = await capabilities();
       if (!current()) return;
       if (!INTERFACE_LOCALES.includes(directory.default_locale))
         throw new Error("不支持目录默认语言");
@@ -149,15 +149,24 @@ export function createInterfacePreferences({
       });
     } catch (error) {
       if (!current()) return;
+      const unsupported =
+        !directory &&
+        error instanceof HttpError &&
+        [404, 405].includes(error.status);
+      // 短暂读取失败保留同身份已确认的界面；新目录仍能立即停用语言。
+      const retained =
+        !unsupported && previous.capabilities ? previous : initial;
       publish({
-        ...initial,
+        ...retained,
         owner,
-        status:
-          !directoryAvailable &&
-          error instanceof HttpError &&
-          [404, 405].includes(error.status)
-            ? "unsupported"
-            : "error",
+        status: unsupported ? "unsupported" : "error",
+        locale:
+          directory && INTERFACE_LOCALES.includes(directory.default_locale)
+            ? resolve(directory, retained.preference, getSession().accountId)
+            : retained.locale,
+        capabilities: directory ?? retained.capabilities,
+        saving: false,
+        refreshing: false,
         error: errorText(error)
       });
     }

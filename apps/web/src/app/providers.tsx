@@ -1,5 +1,6 @@
 "use client";
 
+import { WebLocaleBoundary, useWebLocaleReady } from "@/i18n/boot";
 import { WebLocaleEffects } from "@/i18n/effects";
 import { useWebText } from "@/i18n/client";
 import { webApp } from "@/i18n/messages/app";
@@ -43,13 +44,14 @@ const ReactQueryDevtools = dynamic(
 function SessionRestorer() {
   const uiText = useWebText(webApp);
   const { retry, retrying } = useSessionRestore();
+  const localeReady = useWebLocaleReady();
   const refreshUnconfirmed = useUserStore((s) => s.refreshUnconfirmed);
   const connectionError = useUserStore((s) => s.connectionError);
   const hydrated = useUserStore((s) => s.hydrated);
   useEffect(() => {
     window.dispatchEvent(new Event("tsz:app-ready"));
   }, []);
-  if (!connectionError && !refreshUnconfirmed) return null;
+  if (!localeReady || (!connectionError && !refreshUnconfirmed)) return null;
   // 顶栏为 64px 高的 sticky z-50，提示需落在其下方并压过它，否则文字被遮住。
   return (
     <div
@@ -134,11 +136,13 @@ export function Providers({
         <ThemeSync />
         <WebLocaleEffects />
         <SessionRestorer />
-        <DailyLoginReward />
-        <NotificationTabBadge />
-        <PhoneBindingGuard>
-          <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
-        </PhoneBindingGuard>
+        <WebLocaleBoundary>
+          <DailyLoginReward />
+          <NotificationTabBadge />
+          <PhoneBindingGuard>
+            <TeacherIdentityProvider>{children}</TeacherIdentityProvider>
+          </PhoneBindingGuard>
+        </WebLocaleBoundary>
         {process.env.NODE_ENV === "development" && (
           <ReactQueryDevtools initialIsOpen={false} />
         )}

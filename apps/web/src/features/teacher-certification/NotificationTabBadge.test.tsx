@@ -1,4 +1,5 @@
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { webLocaleBootScript } from "@/i18n/snapshot";
 import { WebLocaleEffects } from "@/i18n/effects";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -191,6 +192,7 @@ it("clears the previous account badge and ignores late image loads after logout"
 });
 
 it("language updates preserve one unread prefix and the existing theme", async () => {
+  localeController.snapshot.status = "ready";
   const localeTree = (locale: "en-GB" | "zh-Hant") => (
     <InterfaceI18nProvider locale={locale}>
       <WebLocaleEffects />
@@ -207,11 +209,64 @@ it("language updates preserve one unread prefix and the existing theme", async (
     await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
     document.title = "站内通知 | 天生会背";
     await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
+    localeController.snapshot.status = "idle";
+    view.rerender(localeTree("zh-Hant"));
+    await waitFor(() => expect(document.title).toBe("(3) 天生会背"));
+    document.title = "登录 | 天生会背";
+    await waitFor(() => expect(document.title).toBe("(3) 天生会背"));
+    localeController.snapshot.status = "ready";
+    view.rerender(localeTree("zh-Hant"));
+    await waitFor(() => expect(document.title).toBe("(3) 站內通知 | 天生会背"));
     expect(document.documentElement.lang).toBe("zh-Hant");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localeController.refresh).not.toHaveBeenCalled();
   } finally {
     view.unmount();
     document.documentElement.classList.remove("dark");
+    localeController.snapshot.status = "idle";
+  }
+});
+
+it("first boot and locale effects keep an unread prefix without an observer loop", async () => {
+  localeController.snapshot.status = "idle";
+  const NativeObserver = globalThis.MutationObserver;
+  const observers = new Set<MutationObserver>();
+  let callbacks = 0;
+  let loopDetected = false;
+  // 错误实现会卡住微任务队列；只在失控时终止，保留真实 observer 调度。
+  vi.stubGlobal(
+    "MutationObserver",
+    class extends NativeObserver {
+      constructor(callback: MutationCallback) {
+        super((records, observer) => {
+          if (++callbacks > 50) {
+            loopDetected = true;
+            observers.forEach((item) => item.disconnect());
+            return;
+          }
+          callback(records, observer);
+        });
+        observers.add(this);
+      }
+    }
+  );
+  Function(webLocaleBootScript)();
+  const view = render(
+    <InterfaceI18nProvider locale="en-GB">
+      <WebLocaleEffects />
+      {tree()}
+    </InterfaceI18nProvider>
+  );
+  try {
+    await waitFor(() => expect(document.title).toBe("(3) 天生会背"));
+    expect(loopDetected).toBe(false);
+    expect(document.documentElement).toHaveAttribute("data-locale-pending");
+    document.title = "登录 | 天生会背";
+    await waitFor(() => expect(document.title).toBe("(3) 天生会背"));
+    expect(loopDetected).toBe(false);
+  } finally {
+    view.unmount();
+    observers.forEach((observer) => observer.disconnect());
+    document.documentElement.removeAttribute("data-locale-pending");
   }
 });
