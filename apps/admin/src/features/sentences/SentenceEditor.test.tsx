@@ -726,10 +726,11 @@ describe("当前词条关联与离开保护", () => {
     ).toBeNull();
     const translations =
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!;
-    const voiceSettings = document.querySelector(
-      "details.tsz-ve-voice-settings"
-    )!;
-    expect(voiceSettings).not.toHaveAttribute("open");
+    const voiceSettings = screen.getByRole("region", {
+      name: "局部配音音色池"
+    });
+    expect(voiceSettings).toBeVisible();
+    expect(voiceSettings.closest("details")).toBeNull();
     expect(
       translations.compareDocumentPosition(voiceSettings) &
         Node.DOCUMENT_POSITION_FOLLOWING
