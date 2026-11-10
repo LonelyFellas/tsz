@@ -59,15 +59,8 @@
   min-height: 24px;
 }
 
-.voice-catalog-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3);
-  width: 180px;
-}
-
-.voice-catalog-controls > .ui-select {
-  width: 100%;
+.voice-catalog-sort[aria-pressed="true"] {
+  color: var(--ui-color-primary);
 }
 
 .voice-catalog-table .ui-table-cell {
@@ -271,21 +264,26 @@
   font-size: 24px;
 }
 
-.voice-library-audition .voice-library-player > .ui-flex {
-  flex-direction: row;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.voice-library-audition .voice-library-player audio {
-  flex: 1 1 240px;
-  width: auto;
-}
-
 .voice-library-player audio {
   display: block;
   width: 100%;
   height: 36px;
+}
+
+.voice-library-player audio[hidden] {
+  display: none;
+}
+
+.voice-library-player-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2) var(--ui-space-4);
+}
+
+.voice-library-player-heading > .ui-typography {
+  font-size: var(--ui-font-size-sm);
 }
 
 .voice-library-sample.ui-typography {
@@ -494,7 +492,7 @@
 /* 目录表头筛选与单行搜索采用同一控件尺度。 */
 .voice-library-catalog .ui-card {
   border-color: var(--ui-color-border-secondary);
-  border-radius: 10px;
+  border-radius: var(--ui-border-radius-lg);
 }
 .voice-library-catalog .voice-library-controls > .ui-card-body {
   padding: var(--ui-space-4) var(--ui-space-5);
@@ -505,39 +503,56 @@
 .voice-library-catalog .voice-library-audition-row {
   gap: var(--ui-space-4);
 }
-.voice-library-catalog .voice-library-audition-row > .ui-btn {
-  min-height: 34px;
-  font-size: var(--ui-font-size-sm);
+.voice-library-catalog .voice-library-audition-text .ui-form-item-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.voice-library-catalog .voice-library-audition-text .ui-form-item-label {
+  padding: 0 0 var(--ui-space-2);
+}
+.voice-library-audition-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  width: 100%;
+}
+.voice-library-audition-count {
+  font-variant-numeric: tabular-nums;
 }
 .voice-library-catalog .voice-library-audition-text label .ui-typography {
   font-size: var(--ui-font-size-compact);
   font-weight: 500;
   color: var(--ui-color-text-secondary);
 }
+.voice-library-catalog .voice-library-audition-text label {
+  width: 100%;
+}
 .voice-library-catalog .voice-library-audition-text textarea.ui-input {
-  min-height: 34px;
-  border-color: var(--ui-color-border-secondary);
-  border-radius: 6px;
-  font-size: var(--ui-font-size-compact);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  font-size: var(--ui-font-size);
+  line-height: 1.6;
 }
 .voice-catalog-heading {
-  gap: 7px;
+  gap: var(--ui-space-2);
 }
 .voice-catalog-heading > span,
 .voice-catalog-heading-label {
-  min-height: 20px;
+  min-height: 24px;
   color: var(--ui-color-text-secondary);
 }
 .voice-catalog-heading > .ui-select {
   box-sizing: border-box;
-  min-height: 32px;
-  border-color: var(--ui-color-border-secondary);
-  border-radius: 6px;
-  font-size: var(--ui-font-size-sm);
+  height: var(--ui-control-height);
+  font-size: var(--ui-font-size-compact);
 }
 .voice-catalog-heading > .ui-select .ui-select-content {
   min-height: 24px;
   line-height: 24px;
+}
+.voice-catalog-heading > .ui-select-multiple .ui-select-content {
+  flex-wrap: nowrap;
 }
 .voice-catalog-heading > .ui-select .ui-select-selection-item {
   box-sizing: border-box;
@@ -545,14 +560,15 @@
   line-height: 20px;
 }
 .voice-catalog-heading .ui-input-affix-wrapper {
-  min-height: 32px;
-  border-color: var(--ui-color-border-secondary);
-  border-radius: 6px;
-  font-size: var(--ui-font-size-sm);
+  height: var(--ui-control-height);
+  font-size: var(--ui-font-size-compact);
+}
+.voice-catalog-heading .ui-input-affix-wrapper > .ui-input {
+  font-size: inherit;
 }
 .voice-catalog-table .ui-table-thead > tr > th {
   padding-block: var(--ui-space-3);
-  background: #f8f9fc;
+  background: var(--ui-color-fill-alter);
 }
 .voice-catalog-table .ui-table-tbody > tr > td {
   padding-block: var(--ui-space-3);
@@ -580,9 +596,14 @@
 .voice-catalog-footer {
   padding-top: var(--ui-space-5);
 }
+@container (max-width: 640px) {
+  .voice-catalog-table .ui-table-cell-fix {
+    position: static;
+  }
+}
 @media (max-width: 600px) {
   .voice-library-catalog .voice-library-controls > .ui-card-body,
   .voice-library-catalog .voice-library-content > .ui-card-body {
-    padding: 14px;
+    padding: var(--ui-space-4);
   }
 }

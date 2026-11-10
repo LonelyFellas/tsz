@@ -453,6 +453,7 @@ textarea.ui-input {
 }
 .ui-select-dropdown {
   padding: var(--ui-space-1);
+  min-width: min(128px, calc(100vw - 12px));
   max-width: calc(100vw - 12px);
   max-height: calc(100dvh - 12px);
   overflow: auto;
@@ -478,7 +479,12 @@ textarea.ui-input {
 .ui-select-item-option-content {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ui-select-item-option-state {
+  flex: none;
 }
 .ui-select-item-option-active:not(.ui-select-item-option-disabled),
 .ui-cascader-menu-item:hover {

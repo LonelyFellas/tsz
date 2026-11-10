@@ -124,12 +124,6 @@ function resetFilters() {
   fireEvent.click(within(header).getByRole("button", { name: "清除筛选" }));
 }
 async function select(label: string, option: string) {
-  if (
-    label === "音色排序" &&
-    !screen.queryAllByLabelText(label).some((node) => !isInaccessible(node))
-  ) {
-    fireEvent.click(visibleControl("音色筛选和排序"));
-  }
   const input = await waitFor(() => visibleControl(label));
   fireEvent.mouseDown(input);
   const content = await waitFor(() => {
@@ -182,6 +176,8 @@ describe("音色目录表格", () => {
     expect(names(container)).toEqual(["Voice 11", "Aardvark"]);
     expect(screen.getByRole("searchbox", { name: "搜索音色" })).toBeDisabled();
     expect(screen.getByText("共 12 个音色")).toBeVisible();
+    expect(visibleControl("名称排序")).toBeDisabled();
+    expect(visibleControl("年龄排序")).toBeDisabled();
     rerender(table(refreshed, false));
     expect(names(container)).toEqual(["Voice 9", "Voice 10", "Voice 11"]);
     expect(screen.getByRole("searchbox", { name: "搜索音色" })).toBeEnabled();
@@ -285,21 +281,34 @@ describe("音色目录表格", () => {
 
   it("名称排序可切换方向，并与年龄筛选联动", async () => {
     const { container } = mount();
-    fireEvent.click(visibleControl("音色筛选和排序"));
-    await select("音色排序", "名称倒序");
+    fireEvent.click(visibleControl("名称排序"));
+    expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
+    fireEvent.click(visibleControl("名称排序"));
     expect(names(container)).toEqual(["Unknown", "Sonia", "Ava", "Ana"]);
-    await select("音色排序", "名称升序");
+    fireEvent.click(visibleControl("名称排序"));
+    expect(names(container)).toEqual(["Ava", "Sonia", "Unknown", "Ana"]);
+    fireEvent.click(visibleControl("名称排序"));
     expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
     await select("年龄组", "儿童");
     expect(names(container)).toEqual(["Ana"]);
   });
 
-  it("年龄排序可切换方向，未知项都在末尾", async () => {
+  it("年龄排序可切换方向，未知项都在末尾，切换名称排序后清除年龄排序状态", () => {
     const { container } = mount();
-    await select("音色排序", "年龄升序");
+    fireEvent.click(visibleControl("年龄排序"));
     expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
-    await select("音色排序", "年龄倒序");
+    fireEvent.click(visibleControl("年龄排序"));
     expect(names(container)).toEqual(["Sonia", "Ava", "Ana", "Unknown"]);
+    expect(visibleControl("年龄排序").closest("th")).toHaveAttribute(
+      "aria-sort",
+      "descending"
+    );
+    fireEvent.click(visibleControl("名称排序"));
+    expect(visibleControl("年龄排序").closest("th")).toHaveAttribute(
+      "aria-sort",
+      "none"
+    );
+    expect(names(container)).toEqual(["Ana", "Ava", "Sonia", "Unknown"]);
   });
 
   it("旧 API 缺资料时仍可试听，只展示真实模型选项，并区分官方原文和人工资料", async () => {

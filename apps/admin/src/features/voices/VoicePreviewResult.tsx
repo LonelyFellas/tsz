@@ -49,11 +49,17 @@ export function VoicePreviewResult({
   const { t } = useVoiceTranslation();
   const [audioError, setAudioError] = useState(false);
   const [reviewAudio, setReviewAudio] = useState<ReviewAudio>();
+  const [reviewReady, setReviewReady] = useState(false);
   // 在新音频触发加载事件前清理旧状态，避免覆盖当前的加载错误。
   useLayoutEffect(() => {
     setAudioError(false);
     setReviewAudio(undefined);
+    setReviewReady(false);
   }, [preview?.result.audio_url]);
+  const hasReview =
+    !!reviewAudio &&
+    reviewAudio.result.audioUrl === preview?.result.audio_url &&
+    !audioError;
   return (
     <div className="voice-library-preview" aria-live="polite">
       {pending && (
@@ -79,19 +85,20 @@ export function VoicePreviewResult({
       {preview && (
         <div className="voice-library-player">
           <Flex vertical gap={8}>
-            <Space wrap>
-              <VoiceName voice={preview.voice} />
-              <Tag>
-                {voiceMessageText(preview.comparison, t) ??
-                  (preview.voice.locale === "en-GB"
-                    ? t("british_english")
-                    : preview.voice.locale === "en-US"
-                      ? t("american_english")
-                      : preview.voice.locale)}
-              </Tag>
+            <div className="voice-library-player-heading">
+              <Space wrap>
+                <VoiceName voice={preview.voice} />
+                <Tag>
+                  {voiceMessageText(preview.comparison, t) ??
+                    (preview.voice.locale === "en-GB"
+                      ? t("british_english")
+                      : preview.voice.locale === "en-US"
+                        ? t("american_english")
+                        : preview.voice.locale)}
+                </Tag>
+              </Space>
               <Typography.Text type="secondary">
-                {t("preview_parameters_intro")}{" "}
-                <VoiceVolume parameters={preview.parameters} />
+                {t("volume")} <VoiceVolume parameters={preview.parameters} />
                 {t("preview_parameter_separator")}
                 <VoiceRate parameters={preview.parameters} />
                 {t("preview_style_suffix", {
@@ -104,11 +111,12 @@ export function VoicePreviewResult({
                     : t("default")
                 })}
               </Typography.Text>
-            </Space>
+            </div>
             <audio
               key={`audio:${preview.result.audio_url}`}
               ref={player}
-              controls
+              controls={!hasReview || !reviewReady}
+              hidden={hasReview && reviewReady}
               autoPlay
               aria-label={t("preview_player", {
                 name: preview.voice.display_name
@@ -143,14 +151,15 @@ export function VoicePreviewResult({
               }}
               onError={() => setAudioError(true)}
             />
-            {reviewAudio &&
-              reviewAudio.result.audioUrl === preview.result.audio_url && (
-                <AudioReview
-                  key={`review:${reviewAudio.result.audioUrl}`}
-                  media={reviewAudio}
-                  onPlay={onPlay}
-                />
-              )}
+            {hasReview && reviewAudio && (
+              <AudioReview
+                compact
+                key={`review:${reviewAudio.result.audioUrl}`}
+                media={reviewAudio}
+                onPlay={onPlay}
+                onReadyChange={setReviewReady}
+              />
+            )}
             {audioError && (
               <Alert
                 type="warning"
@@ -160,11 +169,6 @@ export function VoicePreviewResult({
                 )}
               />
             )}
-            <Typography.Text type="secondary">
-              {audioError
-                ? t("select_preview_again")
-                : t("if_playback_does_not_start_automatically_select_play")}
-            </Typography.Text>
           </Flex>
         </div>
       )}

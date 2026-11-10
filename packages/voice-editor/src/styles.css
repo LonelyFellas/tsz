@@ -1195,6 +1195,69 @@
   width: 100px;
 }
 
+.tsz-ve-review-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2, 8px);
+}
+
+.tsz-ve-review-playback,
+.tsz-ve-review-range {
+  display: contents;
+}
+
+.tsz-ve-audio-review-compact {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.tsz-ve-audio-review-compact .tsz-ve-waveform {
+  height: 64px;
+  border-radius: var(--ui-border-radius, 7px);
+}
+
+.tsz-ve-audio-review-compact .tsz-ve-review-playback,
+.tsz-ve-audio-review-compact .tsz-ve-review-range {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 8px);
+}
+
+.tsz-ve-audio-review-compact .tsz-ve-review-range {
+  margin-inline-start: auto;
+}
+
+.tsz-ve-review-time {
+  color: var(--ui-color-text-secondary, #666);
+  font-size: var(--ui-font-size-sm, 12px);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tsz-ve-review-volume {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 8px);
+}
+
+.tsz-ve-review-volume .ui-slider {
+  width: 120px;
+}
+
+.tsz-ve-audio-review-compact .ui-select {
+  width: 76px;
+}
+
+.tsz-ve-audio-review-compact .ui-input-number {
+  width: 80px;
+}
+
+.tsz-ve-audio-review-compact .ui-checkbox-wrapper {
+  white-space: nowrap;
+}
+
 @media (max-width: 600px) {
   .tsz-ve-voice-columns {
     grid-template-columns: minmax(0, 1fr);
