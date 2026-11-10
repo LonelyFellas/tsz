@@ -637,6 +637,7 @@ export interface UploadPanelProps {
   onRetryUpload: (id: string) => void;
   onDismissUpload: (id: string) => void;
   onRemoveAsset: (asset: AudioAsset) => void;
+  onDefaultAssetChange?: (asset: AudioAsset) => void;
   onPlayAsset: (asset: AudioAsset) => void;
   playingAssetId?: string;
   /** 试听失败的说明；只在这块面板里显示。 */
@@ -667,6 +668,7 @@ export function UploadPanel({
   onRetryUpload,
   onDismissUpload,
   onRemoveAsset,
+  onDefaultAssetChange,
   onPlayAsset,
   playingAssetId,
   playbackMessage
@@ -847,26 +849,44 @@ export function UploadPanel({
                 <span className="tsz-ve-upload-tag">
                   {localeBadge(asset.locale)} · {genderLabel(asset.gender, t)}
                 </span>
-                {/* 移除只是从草稿里去掉引用、保存后才生效，但不进撤销栈，所以要确认一下 */}
-                <Popconfirm
-                  title={t("remove_this_audio")}
-                  description={t("applies_after_saving_the_draft")}
-                  okText={t("remove_2")}
-                  cancelText={t("cancel")}
-                  okButtonProps={{ danger: true }}
-                  disabled={readOnly}
-                  onConfirm={() => onRemoveAsset(asset)}
-                >
-                  <Button
-                    size="small"
-                    type="text"
-                    className="tsz-ve-upload-remove"
-                    aria-label={t("remove_3", { p0: asset.original_name })}
+                <span className="tsz-ve-upload-actions">
+                  {onDefaultAssetChange && (
+                    <Button
+                      size="small"
+                      type={asset.is_default ? "primary" : "text"}
+                      aria-label={`${t(asset.is_default ? "cancel_default_playback" : "set_default_playback")} ${asset.original_name}`}
+                      aria-pressed={!!asset.is_default}
+                      disabled={readOnly}
+                      onClick={() => onDefaultAssetChange(asset)}
+                    >
+                      {t(
+                        asset.is_default
+                          ? "default_playback"
+                          : "set_default_playback"
+                      )}
+                    </Button>
+                  )}
+                  {/* 移除只是从草稿里去掉引用、保存后才生效，但不进撤销栈，所以要确认一下 */}
+                  <Popconfirm
+                    title={t("remove_this_audio")}
+                    description={t("applies_after_saving_the_draft")}
+                    okText={t("remove_2")}
+                    cancelText={t("cancel")}
+                    okButtonProps={{ danger: true }}
                     disabled={readOnly}
+                    onConfirm={() => onRemoveAsset(asset)}
                   >
-                    {t("remove_2")}
-                  </Button>
-                </Popconfirm>
+                    <Button
+                      size="small"
+                      type="text"
+                      className="tsz-ve-upload-remove"
+                      aria-label={t("remove_3", { p0: asset.original_name })}
+                      disabled={readOnly}
+                    >
+                      {t("remove_2")}
+                    </Button>
+                  </Popconfirm>
+                </span>
               </li>
             ))}
           </ul>

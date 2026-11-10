@@ -2574,6 +2574,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     emitAssets(assetsRef.current.filter((item) => item.id !== asset.id));
   };
 
+  const changeDefaultAsset = (asset: AudioAsset) => {
+    if (readOnly) return;
+    emitAssets(
+      assetsRef.current.map((item) => {
+        if (item.locale !== asset.locale) return item;
+        const { is_default: _default, ...rest } = item;
+        return item.id === asset.id && !asset.is_default
+          ? { ...rest, is_default: true }
+          : rest;
+      })
+    );
+  };
+
   const PLAYBACK_FAILED = t(
     "audio_cannot_currently_be_auditioned_try_again_later"
   );
@@ -3492,6 +3505,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             onRetryUpload={retryUpload}
             onDismissUpload={dismissUpload}
             onRemoveAsset={removeAsset}
+            onDefaultAssetChange={
+              onAudioAssetsChange ? changeDefaultAsset : undefined
+            }
             onPlayAsset={(asset) => void playAsset(asset)}
             playingAssetId={playingAssetId}
             playbackMessage={playbackMessage}
@@ -3550,6 +3566,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const localPool =
     recommendationArea && mode !== "actual-pron" && !contentReadOnly ? (
       <LocalVoicePool
+        audioAssets={assets}
         profile={voiceProfile}
         unavailableVersions={unavailableVersions}
         previousAudio={previousAudio}
@@ -3671,6 +3688,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               onRetryUpload={retryUpload}
               onDismissUpload={dismissUpload}
               onRemoveAsset={removeAsset}
+              onDefaultAssetChange={
+                onAudioAssetsChange ? changeDefaultAsset : undefined
+              }
               onPlayAsset={(asset) => {
                 stopDetailPlayback();
                 void playAsset(asset);

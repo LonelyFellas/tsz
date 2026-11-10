@@ -38,6 +38,7 @@ export function VoiceDetail({
   readOnly,
   canAudition,
   audioTools,
+  defaultAudioAssetId,
   pendingUpload,
   onSave,
   onCancel,
@@ -55,6 +56,7 @@ export function VoiceDetail({
   readOnly: boolean;
   canAudition: boolean;
   audioTools?: (stopPlayback: () => void) => ReactNode;
+  defaultAudioAssetId?: string;
   pendingUpload: boolean;
   unavailable?: boolean;
   previousAudio?: VoiceSetting[];
@@ -75,11 +77,14 @@ export function VoiceDetail({
   const latest = useRef({ sourceKey, readOnly });
   latest.current = { sourceKey, readOnly };
   const catalog = useMemo(() => [voice], [voice]);
+  const playbackSetting = defaultAudioAssetId
+    ? { ...draft, audio_asset_id: defaultAudioAssetId }
+    : draft;
   const preview = useVoiceAudition({
     open: true,
     language: "en",
     content,
-    settings: [draft],
+    settings: [playbackSetting],
     previewAdapter: adapter,
     catalog
   });
@@ -262,17 +267,17 @@ export function VoiceDetail({
                 disabled={
                   !parametersValid ||
                   !canAudition ||
-                  (!available && !draft.audio_asset_id)
+                  (!available && !playbackSetting.audio_asset_id)
                 }
                 loading={!!preview.pendingVoiceId}
                 onClick={() => {
                   if (!parametersValid) return;
                   stopExternalAudio();
                   ssmlStop.current?.();
-                  preview.audition(voice, draft);
+                  preview.audition(voice, playbackSetting);
                 }}
               >
-                {draft.audio_asset_id
+                {playbackSetting.audio_asset_id
                   ? t("play_final_audio")
                   : t("audition_current_voice")}
               </Button>

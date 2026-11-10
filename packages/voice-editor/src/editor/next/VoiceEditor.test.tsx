@@ -3454,6 +3454,62 @@ describe("VoiceEditor 发音区", () => {
     ).toContain("2");
   });
 
+  it("已上传录音可设为默认播放，同口音互斥并随草稿重新打开保留", async () => {
+    const uk = asset({ original_name: "uk.mp3" });
+    const another = asset({ original_name: "another.mp3" });
+    const us = asset({ original_name: "us.mp3", locale: "en-US" });
+    const onAudioAssetsChange = vi.fn();
+    const view = props({
+      audioUploadAdapter: audioAdapter(),
+      audioAssets: [uk, another, us],
+      onAudioAssetsChange
+    });
+    const { unmount } = render(<VoiceEditor {...view} />);
+    openTool("音频");
+    fireEvent.click(
+      screen.getByRole("button", { name: "设为默认播放 uk.mp3" })
+    );
+    let saved = onAudioAssetsChange.mock.calls.at(-1)![0];
+    expect(saved).toEqual([{ ...uk, is_default: true }, another, us]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "设为默认播放 us.mp3" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "设为默认播放 another.mp3" })
+    );
+    saved = onAudioAssetsChange.mock.calls.at(-1)![0];
+    expect(saved).toEqual([
+      uk,
+      { ...another, is_default: true },
+      { ...us, is_default: true }
+    ]);
+    unmount();
+    const reopened = render(<VoiceEditor {...view} audioAssets={saved} />);
+    openTool("音频");
+    expect(
+      screen.getByRole("button", { name: "取消默认播放 another.mp3" })
+    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(
+      screen.getByRole("button", { name: "取消默认播放 another.mp3" })
+    );
+    expect(onAudioAssetsChange.mock.calls.at(-1)![0]).toEqual([
+      uk,
+      another,
+      { ...us, is_default: true }
+    ]);
+    const cleared = onAudioAssetsChange.mock.calls.at(-1)![0];
+    reopened.rerender(<VoiceEditor {...view} audioAssets={cleared} readOnly />);
+    expect(
+      screen.getByRole("button", { name: "取消默认播放 us.mp3" })
+    ).toBeDisabled();
+    reopened.rerender(<VoiceEditor {...view} audioAssets={cleared} />);
+    fireEvent.click(screen.getByLabelText("移除 us.mp3"));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "移除", exact: true })
+    );
+    expect(onAudioAssetsChange.mock.calls.at(-1)![0]).toEqual([uk, another]);
+  });
+
   it("超过大小或条数上限的直接进失败列表，不占名额", async () => {
     const adapter = audioAdapter();
     render(

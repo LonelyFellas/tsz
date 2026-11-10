@@ -27,6 +27,7 @@ import {
 } from "react";
 import type { RichTextV2 } from "@tsz/types";
 import type {
+  AudioAsset,
   AudioAssetLocale,
   VoiceOption,
   VoicePreviewAdapter,
@@ -85,6 +86,7 @@ export function LocalVoicePool({
   onOpenDetail,
   onCloseDetail,
   audioTools,
+  audioAssets,
   error,
   unavailableVersions,
   previousAudio = []
@@ -126,6 +128,7 @@ export function LocalVoicePool({
   error?: string;
   unavailableVersions?: ReadonlySet<string>;
   previousAudio?: VoiceSetting[];
+  audioAssets?: AudioAsset[];
 }) {
   const { t } = useVoiceEditorTranslation();
   const [notice, setNotice] = useVoiceEditorMessageState("");
@@ -1171,6 +1174,11 @@ export function LocalVoicePool({
               audioTools(detail.dialect, stopPlayback)
             }
             pendingUpload={pendingUpload}
+            defaultAudioAssetId={
+              audioAssets?.find(
+                (asset) => asset.is_default && asset.locale === detail.dialect
+              )?.id
+            }
             stopExternalAudio={onCloseDetail}
             onCancel={() => {
               onCloseDetail();

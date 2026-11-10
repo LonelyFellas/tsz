@@ -876,4 +876,25 @@ it("final playback follows spelling/phoneme selection and retains legacy recordi
     pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
       .assetId
   ).toBe("recording");
+  pronunciation.synthesis.use_spelling = false;
+  // 未选择录音时沿用合成音频；显式选择后才覆盖同口音的默认播放。
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, spelling, "en-GB", "uk")
+      .assetId
+  ).toBe("active");
+  pronunciation.audio_assets[0]!.is_default = true;
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, spelling, "en-GB", "uk")
+      .assetId
+  ).toBe("recording");
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, spelling, "en-US", "us")
+      .assetId
+  ).toBeUndefined();
+  pronunciation.synthesis.use_spelling = true;
+  spelling.audio_assets = structuredClone(pronunciation.audio_assets);
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, spelling, "en-GB", "uk")
+      .assetId
+  ).toBe("recording");
 });
