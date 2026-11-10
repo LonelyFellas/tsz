@@ -12,6 +12,8 @@ export interface InterfacePreferenceSnapshot {
   status: "idle" | "ready" | "unsupported" | "error";
   locale: InterfaceLocale;
   preference: InterfaceLocale | null;
+  /** 仅本次公开链接的显示覆盖，不写入账号或访客偏好。 */
+  linkLocale?: InterfaceLocale;
   capabilities: InterfaceCapabilities | null;
   saving: boolean;
   refreshing: boolean;
@@ -149,18 +151,17 @@ export function createInterfacePreferences({
       if (!current()) return;
       // read 的 undefined 仅兼容旧 admin profile 缺字段；其他值仍须校验。
       decodeInterfaceLocale(preference);
+      const linkLocale =
+        publicLocale && (!accountId || preference === null)
+          ? publicLocale
+          : undefined;
       publish({
         owner,
         status: "ready",
         capabilities: directory,
         preference,
-        locale: resolve(
-          directory,
-          accountId
-            ? (preference ?? publicLocale ?? null)
-            : (publicLocale ?? preference),
-          accountId
-        ),
+        linkLocale,
+        locale: resolve(directory, linkLocale ?? preference, accountId),
         saving: false,
         refreshing: false,
         error: null
@@ -226,6 +227,7 @@ export function createInterfacePreferences({
           ...snapshot,
           owner,
           preference: saved,
+          linkLocale: undefined,
           locale: resolve(directory, saved, accountId),
           saving: false
         });
@@ -263,6 +265,7 @@ export function createInterfacePreferences({
     publish({
       ...snapshot,
       preference: locale,
+      linkLocale: undefined,
       locale: resolve(directory, locale, null),
       error: null
     });

@@ -17,10 +17,12 @@ import { InterfaceLanguage } from "./InterfaceLanguage";
 
 function fixture({
   preference = null,
-  supported = ["zh-Hans", "zh-Hant", "en-GB", "en-US"]
+  supported = ["zh-Hans", "zh-Hant", "en-GB", "en-US"],
+  link = null
 }: {
   preference?: InterfaceLocale | null;
   supported?: InterfaceLocale[];
+  link?: string | null;
 } = {}) {
   let accountId: string | null = null;
   let saved = preference;
@@ -41,6 +43,10 @@ function fixture({
     }),
     read,
     write,
+    getPublicLocale: () => link,
+    onPreferenceChoice: () => {
+      link = null;
+    },
     getStorage: () => ({
       getItem: (key) => storage.get(key) ?? null,
       setItem: (key, value) => {
@@ -72,6 +78,23 @@ function fixture({
 }
 
 describe("Web 语言选择", () => {
+  it("分享链接覆盖显示时选择器与页面一致，可切回原先保存的语言", async () => {
+    const f = fixture({ link: "en-US" });
+    f.storage.set(interfaceLocaleStorageKey("web", "guest"), "zh-Hans");
+    render(f.tree());
+    const select = await screen.findByRole("combobox", {
+      name: "Interface language"
+    });
+    expect(select).toHaveValue("en-US");
+    expect(f.controller.getSnapshot().preference).toBe("zh-Hans");
+    fireEvent.change(select, { target: { value: "zh-Hans" } });
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "界面语言" })).toHaveValue(
+        "zh-Hans"
+      )
+    );
+    expect(f.controller.getSnapshot().linkLocale).toBeUndefined();
+  });
   it("访客只保存独立本机选择；登录后读取账号偏好且不复制访客值", async () => {
     const f = fixture({ preference: "zh-Hant" });
     const view = render(f.tree());
