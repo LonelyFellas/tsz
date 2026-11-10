@@ -9,6 +9,7 @@ import {
 } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Button } from "@tsz/ui/components/button";
+import { Select } from "@tsz/ui/admin/forms";
 import { AdminTableToolbar } from "@/components/AdminTable";
 import { ColumnSettings } from "@/components/ColumnSettings";
 import { useColumnSettings } from "@/components/useColumnSettings";
@@ -372,17 +373,17 @@ export function WordListTable({
         >
           <ChevronRightIcon />
         </button>
-        <select
+        <Select
           aria-label={t("per_page")}
           value={pageSize}
-          onChange={(event) => onPageChange(1, Number(event.target.value))}
-        >
-          {[10, 20, 50, 100].map((size) => (
-            <option key={size} value={size}>
-              {t("page_size", { size })}
-            </option>
-          ))}
-        </select>
+          onChange={(size) => onPageChange(1, size)}
+          showSearch={false}
+          popupMatchSelectWidth={false}
+          options={[10, 20, 50, 100].map((size) => ({
+            value: size,
+            label: t("page_size", { size })
+          }))}
+        />
       </nav>
     </>
   );

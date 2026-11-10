@@ -507,8 +507,7 @@
   color: var(--list-muted);
   font-variant-numeric: tabular-nums;
 }
-.word-list-pagination button,
-.word-list-pagination select {
+.word-list-pagination button {
   box-sizing: border-box;
   min-width: 32px;
   min-height: 32px;
@@ -531,9 +530,6 @@
   background: var(--ui-color-primary-bg);
   color: var(--ui-color-primary);
   font-weight: 600;
-}
-.word-list-pagination select {
-  border-color: var(--ui-color-border);
 }
 @container (max-width:850px) {
   .word-search-main {

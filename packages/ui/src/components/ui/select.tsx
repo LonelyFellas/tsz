@@ -2,6 +2,7 @@
 
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import { cn } from "../../lib/cn";
 
 const Select = SelectPrimitive.Root;
@@ -21,7 +22,7 @@ const SelectTrigger = forwardRef<
   >
     {children}
     <SelectPrimitive.Icon aria-hidden="true" className="shrink-0">
-      <span className="block size-2 -translate-y-0.5 rotate-45 border-b border-r border-foreground-muted" />
+      <ChevronDown className="size-4 text-foreground-muted" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -65,7 +66,7 @@ const SelectItem = forwardRef<
       className="absolute right-4 text-primary"
       aria-hidden="true"
     >
-      ✓
+      <Check className="size-4" />
     </SelectPrimitive.ItemIndicator>
   </SelectPrimitive.Item>
 ));

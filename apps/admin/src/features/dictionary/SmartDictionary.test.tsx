@@ -1573,9 +1573,12 @@ describe("SmartDictionary", () => {
     );
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-    fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
-      target: { value: "50" }
-    });
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "每页条数" }));
+    fireEvent.click(
+      await screen.findByText("50 条/页", {
+        selector: ".ui-select-item-option-content"
+      })
+    );
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent(
         "/words?keyword=center&status=published&page_size=50"

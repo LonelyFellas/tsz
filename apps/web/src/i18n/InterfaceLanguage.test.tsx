@@ -5,7 +5,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
 import {
   createInterfacePreferences,
@@ -14,6 +14,19 @@ import {
 import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { RequestTimeoutError } from "@tsz/api-client";
 import { InterfaceLanguage } from "./InterfaceLanguage";
+
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+afterAll(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
+
+async function choose(trigger: HTMLElement, name: string) {
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("option", { name }));
+}
 
 function fixture({
   preference = null,
@@ -85,13 +98,13 @@ describe("Web 语言选择", () => {
     const select = await screen.findByRole("combobox", {
       name: "Interface language"
     });
-    expect(select).toHaveValue("en-US");
+    expect(select).toHaveTextContent("English (US)");
     expect(f.controller.getSnapshot().preference).toBe("zh-Hans");
-    fireEvent.change(select, { target: { value: "zh-Hans" } });
+    await choose(select, "简体中文");
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "界面语言" })).toHaveValue(
-        "zh-Hans"
-      )
+      expect(
+        screen.getByRole("combobox", { name: "界面语言" })
+      ).toHaveTextContent("简体中文")
     );
     expect(f.controller.getSnapshot().linkLocale).toBeUndefined();
   });
@@ -99,11 +112,11 @@ describe("Web 语言选择", () => {
     const f = fixture({ preference: "zh-Hant" });
     const view = render(f.tree());
     const select = await screen.findByRole("combobox", { name: "界面语言" });
-    fireEvent.change(select, { target: { value: "en-US" } });
+    await choose(select, "English (US)");
     await waitFor(() =>
       expect(
         screen.getByRole("combobox", { name: "Interface language" })
-      ).toHaveValue("en-US")
+      ).toHaveTextContent("English (US)")
     );
     expect(f.storage.get(interfaceLocaleStorageKey("web", "guest"))).toBe(
       "en-US"
@@ -113,9 +126,9 @@ describe("Web 语言选择", () => {
     f.login();
     view.rerender(f.tree());
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "介面語言" })).toHaveValue(
-        "zh-Hant"
-      )
+      expect(
+        screen.getByRole("combobox", { name: "介面語言" })
+      ).toHaveTextContent("繁體中文")
     );
     expect(f.write).not.toHaveBeenCalled();
     expect(f.storage.has(interfaceLocaleStorageKey("web", "account-a"))).toBe(
@@ -132,11 +145,11 @@ describe("Web 语言选择", () => {
     });
     render(f.tree());
     const select = await screen.findByRole("combobox", { name: "界面语言" });
-    fireEvent.change(select, { target: { value: "en-GB" } });
+    await choose(select, "English (UK)");
     await waitFor(() =>
       expect(
         screen.getByRole("combobox", { name: "Interface language" })
-      ).toHaveValue("en-GB")
+      ).toHaveTextContent("English (UK)")
     );
     expect(f.read).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -148,10 +161,12 @@ describe("Web 语言选择", () => {
     f.login();
     render(f.tree());
     const select = await screen.findByRole("combobox", { name: "界面语言" });
-    expect(select).toHaveValue("en-US");
+    expect(select).toHaveTextContent("English (US)");
+    fireEvent.click(select);
     expect(
-      screen.getByRole("option", { name: /English \(US\)/ })
-    ).toBeDisabled();
+      await screen.findByRole("option", { name: /English \(US\)/ })
+    ).toHaveAttribute("aria-disabled", "true");
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
     expect(screen.getByRole("status")).toHaveTextContent("当前显示简体中文");
     expect(f.controller.getSnapshot().preference).toBe("en-US");
     expect(f.write).not.toHaveBeenCalled();
@@ -178,7 +193,7 @@ describe("Web 语言选择", () => {
       await waitFor(() => expect(select).not.toBeDisabled());
       select.focus();
       expect(select).toHaveFocus();
-      fireEvent.change(select, { target: { value: "en-GB" } });
+      await choose(select, "English (UK)");
       await waitFor(() => expect(select).toBeDisabled());
       // jsdom 不执行原生 disabled 的失焦，补上浏览器已经实测的同一行为。
       document.body.tabIndex = -1;

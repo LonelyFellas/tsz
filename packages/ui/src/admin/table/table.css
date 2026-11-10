@@ -109,8 +109,7 @@
   justify-content: center;
 }
 .ui-pagination
-  :where(li:not(.ui-pagination-total-text, .ui-pagination-options)),
-.ui-pagination select {
+  :where(li:not(.ui-pagination-total-text, .ui-pagination-options)) {
   box-sizing: border-box;
   min-width: 32px;
   min-height: var(--ui-control-height);
@@ -134,6 +133,16 @@
   border-color: currentColor;
   background: var(--ui-color-primary-bg);
 }
+.ui-pagination .ui-pagination-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--ui-control-height) - 2px);
+}
+.ui-pagination-nav svg {
+  width: 16px;
+  height: 16px;
+}
 .ui-pagination
   li:not(
     .ui-pagination-disabled,
@@ -150,30 +159,6 @@
 .ui-pagination button:disabled {
   color: #98a2b3;
   cursor: default;
-}
-.ui-pagination select {
-  appearance: none;
-  padding-inline: var(--ui-space-3) 36px;
-  cursor: pointer;
-  border-color: var(--ui-color-border);
-  background: var(--ui-color-bg-container);
-  color: var(--ui-color-text);
-}
-.ui-pagination select:focus-visible {
-  border-color: var(--ui-color-primary);
-  outline: var(--ui-focus-ring);
-  outline-offset: var(--ui-control-focus-offset);
-}
-.ui-pagination-size-changer {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.ui-pagination-size-changer > svg {
-  position: absolute;
-  inset-inline-end: var(--ui-space-3);
-  pointer-events: none;
-  color: var(--ui-color-text-secondary);
 }
 .ui-pagination-options {
   list-style: none;

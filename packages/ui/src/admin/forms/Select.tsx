@@ -1,4 +1,4 @@
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import RcSelect, {
   type SelectProps as RcSelectProps,
   type DefaultOptionType,
@@ -142,7 +142,7 @@ function Panel<O extends CascadeOption = CascadeOption>({
       {...props}
       prefixCls="ui-cascader"
       disabled={useFieldDisabled(disabled)}
-      expandIcon={<span aria-hidden="true">›</span>}
+      expandIcon={<ChevronRight size="1em" aria-hidden="true" />}
       loadingIcon={<span aria-label={t("status.loading")}>…</span>}
     />
   );

@@ -420,15 +420,6 @@ export function WordlistDetails({
                 total={items.data.pagination.total}
                 showSizeChanger={false}
                 onChange={setPage}
-                itemRender={(_, type, original) =>
-                  type === "next" ? (
-                    <button type="button" aria-label={t("next_page")}>
-                      ›
-                    </button>
-                  ) : (
-                    original
-                  )
-                }
               />
             </>
           ))}
