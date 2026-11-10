@@ -1,4 +1,5 @@
 import RcPagination from "@rc-component/pagination";
+import { ChevronDown } from "lucide-react";
 import type { PaginationProps as RcPaginationProps } from "@rc-component/pagination";
 import zhCN from "@rc-component/pagination/es/locale/zh_CN";
 import zhTW from "@rc-component/pagination/es/locale/zh_TW";
@@ -70,19 +71,22 @@ export function Pagination({
         onSizeChange,
         className: selectClass
       }) => (
-        <select
-          aria-label={t("controls.perPage")}
-          className={selectClass}
-          disabled={disabled}
-          value={value}
-          onChange={(event) => onSizeChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <span className="ui-pagination-size-changer">
+          <select
+            aria-label={t("controls.perPage")}
+            className={selectClass}
+            disabled={disabled}
+            value={value}
+            onChange={(event) => onSizeChange(event.target.value)}
+          >
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size="1em" aria-hidden="true" />
+        </span>
       )}
     />
   );

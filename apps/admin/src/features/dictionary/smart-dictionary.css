@@ -355,7 +355,7 @@
   background: transparent;
   color: var(--ui-color-text-secondary);
 }
-.word-list-page :is(button, a, select, input):focus-visible {
+.word-list-page :is(button, a):focus-visible {
   outline: var(--ui-focus-ring);
   outline-offset: 2px;
 }
