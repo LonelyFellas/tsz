@@ -16,6 +16,7 @@ import {
   usePronunciationVoiceNotice
 } from "./PronunciationPreview";
 import { deferred } from "./wordCreation.test.helper";
+import { V3EnglishTextPreview } from "../word-creation-v3/components/V3EnglishTextPreview";
 
 const preview = vi.hoisted(() => ({
   enabled: true,
@@ -864,6 +865,70 @@ describe("PronunciationPreview", () => {
     expect(preview.synthesize).not.toHaveBeenCalled();
   });
 });
+
+it.each(["uk", "us"] as const)(
+  "英文正文审阅采用%s默认录音，取消后恢复原合成音频",
+  async (side) => {
+    vi.stubGlobal("Audio", AudioMock);
+    dialectPreference.value = side;
+    const value: import("@tsz/types").EnglishTextV3 = {
+      mode: "unified",
+      common: {
+        id: "text",
+        origin: "manual",
+        value: { version: 2, text: "tomato", annotations: [] },
+        voice_profile: {
+          voices: (["en-GB", "en-US"] as const).map((locale) => ({
+            voice_id: "voice-" + locale,
+            locale,
+            enabled: true,
+            rate_percent: 0,
+            audio_asset_id: "generated-" + locale
+          }))
+        },
+        audio_assets: (["en-GB", "en-US"] as const).map((locale) => ({
+          id: "recording-" + locale,
+          is_default: true,
+          locale,
+          gender: "female",
+          content_type: "audio/mpeg",
+          size_bytes: 3,
+          original_name: "fixture.mp3",
+          created_at: "2026-11-10T00:00:00Z"
+        }))
+      }
+    };
+    const view = render(
+      <PronunciationPreviewProvider>
+        <V3EnglishTextPreview value={value} showPlayback />
+      </PronunciationPreviewProvider>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /播放语音/ }));
+    const locale = side === "uk" ? "en-GB" : "en-US";
+    await waitFor(() =>
+      expect(preview.resolveAudio).toHaveBeenLastCalledWith(
+        "recording-" + locale,
+        expect.anything()
+      )
+    );
+    value.common.audio_assets!.forEach((asset) => {
+      delete asset.is_default;
+    });
+    view.rerender(
+      <PronunciationPreviewProvider>
+        <V3EnglishTextPreview value={value} showPlayback />
+      </PronunciationPreviewProvider>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /播放语音/ }));
+    await waitFor(() =>
+      expect(preview.resolveAudio).toHaveBeenLastCalledWith(
+        "generated-" + locale,
+        expect.anything()
+      )
+    );
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  }
+);
 
 it("最终读音只读取正式资产，读取失败也不回退合成", async () => {
   preview.listVoices.mockResolvedValue([]);

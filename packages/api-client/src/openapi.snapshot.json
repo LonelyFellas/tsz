@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/backend-i18n-phase5/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-09T04:23:26.756Z",
+  "_source": "/Users/darwish/.codex/worktrees/fix-task-174-audio/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-10T12:06:57.603Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -6982,7 +6982,7 @@
     "AssistantHistoryRole": { "type": "string", "enum": ["user", "assistant"] },
     "AudioAsset": {
       "type": "object",
-      "description": "一条已登记的音频资产。既是 confirm 的响应体，也内嵌在 `GrammarVariantV3.audio_assets` 里。\n除 `id` 外的字段都是服务端权威元数据：保存词义时按 id 重新灌入，客户端回传的值不作数。",
+      "description": "一条已登记的音频资产。既是 confirm 的响应体，也内嵌在 `GrammarVariantV3.audio_assets` 里。\n`is_default` 是当前正文的播放选择；其余元数据保存时按 id 从服务端重新灌入。",
       "required": [
         "id",
         "locale",
@@ -7002,6 +7002,10 @@
         },
         "gender": { "$ref": "#/components/schemas/AudioAssetGender" },
         "id": { "type": "string", "format": "uuid" },
+        "is_default": {
+          "type": "boolean",
+          "description": "同口音默认播放这条录音；省略时沿用合成音频优先。"
+        },
         "locale": { "$ref": "#/components/schemas/EnglishLocale" },
         "original_name": { "type": "string" },
         "size_bytes": { "type": "integer", "format": "int64" }

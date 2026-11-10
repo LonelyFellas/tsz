@@ -261,6 +261,38 @@ beforeAll(async () => {
 });
 
 describe("OpenAPI generated runtime schema", () => {
+  it("录音默认播放标记可省略或为布尔值，严格读取不丢失选择", () => {
+    const word = validFixture("AdminWordV3") as {
+      meanings: { pos: unknown[] };
+    };
+    const pos = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPosMeaningsV3!
+    ) as Record<string, unknown>;
+    const grammar = buildValidValue(
+      runtimeSchemaBundle.$defs.GrammarStructureV3!
+    ) as Record<string, unknown>;
+    const variant = buildValidValue(
+      runtimeSchemaBundle.$defs.GrammarVariantV3!
+    ) as Record<string, unknown>;
+    const asset = buildValidValue(
+      runtimeSchemaBundle.$defs.AudioAsset!
+    ) as Record<string, unknown>;
+    asset.locale = "en-GB";
+    variant.audio_assets = [asset];
+    grammar.variants = [variant];
+    pos.grammar_structures = [grammar];
+    word.meanings.pos = [pos];
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    for (const selected of [true, false]) {
+      asset.is_default = selected;
+      expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+      expect(asset.is_default).toBe(selected);
+    }
+    for (const invalid of [null, "true", 1]) {
+      asset.is_default = invalid;
+      expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    }
+  });
   it("冻结 V3 变化组级英美拼写与音标规则", () => {
     const pos = runtimeSchemaBundle.$defs.WordPosFormsV3!;
     const group = runtimeSchemaBundle.$defs.WordFormGroupV3!;

@@ -10,6 +10,7 @@ import { ChevronDownIcon, Volume2Icon, RefreshCwIcon } from "lucide-react";
 import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { Button, Space, Tag } from "@tsz/ui/admin/display";
 import type {
+  AudioAssetV3,
   Dialect,
   RichTextV2,
   VoiceProfileV3,
@@ -466,6 +467,7 @@ export function PronunciationPreviewControls({
   playbackOnly = false,
   assetOnly: assetOnlyProp = false,
   audioAssetId,
+  audioAssets,
   dialect,
   ariaLabelPrefix,
   disabled = false,
@@ -482,6 +484,7 @@ export function PronunciationPreviewControls({
   playbackOnly?: boolean;
   assetOnly?: boolean;
   audioAssetId?: string;
+  audioAssets?: readonly AudioAssetV3[] | null;
   dialect: Dialect;
   ariaLabelPrefix?: string;
   disabled?: boolean;
@@ -493,7 +496,15 @@ export function PronunciationPreviewControls({
   const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
-  const assetOnly = assetOnlyProp || context.readOnly || !!audioAssetId;
+  const targetLocale = localeForDialect(dialect, context.dialectPreference);
+  const selectedAssetId =
+    audioAssetId ??
+    audioAssets?.find(
+      (asset) =>
+        asset.is_default &&
+        speechAccentGroup(asset.locale) === speechAccentGroup(targetLocale)
+    )?.id;
+  const assetOnly = assetOnlyProp || context.readOnly || !!selectedAssetId;
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VoicePreviewResult>();
@@ -503,7 +514,6 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const targetLocale = localeForDialect(dialect, context.dialectPreference);
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
@@ -534,7 +544,7 @@ export function PronunciationPreviewControls({
     ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
     : undefined;
   const savedAssetId =
-    audioAssetId ??
+    selectedAssetId ??
     (assetOnly
       ? savedVoiceAudioAsset(playbackProfile, targetLocale)
       : selectedSetting?.audio_asset_id);

@@ -625,7 +625,7 @@
 }
 
 .tsz-ve-upload-list {
-  min-width: 340px;
+  min-width: 0;
 }
 
 .tsz-ve-upload-hint {

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/backend-i18n-phase5/tsz-rust/docs/openapi.json",
-  "_source_sha256": "2f18ff86fd43f429d705ddfdafedb33c3f98d5703012334529b033c1395b717b",
+  "_source": "/Users/darwish/.codex/worktrees/fix-task-174-audio/tsz-rust/docs/openapi.json",
+  "_source_sha256": "b9251825093151586ec12a649450ef8a32f8d773f66975c2e31aac11e3272a2b",
   "roots": [
     "InterfaceCapabilities",
     "InterfaceLocaleV1",
@@ -793,6 +793,7 @@
         "duration_ms": { "type": ["integer", "null"] },
         "gender": { "$ref": "#/$defs/AudioAssetGender" },
         "id": { "type": "string", "format": "uuid" },
+        "is_default": { "type": "boolean" },
         "locale": { "$ref": "#/$defs/EnglishLocale" },
         "original_name": { "type": "string" },
         "size_bytes": { "type": "integer" }

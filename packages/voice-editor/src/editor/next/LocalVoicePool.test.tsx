@@ -136,6 +136,7 @@ function Harness({
   content = { version: 2 as const, text: "hello", annotations: [] },
   audioAssets,
   audioAdapter,
+  onAssets,
   mode,
   locale,
   renderActions
@@ -149,6 +150,7 @@ function Harness({
   content?: { version: 2; text: string; annotations: [] };
   audioAssets?: AudioAsset[];
   audioAdapter?: AudioUploadAdapter;
+  onAssets?: (assets: AudioAsset[]) => void;
   mode?: VoiceEditorProps["mode"];
   locale?: `en-${string}`;
   renderActions?: VoiceEditorProps["renderActions"];
@@ -173,6 +175,7 @@ function Harness({
         }}
         previewAdapter={preview}
         audioAssets={audioAssets}
+        onAudioAssetsChange={onAssets}
         audioUploadAdapter={audioAdapter}
         loadRecommendations={loadRecommendations}
         recommendationArea="meaning"
@@ -226,6 +229,66 @@ function generatedAsset(id: string): AudioAsset {
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
+  it("详情正式播放采用默认录音，取消默认后恢复原合成音频且不改写配音绑定", async () => {
+    const recorded: AudioAsset = {
+      id: "recording",
+      is_default: true,
+      locale: "en-GB",
+      gender: "female",
+      content_type: "audio/mpeg",
+      size_bytes: 3,
+      original_name: "recording.mp3",
+      created_at: "2026-11-10T00:00:00Z"
+    };
+    const resolveAudio = vi.fn().mockResolvedValue({
+      audioUrl: "blob:final",
+      expiresAt: "2099-01-01",
+      cached: false
+    });
+    const preview = { ...adapter(), resolveAudio };
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([
+          { ...version("a"), audio_asset_id: "generated" },
+          version("us")
+        ])}
+        preview={preview}
+        audioAssets={[recorded]}
+        onAssets={vi.fn()}
+        onProfile={onProfile}
+      />
+    );
+    const dialog = await detail();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "播放正式音频" })
+    );
+    await waitFor(() =>
+      expect(resolveAudio).toHaveBeenLastCalledWith(
+        "recording",
+        expect.anything()
+      )
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "取消默认播放 recording.mp3" })
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "播放正式音频" })
+    );
+    await waitFor(() =>
+      expect(resolveAudio).toHaveBeenLastCalledWith(
+        "generated",
+        expect.anything()
+      )
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "保存配音设置" })
+    );
+    expect(onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id).toBe(
+      "generated"
+    );
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  });
   it("勾选英美音色后串行生成正式音频，完成前禁止保存，保存结果保留资产", async () => {
     const preview = adapter();
     const pending: Array<(asset: AudioAsset) => void> = [];

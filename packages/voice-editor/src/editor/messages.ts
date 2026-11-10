@@ -1528,5 +1528,16 @@ export const voiceEditorMessages = {
     "英式与美式各选一个正式版本，其他地区按地区选用补充版本。保存后保留当前参数。",
     "英式與美式各選一個正式版本，其他地區按地區選用補充版本。儲存後保留當前引數。",
     "Select one final version each for British and American accents; other regions use supplementary regional versions. Current parameters are retained after saving."
-  ]
+  ],
+  set_default_playback: [
+    "设为默认播放",
+    "設為預設播放",
+    "Set as default audio"
+  ],
+  cancel_default_playback: [
+    "取消默认播放",
+    "取消預設播放",
+    "Cancel default audio"
+  ],
+  default_playback: ["默认播放", "預設播放", "Default audio"]
 } as const satisfies Record<string, readonly [string, string, string]>;

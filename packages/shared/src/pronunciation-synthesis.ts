@@ -829,6 +829,11 @@ export function pronunciationPlaybackSource(
       requireLocaleConfirmation
     );
   const assetId =
+    uploads?.find((asset) => asset.is_default && matchesLocale(asset.locale))
+      ?.id ??
+    pronunciation.audio_assets?.find(
+      (asset) => asset.is_default && matchesLocale(asset.locale)
+    )?.id ??
     savedVoiceAudioAsset(!synthesis || content ? profile : undefined, locale) ??
     uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
     pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))
