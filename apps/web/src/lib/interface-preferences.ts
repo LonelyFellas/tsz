@@ -17,6 +17,7 @@ export const interfacePreferences = createInterfacePreferences({
   write: async (interface_locale) =>
     (await authRuntime.api.interfacePreferences.update({ interface_locale }))
       .preferences.interface_locale,
+  getPublicLocale: () => new URL(window.location.href).searchParams.get("lang"),
   getStorage: () => ({
     getItem: (key) => {
       let stored: string | null = null;

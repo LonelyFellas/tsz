@@ -143,6 +143,47 @@ it("根错误服务端输出保留无需 JavaScript 的重试入口", () => {
   expect(html).toContain('aria-label="Reload / 重新加载"');
   expect(html).not.toContain("页面资源加载失败");
 });
+
+it("英文分享链接在中文浏览器的服务端渲染和访客水合后保持英文", async () => {
+  window.history.replaceState(null, "", "/login?lang=en-US");
+  vi.spyOn(navigator, "languages", "get").mockReturnValue(["zh-CN"]);
+  useUserStore.setState({ hydrated: true });
+  function SharedPage() {
+    const owner = useUserStore(() => interfacePreferences.sessionKey());
+    return (
+      <InterfacePreferencesProvider
+        controller={interfacePreferences}
+        sessionKey={owner}
+        initialLocale="en-US"
+      >
+        <WebLocaleEffects />
+        <WebLocaleBoundary>
+          <Probe />
+        </WebLocaleBoundary>
+      </InterfacePreferencesProvider>
+    );
+  }
+  const html = renderToString(<SharedPage />);
+  expect(html).toContain("Save");
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  document.body.append(container);
+  const onRecoverableError = vi.fn();
+  const root = hydrateRoot(container, <SharedPage />, { onRecoverableError });
+  try {
+    await waitFor(() =>
+      expect(container.querySelector("h1")).toHaveTextContent("Save")
+    );
+    await waitFor(() => expect(document.documentElement.lang).toBe("en-US"));
+    expect(new URL(window.location.href).searchParams.get("lang")).toBe(
+      "en-US"
+    );
+    expect(onRecoverableError).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
 it("身份与账号偏好未确认时无可见默认文案，首个已确认画面为英文", async () => {
   const preference = deferred<"en-US">();
   vi.spyOn(authRuntime.api.interfacePreferences, "get").mockImplementation(

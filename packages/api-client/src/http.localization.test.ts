@@ -107,8 +107,7 @@ it("records the response language even if the selection changes while the reques
   });
 });
 
-it("captures display context for a request sent without a localization header", async () => {
-  let display = "zh-Hans" as "zh-Hans" | "en-US";
+it("marks the response language unknown when no localization header was sent", async () => {
   let resolve!: (response: Response) => void;
   const fetcher = vi.fn<typeof fetch>(
     () =>
@@ -119,17 +118,15 @@ it("captures display context for a request sent without a localization header", 
   vi.stubGlobal("fetch", fetcher);
   const http = createHttpClient({
     baseUrl: "/api/v1",
-    getInterfaceLocale: () => undefined,
-    getDisplayLocale: () => display
+    getInterfaceLocale: () => undefined
   });
   const pending = http.post("/start", {}).catch((error: unknown) => error);
   await vi.waitFor(() => expect(resolve).toBeDefined());
-  display = "en-US";
   resolve(
     new Response(JSON.stringify({ detail: "原始错误" }), { status: 409 })
   );
   expect(await pending).toMatchObject({
-    requestLocale: "zh-Hans",
+    requestLocale: "unknown",
     message: "原始错误"
   });
   expect(

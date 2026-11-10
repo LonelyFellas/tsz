@@ -28,7 +28,7 @@ function fixture() {
     surface: "web" as const,
     getSession: () => session,
     capabilities: vi.fn(async () => directory),
-    read: vi.fn(async (): Promise<"en-US" | null> => null),
+    read: vi.fn(async (): Promise<"zh-Hans" | "en-US" | null> => null),
     write: vi.fn(
       async (locale: "zh-Hans" | "en-US" | "zh-Hant" | "en-GB" | null) => locale
     ),
@@ -54,6 +54,30 @@ function fixture() {
 }
 
 describe("账号界面偏好", () => {
+  it("公开链接语言受目录约束，账号显式偏好优先且不写回账号", async () => {
+    const f = fixture();
+    let hint = "en-US";
+    const controller = createInterfacePreferences({
+      ...f.options,
+      getPublicLocale: () => hint
+    });
+    f.session(null, 1);
+    f.values.set(interfaceLocaleStorageKey("web", "guest"), "zh-Hans");
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("en-US");
+    f.session("a", 2);
+    f.options.read.mockResolvedValueOnce("zh-Hans");
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("zh-Hans");
+    expect(f.options.write).not.toHaveBeenCalled();
+    f.session("b", 3);
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("en-US");
+    expect(controller.getSnapshot().preference).toBeNull();
+    hint = "zh-Hant";
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("zh-Hans");
+  });
   it("访客选择独立持久化，不调用私有 API 或复制到登录账号", async () => {
     const f = fixture();
     f.session(null, 1);

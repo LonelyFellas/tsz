@@ -8,14 +8,7 @@ import { interfacePreferences } from "./interface-preferences";
 export const authRuntime = createAuthRuntime({
   baseUrl: env.NEXT_PUBLIC_API_BASE_URL,
   getTestResourceRun: readTestResourceRun,
-  getInterfaceLocale: () => interfacePreferences.getRequestLocale(),
-  getDisplayLocale: () => {
-    const snapshot = interfacePreferences.getSnapshot();
-    return snapshot.owner === interfacePreferences.sessionKey() &&
-      snapshot.status !== "idle"
-      ? snapshot.locale
-      : undefined;
-  }
+  getInterfaceLocale: () => interfacePreferences.getRequestLocale()
 });
 
 let initialRestore: { generation: number; promise: Promise<void> } | undefined;

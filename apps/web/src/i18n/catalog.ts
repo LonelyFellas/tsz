@@ -221,6 +221,11 @@ export const webCommon = /* @__PURE__ */ defineWebMessages("webCommon", {
     "錯誤詳情使用了先前的語言，請先查看目前狀態再重試。",
     "The error details were in the previous language. Check the current state before trying again."
   ],
+  unknown_language_error: [
+    "错误详情的语言无法确认，请先查看当前状态再重试。",
+    "無法確認錯誤詳情的語言，請先查看目前狀態再重試。",
+    "The language of the error details is unconfirmed. Check the current state before trying again."
+  ],
   password_required: ["请输入密码", "請輸入密碼", "Enter your password"],
   password_short: [
     "密码至少需要 15 个字符",
@@ -403,9 +408,11 @@ export function webText<C extends WebCatalog>(
     if (typeof source !== "string") {
       if ("original" in source) return source.original;
       if ("serverText" in source)
-        return source.requestLocale === instance.language
-          ? source.serverText
-          : render(localText(webCommon, "webCommon:previous_language_error"));
+        return source.requestLocale === "unknown"
+          ? render(localText(webCommon, "webCommon:unknown_language_error"))
+          : source.requestLocale === instance.language
+            ? source.serverText
+            : render(localText(webCommon, "webCommon:previous_language_error"));
       scope = source.catalog;
       values = source.values;
       source = source.key;

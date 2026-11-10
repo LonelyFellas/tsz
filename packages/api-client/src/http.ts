@@ -13,8 +13,6 @@ export interface HttpClientOptions {
   baseUrl: string;
   /** Already resolved against the surface capability directory; absent disables opt-in. */
   getInterfaceLocale?: () => InterfaceLocaleV1 | undefined;
-  /** Display context for invalidating old errors when no localization header is sent. */
-  getDisplayLocale?: () => InterfaceLocaleV1 | undefined;
   /** 每次请求动态获取 access token。 */
   getToken?: () => string | undefined | Promise<string | undefined>;
   /** 仅测试批次使用；后端仍须验证账号白名单。不会附加到 OSS 直传请求。 */
@@ -169,7 +167,6 @@ export function createHttpClient({
   getToken,
   getTestResourceRun,
   getInterfaceLocale,
-  getDisplayLocale,
   getSessionGeneration,
   onRefresh,
   onSessionExpired,
@@ -184,11 +181,7 @@ export function createHttpClient({
       boolean | ((code: string | undefined) => boolean) = true,
     responseType: "json" | "blob" = "json",
     deadline?: ReturnType<typeof createRequestDeadline>,
-    consumeStream?: (
-      response: Response,
-      checkSession: () => void
-    ) => Promise<T>,
-    displayLocale?: string
+    consumeStream?: (response: Response, checkSession: () => void) => Promise<T>
   ): Promise<T> {
     if (!retrying && !skipAuth && getTestResourceRun) {
       const run = getTestResourceRun();
@@ -250,8 +243,7 @@ export function createHttpClient({
         retryOnUnauthorized,
         responseType,
         deadline,
-        consumeStream,
-        displayLocale
+        consumeStream
       );
     }
 
@@ -274,7 +266,7 @@ export function createHttpClient({
           res.headers.get("Content-Language") ??
           headers.get("Accept-Language") ??
           undefined;
-      else error.requestLocale = displayLocale;
+      else if (getInterfaceLocale) error.requestLocale = "unknown";
       throw error;
     }
 
@@ -311,9 +303,6 @@ export function createHttpClient({
     responseType: "json" | "blob" = "json",
     consumeStream?: (response: Response, checkSession: () => void) => Promise<T>
   ): Promise<T> {
-    const displayLocale = getDisplayLocale
-      ? (getDisplayLocale() ?? "unknown")
-      : undefined;
     if (!retrying) {
       const locale = getInterfaceLocale?.();
       if (locale) {
@@ -347,8 +336,7 @@ export function createHttpClient({
           retryOnUnauthorized,
           responseType,
           deadline,
-          consumeStream,
-          displayLocale
+          consumeStream
         )
       );
     } finally {

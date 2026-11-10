@@ -43,6 +43,7 @@ export function createInterfacePreferences({
   read,
   write,
   getStorage,
+  getPublicLocale,
   browserLanguages = () => []
 }: {
   surface: InterfaceSurface;
@@ -51,6 +52,7 @@ export function createInterfacePreferences({
   read: () => Promise<InterfaceLocale | null | undefined>;
   write: (locale: InterfaceLocale | null) => Promise<InterfaceLocale | null>;
   getStorage?: () => Pick<Storage, "getItem" | "setItem" | "removeItem">;
+  getPublicLocale?: () => string | null;
   browserLanguages?: () => readonly string[];
 }) {
   let snapshot = initial;
@@ -131,9 +133,13 @@ export function createInterfacePreferences({
       if (!INTERFACE_LOCALES.includes(directory.default_locale))
         throw new Error("不支持目录默认语言");
       const { accountId } = getSession();
+      const supported = directory.supported_locales;
+      const publicLocale = INTERFACE_LOCALES.find(
+        (locale) => locale === getPublicLocale?.() && supported.includes(locale)
+      );
       const preference = accountId
         ? ((await read()) ?? null)
-        : (cached(null) ?? null);
+        : (publicLocale ?? cached(null) ?? null);
       if (!current()) return;
       // read 的 undefined 仅兼容旧 admin profile 缺字段；其他值仍须校验。
       decodeInterfaceLocale(preference);
@@ -142,7 +148,11 @@ export function createInterfacePreferences({
         status: "ready",
         capabilities: directory,
         preference,
-        locale: resolve(directory, preference, accountId),
+        locale: resolve(
+          directory,
+          preference ?? publicLocale ?? null,
+          accountId
+        ),
         saving: false,
         refreshing: false,
         error: null
