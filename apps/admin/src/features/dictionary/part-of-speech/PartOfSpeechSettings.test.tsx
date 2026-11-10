@@ -746,9 +746,12 @@ describe("PartOfSpeechSettings", () => {
       expect(mock.queries.at(-1)).toMatchObject({ page: 2, page_size: 10 })
     );
 
-    fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
-      target: { value: "20" }
-    });
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "每页条数" }));
+    fireEvent.click(
+      await screen.findByText("20 条/页", {
+        selector: ".ui-select-item-option-content"
+      })
+    );
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ page: 1, page_size: 20 })
     );

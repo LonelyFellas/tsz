@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { act, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clearUserPending, savePending } from "./pending";
@@ -42,6 +42,13 @@ const base = {
     }
   ]
 };
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+afterAll(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.resetAllMocks();
@@ -362,6 +369,31 @@ it("切换拼写档案后从新档案第一页读取", async () => {
       expect.anything()
     )
   );
+});
+
+it("切换记忆筛选时清除上一筛选的分页游标", async () => {
+  mocks.overview.mockResolvedValue(summary);
+  mocks.items.mockResolvedValue({ items: [], next_cursor: "old-cursor" });
+  renderWithProviders(<ReviewWorkspace />);
+  fireEvent.click(await screen.findByRole("button", { name: "下一页" }));
+  await waitFor(() =>
+    expect(mocks.items).toHaveBeenCalledWith(
+      "all",
+      "old-cursor",
+      expect.anything()
+    )
+  );
+  const filter = screen.getByRole("combobox", { name: "记忆筛选" });
+  fireEvent.click(filter);
+  fireEvent.click(await screen.findByRole("option", { name: "已暂停" }));
+  await waitFor(() =>
+    expect(mocks.items).toHaveBeenLastCalledWith(
+      "paused",
+      undefined,
+      expect.anything()
+    )
+  );
+  expect(filter).toHaveTextContent("已暂停");
 });
 
 it.each(["constructor", "__proto__"])(

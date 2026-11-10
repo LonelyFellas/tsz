@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import {
   ClientResponseError,
   RequestTimeoutError,
@@ -588,12 +589,10 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
             <details className="group border-t border-border/60 pt-5">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-foreground-muted transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
                 {uiText("webTask:manage_task")}
-                <span
-                  className="transition-transform group-open:rotate-90"
+                <ChevronRight
+                  className="size-4 shrink-0 transition-transform group-open:rotate-90"
                   aria-hidden
-                >
-                  ›
-                </span>
+                />
               </summary>
               <div className="mt-5 space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
