@@ -94,7 +94,7 @@ it("does not assume the requested language when the response has no language hea
 });
 
 it("records the response language even if the selection changes while the request is pending", async () => {
-  let locale = "zh-Hans";
+  let locale: "zh-Hans" | "en-US" = "zh-Hans";
   let resolve!: (response: Response) => void;
   vi.stubGlobal(
     "fetch",
