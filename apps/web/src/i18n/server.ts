@@ -12,23 +12,44 @@ import {
 import { webCommon, addWebCatalog, webText, type WebCatalog } from "./catalog";
 import { GUEST_LOCALE_COOKIE } from "./snapshot";
 
+async function getDirectory() {
+  const base = process.env.BACKEND_API_URL ?? "http://localhost:8383/api/v1";
+  const response = await fetch(`${base}/i18n/capabilities?surface=web`, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(1500)
+  });
+  if (!response.ok) throw new Error("Language directory unavailable");
+  return decodeInterfaceCapabilities(await response.json());
+}
+
+/** 资源 URL 的语言必须由公开目录授权，不能借用请求 cookie。 */
+export async function getPublicResourceLocale(value: string) {
+  try {
+    const directory = await getDirectory();
+    return (
+      directory.supported_locales.find((locale) => locale === value) ??
+      directory.default_locale
+    );
+  } catch {
+    return DEFAULT_INTERFACE_LOCALE;
+  }
+}
+
 /** React cache 只在本次 RSC 请求内复用；不缓存活动语言或目录。 */
 export const getWebLocale = cache(async () => {
   const hint = (await cookies()).get(GUEST_LOCALE_COOKIE)?.value;
   try {
-    const base = process.env.BACKEND_API_URL ?? "http://localhost:8383/api/v1";
-    const response = await fetch(`${base}/i18n/capabilities?surface=web`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(1500)
-    });
-    if (!response.ok) return DEFAULT_INTERFACE_LOCALE;
-    const directory = decodeInterfaceCapabilities(await response.json());
+    const directory = await getDirectory();
+    const requestHeaders = await headers();
     const supported = directory.supported_locales.filter((locale) =>
       INTERFACE_LOCALES.includes(locale)
     );
-    const selected = supported.find((locale) => locale === hint);
+    const publicHint = requestHeaders.get("x-tsz-public-locale");
+    const selected =
+      supported.find((locale) => locale === publicHint) ??
+      supported.find((locale) => locale === hint);
     if (selected) return selected;
-    const languages = ((await headers()).get("accept-language") ?? "")
+    const languages = (requestHeaders.get("accept-language") ?? "")
       .split(",")
       .map((entry) => {
         const [tag, ...parameters] = entry.trim().split(";");

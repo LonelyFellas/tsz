@@ -24,7 +24,7 @@ bindAdminAuthorizationCache(useAuthStore, queryClient);
 // 根布局 element：QueryClientProvider + antd ConfigProvider + 会话恢复，包住所有路由。
 // 挂载时用 admin refresh cookie 静默恢复会话，写入 profile / level / hydrated。
 // AntApp 提供 message/modal/notification 的 context 版（v6 起不建议再用静态方法）。
-export function RootProviders() {
+export function RootProviders({ children }: { children?: ReactNode }) {
   const { t } = useAdminTranslation();
   const isLoginPage = useMatch("/login") !== null;
   const permissionModelIncompatible = useAuthStore(
@@ -113,7 +113,11 @@ export function RootProviders() {
             <Alert type="error" showIcon title={t("auth_upgrade")} />
           )}
           {!isLoginPage && connectionNotice}
-          <Outlet context={{ connectionNotice } satisfies RootOutletContext} />
+          {children ?? (
+            <Outlet
+              context={{ connectionNotice } satisfies RootOutletContext}
+            />
+          )}
         </FeedbackApp>
       </>
     </QueryClientProvider>

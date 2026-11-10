@@ -302,13 +302,12 @@ export function EditProfileForm() {
     try {
       commit(await uploadAvatar(file));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
       setAvatarError(
         (e instanceof HttpError && e.code
           ? lookupWebNotice(AVATAR_CODE_ERRORS, e.code)
           : undefined) ??
           translateAuthError(
-            msg,
+            e instanceof Error ? e : "",
             AVATAR_ERRORS,
             localText(
               webAuth,

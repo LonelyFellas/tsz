@@ -6,6 +6,11 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { createInterfaceI18n, INTERFACE_LOCALES } from "@tsz/shared/i18n";
+import {
+  RefreshUnconfirmedError,
+  SessionRefreshError,
+  SessionRefreshHttpError
+} from "@tsz/shared/auth/tokenManager";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   addWebCatalog,
@@ -250,6 +255,49 @@ describe("Web 界面目录", () => {
         webErrorText(new RequestTimeoutError("POST"), originalText("fallback"))
       )
     ).toContain("result is unconfirmed");
+  });
+
+  it("服务端错误保留请求语言，切换后提示先检查状态，原文不受影响", async () => {
+    const instance = createInterfaceI18n("zh-Hans", webWordlist.resources);
+    const error = new HttpError(409, "仅有 0 道，需要 20 道");
+    error.requestLocale = "zh-Hans";
+    const notice = webErrorText(error, "");
+    const text = webText(instance, webWordlist);
+    expect(text(notice)).toBe(error.message);
+    await instance.changeLanguage("en-US");
+    expect(text(notice)).toContain("Check the current state");
+    expect(text(originalText("供应商原文"))).toBe("供应商原文");
+    await instance.changeLanguage("zh-Hans");
+    expect(text(notice)).toBe(error.message);
+  });
+
+  it("会话刷新失败保留检查结果的提示并随语言切换", async () => {
+    const instance = createInterfaceI18n("en-US", webWordlist.resources);
+    const text = webText(instance, webWordlist);
+    for (const error of [
+      new RefreshUnconfirmedError(),
+      new SessionRefreshError("内部原文"),
+      new SessionRefreshHttpError(503, "内部原文")
+    ]) {
+      expect(text(webErrorText(error, ""))).toMatch(
+        /check the operation result/i
+      );
+    }
+    await instance.changeLanguage("zh-Hant");
+    expect(text(webErrorText(new RefreshUnconfirmedError(), ""))).toContain(
+      "查看操作結果"
+    );
+  });
+
+  it("未知响应语言标明原文并保留数量和纠错详情", () => {
+    const instance = createInterfaceI18n("en-US", webWordlist.resources);
+    const error = new HttpError(409, "仅有 0 道，需要 20 道");
+    error.requestLocale = "unknown";
+    const rendered = webText(instance, webWordlist)(webErrorText(error, ""));
+    expect(rendered).toContain("language of the error details is unconfirmed");
+    expect(rendered).toContain("Check the current state");
+    expect(rendered).toContain("Original details: 仅有 0 道，需要 20 道");
+    expect(error.message).toBe("仅有 0 道，需要 20 道");
   });
 
   it("本地模板和原始插值保留到显示时，英美覆盖保持独立", () => {

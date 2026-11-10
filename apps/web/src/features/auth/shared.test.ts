@@ -1,6 +1,7 @@
 import { HttpError } from "@tsz/api-client";
 import { webAuthAccess } from "@/i18n/messages/auth/access";
-import { webCommon, localText, originalText } from "@/i18n/catalog";
+import { webCommon, localText, originalText, webText } from "@/i18n/catalog";
+import { createInterfaceI18n } from "@tsz/shared/i18n";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { User } from "@tsz/types";
@@ -60,6 +61,22 @@ describe("translateAuthError", () => {
     expect(translateAuthError("too many requests", map, fallback)).toEqual(
       originalText("too many requests")
     );
+  });
+
+  it("服务端登录错误随语言切换失效，同时保留原始详情", async () => {
+    const error = new HttpError(
+      401,
+      "账号或密码不正确",
+      [],
+      "invalid_credentials"
+    );
+    error.requestLocale = "zh-Hans";
+    const notice = translateAuthError(error, map, fallback);
+    const instance = createInterfaceI18n("zh-Hans", webAuthAccess.resources);
+    const text = webText(instance, webAuthAccess);
+    expect(text(notice)).toBe(error.message);
+    await instance.changeLanguage("en-US");
+    expect(text(notice)).toContain("Check the current state");
   });
 
   it("空消息使用兜底文案", () => {

@@ -1,4 +1,13 @@
-import { ClientResponseError, RequestTimeoutError } from "@tsz/api-client";
+import {
+  ClientResponseError,
+  HttpError,
+  RequestTimeoutError
+} from "@tsz/api-client";
+import {
+  RefreshUnconfirmedError,
+  SessionRefreshError,
+  SessionRefreshHttpError
+} from "@tsz/shared/auth/tokenManager";
 import {
   type createInterfaceI18n,
   type InterfaceResourceBundles
@@ -24,7 +33,11 @@ export type LocalText = {
   readonly values?: WebValues;
 };
 export type WebValues = Record<string, WebParameterValue>;
-export type WebNotice = "" | OriginalText | LocalText;
+export type ServerText = {
+  readonly serverText: string;
+  readonly requestLocale: string;
+};
+export type WebNotice = "" | OriginalText | LocalText | ServerText;
 /** 只读取作者登记的诊断映射，未知 code/原文不能命中 Object 原型。 */
 export function lookupWebNotice(
   notices: Readonly<Record<string, WebNotice>>,
@@ -47,20 +60,30 @@ export class LocalWebError extends Error {
   }
 }
 export const webErrorText = (error: unknown, fallback: WebNotice): WebNotice =>
-  error instanceof ClientResponseError
-    ? localText(webCommon, "webCommon:response_unavailable")
-    : error instanceof LocalWebError
-      ? error.notice
-      : error instanceof RequestTimeoutError
-        ? localText(
-            webCommon,
-            error.method === "GET" || error.method === "HEAD"
-              ? "webCommon:request_timeout"
-              : "webCommon:request_timeout_unknown"
-          )
-        : error instanceof Error
-          ? originalText(error.message)
-          : fallback;
+  error instanceof RefreshUnconfirmedError
+    ? localText(webCommon, "webCommon:session_refresh_unconfirmed")
+    : error instanceof SessionRefreshError ||
+        error instanceof SessionRefreshHttpError
+      ? localText(webCommon, "webCommon:session_refresh_check")
+      : error instanceof ClientResponseError
+        ? localText(webCommon, "webCommon:response_unavailable")
+        : error instanceof LocalWebError
+          ? error.notice
+          : error instanceof RequestTimeoutError
+            ? localText(
+                webCommon,
+                error.method === "GET" || error.method === "HEAD"
+                  ? "webCommon:request_timeout"
+                  : "webCommon:request_timeout_unknown"
+              )
+            : error instanceof HttpError && error.requestLocale
+              ? {
+                  serverText: error.message,
+                  requestLocale: error.requestLocale
+                }
+              : error instanceof Error
+                ? originalText(error.message)
+                : fallback;
 export interface WebText<C extends WebCatalog> {
   <K extends WebCatalogKey<C>>(key: K, ...args: CatalogArguments<C, K>): string;
   (notice: WebNotice | null | undefined): string;
@@ -182,6 +205,26 @@ export const webCommon = /* @__PURE__ */ defineWebMessages("webCommon", {
     "数据暂不可用，请刷新后重试",
     "資料暫時無法使用，請重新整理後再試",
     "Data are unavailable. Reload and try again."
+  ],
+  session_refresh_check: [
+    "会话刷新未完成，请先查看操作结果；必要时重新登录。",
+    "工作階段更新未完成，請先查看操作結果；必要時重新登入。",
+    "The session refresh did not complete. Check the operation result and sign in again if needed."
+  ],
+  session_refresh_unconfirmed: [
+    "会话刷新结果尚未确认，请重新登录，并先查看操作结果。",
+    "工作階段更新結果尚未確認，請重新登入，並先查看操作結果。",
+    "The session refresh result is unconfirmed. Sign in again and check the operation result."
+  ],
+  previous_language_error: [
+    "错误详情使用了之前的语言，请先查看当前状态再重试。",
+    "錯誤詳情使用了先前的語言，請先查看目前狀態再重試。",
+    "The error details were in the previous language. Check the current state before trying again."
+  ],
+  unknown_language_error: [
+    "错误详情的语言无法确认，请先查看当前状态再重试。原文：{{detail}}",
+    "無法確認錯誤詳情的語言，請先查看目前狀態再重試。原文：{{detail}}",
+    "The language of the error details is unconfirmed. Check the current state before trying again. Original details: {{detail}}"
   ],
   password_required: ["请输入密码", "請輸入密碼", "Enter your password"],
   password_short: [
@@ -357,13 +400,23 @@ export function webText<C extends WebCatalog>(
     >
   ) => string;
   const render = (
-    source: string | OriginalText | LocalText | null | undefined,
+    source: string | OriginalText | LocalText | ServerText | null | undefined,
     values?: WebValues,
     scope: WebCatalog = catalog
   ): string => {
     if (!source) return "";
     if (typeof source !== "string") {
       if ("original" in source) return source.original;
+      if ("serverText" in source)
+        return source.requestLocale === "unknown"
+          ? render(
+              localText(webCommon, "webCommon:unknown_language_error", {
+                detail: originalText(source.serverText)
+              })
+            )
+          : source.requestLocale === instance.language
+            ? source.serverText
+            : render(localText(webCommon, "webCommon:previous_language_error"));
       scope = source.catalog;
       values = source.values;
       source = source.key;

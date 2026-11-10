@@ -15,9 +15,6 @@ export function RouteErrorPage() {
   useEffect(() => {
     if (resourceError) window.dispatchEvent(new Event("tsz:resource-error"));
   }, [resourceError]);
-  // 兜底页自己要能在「入口 chunk 加载失败」时渲染，所以挂在 RootProviders 之外；
-  // 随之而来的是这里没有 ConfigProvider，需要就地补一个品牌主题，
-  // 否则整页会退回 antd 默认蓝，与后台其余部分明显不同色。
   const message = resourceError
     ? t("error_resource_help")
     : t("error_page_help");

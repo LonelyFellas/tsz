@@ -70,7 +70,8 @@ export type WebParameterValue =
   | number
   | bigint
   | import("./catalog").LocalText
-  | import("./catalog").OriginalText;
+  | import("./catalog").OriginalText
+  | import("./catalog").ServerText;
 type MessageParameters<C extends WebCatalog, K extends string> = {
   [
     P in Parameters<Message<C, K>> | PluralParameter<C, K>

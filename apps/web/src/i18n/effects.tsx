@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { interfacePreferences } from "@/lib/interface-preferences";
 import { useUserStore } from "@/stores/user";
 import { site } from "@/lib/site";
@@ -62,6 +62,7 @@ export function WebLocaleEffects() {
   const ready = useWebLocaleReady();
   const uiText = useWebText(webApp);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const hydrated = useUserStore((state) => state.hydrated);
   const snapshot = useSyncExternalStore(
     interfacePreferences.subscribe,
@@ -69,7 +70,18 @@ export function WebLocaleEffects() {
     interfacePreferences.getServerSnapshot
   );
   useLayoutEffect(() => {
-    if (ready) document.documentElement.lang = locale;
+    if (ready) {
+      document.documentElement.lang = locale;
+      document.documentElement.setAttribute("data-interface-locale-ready", "");
+    } else
+      document.documentElement.removeAttribute("data-interface-locale-ready");
+    if (ready) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("lang") !== locale) {
+        url.searchParams.set("lang", locale);
+        window.history.replaceState({ tszLocaleGenerated: true }, "", url);
+      }
+    }
     const pageTitle = titles.find(([pattern]) => pattern.test(pathname))?.[1];
     const title = !ready
       ? site.name
@@ -85,6 +97,9 @@ export function WebLocaleEffects() {
       if (document.title.replace(/^\(\d+\)\s*/, "") !== title)
         document.title = title;
       if (!ready) return;
+      document.head
+        .querySelector('link[rel="manifest"]')
+        ?.setAttribute("href", `/manifest/${locale}`);
       for (const [selector, content] of [
         ['meta[name="description"]', description],
         [
@@ -98,6 +113,16 @@ export function WebLocaleEffects() {
           )
         ],
         ['meta[property="og:locale"]', openGraphLocale[locale]],
+        ['meta[property="og:image"]', `${site.url}/share-image/${locale}`],
+        [
+          'meta[property="og:image:alt"]',
+          uiText("webApp:english_vocabulary_learning")
+        ],
+        ['meta[name="twitter:image"]', `${site.url}/share-image/${locale}`],
+        [
+          'meta[name="twitter:image:alt"]',
+          uiText("webApp:english_vocabulary_learning")
+        ],
         [
           'meta[name="twitter:title"]',
           uiText("webApp:english_vocabulary_learning")
@@ -119,7 +144,7 @@ export function WebLocaleEffects() {
       characterData: true
     });
     return () => observer.disconnect();
-  }, [locale, pathname, ready, uiText]);
+  }, [locale, pathname, ready, searchParams, uiText]);
   useEffect(() => {
     if (
       !hydrated ||

@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   hint: undefined as string | undefined,
-  acceptLanguage: ""
+  acceptLanguage: "",
+  publicHint: ""
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ "accept-language": mocks.acceptLanguage }),
+  headers: async () =>
+    new Headers({
+      "accept-language": mocks.acceptLanguage,
+      "x-tsz-public-locale": mocks.publicHint
+    }),
   cookies: async () => {
     const hint = mocks.hint;
     return { get: () => (hint ? { value: hint } : undefined) };
   }
 }));
-import { getWebLocale, getServerWebText } from "./server";
+import {
+  getWebLocale,
+  getServerWebText,
+  getPublicResourceLocale
+} from "./server";
 import { webApp } from "./messages/app";
 const directory = {
   schema_version: 1,
@@ -22,6 +31,7 @@ const directory = {
 beforeEach(() => {
   mocks.hint = undefined;
   mocks.acceptLanguage = "";
+  mocks.publicHint = "";
   vi.unstubAllGlobals();
 });
 
@@ -84,6 +94,46 @@ it("英文浏览器首访按权重与客户端相同规则匹配，停用项不�
   mocks.hint = undefined;
   mocks.acceptLanguage = "en-US;q=0, en-GB;q=0.7";
   expect(await getWebLocale()).toBe("en-GB");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ ...directory, supported_locales: ["zh-Hans"] })
+    )
+  );
+  expect(await getWebLocale()).toBe("zh-Hans");
+});
+
+it("公开资源只使用 URL 指定且目录开放的语言，不读取 cookie", async () => {
+  mocks.hint = "en-US";
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json(directory))
+  );
+  for (const locale of directory.supported_locales)
+    expect(await getPublicResourceLocale(locale)).toBe(locale);
+  expect(await getPublicResourceLocale("invalid")).toBe("zh-Hans");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ ...directory, supported_locales: ["zh-Hans"] })
+    )
+  );
+  expect(await getPublicResourceLocale("en-US")).toBe("zh-Hans");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(null, { status: 503 }))
+  );
+  expect(await getPublicResourceLocale("en-US")).toBe("zh-Hans");
+});
+
+it("分享 URL 语言优先于 cookie 和爬虫语言，停用语言不能启用", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json(directory))
+  );
+  mocks.publicHint = "en-US";
+  mocks.hint = "zh-Hans";
+  expect(await getWebLocale()).toBe("en-US");
   vi.stubGlobal(
     "fetch",
     vi.fn(async () =>

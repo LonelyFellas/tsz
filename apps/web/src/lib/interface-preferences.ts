@@ -17,6 +17,21 @@ export const interfacePreferences = createInterfacePreferences({
   write: async (interface_locale) =>
     (await authRuntime.api.interfacePreferences.update({ interface_locale }))
       .preferences.interface_locale,
+  getPublicLocale: () =>
+    window.history.state?.tszLocaleGenerated
+      ? null
+      : new URL(window.location.href).searchParams.get("lang"),
+  onPreferenceChoice: () => {
+    try {
+      window.history.replaceState(
+        { tszLocaleGenerated: true },
+        "",
+        window.location.href
+      );
+    } catch {
+      // 语言保存成功不能因浏览器历史记录不可用而改判失败。
+    }
+  },
   getStorage: () => ({
     getItem: (key) => {
       let stored: string | null = null;

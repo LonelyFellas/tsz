@@ -52,7 +52,11 @@ export const router = createBrowserRouter([
     element: <RootProviders />,
     // 兜底：任一子路由渲染/loader 抛错（含 lazy chunk 加载失败）时渲染此页，
     // 而非 react-router 的空白默认错误页。
-    errorElement: <RouteErrorPage />,
+    errorElement: (
+      <RootProviders>
+        <RouteErrorPage />
+      </RootProviders>
+    ),
     hydrateFallbackElement: <AdminBootFallback />,
     children: [
       {
