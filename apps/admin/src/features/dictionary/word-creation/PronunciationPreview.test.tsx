@@ -875,6 +875,7 @@ it.each(["uk", "us"] as const)(
       mode: "unified",
       common: {
         id: "text",
+        origin: "manual",
         value: { version: 2, text: "tomato", annotations: [] },
         voice_profile: {
           voices: (["en-GB", "en-US"] as const).map((locale) => ({
