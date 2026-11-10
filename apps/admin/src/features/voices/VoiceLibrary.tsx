@@ -752,7 +752,6 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     );
   const refreshButton = (
     <Button
-      type="text"
       icon={<RotateCwIcon />}
       loading={voices.isFetching || library.isFetching}
       disabled={metadataEditing}
@@ -768,15 +767,22 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
   const auditionPanel = (
     <section className="voice-library-audition" aria-label={t("voice_preview")}>
       <div className="voice-library-audition-row">
-        {tab === "library" && refreshButton}
         <Form
-          layout="inline"
+          layout="vertical"
           className="voice-library-audition-text"
           colon={false}
         >
           <Form.Item
             label={
-              <Typography.Text strong>{t("preview_text")}</Typography.Text>
+              <span className="voice-library-audition-label">
+                <Typography.Text strong>{t("preview_text")}</Typography.Text>
+                <Typography.Text
+                  type="secondary"
+                  className="voice-library-audition-count"
+                >
+                  {textLength} / 500
+                </Typography.Text>
+              </span>
             }
             validateStatus={!validText ? "error" : undefined}
             help={
@@ -789,18 +795,12 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
               <Input.TextArea
                 aria-label={t("shared_preview_text")}
                 value={text}
-                autoSize={{ minRows: 1, maxRows: 3 }}
+                autoSize={{ minRows: 1, maxRows: 4 }}
                 onChange={(event) => {
                   cancelPreview();
                   setText(event.target.value);
                 }}
               />
-              <Typography.Text
-                type="secondary"
-                className="voice-library-audition-count"
-              >
-                {textLength} / 500
-              </Typography.Text>
             </div>
           </Form.Item>
         </Form>
@@ -817,6 +817,7 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
         <PageHeader
           title={t("voice_library")}
           breadcrumb={<Breadcrumb items={[{ title: t("dubbing_centre") }]} />}
+          actions={refreshButton}
         />
       ) : (
         <Breadcrumb items={[{ title: t("dubbing_centre") }]} />

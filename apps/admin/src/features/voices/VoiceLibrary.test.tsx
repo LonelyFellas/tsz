@@ -286,6 +286,7 @@ afterEach(() => {
   clients.splice(0).forEach((client) => client.clear());
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("配音中心", () => {
@@ -873,7 +874,7 @@ describe("配音中心", () => {
     });
     expect(screen.queryByLabelText("试听 Sonia")).toBeNull();
     expect(screen.getByLabelText("试听 Guy")).toBeEnabled();
-    fireEvent.click(namedButton("音色筛选和排序"));
+    fireEvent.click(namedButton("常用音色筛选"));
     fireEvent.click(screen.getByLabelText("只看常用"));
     expect(screen.getByText("未找到符合条件的数据")).toBeVisible();
     fireEvent.click(namedButton("清除筛选"));
@@ -1641,6 +1642,57 @@ describe("配音中心", () => {
       screen.getByText("音频加载失败或链接已过期，请重新生成试听。")
     ).toBeVisible();
   });
+
+  it.each([false, true])(
+    "波形解码失败=%s：成功后接管播放，失败保留原生控件，媒体错误可恢复",
+    async (decodeFails) => {
+      vi.stubGlobal(
+        "AudioContext",
+        class {
+          decodeAudioData = async () => {
+            if (decodeFails) throw new Error("decode failed");
+            return {
+              duration: 3,
+              numberOfChannels: 1,
+              getChannelData: () => new Float32Array([0.2, -0.3])
+            };
+          };
+          close = async () => {};
+        }
+      );
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(new Uint8Array([82, 73, 70, 70]))
+      );
+      mount();
+      fireEvent.click(await screen.findByLabelText("试听 Sonia"));
+      const audio = await screen.findByLabelText("Sonia 试听播放器");
+      expect(audio).toBeVisible();
+      expect(audio).toHaveAttribute("controls");
+      fireEvent.loadedMetadata(audio);
+      if (decodeFails) {
+        await screen.findByText("波形读取或解码失败，可重新试听后重试。");
+        expect(audio).toBeVisible();
+        expect(audio).toHaveAttribute("controls");
+      } else {
+        await screen.findByLabelText("音频波形，点击定位或拖动选择区间");
+        await waitFor(() => expect(audio).not.toBeVisible());
+        expect(audio).not.toHaveAttribute("controls");
+      }
+      expect(
+        within(screen.getByRole("region", { name: "审听 Sonia" })).getByRole(
+          "button",
+          { name: "播放" }
+        )
+      ).toBeEnabled();
+      fireEvent.error(audio);
+      expect(audio).toBeVisible();
+      expect(audio).toHaveAttribute("controls");
+      expect(screen.queryByRole("region", { name: "审听 Sonia" })).toBeNull();
+      expect(
+        screen.getByText("音频加载失败或链接已过期，请重新生成试听。")
+      ).toBeVisible();
+    }
+  );
 
   it("生成中撤销权限会取消请求且不接纳迟到音频", async () => {
     const pending = deferred<AdminSpeechPreviewResponse>();

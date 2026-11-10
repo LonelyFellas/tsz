@@ -12,6 +12,9 @@ import {
 } from "./VoiceMetadataEditor";
 import { speechAccentGroup } from "@tsz/shared";
 import {
+  ArrowDownIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
   Volume2Icon,
   ListFilterIcon,
   MarsIcon,
@@ -363,7 +366,10 @@ export function VoiceCatalogTable({
     const single = key === "style" || key === "role";
     return (
       <div className="voice-catalog-heading">
-        <span>{label}</span>
+        <div className="voice-catalog-heading-label">
+          <span>{label}</span>
+          {key === "age" && sortButton("age")}
+        </div>
         <Select
           mode={single ? undefined : "multiple"}
           disabled={metadataEditing}
@@ -384,6 +390,59 @@ export function VoiceCatalogTable({
           }}
         />
       </div>
+    );
+  }
+  function sortOrder(key: "name" | "age") {
+    return sort === `${key}-asc`
+      ? ("ascending" as const)
+      : sort === `${key}-desc`
+        ? ("descending" as const)
+        : ("none" as const);
+  }
+  function sortButton(key: "name" | "age") {
+    const order = sortOrder(key);
+    const next =
+      order === "none"
+        ? `${key}-asc`
+        : order === "ascending"
+          ? `${key}-desc`
+          : "recommended";
+    return (
+      <Tooltip
+        title={t(
+          order === "descending"
+            ? "common_voices_first"
+            : key === "name"
+              ? order === "none"
+                ? "name_ascending"
+                : "name_descending"
+              : order === "none"
+                ? "age_ascending"
+                : "age_descending"
+        )}
+      >
+        <Button
+          type="text"
+          size="small"
+          className="voice-catalog-sort"
+          aria-label={t(key === "name" ? "name_order" : "age_order")}
+          aria-pressed={order !== "none"}
+          disabled={metadataEditing}
+          icon={
+            order === "ascending" ? (
+              <ArrowUpIcon />
+            ) : order === "descending" ? (
+              <ArrowDownIcon />
+            ) : (
+              <ArrowUpDownIcon />
+            )
+          }
+          onClick={() => {
+            setSort(next);
+            setPage(1);
+          }}
+        />
+      </Tooltip>
     );
   }
   return (
@@ -485,11 +544,12 @@ export function VoiceCatalogTable({
               <div className="voice-catalog-heading">
                 <div className="voice-catalog-heading-label">
                   <span>{t("voice")}</span>
-                  <Popover
-                    trigger="click"
-                    placement="bottomLeft"
-                    content={
-                      <div className="voice-catalog-controls">
+                  <Space size={0}>
+                    {sortButton("name")}
+                    <Popover
+                      trigger="click"
+                      placement="bottomLeft"
+                      content={
                         <Checkbox
                           checked={commonOnly}
                           disabled={metadataEditing}
@@ -500,35 +560,18 @@ export function VoiceCatalogTable({
                         >
                           {t("common_voices_only")}
                         </Checkbox>
-                        <Select
-                          aria-label={t("voice_order")}
-                          disabled={metadataEditing}
-                          value={sort}
-                          options={[
-                            {
-                              value: "recommended",
-                              label: t("common_voices_first")
-                            },
-                            { value: "name-asc", label: t("name_ascending") },
-                            { value: "name-desc", label: t("name_descending") },
-                            { value: "age-asc", label: t("age_ascending") },
-                            { value: "age-desc", label: t("age_descending") }
-                          ]}
-                          onChange={(value) => {
-                            setSort(value);
-                            setPage(1);
-                          }}
-                        />
-                      </div>
-                    }
-                  >
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<ListFilterIcon />}
-                      aria-label={t("voice_filters_and_order")}
-                    />
-                  </Popover>
+                      }
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<ListFilterIcon />}
+                        aria-label={t("common_voice_filter")}
+                        aria-pressed={commonOnly}
+                        disabled={metadataEditing}
+                      />
+                    </Popover>
+                  </Space>
                 </div>
                 <Input
                   type="search"
@@ -547,8 +590,9 @@ export function VoiceCatalogTable({
                 />
               </div>
             ),
-            width: 184,
+            width: 264,
             fixed: "left",
+            onHeaderCell: () => ({ "aria-sort": sortOrder("name") }),
             render: (_, voice) => (
               <div className="voice-catalog-identity">
                 <Tooltip
@@ -621,7 +665,7 @@ export function VoiceCatalogTable({
           {
             key: "gender",
             title: filter("gender", t("gender"), genderNames),
-            width: 100,
+            width: 112,
             render: (_, voice) => (
               <Space size={4}>
                 {genderIcons[voice.gender.toLowerCase()]}
@@ -637,6 +681,7 @@ export function VoiceCatalogTable({
             key: "age",
             title: filter("age", t("age_group"), ageNames),
             width: 112,
+            onHeaderCell: () => ({ "aria-sort": sortOrder("age") }),
             render: (_, voice) =>
               voiceLabel(
                 ageNames[voice.metadata?.age_group ?? ""] ??
@@ -647,7 +692,11 @@ export function VoiceCatalogTable({
           },
           {
             key: "description",
-            title: t("description"),
+            title: (
+              <div className="voice-catalog-heading">
+                <span>{t("description")}</span>
+              </div>
+            ),
             width: 300,
             render: (_, voice) => {
               const info = metadata.get(voice.alias);

@@ -12,6 +12,8 @@ import { AudioReview, loopPosition, waveformPeaks } from "./AudioReview";
 class Media extends EventTarget {
   currentTime = 0;
   paused = true;
+  muted = false;
+  volume = 1;
   playbackRate = 1;
   play = vi.fn(async () => {
     this.paused = false;
@@ -59,69 +61,84 @@ it("波形保留每个窗口所有声道的真实峰值，静音不伪造振幅"
   expect(loopPosition(1.49, 0.5, 1.5)).toBe(1.49);
 });
 
-it("解码真实字节后定位与循环，下载保持原始内容且卸载关闭解码器", async () => {
-  const media = new Media();
-  const blob = new Blob([new Uint8Array([82, 73, 70, 70])], {
-    type: "audio/wav"
-  });
-  Object.defineProperty(blob, "arrayBuffer", {
-    value: async () => new ArrayBuffer(4)
-  });
-  const loadAudio = vi.fn(async () => blob);
-  let downloaded: Blob | undefined;
-  vi.stubGlobal("URL", {
-    createObjectURL: vi.fn((value: Blob) => {
-      downloaded = value;
-      return "blob:download";
-    }),
-    revokeObjectURL: vi.fn()
-  });
-  const click = vi
-    .spyOn(HTMLAnchorElement.prototype, "click")
-    .mockImplementation(() => {});
-  const view = render(
-    <AudioReview
-      media={{
-        audio: media as unknown as HTMLAudioElement,
-        name: "sample",
-        result: {
-          audioUrl: "blob:sample",
-          expiresAt: "2099-01-01",
-          cached: false,
-          loadAudio
-        }
-      }}
-    />
-  );
-  const waveform =
-    await screen.findByLabelText("音频波形，点击定位或拖动选择区间");
-  fireEvent.keyDown(waveform, { key: "ArrowRight" });
-  expect(media.currentTime).toBeCloseTo(0.1);
-  fireEvent.change(screen.getByLabelText("循环起点秒数"), {
-    target: { value: "0.5" }
-  });
-  fireEvent.change(screen.getByLabelText("循环终点秒数"), {
-    target: { value: "1.5" }
-  });
-  fireEvent.click(screen.getByLabelText("区间循环"));
-  await act(() => media.play());
-  act(() => {
-    media.currentTime = 1.6;
-    media.dispatchEvent(new Event("timeupdate"));
-  });
-  expect(media.currentTime).toBe(0.5);
-  act(() => {
-    media.paused = true;
-    media.currentTime = 2;
-    media.dispatchEvent(new Event("ended"));
-  });
-  await waitFor(() => expect(media.play).toHaveBeenCalledTimes(2));
-  expect(media.currentTime).toBe(0.5);
-  media.playbackRate = 2;
-  fireEvent.click(screen.getByRole("button", { name: "下载原音频" }));
-  expect(downloaded).toBe(blob);
-  expect(click).toHaveBeenCalledOnce();
-  view.unmount();
-  expect(media.playbackRate).toBe(1);
-  expect(close).toHaveBeenCalled();
-});
+it.each([false, true])(
+  "审听 compact=%s：定位与循环、静音、下载和卸载保留原始媒体行为",
+  async (compact) => {
+    const media = new Media();
+    const blob = new Blob([new Uint8Array([82, 73, 70, 70])], {
+      type: "audio/wav"
+    });
+    Object.defineProperty(blob, "arrayBuffer", {
+      value: async () => new ArrayBuffer(4)
+    });
+    const loadAudio = vi.fn(async () => blob);
+    let downloaded: Blob | undefined;
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn((value: Blob) => {
+        downloaded = value;
+        return "blob:download";
+      }),
+      revokeObjectURL: vi.fn()
+    });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    const view = render(
+      <AudioReview
+        compact={compact}
+        media={{
+          audio: media as unknown as HTMLAudioElement,
+          name: "sample",
+          result: {
+            audioUrl: "blob:sample",
+            expiresAt: "2099-01-01",
+            cached: false,
+            loadAudio
+          }
+        }}
+      />
+    );
+    const waveform =
+      await screen.findByLabelText("音频波形，点击定位或拖动选择区间");
+    if (compact) {
+      fireEvent.click(screen.getByRole("button", { name: "播放音量" }));
+      fireEvent.click(screen.getByRole("button", { name: "静音" }));
+      expect(media.muted).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "取消静音" }));
+      expect(media.muted).toBe(false);
+      fireEvent.change(screen.getByRole("slider", { name: "播放音量" }), {
+        target: { value: "50" }
+      });
+      expect(media.volume).toBe(0.5);
+    }
+    fireEvent.keyDown(waveform, { key: "ArrowRight" });
+    expect(media.currentTime).toBeCloseTo(0.1);
+    fireEvent.change(screen.getByLabelText("循环起点秒数"), {
+      target: { value: "0.5" }
+    });
+    fireEvent.change(screen.getByLabelText("循环终点秒数"), {
+      target: { value: "1.5" }
+    });
+    fireEvent.click(screen.getByLabelText("区间循环"));
+    await act(() => media.play());
+    act(() => {
+      media.currentTime = 1.6;
+      media.dispatchEvent(new Event("timeupdate"));
+    });
+    expect(media.currentTime).toBe(0.5);
+    act(() => {
+      media.paused = true;
+      media.currentTime = 2;
+      media.dispatchEvent(new Event("ended"));
+    });
+    await waitFor(() => expect(media.play).toHaveBeenCalledTimes(2));
+    expect(media.currentTime).toBe(0.5);
+    media.playbackRate = 2;
+    fireEvent.click(screen.getByRole("button", { name: "下载原音频" }));
+    expect(downloaded).toBe(blob);
+    expect(click).toHaveBeenCalledOnce();
+    view.unmount();
+    expect(media.playbackRate).toBe(1);
+    expect(close).toHaveBeenCalled();
+  }
+);

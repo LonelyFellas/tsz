@@ -3,8 +3,16 @@ import {
   useVoiceEditorMessageState,
   createVoiceEditorMessage
 } from "../i18n";
-import { Button, Space, Typography } from "@tsz/ui/admin/display";
-import { Checkbox, InputNumber, Select } from "@tsz/ui/admin/forms";
+import { Button, Typography } from "@tsz/ui/admin/display";
+import {
+  DownloadIcon,
+  PauseIcon,
+  PlayIcon,
+  Volume2Icon,
+  VolumeXIcon
+} from "lucide-react";
+import { Checkbox, InputNumber, Select, Slider } from "@tsz/ui/admin/forms";
+import { Popover } from "@tsz/ui/admin/overlays";
 import { useEffect, useRef, useState } from "react";
 import type { VoicePreviewResult } from "../../types";
 
@@ -52,10 +60,14 @@ export interface ReviewAudio {
 
 export function AudioReview({
   media,
-  onPlay
+  onPlay,
+  compact = false,
+  onReadyChange
 }: {
   media: ReviewAudio;
   onPlay?: () => void;
+  compact?: boolean;
+  onReadyChange?: (ready: boolean) => void;
 }) {
   const { t } = useVoiceEditorTranslation();
   const { audio, result } = media;
@@ -64,6 +76,8 @@ export function AudioReview({
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(!audio.paused);
+  const [muted, setMuted] = useState(!!audio.muted);
+  const [volume, setVolume] = useState(audio.volume ?? 1);
   const [range, setRange] = useState<[number, number]>([0, 0]);
   const [loop, setLoop] = useState(false);
   const [hover, setHover] = useState<number>();
@@ -74,6 +88,10 @@ export function AudioReview({
   onPlayRef.current = onPlay;
   const playback = useRef({ range, loop, duration });
   playback.current = { range, loop, duration };
+
+  useEffect(() => {
+    onReadyChange?.(peaks.length > 0);
+  }, [onReadyChange, peaks.length]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -138,6 +156,8 @@ export function AudioReview({
       }
       setPosition(audio.currentTime || 0);
       setPlaying(!audio.paused);
+      setMuted(!!audio.muted);
+      setVolume(audio.volume ?? 1);
     };
     const tick = () => {
       update();
@@ -167,6 +187,7 @@ export function AudioReview({
     audio.addEventListener("play", play);
     audio.addEventListener("pause", update);
     audio.addEventListener("ended", ended);
+    audio.addEventListener("volumechange", update);
     if (!audio.paused) play();
     return () => {
       cancelAnimationFrame(frame);
@@ -174,6 +195,7 @@ export function AudioReview({
       audio.removeEventListener("play", play);
       audio.removeEventListener("pause", update);
       audio.removeEventListener("ended", ended);
+      audio.removeEventListener("volumechange", update);
       audio.playbackRate = 1;
     };
   }, [audio, setError]);
@@ -199,10 +221,10 @@ export function AudioReview({
     ] ?? 0;
   return (
     <section
-      className="tsz-ve-audio-review"
+      className={`tsz-ve-audio-review${compact ? " tsz-ve-audio-review-compact" : ""}`}
       aria-label={t("review", { p0: media.name })}
     >
-      <Typography.Text strong>{media.name}</Typography.Text>
+      {!compact && <Typography.Text strong>{media.name}</Typography.Text>}
       {loading && (
         <Typography.Text type="secondary">
           {t("loading_audio_waveform")}
@@ -289,89 +311,148 @@ export function AudioReview({
               className="tsz-ve-wave-cursor"
             />
           </svg>
-          <div className="tsz-ve-wave-scale">
-            <span>{t("0_seconds")}</span>
-            <span>
-              {at.toFixed(2)} {t("seconds_peak")} {peak.toFixed(3)}
-            </span>
-            <span>
-              {duration.toFixed(2)} {t("seconds")}
-            </span>
-          </div>
+          {!compact && (
+            <div className="tsz-ve-wave-scale">
+              <span>{t("0_seconds")}</span>
+              <span>
+                {at.toFixed(2)} {t("seconds_peak")} {peak.toFixed(3)}
+              </span>
+              <span>
+                {duration.toFixed(2)} {t("seconds")}
+              </span>
+            </div>
+          )}
         </>
       )}
-      <Space wrap>
-        <Button
-          size="small"
-          onClick={() => {
-            if (audio.paused) {
-              if (loop)
-                seek(loopPosition(audio.currentTime, range[0], range[1]));
-              void audio
-                .play()
-                .catch(() =>
-                  setError(
-                    createVoiceEditorMessage(
-                      "audio_playback_failed_audition_again"
+      <div className="tsz-ve-review-controls">
+        <div className="tsz-ve-review-playback">
+          <Button
+            size={compact ? "middle" : "small"}
+            type={compact ? "primary" : "default"}
+            shape={compact ? "circle" : undefined}
+            aria-label={playing ? t("pause_2") : t("play")}
+            icon={compact ? playing ? <PauseIcon /> : <PlayIcon /> : undefined}
+            onClick={() => {
+              if (audio.paused) {
+                if (loop)
+                  seek(loopPosition(audio.currentTime, range[0], range[1]));
+                void audio
+                  .play()
+                  .catch(() =>
+                    setError(
+                      createVoiceEditorMessage(
+                        "audio_playback_failed_audition_again"
+                      )
                     )
-                  )
-                );
-            } else audio.pause();
-          }}
-        >
-          {playing ? t("pause_2") : t("play")}
-        </Button>
-        <Select
-          aria-label={t("review_playback_speed")}
-          size="small"
-          defaultValue={1}
-          options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => ({
-            value,
-            label: `${value}×`
-          }))}
-          onChange={(value) => {
-            audio.playbackRate = value;
-          }}
-        />
-        <InputNumber
-          aria-label={t("loop_start_in_seconds")}
-          size="small"
-          min={0}
-          max={range[1]}
-          precision={2}
-          step={0.1}
-          value={range[0]}
-          disabled={!duration}
-          onChange={(value) => {
-            if (value !== null) setRange([Math.min(value, range[1]), range[1]]);
-          }}
-        />
-        <span>–</span>
-        <InputNumber
-          aria-label={t("loop_end_in_seconds")}
-          size="small"
-          min={range[0]}
-          max={duration}
-          precision={2}
-          step={0.1}
-          value={range[1]}
-          disabled={!duration}
-          onChange={(value) => {
-            if (value !== null) setRange([range[0], Math.max(range[0], value)]);
-          }}
-        />
-        <Checkbox
-          checked={loop}
-          disabled={range[1] <= range[0]}
-          onChange={(event) => {
-            setLoop(event.target.checked);
-            if (event.target.checked) seek(range[0]);
-          }}
-        >
-          {t("loop_selection")}
-        </Checkbox>
+                  );
+              } else audio.pause();
+            }}
+          >
+            {!compact && (playing ? t("pause_2") : t("play"))}
+          </Button>
+          {compact && (
+            <>
+              <Popover
+                trigger="click"
+                content={
+                  <div className="tsz-ve-review-volume">
+                    <Button
+                      type="text"
+                      aria-label={muted ? t("unmute") : t("mute")}
+                      icon={muted ? <VolumeXIcon /> : <Volume2Icon />}
+                      onClick={() => {
+                        audio.muted = !audio.muted;
+                        setMuted(audio.muted);
+                      }}
+                    />
+                    <Slider
+                      ariaLabelForHandle={t("playback_volume")}
+                      min={0}
+                      max={100}
+                      value={Math.round(volume * 100)}
+                      onChange={(value) => {
+                        audio.volume = value / 100;
+                        audio.muted = false;
+                        setVolume(audio.volume);
+                        setMuted(false);
+                      }}
+                    />
+                  </div>
+                }
+              >
+                <Button
+                  type="text"
+                  aria-label={t("playback_volume")}
+                  icon={
+                    muted || volume === 0 ? <VolumeXIcon /> : <Volume2Icon />
+                  }
+                />
+              </Popover>
+              <span className="tsz-ve-review-time" aria-live="off">
+                {position.toFixed(2)} / {duration.toFixed(2)} {t("seconds")}
+              </span>
+            </>
+          )}
+          <Select
+            aria-label={t("review_playback_speed")}
+            size={compact ? "middle" : "small"}
+            defaultValue={1}
+            options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => ({
+              value,
+              label: `${value}×`
+            }))}
+            onChange={(value) => {
+              audio.playbackRate = value;
+            }}
+          />
+        </div>
+        <div className="tsz-ve-review-range">
+          <InputNumber
+            aria-label={t("loop_start_in_seconds")}
+            size={compact ? "middle" : "small"}
+            min={0}
+            max={range[1]}
+            precision={2}
+            step={0.1}
+            value={range[0]}
+            disabled={!duration}
+            onChange={(value) => {
+              if (value !== null)
+                setRange([Math.min(value, range[1]), range[1]]);
+            }}
+          />
+          <span>–</span>
+          <InputNumber
+            aria-label={t("loop_end_in_seconds")}
+            size={compact ? "middle" : "small"}
+            min={range[0]}
+            max={duration}
+            precision={2}
+            step={0.1}
+            value={range[1]}
+            disabled={!duration}
+            onChange={(value) => {
+              if (value !== null)
+                setRange([range[0], Math.max(range[0], value)]);
+            }}
+          />
+          <Checkbox
+            checked={loop}
+            disabled={range[1] <= range[0]}
+            onChange={(event) => {
+              setLoop(event.target.checked);
+              if (event.target.checked) seek(range[0]);
+            }}
+          >
+            {t("loop_selection")}
+          </Checkbox>
+        </div>
         <Button
-          size="small"
+          size={compact ? "middle" : "small"}
+          type={compact ? "text" : "default"}
+          aria-label={t("download_original_audio")}
+          title={compact ? t("download_original_audio") : undefined}
+          icon={compact ? <DownloadIcon /> : undefined}
           disabled={!blob}
           onClick={() => {
             if (blob)
@@ -382,12 +463,14 @@ export function AudioReview({
               );
           }}
         >
-          {t("download_original_audio")}
+          {!compact && t("download_original_audio")}
         </Button>
-      </Space>
-      <Typography.Text type="secondary">
-        {t("playback_speed_only_affects_this_review")}
-      </Typography.Text>
+      </div>
+      {!compact && (
+        <Typography.Text type="secondary">
+          {t("playback_speed_only_affects_this_review")}
+        </Typography.Text>
+      )}
     </section>
   );
 }

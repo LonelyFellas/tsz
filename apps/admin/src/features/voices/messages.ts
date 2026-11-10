@@ -452,17 +452,14 @@ const fixedVoiceMessages = {
   adjust: ["调节", "調整", "Adjust"],
   voice: ["音色", "音色", "Voice"],
   common_voices_only: ["只看常用", "只看常用", "Common voices only"],
-  voice_order: ["音色排序", "音色排序", "Voice order"],
+  name_order: ["名称排序", "名稱排序", "Sort by name"],
+  age_order: ["年龄排序", "年齡排序", "Sort by age"],
   common_voices_first: ["常用优先", "常用優先", "Common voices first"],
   name_ascending: ["名称升序", "名稱升冪", "Name ascending"],
   name_descending: ["名称倒序", "名稱降冪", "Name descending"],
   age_ascending: ["年龄升序", "年齡升冪", "Age ascending"],
   age_descending: ["年龄倒序", "年齡降冪", "Age descending"],
-  voice_filters_and_order: [
-    "音色筛选和排序",
-    "音色篩選與排序",
-    "Voice filters and order"
-  ],
+  common_voice_filter: ["常用音色筛选", "常用音色篩選", "Filter common voices"],
   search_voices: ["搜索音色", "搜尋音色", "Search voices"],
   search_names_descriptions_or_listening_notes: [
     "搜索名称、介绍或听感",

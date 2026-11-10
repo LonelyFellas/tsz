@@ -116,6 +116,9 @@ export const voiceEditorMessages = {
   seconds: ["秒", "秒", "seconds"],
   pause_2: ["暂停", "暫停", "Pause"],
   play: ["播放", "播放", "Play"],
+  mute: ["静音", "靜音", "Mute"],
+  unmute: ["取消静音", "取消靜音", "Unmute"],
+  playback_volume: ["播放音量", "播放音量", "Playback volume"],
   review_playback_speed: ["审听倍速", "審聽倍速", "Review playback speed"],
   loop_start_in_seconds: [
     "循环起点秒数",
