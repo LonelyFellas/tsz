@@ -31,16 +31,36 @@
   margin-bottom: var(--ui-space-4);
   font-size: var(--ui-font-size-compact);
 }
-.admin-language__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .admin-language--compact .admin-language__control {
-  width: 190px;
+  width: auto;
 }
-@media (max-width: 480px) {
-  .admin-language--compact .admin-language__control {
-    width: 175px;
-  }
+.admin-language__trigger.ui-btn {
+  min-height: var(--ui-control-height-comfortable);
+  font-size: var(--ui-font-size-compact);
+}
+.admin-language__trigger[aria-expanded="true"] .admin-language__chevron {
+  transform: rotate(180deg);
+}
+.admin-language__menu {
+  width: 220px;
+  max-width: calc(100vw - 16px);
+}
+.admin-language__menu .ui-dropdown-menu-item {
+  min-height: var(--ui-control-height-lg);
+}
+.admin-language__menu .ui-menu-title-content {
+  flex: 1;
+  min-width: 0;
+}
+.admin-language__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+}
+.admin-language__option > span {
+  white-space: normal;
+}
+.admin-language__option > svg {
+  flex-shrink: 0;
 }

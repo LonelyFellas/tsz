@@ -575,6 +575,7 @@ export function SentenceEditor({
       <VoiceEditorModal
         open
         centered
+        width={1200}
         styles={{
           body: {
             maxHeight: "min(70vh, calc(100dvh - 160px))",
@@ -825,7 +826,6 @@ export function SentenceEditor({
               presentation="editor"
               showDone={false}
               showSaveButton={false}
-              collapseVoiceSettings
               afterText={
                 <V3SentenceTranslationsField
                   sentence={content.sentence}

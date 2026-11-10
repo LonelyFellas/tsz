@@ -169,9 +169,23 @@
   gap: 32px;
 }
 
-.admin-login__panel > .admin-language .admin-language__label,
-.admin-login__panel > .admin-language .admin-language__notice {
+.admin-login__footer .admin-language {
+  margin-bottom: 0;
+  justify-content: center;
+}
+
+.admin-login__footer .admin-language__notice,
+.admin-login__footer .admin-language__trigger {
   color: #d2def5;
+}
+
+.admin-login__footer .admin-language__trigger:not(:disabled):hover {
+  background: rgb(255 255 255 / 8%);
+  color: var(--ui-color-text-light-solid);
+}
+
+.admin-login__footer .admin-language__trigger:focus-visible {
+  outline-color: #d2def5;
 }
 
 .admin-login__header {
@@ -382,6 +396,10 @@
 }
 
 .admin-login__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-2);
   color: #d2def5;
   text-align: center;
   font-size: 10px;
@@ -449,7 +467,7 @@
     font-size: 18px;
   }
   .admin-login__platform {
-    font-size: 11px;
+    display: none;
   }
   .admin-login__card {
     padding: 32px 26px 34px;

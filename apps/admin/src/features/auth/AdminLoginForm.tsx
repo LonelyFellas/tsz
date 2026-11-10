@@ -209,7 +209,6 @@ export function AdminLoginForm({
           className="admin-login__panel"
           aria-labelledby="admin-login-heading"
         >
-          <InterfaceLanguage compact />
           <header className="admin-login__header">
             <span className="admin-login__mobile-brand">
               <span className="admin-login__mark" aria-hidden>
@@ -329,7 +328,8 @@ export function AdminLoginForm({
           </div>
 
           <footer className="admin-login__footer">
-            © {new Date().getFullYear()} 天生会背
+            <InterfaceLanguage compact />
+            <span>© {new Date().getFullYear()} 天生会背</span>
           </footer>
         </section>
       </div>
