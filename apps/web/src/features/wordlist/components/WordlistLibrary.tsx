@@ -1,5 +1,6 @@
 "use client";
-import { localText, type WebNotice } from "@/i18n/catalog";
+import { localText, type WebNotice, webErrorText } from "@/i18n/catalog";
+import { HttpError } from "@tsz/api-client";
 
 import { useWebText } from "@/i18n/client";
 import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
@@ -166,14 +167,20 @@ function Library({ userId }: { userId: string }) {
       const detail =
         e instanceof Error ? e.message.trim().replace(/[。.!！]+$/u, "") : "";
       setError(
-        detail
-          ? localText(webWordlist, "webWordlistLibrary:action_incomplete_v0", {
-              v0: detail
-            })
-          : localText(
-              webWordlist,
-              "webWordlistLibrary:the_action_did_not_complete_try_again_later"
-            )
+        e instanceof HttpError && e.requestLocale
+          ? webErrorText(e, "")
+          : detail
+            ? localText(
+                webWordlist,
+                "webWordlistLibrary:action_incomplete_v0",
+                {
+                  v0: detail
+                }
+              )
+            : localText(
+                webWordlist,
+                "webWordlistLibrary:the_action_did_not_complete_try_again_later"
+              )
       );
       await result.refetch();
     } finally {

@@ -923,3 +923,70 @@ it("刷新恢复动作由错误类型和稳定 code 决定，后端原文与语�
   expect(learningReloadSuggested(new RequestTimeoutError("POST"))).toBe(true);
   expect(learningReloadSuggested(new RequestTimeoutError("GET"))).toBe(false);
 });
+
+it("切换语言后旧语言的学习错误提示检查状态，不自动重试", async () => {
+  const detail = "仅有 0 道可出题内容，需要 20 道；请查看预览排除原因";
+  const plan = sourceRepairPlan();
+  plan.mode = "legacy_v1";
+  plan.mastery = undefined;
+  plan.current_run = null;
+  mocks.plansDetail.mockResolvedValue(plan);
+  const error = new HttpError(
+    409,
+    detail,
+    [],
+    "learning_insufficient_questions"
+  );
+  error.requestLocale = "zh-Hans";
+  const start = vi.fn().mockRejectedValue(error);
+  Object.assign(mocks, { start });
+  const tree = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <LearningTaskPage id="task" />
+    </InterfaceI18nProvider>
+  );
+  const view = renderWithProviders(tree("zh-Hans"));
+  fireEvent.click(await screen.findByRole("button", { name: /^开始练习$/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(detail);
+  view.rerender(tree("en-US"));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Check the current state"
+  );
+  expect(start).toHaveBeenCalledTimes(1);
+});
+
+it("迟到的旧语言写入错误不会覆盖新语言或重放请求", async () => {
+  const plan = sourceRepairPlan();
+  plan.mode = "legacy_v1";
+  plan.mastery = undefined;
+  plan.current_run = null;
+  mocks.plansDetail.mockResolvedValue(plan);
+  let reject!: (error: Error) => void;
+  const start = vi.fn(
+    () =>
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      })
+  );
+  Object.assign(mocks, { start });
+  const tree = (locale: "zh-Hans" | "en-US") => (
+    <InterfaceI18nProvider locale={locale}>
+      <LearningTaskPage id="task" />
+    </InterfaceI18nProvider>
+  );
+  const view = renderWithProviders(tree("zh-Hans"));
+  fireEvent.click(await screen.findByRole("button", { name: /^开始练习$/ }));
+  view.rerender(tree("en-US"));
+  const error = new HttpError(
+    409,
+    "仅有 0 道，需要 20 道",
+    [],
+    "learning_insufficient_questions"
+  );
+  error.requestLocale = "zh-Hans";
+  await act(async () => reject(error));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Check the current state"
+  );
+  expect(start).toHaveBeenCalledTimes(1);
+});

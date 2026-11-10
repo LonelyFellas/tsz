@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { HttpError } from "@tsz/api-client";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { LoginForm } from "./LoginForm";
 import { useUserStore } from "@/stores/user";
 import type { User } from "@tsz/types";
@@ -64,6 +65,32 @@ async function fillLogin(account = "13800138000", password = "abc123") {
 }
 
 describe("LoginForm — 密码与手机验证码登录", () => {
+  it("登录失败后切换语言不保留旧语言错误，也不重复提交", async () => {
+    const error = new HttpError(
+      401,
+      "账号或密码不正确",
+      [],
+      "invalid_credentials"
+    );
+    error.requestLocale = "zh-Hans";
+    mockLogin.mockRejectedValueOnce(error);
+    const tree = (locale: "zh-Hans" | "en-US") => (
+      <InterfaceI18nProvider locale={locale}>
+        <LoginForm />
+      </InterfaceI18nProvider>
+    );
+    const view = renderWithProviders(tree("zh-Hans"));
+    const user = await fillLogin();
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "账号或密码不正确"
+    );
+    view.rerender(tree("en-US"));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Check the current state"
+    );
+    expect(mockLogin).toHaveBeenCalledTimes(1);
+  });
   it.each([
     [429, "login_rate_limited", "登录尝试过于频繁"],
     [503, "login_unavailable", "登录服务暂不可用"]

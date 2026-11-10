@@ -89,7 +89,7 @@ export function InterfaceLanguage({
           <select
             id={id}
             className="min-h-12 w-full rounded-2xl border border-border bg-surface px-4 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"
-            value={snapshot.preference ?? "browser"}
+            value={snapshot.linkLocale ?? snapshot.preference ?? "browser"}
             disabled={snapshot.saving || snapshot.refreshing}
             onChange={(event) =>
               void save(event.target.value, event.currentTarget)

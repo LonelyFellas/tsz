@@ -13,6 +13,9 @@ export class SessionChangedError extends Error {
   }
 }
 
+export class SessionRefreshError extends Error {}
+export class SessionRefreshHttpError extends HttpError {}
+
 export interface TokenManager {
   getToken: () => string | undefined;
   getSessionGeneration: () => number;
@@ -309,7 +312,7 @@ export function createTokenManager({
         assertCurrent();
         deadline.signal.throwIfAborted();
         if (capability.status >= 500 || capability.status === 429)
-          throw new Error("会话连接暂时中断，正在自动恢复");
+          throw new SessionRefreshError("会话连接暂时中断，正在自动恢复");
         recoverySupported =
           capability.ok &&
           capability.headers.get("x-refresh-recovery") === "v1";
@@ -340,7 +343,8 @@ export function createTokenManager({
       }).then(async (res) => {
         assertCurrent();
         deadline.signal.throwIfAborted();
-        if (!res.ok) throw new HttpError(res.status, "会话刷新失败，请重试");
+        if (!res.ok)
+          throw new SessionRefreshHttpError(res.status, "会话刷新失败，请重试");
         recoverySupported = res.headers?.get("x-refresh-recovery") === "v1";
         const data = (await res.json()) as {
           access_token: string;
@@ -354,7 +358,7 @@ export function createTokenManager({
           !Number.isFinite(data.expires_in) ||
           data.expires_in <= 0
         ) {
-          throw new Error("会话刷新响应异常，请重试");
+          throw new SessionRefreshError("会话刷新响应异常，请重试");
         }
         const identity = tokenIdentity(accessToken);
         if (

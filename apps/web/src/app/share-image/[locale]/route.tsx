@@ -1,13 +1,20 @@
 import { ImageResponse } from "next/og";
 import { site } from "@/lib/site";
+import { createInterfaceI18n } from "@tsz/shared/i18n";
+import { webText } from "@/i18n/catalog";
+import { webApp } from "@/i18n/messages/app";
+import { getPublicResourceLocale } from "@/i18n/server";
 
 // 社交分享卡片(微信/X/各平台)的预览大图,动态生成。
 // 同一文件同时被 Next 用于 twitter summary_large_image。
-export const alt = site.fullName;
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+const size = { width: 1200, height: 630 };
 
-export default function OpengraphImage() {
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ locale: string }> }
+) {
+  const locale = await getPublicResourceLocale((await params).locale);
+  const t = webText(createInterfaceI18n(locale, webApp.resources), webApp);
   return new ImageResponse(
     <div
       style={{
@@ -29,7 +36,7 @@ export default function OpengraphImage() {
           letterSpacing: 4
         }}
       >
-        科学记忆 · 师生合一
+        {t("webApp:memory_based_learning_for_students_and_teachers")}
       </div>
       <div style={{ fontSize: 132, fontWeight: 700, marginTop: 24 }}>
         {site.name}
@@ -42,9 +49,11 @@ export default function OpengraphImage() {
           marginTop: 16
         }}
       >
-        智能英语单词学习平台 · 按遗忘曲线高效背词
+        {t(
+          "webApp:english_vocabulary_learning_review_using_the_forgetting_curve"
+        )}
       </div>
     </div>,
-    { ...size }
+    { ...size, headers: { "Cache-Control": "no-store" } }
   );
 }

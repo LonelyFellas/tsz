@@ -3,7 +3,6 @@ import {
   webCommon,
   localText,
   webErrorText,
-  originalText,
   type WebNotice,
   type WebText
 } from "@/i18n/catalog";
@@ -450,11 +449,12 @@ function PlanForm({
                   webTask,
                   "webTask:coverage_tasks_are_not_available_yet_your_draft_is_preserved_try_again_l"
                 )
-            : e instanceof Error
-              ? originalText(e.message)
-              : directPractice
-                ? localText(webTask, "webTask:could_not_start_try_again")
-                : localText(webTask, "webTask:could_not_create_try_again")
+            : webErrorText(
+                e,
+                directPractice
+                  ? localText(webTask, "webTask:could_not_start_try_again")
+                  : localText(webTask, "webTask:could_not_create_try_again")
+              )
         );
         const definite =
           e instanceof HttpError && e.status < 500 && e.status !== 408;

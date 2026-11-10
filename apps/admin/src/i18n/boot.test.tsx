@@ -1,17 +1,27 @@
 import { useLayoutEffect } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  Route,
+  RouterProvider,
+  Routes
+} from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AdminProfile } from "@tsz/types";
 import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
 import { api, authRuntime, useAuthStore } from "@/lib/auth";
 import { interfacePreferences } from "@/lib/interface-preferences";
 import { RootProviders } from "@/providers";
+import { RouteErrorPage } from "@/pages/RouteError";
 import { adminShellResources, useAdminTranslation } from "./index";
 import { AdminLocaleEffects } from "./effects";
 
+const restore = vi.hoisted(() =>
+  vi.fn(() => ({ retry: vi.fn(), retrying: false }))
+);
 vi.mock("@/features/auth/hooks/useAdminSessionRestore", () => ({
-  useAdminSessionRestore: () => ({ retry: vi.fn(), retrying: false })
+  useAdminSessionRestore: restore
 }));
 vi.mock("@/features/recovery/RecoverySession", () => ({
   RecoverySession: () => null
@@ -145,7 +155,7 @@ it("目录后台刷新不卸载草稿，换账号在新语言确认前隐藏旧�
   expect(await screen.findByRole("textbox")).toHaveValue("");
 });
 
-it.each([404, 503])(
+it.each([404, 405, 503])(
   "语言目录 %s 时结束加载，保留会话恢复失败的重试入口",
   async (status) => {
     authRuntime.tokens.setAccessToken(null);
@@ -159,3 +169,48 @@ it.each([404, 503])(
     expect(screen.getByRole("button", { name: "重试连接" })).toBeEnabled();
   }
 );
+
+it("路由资源错误等待账号语言并启动会话恢复", async () => {
+  const preference = deferred<AdminProfile>();
+  vi.mocked(api.profile).mockReturnValue(preference.promise);
+  const router = createMemoryRouter([
+    {
+      element: <RootProviders />,
+      errorElement: (
+        <RootProviders>
+          <RouteErrorPage />
+        </RootProviders>
+      ),
+      hydrateFallbackElement: <div />,
+      children: [
+        {
+          path: "/",
+          lazy: async () => {
+            throw new Error("Failed to fetch dynamically imported module");
+          }
+        }
+      ]
+    }
+  ]);
+  function ErrorHarness() {
+    const sessionKey = useAuthStore(() => interfacePreferences.sessionKey());
+    return (
+      <InterfacePreferencesProvider
+        controller={interfacePreferences}
+        sessionKey={sessionKey}
+        resources={adminShellResources}
+      >
+        <RouterProvider router={router} />
+      </InterfacePreferencesProvider>
+    );
+  }
+  render(<ErrorHarness />);
+  await waitFor(() => expect(restore).toHaveBeenCalled());
+  expect(screen.queryByText("页面资源加载失败")).toBeNull();
+  act(() => useAuthStore.getState().setProfile(profile));
+  await act(async () => preference.resolve(profile));
+  expect(
+    await screen.findByText("Page resources could not be loaded")
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /reload/i })).toBeEnabled();
+});
