@@ -129,19 +129,6 @@
   min-width: 0;
 }
 
-.word-actual-pronunciation-control
-  .v3-voice-text-field-compact
-  textarea.ui-input {
-  border-start-start-radius: var(--ui-border-radius);
-  border-end-start-radius: var(--ui-border-radius);
-  border-start-end-radius: 0;
-  border-end-end-radius: 0;
-}
-
-.word-synthesis-control > textarea.ui-input {
-  border-radius: 0;
-}
-
 .word-synthesis-control > .ui-btn,
 .word-synthesis-input > .ui-btn {
   flex-shrink: 0;

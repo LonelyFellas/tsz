@@ -1,4 +1,5 @@
 @import "../tokens.css";
+@import "../compact.css";
 
 @layer ui-base {
   .ui-app {
@@ -203,14 +204,6 @@
   }
   .ui-space-item {
     min-width: 0;
-  }
-  .ui-space-compact > :not(:first-child) {
-    border-start-start-radius: 0;
-    border-end-start-radius: 0;
-  }
-  .ui-space-compact > :not(:last-child) {
-    border-start-end-radius: 0;
-    border-end-end-radius: 0;
   }
   .ui-card {
     min-width: 0;

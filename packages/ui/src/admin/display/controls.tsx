@@ -16,7 +16,7 @@ import {
   TriangleAlert,
   X
 } from "lucide-react";
-import { useAdminDisabled } from "../context";
+import { useAdminControlSize, useAdminDisabled } from "../context";
 import type { Size } from "./layout";
 
 export interface ButtonProps extends Omit<
@@ -46,7 +46,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     {
       type = "default",
       htmlType = "button",
-      size = "middle",
+      size,
       color,
       variant,
       danger,
@@ -66,6 +66,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) {
     const inherited = useAdminDisabled();
+    size = useAdminControlSize(size) ?? "middle";
     const off = loading || (disabled ?? inherited);
     const glyph = loading ? (
       <LoaderCircle aria-hidden="true" className="ui-spinner" />

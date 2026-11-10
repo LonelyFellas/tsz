@@ -1,4 +1,5 @@
 @import "../tokens.css";
+@import "../compact.css";
 
 .ui-form,
 .ui-form-item,
@@ -200,13 +201,23 @@ textarea.ui-input {
   padding: var(--ui-space-1) 10px;
   background: var(--ui-color-fill-alter);
   border: 1px solid var(--ui-color-border);
-  border-inline-start: 0;
-  border-radius: 0 var(--ui-border-radius) var(--ui-border-radius) 0;
+  border-radius: var(--ui-border-radius);
   font: inherit;
   color: inherit;
 }
 .ui-input-search-button {
+  border-inline-start: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
   cursor: pointer;
+}
+.ui-input-search-button:disabled {
+  color: var(--ui-color-text-disabled);
+  background: var(--ui-color-bg-disabled);
+  cursor: not-allowed;
+}
+.ui-input-search-sm > .ui-input-search-button {
+  padding-block: 0;
 }
 .ui-input-group-wrapper {
   display: inline-block;
@@ -255,8 +266,12 @@ textarea.ui-input {
   white-space: nowrap;
 }
 .ui-input-lg,
+.ui-input-number-lg,
 .ui-select-lg {
   min-height: var(--ui-control-height-lg);
+}
+.ui-input-number-lg input {
+  height: 38px;
 }
 .ui-input-sm,
 .ui-select-sm,
@@ -265,6 +280,42 @@ textarea.ui-input {
 }
 .ui-input-number-sm input {
   height: 22px;
+}
+.ui-input-sm {
+  padding-block: 0;
+}
+.ui-input-affix-wrapper.ui-input-sm > .ui-input {
+  min-height: 22px;
+  padding-block: 0;
+}
+.ui-input-sm :is(.ui-input-clear-icon, .ui-input-password-icon) {
+  padding: 1px;
+  line-height: 1;
+}
+.ui-input-group-wrapper.ui-input-sm
+  > .ui-input-group
+  > :is(.ui-input, .ui-input-affix-wrapper) {
+  min-height: var(--ui-control-height-sm);
+  padding-block: 0;
+}
+.ui-input-group-wrapper.ui-input-sm .ui-input-affix-wrapper > .ui-input {
+  min-height: 22px;
+  padding-block: 0;
+}
+.ui-input-group-wrapper.ui-input-sm .ui-input-group-addon {
+  padding-block: 0;
+}
+.ui-input-group-wrapper.ui-input-lg
+  > .ui-input-group
+  > :is(.ui-input, .ui-input-affix-wrapper) {
+  min-height: var(--ui-control-height-lg);
+}
+.ui-select-sm {
+  padding-block: 1px;
+}
+.ui-select-sm .ui-select-content {
+  min-height: 20px;
+  line-height: 20px;
 }
 .ui-input:focus,
 .ui-input-affix-wrapper:focus-within,
@@ -289,6 +340,7 @@ textarea.ui-input {
   cursor: not-allowed;
 }
 .ui-input.ui-input-status-error,
+.ui-input-affix-wrapper.ui-input-status-error,
 .ui-input-affix-wrapper.ui-input-affix-wrapper-status-error,
 .ui-input-number.ui-input-number-status-error,
 .ui-select.ui-select-status-error,
@@ -303,6 +355,7 @@ textarea.ui-input {
   border-color: var(--ui-color-error);
 }
 .ui-input-status-error:focus,
+.ui-input-affix-wrapper.ui-input-status-error:focus-within,
 .ui-input-affix-wrapper-status-error:focus-within,
 .ui-input-number-status-error:focus-within,
 .ui-select-status-error.ui-select-focused,
@@ -316,13 +369,27 @@ textarea.ui-input {
   ) {
   outline-color: var(--ui-color-error);
 }
+.ui-input-search-status-error,
+.ui-input-search-status-error:focus-within,
 .ui-form-item-has-error .ui-input-search:focus-within {
   outline-color: var(--ui-color-error);
 }
+.ui-input-search-status-error
+  > :is(.ui-input, .ui-input-affix-wrapper, .ui-input-search-button),
+.ui-input-search-status-error:focus-within
+  > :is(.ui-input, .ui-input-affix-wrapper, .ui-input-search-button),
+.ui-input-group-wrapper.ui-input-status-error
+  > .ui-input-group
+  > :is(.ui-input, .ui-input-affix-wrapper, .ui-input-group-addon),
+.ui-form-item-has-error .ui-input-group > .ui-input-group-addon,
 .ui-form-item-has-error
   .ui-input-search:focus-within
   > :is(.ui-input, .ui-input-affix-wrapper, .ui-input-search-button) {
   border-color: var(--ui-color-error);
+}
+.ui-input-group-wrapper.ui-input-status-error
+  :is(.ui-input:focus, .ui-input-affix-wrapper:focus-within) {
+  outline-color: var(--ui-color-error);
 }
 .ui-input-borderless,
 .ui-select-borderless {
@@ -592,8 +659,26 @@ textarea.ui-input {
 }
 .ui-radio-button-wrapper {
   border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-border-radius);
+}
+.ui-radio-group-buttons {
+  gap: 0;
+  flex-wrap: nowrap;
+}
+.ui-radio-group-buttons > .ui-radio-button-wrapper {
+  min-height: var(--ui-control-height);
+  line-height: 1.35;
+}
+.ui-radio-group-buttons.ui-radio-group-small > .ui-radio-button-wrapper {
+  min-height: var(--ui-control-height-sm);
+  padding: 2px 7px;
+  font-size: var(--ui-font-size-compact);
+}
+.ui-radio-group-buttons.ui-radio-group-large > .ui-radio-button-wrapper {
+  min-height: var(--ui-control-height-lg);
 }
 .ui-radio-button-wrapper-checked {
+  z-index: 1;
   color: var(--ui-color-primary);
   border-color: currentColor;
 }

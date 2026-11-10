@@ -237,7 +237,7 @@ function RadioGroup<V extends ChoiceValue = string>({
       <div
         {...props}
         role="radiogroup"
-        className={`ui-radio-group ${size ? "ui-radio-group-" + size : ""} ${className}`}
+        className={`ui-radio-group ${optionType === "button" ? "ui-radio-group-buttons ui-space-compact" : ""} ${size ? "ui-radio-group-" + size : ""} ${className}`}
       >
         {options
           ? options.map((i) => {
