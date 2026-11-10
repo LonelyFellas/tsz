@@ -37,6 +37,7 @@
     --ui-color-warning-border: #f2da9d;
     --ui-focus-ring: 2px solid var(--ui-color-primary);
     --ui-focus-offset: 2px;
+    --ui-control-focus-offset: -2px;
     --ui-control-height: 32px;
     --ui-control-height-sm: 24px;
     --ui-control-height-lg: 40px;

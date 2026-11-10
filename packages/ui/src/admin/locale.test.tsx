@@ -10,6 +10,25 @@ import { Select } from "./forms/Select";
 import { Pagination } from "./table/Pagination";
 import { Modal } from "./overlays/dialog";
 
+it("切换每页条数时保留分页回调", () => {
+  const changed = vi.fn();
+  render(
+    <InterfaceI18nProvider locale="zh-Hans">
+      <Pagination
+        current={1}
+        pageSize={20}
+        total={920}
+        showSizeChanger
+        onChange={changed}
+      />
+    </InterfaceI18nProvider>
+  );
+  fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
+    target: { value: "50" }
+  });
+  expect(changed).toHaveBeenCalledWith(1, 50);
+});
+
 it("切换语言更新控件和门户标签，保留输入、日期值与分页语义", async () => {
   const changed = vi.fn();
   const date = dayjs("2026-11-08T08:30:00");
