@@ -3504,9 +3504,7 @@ describe("VoiceEditor 发音区", () => {
     ).toBeDisabled();
     reopened.rerender(<VoiceEditor {...view} audioAssets={cleared} />);
     fireEvent.click(screen.getByLabelText("移除 us.mp3"));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "移除", exact: true })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "移除" }));
     expect(onAudioAssetsChange.mock.calls.at(-1)![0]).toEqual([uk, another]);
   });
 
