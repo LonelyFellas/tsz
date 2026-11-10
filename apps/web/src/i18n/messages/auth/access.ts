@@ -95,20 +95,10 @@ export const webAuthAccess = /* @__PURE__ */ defineWebMessages(
       "手機號碼錯誤，請檢查後重試",
       "Invalid phone number. Check and try again."
     ],
-    use_15_128_characters_case_sensitive_symbols_and_spaces_allowed: [
-      "密码须为 15–128 个字符，区分大小写，支持符号和空格",
-      "密碼須為 15–128 個字元，區分大小寫，支援符號和空格",
-      "Use 15–128 characters; case-sensitive; symbols and spaces allowed"
-    ],
     verification_codes_are_unavailable_try_again_later: [
       "验证码服务暂时不可用，请稍后再试",
       "驗證碼服務暫時不可用，請稍後再試",
       "Verification codes are unavailable. Try again later."
-    ],
-    too_many_code_requests_try_again_later: [
-      "验证码发送过于频繁，请稍后再试",
-      "驗證碼傳送過於頻繁，請稍後再試",
-      "Too many code requests. Try again later."
     ],
     invalid_email_address: [
       "邮箱格式错误",
@@ -277,92 +267,7 @@ export const webAuthAccess = /* @__PURE__ */ defineWebMessages(
     ],
     verification_method: ["验证方式", "驗證方式", "Verification method"],
     resetting: ["重置中...", "重置中...", "Resetting…"],
-    reset_password_2: ["重置密码", "重設密碼", "Reset password"],
-    use_at_least_v0_characters_for_your_password: [
-      "密码至少 {{v0}} 位",
-      "密碼至少 {{v0}} 位",
-      "Use at least {{v0}} characters for your password"
-    ],
-    network_error_try_again_later: [
-      "网络异常，请稍后重试",
-      "網路異常，請稍後重試",
-      "Network error. Try again later."
-    ],
-    incorrect_or_expired_code_request_all_required_codes_again: [
-      "验证码错误或已失效，请重新获取所需的全部验证码",
-      "驗證碼錯誤或已失效，請重新獲取所需的全部驗證碼",
-      "Incorrect or expired code. Request all required codes again."
-    ],
-    contact_details_are_invalid_unbound_or_unchanged_check_and_try_again: [
-      "联系方式无效、尚未绑定或与当前联系方式相同，请检查后重试",
-      "聯絡方式無效、尚未繫結或與當前聯絡方式相同，請檢查後重試",
-      "Contact details are invalid, unbound or unchanged. Check and try again."
-    ],
-    the_password_service_is_unavailable_try_again_later: [
-      "密码服务暂不可用，请稍后再试",
-      "密碼服務暫時無法使用，請稍後重試",
-      "The password service is unavailable. Try again later."
-    ],
-    incorrect_current_password_try_again: [
-      "当前密码错误，请重试",
-      "當前密碼錯誤，請重試",
-      "Incorrect current password. Try again."
-    ],
-    your_session_expired_sign_in_again_to_continue: [
-      "登录已失效，请重新登录后操作",
-      "登入已失效，請重新登入後操作",
-      "Your session expired. Sign in again to continue."
-    ],
-    this_contact_method_is_used_by_another_account: [
-      "该联系方式已被其他账号使用",
-      "該聯絡方式已被其他賬號使用",
-      "This contact method is used by another account"
-    ],
-    too_many_sign_in_attempts_try_again_later: [
-      "登录尝试过于频繁，请稍后再试",
-      "登入嘗試過於頻繁，請稍後再試",
-      "Too many sign-in attempts. Try again later."
-    ],
-    sign_in_is_unavailable_try_again_later: [
-      "登录服务暂不可用，请稍后再试",
-      "登入服務暫不可用，請稍後再試",
-      "Sign-in is unavailable. Try again later."
-    ],
-    verification_codes_are_unavailable_try_again_later_3: [
-      "验证码服务暂不可用，请稍后再试",
-      "驗證碼服務暫不可用，請稍後再試",
-      "Verification codes are unavailable. Try again later."
-    ],
-    this_account_is_disabled_contact_support_2: [
-      "账号已停用，请联系平台客服",
-      "賬號已停用，請聯絡平臺客服",
-      "This account is disabled. Contact support."
-    ],
-    you_cannot_remove_your_last_sign_in_method: [
-      "不能移除最后一种登录方式",
-      "不能移除最後一種登入方式",
-      "You cannot remove your last sign-in method"
-    ],
-    verify_and_bind_a_phone_number_first: [
-      "请先验证并绑定手机号",
-      "請先驗證並繫結手機號",
-      "Verify and bind a phone number first"
-    ],
-    a_phone_number_cannot_be_unbound_use_change_phone_number_instead: [
-      "手机号不能解绑，请使用换绑手机号",
-      "手機號不能解綁，請使用換綁手機號",
-      "A phone number cannot be unbound. Use “Change phone number” instead."
-    ],
-    your_account_details_have_changed_reload_and_try_again: [
-      "账号信息已变化，请刷新页面后重试",
-      "賬號資訊已變化，請重新整理頁面後重試",
-      "Your account details have changed. Reload and try again."
-    ],
-    "15_128_characters_case_sensitive_symbols_and_spaces_allowed": [
-      "15–128 个字符，区分大小写，支持符号和空格",
-      "15–128 個字元，區分大小寫，支援符號和空格",
-      "15–128 characters; case-sensitive; symbols and spaces allowed"
-    ]
+    reset_password_2: ["重置密码", "重設密碼", "Reset password"]
   } as const,
   {
     you_have_learnt: "you have learned."
