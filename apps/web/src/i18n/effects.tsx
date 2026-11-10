@@ -79,7 +79,7 @@ export function WebLocaleEffects() {
       const url = new URL(window.location.href);
       if (url.searchParams.get("lang") !== locale) {
         url.searchParams.set("lang", locale);
-        window.history.replaceState(null, "", url);
+        window.history.replaceState({ tszLocaleGenerated: true }, "", url);
       }
     }
     const pageTitle = titles.find(([pattern]) => pattern.test(pathname))?.[1];

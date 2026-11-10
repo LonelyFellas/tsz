@@ -38,14 +38,14 @@ it("captures a language for a logical request and preserves code and field issue
       new Response(
         JSON.stringify({
           type: "urn:tsz:problem:revision_conflict",
-          title: "內容版本已變更",
+          title: "Revision changed",
           status: 409,
           code: "revision_conflict",
-          detail: "內容已變更",
+          detail: "Content has changed",
           field: "revision",
           meta: { current_revision: 3 }
         }),
-        { status: 409 }
+        { status: 409, headers: { "Content-Language": "en-US" } }
       )
     );
   vi.stubGlobal("fetch", fetcher);
@@ -65,7 +65,7 @@ it("captures a language for a logical request and preserves code and field issue
     status: 409,
     requestLocale: "en-US",
     code: "revision_conflict",
-    message: "內容已變更",
+    message: "Content has changed",
     meta: { current_revision: 3 },
     problem: { field: "revision" }
   });
@@ -74,6 +74,23 @@ it("captures a language for a logical request and preserves code and field issue
       new Headers(call[1].headers).get("Accept-Language")
     )
   ).toEqual(["en-US", "en-US"]);
+});
+
+it("does not assume the requested language when the response has no language header", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response("Bad Gateway", { status: 502, statusText: "Bad Gateway" })
+    )
+  );
+  const http = createHttpClient({
+    baseUrl: "/api/v1",
+    getInterfaceLocale: () => "zh-Hans"
+  });
+  expect(
+    await http.get("/entry").catch((error: unknown) => error)
+  ).toMatchObject({ status: 502, requestLocale: "unknown" });
 });
 
 it("records the response language even if the selection changes while the request is pending", async () => {

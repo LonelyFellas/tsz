@@ -289,14 +289,14 @@ describe("Web 界面目录", () => {
     );
   });
 
-  it("未知响应语言不把中文错误直接显示在英文界面", () => {
+  it("未知响应语言标明原文并保留数量和纠错详情", () => {
     const instance = createInterfaceI18n("en-US", webWordlist.resources);
     const error = new HttpError(409, "仅有 0 道，需要 20 道");
     error.requestLocale = "unknown";
     const rendered = webText(instance, webWordlist)(webErrorText(error, ""));
     expect(rendered).toContain("language of the error details is unconfirmed");
     expect(rendered).toContain("Check the current state");
-    expect(rendered).not.toContain("仅有");
+    expect(rendered).toContain("Original details: 仅有 0 道，需要 20 道");
     expect(error.message).toBe("仅有 0 道，需要 20 道");
   });
 

@@ -78,6 +78,34 @@ describe("账号界面偏好", () => {
     await controller.refresh();
     expect(controller.getSnapshot().locale).toBe("zh-Hans");
   });
+
+  it("选择跟随浏览器后，后台刷新和重开不把生成的分享参数当作偏好", async () => {
+    const f = fixture();
+    f.session(null, 1);
+    let generated = false;
+    let browser = "en-US";
+    const options = {
+      ...f.options,
+      browserLanguages: () => [browser],
+      getPublicLocale: () => (generated ? null : "en-US"),
+      onPreferenceChoice: () => {
+        generated = true;
+      }
+    };
+    const controller = createInterfacePreferences(options);
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("en-US");
+    await controller.saveGuest(null);
+    await controller.refresh();
+    expect(controller.getSnapshot().preference).toBeNull();
+    browser = "zh-CN";
+    await controller.refresh();
+    expect(controller.getSnapshot().locale).toBe("zh-Hans");
+    const reopened = createInterfacePreferences(options);
+    await reopened.refresh();
+    expect(reopened.getSnapshot().preference).toBeNull();
+    expect(reopened.getSnapshot().locale).toBe("zh-Hans");
+  });
   it("访客选择独立持久化，不调用私有 API 或复制到登录账号", async () => {
     const f = fixture();
     f.session(null, 1);

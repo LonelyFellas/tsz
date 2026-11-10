@@ -44,6 +44,7 @@ export function createInterfacePreferences({
   write,
   getStorage,
   getPublicLocale,
+  onPreferenceChoice,
   browserLanguages = () => []
 }: {
   surface: InterfaceSurface;
@@ -53,11 +54,13 @@ export function createInterfacePreferences({
   write: (locale: InterfaceLocale | null) => Promise<InterfaceLocale | null>;
   getStorage?: () => Pick<Storage, "getItem" | "setItem" | "removeItem">;
   getPublicLocale?: () => string | null;
+  onPreferenceChoice?: () => void;
   browserLanguages?: () => readonly string[];
 }) {
   let snapshot = initial;
   let readEpoch = 0;
   let guestPreference: InterfaceLocale | null | undefined;
+  let ignorePublicLocale = false;
   let pending:
     { owner: string; promise: Promise<void>; epoch: number } | undefined;
   const listeners = new Set<() => void>();
@@ -134,12 +137,15 @@ export function createInterfacePreferences({
         throw new Error("不支持目录默认语言");
       const { accountId } = getSession();
       const supported = directory.supported_locales;
-      const publicLocale = INTERFACE_LOCALES.find(
-        (locale) => locale === getPublicLocale?.() && supported.includes(locale)
-      );
+      const publicLocale = ignorePublicLocale
+        ? undefined
+        : INTERFACE_LOCALES.find(
+            (locale) =>
+              locale === getPublicLocale?.() && supported.includes(locale)
+          );
       const preference = accountId
         ? ((await read()) ?? null)
-        : (publicLocale ?? cached(null) ?? null);
+        : (cached(null) ?? null);
       if (!current()) return;
       // read 的 undefined 仅兼容旧 admin profile 缺字段；其他值仍须校验。
       decodeInterfaceLocale(preference);
@@ -150,7 +156,9 @@ export function createInterfacePreferences({
         preference,
         locale: resolve(
           directory,
-          preference ?? publicLocale ?? null,
+          accountId
+            ? (preference ?? publicLocale ?? null)
+            : (publicLocale ?? preference),
           accountId
         ),
         saving: false,
@@ -211,6 +219,8 @@ export function createInterfacePreferences({
         );
         if (sessionKey() !== owner) throw new Error("当前会话已变化，请重试");
         if (saved !== locale) throw new Error("偏好保存结果不一致，请重新读取");
+        ignorePublicLocale = true;
+        onPreferenceChoice?.();
         cache(accountId, saved);
         publish({
           ...snapshot,
@@ -246,6 +256,8 @@ export function createInterfacePreferences({
     if (locale !== null && !directory.supported_locales.includes(locale))
       throw new Error("该界面语言尚未开放");
     ++readEpoch;
+    ignorePublicLocale = true;
+    onPreferenceChoice?.();
     guestPreference = locale;
     cache("guest", locale);
     publish({

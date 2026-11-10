@@ -262,10 +262,7 @@ export function createHttpClient({
         problem
       );
       if (headers.get("X-TSZ-Localization") === "v1")
-        error.requestLocale =
-          res.headers.get("Content-Language") ??
-          headers.get("Accept-Language") ??
-          undefined;
+        error.requestLocale = res.headers.get("Content-Language") ?? "unknown";
       else if (getInterfaceLocale) error.requestLocale = "unknown";
       throw error;
     }
