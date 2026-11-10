@@ -408,6 +408,7 @@ function V3DialectFormCell({
               spelling={variant.spelling}
               content={spellingEditorValue(variant)}
               voiceProfile={variant.spelling_speech?.voice_profile}
+              audioAssets={variant.spelling_speech?.audio_assets}
               dialect={dialect}
               ariaLabelPrefix={t("dialect_spelling_label", {
                 label: formLabel,
@@ -866,6 +867,7 @@ export function V3ConcreteFormRow({
                     spelling={commonVariant.spelling}
                     content={spellingEditorValue(commonVariant)}
                     voiceProfile={commonVariant.spelling_speech?.voice_profile}
+                    audioAssets={commonVariant.spelling_speech?.audio_assets}
                     dialect="common"
                     ariaLabelPrefix={t("common_spelling_label", {
                       label: formLabel
@@ -974,6 +976,9 @@ export function V3ConcreteFormRow({
                     content={spellingEditorValue(unifiedSpellingVariants.uk)}
                     voiceProfile={
                       unifiedSpellingVariants.uk.spelling_speech?.voice_profile
+                    }
+                    audioAssets={
+                      unifiedSpellingVariants.uk.spelling_speech?.audio_assets
                     }
                     dialect="common"
                     ariaLabelPrefix={t("common_spelling_label", {

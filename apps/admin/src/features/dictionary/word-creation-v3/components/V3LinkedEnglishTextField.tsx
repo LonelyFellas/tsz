@@ -83,6 +83,7 @@ export function V3LinkedEnglishTextField({
                 ariaLabelPrefix={`${label} ${dialectLabel(row.dialect, t)}${suffix}`}
                 content={toRichTextV2(variant.value)}
                 voiceProfile={variant.voice_profile ?? undefined}
+                audioAssets={variant.audio_assets}
                 previewAdapter={createReadingPreviewAdapter(
                   variant.reading_links ?? []
                 )}

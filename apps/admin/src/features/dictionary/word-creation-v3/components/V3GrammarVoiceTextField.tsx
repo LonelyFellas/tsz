@@ -54,6 +54,7 @@ export function V3GrammarVoiceTextField({
           ariaLabelPrefix={props.ariaLabel}
           content={toRichTextV2(props.value)}
           voiceProfile={props.voiceProfile ?? undefined}
+          audioAssets={props.audioAssets}
           previewAdapter={previewAdapter}
         />
       }

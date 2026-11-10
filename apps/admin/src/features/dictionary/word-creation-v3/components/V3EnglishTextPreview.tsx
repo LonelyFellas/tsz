@@ -40,6 +40,7 @@ export function V3EnglishTextPreview({
                   pronunciationId={variant.id}
                   content={toRichTextV2(variant.value)}
                   voiceProfile={variant.voice_profile ?? undefined}
+                  audioAssets={variant.audio_assets}
                   dialect={dialect}
                   ariaLabelPrefix={t("panel_whole_sentence")}
                   playbackOnly
