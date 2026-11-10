@@ -13,6 +13,53 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { archive, bootstrap, point, prune } from "./releases.mjs";
 
+test("a new Web release keeps its middleware manifest separate from the previous build", async () => {
+  const temp = await mkdtemp(path.join(tmpdir(), "tsz-build-id-"));
+  const prior = process.env.TSZ_RELEASE_ID;
+  try {
+    process.env.TSZ_RELEASE_ID = "candidate-ci-123-1-web";
+    const { default: config } = await import("../apps/web/next.config.mjs");
+    const nextId = await config.generateBuildId();
+    assert.equal(nextId, process.env.TSZ_RELEASE_ID);
+    delete process.env.TSZ_RELEASE_ID;
+    assert.equal(await config.generateBuildId(), null);
+    const root = path.join(temp, "store");
+    const old = path.join(
+      temp,
+      "old",
+      "apps/web/.next/static/build-TfctsWXpff2fKS"
+    );
+    const fresh = path.join(temp, "new", "apps/web/.next/static", nextId);
+    await mkdir(old, { recursive: true });
+    await mkdir(fresh, { recursive: true });
+    await writeFile(path.join(old, "_clientMiddlewareManifest.js"), "old");
+    await writeFile(path.join(fresh, "_clientMiddlewareManifest.js"), "new");
+    await archive(root, path.join(temp, "old"), "web", "old");
+    await archive(root, path.join(temp, "new"), "web", "new");
+    assert.equal(
+      await readFile(
+        path.join(
+          root,
+          "assets/build-TfctsWXpff2fKS/_clientMiddlewareManifest.js"
+        ),
+        "utf8"
+      ),
+      "old"
+    );
+    assert.equal(
+      await readFile(
+        path.join(root, "assets", nextId, "_clientMiddlewareManifest.js"),
+        "utf8"
+      ),
+      "new"
+    );
+  } finally {
+    if (prior === undefined) delete process.env.TSZ_RELEASE_ID;
+    else process.env.TSZ_RELEASE_ID = prior;
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
 test("A → B preserves every old static dependency, switches the complete shell, and supports rollback", async () => {
   const temp = await mkdtemp(path.join(tmpdir(), "tsz-releases-"));
   try {

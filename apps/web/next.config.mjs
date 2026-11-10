@@ -9,6 +9,9 @@ const isBuild = process.env.NODE_ENV === "production";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   deploymentId: process.env.TSZ_RELEASE_ID,
+  // Next otherwise uses a constant build ID when deploymentId is set; static
+  // manifests from distinct releases must not collide in the retention store.
+  generateBuildId: async () => process.env.TSZ_RELEASE_ID ?? null,
   env: { TSZ_RELEASE_ID: process.env.TSZ_RELEASE_ID ?? "local" },
   images: {
     minimumCacheTTL: 300,
