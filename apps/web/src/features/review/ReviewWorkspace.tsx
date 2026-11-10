@@ -16,7 +16,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
 import type { ReviewAnswerInput, ReviewReceipt, StartReview } from "@tsz/types";
-import { Button, Input } from "@tsz/ui/components";
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@tsz/ui/components";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import {
@@ -358,25 +366,33 @@ function Overview({ userId }: { userId: string }) {
                   <h2 className="text-xl font-semibold">
                     {uiText("webReview:studied_content")}
                   </h2>
-                  <label className="text-sm">
-                    {uiText("webReview:filter")}{" "}
-                    <select
-                      aria-label={uiText("webReview:memory_filter")}
-                      className="ml-2 rounded-xl border border-border bg-surface p-2"
+                  <label className="flex items-center gap-2 text-sm">
+                    {uiText("webReview:filter")}
+                    <Select
                       value={filter}
-                      onChange={(e) => {
-                        setFilter(e.target.value);
+                      onValueChange={(value) => {
+                        setFilter(value);
                         setAfter(undefined);
                       }}
                     >
-                      <option value="all">{uiText("webReview:all")}</option>
-                      <option value="relearning">
-                        {uiText("webReview:needs_consolidation")}
-                      </option>
-                      <option value="paused">
-                        {uiText("webReview:paused")}
-                      </option>
-                    </select>
+                      <SelectTrigger
+                        aria-label={uiText("webReview:memory_filter")}
+                        className="min-h-11 w-auto min-w-40"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">
+                          {uiText("webReview:all")}
+                        </SelectItem>
+                        <SelectItem value="relearning">
+                          {uiText("webReview:needs_consolidation")}
+                        </SelectItem>
+                        <SelectItem value="paused">
+                          {uiText("webReview:paused")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </label>
                 </div>
                 {items.isPending ? (

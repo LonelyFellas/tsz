@@ -1,5 +1,7 @@
 import RcPagination from "@rc-component/pagination";
-import { ChevronDown } from "lucide-react";
+import { useId } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Select } from "../forms";
 import type { PaginationProps as RcPaginationProps } from "@rc-component/pagination";
 import zhCN from "@rc-component/pagination/es/locale/zh_CN";
 import zhTW from "@rc-component/pagination/es/locale/zh_TW";
@@ -19,6 +21,7 @@ export function Pagination({
   itemRender,
   ...props
 }: PaginationProps) {
+  const sizeChangerId = useId();
   const { t, i18n } = useInterfaceTranslation();
   const locale = {
     "zh-Hans": zhCN,
@@ -53,13 +56,21 @@ export function Pagination({
       locale={locale}
       prefixCls="ui-pagination"
       prevIcon={
-        <button type="button" aria-label={t("controls.previous")}>
-          ‹
+        <button
+          type="button"
+          className="ui-pagination-nav"
+          aria-label={t("controls.previous")}
+        >
+          <ChevronLeft size={16} aria-hidden="true" />
         </button>
       }
       nextIcon={
-        <button type="button" aria-label={t("controls.next")}>
-          ›
+        <button
+          type="button"
+          className="ui-pagination-nav"
+          aria-label={t("controls.next")}
+        >
+          <ChevronRight size={16} aria-hidden="true" />
         </button>
       }
       jumpPrevIcon={<span aria-hidden="true">…</span>}
@@ -71,22 +82,17 @@ export function Pagination({
         onSizeChange,
         className: selectClass
       }) => (
-        <span className="ui-pagination-size-changer">
-          <select
-            aria-label={t("controls.perPage")}
-            className={selectClass}
-            disabled={disabled}
-            value={value}
-            onChange={(event) => onSizeChange(event.target.value)}
-          >
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size="1em" aria-hidden="true" />
-        </span>
+        <Select
+          id={sizeChangerId}
+          aria-label={t("controls.perPage")}
+          className={selectClass}
+          disabled={disabled}
+          value={value}
+          options={options}
+          showSearch={false}
+          popupMatchSelectWidth={false}
+          onChange={(nextValue) => onSizeChange(String(nextValue))}
+        />
       )}
     />
   );

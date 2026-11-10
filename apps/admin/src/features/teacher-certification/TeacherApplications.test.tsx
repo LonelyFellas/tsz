@@ -402,9 +402,12 @@ it("筛选仍提交原状态 code，四语切换保留 1 基分页与 page size"
   });
   const view = show();
   await screen.findByText("李老师");
-  fireEvent.change(screen.getByLabelText("每页条数"), {
-    target: { value: "10" }
-  });
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "每页条数" }));
+  fireEvent.click(
+    await screen.findByText("10 条/页", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
   await waitFor(() =>
     expect(api.teacherCertification.list).toHaveBeenLastCalledWith(
       1,
@@ -427,7 +430,9 @@ it("筛选仍提交原状态 code，四语切换保留 1 基分页与 page size"
     "aria-current",
     "page"
   );
-  expect(screen.getByLabelText("Items per page")).toHaveValue("10");
+  expect(
+    screen.getByLabelText("Items per page").parentElement
+  ).toHaveTextContent("10 / page");
   expect(api.teacherCertification.list).toHaveBeenCalledTimes(count);
   fireEvent.mouseDown(
     screen.getByRole("combobox", { name: "Certification status" })

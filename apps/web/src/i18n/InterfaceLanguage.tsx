@@ -1,9 +1,16 @@
 "use client";
 
-import { useId, useState, useSyncExternalStore } from "react";
+import { useId, useRef, useState, useSyncExternalStore } from "react";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
 import type { InterfacePreferences } from "@tsz/shared/i18n/preferences";
-import { Button } from "@tsz/ui/components";
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@tsz/ui/components";
 import { interfacePreferences } from "@/lib/interface-preferences";
 import { useWebText } from "./client";
 import { webPreferences } from "./messages/preferences";
@@ -22,6 +29,7 @@ export function InterfaceLanguage({
 }) {
   const uiText = useWebText(webPreferences);
   const id = useId();
+  const selectRef = useRef<HTMLButtonElement>(null);
   const snapshot = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
@@ -38,8 +46,7 @@ export function InterfaceLanguage({
   const options = snapshot.capabilities?.supported_locales ?? [];
   const unavailable =
     snapshot.preference !== null && !options.includes(snapshot.preference);
-  async function save(value: string, select: HTMLSelectElement) {
-    const preserveFocus = document.activeElement === select;
+  async function save(value: string, select: HTMLButtonElement) {
     const locale = value === "browser" ? null : (value as InterfaceLocale);
     setFailure(null);
     try {
@@ -55,16 +62,15 @@ export function InterfaceLanguage({
       )
         setFailure(owner);
     } finally {
-      if (preserveFocus)
-        requestAnimationFrame(() => {
-          if (
-            controller.sessionKey() === owner &&
-            select.isConnected &&
-            !select.disabled &&
-            document.activeElement === document.body
-          )
-            select.focus({ preventScroll: true });
-        });
+      requestAnimationFrame(() => {
+        if (
+          controller.sessionKey() === owner &&
+          select.isConnected &&
+          !select.disabled &&
+          document.activeElement === document.body
+        )
+          select.focus({ preventScroll: true });
+      });
     }
   }
   return (
@@ -86,28 +92,33 @@ export function InterfaceLanguage({
         </div>
       ) : (
         <>
-          <select
-            id={id}
-            className="min-h-12 w-full rounded-2xl border border-border bg-surface px-4 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"
+          <Select
             value={snapshot.linkLocale ?? snapshot.preference ?? "browser"}
             disabled={snapshot.saving || snapshot.refreshing}
-            onChange={(event) =>
-              void save(event.target.value, event.currentTarget)
-            }
+            onValueChange={(value) => {
+              if (selectRef.current) void save(value, selectRef.current);
+            }}
           >
-            <option value="browser">{uiText("webPreferences:browser")}</option>
-            {options.map((locale) => (
-              <option key={locale} value={locale}>
-                {names[locale]}
-              </option>
-            ))}
-            {unavailable && snapshot.preference && (
-              <option value={snapshot.preference} disabled>
-                {names[snapshot.preference]} (
-                {uiText("webPreferences:unavailable")})
-              </option>
-            )}
-          </select>
+            <SelectTrigger id={id} ref={selectRef}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="browser">
+                {uiText("webPreferences:browser")}
+              </SelectItem>
+              {options.map((locale) => (
+                <SelectItem key={locale} value={locale}>
+                  {names[locale]}
+                </SelectItem>
+              ))}
+              {unavailable && snapshot.preference && (
+                <SelectItem value={snapshot.preference} disabled>
+                  {names[snapshot.preference]} (
+                  {uiText("webPreferences:unavailable")})
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
           {unavailable && (
             <p
               role="status"

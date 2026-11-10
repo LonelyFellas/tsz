@@ -1,6 +1,6 @@
 import { Empty, List } from "./display/surfaces";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import dayjs from "dayjs";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
@@ -10,7 +10,17 @@ import { Select } from "./forms/Select";
 import { Pagination } from "./table/Pagination";
 import { Modal } from "./overlays/dialog";
 
-it("切换每页条数时保留分页回调", () => {
+afterEach(() => vi.unstubAllGlobals());
+
+it("切换每页条数时保留分页回调", async () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
   const changed = vi.fn();
   render(
     <InterfaceI18nProvider locale="zh-Hans">
@@ -23,9 +33,12 @@ it("切换每页条数时保留分页回调", () => {
       />
     </InterfaceI18nProvider>
   );
-  fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
-    target: { value: "50" }
-  });
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "每页条数" }));
+  fireEvent.click(
+    await screen.findByText("50 条/页", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
   expect(changed).toHaveBeenCalledWith(1, 50);
 });
 

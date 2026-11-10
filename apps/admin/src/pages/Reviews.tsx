@@ -159,14 +159,6 @@ function ReviewQueue({ adminId }: { adminId: string }) {
           dataSource={result.data?.items ?? []}
           scroll={{ x: 800 }}
           pagination={{
-            itemRender: (_, type, original) =>
-              type === "next" ? (
-                <button type="button" aria-label={t("next_page")}>
-                  ›
-                </button>
-              ) : (
-                original
-              ),
             current: query.page,
             pageSize: query.page_size,
             total: result.data?.pagination.total ?? 0,
