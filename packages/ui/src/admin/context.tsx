@@ -2,21 +2,30 @@ import "./tokens.css";
 import { createContext, useContext, type ReactNode } from "react";
 
 const Disabled = createContext(false);
+type AdminControlSize = "small" | "middle" | "large";
+const ControlSize = createContext<AdminControlSize | undefined>(undefined);
 export function useAdminDisabled() {
   return useContext(Disabled);
+}
+export function useAdminControlSize(size?: AdminControlSize) {
+  const inherited = useContext(ControlSize);
+  return size ?? inherited;
 }
 
 export function AdminControls({
   componentDisabled,
+  componentSize,
   children
 }: {
   componentDisabled?: boolean;
+  componentSize?: AdminControlSize;
   children: ReactNode;
 }) {
   const inherited = useAdminDisabled();
+  const size = useAdminControlSize(componentSize);
   return (
     <Disabled.Provider value={componentDisabled ?? inherited}>
-      {children}
+      <ControlSize.Provider value={size}>{children}</ControlSize.Provider>
     </Disabled.Provider>
   );
 }

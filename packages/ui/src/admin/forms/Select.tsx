@@ -14,6 +14,7 @@ import {
   type ReactNode
 } from "react";
 import { useFieldDisabled } from "./Form";
+import { useAdminControlSize } from "../context";
 import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 
 type MenuParts<T> = Partial<
@@ -59,6 +60,7 @@ export function Select<
   ...props
 }: SelectProps<V, O>) {
   const { t } = useInterfaceTranslation();
+  size = useAdminControlSize(size);
   const prefix = "ui-select";
   const { root: rootStyle, popup: popupStyles, ...parts } = styles ?? {};
   const { root: rootClass, popup: popupClasses, ...classes } = classNames ?? {};

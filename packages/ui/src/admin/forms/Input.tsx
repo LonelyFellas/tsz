@@ -10,6 +10,7 @@ import RcNumber, {
 } from "@rc-component/input-number";
 import { forwardRef, useRef, useState, type ReactNode } from "react";
 import { useFieldDisabled } from "./Form";
+import { useAdminControlSize } from "../context";
 import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 import { X } from "lucide-react";
 export type { TextAreaRef } from "@rc-component/input";
@@ -52,6 +53,7 @@ const TextInput = forwardRef<InputRef, InputProps>(function TextInput(
   ref
 ) {
   const { t } = useInterfaceTranslation();
+  size = useAdminControlSize(size);
   return (
     <RcInput
       {...props}
@@ -135,19 +137,27 @@ function Search({
   style,
   className,
   onChange,
+  size,
+  status,
   ...props
 }: SearchProps) {
   const { t } = useInterfaceTranslation();
+  size = useAdminControlSize(size);
   const ref = useRef<InputRef>(null);
   const disabled = useFieldDisabled(providedDisabled);
   const search = () => {
     if (!disabled && !loading) onSearch?.(ref.current?.input?.value ?? "");
   };
   return (
-    <span className={`ui-input-search ${className ?? ""}`} style={style}>
+    <span
+      className={`ui-input-search ${fieldClass("ui-input-search", { size, status }, className)}`}
+      style={style}
+    >
       <TextInput
         type="search"
         {...props}
+        size={size}
+        status={status}
         ref={ref}
         disabled={disabled}
         onChange={onChange}
@@ -192,6 +202,7 @@ export function InputNumber<T extends ValueType = number>({
   className,
   ...props
 }: InputNumberProps<T>) {
+  size = useAdminControlSize(size);
   return (
     <RcNumber<T>
       {...props}

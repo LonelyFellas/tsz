@@ -5,6 +5,7 @@ import {
   type CSSProperties,
   type ReactNode
 } from "react";
+import { AdminControls } from "../context";
 
 export type Size = "small" | "middle" | "large";
 type Div = ComponentPropsWithRef<"div">;
@@ -97,16 +98,18 @@ Space.Compact = function Compact({
   ...props
 }: Div & { block?: boolean; size?: Size }) {
   return (
-    <div
-      {...props}
-      data-size={size}
-      className={`ui-space-compact ${className}`}
-      style={{
-        display: block ? "flex" : "inline-flex",
-        width: block ? "100%" : undefined,
-        ...style
-      }}
-    />
+    <AdminControls componentSize={size}>
+      <div
+        {...props}
+        data-size={size}
+        className={`ui-space-compact ${className}`}
+        style={{
+          display: block ? "flex" : "inline-flex",
+          width: block ? "100%" : undefined,
+          ...style
+        }}
+      />
+    </AdminControls>
   );
 };
 

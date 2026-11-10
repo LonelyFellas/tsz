@@ -1,0 +1,63 @@
+/* 表单控件位于未分层的 CSS 中，组合规则保持同层，避免接缝被控件圆角覆盖。 */
+.ui-space-compact,
+.ui-input-group {
+  align-items: stretch;
+  min-width: 0;
+  isolation: isolate;
+}
+
+.ui-space-compact > *,
+.ui-input-group > * {
+  position: relative;
+  min-width: 0;
+}
+
+/* 图标按钮保留点击宽度，高度跟随字段，不能用正方形比例撑高整组。 */
+.ui-space-compact > .ui-btn-icon-only {
+  min-width: var(--ui-control-height);
+  flex-shrink: 0;
+  aspect-ratio: auto;
+}
+
+.ui-space-compact > .ui-btn-icon-only.ui-btn-sm {
+  min-width: var(--ui-control-height-sm);
+}
+
+.ui-space-compact > .ui-btn-icon-only.ui-btn-lg {
+  min-width: var(--ui-control-height-lg);
+}
+
+/* 自定义输入包装层承接组员位置，内部真实控件继承其外侧圆角。 */
+.ui-space-compact > [data-ui-compact-item] {
+  border-radius: var(--ui-border-radius);
+}
+
+.ui-space-compact > :not(:first-child),
+.ui-input-group > :not(:first-child) {
+  margin-inline-start: -1px;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.ui-space-compact > :not(:last-child),
+.ui-input-group > :not(:last-child) {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.ui-space-compact
+  > [data-ui-compact-item]
+  > :is(.ui-input, .ui-input-affix-wrapper) {
+  border-radius: inherit;
+}
+
+/* 接缝只叠一条边线；聚焦项始终在 hover 项之上，不裁切键盘轮廓。 */
+.ui-space-compact > :hover,
+.ui-input-group > :hover {
+  z-index: 1;
+}
+
+.ui-space-compact > :focus-within,
+.ui-input-group > :focus-within {
+  z-index: 2;
+}

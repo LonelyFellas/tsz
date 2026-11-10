@@ -733,6 +733,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   // textarea 始终保留：Tab、错误定位 focus()、撤销和改字重映射仍走原来的输入路径。
   const collapsedField = (
     <div
+      data-ui-compact-item
       className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}`}
     >
       {fallback}

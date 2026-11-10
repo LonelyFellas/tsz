@@ -776,12 +776,12 @@ function PlanForm({
                 </label>
                 <div>
                   <div className="flex items-center gap-3">
-                    <div className="inline-flex items-center overflow-hidden rounded-xl border border-border">
+                    <div className="inline-flex items-stretch overflow-hidden rounded-xl border border-border">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="rounded-none"
+                        className="h-auto rounded-none focus-visible:-outline-offset-2"
                         aria-label={uiText("webTask:reduce_daily_questions")}
                         disabled={locked || (validCount && n <= 1)}
                         onClick={() =>
@@ -810,13 +810,13 @@ function PlanForm({
                         disabled={locked}
                         value={count}
                         onChange={(e) => setCount(e.target.value)}
-                        className="w-14 rounded-none border-0 px-0 text-center shadow-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        className="w-14 rounded-none border-0 px-0 text-center shadow-none focus-visible:ring-inset [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="rounded-none"
+                        className="h-auto rounded-none focus-visible:-outline-offset-2"
                         aria-label={uiText("webTask:increase_daily_questions")}
                         disabled={
                           locked ||
