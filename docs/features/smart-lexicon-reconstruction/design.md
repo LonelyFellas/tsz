@@ -15,7 +15,7 @@ Rust 保持业务权限、领域事实、保存、审核和发布的最终权威
 | 模型接入与调用视图                                | 主线已有，改造复用           | 抽统一 gateway；助手/词形也接同一约束；现有账户适配不自动全保留 |
 | 命题审核经验                                      | 机制可复用，业务 schema 重写 | 反馈中有直接命题校验和固定 capability；仅保留幂等/撤销机制      |
 | 新词库领域模型、审核依赖、候选采纳                | 真正新工作                   | 新表新 ID；D01–D07 决定部分约束；无旧数据转换依赖               |
-| 前端编辑、预览、用户阅读                          | 基础组件可复用，领域状态重写 | AntD、认证、媒体编辑器复用；V3 表单/DTO 不直接复用              |
+| 前端编辑、预览、用户阅读                          | 基础组件可复用，领域状态重写 | 共享 Admin 控件、认证、媒体编辑器复用；V3 表单/DTO 不直接复用   |
 | 词表/学习接入新来源                               | 真正新工作                   | 现有消费者直接解码旧结构；需明确 source_kind 与新投影           |
 | 第二场景                                          | 候选验证工作                 | 评论领域入口未在本次源码范围发现，须确认业务范围，不能假定现成  |
 | 数据训练/蒸馏                                     | 未发现实现，可选新工作       | 先取得合法样本、冻结评测、证明质量/成本瓶颈；不阻塞首发         |
@@ -219,7 +219,7 @@ flowchart LR
 
 独立 `lexicon_next` schema 包含 entries、永久 nodes、forms、senses、definitions、equivalents、draft_revisions。保存整份所有 locale 草稿，事务复核会话/所有权及 expected_revision；冲突不覆盖数据库或浏览器本地稿。旧库不迁移、不关联。schema_version 固定 1，无未校验扩展袋。
 
-五个 Admin 操作：GET capabilities、POST entries、GET/PUT entries/{id}、GET entries/{id}/view。沿用 words.access/create/edit/edit_others，能力明确 generation=false、publishing=false。前端只增加局部 AntD 编辑器与对应导航；UI 界面语言独立于业务语言选择。预览不回写草稿。
+五个 Admin 操作：GET capabilities、POST entries、GET/PUT entries/{id}、GET entries/{id}/view。沿用 words.access/create/edit/edit_others，能力明确 generation=false、publishing=false。前端只增加共享 Admin 控件编辑器与对应导航；UI 界面语言独立于业务语言选择。预览不回写草稿。
 
 后端 down 会删除本切片全部新库草稿/历史，属于有损回退；旧 schema 保持。旧后端无这些路径，新前端能力请求失败时关闭编辑；旧前端现有路径/响应不变。配套部署未授权，实际线上混合版本未验收，不能据本地测试宣称可发布。
 

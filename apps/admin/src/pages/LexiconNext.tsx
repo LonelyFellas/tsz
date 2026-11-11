@@ -9,20 +9,15 @@ import {
 } from "react-router-dom";
 import {
   Alert,
-  App,
   Button,
-  Checkbox,
   Collapse,
-  Form,
-  Input,
-  Modal,
-  Radio,
-  Select,
   Space,
   Spin,
   Tag
-} from "antd";
-import { PlusOutlined, SaveOutlined } from "@ant-design/icons";
+} from "@tsz/ui/admin/display";
+import { Checkbox, Form, Input, Radio, Select } from "@tsz/ui/admin/forms";
+import { App, Modal } from "@tsz/ui/admin/overlays";
+import { Plus, Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
   CreateNextEntry,
@@ -34,7 +29,6 @@ import type {
   NextSense
 } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
-import { AntProvider } from "@/features/lexicon-next/AntProvider";
 import { ContentRows } from "@/features/lexicon-next/ContentRows";
 import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
@@ -53,9 +47,9 @@ export function LexiconNextPage({
   requests = api.lexiconNext
 }: { requests?: LexiconNextRequests } = {}) {
   return (
-    <AntProvider>
+    <App>
       <LexiconNextWorkspace requests={requests} />
-    </AntProvider>
+    </App>
   );
 }
 function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
@@ -146,7 +140,7 @@ function EntryStart({ requests }: { requests: LexiconNextRequests }) {
         <h2>创建英语词条</h2>
         {!canCreate && <Alert type="info" title="当前账号没有创建词条权限" />}
         {error && <Alert type="error" showIcon title={error} />}
-        <Form
+        <Form<CreateNextEntry>
           layout="vertical"
           initialValues={{ kind: "word" }}
           disabled={busy || !canCreate}
@@ -368,7 +362,7 @@ function EntryEditor({
           </Button>
           <Button
             type="primary"
-            icon={<SaveOutlined aria-hidden="true" />}
+            icon={<Save aria-hidden="true" />}
             loading={busy}
             disabled={!writable || !dirty || conflict}
             onClick={save}
@@ -465,7 +459,7 @@ function EntryEditor({
       <div className="lexicon-next-section-heading">
         <h2>义项</h2>
         <Button
-          icon={<PlusOutlined aria-hidden="true" />}
+          icon={<Plus aria-hidden="true" />}
           disabled={disabled}
           onClick={() =>
             setDraft({

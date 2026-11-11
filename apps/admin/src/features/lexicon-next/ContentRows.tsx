@@ -1,5 +1,6 @@
-import { Button, Input, Select, Space } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Space } from "@tsz/ui/admin/display";
+import { Input, Select } from "@tsz/ui/admin/forms";
+import { Trash2, Plus } from "lucide-react";
 import type { NextDefinition, NextEquivalent } from "@tsz/types";
 
 type Row = NextEquivalent | NextDefinition;
@@ -78,7 +79,7 @@ export function ContentRows({
             )}
             <Button
               aria-label={`删除${label} ${index + 1}`}
-              icon={<DeleteOutlined aria-hidden="true" />}
+              icon={<Trash2 aria-hidden="true" />}
               disabled={disabled}
               onClick={() =>
                 onChange(rows.filter((item) => item.id !== row.id))
@@ -88,7 +89,7 @@ export function ContentRows({
         </div>
       ))}
       <Button
-        icon={<PlusOutlined aria-hidden="true" />}
+        icon={<Plus aria-hidden="true" />}
         disabled={disabled}
         onClick={() =>
           onChange([

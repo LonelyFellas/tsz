@@ -191,3 +191,13 @@ Admin Vite `http://127.0.0.1:59844` 代理到 `http://127.0.0.1:59843/api/v1`，
 前端首次提交正常 pre-commit 的 Prettier、ESLint 及 commit-msg 的 commitlint 全部通过，hook 未改变源码。此次只 commit，不执行前端技能的 pre-push 审查流程。
 
 后端按 ship 提交章节执行独立只读审查，精确范围 `8838c4f065f30d42b88256b30501f9f911a37098..88611753ede0aeee0e70ad9a56c7ed9d28d940af`，未发现 P0–P2 阻断；未重跑已有有效测试。审查：1 轮；确认缺陷 0；证据排除误报 0；关联回归/回退：未知。补充回退限制：后端启动严格校验 SQLx 迁移，不能仅凭旧表未变推断旧二进制可在新增迁移后启动；线上组合与回退仍未验收。
+
+### PR 准备与共享控件修正
+
+用户已授权推送并创建配套 PR。后端保持 `88611753ede0aeee0e70ad9a56c7ed9d28d940af`，正常 pre-push fmt 通过，PR 为 https://github.com/LonelyFellas/tsz-rust/pull/394。
+
+前端首次独立 pre-push 审查发现新词库引入 AntD、增加 ESLint 例外并禁止使用共享控件，违反当前 Admin 规范。此前只有上游 Agent 交接文字要求 AntD，没有人类授权覆盖项目规则。本次改为 `@tsz/ui/admin/*` 和 Lucide，删除局部 AntProvider，恢复原 ESLint 门禁，移除两项新增依赖及其锁文件增量。业务模型、接口及请求时机未变。
+
+修正后：两文件 9 项语言编辑/模型测试、Admin typecheck、Admin production build、41 份样式及 4 项检查脚本测试通过。原 5 项真实 PostgreSQL 集成及真实代理验收的后端、契约和业务状态逻辑未变，沿用其证据，不声称本轮重跑数据库联调。
+
+本轮内置浏览器已可用，使用临时独立界面 fixture（模拟请求、无 token/真实账号或持久化）验证共享控件：四组合正确显示，繁体输入切换后保留，显式保存变为版本 2，已保存预览弹窗正确显示当前组合；1440px、390px 均无横向溢出。截图保存在 `/Users/darwish/.codex/visualizations/2026/11/11/language-shared-controls/{1440,390}.png`。fixture 是 UI 回归，不能替代既有真实后端验收。临时入口文件已移除，Vite 服务停止，视口覆盖已恢复，自建标签已关闭；未创建数据库/缓存/OSS/外部模型资源。
