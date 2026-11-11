@@ -24,6 +24,7 @@ import type {
   NextDraft,
   NextEntry,
   NextEntryView,
+  NextWorkspaceEntry,
   NextLanguageCapability,
   NextSense,
   WordCreationStep
@@ -323,7 +324,28 @@ function EntryEditor({
     try {
       await operation();
     } catch (error) {
-      if (error instanceof HttpError && error.status === 409) {
+      if (
+        error instanceof HttpError &&
+        error.status === 409 &&
+        error.code === "entry_archived"
+      ) {
+        queryClient.setQueryData<NextWorkspaceEntry>(
+          ["admin-lexicon-next", "workspace-entry", saved.id],
+          (current) => (current ? { ...current, status: "archived" } : current)
+        );
+        setConflict(false);
+        setError(
+          "词条已被归档。本地草稿已保留；请先在垃圾桶恢复词条，再重新打开编辑。"
+        );
+        await Promise.all(
+          ["list", "stats"].map((key) =>
+            queryClient.invalidateQueries({
+              queryKey: ["admin-lexicon-next", key],
+              refetchType: "all"
+            })
+          )
+        );
+      } else if (error instanceof HttpError && error.status === 409) {
         setConflict(true);
         setError("服务器版本已更新。本地草稿已保留，请先比较版本。");
       } else if (error instanceof HttpError && error.status === 403) {

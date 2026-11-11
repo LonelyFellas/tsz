@@ -43,7 +43,7 @@ const entry: NextEntry = {
 function requests() {
   return {
     list: vi.fn(),
-    workspaceEntry: vi.fn().mockResolvedValue({ status: "draft" }),
+    workspaceEntry: vi.fn().mockResolvedValue(listRow()),
     stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 }),
     creators: vi.fn().mockResolvedValue([]),
     command: vi.fn(),
@@ -624,6 +624,9 @@ it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", asyn
     items: [listRow({ annotation_visible: true, annotation: "1" })],
     pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
   });
+  api.workspaceEntry.mockResolvedValue(
+    listRow({ annotation_visible: true, annotation: "1" })
+  );
   api.annotation.mockRejectedValue(
     new HttpError(409, "标注已变化，请重新打开后确认", [], "revision_conflict")
   );
@@ -641,6 +644,29 @@ it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", asyn
   fireEvent.click(button("取消"));
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  api.workspaceEntry.mockResolvedValue(
+    listRow({
+      annotation_visible: true,
+      annotation: "9",
+      annotation_revision: 4
+    })
+  );
+  api.annotation.mockResolvedValue({
+    entry_id: id,
+    annotation: "10",
+    annotation_revision: 5
+  });
+  fireEvent.click(button("更多操作：centre"));
+  fireEvent.click(await screen.findByText("标注"));
+  const reopened = await screen.findByDisplayValue("9");
+  fireEvent.change(reopened, { target: { value: "10" } });
+  fireEvent.click(button("保存标注"));
+  await waitFor(() =>
+    expect(api.annotation).toHaveBeenLastCalledWith(id, {
+      annotation: "10",
+      base_annotation_revision: 4
+    })
   );
 });
 it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", async () => {
@@ -667,4 +693,27 @@ it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", a
       month: 1
     })
   );
+});
+
+it("编辑期间被归档后保留本地输入并转只读，不引导丢弃草稿比较版本", async () => {
+  const api = requests();
+  api.save.mockRejectedValue(
+    new HttpError(409, "归档词条不能编辑", [], "entry_archived")
+  );
+  const { client } = mount(api);
+  await screen.findByDisplayValue("centre");
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local unsaved" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findByText(/词条已被归档/);
+  expect(screen.getByDisplayValue("local unsaved")).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
+  expect(button("保存完整草稿")).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "比较服务器版本" })
+  ).not.toBeInTheDocument();
+  expect(
+    client.getQueryData(["admin-lexicon-next", "workspace-entry", id])
+  ).toMatchObject({ status: "archived" });
 });

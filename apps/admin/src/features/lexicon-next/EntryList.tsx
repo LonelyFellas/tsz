@@ -143,6 +143,7 @@ export function EntryList({
     rows: NextWorkspaceEntry[];
   }>();
   const [annotationEntry, setAnnotationEntry] = useState<NextWorkspaceEntry>();
+  const [loadingAnnotationId, setLoadingAnnotationId] = useState<string>();
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState<string>();
@@ -192,6 +193,29 @@ export function EntryList({
         }))
       }
     });
+  }
+  async function openAnnotation(id: string) {
+    if (lock.current) return;
+    lock.current = true;
+    setLoadingAnnotationId(id);
+    try {
+      const current = await requests.workspaceEntry(id);
+      if (current.status === "archived" || !allowed(current, "edit")) {
+        void message.warning(t("next_annotation_unavailable"));
+        await refresh();
+        return;
+      }
+      setError(undefined);
+      setConflict(false);
+      setAnnotationEntry(current);
+    } catch (failure) {
+      void message.error(
+        failure instanceof Error ? failure.message : t("list_failed")
+      );
+    } finally {
+      lock.current = false;
+      setLoadingAnnotationId(undefined);
+    }
   }
   const mayCommand = (
     action: NextListCommand["action"],
@@ -431,11 +455,7 @@ export function EntryList({
                         label: t("annotation"),
                         disabled:
                           row.status === "archived" || !allowed(row, "edit"),
-                        onClick: () => {
-                          setError(undefined);
-                          setConflict(false);
-                          setAnnotationEntry(row);
-                        }
+                        onClick: () => void openAnnotation(row.id)
                       }
                     ]
                   : []),
@@ -468,6 +488,7 @@ export function EntryList({
             <Button
               type="link"
               aria-label={t("next_more_actions", { label: row.headword })}
+              loading={loadingAnnotationId === row.id}
             >
               {t("next_more")}
               <ChevronDownIcon />

@@ -41,6 +41,11 @@ export const lexiconListMessages = {
     "More actions for {{label}}"
   ],
   next_more: ["更多", "更多", "More"],
+  next_annotation_unavailable: [
+    "词条已归档或当前账号无编辑权限，请刷新列表",
+    "詞條已封存或目前帳號沒有編輯權限，請重新整理清單",
+    "The entry is archived or you cannot edit it. Refresh the list"
+  ],
   next_stats_failed: [
     "统计加载失败",
     "統計載入失敗",
