@@ -60,7 +60,7 @@ function Probe() {
     </>
   );
 }
-function Harness() {
+function Harness({ effects = false }: { effects?: boolean }) {
   const owner = useUserStore(() => interfacePreferences.sessionKey());
   return (
     <InterfacePreferencesProvider
@@ -68,6 +68,7 @@ function Harness() {
       sessionKey={owner}
       initialLocale="zh-Hans"
     >
+      {effects && <WebLocaleEffects />}
       <WebLocaleBoundary>
         <Probe />
       </WebLocaleBoundary>
@@ -184,6 +185,43 @@ it("英文分享链接在中文浏览器的服务端渲染和访客水合后保�
     container.remove();
   }
 });
+it("账号偏好暂时读不到时保留分享语言和 URL，目录停用后才回退", async () => {
+  window.history.replaceState(null, "", "/login?lang=en-US");
+  vi.spyOn(navigator, "languages", "get").mockReturnValue(["zh-CN"]);
+  const read = vi
+    .spyOn(authRuntime.api.interfacePreferences, "get")
+    .mockResolvedValue({ preferences: { interface_locale: null } });
+  useUserStore.setState({
+    user: { ...user, roles: ["student"] },
+    hydrated: true
+  });
+  render(<Harness effects />);
+  await waitFor(() => expect(document.documentElement.lang).toBe("en-US"));
+
+  read.mockRejectedValueOnce(new Error("offline"));
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(interfacePreferences.getSnapshot()).toMatchObject({
+    status: "error",
+    linkLocale: "en-US"
+  });
+  expect(screen.getByRole("heading")).toHaveTextContent("Save");
+  expect(document.documentElement.lang).toBe("en-US");
+  expect(window.location.search).toBe("?lang=en-US");
+
+  vi.mocked(fetch).mockImplementation(async () =>
+    Response.json({ ...directory, supported_locales: ["zh-Hans"] })
+  );
+  read.mockRejectedValueOnce(new Error("offline"));
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(interfacePreferences.getSnapshot().linkLocale).toBeUndefined();
+  expect(document.documentElement.lang).toBe("zh-Hans");
+  expect(window.location.search).toBe("?lang=zh-Hans");
+});
+
 it("身份与账号偏好未确认时无可见默认文案，首个已确认画面为英文", async () => {
   const preference = deferred<"en-US">();
   vi.spyOn(authRuntime.api.interfacePreferences, "get").mockImplementation(
