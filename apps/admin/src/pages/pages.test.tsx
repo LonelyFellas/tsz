@@ -354,7 +354,7 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getByText("移入垃圾桶")).toBeInTheDocument();
     expect(screen.queryByText(/^删除/)).toBeNull();
     // 面包屑末级为「智能词库」。
-    expect(screen.getAllByText("智能词库").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("智能词库V1").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByText("创建词条"));
     expect(screen.getByTestId("location")).toHaveTextContent("/words/new");

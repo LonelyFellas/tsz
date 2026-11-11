@@ -28,6 +28,10 @@ const WORD_STEP_TITLE: Record<WordCreationStep, WorkspaceMessage> = {
 
 interface Props {
   currentStep: WordCreationStep;
+  dictionary?: { path: string; label: string; back: string };
+  stepLabels?: Partial<
+    Record<WordCreationStep, { title: string; subtitle: string }>
+  >;
   reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
   onStepChange?: (step: WordCreationStep) => void;
@@ -58,6 +62,8 @@ const STEP_SUBTITLE: Record<WordCreationStep, WorkspaceMessage> = {
 
 export function WordCreationLayout({
   currentStep,
+  dictionary,
+  stepLabels,
   reachableSteps,
   readOnly,
   onStepChange,
@@ -103,7 +109,11 @@ export function WordCreationLayout({
         items={[
           { title: t("dictionary_management") },
           {
-            title: <Link to="/words">{t("dictionary")}</Link>
+            title: (
+              <Link to={dictionary?.path ?? "/words"}>
+                {dictionary?.label ?? t("dictionary")}
+              </Link>
+            )
           },
           { title: presentation.breadcrumbTitle }
         ]}
@@ -135,8 +145,12 @@ export function WordCreationLayout({
                 {finished ? <CheckIcon /> : index + 1}
               </span>
               <span>
-                <strong>{t(WORD_STEP_TITLE[step])}</strong>
-                <small>{t(STEP_SUBTITLE[step])}</small>
+                <strong>
+                  {stepLabels?.[step]?.title ?? t(WORD_STEP_TITLE[step])}
+                </strong>
+                <small>
+                  {stepLabels?.[step]?.subtitle ?? t(STEP_SUBTITLE[step])}
+                </small>
               </span>
               {finished && <span className="sr-only">{t("completed")}</span>}
             </button>
@@ -149,10 +163,10 @@ export function WordCreationLayout({
           <Button
             type="text"
             icon={<ChevronLeftIcon />}
-            onClick={() => navigate("/words")}
+            onClick={() => navigate(dictionary?.path ?? "/words")}
             className="word-creation-back"
           >
-            {t("back")}
+            {dictionary?.back ?? t("back")}
           </Button>
 
           {presentation.showEntrySummary !== false && (

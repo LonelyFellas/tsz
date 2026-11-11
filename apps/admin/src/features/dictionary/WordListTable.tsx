@@ -15,9 +15,8 @@ import { ColumnSettings } from "@/components/ColumnSettings";
 import { useColumnSettings } from "@/components/useColumnSettings";
 import type { ColumnFixed } from "@/components/column-settings";
 import type { AdminWordListItemAny } from "@tsz/types";
-import { wordListLabel } from "./presentation";
 
-export interface WordColumn {
+export interface WordColumn<Row = AdminWordListItemAny> {
   key: string;
   title: string;
   width: number;
@@ -25,13 +24,15 @@ export interface WordColumn {
   wideOnly?: boolean;
   defaultVisible?: boolean;
   ellipsis?: boolean;
-  render: (row: AdminWordListItemAny) => ReactNode;
+  render: (row: Row) => ReactNode;
 }
 
-interface WordListTableProps {
+interface WordListTableProps<Row extends { id: string }> {
   tableId: string;
-  columns: WordColumn[];
-  rows: AdminWordListItemAny[];
+  ariaLabel?: string;
+  columns: WordColumn<Row>[];
+  rows: Row[];
+  rowLabel: (row: Row) => string;
   loading: boolean;
   toolbar: ReactNode;
   emptyText: ReactNode;
@@ -41,17 +42,19 @@ interface WordListTableProps {
   onPageChange: (page: number, size: number) => void;
   selection?: {
     keys: string[];
-    onChange: (keys: string[], selected: AdminWordListItemAny[]) => void;
-    disabled: (row: AdminWordListItemAny) => boolean;
+    onChange: (keys: string[], selected: Row[]) => void;
+    disabled: (row: Row) => boolean;
   };
 }
 
 const CHECKBOX_WIDTH = 44;
 
-export function WordListTable({
+export function WordListTable<Row extends { id: string }>({
   tableId,
+  ariaLabel,
   columns,
   rows,
+  rowLabel,
   toolbar,
   loading,
   emptyText,
@@ -60,7 +63,7 @@ export function WordListTable({
   total,
   onPageChange,
   selection
-}: WordListTableProps) {
+}: WordListTableProps<Row>) {
   const { t, i18n } = useLexiconListTranslation();
   const preferences = useColumnSettings(
     tableId,
@@ -162,7 +165,7 @@ export function WordListTable({
   const count = selectable.filter((row) =>
     selection!.keys.includes(row.id)
   ).length;
-  const toggle = (changed: AdminWordListItemAny[], checked: boolean) => {
+  const toggle = (changed: Row[], checked: boolean) => {
     if (!selection) return;
     const keys = new Set(selection.keys);
     for (const row of changed) {
@@ -229,7 +232,8 @@ export function WordListTable({
           className="word-table"
           style={{ width: Math.max(width, baseWidth) }}
           aria-label={
-            tableId === "dictionary" ? t("entries") : t("status_archived")
+            ariaLabel ??
+            (tableId === "dictionary" ? t("entries") : t("status_archived"))
           }
         >
           <colgroup>
@@ -281,7 +285,7 @@ export function WordListTable({
                     <input
                       type="checkbox"
                       aria-label={t("select_entry", {
-                        label: wordListLabel(row)
+                        label: rowLabel(row)
                       })}
                       checked={selection.keys.includes(row.id)}
                       disabled={selection.disabled(row)}

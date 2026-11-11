@@ -185,3 +185,44 @@ describe("lexicon-next authoritative wire contract", () => {
     expect(conflict.fetch).toHaveBeenCalledTimes(1);
   });
 });
+
+it("列表参数安全编码且摘要响应通过严格运行时契约，拒绝旧库列表形状", async () => {
+  const summary = {
+    id: entry.id,
+    target_language: "en",
+    kind: "word",
+    headword: "centre",
+    owner_id: entry.owner_id,
+    revision: 2,
+    updated_at: entry.updated_at,
+    part_of_speech: ["noun"],
+    gloss: "中心位置"
+  };
+  const response = {
+    items: [summary],
+    pagination: { page: 2, page_size: 20, total: 21, total_pages: 2 }
+  };
+  const { api, fetch } = client(response);
+  expect(
+    await api.list({
+      headword: "centre & %",
+      kind: "word",
+      page: 2,
+      page_size: 20
+    })
+  ).toEqual(response);
+  const url = new URL(fetch.mock.calls[0]![0] as string);
+  expect(url.pathname).toBe("/api/v1/admin/lexicon-next/entries");
+  expect(url.searchParams.get("headword")).toBe("centre & %");
+  expect(url.searchParams.get("page")).toBe("2");
+  expect(validateRuntimeSchema("NextEntryList", response).valid).toBe(true);
+  await expect(
+    client({
+      items: [{ ...summary, kind: "legacy" }],
+      pagination: response.pagination
+    }).api.list()
+  ).rejects.toThrow();
+  await expect(
+    client({ items: [entry], pagination: response.pagination }).api.list()
+  ).rejects.toThrow();
+});

@@ -2340,7 +2340,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("智能词库")).toBeInTheDocument();
+    expect(screen.getByText("智能词库V1")).toBeInTheDocument();
     expect(
       screen.getByRole("group", { name: "词条状态快捷筛选" })
     ).toBeInTheDocument();

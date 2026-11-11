@@ -1772,6 +1772,7 @@ export function SmartDictionary({
         )}
 
         <WordListTable
+          rowLabel={wordListLabel}
           key={mode}
           tableId={trashMode ? "dictionary-trash" : "dictionary"}
           toolbar={

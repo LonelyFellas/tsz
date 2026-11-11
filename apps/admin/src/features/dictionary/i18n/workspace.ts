@@ -41,11 +41,11 @@ export const workspaceMessages = {
     "Progress {{badge}}"
   ],
   dictionary_management: ["词库管理", "詞庫管理", "Lexicon management"],
-  dictionary: ["智能词库", "智慧詞庫", "Entries"],
+  dictionary: ["智能词库V1", "智慧詞庫V1", "Entries V1"],
   steps: ["词条编辑步骤", "詞條編輯步驟", "Entry editing steps"],
   completed: ["已完成", "已完成", "Completed"],
   summary: ["词条摘要", "詞條摘要", "Entry summary"],
-  back: ["返回智能词库", "返回智慧詞庫", "Back to entries"],
+  back: ["返回智能词库V1", "返回智慧詞庫V1", "Back to entries V1"],
   current_entry: ["当前词条", "目前詞條", "Current entry"],
   language: ["所属语言", "所屬語言", "Language"],
   pending_detection: ["待检测", "待偵測", "Awaiting detection"],

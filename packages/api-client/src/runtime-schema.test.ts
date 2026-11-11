@@ -36,6 +36,7 @@ const runtimeSchemaBundle =
 
 const ROOTS = [
   "NextEntry",
+  "NextEntryList",
   "NextCapabilities",
   "NextEntryView",
   "CreateNextEntry",

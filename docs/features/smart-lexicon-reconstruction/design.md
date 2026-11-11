@@ -219,9 +219,9 @@ flowchart LR
 
 独立 `lexicon_next` schema 包含 entries、永久 nodes、forms、senses、definitions、equivalents、draft_revisions。保存整份所有 locale 草稿，事务复核会话/所有权及 expected_revision；冲突不覆盖数据库或浏览器本地稿。旧库不迁移、不关联。schema_version 固定 1，无未校验扩展袋。
 
-五个 Admin 操作：GET capabilities、POST entries、GET/PUT entries/{id}、GET entries/{id}/view。沿用 words.access/create/edit/edit_others，能力明确 generation=false、publishing=false。前端只增加共享 Admin 控件编辑器与对应导航；UI 界面语言独立于业务语言选择。预览不回写草稿。
+Admin 操作：GET capabilities、GET/POST entries、GET/PUT entries/{id}、GET entries/{id}/view。列表按词头字面子串、类型筛选，服务端 1 基分页（每页上限 100）；摘要只包含当前版本，分页总数和数据在同一个只读快照中取得。沿用 words.access/create/edit/edit_others，能力明确 generation=false、publishing=false。前端复用原智能词库的 `WordListTable`（列设置、固定列、分页与窄屏）及 `WordCreationLayout`、`V3ProductProgressList`（步骤条、摘要、完成情况及窄屏抽屉）。新版显示「智能词库」，原 `/words` 及其编辑流程显示「智能词库V1」；URL 与数据命名空间保留。新建在 `/lexicon-next/new`，列表在 `/lexicon-next`，已有 ID 链接保持可用。新版按词形、词义/译词、预览分步展示当前语言模型，切换步骤和语言保留同一份完整草稿。UI 界面语言独立于业务语言选择；预览不回写草稿。尚未实现的发布、语音及生成能力不调用旧版接口冒充。
 
-后端 down 会删除本切片全部新库草稿/历史，属于有损回退；旧 schema 保持。旧后端无这些路径，新前端能力请求失败时关闭编辑；旧前端现有路径/响应不变。配套部署未授权，实际线上混合版本未验收，不能据本地测试宣称可发布。
+后端 down 会删除本切片全部新库草稿/历史，属于有损回退；旧 schema 保持。旧后端无这些路径，新前端能力请求失败时关闭编辑；旧前端现有路径/响应不变。语言基础上一批已单独发布；本轮列表和界面对齐已完成本地实现及联调，按本任务 PR/CI 与发布回执继续交付。需 API 列表能力先行，Admin 随后发布；实际本轮线上组合尚未验收，不能据本地测试宣称已发布。
 
 #### 后续数值约束（未在本次实现）
 

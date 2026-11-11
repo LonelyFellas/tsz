@@ -41,6 +41,32 @@ export interface CreateNextEntry {
   kind: "word" | "phrase";
   headword: string;
 }
+export interface NextListQuery {
+  headword?: string;
+  kind?: "word" | "phrase";
+  page?: number;
+  page_size?: number;
+}
+export interface NextEntrySummary {
+  id: string;
+  target_language: string;
+  kind: "word" | "phrase";
+  headword: string;
+  owner_id: string;
+  revision: number;
+  updated_at: string;
+  part_of_speech: string[];
+  gloss: string | null;
+}
+export interface NextEntryList {
+  items: NextEntrySummary[];
+  pagination: {
+    page: number;
+    page_size: number;
+    total: number;
+    total_pages: number;
+  };
+}
 export interface SaveNextDraft {
   expected_revision: number;
   /** Complete draft across all locales; omission removes a current node. */
