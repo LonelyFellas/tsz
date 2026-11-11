@@ -5,7 +5,6 @@ from pathlib import Path
 from fontTools import subset
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables.otBase import USE_HARFBUZZ_REPACKER
-from fontTools.varLib.instancer import instantiateVariableFont
 
 
 FONT_DIR = Path(__file__).resolve().parents[1] / "packages/shared/src/fonts"
@@ -15,24 +14,18 @@ LATIN = list(range(0x100))
 ENGLISH_IPA = [ord(char) for char in "ŋθɑʒɡʃʌɔəɛɪɒʊɜɹɻɚɝɾʔːˈˌʲʷʸ̩͡ʧʤ"]
 LATIN_MARKS = [0x0300, 0x0301, 0x0302, 0x0303, 0x0308, 0x030A, 0x0327]
 WORD_FEATURES = ["cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05"]
-TEXT_FEATURES = ["ss04", "ss06", "ss07", "ss08"]
 
-for source, family, target_name, style, characters, weight in (
-    ("Andika-Regular", "TSZ Common Words", "TSZCommonWords-Regular", "Regular", LATIN + ENGLISH_IPA + LATIN_MARKS, None),
-    ("Andika-Bold", "TSZ Common Words", "TSZCommonWords-Bold", "Bold", LATIN, None),
-    ("Geist-Regular", "TSZ Common Text", "TSZCommonText-Regular", "Regular", LATIN + list(range(0x2000, 0x2070)), 400),
-    ("Geist-Regular", "TSZ Common Text", "TSZCommonText-Bold", "Bold", LATIN + list(range(0x2000, 0x2070)), 700),
-    ("Geist-Regular", "TSZ Common Text", "TSZCommonText-ExtraBold", "ExtraBold", LATIN + list(range(0x2000, 0x2070)), 800),
+family = "TSZ Common Words"
+for style, characters in (
+    ("Regular", LATIN + ENGLISH_IPA + LATIN_MARKS),
+    ("Bold", LATIN),
 ):
-    font = TTFont(FONT_DIR / f"{source}.woff2", recalcTimestamp=False)
-    if weight is not None:
-        # fonts.css maps text styles to 400, 700 and 800. Static subsets
-        # avoid downloading an unused variable axis for each weight.
-        font = instantiateVariableFont(font, {"wght": weight}, updateFontNames=True)
+    target_name = f"TSZCommonWords-{style}"
+    font = TTFont(FONT_DIR / f"Andika-{style}.woff2", recalcTimestamp=False)
     options = subset.Options()
     # Preserve standard shaping plus every feature enabled by web fonts.css.
     # Unused stylistic alternatives otherwise keep thousands of extra glyphs.
-    options.layout_features += ["tnum"] + (WORD_FEATURES if weight is None else TEXT_FEATURES)
+    options.layout_features += ["tnum"] + WORD_FEATURES
     # Use the same repacker even when optional HarfBuzz bindings are installed.
     font.cfg[USE_HARFBUZZ_REPACKER] = False
     subsetter = subset.Subsetter(options=options)
