@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/fix-task-174-audio/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-10T12:06:57.603Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-11T04:47:58.881Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -31,6 +31,10 @@
     "/admin/coins/manual-credits/{operation_id}/reversal": ["post"],
     "/admin/coins/operations": ["get"],
     "/admin/dashboard/overview": ["get"],
+    "/admin/lexicon-next/capabilities": ["get"],
+    "/admin/lexicon-next/entries": ["post"],
+    "/admin/lexicon-next/entries/{id}": ["get", "put"],
+    "/admin/lexicon-next/entries/{id}/view": ["get"],
     "/admin/lexicon/assistant": ["post"],
     "/admin/lexicon/assistant/capability": ["get"],
     "/admin/lexicon/assistant/form-candidates": ["post"],
@@ -1863,6 +1867,20 @@
         "schema": { "type": "string" }
       }
     ],
+    "get /admin/lexicon-next/entries/{id}/view": [
+      {
+        "name": "medium_locale",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "target_locale",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
     "get /admin/lexicon/entries": [
       {
         "name": "created_by",
@@ -2566,6 +2584,53 @@
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/capabilities": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextCapabilities" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/entries": {
+      "request": { "$ref": "#/components/schemas/CreateNextEntry" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/NextEntry" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/entries/{id}": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextEntry" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/lexicon-next/entries/{id}": {
+      "request": { "$ref": "#/components/schemas/SaveNextDraft" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextEntry" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/entries/{id}/view": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextEntryView" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon/assistant": {
@@ -4845,6 +4910,7 @@
         "invalid_part_of_speech",
         "invalid_headword",
         "unsupported_language",
+        "capability_unavailable",
         "unsupported_schema_version",
         "invalid_phone",
         "invalid_email",
@@ -7277,6 +7343,16 @@
       },
       "additionalProperties": false
     },
+    "CreateNextEntry": {
+      "type": "object",
+      "required": ["target_language", "kind", "headword"],
+      "properties": {
+        "headword": { "type": "string" },
+        "kind": { "$ref": "#/components/schemas/NextEntryKind" },
+        "target_language": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "CreateSharedSentence": {
       "type": "object",
       "required": ["content"],
@@ -8019,6 +8095,87 @@
       },
       "additionalProperties": false
     },
+    "NextDefinition": {
+      "type": "object",
+      "required": ["id", "locale", "text", "style"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "style": { "$ref": "#/components/schemas/NextDefinitionStyle" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDefinitionStyle": {
+      "type": "string",
+      "enum": ["definition", "sentence"]
+    },
+    "NextDraft": {
+      "type": "object",
+      "required": ["schema_version", "headword", "forms", "senses"],
+      "properties": {
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextForm" }
+        },
+        "headword": { "type": "string" },
+        "schema_version": {
+          "type": "integer",
+          "format": "int32",
+          "maximum": 1,
+          "minimum": 1
+        },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextSense" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextEntryKind": { "type": "string", "enum": ["word", "phrase"] },
+    "NextEquivalent": {
+      "type": "object",
+      "required": ["id", "locale", "text"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextForm": {
+      "type": "object",
+      "required": ["id", "locale", "text"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locale": {
+          "type": "string",
+          "description": "Actual content locale, never the editor's current selection."
+        },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextSense": {
+      "type": "object",
+      "required": ["id", "part_of_speech", "definitions", "equivalents"],
+      "properties": {
+        "definitions": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextDefinition" }
+        },
+        "equivalents": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextEquivalent" }
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "part_of_speech": {
+          "type": ["string", "null"],
+          "description": "Language-specific code; null is an incomplete draft, not an inferred POS."
+        }
+      },
+      "additionalProperties": false
+    },
     "PairedDubbingGroup": {
       "type": "object",
       "required": ["id", "name", "areas", "is_global", "pairs"],
@@ -8738,6 +8895,22 @@
         "groups": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/DubbingGroup" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SaveNextDraft": {
+      "type": "object",
+      "required": ["expected_revision", "draft"],
+      "properties": {
+        "draft": {
+          "$ref": "#/components/schemas/NextDraft",
+          "description": "Complete draft, including every locale. Omitted nodes are removed from the current draft."
+        },
+        "expected_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
         }
       },
       "additionalProperties": false

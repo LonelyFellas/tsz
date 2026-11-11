@@ -80,6 +80,8 @@ export function bindAdminAuthorizationCache(
     const roots = new Set<string>();
     for (const key of Object.keys(ADMIN_PERMISSION_DEPENDENCIES)) {
       if (hasAdminPermission(before, key) && !hasAdminPermission(after, key)) {
+        // 新库读取仅依赖 access；失去写权限时保留已打开的本地草稿。
+        if (key === "words.access") roots.add("admin-lexicon-next");
         for (const root of MODULE_QUERY_ROOTS[key.split(".")[0]!] ?? [])
           roots.add(root);
       }

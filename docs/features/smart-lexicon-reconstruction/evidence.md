@@ -1,6 +1,6 @@
 # 评估证据与局限
 
-日期：2026-11-04。此文件用于复核方案中的现状判断，不是测试通过记录。主文档为 [需求](requirements.md) 与 [设计](design.md)。
+初始评估：2026-11-04；语言基础验证：2026-11-11。第 1–6 节为历史评估，第 7 节为本次实际交付证据。主文档为 [需求](requirements.md) 与 [设计](design.md)。
 
 ## 1. 取证方式和版本
 
@@ -136,3 +136,58 @@
 - 仍需后续验证：生产使用盘点、吞吐/SLO、许可清单、人工审核耗时、真实模型质量、第二场景业务入口；这些未知已进入阶段依赖和估算置信度。
 
 格式验证使用仓库实际共享 Prettier 配置。任务 worktree 没有安装 workspace 依赖，根配置无法解析 `@tsz/config`；因此直接指定同仓 `packages/config/prettier.config.js`，使用本机主 checkout 已安装的 Prettier，仅检查本目录文档，未安装依赖或修改配置。
+
+## 7. 语言基础独立切片（2026-11-11）
+
+### 范围、版本与原工作区保护
+
+用户收窄为“先把目标语言和媒介语言推进完就提交”。本次终点是前后端独立可用切片的本地 commit；不含 push/PR/合并/部署、生产迁移和付费调用。第五批线程确认安全停靠后才开始写入。worktree 工具无响应且 Git 清单确认未创建，停止等待后用 Git 原生 worktree 创建隔离分支。
+
+- 前端：`/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz`，分支 `codex/lexicon-language-foundation`；fetch 固定基线 `df33adf2356032951c4e83cbea6d7728e56f417f`。
+- 后端：`/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz-rust`，同名分支；基线 `8838c4f065f30d42b88256b30501f9f911a37098`。
+- 原前端 `/Users/darwish/.codex/worktrees/13a2/tsz`、原后端 `/Users/darwish/.codex/worktrees/lexicon-next-data/tsz-rust`、Agent `/Users/darwish/.codex/worktrees/lexicon-next-candidates-agent/tsz-agent` 保持全部未提交成果。未对它们执行 reset/stash/clean 或提交。
+
+提取第一/二批可复用的语言模型、能力、独立草稿表、权限、创建/读取/保存/视图及 Admin 手工编辑器。明确排除审核发布与公开 reader、GenerationPanel、Agent 候选/账本、后端 workflow/generation/morphology 模块及对应三组后续迁移。原完整方案与多批实施证据仍在原工作树，本提交只带语言方案及这里的实际结果。
+
+### 精确切片的代码验证
+
+全部命令在上述隔离 checkout 执行，未沿用更大工作树的通过结果：
+
+- `SQLX_OFFLINE=true cargo run --locked --all-features --bin export_openapi`；前端显式 `OPENAPI_SOURCE` 指向该文件并清除 `SYNC_OPENAPI_RUNTIME_ONLY`，运行 `pnpm --filter @tsz/api-client sync:openapi`。spec/runtime SHA-256 为 `d11a875c3ce45b6eb97f3fa0c3c5431300020d743777d3d5fe5edc9c3a4b57c6`，快照 264 路径、runtime 426 schemas。未手改生成 JSON 或扩大 PENDING。
+- `cargo test --locked --all-features --test lexicon_next`：5 项通过，真实独立 PostgreSQL＋鉴权 router。证明四组合存储/重开、显式通用回退与缺口、并发 409 原子性、稳定 ID 防跨词条/义项重用、当前权限/所有权与撤权、拒绝原地改语种/未开放语言、迁移 down/up 保留旧库记录。
+- `cargo test --locked --all-features --lib lexicon_next`：2 项通过；`--lib admin::authorization`：2 项通过；后端及 seed build 通过。CI 原生 `ops/ci_test_modules.py list` 将新增 target 唯一归入 lexicon，沿用 `lexicon_*` 分区，不添加重复清单。
+- `pnpm --filter @tsz/api-client test`：39 文件、698 项通过。首次运行仅旧 OpenAPI 哈希 canary 失败，核对原生生成输入后更新为上述哈希，完整重跑通过。
+- Admin 定向测试 `LexiconNext.test.tsx`、`model.test.ts`、`BusinessPermissionGuard.test.tsx`、`ConsoleSidebar.test.tsx`、`adminAuthorization.test.ts`、`resources.test.ts`：6 文件、72 项通过。覆盖未保存四 locale、403/409 保留、离开保护、pending 锁定和能力不可用。jsdom 伪元素 getComputedStyle 提示不影响断言，实际布局另验。
+- `pnpm typecheck`：7 任务成功；`pnpm --filter @tsz/admin build` 成功。`pnpm check:admin-ui`：41 份样式及 4 项脚本测试通过；变更 MJS lint、两仓 diff 检查通过。代码 TS/TSX lint/格式由正常提交 hooks 承接。
+
+### 真实页面、代理与持久化
+
+run-id `tsz-language-20261111-a1`。两个专属 `--rm` Docker 容器均带同批标签：PostgreSQL 18 `127.0.0.1:53084/language_foundation` 使用 tmpfs，Redis 7 `127.0.0.1:53086/0` 关闭持久化。未使用未知 .env/共享数据库。账号是本批新建普通管理员，显式授予 words.access/create/edit；后端既有 OTP sender 使用固定 Mock 码，仅认证发送模拟，登录/会话/权限/词库/数据库均真实。
+
+后端从本批临时目录中的独立制品启动，SHA-256 `9c7649e3478863ddf6bf03c73b2e285cf878073ff25c5f2f1b85352b4ded53b8`，源为上述后端基线＋本次切片。监听 59843，初始 PID 84431；为验证界面语言独立性，仅在本批环境开启既有 `I18N_ADMIN_SUPPORTED_LOCALES=zh-Hans,zh-Hant,en-US` 并重启同一制品，最终 PID 87097。`DEPLOYMENT_SMOKE_ONLY=true`、本地 HTTP `COOKIE_SECURE=false`，无 OSS/外部模型配置。
+
+Admin Vite `http://127.0.0.1:59844` 代理到 `http://127.0.0.1:59843/api/v1`，四项 words/parts/TTS/local-speech mock 全为 false。Web 本次未改/未启动，未使用 next dev。
+
+内置浏览器返回 `Browser is not available: iab`，明确说明后按用户规则降级到 Chrome 专用标签。实际操作及 Network/SQL 证据：
+
+1. 创建 centre：POST 201；同一词条录入英式 centre、美式 center、两条英文释义及简繁解释/译词。切换英简→美简→美繁→英繁时未保存内容保留；初次繁体显示缺口，不复制简体。
+2. PUT 200 保存为 revision 2。独立 SQL 确认一个 entry、一个 sense、九个永久 nodes、两 forms、四 definitions（各 locale 一条）、两 equivalents；不是四套词条。
+3. 离开后按 ID 打开，GET 200 读取 revision 2；四组合分别点击已保存预览，四个真实 GET view 均 200，正文/实际 locale 正确且不回写。
+4. 第二标签保存为 revision 3。第一标签保存旧 revision 返回 409，本地词头保留；比较展示完整两版本，显式二次确认才重载服务器。
+5. 精确撤销专属账号 words.edit，第二标签保存真实 403，profile 重新读取后转只读；切换语言、尝试离开并取消，未保存词头仍保留。独立 SQL 仍 revision 3，拒绝稿未入库；随后恢复原授权。
+6. 临时账号改用英文界面，再重开词条，仍为 revision 3、原英文与中文内容/选择独立；恢复“跟随浏览器”后继续核验。
+7. 1440/768/390px 的 scrollWidth 均等于 innerWidth；列宽分别 520＋520、320＋320、单列326px。桌面/窄屏截图位于 `/Users/darwish/.codex/visualizations/2026/11/11/lexicon-language-foundation/{1440,390}.png`。viewport 覆盖已恢复。
+
+浏览器已退出账号，测试 origin 的 localStorage/sessionStorage 独立复查为 0，自建标签全部关闭。localhost 的两个 `_ga` 统计 Cookie 来源不明，未作测试数据删除；无本批认证 Cookie 残留。数据库/Redis和进程在提交 hooks 完成后统一清理，下节记录实际结果。
+
+### 清理、兼容与提交状态
+
+本批后端/Admin 进程均已按身份停止；带精确 run-id 标签的两容器已删除，匿名卷残留 0，53084/53086/59843/59844 全部关闭，既有其他任务六个容器仍运行。清理前只有本批一个管理员、一个词条、九个节点、三版草稿；这些账号、会话、权限、内容、全部历史与缓存均随独立环境彻底删除。临时目录中的凭据、制品副本、日志和脚本已移除；只保留两张界面截图及脱敏 `cleanup-receipt.json`。无 OSS、付费调用或业务数据变更。
+
+与主线 OpenAPI 比对：既有路径没有变化，既有 schema 仅 ErrorCode 增加 capability_unavailable；其他模型均为新增。候选前端访问旧后端时能力请求 404 的关闭行为已由契约/组件测试验证；实际已部署前端/后端组合未知，未做线上混合版本或部署验收。回退数据库会丢失新库数据，禁止把本地 down/up 测试理解为生产回退授权。
+
+后端提交 `88611753ede0aeee0e70ad9a56c7ed9d28d940af`，正常 pre-commit 的 SQLx prepare 与全目标 Clippy 均通过，.sqlx 无差异；提交后 fmt 通过。前端本记录随语言切片提交，最终 SHA 由本聊天交付。没有执行 push、PR、CI、合并或部署。
+
+前端首次提交正常 pre-commit 的 Prettier、ESLint 及 commit-msg 的 commitlint 全部通过，hook 未改变源码。此次只 commit，不执行前端技能的 pre-push 审查流程。
+
+后端按 ship 提交章节执行独立只读审查，精确范围 `8838c4f065f30d42b88256b30501f9f911a37098..88611753ede0aeee0e70ad9a56c7ed9d28d940af`，未发现 P0–P2 阻断；未重跑已有有效测试。审查：1 轮；确认缺陷 0；证据排除误报 0；关联回归/回退：未知。补充回退限制：后端启动严格校验 SQLx 迁移，不能仅凭旧表未变推断旧二进制可在新增迁移后启动；线上组合与回退仍未验收。

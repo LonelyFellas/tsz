@@ -17,3 +17,5 @@ export {
 } from "./lexicon-assistant";
 
 export { ClientResponseError } from "./client-response-error";
+
+export * from "./lexicon-next";

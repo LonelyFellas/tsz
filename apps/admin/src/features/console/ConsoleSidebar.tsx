@@ -106,6 +106,10 @@ const GROUPS: Group[] = [
     label: "nav_dictionary",
     leaves: [
       pageLeaf(ADMIN_PAGE_ROUTES.words, "nav_words"),
+      pageLeaf(
+        { ...ADMIN_PAGE_ROUTES.lexiconNext, path: "lexicon-next" },
+        "nav_lexicon_next"
+      ),
       pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "nav_trash"),
       pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "nav_parts"),
       {

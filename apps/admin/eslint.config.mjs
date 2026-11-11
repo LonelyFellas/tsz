@@ -7,6 +7,10 @@ export default [
   ...react,
   {
     files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      "src/features/lexicon-next/**/*.{ts,tsx}",
+      "src/pages/LexiconNext{,.test}.tsx"
+    ],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -22,6 +26,26 @@ export default [
               ],
               message:
                 "后台使用 @tsz/ui/admin/*；界面规范见 apps/admin/style.md。"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    // 本批明确要求新词库使用 Ant Design 6；既有页面继续沿用原组件门禁。
+    files: [
+      "src/features/lexicon-next/**/*.{ts,tsx}",
+      "src/pages/LexiconNext{,.test}.tsx"
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@tsz/ui", "@tsz/ui/*", "@mui/*", "@emotion/*"],
+              message: "新词库使用 Ant Design 6。"
             }
           ]
         }

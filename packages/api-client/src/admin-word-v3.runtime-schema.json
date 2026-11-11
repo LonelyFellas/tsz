@@ -1,8 +1,13 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/fix-task-174-audio/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b9251825093151586ec12a649450ef8a32f8d773f66975c2e31aac11e3272a2b",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz-rust/docs/openapi.json",
+  "_source_sha256": "d11a875c3ce45b6eb97f3fa0c3c5431300020d743777d3d5fe5edc9c3a4b57c6",
   "roots": [
+    "NextEntry",
+    "NextCapabilities",
+    "NextEntryView",
+    "CreateNextEntry",
+    "SaveNextDraft",
     "InterfaceCapabilities",
     "InterfaceLocaleV1",
     "LocalizedNotification",
@@ -1165,6 +1170,16 @@
       "additionalProperties": false
     },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
+    "CreateNextEntry": {
+      "type": "object",
+      "required": ["target_language", "kind", "headword"],
+      "properties": {
+        "headword": { "type": "string" },
+        "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "target_language": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "CustomWord": {
       "type": "object",
       "required": ["word", "definition"],
@@ -1731,6 +1746,7 @@
         "invalid_part_of_speech",
         "invalid_headword",
         "unsupported_language",
+        "capability_unavailable",
         "unsupported_schema_version",
         "invalid_phone",
         "invalid_email",
@@ -3552,6 +3568,192 @@
       },
       "additionalProperties": false
     },
+    "NextCapabilities": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "language_rules_version",
+        "languages",
+        "manual_drafts",
+        "generation",
+        "publishing"
+      ],
+      "properties": {
+        "generation": { "type": "boolean" },
+        "language_rules_version": { "type": "string" },
+        "languages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextLanguageCapability" }
+        },
+        "manual_drafts": { "type": "boolean" },
+        "publishing": { "type": "boolean" },
+        "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "NextDefinition": {
+      "type": "object",
+      "required": ["id", "locale", "text", "style"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "style": { "$ref": "#/$defs/NextDefinitionStyle" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDefinitionStyle": {
+      "type": "string",
+      "enum": ["definition", "sentence"]
+    },
+    "NextDraft": {
+      "type": "object",
+      "required": ["schema_version", "headword", "forms", "senses"],
+      "properties": {
+        "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
+        "headword": { "type": "string" },
+        "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
+        "senses": { "type": "array", "items": { "$ref": "#/$defs/NextSense" } }
+      },
+      "additionalProperties": false
+    },
+    "NextEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "target_language",
+        "kind",
+        "owner_id",
+        "revision",
+        "updated_at",
+        "draft"
+      ],
+      "properties": {
+        "draft": { "$ref": "#/$defs/NextDraft" },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "revision": { "type": "integer" },
+        "target_language": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "NextEntryKind": { "type": "string", "enum": ["word", "phrase"] },
+    "NextEntryView": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "revision",
+        "target_locale",
+        "medium_locale",
+        "forms",
+        "missing_forms",
+        "senses"
+      ],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
+        "medium_locale": { "type": "string" },
+        "missing_forms": { "type": "boolean" },
+        "revision": { "type": "integer" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSenseView" }
+        },
+        "target_locale": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextEquivalent": {
+      "type": "object",
+      "required": ["id", "locale", "text"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextForm": {
+      "type": "object",
+      "required": ["id", "locale", "text"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextLanguageCapability": {
+      "type": "object",
+      "required": [
+        "target_language",
+        "target_locales",
+        "medium_locales",
+        "common_target_locale",
+        "part_of_speech_codes"
+      ],
+      "properties": {
+        "common_target_locale": { "type": "string" },
+        "medium_locales": { "type": "array", "items": { "type": "string" } },
+        "part_of_speech_codes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "target_language": { "type": "string" },
+        "target_locales": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "NextSense": {
+      "type": "object",
+      "required": ["id", "part_of_speech", "definitions", "equivalents"],
+      "properties": {
+        "definitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDefinition" }
+        },
+        "equivalents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextEquivalent" }
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "part_of_speech": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "NextSenseView": {
+      "type": "object",
+      "required": [
+        "id",
+        "target_definitions",
+        "medium_definitions",
+        "equivalents",
+        "missing_target_definitions",
+        "missing_medium_definitions",
+        "missing_equivalents"
+      ],
+      "properties": {
+        "equivalents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextEquivalent" }
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "medium_definitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDefinition" }
+        },
+        "missing_equivalents": { "type": "boolean" },
+        "missing_medium_definitions": { "type": "boolean" },
+        "missing_target_definitions": { "type": "boolean" },
+        "target_definitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDefinition" }
+        }
+      },
+      "additionalProperties": false
+    },
     "OpenCodeConnectedProvider": {
       "type": "object",
       "required": ["id", "name", "connections"],
@@ -4674,6 +4876,15 @@
         },
         "value": { "$ref": "#/$defs/RichTextV3" },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
+    "SaveNextDraft": {
+      "type": "object",
+      "required": ["expected_revision", "draft"],
+      "properties": {
+        "draft": { "$ref": "#/$defs/NextDraft" },
+        "expected_revision": { "type": "integer", "minimum": 1 }
       },
       "additionalProperties": false
     },

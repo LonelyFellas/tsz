@@ -1,0 +1,79 @@
+import type { NextDraft, NextEntryView } from "@tsz/types";
+
+export const localeLabels: Record<string, string> = {
+  "en-GB": "英式英语",
+  "en-US": "美式英语",
+  en: "通用英语",
+  "zh-Hans": "简体中文",
+  "zh-Hant": "繁体中文"
+};
+
+/** Local preview only; never replaces the complete editable draft. */
+export function previewDraft(
+  draft: NextDraft,
+  target: string,
+  medium: string
+): NextEntryView {
+  const targetRows = <T extends { locale: string }>(rows: T[]) => {
+    const exact = rows.filter((row) => row.locale === target);
+    return exact.length ? exact : rows.filter((row) => row.locale === "en");
+  };
+  const forms = targetRows(draft.forms);
+  return {
+    entry_id: "",
+    revision: 0,
+    target_locale: target,
+    medium_locale: medium,
+    forms,
+    missing_forms: !forms.length,
+    senses: draft.senses.map((sense) => {
+      const target_definitions = targetRows(sense.definitions);
+      const medium_definitions = sense.definitions.filter(
+        (row) => row.locale === medium
+      );
+      const equivalents = sense.equivalents.filter(
+        (row) => row.locale === medium
+      );
+      return {
+        id: sense.id,
+        target_definitions,
+        medium_definitions,
+        equivalents,
+        missing_target_definitions: !target_definitions.length,
+        missing_medium_definitions: !medium_definitions.length,
+        missing_equivalents: !equivalents.length
+      };
+    })
+  };
+}
+
+export function draftProblem(draft: NextDraft): string | null {
+  const texts = [
+    { text: draft.headword, label: "词头", max: 200 },
+    ...draft.forms.map((row) => ({
+      ...row,
+      label: `${localeLabels[row.locale]}词形`,
+      max: 200
+    })),
+    ...draft.senses.flatMap((sense, index) => [
+      ...sense.definitions.map((row) => ({
+        ...row,
+        label: `义项 ${index + 1} · ${localeLabels[row.locale]}释义`,
+        max: 5000
+      })),
+      ...sense.equivalents.map((row) => ({
+        ...row,
+        label: `义项 ${index + 1} · ${localeLabels[row.locale]}译词`,
+        max: 200
+      }))
+    ])
+  ];
+  const invalid = texts.find(
+    (row) => !row.text.trim() || [...row.text].length > row.max
+  );
+  if (invalid)
+    return `${invalid.label}不能为空，且最多 ${invalid.max} 个字符；不需要的行请删除。`;
+  if (texts.length - 1 + draft.senses.length > 500)
+    return "草稿最多包含 500 个内容节点，请删除多余内容。";
+  return null;
+}
