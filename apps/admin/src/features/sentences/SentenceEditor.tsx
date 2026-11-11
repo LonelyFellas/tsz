@@ -35,7 +35,10 @@ import { V3VoiceTextField } from "../dictionary/word-creation-v3/components/V3Vo
 import { useReadingPreviewAdapter } from "../dictionary/word-creation-v3/components/useReadingPreviewAdapter";
 import { V3SentenceTranslationsField } from "../dictionary/word-creation-v3/components/V3SentenceTranslationsField";
 import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
-import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPicker";
+import {
+  SharedSentenceAssociationPicker,
+  type SentenceTargetLabel
+} from "./SharedSentenceAssociationPicker";
 import { newSentence } from "./model";
 import "./SentenceEditor.css";
 import { VoiceEditorModal } from "../dictionary/word-creation-v3/components/VoiceEditorModal";
@@ -127,12 +130,14 @@ export function SentenceEditor({
     window.addEventListener("beforeunload", prevent);
     return () => window.removeEventListener("beforeunload", prevent);
   }, [dirty]);
-  const [targetLabels, setTargetLabels] = useState<Record<string, string>>(() =>
+  const [targetLabels, setTargetLabels] = useState<
+    Record<string, SentenceTargetLabel>
+  >(() =>
     Object.fromEntries(
       (sentence?.entries ?? []).flatMap((entry) =>
         entry.senses.map((sense) => [
           `${entry.id}:${sense.id}`,
-          `${entry.headword} · ${sense.gloss}`
+          { headword: entry.headword, gloss: sense.gloss }
         ])
       )
     )
@@ -781,7 +786,10 @@ export function SentenceEditor({
                   onClick={() => {
                     setTargetLabels((labels) => ({
                       ...labels,
-                      [`${sourceEntryId}:${sourceSenseId}`]: `${surface.headword} · ${gloss}`
+                      [`${sourceEntryId}:${sourceSenseId}`]: {
+                        headword: surface.headword,
+                        gloss
+                      }
                     }));
                     setContent((current) => ({
                       ...current,

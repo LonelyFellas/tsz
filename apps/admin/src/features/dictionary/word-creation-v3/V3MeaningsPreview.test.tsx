@@ -80,7 +80,10 @@ describe("V3MeaningsPreview", () => {
         })}
       />
     );
-    expect(screen.getByText("central · 中心的；主要的")).toBeVisible();
+    expect(screen.getByText(/中心的；主要的/)).toHaveTextContent(
+      "central · 中心的；主要的"
+    );
+    expect(screen.getByText(/中心的；主要的/)).toBeVisible();
     expect(screen.getAllByText("派生词")).toHaveLength(1);
   });
 
@@ -269,13 +272,20 @@ describe("V3MeaningsPreview", () => {
     expect(screen.getByText("中")).toBeVisible();
     expect(screen.getByText("主关联")).toBeVisible();
     expect(screen.getByText("其他关联")).toBeVisible();
-    expect(screen.getByText("上下文关联：middle · 中间")).toBeVisible();
-    expect(screen.getByText("待关联词条：stand · 站立")).toBeVisible();
+    expect(screen.getByText(/上下文关联：/)).toHaveTextContent(
+      "上下文关联：middle · 中间"
+    );
+    expect(screen.getByText(/上下文关联：/)).toBeVisible();
+    expect(screen.getByText(/待关联词条：/)).toHaveTextContent(
+      "待关联词条：stand · 站立"
+    );
+    expect(screen.getByText(/待关联词条：/)).toBeVisible();
     expect(screen.getByText("已关联")).toBeVisible();
     expect(screen.getAllByText("待关联").length).toBeGreaterThan(0);
     expect(document.body).not.toHaveTextContent(/\b(?:Linked|Pending)\b/u);
     expect(screen.getByText("近义词")).toBeVisible();
-    expect(screen.getByText("midpoint · 中点")).toBeVisible();
+    expect(screen.getByText(/中点/)).toHaveTextContent("midpoint · 中点");
+    expect(screen.getByText(/中点/)).toBeVisible();
     expect(
       screen.queryByText(/internal-|future-role|N-COUNT|synonym/)
     ).toBeNull();
@@ -402,8 +412,14 @@ describe("V3MeaningsPreview", () => {
     expect(
       screen.getByRole("heading", { name: "用于说明回退分支。" })
     ).toBeVisible();
-    expect(screen.getByText("上下文关联：fallback")).toBeVisible();
-    expect(screen.getByText("待补充目标词条 · 待补充释义")).toBeVisible();
+    expect(screen.getByText(/上下文关联：/)).toHaveTextContent(
+      "上下文关联：fallback"
+    );
+    expect(screen.getByText(/上下文关联：/)).toBeVisible();
+    expect(screen.getByText(/待补充释义/)).toHaveTextContent(
+      "待补充目标词条 · 待补充释义"
+    );
+    expect(screen.getByText(/待补充释义/)).toBeVisible();
   });
 });
 

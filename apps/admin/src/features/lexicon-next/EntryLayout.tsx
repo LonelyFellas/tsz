@@ -102,7 +102,7 @@ export function EntryLayout({
         breadcrumbTitle: exists ? "编辑词条" : "创建词条",
         completedSteps: [],
         summaryHeadword: (
-          <strong className="word-summary-headword">
+          <strong className="word-summary-headword tsz-words">
             {draft?.headword || "新词条"}
           </strong>
         ),

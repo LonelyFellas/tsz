@@ -871,12 +871,12 @@ describe("V3PublicationHistory", () => {
     expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
       "当前状态：当前线上版本"
     );
-    expect(
-      detail.getByText("上下文关联：v3-associated-only")
-    ).toBeInTheDocument();
-    expect(
-      detail.getByText("待补充目标词条 · V3 待补充释义")
-    ).toBeInTheDocument();
+    expect(detail.getByText(/上下文关联：/)).toHaveTextContent(
+      "上下文关联：v3-associated-only"
+    );
+    expect(detail.getByText(/V3 待补充释义/)).toHaveTextContent(
+      "待补充目标词条 · V3 待补充释义"
+    );
     expect(detail.getAllByText("其他词性").length).toBeGreaterThan(0);
   });
 
@@ -2492,9 +2492,10 @@ it("历史发布快照展示释义和例句的人工关联", async () => {
     ).toHaveLength(2);
   }
   expect(within(body).queryByText("低", { selector: ".ui-tag" })).toBeNull();
-  expect(within(body).getAllByText("sentence → sentence · 句子")).toHaveLength(
-    2
-  );
+  const links = within(body).getAllByText(/sentence →/);
+  expect(links).toHaveLength(2);
+  for (const link of links)
+    expect(link).toHaveTextContent("sentence → sentence · 句子");
 });
 
 beforeEach(() => {

@@ -1127,12 +1127,15 @@ describe("当前词条关联与离开保护", () => {
             source_segments: [{ start: 0, end: 3, surface: "for" }],
             target: sentenceTarget("source")
           }}
-          labels={{ "source:sense": "for · 对于" }}
+          labels={{ "source:sense": { headword: "for", gloss: "对于" } }}
           onSelect={select}
           onTargetLabel={vi.fn()}
         />
       );
     });
+    expect(screen.getByText(/已关联：/)).toHaveTextContent(
+      "已关联：for · 对于"
+    );
     fireEvent.click(
       await screen.findByText("for", {
         selector: ".v3-component-usage-entry strong"
