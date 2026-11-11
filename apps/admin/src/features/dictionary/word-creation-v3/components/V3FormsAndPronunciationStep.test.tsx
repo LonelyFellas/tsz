@@ -1355,16 +1355,16 @@ describe("V3FormsAndPronunciationStep", () => {
     const { content, base, secondBase } = mixedMatrixFixture();
     const { container } = render(<Harness initial={content} />);
     await screen.findByText("名词");
-    const regularRadios = container.querySelectorAll<HTMLInputElement>(
-      '.v3-spelling-regularity input[type="radio"]'
+    const regularity = within(
+      container.querySelector(".v3-spelling-regularity")!
     );
-    fireEvent.click(regularRadios[1]!);
+    fireEvent.click(regularity.getByRole("radio", { name: "否" }));
     expect(formById(canonicalValue(), base.id)).toMatchObject({
       regional_variants: { common: { is_regular: false } }
     });
     expect(canonicalValue().pos[0]!.form_groups[0]!.is_regular).toBe(true);
     expect(formById(canonicalValue(), secondBase.id)).toEqual(secondBase);
-    fireEvent.click(regularRadios[0]!);
+    fireEvent.click(regularity.getByRole("radio", { name: "是" }));
     expect(formById(canonicalValue(), base.id)).toMatchObject({
       regional_variants: { common: { is_regular: true } }
     });

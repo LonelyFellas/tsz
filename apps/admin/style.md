@@ -86,6 +86,8 @@
 - 同一字段的播放、输入、转换、编辑等连体控件使用 `Space.Compact`，由共享样式统一外侧圆角、单线接缝和焦点层级，不逐页拼边框。自定义输入包装层标记 `data-ui-compact-item`，让内部 `.ui-input` / `.ui-input-affix-wrapper` 继承组员圆角；长文本撑高时两侧操作随组拉伸，独立删除操作留在组外。
 - `Input` 的 `addonBefore` / `addonAfter` 沿用同一接缝规则。`Space.Compact size` 统一组内按钮、输入、数字输入和下拉框的尺寸，子控件显式指定的尺寸优先；搜索框的尺寸与错误态覆盖整组，聚焦后仍保留错误色。
 - `Radio.Group optionType="button"` 使用连体按钮组；普通单选项、卡片式偏好选项及 `Segmented` 保留各自布局。
+- `Radio` / `Radio.Group` 统一封装 shadcn/Radix RadioGroup，保留现有值类型与 `onChange` 接口。圆环和圆点使用控件的 `color`；口音等业务色只作用于实际 Radio，不给外层容器涂选中背景。键盘操作、禁用和表单提交使用同一共享实现。
+- 按钮式 Radio 的完整外框和内边距均可点击；候选列表使用同一个 `Radio.Group`，支持方向键切换并跳过禁用项。
 - 键盘焦点可见，Tab 顺序跟随阅读顺序；只含图标的操作需要可访问名称。浮层保留既有焦点管理和返回焦点。
 - 保留加载时的上下文，刷新不把已有内容瞬间清空。加载、空、错误是不同状态。
 - 过渡由 `--ui-motion-duration` / `--ui-motion-easing` 控制；遵守减少动态效果偏好。工具页不做入场编排。

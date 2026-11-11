@@ -5,13 +5,17 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type ChangeEvent,
+  type ComponentPropsWithoutRef,
   type CSSProperties,
   type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode
 } from "react";
 import { useFieldDisabled } from "./Form";
+import {
+  RadioGroup as ShadcnRadioGroup,
+  RadioGroupItem
+} from "../../components/ui/radio-group";
 
 type ChoiceValue = string | number | boolean;
 type Option<V> =
@@ -128,53 +132,118 @@ function CheckGroup<V extends ChoiceValue = string>({
 }
 export const Checkbox = Object.assign(Check, { Group: CheckGroup });
 
+type RadioChangeEvent<V extends ChoiceValue> = {
+  target: { value: V; checked: boolean; name: string };
+  nativeEvent: Event;
+  stopPropagation: () => void;
+  preventDefault: () => void;
+};
 const Radios = createContext<{
   name: string;
   value?: ChoiceValue;
   disabled?: boolean;
   button: boolean;
-  change: (value: ChoiceValue, event: ChangeEvent<HTMLInputElement>) => void;
+  change: (event: RadioChangeEvent<ChoiceValue>) => void;
 } | null>(null);
-type RadioProps = Omit<CheckProps, "indeterminate"> & { button?: boolean };
+type RadioProps = Omit<
+  ComponentPropsWithoutRef<typeof RadioGroupItem>,
+  "value" | "onChange"
+> & {
+  value?: ChoiceValue;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  name?: string;
+  onChange?: (event: RadioChangeEvent<ChoiceValue>) => void;
+  button?: boolean;
+};
 function RadioInput({
   value,
   checked,
+  defaultChecked = false,
   disabled,
   children,
   className = "",
   style,
   title,
+  name,
   button,
   onChange,
+  onClick,
   ...props
 }: RadioProps) {
   const group = useContext(Radios);
-  const off = useFieldDisabled(disabled ?? group?.disabled);
-  const active = group ? value === group.value : checked;
+  const [local, setLocal] = useState(defaultChecked);
+  const off = useFieldDisabled(disabled || group?.disabled);
+  const active = group ? value === group.value : (checked ?? local);
   const prefix = button || group?.button ? "ui-radio-button" : "ui-radio";
-  return (
+  const labelId = useId();
+  const itemValue = value === undefined ? "on" : String(value);
+  const label = children != null && (
+    <span id={labelId} className="ui-radio-label">
+      {children}
+    </span>
+  );
+  const item = (
+    <RadioGroupItem
+      {...props}
+      aria-labelledby={
+        props["aria-labelledby"] ??
+        (prefix === "ui-radio-button" &&
+        props["aria-label"] === undefined &&
+        children != null
+          ? labelId
+          : undefined)
+      }
+      value={itemValue}
+      disabled={off}
+      className={
+        prefix === "ui-radio-button"
+          ? "ui-radio-button-control"
+          : "ui-radio-input"
+      }
+      title={title}
+      onClick={(event) => {
+        onClick?.(event);
+        if (event.defaultPrevented || off || active) return;
+        const change = {
+          target: {
+            value: value ?? "on",
+            checked: true,
+            name: name ?? group?.name ?? ""
+          },
+          nativeEvent: event.nativeEvent,
+          stopPropagation: () => event.stopPropagation(),
+          preventDefault: () => event.preventDefault()
+        };
+        onChange?.(change);
+        if (group && value !== undefined) group.change(change);
+        else setLocal(true);
+      }}
+    >
+      {prefix === "ui-radio-button" ? label : null}
+    </RadioGroupItem>
+  );
+  const control = (
     <label
       style={style}
       title={title}
       className={`${prefix}-wrapper ${active ? prefix + "-wrapper-checked" : ""} ${off ? prefix + "-wrapper-disabled" : ""} ${className}`}
     >
-      <span className={`${prefix} ${active ? prefix + "-checked" : ""}`}>
-        <input
-          {...props}
-          className={`${prefix}-input`}
-          type="radio"
-          name={props.name ?? group?.name}
-          checked={active}
-          disabled={off}
-          value={value === undefined ? undefined : String(value)}
-          onChange={(event) => {
-            onChange?.(event);
-            if (value !== undefined) group?.change(value, event);
-          }}
-        />
-      </span>
-      {children != null && <span className="ui-radio-label">{children}</span>}
+      {item}
+      {prefix === "ui-radio" ? label : null}
     </label>
+  );
+  return group ? (
+    control
+  ) : (
+    <ShadcnRadioGroup
+      className="ui-radio-standalone"
+      name={name}
+      value={active ? itemValue : ""}
+      disabled={off}
+    >
+      {control}
+    </ShadcnRadioGroup>
   );
 }
 type RadioGroupProps<V extends ChoiceValue> = Omit<
@@ -188,12 +257,8 @@ type RadioGroupProps<V extends ChoiceValue> = Omit<
   optionType?: "default" | "button";
   size?: string;
   disabled?: boolean;
-  onChange?: (event: {
-    target: { value: V; checked: boolean; name: string };
-    nativeEvent: Event;
-    stopPropagation: () => void;
-    preventDefault: () => void;
-  }) => void;
+  dir?: "ltr" | "rtl";
+  onChange?: (event: RadioChangeEvent<V>) => void;
 };
 function RadioGroup<V extends ChoiceValue = string>({
   name,
@@ -211,11 +276,11 @@ function RadioGroup<V extends ChoiceValue = string>({
   const id = useId();
   const [local, setLocal] = useState(defaultValue);
   const off = useFieldDisabled(disabled);
-  const change = (next: ChoiceValue, event: ChangeEvent<HTMLInputElement>) => {
-    setLocal(next as V);
+  const change = (event: RadioChangeEvent<ChoiceValue>) => {
+    setLocal(event.target.value as V);
     onChange?.({
       target: {
-        value: next as V,
+        value: event.target.value as V,
         checked: event.target.checked,
         name: name ?? id
       },
@@ -234,9 +299,11 @@ function RadioGroup<V extends ChoiceValue = string>({
         button: optionType === "button"
       }}
     >
-      <div
+      <ShadcnRadioGroup
         {...props}
-        role="radiogroup"
+        name={name ?? id}
+        value={(value ?? local) === undefined ? "" : String(value ?? local)}
+        disabled={off}
         className={`ui-radio-group ${optionType === "button" ? "ui-radio-group-buttons ui-space-compact" : ""} ${size ? "ui-radio-group-" + size : ""} ${className}`}
       >
         {options
@@ -253,7 +320,7 @@ function RadioGroup<V extends ChoiceValue = string>({
               );
             })
           : children}
-      </div>
+      </ShadcnRadioGroup>
     </Radios.Provider>
   );
 }

@@ -528,47 +528,61 @@ export function RecommendationEditor({
                 })}
               >
                 {candidates.length ? (
-                  candidates.map((candidate) => (
-                    <div
-                      key={candidate.alias}
-                      className={`dubbing-picker-option${item?.voice_alias === candidate.alias ? " is-selected" : ""}`}
-                    >
-                      <Radio
-                        checked={item?.voice_alias === candidate.alias}
-                        disabled={
-                          disabled || candidate.synthesis_available === false
-                        }
-                        onChange={() => chooseVoice(candidate)}
+                  <Radio.Group
+                    className="dubbing-picker-radios"
+                    aria-label={t("select_side_voice", {
+                      side: sideName(activeSide, t)
+                    })}
+                    value={item?.voice_alias}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const chosen = candidates.find(
+                        (candidate) => candidate.alias === event.target.value
+                      );
+                      if (chosen) chooseVoice(chosen);
+                    }}
+                  >
+                    {candidates.map((candidate) => (
+                      <div
+                        key={candidate.alias}
+                        className={`dubbing-picker-option${item?.voice_alias === candidate.alias ? " is-selected" : ""}`}
                       >
-                        <VoiceName voice={candidate} />
-                        <span className="dubbing-picker-badge" aria-hidden>
-                          {candidate.synthesis_available === false
-                            ? t("unavailable")
-                            : candidate.is_common
-                              ? t("common")
-                              : ""}
-                        </span>
-                      </Radio>
-                      <Typography.Text
-                        className="dubbing-picker-id"
-                        copyable={{
-                          text:
-                            candidate.metadata?.provider_voice_id ??
-                            candidate.alias
-                        }}
-                      >
-                        <span
-                          title={
-                            candidate.metadata?.provider_voice_id ??
-                            candidate.alias
+                        <Radio
+                          value={candidate.alias}
+                          disabled={
+                            disabled || candidate.synthesis_available === false
                           }
                         >
-                          {candidate.metadata?.provider_voice_id ??
-                            candidate.alias}
-                        </span>
-                      </Typography.Text>
-                    </div>
-                  ))
+                          <VoiceName voice={candidate} />
+                          <span className="dubbing-picker-badge" aria-hidden>
+                            {candidate.synthesis_available === false
+                              ? t("unavailable")
+                              : candidate.is_common
+                                ? t("common")
+                                : ""}
+                          </span>
+                        </Radio>
+                        <Typography.Text
+                          className="dubbing-picker-id"
+                          copyable={{
+                            text:
+                              candidate.metadata?.provider_voice_id ??
+                              candidate.alias
+                          }}
+                        >
+                          <span
+                            title={
+                              candidate.metadata?.provider_voice_id ??
+                              candidate.alias
+                            }
+                          >
+                            {candidate.metadata?.provider_voice_id ??
+                              candidate.alias}
+                          </span>
+                        </Typography.Text>
+                      </div>
+                    ))}
+                  </Radio.Group>
                 ) : (
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}

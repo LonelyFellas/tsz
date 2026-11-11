@@ -444,9 +444,6 @@
   }
 }
 
-.settings-dialect .ui-radio-button {
-  position: absolute;
-}
 .settings-dialect .ui-radio-label {
   display: flex;
   flex: 1;
