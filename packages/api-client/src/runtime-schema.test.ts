@@ -35,6 +35,11 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "NextEntry",
+  "NextCapabilities",
+  "NextEntryView",
+  "CreateNextEntry",
+  "SaveNextDraft",
   "InterfaceCapabilities",
   "InterfaceLocaleV1",
   "LocalizedNotification",

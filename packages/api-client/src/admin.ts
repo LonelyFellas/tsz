@@ -1,3 +1,4 @@
+import { createLexiconNextEndpoints } from "./lexicon-next";
 import { createDubbingGroupsV3Endpoints } from "./dubbing-groups-v3";
 import { createAiLedgerEndpoints } from "./ai-ledger";
 import { createLexiconAssistantEndpoints } from "./lexicon-assistant";
@@ -260,6 +261,7 @@ export function createAdminEndpoints(http: HttpClient) {
   return {
     aiLedger: createAiLedgerEndpoints(http),
     lexiconAssistant: createLexiconAssistantEndpoints(http),
+    lexiconNext: createLexiconNextEndpoints(http),
     opencode: createOpenCodeEndpoints(http),
     chatgpt: createChatGPTEndpoints(http),
     dashboard: {

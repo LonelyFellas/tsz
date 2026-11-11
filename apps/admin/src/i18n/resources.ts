@@ -7,6 +7,7 @@ export const adminShellMessages = {
   nav_permissions: ["权限管理", "權限管理", "Permissions"],
   nav_classes: ["班级管理", "班級管理", "Classes"],
   nav_dictionary: ["词库管理", "詞庫管理", "Lexicon"],
+  nav_lexicon_next: ["新词库", "新詞庫", "New lexicon"],
   nav_words: ["智能词库", "智慧詞庫", "Entries"],
   nav_trash: ["垃圾桶", "垃圾桶", "Trash"],
   nav_parts: ["词性配置", "詞性設定", "Parts of speech"],

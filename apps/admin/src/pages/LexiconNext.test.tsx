@@ -1,0 +1,312 @@
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpError } from "@tsz/api-client";
+import type { NextCapabilities, NextEntry } from "@tsz/types";
+import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
+import { useAuthStore } from "@/lib/auth";
+import { LexiconNextPage, type LexiconNextRequests } from "./LexiconNext";
+
+const id = "00000000-0000-4000-8000-000000000001";
+const caps: NextCapabilities = {
+  schema_version: 1,
+  language_rules_version: "lexicon-next-en-zh-1",
+  manual_drafts: true,
+  generation: false,
+  publishing: false,
+  languages: [
+    {
+      target_language: "en",
+      target_locales: ["en-GB", "en-US"],
+      medium_locales: ["zh-Hans", "zh-Hant"],
+      common_target_locale: "en",
+      part_of_speech_codes: ["noun", "verb"]
+    }
+  ]
+};
+const entry: NextEntry = {
+  id,
+  owner_id: "editor",
+  target_language: "en",
+  kind: "word",
+  revision: 1,
+  updated_at: "2026-11-11T00:00:00Z",
+  draft: { schema_version: 1, headword: "centre", forms: [], senses: [] }
+};
+function requests() {
+  return {
+    capabilities: vi.fn().mockResolvedValue(caps),
+    get: vi.fn().mockResolvedValue(structuredClone(entry)),
+    create: vi.fn().mockResolvedValue(structuredClone(entry)),
+    save: vi.fn().mockImplementation(async (_id, input) => ({
+      ...entry,
+      revision: input.expected_revision + 1,
+      draft: structuredClone(input.draft)
+    })),
+    view: vi.fn()
+  } satisfies LexiconNextRequests;
+}
+const detachCaches: (() => void)[] = [];
+afterEach(() => {
+  detachCaches.splice(0).forEach((detach) => detach());
+});
+function mount(api: LexiconNextRequests, path = `/lexicon-next/${id}`) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+  });
+  detachCaches.push(bindAdminAuthorizationCache(useAuthStore, client));
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/lexicon-next/:entryId?",
+        element: <LexiconNextPage requests={api} />
+      },
+      { path: "/words", element: <p>旧库页面</p> }
+    ],
+    { initialEntries: [path] }
+  );
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
+  return { client, router };
+}
+const button = (name: string) => screen.getByRole("button", { name });
+async function edit(label: string, value: string) {
+  fireEvent.click(button(`添加${label}`));
+  fireEvent.change(await screen.findByRole("textbox", { name: `${label} 1` }), {
+    target: { value }
+  });
+}
+beforeEach(() => {
+  useAuthStore.setState({
+    profile: {
+      id: "editor",
+      phone: "test-only",
+      display_name: "编辑",
+      role: "admin",
+      permission_version: 1,
+      catalog_version: "test",
+      permissions: ["words.access", "words.create", "words.edit"],
+      preferences: { dialect: "uk" }
+    }
+  });
+});
+describe("新版词库手工闭环", () => {
+  it("切换四组合保留全部未保存内容和义项身份，完整保存；预览不回写本地稿", async () => {
+    const api = requests();
+    mount(api);
+    await screen.findByDisplayValue("centre");
+    await edit("英式英语词形", "centre");
+    fireEvent.click(button("添加义项"));
+    await edit("英式英语释义", "the middle");
+    await edit("简体中文解释", "中心位置");
+    await edit("简体中文译词", "中心");
+    fireEvent.click(screen.getByRole("radio", { name: "美式英语" }));
+    await edit("美式英语词形", "center");
+    await edit("美式英语释义", "the center");
+    fireEvent.click(screen.getByRole("radio", { name: "繁体中文" }));
+    await edit("繁体中文解释", "中心位置（繁體）");
+    await edit("繁体中文译词", "中心處");
+    fireEvent.click(screen.getByRole("radio", { name: "英式英语" }));
+    expect(
+      screen.getByRole("textbox", { name: "英式英语词形 1" })
+    ).toBeVisible();
+    expect(screen.getByDisplayValue("中心位置（繁體）")).toBeVisible();
+    fireEvent.click(screen.getByRole("radio", { name: "简体中文" }));
+    expect(screen.getByDisplayValue("中心位置")).toBeVisible();
+    fireEvent.click(button("保存完整草稿"));
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+    const saved = api.save.mock.calls[0]![1];
+    expect(saved.expected_revision).toBe(1);
+    expect(saved.draft.forms.map((row: { text: string }) => row.text)).toEqual([
+      "centre",
+      "center"
+    ]);
+    expect(saved.draft.senses).toHaveLength(1);
+    expect(
+      saved.draft.senses[0].definitions.map(
+        (row: { locale: string }) => row.locale
+      )
+    ).toEqual(["en-GB", "zh-Hans", "en-US", "zh-Hant"]);
+    const senseId = saved.draft.senses[0].id;
+    await screen.findByText("版本 2");
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "local unsaved" }
+    });
+    api.view.mockResolvedValue({
+      entry_id: id,
+      revision: 2,
+      target_locale: "en-GB",
+      medium_locale: "zh-Hans",
+      forms: [],
+      missing_forms: true,
+      senses: []
+    });
+    fireEvent.click(button("查看已保存预览"));
+    await screen.findByText("已保存预览 · 版本 2");
+    expect(screen.getByDisplayValue("local unsaved")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.click(button("保存完整草稿"));
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+    expect(api.save.mock.calls[1]![1].draft.senses[0].id).toBe(senseId);
+  });
+  it.each([403, 409])(
+    "%s 保留本地草稿，409 比较不会覆盖；显式确认才重载",
+    async (status) => {
+      const api = requests();
+      api.save.mockRejectedValue(new HttpError(status, "rejected"));
+      mount(api);
+      await screen.findByDisplayValue("centre");
+      fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+        target: { value: "local" }
+      });
+      fireEvent.click(button("保存完整草稿"));
+      await screen.findByText(/本地草稿已保留/);
+      expect(screen.getByDisplayValue("local")).toBeVisible();
+      expect(api.save).toHaveBeenCalledTimes(1);
+      if (status === 409) {
+        api.get.mockResolvedValue({
+          ...entry,
+          revision: 5,
+          draft: { ...entry.draft, headword: "remote" }
+        });
+        expect(button("保存完整草稿")).toBeDisabled();
+        fireEvent.click(button("比较服务器版本"));
+        await screen.findByText("服务器 · 版本 5");
+        fireEvent.click(button("保留本地草稿"));
+        expect(button("比较服务器版本")).toBeEnabled();
+        fireEvent.click(button("比较服务器版本"));
+        await screen.findByText("服务器 · 版本 5");
+        expect(screen.getByDisplayValue("local")).toBeVisible();
+        fireEvent.click(button("放弃本地修改并重载"));
+        await screen.findByRole("button", { name: "放弃并重载" });
+        fireEvent.click(button("放弃并重载"));
+        await screen.findByDisplayValue("remote");
+        expect(screen.getByText("版本 5")).toBeVisible();
+      }
+    }
+  );
+  it("能力不可用时不请求条目，不回退旧库；无创建/编辑他人权限时禁止写入", async () => {
+    const api = requests();
+    api.capabilities.mockRejectedValue(new HttpError(404, "not found"));
+    const mounted = mount(api);
+    await screen.findByText("新词库手工编辑暂不可用");
+    expect(api.get).not.toHaveBeenCalled();
+    expect(api.create).not.toHaveBeenCalled();
+    api.capabilities.mockResolvedValue(caps);
+    api.get.mockResolvedValue({ ...entry, owner_id: "another-editor" });
+    fireEvent.click(button("重新检查"));
+    await screen.findByDisplayValue("centre");
+    expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
+    expect(button("添加义项")).toBeDisabled();
+    act(() =>
+      useAuthStore.setState({
+        profile: {
+          ...useAuthStore.getState().profile!,
+          permissions: ["words.access"]
+        }
+      })
+    );
+    await act(() => mounted.router.navigate("/lexicon-next"));
+    await screen.findByText("当前账号没有创建词条权限");
+    expect(button("创建词条")).toBeDisabled();
+  });
+  it("创建只发送一次；保存 pending 不接收编辑，离开需要确认；重新打开读取新版本", async () => {
+    const api = requests();
+    let finishCreate!: (entry: NextEntry) => void;
+    api.create.mockReturnValue(
+      new Promise((resolve) => {
+        finishCreate = resolve;
+      })
+    );
+    const { router } = mount(api, "/lexicon-next");
+    await screen.findByLabelText("词头");
+    fireEvent.change(screen.getByLabelText("词头"), {
+      target: { value: "centre" }
+    });
+    fireEvent.click(button("创建词条"));
+    fireEvent.click(button("创建词条"));
+    await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
+    await act(async () => finishCreate(structuredClone(entry)));
+    await screen.findByText("版本 1");
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "local" }
+    });
+    fireEvent.click(screen.getByRole("link", { name: "新词库入口" }));
+    await screen.findByRole("dialog", { name: "有未保存修改" });
+    fireEvent.click(button("继续编辑"));
+    expect(screen.getByDisplayValue("local")).toBeVisible();
+    let finishSave!: (entry: NextEntry) => void;
+    api.save.mockReturnValue(
+      new Promise((resolve) => {
+        finishSave = resolve;
+      })
+    );
+    fireEvent.click(button("保存完整草稿"));
+    expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
+    await act(async () =>
+      finishSave({
+        ...entry,
+        revision: 2,
+        draft: { ...entry.draft, headword: "local" }
+      })
+    );
+    fireEvent.click(screen.getByRole("link", { name: "新词库入口" }));
+    await screen.findByText("打开已有词条");
+    api.get.mockResolvedValue({
+      ...entry,
+      revision: 3,
+      draft: { ...entry.draft, headword: "latest" }
+    });
+    await act(() => router.navigate(`/lexicon-next/${id}`));
+    await screen.findByDisplayValue("latest");
+    expect(screen.getByText("版本 3")).toBeVisible();
+  });
+  it("撤销编辑权限后的导航与语言切换不会因缓存清理丢失本地草稿", async () => {
+    const api = requests();
+    mount(api);
+    await screen.findByDisplayValue("centre");
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "unsaved after revocation" }
+    });
+    act(() =>
+      useAuthStore.setState({
+        profile: {
+          ...useAuthStore.getState().profile!,
+          permission_version: 2,
+          permissions: ["words.access"]
+        }
+      })
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "美式英语" }));
+    fireEvent.click(screen.getByRole("link", { name: "新词库入口" }));
+    await screen.findByRole("dialog", { name: "有未保存修改" });
+    fireEvent.click(button("继续编辑"));
+    expect(screen.getByDisplayValue("unsaved after revocation")).toBeVisible();
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+  it("删除义项前确认全部语言范围；取消和校验失败均保留草稿", async () => {
+    const api = requests();
+    mount(api);
+    await screen.findByDisplayValue("centre");
+    fireEvent.click(button("添加义项"));
+    await edit("英式英语释义", "");
+    fireEvent.click(button("保存完整草稿"));
+    await screen.findByText(/不能为空/);
+    expect(api.save).not.toHaveBeenCalled();
+    fireEvent.click(button("删除义项"));
+    fireEvent.click(await screen.findByRole("button", { name: /取\s*消/ }));
+    expect(
+      screen.getByRole("textbox", { name: "英式英语释义 1" })
+    ).toBeVisible();
+  });
+});

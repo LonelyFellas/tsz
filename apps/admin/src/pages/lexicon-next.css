@@ -1,0 +1,108 @@
+.lexicon-next {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--ui-color-text);
+  background: var(--ui-color-bg-container);
+}
+.lexicon-next h1 {
+  font-size: 24px;
+  margin: 0;
+}
+.lexicon-next h2 {
+  font-size: 20px;
+  margin: 0;
+}
+.lexicon-next h3 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+.lexicon-next h4 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.lexicon-next-heading,
+.lexicon-next-toolbar,
+.lexicon-next-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.lexicon-next-heading {
+  margin-bottom: 28px;
+}
+.lexicon-next-start,
+.lexicon-next-columns,
+.lexicon-next-selectors {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+}
+.lexicon-next-start h2 {
+  margin-bottom: 20px;
+}
+.lexicon-next .ui-alert {
+  margin-bottom: 16px;
+}
+.lexicon-next-id {
+  color: var(--ui-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.lexicon-next-basics {
+  max-width: 520px;
+}
+.lexicon-next-selectors {
+  margin: 8px 0 24px;
+}
+.lexicon-next-rows {
+  margin: 24px 0;
+  min-width: 0;
+}
+.lexicon-next-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.lexicon-next-row > .ui-input {
+  min-width: 0;
+}
+.lexicon-next-muted {
+  color: var(--ui-color-text-secondary);
+}
+.lexicon-next-section-heading {
+  margin: 24px 0 16px;
+}
+.lexicon-next-sense {
+  border-top: 1px solid var(--ui-color-border-secondary);
+  padding-bottom: 16px;
+}
+.lexicon-next-sense .ui-select {
+  min-width: 140px;
+}
+.lexicon-next-preview {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.lexicon-next-preview ul {
+  padding-left: 20px;
+}
+.lexicon-next-preview section + section {
+  margin-top: 24px;
+}
+@media (max-width: 760px) {
+  .lexicon-next {
+    padding: 16px;
+  }
+  .lexicon-next-start,
+  .lexicon-next-columns,
+  .lexicon-next-selectors {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .lexicon-next-row {
+    flex-wrap: wrap;
+  }
+}

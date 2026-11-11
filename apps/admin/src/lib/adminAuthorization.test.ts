@@ -278,3 +278,23 @@ it("coins 权限撤回或超管降级清理管理缓存，保留本人钱包", (
   detach();
   client.clear();
 });
+
+it("新词库撤销写权限保留可读草稿缓存；撤销访问权限才清理", () => {
+  const store = createAdminAuthStore();
+  const client = new QueryClient();
+  store
+    .getState()
+    .setProfile({ ...profile, permissions: ["words.access", "words.edit"] });
+  const detach = bindAdminAuthorizationCache(store, client);
+  client.setQueryData(["admin-lexicon-next", "entry", "a"], "saved");
+  store.getState().setProfile({ ...profile, permissions: ["words.access"] });
+  expect(client.getQueryData(["admin-lexicon-next", "entry", "a"])).toBe(
+    "saved"
+  );
+  store.getState().setProfile({ ...profile, permissions: [] });
+  expect(
+    client.getQueryData(["admin-lexicon-next", "entry", "a"])
+  ).toBeUndefined();
+  detach();
+  client.clear();
+});

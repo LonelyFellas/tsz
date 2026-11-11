@@ -86,6 +86,12 @@ export const router = createBrowserRouter([
           },
           ...wordRoutes,
           {
+            ...ADMIN_PAGE_ROUTES.lexiconNext,
+            lazy: async () => ({
+              Component: (await import("@/pages/LexiconNext")).LexiconNextPage
+            })
+          },
+          {
             ...ADMIN_PAGE_ROUTES.aiLedger,
             lazy: async () => ({
               Component: (await import("@/pages/AiLedger")).AiLedgerPage
