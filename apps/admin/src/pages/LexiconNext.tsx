@@ -192,7 +192,7 @@ function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                 }
               ]}
             >
-              <Input autoComplete="off" />
+              <Input autoComplete="off" className="tsz-words" />
             </Form.Item>
             <Button
               type="primary"
@@ -455,6 +455,7 @@ function EntryEditor({
           <Form.Item label="词头">
             <Input
               aria-label="词头"
+              className="tsz-words"
               value={draft.headword}
               disabled={disabled}
               onChange={(e) => setDraft({ ...draft, headword: e.target.value })}
@@ -506,6 +507,7 @@ function EntryEditor({
         <div hidden={step !== "forms"} inert={step !== "forms"}>
           <ContentRows
             rows={draft.forms}
+            textClassName="tsz-words"
             locale={editingLocale}
             label={`${localeLabels[editingLocale]}词形`}
             disabled={disabled}

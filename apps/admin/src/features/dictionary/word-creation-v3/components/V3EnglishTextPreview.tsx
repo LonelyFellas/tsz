@@ -71,8 +71,11 @@ export function V3EnglishTextPreview({
               {link.source_segments
                 .map((segment) => segment.surface)
                 .join(" … ")}{" "}
-              → {link.target_headword ?? t("panel_linked_entries")} ·{" "}
-              {link.target_gloss ?? t("panel_meanings_2")}
+              →{" "}
+              <span className="tsz-words">
+                {link.target_headword ?? t("panel_linked_entries")}
+              </span>{" "}
+              · {link.target_gloss ?? t("panel_meanings_2")}
             </Typography.Text>
           ))}
         </div>

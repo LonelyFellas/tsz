@@ -713,7 +713,9 @@ export function EntryList({
           }}
           onOk={() => void submit()}
         >
-          <p>{confirmation.rows.map((row) => row.headword).join("、")}</p>
+          <p className="tsz-words">
+            {confirmation.rows.map((row) => row.headword).join("、")}
+          </p>
           {confirmation.request.action === "delete" && (
             <p>{t("delete_help")}</p>
           )}

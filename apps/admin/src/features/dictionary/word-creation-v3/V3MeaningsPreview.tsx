@@ -376,10 +376,12 @@ export function V3MeaningsPreview({
                                         ? t("panel_pending_entry")
                                         : t("panel_context_link")}
                                       ：
-                                      {headword ??
-                                        association.source_segments
-                                          .map((segment) => segment.surface)
-                                          .join(" … ")}
+                                      <span className="tsz-words">
+                                        {headword ??
+                                          association.source_segments
+                                            .map((segment) => segment.surface)
+                                            .join(" … ")}
+                                      </span>
                                       {gloss ? ` · ${gloss}` : ""}
                                     </Typography.Text>
                                   </Space>
@@ -426,9 +428,11 @@ export function V3MeaningsPreview({
                                         .map((item) => `${item.score}%`)
                                         .join(" / ")}
                                     </span>
-                                    {relation.target_headword ??
-                                      relation.pending_target_headword ??
-                                      t("panel_target_entry_needed")}
+                                    <span className="tsz-words">
+                                      {relation.target_headword ??
+                                        relation.pending_target_headword ??
+                                        t("panel_target_entry_needed")}
+                                    </span>
                                     {gloss ? ` · ${gloss}` : ""}
                                   </Typography.Text>
                                 );

@@ -34,8 +34,10 @@ export function V3TextAssociationPicker({
         </Typography.Text>
         <Typography.Text className="tsz-entry-en">
           {t("panel_linked_2")}
-          {selected.target_headword ?? t("panel_entry")} ·{" "}
-          {selected.target_gloss ?? t("panel_meanings_2")}
+          <span className="tsz-words">
+            {selected.target_headword ?? t("panel_entry")}
+          </span>{" "}
+          · {selected.target_gloss ?? t("panel_meanings_2")}
           {selected.target_word_id === wordId
             ? t("panel_current_entry_2")
             : selected.target_publication_id

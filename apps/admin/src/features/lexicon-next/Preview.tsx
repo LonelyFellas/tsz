@@ -3,10 +3,12 @@ import { localeLabels } from "./model";
 
 function Lines({
   rows,
-  missing
+  missing,
+  textClassName
 }: {
   rows: { id: string; locale: string; text: string }[];
   missing: string;
+  textClassName?: string;
 }) {
   return rows.length ? (
     <ul>
@@ -15,7 +17,7 @@ function Lines({
           <span className="lexicon-next-muted">
             {localeLabels[row.locale]}：
           </span>
-          {row.text || "（空白）"}
+          <span className={textClassName}>{row.text || "（空白）"}</span>
         </li>
       ))}
     </ul>
@@ -26,7 +28,7 @@ function Lines({
 export function Preview({ view }: { view: NextEntryView }) {
   return (
     <div className="lexicon-next-preview">
-      <Lines rows={view.forms} missing="词形" />
+      <Lines rows={view.forms} missing="词形" textClassName="tsz-words" />
       {!view.senses.length && <p>尚无义项</p>}
       {view.senses.map((sense, index) => (
         <section key={sense.id}>
@@ -42,8 +44,8 @@ export function Preview({ view }: { view: NextEntryView }) {
 export function DraftSummary({ draft }: { draft: NextDraft }) {
   return (
     <div className="lexicon-next-preview">
-      <h4>{draft.headword}</h4>
-      <Lines rows={draft.forms} missing="词形" />
+      <h4 className="tsz-words">{draft.headword}</h4>
+      <Lines rows={draft.forms} missing="词形" textClassName="tsz-words" />
       {draft.senses.map((sense, index) => (
         <section key={sense.id}>
           <h4>

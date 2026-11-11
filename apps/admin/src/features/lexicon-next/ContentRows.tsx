@@ -9,6 +9,7 @@ export function ContentRows({
   locale,
   label,
   definition = false,
+  textClassName,
   disabled,
   onChange
 }: {
@@ -16,6 +17,7 @@ export function ContentRows({
   locale: string;
   label: string;
   definition?: boolean;
+  textClassName?: string;
   disabled: boolean;
   onChange: (rows: Row[]) => void;
 }) {
@@ -28,6 +30,7 @@ export function ContentRows({
         <div key={row.id} className="lexicon-next-row">
           {definition ? (
             <Input.TextArea
+              className={textClassName}
               aria-label={`${label} ${index + 1}`}
               value={row.text}
               disabled={disabled}
@@ -44,6 +47,7 @@ export function ContentRows({
             />
           ) : (
             <Input
+              className={textClassName}
               aria-label={`${label} ${index + 1}`}
               value={row.text}
               disabled={disabled}
