@@ -2588,7 +2588,7 @@ describe("V3FormsAndPronunciationStep", () => {
       id: addedId,
       dict_phonetic: "",
       actual_pron: "",
-      style: "normal"
+      style: "citation"
     });
     const removed = onChange.mock.calls[4]![0] as DraftFormsStepContentV3;
     const removedForm = removed.pos[0]!.forms[0]!;
@@ -2856,7 +2856,7 @@ describe("V3FormsAndPronunciationStep", () => {
         id: uuidFromInt(952),
         dict_phonetic: "",
         actual_pron: "",
-        style: "normal"
+        style: "citation"
       }
     ]);
   });
