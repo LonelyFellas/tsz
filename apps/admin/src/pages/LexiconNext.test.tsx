@@ -42,7 +42,13 @@ const entry: NextEntry = {
 };
 function requests() {
   return {
-    list: vi.fn().mockResolvedValue({
+    list: vi.fn(),
+    workspaceEntry: vi.fn().mockResolvedValue({ status: "draft" }),
+    stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 }),
+    creators: vi.fn().mockResolvedValue([]),
+    command: vi.fn(),
+    annotation: vi.fn(),
+    workspaceList: vi.fn().mockResolvedValue({
       items: [],
       pagination: { total: 0, page: 1, page_size: 20, total_pages: 0 }
     }),
@@ -335,20 +341,18 @@ it.each([true, false])(
       api,
       "/lexicon-next?headword=missing&kind=phrase&page=2"
     );
-    await screen.findByText("未找到匹配的词条");
-    fireEvent.click(button("清空条件"));
+    await screen.findByText("未找到符合条件的数据");
+    fireEvent.click(button("重置筛选"));
     await screen.findByText("暂无词条");
     expect(screen.getByRole("searchbox", { name: "词条" })).toHaveValue("");
-    expect(api.list).toHaveBeenLastCalledWith({
-      headword: "",
-      kind: undefined,
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
       page: 1,
       page_size: 20
     });
     const createButtons = screen.queryAllByRole("button", { name: "创建词条" });
-    expect(createButtons).toHaveLength(canCreate ? 2 : 0);
+    expect(createButtons).toHaveLength(canCreate ? 1 : 0);
     if (canCreate) {
-      fireEvent.click(createButtons[1]!);
+      fireEvent.click(createButtons[0]!);
       await waitFor(() =>
         expect(router.state.location.pathname).toBe("/lexicon-next/new")
       );
@@ -358,7 +362,7 @@ it.each([true, false])(
 
 it("越界空页可返回有效页，并保留已应用的筛选条件", async () => {
   const api = requests();
-  api.list
+  api.workspaceList
     .mockResolvedValueOnce({
       items: [],
       pagination: { total: 21, page: 3, page_size: 20, total_pages: 2 }
@@ -366,6 +370,15 @@ it("越界空页可返回有效页，并保留已应用的筛选条件", async (
     .mockResolvedValue({
       items: [
         {
+          status: "draft",
+          forms: [],
+          lifecycle_revision: 1,
+          annotation: null,
+          annotation_revision: 1,
+          annotation_visible: false,
+          created_at: entry.updated_at,
+          created_by_name: "编辑",
+          updated_by_name: "编辑",
           id,
           headword: "centre",
           target_language: "en",
@@ -380,11 +393,11 @@ it("越界空页可返回有效页，并保留已应用的筛选条件", async (
       pagination: { total: 21, page: 2, page_size: 20, total_pages: 2 }
     });
   mount(api, "/lexicon-next?headword=centre&kind=word&page=3&page_size=20");
-  await screen.findByText("未找到匹配的词条");
+  await screen.findByText("未找到符合条件的数据");
   expect(button("上一页")).toBeEnabled();
   fireEvent.click(button("上一页"));
-  await screen.findByRole("link", { name: "centre" });
-  expect(api.list).toHaveBeenLastCalledWith({
+  await screen.findByText("centre");
+  expect(api.workspaceList).toHaveBeenLastCalledWith({
     headword: "centre",
     kind: "word",
     page: 2,
@@ -394,9 +407,18 @@ it("越界空页可返回有效页，并保留已应用的筛选条件", async (
 
 it("列表查询筛选与分页走新版接口，列表入口和创建入口使用新版路由", async () => {
   const api = requests();
-  api.list.mockResolvedValue({
+  api.workspaceList.mockResolvedValue({
     items: [
       {
+        status: "draft",
+        forms: [],
+        lifecycle_revision: 1,
+        annotation: null,
+        annotation_revision: 1,
+        annotation_visible: false,
+        created_at: entry.updated_at,
+        created_by_name: "编辑",
+        updated_by_name: "编辑",
         id,
         headword: "centre",
         target_language: "en",
@@ -411,39 +433,238 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
     pagination: { total: 45, page: 1, page_size: 20, total_pages: 3 }
   });
   const { router } = mount(api, "/lexicon-next");
-  await screen.findByRole("link", { name: "centre" });
+  await screen.findByText("centre");
   fireEvent.change(screen.getByRole("searchbox", { name: "词条" }), {
     target: { value: "centre" }
   });
-  expect(api.list).toHaveBeenCalledTimes(1);
+  expect(api.workspaceList).toHaveBeenCalledTimes(1);
   fireEvent.click(button("搜索"));
   await waitFor(() =>
-    expect(api.list).toHaveBeenLastCalledWith({
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
       headword: "centre",
-      kind: undefined,
       page: 1,
       page_size: 20
     })
   );
   fireEvent.click(button("第 2 页"));
   await waitFor(() =>
-    expect(api.list).toHaveBeenLastCalledWith({
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
       headword: "centre",
-      kind: undefined,
       page: 2,
       page_size: 20
     })
   );
   await act(() => router.navigate("/lexicon-next?page_size=10"));
   await waitFor(() =>
-    expect(api.list).toHaveBeenLastCalledWith({
-      headword: "",
-      kind: undefined,
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
       page: 1,
       page_size: 10
     })
   );
-  fireEvent.click(await screen.findByRole("link", { name: "centre" }));
+  fireEvent.click(button("继续创建"));
   await screen.findByDisplayValue("centre");
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
+});
+
+function listRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    headword: "centre",
+    target_language: "en",
+    kind: "word",
+    owner_id: "editor",
+    revision: 2,
+    lifecycle_revision: 1,
+    status: "draft",
+    updated_at: entry.updated_at,
+    created_at: entry.updated_at,
+    created_by_name: "编辑",
+    updated_by_name: "编辑",
+    part_of_speech: ["noun"],
+    gloss: "中心",
+    forms: [],
+    annotation: null,
+    annotation_revision: 1,
+    annotation_visible: false,
+    ...overrides
+  };
+}
+function grantListPermissions() {
+  useAuthStore.setState({
+    profile: {
+      ...useAuthStore.getState().profile!,
+      permissions: [
+        "words.access",
+        "words.create",
+        "words.edit",
+        "words.archive",
+        "words.restore",
+        "words.publish"
+      ]
+    }
+  });
+}
+it("列表组合条件只在提交后生效，翻页保留，状态切换及移除条件回到第一页", async () => {
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow()],
+    pagination: { total: 45, page: 1, page_size: 20, total_pages: 3 }
+  });
+  mount(
+    api,
+    "/lexicon-next?headword=centre&gloss=middle&kind=word&pos=noun&page=2"
+  );
+  await screen.findByText("centre");
+  expect(api.workspaceList).toHaveBeenLastCalledWith({
+    headword: "centre",
+    gloss: "middle",
+    kind: "word",
+    pos: "noun",
+    page: 2,
+    page_size: 20
+  });
+  fireEvent.change(screen.getByRole("searchbox", { name: "词义" }), {
+    target: { value: "中心" }
+  });
+  expect(api.workspaceList).toHaveBeenCalledTimes(1);
+  fireEvent.click(button("搜索"));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
+      headword: "centre",
+      gloss: "中心",
+      kind: "word",
+      pos: "noun",
+      page: 1,
+      page_size: 20
+    })
+  );
+  fireEvent.click(button("已发布"));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "published", page: 1 })
+    )
+  );
+  expect(api.list).not.toHaveBeenCalled();
+});
+it("批量操作冻结版本、锁住 pending，未知结果沿用同一请求重试；发布入口保持不可用", async () => {
+  grantListPermissions();
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow()],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next");
+  fireEvent.click(
+    await screen.findByRole("checkbox", { name: "选择「centre」" })
+  );
+  expect(button("批量审听与发布")).toBeDisabled();
+  fireEvent.click(button(/移入垃圾桶\(1\)/));
+  let reject!: (error: Error) => void;
+  api.command
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, no) => {
+          reject = no;
+        })
+    )
+    .mockResolvedValue({ entry_ids: [id] });
+  fireEvent.click(button("移入垃圾桶"));
+  await waitFor(() => expect(api.command).toHaveBeenCalledTimes(1));
+  expect(button("取消")).toBeDisabled();
+  const sent = api.command.mock.calls[0]![0];
+  expect(sent.items).toEqual([
+    { entry_id: id, base_revision: 2, base_lifecycle_revision: 1 }
+  ]);
+  await act(async () => reject(new Error("network")));
+  await screen.findByText(/操作结果未确认/);
+  fireEvent.click(button("移入垃圾桶"));
+  await waitFor(() => expect(api.command).toHaveBeenCalledTimes(2));
+  expect(api.command.mock.calls[1]![0]).toEqual(sent);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+});
+it("权限与冲突不丢失选择，垃圾桶固定归档，归档词条打开后只读", async () => {
+  grantListPermissions();
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow({ status: "archived", lifecycle_revision: 2 })],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  api.command.mockRejectedValue(new HttpError(409, "词条已变化"));
+  api.workspaceEntry.mockResolvedValue({ status: "archived" });
+  const { router } = mount(api, "/lexicon-next/trash?status=published");
+  fireEvent.click(
+    await screen.findByRole("checkbox", { name: "选择「centre」" })
+  );
+  expect(api.workspaceList).toHaveBeenLastCalledWith({
+    status: "archived",
+    page: 1,
+    page_size: 20
+  });
+  expect(button(/永久删除\(1\)/)).toBeDisabled();
+  fireEvent.click(button(/恢\s*复\(1\)/));
+  fireEvent.click(button("恢复"));
+  await screen.findByText("词条已变化");
+  expect(button("恢复")).toBeDisabled();
+  fireEvent.click(button("取消"));
+  expect(
+    screen.getByRole("checkbox", { name: "选择「centre」" })
+  ).toBeChecked();
+  fireEvent.click(button("查看"));
+  await screen.findByDisplayValue("centre");
+  expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
+  expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
+  expect(api.save).not.toHaveBeenCalled();
+});
+it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", async () => {
+  grantListPermissions();
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow({ annotation_visible: true, annotation: "1" })],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  api.annotation.mockRejectedValue(
+    new HttpError(409, "标注已变化，请重新打开后确认", [], "revision_conflict")
+  );
+  mount(api, "/lexicon-next");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "更多操作：centre" })
+  );
+  fireEvent.click(await screen.findByText("标注"));
+  const field = await screen.findByDisplayValue("1");
+  fireEvent.change(field, { target: { value: "2" } });
+  fireEvent.click(button("保存标注"));
+  await screen.findByText("标注已变化，请重新打开后确认");
+  expect(screen.getByDisplayValue("2")).toBeVisible();
+  expect(button("保存标注")).toBeDisabled();
+  fireEvent.click(button("取消"));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+});
+it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", async () => {
+  const api = requests();
+  const { client, router } = mount(api, "/lexicon-next");
+  client.setQueryDefaults(["admin-lexicon-next", "stats"], {
+    staleTime: Infinity
+  });
+  await screen.findByText("暂无词条");
+  expect(api.stats).toHaveBeenCalledTimes(1);
+  fireEvent.click(button("创建词条"));
+  await screen.findByLabelText("词头");
+  api.stats.mockResolvedValue({ total: 1, today: 1, month: 1 });
+  fireEvent.change(screen.getByLabelText("词头"), {
+    target: { value: "centre" }
+  });
+  fireEvent.click(button("创建词条"));
+  await screen.findByDisplayValue("centre");
+  await act(() => router.navigate("/lexicon-next"));
+  await waitFor(() =>
+    expect(client.getQueryData(["admin-lexicon-next", "stats"])).toEqual({
+      total: 1,
+      today: 1,
+      month: 1
+    })
+  );
 });

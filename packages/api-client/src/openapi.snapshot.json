@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-11T07:10:17.450Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-list-parity-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-11T10:45:27.818Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -35,6 +35,12 @@
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/view": ["get"],
+    "/admin/lexicon-next/workspace/commands": ["post"],
+    "/admin/lexicon-next/workspace/creators": ["get"],
+    "/admin/lexicon-next/workspace/entries": ["get"],
+    "/admin/lexicon-next/workspace/entries/{id}": ["get"],
+    "/admin/lexicon-next/workspace/entries/{id}/annotation": ["patch"],
+    "/admin/lexicon-next/workspace/stats": ["get"],
     "/admin/lexicon/assistant": ["post"],
     "/admin/lexicon/assistant/capability": ["get"],
     "/admin/lexicon/assistant/form-candidates": ["post"],
@@ -2640,6 +2646,65 @@
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/workspace/commands": {
+      "request": { "$ref": "#/components/schemas/NextListCommand" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextListCommandResult" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/workspace/creators": {
+      "request": null,
+      "responses": {
+        "200": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextWorkspaceCreator" }
+        },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/workspace/entries": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextWorkspaceList" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/workspace/entries/{id}": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextWorkspaceEntry" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "patch /admin/lexicon-next/workspace/entries/{id}/annotation": {
+      "request": { "$ref": "#/components/schemas/NextAnnotationInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextAnnotationResult" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/workspace/stats": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextWorkspaceStats" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon/assistant": {
@@ -8104,6 +8169,19 @@
       },
       "additionalProperties": false
     },
+    "NextAnnotationInput": {
+      "type": "object",
+      "required": ["annotation", "base_annotation_revision"],
+      "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "base_annotation_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
     "NextDefinition": {
       "type": "object",
       "required": ["id", "locale", "text", "style"],
@@ -8162,6 +8240,37 @@
           "description": "Actual content locale, never the editor's current selection."
         },
         "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextListAction": {
+      "type": "string",
+      "enum": ["archive", "restore", "delete"]
+    },
+    "NextListCommand": {
+      "type": "object",
+      "required": ["request_id", "action", "items"],
+      "properties": {
+        "action": { "$ref": "#/components/schemas/NextListAction" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextListTarget" }
+        },
+        "request_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextListTarget": {
+      "type": "object",
+      "required": ["entry_id", "base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "entry_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

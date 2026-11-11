@@ -76,8 +76,8 @@ describe("词条标注 wire 契约", () => {
         })
       })
     );
-    const path = Object.keys(snapshot.paths).find((path) =>
-      path.endsWith("/annotation")
+    const path = Object.keys(snapshot.paths).find(
+      (path) => path === "/admin/lexicon/entries/{id}/annotation"
     );
     expect(path).toBeDefined();
     const operation = (

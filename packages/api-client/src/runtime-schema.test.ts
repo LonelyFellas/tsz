@@ -35,6 +35,14 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "NextWorkspaceEntry",
+  "NextWorkspaceList",
+  "NextWorkspaceStats",
+  "NextWorkspaceCreator",
+  "NextListCommand",
+  "NextListCommandResult",
+  "NextAnnotationInput",
+  "NextAnnotationResult",
   "NextEntry",
   "NextEntryList",
   "NextCapabilities",

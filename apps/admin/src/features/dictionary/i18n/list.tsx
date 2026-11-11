@@ -9,6 +9,43 @@ export const lexiconListMessages = {
     "Public visibility and homograph notice"
   ],
   publish: ["发布", "發布", "Publish"],
+  next_publish_unavailable: [
+    "新版尚未接入语音审核、例句及发布系统，暂不能批量发布",
+    "新版尚未接入語音審核、例句及發布系統，暫不能批次發布",
+    "Batch publication requires the new audio review, sentence and publication systems"
+  ],
+  next_references_unavailable: [
+    "新版尚未接入引用系统，暂不能检查引用",
+    "新版尚未接入引用系統，暫不能檢查引用",
+    "Reference checking is not available in the new lexicon yet"
+  ],
+  next_check_references: ["检查引用", "檢查引用", "Check links"],
+  next_no_levels: [
+    "当前语言草稿尚无义项等级数据",
+    "目前語言草稿尚無義項等級資料",
+    "Language drafts do not have sense levels yet"
+  ],
+  next_command_unknown: [
+    "操作结果未确认，可重试同一请求；请勿重新创建操作",
+    "操作結果未確認，可重試同一請求；請勿重新建立操作",
+    "The result is unknown. Retry this request rather than starting a new action"
+  ],
+  next_restore_help: [
+    "恢复后为草稿，不会自动发布。任意一条冲突时，整批保持原状。",
+    "恢復後為草稿，不會自動發布。任一詞條衝突時，整批維持原狀。",
+    "Restored entries remain drafts. A conflict leaves the entire batch unchanged."
+  ],
+  next_more_actions: [
+    "更多操作：{{label}}",
+    "更多操作：{{label}}",
+    "More actions for {{label}}"
+  ],
+  next_more: ["更多", "更多", "More"],
+  next_stats_failed: [
+    "统计加载失败",
+    "統計載入失敗",
+    "Could not load statistics"
+  ],
   restore_draft: ["恢复草稿", "恢復草稿", "Restore draft"],
   public_scope: ["公开范围", "公開範圍", "public scope"],
   confirmation_title: [

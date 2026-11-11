@@ -94,6 +94,13 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
             <Button onClick={() => void capability.refetch()}>重新检查</Button>
           }
         />
+      ) : entryId === "trash" ? (
+        <EntryList
+          key="trash"
+          requests={requests}
+          trashMode
+          partOfSpeechCodes={language.part_of_speech_codes}
+        />
       ) : entryId === "new" ? (
         <EntryStart requests={requests} />
       ) : entryId ? (
@@ -104,13 +111,18 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           language={language}
         />
       ) : (
-        <EntryList requests={requests} />
+        <EntryList
+          key="library"
+          requests={requests}
+          partOfSpeechCodes={language.part_of_speech_codes}
+        />
       )}
     </div>
   );
 }
 function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const canCreate = usePermission("words.create");
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
@@ -126,6 +138,14 @@ function EntryStart({ requests }: { requests: LexiconNextRequests }) {
         target_language: "en",
         headword: values.headword.trim()
       });
+      await Promise.all(
+        ["list", "stats", "creators"].map((key) =>
+          queryClient.invalidateQueries({
+            queryKey: ["admin-lexicon-next", key],
+            refetchType: "all"
+          })
+        )
+      );
       navigate(`/lexicon-next/${entry.id}`);
     } catch (error) {
       setError(`${failure(error)} 创建结果未确认，请先核实，勿重复创建。`);
@@ -205,7 +225,26 @@ function EntryLoader({
     gcTime: 0,
     refetchOnReconnect: false
   });
-  if (query.isPending) return <Spin aria-label="正在打开词条" />;
+  const metadata = useQuery({
+    queryKey: ["admin-lexicon-next", "workspace-entry", id],
+    queryFn: () => requests.workspaceEntry(id),
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    staleTime: Infinity,
+    gcTime: 0
+  });
+  if (query.isPending || metadata.isPending)
+    return <Spin aria-label="正在打开词条" />;
+  if (metadata.isError)
+    return (
+      <Alert
+        type="error"
+        title="无法读取词条状态"
+        description={failure(metadata.error)}
+        action={<Button onClick={() => void metadata.refetch()}>重试</Button>}
+      />
+    );
   if (query.error)
     return (
       <Alert
@@ -219,14 +258,21 @@ function EntryLoader({
   if (query.data.target_language !== "en")
     return <Alert type="warning" title="当前编辑器尚未开放此目标语言" />;
   return (
-    <EntryEditor initial={query.data} requests={requests} language={language} />
+    <EntryEditor
+      initial={query.data}
+      requests={requests}
+      language={language}
+      archived={metadata.data.status === "archived"}
+    />
   );
 }
 function EntryEditor({
   initial,
   requests,
-  language
+  language,
+  archived
 }: {
+  archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -249,7 +295,8 @@ function EntryEditor({
   const profile = useAuthStore((state) => state.profile);
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
-  const writable = canEdit && (saved.owner_id === profile?.id || editOthers);
+  const writable =
+    !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
   const disabled = busy || !writable;
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved.draft);
   const blocker = useBlocker(dirty || busy);

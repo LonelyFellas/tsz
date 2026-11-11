@@ -1,4 +1,13 @@
 import type {
+  NextWorkspaceQuery,
+  NextWorkspaceEntry,
+  NextWorkspaceList,
+  NextWorkspaceStats,
+  NextWorkspaceCreator,
+  NextListCommand,
+  NextListCommandResult,
+  NextAnnotationInput,
+  NextAnnotationResult,
   CreateNextEntry,
   NextCapabilities,
   NextEntry,
@@ -40,7 +49,59 @@ export function decodeNextEntryView(value: unknown): NextEntryView {
 export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
   const entry = (id: string) => `${root}/entries/${encodeURIComponent(id)}`;
+  const decode = <T>(
+    schema: Parameters<typeof validateRuntimeSchema>[0],
+    value: unknown
+  ): T => {
+    if (!validateRuntimeSchema(schema, value).valid)
+      throw new ClientResponseError("智能词库列表响应不符合接口契约");
+    return value as T;
+  };
   return {
+    workspaceList: (query: NextWorkspaceQuery = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== "") params.set(key, String(value));
+      }
+      return http
+        .get<unknown>(`${root}/workspace/entries?${params}`)
+        .then((value) => decode<NextWorkspaceList>("NextWorkspaceList", value));
+    },
+    workspaceEntry: (id: string) =>
+      http
+        .get<unknown>(`${root}/workspace/entries/${encodeURIComponent(id)}`)
+        .then((value) =>
+          decode<NextWorkspaceEntry>("NextWorkspaceEntry", value)
+        ),
+    stats: () =>
+      http
+        .get<unknown>(`${root}/workspace/stats`)
+        .then((value) =>
+          decode<NextWorkspaceStats>("NextWorkspaceStats", value)
+        ),
+    creators: () =>
+      http.get<unknown>(`${root}/workspace/creators`).then((value) => {
+        if (!Array.isArray(value))
+          throw new ClientResponseError("智能词库创建人响应不符合接口契约");
+        return value.map((row) =>
+          decode<NextWorkspaceCreator>("NextWorkspaceCreator", row)
+        );
+      }),
+    command: (input: NextListCommand) =>
+      http
+        .post<unknown>(`${root}/workspace/commands`, input)
+        .then((value) =>
+          decode<NextListCommandResult>("NextListCommandResult", value)
+        ),
+    annotation: (id: string, input: NextAnnotationInput) =>
+      http
+        .patch<unknown>(
+          `${root}/workspace/entries/${encodeURIComponent(id)}/annotation`,
+          input
+        )
+        .then((value) =>
+          decode<NextAnnotationResult>("NextAnnotationResult", value)
+        ),
     list: (query: NextListQuery = {}) => {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(query)) {

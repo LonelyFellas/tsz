@@ -226,3 +226,86 @@ it("列表参数安全编码且摘要响应通过严格运行时契约，拒绝�
     client({ items: [entry], pagination: response.pagination }).api.list()
   ).rejects.toThrow();
 });
+
+it("管理列表使用独立 wire 契约，保留查询参数且拒绝旧列表冒充", async () => {
+  const row = {
+    id: uuid(1),
+    target_language: "en",
+    kind: "word",
+    headword: "centre",
+    owner_id: uuid(8),
+    revision: 2,
+    lifecycle_revision: 3,
+    status: "archived",
+    created_at: entry.updated_at,
+    updated_at: entry.updated_at,
+    created_by_name: "Editor",
+    updated_by_name: "Editor",
+    annotation: null,
+    annotation_revision: 1,
+    annotation_visible: false,
+    part_of_speech: ["noun"],
+    gloss: "中心",
+    forms: draft.forms
+  };
+  const response = {
+    items: [row],
+    pagination: { page: 2, page_size: 10, total: 11, total_pages: 2 }
+  };
+  const { api, fetch } = client(response);
+  expect(
+    await api.workspaceList({
+      headword: "100% centre",
+      gloss: "中心",
+      status: "archived",
+      page: 2,
+      page_size: 10
+    })
+  ).toEqual(response);
+  const url = new URL(fetch.mock.calls[0]![0] as string);
+  expect(url.pathname).toBe("/api/v1/admin/lexicon-next/workspace/entries");
+  expect(url.searchParams.get("headword")).toBe("100% centre");
+  expect(url.searchParams.get("status")).toBe("archived");
+  const malformed = client({
+    ...response,
+    items: [{ ...row, status: "invented" }]
+  }).api;
+  await expect(malformed.workspaceList()).rejects.toThrow("接口契约");
+  const missing = client({
+    ...response,
+    items: [{ id: uuid(1), headword: "centre" }]
+  }).api;
+  await expect(missing.workspaceList()).rejects.toThrow("接口契约");
+});
+it("生命周期请求保留重试标识与精确版本，不回退 V1；标注走独立 PATCH", async () => {
+  const { api, fetch } = client({ entry_ids: [uuid(1)] });
+  const input = {
+    request_id: uuid(10),
+    action: "archive" as const,
+    items: [{ entry_id: uuid(1), base_revision: 2, base_lifecycle_revision: 1 }]
+  };
+  await api.command(input);
+  await api.command(input);
+  expect(fetch.mock.calls.map((call) => JSON.parse(call[1].body))).toEqual([
+    input,
+    input
+  ]);
+  expect(
+    fetch.mock.calls.every((call) =>
+      String(call[0]).endsWith("/lexicon-next/workspace/commands")
+    )
+  ).toBe(true);
+  const annotation = client({
+    entry_id: uuid(1),
+    annotation: "2",
+    annotation_revision: 2
+  });
+  await annotation.api.annotation(uuid(1), {
+    annotation: "2",
+    base_annotation_revision: 1
+  });
+  expect(annotation.fetch.mock.calls[0]![1].method).toBe("PATCH");
+  const missing = client({ message: "not found" }, 404);
+  await expect(missing.api.workspaceList()).rejects.toBeInstanceOf(HttpError);
+  expect(missing.fetch).toHaveBeenCalledTimes(1);
+});
