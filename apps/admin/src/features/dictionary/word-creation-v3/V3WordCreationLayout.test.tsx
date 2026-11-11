@@ -16,7 +16,6 @@ import {
 } from "./fixtures";
 import type { V3Problem } from "./problem";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
-import { mockPageWidthObserver } from "../word-creation/wordCreation.test.helper";
 import {
   V3WordCreationLayout,
   type V3ConflictComparison
@@ -141,7 +140,7 @@ function renderLayout(
     word?: AdminWordV3;
   } = {}
 ) {
-  return render(
+  const view = render(
     <MemoryRouter>
       <V3WordCreationLayout
         word={options.word ?? word()}
@@ -164,6 +163,8 @@ function renderLayout(
       </V3WordCreationLayout>
     </MemoryRouter>
   );
+  fireEvent.click(screen.getByRole("button", { name: "展开词条概览" }));
+  return view;
 }
 
 describe("V3WordCreationLayout", () => {
@@ -336,7 +337,7 @@ describe("V3WordCreationLayout", () => {
 
     const view = renderLayout({ word: current });
     const rows = Array.from(
-      view.container.querySelectorAll<HTMLElement>(
+      view.baseElement.querySelectorAll<HTMLElement>(
         ".word-creation-progress-row"
       )
     );
@@ -454,22 +455,19 @@ describe("V3WordCreationLayout", () => {
     expect(panel).not.toHaveAttribute("inert");
   });
 
-  it("窄屏入口按完成的行数报计数，清单本身不再占首屏", () => {
-    const observer = mockPageWidthObserver(900);
-    try {
-      renderLayout({ word: word() });
-
-      // fixture 里「语言识别」「基本词性」两行已完成
-      expect(
-        screen.getByRole("button", { name: "完成情况 2/7" })
-      ).toBeInTheDocument();
-      expect(screen.queryByText("多维例句")).not.toBeInTheDocument();
-    } finally {
-      observer.restore();
-    }
+  it("悬浮概览按完成行数报计数，关闭后清单不占首屏", () => {
+    renderLayout({ word: word() });
+    expect(screen.getByText("2/7")).toBeVisible();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "词条概览" })).getByRole(
+        "button",
+        { name: "收起词条概览" }
+      )
+    );
+    expect(screen.getByText("多维例句")).not.toBeVisible();
   });
 
-  it("左栏在完成情况上方展示当前原形与所属语言", () => {
+  it("悬浮概览在完成情况上方展示当前原形与所属语言", () => {
     const current = word();
     current.presentation.label = "center / centers";
     current.presentation.matched_surfaces = ["center", "centers"];
@@ -540,7 +538,7 @@ describe("V3WordCreationLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "展开语言识别" }));
 
     expect(
-      view.container.querySelectorAll(".word-creation-summary-headword")
+      view.baseElement.querySelectorAll(".word-creation-summary-headword")
     ).toHaveLength(0);
     expect(screen.getByText("BrE")).toBeVisible();
     expect(screen.getByText("AmE")).toBeVisible();

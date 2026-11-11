@@ -2,18 +2,12 @@ import {
   useWorkspaceTranslation,
   type WorkspaceMessage
 } from "@/features/dictionary/i18n/workspace";
-import { CheckIcon, ChevronLeftIcon, ListIcon } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon } from "lucide-react";
 import { Breadcrumb, Button, Typography } from "@tsz/ui/admin/display";
 import { useAdminDisabled } from "@tsz/ui/admin/context";
-import { Drawer } from "@tsz/ui/admin/overlays";
+import { FloatingEntryOverview } from "./FloatingEntryOverview";
 import type { WordCreationStep } from "@tsz/types";
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode
-} from "react";
+import { useRef, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./word-creation.css";
 
@@ -43,15 +37,11 @@ interface Props {
     showEntrySummary?: boolean;
     status?: ReactNode;
     progress: ReactNode;
-    /** 窄屏抽屉入口上的完成计数(如 "1/7")。不传就只显示「完成情况」。 */
+    /** 完成情况标题上的完成计数（如 "1/7"）。 */
     progressBadge?: string;
   };
   children: ReactNode;
 }
-
-// 与 word-creation.css 里 `@container word-creation-page` 的窄屏断点同值：
-// 超过这个宽度左栏才排得下，窄于它「完成情况」改走抽屉。
-const PROGRESS_DRAWER_MAX_WIDTH = 1199;
 
 const STEP_SUBTITLE: Record<WordCreationStep, WorkspaceMessage> = {
   basics: "basics_help",
@@ -72,34 +62,10 @@ export function WordCreationLayout({
 }: Props) {
   const { t } = useWorkspaceTranslation();
   const navigate = useNavigate();
-  // 「完成情况」是只读清单,窄屏平铺在顶部会把主内容整个挤出首屏,改收进右侧抽屉。
-  // 量不到宽度时(jsdom、首帧)按宽屏渲染,免得清单被藏进一个没人点的抽屉里。
   const pageRef = useRef<HTMLDivElement>(null);
-  const [narrowProgress, setNarrowProgress] = useState(false);
-  const [progressOpen, setProgressOpen] = useState(false);
-  useLayoutEffect(() => {
-    const page = pageRef.current;
-    if (!page || typeof ResizeObserver === "undefined") return;
-    const apply = (width: number) => {
-      if (width > 0) setNarrowProgress(width <= PROGRESS_DRAWER_MAX_WIDTH);
-    };
-    apply(page.clientWidth);
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) apply(entry.contentRect.width);
-    });
-    observer.observe(page);
-    return () => observer.disconnect();
-  }, []);
-  // 拖宽窗口时抽屉留在那儿会盖住已经排得下的左栏。
-  useEffect(() => {
-    if (!narrowProgress) setProgressOpen(false);
-  }, [narrowProgress]);
   const componentDisabled = useAdminDisabled();
   const isBasicsStep = currentStep === "basics";
   const completed = new Set(presentation.completedSteps);
-  const progressTriggerLabel = presentation.progressBadge
-    ? t("progress_badge", { badge: presentation.progressBadge })
-    : t("progress");
 
   return (
     <div className="word-creation-page" ref={pageRef}>
@@ -159,58 +125,51 @@ export function WordCreationLayout({
       </nav>
 
       <div className="word-creation-shell">
-        <section className="word-creation-summary" aria-label={t("summary")}>
-          <Button
-            type="text"
-            icon={<ChevronLeftIcon />}
-            onClick={() => navigate(dictionary?.path ?? "/words")}
-            className="word-creation-back"
-          >
-            {dictionary?.back ?? t("back")}
-          </Button>
-
-          {presentation.showEntrySummary !== false && (
-            <div className="word-summary-entry-card">
-              <Typography.Text type="secondary" className="word-summary-kicker">
-                {t("current_entry")}
-              </Typography.Text>
-              {presentation.summaryHeadword}
-
-              <div className="word-summary-language">
-                <Typography.Text type="secondary">
-                  {t("language")}
-                </Typography.Text>
-                <strong>English</strong>
-              </div>
-
-              {presentation.status}
-            </div>
-          )}
-
-          {narrowProgress ? (
+        <FloatingEntryOverview pageRef={pageRef}>
+          <section className="word-creation-summary" aria-label={t("summary")}>
             <Button
-              // 图标 会把「unordered-list」混进可及名，显式定名兜住。
-              aria-label={progressTriggerLabel}
-              className="word-summary-progress-trigger"
-              icon={<ListIcon />}
-              onClick={() => setProgressOpen(true)}
+              type="text"
+              icon={<ChevronLeftIcon />}
+              onClick={() => navigate(dictionary?.path ?? "/words")}
+              className="word-creation-back"
             >
-              {progressTriggerLabel}
+              {dictionary?.back ?? t("back")}
             </Button>
-          ) : (
-            <>
-              <div className="word-summary-progress-title">
+
+            {presentation.showEntrySummary !== false && (
+              <div className="word-summary-entry-card">
                 <Typography.Text
                   type="secondary"
                   className="word-summary-kicker"
                 >
-                  {t("progress")}
+                  {t("current_entry")}
                 </Typography.Text>
+                {presentation.summaryHeadword}
+
+                <div className="word-summary-language">
+                  <Typography.Text type="secondary">
+                    {t("language")}
+                  </Typography.Text>
+                  <strong>English</strong>
+                </div>
+
+                {presentation.status}
               </div>
-              {presentation.progress}
-            </>
-          )}
-        </section>
+            )}
+
+            <div className="word-summary-progress-title">
+              <Typography.Text type="secondary" className="word-summary-kicker">
+                {t("progress")}
+              </Typography.Text>
+              {presentation.progressBadge && (
+                <Typography.Text type="secondary">
+                  {presentation.progressBadge}
+                </Typography.Text>
+              )}
+            </div>
+            {presentation.progress}
+          </section>
+        </FloatingEntryOverview>
 
         <main
           className={`word-creation-content${isBasicsStep ? " word-creation-content--basics" : ""}`}
@@ -218,19 +177,6 @@ export function WordCreationLayout({
           {children}
         </main>
       </div>
-
-      {narrowProgress && (
-        <Drawer
-          classNames={{ body: "word-creation-progress-drawer" }}
-          onClose={() => setProgressOpen(false)}
-          open={progressOpen}
-          placement="right"
-          size="min(360px, 86vw)"
-          title={t("progress")}
-        >
-          {presentation.progress}
-        </Drawer>
-      )}
     </div>
   );
 }
