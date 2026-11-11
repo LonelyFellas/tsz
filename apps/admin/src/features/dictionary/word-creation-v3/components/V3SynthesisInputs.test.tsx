@@ -21,6 +21,7 @@ import { V3SynthesisInputs } from "./V3SynthesisInputs";
 
 const speech = vi.hoisted(() => ({
   synthesize: vi.fn(),
+  resolveAudio: vi.fn(),
   generateAudio: vi.fn(),
   resolve: vi.fn(),
   recommendations: vi.fn()
@@ -61,6 +62,7 @@ vi.mock("../../voice-editor/dataSource", () => ({
       }
     ],
     synthesize: speech.synthesize,
+    resolveAudio: speech.resolveAudio,
     resolveVoices: (input: unknown) =>
       speech
         .resolve(input)
@@ -101,6 +103,11 @@ beforeEach(() => {
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     cached: false
   });
+  speech.resolveAudio.mockReset().mockResolvedValue({
+    audioUrl: "/saved-audio.mp3",
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    cached: false
+  });
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 });
@@ -113,6 +120,7 @@ function Harness({
   legacyPhrase = false,
   settingsPhrase = false,
   generated = false,
+  recording = false,
   issues = []
 }: {
   dialect: Dialect;
@@ -122,6 +130,7 @@ function Harness({
   legacyPhrase?: boolean;
   settingsPhrase?: boolean;
   generated?: boolean;
+  recording?: boolean;
   issues?: readonly V3DraftValidationIssue[];
 }) {
   const generatedSpeech = {
@@ -147,6 +156,22 @@ function Harness({
     dict_phonetic: "fɑː",
     actual_pron: "fɑː",
     style: "normal",
+    ...(recording
+      ? {
+          audio_assets: [
+            {
+              id: "old-recording",
+              locale: "en-GB" as const,
+              gender: "female" as const,
+              content_type: "audio/mpeg",
+              size_bytes: 1024,
+              original_name: "recording.mp3",
+              created_at: "2026-11-11T07:00:00Z",
+              is_default: true
+            }
+          ]
+        }
+      : {}),
     synthesis: settingsPhrase
       ? {
           alphabet: "ipa",
@@ -293,7 +318,7 @@ describe("双口音真实试听控件", () => {
     expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
   });
   it.each(["ipa", "ups"] as const)(
-    "%s 弹窗改音素后生成并完成，保留新音频绑定",
+    "%s 弹窗改音素后生成并完成，字段播放新配音而非整条发音的默认录音",
     async (alphabet) => {
       speech.recommendations.mockResolvedValue([
         {
@@ -311,7 +336,7 @@ describe("双口音真实试听控件", () => {
           }
         }
       ]);
-      renderWithUps(<Harness dialect="uk" />);
+      renderWithUps(<Harness dialect="uk" recording />);
       const label = `第 1 条发音 英式 Azure ${alphabet.toUpperCase()}`;
       fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
       const input = await screen.findByLabelText(`${label}音标编辑`);
@@ -353,8 +378,36 @@ describe("双口音真实试听控件", () => {
         }),
         expect.any(AbortSignal)
       );
+      await waitFor(() => expect(editor).not.toBeInTheDocument());
+      const play = screen.getByLabelText(`${label} 最终读音 播放语音`);
+      await waitFor(() => expect(play).toBeEnabled());
+      fireEvent.click(play);
+      await waitFor(() =>
+        expect(speech.resolveAudio).toHaveBeenCalledWith("new-audio", {
+          signal: expect.any(AbortSignal)
+        })
+      );
+      expect(saved.audio_assets[0].id).toBe("old-recording");
+      expect(saved.audio_assets[0].is_default).toBe(true);
     }
   );
+  it("默认录音不能启用空音标，填写音标后按字段内容试听", async () => {
+    renderWithUps(<Harness dialect="uk" empty recording />);
+    const play = screen.getByLabelText(
+      "第 1 条发音 英式 Azure IPA 最终读音 播放语音"
+    );
+    await waitFor(() => expect(play).toBeDisabled());
+    fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+      target: { value: "fɑː" }
+    });
+    await waitFor(() => expect(play).toBeEnabled());
+    fireEvent.click(play);
+    await waitFor(() => expect(speech.synthesize).toHaveBeenCalled());
+    expect(speech.resolveAudio).not.toHaveBeenCalled();
+    expect(speech.synthesize.mock.lastCall![0].content.annotations).toEqual([
+      { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "fɑː" }
+    ]);
+  });
   it("改音素只清除对应音频引用，保留参数、另一读法和另一口音", () => {
     renderWithUps(<Harness dialect="common" generated />);
     fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
