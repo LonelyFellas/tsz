@@ -448,6 +448,11 @@ export const lexiconListMessages = {
   ],
   trash_empty: ["垃圾桶暂无词条", "垃圾桶尚無詞條", "Trash is empty"],
   empty: ["暂无词条", "尚無詞條", "No entries yet"],
+  no_matching_entries: [
+    "未找到匹配的词条",
+    "找不到符合條件的詞條",
+    "No matching entries"
+  ],
   kind_word: ["单词", "單字", "Word"],
   kind_phrase: ["短语", "片語", "Phrase"],
   action_edit: ["编辑", "編輯", "Edit"],
