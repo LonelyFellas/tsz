@@ -59,6 +59,14 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "NextWorkspaceEntry",
+  "NextWorkspaceList",
+  "NextWorkspaceStats",
+  "NextWorkspaceCreator",
+  "NextListCommand",
+  "NextListCommandResult",
+  "NextAnnotationInput",
+  "NextAnnotationResult",
   "NextEntry",
   "NextEntryList",
   "NextCapabilities",

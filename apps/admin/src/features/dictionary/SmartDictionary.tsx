@@ -1,10 +1,10 @@
+import { PartOfSpeechAbbreviation } from "./part-of-speech/PartOfSpeechAbbreviation";
+import { WordListFilters } from "./WordListFilters";
 import {
   useLexiconListTranslation,
   LexiconListText,
   type LexiconListKey
 } from "@/features/dictionary/i18n/list";
-import { Button as PilotButton } from "@tsz/ui/components/button";
-import { Input as PilotInput } from "@tsz/ui/components/input";
 import { WordListTable, type WordColumn } from "./WordListTable";
 import "./word-list-controls.css";
 import { TableEmptyState } from "@/components/TableEmptyState";
@@ -13,11 +13,7 @@ import {
   ChevronDownIcon,
   LoaderCircleIcon,
   PlusIcon,
-  Undo2Icon,
-  SearchIcon,
-  ChevronUpIcon,
-  SlidersHorizontalIcon,
-  XIcon
+  Undo2Icon
 } from "lucide-react";
 import {
   Alert,
@@ -34,8 +30,7 @@ import {
   Tooltip,
   type MenuProps
 } from "@tsz/ui/admin/overlays";
-import { DatePicker, Form, Select } from "@tsz/ui/admin/forms";
-import { adminTokens } from "@tsz/ui/admin/context";
+import { Form } from "@tsz/ui/admin/forms";
 
 import dayjs from "dayjs";
 import {
@@ -79,12 +74,11 @@ import {
   partitionDeletableRows
 } from "./deletePermission";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
-import { CEFR_OPTIONS, cefrColor, KIND_OPTIONS } from "./labels";
+import { cefrColor, KIND_OPTIONS } from "./labels";
 import {
   availablePartOfSpeechOptions,
   localizedCatalogName,
-  createPartOfSpeechLookup,
-  type PartOfSpeechLookup
+  createPartOfSpeechLookup
 } from "./part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
@@ -116,8 +110,6 @@ import { EditEntryAnnotation } from "./EditEntryAnnotation";
 import { canEditRowAnnotation } from "./annotationPermission";
 import { BatchPublicationModal } from "./BatchPublicationModal";
 
-const { RangePicker } = DatePicker;
-
 const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, LexiconListKey> = {
   relation: "reference_relation",
   relation_prebound: "reference_prebound",
@@ -145,27 +137,6 @@ function BlockedDeleteNotice({
       {blocked.length > 3
         ? t("more_delete_blocked", { detail, count: blocked.length - 3 })
         : detail}
-    </>
-  );
-}
-
-/** 基本词性按英文缩写展示，只斜体字母、点号保持正体（如 *adj*.）；目录里没有的编码原样显示。 */
-function PartOfSpeechAbbreviation({
-  lookup,
-  code
-}: {
-  lookup: PartOfSpeechLookup;
-  code: string;
-}) {
-  const abbreviation = lookup.byCode.get(code)?.abbreviation;
-  if (!abbreviation) return code;
-  return (
-    <>
-      {abbreviation
-        .split(/([A-Za-z]+)/)
-        .map((part, index) =>
-          /^[A-Za-z]+$/.test(part) ? <i key={index}>{part}</i> : part
-        )}
     </>
   );
 }
@@ -266,7 +237,6 @@ export function SmartDictionary({
   );
   const [advancedExpanded, setAdvancedExpanded] = useState(hasAdvancedFilters);
   const advancedPanelId = useId();
-  const token = adminTokens;
   const creators = useWordCreators(advancedExpanded);
   const creatorOptions = (creators.data ?? []).map((creator) => ({
     value: creator.id,
@@ -1319,78 +1289,6 @@ export function SmartDictionary({
     }
   ];
 
-  const filterSummaries: Array<{ key: keyof WordFilterValues; label: string }> =
-    [
-      ...(filters.headword || filters.keyword
-        ? [
-            {
-              key: "headword" as const,
-              label: t("filter_entry", {
-                value: filters.headword || filters.keyword
-              })
-            }
-          ]
-        : []),
-      ...(filters.gloss
-        ? [
-            {
-              key: "gloss" as const,
-              label: t("filter_gloss", { value: filters.gloss })
-            }
-          ]
-        : []),
-      ...(filters.kind
-        ? [
-            {
-              key: "kind" as const,
-              label: t("filter_kind", { value: kindLabel(filters.kind) })
-            }
-          ]
-        : []),
-      ...(filters.pos
-        ? [
-            {
-              key: "pos" as const,
-              label: t("filter_pos", {
-                value: posDisplayName(filters.pos)
-              })
-            }
-          ]
-        : []),
-      ...(filters.level
-        ? [
-            {
-              key: "level" as const,
-              label: t("filter_level", { value: filters.level })
-            }
-          ]
-        : []),
-      ...(filters.createdBy
-        ? [
-            {
-              key: "createdBy" as const,
-              label: t("filter_creator", {
-                value:
-                  creatorOptions.find(
-                    (item) => item.value === filters.createdBy
-                  )?.label ?? filters.createdBy.slice(-8)
-              })
-            }
-          ]
-        : []),
-      ...(filters.range?.some(Boolean)
-        ? [
-            {
-              key: "range" as const,
-              label: t("filter_date", {
-                zone: filters.rangeTimezone ? t("beijing_parenthesis") : "",
-                start: filters.range[0]?.format("YYYY-MM-DD") ?? t("unlimited"),
-                end: filters.range[1]?.format("YYYY-MM-DD") ?? t("unlimited")
-              })
-            }
-          ]
-        : [])
-    ];
   const columnPriority = [
     "label",
     "kind",
@@ -1470,226 +1368,22 @@ export function SmartDictionary({
         )}
       </PageHeader>
 
-      <section
-        className="word-list-panel word-list-filter-panel"
-        aria-label={t("filters")}
-      >
-        {!trashMode && (
-          <div
-            className="word-status-filters"
-            role="group"
-            aria-label={t("status_filters")}
-          >
-            {(
-              [
-                { value: undefined, label: t("all_entries") },
-                { value: "draft", label: t("status_draft") },
-                { value: "published", label: t("status_published") }
-              ] as const
-            ).map((item) => (
-              <button
-                key={item.value ?? "all"}
-                type="button"
-                aria-pressed={filters.status === item.value}
-                onClick={() =>
-                  applyFilters({ ...form.getFieldsValue(), status: item.value })
-                }
-              >
-                {item.label}
-              </button>
-            ))}
-            {filters.status === "archived" && (
-              <button type="button" aria-pressed="true">
-                {t("status_archived")}
-              </button>
-            )}
-          </div>
-        )}
-        <Form
-          form={form}
-          initialValues={{
-            ...filters,
-            headword: filters.headword ?? filters.keyword
-          }}
-          layout="horizontal"
-          labelCol={{ flex: "72px" }}
-          wrapperCol={{ flex: 1 }}
-          labelAlign="left"
-          colon={false}
-          onFinish={applyFilters}
-          className="word-search-form"
-        >
-          <div className="word-search-main">
-            <Form.Item
-              name="headword"
-              label={t("entry")}
-              labelCol={{ flex: "none" }}
-            >
-              <PilotInput
-                type="search"
-                className="min-h-9 rounded-lg px-3 py-1"
-                placeholder={t("search_entry")}
-              />
-            </Form.Item>
-            <Form.Item
-              name="gloss"
-              label={t("meaning")}
-              labelCol={{ flex: "none" }}
-            >
-              <PilotInput
-                type="search"
-                className="min-h-9 rounded-lg px-3 py-1"
-                placeholder={t("search_meaning")}
-              />
-            </Form.Item>
-            <div className="word-search-actions">
-              <PilotButton
-                variant="default"
-                size="compact"
-                className="rounded-lg"
-                type="submit"
-              >
-                <SearchIcon />
-                {t("search")}
-              </PilotButton>
-              <PilotButton
-                type="button"
-                variant="ghost"
-                size="compact"
-                className="rounded-lg"
-                onClick={() => {
-                  form.resetFields();
-                  applyFilters({});
-                }}
-              >
-                {t("reset")}
-              </PilotButton>
-              <PilotButton
-                type="button"
-                variant="ghost"
-                size="compact"
-                className="word-search-toggle"
-                aria-expanded={advancedExpanded}
-                aria-controls={advancedPanelId}
-                onClick={() => setAdvancedExpanded((value) => !value)}
-              >
-                <SlidersHorizontalIcon />
-                {advancedExpanded ? t("collapse_filters") : t("more_filters")}
-                {advancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-              </PilotButton>
-            </div>
-          </div>
-          <div
-            id={advancedPanelId}
-            className="word-search-advanced"
-            hidden={!advancedExpanded}
-            aria-hidden={!advancedExpanded}
-            inert={!advancedExpanded}
-            style={{
-              borderTop: `1px solid ${token.colorSplit}`
-            }}
-          >
-            <Form.Item name="kind" label={t("entry_kind")}>
-              <Select placeholder={t("all")} options={kindOptions} allowClear />
-            </Form.Item>
-            <Form.Item name="pos" label={t("pos")}>
-              <Select
-                placeholder={t("all")}
-                options={partOfSpeechOptions}
-                loading={partOfSpeechCatalog.isPending}
-                disabled={partOfSpeechCatalog.isError}
-                allowClear
-              />
-            </Form.Item>
-            <Form.Item name="level" label={t("meaning_level")}>
-              <Select
-                placeholder={t("all")}
-                options={CEFR_OPTIONS}
-                allowClear
-              />
-            </Form.Item>
-            {!trashMode && (
-              <Form.Item name="status" hidden>
-                <input type="hidden" />
-              </Form.Item>
-            )}
-            <Form.Item
-              name="createdBy"
-              label={t("creator")}
-              help={
-                creators.isError ? (
-                  <span>
-                    {t("creators_failed")}
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={() => void creators.refetch()}
-                    >
-                      {t("reload_creators")}
-                    </Button>
-                  </span>
-                ) : undefined
-              }
-            >
-              <Select
-                placeholder={t("unlimited")}
-                options={creatorOptions}
-                allowClear
-                showSearch={{ optionFilterProp: "label" }}
-                loading={creators.isPending}
-              />
-            </Form.Item>
-            <Form.Item name="rangeTimezone" hidden>
-              <input type="hidden" />
-            </Form.Item>
-            <Form.Item
-              name="range"
-              label={t("created_at")}
-              className="word-search-date"
-              help={filters.rangeTimezone ? t("beijing_time") : undefined}
-            >
-              <RangePicker style={{ width: "100%" }} />
-            </Form.Item>
-            <div className="word-search-advanced-actions">
-              <Button htmlType="submit" type="primary" size="small">
-                {t("apply_filters")}
-              </Button>
-            </div>
-          </div>
-        </Form>
-        {filterSummaries.length > 0 && (
-          <div className="word-active-filters" aria-label={t("active_filters")}>
-            <span>{t("filtered")}</span>
-            {filterSummaries.map((item) => (
-              <button
-                type="button"
-                key={item.key}
-                aria-label={t("remove_filter", { label: item.label })}
-                onClick={() => {
-                  const next = { ...filters };
-                  delete next[item.key];
-                  if (item.key === "headword") delete next.keyword;
-                  if (item.key === "range") delete next.rangeTimezone;
-                  applyFilters(next);
-                }}
-              >
-                {item.label}
-                <XIcon aria-hidden="true" />
-              </button>
-            ))}
-            <button
-              type="button"
-              className="word-clear-filters"
-              onClick={() => {
-                form.resetFields();
-                applyFilters({});
-              }}
-            >
-              {t("clear_filters")}
-            </button>
-          </div>
-        )}
-      </section>
+      <WordListFilters
+        form={form}
+        filters={filters}
+        applyFilters={applyFilters}
+        trashMode={trashMode}
+        advancedExpanded={advancedExpanded}
+        setAdvancedExpanded={setAdvancedExpanded}
+        advancedPanelId={advancedPanelId}
+        kindOptions={kindOptions}
+        partOfSpeechOptions={partOfSpeechOptions}
+        partOfSpeechCatalog={partOfSpeechCatalog}
+        creators={creators}
+        creatorOptions={creatorOptions}
+        kindLabel={kindLabel}
+        posDisplayName={posDisplayName}
+      />
 
       <section
         className="word-list-panel word-list-results-panel"

@@ -1,8 +1,16 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "e645bd02a4018f4dcd1b12077d96cf1f652072a089bdbddc493bd22103409546",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-list-parity-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "7cb099ea43480171aa6b76f60654acb7b6188939b9a9ee2292b668cf6eccf93f",
   "roots": [
+    "NextWorkspaceEntry",
+    "NextWorkspaceList",
+    "NextWorkspaceStats",
+    "NextWorkspaceCreator",
+    "NextListCommand",
+    "NextListCommandResult",
+    "NextAnnotationInput",
+    "NextAnnotationResult",
     "NextEntry",
     "NextEntryList",
     "NextCapabilities",
@@ -3569,6 +3577,25 @@
       },
       "additionalProperties": false
     },
+    "NextAnnotationInput": {
+      "type": "object",
+      "required": ["annotation", "base_annotation_revision"],
+      "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "base_annotation_revision": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "NextAnnotationResult": {
+      "type": "object",
+      "required": ["entry_id", "annotation", "annotation_revision"],
+      "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer" },
+        "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "NextCapabilities": {
       "type": "object",
       "required": [
@@ -3745,6 +3772,44 @@
       },
       "additionalProperties": false
     },
+    "NextListAction": {
+      "type": "string",
+      "enum": ["archive", "restore", "delete"]
+    },
+    "NextListCommand": {
+      "type": "object",
+      "required": ["request_id", "action", "items"],
+      "properties": {
+        "action": { "$ref": "#/$defs/NextListAction" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextListTarget" }
+        },
+        "request_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextListCommandResult": {
+      "type": "object",
+      "required": ["entry_ids"],
+      "properties": {
+        "entry_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextListTarget": {
+      "type": "object",
+      "required": ["entry_id", "base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": { "type": "integer", "minimum": 1 },
+        "base_revision": { "type": "integer", "minimum": 1 },
+        "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "NextSense": {
       "type": "object",
       "required": ["id", "part_of_speech", "definitions", "equivalents"],
@@ -3793,6 +3858,82 @@
       },
       "additionalProperties": false
     },
+    "NextWorkspaceCreator": {
+      "type": "object",
+      "required": ["id", "display_name"],
+      "properties": {
+        "display_name": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextWorkspaceEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "target_language",
+        "kind",
+        "headword",
+        "owner_id",
+        "revision",
+        "lifecycle_revision",
+        "status",
+        "created_at",
+        "updated_at",
+        "created_by_name",
+        "updated_by_name",
+        "annotation",
+        "annotation_revision",
+        "annotation_visible",
+        "part_of_speech",
+        "gloss",
+        "forms"
+      ],
+      "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer" },
+        "annotation_visible": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by_name": { "type": "string" },
+        "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
+        "gloss": { "type": ["string", "null"] },
+        "headword": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "lifecycle_revision": { "type": "integer" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "part_of_speech": { "type": "array", "items": { "type": "string" } },
+        "revision": { "type": "integer" },
+        "status": { "$ref": "#/$defs/NextWorkspaceStatus" },
+        "target_language": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by_name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextWorkspaceList": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextWorkspaceEntry" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "NextWorkspaceStats": {
+      "type": "object",
+      "required": ["total", "today", "month"],
+      "properties": {
+        "month": { "type": "integer" },
+        "today": { "type": "integer" },
+        "total": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "NextWorkspaceStatus": { "type": "string", "enum": ["draft", "archived"] },
     "OpenCodeConnectedProvider": {
       "type": "object",
       "required": ["id", "name", "connections"],

@@ -109,3 +109,60 @@ export interface NextEntryView {
   missing_forms: boolean;
   senses: NextSenseView[];
 }
+
+/** List management has a separate endpoint; language draft responses stay compatible. */
+export interface NextWorkspaceQuery extends NextListQuery {
+  gloss?: string;
+  pos?: string;
+  level?: string;
+  status?: "draft" | "published" | "archived";
+  created_by?: string;
+  created_from?: string;
+  created_to?: string;
+}
+export interface NextWorkspaceEntry extends NextEntrySummary {
+  status: "draft" | "archived";
+  lifecycle_revision: number;
+  created_at: string;
+  created_by_name: string;
+  updated_by_name: string;
+  annotation: string | null;
+  annotation_revision: number;
+  annotation_visible: boolean;
+  forms: NextForm[];
+}
+export interface NextWorkspaceList {
+  items: NextWorkspaceEntry[];
+  pagination: NextEntryList["pagination"];
+}
+export interface NextWorkspaceStats {
+  total: number;
+  today: number;
+  month: number;
+}
+export interface NextWorkspaceCreator {
+  id: string;
+  display_name: string;
+}
+export interface NextListTarget {
+  entry_id: string;
+  base_revision: number;
+  base_lifecycle_revision: number;
+}
+export interface NextListCommand {
+  request_id: string;
+  action: "archive" | "restore" | "delete";
+  items: NextListTarget[];
+}
+export interface NextListCommandResult {
+  entry_ids: string[];
+}
+export interface NextAnnotationInput {
+  annotation: string | null;
+  base_annotation_revision: number;
+}
+export interface NextAnnotationResult {
+  entry_id: string;
+  annotation: string | null;
+  annotation_revision: number;
+}
