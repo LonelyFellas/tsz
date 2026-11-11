@@ -251,8 +251,7 @@ export function EntryAnnotationModal({
       keyboard={!busy && !frozen}
       cancelButtonProps={{ disabled: busy || frozen }}
       onOk={() => {
-        if (busy || frozen || saveDisabled || Object.keys(errors).length)
-          return;
+        if (busy || saveDisabled || Object.keys(errors).length) return;
         const normalized = Object.fromEntries(
           Object.entries(values).map(([id, value]) => [id, value.trim()])
         );
@@ -265,8 +264,7 @@ export function EntryAnnotationModal({
       }
       confirmLoading={busy}
       okButtonProps={{
-        disabled:
-          busy || frozen || saveDisabled || Object.keys(errors).length > 0
+        disabled: busy || saveDisabled || Object.keys(errors).length > 0
       }}
       destroyOnHidden
     >
