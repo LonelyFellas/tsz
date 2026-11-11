@@ -327,13 +327,7 @@ export function V3SynthesisInputs({
                       side: sideLabel,
                       name
                     })}
-                    disabled={
-                      !rowContent &&
-                      !pronunciation.audio_assets?.some(
-                        (asset) =>
-                          asset.is_default && asset.locale === sideLocale
-                      )
-                    }
+                    disabled={!rowContent}
                     disabledReason={
                       localPhoneticDiagnostic(
                         synthesisInputIssue(alphabet, candidate[alphabet]),
@@ -356,7 +350,6 @@ export function V3SynthesisInputs({
                       candidate[`${alphabet}_speech`]?.voice_profile ??
                       pronunciation.voice_profile
                     }
-                    audioAssets={pronunciation.audio_assets}
                   />
                   <Input.TextArea
                     id={`${inputPrefix}-${side}-${alphabet}`}
