@@ -44,6 +44,14 @@ export const workspaceMessages = {
   dictionary: ["智能词库V1", "智慧詞庫V1", "Entries V1"],
   steps: ["词条编辑步骤", "詞條編輯步驟", "Entry editing steps"],
   completed: ["已完成", "已完成", "Completed"],
+  overview: ["词条概览", "詞條概覽", "Entry overview"],
+  overview_open: ["展开词条概览", "展開詞條概覽", "Open entry overview"],
+  overview_close: ["收起词条概览", "收起詞條概覽", "Close entry overview"],
+  overview_hint: [
+    "点击悬浮球展开或收起，拖动或按方向键调整位置。",
+    "點擊懸浮球展開或收起，拖曳或按方向鍵調整位置。",
+    "Click to expand or collapse. Drag or use arrow keys to reposition."
+  ],
   summary: ["词条摘要", "詞條摘要", "Entry summary"],
   back: ["返回智能词库V1", "返回智慧詞庫V1", "Back to entries V1"],
   current_entry: ["当前词条", "目前詞條", "Current entry"],

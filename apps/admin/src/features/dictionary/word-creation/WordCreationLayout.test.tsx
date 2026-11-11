@@ -1,9 +1,8 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Typography } from "@tsz/ui/admin/display";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { WordCreationLayout } from "./WordCreationLayout";
-import { mockPageWidthObserver } from "./wordCreation.test.helper";
 
 function LocationProbe() {
   const location = useLocation();
@@ -34,7 +33,6 @@ function renderLayout(
   props: LayoutProps,
   initialEntry = "/words/word-center/v3/wizard/forms"
 ) {
-  // 关掉动画：抽屉的退场过渡在 jsdom 里不结束，关闭后面板会一直留在可见态。
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <WordCreationLayout {...props}>
@@ -66,8 +64,9 @@ describe("WordCreationLayout", () => {
         view.container.querySelector<HTMLElement>(".word-creation-breadcrumb")!
       ).getByText("创建词条")
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "展开词条概览" }));
     expect(screen.getByRole("region", { name: "词条摘要" })).toBe(
-      view.container.querySelector(".word-creation-summary")
+      document.querySelector(".word-creation-summary")
     );
     expect(screen.getByText("待检测")).toHaveClass(
       "word-summary-pending-detection"
@@ -155,54 +154,30 @@ describe("WordCreationLayout", () => {
     expect(
       view.container.querySelectorAll(".word-editor-step:disabled").length
     ).toBeGreaterThan(0);
-    const summary = view.container.querySelector<HTMLElement>(
+    fireEvent.click(screen.getByRole("button", { name: "展开词条概览" }));
+    const summary = document.querySelector<HTMLElement>(
       ".word-creation-summary"
     )!;
     fireEvent.click(within(summary).getByText("返回智能词库V1"));
     expect(screen.getByTestId("location")).toHaveTextContent("/words");
   });
 
-  describe("窄屏的完成情况", () => {
-    const narrow = presentation({ progressBadge: "1/7" });
-
-    it("量不到宽度时按宽屏渲染，清单直接摆在左栏", () => {
-      renderLayout({ currentStep: "forms", presentation: narrow });
-
-      expect(screen.getByTestId("progress-list")).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /完成情况/ })
-      ).not.toBeInTheDocument();
+  it("概览默认收起，展开后显示计数和清单，关闭后保留内容状态", () => {
+    renderLayout({
+      currentStep: "forms",
+      presentation: presentation({ progressBadge: "1/7" })
     });
-
-    it("窄屏把清单收进抽屉，入口带完成计数", () => {
-      const observer = mockPageWidthObserver(900);
-      try {
-        renderLayout({ currentStep: "forms", presentation: narrow });
-
-        // 清单不再占首屏，顶部只留一个入口
-        expect(screen.queryByTestId("progress-list")).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "完成情况 1/7" }));
-        expect(screen.getByTestId("progress-list")).toBeInTheDocument();
-      } finally {
-        observer.restore();
-      }
-    });
-
-    it("抽屉开着时拖宽窗口，清单回到左栏且不会留下第二份", () => {
-      const observer = mockPageWidthObserver(900);
-      try {
-        renderLayout({ currentStep: "forms", presentation: narrow });
-        fireEvent.click(screen.getByRole("button", { name: "完成情况 1/7" }));
-
-        act(() => observer.resize(1400));
-
-        expect(
-          screen.queryByRole("button", { name: /完成情况/ })
-        ).not.toBeInTheDocument();
-        expect(screen.getAllByTestId("progress-list")).toHaveLength(1);
-      } finally {
-        observer.restore();
-      }
-    });
+    expect(screen.getByTestId("progress-list")).not.toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "展开词条概览" }));
+    expect(screen.getByTestId("progress-list")).toBeVisible();
+    expect(screen.getByText("1/7")).toBeVisible();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "词条概览" })).getByRole(
+        "button",
+        { name: "收起词条概览" }
+      )
+    );
+    expect(screen.getByTestId("progress-list")).not.toBeVisible();
+    expect(screen.getByRole("button", { name: "展开词条概览" })).toHaveFocus();
   });
 });

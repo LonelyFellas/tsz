@@ -653,11 +653,6 @@
   transform: rotate(-45deg) translateX(-2.5px);
 }
 
-.word-creation-summary:has(.v3-product-progress-list)
-  .word-summary-progress-title {
-  display: block;
-}
-
 .v3-product-progress-panel {
   display: grid;
   grid-template-rows: 0fr;

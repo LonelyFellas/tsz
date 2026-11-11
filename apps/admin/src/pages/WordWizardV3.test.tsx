@@ -713,6 +713,9 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/meanings`,
       createV3WordRequests(api)
     );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "展开词条概览" })
+    );
     const field = await screen.findByLabelText("语义区间 1 中文");
     fireEvent.change(field, { target: { value: "即时语义区间" } });
     // 左栏明细现在默认收起，点开才列出条目。
@@ -751,6 +754,9 @@ describe("WordWizardV3Page", () => {
     const router = renderPage(
       `/words/${WORD_ID}/v3/wizard/basics`,
       createV3WordRequests(api)
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "展开词条概览" })
     );
 
     expect(await screen.findByText("STEP 01")).toBeInTheDocument();
@@ -865,6 +871,9 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/basics`,
       createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
     );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "展开词条概览" })
+    );
 
     expect(await screen.findByText("完成情况")).toBeVisible();
     expect(screen.queryByText("完成检测后显示")).toBeNull();
@@ -948,6 +957,9 @@ describe("WordWizardV3Page", () => {
       `/words/${WORD_ID}/v3/wizard/basics`,
       createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
     );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "展开词条概览" })
+    );
 
     expect(await screen.findByLabelText("录入词条")).toHaveValue(
       "surface fallback"
@@ -1021,6 +1033,9 @@ describe("WordWizardV3Page", () => {
     renderPage(
       `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints)
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "展开词条概览" })
     );
 
     expect(await screen.findByText("centre · 词形与发音")).toBeInTheDocument();

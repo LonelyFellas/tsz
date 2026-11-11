@@ -383,10 +383,6 @@
 .v3-review-publish {
   border-color: #dce4f5;
 }
-/* 预览使用词义阅读目录；录入步骤继续保留原完成情况侧栏。 */
-.word-creation-page:has(.v3-review) .word-creation-summary {
-  display: none;
-}
 @media (max-width: 1100px) {
   .v3-review-reading-layout {
     grid-template-columns: 150px minmax(0, 1fr);
