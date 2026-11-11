@@ -63,7 +63,11 @@ export function V3ActualPronunciationCopy({
             pronunciation.style
           );
           if (!result.ok) {
-            void message.error(conversionMessage(result.message, t));
+            void message.error(
+              !spelling.trim()
+                ? t("panel_enter_the_form_spelling_first")
+                : conversionMessage(result.message, t)
+            );
             return;
           }
           apply(result.value);
