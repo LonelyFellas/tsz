@@ -131,6 +131,9 @@ export function LocalVoicePool({
   audioAssets?: AudioAsset[];
 }) {
   const { t } = useVoiceEditorTranslation();
+  const sides = voiceSides(t).filter(
+    (side) => !locale || locale === side.locale
+  );
   const [notice, setNotice] = useVoiceEditorMessageState("");
   const [search, setSearch] = useState<Record<string, string>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
@@ -184,9 +187,14 @@ export function LocalVoicePool({
       else groups.push([item]);
       return groups;
     }, []);
-  const visiblePairs = pairs.filter((pair) => !pair[0]!.fallbackOnly);
+  const visiblePairs = pairs.filter(
+    (pair) =>
+      !pair[0]!.fallbackOnly &&
+      pair.some((item) => !locale || item.locale === locale)
+  );
   const legacyRecommendations = recommendations.filter(
-    (item) => !item.pairId && !item.fallbackOnly
+    (item) =>
+      !item.pairId && !item.fallbackOnly && (!locale || item.locale === locale)
   );
   const inheritedPair = inherited
     ? pairs.find((pair) =>
@@ -802,11 +810,14 @@ export function LocalVoicePool({
           </Radio>
         </div>
         <div className="tsz-ve-pool-scroll">
-          <div className="tsz-ve-pool-recommendations tsz-ve-pool-paired-recommendations">
+          <div
+            className="tsz-ve-pool-recommendations tsz-ve-pool-paired-recommendations"
+            data-single={!!locale}
+          >
             <div className="tsz-ve-pool-pair tsz-ve-pool-head">
               <span>{t("recommended_voices")}</span>
               <span>{t("source_group")}</span>
-              {voiceSides(t).map((side) => (
+              {sides.map((side) => (
                 <div key={side.key} className="tsz-ve-pool-pair-side">
                   <span>{t("audition")}</span>
                   <span>{t("accent_voice", { accent: side.label })}</span>
@@ -857,26 +868,28 @@ export function LocalVoicePool({
                     ? t("none_selected_in_group")
                     : ""}
                 </span>
-                {pair.map((item) => (
-                  <div
-                    className="tsz-ve-pool-pair-side"
-                    data-label={
-                      item.locale === "en-GB"
-                        ? t("british_voice")
-                        : t("american_voice")
-                    }
-                    key={item.id}
-                  >
-                    {renderIdentity(
-                      {
-                        ...item.setting,
-                        version_name: item.name,
-                        version_id: item.id
-                      },
-                      item.locale
-                    )}
-                  </div>
-                ))}
+                {pair
+                  .filter((item) => !locale || item.locale === locale)
+                  .map((item) => (
+                    <div
+                      className="tsz-ve-pool-pair-side"
+                      data-label={
+                        item.locale === "en-GB"
+                          ? t("british_voice")
+                          : t("american_voice")
+                      }
+                      key={item.id}
+                    >
+                      {renderIdentity(
+                        {
+                          ...item.setting,
+                          version_name: item.name,
+                          version_id: item.id
+                        },
+                        item.locale
+                      )}
+                    </div>
+                  ))}
               </div>
             ))}
           </div>
@@ -1006,8 +1019,8 @@ export function LocalVoicePool({
         <div className="tsz-ve-pool-catalog-body">
           {loading && <Spin aria-label={t("loading_voice_catalogue")} />}
           <div className="tsz-ve-pool-scroll">
-            <div className="tsz-ve-pool-catalog">
-              {voiceSides(t).flatMap((side) =>
+            <div className="tsz-ve-pool-catalog" data-single={!!locale}>
+              {sides.flatMap((side) =>
                 ["female", "male"].map((gender) => {
                   const key = `${side.key}-${gender}`;
                   const columnVoices = voices.filter(
@@ -1095,10 +1108,7 @@ export function LocalVoicePool({
                                 aria-label={t("select", {
                                   p0: voice.displayName ?? voice.label
                                 })}
-                                disabled={
-                                  readOnly ||
-                                  !!(locale && locale !== side.locale)
-                                }
+                                disabled={readOnly}
                                 checked={current.some(
                                   (setting) =>
                                     setting.enabled &&

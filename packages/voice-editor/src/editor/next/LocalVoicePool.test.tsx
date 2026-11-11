@@ -229,6 +229,71 @@ function generatedAsset(id: string): AudioAsset {
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
+  it.each(["en-GB", "en-US", undefined] as const)(
+    "%s 的推荐和目录只展示适用方言，选用推荐仍保留成对来源",
+    async (locale) => {
+      const onProfile = vi.fn();
+      render(
+        <Harness
+          locale={locale}
+          initial={pool([])}
+          recommendations={[
+            recommendation("a", "第一套"),
+            recommendation("us", "第一套"),
+            { ...recommendation("b", "旧英式"), pairId: undefined },
+            { ...recommendation("us", "旧美式"), pairId: undefined }
+          ]}
+          onProfile={onProfile}
+        />
+      );
+      const first = await screen.findByRole("radio", { name: "第一套" });
+      await waitFor(() => expect(first).toBeEnabled());
+      const recommended = within(
+        screen.getByRole("radiogroup", {
+          name: "局部推荐"
+        })
+      );
+      fireEvent.click(screen.getByText("完整音色目录"));
+      for (const [sideLocale, label, voice] of [
+        ["en-GB", "英式", "Alpha 阿尔法"],
+        ["en-US", "美式", "American"]
+      ]) {
+        const applicable = !locale || locale === sideLocale;
+        expect(
+          recommended.queryByRole("button", {
+            name: `试听 ${voice}`
+          }) !== null
+        ).toBe(applicable);
+        expect(
+          screen.queryByRole("searchbox", {
+            name: `${label}女声目录搜索`
+          }) !== null
+        ).toBe(applicable);
+        expect(
+          screen.queryByRole("searchbox", {
+            name: `${label}男声目录搜索`
+          }) !== null
+        ).toBe(applicable);
+        expect(
+          screen.queryByText(sideLocale === "en-GB" ? /旧英式/ : /旧美式/) !==
+            null
+        ).toBe(applicable);
+      }
+      expect(onProfile).not.toHaveBeenCalled();
+      fireEvent.click(first);
+      const next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+      expect(
+        next.voices.filter((item) => item.enabled).map((item) => item.voice_id)
+      ).toEqual(
+        locale === "en-GB" ? ["a"] : locale === "en-US" ? ["us"] : ["a", "us"]
+      );
+      expect(next.dubbing?.recommendation).toMatchObject({
+        group_id: "group",
+        pair_id: "第一套",
+        voice_ids: ["a", "us"]
+      });
+    }
+  );
   it("详情正式播放采用默认录音，取消默认后恢复原合成音频且不改写配音绑定", async () => {
     const recorded: AudioAsset = {
       id: "recording",
@@ -1267,9 +1332,9 @@ it("英文局部池说明、表头和目录可及名保留完整词界", async (
     screen.getByRole("button", { name: "Selection and audition guidance" })
   );
   expect(
-    await screen.findByText(/This text only edits the British local pool/)
+    await screen.findByText(/This text only shows and edits British voices/)
   ).toHaveTextContent(
-    "ownership. Auditions must also match the current language region."
+    "voices. Auditions must also match the current language region."
   );
   fireEvent.click(screen.getByText("Full voice catalogue").closest("summary")!);
   expect(
