@@ -3418,7 +3418,7 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     openTool("音频");
-    fireEvent.click(screen.getByLabelText("AmE"));
+    fireEvent.click(screen.getByRole("radio", { name: "AmE" }));
     chooseFiles([
       mp3("a.mp3"),
       new File([new Uint8Array(3)], "b.txt", { type: "text/plain" }),

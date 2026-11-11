@@ -621,21 +621,37 @@ textarea.ui-input {
   cursor: pointer;
 }
 .ui-checkbox-wrapper-disabled,
-.ui-radio-wrapper-disabled {
+.ui-radio-wrapper-disabled,
+.ui-radio-button-wrapper-disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
-.ui-checkbox,
-.ui-radio {
+.ui-checkbox {
   display: inline-flex;
   align-items: center;
 }
-.ui-checkbox-input,
-.ui-radio-input {
+.ui-checkbox-input {
   accent-color: var(--ui-color-primary);
   width: 16px;
   height: 16px;
   margin: 0;
+}
+.ui-radio-standalone {
+  display: inline-flex;
+}
+.ui-radio-button-control.tsz-radio-group-item {
+  width: 100%;
+  height: auto;
+  font: inherit;
+  color: inherit;
+  border: 0;
+  border-radius: inherit;
+}
+.ui-radio-button-control > .tsz-radio-group-indicator {
+  display: none;
+}
+.ui-radio-button-control.tsz-radio-group-item:focus-visible {
+  outline: none;
 }
 .ui-checkbox-group,
 .ui-radio-group,
@@ -655,7 +671,6 @@ textarea.ui-input {
   border-radius: 5px;
   padding: var(--ui-space-1) 9px;
 }
-.ui-radio-button-input,
 .ui-segmented-item-input {
   position: absolute;
   opacity: 0;

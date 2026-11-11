@@ -10,6 +10,7 @@ export {
   CardContent
 } from "./card";
 export { Input } from "./input";
+export { RadioGroup, RadioGroupItem } from "./radio-group";
 export { Label } from "./label";
 export { FormField, type FormFieldProps } from "./form-field";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";

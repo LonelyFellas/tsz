@@ -300,16 +300,19 @@
     .word-form-matrix-dialect-cell-us
   )
   .word-synthesis-choice.ui-radio-wrapper-checked
-  .word-synthesis-choice-tag,
+  .word-synthesis-choice-tag {
+  background-color: #d42a91;
+  border-color: #d42a91;
+}
+
 :is(
     .word-shared-pronunciation-us,
     .v3-dialect-panel-us,
     .word-form-matrix-dialect-cell-us
   )
   .word-synthesis-choice.ui-radio-wrapper
-  .ui-radio-checked:not(.ui-radio-disabled) {
-  background-color: #d42a91;
-  border-color: #d42a91;
+  .ui-radio-input {
+  color: #d42a91;
 }
 
 .word-synthesis-settings-header {

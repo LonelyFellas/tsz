@@ -101,12 +101,12 @@ const initial: AdminDubbingRecommendationPair = {
     }
   }
 };
-function mount(side?: "uk") {
+function mount(side?: "uk", voices = [sonia, libby, aria]) {
   const onSave = vi.fn();
   render(
     <App>
       <RecommendationEditor
-        voices={[sonia, libby, aria]}
+        voices={voices}
         initial={initial}
         side={side}
         disabled={false}
@@ -147,6 +147,42 @@ afterEach(() => {
   cleanup();
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
+});
+it("候选音色在同组内用方向键切换并跳过不可用项，保存当前口音的选择", async () => {
+  const onSave = mount(undefined, [
+    sonia,
+    {
+      ...libby,
+      alias: "unavailable",
+      display_name: "Unavailable",
+      synthesis_available: false
+    },
+    libby,
+    aria
+  ]);
+  const unavailable = screen.getByRole("radio", { name: "Unavailable 女声" });
+  expect(unavailable).toBeDisabled();
+  const current = screen.getByRole("radio", { name: "Sonia 女声" });
+  act(() => current.focus());
+  fireEvent.keyDown(current, { key: "ArrowDown" });
+  await waitFor(() =>
+    expect(screen.getByRole("radio", { name: "Libby 女声" })).toBeChecked()
+  );
+  expect(screen.getByRole("radio", { name: "Libby 女声" })).toHaveFocus();
+  fireEvent.keyUp(screen.getByRole("radio", { name: "Libby 女声" }), {
+    key: "ArrowDown"
+  });
+  expect(unavailable).not.toBeChecked();
+  expect(onSave).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+  await waitFor(() =>
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uk: expect.objectContaining({ voice_alias: "libby" }),
+        us: initial.us
+      })
+    )
+  );
 });
 it.each(["", " \t "])("名称为 %j 时使用默认名称保存整套配置", async (name) => {
   const onSave = mount();

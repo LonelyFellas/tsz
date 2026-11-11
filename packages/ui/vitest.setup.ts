@@ -4,3 +4,11 @@ import { afterEach } from "vitest";
 
 // 未开启 globals,需手动在每个用例后清理 DOM。
 afterEach(() => cleanup());
+
+if (!("ResizeObserver" in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
