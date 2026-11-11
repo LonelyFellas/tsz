@@ -175,14 +175,28 @@ export function createInterfacePreferences({
       // 短暂读取失败保留同身份已确认的界面；新目录仍能立即停用语言。
       const retained =
         !unsupported && previous.capabilities ? previous : initial;
+      const activeDirectory =
+        directory && INTERFACE_LOCALES.includes(directory.default_locale)
+          ? directory
+          : undefined;
+      const linkLocale =
+        activeDirectory &&
+        retained.linkLocale &&
+        !activeDirectory.supported_locales.includes(retained.linkLocale)
+          ? undefined
+          : retained.linkLocale;
       publish({
         ...retained,
         owner,
         status: unsupported ? "unsupported" : "error",
-        locale:
-          directory && INTERFACE_LOCALES.includes(directory.default_locale)
-            ? resolve(directory, retained.preference, getSession().accountId)
-            : retained.locale,
+        linkLocale,
+        locale: activeDirectory
+          ? resolve(
+              activeDirectory,
+              linkLocale ?? retained.preference,
+              getSession().accountId
+            )
+          : retained.locale,
         capabilities: directory ?? retained.capabilities,
         saving: false,
         refreshing: false,
