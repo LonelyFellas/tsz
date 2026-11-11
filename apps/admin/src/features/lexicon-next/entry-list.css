@@ -1,0 +1,104 @@
+.lexicon-entry-list {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+}
+.lexicon-entry-search {
+  container-type: inline-size;
+}
+.lexicon-entry-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 400px) minmax(140px, 200px) auto;
+  align-items: end;
+  justify-content: start;
+  gap: var(--ui-space-4);
+}
+.lexicon-entry-filters .ui-form-item {
+  min-width: 0;
+  margin: 0;
+}
+.lexicon-entry-filters :is(.ui-input, .ui-select-selector, .ui-btn) {
+  min-height: var(--ui-control-height-comfortable);
+}
+.lexicon-entry-filters .ui-select-single {
+  height: var(--ui-control-height-comfortable);
+}
+.lexicon-entry-search-actions {
+  display: flex;
+  gap: var(--ui-space-2);
+}
+.lexicon-entry-list .word-table td {
+  font-size: var(--ui-font-size);
+  overflow-wrap: anywhere;
+}
+.lexicon-entry-name {
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-section);
+  font-weight: 600;
+  text-decoration: none;
+}
+.lexicon-entry-name:hover {
+  color: var(--ui-color-primary);
+}
+.lexicon-entry-date {
+  font-size: var(--ui-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+/* 空状态按可见区域居中，不随桌面列宽撑出横向滚动。 */
+.lexicon-entry-list .word-table:has(.lexicon-entry-empty) {
+  width: 100% !important;
+}
+.lexicon-entry-list .word-table:has(.lexicon-entry-empty) :is(colgroup, thead) {
+  display: none;
+}
+.lexicon-entry-list .word-table:has(.lexicon-entry-empty) td {
+  padding: 0;
+  border: 0;
+  background: var(--ui-color-bg-container);
+}
+.lexicon-entry-empty.ui-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--ui-space-4);
+  margin: 0;
+  padding: 64px var(--ui-space-4);
+}
+.lexicon-entry-empty .ui-empty-image {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ui-border-radius-lg);
+  background: var(--ui-color-fill-secondary);
+  color: var(--ui-color-text-secondary);
+}
+.lexicon-entry-empty .ui-empty-image svg {
+  width: 28px;
+  height: 28px;
+}
+.lexicon-entry-empty .ui-empty-description {
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size);
+  font-weight: 500;
+}
+.lexicon-entry-list .word-table-scroll:has(.lexicon-entry-empty) {
+  border-bottom: 0;
+}
+.lexicon-entry-list
+  .word-table-scroll:has(.lexicon-entry-empty[data-total="0"])
+  + nav {
+  display: none;
+}
+@container (max-width: 700px) {
+  .lexicon-entry-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
+  }
+  .lexicon-entry-search-actions {
+    grid-column: 1 / -1;
+  }
+}
+@container (max-width: 400px) {
+  .lexicon-entry-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

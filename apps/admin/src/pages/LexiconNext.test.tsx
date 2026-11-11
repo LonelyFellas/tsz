@@ -321,6 +321,77 @@ describe("新版词库手工闭环", () => {
   });
 });
 
+it.each([true, false])(
+  "空状态按创建权限提供入口，筛选无结果可清空（创建权限：%s）",
+  async (canCreate) => {
+    if (!canCreate) {
+      const profile = useAuthStore.getState().profile!;
+      useAuthStore.setState({
+        profile: { ...profile, permissions: ["words.access"] }
+      });
+    }
+    const api = requests();
+    const { router } = mount(
+      api,
+      "/lexicon-next?headword=missing&kind=phrase&page=2"
+    );
+    await screen.findByText("未找到匹配的词条");
+    fireEvent.click(button("清空条件"));
+    await screen.findByText("暂无词条");
+    expect(screen.getByRole("searchbox", { name: "词条" })).toHaveValue("");
+    expect(api.list).toHaveBeenLastCalledWith({
+      headword: "",
+      kind: undefined,
+      page: 1,
+      page_size: 20
+    });
+    const createButtons = screen.queryAllByRole("button", { name: "创建词条" });
+    expect(createButtons).toHaveLength(canCreate ? 2 : 0);
+    if (canCreate) {
+      fireEvent.click(createButtons[1]!);
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe("/lexicon-next/new")
+      );
+    }
+  }
+);
+
+it("越界空页可返回有效页，并保留已应用的筛选条件", async () => {
+  const api = requests();
+  api.list
+    .mockResolvedValueOnce({
+      items: [],
+      pagination: { total: 21, page: 3, page_size: 20, total_pages: 2 }
+    })
+    .mockResolvedValue({
+      items: [
+        {
+          id,
+          headword: "centre",
+          target_language: "en",
+          kind: "word",
+          owner_id: "editor",
+          revision: 2,
+          updated_at: entry.updated_at,
+          part_of_speech: ["noun"],
+          gloss: "中心位置"
+        }
+      ],
+      pagination: { total: 21, page: 2, page_size: 20, total_pages: 2 }
+    });
+  mount(api, "/lexicon-next?headword=centre&kind=word&page=3&page_size=20");
+  await screen.findByText("未找到匹配的词条");
+  expect(button("上一页")).toBeEnabled();
+  fireEvent.click(button("上一页"));
+  await screen.findByRole("link", { name: "centre" });
+  expect(api.list).toHaveBeenLastCalledWith({
+    headword: "centre",
+    kind: "word",
+    page: 2,
+    page_size: 20
+  });
+});
+
 it("列表查询筛选与分页走新版接口，列表入口和创建入口使用新版路由", async () => {
   const api = requests();
   api.list.mockResolvedValue({

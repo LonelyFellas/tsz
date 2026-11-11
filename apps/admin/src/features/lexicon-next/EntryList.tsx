@@ -1,8 +1,14 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { PlusIcon, SearchIcon } from "lucide-react";
-import { Alert, Button, PageHeader, Space, Tag } from "@tsz/ui/admin/display";
+import {
+  BookOpenIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  SearchIcon
+} from "lucide-react";
+import dayjs from "dayjs";
+import { Alert, Button, Empty, PageHeader, Tag } from "@tsz/ui/admin/display";
 import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import type { NextEntrySummary, NextListQuery } from "@tsz/types";
 import {
@@ -15,6 +21,7 @@ import { useAuthStore, usePermission } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
+import "./entry-list.css";
 
 export function EntryList({ requests }: { requests: LexiconNextRequests }) {
   const { t } = useLexiconListTranslation();
@@ -60,6 +67,11 @@ export function EntryList({ requests }: { requests: LexiconNextRequests }) {
     next.set("page_size", String(values.page_size ?? pageSize));
     setSearch(next);
   }
+  function reset() {
+    form.resetFields();
+    apply({});
+  }
+  const filtered = Boolean(headword || query.kind);
   const columns: WordColumn<NextEntrySummary>[] = [
     {
       key: "headword",
@@ -67,42 +79,49 @@ export function EntryList({ requests }: { requests: LexiconNextRequests }) {
       width: 220,
       fixed: "left",
       render: (row) => (
-        <Link to={`/lexicon-next/${row.id}`}>{row.headword}</Link>
+        <Link className="lexicon-entry-name" to={`/lexicon-next/${row.id}`}>
+          {row.headword}
+        </Link>
       )
     },
     {
       key: "kind",
       title: t("kind"),
       width: 100,
+      wideOnly: true,
       render: (row) => t(row.kind === "word" ? "kind_word" : "kind_phrase")
     },
     {
       key: "gloss",
       title: t("gloss"),
       width: 280,
+      wideOnly: true,
       render: (row) => row.gloss ?? "—"
     },
     {
       key: "status",
       title: t("status"),
       width: 100,
+      wideOnly: true,
       render: () => <Tag>{t("status_draft")}</Tag>
     },
     {
       key: "pos",
       title: t("pos"),
       width: 140,
+      wideOnly: true,
       render: (row) => row.part_of_speech.join(" / ") || "—"
     },
     {
       key: "updated_at",
       title: t("updated_at"),
       width: 180,
-      render: (row) =>
-        new Intl.DateTimeFormat("zh-CN", {
-          dateStyle: "short",
-          timeStyle: "short"
-        }).format(new Date(row.updated_at))
+      wideOnly: true,
+      render: (row) => (
+        <span className="lexicon-entry-date">
+          {dayjs(row.updated_at).format("YYYY-MM-DD HH:mm")}
+        </span>
+      )
     },
     {
       key: "actions",
@@ -121,7 +140,7 @@ export function EntryList({ requests }: { requests: LexiconNextRequests }) {
     }
   ];
   return (
-    <div className="word-list-page word-list-page--library">
+    <div className="word-list-page word-list-page--library lexicon-entry-list">
       <PageHeader
         className="word-list-heading"
         title={shell("nav_lexicon_next")}
@@ -146,41 +165,37 @@ export function EntryList({ requests }: { requests: LexiconNextRequests }) {
       >
         <Form
           form={form}
-          layout="horizontal"
+          layout="vertical"
           onFinish={apply}
-          className="word-search-form"
+          className="lexicon-entry-search"
         >
-          <div className="word-search-main">
+          <div className="lexicon-entry-filters">
             <Form.Item name="headword" label={t("entry")}>
-              <Input type="search" />
+              <Input type="search" placeholder={t("search_entry")} />
             </Form.Item>
             <Form.Item name="kind" label={t("kind")}>
               <Select
                 allowClear
+                placeholder={t("all")}
                 options={[
                   { value: "word", label: t("kind_word") },
                   { value: "phrase", label: t("kind_phrase") }
                 ]}
               />
             </Form.Item>
-            <Space wrap>
+            <div className="lexicon-entry-search-actions">
               <Button type="primary" htmlType="submit" icon={<SearchIcon />}>
                 {t("search")}
               </Button>
-              <Button
-                onClick={() => {
-                  form.resetFields();
-                  apply({});
-                }}
-              >
+              <Button icon={<RotateCcwIcon />} onClick={reset}>
                 {t("reset")}
               </Button>
-            </Space>
+            </div>
           </div>
         </Form>
       </section>
       <section
-        className="word-list-panel"
+        className="word-list-panel word-list-results-panel"
         aria-label={shell("nav_lexicon_next")}
       >
         {result.isError ? (
@@ -200,7 +215,25 @@ export function EntryList({ requests }: { requests: LexiconNextRequests }) {
             rowLabel={(row) => row.headword}
             loading={result.isPending}
             toolbar={null}
-            emptyText={headword || kind ? "未找到匹配的词条" : "尚无词条"}
+            emptyText={
+              <Empty
+                className="lexicon-entry-empty"
+                data-total={result.data?.pagination.total}
+                image={filtered ? <SearchIcon /> : <BookOpenIcon />}
+                description={filtered ? t("no_matching_entries") : t("empty")}
+              >
+                {filtered ? (
+                  <Button onClick={reset}>{t("clear_filters")}</Button>
+                ) : canCreate ? (
+                  <Button
+                    icon={<PlusIcon />}
+                    onClick={() => navigate("/lexicon-next/new")}
+                  >
+                    {t("create")}
+                  </Button>
+                ) : null}
+              </Empty>
+            }
             page={page}
             pageSize={pageSize}
             total={result.data?.pagination.total ?? 0}
