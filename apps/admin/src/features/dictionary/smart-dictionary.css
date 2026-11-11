@@ -233,6 +233,9 @@
 .word-search-main input[type="search"]::placeholder {
   color: var(--ui-color-text-secondary);
 }
+.word-search-main input.tsz-words {
+  font-family: var(--tsz-font-words);
+}
 .word-search-main input[type="search"]:hover {
   border-color: #b4bfce;
 }

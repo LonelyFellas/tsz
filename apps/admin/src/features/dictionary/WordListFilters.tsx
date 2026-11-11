@@ -187,7 +187,7 @@ export function WordListFilters({
           >
             <PilotInput
               type="search"
-              className="min-h-9 rounded-lg px-3 py-1"
+              className="tsz-words min-h-9 rounded-lg px-3 py-1"
               placeholder={t("search_entry")}
             />
           </Form.Item>

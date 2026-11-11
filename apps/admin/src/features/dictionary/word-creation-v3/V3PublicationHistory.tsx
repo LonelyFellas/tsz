@@ -472,8 +472,9 @@ function PublicationSnapshotBody({
                       key={association.id}
                     >
                       {t("snapshot_association", {
-                        target: association.target
+                        target: ""
                       })}
+                      <span className="tsz-words">{association.target}</span>
                       {association.gloss ? ` · ${association.gloss}` : ""}
                     </Typography.Text>
                   ))}
@@ -494,7 +495,9 @@ function PublicationSnapshotBody({
                 <Tag>{partOfSpeechLabel(relation.pos)}</Tag>
                 <Tag>{relationLabel(relation.relation, t)}</Tag>
                 <Typography.Text className="tsz-entry-en">
-                  {relation.target || t("snapshot_target_missing")}
+                  <span className="tsz-words">
+                    {relation.target || t("snapshot_target_missing")}
+                  </span>
                   {relation.gloss ? ` · ${relation.gloss}` : ""}
                 </Typography.Text>
               </Flex>

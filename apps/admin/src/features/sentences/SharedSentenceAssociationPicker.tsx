@@ -14,6 +14,11 @@ import {
   type ResolvedTarget
 } from "../dictionary/word-creation-v3/components/V3TargetCascader";
 
+export interface SentenceTargetLabel {
+  headword: string;
+  gloss?: string | null;
+}
+
 export function SharedSentenceAssociationPicker({
   kind,
   segments,
@@ -29,13 +34,13 @@ export function SharedSentenceAssociationPicker({
   onTargetLabel
 }: AssociationPickerProps<SharedSentenceAnnotation> & {
   dialect: Dialect;
-  labels: Record<string, string>;
+  labels: Record<string, SentenceTargetLabel>;
   /** 例句所处词条／词义：候选排序时默认置顶（任务 #34）。 */
   sourceEntryId?: string;
   sourceSenseId?: string;
   sourcePosId?: string;
   sourceForms?: AdminWordV3["forms"];
-  onTargetLabel: (id: string, label: string) => void;
+  onTargetLabel: (id: string, label: SentenceTargetLabel) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
   const literal = segments.map((segment) => segment.surface).join(" ");
@@ -44,23 +49,30 @@ export function SharedSentenceAssociationPicker({
   const [gloss, setGloss] = useState("");
   if (selected && selected.target.state !== "entry_only") {
     const target = selected.target;
+    const label =
+      target.state === "linked"
+        ? labels[`${target.target_entry_id}:${target.target_sense_id}`]
+        : target;
     return (
       <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
-        <Typography.Text className="tsz-entry-en" strong>
+        <Typography.Text className="tsz-words" strong>
           {literal}
         </Typography.Text>
         <Typography.Text className="tsz-entry-en">
           {target.state === "linked"
             ? t("panel_linked_3", {
-                p0:
-                  labels[
-                    `${target.target_entry_id}:${target.target_sense_id}`
-                  ] ?? t("panel_specific_meaning")
+                p0: label ? "" : t("panel_specific_meaning")
               })
             : t("panel_pending_link_2", {
-                p0: target.headword,
-                p1: target.gloss ? ` · ${target.gloss}` : ""
+                p0: "",
+                p1: ""
               })}
+          {label && (
+            <>
+              <span className="tsz-words">{label.headword}</span>
+              {label.gloss ? ` · ${label.gloss}` : ""}
+            </>
+          )}
         </Typography.Text>
         <Typography.Text type="secondary">
           {t(
@@ -118,7 +130,7 @@ export function SharedSentenceAssociationPicker({
       gap="small"
       style={{ maxWidth: "min(760px, 85vw)" }}
     >
-      <Typography.Text className="tsz-entry-en" strong>
+      <Typography.Text className="tsz-words" strong>
         {segments.map((segment) => segment.surface).join(" … ")}
       </Typography.Text>
       {selected?.target.state === "entry_only" && (
@@ -158,7 +170,7 @@ export function SharedSentenceAssociationPicker({
         <>
           <Input
             aria-label={t("panel_pending_surface")}
-            className="tsz-entry-en"
+            className="tsz-words"
             value={literal}
             readOnly
             title={t("panel_determined_by_the_selected_text_segments")}
@@ -184,7 +196,10 @@ export function SharedSentenceAssociationPicker({
             if (mode === "linked" && choice)
               onTargetLabel(
                 `${choice.target_word_id}:${choice.target_sense_id}`,
-                `${choice.target_headword} · ${choice.target_gloss}`
+                {
+                  headword: choice.target_headword,
+                  gloss: choice.target_gloss
+                }
               );
             onSelect(
               mode === "linked" && choice

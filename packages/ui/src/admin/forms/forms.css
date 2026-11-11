@@ -76,6 +76,17 @@
   margin: 0;
 }
 
+/* 字体继承只作默认值，不能覆盖词条、音标等专用字体。 */
+@layer ui-base {
+  .ui-input,
+  .ui-input-affix-wrapper,
+  .ui-input-number,
+  .ui-select,
+  .ui-picker {
+    font-family: inherit;
+  }
+}
+
 .ui-input,
 .ui-input-affix-wrapper,
 .ui-input-number,
@@ -89,7 +100,6 @@
   border-radius: var(--ui-border-radius);
   background: var(--ui-color-bg-container);
   color: var(--ui-color-text);
-  font-family: inherit;
   font-size: var(--ui-font-size);
   line-height: 1.45;
   transition:

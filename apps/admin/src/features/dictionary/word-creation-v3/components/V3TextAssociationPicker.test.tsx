@@ -1227,7 +1227,8 @@ it("短语直接选择词形词义，已关联后只能查看和清除", async (
       onSelect={onSelect}
     />
   );
-  expect(screen.getByText(/已关联：give up/)).toBeVisible();
+  expect(screen.getByText(/已关联：/)).toHaveTextContent("已关联：give up");
+  expect(screen.getByText(/已关联：/)).toBeVisible();
   expect(search).not.toHaveBeenCalled();
   fireEvent.click(screen.getByText("清除关联"));
   expect(onSelect).toHaveBeenLastCalledWith(undefined);
@@ -1370,7 +1371,10 @@ it("已关联到草稿目标时在已关联视图里标出草稿", () => {
       }}
     />
   );
-  expect(screen.getByText(/已关联：give · 给；交给（草稿）/)).toBeVisible();
+  expect(screen.getByText(/已关联：/)).toHaveTextContent(
+    "已关联：give · 给；交给（草稿）"
+  );
+  expect(screen.getByText(/已关联：/)).toBeVisible();
 });
 
 it("还没保存词义的草稿列成禁用行并说明原因", async () => {
