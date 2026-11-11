@@ -1513,14 +1513,14 @@ export const voiceEditorMessages = {
     "; configure {{tools}}."
   ],
   voice_pool_scope_help: [
-    "当前正文仅编辑{{accent}}局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。",
-    "當前正文僅編輯{{accent}}局部池；另一側目錄和推薦供檢視，不改變其正文與音訊歸屬。",
-    "This text only edits the {{accent}} local pool. The other accent’s catalogue and recommendations are view-only and do not change its text or audio ownership."
+    "当前正文仅显示和编辑{{accent}}音色。",
+    "當前正文僅顯示和編輯{{accent}}音色。",
+    "This text only shows and edits {{accent}} voices."
   ],
   voice_pool_scope_native_help: [
-    "当前正文仅编辑{{accent}}局部池；另一侧目录和推荐供查看，不改变其正文与音频归属。试听还需符合当前语言地区。",
-    "當前正文僅編輯{{accent}}局部池；另一側目錄和推薦供檢視，不改變其正文與音訊歸屬。試聽還需符合當前語言地區。",
-    "This text only edits the {{accent}} local pool. The other accent’s catalogue and recommendations are view-only and do not change its text or audio ownership. Auditions must also match the current language region."
+    "当前正文仅显示和编辑{{accent}}音色，试听还需符合当前语言地区。",
+    "當前正文僅顯示和編輯{{accent}}音色，試聽還需符合當前語言地區。",
+    "This text only shows and edits {{accent}} voices. Auditions must also match the current language region."
   ],
   voice_versions_help_multiple: [
     "同口音可选多个版本，按顺序审听，首个有效已选版本作为默认。保存后保留当前参数。",
