@@ -158,7 +158,7 @@ describe("WordCreationLayout", () => {
     const summary = view.container.querySelector<HTMLElement>(
       ".word-creation-summary"
     )!;
-    fireEvent.click(within(summary).getByText("返回智能词库"));
+    fireEvent.click(within(summary).getByText("返回智能词库V1"));
     expect(screen.getByTestId("location")).toHaveTextContent("/words");
   });
 

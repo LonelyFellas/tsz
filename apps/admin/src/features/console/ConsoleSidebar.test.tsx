@@ -245,12 +245,12 @@ describe("ConsoleSidebar", () => {
   it("分类分组默认收起，展开后已落地模块可点", () => {
     renderAt("/words");
     // 分类默认收起：子项初始不在可访问树中。
-    expect(screen.queryByRole("menuitem", { name: "智能词库" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "智能词库V1" })).toBeNull();
 
     // 展开「词库管理」分组后，智能词库（已挂真实路由）可点。
     fireEvent.click(screen.getByText("词库管理"));
     expect(
-      screen.getByRole("menuitem", { name: "智能词库" })
+      screen.getByRole("menuitem", { name: "智能词库V1" })
     ).toBeInTheDocument();
   });
 
@@ -262,7 +262,7 @@ describe("ConsoleSidebar", () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByText("词库管理"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "智能词库" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "智能词库V1" }));
     expect(mockNavigate).toHaveBeenCalledWith("/words");
     expect(onNavigate).toHaveBeenCalledTimes(1);
   });
@@ -290,7 +290,7 @@ it("公开例句只读管理员可见例句菜单及直链，不能进入词库"
   renderAt("/sentences");
   fireEvent.click(screen.getByText("例句管理"));
   await waitFor(() => expect(screen.getByText("多维例句")).toBeVisible());
-  expect(screen.queryByText("智能词库")).toBeNull();
+  expect(screen.queryByText("智能词库V1")).toBeNull();
   const { canVisitAdminRoute } = await import("@/lib/adminPageRoutes");
   const profile = useAuthStore.getState().profile;
   expect(canVisitAdminRoute(profile, "/sentences")).toBe(true);
@@ -322,15 +322,15 @@ it("词表查看权限可进入审核菜单及直链，审核操作权限不替�
 
 it.each([
   ["/words/trash", "垃圾桶"],
-  ["/words", "智能词库"],
-  ["/words/entry-id/v3/wizard/forms", "智能词库"]
+  ["/words", "智能词库V1"],
+  ["/words/entry-id/v3/wizard/forms", "智能词库V1"]
 ])("%s 只选中所属的菜单项 %s", (path, selected) => {
   renderAt(path);
   fireEvent.click(screen.getByText("词库管理"));
-  const library = screen.getByRole("menuitem", { name: "智能词库" });
+  const library = screen.getByRole("menuitem", { name: "智能词库V1" });
   const trash = screen.getByRole("menuitem", { name: "垃圾桶" });
   expect(library.classList.contains("ui-menu-item-selected")).toBe(
-    selected === "智能词库"
+    selected === "智能词库V1"
   );
   expect(trash.classList.contains("ui-menu-item-selected")).toBe(
     selected === "垃圾桶"
@@ -347,7 +347,7 @@ it("收起侧栏的浮层菜单中，垃圾桶也不会同时选中智能词库"
   expect(await screen.findByRole("menuitem", { name: "垃圾桶" })).toHaveClass(
     "ui-menu-item-selected"
   );
-  expect(screen.getByRole("menuitem", { name: "智能词库" })).not.toHaveClass(
+  expect(screen.getByRole("menuitem", { name: "智能词库V1" })).not.toHaveClass(
     "ui-menu-item-selected"
   );
 });
@@ -381,14 +381,14 @@ describe("ConsoleSidebar 顶部面板", () => {
       "aria-pressed",
       "true"
     );
-    expect(screen.getByRole("link", { name: "智能词库" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "智能词库V1" })).toHaveAttribute(
       "aria-current",
       "page"
     );
     fireEvent.click(screen.getByRole("button", { name: "用户管理" }));
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(
-      screen.queryByRole("link", { name: "智能词库" })
+      screen.queryByRole("link", { name: "智能词库V1" })
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "用户管理" }));
     expect(onNavigate).toHaveBeenCalledOnce();

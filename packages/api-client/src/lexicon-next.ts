@@ -2,6 +2,8 @@ import type {
   CreateNextEntry,
   NextCapabilities,
   NextEntry,
+  NextEntryList,
+  NextListQuery,
   NextEntryView,
   NextViewQuery,
   SaveNextDraft
@@ -14,6 +16,11 @@ export function decodeNextEntry(value: unknown): NextEntry {
   if (!validateRuntimeSchema("NextEntry", value).valid)
     throw new ClientResponseError("新版词库草稿响应不符合接口契约");
   return value as NextEntry;
+}
+export function decodeNextEntryList(value: unknown): NextEntryList {
+  if (!validateRuntimeSchema("NextEntryList", value).valid)
+    throw new ClientResponseError("智能词库列表响应不符合接口契约");
+  return value as NextEntryList;
 }
 export function decodeNextCapabilities(value: unknown): NextCapabilities {
   if (
@@ -34,6 +41,15 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
   const entry = (id: string) => `${root}/entries/${encodeURIComponent(id)}`;
   return {
+    list: (query: NextListQuery = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== "") params.set(key, String(value));
+      }
+      return http
+        .get<unknown>(`${root}/entries?${params}`)
+        .then(decodeNextEntryList);
+    },
     capabilities: () =>
       http.get<unknown>(`${root}/capabilities`).then(decodeNextCapabilities),
     create: (input: CreateNextEntry) =>

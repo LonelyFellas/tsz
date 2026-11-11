@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-11T04:47:58.881Z",
+  "_generatedAt": "2026-11-11T07:10:17.450Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -32,7 +32,7 @@
     "/admin/coins/operations": ["get"],
     "/admin/dashboard/overview": ["get"],
     "/admin/lexicon-next/capabilities": ["get"],
-    "/admin/lexicon-next/entries": ["post"],
+    "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/view": ["get"],
     "/admin/lexicon/assistant": ["post"],
@@ -2592,6 +2592,15 @@
         "200": { "$ref": "#/components/schemas/NextCapabilities" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/entries": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextEntryList" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon-next/entries": {

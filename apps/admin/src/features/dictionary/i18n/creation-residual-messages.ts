@@ -281,7 +281,7 @@ export const creationResidualMessages = {
     "詞典未提供",
     "Not provided by the dictionary"
   ],
-  creation_smart_lexicon: ["智能词库", "智慧詞庫", "Smart lexicon"],
+  creation_smart_lexicon: ["智能词库V1", "智慧詞庫V1", "Smart lexicon"],
   creation_built_in_dictionary: ["内置词典", "內建詞典", "Built-in dictionary"],
   creation_detection_results: ["检测结果", "檢測結果", "Detection results"],
   creation_matched: ["已匹配", "已匹配", "Matched"],
@@ -385,8 +385,8 @@ export const creationResidualMessages = {
   ],
   creation_american_headword: ["美式主词", "美式主詞", "American headword"],
   creation_smart_lexicon_base_form: [
-    "智能词库原形",
-    "智慧詞庫原形",
+    "智能词库V1原形",
+    "智慧詞庫V1原形",
     "Smart lexicon base form"
   ],
   creation_current_input: ["本次输入", "本次輸入", "Current input"],
@@ -449,8 +449,8 @@ export const creationResidualMessages = {
   ],
   creation_the_smart_lexicon_already_contains_the_same_base_form_continuing_creates_a_separate_entry:
     [
-      "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
-      "偵測到智慧詞庫已有相同原形。繼續後將建立新的獨立詞條，不會修改已有詞條。",
+      "检测到智能词库V1已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
+      "偵測到智慧詞庫V1已有相同原形。繼續後將建立新的獨立詞條，不會修改已有詞條。",
       "The smart lexicon already contains the same base form. Continuing creates a separate entry and leaves existing entries unchanged."
     ],
   creation_check_a_word_or_phrase_against_the_built_in_dictionary_then_confirm_the_headwords_to_creat:
@@ -552,8 +552,8 @@ export const creationResidualMessages = {
     ],
   creation_enter_an_entry_to_identify_its_type_find_existing_base_forms_and_match_british_and_america:
     [
-      "录入词条，系统将判断词条类型，检测智能词库中的已有原形，并从内置词典匹配英美词形和建议词性。",
-      "輸入詞條後，系統會判斷類型、檢測智慧詞庫已有原形，並從內建詞典匹配英美詞形與建議詞性。",
+      "录入词条，系统将判断词条类型，检测智能词库V1中的已有原形，并从内置词典匹配英美词形和建议词性。",
+      "輸入詞條後，系統會判斷類型、檢測智慧詞庫V1已有原形，並從內建詞典匹配英美詞形與建議詞性。",
       "Enter an entry to identify its type, find existing base forms and match British and American forms and suggested parts of speech from the built-in dictionary."
     ],
   creation_english_entries_only: [

@@ -62,7 +62,7 @@ export const dashboardMessages = {
   ],
   operations: ["运营与工作入口", "營運與工作入口", "Operations and workspaces"],
   workspaces: ["内容工作区", "內容工作區", "Content workspaces"],
-  entries: ["智能词库", "智慧詞庫", "Entries"],
+  entries: ["智能词库V1", "智慧詞庫V1", "Entries"],
   entries_help: [
     "词形、发音与多维词义",
     "詞形、發音與多維詞義",

@@ -201,3 +201,23 @@ Admin Vite `http://127.0.0.1:59844` 代理到 `http://127.0.0.1:59843/api/v1`，
 修正后：两文件 9 项语言编辑/模型测试、Admin typecheck、Admin production build、41 份样式及 4 项检查脚本测试通过。原 5 项真实 PostgreSQL 集成及真实代理验收的后端、契约和业务状态逻辑未变，沿用其证据，不声称本轮重跑数据库联调。
 
 本轮内置浏览器已可用，使用临时独立界面 fixture（模拟请求、无 token/真实账号或持久化）验证共享控件：四组合正确显示，繁体输入切换后保留，显式保存变为版本 2，已保存预览弹窗正确显示当前组合；1440px、390px 均无横向溢出。截图保存在 `/Users/darwish/.codex/visualizations/2026/11/11/language-shared-controls/{1440,390}.png`。fixture 是 UI 回归，不能替代既有真实后端验收。临时入口文件已移除，Vite 服务停止，视口覆盖已恢复，自建标签已关闭；未创建数据库/缓存/OSS/外部模型资源。
+
+## 8. 复用原词库布局与名称对齐（2026-11-11）
+
+用户确认新版完整沿用原版列表及分步编辑布局，再接入新版数据；新版名称为「智能词库」，原版为「智能词库V1」。本轮前后端分支均为 `codex/lexicon-ui-alignment`；前端基线 `5787be19d2b7c610cd21f725791b699d7aad3a5a`，后端基线 `1218d612af44ac9b6cb0bdb9267dedfadb1095e2`。原先已完成的语言基础发布与本轮未提交改动分开，不把本地界面当作线上结果。
+
+新版直接复用 `WordListTable`、`WordCreationLayout` 和 `V3ProductProgressList`，包含列设置、固定列、分页、步骤条、词条摘要、完成情况及窄屏抽屉。共用组件仅加入数据行泛型、显示名称/返回路径及步骤文案参数；原版继续其原有路由和数据接口。新版接入独立 `lexicon_next` 模型，步骤及语言切换保留完整草稿；列表可按词头和类型筛选，从列表创建/重开，保留已有 ID 直链。导航、原版页面标题、面包屑及返回文案统一版本命名。
+
+后端新增 `GET /api/v1/admin/lexicon-next/entries`，沿用 `words.access`；摘要来自当前持久化版本，提供字面子串搜索、类型筛选、稳定排序及 1 基分页。计数与列表共享只读快照，每页上限 100，不返回整个草稿，不读取旧词库。没有新增迁移、发布、生成、音频调用或旧数据迁移。OpenAPI 及严格 runtime 契约由原生生成链同步，未增加 PENDING 或手写生成结果。
+
+验证结果：
+
+- `DATABASE_URL=<本批独立PG18> SQLX_OFFLINE=true cargo test --locked --all-features --test lexicon_next`：6 项通过，覆盖四组合存储/权限/并发、列表筛选/分页/字面百分号、当前版本摘要与旧库隔离。`cargo clippy --locked --all-targets --all-features -- -D warnings`、fmt 和 diff 检查通过。
+- `pnpm --filter @tsz/api-client test`：39 文件、700 项通过。`pnpm typecheck`：7 任务通过；Admin production build、受影响 ESLint、`pnpm check:admin-ui` 通过。
+- 原版列表/创建/向导、共享布局、导航及新版定向回归：11 文件、147 项通过；最后的小范围变更再跑新版 8 项通过。jsdom 的伪元素 getComputedStyle 提示不影响断言，实际布局另由浏览器核实。
+- Codex 内置浏览器通过独立 origin `http://lexicon-ui.localhost:59854`，经实际同源代理到后端 `127.0.0.1:59853/api/v1`；words/词性/TTS/local-speech mock 全关闭。测试使用本批独立 PG18 `55509/lexicon_ui` 与 Redis7 `55510/0`，没有接共享库或测试服。
+- 真实页面创建 centre，分步录入 centre/center、两条英文释义及简繁解释/译词；完整保存为 revision 2，返回列表可见已保存摘要，筛选无结果/重置、每页 10 条实际请求、列表重新打开与四个已保存 view 请求均 200。独立 SQL 确认为 1 entry、9 nodes、2 revisions，当前版本 2。
+- 1440/768/390px 的整页 scrollWidth 不超过 viewport；窄屏沿用完成情况抽屉，明细能展开，表格滚动限制在表格内。截图和脱敏请求证据在 `/Users/darwish/.codex/visualizations/2026/11/11/lexicon-ui-alignment/`。
+- 已退出测试账号并清理专用 origin 的浏览器存储，认证 Cookie 为 0；本批后端和 Vite 进程、两个容器、唯一匿名卷及私有凭据全部清理，四个测试端口关闭，既有六个容器仍运行。无 OSS 或付费调用，清理回执为上述目录 `cleanup-receipt.json`。
+
+实施收尾后，用户已授权提交、开 PR、检查通过后合并及部署；实时提交/PR/发布回执由本任务继续维护。配套发布须先发 API 的列表能力，再发 Admin；新 Admin 遇到旧 API 的列表 404 时显示错误，不借用旧词库填充。新版已有 ID 的编辑、保存及语言预览仍使用原生新版接口。原版完整发布/语音等业务继续由 V1 保持，不能将复用布局理解为新增这些业务能力。

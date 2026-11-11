@@ -1,9 +1,10 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/lexicon-language-foundation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "d11a875c3ce45b6eb97f3fa0c3c5431300020d743777d3d5fe5edc9c3a4b57c6",
+  "_source_sha256": "e645bd02a4018f4dcd1b12077d96cf1f652072a089bdbddc493bd22103409546",
   "roots": [
     "NextEntry",
+    "NextEntryList",
     "NextCapabilities",
     "NextEntryView",
     "CreateNextEntry",
@@ -3640,6 +3641,44 @@
       "additionalProperties": false
     },
     "NextEntryKind": { "type": "string", "enum": ["word", "phrase"] },
+    "NextEntryList": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextEntrySummary" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "NextEntrySummary": {
+      "type": "object",
+      "required": [
+        "id",
+        "target_language",
+        "kind",
+        "headword",
+        "owner_id",
+        "revision",
+        "updated_at",
+        "part_of_speech",
+        "gloss"
+      ],
+      "properties": {
+        "gloss": { "type": ["string", "null"] },
+        "headword": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "part_of_speech": { "type": "array", "items": { "type": "string" } },
+        "revision": { "type": "integer" },
+        "target_language": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
     "NextEntryView": {
       "type": "object",
       "required": [

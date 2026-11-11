@@ -21,7 +21,6 @@
   font-size: 14px;
   margin: 0 0 8px;
 }
-.lexicon-next-heading,
 .lexicon-next-toolbar,
 .lexicon-next-section-heading {
   display: flex;
@@ -30,26 +29,16 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-.lexicon-next-heading {
-  margin-bottom: 28px;
-}
-.lexicon-next-start,
 .lexicon-next-columns,
 .lexicon-next-selectors {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 32px;
 }
-.lexicon-next-start h2 {
-  margin-bottom: 20px;
-}
 .lexicon-next .ui-alert {
   margin-bottom: 16px;
 }
-.lexicon-next-id {
-  color: var(--ui-color-text-secondary);
-  overflow-wrap: anywhere;
-}
+
 .lexicon-next-basics {
   max-width: 520px;
 }
@@ -96,7 +85,6 @@
   .lexicon-next {
     padding: 16px;
   }
-  .lexicon-next-start,
   .lexicon-next-columns,
   .lexicon-next-selectors {
     grid-template-columns: minmax(0, 1fr);
@@ -105,4 +93,8 @@
   .lexicon-next-row {
     flex-wrap: wrap;
   }
+}
+
+.lexicon-next-selectors > [hidden] {
+  display: none;
 }

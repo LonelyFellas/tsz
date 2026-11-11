@@ -42,6 +42,10 @@ const entry: NextEntry = {
 };
 function requests() {
   return {
+    list: vi.fn().mockResolvedValue({
+      items: [],
+      pagination: { total: 0, page: 1, page_size: 20, total_pages: 0 }
+    }),
     capabilities: vi.fn().mockResolvedValue(caps),
     get: vi.fn().mockResolvedValue(structuredClone(entry)),
     create: vi.fn().mockResolvedValue(structuredClone(entry)),
@@ -79,8 +83,9 @@ function mount(api: LexiconNextRequests, path = `/lexicon-next/${id}`) {
   );
   return { client, router };
 }
-const button = (name: string) => screen.getByRole("button", { name });
+const button = (name: string | RegExp) => screen.getByRole("button", { name });
 async function edit(label: string, value: string) {
+  fireEvent.click(button(label.includes("词形") ? /词性与词形/ : /词义与译词/));
   fireEvent.click(button(`添加${label}`));
   fireEvent.change(await screen.findByRole("textbox", { name: `${label} 1` }), {
     target: { value }
@@ -106,6 +111,7 @@ describe("新版词库手工闭环", () => {
     mount(api);
     await screen.findByDisplayValue("centre");
     await edit("英式英语词形", "centre");
+    fireEvent.click(button(/词义与译词/));
     fireEvent.click(button("添加义项"));
     await edit("英式英语释义", "the middle");
     await edit("简体中文解释", "中心位置");
@@ -117,9 +123,11 @@ describe("新版词库手工闭环", () => {
     await edit("繁体中文解释", "中心位置（繁體）");
     await edit("繁体中文译词", "中心處");
     fireEvent.click(screen.getByRole("radio", { name: "英式英语" }));
-    expect(
-      screen.getByRole("textbox", { name: "英式英语词形 1" })
-    ).toBeVisible();
+    fireEvent.click(button(/词性与词形/));
+    expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
+      "centre"
+    );
+    fireEvent.click(button(/词义与译词/));
     expect(screen.getByDisplayValue("中心位置（繁體）")).toBeVisible();
     fireEvent.click(screen.getByRole("radio", { name: "简体中文" }));
     expect(screen.getByDisplayValue("中心位置")).toBeVisible();
@@ -199,7 +207,7 @@ describe("新版词库手工闭环", () => {
     const api = requests();
     api.capabilities.mockRejectedValue(new HttpError(404, "not found"));
     const mounted = mount(api);
-    await screen.findByText("新词库手工编辑暂不可用");
+    await screen.findByText("智能词库手工编辑暂不可用");
     expect(api.get).not.toHaveBeenCalled();
     expect(api.create).not.toHaveBeenCalled();
     api.capabilities.mockResolvedValue(caps);
@@ -207,6 +215,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(button("重新检查"));
     await screen.findByDisplayValue("centre");
     expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
+    fireEvent.click(button(/词义与译词/));
     expect(button("添加义项")).toBeDisabled();
     act(() =>
       useAuthStore.setState({
@@ -216,7 +225,7 @@ describe("新版词库手工闭环", () => {
         }
       })
     );
-    await act(() => mounted.router.navigate("/lexicon-next"));
+    await act(() => mounted.router.navigate("/lexicon-next/new"));
     await screen.findByText("当前账号没有创建词条权限");
     expect(button("创建词条")).toBeDisabled();
   });
@@ -228,7 +237,7 @@ describe("新版词库手工闭环", () => {
         finishCreate = resolve;
       })
     );
-    const { router } = mount(api, "/lexicon-next");
+    const { router } = mount(api, "/lexicon-next/new");
     await screen.findByLabelText("词头");
     fireEvent.change(screen.getByLabelText("词头"), {
       target: { value: "centre" }
@@ -241,7 +250,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local" }
     });
-    fireEvent.click(screen.getByRole("link", { name: "新词库入口" }));
+    fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
     await screen.findByRole("dialog", { name: "有未保存修改" });
     fireEvent.click(button("继续编辑"));
     expect(screen.getByDisplayValue("local")).toBeVisible();
@@ -260,8 +269,8 @@ describe("新版词库手工闭环", () => {
         draft: { ...entry.draft, headword: "local" }
       })
     );
-    fireEvent.click(screen.getByRole("link", { name: "新词库入口" }));
-    await screen.findByText("打开已有词条");
+    fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
+    await screen.findByRole("button", { name: "创建词条" });
     api.get.mockResolvedValue({
       ...entry,
       revision: 3,
@@ -288,7 +297,7 @@ describe("新版词库手工闭环", () => {
       })
     );
     fireEvent.click(screen.getByRole("radio", { name: "美式英语" }));
-    fireEvent.click(screen.getByRole("link", { name: "新词库入口" }));
+    fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
     await screen.findByRole("dialog", { name: "有未保存修改" });
     fireEvent.click(button("继续编辑"));
     expect(screen.getByDisplayValue("unsaved after revocation")).toBeVisible();
@@ -298,6 +307,7 @@ describe("新版词库手工闭环", () => {
     const api = requests();
     mount(api);
     await screen.findByDisplayValue("centre");
+    fireEvent.click(button(/词义与译词/));
     fireEvent.click(button("添加义项"));
     await edit("英式英语释义", "");
     fireEvent.click(button("保存完整草稿"));
@@ -309,4 +319,60 @@ describe("新版词库手工闭环", () => {
       screen.getByRole("textbox", { name: "英式英语释义 1" })
     ).toBeVisible();
   });
+});
+
+it("列表查询筛选与分页走新版接口，列表入口和创建入口使用新版路由", async () => {
+  const api = requests();
+  api.list.mockResolvedValue({
+    items: [
+      {
+        id,
+        headword: "centre",
+        target_language: "en",
+        kind: "word",
+        owner_id: "editor",
+        revision: 2,
+        updated_at: entry.updated_at,
+        part_of_speech: ["noun"],
+        gloss: "中心位置"
+      }
+    ],
+    pagination: { total: 45, page: 1, page_size: 20, total_pages: 3 }
+  });
+  const { router } = mount(api, "/lexicon-next");
+  await screen.findByRole("link", { name: "centre" });
+  fireEvent.change(screen.getByRole("searchbox", { name: "词条" }), {
+    target: { value: "centre" }
+  });
+  expect(api.list).toHaveBeenCalledTimes(1);
+  fireEvent.click(button("搜索"));
+  await waitFor(() =>
+    expect(api.list).toHaveBeenLastCalledWith({
+      headword: "centre",
+      kind: undefined,
+      page: 1,
+      page_size: 20
+    })
+  );
+  fireEvent.click(button("第 2 页"));
+  await waitFor(() =>
+    expect(api.list).toHaveBeenLastCalledWith({
+      headword: "centre",
+      kind: undefined,
+      page: 2,
+      page_size: 20
+    })
+  );
+  await act(() => router.navigate("/lexicon-next?page_size=10"));
+  await waitFor(() =>
+    expect(api.list).toHaveBeenLastCalledWith({
+      headword: "",
+      kind: undefined,
+      page: 1,
+      page_size: 10
+    })
+  );
+  fireEvent.click(await screen.findByRole("link", { name: "centre" }));
+  await screen.findByDisplayValue("centre");
+  expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
 });

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Link,
   useBeforeUnload,
   useBlocker,
   useNavigate,
@@ -26,7 +25,8 @@ import type {
   NextEntry,
   NextEntryView,
   NextLanguageCapability,
-  NextSense
+  NextSense,
+  WordCreationStep
 } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { ContentRows } from "@/features/lexicon-next/ContentRows";
@@ -36,6 +36,8 @@ import {
   localeLabels,
   previewDraft
 } from "@/features/lexicon-next/model";
+import { EntryList } from "@/features/lexicon-next/EntryList";
+import { EntryLayout } from "@/features/lexicon-next/EntryLayout";
 import "./lexicon-next.css";
 
 export type LexiconNextRequests = typeof api.lexiconNext;
@@ -75,18 +77,14 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
       language.medium_locales.includes(locale)
     );
   return (
-    <div className="lexicon-next">
-      <header className="lexicon-next-heading">
-        <h1>新词库 · 编辑</h1>
-        <Link to="/words">旧词库</Link>
-      </header>
+    <div className="lexicon-next-workspace">
       {capability.isPending ? (
-        <Spin aria-label="正在读取新词库能力" />
+        <Spin aria-label="正在读取智能词库能力" />
       ) : !supported ? (
         <Alert
           type="warning"
           showIcon
-          title="新词库手工编辑暂不可用"
+          title="智能词库手工编辑暂不可用"
           description={
             capability.error
               ? failure(capability.error)
@@ -96,6 +94,8 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
             <Button onClick={() => void capability.refetch()}>重新检查</Button>
           }
         />
+      ) : entryId === "new" ? (
+        <EntryStart requests={requests} />
       ) : entryId ? (
         <EntryLoader
           key={entryId}
@@ -104,7 +104,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           language={language}
         />
       ) : (
-        <EntryStart requests={requests} />
+        <EntryList requests={requests} />
       )}
     </div>
   );
@@ -135,81 +135,56 @@ function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     }
   }
   return (
-    <div className="lexicon-next-start">
-      <section>
-        <h2>创建英语词条</h2>
-        {!canCreate && <Alert type="info" title="当前账号没有创建词条权限" />}
-        {error && <Alert type="error" showIcon title={error} />}
-        <Form<CreateNextEntry>
-          layout="vertical"
-          initialValues={{ kind: "word" }}
-          disabled={busy || !canCreate}
-          onFinish={(values) => void create(values)}
-        >
-          <Form.Item label="目标语言">
-            <Input value="英语" disabled />
-          </Form.Item>
-          <Form.Item name="kind" label="词条类型">
-            <Radio.Group
-              options={[
-                { label: "单词", value: "word" },
-                { label: "短语", value: "phrase" }
+    <EntryLayout step="basics" exists={false}>
+      <div className="lexicon-next">
+        <section>
+          <h2>创建英语词条</h2>
+          {!canCreate && <Alert type="info" title="当前账号没有创建词条权限" />}
+          {error && <Alert type="error" showIcon title={error} />}
+          <Form<CreateNextEntry>
+            layout="vertical"
+            initialValues={{ kind: "word" }}
+            disabled={busy || !canCreate}
+            onFinish={(values) => void create(values)}
+          >
+            <Form.Item label="目标语言">
+              <Input value="英语" disabled />
+            </Form.Item>
+            <Form.Item name="kind" label="词条类型">
+              <Radio.Group
+                options={[
+                  { label: "单词", value: "word" },
+                  { label: "短语", value: "phrase" }
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              name="headword"
+              label="词头"
+              rules={[
+                { required: true, whitespace: true, message: "请输入词头" },
+                {
+                  validator: (_, value: string) =>
+                    !value || [...value].length <= 200
+                      ? Promise.resolve()
+                      : Promise.reject(new Error("词头最多 200 个字符"))
+                }
               ]}
-            />
-          </Form.Item>
-          <Form.Item
-            name="headword"
-            label="词头"
-            rules={[
-              { required: true, whitespace: true, message: "请输入词头" },
-              {
-                validator: (_, value: string) =>
-                  !value || [...value].length <= 200
-                    ? Promise.resolve()
-                    : Promise.reject(new Error("词头最多 200 个字符"))
-              }
-            ]}
-          >
-            <Input autoComplete="off" />
-          </Form.Item>
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={busy}
-            disabled={!canCreate}
-          >
-            创建词条
-          </Button>
-        </Form>
-      </section>
-      <section>
-        <h2>打开已有词条</h2>
-        <Form
-          layout="vertical"
-          onFinish={({ id }: { id: string }) =>
-            navigate(`/lexicon-next/${id.trim()}`)
-          }
-        >
-          <Form.Item
-            name="id"
-            label="新词库词条 ID"
-            rules={[
-              { required: true, message: "请输入词条 ID" },
-              {
-                pattern:
-                  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-                message: "请输入完整 UUID"
-              }
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Button htmlType="submit" disabled={busy}>
-            打开词条
-          </Button>
-        </Form>
-      </section>
-    </div>
+            >
+              <Input autoComplete="off" />
+            </Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={busy}
+              disabled={!canCreate}
+            >
+              创建词条
+            </Button>
+          </Form>
+        </section>
+      </div>
+    </EntryLayout>
   );
 }
 function EntryLoader({
@@ -236,7 +211,7 @@ function EntryLoader({
       <Alert
         type="error"
         showIcon
-        title="无法打开新词库词条"
+        title="无法打开智能词库词条"
         description={failure(query.error)}
         action={<Button onClick={() => void query.refetch()}>重试</Button>}
       />
@@ -257,6 +232,8 @@ function EntryEditor({
   language: NextLanguageCapability;
 }) {
   const { message, modal } = App.useApp();
+  const queryClient = useQueryClient();
+  const [step, setStep] = useState<WordCreationStep>("forms");
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
   const [target, setTarget] = useState("en-GB");
@@ -328,6 +305,9 @@ function EntryEditor({
       setDraft(result.draft);
       setConflict(false);
       setRemote(undefined);
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-lexicon-next", "list"]
+      });
       void message.success("草稿已保存");
     });
   }
@@ -336,321 +316,338 @@ function EntryEditor({
     setView(undefined);
   }, [target, medium]);
   return (
-    <>
-      <div className="lexicon-next-toolbar">
-        <Space wrap>
-          <Link to="/lexicon-next">新词库入口</Link>
-          <Tag>{saved.kind === "word" ? "单词" : "短语"} · 英语</Tag>
-          <span>版本 {saved.revision}</span>
-          <span role="status">{dirty ? "有未保存修改" : "已保存"}</span>
-        </Space>
-        <Space wrap>
-          <Button
-            disabled={busy}
-            onClick={() =>
-              void run(async () =>
-                setView(
-                  await requests.view(saved.id, {
-                    target_locale: target,
-                    medium_locale: medium
-                  })
+    <EntryLayout
+      draft={draft}
+      step={step}
+      onStepChange={busy ? undefined : setStep}
+    >
+      <div className="lexicon-next">
+        <div className="lexicon-next-toolbar">
+          <Space wrap>
+            <Tag>{saved.kind === "word" ? "单词" : "短语"} · 英语</Tag>
+            <span>版本 {saved.revision}</span>
+            <span role="status">{dirty ? "有未保存修改" : "已保存"}</span>
+          </Space>
+          <Space wrap>
+            <Button
+              disabled={busy}
+              onClick={() =>
+                void run(async () =>
+                  setView(
+                    await requests.view(saved.id, {
+                      target_locale: target,
+                      medium_locale: medium
+                    })
+                  )
                 )
+              }
+            >
+              查看已保存预览
+            </Button>
+            <Button
+              type="primary"
+              icon={<Save aria-hidden="true" />}
+              loading={busy}
+              disabled={!writable || !dirty || conflict}
+              onClick={save}
+            >
+              保存完整草稿
+            </Button>
+          </Space>
+        </div>
+        {!writable && (
+          <Alert
+            type="info"
+            title="此词条只读：需要编辑权限，编辑他人词条还需相应授权。"
+          />
+        )}
+        {(error || conflict) && (
+          <Alert
+            type="error"
+            showIcon
+            title={error ?? "服务器版本已更新。本地草稿已保留，请先比较版本。"}
+            action={
+              conflict && (
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () =>
+                      setRemote(await requests.get(saved.id))
+                    )
+                  }
+                >
+                  比较服务器版本
+                </Button>
               )
             }
+          />
+        )}
+        <Form layout="vertical" className="lexicon-next-basics">
+          <Form.Item label="词头">
+            <Input
+              aria-label="词头"
+              value={draft.headword}
+              disabled={disabled}
+              onChange={(e) => setDraft({ ...draft, headword: e.target.value })}
+            />
+          </Form.Item>
+        </Form>
+        <div className="lexicon-next-selectors">
+          <section>
+            <h3>目标语言</h3>
+            <Radio.Group
+              disabled={busy}
+              aria-label="目标语言变体"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              options={[
+                { label: "英式英语", value: "en-GB" },
+                { label: "美式英语", value: "en-US" }
+              ]}
+            />
+          </section>
+          <section hidden={step === "forms"} inert={step === "forms"}>
+            <h3>媒介语言</h3>
+            <Radio.Group
+              disabled={busy}
+              aria-label="媒介语言文字形式"
+              value={medium}
+              onChange={(e) => setMedium(e.target.value)}
+              options={[
+                { label: "简体中文", value: "zh-Hans" },
+                { label: "繁体中文", value: "zh-Hant" }
+              ]}
+            />
+          </section>
+        </div>
+        {language.common_target_locale === "en" && (
+          <Checkbox
+            disabled={busy}
+            checked={common}
+            onChange={(e) => setCommon(e.target.checked)}
           >
-            查看已保存预览
-          </Button>
-          <Button
-            type="primary"
-            icon={<Save aria-hidden="true" />}
-            loading={busy}
-            disabled={!writable || !dirty || conflict}
-            onClick={save}
-          >
-            保存完整草稿
-          </Button>
-        </Space>
-      </div>
-      <p className="lexicon-next-id">词条 ID：{saved.id}</p>
-      {!writable && (
-        <Alert
-          type="info"
-          title="此词条只读：需要编辑权限，编辑他人词条还需相应授权。"
-        />
-      )}
-      {(error || conflict) && (
-        <Alert
-          type="error"
-          showIcon
-          title={error ?? "服务器版本已更新。本地草稿已保留，请先比较版本。"}
-          action={
-            conflict && (
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => setRemote(await requests.get(saved.id)))
-                }
-              >
-                比较服务器版本
-              </Button>
-            )
-          }
-        />
-      )}
-      <Form layout="vertical" className="lexicon-next-basics">
-        <Form.Item label="词头">
-          <Input
-            aria-label="词头"
-            value={draft.headword}
+            编辑通用英语内容
+          </Checkbox>
+        )}
+        {common && (
+          <p className="lexicon-next-muted">
+            通用英语仅在所选英美变体没有对应内容时使用。
+          </p>
+        )}
+        <div hidden={step !== "forms"} inert={step !== "forms"}>
+          <ContentRows
+            rows={draft.forms}
+            locale={editingLocale}
+            label={`${localeLabels[editingLocale]}词形`}
             disabled={disabled}
-            onChange={(e) => setDraft({ ...draft, headword: e.target.value })}
+            onChange={(forms) => setDraft({ ...draft, forms })}
           />
-        </Form.Item>
-      </Form>
-      <div className="lexicon-next-selectors">
-        <section>
-          <h3>目标语言</h3>
-          <Radio.Group
-            disabled={busy}
-            aria-label="目标语言变体"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            options={[
-              { label: "英式英语", value: "en-GB" },
-              { label: "美式英语", value: "en-US" }
-            ]}
-          />
-        </section>
-        <section>
-          <h3>媒介语言</h3>
-          <Radio.Group
-            disabled={busy}
-            aria-label="媒介语言文字形式"
-            value={medium}
-            onChange={(e) => setMedium(e.target.value)}
-            options={[
-              { label: "简体中文", value: "zh-Hans" },
-              { label: "繁体中文", value: "zh-Hant" }
-            ]}
-          />
-        </section>
-      </div>
-      {language.common_target_locale === "en" && (
-        <Checkbox
-          disabled={busy}
-          checked={common}
-          onChange={(e) => setCommon(e.target.checked)}
-        >
-          编辑通用英语内容
-        </Checkbox>
-      )}
-      {common && (
-        <p className="lexicon-next-muted">
-          通用英语仅在所选英美变体没有对应内容时使用。
-        </p>
-      )}
-      <ContentRows
-        rows={draft.forms}
-        locale={editingLocale}
-        label={`${localeLabels[editingLocale]}词形`}
-        disabled={disabled}
-        onChange={(forms) => setDraft({ ...draft, forms })}
-      />
-      <div className="lexicon-next-section-heading">
-        <h2>义项</h2>
-        <Button
-          icon={<Plus aria-hidden="true" />}
-          disabled={disabled}
-          onClick={() =>
-            setDraft({
-              ...draft,
-              senses: [
-                ...draft.senses,
-                {
-                  id: crypto.randomUUID(),
-                  part_of_speech: null,
-                  definitions: [],
-                  equivalents: []
-                }
-              ]
-            })
-          }
-        >
-          添加义项
-        </Button>
-      </div>
-      {!draft.senses.length && <p className="lexicon-next-muted">尚无义项</p>}
-      {draft.senses.map((sense, index) => (
-        <section
-          className="lexicon-next-sense"
-          key={sense.id}
-          aria-label={`义项 ${index + 1}`}
-        >
+        </div>
+        <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <div className="lexicon-next-section-heading">
-            <h3>义项 {index + 1}</h3>
-            <Space wrap>
-              <Select
-                aria-label={`义项 ${index + 1} 词性`}
-                placeholder="未指定词性"
-                allowClear
-                value={sense.part_of_speech ?? undefined}
-                disabled={disabled}
-                options={language.part_of_speech_codes.map((value) => ({
-                  value,
-                  label: value
-                }))}
-                onChange={(value) =>
-                  updateSense(sense.id, { part_of_speech: value ?? null })
-                }
-              />
+            <h2>义项</h2>
+            <Button
+              icon={<Plus aria-hidden="true" />}
+              disabled={disabled}
+              onClick={() =>
+                setDraft({
+                  ...draft,
+                  senses: [
+                    ...draft.senses,
+                    {
+                      id: crypto.randomUUID(),
+                      part_of_speech: null,
+                      definitions: [],
+                      equivalents: []
+                    }
+                  ]
+                })
+              }
+            >
+              添加义项
+            </Button>
+          </div>
+          {!draft.senses.length && (
+            <p className="lexicon-next-muted">尚无义项</p>
+          )}
+          {draft.senses.map((sense, index) => (
+            <section
+              className="lexicon-next-sense"
+              key={sense.id}
+              aria-label={`义项 ${index + 1}`}
+            >
+              <div className="lexicon-next-section-heading">
+                <h3>义项 {index + 1}</h3>
+                <Space wrap>
+                  <Select
+                    aria-label={`义项 ${index + 1} 词性`}
+                    placeholder="未指定词性"
+                    allowClear
+                    value={sense.part_of_speech ?? undefined}
+                    disabled={disabled}
+                    options={language.part_of_speech_codes.map((value) => ({
+                      value,
+                      label: value
+                    }))}
+                    onChange={(value) =>
+                      updateSense(sense.id, { part_of_speech: value ?? null })
+                    }
+                  />
+                  <Button
+                    danger
+                    disabled={disabled}
+                    onClick={() =>
+                      modal.confirm({
+                        title: `删除义项 ${index + 1}？`,
+                        content:
+                          "这将从草稿移除此义项的所有语言内容。保存后生效。",
+                        okText: "删除义项",
+                        cancelText: "取消",
+                        onOk: () =>
+                          setDraft((current) => ({
+                            ...current,
+                            senses: current.senses.filter(
+                              (item) => item.id !== sense.id
+                            )
+                          }))
+                      })
+                    }
+                  >
+                    删除义项
+                  </Button>
+                </Space>
+              </div>
+              <div className="lexicon-next-columns">
+                <ContentRows
+                  rows={sense.definitions}
+                  locale={editingLocale}
+                  label={`${localeLabels[editingLocale]}释义`}
+                  definition
+                  disabled={disabled}
+                  onChange={(definitions) =>
+                    updateSense(sense.id, {
+                      definitions: definitions as NextDefinition[]
+                    })
+                  }
+                />
+                <div>
+                  <ContentRows
+                    rows={sense.definitions}
+                    locale={medium}
+                    label={`${localeLabels[medium]}解释`}
+                    definition
+                    disabled={disabled}
+                    onChange={(definitions) =>
+                      updateSense(sense.id, {
+                        definitions: definitions as NextDefinition[]
+                      })
+                    }
+                  />
+                  <ContentRows
+                    rows={sense.equivalents}
+                    locale={medium}
+                    label={`${localeLabels[medium]}译词`}
+                    disabled={disabled}
+                    onChange={(equivalents) =>
+                      updateSense(sense.id, { equivalents })
+                    }
+                  />
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
+        <div hidden={step !== "preview"} inert={step !== "preview"}>
+          <h2>预览</h2>
+          <Preview view={previewDraft(draft, target, medium)} />
+        </div>
+        <Collapse
+          items={[
+            {
+              key: "preview",
+              label: "当前草稿预览（含未保存修改）",
+              children: <Preview view={previewDraft(draft, target, medium)} />
+            }
+          ]}
+        />
+        <Modal
+          open={!!view}
+          title={`已保存预览 · 版本 ${view?.revision ?? ""}`}
+          footer={null}
+          onCancel={() => setView(undefined)}
+        >
+          {view && <Preview view={view} />}
+        </Modal>
+        <Modal
+          open={!!remote}
+          title="比较草稿"
+          width={960}
+          onCancel={() => setRemote(undefined)}
+          footer={
+            <Space>
+              <Button onClick={() => setRemote(undefined)}>保留本地草稿</Button>
               <Button
                 danger
-                disabled={disabled}
                 onClick={() =>
                   modal.confirm({
-                    title: `删除义项 ${index + 1}？`,
-                    content: "这将从草稿移除此义项的所有语言内容。保存后生效。",
-                    okText: "删除义项",
+                    title: "放弃本地修改并重载？",
+                    content: "本地未保存内容将被服务器版本替换。",
+                    okText: "放弃并重载",
                     cancelText: "取消",
-                    onOk: () =>
-                      setDraft((current) => ({
-                        ...current,
-                        senses: current.senses.filter(
-                          (item) => item.id !== sense.id
-                        )
-                      }))
+                    onOk: () => {
+                      if (remote) {
+                        setSaved(remote);
+                        setDraft(remote.draft);
+                        setRemote(undefined);
+                        setConflict(false);
+                        setError(undefined);
+                      }
+                    }
                   })
                 }
               >
-                删除义项
+                放弃本地修改并重载
               </Button>
             </Space>
-          </div>
-          <div className="lexicon-next-columns">
-            <ContentRows
-              rows={sense.definitions}
-              locale={editingLocale}
-              label={`${localeLabels[editingLocale]}释义`}
-              definition
-              disabled={disabled}
-              onChange={(definitions) =>
-                updateSense(sense.id, {
-                  definitions: definitions as NextDefinition[]
-                })
-              }
-            />
-            <div>
-              <ContentRows
-                rows={sense.definitions}
-                locale={medium}
-                label={`${localeLabels[medium]}解释`}
-                definition
-                disabled={disabled}
-                onChange={(definitions) =>
-                  updateSense(sense.id, {
-                    definitions: definitions as NextDefinition[]
-                  })
-                }
-              />
-              <ContentRows
-                rows={sense.equivalents}
-                locale={medium}
-                label={`${localeLabels[medium]}译词`}
-                disabled={disabled}
-                onChange={(equivalents) =>
-                  updateSense(sense.id, { equivalents })
-                }
-              />
-            </div>
-          </div>
-        </section>
-      ))}
-      <Collapse
-        items={[
-          {
-            key: "preview",
-            label: "当前草稿预览（含未保存修改）",
-            children: <Preview view={previewDraft(draft, target, medium)} />
           }
-        ]}
-      />
-      <Modal
-        open={!!view}
-        title={`已保存预览 · 版本 ${view?.revision ?? ""}`}
-        footer={null}
-        onCancel={() => setView(undefined)}
-      >
-        {view && <Preview view={view} />}
-      </Modal>
-      <Modal
-        open={!!remote}
-        title="比较草稿"
-        width={960}
-        onCancel={() => setRemote(undefined)}
-        footer={
-          <Space>
-            <Button onClick={() => setRemote(undefined)}>保留本地草稿</Button>
-            <Button
-              danger
-              onClick={() =>
-                modal.confirm({
-                  title: "放弃本地修改并重载？",
-                  content: "本地未保存内容将被服务器版本替换。",
-                  okText: "放弃并重载",
-                  cancelText: "取消",
-                  onOk: () => {
-                    if (remote) {
-                      setSaved(remote);
-                      setDraft(remote.draft);
-                      setRemote(undefined);
-                      setConflict(false);
-                      setError(undefined);
-                    }
-                  }
-                })
-              }
-            >
-              放弃本地修改并重载
-            </Button>
-          </Space>
-        }
-      >
-        {remote && (
-          <div className="lexicon-next-columns">
-            <section>
-              <h3>本地草稿 · 基于版本 {saved.revision}</h3>
-              <DraftSummary draft={draft} />
-            </section>
-            <section>
-              <h3>服务器 · 版本 {remote.revision}</h3>
-              <DraftSummary draft={remote.draft} />
-            </section>
-          </div>
-        )}
-      </Modal>
-      <Modal
-        open={blocker.state === "blocked"}
-        title={busy ? "请求尚未完成" : "有未保存修改"}
-        closable={false}
-        footer={
-          <Space>
-            <Button
-              onClick={() => blocker.state === "blocked" && blocker.reset()}
-            >
-              继续编辑
-            </Button>
-            <Button
-              danger
-              disabled={busy}
-              onClick={() => blocker.state === "blocked" && blocker.proceed()}
-            >
-              放弃修改并离开
-            </Button>
-          </Space>
-        }
-      >
-        离开此页会丢失未保存的草稿。
-      </Modal>
-    </>
+        >
+          {remote && (
+            <div className="lexicon-next-columns">
+              <section>
+                <h3>本地草稿 · 基于版本 {saved.revision}</h3>
+                <DraftSummary draft={draft} />
+              </section>
+              <section>
+                <h3>服务器 · 版本 {remote.revision}</h3>
+                <DraftSummary draft={remote.draft} />
+              </section>
+            </div>
+          )}
+        </Modal>
+        <Modal
+          open={blocker.state === "blocked"}
+          title={busy ? "请求尚未完成" : "有未保存修改"}
+          closable={false}
+          footer={
+            <Space>
+              <Button
+                onClick={() => blocker.state === "blocked" && blocker.reset()}
+              >
+                继续编辑
+              </Button>
+              <Button
+                danger
+                disabled={busy}
+                onClick={() => blocker.state === "blocked" && blocker.proceed()}
+              >
+                放弃修改并离开
+              </Button>
+            </Space>
+          }
+        >
+          离开此页会丢失未保存的草稿。
+        </Modal>
+      </div>
+    </EntryLayout>
   );
 }

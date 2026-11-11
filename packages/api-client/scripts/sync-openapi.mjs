@@ -60,6 +60,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 
 const RUNTIME_SCHEMA_ROOTS = [
   "NextEntry",
+  "NextEntryList",
   "NextCapabilities",
   "NextEntryView",
   "CreateNextEntry",

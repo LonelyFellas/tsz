@@ -635,8 +635,8 @@ const fixedAccessMessages = {
   ],
   create_entries: ["创建词条", "建立詞條", "Create entries"],
   create_entries_in_the_lexicon_using_the_built_in_dictionary_to_id: [
-    "在智能词库中创建新词条，利用内置辞典识别基本词性和英美拼写，同时检测词库中是否已存在同名词条。",
-    "在智慧詞庫中建立新詞條，利用內建辭典辨識基本詞性和英美拼寫，同時檢測詞庫是否已有同名詞條。",
+    "在智能词库V1中创建新词条，利用内置辞典识别基本词性和英美拼写，同时检测词库中是否已存在同名词条。",
+    "在智慧詞庫V1中建立新詞條，利用內建辭典辨識基本詞性和英美拼寫，同時檢測詞庫是否已有同名詞條。",
     "Create entries in the lexicon using the built-in dictionary to identify parts of speech and British and American spellings, and check for existing entries with the same headword."
   ],
   edit_entry_text_and_pronunciation: [
@@ -687,8 +687,8 @@ const fixedAccessMessages = {
     "Restore entries from trash"
   ],
   restore_trashed_entries_to_the_lexicon_as_editable_drafts_without: [
-    "将已删入垃圾桶的词条恢复到智能词库，重返草稿状态，可以被编辑，但不会自动公开。",
-    "將垃圾桶中的詞條恢復至智慧詞庫的草稿狀態，可供編輯但不會自動公開。",
+    "将已删入垃圾桶的词条恢复到智能词库V1，重返草稿状态，可以被编辑，但不会自动公开。",
+    "將垃圾桶中的詞條恢復至智慧詞庫V1的草稿狀態，可供編輯但不會自動公開。",
     "Restore trashed entries to the lexicon as editable drafts without publishing them automatically."
   ],
   restore_entry_history: [
