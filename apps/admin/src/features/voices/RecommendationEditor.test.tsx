@@ -148,6 +148,19 @@ afterEach(() => {
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
 });
+it.each(["", " \t "])("名称为 %j 时使用默认名称保存整套配置", async (name) => {
+  const onSave = mount();
+  fireEvent.change(screen.getByLabelText("推荐名称"), {
+    target: { value: name }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+  await waitFor(() =>
+    expect(onSave).toHaveBeenCalledWith({
+      ...initial,
+      name: "未命名推荐"
+    })
+  );
+});
 it("高级参数收展、英美往返及试听均保留参数与各自文本、格式", async () => {
   vi.spyOn(api.speech, "preview").mockResolvedValue({
     audio_url: "https://audio.example.test/current.wav",
