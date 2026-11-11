@@ -241,7 +241,7 @@ export function V3PronunciationList({
                             id: idFactory(),
                             dict_phonetic: "",
                             actual_pron: "",
-                            style: "normal"
+                            style: "citation"
                           };
                           add(next, index + 1);
                           onChange(
@@ -508,7 +508,7 @@ export function V3PronunciationList({
                         id: idFactory(),
                         dict_phonetic: "",
                         actual_pron: "",
-                        style: "normal"
+                        style: "citation"
                       };
                       add(pronunciation);
                       onChange(
