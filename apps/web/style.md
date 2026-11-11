@@ -9,7 +9,7 @@
 ## 1. 规范与实现来源
 
 - 颜色与动效值：[globals.css](src/app/globals.css)。组件引用语义 token，完整色值只维护在这里。
-- 字体：[共享字体](../../packages/shared/src/fonts.css)。沿用现有字体及中文系统回退，不为单个页面引入新字体。
+- 字体：[共享字体](../../packages/shared/src/fonts.css)。普通中英文使用系统字体，数字与指定标点使用 Inter Display，词汇与音标使用 Andika。不为单个页面引入新字体。
 - 已适配的基础组件：[Button、Input、Label、FormField、Select、Tabs、DropdownMenu](../../packages/ui/src/components/ui/)。从 `@tsz/ui/components` 导入，沿用 Tailwind 与 shadcn/Radix，不复制一份基础样式或引入另一套 UI 库。
 - 主题行为：[useTheme](src/features/theme/useTheme.ts)、[主题内核](src/lib/theme.ts)。页面通过 hook 使用主题，不自行操作存储或 `<html>`。
 - 品牌来源仍为配套总文档仓库的 `visual.md`；本文件规定 C 端的落地方式。
