@@ -627,7 +627,7 @@
   width: 100%;
   min-width: 0;
 }
-.tsz-ve-pool-recommendation-section {
+.tsz-ve-local-pool .tsz-ve-pool-recommendation-section {
   display: block;
   margin-top: 16px;
   padding-top: 16px;
@@ -676,6 +676,10 @@
 }
 .tsz-ve-pool-paired-recommendations .tsz-ve-pool-pair[data-selected="true"] {
   background: var(--ui-color-primary-bg, #f5f8ff);
+}
+.tsz-ve-pool-paired-recommendations:where([data-single="true"])
+  .tsz-ve-pool-pair {
+  grid-template-columns: 120px 96px minmax(0, 1fr);
 }
 .tsz-ve-pool-paired-recommendations .tsz-ve-pool-head {
   min-height: 40px;
@@ -726,6 +730,9 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   min-width: 0;
+}
+.tsz-ve-pool-catalog:where([data-single="true"]) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .tsz-ve-pool-catalog-list {
   height: 280px;
