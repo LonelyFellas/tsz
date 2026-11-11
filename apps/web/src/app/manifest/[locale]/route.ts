@@ -1,5 +1,5 @@
 import { createInterfaceI18n } from "@tsz/shared/i18n";
-import { addWebCatalog, webText } from "@/i18n/catalog";
+import { webText } from "@/i18n/catalog";
 import { webApp } from "@/i18n/messages/app";
 import { getPublicResourceLocale } from "@/i18n/server";
 import { site } from "@/lib/site";
@@ -9,9 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ locale: string }> }
 ) {
   const locale = await getPublicResourceLocale((await params).locale);
-  const instance = createInterfaceI18n(locale, webApp.resources);
-  addWebCatalog(instance, webApp);
-  const t = webText(instance, webApp);
+  const t = webText(createInterfaceI18n(locale, webApp.resources), webApp);
   return Response.json(
     {
       name: t("webApp:english_vocabulary_learning"),
