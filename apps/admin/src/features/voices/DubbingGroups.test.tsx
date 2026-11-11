@@ -434,6 +434,44 @@ describe("分组工作台与逐组草稿", () => {
     }
     expect(api.speech.savePairedGroup).not.toHaveBeenCalled();
   });
+  it("未填写名称仍须选齐英美音色，保存当前组后可继续改名且保留整套身份与参数", async () => {
+    mount();
+    const panel = groupPanel("A");
+    fireEvent.click(button("新增推荐", panel));
+    selectVoice("Sonia 女声");
+    fireEvent.click(button("保存整套推荐", screen.getByRole("dialog")));
+    expect(
+      await screen.findByText("请明确选择美式音色，每套必须包含英美各一项。")
+    ).toBeVisible();
+    selectVoice("Guy 男声");
+    fireEvent.click(button("保存整套推荐", screen.getByRole("dialog")));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(within(panel).getByDisplayValue("未命名推荐")).toBeVisible();
+    fireEvent.click(button("保存当前组", panel));
+    await waitFor(() =>
+      expect(api.speech.savePairedGroup).toHaveBeenCalledTimes(1)
+    );
+    await waitFor(() => expect(button("保存当前组", panel)).toBeDisabled());
+    const saved = vi.mocked(api.speech.savePairedGroup).mock.calls[0]![0].group
+      .pairs[1]!;
+    expect(saved).toMatchObject({
+      name: "未命名推荐",
+      uk: { voice_alias: "sonia" },
+      us: { voice_alias: "guy" }
+    });
+    fireEvent.change(within(panel).getByDisplayValue("未命名推荐"), {
+      target: { value: "自然朗读" }
+    });
+    fireEvent.click(button("保存当前组", panel));
+    await waitFor(() =>
+      expect(api.speech.savePairedGroup).toHaveBeenCalledTimes(2)
+    );
+    expect(
+      vi.mocked(api.speech.savePairedGroup).mock.calls[1]![0].group.pairs[1]
+    ).toEqual({ ...saved, name: "自然朗读" });
+    await waitFor(() => expect(button("保存当前组", panel)).toBeDisabled());
+    expect(within(panel).getByDisplayValue("自然朗读")).toBeVisible();
+  });
   it("完整英美套须人工选齐；复制保留参数但生成新的套及侧身份", async () => {
     mount();
     const panel = groupPanel("A");

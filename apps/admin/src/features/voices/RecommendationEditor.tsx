@@ -145,11 +145,8 @@ export function RecommendationEditor({
   }
   function save() {
     if (disabled) return;
-    if (!value.name?.trim()) {
-      setError(voiceMessage("enter_a_recommendation_name"));
-      return;
-    }
-    if (Array.from(value.name.trim()).length > 40) {
+    const name = value.name?.trim() || t("unnamed_recommendation");
+    if (Array.from(name).length > 40) {
       setError(
         voiceMessage("recommendation_names_must_be_at_most_40_characters")
       );
@@ -169,7 +166,7 @@ export function RecommendationEditor({
         const issue = recommendationError(
           t("recommendation"),
           key,
-          { ...next, name: value.name },
+          { ...next, name },
           voices.find((v) => v.alias === next.voice_alias)
         );
         if (issue) {
@@ -179,7 +176,7 @@ export function RecommendationEditor({
               recommendationError(
                 t("recommendation"),
                 key,
-                { ...next, name: value.name! },
+                { ...next, name },
                 voices.find((v) => v.alias === next.voice_alias),
                 t
               ) ?? ""
@@ -190,7 +187,7 @@ export function RecommendationEditor({
     }
     onSave({
       id: value.id ?? newWordNodeId(),
-      name: value.name.trim(),
+      name,
       selected: value.selected ?? !legacy,
       uk: value.uk!,
       us: value.us!
