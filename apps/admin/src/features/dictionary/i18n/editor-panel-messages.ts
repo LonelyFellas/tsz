@@ -343,11 +343,6 @@ export const lexiconEditorPanelMessages = {
     "發布檢查 ↓",
     "Publication checks ↓"
   ],
-  panel_content_is_saved_view_the_content_or_publication_history: [
-    "当前内容已保存，可查看内容或发布历史。",
-    "當前內容已儲存，可檢視內容或發布歷史。",
-    "Content is saved. View the content or publication history."
-  ],
   panel_edit_forms_and_pronunciation: [
     "编辑词形与发音",
     "編輯詞形與發音",

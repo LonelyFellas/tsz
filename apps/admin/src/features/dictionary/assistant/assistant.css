@@ -34,12 +34,6 @@
   padding-block: var(--ui-space-6);
 }
 
-.lexicon-assistant-welcome .ui-empty-image {
-  height: auto;
-  color: var(--ui-color-primary);
-  font-size: 32px;
-}
-
 .lexicon-assistant-starter {
   height: auto;
   min-height: 40px;

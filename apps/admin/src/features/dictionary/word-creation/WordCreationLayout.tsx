@@ -43,13 +43,6 @@ interface Props {
   children: ReactNode;
 }
 
-const STEP_SUBTITLE: Record<WordCreationStep, WorkspaceMessage> = {
-  basics: "basics_help",
-  forms: "forms_help",
-  meanings: "meanings_help",
-  preview: "preview_help"
-};
-
 export function WordCreationLayout({
   currentStep,
   dictionary,
@@ -114,9 +107,9 @@ export function WordCreationLayout({
                 <strong>
                   {stepLabels?.[step]?.title ?? t(WORD_STEP_TITLE[step])}
                 </strong>
-                <small>
-                  {stepLabels?.[step]?.subtitle ?? t(STEP_SUBTITLE[step])}
-                </small>
+                {stepLabels?.[step]?.subtitle && (
+                  <small>{stepLabels[step].subtitle}</small>
+                )}
               </span>
               {finished && <span className="sr-only">{t("completed")}</span>}
             </button>

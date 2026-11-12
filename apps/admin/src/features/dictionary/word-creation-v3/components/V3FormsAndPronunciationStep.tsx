@@ -555,9 +555,6 @@ export function V3FormsAndPronunciationStep({
             <Typography.Title level={2} style={{ margin: 0 }}>
               {t("forms_title")}
             </Typography.Title>
-            <Typography.Paragraph className="word-step-description">
-              {t("forms_help")}
-            </Typography.Paragraph>
             <details className="v3-pronunciation-guide">
               <summary>{t("pronunciation_help_title")}</summary>
               <p>{t("pronunciation_help")}</p>
