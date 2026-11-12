@@ -15,6 +15,7 @@ import { V3FormContentOverview } from "./V3FormContentOverview";
 
 const preview = vi.hoisted(() => ({
   preference: "uk" as "uk" | "us",
+  resolveVoices: vi.fn(),
   synthesize: vi.fn(),
   pause: vi.fn()
 }));
@@ -32,7 +33,8 @@ vi.mock("../../voice-editor/dataSource", () => ({
       { id: "british-voice", label: "British", locale: "en-GB" },
       { id: "american-voice", label: "American", locale: "en-US" }
     ],
-    synthesize: preview.synthesize
+    synthesize: preview.synthesize,
+    resolveVoices: preview.resolveVoices
   },
   voicePreviewIsMock: false
 }));
@@ -70,6 +72,18 @@ function Harness({
 beforeEach(() => {
   vi.clearAllMocks();
   preview.preference = "uk";
+  preview.resolveVoices.mockImplementation(async ({ accent }) => ({
+    source: { kind: "catalog" },
+    voices: [
+      {
+        voice_id: accent === "gb" ? "british-voice" : "american-voice",
+        version_id: `recommended-${accent}`,
+        locale: accent === "gb" ? "en-GB" : "en-US",
+        enabled: true,
+        rate_percent: accent === "gb" ? -10 : -25
+      }
+    ]
+  }));
   preview.synthesize.mockImplementation(async () => ({
     audioUrl: "https://audio.test/job.mp3",
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -220,6 +234,7 @@ it.each(["common", "uk_us"] as const)(
     view.rerender(<Harness form={form} rules={rules} />);
     expect(play).toHaveAttribute("data-playback-dialect", "us");
     expect(preview.pause).toHaveBeenCalled();
+    await waitFor(() => expect(play).toBeEnabled());
     fireEvent.click(play);
     await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(2));
     expect(preview.synthesize.mock.calls[1]![0].voiceId).toBe("american-voice");

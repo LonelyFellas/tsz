@@ -256,15 +256,30 @@ export function useSelectedVoiceAudio({
             selectedKeys.add(voiceSettingKey(setting));
           }
         }
+        const reused = new Map(
+          selected
+            .filter((setting) => setting.audio_asset_id)
+            .map((setting) => [voiceSettingKey(setting), setting])
+        );
         stored = {
           ...stored,
-          voices: stored.voices.map((setting) =>
-            inScope(setting, stored, locale) &&
-            inheritedSetting(setting, stored, locale) &&
-            !selectedKeys.has(voiceSettingKey(setting))
-              ? { ...setting, enabled: false }
-              : setting
-          )
+          voices: stored.voices.map((setting) => {
+            const resolved = inScope(setting, stored, locale)
+              ? reused.get(voiceSettingKey(setting))
+              : undefined;
+            return resolved
+              ? {
+                  ...resolved,
+                  ...(setting.version_name !== undefined
+                    ? { version_name: setting.version_name }
+                    : {})
+                }
+              : inScope(setting, stored, locale) &&
+                  inheritedSetting(setting, stored, locale) &&
+                  !selectedKeys.has(voiceSettingKey(setting))
+                ? { ...setting, enabled: false }
+                : setting;
+          })
         };
         if (JSON.stringify(stored) !== JSON.stringify(latest.current.profile))
           commit(stored);

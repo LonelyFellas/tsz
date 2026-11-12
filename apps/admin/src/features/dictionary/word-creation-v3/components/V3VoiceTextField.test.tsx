@@ -2315,7 +2315,7 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
       dubbing: {
         area: "word" as const,
         uk: { mode: "local" },
-        us: { mode: "local" }
+        us: { mode: "inherit" }
       },
       voices: [
         {

@@ -16,6 +16,19 @@ import {
   voiceSettingAccent
 } from "./voice-versions";
 
+/** Only absent/legacy-empty profiles are defaults; explicit local pools remain independent. */
+export function withDefaultVoiceProfile(
+  profile: VoiceProfile | null | undefined,
+  area: VoiceRecommendationArea
+): VoiceProfile {
+  if (profile?.dubbing || profile?.voices.length) return profile;
+  return {
+    ...profile,
+    voices: [],
+    dubbing: inheritedDubbing(area)
+  };
+}
+
 export function recommendationVoiceSetting(
   item: VoiceRecommendation,
   voices: readonly VoiceOption[]

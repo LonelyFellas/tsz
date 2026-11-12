@@ -1,4 +1,5 @@
 import { act, fireEvent, waitFor, within } from "@testing-library/react";
+import { expect } from "vitest";
 
 export async function changeVoiceText(
   input: HTMLElement,
@@ -35,6 +36,7 @@ export async function changeVoiceText(
   const done = () =>
     within(dialog).queryByLabelText(`保存${label}修改`) ??
     within(dialog).getByLabelText(`完成${label}编辑`);
+  await waitFor(() => expect(done()).toBeEnabled());
   fireEvent.click(done());
   if (within(dialog).queryByText(/已规范化拼写/)) {
     fireEvent.click(done());

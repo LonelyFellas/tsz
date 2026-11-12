@@ -358,6 +358,7 @@ export function V3SynthesisInputs({
                 </label>
                 <Space.Compact className="word-synthesis-control">
                   <PronunciationPreviewControls
+                    recommendationArea="azure"
                     playbackOnly
                     pronunciationId={pronunciation.id}
                     dialect={side}

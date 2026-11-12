@@ -63,6 +63,11 @@ import {
 
 // 本文件验证词形矩阵/步骤定位；音素编辑与试听由 V3PronunciationList 和 VoiceEditor 测试覆盖。
 // 避免每个父级场景重复挂载整套语音控件，保持原有 5 秒超时与全部业务断言。
+// 正文编辑器继续使用真实组件；此处没有配音服务 fixture，关闭外部音频请求。
+vi.mock("@/lib/env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/env")>();
+  return { ...actual, env: { ...actual.env, VOICE_PREVIEW: false } };
+});
 vi.mock("./V3SynthesisInputs", () => ({
   V3SynthesisInputs: ({
     pronunciation,

@@ -17,13 +17,20 @@ import type {
   PhonemeLocaleV3
 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
-import { retainResolvedAudio, voiceSettingFor } from "@tsz/voice-editor/core";
+import {
+  retainResolvedAudio,
+  voiceSettingFor,
+  profileHasInheritance,
+  withDefaultVoiceProfile
+} from "@tsz/voice-editor/core";
+import { queryClient } from "@/lib/queryClient";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type {
   VoiceOption,
   VoicePreviewAdapter,
   VoicePreviewResult,
-  VoiceSetting
+  VoiceSetting,
+  VoiceRecommendationArea
 } from "@tsz/voice-editor/types";
 import {
   createContext,
@@ -31,6 +38,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -54,6 +62,8 @@ interface PreviewContextValue {
   /** 统一内容按管理员偏好挑发音人；在 Provider 里取一次，别让每个控件各自订阅。 */
   dialectPreference: AdminDialectPreference;
   adapter: VoicePreviewAdapter;
+  resolutionScope: string;
+  recommendationRefresh: number;
 }
 
 const PreviewContext = createContext<PreviewContextValue | null>(null);
@@ -80,6 +90,27 @@ export function PronunciationPreviewProvider({
     if (activePlayback.current === stop) activePlayback.current = null;
   }, []);
   const enabled = env.VOICE_PREVIEW && !readOnly;
+  const resolutionScope = useId();
+  const [recommendationRefresh, setRecommendationRefresh] = useState(0);
+  useEffect(() => {
+    const refresh = () => setRecommendationRefresh((value) => value + 1);
+    window.addEventListener("focus", refresh);
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (
+        event.type === "updated" &&
+        event.action.type === "success" &&
+        event.query.queryKey[0] === "admin-dubbing-groups-v3"
+      )
+        refresh();
+    });
+    return () => {
+      window.removeEventListener("focus", refresh);
+      unsubscribe();
+      queryClient.removeQueries({
+        queryKey: ["pronunciation-preview", resolutionScope]
+      });
+    };
+  }, [resolutionScope]);
   const { preference: dialectPreference } = useDialectPreference();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
@@ -124,7 +155,9 @@ export function PronunciationPreviewProvider({
       voicesLoading,
       voicesError,
       dialectPreference,
-      adapter: adminVoicePreviewAdapter
+      adapter: adminVoicePreviewAdapter,
+      resolutionScope,
+      recommendationRefresh
     }),
     [
       claimPlayback,
@@ -134,7 +167,9 @@ export function PronunciationPreviewProvider({
       readOnly,
       voices,
       voicesError,
-      voicesLoading
+      voicesLoading,
+      resolutionScope,
+      recommendationRefresh
     ]
   );
   return (
@@ -240,15 +275,20 @@ function useResolvedPreviewProfile(
   profile: VoiceProfileV3 | undefined,
   content: RichTextV2,
   dialect: Dialect,
-  adapter = context.adapter
+  adapter = context.adapter,
+  recommendationArea?: VoiceRecommendationArea
 ) {
   const { t } = useLexiconEditorTranslation();
+  profile = recommendationArea
+    ? withDefaultVoiceProfile(profile, recommendationArea)
+    : profile;
   const locale = localeForDialect(dialect, context.dialectPreference);
   const key = JSON.stringify([
     profile,
     content,
     locale,
-    adapter.audioSourceKey
+    adapter.audioSourceKey,
+    profileHasInheritance(profile, locale) ? context.recommendationRefresh : 0
   ]);
   const inputRef = useRef({ profile, content, locale, adapter });
   inputRef.current = { profile, content, locale, adapter };
@@ -267,11 +307,17 @@ function useResolvedPreviewProfile(
     )
       return;
     const controller = new AbortController();
-    void adapter
-      .resolveVoices(
-        { profile, content, accent: locale === "en-GB" ? "gb" : "us" },
-        { signal: controller.signal }
-      )
+    void queryClient
+      .fetchQuery({
+        queryKey: ["pronunciation-preview", context.resolutionScope, key],
+        queryFn: ({ signal }) =>
+          adapter.resolveVoices!(
+            { profile, content, accent: locale === "en-GB" ? "gb" : "us" },
+            { signal }
+          ),
+        staleTime: 0,
+        retry: false
+      })
       .then(({ voices }) => {
         if (!controller.signal.aborted) setResolved({ key, voices });
       })
@@ -280,7 +326,7 @@ function useResolvedPreviewProfile(
           setResolved({ key, voices: [], error: errorMessage(error) });
       });
     return () => controller.abort();
-  }, [key, context.enabled]);
+  }, [key, context.enabled, context.resolutionScope]);
   if (!profile?.dubbing) return { profile, pending: false, error: undefined };
   if (!adapter.resolveVoices)
     return {
@@ -311,12 +357,14 @@ export function PronunciationPreviewVoiceSummary({
   voiceProfile,
   pronunciationId,
   content,
+  recommendationArea,
   column = "voice"
 }: {
   dialect: Dialect;
   voiceProfile?: VoiceProfileV3;
   pronunciationId?: string;
   content?: RichTextV2;
+  recommendationArea?: VoiceRecommendationArea;
   column?: "voice" | "rate" | "volume";
 }) {
   const { t } = useLexiconEditorTranslation();
@@ -326,7 +374,9 @@ export function PronunciationPreviewVoiceSummary({
     context,
     voiceProfile,
     content ?? { version: 2, text: "", annotations: [] },
-    dialect
+    dialect,
+    context.adapter,
+    context.readOnly ? undefined : recommendationArea
   );
   const { voice, rate, isDefault } = resolvePronunciationPreviewVoice(
     context.voices,
@@ -464,6 +514,7 @@ export function PronunciationPreviewControls({
   spelling,
   content,
   voiceProfile,
+  recommendationArea,
   playbackOnly = false,
   assetOnly: assetOnlyProp = false,
   audioAssetId,
@@ -481,6 +532,7 @@ export function PronunciationPreviewControls({
   spelling?: string;
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
+  recommendationArea?: VoiceRecommendationArea;
   playbackOnly?: boolean;
   assetOnly?: boolean;
   audioAssetId?: string;
@@ -530,7 +582,8 @@ export function PronunciationPreviewControls({
     playbackProfile,
     previewContent,
     dialect,
-    previewAdapter ?? context.adapter
+    previewAdapter ?? context.adapter,
+    assetOnly ? undefined : recommendationArea
   );
   const enabledSettings =
     resolved.profile?.voices.filter((setting) => setting.enabled) ?? [];

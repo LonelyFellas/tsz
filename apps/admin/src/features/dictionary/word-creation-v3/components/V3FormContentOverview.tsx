@@ -108,6 +108,10 @@ function PronunciationCell({
     ? synthesisForLocale(row.synthesis, locale, variant.dialect).source
     : undefined;
   const profile = source ? activeProfile : (activeProfile ?? row.voice_profile);
+  const recommendationArea =
+    source === "spelling" || (!source && row.synthesis?.use_spelling)
+      ? "word"
+      : "azure";
   const sourceLabel =
     source === "none"
       ? t("creation_accent_not_configured")
@@ -130,6 +134,7 @@ function PronunciationCell({
           <span>{settings === "voice" ? sourceLabel : "—"}</span>
         ) : (
           <PronunciationPreviewVoiceSummary
+            recommendationArea={recommendationArea}
             dialect={dialect}
             voiceProfile={profile}
             pronunciationId={row.id}
@@ -140,6 +145,7 @@ function PronunciationCell({
       ) : (
         <div className="v3-overview-pronunciation">
           <PronunciationPreviewControls
+            recommendationArea={recommendationArea}
             pronunciationId={row.id}
             dialect={dialect}
             content={content}

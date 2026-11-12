@@ -22,7 +22,7 @@ import type {
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   defaultDefinitions,
   ensureV3MeaningsForForms,
@@ -38,6 +38,15 @@ import {
   uuidFromInt,
   uuidSequence
 } from "./fixtures";
+
+// 正文与定位用例不提供配音服务；试听及默认配音另有真实组件回归和后端验收。
+function withoutSpeechService() {
+  const previous = env.VOICE_PREVIEW;
+  env.VOICE_PREVIEW = false;
+  onTestFinished(() => {
+    env.VOICE_PREVIEW = previous;
+  });
+}
 
 const meaningsCss = readFileSync(
   resolve(
@@ -1314,6 +1323,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     const synthesize = vi
       .spyOn(adminVoicePreviewAdapter, "synthesize")
       .mockRejectedValue(new Error("试听测试"));
+    const resolving = vi.spyOn(api.speech, "resolve").mockResolvedValue({
+      source: { kind: "catalog" },
+      voices: [
+        {
+          voice_id: "sonia",
+          version_id: UUIDS.pronunciation,
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: -10
+        }
+      ]
+    });
     try {
       const initial = structuredClone(meaningsFixture);
       initial.pos[0]!.senses[0]!.definitions[0] = {
@@ -1345,7 +1366,8 @@ describe("V3MeaningsAndExamplesStep", () => {
             expect.objectContaining({
               content: expect.objectContaining({
                 text: (input as HTMLTextAreaElement).value
-              })
+              }),
+              ratePercent: -10
             }),
             expect.anything()
           )
@@ -1360,11 +1382,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     } finally {
       voices.mockRestore();
       synthesize.mockRestore();
+      resolving.mockRestore();
       Object.assign(env, { VOICE_PREVIEW: previous });
     }
   }, 15_000);
 
   it("语法结构挂上语音编辑器，完成后回写标注且不丢正文", async () => {
+    withoutSpeechService();
     // 关联编辑器共存时，语法结构仍使用原来的标注工具。
     render(<Harness initial={meaningsFixture} />);
 
@@ -1669,6 +1693,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("区分英美式词性的语法结构提供英式美式双栏，新增也按方言建双条", async () => {
+    withoutSpeechService();
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.grammar_structures[0]!.variants = [
       {
@@ -4086,6 +4111,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("controlled 编辑 frequency/grammar/definition/relation 且外层例句保持只读", async () => {
+    withoutSpeechService();
     render(<Harness />);
 
     fireEvent.change(screen.getByLabelText("释义 1 频率"), {
@@ -4543,6 +4569,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("zh_sentence 与 distinguish EnglishText 暴露各自 locator 并保持方言 UUID", async () => {
+    withoutSpeechService();
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.senses[0]!.definitions[0] = {
       id: "definition-zh-sentence",

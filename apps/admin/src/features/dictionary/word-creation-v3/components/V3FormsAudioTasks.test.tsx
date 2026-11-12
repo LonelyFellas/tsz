@@ -31,6 +31,10 @@ vi.mock("../../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: speech.catalog,
     synthesize: speech.synthesize,
+    resolveVoices: async (input: {
+      profile: { voices: VoiceSettingV3[] };
+      accent: string;
+    }) => speech.resolve(input),
     generateAudio: async (input: {
       content: RichTextV2;
       setting: VoiceSettingV3;
@@ -147,6 +151,108 @@ beforeEach(() => {
     );
   speech.synthesize.mockReset();
 });
+
+it("未配置音标只在保存时生成当前推荐并保留继承，浏览不生成", async () => {
+  const initial = fixture();
+  const regions = initial.contents[0]!.regional_variants;
+  if (regions.mode !== "common") throw new Error("fixture must be common");
+  delete regions.common.pronunciations[0]!.voice_profile;
+  speech.resolve.mockImplementation(async ({ accent }) => ({
+    voices: [
+      {
+        ...voices[accent === "gb" ? 0 : 1]!,
+        rate_percent: -25,
+        volume_percent: 80
+      }
+    ]
+  }));
+  render(<Host initial={initial} />);
+  await act(async () => {});
+  expect(speech.generate).not.toHaveBeenCalled();
+  await act(async () => {
+    for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
+  });
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+  const row = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+    .contents[0].regional_variants.common.pronunciations[0];
+  for (const side of ["uk", "us"]) {
+    expect(row.synthesis[side].ipa_speech.voice_profile).toMatchObject({
+      dubbing: {
+        area: "azure",
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      },
+      voices: [
+        expect.objectContaining({
+          rate_percent: -25,
+          volume_percent: 80,
+          audio_asset_id: expect.any(String)
+        })
+      ]
+    });
+  }
+});
+
+it.each([false, true])(
+  "缺省拼写保存完整继承声音，默认录音及播放选择原样保留（逐侧来源=%s）",
+  async (explicitSources) => {
+    const initial = fixture();
+    const regions = initial.contents[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("fixture must be common");
+    const row = regions.common.pronunciations[0]!;
+    delete row.voice_profile;
+    row.synthesis!.use_spelling = !explicitSources;
+    if (explicitSources) {
+      row.synthesis!.uk!.source = "spelling";
+      row.synthesis!.us!.source = "spelling";
+    }
+    const recording = {
+      id: "recording-uk",
+      locale: "en-GB" as const,
+      gender: "female" as const,
+      content_type: "audio/mpeg",
+      size_bytes: 10,
+      original_name: "recording.mp3",
+      created_at: "2026-11-12T00:00:00Z",
+      is_default: true
+    };
+    regions.common.spelling_speech = {
+      content: { version: 2, text: "hello", annotations: [] },
+      voice_profile: { voices: [] },
+      audio_assets: [recording]
+    };
+    speech.resolve.mockImplementation(async ({ accent }) => ({
+      voices: [{ ...voices[accent === "gb" ? 0 : 1]!, rate_percent: -25 }]
+    }));
+    render(<Host initial={initial} />);
+    await act(async () => {});
+    expect(speech.generate).not.toHaveBeenCalled();
+    await act(async () => {
+      for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
+    });
+    expect(speech.generate).toHaveBeenCalledTimes(2);
+    expect(speech.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ accent: "us" })
+    );
+    expect(speech.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ accent: "gb" })
+    );
+    const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+      .contents[0].regional_variants.common.spelling_speech;
+    expect(saved.audio_assets).toEqual([recording]);
+    expect(saved.voice_profile).toMatchObject({
+      dubbing: {
+        area: "word",
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      },
+      voices: [
+        expect.objectContaining({ locale: "en-GB", rate_percent: -25 }),
+        expect.objectContaining({ locale: "en-US", rate_percent: -25 })
+      ]
+    });
+  }
+);
 
 it("词典带入的已选音标在不打开弹窗、不试听时生成，英美资产同时回写共享内容", async () => {
   render(<Host />);
