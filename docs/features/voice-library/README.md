@@ -1645,3 +1645,7 @@ admin-2 最终首轮结果与补验：该分片另有 IPA／UPS 两条本批改�
 前端 PR：[tsz #752](https://github.com/LonelyFellas/tsz/pull/752)；配套 API：[tsz-rust #403](https://github.com/LonelyFellas/tsz-rust/pull/403)。功能提交 `fe2e6731` 经一次完整及四次同一 reviewer 增量审查闭合；本次 schema／交付记录做第 6 轮精确增量。审查共 6 轮（含本次 schema 增量）；确认根因 2；证据排除误报 0；最终覆盖 SHA、CI 和实际合并状态以 PR 及交付回执为准；关联回归／回退：未知。`fe2e6731` 的 CI run `43197030857` attempt 1 十项成功；本次新提交必须等待自己的 CI，不沿用旧 SHA 绿灯。
 
 新组合真实 IAB 验收完成：全 UI 功能开启、业务 mock 关闭，使用独占 PG／Redis／真实任务后端及无 speech.generate 的 fixture 编辑账号。英式两推荐加单目录音色保存／GET一致；目录换选保留未选缓存；不使用推荐只取消贡献、保留额外音色；不使用目录保留推荐；美式始终 inherit，ID／参数／选用完整指纹不变。刷新重开匹配已保存值，取消不落盘；外部写入 revision6 后，页面旧版本实际 PUT 409，保留本地正文，放弃后重开服务端值，独立 GET 仍为 revision6。390px 无整页溢出。本轮没有 TTS、上传或 OSS 对象。两个专属容器／卷、服务、所有fixture行／会话、凭据及完整响应已清理，四个端口关闭；专属 IAB 正常退出、草稿清除、标签关闭与视口恢复，额外站点／HTTP缓存擦除工具不支持，未宣称独立清空。脱敏证据在协调目录 frontend-delivery-evidence。GitHub网络曾中断，查询失败未作为 CI 失败重跑；连通恢复后继续按当前提交状态推进。
+
+PR #752 的 `107b5b2d` CI run `43203057442` attempt 1：8 项通过，admin-2 一条历史发布确认用例失败，verify 随之失败。该文件／组件与此前绿色功能提交相同；准确失败为完整 surface 快照尚未就绪时点击确认，替换快照请求未发生。测试只补两个确认按钮的 enabled 等待及第二次请求断言，仍保留替换候选、三次请求、幂等键轮换和新 token 的全部断言；未更改业务、全局／用例超时或覆盖率。单文件按 CI 覆盖率和 maxWorkers=1 模式 47 项通过，本次由同一 reviewer 做第 7 轮精确增量；新提交继续等自己的 CI。
+
+发布兼容补证的原独占浏览器环境已在请求前清理，未另建环境。已只读核实服务器 accepted manifest：旧 Web/Admin 为 `850873b4760a8f499ec762768d395ad085f89cf3`，旧 API 为 `1f80dfb48bd29d876a340378e01f9a20264cc323`。旧前端精确 runtime bundle 的候选旧协议响应验证仍需已拥有 fixture 的实际 GET 数据，不能用构造 mock 当通过；具体缺项与最终配套顺序由父聊天统一核对，服务器写入门禁继续保留。
