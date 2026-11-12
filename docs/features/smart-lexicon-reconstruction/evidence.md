@@ -242,3 +242,22 @@ Admin Vite `http://127.0.0.1:59844` 代理到 `http://127.0.0.1:59843/api/v1`，
 - 浏览器已退出本批账号；独立清理页通过 Clear-Site-Data 仅清除此专用 origin 的缓存/存储，实际复查 localStorage/sessionStorage/requestCookies 均为 0，标签已关闭。数据库、进程与凭据在提交 hooks 后清理；最终回执随交付补记。
 
 发布顺序必须为 API → Admin；Web 无本次页面改动，不发布。旧前端使用的语言草稿响应形状不变，新管理字段只在新增端点中返回；候选前端遇到旧 API 的管理端点 404 时显示错误、不回退 V1（契约测试覆盖）。候选两端的真实闭环已验收。迁移仅新增列表元数据和命令回执；down 在存在归档、标注或命令回执时拒绝丢弃状态。写入新状态后不得直接恢复不识别归档的旧后端，也不得为了回退删除业务状态；部署恢复策略须由原生控制器按实际基线确认。
+
+## 10. 创建页检测参考与 V1 流程对齐（本地完成，2026-11-11）
+
+用户确认：沿用 V1 的输入、检测、确认创建顺序；内置词典没有主词选择，可以返回多条平级记录。全部匹配仅供参考，不勾选、不自动带入草稿，始终按输入创建后再手工编辑。
+
+前端复用当前工作区 `/Users/darwish/.codex/worktrees/be34/tsz`，基线 `0f37ce74`；后端使用 `/Users/darwish/.codex/worktrees/lexicon-create-matches-api/tsz-rust`，基线 `b598ae6`。两仓任务分支均为 `codex/lexicon-create-dictionary-matches`；以下结果对应基线加本次工作区差异，未提交、开 PR 或部署。
+
+- 已有能力：新版创建和完整草稿接口、分步布局、创建权限、列表缓存刷新；复用 V1 英文输入校验和词条类型识别。
+- 新增 `POST /api/v1/admin/lexicon-next/detections`，要求 `words.access` 与 `words.create`。只读当前 active 词典及其直接关联拼写，按来源记录返回稳定 ID、词性、释义、词形、音标和来源版本。同词面、同词性的不同记录保持独立，不挑选主词，不写词条或创建快照。未配置词典返回 503；正常无匹配返回空数组。
+- 创建页改为“录入与检测 → 多条参考 → 确认创建”。编辑输入会清除旧结果，失败可重试；创建只使用输入及识别的类型，保持既有创建 wire 和持久化格式。词典查询的 Unicode 归一化不覆盖创建输入；未知创建结果保留输入并阻止重复写入。
+- 按原生导出链生成后端 OpenAPI，同步前端端点快照和严格 runtime bundle，来源哈希相符。没有迁移或 V1 接口变动。旧前端不访问新增端点；新前端遇旧 API 的检测 404 时显示错误，不回退 V1 或绕过检测创建。后续配套发布应先 API 后 Admin。
+
+验证：前端 3 文件 31 项回归、api-client 39 文件 713 项、全仓 typecheck、Admin production build、受影响 ESLint、Prettier、后台样式检查通过。后端 `--test lexicon_next` 11 项真实 PostgreSQL 集成、`--lib admin::authorization` 2 项权限策略检查、Clippy 全目标全特性及 fmt 通过。
+
+内置浏览器使用本批专用临时入口和测试凭据，通过 Vite `127.0.0.1:59884` 同源代理到本次 Rust Router `127.0.0.1:59883`；检测、创建、读取和持久化均使用真实处理器与独立 PostgreSQL，未 mock 这些请求。临时入口不包含完整生产外壳或登录流程，词典记录为本批隔离 fixture，不能外推为测试服现有导入数据验收。
+
+实际检测得到 3 条记录（含同词面同词性 2 条），检测 200、创建 201、独立重开 GET 200；SQL 确认词头仍为 `Colour`、revision 1、forms/senses 为空。修改输入后旧创建动作消失；`give up` 自动识别为短语，无匹配时可确认创建。1440/768/390px 页面宽度均不超过视口。
+
+本批 PostgreSQL `56022`、Redis `56023` 均为专用容器，临时词条、账号、词典、专属数据库及匿名卷随容器彻底移除；四个测试端口已关闭。临时入口、私有凭据和后端临时验收钩子已移除；浏览器专用 origin 的 local/session storage、service worker、cache、IndexedDB、cookie 均为 0，自建标签已关闭，视口已恢复。既有六个容器仍运行，未创建 OSS 或付费资源。截图及脱敏清理回执位于 `/Users/darwish/.codex/visualizations/2026/11/11/lexicon-create-matches/`。

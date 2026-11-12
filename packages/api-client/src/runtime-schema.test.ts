@@ -48,6 +48,8 @@ const ROOTS = [
   "NextCapabilities",
   "NextEntryView",
   "CreateNextEntry",
+  "NextDetection",
+  "NextDetectionInput",
   "SaveNextDraft",
   "InterfaceCapabilities",
   "InterfaceLocaleV1",

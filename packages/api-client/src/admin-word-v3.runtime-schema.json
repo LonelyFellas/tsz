@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-list-parity-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "7cb099ea43480171aa6b76f60654acb7b6188939b9a9ee2292b668cf6eccf93f",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-create-matches-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "a8f101054386e7fc63555cece9716a7cf2570ee3ae922b61ed62c351534d708c",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",
@@ -16,6 +16,8 @@
     "NextCapabilities",
     "NextEntryView",
     "CreateNextEntry",
+    "NextDetection",
+    "NextDetectionInput",
     "SaveNextDraft",
     "InterfaceCapabilities",
     "InterfaceLocaleV1",
@@ -3633,6 +3635,76 @@
     "NextDefinitionStyle": {
       "type": "string",
       "enum": ["definition", "sentence"]
+    },
+    "NextDetection": {
+      "type": "object",
+      "required": ["surface", "kind", "matches"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "matches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDictionaryMatch" }
+        },
+        "surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDetectionInput": {
+      "type": "object",
+      "required": ["target_language", "surface"],
+      "properties": {
+        "surface": { "type": "string" },
+        "target_language": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionaryForm": {
+      "type": "object",
+      "required": ["text", "tags"],
+      "properties": {
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionaryMatch": {
+      "type": "object",
+      "required": [
+        "id",
+        "term",
+        "part_of_speech",
+        "glosses",
+        "forms",
+        "phonetics",
+        "source_name",
+        "source_version"
+      ],
+      "properties": {
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDictionaryForm" }
+        },
+        "glosses": { "type": "array", "items": { "type": "string" } },
+        "id": { "type": "string" },
+        "part_of_speech": { "type": "string" },
+        "phonetics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDictionaryPhonetic" }
+        },
+        "source_name": { "type": "string" },
+        "source_version": { "type": "string" },
+        "term": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionaryPhonetic": {
+      "type": "object",
+      "required": ["ipa", "tags"],
+      "properties": {
+        "ipa": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
     },
     "NextDraft": {
       "type": "object",

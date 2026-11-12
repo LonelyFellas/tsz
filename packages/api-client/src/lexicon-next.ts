@@ -9,6 +9,8 @@ import type {
   NextAnnotationInput,
   NextAnnotationResult,
   CreateNextEntry,
+  NextDetection,
+  NextDetectionInput,
   NextCapabilities,
   NextEntry,
   NextEntryList,
@@ -115,6 +117,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       http.get<unknown>(`${root}/capabilities`).then(decodeNextCapabilities),
     create: (input: CreateNextEntry) =>
       http.post<unknown>(`${root}/entries`, input).then(decodeNextEntry),
+    detect: (input: NextDetectionInput) =>
+      http
+        .post<unknown>(`${root}/detections`, input)
+        .then((value) => decode<NextDetection>("NextDetection", value)),
     get: (id: string) => http.get<unknown>(entry(id)).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) =>
       http.put<unknown>(entry(id), input).then(decodeNextEntry),

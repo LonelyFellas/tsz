@@ -72,6 +72,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "NextCapabilities",
   "NextEntryView",
   "CreateNextEntry",
+  "NextDetection",
+  "NextDetectionInput",
   "SaveNextDraft",
   "InterfaceCapabilities",
   "InterfaceLocaleV1",
