@@ -11,7 +11,7 @@ type RuntimeSchema = {
   enum?: unknown[];
   required?: string[];
   properties?: Record<string, RuntimeSchema>;
-  additionalProperties?: false | RuntimeSchema;
+  additionalProperties?: boolean | RuntimeSchema;
   items?: RuntimeSchema;
   oneOf?: RuntimeSchema[];
   anyOf?: RuntimeSchema[];
@@ -558,6 +558,15 @@ describe("runtime schema fail-closed diagnostics", () => {
     pos.senses = [sense];
     word.meanings.pos = [pos];
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    expect(
+      runtimeSchemaBundle.$defs.VoiceProfileV3!.properties!.legacy_dubbing
+    ).toMatchObject({ type: "object", additionalProperties: true });
+    expect(runtimeSchemaBundle.$defs.VoiceProfileV3!.additionalProperties).toBe(
+      false
+    );
+    expect(
+      runtimeSchemaBundle.$defs.VoiceSideDubbingV3!.additionalProperties
+    ).toBe(false);
     Object.assign(profile, {
       legacy_dubbing: { mode: "local", recommendations: [{ pair_id: id }] }
     });

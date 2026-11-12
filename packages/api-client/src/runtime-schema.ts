@@ -180,7 +180,7 @@ type RuntimeSchema = {
   enum?: unknown[];
   required?: string[];
   properties?: Record<string, RuntimeSchema>;
-  additionalProperties?: false;
+  additionalProperties?: boolean;
   items?: RuntimeSchema;
   oneOf?: RuntimeSchema[];
   anyOf?: RuntimeSchema[];

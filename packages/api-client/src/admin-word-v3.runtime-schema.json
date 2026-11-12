@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/task190-backend/tsz-rust/docs/openapi.json",
-  "_source_sha256": "f41a65dfd9f17181c55c5cca18516a260324076983546099d19a7c185f57c888",
+  "_source_sha256": "eaef2e6e444350707e3a92865c9650cafdbdad91eed25144da92c7c452adfa12",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",
@@ -6177,7 +6177,7 @@
             { "type": "null" }
           ]
         },
-        "legacy_dubbing": { "type": "object" },
+        "legacy_dubbing": { "type": "object", "additionalProperties": true },
         "voices": {
           "type": "array",
           "items": { "$ref": "#/$defs/VoiceSettingV3" },

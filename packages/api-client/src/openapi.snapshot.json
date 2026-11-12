@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/task190-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-12T08:52:25.026Z",
+  "_generatedAt": "2026-11-12T10:39:50.446Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -9458,7 +9458,9 @@
         },
         "legacy_dubbing": {
           "type": "object",
-          "description": "Original stored provenance, retained by the server during lazy v6 upgrades."
+          "description": "Original stored provenance, retained by the server during lazy v6 upgrades.",
+          "additionalProperties": true,
+          "readOnly": true
         },
         "voices": {
           "type": "array",
