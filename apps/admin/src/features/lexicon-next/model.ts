@@ -48,7 +48,12 @@ export function previewDraft(
 }
 
 export function draftProblem(draft: NextDraft): string | null {
-  const texts = [
+  const texts: {
+    text: string;
+    label: string;
+    max: number;
+    multiline?: boolean;
+  }[] = [
     { text: draft.headword, label: "词头", max: 200 },
     ...draft.forms.map((row) => ({
       ...row,
@@ -59,7 +64,8 @@ export function draftProblem(draft: NextDraft): string | null {
       ...sense.definitions.map((row) => ({
         ...row,
         label: `义项 ${index + 1} · ${localeLabels[row.locale]}释义`,
-        max: 5000
+        max: 5000,
+        multiline: true
       })),
       ...sense.equivalents.map((row) => ({
         ...row,
@@ -73,6 +79,11 @@ export function draftProblem(draft: NextDraft): string | null {
   );
   if (invalid)
     return `${invalid.label}不能为空，且最多 ${invalid.max} 个字符；不需要的行请删除。`;
+  const control = texts.find((row) =>
+    /\p{Cc}/u.test(row.multiline ? row.text.replace(/[\r\n]/g, "") : row.text)
+  );
+  if (control)
+    return `${control.label}${control.multiline ? "不能包含制表符或其他控制字符。" : "必须为单行，且不能包含制表符或其他控制字符。"}`;
   if (texts.length - 1 + draft.senses.length > 500)
     return "草稿最多包含 500 个内容节点，请删除多余内容。";
   return null;

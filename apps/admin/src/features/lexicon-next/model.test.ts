@@ -44,4 +44,39 @@ describe("本地草稿预览", () => {
     draft.headword += "a";
     expect(draftProblem(draft)).toContain("词头");
   });
+  it("释义允许换行，其余字段保持单行且所有字段拒绝其他控制字符", () => {
+    const draft: NextDraft = {
+      schema_version: 1,
+      headword: "centre",
+      forms: [{ id: "form", locale: "en-US", text: "center" }],
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: null,
+          definitions: [
+            {
+              id: "definition",
+              locale: "zh-Hant",
+              text: "首行\r\n次行\n末行",
+              style: "definition"
+            }
+          ],
+          equivalents: [{ id: "equivalent", locale: "zh-Hant", text: "中心" }]
+        }
+      ]
+    };
+    expect(draftProblem(draft)).toBeNull();
+    for (const control of ["\0", "\t", "\u007f", "\u0085"]) {
+      const invalid = structuredClone(draft);
+      invalid.senses[0]!.definitions[0]!.text = `首行${control}次行`;
+      expect(draftProblem(invalid)).toContain("繁体中文释义");
+    }
+    for (const field of ["headword", "form", "equivalent"]) {
+      const invalid = structuredClone(draft);
+      if (field === "headword") invalid.headword = "cen\ntre";
+      else if (field === "form") invalid.forms[0]!.text = "cen\nter";
+      else invalid.senses[0]!.equivalents[0]!.text = "中\r\n心";
+      expect(draftProblem(invalid)).not.toBeNull();
+    }
+  });
 });
