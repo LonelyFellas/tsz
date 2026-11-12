@@ -1541,9 +1541,7 @@ it("面板取消和移除默认录音均保留显式选择，不把本口音旧�
     expect(screen.getByRole("radio", { name: "上传音频" })).toBeChecked()
   );
   fireEvent.click(screen.getByLabelText("移除 recording.mp3"));
-  fireEvent.click(
-    await screen.findByRole("button", { name: "移除", exact: true })
-  );
+  fireEvent.click(await screen.findByRole("button", { name: /^移除$/ }));
   await waitFor(() =>
     expect(saved().audio_assets).toEqual([
       expect.objectContaining({ id: "old-alternative", is_default: false })
