@@ -246,6 +246,8 @@
     font-size: var(--ui-font-size-sm);
   }
   .ui-card-head {
+    display: grid;
+    align-content: center;
     padding: var(--ui-space-3) var(--ui-space-5);
     border-bottom: 1px solid var(--ui-color-border-secondary);
   }

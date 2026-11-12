@@ -633,7 +633,13 @@ export const voiceEditorMessages = {
   ],
   audio: ["音频", "音訊", "Audio"],
   upload_audio: ["上传音频", "上傳音訊", "Upload audio"],
-  ownership: ["归属", "歸屬", "Ownership"],
+  upload_accent: ["口音", "口音", "Accent"],
+  upload_gender: ["声音", "聲音", "Voice"],
+  audio_upload_usage: [
+    "已用 {{used}} / {{limit}}",
+    "已用 {{used}} / {{limit}}",
+    "{{used}} / {{limit}} used"
+  ],
   upload_audio_language: [
     "上传音频语种",
     "上傳音訊語種",
@@ -645,11 +651,6 @@ export const voiceEditorMessages = {
     "没有上传音频的权限",
     "沒有上傳音訊的許可權",
     "Audio upload permission is required"
-  ],
-  up_to_items_used: [
-    "{{p0}}，最多 {{p1}} 条（已用 {{p2}}）",
-    "{{p0}}，最多 {{p1}} 條（已用 {{p2}}）",
-    "{{p0}}; up to {{p1}} items (used: {{p2}})"
   ],
   uploaded_audio: ["已上传音频", "已上傳音訊", "Uploaded audio"],
   upload_progress_for: [
