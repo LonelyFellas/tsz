@@ -829,12 +829,18 @@ describe("新版局部主页和唯一声音草稿", () => {
     await screen.findByRole("checkbox", { name: "选用 Beta" });
     const search = screen.getByRole("searchbox", { name: "英式女声目录搜索" });
     expect(screen.getAllByRole("searchbox")).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: /^搜索$/ })).toBeNull();
     fireEvent.change(search, { target: { value: "不存在的音色" } });
     expect(screen.getAllByText("没有匹配的音色")).toHaveLength(1);
     expect(
       screen.getByRole("checkbox", { name: "选用 American" }).closest("label")
     ).toBeVisible();
-    fireEvent.change(search, { target: { value: "" } });
+    fireEvent.click(
+      within(search.closest(".ui-input-affix-wrapper")!).getByRole("button", {
+        name: "清除"
+      })
+    );
+    expect(search).toHaveValue("");
     expect(
       screen.getByRole("checkbox", { name: "选用 Beta" }).closest("label")
     ).toBeVisible();

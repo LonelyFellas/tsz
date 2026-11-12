@@ -4,6 +4,7 @@ import {
   useVoiceMessageState
 } from "./i18n";
 import { useLayoutEffect, useRef, useState } from "react";
+import { SearchIcon } from "lucide-react";
 import { speechAccentGroup } from "@tsz/shared";
 import type {
   AdminDubbingRecommendationPair,
@@ -501,7 +502,9 @@ export function RecommendationEditor({
                 </Typography.Text>
               </div>
               <div className="dubbing-picker-filters">
-                <Input.Search
+                <Input
+                  type="search"
+                  prefix={<SearchIcon size={14} aria-hidden="true" />}
                   aria-label={t("search_recommendation_voices")}
                   placeholder={t("search_name_or_official_id")}
                   value={search}
