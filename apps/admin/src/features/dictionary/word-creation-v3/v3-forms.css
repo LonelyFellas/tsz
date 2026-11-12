@@ -13,6 +13,10 @@
   padding-bottom: var(--ui-space-3);
   isolation: isolate;
 }
+.v3-form-overview .ui-table table {
+  /* rc-table 的横向滚动默认以内联 min-width: 100% 撑满容器。 */
+  min-width: 0 !important;
+}
 .v3-form-overview .ui-table.ui-table-small .ui-table-thead > tr > th {
   padding: 10px var(--ui-space-3);
   color: #8d929b;
@@ -28,6 +32,7 @@
   padding: 2px var(--ui-space-3);
   vertical-align: top;
   border-bottom: 0;
+  white-space: nowrap;
 }
 .v3-form-overview
   .ui-table.ui-table-small
@@ -135,8 +140,9 @@
 .v3-overview-phonetic,
 .v3-overview-phonetic .tsz-ve-readonly {
   font-size: var(--ui-font-size);
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  flex-shrink: 0;
 }
 .v3-overview-pronunciation .word-pronunciation-play-action.ui-btn {
   width: 24px;
@@ -152,8 +158,6 @@
 }
 .v3-overview-settings .word-pronunciation-voice-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .v3-overview-settings .word-pronunciation-voice-summary {
@@ -176,8 +180,9 @@
   min-width: 0;
   font-size: var(--ui-font-size);
   font-weight: 600;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  flex-shrink: 0;
 }
 .v3-overview-type-fix.ui-btn {
   max-width: 100%;
