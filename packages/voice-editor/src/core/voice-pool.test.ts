@@ -119,6 +119,40 @@ describe("新版局部音色池", () => {
     ).toEqual(["b"]);
     expect(none.dubbing).not.toHaveProperty("recommendation");
   });
+  it("多组推荐共享官方音色时去重，取消一组仍保留另一组需要的声音和既有参数", () => {
+    const first = switchPoolRecommendation(
+      profile([]),
+      [rec("a"), rec("us")],
+      voices
+    ).profile;
+    const both = switchPoolRecommendation(
+      first,
+      [rec("a"), rec("us"), rec("b", "pair-b"), rec("us", "pair-b")],
+      voices
+    );
+    expect(both.duplicates).toEqual([]);
+    expect(
+      both.profile.voices
+        .filter((item) => item.enabled)
+        .map((item) => item.voice_id)
+    ).toEqual(["a", "us", "b"]);
+    expect(
+      new Set(both.profile.dubbing!.recommendation!.contribution_ids).size
+    ).toBe(3);
+    const remaining = switchPoolRecommendation(
+      both.profile,
+      [rec("b", "pair-b"), rec("us", "pair-b")],
+      voices
+    ).profile;
+    expect(
+      remaining.voices
+        .filter((item) => item.enabled)
+        .map((item) => item.voice_id)
+    ).toEqual(["us", "b"]);
+    expect(remaining.voices.find((item) => item.voice_id === "us")).toEqual(
+      first.voices.find((item) => item.voice_id === "us")
+    );
+  });
   it("不选推荐不补任何推荐或目录声；旧 local 空池仍保留旧语义", () => {
     const adopted = switchPoolRecommendation(
       profile([]),

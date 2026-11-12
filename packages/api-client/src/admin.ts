@@ -130,7 +130,7 @@ const SPELLING_MARKUP_HEADERS = {
   "X-TSZ-Spelling-Markup": "v1",
   "X-TSZ-Spelling-Speech": "v1",
   "X-TSZ-Phoneme-Speech": "v1",
-  "X-TSZ-Voice-Versions": "v4",
+  "X-TSZ-Voice-Versions": "v5",
   "X-TSZ-Voice-Locales": "v1",
   "X-TSZ-Voice-Models": "v1",
   "X-TSZ-Form-Contents": "v1",
@@ -334,7 +334,7 @@ export function createAdminEndpoints(http: HttpClient) {
         http.post<{ voices: import("@tsz/types").VoiceSettingV3[] }>(
           "/speech/resolve",
           input,
-          { signal, headers: { "X-TSZ-Voice-Versions": "v4" } }
+          { signal, headers: { "X-TSZ-Voice-Versions": "v5" } }
         ),
       generateAudio: (
         input: import("@tsz/types").GenerateVoiceAudioRequest,
@@ -346,7 +346,7 @@ export function createAdminEndpoints(http: HttpClient) {
           {
             signal,
             headers: {
-              "X-TSZ-Voice-Versions": "v4",
+              "X-TSZ-Voice-Versions": "v5",
               "X-TSZ-Voice-Locales": "v1",
               "X-TSZ-Voice-Models": "v1"
             }

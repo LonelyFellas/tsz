@@ -6,7 +6,7 @@ import type { VoiceProfileV3 } from "@tsz/types";
 import spec from "./openapi.snapshot.json";
 
 describe("音色库契约", () => {
-  it("局部池显式版本与推荐来源严格解析，resolve携带v4且原样传输无推荐池", async () => {
+  it("局部池显式版本与推荐来源严格解析，resolve携带v5且原样传输无推荐池", async () => {
     const id = "11111111-1111-4111-8111-111111111111";
     const profile: VoiceProfileV3 = {
       voices: [
@@ -49,7 +49,7 @@ describe("音色库契约", () => {
     );
     expect(http.post).toHaveBeenCalledWith("/speech/resolve", input, {
       signal: undefined,
-      headers: { "X-TSZ-Voice-Versions": "v4" }
+      headers: { "X-TSZ-Voice-Versions": "v5" }
     });
     expect(http.post.mock.calls[0]![1].profile).toBe(profile);
   });

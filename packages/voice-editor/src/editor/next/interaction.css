@@ -866,12 +866,12 @@
   height: 28px;
   padding: 0;
 }
-.tsz-ve-pool-catalog-list .ui-checkbox-wrapper {
+.tsz-ve-pool-catalog-list .ui-radio-wrapper {
   align-items: center;
   flex: 1;
   min-width: 0;
 }
-.tsz-ve-pool-catalog-list .ui-checkbox-label {
+.tsz-ve-pool-catalog-list .ui-radio-label {
   min-width: 0;
 }
 .tsz-ve-pool-provider-id {
