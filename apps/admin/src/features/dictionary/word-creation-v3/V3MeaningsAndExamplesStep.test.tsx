@@ -2,7 +2,7 @@ import type { RelatedWordResultAny } from "@tsz/types";
 import type { RelatedWordChoice } from "../relatedSuggestions";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
-import { api } from "@/lib/auth";
+import { api, useAuthStore } from "@/lib/auth";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import {
   fireEvent,
@@ -1419,6 +1419,23 @@ describe("V3MeaningsAndExamplesStep", () => {
   }, 15_000);
 
   it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
+    // 正向生成场景显式提供授权身份，目录读取不触发无关鉴权请求。
+    const previousProfile = useAuthStore.getState().profile;
+    useAuthStore.setState({
+      profile: {
+        id: "audio-assets-fixture",
+        role: "admin",
+        phone: "test-phone",
+        display_name: "配音测试",
+        permission_version: 1,
+        catalog_version: "test",
+        preferences: { dialect: "uk" },
+        permissions: ["words.access", "words.edit", "speech.generate"]
+      }
+    });
+    const groups = vi
+      .spyOn(api.speech, "groupsV3")
+      .mockResolvedValue({ groups: [], revision: 0, order_revision: 0 });
     const resolving = vi
       .spyOn(api.speech, "resolve")
       .mockImplementation(async ({ profile, accent }) => ({
@@ -1513,6 +1530,8 @@ describe("V3MeaningsAndExamplesStep", () => {
           .voices[0]!.audio_asset_id
       ).toBe("formal-grammar-audio");
     } finally {
+      useAuthStore.setState({ profile: previousProfile });
+      groups.mockRestore();
       listing.mockRestore();
       resolving.mockRestore();
       generating.mockRestore();
