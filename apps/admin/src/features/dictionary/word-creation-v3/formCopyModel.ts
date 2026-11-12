@@ -523,10 +523,15 @@ function copyPhonetics(
     }
     if (spellingChanges.length) {
       // 迁移自己的配置保留继承模式；音色复制的局部快照规则不适用于此处。
-      let profile = structuredClone(
+      const previousProfile =
         spellingCopies.get(target.id) ??
-          targetVariant.spelling_speech?.voice_profile ?? { voices: [] }
+        targetVariant.spelling_speech?.voice_profile;
+      let profile: VoiceProfileV3 = structuredClone(
+        previousProfile ?? { voices: [] }
       );
+      const previousMode = previousProfile
+        ? ("local" as const)
+        : ("inherit" as const);
       const complete =
         spellingChanges.length === matches.length &&
         spellingChanges.every(
@@ -551,8 +556,8 @@ function copyPhonetics(
           );
           const dubbing = profile.dubbing ?? {
             area: "word" as const,
-            uk: { mode: "inherit" as const },
-            us: { mode: "inherit" as const }
+            uk: { mode: previousMode },
+            us: { mode: previousMode }
           };
           profile = {
             ...profile,

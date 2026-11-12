@@ -1465,57 +1465,69 @@ it("部分合并按保存的口音归属替换，而不是按原生locale保留�
   );
 });
 
-it("音标来源迁移到拼写时保留本侧继承模式和另一侧拼写缓存", () => {
-  const { forms, sourceId, targetId } = setup(
-    commonFormFixture({ spelling: "cat" }),
-    commonFormFixture({ id: uuidFromInt(700), spelling: "cats" })
-  );
-  const from = variant(forms.contents[0]!).pronunciations[0]!;
-  const targetVariant = variant(forms.contents[1]!);
-  const to = targetVariant.pronunciations[0]!;
-  from.synthesis = {
-    alphabet: "ipa",
-    ipa: "",
-    ups: "",
-    uk: { source: "spelling", ipa: "kæt", ups: "" },
-    us: { source: "ipa", ipa: "kæt", ups: "" }
-  };
-  const inherited = profile("own-ipa", true);
-  const american = {
-    ...profile("keep-us-spelling").voices[0]!,
-    locale: "en-US" as const,
-    accent: "us" as const
-  };
-  targetVariant.spelling_speech = speech("cats", {
-    voices: [american],
-    dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } }
-  });
-  to.synthesis = {
-    alphabet: "ipa",
-    ipa: "",
-    ups: "",
-    uk: {
-      source: "ipa",
-      ipa: "kæts",
+it.each([true, false])(
+  "音标迁移保留本侧继承及另一侧拼写模式，既有holder带dubbing=%s",
+  (versioned) => {
+    const { forms, sourceId, targetId } = setup(
+      commonFormFixture({ spelling: "cat" }),
+      commonFormFixture({ id: uuidFromInt(700), spelling: "cats" })
+    );
+    const from = variant(forms.contents[0]!).pronunciations[0]!;
+    const targetVariant = variant(forms.contents[1]!);
+    const to = targetVariant.pronunciations[0]!;
+    from.synthesis = {
+      alphabet: "ipa",
+      ipa: "",
       ups: "",
-      ipa_speech: speech("cats", inherited)
-    },
-    us: { source: "ipa", ipa: "kæts", ups: "" }
-  };
-  const result = applyFormCopy(
-    forms,
-    planFormCopy(forms, sourceId, targetId, "phonetics")
-  );
-  const migrated = variant(result.contents[1]!).spelling_speech!.voice_profile;
-  expect(migrated.dubbing).toEqual({
-    area: "word",
-    uk: { mode: "inherit" },
-    us: { mode: "local" }
-  });
-  expect(migrated.voices.find((voice) => voice.locale === "en-US")).toEqual(
-    american
-  );
-});
+      uk: { source: "spelling", ipa: "kæt", ups: "" },
+      us: { source: "ipa", ipa: "kæt", ups: "" }
+    };
+    const inherited = profile("own-ipa", true);
+    const american = {
+      ...profile("keep-us-spelling").voices[0]!,
+      locale: "en-US" as const,
+      accent: "us" as const
+    };
+    targetVariant.spelling_speech = speech("cats", {
+      voices: [american],
+      ...(versioned
+        ? {
+            dubbing: {
+              area: "word" as const,
+              uk: { mode: "local" as const },
+              us: { mode: "local" as const }
+            }
+          }
+        : {})
+    });
+    to.synthesis = {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      uk: {
+        source: "ipa",
+        ipa: "kæts",
+        ups: "",
+        ipa_speech: speech("cats", inherited)
+      },
+      us: { source: "ipa", ipa: "kæts", ups: "" }
+    };
+    const result = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "phonetics")
+    );
+    const migrated = variant(result.contents[1]!).spelling_speech!
+      .voice_profile;
+    expect(migrated.dubbing).toEqual({
+      area: "word",
+      uk: { mode: "inherit" },
+      us: { mode: "local" }
+    });
+    expect(migrated.voices.find((voice) => voice.locale === "en-US")).toEqual(
+      american
+    );
+  }
+);
 
 it("原无合成来源的目标从显式IPA资料复制后仍使用自己的逐侧音色", () => {
   const { forms, sourceId, targetId } = setup(
