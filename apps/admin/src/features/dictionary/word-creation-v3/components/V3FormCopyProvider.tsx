@@ -274,7 +274,7 @@ export function V3FormCopyProvider({
     setTarget(undefined);
   };
   const begin = (formId: string, kind: FormCopyKind, clicked: boolean) => {
-    if (busy || (clicked && suppressClick.current)) return;
+    if (latest.current.disabled || (clicked && suppressClick.current)) return;
     const content = contentFor(latest.current.forms, formId);
     if (!content) return;
     setSource({ formId, kind, clicked, snapshot: structuredClone(content) });
@@ -344,7 +344,12 @@ export function V3FormCopyProvider({
     }
   };
   const chooseTarget = (formId: string, kind: FormCopyKind) => {
-    if (!source || busy || source.kind !== kind || source.formId === formId)
+    if (
+      !source ||
+      latest.current.disabled ||
+      source.kind !== kind ||
+      source.formId === formId
+    )
       return;
     cancel();
     try {
@@ -498,7 +503,7 @@ export function V3FormCopyProvider({
         ref={root}
         className="v3-form-copy-scope"
         onKeyDown={(event) => {
-          if (!source || busy) return;
+          if (!source || disabled) return;
           if (event.key === "Escape") {
             event.preventDefault();
             cancel();

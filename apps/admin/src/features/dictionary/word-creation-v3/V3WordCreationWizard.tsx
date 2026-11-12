@@ -2215,6 +2215,7 @@ function V3WordCreationSession({
           ? (next, expected) => {
               if (
                 pending.size ||
+                (activeStep === "forms" && hasSentenceGuard) ||
                 conflict ||
                 remoteUpdate ||
                 JSON.stringify(draftFormsRef.current) !== expected
@@ -2228,6 +2229,7 @@ function V3WordCreationSession({
       activeStep={activeStep}
       reachableSteps={reachableSteps}
       readOnly={sessionReadOnly}
+      referenceOnly={activeStep === "forms" && hasSentenceGuard}
       dirtySteps={dirtySteps}
       draftForms={draftForms}
       draftMeanings={draftMeanings}

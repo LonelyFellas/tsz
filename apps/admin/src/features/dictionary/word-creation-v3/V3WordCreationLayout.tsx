@@ -63,6 +63,7 @@ interface Props {
   activeStep: WordCreationStep;
   reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
+  referenceOnly?: boolean;
   dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
   draftForms?: FormsStepRepresentationV3;
   draftMeanings?: DraftMeaningsStepContentWritableV3;
@@ -179,6 +180,7 @@ function V3WordCreationLayoutContent({
   activeStep,
   reachableSteps,
   readOnly = false,
+  referenceOnly = false,
   sharedSentenceCount,
   dirtySteps = { forms: false, meanings: false },
   draftForms,
@@ -302,7 +304,7 @@ function V3WordCreationLayoutContent({
           />
         )
       }}
-      readOnly={readOnly}
+      readOnly={readOnly || referenceOnly}
     >
       <Flex vertical gap="middle">
         {showRemoteUpdate && remoteUpdate ? (
@@ -466,7 +468,11 @@ function V3WordCreationLayoutContent({
             catalog: assistantCatalog,
             navigateField: onAssistantNavigate,
             applyForms:
-              !readOnly && !conflict && !remoteUpdate && !retrying
+              !readOnly &&
+              !referenceOnly &&
+              !conflict &&
+              !remoteUpdate &&
+              !retrying
                 ? onAssistantFormsApply
                 : undefined,
             step: activeStep,

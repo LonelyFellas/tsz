@@ -529,6 +529,13 @@ describe("WordWizardV3Page", () => {
     await changeVoiceText(input, { target: { value: "shared edited" } });
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(screen.getByText("进入词义与例句").closest("button")).toBeDisabled();
+    expect(screen.getByText("保存草稿").closest("button")).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "收起" }));
+    expect(screen.getByText("进入词义与例句").closest("button")).toBeDisabled();
+    expect(input).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "展开" }));
+    expect(screen.getByLabelText("词形英美通用拼写")).toBe(input);
     fireEvent.click(screen.getByText("确认，应用到草稿").closest("button")!);
     const save = screen.getByText("保存草稿").closest("button")!;
     fireEvent.click(save);
