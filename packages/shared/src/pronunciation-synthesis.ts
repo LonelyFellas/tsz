@@ -845,6 +845,9 @@ export function pronunciationPlaybackSource(
     : pronunciation.audio_assets;
   const matchesLocale = (value: string | undefined) =>
     speechAccentGroup(value) === speechAccentGroup(locale);
+  const recordingChoice = pronunciation.audio_assets?.some(
+    (asset) => matchesLocale(asset.locale) && asset.is_default !== undefined
+  );
   const content =
     (synthesis?.use_spelling ? spellingSpeech?.content : undefined) ??
     pronunciationSynthesisContent(
@@ -855,18 +858,24 @@ export function pronunciationPlaybackSource(
     );
   const assetId = synthesis?.source
     ? savedVoiceAudioAsset(content ? profile : undefined, locale)
-    : (uploads?.find((asset) => asset.is_default && matchesLocale(asset.locale))
-        ?.id ??
-      pronunciation.audio_assets?.find(
+    : (pronunciation.audio_assets?.find(
         (asset) => asset.is_default && matchesLocale(asset.locale)
       )?.id ??
+      uploads?.find((asset) => asset.is_default && matchesLocale(asset.locale))
+        ?.id ??
       savedVoiceAudioAsset(
         !synthesis || content ? profile : undefined,
         locale
       ) ??
-      uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
-      pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))
-        ?.id);
+      (synthesis?.use_spelling
+        ? uploads?.find((asset) => matchesLocale(asset.locale))?.id
+        : undefined) ??
+      (!recordingChoice
+        ? (uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
+          pronunciation.audio_assets?.find((asset) =>
+            matchesLocale(asset.locale)
+          )?.id)
+        : undefined));
   return {
     content,
     profile,

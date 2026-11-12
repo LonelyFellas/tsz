@@ -192,6 +192,12 @@
   min-width: 0;
 }
 
+.word-pronunciation-upload {
+  width: min(360px, calc(100vw - 48px));
+  max-height: min(540px, calc(100dvh - 160px));
+  overflow-y: auto;
+}
+
 .word-synthesis-source-actions > .ui-radio-group {
   display: flex;
   flex-direction: column;

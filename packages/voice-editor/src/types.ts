@@ -292,6 +292,7 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
     | "actual-pron"
     | "spelling"
     | "synthesis"
+    | "audio-upload"
     | "phoneme-settings"
     | "voice-trial";
   /** 固定音色的本次试听，仅开放已确认支持的发音工具。 */
@@ -370,6 +371,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   audioUploadAdapter?: AudioUploadAdapter;
   /** 仅限制新增上传；已有音频仍可试听。 */
   audioUploadAllowed?: boolean;
+  /** 宿主已提供上传入口时，隐藏编辑器内的上传工具。 */
+  showAudioUpload?: boolean;
   /** 挂在这段文本上的音频资产；与 voiceProfile 一样是受控通道，改动实时抛出。 */
   audioAssets?: AudioAsset[];
   onAudioAssetsChange?: (next: AudioAsset[]) => void;

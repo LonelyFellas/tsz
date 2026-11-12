@@ -5,6 +5,7 @@ import {
   createLexiconEditorMessage as creationMessage
 } from "../../i18n/editor";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
+import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
 import { ChevronDownIcon, ArrowLeftRightIcon } from "lucide-react";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Input, Radio } from "@tsz/ui/admin/forms";
@@ -26,7 +27,8 @@ import {
   synthesisInputIssue,
   pronunciationLocale,
   synthesisLocaleIssue,
-  synthesisForLocale
+  synthesisForLocale,
+  speechAccentGroup
 } from "@tsz/shared";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -311,6 +313,10 @@ export function V3SynthesisInputs({
             const sideLocale = pronunciationLocale(side, "uk");
             const sideLabel = t(side === "uk" ? "dialect_uk" : "dialect_us");
             const candidate = candidateForSide(synthesis, side, dialect);
+            const selected = synthesisForLocale(synthesis, sideLocale, dialect);
+            const selectedSource =
+              selected.source ??
+              (selected.use_spelling ? "spelling" : selected.alphabet);
             const rowContent = pronunciationSynthesisContent(
               spelling,
               {
@@ -453,9 +459,7 @@ export function V3SynthesisInputs({
                     onClick={() => convert(side, alphabet)}
                   />
                   <V3PhonemeSpeechSettings
-                    active={
-                      !synthesis.use_spelling && synthesis.alphabet === alphabet
-                    }
+                    active={selectedSource === alphabet}
                     spelling={spelling}
                     nodeId={pronunciation.id}
                     field={`synthesis.${side}.${alphabet}_speech`}
@@ -550,6 +554,13 @@ export function V3SynthesisInputs({
               <Typography.Text className="word-pronunciation-label">
                 {t("creation_speech_source")}
               </Typography.Text>
+              <V3PronunciationAudioUpload
+                nodeId={pronunciation.id}
+                locale={dialect === "common" ? undefined : locale}
+                label={t("creation_upload_pronunciation_audio", { label })}
+                assets={pronunciation.audio_assets ?? []}
+                onChange={(audio_assets) => onChange({ audio_assets })}
+              />
               <Button
                 className="word-synthesis-ups-toggle"
                 type="text"
@@ -591,28 +602,38 @@ export function V3SynthesisInputs({
                 {renderInputs("ups")}
               </div>
             )}
-            <div className="word-synthesis-source-actions">
+            <div className="word-synthesis-candidates">
               {SIDES.filter(
                 (side) => dialect === "common" || dialect === side
               ).map((side) => {
+                const sideLabel = t(
+                  side === "uk" ? "dialect_uk" : "dialect_us"
+                );
                 const candidate = candidateForSide(synthesis, side, dialect);
                 const current = synthesisForLocale(
                   synthesis,
                   side === "uk" ? "en-GB" : "en-US",
                   dialect
                 );
-                const sideLabel = t(
-                  side === "uk" ? "dialect_uk" : "dialect_us"
+                const recordings = (pronunciation.audio_assets ?? []).filter(
+                  (asset) => speechAccentGroup(asset.locale) === side
                 );
+                const recording = recordings.find((asset) => asset.is_default);
                 return (
                   <section
+                    className="word-synthesis-source-actions"
                     key={side}
                     aria-label={t("creation_accent_source", {
                       side: sideLabel
                     })}
                   >
-                    <Typography.Text>{sideLabel}</Typography.Text>
+                    {dialect === "common" && (
+                      <Typography.Text type="secondary">
+                        {sideLabel}
+                      </Typography.Text>
+                    )}
                     <Radio.Group
+                      name={`synthesis-source-${pronunciation.id}-${side}`}
                       data-v3-node-id={pronunciation.id}
                       data-v3-field={`synthesis.${side}.source`}
                       aria-label={t("creation_accent_source", {
@@ -620,34 +641,89 @@ export function V3SynthesisInputs({
                       })}
                       value={
                         current.source ??
-                        (current.use_spelling ? "spelling" : current.alphabet)
+                        (recording
+                          ? "upload"
+                          : current.use_spelling
+                            ? "spelling"
+                            : current.alphabet)
                       }
-                      onChange={(event) =>
-                        writeCandidate(side, {
-                          ...candidate,
-                          source: event.target.value
-                        })
-                      }
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        const selected = recording ?? recordings[0];
+                        writeCandidate(
+                          side,
+                          { ...candidate, source: value },
+                          (pronunciation.audio_assets ?? []).map((asset) =>
+                            recordings.some((item) => item.id === asset.id)
+                              ? {
+                                  ...asset,
+                                  is_default:
+                                    value === "upload" &&
+                                    asset.id === selected?.id
+                                }
+                              : asset
+                          )
+                        );
+                      }}
                     >
                       {[
-                        { value: "spelling", label: t("spelling") },
-                        { value: "ipa", label: "Azure IPA" },
-                        { value: "ups", label: "Azure UPS" },
+                        {
+                          value: "spelling",
+                          name: t("spelling"),
+                          text: spelling,
+                          fontClass: "tsz-words"
+                        },
+                        {
+                          value: "ipa",
+                          name: "Azure IPA",
+                          text: candidate.ipa.trim()
+                            ? `/ ${candidate.ipa.trim()} /`
+                            : "",
+                          fontClass: "tsz-phonetics"
+                        },
+                        {
+                          value: "ups",
+                          name: "Azure UPS",
+                          text: candidate.ups.trim(),
+                          fontClass: "tsz-phonetics"
+                        },
                         {
                           value: "upload",
-                          label: t("creation_uploaded_source")
+                          name: t("creation_upload_audio"),
+                          text:
+                            (recording ?? recordings[0])?.original_name ?? "",
+                          fontClass: "",
+                          disabled: recordings.length === 0
                         },
                         {
                           value: "none",
-                          label: t("creation_accent_not_configured")
+                          name: t("creation_accent_not_configured"),
+                          text: "",
+                          fontClass: ""
                         }
                       ].map((option) => (
                         <Radio
                           key={option.value}
                           value={option.value}
-                          aria-label={option.label}
+                          aria-label={
+                            dialect === "common"
+                              ? `${sideLabel} ${option.name}`
+                              : option.name
+                          }
+                          disabled={"disabled" in option && option.disabled}
+                          className="word-synthesis-choice"
                         >
-                          {option.label}
+                          <span className="word-synthesis-choice-content">
+                            <span className="word-synthesis-choice-tag">
+                              {option.name}
+                            </span>
+                            <span
+                              className={`word-synthesis-choice-preview ${option.fontClass}`}
+                              title={option.text}
+                            >
+                              {option.text}
+                            </span>
+                          </span>
                         </Radio>
                       ))}
                     </Radio.Group>

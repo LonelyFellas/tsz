@@ -17,10 +17,16 @@ import type {
   WordPronunciationV3
 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
+import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
+import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
+import { VoiceAudioTasksContext } from "../voiceSaveContext";
+import { pronunciationPlaybackSource } from "@tsz/shared";
 
 const speech = vi.hoisted(() => ({
   canGenerate: true,
+  canUpload: true,
+  upload: vi.fn(),
   synthesize: vi.fn(),
   resolveAudio: vi.fn(),
   generateAudio: vi.fn(),
@@ -29,12 +35,18 @@ const speech = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/auth", () => ({
   usePermission: (permission: string) =>
-    permission === "speech.generate" ? speech.canGenerate : true,
+    permission === "speech.generate"
+      ? speech.canGenerate
+      : permission === "speech.upload_audio"
+        ? speech.canUpload
+        : true,
   api: {
     speech: { generateAudio: speech.generateAudio, resolve: speech.resolve }
   }
 }));
-vi.mock("@/lib/env", () => ({ env: { VOICE_PREVIEW: true } }));
+vi.mock("@/lib/env", () => ({
+  env: { VOICE_PREVIEW: true, VOICE_AUDIO_UPLOAD: true }
+}));
 vi.mock("@/features/settings/useDialectPreference", () => ({
   useDialectPreference: () => ({ preference: "us" })
 }));
@@ -67,7 +79,7 @@ vi.mock("../../voice-editor/dataSource", () => ({
     resolveAudio: speech.resolveAudio,
     resolveVoices: (input: unknown) => speech.resolve(input)
   },
-  adminAudioUploadAdapter: {},
+  adminAudioUploadAdapter: { upload: speech.upload },
   voicePreviewIsMock: false
 }));
 
@@ -75,10 +87,16 @@ function sourceRadio(name: string, side = "美式") {
   const group =
     screen.queryByRole("radiogroup", { name: `${side}配音来源` }) ??
     screen.getByRole("radiogroup", { name: "英式配音来源" });
-  return within(group).getByRole("radio", { name });
+  return within(group).getByRole("radio", {
+    name: new RegExp(
+      `^(?:(?:英式|美式) )?${name === "上传录音" ? "上传音频" : name}$`
+    )
+  });
 }
 beforeEach(() => {
   speech.canGenerate = true;
+  speech.canUpload = true;
+  speech.upload.mockReset();
   speech.recommendations.mockReset().mockResolvedValue([]);
   speech.resolve
     .mockReset()
@@ -128,7 +146,9 @@ function Harness({
   settingsPhrase = false,
   generated = false,
   recording = false,
-  issues = []
+  extraRecording = false,
+  issues = [],
+  audioTasks = null
 }: {
   dialect: Dialect;
   legacy?: boolean;
@@ -139,7 +159,9 @@ function Harness({
   settingsPhrase?: boolean;
   generated?: boolean;
   recording?: boolean;
+  extraRecording?: boolean;
   issues?: readonly V3DraftValidationIssue[];
+  audioTasks?: Map<string, () => Promise<boolean>> | null;
 }) {
   const generatedSpeech = {
     content: { version: 2 as const, text: "far", annotations: [] },
@@ -176,7 +198,20 @@ function Harness({
               original_name: "recording.mp3",
               created_at: "2026-11-11T07:00:00Z",
               is_default: true
-            }
+            },
+            ...(extraRecording
+              ? [
+                  {
+                    id: "old-alternative",
+                    locale: "en-GB" as const,
+                    gender: "female" as const,
+                    content_type: "audio/mpeg",
+                    size_bytes: 1024,
+                    original_name: "alternative.mp3",
+                    created_at: "2026-11-11T07:00:00Z"
+                  }
+                ]
+              : [])
           ]
         }
       : {}),
@@ -265,22 +300,24 @@ function Harness({
   });
   return (
     <App>
-      <PronunciationPreviewProvider>
-        <V3SynthesisInputs
-          pronunciation={pronunciation}
-          synthesisEditable
-          spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
-          dialect={dialect}
-          index={0}
-          issues={issues}
-          onChange={(patch) =>
-            setPronunciation((value) => ({ ...value, ...patch }))
-          }
-        />
-        <output data-testid="pronunciation-wire">
-          {JSON.stringify(pronunciation)}
-        </output>
-      </PronunciationPreviewProvider>
+      <VoiceAudioTasksContext.Provider value={audioTasks}>
+        <PronunciationPreviewProvider>
+          <V3SynthesisInputs
+            pronunciation={pronunciation}
+            synthesisEditable
+            spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
+            dialect={dialect}
+            index={0}
+            issues={issues}
+            onChange={(patch) =>
+              setPronunciation((value) => ({ ...value, ...patch }))
+            }
+          />
+          <output data-testid="pronunciation-wire">
+            {JSON.stringify(pronunciation)}
+          </output>
+        </PronunciationPreviewProvider>
+      </VoiceAudioTasksContext.Provider>
     </App>
   );
 }
@@ -380,6 +417,9 @@ describe("双口音真实试听控件", () => {
     await waitFor(() => expect(open()).toBeEnabled());
     fireEvent.click(open());
     const input = await screen.findByLabelText(`${label}音标编辑`);
+    const dialog = input.closest<HTMLElement>('[role="dialog"]')!;
+    expect(within(dialog).queryByRole("button", { name: "音频" })).toBeNull();
+    expect(within(dialog).queryByLabelText("上传音频")).toBeNull();
     fireEvent.change(input, { target: { value: "fɑːɹ" } });
     await waitFor(() =>
       expect(screen.getByLabelText(`完成${label}设置`)).toBeEnabled()
@@ -1376,4 +1416,284 @@ it("已显示的音素后端兼容诊断随语言更新，不重建设置器或�
     speech.resolve.mock.calls.length,
     speech.recommendations.mock.calls.length
   ]).toEqual(calls);
+});
+
+it("外层人工上传按口音保存并选源，上传未完成时阻止保存，切回合成不影响另一侧录音", async () => {
+  const tasks = new Map<string, () => Promise<boolean>>();
+  let finish!: (asset: unknown) => void;
+  speech.upload.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  render(<Harness dialect="common" recording audioTasks={tasks} />);
+  expect(screen.getByRole("radio", { name: "英式 上传音频" })).toBeChecked();
+  expect(screen.getByRole("radio", { name: "美式 上传音频" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  const fileInput = await screen.findByLabelText("上传音频", {
+    selector: "input"
+  });
+  fireEvent.click(
+    within(screen.getByRole("radiogroup", { name: "上传音频语种" })).getByRole(
+      "radio",
+      { name: "AmE" }
+    )
+  );
+  const file = new File(["fixture"], "american.mp3", { type: "audio/mpeg" });
+  fireEvent.change(fileInput, { target: { files: [file] } });
+  await waitFor(() =>
+    expect(speech.upload).toHaveBeenCalledWith(
+      expect.objectContaining({ file, locale: "en-US" })
+    )
+  );
+  expect(await tasks.get("p:common:upload")!()).toBe(false);
+  const settingsLabel = "第 1 条发音 美式 Azure IPA";
+  fireEvent.click(screen.getByLabelText(`打开${settingsLabel} TTS 设置器`));
+  const settings = await phonemeDialog(settingsLabel);
+  finish({
+    id: "uploaded-us",
+    locale: "en-US",
+    gender: "female",
+    content_type: "audio/mpeg",
+    size_bytes: 7,
+    original_name: "american.mp3",
+    created_at: "2026-11-12T00:00:00Z"
+  });
+  await waitFor(() =>
+    expect(screen.getByTestId("pronunciation-wire").textContent).toContain(
+      "uploaded-us"
+    )
+  );
+  expect(await tasks.get("p:common:upload")!()).toBe(true);
+  expect(
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
+      .audio_assets
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: "uploaded-us", is_default: false })
+    ])
+  );
+  const complete = within(settings).getByLabelText(`完成${settingsLabel}设置`);
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await waitFor(() => expect(settings).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole("radio", { name: "美式 上传音频" }));
+  const saved = () =>
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+  expect(saved().audio_assets).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: "old-recording", is_default: true }),
+      expect.objectContaining({ id: "uploaded-us", is_default: true })
+    ])
+  );
+  fireEvent.click(screen.getByRole("radio", { name: "美式 Azure IPA" }));
+  expect(saved().audio_assets).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: "old-recording", is_default: true }),
+      expect.objectContaining({ id: "uploaded-us", is_default: false })
+    ])
+  );
+});
+
+it("外层上传权限不足时保留已有录音，文件校验和失败重试仍使用原上传流程", async () => {
+  speech.canUpload = false;
+  const view = render(<Harness dialect="uk" recording />);
+  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  expect(
+    await screen.findByLabelText("上传音频", { selector: "input" })
+  ).toBeDisabled();
+  expect(screen.getByRole("list", { name: "已上传音频" })).toHaveTextContent(
+    "recording.mp3"
+  );
+  view.unmount();
+  speech.canUpload = true;
+  speech.upload
+    .mockRejectedValueOnce(new Error("temporary failure"))
+    .mockResolvedValueOnce({
+      id: "retry-audio",
+      locale: "en-US",
+      gender: "female",
+      content_type: "audio/mpeg",
+      size_bytes: 7,
+      original_name: "retry.mp3",
+      created_at: "2026-11-12T00:00:00Z"
+    });
+  render(<Harness dialect="us" />);
+  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  const input = await screen.findByLabelText("上传音频", { selector: "input" });
+  fireEvent.change(input, {
+    target: { files: [new File(["bad"], "bad.txt", { type: "text/plain" })] }
+  });
+  expect(speech.upload).not.toHaveBeenCalled();
+  fireEvent.change(input, {
+    target: {
+      files: [new File(["fixture"], "retry.mp3", { type: "audio/mpeg" })]
+    }
+  });
+  const retry = await screen.findByRole("button", { name: "重试 retry.mp3" });
+  fireEvent.click(retry);
+  await waitFor(() =>
+    expect(
+      JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
+        .audio_assets
+    ).toEqual([expect.objectContaining({ id: "retry-audio", locale: "en-US" })])
+  );
+});
+
+it("面板取消和移除默认录音均保留显式选择，不把本口音旧录音重新当作回退", async () => {
+  render(<Harness dialect="uk" recording extraRecording />);
+  const saved = () =>
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  fireEvent.click(await screen.findByLabelText("取消默认播放 recording.mp3"));
+  await waitFor(() =>
+    expect(
+      saved().audio_assets.every(
+        (asset: { is_default?: boolean }) => asset.is_default === false
+      )
+    ).toBe(true)
+  );
+  expect(screen.getByRole("radio", { name: "上传音频" })).not.toBeChecked();
+  expect(
+    pronunciationPlaybackSource("far", saved(), undefined, "en-GB", "uk")
+      .assetId
+  ).toBeUndefined();
+  fireEvent.click(screen.getByLabelText("设为默认播放 recording.mp3"));
+  await waitFor(() =>
+    expect(screen.getByRole("radio", { name: "上传音频" })).toBeChecked()
+  );
+  fireEvent.click(screen.getByLabelText("移除 recording.mp3"));
+  fireEvent.click(await screen.findByRole("button", { name: /^移除$/ }));
+  await waitFor(() =>
+    expect(saved().audio_assets).toEqual([
+      expect.objectContaining({ id: "old-alternative", is_default: false })
+    ])
+  );
+  expect(
+    pronunciationPlaybackSource("far", saved(), undefined, "en-GB", "uk")
+      .assetId
+  ).toBeUndefined();
+});
+
+it("上传完成使用宿主当前回调，保留上传期间编辑的其他字段", async () => {
+  let finish!: (asset: unknown) => void;
+  speech.upload.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  function RaceHarness() {
+    const [draft, setDraft] = useState({
+      note: "",
+      assets: [] as import("@tsz/types").AudioAssetV3[]
+    });
+    return (
+      <App>
+        <input
+          aria-label="其他字段"
+          value={draft.note}
+          onChange={(event) => setDraft({ ...draft, note: event.target.value })}
+        />
+        <V3PronunciationAudioUpload
+          nodeId="race"
+          locale="en-US"
+          label="人工上传"
+          assets={draft.assets}
+          onChange={(assets) => setDraft({ ...draft, assets })}
+        />
+        <output data-testid="upload-race-wire">{JSON.stringify(draft)}</output>
+      </App>
+    );
+  }
+  render(<RaceHarness />);
+  fireEvent.click(screen.getByRole("button", { name: "人工上传" }));
+  fireEvent.change(
+    await screen.findByLabelText("上传音频", { selector: "input" }),
+    {
+      target: {
+        files: [new File(["fixture"], "race.mp3", { type: "audio/mpeg" })]
+      }
+    }
+  );
+  await waitFor(() => expect(speech.upload).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByLabelText("其他字段"), {
+    target: { value: "上传期间的编辑" }
+  });
+  finish({
+    id: "race-upload",
+    locale: "en-US",
+    gender: "female",
+    content_type: "audio/mpeg",
+    size_bytes: 7,
+    original_name: "race.mp3",
+    created_at: "2026-11-12T00:00:00Z"
+  });
+  await waitFor(() =>
+    expect(screen.getByTestId("upload-race-wire").textContent).toContain(
+      "race-upload"
+    )
+  );
+  expect(screen.getByLabelText("其他字段")).toHaveValue("上传期间的编辑");
+});
+
+it("明确选择IPA来源时，旧录音默认标记不阻止本侧生成", async () => {
+  render(
+    <App>
+      <V3PhonemeSpeechSettings
+        active
+        spelling="far"
+        nodeId="explicit-source"
+        field="synthesis.uk.ipa_speech"
+        alphabet="ipa"
+        locale="en-GB"
+        label="明确IPA来源"
+        candidate={{
+          source: "ipa",
+          ipa: "fɑː",
+          ups: "F AA",
+          ipa_speech: {
+            content: { version: 2, text: "far", annotations: [] },
+            voice_profile: {
+              voices: [
+                {
+                  voice_id: "en-gb-sonia",
+                  locale: "en-GB",
+                  enabled: true,
+                  rate_percent: 0
+                }
+              ],
+              dubbing: {
+                area: "azure",
+                uk: { mode: "local" },
+                us: { mode: "local" }
+              }
+            }
+          }
+        }}
+        audioAssets={[
+          {
+            id: "retained-recording",
+            locale: "en-GB",
+            gender: "female",
+            content_type: "audio/mpeg",
+            size_bytes: 7,
+            original_name: "old.mp3",
+            created_at: "2026-11-12T00:00:00Z",
+            is_default: true
+          }
+        ]}
+        onChange={vi.fn()}
+      />
+    </App>
+  );
+  await waitFor(() =>
+    expect(speech.generateAudio).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setting: expect.objectContaining({ voice_id: "en-gb-sonia" })
+      }),
+      expect.any(AbortSignal)
+    )
+  );
 });

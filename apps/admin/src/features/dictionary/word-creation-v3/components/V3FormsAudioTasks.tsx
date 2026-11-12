@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { synthesisForLocale } from "@tsz/shared";
+import { synthesisForLocale, speechAccentGroup } from "@tsz/shared";
 import type {
   Dialect,
   FormContentVariantV3,
@@ -17,7 +17,7 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
-import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { toRichTextV2, voiceSettingKey } from "@tsz/voice-editor/core";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import type { VoiceOption } from "@tsz/voice-editor/types";
 import { flushSync } from "react-dom";
@@ -165,38 +165,117 @@ export function V3FormsAudioTasks({
             />
           )}
           {variant.pronunciations.flatMap((pronunciation) => {
-            const rowAudio = pronunciation.voice_profile ? (
-              <TextAudioTask
-                key={`${pronunciation.id}:voice_profile`}
-                target={JSON.stringify([pronunciation.id, "voice_profile"])}
-                content={toRichTextV2(
-                  pronunciation.dict_phonetic_rich ?? {
-                    version: 2,
-                    text: pronunciation.dict_phonetic,
-                    annotations: []
-                  }
-                )}
-                profile={pronunciation.voice_profile}
-                enabled={ready}
-                onChange={(voice_profile) =>
-                  patch(variant.id, (current) => {
-                    const row = current.pronunciations.find(
-                      (item) => item.id === pronunciation.id
-                    );
-                    if (row) row.voice_profile = voice_profile;
-                  })
-                }
-              />
-            ) : null;
             const synthesis = pronunciation.synthesis;
-            if (rowOnly || !synthesis || synthesis.use_spelling)
-              return [rowAudio];
-            const alphabet = synthesis.alphabet;
+            const explicitSources = !!(
+              synthesis?.uk?.source || synthesis?.us?.source
+            );
+            const activeLocales = (["en-GB", "en-US"] as const).filter(
+              (locale) => {
+                if (
+                  dialect !== "common" &&
+                  (locale === "en-GB" ? "uk" : "us") !== dialect
+                )
+                  return false;
+                const selected =
+                  synthesis && synthesisForLocale(synthesis, locale, dialect);
+                return (
+                  selected?.source !== "none" && selected?.source !== "upload"
+                );
+              }
+            );
+            const rowAudio = pronunciation.voice_profile
+              ? (explicitSources ? activeLocales : [undefined]).map(
+                  (locale) => {
+                    const profile = pronunciation.voice_profile!;
+                    const scoped = {
+                      ...profile,
+                      voices: profile.voices.flatMap((setting) => {
+                        const native =
+                          setting.locale ??
+                          catalog.find((voice) => voice.id === setting.voice_id)
+                            ?.locale;
+                        if (
+                          locale &&
+                          native &&
+                          speechAccentGroup(native, setting.accent) !==
+                            speechAccentGroup(locale)
+                        )
+                          return [];
+                        return [
+                          native
+                            ? { ...setting, locale: native as `en-${string}` }
+                            : setting
+                        ];
+                      })
+                    };
+                    return (
+                      <TextAudioTask
+                        key={`${pronunciation.id}:voice_profile:${locale ?? "all"}`}
+                        target={JSON.stringify([
+                          pronunciation.id,
+                          "voice_profile",
+                          locale
+                        ])}
+                        locale={locale}
+                        content={toRichTextV2(
+                          pronunciation.dict_phonetic_rich ?? {
+                            version: 2,
+                            text: pronunciation.dict_phonetic,
+                            annotations: []
+                          }
+                        )}
+                        profile={scoped}
+                        enabled={ready}
+                        onChange={(voice_profile) =>
+                          patch(variant.id, (current) => {
+                            const row = current.pronunciations.find(
+                              (item) => item.id === pronunciation.id
+                            );
+                            if (!row?.voice_profile) return;
+                            if (!locale) {
+                              row.voice_profile = voice_profile;
+                              return;
+                            }
+                            const replacements = new Map(
+                              voice_profile.voices.map((item) => [
+                                voiceSettingKey(item),
+                                item
+                              ])
+                            );
+                            const oldKeys = new Set(
+                              row.voice_profile.voices.map(voiceSettingKey)
+                            );
+                            row.voice_profile = {
+                              ...row.voice_profile,
+                              voices: [
+                                ...row.voice_profile.voices.map(
+                                  (item) =>
+                                    replacements.get(voiceSettingKey(item)) ??
+                                    item
+                                ),
+                                ...voice_profile.voices.filter(
+                                  (item) => !oldKeys.has(voiceSettingKey(item))
+                                )
+                              ]
+                            };
+                          })
+                        }
+                      />
+                    );
+                  }
+                )
+              : [];
+            if (rowOnly || !synthesis) return rowAudio;
             const phonemes = (["uk", "us"] as const)
               .filter((side) => dialect === "common" || dialect === side)
               .map((side) => {
                 const locale = side === "uk" ? "en-GB" : "en-US";
                 const resolved = synthesisForLocale(synthesis, locale, dialect);
+                const source =
+                  resolved.source ??
+                  (resolved.use_spelling ? "spelling" : resolved.alphabet);
+                if (source !== "ipa" && source !== "ups") return null;
+                const alphabet = source;
                 const candidate = synthesis[side] ?? {
                   ipa: resolved.ipa,
                   ups: resolved.ups,
@@ -209,6 +288,7 @@ export function V3FormsAudioTasks({
                     key={`${pronunciation.id}:${side}:${alphabet}`}
                     headless
                     active={ready}
+                    audioAssets={pronunciation.audio_assets}
                     nodeId={pronunciation.id}
                     field={`synthesis.${side}.${alphabet}_speech`}
                     candidate={candidate}
@@ -248,7 +328,7 @@ export function V3FormsAudioTasks({
                   />
                 );
               });
-            return [rowAudio, ...phonemes];
+            return [...rowAudio, ...phonemes];
           })}
         </div>
       ))}
@@ -261,10 +341,12 @@ function TextAudioTask({
   content,
   profile,
   enabled,
+  locale,
   onChange
 }: {
   target: string;
   content: RichTextV2;
+  locale?: `en-${string}`;
   profile: VoiceProfileV3;
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
@@ -275,6 +357,7 @@ function TextAudioTask({
     content,
     profile,
     adapter: adminVoicePreviewAdapter,
+    locale,
     enabled,
     defer: false,
     onChange
