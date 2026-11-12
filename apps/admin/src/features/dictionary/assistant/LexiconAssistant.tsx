@@ -8,7 +8,6 @@ import { Link } from "react-router-dom";
 import {
   Alert,
   Button,
-  Empty,
   Flex,
   Space,
   Spin,
@@ -342,16 +341,6 @@ export function LexiconAssistant({
         >
           {turns.length === 0 && !pending && (
             <div className="lexicon-assistant-welcome">
-              <Empty
-                image={<BotIcon />}
-                description={
-                  <>
-                    <Typography.Paragraph type="secondary">
-                      {t("assistant_help")}
-                    </Typography.Paragraph>
-                  </>
-                }
-              />
               <Flex vertical gap={8}>
                 {STARTERS[context.step].map((starter) => (
                   <Button

@@ -252,11 +252,6 @@ export const publishingWorkspaceMessages = {
     "詞庫助手對話",
     "Lexicon assistant conversation"
   ],
-  assistant_help: [
-    "我可以查智能词库V1和内置词典，结合你正在编辑的内容，解释字段、比较词义、提供建议。",
-    "我可以查詢智慧詞庫V1和內建詞典，結合你正在編輯的內容，解釋欄位、比較詞義、提供建議。",
-    "Ask about fields, meanings or suggestions using the lexicon, built-in dictionary and your current edits."
-  ],
   assistant_name: ["小精灵", "小精靈", "Assistant"],
   assistant_partial_source: ["部分内容", "部分內容", "Partial content"],
   assistant_interrupted: [

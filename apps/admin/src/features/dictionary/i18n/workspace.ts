@@ -14,26 +14,6 @@ export const workspaceMessages = {
   meanings: ["词义与例句", "詞義與例句", "Meanings and examples"],
   preview: ["预览并生效", "預覽並生效", "Preview and publish"],
   review_publish: ["核对与发布", "核對與發布", "Review and publish"],
-  basics_help: [
-    "所属语言｜英美区分",
-    "所屬語言｜英美區分",
-    "Language | British and American variants"
-  ],
-  forms_help: [
-    "词性分类｜词形变化",
-    "詞性分類｜詞形變化",
-    "Parts of speech | Inflections"
-  ],
-  meanings_help: [
-    "多维释义｜多维例句",
-    "多維釋義｜多維例句",
-    "Definitions | Examples"
-  ],
-  preview_help: [
-    "结构核对｜提交生效",
-    "結構核對｜提交生效",
-    "Check structure | Publish"
-  ],
   progress: ["完成情况", "完成情況", "Progress"],
   progress_badge: [
     "完成情况 {{badge}}",
