@@ -19,6 +19,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const posLabel = usePartOfSpeechLabel();
   const [value, setValue] = useState("");
   const [detection, setDetection] = useState<NextDetection>();
+  const [expandedGlosses, setExpandedGlosses] = useState<Set<string>>(
+    new Set()
+  );
   const [entryMatches, setEntryMatches] = useState<NextEntryMatches>();
   const [busy, setBusy] = useState<"detect" | "create" | "matches">();
   const [error, setError] = useState<string>();
@@ -47,6 +50,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setError(undefined);
     setFieldError(undefined);
     setDetection(undefined);
+    setExpandedGlosses(new Set());
     setEntryMatches(undefined);
     try {
       const query = { target_language: "en", surface: input.normalized };
@@ -223,10 +227,34 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                       )}
                       {match.glosses.length > 0 && (
                         <ul>
-                          {match.glosses.map((gloss, index) => (
-                            <li key={index}>{gloss}</li>
-                          ))}
+                          {match.glosses
+                            .slice(
+                              0,
+                              expandedGlosses.has(match.id) ? undefined : 3
+                            )
+                            .map((gloss, index) => (
+                              <li key={index}>{gloss}</li>
+                            ))}
                         </ul>
+                      )}
+                      {match.glosses.length > 3 && (
+                        <Button
+                          type="link"
+                          size="small"
+                          aria-expanded={expandedGlosses.has(match.id)}
+                          onClick={() => {
+                            setExpandedGlosses((previous) => {
+                              const next = new Set(previous);
+                              if (next.has(match.id)) next.delete(match.id);
+                              else next.add(match.id);
+                              return next;
+                            });
+                          }}
+                        >
+                          {expandedGlosses.has(match.id)
+                            ? "收起"
+                            : `展开全部（共 ${match.glosses.length} 条）`}
+                        </Button>
                       )}
                       {match.forms.length > 0 && (
                         <dl>
