@@ -339,6 +339,62 @@ it("折叠拼写输入直接保存后，正文和默认推荐一起读回", asyn
   expect(profileChanged).not.toHaveBeenCalled();
 });
 
+it("折叠字段的默认勾选不依赖打开编辑器或试听，生成资产随原保存链路提交", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const setting: VoiceSetting = {
+    voice_id: "sonia",
+    version_id: UUIDS.pronunciation,
+    locale: "en-GB",
+    enabled: true,
+    rate_percent: -25
+  };
+  const generateAudio = vi.fn().mockResolvedValue({ id: "formal-default" });
+  const onProfile = vi.fn();
+  const audioTasks = new Map<string, () => Promise<boolean>>();
+  function Host() {
+    const [profile, setProfile] = useState<VoiceProfileV3>({
+      voices: [setting]
+    });
+    return (
+      <VoiceSaveContext.Provider value={{ save: async () => true, audioTasks }}>
+        <V3VoiceTextField
+          mode="grammar"
+          value={VALUE}
+          nodeId="automatic-default"
+          field="value"
+          ariaLabel="自动配音正文"
+          dialect="uk"
+          voiceProfile={profile}
+          onVoiceProfileChange={(next) => {
+            setProfile(next);
+            onProfile(next);
+          }}
+          onChange={vi.fn()}
+          previewAdapter={{
+            listVoices: state.listVoices,
+            synthesize: state.synthesize,
+            generateAudio
+          }}
+        />
+      </VoiceSaveContext.Provider>
+    );
+  }
+  render(<Host />);
+  await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
+  expect(generateAudio).toHaveBeenCalledWith(
+    expect.objectContaining({ content: VALUE, setting }),
+    expect.objectContaining({ signal: expect.any(AbortSignal) })
+  );
+  await waitFor(() =>
+    expect(onProfile).toHaveBeenLastCalledWith({
+      voices: [{ ...setting, audio_asset_id: "formal-default" }]
+    })
+  );
+  for (const wait of audioTasks.values()) expect(await wait()).toBe(true);
+  expect(state.synthesize).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText("标注工具栏")).not.toBeInTheDocument();
+});
+
 it("默认推荐加载期间不能提交正文，失败后保留手动录入入口", async () => {
   let reject!: (error: Error) => void;
   state.recommendations.mockImplementation(
@@ -2083,8 +2139,9 @@ it("弹窗新增关联后生成使用当前草稿关联，不读取打开前的�
   });
   await waitFor(() => expect(generate).toBeEnabled());
   fireEvent.click(generate);
-  await waitFor(() => expect(generatedLinks).toHaveLength(1));
-  expect(generatedLinks[0]).toEqual([
+  await waitFor(() => expect(generatedLinks).toHaveLength(2));
+  expect(generatedLinks[0]).toEqual([]);
+  expect(generatedLinks[1]).toEqual([
     expect.objectContaining({ target_word_id: "w" })
   ]);
 });

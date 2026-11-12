@@ -548,6 +548,39 @@ describe("新版局部主页和唯一声音草稿", () => {
     expect(preview.synthesize).not.toHaveBeenCalled();
   });
 
+  it("载入已勾选音色无需试听就补齐正式音频，已有资产和未勾选音色不重新生成", async () => {
+    const preview = adapter();
+    const generateAudio = vi
+      .fn<NonNullable<VoicePreviewAdapter["generateAudio"]>>()
+      .mockResolvedValue(generatedAsset("automatic-uk"));
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([
+          version("a"),
+          { ...version("b"), enabled: false },
+          { ...version("us"), audio_asset_id: "existing-us" }
+        ])}
+        preview={{ ...preview, generateAudio }}
+        onProfile={onProfile}
+      />
+    );
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(onProfile).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          voices: [
+            expect.objectContaining({ audio_asset_id: "automatic-uk" }),
+            expect.objectContaining({ voice_id: "b", enabled: false }),
+            expect.objectContaining({ audio_asset_id: "existing-us" })
+          ]
+        })
+      )
+    );
+    expect(preview.synthesize).not.toHaveBeenCalled();
+    expect(AudioMock.instances).toHaveLength(0);
+  });
+
   it("自动生成失败保留选择并阻止保存，显式重试复用请求身份", async () => {
     const generateAudio = vi
       .fn<NonNullable<VoicePreviewAdapter["generateAudio"]>>()
@@ -1073,7 +1106,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     const generateAudio = vi.fn();
     render(
       <Harness
-        initial={pool([version("a")])}
+        initial={pool([{ ...version("a"), audio_asset_id: "existing-a" }])}
         onProfile={onProfile}
         preview={{ ...adapter(synthesize), generateAudio }}
       />
@@ -1083,7 +1116,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     const save = dialogButton(dialog, "保存配音设置");
     fireEvent.change(rate, { target: { value: "" } });
     await waitFor(() => expect(save).toBeDisabled());
-    const preview = dialogButton(dialog, "试听当前音色");
+    const preview = dialogButton(dialog, "播放正式音频");
     const generate = dialogButton(dialog, "生成正式音频");
     expect(preview).toBeDisabled();
     expect(generate).toBeDisabled();
@@ -1227,13 +1260,26 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
     const preview = { ...adapter(), generateAudio };
     const onProfile = vi.fn();
-    const view = render(<Harness preview={preview} onProfile={onProfile} />);
+    const initial = pool([
+      { ...version("a"), audio_asset_id: "existing-a" },
+      { ...version("us"), audio_asset_id: "existing-us" }
+    ]);
+    const view = render(
+      <Harness initial={initial} preview={preview} onProfile={onProfile} />
+    );
     const dialog = await detail();
     fireEvent.click(
       within(dialog).getByRole("button", { name: "生成正式音频" })
     );
     await waitFor(() => expect(generateAudio).toHaveBeenCalled());
-    view.rerender(<Harness preview={preview} onProfile={onProfile} readOnly />);
+    view.rerender(
+      <Harness
+        initial={initial}
+        preview={preview}
+        onProfile={onProfile}
+        readOnly
+      />
+    );
     await act(async () => finish({ id: "late-asset" }));
     expect(onProfile).not.toHaveBeenCalled();
     expect(
@@ -1248,6 +1294,10 @@ describe("新版局部主页和唯一声音草稿", () => {
     const onProfile = vi.fn();
     render(
       <Harness
+        initial={pool([
+          { ...version("a"), audio_asset_id: "existing-a" },
+          { ...version("us"), audio_asset_id: "existing-us" }
+        ])}
         preview={{ ...adapter(), generateAudio }}
         onProfile={onProfile}
       />
@@ -1275,7 +1325,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     fireEvent.click(dialogButton(dialog, "保存配音设置"));
     expect(onProfile.mock.calls.at(-1)![0].voices).toEqual([
       { ...version("a"), audio_asset_id: "asset-a" },
-      version("us")
+      { ...version("us"), audio_asset_id: "existing-us" }
     ]);
   });
   it("当前人工归属与单侧正文不符时保留旧配置并显示说明，不补声也不计概率", async () => {

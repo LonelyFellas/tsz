@@ -366,17 +366,6 @@ describe("双口音真实试听控件", () => {
         target: { value: alphabet === "ipa" ? "fɑːɹ" : "F AA R" }
       });
       const editor = input.closest('[role="dialog"]') as HTMLElement;
-      const editVoice = await within(editor).findByLabelText("修改 自然");
-      await waitFor(() => expect(editVoice).toBeEnabled());
-      fireEvent.click(editVoice);
-      const detail = (await screen.findByLabelText("当前音色语速")).closest(
-        '[role="dialog"]'
-      ) as HTMLElement;
-      const generate = await dialogButton(detail, "生成正式音频");
-      await waitFor(() => expect(generate).toBeEnabled());
-      fireEvent.click(generate);
-      expect(await within(detail).findByText("播放正式音频")).toBeVisible();
-      fireEvent.click(await dialogButton(detail, "保存配音设置"));
       const complete = within(editor).getByLabelText(`完成${label}设置`);
       await waitFor(() => expect(complete).toBeEnabled());
       fireEvent.click(complete);
@@ -935,6 +924,9 @@ it.each([
         { signal: expect.any(AbortSignal) }
       )
     );
+    await waitFor(() =>
+      expect(screen.getByLabelText(`完成${label}设置`)).toBeEnabled()
+    );
     fireEvent.click(screen.getByLabelText(`完成${label}设置`));
     await waitFor(() => expect(input).not.toBeInTheDocument());
     expect(
@@ -1059,8 +1051,22 @@ it("未配置的音素设置器采用首位推荐，完成时保存参数", asyn
   await waitFor(() =>
     expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
   );
-  fireEvent.click(await screen.findByRole("button", { name: "修改 慢读" }));
-  expect(screen.getByLabelText("当前音色语速")).toHaveValue("0.75");
+  const complete = screen.getByLabelText(`完成${label}设置`);
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  const saved = JSON.parse(
+    screen.getByTestId("pronunciation-wire").textContent!
+  );
+  expect(saved.synthesis.uk.ipa_speech.voice_profile.voices[0]).toEqual(
+    expect.objectContaining({ rate_percent: -25, audio_asset_id: "new-audio" })
+  );
+  expect(speech.generateAudio).toHaveBeenCalledWith(
+    expect.objectContaining({
+      setting: expect.objectContaining({ rate_percent: -25 })
+    }),
+    expect.any(AbortSignal)
+  );
+  expect(speech.synthesize).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -1092,28 +1098,37 @@ it.each([
     expect(control(`${label}音标编辑`)).toHaveValue(
       wire().synthesis[side][alphabet.toLowerCase()]
     );
+    await waitFor(() => expect(control(`完成${label}设置`)).toBeEnabled());
     fireEvent.click(control("停顿"));
     fireEvent.click(control(`停顿 ${duration / 1000} 秒`));
     fireEvent.mouseDown(
       dialog.querySelectorAll(".tsz-ve-gap")[alphabet === "UPS" ? 2 : 0]!
     );
-    const poolPreview = await within(dialog).findByLabelText(`试听 ${voice}`);
-    expect(poolPreview).toBeVisible();
-    fireEvent.click(poolPreview);
     await waitFor(() =>
-      expect(speech.synthesize).toHaveBeenLastCalledWith(
+      expect(speech.generateAudio).toHaveBeenCalledWith(
         expect.objectContaining({
-          voiceId,
-          content: expect.objectContaining({
-            text: "far away",
-            annotations: expect.arrayContaining([
-              { type: "pause", at: 3, duration_ms: duration }
-            ])
+          setting: expect.objectContaining({ voice_id: voiceId }),
+          source: expect.objectContaining({
+            content: expect.objectContaining({
+              text: "far away",
+              annotations: expect.arrayContaining([
+                { type: "pause", at: 3, duration_ms: duration }
+              ])
+            })
           })
         }),
-        { signal: expect.any(AbortSignal) }
+        expect.any(AbortSignal)
       )
     );
+    const poolPreview = () => within(dialog).getByLabelText(`试听 ${voice}`);
+    await waitFor(() => expect(poolPreview()).toBeVisible());
+    fireEvent.click(poolPreview());
+    await waitFor(() =>
+      expect(speech.resolveAudio).toHaveBeenCalledWith("new-audio", {
+        signal: expect.any(AbortSignal)
+      })
+    );
+    expect(speech.synthesize).not.toHaveBeenCalled();
     expect(
       wire().synthesis[side][`${alphabet.toLowerCase()}_speech`]
     ).toBeUndefined();
@@ -1146,17 +1161,12 @@ it.each([
     speech.synthesize.mockClear();
     fireEvent.click(play);
     await waitFor(() =>
-      expect(speech.synthesize).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          content: expect.objectContaining({
-            annotations: expect.arrayContaining([
-              { type: "pause", at: 3, duration_ms: duration }
-            ])
-          })
-        }),
+      expect(speech.resolveAudio).toHaveBeenLastCalledWith(
+        saved.synthesis[side][field].voice_profile.voices[0].audio_asset_id,
         { signal: expect.any(AbortSignal) }
       )
     );
+    expect(speech.synthesize).not.toHaveBeenCalled();
   }
 );
 

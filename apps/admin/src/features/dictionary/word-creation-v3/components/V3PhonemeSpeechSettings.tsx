@@ -6,6 +6,7 @@ import {
   createLexiconEditorMessage as creationMessage
 } from "../../i18n/editor";
 import { useVoiceSave } from "../voiceSaveContext";
+import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
 import { flushSync } from "react-dom";
 import { PencilIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
@@ -26,7 +27,7 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
-import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { clearVoiceAudio, toRichTextV2 } from "@tsz/voice-editor/core";
 import {
   editSynthesisUpsWords,
   pronunciationSynthesisContent,
@@ -61,6 +62,8 @@ export function V3PhonemeSpeechSettings({
   audioAssets = [],
   nodeId,
   field,
+  active,
+  headless = false,
   onChange
 }: {
   spelling: string;
@@ -72,6 +75,8 @@ export function V3PhonemeSpeechSettings({
   audioAssets?: AudioAssetV3[];
   nodeId: string;
   field: string;
+  active: boolean;
+  headless?: boolean;
   onChange: (
     candidate: PronunciationSynthesisCandidateV3,
     audioAssets: AudioAssetV3[]
@@ -98,6 +103,7 @@ export function V3PhonemeSpeechSettings({
   }, [targetKey]);
   const { edit: canEdit } = useContentEditPermissions();
   const canUploadAudio = usePermission("speech.upload_audio");
+  const canGenerateAudio = usePermission("speech.generate");
   const [open, setOpen] = useState(false);
   const wordHistory = useRef(
     new Map<string, PronunciationSynthesisCandidateV3["ups_words"]>()
@@ -310,21 +316,129 @@ export function V3PhonemeSpeechSettings({
     }),
     []
   );
+  const speech = candidate[`${alphabet}_speech`];
+  const collapsedContent = speech
+    ? mapSynthesisSpeechContent(
+        speech.content,
+        spelling,
+        candidate,
+        alphabet,
+        false
+      )
+    : undefined;
+  const generatedSource = {
+    kind: "phoneme" as const,
+    phoneme_locale: locale,
+    content: speech?.content ?? {
+      version: 2 as const,
+      text: spelling,
+      annotations: []
+    },
+    alphabet,
+    phoneme: candidate[alphabet],
+    ...(alphabet === "ups" ? { ups_words: candidate.ups_words ?? [] } : {})
+  };
+  const closedAdapter: VoicePreviewAdapter = {
+    ...adapter,
+    audioSourceKey: JSON.stringify(generatedSource),
+    async resolveVoices(input, options) {
+      return (
+        await api.speech.resolve(
+          {
+            profile: input.profile,
+            accent: input.accent,
+            source: generatedSource
+          },
+          options?.signal
+        )
+      ).voices;
+    },
+    async generateAudio(input, options) {
+      return (
+        await api.speech.generateAudio(
+          {
+            request_id: input.requestId,
+            source: generatedSource,
+            setting: input.setting,
+            ...(input.profile ? { profile: input.profile } : {})
+          },
+          options?.signal
+        )
+      ).asset;
+    }
+  };
+  const automaticAudio = useSelectedVoiceAudio({
+    target: JSON.stringify([nodeId, field, alphabet, locale]),
+    content: collapsedContent ?? {
+      version: 2,
+      text: candidate[alphabet],
+      annotations: []
+    },
+    profile:
+      speech?.voice_profile ??
+      (fallbackVoiceProfile
+        ? clearVoiceAudio(fallbackVoiceProfile)
+        : undefined),
+    adapter: closedAdapter,
+    locale,
+    enabled:
+      active &&
+      !open &&
+      canEdit &&
+      env.VOICE_PREVIEW &&
+      canGenerateAudio &&
+      !voicePreviewIsMock &&
+      !!spelling.trim() &&
+      !synthesisInputIssue(alphabet, candidate[alphabet]),
+    defer: false,
+    onChange: (voice_profile) =>
+      onChange(
+        {
+          ...candidate,
+          [`${alphabet}_speech`]: {
+            content: generatedSource.content,
+            voice_profile
+          }
+        },
+        audioAssets
+      )
+  });
   return (
     <>
-      <Button
-        icon={<PencilIcon />}
-        aria-label={t("creation_open_tts_settings", { label })}
-        data-v3-node-id={nodeId}
-        data-v3-field={field}
-        disabled={!canEdit}
-        onClick={() => {
-          setDraft(capture());
-          setSaveError("");
-          setSource(sourceKey);
-          setOpen(true);
-        }}
-      />
+      {!headless && (
+        <Button
+          icon={<PencilIcon />}
+          aria-label={t("creation_open_tts_settings", { label })}
+          data-v3-node-id={nodeId}
+          data-v3-field={field}
+          disabled={!canEdit}
+          onClick={() => {
+            setDraft(capture());
+            setSaveError("");
+            setSource(sourceKey);
+            setOpen(true);
+          }}
+        />
+      )}
+      {!headless && automaticAudio.busy && (
+        <span role="status">{t("panel_generating_final_audio")}</span>
+      )}
+      {!open && automaticAudio.error != null && (
+        <Alert
+          type="error"
+          showIcon
+          title={
+            automaticAudio.error instanceof Error
+              ? automaticAudio.error.message
+              : t("panel_final_audio_generation_failed")
+          }
+          action={
+            <Button size="small" onClick={() => void automaticAudio.retry()}>
+              {t("panel_retry_final_audio")}
+            </Button>
+          }
+        />
+      )}
       {open && (
         <VoiceEditorModal
           width={1200}

@@ -69,6 +69,7 @@ import {
 } from "../sortableRows";
 import { SortableDragHandle } from "./SortableDragHandle";
 import { V3FormContentModal } from "./V3FormContentModal";
+import { V3FormsAudioTasks } from "./V3FormsAudioTasks";
 import { V3FormCopyProvider } from "./V3FormCopyProvider";
 import type { createPronunciationReferenceIds } from "../sharedFormsModel";
 
@@ -483,6 +484,13 @@ export function V3FormsAndPronunciationStep({
 
   const editor = (
     <>
+      {sharedForms && onSharedFormsChange && (
+        <V3FormsAudioTasks
+          forms={sharedForms}
+          paused={!!editingFormId}
+          onChange={onSharedFormsChange}
+        />
+      )}
       {editingFormId &&
         sharedForms &&
         onSharedFormsChange &&
