@@ -387,6 +387,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       previewAdapter
     ]
   );
+  const editorPreviewAdapter = useMemo(() => {
+    const adapter = sessionPreviewAdapter ?? adminVoicePreviewAdapter;
+    return canGenerateAudio
+      ? adapter
+      : { ...adapter, generateAudio: undefined };
+  }, [canGenerateAudio, sessionPreviewAdapter]);
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   const reportEditorReady = useCallback(
     (ready: boolean) => onDraftPendingChange?.(!ready),
@@ -991,7 +997,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                     : nextReadingLinks
                 }));
             }}
-            previewAdapter={sessionPreviewAdapter ?? adminVoicePreviewAdapter}
+            previewAdapter={editorPreviewAdapter}
             previewEnabled={env.VOICE_PREVIEW}
             previewIsMock={voicePreviewIsMock}
             onVoiceProfileChange={(next) => {

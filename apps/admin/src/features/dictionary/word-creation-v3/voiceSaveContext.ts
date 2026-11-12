@@ -8,3 +8,14 @@ export const VoiceSaveContext = createContext<{
   audioTasks?: Map<string, () => Promise<boolean>>;
 } | null>(null);
 export const useVoiceSave = () => useContext(VoiceSaveContext);
+
+/** 内容弹窗有独立草稿，即使没有业务保存动作也需要等待其音频。 */
+export const VoiceAudioTasksContext = createContext<Map<
+  string,
+  () => Promise<boolean>
+> | null>(null);
+export function useVoiceAudioTasks() {
+  const scoped = useContext(VoiceAudioTasksContext);
+  const save = useVoiceSave();
+  return scoped ?? save?.audioTasks;
+}

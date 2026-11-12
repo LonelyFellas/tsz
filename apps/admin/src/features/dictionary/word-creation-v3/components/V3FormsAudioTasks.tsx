@@ -4,7 +4,8 @@ import type {
   Dialect,
   FormContentVariantV3,
   SharedFormsStepContentV3,
-  VoiceProfileV3
+  VoiceProfileV3,
+  RichTextV2
 } from "@tsz/types";
 import { Alert, Button } from "@tsz/ui/admin/display";
 import { env } from "@/lib/env";
@@ -16,10 +17,11 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
+import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import type { VoiceOption } from "@tsz/voice-editor/types";
 import { flushSync } from "react-dom";
-import { useVoiceSave } from "../voiceSaveContext";
+import { useVoiceAudioTasks } from "../voiceSaveContext";
 
 function variants(forms: SharedFormsStepContentV3) {
   return forms.contents.flatMap<{
@@ -42,11 +44,13 @@ function variants(forms: SharedFormsStepContentV3) {
 export function V3FormsAudioTasks({
   forms,
   paused,
-  onChange
+  onChange,
+  rowOnly = false
 }: {
   forms: SharedFormsStepContentV3;
   paused: boolean;
   onChange: (forms: SharedFormsStepContentV3) => void;
+  rowOnly?: boolean;
 }) {
   const { edit } = useContentEditPermissions();
   const { t } = useLexiconEditorTranslation();
@@ -60,15 +64,17 @@ export function V3FormsAudioTasks({
   const [catalog, setCatalog] = useState<VoiceOption[]>([]);
   const [catalogError, setCatalogError] = useState<unknown>();
   const [catalogAttempt, retryCatalog] = useState(0);
-  const audioTasks = useVoiceSave()?.audioTasks;
+  const audioTasks = useVoiceAudioTasks();
   const catalogReady = useRef<Promise<boolean>>(Promise.resolve(false));
-  const needsCatalog = variants(forms).some(({ variant }) =>
-    variant.pronunciations.some((row) =>
-      row.voice_profile?.voices.some(
-        (setting) => setting.enabled && !setting.locale
+  const needsCatalog =
+    !rowOnly &&
+    variants(forms).some(({ variant }) =>
+      variant.pronunciations.some((row) =>
+        row.voice_profile?.voices.some(
+          (setting) => setting.enabled && !setting.locale
+        )
       )
-    )
-  );
+    );
   useEffect(() => {
     if (!enabled || !needsCatalog) return;
     setCatalogError(undefined);
@@ -142,28 +148,51 @@ export function V3FormsAudioTasks({
       )}
       {variants(forms).map(({ variant, dialect }) => (
         <div key={variant.id}>
-          {variant.spelling_speech &&
-            variant.pronunciations.some(
-              (row) => row.synthesis?.use_spelling
-            ) && (
-              <SpellingAudioTask
-                variant={variant}
+          {!rowOnly && variant.spelling_speech && (
+            <TextAudioTask
+              target={JSON.stringify([variant.id, "spelling_speech"])}
+              content={variant.spelling_speech.content}
+              profile={variant.spelling_speech.voice_profile}
+              enabled={ready}
+              onChange={(voice_profile) =>
+                patch(variant.id, (current) => {
+                  current.spelling_speech = {
+                    ...current.spelling_speech!,
+                    voice_profile
+                  };
+                })
+              }
+            />
+          )}
+          {variant.pronunciations.flatMap((pronunciation) => {
+            const rowAudio = pronunciation.voice_profile ? (
+              <TextAudioTask
+                key={`${pronunciation.id}:voice_profile`}
+                target={JSON.stringify([pronunciation.id, "voice_profile"])}
+                content={toRichTextV2(
+                  pronunciation.dict_phonetic_rich ?? {
+                    version: 2,
+                    text: pronunciation.dict_phonetic,
+                    annotations: []
+                  }
+                )}
+                profile={pronunciation.voice_profile}
                 enabled={ready}
                 onChange={(voice_profile) =>
                   patch(variant.id, (current) => {
-                    current.spelling_speech = {
-                      ...current.spelling_speech!,
-                      voice_profile
-                    };
+                    const row = current.pronunciations.find(
+                      (item) => item.id === pronunciation.id
+                    );
+                    if (row) row.voice_profile = voice_profile;
                   })
                 }
               />
-            )}
-          {variant.pronunciations.flatMap((pronunciation) => {
+            ) : null;
             const synthesis = pronunciation.synthesis;
-            if (!synthesis || synthesis.use_spelling) return [];
+            if (rowOnly || !synthesis || synthesis.use_spelling)
+              return [rowAudio];
             const alphabet = synthesis.alphabet;
-            return (["uk", "us"] as const)
+            const phonemes = (["uk", "us"] as const)
               .filter((side) => dialect === "common" || dialect === side)
               .map((side) => {
                 const locale = side === "uk" ? "en-GB" : "en-US";
@@ -219,6 +248,7 @@ export function V3FormsAudioTasks({
                   />
                 );
               });
+            return [rowAudio, ...phonemes];
           })}
         </div>
       ))}
@@ -226,20 +256,24 @@ export function V3FormsAudioTasks({
   );
 }
 
-function SpellingAudioTask({
-  variant,
+function TextAudioTask({
+  target,
+  content,
+  profile,
   enabled,
   onChange
 }: {
-  variant: FormContentVariantV3;
+  target: string;
+  content: RichTextV2;
+  profile: VoiceProfileV3;
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
   const task = useSelectedVoiceAudio({
-    target: JSON.stringify([variant.id, "spelling_speech"]),
-    content: variant.spelling_speech!.content,
-    profile: variant.spelling_speech!.voice_profile,
+    target,
+    content,
+    profile,
     adapter: adminVoicePreviewAdapter,
     enabled,
     defer: false,

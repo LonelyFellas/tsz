@@ -52,3 +52,11 @@
 脱敏证据位于本次可视化目录：`task166-acceptance.json`、`task166-db-cleanup.txt`、`task166-oss-cleanup.json`、`task166-oss-independent.json`、`task166-default-audio.png`。
 
 用户随后授权提交、推送并创建 PR；交付继续复用上述验证，并执行精确提交的独立审查和原生 hooks。未授权合并或部署。
+
+## PR 交付前复查补充
+
+首次独立审查确认 6 项实质问题：发布清单要求的行级/拼写 owner 漏生成、人工口音归属被物理地区过滤、可见音素入口混入另一侧 fallback、内部物化使保存中断、内容弹窗丢失任务登记，以及展开编辑器缺少生成权限门禁。已补齐对应修复和回归；实测另定位并修复了 JSON 字段顺序变化导致误判来源、重复生成的问题。
+
+第二批 `20261112-task166-review-2e91` 通过真实业务 API 创建专用草稿后，在实际词条汇总编辑页自动生成全部已选来源，全程未试听。保存 revision 3 后，真实 `publication-audio/check` 返回 6 项、全部 `issue=null`、`ready=true`；稳定指纹修复后保存 revision 4 和刷新没有新增对象，草稿保持已保存，完整清单再次 `ready=true`。本批含复现和热更新阶段共创建 12 个对象版本；已删除全部版本及专用词条、登记、投影和专属审计/outbox。独立复查 155 张业务表无本批残留，Redis 无专属键，原 centre / center 指纹不变。验收会话和标签页已退出，本地服务、临时验收页均已移除。对应脱敏证据为 `task166-full-manifest.json/png`、`task166-review-oss-cleanup.json`、`task166-review-db-cleanup.txt`。
+
+按用户后续指示删除“词条概览”中重复解释悬浮球操作的说明及其三语文案、专属样式和失效引用，保留既有展开、拖动与键盘行为。最终精确提交的独立复查及 hooks/CI 状态记录在 PR。

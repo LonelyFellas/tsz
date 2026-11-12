@@ -5,8 +5,9 @@ import {
   useLexiconEditorMessageState as useCreationMessageState,
   createLexiconEditorMessage as creationMessage
 } from "../../i18n/editor";
-import { useVoiceSave } from "../voiceSaveContext";
+import { useVoiceAudioTasks, useVoiceSave } from "../voiceSaveContext";
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
+import { v3ContentFingerprint } from "../saveFlow";
 import { flushSync } from "react-dom";
 import { PencilIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
@@ -14,6 +15,7 @@ import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import {
   lazy,
   Suspense,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -26,7 +28,7 @@ import type {
   RichTextV2,
   VoiceProfileV3
 } from "@tsz/types";
-import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
+import type { VoiceOption, VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import { clearVoiceAudio, toRichTextV2 } from "@tsz/voice-editor/core";
 import {
   editSynthesisUpsWords,
@@ -105,6 +107,97 @@ export function V3PhonemeSpeechSettings({
   const canUploadAudio = usePermission("speech.upload_audio");
   const canGenerateAudio = usePermission("speech.generate");
   const [open, setOpen] = useState(false);
+  const audioTasks = useVoiceAudioTasks();
+  const speech = candidate[`${alphabet}_speech`];
+  const needsFallbackCatalog =
+    !speech &&
+    !!fallbackVoiceProfile?.voices.some(
+      (setting) => setting.enabled && !setting.locale
+    );
+  const fallbackKey = JSON.stringify([
+    targetKey,
+    fallbackVoiceProfile?.voices.map((setting) => [
+      setting.voice_id,
+      setting.locale
+    ])
+  ]);
+  const [fallbackCatalog, setFallbackCatalog] = useState<{
+    key: string;
+    voices: VoiceOption[];
+    error?: unknown;
+  }>();
+  const [fallbackAttempt, retryFallback] = useState(0);
+  const fallbackReady = useRef<Promise<boolean>>(Promise.resolve(false));
+  const fallbackNeeded = useRef(needsFallbackCatalog);
+  fallbackNeeded.current = needsFallbackCatalog;
+  const fallbackPending =
+    needsFallbackCatalog && fallbackCatalog?.key !== fallbackKey;
+  const fallbackError =
+    needsFallbackCatalog && fallbackCatalog?.key === fallbackKey
+      ? fallbackCatalog.error
+      : undefined;
+  useEffect(() => {
+    if (!needsFallbackCatalog || !canEdit) return;
+    const controller = new AbortController();
+    fallbackReady.current = adminVoicePreviewAdapter
+      .listVoices({ language: "en", signal: controller.signal })
+      .then((voices) => {
+        if (controller.signal.aborted) return false;
+        flushSync(() => setFallbackCatalog({ key: fallbackKey, voices }));
+        return true;
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setFallbackCatalog({ key: fallbackKey, voices: [], error });
+        return false;
+      });
+    return () => controller.abort();
+  }, [canEdit, fallbackAttempt, fallbackKey, needsFallbackCatalog]);
+  const audioTarget = JSON.stringify([nodeId, field, alphabet, locale]);
+  useLayoutEffect(() => {
+    if (
+      !active ||
+      open ||
+      !canGenerateAudio ||
+      !needsFallbackCatalog ||
+      !audioTasks
+    )
+      return;
+    const key = `${audioTarget}:native-voices`;
+    audioTasks.set(key, async () => {
+      const pending = fallbackReady.current;
+      if (!(await pending)) {
+        if (pending !== fallbackReady.current)
+          return (await audioTasks.get(key)?.()) ?? false;
+        if (fallbackNeeded.current) return false;
+      }
+      return (await audioTasks.get(audioTarget)?.()) ?? true;
+    });
+    return () => {
+      audioTasks.delete(key);
+    };
+  }, [
+    active,
+    audioTarget,
+    audioTasks,
+    canGenerateAudio,
+    needsFallbackCatalog,
+    open
+  ]);
+  const scopedFallback = fallbackVoiceProfile
+    ? {
+        ...fallbackVoiceProfile,
+        voices: fallbackVoiceProfile.voices.flatMap((setting) => {
+          if (!setting.enabled) return [setting];
+          const nativeLocale =
+            setting.locale ??
+            fallbackCatalog?.voices.find(
+              (voice) => voice.id === setting.voice_id
+            )?.locale;
+          return nativeLocale === locale ? [{ ...setting, locale }] : [];
+        })
+      }
+    : undefined;
   const wordHistory = useRef(
     new Map<string, PronunciationSynthesisCandidateV3["ups_words"]>()
   );
@@ -127,7 +220,7 @@ export function V3PhonemeSpeechSettings({
               annotations: []
             })
           : { version: 2 as const, text: candidate[alphabet], annotations: [] },
-      voice_profile: speech?.voice_profile ?? fallbackVoiceProfile,
+      voice_profile: speech?.voice_profile ?? scopedFallback,
       audio_assets: audioAssets,
       ups_words: candidate.ups_words
     });
@@ -316,7 +409,11 @@ export function V3PhonemeSpeechSettings({
     }),
     []
   );
-  const speech = candidate[`${alphabet}_speech`];
+  const editorAdapter = useMemo(
+    () =>
+      canGenerateAudio ? adapter : { ...adapter, generateAudio: undefined },
+    [adapter, canGenerateAudio]
+  );
   const collapsedContent = speech
     ? mapSynthesisSpeechContent(
         speech.content,
@@ -340,7 +437,7 @@ export function V3PhonemeSpeechSettings({
   };
   const closedAdapter: VoicePreviewAdapter = {
     ...adapter,
-    audioSourceKey: JSON.stringify(generatedSource),
+    audioSourceKey: v3ContentFingerprint(generatedSource),
     async resolveVoices(input, options) {
       return (
         await api.speech.resolve(
@@ -376,9 +473,7 @@ export function V3PhonemeSpeechSettings({
     },
     profile:
       speech?.voice_profile ??
-      (fallbackVoiceProfile
-        ? clearVoiceAudio(fallbackVoiceProfile)
-        : undefined),
+      (scopedFallback ? clearVoiceAudio(scopedFallback) : undefined),
     adapter: closedAdapter,
     locale,
     enabled:
@@ -387,6 +482,8 @@ export function V3PhonemeSpeechSettings({
       canEdit &&
       env.VOICE_PREVIEW &&
       canGenerateAudio &&
+      !fallbackPending &&
+      fallbackError == null &&
       !voicePreviewIsMock &&
       !!spelling.trim() &&
       !synthesisInputIssue(alphabet, candidate[alphabet]),
@@ -405,13 +502,34 @@ export function V3PhonemeSpeechSettings({
   });
   return (
     <>
+      {fallbackError != null && (
+        <Alert
+          type="error"
+          showIcon
+          title={
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : t(
+                  "panel_default_voices_could_not_be_loaded_you_can_keep_typing_and_select_voices_in"
+                )
+          }
+          action={
+            <Button
+              size="small"
+              onClick={() => retryFallback((attempt) => attempt + 1)}
+            >
+              {t("panel_retry_final_audio")}
+            </Button>
+          }
+        />
+      )}
       {!headless && (
         <Button
           icon={<PencilIcon />}
           aria-label={t("creation_open_tts_settings", { label })}
           data-v3-node-id={nodeId}
           data-v3-field={field}
-          disabled={!canEdit}
+          disabled={!canEdit || fallbackPending || fallbackError != null}
           onClick={() => {
             setDraft(capture());
             setSaveError("");
@@ -514,7 +632,7 @@ export function V3PhonemeSpeechSettings({
               onVoiceProfileChange={(voice_profile) =>
                 setDraft((current) => ({ ...current, voice_profile }))
               }
-              previewAdapter={adapter}
+              previewAdapter={editorAdapter}
               previewEnabled={env.VOICE_PREVIEW && source === sourceKey}
               previewIsMock={voicePreviewIsMock}
               renderActions={(canComplete, prepareComplete, captureResult) => (

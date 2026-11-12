@@ -117,7 +117,9 @@ beforeEach(() => {
   speech.generate
     .mockReset()
     .mockImplementation(async (input: GenerateVoiceAudioRequest) => ({
-      asset: { id: `formal-${input.setting.locale}` }
+      asset: {
+        id: `formal-${input.source.kind === "phoneme" ? "phoneme" : input.source.content.text === "hello" ? "spelling" : "row"}-${input.setting.locale}`
+      }
     }));
   speech.resolve
     .mockReset()
@@ -129,9 +131,18 @@ beforeEach(() => {
         profile: { voices: VoiceSettingV3[] };
         accent: string;
       }) => ({
-        voices: profile.voices.filter(
-          (setting) => setting.locale === (accent === "gb" ? "en-GB" : "en-US")
-        )
+        voices: profile.voices
+          .map((setting) => ({
+            ...setting,
+            locale:
+              setting.locale ??
+              voices.find((voice) => voice.voice_id === setting.voice_id)
+                ?.locale
+          }))
+          .filter(
+            (setting) =>
+              setting.locale === (accent === "gb" ? "en-GB" : "en-US")
+          )
       })
     );
   speech.synthesize.mockReset();
@@ -139,16 +150,21 @@ beforeEach(() => {
 
 it("词典带入的已选音标在不打开弹窗、不试听时生成，英美资产同时回写共享内容", async () => {
   render(<Host />);
-  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   await waitFor(() => {
     const row = JSON.parse(screen.getByTestId("saved-forms").textContent!)
       .contents[0].regional_variants.common.pronunciations[0];
     expect(
+      row.voice_profile.voices.map(
+        (setting: VoiceSettingV3) => setting.audio_asset_id
+      )
+    ).toEqual(["formal-row-en-GB", "formal-row-en-US"]);
+    expect(
       row.synthesis.uk.ipa_speech.voice_profile.voices[0].audio_asset_id
-    ).toBe("formal-en-GB");
+    ).toBe("formal-phoneme-en-GB");
     expect(
       row.synthesis.us.ipa_speech.voice_profile.voices[0].audio_asset_id
-    ).toBe("formal-en-US");
+    ).toBe("formal-phoneme-en-US");
   });
   expect(speech.generate).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -168,7 +184,7 @@ it("内容弹窗打开时暂停汇总表任务，关闭后自动继续缺失配�
   const view = render(<Host paused />);
   expect(speech.generate).not.toHaveBeenCalled();
   view.rerender(<Host paused={false} />);
-  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
 });
 
 it("旧勾选缺少地区时先读取目录，快速保存也等待地区解析和正式音频", async () => {
@@ -197,8 +213,10 @@ it("旧勾选缺少地区时先读取目录，快速保存也等待地区解析�
     );
     expect(await waiting).toBe(true);
   });
-  expect(speech.generate).toHaveBeenCalledTimes(2);
-  expect(screen.getByTestId("saved-forms")).toHaveTextContent("formal-en-US");
+  expect(speech.generate).toHaveBeenCalledTimes(4);
+  expect(screen.getByTestId("saved-forms")).toHaveTextContent(
+    "formal-phoneme-en-US"
+  );
 });
 
 it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续生成", async () => {
@@ -214,8 +232,10 @@ it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续�
   expect(await tasks.get("forms:audio-catalog")!()).toBe(false);
   expect(speech.generate).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "重试生成音频" }));
-  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId("saved-forms")).toHaveTextContent("formal-en-US");
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
+  expect(screen.getByTestId("saved-forms")).toHaveTextContent(
+    "formal-phoneme-en-US"
+  );
 });
 
 it("词形拼写来源只补缺失的已选音频，不生成未启用的音标来源", async () => {
@@ -230,7 +250,7 @@ it("词形拼写来源只补缺失的已选音频，不生成未启用的音标�
     }
   };
   render(<Host initial={forms} />);
-  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(3));
   expect(speech.generate).toHaveBeenCalledWith(
     expect.objectContaining({
       source: {
@@ -240,4 +260,38 @@ it("词形拼写来源只补缺失的已选音频，不生成未启用的音标�
       setting: expect.objectContaining({ locale: "en-US" })
     })
   );
+});
+
+it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来源之间不混用", async () => {
+  const forms = fixture();
+  const variant = forms.contents[0]!.regional_variants;
+  if (variant.mode !== "common") throw new Error("expected common fixture");
+  variant.common.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: { voices }
+  };
+  render(<Host initial={forms} />);
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(6));
+  await waitFor(() => {
+    const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+      .contents[0].regional_variants.common;
+    const row = saved.pronunciations[0];
+    const owners = [
+      saved.spelling_speech,
+      { voice_profile: row.voice_profile },
+      row.synthesis.uk.ipa_speech,
+      row.synthesis.us.ipa_speech
+    ];
+    for (const owner of owners) {
+      for (const setting of owner.voice_profile.voices as VoiceSettingV3[])
+        if (setting.enabled) expect(setting.audio_asset_id).toBeTruthy();
+    }
+    expect(saved.spelling_speech.voice_profile.voices[0].audio_asset_id).toBe(
+      "formal-spelling-en-GB"
+    );
+    expect(row.voice_profile.voices[0].audio_asset_id).toBe("formal-row-en-GB");
+    expect(
+      row.synthesis.uk.ipa_speech.voice_profile.voices[0].audio_asset_id
+    ).toBe("formal-phoneme-en-GB");
+  });
 });

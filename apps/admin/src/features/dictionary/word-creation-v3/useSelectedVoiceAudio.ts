@@ -15,7 +15,8 @@ import {
   voiceEffectKey,
   voiceSettingKey
 } from "@tsz/voice-editor/core";
-import { useVoiceSave } from "./voiceSaveContext";
+import { useVoiceAudioTasks } from "./voiceSaveContext";
+import { v3ContentFingerprint } from "./saveFlow";
 
 // 一页可能有多个折叠字段，正式生成按序请求，避免默认音色同时冲击供应商。
 let generationQueue: Promise<unknown> = Promise.resolve();
@@ -23,6 +24,23 @@ function enqueue<T>(run: () => Promise<T>): Promise<T> {
   const result = generationQueue.then(run, run);
   generationQueue = result.catch(() => undefined);
   return result;
+}
+
+function selectionSignature(
+  sourceKey: string,
+  locale: string | undefined,
+  profile?: VoiceProfileV3 | null
+) {
+  return v3ContentFingerprint([
+    sourceKey,
+    locale,
+    profile?.dubbing,
+    profile?.dubbing?.mode === "inherit"
+      ? undefined
+      : profile?.voices
+          .filter((setting) => setting.enabled)
+          .map((setting) => [voiceSettingKey(setting), voiceEffectKey(setting)])
+  ]);
 }
 
 /** 折叠字段也生成正式资产；回写草稿，仍由宿主执行业务保存。 */
@@ -45,7 +63,7 @@ export function useSelectedVoiceAudio({
   defer: boolean;
   onChange?: (profile: VoiceProfileV3) => void;
 }) {
-  const audioTasks = useVoiceSave()?.audioTasks;
+  const audioTasks = useVoiceAudioTasks();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const requests = useRef(new Map<string, { input: string; id: string }>());
@@ -54,16 +72,22 @@ export function useSelectedVoiceAudio({
     controller: AbortController;
     result: Promise<boolean>;
   }>(null);
-  const sourceKey = JSON.stringify([target, content, adapter.audioSourceKey]);
-  const signature = JSON.stringify([
-    sourceKey,
-    locale,
-    profile?.dubbing,
-    profile?.voices.map(({ audio_asset_id: _audio, ...setting }) => setting)
+  const sourceKey = v3ContentFingerprint([
+    target,
+    content,
+    adapter.audioSourceKey
   ]);
-  const latest = useRef({ signature, enabled, profile, adapter, onChange });
+  const signature = selectionSignature(sourceKey, locale, profile);
+  const latest = useRef({
+    target,
+    signature,
+    enabled,
+    profile,
+    adapter,
+    onChange
+  });
   useLayoutEffect(() => {
-    latest.current = { signature, enabled, profile, adapter, onChange };
+    latest.current = { target, signature, enabled, profile, adapter, onChange };
   });
   const effects = useMemo(
     () =>
@@ -77,6 +101,9 @@ export function useSelectedVoiceAudio({
   );
   const lastSource = useRef({ target, sourceKey, effects });
   const attempted = useRef<string | undefined>(undefined);
+  const ensureRef = useRef<() => Promise<boolean>>(() =>
+    Promise.resolve(false)
+  );
 
   const ensure = useCallback((): Promise<boolean> => {
     if (
@@ -94,12 +121,31 @@ export function useSelectedVoiceAudio({
       return running.current.result;
     running.current?.controller.abort();
     const controller = new AbortController();
+    let expectedSignature = signature;
     const isCurrent = () =>
       !controller.signal.aborted &&
       latest.current.enabled &&
-      latest.current.signature === signature;
+      latest.current.signature === expectedSignature;
+    const resumeCurrent = () =>
+      latest.current.enabled && latest.current.target === target
+        ? ensureRef.current()
+        : Promise.resolve(false);
     const commit = (next: VoiceProfileV3) => {
       if (!isCurrent()) return;
+      expectedSignature = selectionSignature(sourceKey, locale, next);
+      attempted.current = expectedSignature;
+      if (running.current?.controller === controller)
+        running.current.signature = expectedSignature;
+      lastSource.current = {
+        target,
+        sourceKey,
+        effects: new Map(
+          next.voices.map((setting) => [
+            voiceSettingKey(setting),
+            voiceEffectKey(setting)
+          ])
+        )
+      };
       flushSync(() => latest.current.onChange?.(next));
     };
     setBusy(true);
@@ -129,35 +175,67 @@ export function useSelectedVoiceAudio({
             commit(stored);
         }
         lastSource.current = { target, sourceKey, effects };
-        const resolved =
-          stored.dubbing && adapter.resolveVoices
-            ? (
-                await Promise.all(
-                  (["gb", "us"] as const)
-                    .filter(
-                      (accent) =>
-                        !locale ||
-                        (locale === "en-GB" ? accent === "gb" : accent === "us")
-                    )
-                    .map((accent) =>
-                      adapter.resolveVoices!(
-                        { profile: stored, content, accent },
-                        { signal: controller.signal }
-                      )
-                    )
+        let resolved = stored.voices;
+        if (adapter.resolveVoices) {
+          const results = await Promise.allSettled(
+            (["gb", "us"] as const)
+              .filter(
+                (accent) =>
+                  !locale ||
+                  (locale === "en-GB" ? accent === "gb" : accent === "us")
+              )
+              .map((accent) =>
+                adapter.resolveVoices!(
+                  { profile: stored, content, accent },
+                  { signal: controller.signal }
                 )
-              ).flat()
-            : stored.voices;
-        if (!isCurrent()) return false;
+              )
+          );
+          resolved = results.flatMap((result) =>
+            result.status === "fulfilled" ? result.value : []
+          );
+          const failure = results.find(
+            (result) => result.status === "rejected"
+          );
+          if (
+            !resolved.length &&
+            (stored.dubbing?.mode === "inherit" ||
+              !stored.voices.some((setting) => setting.enabled)) &&
+            failure?.status === "rejected"
+          )
+            throw failure.reason;
+        }
+        if (!isCurrent()) return resumeCurrent();
         const selected = retainResolvedAudio(resolved, stored.voices).filter(
-          (setting) =>
-            setting.enabled &&
-            (!locale || !setting.locale || setting.locale === locale)
+          (setting) => setting.enabled
         );
+        const selectedKeys = new Set(selected.map(voiceSettingKey));
+        if (stored.dubbing?.mode !== "inherit") {
+          for (const setting of stored.voices) {
+            if (
+              setting.enabled &&
+              !selectedKeys.has(voiceSettingKey(setting))
+            ) {
+              selected.push(setting);
+              selectedKeys.add(voiceSettingKey(setting));
+            }
+          }
+        } else {
+          stored = {
+            ...stored,
+            voices: stored.voices.map((setting) =>
+              selectedKeys.has(voiceSettingKey(setting))
+                ? setting
+                : { ...setting, enabled: false }
+            )
+          };
+          if (JSON.stringify(stored) !== JSON.stringify(latest.current.profile))
+            commit(stored);
+        }
         for (const setting of selected) {
           if (setting.audio_asset_id) continue;
           const key = voiceSettingKey(setting);
-          const input = JSON.stringify([
+          const input = v3ContentFingerprint([
             sourceKey,
             voiceEffectKey(setting),
             stored.dubbing
@@ -179,21 +257,36 @@ export function useSelectedVoiceAudio({
               { signal: controller.signal }
             );
           });
-          if (!isCurrent()) return false;
-          const voices = [...(latest.current.profile?.voices ?? stored.voices)];
+          if (!isCurrent()) return resumeCurrent();
+          const voices = (latest.current.profile?.voices ?? stored.voices).map(
+            (item) =>
+              stored.dubbing?.mode === "inherit" &&
+              !selectedKeys.has(voiceSettingKey(item))
+                ? { ...item, enabled: false }
+                : item
+          );
           const index = voices.findIndex(
             (item) => voiceSettingKey(item) === key
           );
-          const generated = { ...setting, audio_asset_id: asset.id };
+          const generated = {
+            ...setting,
+            ...(index >= 0 && voices[index]!.version_name !== undefined
+              ? { version_name: voices[index]!.version_name }
+              : {}),
+            audio_asset_id: asset.id
+          };
           if (index < 0) voices.push(generated);
           else voices[index] = generated;
           stored = { ...stored, voices };
           commit(stored);
         }
-        return isCurrent();
+        return isCurrent() ? true : resumeCurrent();
       } catch (failure) {
-        if (isCurrent()) setError(failure);
-        return false;
+        if (isCurrent()) {
+          setError(failure);
+          return false;
+        }
+        return resumeCurrent();
       } finally {
         if (running.current?.controller === controller) {
           running.current = null;
@@ -214,7 +307,6 @@ export function useSelectedVoiceAudio({
     sourceKey,
     target
   ]);
-  const ensureRef = useRef(ensure);
   useLayoutEffect(() => {
     ensureRef.current = ensure;
     if (!enabled || !onChange) return;

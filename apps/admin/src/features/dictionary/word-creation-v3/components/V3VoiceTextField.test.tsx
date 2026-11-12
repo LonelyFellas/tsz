@@ -23,6 +23,7 @@ import type { AudioUploadAdapter, VoiceSetting } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
   canUpload: true,
+  canGenerate: true,
   flags: {
     VOICE_EDITOR: true,
     VOICE_PREVIEW: false,
@@ -38,7 +39,8 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/auth")>()),
-  usePermission: () => state.canUpload
+  usePermission: (permission: string) =>
+    permission === "speech.generate" ? state.canGenerate : state.canUpload
 }));
 vi.mock("@/lib/env", () => ({ env: state.flags }));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
@@ -98,6 +100,7 @@ beforeEach(() => {
   state.synthesize.mockReset();
   state.recommendations.mockReset().mockResolvedValue([]);
   state.canUpload = true;
+  state.canGenerate = true;
   state.flags.VOICE_EDITOR = true;
   state.flags.SENTENCE_FORMATTING = true;
   state.flags.VOICE_PREVIEW = false;
@@ -175,6 +178,42 @@ it("配音校验只阻止保存，不将例句关联编辑标记为未完成", a
     ).toBeEnabled()
   );
   expect(pending).toHaveBeenLastCalledWith(false);
+});
+
+it("没有生成权限时展开编辑器不自动生成，也不阻止保留配音配置的正文保存", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  state.canGenerate = false;
+  const generateAudio = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="grammar"
+      presentation="editor"
+      value={VALUE}
+      nodeId="no-generate"
+      field="value"
+      ariaLabel="受限正文"
+      voiceProfile={{
+        voices: [
+          { voice_id: "sonia", locale: "en-GB", enabled: true, rate_percent: 0 }
+        ]
+      }}
+      onVoiceProfileChange={vi.fn()}
+      onChange={vi.fn()}
+      onSave={vi.fn(async () => true)}
+      previewAdapter={{
+        listVoices: state.listVoices,
+        synthesize: state.synthesize,
+        generateAudio
+      }}
+    />
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "保存受限正文修改" })
+    ).toBeEnabled()
+  );
+  expect(generateAudio).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "生成正式音频" })).toBeNull();
 });
 
 it("先在折叠字段输入再打开编辑器，保留已应用的首次推荐", async () => {

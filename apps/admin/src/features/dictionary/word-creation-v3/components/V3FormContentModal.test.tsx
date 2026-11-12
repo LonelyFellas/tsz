@@ -1,6 +1,11 @@
 import { primaryRegionalVariant } from "@tsz/shared";
-import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
-import { useState } from "react";
+import {
+  VoiceSaveContext,
+  useVoiceAudioTasks,
+  useVoiceSave
+} from "../voiceSaveContext";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   act,
   fireEvent,
@@ -10,7 +15,7 @@ import {
   within
 } from "@testing-library/react";
 import { App } from "@tsz/ui/admin/overlays";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   DraftFormsStepContentV3,
   SharedFormsStepContentV3
@@ -31,6 +36,13 @@ import {
   uuidFromInt
 } from "../fixtures";
 
+const backgroundAudio = vi.hoisted(() => ({
+  enabled: false,
+  finish: (() => {}) as () => void
+}));
+beforeEach(() => {
+  backgroundAudio.enabled = false;
+});
 // 宿主测试只替换重型语音编辑器，嵌套弹窗和本地草稿使用真实实现。
 vi.mock("./V3ConcreteFormRow", () => ({
   V3ConcreteFormRow: ({
@@ -41,6 +53,43 @@ vi.mock("./V3ConcreteFormRow", () => ({
     onChange: (next: DraftFormsStepContentV3) => void;
   }) => {
     const localSave = useVoiceSave();
+    const audioTasks = useVoiceAudioTasks();
+    const latest = useRef({ content, onChange });
+    latest.current = { content, onChange };
+    useEffect(() => {
+      if (!backgroundAudio.enabled || !audioTasks) return;
+      const pending = new Promise<boolean>((resolve) => {
+        backgroundAudio.finish = () => {
+          const next = structuredClone(latest.current.content);
+          const regions = next.pos[0]!.forms[0]!.regional_variants;
+          if (regions.mode !== "common")
+            throw new Error("expected common fixture");
+          regions.common.spelling_speech = {
+            content: {
+              version: 2,
+              text: regions.common.spelling,
+              annotations: []
+            },
+            voice_profile: {
+              voices: [
+                {
+                  voice_id: "sonia",
+                  enabled: true,
+                  rate_percent: 0,
+                  audio_asset_id: "formal-in-drawer"
+                }
+              ]
+            }
+          };
+          flushSync(() => latest.current.onChange(next));
+          resolve(true);
+        };
+      });
+      audioTasks.set("drawer-background-audio", () => pending);
+      return () => {
+        audioTasks.delete("drawer-background-audio");
+      };
+    }, [audioTasks]);
     const regions = content.pos[0]!.forms[0]!.regional_variants;
     return (
       <>
@@ -892,3 +941,27 @@ it("局部保存先交接完整抽屉结果再请求业务保存，失败不关�
   expect(persist.mock.calls[1]![0]).toEqual(persist.mock.calls[0]![0]);
   expect(onConfirm).not.toHaveBeenCalled();
 });
+
+it.each([true, false])(
+  "弹窗先等待全部内部音频再读取最新草稿（业务保存=%s）",
+  async (persisted) => {
+    backgroundAudio.enabled = true;
+    const persist = vi.fn(async (_forms: SharedFormsStepContentV3) => true);
+    const { onConfirm } = setup({ persist: persisted ? persist : undefined });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: persisted ? "保存当前正文" : "确认，应用到草稿"
+      })
+    );
+    expect(persist).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+    await act(async () => backgroundAudio.finish());
+    await waitFor(() =>
+      expect(persisted ? persist : onConfirm).toHaveBeenCalledOnce()
+    );
+    const result = persisted
+      ? persist.mock.calls[0]![0]
+      : onConfirm.mock.calls[0]![0];
+    expect(JSON.stringify(result)).toContain("formal-in-drawer");
+  }
+);

@@ -182,6 +182,22 @@ it("改字后清除旧资产并自动生成新文本，现有匹配资产不请�
   );
 });
 
+it("后端读回只改变 JSON 字段顺序时复用已有资产，不误报来源变化", async () => {
+  const generate = vi.fn();
+  const view = setup(adapter(generate), {
+    voices: [{ ...setting, audio_asset_id: "cached" }]
+  });
+  await act(async () => {});
+  view.rerender({
+    content: { annotations: [], text: content.text, version: 2 },
+    enabled: true,
+    defer: false
+  });
+  await act(async () => {});
+  expect(generate).not.toHaveBeenCalled();
+  expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe("cached");
+});
+
 it("参数改变后不会沿用旧资产，自动生成新参数的正式音频", async () => {
   const generate = vi.fn().mockResolvedValue(asset("new-volume"));
   const view = setup(adapter(generate), {
@@ -226,6 +242,89 @@ it("继承推荐先解析实际选择，再生成并绑定解析出的音色", a
     expect.anything()
   );
   expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it.each([true, false])(
+  "原生美式音色人工归为英式时，已解析的有效选择不被地区过滤（局部配置=%s）",
+  async (local) => {
+    const reassigned = {
+      ...setting,
+      voice_id: "guy",
+      locale: "en-US" as const
+    };
+    const generate = vi.fn().mockResolvedValue(asset("reassigned"));
+    const preview = {
+      ...adapter(generate),
+      resolveVoices: vi.fn().mockResolvedValue([reassigned])
+    };
+    const profile: VoiceProfileV3 = {
+      voices: [reassigned],
+      ...(local
+        ? {
+            dubbing: {
+              mode: "local",
+              area: "grammar",
+              pool_version: "provider_id_v1"
+            } as const
+          }
+        : {})
+    };
+    const view = setup(preview, profile);
+    await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+    expect(preview.resolveVoices).toHaveBeenCalledWith(
+      expect.objectContaining({ accent: "gb" }),
+      expect.anything()
+    );
+    expect(generate).toHaveBeenCalledWith(
+      expect.objectContaining({ setting: reassigned }),
+      expect.anything()
+    );
+    expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe(
+      "reassigned"
+    );
+  }
+);
+
+it("保存等待空继承配置物化首个有效音色，同一次保存承诺完成而不被自身回写作废", async () => {
+  let finish!: (asset: AudioAsset) => void;
+  const generate = vi.fn(
+    () =>
+      new Promise<AudioAsset>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const preview = {
+    ...adapter(generate),
+    resolveVoices: vi.fn().mockResolvedValue([setting])
+  };
+  const view = setup(preview, {
+    voices: [],
+    dubbing: { mode: "inherit", area: "word", pool_version: "provider_id_v1" }
+  });
+  await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+  const waiting = view.audioTasks.get("fixture-field")!();
+  await act(async () => {
+    finish(asset("inherited"));
+    expect(await waiting).toBe(true);
+  });
+  expect(generate).toHaveBeenCalledTimes(1);
+  expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe(
+    "inherited"
+  );
+});
+
+it("补充地区的已选声音没有英美默认归属时仍会正式生成", async () => {
+  const other = { ...setting, voice_id: "neerja", locale: "en-IN" as const };
+  const generate = vi
+    .fn()
+    .mockResolvedValue({ ...asset("other"), locale: "en-IN" });
+  const preview = {
+    ...adapter(generate),
+    resolveVoices: vi.fn().mockRejectedValue(new Error("当前口音没有已选推荐"))
+  };
+  const view = setup(preview, { voices: [other] });
+  await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+  expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe("other");
 });
 
 it("输入期间暂缓生成，保存仍可主动等待；卸载清除登记并中止请求", async () => {
