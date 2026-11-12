@@ -271,6 +271,28 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
   return view;
 };
 
+it("UPS 缺少当前口音 IPA 时在 IPA 框内提示并聚焦，补齐后恢复转换", () => {
+  renderWithUps(<Harness dialect="common" empty />);
+  const ipa = screen.getByLabelText("第 1 条发音的美式 Azure IPA");
+  const before = screen.getByTestId("pronunciation-wire").textContent;
+  fireEvent.click(screen.getByLabelText("第 1 条发音转换为美式 Azure UPS"));
+  expect(ipa).toHaveFocus();
+  expect(ipa).toHaveAttribute("aria-invalid", "true");
+  expect(
+    document.getElementById(ipa.getAttribute("aria-describedby")!)
+  ).toBeVisible();
+  expect(
+    screen.getByLabelText("第 1 条发音的英式 Azure IPA")
+  ).not.toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
+  fireEvent.change(ipa, { target: { value: "fɑɹ" } });
+  expect(ipa).not.toHaveAttribute("aria-invalid", "true");
+  fireEvent.click(screen.getByLabelText("第 1 条发音转换为美式 Azure UPS"));
+  expect(screen.getByLabelText("第 1 条发音的美式 Azure UPS")).toHaveValue(
+    "F AA R"
+  );
+});
+
 async function dialogButton(dialog: HTMLElement, text: string) {
   const button = within(dialog)
     .getByText(text)

@@ -65,6 +65,7 @@ export interface V3PronunciationListProps {
   variant: WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3;
   issues: readonly V3DraftValidationIssue[];
   idFactory: V3IdFactory;
+  onMissingSpelling?: () => void;
   onChange: (next: DraftFormsStepContentV3) => void;
 }
 
@@ -73,11 +74,15 @@ export function V3PronunciationList({
   variant,
   issues,
   idFactory,
+  onMissingSpelling,
   onChange
 }: V3PronunciationListProps) {
   const { t } = useLexiconEditorTranslation();
   const [form] = Form.useForm();
   const inputPrefix = useId();
+  const [missingDictionary, setMissingDictionary] = useState<
+    ReadonlySet<string>
+  >(new Set());
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
   useEffect(() => {
@@ -360,6 +365,14 @@ export function V3PronunciationList({
                               nodeId={pronunciation.id}
                               field="dict_phonetic"
                               invalid={Boolean(dictPhoneticIssue)}
+                              requiredError={
+                                missingDictionary.has(pronunciation.id) &&
+                                !pronunciation.dict_phonetic.trim()
+                                  ? t(
+                                      "panel_enter_the_dictionary_transcription_first"
+                                    )
+                                  : undefined
+                              }
                               placeholder="Dictionary Pronunciation"
                               value={
                                 pronunciation.dict_phonetic_rich ?? {
@@ -416,6 +429,7 @@ export function V3PronunciationList({
                                   pronunciation={pronunciation}
                                   spelling={variant.spelling}
                                   dialect={variant.dialect}
+                                  onMissingSpelling={onMissingSpelling}
                                   onChange={(patch) =>
                                     onChange(
                                       updatePronunciation(
@@ -481,6 +495,17 @@ export function V3PronunciationList({
                         dialect={variant.dialect}
                         index={index}
                         issues={rowIssues}
+                        onMissingSpelling={onMissingSpelling}
+                        onMissingDictionary={() => {
+                          setMissingDictionary(
+                            (current) => new Set([...current, pronunciation.id])
+                          );
+                          document
+                            .getElementById(
+                              `${inputPrefix}-${pronunciation.id}-dict`
+                            )
+                            ?.focus();
+                        }}
                         onChange={(patch) =>
                           onChange(
                             updatePronunciation(

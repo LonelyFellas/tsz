@@ -1,0 +1,25 @@
+.required-field-feedback {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.required-field-feedback-error {
+  z-index: 1;
+  border-radius: var(--ui-border-radius);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--ui-color-error) 20%, transparent);
+}
+
+.required-field-feedback-message {
+  position: absolute;
+  inset: 1px;
+  display: flex;
+  align-items: center;
+  padding: 4px 11px;
+  color: var(--ui-color-error);
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
+  line-height: 20px;
+  pointer-events: none;
+}

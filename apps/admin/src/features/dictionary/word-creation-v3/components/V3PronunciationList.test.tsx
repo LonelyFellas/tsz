@@ -329,9 +329,12 @@ describe("独立发音输入", () => {
     expect(field("Azure UPS")).toHaveValue("H U M");
     change("Azure IPA", "");
     convert("UPS");
+    const missingIpa = field("Azure IPA");
+    expect(missingIpa).toHaveFocus();
+    expect(missingIpa).toHaveAttribute("aria-invalid", "true");
     expect(
-      screen.getByText("请先填写对应口音的 Azure IPA")
-    ).toBeInTheDocument();
+      document.getElementById(missingIpa.getAttribute("aria-describedby")!)
+    ).toBeVisible();
     expect(field("Azure UPS")).toHaveValue("H U M");
     await change("实际发音", "kæt?");
     convert("IPA");
@@ -572,4 +575,25 @@ it("读法按指定顺序展示，逐字正音使用独立 wire 值", () => {
   expect(
     wire.pos[0].forms[0].regional_variants.common.pronunciations[0].style
   ).toBe("citation");
+});
+
+it("Azure IPA 转换缺少字典音标时标记来源框，输入后清除并能再次转换", () => {
+  renderWithUps(<Harness phonetic="" />);
+  const source = screen.getByLabelText("第 1 条发音的字典音标");
+  const before = screen.getByTestId("form-state").textContent;
+  fireEvent.click(screen.getByLabelText("第 1 条发音转换为美式 Azure IPA"));
+  expect(source).toHaveFocus();
+  expect(source).toHaveAttribute("aria-invalid", "true");
+  expect(
+    document.getElementById(source.getAttribute("aria-describedby")!)
+  ).toBeVisible();
+  expect(screen.getByTestId("form-state").textContent).toBe(before);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.change(source, { target: { value: "kæt" } });
+  expect(source).toHaveFocus();
+  expect(source).not.toHaveAttribute("aria-invalid", "true");
+  fireEvent.click(screen.getByLabelText("第 1 条发音转换为美式 Azure IPA"));
+  expect(screen.getByLabelText("第 1 条发音的美式 Azure IPA")).toHaveValue(
+    "kæt"
+  );
 });

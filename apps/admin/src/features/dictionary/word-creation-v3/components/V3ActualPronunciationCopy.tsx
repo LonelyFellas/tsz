@@ -12,11 +12,13 @@ export function V3ActualPronunciationCopy({
   pronunciation,
   spelling,
   dialect,
+  onMissingSpelling,
   onChange
 }: {
   pronunciation: WordPronunciationV3;
   spelling: string;
   dialect: Dialect;
+  onMissingSpelling?: () => void;
   onChange: (patch: Partial<WordPronunciationV3>) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
@@ -56,6 +58,10 @@ export function V3ActualPronunciationCopy({
         title={t("panel_convert_to_actual_pronunciation")}
         disabled={!pronunciation.dict_phonetic.trim()}
         onClick={() => {
+          if (!spelling.trim()) {
+            onMissingSpelling?.();
+            return;
+          }
           const result = convertDictionaryToUnified(
             pronunciation.dict_phonetic,
             spelling,
@@ -63,11 +69,7 @@ export function V3ActualPronunciationCopy({
             pronunciation.style
           );
           if (!result.ok) {
-            void message.error(
-              !spelling.trim()
-                ? t("panel_enter_the_form_spelling_first")
-                : conversionMessage(result.message, t)
-            );
+            void message.error(conversionMessage(result.message, t));
             return;
           }
           apply(result.value);
