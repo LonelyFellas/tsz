@@ -820,9 +820,7 @@ export function pronunciationPlaybackSource(
     : pronunciation.audio_assets;
   const matchesLocale = (value: string | undefined) =>
     speechAccentGroup(value) === speechAccentGroup(locale);
-  const recordingChoice = pronunciation.audio_assets?.some(
-    (asset) => matchesLocale(asset.locale) && asset.is_default !== undefined
-  );
+  const explicitSynthesis = synthesis?.use_spelling != null;
   const content =
     (synthesis?.use_spelling ? spellingSpeech?.content : undefined) ??
     pronunciationSynthesisContent(
@@ -835,13 +833,10 @@ export function pronunciationPlaybackSource(
     pronunciation.audio_assets?.find(
       (asset) => asset.is_default && matchesLocale(asset.locale)
     )?.id ??
-    (!recordingChoice
-      ? uploads?.find(
-          (asset) => asset.is_default && matchesLocale(asset.locale)
-        )?.id
-      : undefined) ??
+    uploads?.find((asset) => asset.is_default && matchesLocale(asset.locale))
+      ?.id ??
     savedVoiceAudioAsset(!synthesis || content ? profile : undefined, locale) ??
-    (!recordingChoice
+    (!explicitSynthesis
       ? (uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
         pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))
           ?.id)
