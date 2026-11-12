@@ -699,7 +699,7 @@ export function V3FormCopyProvider({
                           },
                           ...sourcePronunciations.map((item, index) => ({
                             value: item.id,
-                            label: t("panel_source_reading", {
+                            title: t("panel_source_reading", {
                               p0: index + 1,
                               p1: item.style
                                 ? ` · ${pronunciationStyleLabel(item.style, t)}`
@@ -707,7 +707,26 @@ export function V3FormCopyProvider({
                               p2: item.actual_pron
                                 ? ` · ${item.actual_pron}`
                                 : ""
-                            })
+                            }),
+                            label: (
+                              <>
+                                {t("panel_source_reading", {
+                                  p0: index + 1,
+                                  p1: item.style
+                                    ? ` · ${pronunciationStyleLabel(item.style, t)}`
+                                    : "",
+                                  p2: ""
+                                })}
+                                {item.actual_pron && (
+                                  <>
+                                    {" · "}
+                                    <span className="tsz-phonetics">
+                                      {item.actual_pron}
+                                    </span>
+                                  </>
+                                )}
+                              </>
+                            )
                           }))
                         ]}
                         onChange={(id) =>

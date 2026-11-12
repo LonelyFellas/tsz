@@ -160,7 +160,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                         <ul className="lexicon-next-phonetics">
                           {match.phonetics.map((phonetic, index) => (
                             <li key={index}>
-                              {phonetic.ipa}
+                              <span className="tsz-phonetics">
+                                {phonetic.ipa}
+                              </span>
                               {phonetic.tags.length > 0 &&
                                 ` · ${phonetic.tags.join("、")}`}
                             </li>
