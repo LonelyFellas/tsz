@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-existing-matches-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "226972ef41a132dd878899e20c0c0463c8ede55ea9d4f7c322f454c81140947b",
+  "_source": "/Users/darwish/.codex/worktrees/task193-voice-selection-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "16d65edaed3dc1fb6b447590c5723903acd927c0022b7b4c8c783e86420e33f9",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",
@@ -3338,14 +3338,14 @@
         "contribution_ids": {
           "type": "array",
           "items": { "type": "string", "format": "uuid" },
-          "maxItems": 2
+          "maxItems": 2000
         },
         "group_id": { "type": "string", "format": "uuid" },
         "pair_id": { "type": "string", "format": "uuid" },
         "voice_ids": {
           "type": "array",
           "items": { "type": "string" },
-          "maxItems": 2
+          "maxItems": 2000
         }
       },
       "additionalProperties": false
