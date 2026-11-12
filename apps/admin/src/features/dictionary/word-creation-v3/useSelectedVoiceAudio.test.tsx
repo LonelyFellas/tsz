@@ -91,6 +91,31 @@ it("继承缓存重新成为有效推荐时启用声音并复用已存资产", a
   expect(generate).not.toHaveBeenCalled();
 });
 
+it("已启用的继承资产参数相同时保留宿主快照，不因响应字段顺序使草稿变脏", async () => {
+  const generate = vi.fn();
+  const resolveVoices = vi
+    .fn()
+    .mockResolvedValue({ voices: [setting], source: { kind: "catalog" } });
+  const view = setup(
+    { ...adapter(generate), resolveVoices },
+    {
+      voices: [{ audio_asset_id: "stored-audio", ...setting }],
+      dubbing: {
+        area: "word",
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
+    }
+  );
+  await waitFor(() => expect(resolveVoices).toHaveBeenCalled());
+  await waitFor(() => expect(view.result.current.busy).toBe(false));
+  expect(view.changed).not.toHaveBeenCalled();
+  expect(generate).not.toHaveBeenCalled();
+  expect(view.result.current.profile.voices[0]?.audio_asset_id).toBe(
+    "stored-audio"
+  );
+});
+
 it("保存等待在途的默认音频并取得资产回写，不重复发起生成", async () => {
   let finish!: (asset: AudioAsset) => void;
   const generate = vi.fn(
