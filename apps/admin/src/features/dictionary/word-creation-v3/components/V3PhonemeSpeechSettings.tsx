@@ -29,7 +29,11 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 import type { VoiceOption, VoicePreviewAdapter } from "@tsz/voice-editor/types";
-import { clearVoiceAudio, toRichTextV2 } from "@tsz/voice-editor/core";
+import {
+  clearVoiceAudio,
+  toRichTextV2,
+  withDefaultVoiceProfile
+} from "@tsz/voice-editor/core";
 import {
   editSynthesisUpsWords,
   pronunciationSynthesisContent,
@@ -118,6 +122,7 @@ export function V3PhonemeSpeechSettings({
   const audioTasks = useVoiceAudioTasks();
   const speech = candidate[`${alphabet}_speech`];
   const needsFallbackCatalog =
+    active &&
     !speech &&
     !!fallbackVoiceProfile?.voices.some(
       (setting) => setting.enabled && !setting.locale
@@ -206,6 +211,12 @@ export function V3PhonemeSpeechSettings({
         })
       }
     : undefined;
+  const storedProfile = speech?.voice_profile ?? fallbackVoiceProfile;
+  const defaultProfile = withDefaultVoiceProfile(storedProfile, "azure");
+  const scopedProfile =
+    !speech?.voice_profile && defaultProfile === fallbackVoiceProfile
+      ? scopedFallback!
+      : defaultProfile;
   const wordHistory = useRef(
     new Map<string, PronunciationSynthesisCandidateV3["ups_words"]>()
   );
@@ -228,7 +239,8 @@ export function V3PhonemeSpeechSettings({
               annotations: []
             })
           : { version: 2 as const, text: candidate[alphabet], annotations: [] },
-      voice_profile: speech?.voice_profile ?? scopedFallback,
+      voice_profile:
+        defaultProfile === storedProfile ? scopedProfile : undefined,
       ups_words: candidate.ups_words
     });
   };
@@ -477,9 +489,9 @@ export function V3PhonemeSpeechSettings({
       text: candidate[alphabet],
       annotations: []
     },
-    profile:
-      speech?.voice_profile ??
-      (scopedFallback ? clearVoiceAudio(scopedFallback) : undefined),
+    profile: speech?.voice_profile
+      ? defaultProfile
+      : clearVoiceAudio(scopedProfile),
     adapter: closedAdapter,
     locale,
     enabled:
@@ -493,7 +505,7 @@ export function V3PhonemeSpeechSettings({
       !voicePreviewIsMock &&
       !!spelling.trim() &&
       !synthesisInputIssue(alphabet, candidate[alphabet]),
-    defer: false,
+    defer: defaultProfile !== storedProfile,
     onChange: (voice_profile) =>
       onChange(
         {
@@ -597,10 +609,7 @@ export function V3PhonemeSpeechSettings({
             <VoiceEditor
               readOnly={!canEdit || saving || source !== sourceKey}
               mode="phoneme-settings"
-              autoRecommend={
-                candidate[`${alphabet}_speech`]?.voice_profile == null &&
-                fallbackVoiceProfile == null
-              }
+              autoRecommend={defaultProfile !== storedProfile}
               loadRecommendations={loadAdminVoiceRecommendations}
               recommendationArea="azure"
               locale={locale}

@@ -105,6 +105,7 @@ function PronunciationCell({
     variant.dialect
   );
   const profile = activeProfile ?? row.voice_profile;
+  const recommendationArea = row.synthesis?.use_spelling ? "word" : "azure";
   const actualPron = row.actual_pron_rich ?? {
     version: 2 as const,
     text: row.actual_pron,
@@ -118,6 +119,7 @@ function PronunciationCell({
     >
       {settings ? (
         <PronunciationPreviewVoiceSummary
+          recommendationArea={recommendationArea}
           dialect={dialect}
           voiceProfile={profile}
           pronunciationId={row.id}
@@ -127,6 +129,7 @@ function PronunciationCell({
       ) : (
         <div className="v3-overview-pronunciation">
           <PronunciationPreviewControls
+            recommendationArea={recommendationArea}
             pronunciationId={row.id}
             dialect={dialect}
             content={content}

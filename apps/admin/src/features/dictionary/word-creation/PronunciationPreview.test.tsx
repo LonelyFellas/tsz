@@ -7,7 +7,10 @@ import {
   within
 } from "@testing-library/react";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
-import type { VoicePreviewResult } from "@tsz/voice-editor/types";
+import type {
+  VoicePreviewResult,
+  VoiceRecommendationArea
+} from "@tsz/voice-editor/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PronunciationPreviewControls,
@@ -17,6 +20,7 @@ import {
 } from "./PronunciationPreview";
 import { deferred } from "./wordCreation.test.helper";
 import { V3EnglishTextPreview } from "../word-creation-v3/components/V3EnglishTextPreview";
+import { queryClient } from "@/lib/queryClient";
 
 const preview = vi.hoisted(() => ({
   enabled: true,
@@ -141,6 +145,7 @@ function PreviewHarness({
   spelling = "tomato",
   content,
   voiceProfile,
+  recommendationArea,
   playbackOnly,
   assetOnly,
   audioAssetId,
@@ -150,6 +155,7 @@ function PreviewHarness({
   spelling?: string;
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
+  recommendationArea?: VoiceRecommendationArea;
   playbackOnly?: boolean;
   assetOnly?: boolean;
   audioAssetId?: string;
@@ -163,6 +169,7 @@ function PreviewHarness({
         spelling={spelling}
         content={content}
         voiceProfile={voiceProfile}
+        recommendationArea={recommendationArea}
         playbackOnly={playbackOnly}
         assetOnly={assetOnly}
         audioAssetId={audioAssetId}
@@ -209,6 +216,94 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it.each([undefined, { voices: [] }])(
+  "未配置快捷试听采用最新板块推荐，返回页面后刷新：%j",
+  async (voiceProfile) => {
+    const recommended = (rate: number) => [
+      {
+        voice_id: "british-voice",
+        version_id: "current",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: rate,
+        volume_percent: 93
+      }
+    ];
+    preview.resolveVoices.mockReset().mockResolvedValue(recommended(-10));
+    render(
+      <PreviewHarness recommendationArea="azure" voiceProfile={voiceProfile} />
+    );
+    await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalled());
+    expect(preview.resolveVoices.mock.calls[0]![0].profile).toMatchObject({
+      voices: [],
+      dubbing: { mode: "inherit", area: "azure" }
+    });
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    await waitFor(() =>
+      expect(preview.synthesize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voiceId: "british-voice",
+          ratePercent: -10,
+          volumePercent: 93
+        }),
+        expect.anything()
+      )
+    );
+    preview.resolveVoices.mockResolvedValue(recommended(-25));
+    fireEvent(window, new Event("focus"));
+    await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    await waitFor(() =>
+      expect(preview.synthesize).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ratePercent: -25, volumePercent: 93 }),
+        expect.anything()
+      )
+    );
+  }
+);
+
+it("默认音色摘要与播放合并解析，保存推荐后同步新参数", async () => {
+  const setting = {
+    voice_id: "british-voice",
+    version_id: "current",
+    locale: "en-GB",
+    enabled: true,
+    rate_percent: -10
+  };
+  preview.resolveVoices.mockReset().mockResolvedValue([setting]);
+  const content: RichTextV2 = { version: 2, text: "hello", annotations: [] };
+  render(
+    <PronunciationPreviewProvider>
+      <PronunciationPreviewVoiceSummary
+        dialect="uk"
+        recommendationArea="word"
+        content={content}
+        column="rate"
+      />
+      <PronunciationPreviewControls
+        pronunciationId="default"
+        dialect="uk"
+        recommendationArea="word"
+        content={content}
+      />
+    </PronunciationPreviewProvider>
+  );
+  expect(await screen.findByText("0.90×")).toBeVisible();
+  expect(preview.resolveVoices).toHaveBeenCalledTimes(1);
+  preview.resolveVoices.mockResolvedValue([{ ...setting, rate_percent: -25 }]);
+  act(() =>
+    queryClient.setQueryData(["admin-dubbing-groups-v3", "actor"], {
+      revision: 2
+    })
+  );
+  expect(await screen.findByText("0.75×")).toBeVisible();
+  expect(preview.resolveVoices).toHaveBeenCalledTimes(2);
+  queryClient.removeQueries({ queryKey: ["admin-dubbing-groups-v3", "actor"] });
 });
 
 describe("PronunciationPreview", () => {

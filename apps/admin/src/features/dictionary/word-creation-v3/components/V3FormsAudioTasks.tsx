@@ -5,6 +5,7 @@ import type {
   FormContentVariantV3,
   SharedFormsStepContentV3,
   VoiceProfileV3,
+  AudioAssetV3,
   RichTextV2
 } from "@tsz/types";
 import { Alert, Button } from "@tsz/ui/admin/display";
@@ -17,7 +18,7 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
-import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import type { VoiceOption } from "@tsz/voice-editor/types";
 import { flushSync } from "react-dom";
@@ -148,22 +149,46 @@ export function V3FormsAudioTasks({
       )}
       {variants(forms).map(({ variant, dialect }) => (
         <div key={variant.id}>
-          {!rowOnly && variant.spelling_speech && (
-            <TextAudioTask
-              target={JSON.stringify([variant.id, "spelling_speech"])}
-              content={variant.spelling_speech.content}
-              profile={variant.spelling_speech.voice_profile}
-              enabled={ready}
-              onChange={(voice_profile) =>
-                patch(variant.id, (current) => {
-                  current.spelling_speech = {
-                    ...current.spelling_speech!,
-                    voice_profile
-                  };
-                })
-              }
-            />
-          )}
+          {!rowOnly &&
+            (variant.spelling_speech ||
+              variant.pronunciations.some(
+                (row) => row.synthesis?.use_spelling
+              )) && (
+              <TextAudioTask
+                target={JSON.stringify([variant.id, "spelling_speech"])}
+                content={
+                  variant.spelling_speech?.content ?? {
+                    version: 2,
+                    text: variant.spelling,
+                    annotations: []
+                  }
+                }
+                profile={variant.spelling_speech?.voice_profile}
+                audioAssets={variant.spelling_speech?.audio_assets}
+                recommendationArea="word"
+                locale={
+                  dialect === "common"
+                    ? undefined
+                    : dialect === "uk"
+                      ? "en-GB"
+                      : "en-US"
+                }
+                enabled={ready}
+                onChange={(voice_profile) =>
+                  patch(variant.id, (current) => {
+                    current.spelling_speech = {
+                      content: {
+                        version: 2,
+                        text: current.spelling,
+                        annotations: []
+                      },
+                      ...current.spelling_speech,
+                      voice_profile
+                    };
+                  })
+                }
+              />
+            )}
           {variant.pronunciations.flatMap((pronunciation) => {
             const rowAudio = pronunciation.voice_profile ? (
               <TextAudioTask
@@ -221,17 +246,18 @@ export function V3FormsAudioTasks({
                       pronunciation.voice_profile
                         ? {
                             ...pronunciation.voice_profile,
-                            voices: pronunciation.voice_profile.voices.flatMap(
+                            voices: pronunciation.voice_profile.voices.map(
                               (setting) => {
-                                if (!setting.enabled) return [setting];
+                                if (!setting.enabled) return setting;
                                 const sourceLocale =
                                   setting.locale ??
                                   catalog.find(
                                     (voice) => voice.id === setting.voice_id
                                   )?.locale;
-                                return sourceLocale === locale
-                                  ? [{ ...setting, locale }]
-                                  : [];
+                                return sourceLocale === "en-GB" ||
+                                  sourceLocale === "en-US"
+                                  ? { ...setting, locale: sourceLocale }
+                                  : setting;
                               }
                             )
                           }
@@ -262,22 +288,33 @@ function TextAudioTask({
   content,
   profile,
   enabled,
-  onChange
+  onChange,
+  recommendationArea,
+  audioAssets,
+  locale
 }: {
   target: string;
   content: RichTextV2;
-  profile: VoiceProfileV3;
+  profile?: VoiceProfileV3;
+  recommendationArea?: "word";
+  audioAssets?: AudioAssetV3[];
+  locale?: "en-GB" | "en-US";
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const effectiveProfile = recommendationArea
+    ? withDefaultVoiceProfile(profile, recommendationArea)
+    : profile;
   const task = useSelectedVoiceAudio({
     target,
     content,
-    profile,
+    profile: effectiveProfile,
+    audioAssets,
+    locale,
     adapter: adminVoicePreviewAdapter,
     enabled,
-    defer: false,
+    defer: effectiveProfile !== profile,
     onChange
   });
   return task.error == null ? null : (

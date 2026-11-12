@@ -12,6 +12,18 @@ import { isVoiceRecommendationAvailable } from "./voice-recommendations";
 import { effectiveVoiceSetting } from "./voice-pool";
 import { newVoiceVersionId, voiceSettingKey } from "./voice-versions";
 
+/** Only absent/legacy-empty profiles are defaults; explicit local pools remain independent. */
+export function withDefaultVoiceProfile(
+  profile: VoiceProfile | null | undefined,
+  area: VoiceRecommendationArea
+): VoiceProfile {
+  if (profile?.dubbing || profile?.voices.length) return profile;
+  return {
+    voices: [],
+    dubbing: { mode: "inherit", area, pool_version: "provider_id_v1" }
+  };
+}
+
 export function recommendationVoiceSetting(
   item: VoiceRecommendation,
   voices: readonly VoiceOption[]

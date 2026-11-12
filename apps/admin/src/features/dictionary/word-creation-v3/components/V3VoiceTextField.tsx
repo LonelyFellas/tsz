@@ -30,7 +30,8 @@ import {
   normalizeSpellingRich,
   remapTextLinks,
   toRichTextV2,
-  recommendationVoiceSetting
+  recommendationVoiceSetting,
+  withDefaultVoiceProfile
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { PencilIcon } from "lucide-react";
@@ -571,7 +572,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const automaticAudio = useSelectedVoiceAudio({
     target: JSON.stringify([nodeId, field]),
     content: collapsedContent,
-    profile: voiceProfile,
+    profile: area ? withDefaultVoiceProfile(voiceProfile, area) : voiceProfile,
+    audioAssets,
     adapter: collapsedAdapter,
     locale: voiceLocale(dialect),
     enabled:
@@ -585,7 +587,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       !contentReadOnly &&
       mode !== "actual-pron" &&
       !!onVoiceProfileChange,
-    defer: focused,
+    defer:
+      focused ||
+      (!!area && withDefaultVoiceProfile(voiceProfile, area) !== voiceProfile),
     onChange: onVoiceProfileChange
   });
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。
@@ -1040,7 +1044,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             }}
             readOnly={readOnly || saving}
             value={editorState.value}
-            voiceProfile={editorState.voiceProfile}
+            voiceProfile={
+              area &&
+              env.VOICE_PREVIEW &&
+              !initialVoiceState.current.unconfigured
+                ? withDefaultVoiceProfile(editorState.voiceProfile, area)
+                : editorState.voiceProfile
+            }
           />
         </Suspense>
       </div>

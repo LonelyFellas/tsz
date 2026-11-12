@@ -5,7 +5,8 @@ import {
   localVoiceProfile,
   recommendationVoiceSetting,
   retainResolvedAudio,
-  resolveRecommendedVoices
+  resolveRecommendedVoices,
+  withDefaultVoiceProfile
 } from "./dubbing";
 
 const voices: VoiceOption[] = [
@@ -51,6 +52,31 @@ const recommendations: VoiceRecommendation[] = [
   }
 ];
 describe("文本配音模式", () => {
+  it("仅缺省或旧空配置继承推荐，局部空池与停用缓存保留原意", () => {
+    for (const profile of [undefined, null, { voices: [] }])
+      expect(withDefaultVoiceProfile(profile, "azure")).toEqual({
+        voices: [],
+        dubbing: {
+          mode: "inherit",
+          area: "azure",
+          pool_version: "provider_id_v1"
+        }
+      });
+    const profiles: VoiceProfile[] = [
+      {
+        voices: [],
+        dubbing: {
+          mode: "local",
+          area: "azure",
+          pool_version: "provider_id_v1"
+        }
+      },
+      { voices: [{ voice_id: "sonia", enabled: false, rate_percent: -10 }] },
+      { voices: [], dubbing: { mode: "inherit", area: "word" } }
+    ];
+    for (const profile of profiles)
+      expect(withDefaultVoiceProfile(profile, "azure")).toBe(profile);
+  });
   it("已保存版本按人工口音参与候选，原生地区保留且不决定英美侧", () => {
     const reassigned = [{ ...voices[1]!, accent: "gb" as const }];
     const setting = {

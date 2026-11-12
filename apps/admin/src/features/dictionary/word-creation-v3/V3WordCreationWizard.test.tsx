@@ -15,6 +15,7 @@ import { V3FormContentModal } from "./components/V3FormContentModal";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { useAuthStore } from "@/lib/auth";
+import { env } from "@/lib/env";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminWordDraftV3Envelope,
@@ -70,6 +71,15 @@ import {
 vi.mock("./components/V3SynthesisInputs", () => ({
   V3SynthesisInputs: () => null
 }));
+
+// 定位与内容结构用例没有配音服务 fixture；默认配音保存由专用用例和真实后端验收覆盖。
+function withoutSpeechService() {
+  const previous = env.VOICE_PREVIEW;
+  env.VOICE_PREVIEW = false;
+  onTestFinished(() => {
+    env.VOICE_PREVIEW = previous;
+  });
+}
 
 function canonicalMeanings(posId: string): AdminWordV3["meanings"] {
   return {
@@ -2837,6 +2847,7 @@ describe("V3WordCreationWizard", () => {
   });
 
   it("routes a meanings publication issue to its POS and backend text-variant locator", async () => {
+    withoutSpeechService();
     const initialWord = word();
     const secondPosId = "meaning-pos-2";
     initialWord.forms.pos.push(
@@ -6726,6 +6737,7 @@ it.each([commonFormFixture(), ukUsFormFixture()])(
 );
 
 it("未保存页面时跨两次内容弹窗地区往返保留完整引用身份", async () => {
+  withoutSpeechService();
   const initialWord: AdminWordV3 = word();
   const shared = applyFormsStructure(
     { forms_format: "shared_v1", contents: [], pos: [] },
@@ -7178,6 +7190,7 @@ describe("新草稿默认录入位", () => {
   });
 
   it("删除模板行后经过保存请求和 canonical 响应，重新挂载不回补", async () => {
+    withoutSpeechService();
     const initialWord = word();
     let savedWord: AdminWordV3 | undefined;
     const saveForms = vi.fn<V3WordRequests["saveForms"]>(

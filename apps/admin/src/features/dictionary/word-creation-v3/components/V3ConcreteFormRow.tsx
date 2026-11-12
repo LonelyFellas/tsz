@@ -417,6 +417,7 @@ function V3DialectFormCell({
           dialect={dialect}
           leadingAction={
             <PronunciationPreviewControls
+              recommendationArea="word"
               playbackOnly
               pronunciationId={variant.id}
               spelling={variant.spelling}
@@ -892,6 +893,7 @@ export function V3ConcreteFormRow({
                 }
                 leadingAction={
                   <PronunciationPreviewControls
+                    recommendationArea="word"
                     playbackOnly
                     pronunciationId={commonVariant.id}
                     spelling={commonVariant.spelling}
@@ -1008,6 +1010,7 @@ export function V3ConcreteFormRow({
                 }
                 leadingAction={
                   <PronunciationPreviewControls
+                    recommendationArea="word"
                     playbackOnly
                     pronunciationId={form.id}
                     spelling={unifiedSpellingVariants.uk.spelling}
