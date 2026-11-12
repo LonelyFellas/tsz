@@ -905,7 +905,7 @@ export function addPartOfSpeech(
     id,
     dict_phonetic: "",
     actual_pron: "",
-    style: "normal"
+    style: "citation"
   });
   const regionalVariants = commonDialect
     ? {
@@ -1196,7 +1196,7 @@ export function addConcreteForm(
     id,
     dict_phonetic: "",
     actual_pron: "",
-    style: "normal"
+    style: "citation"
   });
   const regionalVariants = commonDialect
     ? {
@@ -1389,7 +1389,7 @@ export function editSpellingList(
           id: idFactory(),
           dict_phonetic: "",
           actual_pron: "",
-          style: "normal" as const
+          style: "citation" as const
         }
       ]
     };

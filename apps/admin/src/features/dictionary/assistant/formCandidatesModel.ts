@@ -49,7 +49,7 @@ export interface CandidateImportRow {
 export function candidatePronunciation(
   value: AssistantCandidateVariant,
   dialect: Dialect,
-  style: PronunciationStyle = "normal"
+  style: PronunciationStyle = "citation"
 ): WordPronunciationV3 {
   const actual = convertDictionaryToUnified(
     value.dict_phonetic,
