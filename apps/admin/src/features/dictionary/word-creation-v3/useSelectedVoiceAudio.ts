@@ -264,9 +264,10 @@ export function useSelectedVoiceAudio({
         stored = {
           ...stored,
           voices: stored.voices.map((setting) => {
-            const resolved = inScope(setting, stored, locale)
-              ? reused.get(voiceSettingKey(setting))
-              : undefined;
+            const resolved =
+              !setting.enabled && inScope(setting, stored, locale)
+                ? reused.get(voiceSettingKey(setting))
+                : undefined;
             return resolved
               ? {
                   ...resolved,
