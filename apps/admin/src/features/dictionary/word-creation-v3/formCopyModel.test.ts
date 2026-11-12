@@ -1338,3 +1338,129 @@ it("只复制英式拼写音色时保留美式IPA行的原有音色缓存", () =
     "new-spelling"
   );
 });
+
+it("混合旧格式复制上传来源时保留目标该侧有效拼写来源", () => {
+  const { forms, sourceId, targetId } = setup(
+    commonFormFixture({ spelling: "cat" }),
+    commonFormFixture({ id: uuidFromInt(700), spelling: "cats" })
+  );
+  const from = variant(forms.contents[0]!).pronunciations[0]!;
+  const to = variant(forms.contents[1]!).pronunciations[0]!;
+  from.synthesis = {
+    alphabet: "ipa",
+    use_spelling: false,
+    ipa: "",
+    ups: "",
+    uk: { source: "upload", ipa: "kæt", ups: "" },
+    us: { ipa: "kæt", ups: "" }
+  };
+  to.synthesis = {
+    alphabet: "ipa",
+    use_spelling: true,
+    ipa: "",
+    ups: "",
+    uk: { ipa: "", ups: "" },
+    us: { ipa: "", ups: "" }
+  };
+  const result = applyFormCopy(
+    forms,
+    planFormCopy(forms, sourceId, targetId, "phonetics")
+  );
+  const synthesis = variant(result.contents[1]!).pronunciations[0]!.synthesis!;
+  expect(synthesisForLocale(synthesis, "en-GB", "common").use_spelling).toBe(
+    true
+  );
+  expect(synthesisForLocale(synthesis, "en-US", "common").use_spelling).toBe(
+    false
+  );
+});
+
+it("另一侧旧来源改变时不覆盖显式侧既有IPA音色缓存", () => {
+  const { forms, sourceId, targetId } = setup(
+    commonFormFixture({ spelling: "cat" }),
+    commonFormFixture({ id: uuidFromInt(700), spelling: "cats" })
+  );
+  const from = variant(forms.contents[0]!).pronunciations[0]!;
+  const targetVariant = variant(forms.contents[1]!);
+  const to = targetVariant.pronunciations[0]!;
+  from.synthesis = {
+    alphabet: "ipa",
+    use_spelling: false,
+    ipa: "",
+    ups: "",
+    uk: { source: "ipa", ipa: "kæt", ups: "" },
+    us: { ipa: "kæt", ups: "" }
+  };
+  to.voice_profile = profile("row-fallback");
+  const spellingProfile = profile("spelling-target", true);
+  spellingProfile.dubbing!.area = "word";
+  targetVariant.spelling_speech = speech("cats", spellingProfile);
+  to.synthesis = {
+    alphabet: "ipa",
+    use_spelling: true,
+    ipa: "",
+    ups: "",
+    uk: {
+      source: "ipa",
+      ipa: "kæts",
+      ups: "",
+      ipa_speech: speech("cats", profile("keep-uk-ipa"))
+    },
+    us: { ipa: "kæts", ups: "" }
+  };
+  const result = applyFormCopy(
+    forms,
+    planFormCopy(forms, sourceId, targetId, "phonetics")
+  );
+  const synthesis = variant(result.contents[1]!).pronunciations[0]!.synthesis!;
+  expect(synthesis.uk!.ipa_speech!.voice_profile.voices[0]!.voice_id).toBe(
+    "keep-uk-ipa"
+  );
+  expect(synthesis.us!.ipa_speech!.voice_profile.voices[0]!.voice_id).toBe(
+    "spelling-target"
+  );
+  expect(synthesis.us!.ipa_speech!.voice_profile.dubbing!.area).toBe("azure");
+  expect(synthesis.us!.ipa_speech!.voice_profile.dubbing!.us.mode).toBe(
+    "inherit"
+  );
+});
+
+it("部分合并按保存的口音归属替换，而不是按原生locale保留旧英式声音", () => {
+  const { forms, sourceId, targetId } = setup();
+  const from = variant(forms.contents[0]!).pronunciations[0]!;
+  const to = variant(forms.contents[1]!).pronunciations[0]!;
+  from.voice_profile = profile("same-voice");
+  const oldBritish = {
+    ...profile("same-voice").voices[0]!,
+    version_id: uuidFromInt(599),
+    locale: "en-US" as const,
+    accent: "gb" as const,
+    rate_percent: 30
+  };
+  const american = {
+    ...profile("keep-us").voices[0]!,
+    version_id: uuidFromInt(598),
+    locale: "en-US" as const,
+    accent: "us" as const
+  };
+  to.voice_profile = {
+    voices: [oldBritish, american],
+    dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } }
+  };
+  const result = applyFormCopy(
+    forms,
+    planFormCopy(forms, sourceId, targetId, "voices", { us: { [to.id]: null } })
+  );
+  const copied = variant(result.contents[1]!).pronunciations[0]!.voice_profile!;
+  expect(
+    copied.voices.filter(
+      (voice) => voice.voice_id === "same-voice" && voice.enabled
+    )
+  ).toHaveLength(1);
+  expect(
+    copied.voices.find((voice) => voice.voice_id === "same-voice")!.rate_percent
+  ).toBe(12);
+  expect(copied.voices.find((voice) => voice.voice_id === "keep-us")).toEqual(
+    american
+  );
+});
