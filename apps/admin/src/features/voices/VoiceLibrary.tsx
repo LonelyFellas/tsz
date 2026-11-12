@@ -166,9 +166,11 @@ type VoiceView = "groups" | "library";
 export function VoiceLibrary({ view = "groups" }: { view?: VoiceView }) {
   const accountId = useAuthStore((state) => state.profile?.id);
   return (
-    <DubbingDrafts key={accountId}>
-      <VoiceLibraryContent key={view} view={view} />
-    </DubbingDrafts>
+    <div className="voice-library-scroll" tabIndex={0}>
+      <DubbingDrafts key={accountId}>
+        <VoiceLibraryContent key={view} view={view} />
+      </DubbingDrafts>
+    </div>
   );
 }
 

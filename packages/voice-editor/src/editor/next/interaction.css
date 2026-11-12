@@ -525,12 +525,22 @@
   }
 }
 
+.tsz-ve-local-pool-scroll {
+  min-width: 0;
+  max-width: 100%;
+  padding-inline-end: var(--ui-space-4, 16px);
+  scroll-padding-inline-end: var(--ui-space-4, 16px);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.tsz-ve-local-pool-scroll:focus-visible {
+  outline: var(--ui-focus-ring);
+  outline-offset: 2px;
+}
 .tsz-ve-local-pool {
   box-sizing: border-box;
   container-type: inline-size;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
+  width: 1120px;
   margin-top: 16px;
 }
 .tsz-ve-local-pool > .ui-typography,

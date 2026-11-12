@@ -398,6 +398,13 @@
 .dubbing-editor-drawer .ui-drawer-body {
   padding: 23px 26px;
 }
+.dubbing-editor-drawer .ui-drawer-body > .ui-form {
+  width: 508px;
+}
+.dubbing-editor-drawer .voice-configuration-layout {
+  width: 508px;
+  grid-template-columns: minmax(0, 1fr);
+}
 .dubbing-editor-drawer .ui-drawer-footer {
   padding: var(--ui-space-4) 26px;
   text-align: right;
@@ -415,24 +422,6 @@
   color: var(--ui-color-text-tertiary);
 }
 @media (max-width: 700px) {
-  .dubbing-group-entry {
-    grid-template-columns: 40px minmax(0, 1fr);
-    gap: 6px;
-  }
-  .dubbing-group-priority > .ui-space {
-    flex-direction: column;
-  }
-  .dubbing-group {
-    padding-inline: 15px;
-  }
-  .dubbing-group-heading,
-  .dubbing-group-footer {
-    flex-wrap: wrap;
-  }
-  .dubbing-group-heading > .ui-space,
-  .dubbing-group-footer > .ui-space {
-    flex-wrap: wrap;
-  }
   .dubbing-legacy-overview,
   .dubbing-legacy-review-columns {
     grid-template-columns: minmax(0, 1fr);
@@ -502,7 +491,7 @@
   display: flex;
   flex-direction: column;
   padding: 18px var(--ui-space-6);
-  overflow: hidden;
+  overflow-x: auto;
 }
 .dubbing-pair-editor .ui-drawer-footer {
   margin: 0;
@@ -527,6 +516,8 @@
   justify-content: flex-end;
 }
 .dubbing-pair-form {
+  width: 1072px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-3);
@@ -614,7 +605,7 @@
 }
 .dubbing-pair-workspace {
   display: grid;
-  grid-template-columns: minmax(240px, 0.6fr) minmax(0, 1.4fr);
+  grid-template-columns: 316px minmax(0, 1fr);
   min-height: 0;
   flex: 1;
   gap: var(--ui-space-5);
@@ -715,66 +706,16 @@
   border-left: 1px solid var(--voice-border, var(--ui-color-border-secondary));
   scrollbar-gutter: stable;
 }
+.dubbing-pair-controls-panel .voice-configuration-layout {
+  width: 696px;
+  grid-template-columns: minmax(0, 1fr);
+}
 @media (max-width: 700px) {
   .dubbing-pair-editor .ui-drawer-header {
     padding: var(--ui-space-4);
   }
-  .dubbing-pair-editor .ui-drawer-body {
-    padding: var(--ui-space-3) var(--ui-space-4);
-  }
   .dubbing-pair-editor .ui-drawer-footer {
     padding: var(--ui-space-3) var(--ui-space-4);
-  }
-  .dubbing-pair-form {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
-  .dubbing-pair-metadata {
-    display: block;
-  }
-  .dubbing-pair-metadata > .ui-checkbox-wrapper {
-    margin: 10px 0 0;
-  }
-  .dubbing-pair-selection {
-    background: var(--ui-color-bg-container);
-    gap: var(--ui-space-2);
-  }
-  .dubbing-selection-side.ui-btn {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 3px var(--ui-space-2);
-    padding: var(--ui-space-2) 10px;
-    min-height: 56px;
-  }
-  .dubbing-selection-parameters {
-    grid-column: 1 / -1;
-  }
-  .dubbing-selection-name {
-    font-size: var(--ui-font-size);
-  }
-  .dubbing-selection-name .voice-shared-name > small {
-    display: none;
-  }
-  .dubbing-pair-workspace {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-5);
-    flex: 1;
-    min-height: 0;
-    /* 主滚动区位于信息栏下方，吸顶试听工具栏不会进入切换条。 */
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-  .dubbing-voice-picker {
-    height: 300px;
-    flex-shrink: 0;
-  }
-  .dubbing-pair-controls-panel {
-    flex-shrink: 0;
-    border-left: 0;
-    border-top: 1px solid var(--voice-border, var(--ui-color-border-secondary));
-    overflow: visible;
-    padding: var(--ui-space-4) 0 0;
   }
   .dubbing-editor-footer {
     flex-direction: column;
