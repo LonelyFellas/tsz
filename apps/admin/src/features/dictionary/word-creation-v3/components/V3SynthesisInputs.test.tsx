@@ -18,7 +18,9 @@ import type {
 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
+import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
 import { VoiceAudioTasksContext } from "../voiceSaveContext";
+import { pronunciationPlaybackSource } from "@tsz/shared";
 
 const speech = vi.hoisted(() => ({
   canGenerate: true,
@@ -136,6 +138,7 @@ function Harness({
   settingsPhrase = false,
   generated = false,
   recording = false,
+  extraRecording = false,
   issues = [],
   audioTasks = null
 }: {
@@ -148,6 +151,7 @@ function Harness({
   settingsPhrase?: boolean;
   generated?: boolean;
   recording?: boolean;
+  extraRecording?: boolean;
   issues?: readonly V3DraftValidationIssue[];
   audioTasks?: Map<string, () => Promise<boolean>> | null;
 }) {
@@ -186,7 +190,20 @@ function Harness({
               original_name: "recording.mp3",
               created_at: "2026-11-11T07:00:00Z",
               is_default: true
-            }
+            },
+            ...(extraRecording
+              ? [
+                  {
+                    id: "old-alternative",
+                    locale: "en-GB" as const,
+                    gender: "female" as const,
+                    content_type: "audio/mpeg",
+                    size_bytes: 1024,
+                    original_name: "alternative.mp3",
+                    created_at: "2026-11-11T07:00:00Z"
+                  }
+                ]
+              : [])
           ]
         }
       : {}),
@@ -1499,4 +1516,103 @@ it("外层上传权限不足时保留已有录音，文件校验和失败重试�
         .audio_assets
     ).toEqual([expect.objectContaining({ id: "retry-audio", locale: "en-US" })])
   );
+});
+
+it("面板取消和移除默认录音均保留显式选择，不把本口音旧录音重新当作回退", async () => {
+  render(<Harness dialect="uk" recording extraRecording />);
+  const saved = () =>
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  fireEvent.click(await screen.findByLabelText("取消默认播放 recording.mp3"));
+  await waitFor(() =>
+    expect(
+      saved().audio_assets.every(
+        (asset: { is_default?: boolean }) => asset.is_default === false
+      )
+    ).toBe(true)
+  );
+  expect(screen.getByRole("radio", { name: "上传音频" })).not.toBeChecked();
+  expect(
+    pronunciationPlaybackSource("far", saved(), undefined, "en-GB", "uk")
+      .assetId
+  ).toBeUndefined();
+  fireEvent.click(screen.getByLabelText("设为默认播放 recording.mp3"));
+  await waitFor(() =>
+    expect(screen.getByRole("radio", { name: "上传音频" })).toBeChecked()
+  );
+  fireEvent.click(screen.getByLabelText("移除 recording.mp3"));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "移除", exact: true })
+  );
+  await waitFor(() =>
+    expect(saved().audio_assets).toEqual([
+      expect.objectContaining({ id: "old-alternative", is_default: false })
+    ])
+  );
+  expect(
+    pronunciationPlaybackSource("far", saved(), undefined, "en-GB", "uk")
+      .assetId
+  ).toBeUndefined();
+});
+
+it("上传完成使用宿主当前回调，保留上传期间编辑的其他字段", async () => {
+  let finish!: (asset: unknown) => void;
+  speech.upload.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  function RaceHarness() {
+    const [draft, setDraft] = useState({
+      note: "",
+      assets: [] as import("@tsz/types").AudioAssetV3[]
+    });
+    return (
+      <App>
+        <input
+          aria-label="其他字段"
+          value={draft.note}
+          onChange={(event) => setDraft({ ...draft, note: event.target.value })}
+        />
+        <V3PronunciationAudioUpload
+          nodeId="race"
+          locale="en-US"
+          label="人工上传"
+          assets={draft.assets}
+          onChange={(assets) => setDraft({ ...draft, assets })}
+        />
+        <output data-testid="upload-race-wire">{JSON.stringify(draft)}</output>
+      </App>
+    );
+  }
+  render(<RaceHarness />);
+  fireEvent.click(screen.getByRole("button", { name: "人工上传" }));
+  fireEvent.change(
+    await screen.findByLabelText("上传音频", { selector: "input" }),
+    {
+      target: {
+        files: [new File(["fixture"], "race.mp3", { type: "audio/mpeg" })]
+      }
+    }
+  );
+  await waitFor(() => expect(speech.upload).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByLabelText("其他字段"), {
+    target: { value: "上传期间的编辑" }
+  });
+  finish({
+    id: "race-upload",
+    locale: "en-US",
+    gender: "female",
+    content_type: "audio/mpeg",
+    size_bytes: 7,
+    original_name: "race.mp3",
+    created_at: "2026-11-12T00:00:00Z"
+  });
+  await waitFor(() =>
+    expect(screen.getByTestId("upload-race-wire").textContent).toContain(
+      "race-upload"
+    )
+  );
+  expect(screen.getByLabelText("其他字段")).toHaveValue("上传期间的编辑");
 });

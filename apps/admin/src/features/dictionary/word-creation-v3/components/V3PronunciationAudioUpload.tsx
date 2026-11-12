@@ -9,6 +9,7 @@ import { adminAudioUploadAdapter } from "../../voice-editor/dataSource";
 import { useContentEditPermissions } from "../../contentEditPermissions";
 import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { useVoiceAudioTasks } from "../voiceSaveContext";
+import { speechAccentGroup } from "@tsz/shared";
 
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -67,16 +68,22 @@ export function V3PronunciationAudioUpload({
               }
               audioUploadAllowed={allowed}
               audioAssets={assets}
-              onAudioAssetsChange={(next) =>
+              onAudioAssetsChange={(next) => {
+                const explicitAccents = new Set(
+                  assets
+                    .filter((asset) => asset.is_default !== undefined)
+                    .map((asset) => speechAccentGroup(asset.locale))
+                );
                 onChange(
                   next.map((asset) =>
                     asset.is_default === undefined &&
-                    !assets.some((current) => current.id === asset.id)
+                    (!assets.some((current) => current.id === asset.id) ||
+                      explicitAccents.has(speechAccentGroup(asset.locale)))
                       ? { ...asset, is_default: false }
                       : asset
                   )
-                )
-              }
+                );
+              }}
               onValidationChange={(valid) => {
                 ready.current = valid;
               }}
