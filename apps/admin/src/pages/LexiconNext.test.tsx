@@ -218,7 +218,7 @@ it("已有词条翻页只重查新版匹配，失败保留原结果并支持重�
   expect(screen.getByText("第一页已有释义")).toBeVisible();
   fireEvent.click(within(region).getByRole("button", { name: /2.*页/ }));
   await screen.findByText("第二页已有释义");
-  expect(region).toHaveFocus();
+  await waitFor(() => expect(region).toHaveFocus());
   expect(api.detect).toHaveBeenCalledTimes(1);
   expect(api.matchEntries).toHaveBeenLastCalledWith({
     target_language: "en",

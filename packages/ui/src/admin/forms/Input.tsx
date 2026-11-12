@@ -61,6 +61,7 @@ const TextInput = forwardRef<InputRef, InputProps>(function TextInput(
       prefixCls="ui-input"
       className={fieldClass("ui-input", { size, status, variant }, className)}
       disabled={useFieldDisabled(disabled)}
+      data-ui-clearable={!!allowClear || undefined}
       allowClear={clearControl(allowClear, t("actions.clear"))}
     />
   );

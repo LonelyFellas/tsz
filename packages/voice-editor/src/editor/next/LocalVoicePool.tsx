@@ -12,6 +12,7 @@ import {
   ChevronUpIcon,
   PencilIcon,
   CircleHelpIcon,
+  SearchIcon,
   Volume2Icon
 } from "lucide-react";
 import { Alert, Button, Space, Spin, Typography } from "@tsz/ui/admin/display";
@@ -1127,7 +1128,10 @@ export function LocalVoicePool({
                           {side.label} ·{" "}
                           {gender === "female" ? t("female") : t("male")}
                         </Typography.Text>
-                        <Input.Search
+                        <Input
+                          type="search"
+                          className="tsz-ve-pool-catalog-search"
+                          prefix={<SearchIcon size={14} aria-hidden="true" />}
                           size="small"
                           aria-label={t("search_catalogue", {
                             p0: side.label,
