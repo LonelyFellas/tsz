@@ -5,7 +5,9 @@ import {
   useLexiconEditorMessageState as useCreationMessageState,
   createLexiconEditorMessage as creationMessage
 } from "../../i18n/editor";
-import { useVoiceSave } from "../voiceSaveContext";
+import { useVoiceAudioTasks, useVoiceSave } from "../voiceSaveContext";
+import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
+import { v3ContentFingerprint } from "../saveFlow";
 import { flushSync } from "react-dom";
 import { PencilIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
@@ -13,6 +15,7 @@ import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import {
   lazy,
   Suspense,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -25,8 +28,8 @@ import type {
   RichTextV2,
   VoiceProfileV3
 } from "@tsz/types";
-import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
-import { toRichTextV2 } from "@tsz/voice-editor/core";
+import type { VoiceOption, VoicePreviewAdapter } from "@tsz/voice-editor/types";
+import { clearVoiceAudio, toRichTextV2 } from "@tsz/voice-editor/core";
 import {
   editSynthesisUpsWords,
   pronunciationSynthesisContent,
@@ -61,6 +64,8 @@ export function V3PhonemeSpeechSettings({
   audioAssets = [],
   nodeId,
   field,
+  active,
+  headless = false,
   onChange
 }: {
   spelling: string;
@@ -72,6 +77,8 @@ export function V3PhonemeSpeechSettings({
   audioAssets?: AudioAssetV3[];
   nodeId: string;
   field: string;
+  active: boolean;
+  headless?: boolean;
   onChange: (
     candidate: PronunciationSynthesisCandidateV3,
     audioAssets: AudioAssetV3[]
@@ -98,7 +105,99 @@ export function V3PhonemeSpeechSettings({
   }, [targetKey]);
   const { edit: canEdit } = useContentEditPermissions();
   const canUploadAudio = usePermission("speech.upload_audio");
+  const canGenerateAudio = usePermission("speech.generate");
   const [open, setOpen] = useState(false);
+  const audioTasks = useVoiceAudioTasks();
+  const speech = candidate[`${alphabet}_speech`];
+  const needsFallbackCatalog =
+    !speech &&
+    !!fallbackVoiceProfile?.voices.some(
+      (setting) => setting.enabled && !setting.locale
+    );
+  const fallbackKey = JSON.stringify([
+    targetKey,
+    fallbackVoiceProfile?.voices.map((setting) => [
+      setting.voice_id,
+      setting.locale
+    ])
+  ]);
+  const [fallbackCatalog, setFallbackCatalog] = useState<{
+    key: string;
+    voices: VoiceOption[];
+    error?: unknown;
+  }>();
+  const [fallbackAttempt, retryFallback] = useState(0);
+  const fallbackReady = useRef<Promise<boolean>>(Promise.resolve(false));
+  const fallbackNeeded = useRef(needsFallbackCatalog);
+  fallbackNeeded.current = needsFallbackCatalog;
+  const fallbackPending =
+    needsFallbackCatalog && fallbackCatalog?.key !== fallbackKey;
+  const fallbackError =
+    needsFallbackCatalog && fallbackCatalog?.key === fallbackKey
+      ? fallbackCatalog.error
+      : undefined;
+  useEffect(() => {
+    if (!needsFallbackCatalog || !canEdit) return;
+    const controller = new AbortController();
+    fallbackReady.current = adminVoicePreviewAdapter
+      .listVoices({ language: "en", signal: controller.signal })
+      .then((voices) => {
+        if (controller.signal.aborted) return false;
+        flushSync(() => setFallbackCatalog({ key: fallbackKey, voices }));
+        return true;
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setFallbackCatalog({ key: fallbackKey, voices: [], error });
+        return false;
+      });
+    return () => controller.abort();
+  }, [canEdit, fallbackAttempt, fallbackKey, needsFallbackCatalog]);
+  const audioTarget = JSON.stringify([nodeId, field, alphabet, locale]);
+  useLayoutEffect(() => {
+    if (
+      !active ||
+      open ||
+      !canGenerateAudio ||
+      !needsFallbackCatalog ||
+      !audioTasks
+    )
+      return;
+    const key = `${audioTarget}:native-voices`;
+    audioTasks.set(key, async () => {
+      const pending = fallbackReady.current;
+      if (!(await pending)) {
+        if (pending !== fallbackReady.current)
+          return (await audioTasks.get(key)?.()) ?? false;
+        if (fallbackNeeded.current) return false;
+      }
+      return (await audioTasks.get(audioTarget)?.()) ?? true;
+    });
+    return () => {
+      audioTasks.delete(key);
+    };
+  }, [
+    active,
+    audioTarget,
+    audioTasks,
+    canGenerateAudio,
+    needsFallbackCatalog,
+    open
+  ]);
+  const scopedFallback = fallbackVoiceProfile
+    ? {
+        ...fallbackVoiceProfile,
+        voices: fallbackVoiceProfile.voices.flatMap((setting) => {
+          if (!setting.enabled) return [setting];
+          const nativeLocale =
+            setting.locale ??
+            fallbackCatalog?.voices.find(
+              (voice) => voice.id === setting.voice_id
+            )?.locale;
+          return nativeLocale === locale ? [{ ...setting, locale }] : [];
+        })
+      }
+    : undefined;
   const wordHistory = useRef(
     new Map<string, PronunciationSynthesisCandidateV3["ups_words"]>()
   );
@@ -121,7 +220,7 @@ export function V3PhonemeSpeechSettings({
               annotations: []
             })
           : { version: 2 as const, text: candidate[alphabet], annotations: [] },
-      voice_profile: speech?.voice_profile ?? fallbackVoiceProfile,
+      voice_profile: speech?.voice_profile ?? scopedFallback,
       audio_assets: audioAssets,
       ups_words: candidate.ups_words
     });
@@ -310,21 +409,154 @@ export function V3PhonemeSpeechSettings({
     }),
     []
   );
+  const editorAdapter = useMemo(
+    () =>
+      canGenerateAudio ? adapter : { ...adapter, generateAudio: undefined },
+    [adapter, canGenerateAudio]
+  );
+  const collapsedContent = speech
+    ? mapSynthesisSpeechContent(
+        speech.content,
+        spelling,
+        candidate,
+        alphabet,
+        false
+      )
+    : undefined;
+  const generatedSource = {
+    kind: "phoneme" as const,
+    phoneme_locale: locale,
+    content: speech?.content ?? {
+      version: 2 as const,
+      text: spelling,
+      annotations: []
+    },
+    alphabet,
+    phoneme: candidate[alphabet],
+    ...(alphabet === "ups" ? { ups_words: candidate.ups_words ?? [] } : {})
+  };
+  const closedAdapter: VoicePreviewAdapter = {
+    ...adapter,
+    audioSourceKey: v3ContentFingerprint(generatedSource),
+    async resolveVoices(input, options) {
+      return (
+        await api.speech.resolve(
+          {
+            profile: input.profile,
+            accent: input.accent,
+            source: generatedSource
+          },
+          options?.signal
+        )
+      ).voices;
+    },
+    async generateAudio(input, options) {
+      return (
+        await api.speech.generateAudio(
+          {
+            request_id: input.requestId,
+            source: generatedSource,
+            setting: input.setting,
+            ...(input.profile ? { profile: input.profile } : {})
+          },
+          options?.signal
+        )
+      ).asset;
+    }
+  };
+  const automaticAudio = useSelectedVoiceAudio({
+    target: JSON.stringify([nodeId, field, alphabet, locale]),
+    content: collapsedContent ?? {
+      version: 2,
+      text: candidate[alphabet],
+      annotations: []
+    },
+    profile:
+      speech?.voice_profile ??
+      (scopedFallback ? clearVoiceAudio(scopedFallback) : undefined),
+    adapter: closedAdapter,
+    locale,
+    enabled:
+      active &&
+      !open &&
+      canEdit &&
+      env.VOICE_PREVIEW &&
+      canGenerateAudio &&
+      !fallbackPending &&
+      fallbackError == null &&
+      !voicePreviewIsMock &&
+      !!spelling.trim() &&
+      !synthesisInputIssue(alphabet, candidate[alphabet]),
+    defer: false,
+    onChange: (voice_profile) =>
+      onChange(
+        {
+          ...candidate,
+          [`${alphabet}_speech`]: {
+            content: generatedSource.content,
+            voice_profile
+          }
+        },
+        audioAssets
+      )
+  });
   return (
     <>
-      <Button
-        icon={<PencilIcon />}
-        aria-label={t("creation_open_tts_settings", { label })}
-        data-v3-node-id={nodeId}
-        data-v3-field={field}
-        disabled={!canEdit}
-        onClick={() => {
-          setDraft(capture());
-          setSaveError("");
-          setSource(sourceKey);
-          setOpen(true);
-        }}
-      />
+      {fallbackError != null && (
+        <Alert
+          type="error"
+          showIcon
+          title={
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : t(
+                  "panel_default_voices_could_not_be_loaded_you_can_keep_typing_and_select_voices_in"
+                )
+          }
+          action={
+            <Button
+              size="small"
+              onClick={() => retryFallback((attempt) => attempt + 1)}
+            >
+              {t("panel_retry_final_audio")}
+            </Button>
+          }
+        />
+      )}
+      {!headless && (
+        <Button
+          icon={<PencilIcon />}
+          aria-label={t("creation_open_tts_settings", { label })}
+          data-v3-node-id={nodeId}
+          data-v3-field={field}
+          disabled={!canEdit || fallbackPending || fallbackError != null}
+          onClick={() => {
+            setDraft(capture());
+            setSaveError("");
+            setSource(sourceKey);
+            setOpen(true);
+          }}
+        />
+      )}
+      {!headless && automaticAudio.busy && (
+        <span role="status">{t("panel_generating_final_audio")}</span>
+      )}
+      {!open && automaticAudio.error != null && (
+        <Alert
+          type="error"
+          showIcon
+          title={
+            automaticAudio.error instanceof Error
+              ? automaticAudio.error.message
+              : t("panel_final_audio_generation_failed")
+          }
+          action={
+            <Button size="small" onClick={() => void automaticAudio.retry()}>
+              {t("panel_retry_final_audio")}
+            </Button>
+          }
+        />
+      )}
       {open && (
         <VoiceEditorModal
           width={1200}
@@ -400,7 +632,7 @@ export function V3PhonemeSpeechSettings({
               onVoiceProfileChange={(voice_profile) =>
                 setDraft((current) => ({ ...current, voice_profile }))
               }
-              previewAdapter={adapter}
+              previewAdapter={editorAdapter}
               previewEnabled={env.VOICE_PREVIEW && source === sourceKey}
               previewIsMock={voicePreviewIsMock}
               renderActions={(canComplete, prepareComplete, captureResult) => (

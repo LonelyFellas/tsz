@@ -35,7 +35,8 @@ import {
   waitFor
 } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
@@ -7501,4 +7502,65 @@ it("局部词义保存只发一次有 revision 的聚合请求，保留另一步
     intent: "save"
   });
   expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+});
+
+it("词形保存等待默认配音回写，再提交包含新资产的当前草稿", async () => {
+  const source = requests();
+  let finish!: (ready: boolean) => void;
+  const generated = new Promise<boolean>((resolve) => {
+    finish = resolve;
+  });
+  function PendingAudio({ context }: { context: V3WizardSlotContext }) {
+    const save = useVoiceSave();
+    useEffect(() => {
+      save!.audioTasks!.set("default-audio", () => generated);
+      return () => {
+        save!.audioTasks!.delete("default-audio");
+      };
+    }, [save]);
+    return (
+      <>
+        <Slot context={context} />
+        <button
+          onClick={() => {
+            const next = structuredClone(context.draftForms);
+            const variants = next.pos[0]!.forms[0]!.regional_variants;
+            if (variants.mode !== "common")
+              throw new Error("expected common fixture");
+            variants.common.spelling_speech = {
+              content: {
+                version: 2,
+                text: variants.common.spelling,
+                annotations: []
+              },
+              voice_profile: {
+                voices: [
+                  {
+                    voice_id: "sonia",
+                    enabled: true,
+                    rate_percent: 0,
+                    audio_asset_id: UUIDS.pronunciation
+                  }
+                ]
+              }
+            };
+            flushSync(() => context.setDraftForms(next));
+            finish(true);
+          }}
+        >
+          完成后台音频生成
+        </button>
+      </>
+    );
+  }
+  renderWizard(source, {
+    renderStep: (context) => <PendingAudio context={context} />
+  });
+  fireEvent.click(screen.getByText("保存"));
+  expect(source.saveForms).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("完成后台音频生成"));
+  await waitFor(() => expect(source.saveForms).toHaveBeenCalledOnce());
+  expect(
+    JSON.stringify(vi.mocked(source.saveForms).mock.calls[0]![1].content)
+  ).toContain(`"audio_asset_id":"${UUIDS.pronunciation}"`);
 });

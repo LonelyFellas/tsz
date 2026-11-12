@@ -1,11 +1,16 @@
 import { LocalLexiconError } from "../../i18n/local-error-messages";
+import { V3FormsAudioTasks } from "./V3FormsAudioTasks";
 import {
   useLexiconEditorTranslation,
   LexiconEditorText,
   type LexiconEditorKey
 } from "@/features/dictionary/i18n/editor";
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
-import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
+import {
+  VoiceAudioTasksContext,
+  VoiceSaveContext,
+  useVoiceSave
+} from "../voiceSaveContext";
 import { flushSync } from "react-dom";
 import {
   type ContextType,
@@ -112,6 +117,12 @@ export function V3FormContentModal({
   outerSaveRef.current = outerSave;
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const audioTasks = useRef(new Map<string, () => Promise<boolean>>());
+  const waitForAudio = async () => {
+    for (const wait of [...audioTasks.current.values()])
+      if (!(await wait())) return false;
+    return true;
+  };
   const original = useRef(forms);
   const [pronunciationIds] = useState(
     () =>
@@ -276,14 +287,21 @@ export function V3FormContentModal({
         )
       : local;
   };
-  const confirmed = () => {
+  const confirmed = async (leave = false) => {
     if (savingRef.current) return false;
+    savingRef.current = true;
+    setSaving(true);
     try {
+      if (audioTasks.current.size > 0 && !(await waitForAudio())) return false;
       onConfirm(completeForms());
+      if (leave) finishLeave(true);
       return true;
     } catch (cause) {
       setError(issueForCause(cause, "content_incomplete"));
       return false;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
   const [leavePrompt, setLeavePrompt] = useState(false);
@@ -541,11 +559,14 @@ export function V3FormContentModal({
   const saveScope: ContextType<typeof VoiceSaveContext> =
     outerSave && onApply
       ? {
+          audioTasks: audioTasks.current,
           save: async (area) => {
             if (savingRef.current) return false;
             savingRef.current = true;
             setSaving(true);
             try {
+              if (audioTasks.current.size > 0 && !(await waitForAudio()))
+                return false;
               const next = completeForms();
               flushSync(() => onApply(next));
               const accepted = await outerSaveRef.current!.save(area);
@@ -583,7 +604,11 @@ export function V3FormContentModal({
             >
               {t("cancel")}
             </Button>
-            <Button type="primary" disabled={saving} onClick={confirmed}>
+            <Button
+              type="primary"
+              disabled={saving}
+              onClick={() => void confirmed()}
+            >
               {t("apply_to_draft")}
             </Button>
           </Space>
@@ -591,6 +616,17 @@ export function V3FormContentModal({
       }
     >
       <div className="v3-content-modal">
+        <V3FormsAudioTasks
+          forms={{ ...labels, contents: [current] }}
+          paused={false}
+          rowOnly
+          onChange={(next) => {
+            const updated = next.contents.find(
+              (item) => item.id === content.id
+            );
+            if (updated) setEditor(contentEditorForms(updated));
+          }}
+        />
         {rows.length > 0 && (
           <div className="v3-content-rules">
             <div className="v3-content-rule-row">
@@ -783,12 +819,15 @@ export function V3FormContentModal({
         open={leavePrompt}
         title={t("unapplied_content")}
         zIndex={2100}
-        onCancel={() => finishLeave(false)}
+        onCancel={() => {
+          if (!savingRef.current) finishLeave(false);
+        }}
         destroyOnHidden
         footer={
           <Space>
             <Button
               danger
+              disabled={saving}
               onClick={() => {
                 finishLeave(true);
                 onCancel();
@@ -796,14 +835,13 @@ export function V3FormContentModal({
             >
               {t("discard")}
             </Button>
-            <Button onClick={() => finishLeave(false)}>
+            <Button disabled={saving} onClick={() => finishLeave(false)}>
               {t("keep_editing")}
             </Button>
             <Button
               type="primary"
-              onClick={() => {
-                if (confirmed()) finishLeave(true);
-              }}
+              disabled={saving}
+              onClick={() => void confirmed(true)}
             >
               {t("apply_leave")}
             </Button>
@@ -962,8 +1000,10 @@ export function V3FormContentModal({
     </Drawer>
   );
   return (
-    <VoiceSaveContext.Provider value={saveScope}>
-      {drawer}
-    </VoiceSaveContext.Provider>
+    <VoiceAudioTasksContext.Provider value={audioTasks.current}>
+      <VoiceSaveContext.Provider value={saveScope}>
+        {drawer}
+      </VoiceSaveContext.Provider>
+    </VoiceAudioTasksContext.Provider>
   );
 }

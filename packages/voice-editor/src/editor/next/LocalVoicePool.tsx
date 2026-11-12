@@ -39,6 +39,8 @@ import type {
 } from "../../types";
 import {
   convertVoicePool,
+  clearVoiceAudio,
+  retainResolvedAudio,
   effectiveVoiceSetting,
   isVoiceRecommendationAvailable,
   providerVoiceKey,
@@ -149,7 +151,8 @@ export function LocalVoicePool({
     if (
       detail &&
       (detail.sourceKey !== sourceKey ||
-        detail.baseline !== JSON.stringify(profile ?? null))
+        detail.baseline !==
+          JSON.stringify(profile ? clearVoiceAudio(profile) : null))
     ) {
       setDetail(undefined);
       onCloseDetail();
@@ -332,7 +335,7 @@ export function LocalVoicePool({
       setting: structuredClone(selected),
       profile: local,
       sourceKey,
-      baseline: JSON.stringify(profile ?? null),
+      baseline: JSON.stringify(profile ? clearVoiceAudio(profile) : null),
       dialect
     });
   }
@@ -1190,7 +1193,8 @@ export function LocalVoicePool({
       </details>
       {detail &&
         detail.sourceKey === sourceKey &&
-        detail.baseline === JSON.stringify(profile ?? null) &&
+        detail.baseline ===
+          JSON.stringify(profile ? clearVoiceAudio(profile) : null) &&
         voices.some((voice) => voice.id === detail.setting.voice_id) && (
           <VoiceDetail
             key={`${sourceKey}/${detail.dialect}/${voiceSettingKey(detail.setting)}`}
@@ -1231,7 +1235,11 @@ export function LocalVoicePool({
               onChange({
                 ...local,
                 voices: local.voices.map((item) =>
-                  voiceSettingKey(item) === voiceSettingKey(next) ? next : item
+                  voiceSettingKey(item) === voiceSettingKey(next)
+                    ? next.audio_asset_id
+                      ? next
+                      : retainResolvedAudio([next], local.voices)[0]!
+                    : item
                 )
               });
               onCloseDetail();

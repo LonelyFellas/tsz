@@ -156,7 +156,6 @@ export function FloatingEntryOverview({
         aria-expanded={open}
         aria-controls={id}
         aria-haspopup="dialog"
-        aria-describedby={`${id}-hint`}
         onClick={(event) => {
           if (event.detail !== 0 && suppressClick.current) {
             suppressClick.current = false;
@@ -231,7 +230,6 @@ export function FloatingEntryOverview({
             aria-label={t("overview_close")}
             onClick={close}
           />
-          <p id={`${id}-hint`}>{t("overview_hint")}</p>
         </header>
         {children}
       </div>
