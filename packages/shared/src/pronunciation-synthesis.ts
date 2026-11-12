@@ -836,6 +836,9 @@ export function pronunciationPlaybackSource(
     uploads?.find((asset) => asset.is_default && matchesLocale(asset.locale))
       ?.id ??
     savedVoiceAudioAsset(!synthesis || content ? profile : undefined, locale) ??
+    (synthesis?.use_spelling
+      ? uploads?.find((asset) => matchesLocale(asset.locale))?.id
+      : undefined) ??
     (!explicitSynthesis
       ? (uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
         pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))

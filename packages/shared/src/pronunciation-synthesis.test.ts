@@ -912,4 +912,10 @@ it("final playback follows spelling/phoneme selection and retains legacy recordi
     pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
       .assetId
   ).toBeUndefined();
+  delete spelling.audio_assets[0]!.is_default;
+  spelling.voice_profile.voices = [];
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, spelling, "en-GB", "uk")
+      .assetId
+  ).toBe("spelling-recording");
 });
