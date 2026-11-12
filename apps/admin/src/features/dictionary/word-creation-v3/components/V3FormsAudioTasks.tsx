@@ -209,6 +209,7 @@ export function V3FormsAudioTasks({
                     key={`${pronunciation.id}:${side}:${alphabet}`}
                     headless
                     active={ready}
+                    audioAssets={pronunciation.audio_assets}
                     nodeId={pronunciation.id}
                     field={`synthesis.${side}.${alphabet}_speech`}
                     candidate={candidate}

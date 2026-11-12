@@ -208,6 +208,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   onVoiceProfileChange,
   audioUploadAdapter,
   audioUploadAllowed = true,
+  showAudioUpload = true,
   audioAssets,
   onAudioAssetsChange,
   audioAssetLimit = AUDIO_ASSETS_PER_VARIANT_MAX,
@@ -3546,6 +3547,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       )
     }
   ].filter((tool) => {
+    if (tool.key === "uploads" && !showAudioUpload) return false;
     if (mode === "voice-trial")
       return ["phoneme", "reading-link", "reading", "pause"].includes(tool.key);
     if (contentReadOnly) return tool.key === "roles" || tool.key === "text";
@@ -3667,63 +3669,71 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           setUpload((current) => ({ ...current, locale: dialect }));
         }}
         onCloseDetail={stopAssetPlayback}
-        audioTools={(dialect, stopDetailPlayback) => (
-          <section aria-label={t("recordings_for_this_text_s_accent")}>
-            <Typography.Title level={5}>
-              {t("human_recording")}
-            </Typography.Title>
-            <p>
-              {t("recordings_accent_help", {
-                accent: dialect === "en-GB" ? t("british") : t("american")
-              })}
-            </p>
-            <UploadPanel
-              uploadAllowed={audioUploadAllowed}
-              readOnly={readOnly}
-              locale={dialect}
-              available={!!audioUploadAdapter && !storageUnavailable}
-              unavailableReason={
-                audioUploadAdapter
-                  ? t("audio_storage_is_unavailable_uploading_is_disabled")
-                  : t("audio_uploading_is_disabled")
-              }
-              upload={{ ...upload, locale: dialect }}
-              onUploadChange={(next) =>
-                setUpload((current) => ({
-                  ...current,
-                  ...next,
-                  locale: dialect
-                }))
-              }
-              assets={assets.filter((asset) => asset.locale === dialect)}
-              pending={pendingUploads.filter((item) => item.locale === dialect)}
-              limit={audioAssetLimit}
-              onAddFiles={addAudioFiles}
-              onRetryUpload={retryUpload}
-              onDismissUpload={dismissUpload}
-              onRemoveAsset={removeAsset}
-              onDefaultAssetChange={
-                onAudioAssetsChange ? changeDefaultAsset : undefined
-              }
-              onPlayAsset={(asset) => {
-                stopDetailPlayback();
-                void playAsset(asset);
-              }}
-              playingAssetId={playingAssetId}
-              playbackMessage={playbackMessage}
-            />
-            {assetReview && (
-              <AudioReview
-                key={assetReview.result.audioUrl}
-                media={assetReview}
-                onPlay={() => {
-                  stopDetailPlayback();
-                  stopAudition();
-                }}
-              />
-            )}
-          </section>
-        )}
+        audioTools={
+          showAudioUpload
+            ? (dialect, stopDetailPlayback) => (
+                <section aria-label={t("recordings_for_this_text_s_accent")}>
+                  <Typography.Title level={5}>
+                    {t("human_recording")}
+                  </Typography.Title>
+                  <p>
+                    {t("recordings_accent_help", {
+                      accent: dialect === "en-GB" ? t("british") : t("american")
+                    })}
+                  </p>
+                  <UploadPanel
+                    uploadAllowed={audioUploadAllowed}
+                    readOnly={readOnly}
+                    locale={dialect}
+                    available={!!audioUploadAdapter && !storageUnavailable}
+                    unavailableReason={
+                      audioUploadAdapter
+                        ? t(
+                            "audio_storage_is_unavailable_uploading_is_disabled"
+                          )
+                        : t("audio_uploading_is_disabled")
+                    }
+                    upload={{ ...upload, locale: dialect }}
+                    onUploadChange={(next) =>
+                      setUpload((current) => ({
+                        ...current,
+                        ...next,
+                        locale: dialect
+                      }))
+                    }
+                    assets={assets.filter((asset) => asset.locale === dialect)}
+                    pending={pendingUploads.filter(
+                      (item) => item.locale === dialect
+                    )}
+                    limit={audioAssetLimit}
+                    onAddFiles={addAudioFiles}
+                    onRetryUpload={retryUpload}
+                    onDismissUpload={dismissUpload}
+                    onRemoveAsset={removeAsset}
+                    onDefaultAssetChange={
+                      onAudioAssetsChange ? changeDefaultAsset : undefined
+                    }
+                    onPlayAsset={(asset) => {
+                      stopDetailPlayback();
+                      void playAsset(asset);
+                    }}
+                    playingAssetId={playingAssetId}
+                    playbackMessage={playbackMessage}
+                  />
+                  {assetReview && (
+                    <AudioReview
+                      key={assetReview.result.audioUrl}
+                      media={assetReview}
+                      onPlay={() => {
+                        stopDetailPlayback();
+                        stopAudition();
+                      }}
+                    />
+                  )}
+                </section>
+              )
+            : undefined
+        }
       />
     ) : undefined;
 
@@ -3763,6 +3773,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     () => onValidationChange?.(editorReady),
     [editorReady, onValidationChange]
   );
+  if (mode === "audio-upload")
+    return (
+      <div className="tsz-ve-editor">
+        {tools.find((tool) => tool.key === "uploads")?.content}
+      </div>
+    );
   if (mode === "synthesis") {
     return (
       <section
