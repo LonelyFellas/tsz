@@ -151,10 +151,12 @@ function baseFormSummaryLabel(summary?: V3BaseFormSummary): string | undefined {
 
 function DiscardLocalChangesButton({
   revision,
-  onConfirm
+  onConfirm,
+  disabled
 }: {
   revision: number;
   onConfirm: () => void;
+  disabled?: boolean;
 }) {
   const { t } = useWorkspaceTranslation();
   return (
@@ -166,7 +168,9 @@ function DiscardLocalChangesButton({
       onConfirm={onConfirm}
       title={t("discard_local_confirm")}
     >
-      <Button danger>{t("discard_local")}</Button>
+      <Button danger disabled={disabled}>
+        {t("discard_local")}
+      </Button>
     </Popconfirm>
   );
 }
@@ -329,13 +333,18 @@ function V3WordCreationLayoutContent({
               action={
                 <Flex gap="small" wrap="wrap">
                   {onKeepLocalChanges ? (
-                    <Button type="primary" onClick={onKeepLocalChanges}>
+                    <Button
+                      type="primary"
+                      disabled={referenceOnly}
+                      onClick={onKeepLocalChanges}
+                    >
                       {t("keep_local")}
                     </Button>
                   ) : null}
                   {onDiscardLocalChanges ? (
                     <DiscardLocalChangesButton
                       revision={remoteUpdate.revision}
+                      disabled={referenceOnly}
                       onConfirm={onDiscardLocalChanges}
                     />
                   ) : null}
@@ -400,6 +409,7 @@ function V3WordCreationLayoutContent({
                 onRefreshConflict ? (
                   <Flex gap="small" wrap="wrap">
                     <Button
+                      disabled={referenceOnly}
                       loading={refreshingConflict}
                       onClick={onRefreshConflict}
                     >
@@ -407,6 +417,7 @@ function V3WordCreationLayoutContent({
                     </Button>
                     {conflict.serverWord && onDiscardLocalChanges ? (
                       <DiscardLocalChangesButton
+                        disabled={referenceOnly}
                         revision={conflict.serverWord.revision}
                         onConfirm={onDiscardLocalChanges}
                       />
@@ -414,6 +425,7 @@ function V3WordCreationLayoutContent({
                   </Flex>
                 ) : operationValidationIssues[0] && onIssueNavigate ? (
                   <Button
+                    disabled={referenceOnly}
                     onClick={() =>
                       onIssueNavigate(operationValidationIssues[0]!)
                     }
@@ -421,7 +433,11 @@ function V3WordCreationLayoutContent({
                     {t("first_issue")}
                   </Button>
                 ) : problem.retryable && onRetry ? (
-                  <Button loading={retrying} onClick={onRetry}>
+                  <Button
+                    disabled={referenceOnly}
+                    loading={retrying}
+                    onClick={onRetry}
+                  >
                     {t("retry")}
                   </Button>
                 ) : undefined
