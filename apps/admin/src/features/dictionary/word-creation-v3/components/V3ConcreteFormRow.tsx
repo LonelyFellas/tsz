@@ -11,7 +11,7 @@ import {
   TriangleAlertIcon
 } from "lucide-react";
 import { Button, Flex, Typography } from "@tsz/ui/admin/display";
-import { Radio, Select } from "@tsz/ui/admin/forms";
+import { Radio, Select, type TextAreaRef } from "@tsz/ui/admin/forms";
 import { Tooltip } from "@tsz/ui/admin/overlays";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import type {
@@ -24,7 +24,13 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode
+} from "react";
 import {
   editSpellingList,
   unifyUkUsSpelling,
@@ -341,6 +347,8 @@ function V3DialectFormCell({
   spellingLabel
 }: V3DialectFormCellProps) {
   const { t } = useLexiconEditorTranslation();
+  const spellingRef = useRef<TextAreaRef>(null);
+  const [spellingRequired, setSpellingRequired] = useState(false);
   const referenceGuard = useV3ReferenceGuard();
   if (form.regional_variants.mode === "common") return null;
   const variant = regionalVariants(form.regional_variants, dialect).find(
@@ -400,6 +408,12 @@ function V3DialectFormCell({
         </Flex>
         <V3VoiceTextField
           mode="spelling"
+          inputRef={spellingRef}
+          requiredError={
+            spellingRequired && !variant.spelling.trim()
+              ? t("panel_enter_the_form_spelling_first")
+              : undefined
+          }
           dialect={dialect}
           leadingAction={
             <PronunciationPreviewControls
@@ -499,6 +513,10 @@ function V3DialectFormCell({
           issues={issues}
           onChange={onChange}
           variant={variant}
+          onMissingSpelling={() => {
+            setSpellingRequired(true);
+            spellingRef.current?.focus();
+          }}
         />
       </Flex>
     </div>
@@ -713,6 +731,12 @@ export function V3ConcreteFormRow({
   referenceBadge
 }: V3ConcreteFormRowProps) {
   const { t } = useLexiconEditorTranslation();
+  const spellingRef = useRef<TextAreaRef>(null);
+  const [spellingRequired, setSpellingRequired] = useState(false);
+  const requireSpelling = () => {
+    setSpellingRequired(true);
+    spellingRef.current?.focus();
+  };
   const formLabel = providedFormLabel ?? t("form");
   const formTypeAriaLabel =
     providedFormTypeAriaLabel ?? t("type_label", { label: formLabel });
@@ -860,6 +884,12 @@ export function V3ConcreteFormRow({
               </Flex>
               <V3VoiceTextField
                 mode="spelling"
+                inputRef={spellingRef}
+                requiredError={
+                  spellingRequired && !commonVariant.spelling.trim()
+                    ? t("panel_enter_the_form_spelling_first")
+                    : undefined
+                }
                 leadingAction={
                   <PronunciationPreviewControls
                     playbackOnly
@@ -944,6 +974,7 @@ export function V3ConcreteFormRow({
                   issues={issues}
                   onChange={onChange}
                   variant={commonVariant}
+                  onMissingSpelling={requireSpelling}
                 />
               </div>
             </div>
@@ -968,6 +999,13 @@ export function V3ConcreteFormRow({
               </Flex>
               <V3VoiceTextField
                 mode="spelling"
+                inputRef={spellingRef}
+                requiredError={
+                  spellingRequired &&
+                  !unifiedSpellingVariants.uk.spelling.trim()
+                    ? t("panel_enter_the_form_spelling_first")
+                    : undefined
+                }
                 leadingAction={
                   <PronunciationPreviewControls
                     playbackOnly
@@ -1059,6 +1097,7 @@ export function V3ConcreteFormRow({
                       issues={issues}
                       onChange={onChange}
                       variant={variant}
+                      onMissingSpelling={requireSpelling}
                     />
                   </div>
                 )

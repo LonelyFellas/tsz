@@ -2330,3 +2330,50 @@ it("切换语言保留检测请求、已编辑主词和未知结果的完整重�
   expect(vi.mocked(supplied.createV3).mock.calls[1]).toEqual(original);
   expect(supplied.detectV3).toHaveBeenCalledTimes(1);
 });
+
+it("空词条检测在输入框内提示且不请求，填写后恢复检测", async () => {
+  const supplied = requests();
+  renderStep(supplied);
+  const entry = input();
+  fireEvent.click(screen.getByText("词典检测"));
+  expect(entry).toHaveFocus();
+  expect(entry).toHaveAttribute("aria-invalid", "true");
+  expect(
+    document.getElementById(entry.getAttribute("aria-describedby")!)
+  ).toBeVisible();
+  expect(supplied.detectV3).not.toHaveBeenCalled();
+  fireEvent.change(entry, { target: { value: "novel-term" } });
+  expect(entry).toHaveFocus();
+  expect(entry).not.toHaveAttribute("aria-invalid", "true");
+  expect(entry).not.toHaveAttribute("aria-describedby");
+  fireEvent.click(screen.getByText("词典检测"));
+  await waitFor(() => expect(supplied.detectV3).toHaveBeenCalledTimes(1));
+});
+
+it.each(["unified", "distinguish"])(
+  "%s 主词留空时在对应框内提示，补齐后恢复",
+  async (mode) => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("novel-term"));
+    renderStep(supplied);
+    fireEvent.change(input(), { target: { value: "novel-term" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    await screen.findByLabelText("英美通用主词");
+    if (mode === "distinguish")
+      fireEvent.click(screen.getByLabelText("区分英美拼写"));
+    const target = screen.getByLabelText(
+      mode === "unified" ? "英美通用主词" : "英式主词"
+    );
+    fireEvent.change(target, { target: { value: "" } });
+    expect(target).toHaveFocus();
+    expect(target).toHaveAttribute("aria-invalid", "true");
+    expect(
+      document.getElementById(target.getAttribute("aria-describedby")!)
+    ).toBeVisible();
+    fireEvent.change(target, { target: { value: "novel-term" } });
+    expect(target).toHaveFocus();
+    expect(target).not.toHaveAttribute("aria-invalid", "true");
+    expect(target).not.toHaveAttribute("aria-describedby");
+    expect(supplied.createV3).not.toHaveBeenCalled();
+  }
+);

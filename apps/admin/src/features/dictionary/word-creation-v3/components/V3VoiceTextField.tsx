@@ -35,15 +35,17 @@ import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { PencilIcon } from "lucide-react";
 import { flushSync } from "react-dom";
 import { Alert, Button, Space } from "@tsz/ui/admin/display";
-import { Input } from "@tsz/ui/admin/forms";
+import { Input, type TextAreaRef } from "@tsz/ui/admin/forms";
 import { message } from "@tsz/ui/admin/overlays";
 import {
   type ReactNode,
+  type Ref,
   type RefObject,
   Suspense,
   lazy,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -60,6 +62,7 @@ import { env } from "@/lib/env";
 import "@tsz/voice-editor/styles.css";
 import "./V3VoiceTextField.css";
 import { VoiceEditorModal } from "./VoiceEditorModal";
+import { RequiredFieldFeedback } from "../../RequiredFieldFeedback";
 
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -126,6 +129,8 @@ export interface V3VoiceTextFieldProps<
   contentReadOnly?: boolean;
   associationsReadOnly?: boolean;
   invalid?: boolean;
+  requiredError?: string;
+  inputRef?: Ref<TextAreaRef>;
   leadingAction?: ReactNode;
   trailingAction?: ReactNode;
   audioUploadEnabled?: boolean;
@@ -180,6 +185,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   contentReadOnly: requestedContentReadOnly,
   associationsReadOnly: requestedAssociationsReadOnly,
   invalid,
+  requiredError,
+  inputRef,
   leadingAction,
   trailingAction,
   audioUploadEnabled = mode !== "association",
@@ -191,6 +198,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
   const { t } = useLexiconEditorTranslation();
+  const requiredErrorId = useId();
   const businessSave = useVoiceSave();
   const saveRef = useRef({ onSave, businessSave });
   useLayoutEffect(() => {
@@ -633,6 +641,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     value.text !== "";
   const fallback = (
     <Input.TextArea
+      ref={inputRef}
       id={expanded ? undefined : id}
       key={largePreview ? "large" : "standard"}
       onFocus={() => setFocused(true)}
@@ -656,8 +665,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         if (value.text.trim()) setRecorded(true);
       }}
       aria-label={expanded ? t("panel_preview", { p0: ariaLabel }) : ariaLabel}
-      aria-invalid={invalid}
-      status={invalid ? "error" : undefined}
+      aria-invalid={invalid || Boolean(requiredError)}
+      aria-describedby={requiredError ? requiredErrorId : undefined}
+      status={invalid || requiredError ? "error" : undefined}
       // 无连读时用自然高度；有连读时显式设置最小行数。
       // 单改 padding 不会触发 antd autoSize，须切换 minRows，确保只增删标记也重测且不重挂输入框。
       autoSize={{
@@ -718,7 +728,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             )
           );
       }}
-      placeholder={placeholder}
+      placeholder={requiredError ? undefined : placeholder}
       aria-busy={defaultLoading || undefined}
       readOnly={
         readOnly ||
@@ -732,8 +742,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 
   // textarea 始终保留：Tab、错误定位 focus()、撤销和改字重映射仍走原来的输入路径。
   const collapsedField = (
-    <div
-      data-ui-compact-item
+    <RequiredFieldFeedback
+      message={requiredError}
+      messageId={requiredErrorId}
       className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}`}
     >
       {fallback}
@@ -759,7 +770,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       ) : mode !== "grammar" && liaisons ? (
         <LiaisonOverlay value={liaisons} />
       ) : null}
-    </div>
+    </RequiredFieldFeedback>
   );
 
   if (!env.VOICE_EDITOR || !editingEnabled)
@@ -769,12 +780,18 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {leadingAction || trailingAction ? (
           <Space.Compact block className="v3-voice-text-field-compact">
             {leadingAction}
-            {mode === "grammar" || mode === "spelling" || associationPreview
+            {mode === "grammar" ||
+            mode === "spelling" ||
+            mode === "dict-phonetic" ||
+            associationPreview
               ? collapsedField
               : fallback}
             {trailingAction}
           </Space.Compact>
-        ) : mode === "grammar" || mode === "spelling" || associationPreview ? (
+        ) : mode === "grammar" ||
+          mode === "spelling" ||
+          mode === "dict-phonetic" ||
+          associationPreview ? (
           collapsedField
         ) : (
           fallback

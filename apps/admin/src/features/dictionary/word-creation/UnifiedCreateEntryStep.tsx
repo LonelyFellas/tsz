@@ -39,7 +39,15 @@ import {
 } from "@tsz/ui/admin/display";
 import { App } from "@tsz/ui/admin/overlays";
 import { Form, Input, Select, Switch } from "@tsz/ui/admin/forms";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState
+} from "react";
+import { RequiredFieldFeedback } from "../RequiredFieldFeedback";
 import { adminWordsDataSource } from "../dataSource";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import {
@@ -624,6 +632,37 @@ function DetectionPresentationCard({
   );
 }
 
+function HeadwordInput({
+  label,
+  value,
+  disabled,
+  error,
+  onChange
+}: {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
+  const messageId = useId();
+  const requiredError = !value.trim() ? error : undefined;
+  return (
+    <RequiredFieldFeedback message={requiredError} messageId={messageId}>
+      <Input
+        aria-label={label}
+        aria-invalid={Boolean(error)}
+        aria-describedby={requiredError ? messageId : undefined}
+        status={error ? "error" : undefined}
+        className="tsz-words"
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </RequiredFieldFeedback>
+  );
+}
+
 function HeadwordConfirmationCard({
   state,
   preference,
@@ -717,20 +756,18 @@ function HeadwordConfirmationCard({
             validateStatus={
               value.common.trim() === "" || issues.uk ? "error" : undefined
             }
-            help={
-              value.common.trim() === ""
-                ? t("creation_enter_the_common_headword")
-                : issues.uk
-            }
+            help={value.common.trim() ? issues.uk : undefined}
           >
-            <Input
-              aria-label={t("creation_common_headword")}
-              className="tsz-words"
+            <HeadwordInput
+              label={t("creation_common_headword")}
+              error={
+                !value.common.trim()
+                  ? t("creation_enter_the_common_headword")
+                  : issues.uk
+              }
               disabled={disabled}
               value={value.common}
-              onChange={(event) =>
-                onChange({ mode: "unified", common: event.target.value })
-              }
+              onChange={(common) => onChange({ mode: "unified", common })}
             />
           </Form.Item>
         </div>
@@ -753,20 +790,18 @@ function HeadwordConfirmationCard({
                   validateStatus={
                     value.uk.trim() === "" || issues.uk ? "error" : undefined
                   }
-                  help={
-                    value.uk.trim() === ""
-                      ? t("creation_enter_the_british_headword")
-                      : issues.uk
-                  }
+                  help={value.uk.trim() ? issues.uk : undefined}
                 >
-                  <Input
-                    aria-label={t("creation_british_headword")}
-                    className="tsz-words"
+                  <HeadwordInput
+                    label={t("creation_british_headword")}
+                    error={
+                      !value.uk.trim()
+                        ? t("creation_enter_the_british_headword")
+                        : issues.uk
+                    }
                     value={value.uk}
                     disabled={disabled || preference === "uk"}
-                    onChange={(event) =>
-                      onChange({ ...value, uk: event.target.value })
-                    }
+                    onChange={(uk) => onChange({ ...value, uk })}
                   />
                 </Form.Item>
               </div>
@@ -781,20 +816,18 @@ function HeadwordConfirmationCard({
                   validateStatus={
                     value.us.trim() === "" || issues.us ? "error" : undefined
                   }
-                  help={
-                    value.us.trim() === ""
-                      ? t("creation_enter_the_american_headword")
-                      : issues.us
-                  }
+                  help={value.us.trim() ? issues.us : undefined}
                 >
-                  <Input
-                    aria-label={t("creation_american_headword")}
-                    className="tsz-words"
+                  <HeadwordInput
+                    label={t("creation_american_headword")}
+                    error={
+                      !value.us.trim()
+                        ? t("creation_enter_the_american_headword")
+                        : issues.us
+                    }
                     value={value.us}
                     disabled={disabled || preference === "us"}
-                    onChange={(event) =>
-                      onChange({ ...value, us: event.target.value })
-                    }
+                    onChange={(us) => onChange({ ...value, us })}
                   />
                 </Form.Item>
               </div>
@@ -832,6 +865,7 @@ export function UnifiedCreateEntryStep({
   const catalog = usePartOfSpeechCatalog();
   const { preference } = useDialectPreference();
   const [value, setValue] = useState("");
+  const entryInputId = useId();
   const [fieldErrorValue, setFieldError] = useState<string>();
   const fieldError =
     fieldErrorValue === undefined
@@ -1129,6 +1163,7 @@ export function UnifiedCreateEntryStep({
     const { normalized, kind, issue } = validateEntryInput(value);
     if (issue) {
       setFieldError(value);
+      document.getElementById(entryInputId)?.focus();
       return;
     }
 
@@ -1342,30 +1377,48 @@ export function UnifiedCreateEntryStep({
           <Form.Item
             label={t("creation_entry_text")}
             validateStatus={fieldError ? "error" : undefined}
-            help={fieldError}
+            help={value.trim() ? fieldError : undefined}
           >
-            <Input.Search
-              autoComplete="off"
-              className="tsz-words"
-              autoFocus
-              disabled={
-                busy !== undefined ||
-                (pending !== undefined && !existingDraftId) ||
-                createAttempt !== undefined
-              }
-              enterButton={
-                <Space size={6}>
-                  <SearchIcon />
-                  {t("creation_dictionary_detection")}
-                </Space>
-              }
-              loading={busy === "checking"}
-              placeholder={t("creation_e_g_center_or_give_up")}
-              size="large"
-              value={value}
-              onChange={(event) => changeValue(event.target.value)}
-              onSearch={() => void submit()}
-            />
+            <RequiredFieldFeedback
+              message={!value.trim() ? fieldError : undefined}
+              messageId={`${entryInputId}-required`}
+            >
+              <Input.Search
+                id={entryInputId}
+                aria-label={t("creation_entry_text")}
+                aria-invalid={Boolean(fieldError)}
+                aria-describedby={
+                  !value.trim() && fieldError
+                    ? `${entryInputId}-required`
+                    : undefined
+                }
+                status={fieldError ? "error" : undefined}
+                autoComplete="off"
+                className="tsz-words"
+                autoFocus
+                disabled={
+                  busy !== undefined ||
+                  (pending !== undefined && !existingDraftId) ||
+                  createAttempt !== undefined
+                }
+                enterButton={
+                  <Space size={6}>
+                    <SearchIcon />
+                    {t("creation_dictionary_detection")}
+                  </Space>
+                }
+                loading={busy === "checking"}
+                placeholder={
+                  !value.trim() && fieldError
+                    ? undefined
+                    : t("creation_e_g_center_or_give_up")
+                }
+                size="large"
+                value={value}
+                onChange={(event) => changeValue(event.target.value)}
+                onSearch={() => void submit()}
+              />
+            </RequiredFieldFeedback>
           </Form.Item>
           <Typography.Text type="secondary" className="word-field-help">
             {t("creation_press_enter_to_run_detection_then_confirm_to_create")}

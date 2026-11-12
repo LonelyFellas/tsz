@@ -32,6 +32,7 @@ import { PronunciationPreviewControls } from "../../word-creation/PronunciationP
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { v3IssueMessage } from "../presentationErrors";
 import "./V3SynthesisInputs.css";
+import { RequiredFieldFeedback } from "../../RequiredFieldFeedback";
 type Alphabet = "ipa" | "ups";
 type Side = "uk" | "us";
 const SIDES = ["uk", "us"] as const;
@@ -61,6 +62,8 @@ export function V3SynthesisInputs({
   dialect,
   index,
   issues,
+  onMissingDictionary,
+  onMissingSpelling,
   onChange
 }: {
   pronunciation: WordPronunciationV3;
@@ -69,11 +72,14 @@ export function V3SynthesisInputs({
   dialect: Dialect;
   index: number;
   issues: readonly V3DraftValidationIssue[];
+  onMissingDictionary?: () => void;
+  onMissingSpelling?: () => void;
   onChange: (patch: Partial<WordPronunciationV3>) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
   const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
   const inputPrefix = useId();
+  const [missingIpa, setMissingIpa] = useState<Side>();
   const [upsState, setUpsState] = useState<
     "unmounted" | "collapsed" | "expanded"
   >("unmounted");
@@ -223,6 +229,20 @@ export function V3SynthesisInputs({
       alphabet === "ipa"
         ? pronunciation.dict_phonetic
         : candidateForSide(synthesis, side, dialect).ipa;
+    if (!source.trim()) {
+      setDiagnostic("");
+      if (alphabet === "ipa") onMissingDictionary?.();
+      else {
+        setMissingIpa(side);
+        document.getElementById(`${inputPrefix}-${side}-ipa`)?.focus();
+      }
+      return;
+    }
+    if (!spelling.trim()) {
+      setDiagnostic("");
+      onMissingSpelling?.();
+      return;
+    }
     let result =
       alphabet === "ipa"
         ? convertDictionaryToAzureIpa(
@@ -299,6 +319,13 @@ export function V3SynthesisInputs({
               sideLocale
             );
             const field = `synthesis.${side}.${alphabet}`;
+            const requiredError =
+              alphabet === "ipa" && missingIpa === side && !candidate.ipa.trim()
+                ? t("creation_phonetic_enter_azure_alphabet", {
+                    alphabet: "IPA"
+                  })
+                : undefined;
+            const requiredErrorId = `${inputPrefix}-${side}-${alphabet}-required`;
             const inputIssue =
               issues.find((issue) => issue.field === field) ??
               (side === legacySide
@@ -308,6 +335,7 @@ export function V3SynthesisInputs({
                 : undefined);
             const invalid =
               Boolean(inputIssue) ||
+              Boolean(requiredError) ||
               issues.some((issue) => issue.field === `${field}_speech`);
             return (
               <div className="word-synthesis-candidate" key={side}>
@@ -351,38 +379,50 @@ export function V3SynthesisInputs({
                       pronunciation.voice_profile
                     }
                   />
-                  <Input.TextArea
-                    id={`${inputPrefix}-${side}-${alphabet}`}
-                    className="tsz-phonetics"
-                    autoSize={{ minRows: 1, maxRows: 6 }}
-                    aria-label={t("creation_synthesis_field", {
-                      label,
-                      side: sideLabel,
-                      name
-                    })}
-                    data-v3-node-id={pronunciation.id}
-                    data-v3-field={inputIssue?.field ?? field}
-                    status={invalid ? "error" : undefined}
-                    aria-invalid={invalid}
-                    value={candidate[alphabet]}
-                    placeholder={t("creation_synthesis_placeholder", {
-                      side: sideLabel,
-                      alphabet: alphabet.toUpperCase()
-                    })}
-                    onChange={(event) =>
-                      change(side, alphabet, event.target.value)
-                    }
-                    onKeyDown={(event) => {
-                      if (
-                        (event.metaKey || event.ctrlKey) &&
-                        event.key.toLowerCase() === "z" &&
-                        !event.shiftKey
-                      ) {
-                        event.preventDefault();
-                        undo(side, alphabet);
+                  <RequiredFieldFeedback
+                    message={requiredError}
+                    messageId={requiredErrorId}
+                  >
+                    <Input.TextArea
+                      id={`${inputPrefix}-${side}-${alphabet}`}
+                      className="tsz-phonetics"
+                      autoSize={{ minRows: 1, maxRows: 6 }}
+                      aria-label={t("creation_synthesis_field", {
+                        label,
+                        side: sideLabel,
+                        name
+                      })}
+                      data-v3-node-id={pronunciation.id}
+                      data-v3-field={inputIssue?.field ?? field}
+                      status={invalid ? "error" : undefined}
+                      aria-invalid={invalid}
+                      aria-describedby={
+                        requiredError ? requiredErrorId : undefined
                       }
-                    }}
-                  />
+                      value={candidate[alphabet]}
+                      placeholder={
+                        requiredError
+                          ? undefined
+                          : t("creation_synthesis_placeholder", {
+                              side: sideLabel,
+                              alphabet: alphabet.toUpperCase()
+                            })
+                      }
+                      onChange={(event) =>
+                        change(side, alphabet, event.target.value)
+                      }
+                      onKeyDown={(event) => {
+                        if (
+                          (event.metaKey || event.ctrlKey) &&
+                          event.key.toLowerCase() === "z" &&
+                          !event.shiftKey
+                        ) {
+                          event.preventDefault();
+                          undo(side, alphabet);
+                        }
+                      }}
+                    />
+                  </RequiredFieldFeedback>
                   <Button
                     icon={<ArrowLeftRightIcon />}
                     aria-label={t("creation_convert_field", {
@@ -418,7 +458,7 @@ export function V3SynthesisInputs({
                     }
                   />
                 </Space.Compact>
-                {invalid && (
+                {invalid && !requiredError && (
                   <Typography.Text className="word-field-help" type="danger">
                     {localPhoneticDiagnostic(
                       synthesisInputIssue(alphabet, candidate[alphabet]),
