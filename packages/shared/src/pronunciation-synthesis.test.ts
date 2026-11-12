@@ -875,7 +875,7 @@ it("final playback follows spelling/phoneme selection and retains legacy recordi
   expect(
     pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
       .assetId
-  ).toBeUndefined();
+  ).toBe("recording");
   pronunciation.synthesis.use_spelling = false;
   // 未选择录音时沿用合成音频；显式选择后才覆盖同口音的默认播放。
   expect(
@@ -908,6 +908,11 @@ it("final playback follows spelling/phoneme selection and retains legacy recordi
     pronunciationPlaybackSource("word", pronunciation, spelling, "en-GB", "uk")
       .assetId
   ).toBe("spelling-recording");
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
+      .assetId
+  ).toBe("recording");
+  pronunciation.audio_assets[0]!.is_default = false;
   expect(
     pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
       .assetId

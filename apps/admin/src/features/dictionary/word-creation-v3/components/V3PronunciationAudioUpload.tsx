@@ -67,7 +67,16 @@ export function V3PronunciationAudioUpload({
               }
               audioUploadAllowed={allowed}
               audioAssets={assets}
-              onAudioAssetsChange={onChange}
+              onAudioAssetsChange={(next) =>
+                onChange(
+                  next.map((asset) =>
+                    asset.is_default === undefined &&
+                    !assets.some((current) => current.id === asset.id)
+                      ? { ...asset, is_default: false }
+                      : asset
+                  )
+                )
+              }
               onValidationChange={(valid) => {
                 ready.current = valid;
               }}

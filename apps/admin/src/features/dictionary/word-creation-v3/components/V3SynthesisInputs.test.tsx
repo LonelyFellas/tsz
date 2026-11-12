@@ -1426,6 +1426,14 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
     )
   );
   expect(await tasks.get("p:common:upload")!()).toBe(true);
+  expect(
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
+      .audio_assets
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: "uploaded-us", is_default: false })
+    ])
+  );
   const complete = within(settings).getByLabelText(`完成${settingsLabel}设置`);
   await waitFor(() => expect(complete).toBeEnabled());
   fireEvent.click(complete);
