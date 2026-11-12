@@ -101,6 +101,9 @@ export function convertVoicePool(
       mode: "local",
       area,
       pool_version: "provider_id_v1",
+      ...(profile?.dubbing?.recommendation_order
+        ? { recommendation_order: profile.dubbing.recommendation_order }
+        : {}),
       ...(profile?.dubbing?.recommendation
         ? { recommendation: profile.dubbing.recommendation }
         : {})
@@ -122,8 +125,11 @@ export function switchPoolRecommendation(
   );
   const contribution_ids: string[] = [];
   const duplicates: string[] = [];
+  const seen = new Set<string>();
   for (const item of items) {
     const key = providerVoiceKey(item.setting.voice_id, voices);
+    if (seen.has(key)) continue;
+    seen.add(key);
     const index = settings.findIndex(
       (setting) => providerVoiceKey(setting.voice_id, voices) === key
     );

@@ -231,12 +231,17 @@ export function LocalVoicePool({
       )
     : undefined;
   const source = profile?.dubbing?.recommendation;
-  const selectedPair = inherited
+  const selectedPairs = inherited
     ? inheritedPair
-    : pairs.find(
+      ? [inheritedPair]
+      : []
+    : pairs.filter(
         (pair) =>
-          pair[0]!.pairId === source?.pair_id &&
-          pair[0]!.groupId === source?.group_id
+          profile?.dubbing?.recommendation_order?.some((id) =>
+            pair.some((item) => item.id === id)
+          ) ||
+          (pair[0]!.pairId === source?.pair_id &&
+            pair[0]!.groupId === source?.group_id)
       );
   const excluded = new Set(
     (inherited
@@ -276,7 +281,7 @@ export function LocalVoicePool({
     }
     return local;
   }
-  function selectRecommendation(pair: VoiceRecommendation[]) {
+  function selectRecommendation(nextPairs: VoiceRecommendation[][]) {
     if (readOnly) return;
     const local = materialize();
     if (!local) return;
@@ -287,19 +292,22 @@ export function LocalVoicePool({
       );
     const result = switchPoolRecommendation(
       local,
-      pair.filter((item) => !locale || item.locale === locale),
+      nextPairs.flat().filter((item) => !locale || item.locale === locale),
       voices
     );
+    result.profile.dubbing!.recommendation_order = nextPairs
+      .flat()
+      .map((item) => item.id);
     if (result.profile.dubbing?.recommendation)
-      result.profile.dubbing.recommendation.voice_ids = pair.map(
-        (item) => item.setting.voice_id
-      );
+      result.profile.dubbing.recommendation.voice_ids = [
+        ...new Set(nextPairs.flat().map((item) => item.setting.voice_id))
+      ];
     setNotice(
       result.duplicates.length
         ? createVoiceEditorMessage(
             "this_recommendation_duplicates_an_existing_voice_existing_local_parameters"
           )
-        : pair.length
+        : nextPairs.length
           ? createVoiceEditorMessage(
               "local_recommendation_copy_applied_save_it_through_the_host_workflow"
             )
@@ -313,7 +321,19 @@ export function LocalVoicePool({
     if (readOnly) return;
     if (phonemeIssue(voice) && !isSelected(voice)) return;
     const local = materialize();
-    if (local) onChange(togglePoolVoice(local, voice, voices));
+    if (local) {
+      const next = togglePoolVoice(local, voice, voices);
+      onChange({
+        ...next,
+        voices: next.voices.map((item) =>
+          providerVoiceKey(item.voice_id, voices) !==
+            providerVoiceKey(voice.id, voices) &&
+          !excluded.has(providerVoiceKey(item.voice_id, voices))
+            ? { ...item, enabled: false }
+            : item
+        )
+      });
+    }
   }
   function edit(setting: VoiceSetting) {
     if (readOnly) return;
@@ -806,35 +826,21 @@ export function LocalVoicePool({
             </Button>
           </div>
         ))}
-      <Radio.Group
+      <section
         className="tsz-ve-pool-recommendation-section"
         aria-label={t("local_recommendation")}
-        value={
-          selectedPair
-            ? `${selectedPair[0]!.groupId}/${selectedPair[0]!.pairId}`
-            : !inherited && converted && !source
-              ? "none"
-              : undefined
-        }
-        onChange={(event) =>
-          selectRecommendation(
-            event.target.value === "none"
-              ? []
-              : (pairs.find(
-                  (pair) =>
-                    `${pair[0]!.groupId}/${pair[0]!.pairId}` ===
-                    event.target.value
-                ) ?? [])
-          )
-        }
       >
         <div className="tsz-ve-pool-recommendation-header">
           <Typography.Title level={5}>
             {t("recommended_voices")}
           </Typography.Title>
-          <Radio value="none" disabled={readOnly}>
+          <Checkbox
+            checked={!selectedPairs.length && !inherited}
+            disabled={readOnly}
+            onChange={() => selectRecommendation([])}
+          >
             {t("do_not_use_recommended_voices")}
-          </Radio>
+          </Checkbox>
         </div>
         <div className="tsz-ve-pool-scroll">
           <div
@@ -856,14 +862,18 @@ export function LocalVoicePool({
             {visiblePairs.map((pair) => (
               <div
                 className="tsz-ve-pool-pair"
-                data-selected={
-                  selectedPair?.[0]?.groupId === pair[0]!.groupId &&
-                  selectedPair?.[0]?.pairId === pair[0]!.pairId
-                }
+                data-selected={selectedPairs.includes(pair)}
                 key={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
               >
-                <Radio
-                  value={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
+                <Checkbox
+                  checked={selectedPairs.includes(pair)}
+                  onChange={(event) =>
+                    selectRecommendation(
+                      event.target.checked
+                        ? [...selectedPairs, pair]
+                        : selectedPairs.filter((item) => item !== pair)
+                    )
+                  }
                   disabled={
                     readOnly ||
                     pair
@@ -889,7 +899,7 @@ export function LocalVoicePool({
                   }
                 >
                   {pair[0]!.name}
-                </Radio>
+                </Checkbox>
                 <span className="tsz-ve-pool-group-name">
                   {pair[0]!.groupName}
                   {pair[0]!.selected === false
@@ -922,7 +932,7 @@ export function LocalVoicePool({
             ))}
           </div>
         </div>
-      </Radio.Group>
+      </section>
       {legacyRecommendations.length > 0 && (
         <section aria-label={t("unpaired_historical_recommendation")}>
           <Typography.Paragraph type="secondary">
@@ -979,7 +989,7 @@ export function LocalVoicePool({
           )}
         </Typography.Paragraph>
       )}
-      {source && !selectedPair && (
+      {source && !selectedPairs.length && (
         <Typography.Paragraph type="secondary">
           {t(
             "the_source_recommendation_changed_or_was_removed_applied_local_copies_are_r"
@@ -1047,7 +1057,24 @@ export function LocalVoicePool({
         <div className="tsz-ve-pool-catalog-body">
           {loading && <Spin aria-label={t("loading_voice_catalogue")} />}
           <div className="tsz-ve-pool-scroll">
-            <div className="tsz-ve-pool-catalog" data-single={!!locale}>
+            <Radio.Group
+              className="tsz-ve-pool-catalog"
+              data-single={!!locale}
+              aria-label={t("full_voice_catalogue")}
+              value={
+                current.find(
+                  (item) =>
+                    item.enabled &&
+                    !excluded.has(providerVoiceKey(item.voice_id, voices))
+                )?.voice_id ?? ""
+              }
+              onChange={(event) => {
+                const voice = voices.find(
+                  (item) => item.id === event.target.value
+                );
+                if (voice) toggle(voice);
+              }}
+            >
               {sides.flatMap((side) =>
                 ["female", "male"].map((gender) => {
                   const key = `${side.key}-${gender}`;
@@ -1132,7 +1159,8 @@ export function LocalVoicePool({
                         {columnVoices.map((voice) => (
                           <div key={voice.id} hidden={!isVisible(voice)}>
                             <div className="tsz-ve-pool-catalog-item-head">
-                              <Checkbox
+                              <Radio
+                                value={voice.id}
                                 aria-label={t("select", {
                                   p0: voice.displayName ?? voice.label
                                 })}
@@ -1140,14 +1168,12 @@ export function LocalVoicePool({
                                   readOnly ||
                                   (!!phonemeIssue(voice) && !isSelected(voice))
                                 }
-                                checked={isSelected(voice)}
-                                onChange={() => toggle(voice)}
                               >
                                 <PoolVoiceName
                                   voice={voice}
                                   fallback={voice.id}
                                 />
-                              </Checkbox>
+                              </Radio>
                               {preview(
                                 {
                                   voice_id: voice.id,
@@ -1183,7 +1209,7 @@ export function LocalVoicePool({
                   );
                 })
               )}
-            </div>
+            </Radio.Group>
           </div>
         </div>
       </details>
