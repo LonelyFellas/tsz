@@ -1368,11 +1368,6 @@ export function UnifiedCreateEntryStep({
         <Typography.Title level={2} style={{ margin: 0 }}>
           {t("assistant_step_basics")}
         </Typography.Title>
-        <Typography.Paragraph className="word-step-description">
-          {t(
-            "creation_check_a_word_or_phrase_against_the_built_in_dictionary_then_confirm_the_headwords_to_creat"
-          )}
-        </Typography.Paragraph>
       </div>
 
       <Card

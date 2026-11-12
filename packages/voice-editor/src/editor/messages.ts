@@ -263,7 +263,6 @@ export const voiceEditorMessages = {
   move_down: ["下移", "下移", "Move down"],
   label_2: ["{{p0}} {{p1}}", "{{p0}} {{p1}}", "{{p0}} {{p1}}"],
   edit_2: ["修改 {{p0}}", "修改 {{p0}}", "Edit {{p0}}"],
-  final_audio_ready: ["正式音频已就绪", "正式音訊已就緒", "Final audio ready"],
   generating_final_audio: [
     "正在生成正式音频",
     "正在生成正式音訊",
@@ -832,11 +831,6 @@ export const voiceEditorMessages = {
     "生成期间参数已修改，请重新生成。",
     "生成期間引數已修改，請重新生成。",
     "Parameters changed during generation. Generate again."
-  ],
-  final_audio_generated_complete_editing_and_save_the_text: [
-    "正式音频已生成，请完成编辑并保存正文。",
-    "正式音訊已生成，請完成編輯並儲存正文。",
-    "Final audio generated. Complete editing and save the text."
   ],
   generation_failed_try_again_2: [
     "生成失败，请重试。",

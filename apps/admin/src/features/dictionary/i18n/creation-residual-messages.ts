@@ -453,12 +453,6 @@ export const creationResidualMessages = {
       "偵測到智慧詞庫V1已有相同原形。繼續後將建立新的獨立詞條，不會修改已有詞條。",
       "The smart lexicon already contains the same base form. Continuing creates a separate entry and leaves existing entries unchanged."
     ],
-  creation_check_a_word_or_phrase_against_the_built_in_dictionary_then_confirm_the_headwords_to_creat:
-    [
-      "利用内置词典检测单词或短语，确认主词后创建词条。",
-      "使用內建詞典檢測單字或片語，確認主詞後建立詞條。",
-      "Check a word or phrase against the built-in dictionary, then confirm the headwords to create the entry."
-    ],
   creation_input_and_detection: [
     "录入与检测",
     "輸入與檢測",
@@ -544,30 +538,12 @@ export const creationResidualMessages = {
     "目前草稿詞形",
     "Current draft forms"
   ],
-  creation_british_and_american_spellings_forms_and_phonetics_were_applied_from_the_built_in_dictiona:
-    [
-      "建条时已套用内置词典的英美拼写、词形和音标；下面是草稿的最新内容，在词形与发音步改动后这里同步更新。",
-      "建立時已套用內建詞典的英美拼寫、詞形和音標；以下為草稿最新內容，會隨詞形與發音步驟的修改更新。",
-      "British and American spellings, forms and phonetics were applied from the built-in dictionary. This shows the latest draft and updates when you edit forms and pronunciation."
-    ],
-  creation_enter_an_entry_to_identify_its_type_find_existing_base_forms_and_match_british_and_america:
-    [
-      "录入词条，系统将判断词条类型，检测智能词库V1中的已有原形，并从内置词典匹配英美词形和建议词性。",
-      "輸入詞條後，系統會判斷類型、檢測智慧詞庫V1已有原形，並從內建詞典匹配英美詞形與建議詞性。",
-      "Enter an entry to identify its type, find existing base forms and match British and American forms and suggested parts of speech from the built-in dictionary."
-    ],
   creation_english_entries_only: [
     "仅支持英文词条",
     "僅支援英文詞條",
     "English entries only"
   ],
   creation_no_entry_name: ["暂无词条名称", "尚無詞條名稱", "No entry name"],
-  creation_dictionary_detection_is_complete_suggestions_have_been_applied_to_the_current_draft:
-    [
-      "词典检测已完成，建议内容已应用到当前草稿。",
-      "詞典檢測已完成，建議內容已套用至目前草稿。",
-      "Dictionary detection is complete. Suggestions have been applied to the current draft."
-    ],
   creation_dictionary_detection_results: [
     "词典检测结果",
     "詞典檢測結果",
@@ -1121,12 +1097,6 @@ export const creationResidualMessages = {
     "已依內建詞典預填，請核對",
     "Prefilled from the built-in dictionary. Check the content."
   ],
-  creation_parts_of_speech_forms_and_pronunciations_reflect_the_current_draft_continue_editing_then_s:
-    [
-      "词性、词形和发音以当前草稿内容为准，可继续完善后保存。",
-      "詞性、詞形和發音以目前草稿內容為準，可繼續補齊後儲存。",
-      "Parts of speech, forms and pronunciations reflect the current draft. Continue editing, then save."
-    ],
   creation_suggested_parts_of_speech_have_not_been_added_enter_them_manually: [
     "词性建议尚未写入，请手动补充",
     "詞性建議尚未寫入，請手動補充",
@@ -1142,11 +1112,6 @@ export const creationResidualMessages = {
     "未找到内置词典建议，已创建空白草稿",
     "未找到內建詞典建議，已建立空白草稿",
     "No built-in dictionary suggestions found. A blank draft was created."
-  ],
-  creation_add_parts_of_speech_forms_and_pronunciation_in_the_following_steps: [
-    "请在后续步骤补充词性、词形和发音。",
-    "請在後續步驟補充詞性、詞形和發音。",
-    "Add parts of speech, forms and pronunciation in the following steps."
   ],
   creation_word_entry: ["单词词条", "單字詞條", "Word entry"],
   creation_phrase_entry: ["短语词条", "片語詞條", "Phrase entry"],

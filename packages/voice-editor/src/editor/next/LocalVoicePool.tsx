@@ -749,17 +749,11 @@ export function LocalVoicePool({
                             onClick={() => edit(setting)}
                           />
                         </div>
-                        {adapter?.generateAudio && (
-                          <Typography.Text
-                            type={
-                              setting.audio_asset_id ? "success" : "secondary"
-                            }
-                          >
-                            {setting.audio_asset_id
-                              ? t("final_audio_ready")
-                              : generatingVersion === key
-                                ? t("generating_final_audio")
-                                : t("final_audio_not_generated")}
+                        {adapter?.generateAudio && !setting.audio_asset_id && (
+                          <Typography.Text type="secondary">
+                            {generatingVersion === key
+                              ? t("generating_final_audio")
+                              : t("final_audio_not_generated")}
                           </Typography.Text>
                         )}
                         {probability === undefined && (

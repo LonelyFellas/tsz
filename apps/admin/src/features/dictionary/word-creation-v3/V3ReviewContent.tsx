@@ -581,12 +581,11 @@ export function V3ReviewContent({
           <a href="#review-publish">{t("panel_publication_checks_2")}</a>
         </nav>
         <div className="v3-review-paper">
-          <div className="v3-review-readiness" role="status">
-            {readiness ??
-              t(
-                "panel_content_is_saved_view_the_content_or_publication_history"
-              )}
-          </div>
+          {readiness && (
+            <div className="v3-review-readiness" role="status">
+              {readiness}
+            </div>
+          )}
           <div className="v3-review-content">
             <Collapse
               activeKey={openSections}

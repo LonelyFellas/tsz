@@ -1074,11 +1074,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       emittedProfileRef.current = JSON.stringify(profile);
       onVoiceProfileChange?.(profile);
       generationKeys.current.delete(key);
-      setRecommendationError(
-        createVoiceEditorMessage(
-          "final_audio_generated_complete_editing_and_save_the_text"
-        )
-      );
     } catch (error) {
       if (!request.signal.aborted)
         setRecommendationError(

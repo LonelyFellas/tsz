@@ -1492,7 +1492,12 @@ describe("V3MeaningsAndExamplesStep", () => {
         .getByLabelText("标注工具栏")
         .closest('[role="dialog"]') as HTMLElement;
       fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
-      await within(editor).findByText("正式音频已就绪");
+      await waitFor(() => expect(generating).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(
+          within(editor).queryByText("正在生成正式音频")
+        ).not.toBeInTheDocument()
+      );
       const editVoice = await within(editor).findByLabelText("修改 Sonia");
       await waitFor(() => expect(editVoice).toBeEnabled());
       fireEvent.click(editVoice);
