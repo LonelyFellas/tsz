@@ -103,6 +103,7 @@ export function V3PhonemeSpeechSettings({
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [saveError, setSaveError] = useCreationMessageState();
+  const [businessSaveFailed, setBusinessSaveFailed] = useState(false);
   const targetKey = JSON.stringify([nodeId, alphabet, locale]);
   const activeTarget = useRef<string | null>(targetKey);
   useLayoutEffect(() => {
@@ -538,6 +539,7 @@ export function V3PhonemeSpeechSettings({
           onClick={() => {
             setDraft(capture());
             setSaveError("");
+            setBusinessSaveFailed(false);
             setSource(sourceKey);
             setOpen(true);
           }}
@@ -574,7 +576,17 @@ export function V3PhonemeSpeechSettings({
           closable={!saving}
           keyboard={!saving}
         >
-          {saveError && <Alert type="error" showIcon title={saveError} />}
+          {saveError && (
+            <Alert
+              type="error"
+              showIcon
+              title={
+                businessSaveFailed
+                  ? (businessSave?.failure ?? saveError)
+                  : saveError
+              }
+            />
+          )}
           <Suspense
             fallback={
               <Typography.Text>
@@ -669,6 +681,7 @@ export function V3PhonemeSpeechSettings({
                       savingRef.current = true;
                       setSaving(true);
                       setSaveError("");
+                      setBusinessSaveFailed(false);
                       try {
                         const result = captureResult?.(!!businessSave);
                         const next = resolveCandidate(
@@ -695,6 +708,7 @@ export function V3PhonemeSpeechSettings({
                           !(await businessSaveRef.current.save("azure"))
                         ) {
                           if (activeTarget.current !== targetKey) return;
+                          setBusinessSaveFailed(true);
                           setSaveError(
                             creationMessage(
                               "panel_saving_is_incomplete_all_changes_are_retained_resolve_validation_issues_or"

@@ -561,6 +561,7 @@ export function V3FormContentModal({
     outerSave && onApply
       ? {
           audioTasks: audioTasks.current,
+          failure: outerSave.failure,
           save: async (area) => {
             if (savingRef.current) return false;
             savingRef.current = true;

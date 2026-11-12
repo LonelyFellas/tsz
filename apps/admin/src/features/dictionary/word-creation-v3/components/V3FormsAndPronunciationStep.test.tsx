@@ -1886,7 +1886,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(variant.common.pronunciations[1]!.actual_pron).toBe("two-edited");
   });
 
-  it("I08 draft 空态可编辑但不误报完成；发布问题只显示简短状态", () => {
+  it("I08 draft 空态可编辑，字段错误就地展示且不重复显示警告横幅", () => {
     const { rerender } = render(
       <FeedbackApp>
         <V3FormsAndPronunciationStep
@@ -1919,10 +1919,10 @@ describe("V3FormsAndPronunciationStep", () => {
       </FeedbackApp>
     );
     expect(
-      screen.getByText(
+      screen.queryByText(
         "已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
       )
-    ).toBeInTheDocument();
+    ).toBeNull();
 
     const incomplete = formsFixture({
       forms: [commonFormFixture({ spelling: "", pronunciations: [] })]
@@ -1970,7 +1970,7 @@ describe("V3FormsAndPronunciationStep", () => {
       </FeedbackApp>
     );
 
-    expect(screen.getByText("词形与发音尚未完成")).toBeInTheDocument();
+    expect(screen.queryByText("词形与发音尚未完成")).toBeNull();
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveAttribute(
       "aria-invalid",
       "true"

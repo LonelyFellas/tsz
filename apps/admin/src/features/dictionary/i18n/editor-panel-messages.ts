@@ -721,10 +721,35 @@ export const lexiconEditorPanelMessages = {
     ],
   panel_saving_is_incomplete_all_changes_are_retained_resolve_validation_issues_or:
     [
-      "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。",
-      "儲存未完成，全部修改已保留；請處理業務校驗或版本衝突後重試。",
-      "Saving is incomplete; all changes are retained. Resolve validation issues or version conflicts and retry."
+      "尚未保存，修改已保留，请重试。",
+      "尚未儲存，修改已保留，請重試。",
+      "Not saved. Your changes are retained. Try again."
     ],
+  panel_save_validation: [
+    "尚未保存，修改已保留。{{issue}}",
+    "尚未儲存，修改已保留。{{issue}}",
+    "Not saved. Your changes are retained. {{issue}}"
+  ],
+  panel_save_conflict: [
+    "尚未保存，修改已保留。词条已有新版本，请关闭配音设置，选择保留或放弃本地修改。",
+    "尚未儲存，修改已保留。詞條已有新版本，請關閉配音設定，選擇保留或放棄本機修改。",
+    "Not saved. Your changes are retained. The entry has a newer version. Close voice settings and choose whether to keep or discard your local changes."
+  ],
+  panel_save_expired: [
+    "登录已失效，尚未保存。请重新登录后重试，勿关闭当前编辑页。",
+    "登入已失效，尚未儲存。請重新登入後重試，勿關閉目前編輯頁。",
+    "Your session has expired. Changes are not saved. Sign in again and retry; keep this editor open."
+  ],
+  panel_save_forbidden: [
+    "尚未保存，修改已保留。当前账号没有保存权限，请联系管理员。",
+    "尚未儲存，修改已保留。目前帳號沒有儲存權限，請聯絡管理員。",
+    "Not saved. Your changes are retained. Your account cannot save these changes. Contact an administrator."
+  ],
+  panel_save_unavailable: [
+    "暂时无法连接保存服务，修改已保留，请稍后重试。",
+    "暫時無法連線儲存服務，修改已保留，請稍後重試。",
+    "The save service is unavailable. Your changes are retained. Try again later."
+  ],
   panel_saving_failed_all_changes_are_retained_try_again: [
     "保存失败，全部修改已保留，请重试",
     "儲存失敗，全部修改已保留，請重試",
@@ -1897,9 +1922,9 @@ export const lexiconEditorPanelMessages = {
     "The linked entry changed. Select it again."
   ],
   validation_voice_profile_invalid: [
-    "音色或语速设置不合法，请重新选择音色并把语速调回 0.50×–2.00×",
-    "音色或語速設定不合法，請重新選擇音色並把語速調回 0.50×–2.00×",
-    "The voice or rate setting is invalid. Select a voice again and set the rate to 0.50×–2.00×."
+    "配音配置无法保存，请打开对应的配音设置，重新选择音色后重试",
+    "配音設定無法儲存，請開啟對應的配音設定，重新選擇音色後重試",
+    "The voice configuration cannot be saved. Open its voice settings, select the voices again and retry."
   ],
   validation_phoneme_long: [
     "{{name}} 超长或包含控制字符，请检查输入",

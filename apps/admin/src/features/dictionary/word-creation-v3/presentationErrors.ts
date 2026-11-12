@@ -109,13 +109,21 @@ import {
   UnsupportedAdminWordSchemaVersionError
 } from "@tsz/api-client";
 import type { V3DraftValidationIssue } from "@tsz/types";
+import type { V3Problem } from "./problem";
 
 export function v3IssueMessage(
   issue: V3DraftValidationIssue,
   t: LexiconEditorTranslation = defaultLexiconEditorTranslation
 ): string {
-  if (issue.field === "synthesis.ipa" || issue.field === "synthesis.ups") {
-    const name = issue.field === "synthesis.ipa" ? "Azure IPA" : "Azure UPS";
+  const phonemeField = /^synthesis\.(?:(?:uk|us)\.)?(ipa|ups)$/.exec(
+    issue.field
+  );
+  if (
+    phonemeField &&
+    (issue.code === "content_limit_exceeded" ||
+      issue.code === "pronunciation_required")
+  ) {
+    const name = phonemeField[1] === "ipa" ? "Azure IPA" : "Azure UPS";
     return issue.code === "content_limit_exceeded"
       ? t("validation_phoneme_long", { name })
       : t("validation_phoneme_required", { name });
@@ -146,6 +154,32 @@ export function v3IssueMessages(
       )
     )
   ];
+}
+
+export function v3SaveProblemMessage(
+  problem: V3Problem,
+  t: CreationTranslation = creationDefaultT
+): string {
+  switch (problem.kind) {
+    case "validation":
+      return problem.issues[0]
+        ? t("panel_save_validation", {
+            issue: v3IssueMessage(problem.issues[0], t)
+          })
+        : t("panel_saving_failed_all_changes_are_retained_try_again");
+    case "revision_conflict":
+      return t("panel_save_conflict");
+    case "authentication":
+      return t("panel_save_expired");
+    case "authorization":
+      return t("panel_save_forbidden");
+    case "network":
+    case "server":
+    case "service_unavailable":
+      return t("panel_save_unavailable");
+    default:
+      return t("panel_saving_failed_all_changes_are_retained_try_again");
+  }
 }
 
 export interface V3DetailErrorPresentation {

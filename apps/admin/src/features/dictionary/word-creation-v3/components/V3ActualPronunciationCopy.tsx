@@ -73,16 +73,6 @@ export function V3ActualPronunciationCopy({
             return;
           }
           apply(result.value);
-          const success = hasAnnotations
-            ? t("panel_transcription_converted_previous_annotations_cleared")
-            : t("panel_transcription_converted");
-          void message.open({
-            type: result.notices.length ? "warning" : "success",
-            content: [
-              success,
-              ...result.notices.map((notice) => conversionMessage(notice, t))
-            ].join("；")
-          });
         }}
       />
       {history &&

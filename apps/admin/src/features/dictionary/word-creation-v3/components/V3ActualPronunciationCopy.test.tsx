@@ -34,7 +34,7 @@ it("一键转换清除旧标注，不弹确认框，撤销恢复完整富文本"
     actual_pron: "ˈfæməlɪ",
     actual_pron_rich: { version: 2, text: "ˈfæməlɪ", annotations: [] }
   });
-  expect(await screen.findByText(/原标注已清除/)).toBeInTheDocument();
+  expect(screen.queryByText(/原标注已清除/)).toBeNull();
   view.rerender(
     <V3ActualPronunciationCopy
       {...props}
@@ -86,7 +86,7 @@ it("每次点击按当前来源、口音与读法转换，撤销只恢复上一�
   });
 });
 
-it("没有词汇依据的弱读直接规范音标并提示核对", async () => {
+it("没有词汇依据的弱读直接规范音标，不弹出泛化核对提示", () => {
   const onChange = vi.fn();
   renderCopy({
     pronunciation: {
@@ -106,7 +106,7 @@ it("没有词汇依据的弱读直接规范音标并提示核对", async () => {
     actual_pron_rich: { version: 2, text: "ˈwɪntər", annotations: [] }
   });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(await screen.findByText(/核对读法/)).toBeInTheDocument();
+  expect(screen.queryByText(/核对读法/)).toBeNull();
 });
 
 it("无效音标不改写实际发音或标注", async () => {
