@@ -328,6 +328,64 @@ describe("新版局部主页和唯一声音草稿", () => {
     });
   });
 
+  it("目录音色被同声推荐采用后，换目录再取消推荐仍只保留新目录音色", async () => {
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([])}
+        recommendations={[recommendation("b", "同声推荐")]}
+        onProfile={onProfile}
+      />
+    );
+    fireEvent.click(screen.getByText("完整音色目录"));
+    fireEvent.click(await screen.findByRole("radio", { name: "选用 Beta" }));
+    const recommended = screen.getByRole("checkbox", { name: "同声推荐" });
+    fireEvent.click(recommended);
+    fireEvent.click(screen.getByRole("radio", { name: "选用 American" }));
+    fireEvent.click(recommended);
+    expect(
+      onProfile.mock.calls
+        .at(-1)![0]
+        .voices.filter((item: VoiceSetting) => item.enabled)
+        .map((item: VoiceSetting) => item.voice_id)
+    ).toEqual(["us"]);
+    expect(screen.getByRole("radio", { name: "选用 American" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "选用 Beta" })).not.toBeChecked();
+  });
+
+  it("恢复默认推荐后再选择目录，不恢复之前取消的推荐勾选", async () => {
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([])}
+        recommendations={[
+          recommendation("a", "第一套"),
+          recommendation("b", "第二套")
+        ]}
+        onProfile={onProfile}
+      />
+    );
+    fireEvent.click(await screen.findByRole("checkbox", { name: "第一套" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "第二套" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复默认推荐" }));
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "第一套" })).toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: "第二套" })
+      ).not.toBeChecked();
+    });
+    fireEvent.click(screen.getByText("完整音色目录"));
+    fireEvent.click(screen.getByRole("radio", { name: "选用 American" }));
+    expect(screen.getByRole("checkbox", { name: "第二套" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "第一套" }));
+    expect(
+      onProfile.mock.calls
+        .at(-1)![0]
+        .voices.filter((item: VoiceSetting) => item.enabled)
+        .map((item: VoiceSetting) => item.voice_id)
+    ).toEqual(["us"]);
+  });
+
   it.each(["spelling", "phoneme-settings"] as const)(
     "%s 中 Flash 只允许自然朗读，音素模式在选用前拦截",
     async (mode) => {

@@ -101,7 +101,8 @@ export function convertVoicePool(
       mode: "local",
       area,
       pool_version: "provider_id_v1",
-      ...(profile?.dubbing?.recommendation_order
+      ...(profile?.dubbing?.mode === "local" &&
+      profile.dubbing.recommendation_order
         ? { recommendation_order: profile.dubbing.recommendation_order }
         : {}),
       ...(profile?.dubbing?.recommendation

@@ -249,6 +249,10 @@ export function LocalVoicePool({
       : source?.voice_ids
     )?.map((id) => providerVoiceKey(id, voices)) ?? []
   );
+  const catalogSelection = current.find(
+    (item) =>
+      item.enabled && !excluded.has(providerVoiceKey(item.voice_id, voices))
+  );
   const probabilities = voicePoolProbabilities(
     current.filter((item) => !unavailableVersions?.has(voiceSettingKey(item))),
     voices,
@@ -302,6 +306,28 @@ export function LocalVoicePool({
       result.profile.dubbing.recommendation.voice_ids = [
         ...new Set(nextPairs.flat().map((item) => item.setting.voice_id))
       ];
+    const recommendedKeys = new Set(
+      nextPairs
+        .flat()
+        .map((item) => providerVoiceKey(item.setting.voice_id, voices))
+    );
+    const catalogVoices = result.profile.voices.filter(
+      (item) =>
+        item.enabled &&
+        !recommendedKeys.has(providerVoiceKey(item.voice_id, voices))
+    );
+    const retainedCatalog =
+      catalogVoices.find(
+        (item) =>
+          catalogSelection &&
+          providerVoiceKey(item.voice_id, voices) ===
+            providerVoiceKey(catalogSelection.voice_id, voices)
+      ) ?? catalogVoices[0];
+    result.profile.voices = result.profile.voices.map((item) =>
+      catalogVoices.includes(item) && item !== retainedCatalog
+        ? { ...item, enabled: false }
+        : item
+    );
     setNotice(
       result.duplicates.length
         ? createVoiceEditorMessage(
@@ -1061,13 +1087,7 @@ export function LocalVoicePool({
               className="tsz-ve-pool-catalog"
               data-single={!!locale}
               aria-label={t("full_voice_catalogue")}
-              value={
-                current.find(
-                  (item) =>
-                    item.enabled &&
-                    !excluded.has(providerVoiceKey(item.voice_id, voices))
-                )?.voice_id ?? ""
-              }
+              value={catalogSelection?.voice_id ?? ""}
               onChange={(event) => {
                 const voice = voices.find(
                   (item) => item.id === event.target.value
