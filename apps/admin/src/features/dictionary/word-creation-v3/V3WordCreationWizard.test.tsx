@@ -7564,3 +7564,111 @@ it("词形保存等待默认配音回写，再提交包含新资产的当前草�
     JSON.stringify(vi.mocked(source.saveForms).mock.calls[0]![1].content)
   ).toContain(`"audio_asset_id":"${UUIDS.pronunciation}"`);
 });
+
+function formReferenceSlot(context: V3WizardSlotContext) {
+  return (
+    <>
+      <Slot context={context} />
+      <button
+        onClick={() => context.registerSentenceLeaveGuard?.(async () => false)}
+      >
+        打开参考浮窗
+      </button>
+      <button onClick={() => context.registerSentenceLeaveGuard?.(undefined)}>
+        关闭参考浮窗
+      </button>
+      <button onClick={() => void context.actions.refreshConflict()}>
+        调用冲突刷新
+      </button>
+    </>
+  );
+}
+
+it("参考浮窗打开期间延后自动换版，关闭后才采用没有外层修改的新版本", async () => {
+  const source = requests();
+  const view = renderWizard(source, { renderStep: formReferenceSlot });
+  fireEvent.click(screen.getByText("打开参考浮窗"));
+  view.rerender(
+    inRouter(
+      <V3WordCreationWizard
+        initialWord={word(2, "remote update")}
+        requests={source}
+        renderStep={formReferenceSlot}
+      />
+    )
+  );
+  expect(screen.getByTestId("revision")).toHaveTextContent("1");
+  expect(screen.getByTestId("spelling")).toHaveTextContent("centre");
+  expect(screen.getByRole("button", { name: "保留本地修改" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "放弃本地修改" })).toBeDisabled();
+  fireEvent.click(screen.getByText("关闭参考浮窗"));
+  await waitFor(() =>
+    expect(screen.getByTestId("revision")).toHaveTextContent("2")
+  );
+  expect(screen.getByTestId("spelling")).toHaveTextContent("remote update");
+});
+
+it("参考浮窗保护在途冲突刷新及直接重试命令，关闭后才允许换基线", async () => {
+  let resolveGet!: (value: AdminWordDraftV3Envelope) => void;
+  const get = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<AdminWordDraftV3Envelope>((resolve) => {
+          resolveGet = resolve;
+        })
+    )
+    .mockResolvedValue(draftEnvelope(4, "remote latest"));
+  const source = requests({
+    get,
+    saveForms: vi.fn(async () => {
+      throw new HttpError(409, "stale", [], "revision_conflict");
+    })
+  });
+  renderWizard(source, { renderStep: formReferenceSlot });
+  fireEvent.click(screen.getByText("编辑"));
+  fireEvent.click(screen.getByText("保存"));
+  fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+  await waitFor(() => expect(get).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByText("打开参考浮窗"));
+  await act(async () => resolveGet(draftEnvelope(3, "in-flight remote")));
+  expect(screen.getByTestId("revision")).toHaveTextContent("1");
+  fireEvent.click(screen.getByText("调用冲突刷新"));
+  await act(async () => {});
+  expect(get).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByText("关闭参考浮窗"));
+  fireEvent.click(screen.getByText("调用冲突刷新"));
+  await waitFor(() =>
+    expect(screen.getByTestId("revision")).toHaveTextContent("4")
+  );
+  expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+});
+
+it("参考浮窗打开期间不能恢复备份草稿，关闭后恢复仍然可用", async () => {
+  const initialWord = word();
+  initialWord.id = "task184-recovery";
+  const key = snapshotKey("admin-1", `word-v3:${initialWord.id}`);
+  const previous = sessionStorage.getItem(key);
+  sessionStorage.removeItem(key);
+  onTestFinished(() => {
+    if (previous === null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, previous);
+  });
+  const source = requests();
+  const first = renderWizard(source, {
+    initialWord,
+    renderStep: formReferenceSlot
+  });
+  fireEvent.click(screen.getByText("编辑"));
+  first.unmount();
+  renderWizard(source, { initialWord, renderStep: formReferenceSlot });
+  fireEvent.click(screen.getByText("打开参考浮窗"));
+  const restore = screen.getByRole("button", { name: "恢复编辑" });
+  expect(restore).toBeDisabled();
+  fireEvent.click(restore);
+  expect(screen.getByTestId("spelling")).toHaveTextContent("centre");
+  fireEvent.click(screen.getByText("关闭参考浮窗"));
+  expect(restore).toBeEnabled();
+  fireEvent.click(restore);
+  expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+});

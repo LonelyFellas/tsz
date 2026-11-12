@@ -1,4 +1,4 @@
-export { Modal, Drawer, type ModalProps } from "./dialog";
+export { Modal, Drawer, OverlayLayer, type ModalProps } from "./dialog";
 export { App, message } from "./feedback";
 export {
   Dropdown,

@@ -170,6 +170,15 @@ function V3BlockedReferencesAlert({
 
 function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
   const { t } = useLexiconEditorTranslation();
+  const [contentEditorOpen, setContentEditorOpen] = useState(false);
+  const { registerSentenceLeaveGuard } = context;
+  const registerContentLeaveGuard = useCallback(
+    (guard?: () => Promise<boolean>) => {
+      setContentEditorOpen(!!guard);
+      registerSentenceLeaveGuard?.(guard);
+    },
+    [registerSentenceLeaveGuard]
+  );
   const referenceGuard = useV3ReferenceGuard();
   // 草稿可编辑；即时列出拼写影响，发布前必须修复引用。
   const conflicts = spellingConflicts(referenceGuard.index, context.draftForms);
@@ -251,7 +260,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
             }
             retiredContentSlots={context.retiredContentSlots}
             retiredStableNodes={context.retiredStableNodes}
-            registerLeaveGuard={context.registerSentenceLeaveGuard}
+            registerLeaveGuard={registerContentLeaveGuard}
             activePosId={context.activePosId}
             entryKind={context.word.kind}
             formGroupBindingCounts={countFormGroupBindings(
@@ -300,7 +309,11 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         }
       >
         <Button
-          disabled={(!context.hasUnsavedChanges && !bindingsDirty) || busy}
+          disabled={
+            contentEditorOpen ||
+            (!context.hasUnsavedChanges && !bindingsDirty) ||
+            busy
+          }
           loading={busy}
           onClick={() => void saveDraft()}
         >
@@ -308,7 +321,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         </Button>
         <Button
           type="primary"
-          disabled={busy}
+          disabled={busy || contentEditorOpen}
           onClick={() => {
             context.setActiveStep("meanings");
           }}

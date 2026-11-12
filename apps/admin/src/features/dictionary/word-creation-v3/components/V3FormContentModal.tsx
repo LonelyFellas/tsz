@@ -29,7 +29,8 @@ import {
   Tag,
   Typography
 } from "@tsz/ui/admin/display";
-import { App, Drawer, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
+import { V3FormContentWindow } from "./V3FormContentWindow";
 import { Checkbox, Switch } from "@tsz/ui/admin/forms";
 import type {
   DialectRulesV3,
@@ -585,16 +586,10 @@ export function V3FormContentModal({
           }
         }
       : outerSave;
-  const drawer = (
-    <Drawer
-      open
-      placement="right"
-      size="min(1200px, 100vw)"
-      rootClassName="v3-content-drawer"
+  const contentWindow = (
+    <V3FormContentWindow
       title={t("content_settings", { index: previewSpelling || t("blank") })}
       onClose={() => void askLeaveRef.current!()}
-      mask={{ closable: false }}
-      destroyOnHidden
       footer={
         <Flex justify="flex-end" align="center" gap="small" wrap>
           <Space>
@@ -997,12 +992,12 @@ export function V3FormContentModal({
           })}
         </div>
       </Modal>
-    </Drawer>
+    </V3FormContentWindow>
   );
   return (
     <VoiceAudioTasksContext.Provider value={audioTasks.current}>
       <VoiceSaveContext.Provider value={saveScope}>
-        {drawer}
+        {contentWindow}
       </VoiceSaveContext.Provider>
     </VoiceAudioTasksContext.Provider>
   );

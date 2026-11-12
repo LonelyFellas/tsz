@@ -14,6 +14,7 @@ import {
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import type {
   DraftFormsStepContentV3,
+  SharedFormsStepContentV3,
   Dialect,
   WordPronunciationV3,
   V3DraftValidationIssue,
@@ -42,7 +43,11 @@ import {
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 import { V3FormGroupCard } from "./V3FormGroupCard";
 import { V3FormContentOverview } from "./V3FormContentOverview";
-import { updateConcreteFormType } from "../operations";
+import {
+  updateConcreteFormType,
+  createStableVariantIdFactory
+} from "../operations";
+import { applyFormsStructure, expandFormContents } from "../sharedFormsModel";
 import { V3FormsAndPronunciationStep } from "./V3FormsAndPronunciationStep";
 import { V3PosTab } from "./V3PosTab";
 import { V3PronunciationList } from "./V3PronunciationList";
@@ -3878,4 +3883,50 @@ it("目录自定义词形可展示，改名后保留词形编码", async () => {
   expect((await screen.findAllByText("改名词形")).length).toBeGreaterThan(0);
   expect(screen.queryByText("自定义")).toBeNull();
   expect(formById(canonicalValue(), custom.id)).toEqual(custom);
+});
+
+it("词形浮窗打开和收起时背景只供参考，关闭后恢复编辑", async () => {
+  const initial = formsFixture({
+    forms: [commonFormFixture({ spelling: "reference" })]
+  });
+  const forms = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    initial
+  ) as SharedFormsStepContentV3;
+  const onChange = vi.fn();
+  const onSharedFormsChange = vi.fn();
+  render(
+    <FeedbackApp>
+      <V3FormsAndPronunciationStep
+        value={expandFormContents(forms)}
+        sharedForms={forms}
+        onSharedFormsChange={onSharedFormsChange}
+        onChange={onChange}
+        stableVariantIds={createStableVariantIdFactory(initial, [])}
+      />
+    </FeedbackApp>
+  );
+  const edit = screen.getByRole("button", { name: "编辑原形内容" });
+  edit.focus();
+  fireEvent.click(edit);
+  const dialog = screen.getByRole("dialog");
+  expect(edit).toBeDisabled();
+  expect(
+    within(dialog).getByRole("button", { name: "新增标签" })
+  ).toBeEnabled();
+  const background = document.querySelector(".v3-forms-reference")!;
+  expect(background).not.toHaveAttribute("inert");
+  expect(
+    within(background as HTMLElement).getByText("reference", { exact: true })
+  ).toBeVisible();
+  fireEvent.click(edit);
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  fireEvent.click(within(dialog).getByRole("button", { name: "收起" }));
+  expect(edit).toBeDisabled();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(onSharedFormsChange).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "关闭词形内容设置" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(edit).toBeEnabled();
+  expect(edit).toHaveFocus();
 });

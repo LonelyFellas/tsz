@@ -393,6 +393,23 @@ describe("词形复制交互", () => {
     expect(current()).toEqual(initial);
   });
 
+  it("选择复制目标后打开只读参考状态，键盘和点击都不能改写草稿", async () => {
+    const initial = fixture();
+    const view = render(<Harness initial={initial} />);
+    begin();
+    fireEvent.keyDown(screen.getByTestId("phonetics-0"), { key: "ArrowDown" });
+    view.rerender(<Harness initial={initial} disabled />);
+    fireEvent.keyDown(screen.getByTestId("phonetics-1"), { key: "Enter" });
+    fireEvent.click(screen.getByTestId("phonetics-1"));
+    expect(resolveProfiles).not.toHaveBeenCalled();
+    expect(current()).toEqual(initial);
+    view.rerender(<Harness initial={initial} />);
+    fireEvent.keyDown(screen.getByTestId("phonetics-1"), { key: "Enter" });
+    await waitFor(() =>
+      expect(targetPronunciation().actual_pron).toBe("source")
+    );
+  });
+
   it("后续编辑阻止撤销覆盖新值", async () => {
     render(<Harness />);
     begin();

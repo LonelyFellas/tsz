@@ -381,6 +381,11 @@ export const lexiconEditorMessages = {
   sense: ["词义", "詞義", "Meaning"],
   collapse: ["收起", "收起", "Collapse"],
   expand: ["展开", "展開", "Expand"],
+  close_content_settings: [
+    "关闭词形内容设置",
+    "關閉詞形內容設定",
+    "Close form content settings"
+  ],
   one_sense_required: [
     "至少保留一条词义",
     "至少保留一個詞義",
@@ -1062,9 +1067,9 @@ export const lexiconEditorMessages = {
   keep_editing: ["继续编辑", "繼續編輯", "Keep editing"],
   apply_leave: ["应用并离开", "套用並離開", "Apply and leave"],
   drawer_leave_help: [
-    "确认后应用到页面草稿；放弃会丢弃本次抽屉修改。",
-    "確認後套用至頁面草稿；放棄則會捨棄本次抽屜修改。",
-    "Confirm to apply changes to the page draft, or discard this drawer's changes."
+    "确认后应用到页面草稿；放弃会丢弃本次修改。",
+    "確認後套用至頁面草稿；放棄則會捨棄本次修改。",
+    "Confirm to apply changes to the page draft, or discard these changes."
   ],
   replace_forms_title: [
     "以下词形的拼写与发音将被替换",
