@@ -305,6 +305,65 @@ it("多条词典记录平等展示，按原输入创建且不带入参考内容"
   expect(api.save).not.toHaveBeenCalled();
 });
 
+it("保留全部词典匹配，每条释义独立展开收起，重新检测恢复前三条", async () => {
+  const api = requests();
+  api.detect.mockResolvedValue({
+    surface: "colour",
+    kind: "word",
+    matches: [5, 4, 3, 2, 1, 0].map((length, index) => ({
+      id: `dictionary:${index}`,
+      term: `match ${index}`,
+      part_of_speech: "noun",
+      glosses: Array.from(
+        { length },
+        (_, gloss) => `meaning ${index}-${gloss}`
+      ),
+      forms: [],
+      phonetics: [],
+      source_name: "Test dictionary",
+      source_version: "v1"
+    }))
+  });
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("词头"), {
+    target: { value: "colour" }
+  });
+  fireEvent.click(button("检测词条"));
+  await screen.findByText("6 条匹配");
+  const records = screen.getAllByRole("article");
+  expect(records).toHaveLength(6);
+  records.forEach((record, index) => {
+    expect(within(record).queryAllByRole("listitem")).toHaveLength(
+      Math.min(5 - index, 3)
+    );
+    expect(within(record).queryAllByRole("button")).toHaveLength(
+      index < 2 ? 1 : 0
+    );
+  });
+  const first = within(records[0]!);
+  const second = within(records[1]!);
+  const expandFirst = first.getByRole("button", { expanded: false });
+  fireEvent.click(expandFirst);
+  expect(first.getAllByRole("listitem")).toHaveLength(5);
+  expect(first.getByText("meaning 0-4")).toBeVisible();
+  expect(second.queryByText("meaning 1-3")).toBeNull();
+  fireEvent.click(second.getByRole("button", { expanded: false }));
+  fireEvent.click(first.getByRole("button", { expanded: true }));
+  expect(expandFirst).toHaveAttribute("aria-expanded", "false");
+  expect(first.queryByText("meaning 0-3")).toBeNull();
+  expect(second.getByText("meaning 1-3")).toBeVisible();
+  expect(screen.getAllByRole("article")).toHaveLength(6);
+  fireEvent.click(button("检测词条"));
+  await screen.findByText("6 条匹配");
+  expect(screen.queryByText("meaning 1-3")).toBeNull();
+  expect(
+    within(screen.getAllByRole("article")[1]!).getByRole("button", {
+      expanded: false
+    })
+  ).toBeVisible();
+  expect(api.create).not.toHaveBeenCalled();
+});
+
 it("输入变化清除旧结果，短语自动识别；检测失败保留输入并支持重试", async () => {
   const api = requests();
   mount(api, "/lexicon-next/new");
