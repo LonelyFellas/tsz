@@ -347,10 +347,13 @@ function copyPhonetics(
       ? candidateForSide(rows[index]!, match.source.region, match.side)
       : undefined
   );
-  const selections = rows.map((row, index) =>
-    candidates[index] ? row.synthesis : before.synthesis
+  const selections = rows.flatMap((row, index) =>
+    candidates[index]?.source
+      ? []
+      : [candidates[index] ? row.synthesis : before.synthesis]
   );
-  const selected = selections.find((value) => value !== undefined);
+  const selected =
+    selections.find((value) => value !== undefined) ?? before.synthesis;
   if (
     selections.some(
       (value) =>
@@ -391,7 +394,10 @@ function copyPhonetics(
       }
       continue;
     }
+    const copiedSource =
+      candidate.source === "upload" ? previous?.source : candidate.source;
     const next: PronunciationSynthesisCandidateV3 = {
+      ...(copiedSource ? { source: copiedSource } : {}),
       ipa: candidate.ipa,
       ups: candidate.ups,
       ...(candidate.ups_words !== undefined
@@ -549,8 +555,7 @@ function mergeFallbacks(
           item.profile.dubbing?.us.mode === "inherit" ||
           item.profile.voices.some((voice) => !profileSide(voice.locale)))
     ) ||
-    unchanged.some((voice) => !profileSide(voice.locale)) ||
-    (!complete && Boolean(target?.dubbing))
+    unchanged.some((voice) => !profileSide(voice.locale))
   )
     throw new FormCopyError("copy_voice_accent_unknown");
   const voices = values.flatMap(({ match, profile, sideScoped }) =>
@@ -568,6 +573,19 @@ function mergeFallbacks(
   const seen = new Set<string>();
   return {
     ...values[0]!.profile,
+    ...(target?.dubbing
+      ? {
+          dubbing: {
+            ...target.dubbing,
+            ...Object.fromEntries(
+              values.map(({ match }) => [
+                match.side,
+                { mode: "local" as const }
+              ])
+            )
+          }
+        }
+      : {}),
     voices: voices.filter((voice) => {
       const key = voice.version_id ?? voice.voice_id;
       if (seen.has(key)) return false;
@@ -593,12 +611,34 @@ function copyVoices(
     profile: VoiceProfileV3;
     sideScoped?: boolean;
   }[] = [];
+  const spellingFallbacks: typeof fallbacks = [];
   for (const match of matches) {
     if (!match.source) continue;
     const from = pronunciationAt(source, match.source);
     const fromVariant = variantForCopyReference(source, match.source);
+    const sourceSelection =
+      from.synthesis &&
+      synthesisForLocale(
+        from.synthesis,
+        match.side === "uk" ? "en-GB" : "en-US",
+        match.source.region
+      );
+    if (
+      sourceSelection?.source === "none" ||
+      sourceSelection?.source === "upload"
+    )
+      continue;
+    const targetSelection =
+      before.synthesis &&
+      synthesisForLocale(
+        before.synthesis,
+        match.side === "uk" ? "en-GB" : "en-US",
+        match.target.region
+      );
+    const fromSpelling = Boolean(sourceSelection?.use_spelling);
+    const targetSpelling = Boolean(targetSelection?.use_spelling);
     const fallback = copiedProfile(
-      from.synthesis?.use_spelling
+      fromSpelling
         ? fromVariant.spelling_speech?.voice_profile
         : from.voice_profile,
       match,
@@ -611,9 +651,9 @@ function copyVoices(
       match.source.region,
       match.side
     );
-    const selectedAlphabet = from.synthesis?.alphabet ?? "ipa";
+    const selectedAlphabet = sourceSelection?.alphabet ?? "ipa";
     const effectiveFallback =
-      before.synthesis?.use_spelling && !from.synthesis?.use_spelling
+      targetSpelling && !fromSpelling
         ? (copiedProfile(
             fromCandidate?.[`${selectedAlphabet}_speech`]?.voice_profile,
             match,
@@ -624,12 +664,12 @@ function copyVoices(
         : fallback;
     if (effectiveFallback) {
       const channel =
-        before.synthesis?.use_spelling &&
-        !from.synthesis?.use_spelling &&
+        targetSpelling &&
+        !fromSpelling &&
         fromCandidate?.[`${selectedAlphabet}_speech`]?.voice_profile
           ? selectedAlphabet
           : "fallback";
-      fallbacks.push({
+      (targetSpelling ? spellingFallbacks : fallbacks).push({
         match,
         profile: effectiveFallback,
         sideScoped: resolved.some(
@@ -644,7 +684,7 @@ function copyVoices(
     const previous = candidateForSide(before, match.target.region, match.side);
     for (const alphabet of ALPHABETS) {
       const key = `${alphabet}_speech` as const;
-      const ownProfile = from.synthesis?.use_spelling
+      const ownProfile = fromSpelling
         ? undefined
         : fromCandidate?.[key]?.voice_profile;
       const profile =
@@ -677,15 +717,32 @@ function copyVoices(
   }
   if (fallbacks.length) {
     target.voice_profile = mergeFallbacks(
-      before.synthesis?.use_spelling
-        ? targetVariant.spelling_speech?.voice_profile
-        : before.voice_profile,
+      before.voice_profile,
       matches,
       fallbacks
     );
-    if (before.synthesis?.use_spelling) {
-      spellingCopies.set(target.id, target.voice_profile);
-    }
+    copied = true;
+  }
+  if (spellingFallbacks.length) {
+    const spelling = mergeFallbacks(
+      targetVariant.spelling_speech?.voice_profile,
+      matches,
+      spellingFallbacks
+    );
+    spellingCopies.set(target.id, spelling);
+    if (
+      !fallbacks.length &&
+      matches.every(
+        (match) =>
+          before.synthesis &&
+          synthesisForLocale(
+            before.synthesis,
+            match.side === "uk" ? "en-GB" : "en-US",
+            match.target.region
+          ).use_spelling
+      )
+    )
+      target.voice_profile = spelling;
     copied = true;
   }
   return copied;
@@ -741,7 +798,18 @@ export function applyFormCopy(
     if (!variant.pronunciations.some((row) => spellingCopies.has(row.id)))
       continue;
     const profiles = variant.pronunciations
-      .filter((row) => row.synthesis?.use_spelling)
+      .filter(
+        (row) =>
+          row.synthesis &&
+          SIDES.some(
+            (side) =>
+              synthesisForLocale(
+                row.synthesis!,
+                side === "uk" ? "en-GB" : "en-US",
+                "common"
+              ).use_spelling
+          )
+      )
       .map(
         (row) =>
           spellingCopies.get(row.id) ?? variant.spelling_speech?.voice_profile

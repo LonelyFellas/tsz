@@ -322,3 +322,43 @@ describe("复制前解析完整音色配置", () => {
     ).rejects.toThrow("配置已失效");
   });
 });
+
+it("逐侧拼写选择覆盖旧全局开关，复制前解析实际拼写配置", async () => {
+  const forms = fixture(profile);
+  const region = forms.contents[0]!.regional_variants;
+  if (region.mode !== "common") throw new Error("fixture");
+  const row = region.common.pronunciations[0]!;
+  delete row.voice_profile;
+  row.synthesis!.use_spelling = false;
+  row.synthesis!.uk = { ...row.synthesis!.uk!, source: "spelling" };
+  row.synthesis!.us = { ipa: "", ups: "", source: "none" };
+  region.common.spelling_speech = {
+    content: { version: 2, text: region.common.spelling, annotations: [] },
+    voice_profile: profile
+  };
+  const plan = planFormCopy(
+    forms,
+    forms.pos[0]!.forms[0]!.id,
+    forms.pos[0]!.forms[1]!.id,
+    "voices"
+  );
+  const resolved = await resolveFormCopyProfiles(
+    plan,
+    new AbortController().signal
+  );
+  expect(
+    resolved.some((item) => item.side === "uk" && item.channel === "fallback")
+  ).toBe(true);
+  expect(resolve).toHaveBeenCalledWith(
+    expect.objectContaining({
+      profile,
+      accent: "gb",
+      source: expect.objectContaining({
+        kind: "text",
+        content: expect.objectContaining({ text: region.common.spelling })
+      })
+    }),
+    expect.any(AbortSignal)
+  );
+  expect(resolved.some((item) => item.side === "us")).toBe(false);
+});
