@@ -4,12 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { Alert, Button, Card, Space, Tag } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
 import { Search, Plus } from "lucide-react";
-import type { NextDetection } from "@tsz/types";
+import type { NextDetection, NextEntryMatches } from "@tsz/types";
 import { usePermission } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { validateEntryInput } from "@/features/dictionary/word-creation/entryClassification";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { EntryLayout } from "./EntryLayout";
+import { ExistingEntryMatches } from "./ExistingEntryMatches";
 
 export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const navigate = useNavigate();
@@ -18,7 +19,8 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const posLabel = usePartOfSpeechLabel();
   const [value, setValue] = useState("");
   const [detection, setDetection] = useState<NextDetection>();
-  const [busy, setBusy] = useState<"detect" | "create">();
+  const [entryMatches, setEntryMatches] = useState<NextEntryMatches>();
+  const [busy, setBusy] = useState<"detect" | "create" | "matches">();
   const [error, setError] = useState<string>();
   const [fieldError, setFieldError] = useState<string>();
   const [uncertain, setUncertain] = useState(false);
@@ -45,20 +47,24 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setError(undefined);
     setFieldError(undefined);
     setDetection(undefined);
+    setEntryMatches(undefined);
     try {
-      const result = await requests.detect({
-        target_language: "en",
-        surface: input.normalized
-      });
+      const query = { target_language: "en", surface: input.normalized };
+      const [result, entries] = await Promise.all([
+        requests.detect(query),
+        requests.matchEntries({ ...query, page: 1, page_size: 20 })
+      ]);
       if (current !== generation.current) return;
       if (
         result.surface.normalize("NFKC") !==
           input.normalized.normalize("NFKC") ||
-        result.kind !== input.kind
+        result.kind !== input.kind ||
+        entries.surface.normalize("NFKC") !== input.normalized.normalize("NFKC")
       ) {
         throw new Error("检测结果与当前输入不一致，请重新检测。");
       }
       setDetection({ ...result, surface: input.normalized });
+      setEntryMatches(entries);
     } catch (error) {
       if (current === generation.current)
         setError(error instanceof Error ? error.message : "检测失败，请重试。");
@@ -68,8 +74,40 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     }
   }
 
+  async function matchPage(page: number) {
+    if (lock.current || !detection || !entryMatches || !canCreate || uncertain)
+      return;
+    const current = generation.current;
+    lock.current = true;
+    setBusy("matches");
+    setError(undefined);
+    try {
+      const result = await requests.matchEntries({
+        target_language: "en",
+        surface: detection.surface,
+        page,
+        page_size: entryMatches.pagination.page_size
+      });
+      if (current !== generation.current) return;
+      if (
+        result.surface.normalize("NFKC") !== detection.surface.normalize("NFKC")
+      )
+        throw new Error("检测结果与当前输入不一致，请重新检测。");
+      setEntryMatches(result);
+    } catch (error) {
+      if (current === generation.current)
+        setError(
+          error instanceof Error ? error.message : "读取已有词条失败，请重试。"
+        );
+    } finally {
+      lock.current = false;
+      if (current === generation.current) setBusy(undefined);
+    }
+  }
+
   async function create() {
-    if (lock.current || !canCreate || !detection || uncertain) return;
+    if (lock.current || !canCreate || !detection || !entryMatches || uncertain)
+      return;
     lock.current = true;
     setBusy("create");
     setError(undefined);
@@ -121,6 +159,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                 onChange={(event) => {
                   setValue(event.target.value);
                   setDetection(undefined);
+                  setEntryMatches(undefined);
                   setError(undefined);
                   setFieldError(undefined);
                 }}
@@ -131,7 +170,12 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
               htmlType="submit"
               icon={<Search aria-hidden />}
               loading={busy === "detect"}
-              disabled={!canCreate || busy === "create" || uncertain}
+              disabled={
+                !canCreate ||
+                busy === "create" ||
+                busy === "matches" ||
+                uncertain
+              }
             >
               检测词条
             </Button>
@@ -139,6 +183,14 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
         </Card>
         {detection && (
           <>
+            {entryMatches && (
+              <ExistingEntryMatches
+                result={entryMatches}
+                disabled={Boolean(busy) || uncertain}
+                loading={busy === "matches"}
+                onPageChange={(page) => void matchPage(page)}
+              />
+            )}
             <Card
               title="内置词典"
               extra={
@@ -210,7 +262,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
             <div className="lexicon-next-create-actions">
               <span>
                 按输入“<span className="tsz-words">{detection.surface}</span>
-                ”创建，词典结果仅供参考。
+                ”创建，内置词典结果仅供参考。
               </span>
               <Button
                 type="primary"
