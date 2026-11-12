@@ -207,10 +207,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   });
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const [failure, setFailure] = useState<{ target: string; message: string }>();
+  const [failure, setFailure] = useState<{
+    target: string;
+    message: string;
+    business?: boolean;
+  }>();
   const saveError = failure?.target === nodeId ? failure.message : "";
-  const setSaveError = (message: string) =>
-    setFailure({ target: nodeId, message });
+  const setSaveError = (message: string, business = false) =>
+    setFailure({ target: nodeId, message, business });
   const [savedTarget, setSavedTarget] = useState<string | null>(null);
   const saved = savedTarget === nodeId;
   const activeTarget = useRef<string | null>(nodeId);
@@ -514,7 +518,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         setSaveError(
           t(
             "panel_saving_is_incomplete_all_changes_are_retained_resolve_validation_issues_or"
-          )
+          ),
+          !saveRef.current.onSave
         );
         return false;
       }
@@ -941,7 +946,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     >
       <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
         {feedbackHolder}
-        {saveError && <Alert type="error" showIcon title={saveError} />}
+        {saveError && (
+          <Alert
+            type="error"
+            showIcon
+            title={
+              failure?.business
+                ? (businessSave?.failure ?? saveError)
+                : saveError
+            }
+          />
+        )}
         {saving && <span role="status">{t("panel_saving_changes")}</span>}
         {saved && (
           <span role="status">{t("panel_changes_saved_as_a_draft")}</span>

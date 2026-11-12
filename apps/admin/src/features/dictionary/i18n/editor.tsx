@@ -277,9 +277,9 @@ export const lexiconEditorMessages = {
     "Links affected by these form changes must be resolved before publishing: {{count}}"
   ],
   draft_revision: [
-    "当前草稿 · 第 {{revision}} 版",
-    "目前草稿 · 第 {{revision}} 版",
-    "Current draft · revision {{revision}}"
+    "草稿已保存 · 第 {{revision}} 版",
+    "草稿已儲存 · 第 {{revision}} 版",
+    "Draft saved · revision {{revision}}"
   ],
   confirm_impact_count: [
     "本次词形修改会影响 {{count}} 项关联内容。",

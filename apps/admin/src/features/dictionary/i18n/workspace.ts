@@ -44,6 +44,7 @@ export const workspaceMessages = {
     "仍有內容需要完成",
     "Some content is incomplete"
   ],
+  save_failed: ["草稿未保存", "草稿未儲存", "Draft not saved"],
   impact_confirmation: [
     "词形影响需要重新确认",
     "詞形影響需要重新確認",

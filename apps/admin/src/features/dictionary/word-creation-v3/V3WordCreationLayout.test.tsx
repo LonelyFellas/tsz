@@ -194,7 +194,7 @@ describe("V3WordCreationLayout", () => {
       onIssueNavigate
     });
 
-    expect(screen.getByText("仍有内容需要完成")).toBeVisible();
+    expect(screen.getByText("草稿未保存")).toBeVisible();
     expect(screen.getByText("内容来源无法确认，请刷新后重试")).toBeVisible();
     expect(screen.queryByText("spelling is invalid")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "去处理首项" }));
@@ -656,12 +656,14 @@ describe("V3WordCreationLayout", () => {
     expect(onStepChange).toHaveBeenCalledWith("meanings");
   });
 
-  it("shows dirty steps only for writable sessions", () => {
+  it("未保存状态不再重复显示为警告横幅", () => {
     const dirtySteps = { forms: true, meanings: true };
     const writable = renderLayout({ dirtySteps });
 
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
-    expect(screen.getByText(/词形与发音、词义与例句/)).toBeInTheDocument();
+    expect(screen.queryByText("有未保存的草稿")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "展开词形变化" })
+    ).toHaveAttribute("title", "按当前输入统计，尚未保存");
 
     writable.unmount();
     renderLayout({ dirtySteps, readOnly: true });
