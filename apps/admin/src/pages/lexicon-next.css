@@ -102,6 +102,11 @@
 .lexicon-next-create {
   display: grid;
   gap: var(--ui-space-6);
+  padding: 0;
+  background: transparent;
+}
+.lexicon-next-create .word-step-heading {
+  margin-bottom: 0;
 }
 .lexicon-next-match {
   overflow-wrap: anywhere;

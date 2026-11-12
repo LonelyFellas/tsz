@@ -146,10 +146,10 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保�
     pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
   });
   mount(api, "/lexicon-next/new");
-  fireEvent.change(await screen.findByLabelText("词头"), {
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
     target: { value: "center" }
   });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   const matches = within(
     await screen.findByRole("region", { name: "智能词库匹配结果" })
   );
@@ -207,9 +207,9 @@ it("已有词条翻页只重查新版匹配，失败保留原结果并支持重�
       pagination: { page: 2, page_size: 20, total: 21, total_pages: 2 }
     });
   mount(api, "/lexicon-next/new");
-  const input = await screen.findByLabelText("词头");
+  const input = await screen.findByLabelText("录入词条");
   fireEvent.change(input, { target: { value: "center" } });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   const region = await screen.findByRole("region", {
     name: "智能词库匹配结果"
   });
@@ -240,9 +240,9 @@ it("已有匹配未完成、失败或回显不符时不能创建，也不伪装�
     })
   );
   mount(api, "/lexicon-next/new");
-  const input = await screen.findByLabelText("词头");
+  const input = await screen.findByLabelText("录入词条");
   fireEvent.change(input, { target: { value: "center" } });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await waitFor(() => expect(api.matchEntries).toHaveBeenCalledTimes(1));
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
   await act(async () =>
@@ -257,7 +257,7 @@ it("已有匹配未完成、失败或回显不符时不能创建，也不伪装�
   api.matchEntries.mockRejectedValueOnce(
     new HttpError(404, "已有词条检测暂不可用")
   );
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await screen.findByText("已有词条检测暂不可用");
   expect(input).toHaveValue("center");
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
@@ -281,10 +281,10 @@ it("多条词典记录平等展示，按原输入创建且不带入参考内容"
     }))
   });
   mount(api, "/lexicon-next/new");
-  fireEvent.change(await screen.findByLabelText("词头"), {
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
     target: { value: "  Colour  " }
   });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await screen.findByText("visible hue");
   expect(screen.getByText("a flag")).toBeVisible();
   expect(screen.getByText("2 条匹配")).toBeVisible();
@@ -325,10 +325,10 @@ it("保留全部词典匹配，每条释义独立展开收起，重新检测恢�
     }))
   });
   mount(api, "/lexicon-next/new");
-  fireEvent.change(await screen.findByLabelText("词头"), {
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
     target: { value: "colour" }
   });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await screen.findByText("6 条匹配");
   const records = screen.getAllByRole("article");
   expect(records).toHaveLength(6);
@@ -353,7 +353,7 @@ it("保留全部词典匹配，每条释义独立展开收起，重新检测恢�
   expect(first.queryByText("meaning 0-3")).toBeNull();
   expect(second.getByText("meaning 1-3")).toBeVisible();
   expect(screen.getAllByRole("article")).toHaveLength(6);
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await screen.findByText("6 条匹配");
   expect(screen.queryByText("meaning 1-3")).toBeNull();
   expect(
@@ -367,18 +367,18 @@ it("保留全部词典匹配，每条释义独立展开收起，重新检测恢�
 it("输入变化清除旧结果，短语自动识别；检测失败保留输入并支持重试", async () => {
   const api = requests();
   mount(api, "/lexicon-next/new");
-  const input = await screen.findByLabelText("词头");
+  const input = await screen.findByLabelText("录入词条");
   fireEvent.change(input, { target: { value: "centre" } });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await screen.findByRole("button", { name: "确认创建" });
   fireEvent.change(input, { target: { value: " give   up " } });
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
   api.detect.mockRejectedValueOnce(new Error("内置词典暂时不可用"));
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await screen.findByText("内置词典暂时不可用");
   expect(input).toHaveValue("give up");
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   await screen.findByText("短语");
   fireEvent.click(button("确认创建"));
   await waitFor(() =>
@@ -390,7 +390,7 @@ it("输入变化清除旧结果，短语自动识别；检测失败保留输入�
   );
 });
 
-it("检测 pending 不重复请求，非法输入和不对应的检测结果不能创建", async () => {
+it("Enter 检测 pending 不重复请求，非法输入和不对应的检测结果不能创建", async () => {
   const api = requests();
   let finish!: (detection: NextDetection) => void;
   api.detect.mockReturnValueOnce(
@@ -399,15 +399,23 @@ it("检测 pending 不重复请求，非法输入和不对应的检测结果不�
     })
   );
   mount(api, "/lexicon-next/new");
-  const input = await screen.findByLabelText("词头");
+  const input = await screen.findByLabelText("录入词条");
   fireEvent.change(input, { target: { value: "中文" } });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   expect(api.detect).not.toHaveBeenCalled();
   fireEvent.change(input, { target: { value: "centre" } });
-  fireEvent.click(button("检测词条"));
-  fireEvent.click(button("检测词条"));
-  await waitFor(() => expect(api.detect).toHaveBeenCalledTimes(1));
+  fireEvent.keyDown(input, { key: "Enter", code: "Enter", keyCode: 13 });
+  fireEvent.keyDown(input, { key: "Enter", code: "Enter", keyCode: 13 });
+  fireEvent.click(button("词典检测"));
+  await waitFor(() =>
+    expect(api.detect).toHaveBeenCalledExactlyOnceWith({
+      target_language: "en",
+      surface: "centre"
+    })
+  );
   expect(input).toBeDisabled();
+  expect(button("词典检测")).toBeDisabled();
+  expect(button("词典检测")).toHaveAttribute("aria-busy", "true");
   await act(async () =>
     finish({ surface: "another", kind: "word", matches: [] })
   );
@@ -421,9 +429,9 @@ it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻�
   api.detect.mockResolvedValue({ surface: "café", kind: "word", matches: [] });
   api.create.mockRejectedValue(new Error("网络连接中断"));
   mount(api, "/lexicon-next/new");
-  const input = await screen.findByLabelText("词头");
+  const input = await screen.findByLabelText("录入词条");
   fireEvent.change(input, { target: { value: "cafe\u0301" } });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await screen.findByText(/创建结果未确认/);
   expect(api.create).toHaveBeenCalledExactlyOnceWith({
@@ -578,7 +586,7 @@ describe("新版词库手工闭环", () => {
     );
     await act(() => mounted.router.navigate("/lexicon-next/new"));
     await screen.findByText("当前账号没有创建词条权限");
-    expect(button("检测词条")).toBeDisabled();
+    expect(button("词典检测")).toBeDisabled();
   });
   it("创建只发送一次；保存 pending 不接收编辑，离开需要确认；重新打开读取新版本", async () => {
     const api = requests();
@@ -589,11 +597,11 @@ describe("新版词库手工闭环", () => {
       })
     );
     const { router } = mount(api, "/lexicon-next/new");
-    await screen.findByLabelText("词头");
-    fireEvent.change(screen.getByLabelText("词头"), {
+    await screen.findByLabelText("录入词条");
+    fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: "centre" }
     });
-    fireEvent.click(button("检测词条"));
+    fireEvent.click(button("词典检测"));
     await screen.findByText("未找到内置词典匹配，可继续创建空白草稿。");
     fireEvent.click(button("确认创建"));
     fireEvent.click(button("确认创建"));
@@ -1027,12 +1035,12 @@ it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", a
   await screen.findByText("暂无词条");
   expect(api.stats).toHaveBeenCalledTimes(1);
   fireEvent.click(button("创建词条"));
-  await screen.findByLabelText("词头");
+  await screen.findByLabelText("录入词条");
   api.stats.mockResolvedValue({ total: 1, today: 1, month: 1 });
-  fireEvent.change(screen.getByLabelText("词头"), {
+  fireEvent.change(screen.getByLabelText("录入词条"), {
     target: { value: "centre" }
   });
-  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("词典检测"));
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
   await screen.findByText("版本 1");
