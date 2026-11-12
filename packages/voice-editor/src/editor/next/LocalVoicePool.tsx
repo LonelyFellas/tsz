@@ -175,6 +175,25 @@ export function LocalVoicePool({
   const converted = !!profile?.dubbing?.pool_version;
   // Resolved inheritance is a view. Only an explicit action materializes it.
   const current = converted && !inherited ? profile!.voices : settings;
+  const requiresPhoneme =
+    !!nativeAuditionLocale ||
+    content.annotations.some((mark) => mark.type === "phoneme");
+  const phonemeIssue = (voice: VoiceOption) =>
+    requiresPhoneme && voice.supportsPhoneme === false
+      ? t("this_voice_does_not_support_specified_phonemes_select_another_voice")
+      : nativeAuditionLocale && voice.locale !== nativeAuditionLocale
+        ? t(
+            "current_phonemes_use_and_cannot_be_auditioned_with_another_accent_you_can_d",
+            { p0: nativeAuditionLocale }
+          )
+        : undefined;
+  const isSelected = (voice: VoiceOption) =>
+    current.some(
+      (setting) =>
+        setting.enabled &&
+        providerVoiceKey(setting.voice_id, voices) ===
+          providerVoiceKey(voice.id, voices)
+    );
   const conflicts = voicePoolConflicts(current, voices);
   const pairs = recommendations
     .filter((item) => item.pairId && item.groupId)
@@ -226,7 +245,8 @@ export function LocalVoicePool({
     current.filter((item) => !unavailableVersions?.has(voiceSettingKey(item))),
     voices,
     content,
-    locale
+    locale,
+    nativeAuditionLocale
   );
   function materialize(): VoiceProfile | undefined {
     if (conflicts.length) {
@@ -288,6 +308,7 @@ export function LocalVoicePool({
   }
   function toggle(voice: VoiceOption) {
     if (readOnly) return;
+    if (phonemeIssue(voice) && !isSelected(voice)) return;
     const local = materialize();
     if (local) onChange(togglePoolVoice(local, voice, voices));
   }
@@ -348,7 +369,8 @@ export function LocalVoicePool({
       },
       voices,
       accent,
-      content
+      content,
+      nativeAuditionLocale
     );
     const disabled =
       !(catalog ? canAuditionCatalog : canAudition) ||
@@ -603,6 +625,7 @@ export function LocalVoicePool({
                   {selected.map((setting, rank) => {
                     const key = voiceSettingKey(setting);
                     const probability = probabilities.get(key);
+                    const voice = voices.find((v) => v.id === setting.voice_id);
                     return (
                       <div
                         key={key}
@@ -691,9 +714,10 @@ export function LocalVoicePool({
                         )}
                         {probability === undefined && (
                           <Typography.Text type="warning">
-                            {t(
-                              "this_voice_its_parameters_or_the_text_reading_is_unavailable_configuration"
-                            )}
+                            {(voice && phonemeIssue(voice)) ||
+                              t(
+                                "this_voice_its_parameters_or_the_text_reading_is_unavailable_configuration"
+                              )}
                           </Typography.Text>
                         )}
                         {!voices.some(
@@ -855,7 +879,8 @@ export function LocalVoicePool({
                             },
                             voices,
                             item.locale,
-                            content
+                            content,
+                            nativeAuditionLocale
                           )
                       )
                   }
@@ -1108,15 +1133,11 @@ export function LocalVoicePool({
                                 aria-label={t("select", {
                                   p0: voice.displayName ?? voice.label
                                 })}
-                                disabled={readOnly}
-                                checked={current.some(
-                                  (setting) =>
-                                    setting.enabled &&
-                                    providerVoiceKey(
-                                      setting.voice_id,
-                                      voices
-                                    ) === providerVoiceKey(voice.id, voices)
-                                )}
+                                disabled={
+                                  readOnly ||
+                                  (!!phonemeIssue(voice) && !isSelected(voice))
+                                }
+                                checked={isSelected(voice)}
                                 onChange={() => toggle(voice)}
                               >
                                 <PoolVoiceName
@@ -1147,6 +1168,11 @@ export function LocalVoicePool({
                                 {voice.providerVoiceId ?? voice.id}
                               </span>
                             </Typography.Text>
+                            {phonemeIssue(voice) && (
+                              <Typography.Text type="secondary">
+                                {phonemeIssue(voice)}
+                              </Typography.Text>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1169,6 +1195,7 @@ export function LocalVoicePool({
             content={content}
             sourceKey={sourceKey}
             dialect={detail.dialect}
+            phonemeLocale={nativeAuditionLocale}
             profile={detail.profile}
             adapter={adapter}
             readOnly={readOnly}

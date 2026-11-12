@@ -965,6 +965,11 @@ export const voiceEditorMessages = {
     "當前音色暫未開放指定音標",
     "This voice does not support specified phonemes yet"
   ],
+  this_voice_does_not_support_specified_phonemes_select_another_voice: [
+    "此音色不支持指定音素，请选择其他音色。",
+    "此音色不支援指定音素，請選擇其他音色。",
+    "This voice does not support specified phonemes. Select another voice."
+  ],
   phonetic_alphabet: ["标音系统", "標音系統", "Phonetic alphabet"],
   ipa_international_phonetic_alphabet: [
     "IPA · 国际音标",

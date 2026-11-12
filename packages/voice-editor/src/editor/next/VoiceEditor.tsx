@@ -721,6 +721,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             )
           }
         : workingValue;
+  const phonemeLocale =
+    mode === "synthesis" || mode === "phoneme-settings" ? locale : undefined;
   const inherited = voiceProfile?.dubbing?.mode === "inherit";
   const refreshSavedRecommendations = useCallback(() => {
     if (inherited) {
@@ -812,7 +814,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       recommendations,
       voices,
       locale,
-      generationContent
+      generationContent,
+      phonemeLocale
     );
   }, [
     voiceProfile,
@@ -822,7 +825,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     locale,
     previewAdapter,
     resolvedVoices,
-    resolutionKey
+    resolutionKey,
+    phonemeLocale
   ]);
   const unavailableVersions =
     voiceProfile?.dubbing && previewAdapter?.resolveVoices
@@ -1183,7 +1187,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             item,
             voices,
             accent,
-            generationContent
+            generationContent,
+            phonemeLocale
           )
       );
       if (!first) {
@@ -1221,8 +1226,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   const recommendationAvailable = useCallback(
     (item: VoiceRecommendation): boolean =>
-      isVoiceRecommendationAvailable(item, voices, locale, generationContent),
-    [voices, locale, generationContent]
+      isVoiceRecommendationAvailable(
+        item,
+        voices,
+        locale,
+        generationContent,
+        phonemeLocale
+      ),
+    [voices, locale, generationContent, phonemeLocale]
   );
 
   useEffect(() => {
@@ -1250,7 +1261,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               item,
               voices,
               accent,
-              generationContent
+              generationContent,
+              phonemeLocale
             )
         )
       )
@@ -1311,6 +1323,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     voiceSettings,
     voiceProfile,
     recommendationAvailable,
+    phonemeLocale,
     voices
   ]);
 
@@ -3360,11 +3373,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 (mark) => mark.type === "phoneme"
               )}
               locale={locale}
-              phonemeLocale={
-                mode === "synthesis" || mode === "phoneme-settings"
-                  ? locale
-                  : undefined
-              }
+              phonemeLocale={phonemeLocale}
               editingKey={editingVersionKey}
               canAudition={
                 previewEnabled &&
@@ -3589,11 +3598,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         area={recommendationArea}
         locale={locale}
         content={generationContent}
-        nativeAuditionLocale={
-          mode === "synthesis" || mode === "phoneme-settings"
-            ? locale
-            : undefined
-        }
+        nativeAuditionLocale={phonemeLocale}
         sourceKey={audioContentKey}
         adapter={
           previewIsMock || !previewEnabled

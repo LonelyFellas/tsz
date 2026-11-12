@@ -230,7 +230,8 @@ export function voicePoolProbabilities(
   settings: readonly VoiceSetting[],
   voices: readonly VoiceOption[],
   content: VoicePreviewRequest["content"],
-  locale?: `en-${string}`
+  locale?: `en-${string}`,
+  phonemeLocale?: `en-${string}`
 ): Map<string, number> {
   const probabilities = new Map<string, number>();
   for (const accent of ["en-GB", "en-US"] as const) {
@@ -257,7 +258,8 @@ export function voicePoolProbabilities(
           },
           voices,
           accent,
-          content
+          content,
+          phonemeLocale
         )
     );
     const weights = harmonicProbabilities(eligible.length);

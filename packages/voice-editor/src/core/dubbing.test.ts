@@ -210,6 +210,16 @@ describe("文本配音模式", () => {
     ).toEqual(["sonia"]);
     expect(marked.annotations[0]!.phoneme).toBe("kæt");
     expect(
+      resolveRecommendedVoices(
+        profile,
+        items,
+        options,
+        "en-GB",
+        { version: 2, text: "kæt", annotations: [] },
+        "en-GB"
+      ).map((item) => item.voice_id)
+    ).toEqual(["sonia"]);
+    expect(
       resolveRecommendedVoices(profile, items, options, "en-GB")[0]!.voice_id
     ).toBe("native");
   });

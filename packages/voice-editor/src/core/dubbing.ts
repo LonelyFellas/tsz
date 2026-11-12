@@ -101,7 +101,8 @@ export function resolveRecommendedVoices(
   recommendations: readonly VoiceRecommendation[],
   voices: readonly VoiceOption[],
   locale?: AudioAssetLocale,
-  content?: VoicePreviewRequest["content"]
+  content?: VoicePreviewRequest["content"],
+  phonemeLocale?: AudioAssetLocale
 ): VoiceSetting[] {
   if (!profile?.dubbing) return profile?.voices ?? [];
   return (["en-GB", "en-US"] as const)
@@ -139,7 +140,8 @@ export function resolveRecommendedVoices(
                   },
                   voices,
                   accent,
-                  content
+                  content,
+                  phonemeLocale
                 )
             )
           : [];
@@ -150,7 +152,13 @@ export function resolveRecommendedVoices(
         (item) =>
           item.selected !== false &&
           item.locale === accent &&
-          isVoiceRecommendationAvailable(item, voices, accent, content)
+          isVoiceRecommendationAvailable(
+            item,
+            voices,
+            accent,
+            content,
+            phonemeLocale
+          )
       );
       if (recommended) return [recommendationVoiceSetting(recommended, voices)];
       // Existing local-empty profiles retain their old fallback until pool conversion.
@@ -169,7 +177,8 @@ export function resolveRecommendedVoices(
             },
             voices,
             accent,
-            content
+            content,
+            phonemeLocale
           )
       );
       return fallback

@@ -10,7 +10,8 @@ export function isVoiceRecommendationAvailable(
   item: VoiceRecommendation,
   voices: readonly VoiceOption[],
   locale?: AudioAssetLocale,
-  content?: VoicePreviewRequest["content"]
+  content?: VoicePreviewRequest["content"],
+  phonemeLocale?: AudioAssetLocale
 ): boolean {
   const voice = voices.find(
     (value) =>
@@ -25,6 +26,8 @@ export function isVoiceRecommendationAvailable(
     : speechAccentGroup(item.locale);
   if (
     !voice ||
+    (phonemeLocale &&
+      (voice.supportsPhoneme === false || voice.locale !== phonemeLocale)) ||
     (locale && group !== "other" && group !== speechAccentGroup(locale)) ||
     (group !== "other" &&
       speechAccentGroup(voice.locale, voice.accent) !== group) ||

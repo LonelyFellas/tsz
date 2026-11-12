@@ -72,6 +72,20 @@ const options: VoiceOption[] = [
     isDefault: false
   }
 ];
+const flash: VoiceOption = {
+  ...options[2]!,
+  id: "flash",
+  providerVoiceId: "en-US-Jimmie:DragonHDFlashLatestNeural",
+  displayName: "Jimmie HD Flash",
+  label: "Jimmie",
+  supportsRate: false,
+  supportsPitch: false,
+  supportsVolume: false,
+  supportsPause: false,
+  supportsPhoneme: false,
+  rateRange: { min: 0, max: 0 },
+  pitchRange: { min: 0, max: 0 }
+};
 const version = (id: string, rate = 0): VoiceSetting => ({
   voice_id: id,
   version_id: `${id}-version`,
@@ -229,6 +243,123 @@ function generatedAsset(id: string): AudioAsset {
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
+  it.each(["spelling", "phoneme-settings"] as const)(
+    "%s 中 Flash 只允许自然朗读，音素模式在选用前拦截",
+    async (mode) => {
+      const generateAudio = vi.fn().mockResolvedValue({
+        ...generatedAsset("formal-us"),
+        locale: "en-US",
+        gender: "male"
+      });
+      const preview = {
+        ...adapter(),
+        listVoices: vi.fn().mockResolvedValue([flash, options[2]!]),
+        generateAudio
+      };
+      render(
+        <Harness
+          mode={mode}
+          locale="en-US"
+          initial={pool([])}
+          preview={preview}
+        />
+      );
+      fireEvent.click(screen.getByText("完整音色目录"));
+      const select = await screen.findByRole("checkbox", {
+        name: "选用 Jimmie HD Flash"
+      });
+      const audition = screen.getByRole("button", {
+        name: "试听目录音色 Jimmie HD Flash"
+      });
+      if (mode === "phoneme-settings") {
+        expect(select).toBeDisabled();
+        expect(audition).toBeDisabled();
+        fireEvent.click(select);
+        fireEvent.click(audition);
+        expect(generateAudio).not.toHaveBeenCalled();
+        expect(preview.synthesize).not.toHaveBeenCalled();
+        fireEvent.click(
+          screen.getByRole("checkbox", { name: "选用 American" })
+        );
+        await waitFor(() =>
+          expect(generateAudio).toHaveBeenCalledWith(
+            expect.objectContaining({
+              setting: expect.objectContaining({ voice_id: "us" })
+            }),
+            expect.anything()
+          )
+        );
+      } else {
+        expect(select).toBeEnabled();
+        expect(audition).toBeEnabled();
+        fireEvent.click(select);
+        await waitFor(() =>
+          expect(generateAudio).toHaveBeenCalledWith(
+            expect.objectContaining({
+              setting: expect.objectContaining({
+                voice_id: "flash",
+                rate_percent: 0
+              })
+            }),
+            expect.anything()
+          )
+        );
+      }
+    }
+  );
+
+  it("音素模式保留历史 Flash 配置，禁用详情合成和 SSML，并允许取消选用", async () => {
+    const generateAudio = vi.fn();
+    const renderSsml = vi.fn().mockResolvedValue("<speak>hello</speak>");
+    const onProfile = vi.fn();
+    const setting = { ...version("flash"), locale: "en-US" as const };
+    const preview = {
+      ...adapter(),
+      listVoices: vi.fn().mockResolvedValue([flash]),
+      generateAudio,
+      renderSsml
+    };
+    render(
+      <Harness
+        mode="phoneme-settings"
+        locale="en-US"
+        initial={pool([setting])}
+        preview={preview}
+        onProfile={onProfile}
+      />
+    );
+    const dialog = await detail("flash");
+    expect(
+      within(screen.getByLabelText("美式池 flash")).getByText("—")
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "试听当前音色" })
+    ).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "生成正式音频" })
+    ).toBeDisabled();
+    expect(
+      within(dialog).queryByRole("button", { name: "查看 SSML" })
+    ).not.toBeInTheDocument();
+    expect(renderSsml).not.toHaveBeenCalled();
+    expect(generateAudio).not.toHaveBeenCalled();
+    expect(preview.synthesize).not.toHaveBeenCalled();
+    fireEvent.click(dialogButton(dialog, "取消"));
+    expect(onProfile).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("完整音色目录"));
+    const select = screen.getByRole("checkbox", {
+      name: "选用 Jimmie HD Flash"
+    });
+    expect(select).toBeChecked();
+    expect(select).toBeEnabled();
+    fireEvent.click(select);
+    expect(onProfile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ voices: [{ ...setting, enabled: false }] })
+    );
+    expect(select).not.toBeChecked();
+    expect(select).toBeDisabled();
+  });
+
   it.each(["en-GB", "en-US", undefined] as const)(
     "%s 的推荐和目录只展示适用方言，选用推荐仍保留成对来源",
     async (locale) => {
