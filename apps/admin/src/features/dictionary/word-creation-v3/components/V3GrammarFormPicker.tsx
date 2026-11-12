@@ -608,11 +608,23 @@ export function V3GrammarFormPicker({
                         ...natural,
                         {
                           value: `${row.id}:${alphabet}`,
-                          label: t("creation_reading_value", {
+                          title: t("creation_reading_value", {
                             index: index + 1,
                             alphabet: alphabet.toUpperCase(),
                             value: value[alphabet]
                           }),
+                          label: (
+                            <>
+                              {t("creation_reading_value", {
+                                index: index + 1,
+                                alphabet: alphabet.toUpperCase(),
+                                value: ""
+                              })}
+                              <span className="tsz-phonetics">
+                                {value[alphabet]}
+                              </span>
+                            </>
+                          ),
                           row,
                           alphabet,
                           use_spelling: false

@@ -2727,6 +2727,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 />
                 <Input.TextArea
                   aria-label={t("specified_phonemes")}
+                  className="tsz-phonetics"
                   value={phonemeText}
                   onChange={(event) => setPhonemeText(event.target.value)}
                   autoSize={{ minRows: 2, maxRows: 5 }}

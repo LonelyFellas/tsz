@@ -163,12 +163,17 @@ export function FormCandidates({
     <Flex vertical gap={4}>
       <Typography.Text strong>{row[side].spelling}</Typography.Text>
       <Typography.Text>
-        {row[side].dict_phonetic || t("candidate_phonetic_missing")}
+        {row[side].dict_phonetic ? (
+          <span className="tsz-phonetics">{row[side].dict_phonetic}</span>
+        ) : (
+          t("candidate_phonetic_missing")
+        )}
       </Typography.Text>
       <Typography.Text type="secondary">
         {t("candidate_actual", {
-          value: row[`${side}_actual`] || t("candidate_conversion_missing")
+          value: row[`${side}_actual`] ? "" : t("candidate_conversion_missing")
         })}
+        <span className="tsz-phonetics">{row[`${side}_actual`]}</span>
       </Typography.Text>
     </Flex>
   );
