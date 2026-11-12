@@ -447,9 +447,11 @@ function copyPhonetics(
     target.synthesis ??= emptySynthesis();
     target.synthesis[match.side] = next;
   }
-  if (target.synthesis && selected && candidates.some(Boolean)) {
-    target.synthesis.alphabet = selected.alphabet;
-    target.synthesis.use_spelling = selected.use_spelling;
+  if (target.synthesis && candidates.some(Boolean)) {
+    if (selected) {
+      target.synthesis.alphabet = selected.alphabet;
+      target.synthesis.use_spelling = selected.use_spelling;
+    }
     const spellingChanges: {
       match: FormCopyPlan["matches"][number];
       profile: VoiceProfileV3;
@@ -508,15 +510,67 @@ function copyPhonetics(
           text: match.target.spelling,
           annotations: []
         },
-        voice_profile: profile
+        voice_profile: {
+          ...profile,
+          voices: profile.voices.map((voice) => {
+            const side = profileSide(voice.locale, voice.accent);
+            return side == null || side === match.side
+              ? voice
+              : { ...voice, enabled: false };
+          })
+        }
       };
     }
     if (spellingChanges.length) {
-      const profile = mergeFallbacks(
-        targetVariant.spelling_speech?.voice_profile,
-        matches,
-        spellingChanges
+      // 迁移自己的配置保留继承模式；音色复制的局部快照规则不适用于此处。
+      let profile = structuredClone(
+        spellingCopies.get(target.id) ??
+          targetVariant.spelling_speech?.voice_profile ?? { voices: [] }
       );
+      const complete =
+        spellingChanges.length === matches.length &&
+        spellingChanges.every(
+          (item) =>
+            JSON.stringify(item.profile) ===
+            JSON.stringify(spellingChanges[0]!.profile)
+        );
+      if (complete) profile = spellingChanges[0]!.profile;
+      else
+        for (const { match, profile: incoming } of spellingChanges) {
+          if (
+            match.target.region === "common" &&
+            [...profile.voices, ...incoming.voices].some(
+              (voice) => !profileSide(voice.locale, voice.accent)
+            )
+          )
+            throw new FormCopyError("copy_voice_accent_unknown");
+          const sideVoices = incoming.voices.filter(
+            (voice) =>
+              match.target.region !== "common" ||
+              profileSide(voice.locale, voice.accent) === match.side
+          );
+          const dubbing = profile.dubbing ?? {
+            area: "word" as const,
+            uk: { mode: "inherit" as const },
+            us: { mode: "inherit" as const }
+          };
+          profile = {
+            ...profile,
+            voices: [
+              ...profile.voices.filter(
+                (voice) =>
+                  profileSide(voice.locale, voice.accent) !== match.side
+              ),
+              ...sideVoices
+            ],
+            dubbing: {
+              ...dubbing,
+              [match.side]: incoming.dubbing?.[match.side] ?? {
+                mode: "local" as const
+              }
+            }
+          };
+        }
       spellingCopies.set(target.id, profile);
       if (
         matches.every(
