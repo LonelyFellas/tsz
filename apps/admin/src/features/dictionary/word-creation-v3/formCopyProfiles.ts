@@ -96,7 +96,8 @@ export async function resolveFormCopyProfiles(
             return (
               resolved.has(voiceKey(setting)) ||
               (side === match.side &&
-                (profile.dubbing?.mode !== "inherit" || !setting.enabled))
+                (profile.dubbing?.[match.side].mode !== "inherit" ||
+                  !setting.enabled))
             );
           });
           const merged = stored.map((setting) => {

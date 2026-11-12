@@ -13,7 +13,7 @@ import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { useDubbingDrafts } from "./DubbingDrafts";
 import {
   dubbingGroupsKey,
-  newPairVoice,
+  newRecommendationVoice,
   type DubbingDraft
 } from "./dubbing-model";
 import {
@@ -73,16 +73,7 @@ export function AddRecommendation({
       setError(voiceMessage("select_a_recommendation_group"));
       return;
     }
-    const rec = group.recommendations;
-    if (
-      (rec.format === "paired"
-        ? rec.pairs.length
-        : Math.max(
-            rec.uk.length,
-            rec.us.length,
-            group.legacyPairs?.length ?? 0
-          )) >= 20
-    ) {
+    if (group[locale].length >= 20) {
       setError(
         voiceMessage(
           "this_group_already_has_20_recommendations_organise_them_in_group_"
@@ -97,7 +88,8 @@ export function AddRecommendation({
       if (useAuthStore.getState().profile?.id !== accountId) return;
       setSeed({
         name: voice.display_name,
-        [locale]: { ...newPairVoice(voice), parameters }
+        ...newRecommendationVoice(voice),
+        parameters
       });
     } catch {
       setError(
@@ -159,7 +151,7 @@ export function AddRecommendation({
             loading={pending}
             onClick={() => void add()}
           >
-            {t("create_recommendation_pair")}
+            {t("add_recommendation")}
           </Button>
           <Button disabled={pending} onClick={onClose}>
             {t("cancel_addition")}
@@ -171,31 +163,20 @@ export function AddRecommendation({
         <RecommendationEditor
           voices={voices}
           initial={seed}
+          side={locale === "us" ? "us" : "uk"}
           disabled={!canEdit || pending}
           onCancel={() => setSeed(undefined)}
-          onSave={(pair) => {
+          onSave={(item) => {
             if (!canEdit || useAuthStore.getState().profile?.id !== accountId)
               return;
             const original = options.find((g) => g.id === groupId);
             if (!original) return;
             setDrafts((current) => {
               const target = current[original.id] ?? original;
-              const rec = target.recommendations;
+              if (locale !== "uk" && locale !== "us") return current;
               return {
                 ...current,
-                [target.id]:
-                  rec.format === "paired"
-                    ? {
-                        ...target,
-                        recommendations: {
-                          format: "paired",
-                          pairs: [...rec.pairs, pair]
-                        }
-                      }
-                    : {
-                        ...target,
-                        legacyPairs: [...(target.legacyPairs ?? []), pair]
-                      }
+                [target.id]: { ...target, [locale]: [...target[locale], item] }
               };
             });
             setSeed(undefined);

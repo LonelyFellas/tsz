@@ -505,7 +505,11 @@ function copiedProfile(
     }),
     ...(local.dubbing
       ? {
-          dubbing: { ...local.dubbing, mode: "local", recommendation_order: [] }
+          dubbing: {
+            ...local.dubbing,
+            uk: { mode: "local" },
+            us: { mode: "local" }
+          }
         }
       : {})
   });
@@ -541,7 +545,8 @@ function mergeFallbacks(
     values.some(
       (item) =>
         !item.sideScoped &&
-        (item.profile.dubbing?.mode === "inherit" ||
+        (item.profile.dubbing?.uk.mode === "inherit" ||
+          item.profile.dubbing?.us.mode === "inherit" ||
           item.profile.voices.some((voice) => !profileSide(voice.locale)))
     ) ||
     unchanged.some((voice) => !profileSide(voice.locale)) ||

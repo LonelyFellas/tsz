@@ -833,7 +833,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "226972ef41a132dd878899e20c0c0463c8ede55ea9d4f7c322f454c81140947b"
+      "11d01490c46db52a6b9c7fd7b523aaf3d68613c3450e40e0f9fc7eacec25f5d4"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1134,32 +1134,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(snapshot.operationHeaders).toEqual({
       "post /auth/refresh": [currentOnlyHeader, refreshHeader],
       "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
-      "get /admin/speech/groups": [
-        "X-TSZ-Dubbing-Groups",
-        "X-TSZ-Voice-Models"
-      ].map((name) => ({
-        name,
-        in: "header",
-        required: false,
-        schema: { type: ["string", "null"] }
-      })),
-      ...Object.fromEntries(
-        [
-          "post /admin/speech/groups",
-          "put /admin/speech/groups/{id}",
-          "delete /admin/speech/groups/{id}"
-        ].map((operation) => [
-          operation,
-          [
-            {
-              name: "X-TSZ-Dubbing-Groups",
-              in: "header",
-              required: false,
-              schema: { type: ["string", "null"] }
-            }
-          ]
-        ])
-      ),
       "get /admin/speech/voices": [
         "X-TSZ-Voice-Catalog",
         "X-TSZ-Voice-Models"
@@ -1850,7 +1824,7 @@ it("group ordering only accepts persisted IDs and its own revision", () => {
     $ref: "#/components/schemas/SaveDubbingGroupOrderRequest"
   });
   expect(operation.responses["200"]).toEqual({
-    $ref: "#/components/schemas/DubbingGroupsV3Response"
+    $ref: "#/components/schemas/DubbingGroupsResponse"
   });
   const schema = snapshot.schemas.SaveDubbingGroupOrderRequest;
   expect(schema.additionalProperties).toBe(false);

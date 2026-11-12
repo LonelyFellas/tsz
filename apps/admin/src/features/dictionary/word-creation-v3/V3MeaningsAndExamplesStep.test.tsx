@@ -1422,6 +1422,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     const resolving = vi
       .spyOn(api.speech, "resolve")
       .mockImplementation(async ({ profile, accent }) => ({
+        source: { kind: "local" as const },
         voices: profile.voices.filter(
           (setting) => setting.locale === (accent === "gb" ? "en-GB" : "en-US")
         )
@@ -1554,7 +1555,10 @@ describe("V3MeaningsAndExamplesStep", () => {
       const editor = screen
         .getByLabelText("标注工具栏")
         .closest('[role="dialog"]') as HTMLElement;
-      fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
+      const checkbox = (await within(editor).findByLabelText(
+        "选用 Sonia"
+      )) as HTMLInputElement;
+      if (!checkbox.checked) fireEvent.click(checkbox);
       fireEvent.click(await within(editor).findByLabelText("修改 Sonia"));
       const rate = await screen.findByLabelText("当前音色语速");
       fireEvent.change(rate, { target: { value: "1.20" } });
@@ -1576,9 +1580,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.click(complete);
       expect(variant().voice_profile).toEqual({
         dubbing: {
-          mode: "local",
           area: "grammar",
-          pool_version: "provider_id_v1"
+          uk: { mode: "local" },
+          us: { mode: "inherit" }
         },
         voices: [
           {

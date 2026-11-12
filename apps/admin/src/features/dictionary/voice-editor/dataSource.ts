@@ -62,26 +62,10 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   ];
   return applicable.flatMap((source) =>
     (["en-GB", "en-US"] as const)
-      .filter(
-        (value) =>
-          source.recommendations.format === "paired" ||
-          !locale ||
-          locale === value
-      )
+      .filter((value) => !locale || locale === value)
       .flatMap((value) => {
         const key = value === "en-GB" ? "uk" : "us";
-        const items =
-          source.recommendations.format === "paired"
-            ? source.recommendations.pairs.map((pair) => ({
-                ...pair[key],
-                name: pair.name,
-                selected: pair.selected,
-                pairId: pair.id
-              }))
-            : source.recommendations[key].map((item) => ({
-                ...item,
-                pairId: undefined
-              }));
+        const items = source[key];
         return items.map((item): VoiceRecommendation => ({
           id: item.id,
           name: item.name,
@@ -91,7 +75,6 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
           ...(source.is_global && areaGroups.length
             ? { fallbackOnly: true }
             : {}),
-          ...(item.pairId ? { pairId: item.pairId } : {}),
           ...(item.selected !== undefined ? { selected: item.selected } : {}),
           setting: {
             voice_id: item.voice_alias,
@@ -158,7 +141,7 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
       },
       options?.signal
     );
-    return result.voices;
+    return result;
   },
   async generateAudio(input, options) {
     if (voicePreviewIsMock)

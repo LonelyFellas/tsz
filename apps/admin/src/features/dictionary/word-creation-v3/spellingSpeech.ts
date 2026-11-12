@@ -29,6 +29,7 @@ export function spellingSpeechEqual(
       audio_asset_id: voice.audio_asset_id,
       version_name: voice.version_name,
       locale: voice.locale,
+      accent: voice.accent,
       enabled: voice.enabled,
       rate_percent: voice.rate_percent,
       pitch_semitones: voice.pitch_semitones ?? 0,

@@ -394,7 +394,12 @@ describe("PronunciationPreview", () => {
 
   it("音量摘要随继承解析更新，不显示旧快照或失败后的默认音量", async () => {
     const resolved = deferred<VoiceProfileV3["voices"]>();
-    preview.resolveVoices.mockReturnValueOnce(resolved.promise);
+    preview.resolveVoices.mockReturnValueOnce(
+      resolved.promise.then((voices) => ({
+        voices,
+        source: { kind: "catalog" }
+      }))
+    );
     const voiceProfile: VoiceProfileV3 = {
       voices: [
         {
@@ -404,7 +409,11 @@ describe("PronunciationPreview", () => {
           volume_percent: 90
         }
       ],
-      dubbing: { mode: "inherit", area: "word" }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
     };
     const summary = (content: string) => (
       <PronunciationPreviewProvider>
@@ -438,23 +447,30 @@ describe("PronunciationPreview", () => {
   });
 
   it("继承快捷播放采用当前解析结果且不使用旧快照默认", async () => {
-    preview.resolveVoices.mockResolvedValue([
-      {
-        voice_id: "british-voice",
-        version_id: "current",
-        version_name: "current",
-        locale: "en-GB",
-        enabled: true,
-        rate_percent: -27
-      }
-    ]);
+    preview.resolveVoices.mockResolvedValue({
+      voices: [
+        {
+          voice_id: "british-voice",
+          version_id: "current",
+          version_name: "current",
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: -27
+        }
+      ],
+      source: { kind: "catalog" }
+    });
     render(
       <PreviewHarness
         voiceProfile={{
           voices: [
             { voice_id: "british-voice", enabled: true, rate_percent: 0 }
           ],
-          dubbing: { mode: "inherit", area: "word" }
+          dubbing: {
+            area: "word" as const,
+            uk: { mode: "inherit" },
+            us: { mode: "inherit" }
+          }
         }}
       />
     );
@@ -473,7 +489,11 @@ describe("PronunciationPreview", () => {
       <PreviewHarness
         voiceProfile={{
           voices: [],
-          dubbing: { mode: "inherit", area: "word" }
+          dubbing: {
+            area: "word" as const,
+            uk: { mode: "inherit" },
+            us: { mode: "inherit" }
+          }
         }}
       />
     );

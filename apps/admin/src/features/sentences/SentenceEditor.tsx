@@ -607,15 +607,17 @@ export function SentenceEditor({
             >
               {t("panel_cancel")}
             </Button>
-            <Button
-              type="primary"
-              aria-label={t("panel_save_example")}
-              loading={saving}
-              disabled={conflict || !allowed || !canSave}
-              onClick={() => void saveBeforeLeave()}
-            >
-              {t("panel_save_draft")}
-            </Button>
+            {!env.VOICE_EDITOR && (
+              <Button
+                type="primary"
+                aria-label={t("panel_save_example")}
+                loading={saving}
+                disabled={conflict || !allowed || !canSave}
+                onClick={() => void saveBeforeLeave()}
+              >
+                {t("panel_save_draft")}
+              </Button>
+            )}
           </Flex>
         }
         onCancel={close}
@@ -833,7 +835,6 @@ export function SentenceEditor({
               mode="association"
               presentation="editor"
               showDone={false}
-              showSaveButton={false}
               afterText={
                 <V3SentenceTranslationsField
                   sentence={content.sentence}

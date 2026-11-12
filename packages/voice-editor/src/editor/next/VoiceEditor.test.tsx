@@ -1982,10 +1982,9 @@ describe("VoiceEditor 发音区", () => {
     await waitFor(() =>
       expect(onVoiceProfileChange).toHaveBeenCalledWith({
         dubbing: {
-          mode: "inherit",
           area: "meaning",
-          pool_version: "provider_id_v1",
-          recommendation_order: ["flash-rec"]
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
         },
         voices: [
           expect.objectContaining({
@@ -2069,10 +2068,9 @@ describe("VoiceEditor 发音区", () => {
     await waitFor(() =>
       expect(onVoiceProfileChange).toHaveBeenCalledWith({
         dubbing: {
-          mode: "inherit",
           area: "grammar",
-          pool_version: "provider_id_v1",
-          recommendation_order: ["r"]
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
         },
         voices: [
           {
@@ -2087,7 +2085,7 @@ describe("VoiceEditor 发音区", () => {
     view.unmount();
     onVoiceProfileChange.mockClear();
     const existing = render(<VoiceEditor {...props(base)} />);
-    await screen.findByRole("radiogroup", { name: "局部推荐" });
+    await screen.findByRole("radiogroup", { name: "英式 局部推荐" });
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
     existing.unmount();
     render(
@@ -2143,10 +2141,9 @@ describe("VoiceEditor 发音区", () => {
     await waitFor(() =>
       expect(onVoiceProfileChange).toHaveBeenCalledWith({
         dubbing: {
-          mode: "inherit",
           area: "grammar",
-          pool_version: "provider_id_v1",
-          recommendation_order: ["ok"]
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
         },
         voices: [
           {
@@ -2182,7 +2179,7 @@ describe("VoiceEditor 发音区", () => {
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
       voices: [{ voice_id: "gone", enabled: false, rate_percent: 0 }]
     });
-    expect(screen.getByText(/历史未配对分组/)).toBeVisible();
+    expect(screen.getByRole("radio", { name: "有效美式" })).toBeVisible();
   });
 
   it("音色风格失效后仍可恢复自然", async () => {
@@ -2225,13 +2222,13 @@ describe("VoiceEditor 发音区", () => {
     });
   });
 
-  it("应用配对推荐保存完整参数、保留重复另一口音，试听使用参数快照", async () => {
+  it("应用单侧推荐保存完整参数、另一口音原样保留，试听使用推荐参数", async () => {
     const onVoiceProfileChange = vi.fn();
     const synthesize = vi.fn().mockResolvedValue(previewResult());
     const uk = {
       id: "r",
       groupId: "g",
-      pairId: "p",
+
       name: "清晰慢读",
       locale: "en-GB",
       groupName: "语法",
@@ -2273,29 +2270,31 @@ describe("VoiceEditor 发音区", () => {
         })}
       />
     );
-    const radio = await screen.findByRole("radio", { name: /清晰慢读/ });
+    const radio = await within(
+      await screen.findByRole("radiogroup", { name: "英式 局部推荐" })
+    ).findByRole("radio", { name: /清晰慢读/ });
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
     await waitFor(() => expect(radio).toBeEnabled());
     fireEvent.click(radio);
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
       dubbing: {
-        mode: "local",
         area: "grammar",
-        pool_version: "provider_id_v1",
-        recommendation: {
-          group_id: "g",
-          pair_id: "p",
-          voice_ids: ["sonia", "guy"],
-          contribution_ids: [expect.any(String)]
-        }
+        uk: {
+          mode: "local",
+          recommendation: {
+            group_id: "g",
+            recommendation_id: "r",
+            voice_id: "sonia",
+            contribution_id: expect.any(String)
+          }
+        },
+        us: { mode: "local" }
       },
       voices: [
         expect.objectContaining({
           voice_id: "guy",
           enabled: true,
-          rate_percent: -25,
-          version_id: expect.any(String),
-          locale: "en-US"
+          rate_percent: -25
         }),
         expect.objectContaining({
           ...uk.setting,
@@ -2305,7 +2304,9 @@ describe("VoiceEditor 发音区", () => {
         })
       ]
     });
-    const recommended = screen.getByRole("radiogroup", { name: "局部推荐" });
+    const recommended = screen.getByRole("radiogroup", {
+      name: "英式 局部推荐"
+    });
     fireEvent.click(
       within(recommended).getAllByRole("button", {
         name: "试听 Sonia · 英式女声"
@@ -2322,7 +2323,7 @@ describe("VoiceEditor 发音区", () => {
         expect.anything()
       )
     );
-    expect(screen.getByText(/已保留现有局部参数/)).toBeVisible();
+    expect(screen.queryByText(/已保留现有局部参数/)).not.toBeInTheDocument();
   });
 
   it("同音色多个版本分别试听和选用，另一口音与未选版本保持不变", async () => {
@@ -2583,9 +2584,12 @@ describe("VoiceEditor 发音区", () => {
       let finish!: (voices: VoiceSetting[]) => void;
       const resolveVoices = vi.fn(
         () =>
-          new Promise<VoiceSetting[]>((resolve) => {
-            finish = resolve;
-          })
+          new Promise<import("@tsz/types").AdminResolveDubbingResponse>(
+            (resolve) => {
+              finish = (voices) =>
+                resolve({ voices, source: { kind: "local" } });
+            }
+          )
       );
       render(
         <VoiceEditor
@@ -2596,9 +2600,9 @@ describe("VoiceEditor 发音区", () => {
             voiceProfile: {
               voices: [setting],
               dubbing: {
-                mode: "local",
                 area: "grammar",
-                pool_version: "provider_id_v1"
+                uk: { mode: "local" },
+                us: { mode: "local" }
               }
             },
             previewAdapter: { ...adapter(), resolveVoices },
@@ -2681,10 +2685,16 @@ describe("VoiceEditor 发音区", () => {
     };
     const profile = {
       voices: [],
-      dubbing: { mode: "inherit" as const, area: "word" as const }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" as const },
+        us: { mode: "inherit" as const }
+      }
     };
     const onVoiceProfileChange = vi.fn();
-    const resolveVoices = vi.fn().mockResolvedValue([setting]);
+    const resolveVoices = vi
+      .fn()
+      .mockResolvedValue({ voices: [setting], source: { kind: "local" } });
     const generateAudio = vi.fn().mockResolvedValue(asset());
     const base = props({
       locale: "en-GB",
@@ -2725,7 +2735,10 @@ describe("VoiceEditor 发音区", () => {
       .fn()
       .mockImplementation(async ({ accent }: { accent: string }) => {
         if (accent === "us") throw new Error("美式未确认读法");
-        return [{ ...stored, rate_percent: -5, audio_asset_id: undefined }];
+        return {
+          voices: [{ ...stored, rate_percent: -5, audio_asset_id: undefined }],
+          source: { kind: "catalog" }
+        };
       });
     const generateAudio = vi.fn().mockResolvedValue(asset());
     const resolveAudio = vi.fn().mockResolvedValue({
@@ -2738,7 +2751,11 @@ describe("VoiceEditor 发音区", () => {
         {...props({
           voiceProfile: {
             voices: [stored],
-            dubbing: { mode: "inherit", area: "word" }
+            dubbing: {
+              area: "word" as const,
+              uk: { mode: "inherit" },
+              us: { mode: "inherit" }
+            }
           },
           onVoiceProfileChange: vi.fn(),
           previewAdapter: {
@@ -2787,7 +2804,11 @@ describe("VoiceEditor 发音区", () => {
           locale: "en-GB",
           voiceProfile: {
             voices: [setting],
-            dubbing: { mode: "local", area: "word" }
+            dubbing: {
+              area: "word" as const,
+              uk: { mode: "local" },
+              us: { mode: "local" }
+            }
           },
 
           onVoiceProfileChange: vi.fn(),
@@ -2800,7 +2821,10 @@ describe("VoiceEditor 发音区", () => {
                   voice.id === "guy" ? { ...voice, accent: "gb" } : voice
                 )
               ),
-            resolveVoices: vi.fn().mockResolvedValue([setting]),
+            resolveVoices: vi.fn().mockResolvedValue({
+              voices: [setting],
+              source: { kind: "local" }
+            }),
             generateAudio: vi.fn()
           }
         })}
@@ -2834,7 +2858,11 @@ describe("VoiceEditor 发音区", () => {
 
           voiceProfile: {
             voices: [stored],
-            dubbing: { mode: "inherit", area: "word" }
+            dubbing: {
+              area: "word" as const,
+              uk: { mode: "inherit" },
+              us: { mode: "inherit" }
+            }
           },
           onVoiceProfileChange,
           previewAdapter: {
@@ -2879,7 +2907,11 @@ describe("VoiceEditor 发音区", () => {
     const onVoiceProfileChange = vi.fn();
     const profile = {
       voices: [setting],
-      dubbing: { mode: "inherit" as const, area: "word" as const }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" as const },
+        us: { mode: "inherit" as const }
+      }
     };
     const base = props({
       locale: "en-GB",
@@ -2887,7 +2919,9 @@ describe("VoiceEditor 发音区", () => {
       voiceProfile: profile,
       previewAdapter: {
         ...adapter(),
-        resolveVoices: vi.fn().mockResolvedValue([setting]),
+        resolveVoices: vi
+          .fn()
+          .mockResolvedValue({ voices: [setting], source: { kind: "local" } }),
         generateAudio
       },
       onVoiceProfileChange
@@ -2901,7 +2935,11 @@ describe("VoiceEditor 发音区", () => {
         {...base}
         voiceProfile={{
           ...profile,
-          dubbing: { ...profile.dubbing, mode: "local" }
+          dubbing: {
+            area: "word" as const,
+            uk: { mode: "local" },
+            us: { mode: "local" }
+          }
         }}
       />
     );
@@ -2909,13 +2947,13 @@ describe("VoiceEditor 发音区", () => {
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
   });
 
-  it("采用最新配对推荐时同声只保留原局部参数和另一口音", async () => {
+  it("采用单侧推荐时同声保留原局部参数和另一口音", async () => {
     const onVoiceProfileChange = vi.fn();
     const loadRecommendations = vi.fn().mockResolvedValue([
       {
         id: "r",
         groupId: "g",
-        pairId: "p",
+
         name: "新推荐",
         locale: "en-GB",
         groupName: "语法",
@@ -2924,7 +2962,7 @@ describe("VoiceEditor 发音区", () => {
       {
         id: "s",
         groupId: "g",
-        pairId: "p",
+
         name: "新推荐",
         locale: "en-US",
         groupName: "语法",
@@ -2944,19 +2982,21 @@ describe("VoiceEditor 发音区", () => {
         })}
       />
     );
-    const radio = await screen.findByRole("radio", { name: /新推荐/ });
+    const radio = await within(
+      await screen.findByRole("radiogroup", { name: "英式 局部推荐" })
+    ).findByRole("radio", { name: /新推荐/ });
     await waitFor(() => expect(radio).toBeEnabled());
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
     fireEvent.click(radio);
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         dubbing: expect.objectContaining({
-          mode: "local",
-          pool_version: "provider_id_v1"
+          uk: expect.objectContaining({ mode: "local" }),
+          us: expect.objectContaining({ mode: "local" })
         }),
         voices: [
           expect.objectContaining({ ...old, version_id: expect.any(String) }),
-          expect.objectContaining({ ...us, version_id: expect.any(String) })
+          us
         ]
       })
     );
@@ -3004,7 +3044,7 @@ describe("VoiceEditor 发音区", () => {
         {
           id: "r",
           groupId: "g",
-          pairId: "p",
+
           name: "新推荐",
           locale: "en-GB",
           groupName: "语法",
@@ -3016,8 +3056,8 @@ describe("VoiceEditor 发音区", () => {
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         dubbing: expect.objectContaining({
-          mode: "local",
-          pool_version: "provider_id_v1"
+          uk: expect.objectContaining({ mode: "local" }),
+          us: expect.objectContaining({ mode: "local" })
         }),
         voices: [
           expect.objectContaining({
@@ -4037,14 +4077,14 @@ it("synthesis 面板直接使用 phoneme 内容，隐藏正文工具，换格式
   expect(screen.queryByLabelText("编辑文本")).not.toBeInTheDocument();
 });
 
-it("普通保存固定有效继承副本并保留原始参数与稳定来源，浏览不冻结", async () => {
+it("浏览与原样保存保留继承状态和原配置，不物化任何一侧", async () => {
   const saved = vi.fn();
   const recommendation = {
     id: "recommendation-side",
     name: "原始慢读",
     groupName: "组",
     groupId: "group-id",
-    pairId: "pair-id",
+
     locale: "en-GB" as const,
     setting: { voice_id: "sonia", enabled: true, rate_percent: -25 }
   };
@@ -4062,7 +4102,9 @@ it("普通保存固定有效继承副本并保留原始参数与稳定来源，�
       .mockResolvedValue([
         { ...VOICES[0]!, supportsRate: false, rateRange: undefined }
       ]),
-    resolveVoices: vi.fn().mockResolvedValue([setting])
+    resolveVoices: vi
+      .fn()
+      .mockResolvedValue({ voices: [setting], source: { kind: "local" } })
   };
   const onVoiceProfileChange = vi.fn();
   render(
@@ -4076,9 +4118,9 @@ it("普通保存固定有效继承副本并保留原始参数与稳定来源，�
         onVoiceProfileChange,
         voiceProfile: {
           dubbing: {
-            mode: "inherit",
             area: "grammar",
-            pool_version: "provider_id_v1"
+            uk: { mode: "inherit" },
+            us: { mode: "inherit" }
           },
           voices: [
             { ...setting, rate_percent: -20 },
@@ -4095,19 +4137,15 @@ it("普通保存固定有效继承副本并保留原始参数与稳定来源，�
   expect(onVoiceProfileChange).not.toHaveBeenCalled();
   fireEvent.click(screen.getByText("固定保存"));
   expect(saved).toHaveBeenCalledOnce();
-  expect(saved.mock.calls[0]![0].voiceProfile).toMatchObject({
+  expect(saved.mock.calls[0]![0].voiceProfile).toEqual({
     dubbing: {
-      mode: "local",
-      pool_version: "provider_id_v1",
-      recommendation: {
-        group_id: "group-id",
-        pair_id: "pair-id",
-        contribution_ids: ["recommendation-side"]
-      }
+      area: "grammar",
+      uk: { mode: "inherit" },
+      us: { mode: "inherit" }
     },
     voices: [
-      { voice_id: "sonia", enabled: true, rate_percent: -25 },
-      { voice_id: "gone", enabled: false, rate_percent: 10 }
+      { ...setting, rate_percent: -20 },
+      { voice_id: "gone", enabled: true, rate_percent: 10 }
     ]
   });
 });
@@ -4258,9 +4296,9 @@ it("英文录音说明保留口音两侧的词界", async () => {
           voiceProfile: {
             voices: [setting],
             dubbing: {
-              mode: "local",
               area: "meaning",
-              pool_version: "provider_id_v1"
+              uk: { mode: "local" },
+              us: { mode: "local" }
             }
           },
           onVoiceProfileChange: vi.fn(),
@@ -4300,4 +4338,150 @@ it("损坏的原始标注诊断随语言切换，保留原正文并且不提交�
       document.body.textContent
   ).toContain("raw text 保留");
   expect(base.onChange).not.toHaveBeenCalled();
+});
+
+it("单侧正文变化只使本侧正式音频失效", async () => {
+  const uk: VoiceSetting = {
+    voice_id: "sonia",
+    locale: "en-GB",
+    enabled: true,
+    rate_percent: 0,
+    version_id: "uk-text",
+    version_name: "英式",
+    audio_asset_id: "uk-audio"
+  };
+  const us: VoiceSetting = {
+    voice_id: "guy",
+    locale: "en-US",
+    enabled: true,
+    rate_percent: 7,
+    version_id: "us-text",
+    version_name: "美式",
+    audio_asset_id: "us-audio"
+  };
+  const onVoiceProfileChange = vi.fn();
+  render(
+    <VoiceEditor
+      {...props({
+        locale: "en-GB",
+        previewAdapter: adapter(),
+        voiceProfile: { voices: [uk, us] },
+        onVoiceProfileChange
+      })}
+    />
+  );
+  await screen.findByRole("textbox", { name: "语音编辑器" });
+  fireEvent.change(screen.getByRole("textbox", { name: "语音编辑器" }), {
+    target: { value: "a safe harbour" }
+  });
+  await waitFor(() => expect(onVoiceProfileChange).toHaveBeenCalled());
+  const profile = onVoiceProfileChange.mock.calls.at(-1)![0];
+  expect(profile.voices[0]).not.toHaveProperty("audio_asset_id");
+  expect(profile.voices[1]).toEqual(us);
+});
+
+it("单侧自动生成不被另一侧待生成缓存阻塞且保留另一侧草稿", async () => {
+  const { useState } = await import("react");
+  const us: VoiceSetting = {
+    voice_id: "guy",
+    locale: "en-US",
+    enabled: true,
+    rate_percent: 7,
+    version_id: "us-cache",
+    version_name: "美式缓存"
+  };
+  const uk: VoiceSetting = {
+    voice_id: "sonia",
+    locale: "en-GB",
+    enabled: true,
+    rate_percent: 0,
+    version_id: "uk-recommendation",
+    version_name: "原英式",
+    audio_asset_id: "uk-existing"
+  };
+  const ryan = {
+    ...VOICES[0]!,
+    id: "ryan",
+    label: "Ryan",
+    gender: "male" as const
+  };
+  const generateAudio = vi.fn().mockResolvedValue(asset());
+  const saved = vi.fn();
+  const previewAdapter: VoicePreviewAdapter = {
+    ...adapter(),
+    listVoices: vi.fn().mockResolvedValue([...VOICES, ryan]),
+    generateAudio,
+    resolveVoices: vi.fn(
+      async ({
+        profile
+      }: Parameters<NonNullable<VoicePreviewAdapter["resolveVoices"]>>[0]) => ({
+        voices: profile.voices.filter((v) => v.enabled && v.locale === "en-GB"),
+        source: { kind: "local" as const }
+      })
+    )
+  };
+  const loadRecommendations = vi.fn().mockResolvedValue([
+    {
+      id: uk.version_id,
+      groupId: "group",
+      groupName: "组",
+      name: "原英式",
+      locale: "en-GB",
+      setting: uk
+    },
+    {
+      id: "ryan-recommendation",
+      groupId: "group",
+      groupName: "组",
+      name: "新英式",
+      locale: "en-GB",
+      setting: { voice_id: "ryan", enabled: true, rate_percent: 0 }
+    }
+  ]);
+  function Harness() {
+    const [profile, setProfile] = useState<import("../../types").VoiceProfile>({
+      voices: [us, uk],
+      dubbing: {
+        area: "grammar",
+        uk: { mode: "local" },
+        us: { mode: "inherit" }
+      }
+    });
+    return (
+      <VoiceEditor
+        {...props({
+          locale: "en-GB",
+          recommendationArea: "grammar",
+          previewAdapter,
+          loadRecommendations,
+          voiceProfile: profile,
+          onVoiceProfileChange: setProfile
+        })}
+        renderActions={(canComplete, _prepare, capture) => (
+          <button disabled={!canComplete} onClick={() => saved(capture!(true))}>
+            保存单侧回归
+          </button>
+        )}
+      />
+    );
+  }
+  render(<Harness />);
+  const radio = await screen.findByRole("radio", { name: "新英式" });
+  await waitFor(() => expect(radio).toBeEnabled());
+  fireEvent.click(radio);
+  await waitFor(() => expect(generateAudio).toHaveBeenCalledOnce());
+  expect(generateAudio.mock.calls[0]![0].setting.voice_id).toBe("ryan");
+  await waitFor(() => expect(screen.getByText("保存单侧回归")).toBeEnabled());
+  expect(
+    screen.queryByRole("button", { name: "取消启用失效音色 guy" })
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("保存单侧回归"));
+  expect(
+    saved.mock.calls[0]![0].voiceProfile.voices.find(
+      (v: VoiceSetting) => v.voice_id === "guy"
+    )
+  ).toEqual(us);
+  expect(saved.mock.calls[0]![0].voiceProfile.dubbing.us).toEqual({
+    mode: "inherit"
+  });
 });

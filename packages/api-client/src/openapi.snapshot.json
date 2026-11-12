@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-existing-matches-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-12T03:12:22.671Z",
+  "_source": "/Users/darwish/.codex/worktrees/task190-backend/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-12T06:22:04.228Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1448,47 +1448,9 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
-    "get /admin/speech/groups": [
-      {
-        "name": "X-TSZ-Dubbing-Groups",
-        "in": "header",
-        "required": false,
-        "schema": { "type": ["string", "null"] }
-      },
-      {
-        "name": "X-TSZ-Voice-Models",
-        "in": "header",
-        "required": false,
-        "schema": { "type": ["string", "null"] }
-      }
-    ],
-    "post /admin/speech/groups": [
-      {
-        "name": "X-TSZ-Dubbing-Groups",
-        "in": "header",
-        "required": false,
-        "schema": { "type": ["string", "null"] }
-      }
-    ],
     "put /admin/speech/groups": [
       {
         "name": "X-TSZ-Voice-Models",
-        "in": "header",
-        "required": false,
-        "schema": { "type": ["string", "null"] }
-      }
-    ],
-    "delete /admin/speech/groups/{id}": [
-      {
-        "name": "X-TSZ-Dubbing-Groups",
-        "in": "header",
-        "required": false,
-        "schema": { "type": ["string", "null"] }
-      }
-    ],
-    "put /admin/speech/groups/{id}": [
-      {
-        "name": "X-TSZ-Dubbing-Groups",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -3525,15 +3487,15 @@
     "get /admin/speech/groups": {
       "request": null,
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/speech/groups": {
-      "request": { "$ref": "#/components/schemas/DubbingGroupWriteRequest" },
+      "request": { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -3557,7 +3519,7 @@
         "$ref": "#/components/schemas/SaveDubbingGroupOrderRequest"
       },
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsV3Response" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -3568,7 +3530,7 @@
     "delete /admin/speech/groups/{id}": {
       "request": { "$ref": "#/components/schemas/DeleteDubbingGroupRequest" },
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -3577,9 +3539,9 @@
       }
     },
     "put /admin/speech/groups/{id}": {
-      "request": { "$ref": "#/components/schemas/DubbingGroupWriteRequest" },
+      "request": { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -4188,95 +4150,15 @@
     },
     "DubbingGroupsResponse": {
       "type": "object",
-      "required": ["groups", "revision"],
+      "required": ["groups", "revision", "order_revision"],
       "properties": {
         "groups": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/DubbingGroup" }
         },
+        "order_revision": { "type": "integer", "format": "int64" },
         "revision": { "type": "integer", "format": "int64" }
       }
-    },
-    "DubbingGroupsReadResponse": {
-      "oneOf": [
-        { "$ref": "#/components/schemas/DubbingGroupsResponse" },
-        { "$ref": "#/components/schemas/DubbingGroupsV3Response" }
-      ]
-    },
-    "DubbingGroupsV3Response": {
-      "type": "object",
-      "required": ["groups", "revision", "order_revision"],
-      "properties": {
-        "groups": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/DubbingGroupV3" }
-        },
-        "order_revision": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
-        },
-        "revision": { "type": "integer", "format": "int64", "minimum": 0 }
-      },
-      "additionalProperties": false
-    },
-    "DubbingGroupV3": {
-      "type": "object",
-      "required": [
-        "id",
-        "name",
-        "areas",
-        "revision",
-        "is_global",
-        "recommendations"
-      ],
-      "properties": {
-        "areas": { "type": "array", "items": { "type": "string" } },
-        "id": { "type": "string", "format": "uuid" },
-        "is_global": { "type": "boolean" },
-        "name": { "type": "string" },
-        "recommendations": {
-          "$ref": "#/components/schemas/DubbingRecommendationsV3"
-        },
-        "revision": { "type": "integer", "format": "int64", "minimum": 0 }
-      },
-      "additionalProperties": false
-    },
-    "DubbingRecommendationsV3": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["uk", "us", "format"],
-          "properties": {
-            "format": { "type": "string", "enum": ["legacy"] },
-            "uk": {
-              "type": "array",
-              "items": { "$ref": "#/components/schemas/DubbingRecommendation" }
-            },
-            "us": {
-              "type": "array",
-              "items": { "$ref": "#/components/schemas/DubbingRecommendation" }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["pairs", "format"],
-          "properties": {
-            "format": { "type": "string", "enum": ["paired"] },
-            "pairs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/DubbingRecommendationPair"
-              },
-              "maxItems": 20
-            }
-          },
-          "additionalProperties": false
-        }
-      ],
-      "discriminator": { "propertyName": "format" }
     },
     "DubbingAudioUpdates": {
       "type": "object",
@@ -7539,62 +7421,35 @@
     },
     "DubbingGroup": {
       "type": "object",
-      "required": ["id", "name", "areas", "uk", "us"],
+      "required": ["id", "name", "areas", "uk", "us", "revision", "is_global"],
       "properties": {
         "areas": { "type": "array", "items": { "type": "string" } },
         "id": { "type": "string", "format": "uuid" },
         "is_global": { "type": "boolean" },
         "name": { "type": "string" },
-        "revision": { "type": "integer", "format": "int64" },
+        "revision": { "type": "integer", "format": "int64", "minimum": 0 },
         "uk": {
           "type": "array",
-          "items": { "$ref": "#/components/schemas/DubbingRecommendation" }
+          "items": { "$ref": "#/components/schemas/DubbingRecommendation" },
+          "maxItems": 20
         },
         "us": {
           "type": "array",
-          "items": { "$ref": "#/components/schemas/DubbingRecommendation" }
+          "items": { "$ref": "#/components/schemas/DubbingRecommendation" },
+          "maxItems": 20
         }
-      },
-      "additionalProperties": false
-    },
-    "DubbingGroupWriteRequest": {
-      "oneOf": [
-        { "$ref": "#/components/schemas/SaveDubbingGroupRequest" },
-        { "$ref": "#/components/schemas/SavePairedDubbingGroupRequest" }
-      ]
-    },
-    "DubbingPairVoice": {
-      "type": "object",
-      "description": "A pair owns selection and order; each side retains its existing version identity.",
-      "required": ["id", "voice_alias", "parameters"],
-      "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "parameters": { "$ref": "#/components/schemas/VoiceParameters" },
-        "voice_alias": { "type": "string" }
       },
       "additionalProperties": false
     },
     "DubbingRecommendation": {
       "type": "object",
-      "required": ["id", "name", "voice_alias", "parameters"],
+      "required": ["id", "name", "voice_alias", "parameters", "selected"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "name": { "type": "string" },
         "parameters": { "$ref": "#/components/schemas/VoiceParameters" },
         "selected": { "type": "boolean" },
         "voice_alias": { "type": "string" }
-      },
-      "additionalProperties": false
-    },
-    "DubbingRecommendationPair": {
-      "type": "object",
-      "required": ["id", "name", "selected", "uk", "us"],
-      "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "name": { "type": "string" },
-        "selected": { "type": "boolean" },
-        "uk": { "$ref": "#/components/schemas/DubbingPairVoice" },
-        "us": { "$ref": "#/components/schemas/DubbingPairVoice" }
       },
       "additionalProperties": false
     },
@@ -8163,20 +8018,13 @@
     },
     "LocalVoiceRecommendationV3": {
       "type": "object",
-      "required": ["group_id", "pair_id", "voice_ids", "contribution_ids"],
+      "description": "A local base recommendation contributes at most one voice to this side's pool.",
+      "required": ["group_id", "recommendation_id", "voice_id"],
       "properties": {
-        "contribution_ids": {
-          "type": "array",
-          "items": { "type": "string", "format": "uuid" },
-          "maxItems": 2
-        },
+        "contribution_id": { "type": "string", "format": "uuid" },
         "group_id": { "type": "string", "format": "uuid" },
-        "pair_id": { "type": "string", "format": "uuid" },
-        "voice_ids": {
-          "type": "array",
-          "items": { "type": "string" },
-          "maxItems": 2
-        }
+        "recommendation_id": { "type": "string", "format": "uuid" },
+        "voice_id": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -8344,22 +8192,6 @@
       },
       "additionalProperties": false
     },
-    "PairedDubbingGroup": {
-      "type": "object",
-      "required": ["id", "name", "areas", "is_global", "pairs"],
-      "properties": {
-        "areas": { "type": "array", "items": { "type": "string" } },
-        "id": { "type": "string", "format": "uuid" },
-        "is_global": { "type": "boolean" },
-        "name": { "type": "string" },
-        "pairs": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/DubbingRecommendationPair" },
-          "maxItems": 20
-        }
-      },
-      "additionalProperties": false
-    },
     "PasswordChangeRequest": {
       "type": "object",
       "required": ["current_password", "new_password"],
@@ -8495,6 +8327,11 @@
       },
       "additionalProperties": false
     },
+    "PronunciationSpeechSourceV3": {
+      "type": "string",
+      "description": "The active source belongs to this reading and accent; cached inputs remain intact.",
+      "enum": ["spelling", "ipa", "ups", "upload", "none"]
+    },
     "PronunciationStyle": {
       "type": "string",
       "enum": ["normal", "citation", "strong", "weak"]
@@ -8505,6 +8342,9 @@
       "properties": {
         "ipa": { "type": "string", "maxLength": 200 },
         "ipa_speech": { "$ref": "#/components/schemas/SynthesisSpeechV3" },
+        "source": {
+          "$ref": "#/components/schemas/PronunciationSpeechSourceV3"
+        },
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_speech": { "$ref": "#/components/schemas/SynthesisSpeechV3" },
         "ups_words": {
@@ -9083,15 +8923,6 @@
       },
       "additionalProperties": false
     },
-    "SavePairedDubbingGroupRequest": {
-      "type": "object",
-      "required": ["group", "base_revision"],
-      "properties": {
-        "base_revision": { "type": "integer", "format": "int64", "minimum": 0 },
-        "group": { "$ref": "#/components/schemas/PairedDubbingGroup" }
-      },
-      "additionalProperties": false
-    },
     "SaveVoiceAccentRequest": {
       "type": "object",
       "required": ["accent", "base_revision"],
@@ -9548,33 +9379,13 @@
       },
       "additionalProperties": false
     },
-    "VoicePoolVersionV3": {
-      "type": "string",
-      "description": "Explicit opt-in: historical profiles keep their existing fallback and version semantics.",
-      "enum": ["provider_id_v1"]
-    },
     "VoiceProfileDubbingV3": {
       "type": "object",
-      "required": ["mode", "area"],
+      "required": ["area", "uk", "us"],
       "properties": {
         "area": { "$ref": "#/components/schemas/DubbingAreaV3" },
-        "mode": { "$ref": "#/components/schemas/VoiceProfileModeV3" },
-        "pool_version": {
-          "oneOf": [
-            { "$ref": "#/components/schemas/VoicePoolVersionV3" },
-            { "type": "null" }
-          ]
-        },
-        "recommendation": {
-          "oneOf": [
-            { "$ref": "#/components/schemas/LocalVoiceRecommendationV3" },
-            { "type": "null" }
-          ]
-        },
-        "recommendation_order": {
-          "type": "array",
-          "items": { "type": "string", "format": "uuid" }
-        }
+        "uk": { "$ref": "#/components/schemas/VoiceSideDubbingV3" },
+        "us": { "$ref": "#/components/schemas/VoiceSideDubbingV3" }
       },
       "additionalProperties": false
     },
@@ -9603,6 +9414,10 @@
       "description": "单个音色的 C 端启用选择和独立语速；取消勾选后仍保留语速。",
       "required": ["voice_id", "enabled", "rate_percent"],
       "properties": {
+        "accent": {
+          "$ref": "#/components/schemas/VoiceAccent",
+          "description": "Saved pool side when it differs from the voice's native synthesis locale."
+        },
         "audio_asset_id": { "type": "string", "format": "uuid" },
         "enabled": { "type": "boolean" },
         "locale": { "$ref": "#/components/schemas/EnglishLocale" },
@@ -9640,6 +9455,17 @@
           "format": "int32",
           "maximum": 100,
           "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "VoiceSideDubbingV3": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "$ref": "#/components/schemas/VoiceProfileModeV3" },
+        "recommendation": {
+          "$ref": "#/components/schemas/LocalVoiceRecommendationV3"
         }
       },
       "additionalProperties": false

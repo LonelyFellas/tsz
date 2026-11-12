@@ -272,7 +272,7 @@ function useResolvedPreviewProfile(
         { profile, content, accent: locale === "en-GB" ? "gb" : "us" },
         { signal: controller.signal }
       )
-      .then((voices) => {
+      .then(({ voices }) => {
         if (!controller.signal.aborted) setResolved({ key, voices });
       })
       .catch((error) => {

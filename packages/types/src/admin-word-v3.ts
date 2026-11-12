@@ -56,7 +56,11 @@ export interface SynthesisSpeechV3 {
   content: RichTextV2V3;
   voice_profile: VoiceProfileV3;
 }
+export type PronunciationSpeechSourceV3 =
+  "spelling" | "ipa" | "ups" | "upload" | "none";
 export interface PronunciationSynthesisCandidateV3 {
+  /** Active source for this reading/accent; all inactive source caches remain stored. */
+  source?: PronunciationSpeechSourceV3;
   ipa: string;
   ups: string;
   ups_words?: UpsWordV3[] | null;
@@ -419,6 +423,8 @@ export interface SenseGroupV3 {
 
 /** 单个音色的启用选择与独立语速；未启用时仍保留语速。 */
 export interface VoiceSettingV3 {
+  /** Saved pool side; native locale remains unchanged. */
+  accent?: "gb" | "us" | "none";
   output_format?: "mp3" | "wav";
   audio_asset_id?: string;
   version_id?: string;
@@ -438,16 +444,19 @@ export interface VoiceSettingV3 {
 export interface VoiceProfileV3 {
   voices: VoiceSettingV3[];
   dubbing?: {
-    mode: "inherit" | "local";
     area: "word" | "azure" | "grammar" | "meaning" | "example";
-    recommendation_order?: string[];
-    pool_version?: "provider_id_v1";
-    recommendation?: {
-      group_id: string;
-      pair_id: string;
-      voice_ids: string[];
-      contribution_ids: string[];
-    };
+    uk: VoiceSideDubbingV3;
+    us: VoiceSideDubbingV3;
+  };
+}
+
+export interface VoiceSideDubbingV3 {
+  mode: "inherit" | "local";
+  recommendation?: {
+    group_id: string;
+    recommendation_id: string;
+    voice_id: string;
+    contribution_id?: string;
   };
 }
 

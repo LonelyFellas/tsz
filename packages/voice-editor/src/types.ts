@@ -135,7 +135,7 @@ export interface VoicePreviewAdapter {
   resolveVoices?(
     input: { profile: VoiceProfile; content: RichTextV2; accent: "gb" | "us" },
     options?: { signal?: AbortSignal }
-  ): Promise<VoiceSetting[]>;
+  ): Promise<import("@tsz/types").AdminResolveDubbingResponse>;
   generateAudio?(
     input: {
       requestId: string;
@@ -241,6 +241,7 @@ export interface VoiceRichTextFieldProps {
  * 但本包不依赖 admin 的词条类型，故在此另行定义。
  */
 export interface VoiceSetting {
+  accent?: "gb" | "us" | "none";
   output_format?: "mp3" | "wav";
   audio_asset_id?: string;
   version_id?: string;
@@ -262,7 +263,6 @@ export interface VoiceRecommendation {
   locale: AudioAssetLocale;
   groupName: string;
   groupId?: string;
-  pairId?: string;
   selected?: boolean;
   /** 仅供自动兜底解析，不在手动推荐列表中展示。 */
   fallbackOnly?: boolean;

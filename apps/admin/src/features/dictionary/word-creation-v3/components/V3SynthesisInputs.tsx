@@ -138,19 +138,24 @@ export function V3SynthesisInputs({
     locale,
     requireLocaleConfirmation
   );
-  const selectedIssue = selectedSynthesis.use_spelling
-    ? undefined
-    : (synthesisInputIssue(
-        selectedSynthesis.alphabet,
-        selectedSynthesis[selectedSynthesis.alphabet]
-      ) ??
-      synthesisLocaleIssue(
-        selectedSynthesis,
-        selectedSynthesis.alphabet,
-        locale,
-        requireLocaleConfirmation
-      ));
-  const source = synthesis.use_spelling ? "spelling" : synthesis.alphabet;
+  const selectedIssue =
+    selectedSynthesis.source === "none" ||
+    selectedSynthesis.source === "upload" ||
+    selectedSynthesis.use_spelling
+      ? undefined
+      : (synthesisInputIssue(
+          selectedSynthesis.alphabet,
+          selectedSynthesis[selectedSynthesis.alphabet]
+        ) ??
+        synthesisLocaleIssue(
+          selectedSynthesis,
+          selectedSynthesis.alphabet,
+          locale,
+          requireLocaleConfirmation
+        ));
+  const source =
+    selectedSynthesis.source ??
+    (selectedSynthesis.use_spelling ? "spelling" : selectedSynthesis.alphabet);
   const writeCandidate = (
     side: Side,
     candidate: PronunciationSynthesisCandidateV3,
@@ -355,7 +360,11 @@ export function V3SynthesisInputs({
                       side: sideLabel,
                       name
                     })}
-                    disabled={!rowContent}
+                    disabled={
+                      !rowContent ||
+                      candidate.source === "none" ||
+                      candidate.source === "upload"
+                    }
                     disabledReason={
                       localPhoneticDiagnostic(
                         synthesisInputIssue(alphabet, candidate[alphabet]),
@@ -580,69 +589,68 @@ export function V3SynthesisInputs({
               </div>
             )}
             <div className="word-synthesis-source-actions">
-              <Radio.Group
-                name={`synthesis-source-${pronunciation.id}`}
-                aria-label={t("creation_synthesis_source_label", { label })}
-                value={source}
-                onChange={(event) =>
-                  onChange({
-                    synthesis: {
-                      ...synthesis,
-                      use_spelling: event.target.value === "spelling",
-                      alphabet:
-                        event.target.value === "spelling"
-                          ? synthesis.alphabet
-                          : event.target.value
-                    }
-                  })
-                }
-              >
-                {[
-                  {
-                    value: "spelling",
-                    name: t("spelling"),
-                    text: spelling,
-                    fontClass: "tsz-words"
-                  },
-                  {
-                    value: "ipa",
-                    name: "Azure IPA",
-                    text: selectedSynthesis.ipa.trim()
-                      ? `/ ${selectedSynthesis.ipa.trim()} /`
-                      : "",
-                    fontClass: "tsz-phonetics"
-                  },
-                  ...(upsExpanded
-                    ? [
-                        {
-                          value: "ups",
-                          name: "Azure UPS",
-                          text: selectedSynthesis.ups.trim(),
-                          fontClass: "tsz-phonetics"
-                        }
-                      ]
-                    : [])
-                ].map((option) => (
-                  <Radio
-                    key={option.value}
-                    value={option.value}
-                    aria-label={option.name}
-                    className="word-synthesis-choice"
+              {SIDES.filter(
+                (side) => dialect === "common" || dialect === side
+              ).map((side) => {
+                const candidate = candidateForSide(synthesis, side, dialect);
+                const current = synthesisForLocale(
+                  synthesis,
+                  side === "uk" ? "en-GB" : "en-US",
+                  dialect
+                );
+                const sideLabel = t(
+                  side === "uk" ? "dialect_uk" : "dialect_us"
+                );
+                return (
+                  <section
+                    key={side}
+                    aria-label={t("creation_accent_source", {
+                      side: sideLabel
+                    })}
                   >
-                    <span className="word-synthesis-choice-content">
-                      <span className="word-synthesis-choice-tag">
-                        {option.name}
-                      </span>
-                      <span
-                        className={`word-synthesis-choice-preview ${option.fontClass}`}
-                        title={option.text}
-                      >
-                        {option.text}
-                      </span>
-                    </span>
-                  </Radio>
-                ))}
-              </Radio.Group>
+                    <Typography.Text>{sideLabel}</Typography.Text>
+                    <Radio.Group
+                      data-v3-node-id={pronunciation.id}
+                      data-v3-field={`synthesis.${side}.source`}
+                      aria-label={t("creation_accent_source", {
+                        side: sideLabel
+                      })}
+                      value={
+                        current.source ??
+                        (current.use_spelling ? "spelling" : current.alphabet)
+                      }
+                      onChange={(event) =>
+                        writeCandidate(side, {
+                          ...candidate,
+                          source: event.target.value
+                        })
+                      }
+                    >
+                      {[
+                        { value: "spelling", label: t("spelling") },
+                        { value: "ipa", label: "Azure IPA" },
+                        { value: "ups", label: "Azure UPS" },
+                        {
+                          value: "upload",
+                          label: t("creation_uploaded_source")
+                        },
+                        {
+                          value: "none",
+                          label: t("creation_accent_not_configured")
+                        }
+                      ].map((option) => (
+                        <Radio
+                          key={option.value}
+                          value={option.value}
+                          aria-label={option.label}
+                        >
+                          {option.label}
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </section>
+                );
+              })}
             </div>
           </div>
           {diagnostic && (
@@ -652,7 +660,9 @@ export function V3SynthesisInputs({
               showIcon
             />
           )}
-          {!selectedSynthesis.use_spelling &&
+          {selectedSynthesis.source !== "none" &&
+            selectedSynthesis.source !== "upload" &&
+            !selectedSynthesis.use_spelling &&
             !content &&
             Boolean(selectedSynthesis[selectedSynthesis.alphabet].trim()) && (
               <Typography.Text type="warning">
@@ -667,9 +677,14 @@ export function V3SynthesisInputs({
         <Space wrap>
           <Typography.Text>
             {t("creation_current_source", {
-              source: selectedSynthesis.use_spelling
-                ? t("spelling")
-                : `Azure ${selectedSynthesis.alphabet.toUpperCase()}`
+              source:
+                source === "none"
+                  ? t("creation_accent_not_configured")
+                  : source === "upload"
+                    ? t("creation_uploaded_source")
+                    : source === "spelling"
+                      ? t("spelling")
+                      : `Azure ${source.toUpperCase()}`
             })}
           </Typography.Text>
         </Space>

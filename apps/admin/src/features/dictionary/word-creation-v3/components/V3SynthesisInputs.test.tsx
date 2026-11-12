@@ -63,15 +63,18 @@ vi.mock("../../voice-editor/dataSource", () => ({
     ],
     synthesize: speech.synthesize,
     resolveAudio: speech.resolveAudio,
-    resolveVoices: (input: unknown) =>
-      speech
-        .resolve(input)
-        .then((response: { voices: unknown[] }) => response.voices)
+    resolveVoices: (input: unknown) => speech.resolve(input)
   },
   adminAudioUploadAdapter: {},
   voicePreviewIsMock: false
 }));
 
+function sourceRadio(name: string, side = "美式") {
+  const group =
+    screen.queryByRole("radiogroup", { name: `${side}配音来源` }) ??
+    screen.getByRole("radiogroup", { name: "英式配音来源" });
+  return within(group).getByRole("radio", { name });
+}
 beforeEach(() => {
   speech.recommendations.mockReset().mockResolvedValue([]);
   speech.resolve
@@ -137,9 +140,9 @@ function Harness({
     content: { version: 2 as const, text: "far", annotations: [] },
     voice_profile: {
       dubbing: {
-        mode: "inherit" as const,
         area: "azure" as const,
-        recommendation_order: ["recommended"]
+        uk: { mode: "inherit" as const },
+        us: { mode: "inherit" as const }
       },
       voices: [
         {
@@ -439,9 +442,9 @@ describe("双口音真实试听控件", () => {
       screen.getByTestId("pronunciation-wire").textContent!
     );
     expect(saved.synthesis.uk.ipa_speech.voice_profile.dubbing).toEqual({
-      mode: "inherit",
       area: "azure",
-      recommendation_order: ["recommended"]
+      uk: { mode: "inherit" },
+      us: { mode: "inherit" }
     });
     expect(saved.synthesis.uk.ipa_speech.voice_profile.voices[0]).toEqual({
       voice_id: "en-gb-sonia",
@@ -478,10 +481,8 @@ describe("双口音真实试听控件", () => {
         fireEvent.click(
           screen.getByRole("button", { name: "展开第 1 条发音的 UPS" })
         );
-      fireEvent.click(screen.getByRole("radio", { name: "词形拼写" }));
-      fireEvent.click(
-        screen.getByRole("radio", { name: `Azure ${alphabet.toUpperCase()}` })
-      );
+      fireEvent.click(sourceRadio("词形拼写"));
+      fireEvent.click(sourceRadio(`Azure ${alphabet.toUpperCase()}`));
       const accent = dialect === "uk" ? "英式" : "美式";
       const input = screen.getByLabelText(
         `第 1 条发音的${accent} Azure ${alphabet.toUpperCase()}`
@@ -662,7 +663,7 @@ describe("双口音真实试听控件", () => {
     );
     expect(ups).toBeInTheDocument();
     expect(ups).not.toBeVisible();
-    expect(screen.getByRole("radio", { name: "词形拼写" })).toBeChecked();
+    expect(sourceRadio("词形拼写")).toBeChecked();
     expect(
       JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
         .synthesis.us.ups
@@ -700,7 +701,7 @@ describe("双口音真实试听控件", () => {
     expect(
       screen.getByLabelText("第 1 条发音的美式 Azure UPS")
     ).toHaveAttribute("aria-invalid", "true");
-    fireEvent.click(screen.getByRole("radio", { name: "Azure UPS" }));
+    fireEvent.click(sourceRadio("Azure UPS"));
     fireEvent.change(screen.getByLabelText("第 1 条发音的美式 Azure UPS"), {
       target: { value: "" }
     });
@@ -709,6 +710,38 @@ describe("双口音真实试听控件", () => {
     ).toHaveAttribute("aria-invalid", "true");
   });
 
+  it("同拼写读法两侧选源独立，停配保留本侧资料，切回IPA恢复原缓存", () => {
+    renderWithUps(<Harness dialect="common" generated />);
+    const before = JSON.parse(
+      screen.getByTestId("pronunciation-wire").textContent!
+    );
+    fireEvent.click(sourceRadio("本侧暂不配置", "英式"));
+    let saved = JSON.parse(
+      screen.getByTestId("pronunciation-wire").textContent!
+    );
+    expect(saved.synthesis.uk).toEqual({
+      ...before.synthesis.uk,
+      source: "none"
+    });
+    expect(saved.synthesis.us).toEqual(before.synthesis.us);
+    expect(
+      screen.getByLabelText("第 1 条发音 英式 Azure IPA 最终读音 播放语音")
+    ).toBeDisabled();
+    fireEvent.click(sourceRadio("Azure UPS", "美式"));
+    saved = JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+    expect(saved.synthesis.uk.source).toBe("none");
+    expect(saved.synthesis.us).toEqual({
+      ...before.synthesis.us,
+      source: "ups"
+    });
+    fireEvent.click(sourceRadio("Azure IPA", "英式"));
+    saved = JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+    expect(saved.synthesis.uk).toEqual({
+      ...before.synthesis.uk,
+      source: "ipa"
+    });
+    expect(saved.synthesis.us.source).toBe("ups");
+  });
   it("不在每条发音下重复说明 UPS 选源规则", () => {
     renderWithUps(<Harness dialect="common" />);
     expect(
@@ -718,7 +751,7 @@ describe("双口音真实试听控件", () => {
 
   it("空输入不常驻提示必填，已填音素的格式错误仍提示", () => {
     renderWithUps(<Harness dialect="common" />);
-    fireEvent.click(screen.getByRole("radio", { name: "Azure IPA" }));
+    fireEvent.click(sourceRadio("Azure IPA"));
     const ups = screen.getByLabelText("第 1 条发音的美式 Azure UPS");
     fireEvent.change(ups, { target: { value: "" } });
     fireEvent.change(screen.getByLabelText("第 1 条发音的美式 Azure IPA"), {
@@ -728,50 +761,50 @@ describe("双口音真实试听控件", () => {
     expect(
       screen.getByLabelText("第 1 条发音 美式 Azure IPA 最终读音 播放语音")
     ).toBeDisabled();
-    fireEvent.click(screen.getByRole("radio", { name: "Azure UPS" }));
+    fireEvent.click(sourceRadio("Azure UPS"));
     fireEvent.change(ups, { target: { value: "错误" } });
     expect(
       screen.getByText("UPS 使用区分大小写、以空格分隔的 ASCII 音素")
     ).toBeInTheDocument();
   });
 
-  it("手动选源：展开显示 UPS 单选，收起隐藏但保留选择和内容", () => {
+  it("单侧选源与 UPS 输入收展独立，收起后仍保留来源和缓存", () => {
     render(<Harness dialect="common" />);
-    expect(screen.queryByRole("radio", { name: "Azure UPS" })).toBeNull();
+    expect(sourceRadio("Azure UPS")).toBeVisible();
     fireEvent.click(
       screen.getByRole("button", { name: "展开第 1 条发音的 UPS" })
     );
-    const ups = screen.getByRole("radio", { name: "Azure UPS" });
+    const ups = sourceRadio("Azure UPS");
     expect(ups).not.toBeChecked();
     fireEvent.click(ups);
     expect(ups).toBeChecked();
     expect(
       JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
         .synthesis
-    ).toMatchObject({ alphabet: "ups", use_spelling: false });
+    ).toMatchObject({ us: { source: "ups" } });
     fireEvent.click(
       screen.getByRole("button", { name: "收起第 1 条发音的 UPS" })
     );
-    expect(screen.queryByRole("radio", { name: "Azure UPS" })).toBeNull();
+    expect(sourceRadio("Azure UPS")).toBeVisible();
     expect(
       screen.getByLabelText("第 1 条发音的美式 Azure UPS")
     ).not.toBeVisible();
     expect(
       JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
         .synthesis
-    ).toMatchObject({ alphabet: "ups", use_spelling: false });
+    ).toMatchObject({ us: { source: "ups" } });
     fireEvent.click(
       screen.getByRole("button", { name: "展开第 1 条发音的 UPS" })
     );
-    expect(screen.getByRole("radio", { name: "Azure UPS" })).toBeChecked();
+    expect(sourceRadio("Azure UPS")).toBeChecked();
     const input = screen.getByLabelText("第 1 条发音的美式 Azure UPS");
     expect(input).toHaveValue("F AA R");
     for (const source of ["Azure IPA", "词形拼写"]) {
-      fireEvent.click(screen.getByRole("radio", { name: source }));
+      fireEvent.click(sourceRadio(source));
       fireEvent.change(input, { target: { value: "K AE T" } });
-      expect(screen.getByRole("radio", { name: source })).toBeChecked();
+      expect(sourceRadio(source)).toBeChecked();
       fireEvent.change(input, { target: { value: "" } });
-      expect(screen.getByRole("radio", { name: source })).toBeChecked();
+      expect(sourceRadio(source)).toBeChecked();
       expect(screen.queryByText("请填写 Azure UPS")).toBeNull();
     }
   });
@@ -793,7 +826,7 @@ describe("双口音真实试听控件", () => {
     async (dialect) => {
       renderWithUps(<Harness dialect={dialect} />);
       for (const source of ["词形拼写", "Azure IPA", "Azure UPS"]) {
-        fireEvent.click(screen.getByRole("radio", { name: source }));
+        fireEvent.click(sourceRadio(source));
         for (const [accent, alphabet, voiceId, phoneme] of [
           ["英式", "IPA", "en-gb-sonia", "fɑː"],
           ["美式", "IPA", "en-us-aria", "fɑɹ"],

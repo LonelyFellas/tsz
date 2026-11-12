@@ -1,3 +1,4 @@
+import { validateRuntimeSchema } from "./runtime-schema";
 import { createLexiconNextEndpoints } from "./lexicon-next";
 import { createDubbingGroupsV3Endpoints } from "./dubbing-groups-v3";
 import { createAiLedgerEndpoints } from "./ai-ledger";
@@ -130,7 +131,7 @@ const SPELLING_MARKUP_HEADERS = {
   "X-TSZ-Spelling-Markup": "v1",
   "X-TSZ-Spelling-Speech": "v1",
   "X-TSZ-Phoneme-Speech": "v1",
-  "X-TSZ-Voice-Versions": "v4",
+  "X-TSZ-Voice-Versions": "v5",
   "X-TSZ-Voice-Locales": "v1",
   "X-TSZ-Voice-Models": "v1",
   "X-TSZ-Form-Contents": "v1",
@@ -331,11 +332,17 @@ export function createAdminEndpoints(http: HttpClient) {
         },
         signal?: AbortSignal
       ) =>
-        http.post<{ voices: import("@tsz/types").VoiceSettingV3[] }>(
-          "/speech/resolve",
-          input,
-          { signal, headers: { "X-TSZ-Voice-Versions": "v4" } }
-        ),
+        http
+          .post<import("@tsz/types").AdminResolveDubbingResponse>(
+            "/speech/resolve",
+            input,
+            { signal, headers: { "X-TSZ-Voice-Versions": "v5" } }
+          )
+          .then((value) => {
+            if (!validateRuntimeSchema("ResolveDubbingResponse", value).valid)
+              throw new Error("配音解析响应不符合接口契约");
+            return value;
+          }),
       generateAudio: (
         input: import("@tsz/types").GenerateVoiceAudioRequest,
         signal?: AbortSignal
@@ -346,7 +353,7 @@ export function createAdminEndpoints(http: HttpClient) {
           {
             signal,
             headers: {
-              "X-TSZ-Voice-Versions": "v4",
+              "X-TSZ-Voice-Versions": "v5",
               "X-TSZ-Voice-Locales": "v1",
               "X-TSZ-Voice-Models": "v1"
             }
@@ -387,29 +394,18 @@ export function createAdminEndpoints(http: HttpClient) {
       },
       ...createDubbingGroupsV3Endpoints(http),
       groups: (signal?: AbortSignal) =>
-        http.get<AdminDubbingGroupsResponse>("/speech/groups", {
-          signal,
-          headers: { "X-TSZ-Voice-Models": "v1", "X-TSZ-Dubbing-Groups": "v2" }
-        }),
+        createDubbingGroupsV3Endpoints(http).groupsV3(signal),
       saveGroup: (
         group: import("@tsz/types").AdminDubbingGroup,
         base_revision: number,
         create = false
       ) =>
-        create
-          ? http.post<AdminDubbingGroupsResponse>("/speech/groups", {
-              group,
-              base_revision
-            })
-          : http.put<AdminDubbingGroupsResponse>(
-              `/speech/groups/${encodeURIComponent(group.id)}`,
-              { group, base_revision }
-            ),
-      deleteGroup: (id: string, base_revision: number) =>
-        http.del<AdminDubbingGroupsResponse>(
-          `/speech/groups/${encodeURIComponent(id)}`,
-          { base_revision }
+        createDubbingGroupsV3Endpoints(http).saveIndependentGroup(
+          { group, base_revision },
+          create
         ),
+      deleteGroup: (id: string, base_revision: number) =>
+        createDubbingGroupsV3Endpoints(http).deleteGroupV3(id, base_revision),
       audioUpdateSettings: (signal?: AbortSignal) =>
         http.get<import("@tsz/types").AdminDubbingUpdateSettings>(
           "/speech/audio-update-settings",

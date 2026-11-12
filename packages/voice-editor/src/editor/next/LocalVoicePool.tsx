@@ -37,7 +37,7 @@ import type {
   VoiceSetting
 } from "../../types";
 import {
-  convertVoicePool,
+  localVoicePool,
   effectiveVoiceSetting,
   isVoiceRecommendationAvailable,
   providerVoiceKey,
@@ -46,7 +46,8 @@ import {
   togglePoolVoice,
   voicePoolConflicts,
   voicePoolProbabilities,
-  voiceSettingKey
+  voiceSettingKey,
+  voiceSettingAccent
 } from "../../core";
 import { PoolVoiceName, PoolVoiceRate, PoolVoiceVolume } from "./VoiceDisplay";
 import { VoiceDetail } from "./VoiceDetail";
@@ -61,6 +62,7 @@ function voiceSides(t: VoiceEditorTranslation = defaultVoiceEditorTranslation) {
 export function LocalVoicePool({
   profile,
   settings,
+  sources,
   voices,
   loading,
   recommendations,
@@ -93,6 +95,12 @@ export function LocalVoicePool({
 }: {
   profile?: VoiceProfile | null;
   settings: VoiceSetting[];
+  sources?: Partial<
+    Record<
+      "uk" | "us",
+      import("@tsz/types").AdminResolveDubbingResponse["source"]
+    >
+  >;
   voices: VoiceOption[];
   loading: boolean;
   recommendations: VoiceRecommendation[];
@@ -118,7 +126,7 @@ export function LocalVoicePool({
     setting?: VoiceSetting,
     catalog?: boolean
   ) => void;
-  onRestore: () => void;
+  onRestore: (side?: "uk" | "us") => void;
   onOpenDetail: (dialect: "en-GB" | "en-US") => void;
   onCloseDetail: () => void;
   audioTools: (
@@ -136,7 +144,6 @@ export function LocalVoicePool({
   );
   const [notice, setNotice] = useVoiceEditorMessageState("");
   const [search, setSearch] = useState<Record<string, string>>({});
-  const [choices, setChoices] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<{
     setting: VoiceSetting;
     profile: VoiceProfile;
@@ -171,10 +178,7 @@ export function LocalVoicePool({
     });
     previousSearch.current = search;
   }, [search, settings, recommendations]);
-  const inherited = profile?.dubbing?.mode === "inherit";
-  const converted = !!profile?.dubbing?.pool_version;
-  // Resolved inheritance is a view. Only an explicit action materializes it.
-  const current = converted && !inherited ? profile!.voices : settings;
+  const current = settings;
   const requiresPhoneme =
     !!nativeAuditionLocale ||
     content.annotations.some((mark) => mark.type === "phoneme");
@@ -191,55 +195,38 @@ export function LocalVoicePool({
     current.some(
       (setting) =>
         setting.enabled &&
+        voiceSettingAccent(setting, voices) ===
+          speechAccentGroup(voice.locale, voice.accent) &&
         providerVoiceKey(setting.voice_id, voices) ===
           providerVoiceKey(voice.id, voices)
     );
+  const sideOf = (setting: VoiceSetting) => {
+    return voiceSettingAccent(setting, voices);
+  };
   const conflicts = voicePoolConflicts(current, voices);
-  const pairs = recommendations
-    .filter((item) => item.pairId && item.groupId)
-    .reduce<VoiceRecommendation[][]>((groups, item) => {
-      const pair = groups.find(
-        (group) =>
-          group[0]!.pairId === item.pairId && group[0]!.groupId === item.groupId
-      );
-      if (pair) pair.push(item);
-      else groups.push([item]);
-      return groups;
-    }, []);
-  const visiblePairs = pairs.filter(
-    (pair) =>
-      !pair[0]!.fallbackOnly &&
-      pair.some((item) => !locale || item.locale === locale)
-  );
-  const legacyRecommendations = recommendations.filter(
-    (item) =>
-      !item.pairId && !item.fallbackOnly && (!locale || item.locale === locale)
-  );
-  const inheritedPair = inherited
-    ? pairs.find((pair) =>
-        pair
-          .filter((item) => !locale || item.locale === locale)
-          .every((item) =>
+  const inheritedFor = (side: "uk" | "us") =>
+    profile?.dubbing?.[side].mode === "inherit";
+  const selectedRecommendation = (side: "uk" | "us") =>
+    inheritedFor(side)
+      ? recommendations.find(
+          (item) =>
+            speechAccentGroup(item.locale) === side &&
             current.some(
-              (setting) =>
-                setting.enabled && voiceSettingKey(setting) === item.id
+              (voice) => voice.enabled && voiceSettingKey(voice) === item.id
             )
-          )
-      )
-    : undefined;
-  const source = profile?.dubbing?.recommendation;
-  const selectedPair = inherited
-    ? inheritedPair
-    : pairs.find(
-        (pair) =>
-          pair[0]!.pairId === source?.pair_id &&
-          pair[0]!.groupId === source?.group_id
-      );
+        )
+      : recommendations.find(
+          (item) =>
+            item.id ===
+            profile?.dubbing?.[side].recommendation?.recommendation_id
+        );
   const excluded = new Set(
-    (inherited
-      ? inheritedPair?.map((item) => item.setting.voice_id)
-      : source?.voice_ids
-    )?.map((id) => providerVoiceKey(id, voices)) ?? []
+    sides.flatMap(({ key }) => {
+      const id = inheritedFor(key)
+        ? selectedRecommendation(key)?.setting.voice_id
+        : profile?.dubbing?.[key].recommendation?.voice_id;
+      return id ? [providerVoiceKey(id, voices)] : [];
+    })
   );
   const probabilities = voicePoolProbabilities(
     current.filter((item) => !unavailableVersions?.has(voiceSettingKey(item))),
@@ -248,73 +235,96 @@ export function LocalVoicePool({
     locale,
     nativeAuditionLocale
   );
-  function materialize(): VoiceProfile | undefined {
-    if (conflicts.length) {
-      setNotice(
-        createVoiceEditorMessage(
-          "resolve_the_historical_configuration_conflicts_before_converting_to_a_new_p"
-        )
-      );
+  function materialize(side: "uk" | "us"): VoiceProfile | undefined {
+    if (
+      voicePoolConflicts(
+        current.filter((item) => sideOf(item) === side),
+        voices
+      ).length
+    ) {
+      setNotice("同一官方音色只能保留一个配置");
       return;
     }
-    const local = convertVoicePool(profile, current, voices, area);
-    if (inherited) {
-      const contributed = current
-        .filter((item) => item.enabled)
-        .map(voiceSettingKey);
-      const pair = inheritedPair?.[0];
-      if (pair?.groupId && pair.pairId)
-        local.dubbing!.recommendation = {
-          group_id: pair.groupId,
-          pair_id: pair.pairId,
-          voice_ids: inheritedPair!.map((item) => item.setting.voice_id),
-          contribution_ids: contributed
-        };
-    }
+    const raw = current.map((setting) => {
+      const recommendation =
+        inheritedFor(side) && sideOf(setting) === side
+          ? recommendations.find((item) => item.id === voiceSettingKey(setting))
+          : undefined;
+      return recommendation
+        ? {
+            ...setting,
+            ...recommendation.setting,
+            version_id: setting.version_id,
+            version_name: setting.version_name,
+            locale: setting.locale
+          }
+        : setting;
+    });
+    const local = localVoicePool(profile, raw, voices, area, side);
+    const recommendation = selectedRecommendation(side);
+    const selected = current.find(
+      (item) => item.enabled && item.version_id === recommendation?.id
+    );
+    if (inheritedFor(side) && recommendation?.groupId && selected)
+      local.dubbing![side].recommendation = {
+        group_id: recommendation.groupId,
+        recommendation_id: recommendation.id,
+        voice_id: selected.voice_id,
+        contribution_id: voiceSettingKey(selected)
+      };
     return local;
   }
-  function selectRecommendation(pair: VoiceRecommendation[]) {
+  function selectRecommendation(
+    items: VoiceRecommendation[],
+    side: "uk" | "us"
+  ) {
     if (readOnly) return;
-    const local = materialize();
+    const local = materialize(side);
     if (!local) return;
-    // An inherited legacy/default view has no pair identity but its active defaults must still be cleared.
-    if (inherited && !local.dubbing?.recommendation)
+    if (inheritedFor(side) && !local.dubbing?.[side].recommendation)
       local.voices = local.voices.map((item) =>
-        item.enabled ? { ...item, enabled: false } : item
+        speechAccentGroup(item.locale) === side
+          ? { ...item, enabled: false }
+          : item
       );
-    const result = switchPoolRecommendation(
-      local,
-      pair.filter((item) => !locale || item.locale === locale),
-      voices
-    );
-    if (result.profile.dubbing?.recommendation)
-      result.profile.dubbing.recommendation.voice_ids = pair.map(
-        (item) => item.setting.voice_id
-      );
+    let result: ReturnType<typeof switchPoolRecommendation>;
+    try {
+      result = switchPoolRecommendation(local, items, voices, side);
+    } catch {
+      setNotice(t("voice_pool_accent_conflict"));
+      return;
+    }
     setNotice(
       result.duplicates.length
         ? createVoiceEditorMessage(
             "this_recommendation_duplicates_an_existing_voice_existing_local_parameters"
           )
-        : pair.length
-          ? createVoiceEditorMessage(
-              "local_recommendation_copy_applied_save_it_through_the_host_workflow"
-            )
-          : createVoiceEditorMessage(
-              "recommendation_deselected_its_voice_remains_in_the_unselected_cache_voices"
-            )
+        : ""
     );
     onChange(result.profile);
   }
   function toggle(voice: VoiceOption) {
     if (readOnly) return;
     if (phonemeIssue(voice) && !isSelected(voice)) return;
-    const local = materialize();
+    const side = speechAccentGroup(voice.locale, voice.accent);
+    if (side !== "uk" && side !== "us") return;
+    const cached = profile?.voices.find(
+      (item) =>
+        providerVoiceKey(item.voice_id, voices) ===
+        providerVoiceKey(voice.id, voices)
+    );
+    if (cached && sideOf(cached) !== side) {
+      setNotice(t("voice_pool_accent_conflict"));
+      return;
+    }
+    const local = materialize(side);
     if (local) onChange(togglePoolVoice(local, voice, voices));
   }
   function edit(setting: VoiceSetting) {
     if (readOnly) return;
-    const local = materialize();
+    const side = sideOf(setting);
+    if (side !== "uk" && side !== "us") return;
+    const local = materialize(side);
     if (!local) return;
     const selected =
       local.voices.find(
@@ -451,67 +461,7 @@ export function LocalVoicePool({
         />
       )}
       {conflicts.length > 0 && (
-        <section aria-label={t("historical_voice_conflicts")}>
-          <Alert
-            type="warning"
-            title={t(
-              "several_historical_configurations_share_an_official_id_existing_versions_re"
-            )}
-          />
-          {conflicts.map(([id, items]) => (
-            <div key={id}>
-              <Typography.Text code>
-                {voices.find((v) => v.id === items[0]!.voice_id)
-                  ?.providerVoiceId ?? items[0]!.voice_id}
-              </Typography.Text>
-              <Radio.Group
-                aria-label={t("historical_conflict", {
-                  p0: items[0]!.voice_id
-                })}
-                value={choices[id]}
-                onChange={(event) =>
-                  setChoices((previous) => ({
-                    ...previous,
-                    [id]: event.target.value
-                  }))
-                }
-              >
-                {items.map((item) => (
-                  <div key={voiceSettingKey(item)}>
-                    <Radio value={voiceSettingKey(item)}>
-                      {item.version_name ?? item.voice_id} ·{" "}
-                      <PoolVoiceRate setting={item} /> ·{" "}
-                      <PoolVoiceVolume setting={item} />
-                      {item.enabled ? t("selected") : t("cached")}
-                    </Radio>
-                    {preview(item)}
-                  </div>
-                ))}
-              </Radio.Group>
-            </div>
-          ))}
-          <Button
-            disabled={
-              readOnly ||
-              conflicts.some(
-                ([id, items]) =>
-                  !items.some((item) => voiceSettingKey(item) === choices[id])
-              )
-            }
-            onClick={() => {
-              onChange(
-                convertVoicePool(profile, current, voices, area, choices)
-              );
-              setNotice(
-                createVoiceEditorMessage(
-                  "local_draft_converted_using_your_selections_save_it_through_the_host_workfl"
-                )
-              );
-            }}
-          >
-            {t("convert_using_selections")}
-          </Button>
-        </section>
+        <Alert type="warning" title="同一官方音色只能保留一个配置" />
       )}
       <div className="tsz-ve-pool-current-header">
         <div className="tsz-ve-pool-heading">
@@ -553,7 +503,7 @@ export function LocalVoicePool({
             className="tsz-ve-pool-restore"
             type="link"
             disabled={readOnly}
-            onClick={onRestore}
+            onClick={() => onRestore()}
           >
             {t("restore_default_recommendations")}
           </Button>
@@ -575,14 +525,7 @@ export function LocalVoicePool({
             .filter((side) => !locale || locale === side.locale)
             .map((side) => {
               const selected = current.filter((setting) => {
-                const voice = voices.find((v) => v.id === setting.voice_id);
-                return (
-                  setting.enabled &&
-                  speechAccentGroup(
-                    voice?.locale ?? setting.locale,
-                    voice?.accent
-                  ) === side.key
-                );
+                return setting.enabled && sideOf(setting) === side.key;
               });
               return (
                 <section
@@ -596,6 +539,39 @@ export function LocalVoicePool({
                   >
                     {side.label}
                   </Typography.Text>
+                  <Typography.Text
+                    type="secondary"
+                    className="tsz-ve-pool-source"
+                  >
+                    {inheritedFor(side.key)
+                      ? (() => {
+                          const source = sources?.[side.key];
+                          const recommendation =
+                            source?.kind === "recommendation"
+                              ? recommendations.find(
+                                  (item) => item.id === source.recommendation_id
+                                )
+                              : selectedRecommendation(side.key);
+                          return source?.kind === "catalog" ||
+                            (!source && !recommendation)
+                            ? t("inherited_catalog_source")
+                            : t("inherited_recommendation_source", {
+                                p0:
+                                  recommendation?.groupName ??
+                                  t("recommended_voices"),
+                                p1: recommendation?.name ?? ""
+                              });
+                        })()
+                      : t("local_voice_settings")}
+                  </Typography.Text>
+                  <Button
+                    size="small"
+                    type="link"
+                    disabled={readOnly}
+                    onClick={() => onRestore(side.key)}
+                  >
+                    {t("restore_accent_defaults", { p0: side.label })}
+                  </Button>
                   {!!selected.length && (
                     <div className="tsz-ve-pool-row tsz-ve-pool-head">
                       <span>{t("no")}</span>
@@ -668,7 +644,7 @@ export function LocalVoicePool({
                                     : rank === selected.length - 1)
                                 }
                                 onClick={() => {
-                                  const local = materialize();
+                                  const local = materialize(side.key);
                                   if (local)
                                     onChange({
                                       ...local,
@@ -728,7 +704,7 @@ export function LocalVoicePool({
                             type="link"
                             disabled={readOnly}
                             onClick={() => {
-                              const local = materialize();
+                              const local = materialize(side.key);
                               if (local)
                                 onChange({
                                   ...local,
@@ -755,6 +731,13 @@ export function LocalVoicePool({
       {current
         .filter((item) => {
           const voice = voices.find((v) => v.id === item.voice_id);
+          const savedSide = sideOf(item);
+          if (
+            locale &&
+            (savedSide === "uk" || savedSide === "us") &&
+            savedSide !== speechAccentGroup(locale)
+          )
+            return false;
           return (
             item.enabled &&
             (!["uk", "us"].includes(
@@ -784,7 +767,7 @@ export function LocalVoicePool({
                 }
               )}
             />
-            {preview(item)}
+            {!sides.some((side) => side.key === sideOf(item)) && preview(item)}
             <Button
               disabled={readOnly}
               aria-label={t("disable_unavailable_voice", { p0: item.voice_id })}
@@ -803,77 +786,66 @@ export function LocalVoicePool({
             </Button>
           </div>
         ))}
-      <Radio.Group
-        className="tsz-ve-pool-recommendation-section"
-        aria-label={t("local_recommendation")}
-        value={
-          selectedPair
-            ? `${selectedPair[0]!.groupId}/${selectedPair[0]!.pairId}`
-            : !inherited && converted && !source
-              ? "none"
-              : undefined
-        }
-        onChange={(event) =>
-          selectRecommendation(
-            event.target.value === "none"
-              ? []
-              : (pairs.find(
-                  (pair) =>
-                    `${pair[0]!.groupId}/${pair[0]!.pairId}` ===
-                    event.target.value
-                ) ?? [])
-          )
-        }
-      >
-        <div className="tsz-ve-pool-recommendation-header">
-          <Typography.Title level={5}>
-            {t("recommended_voices")}
-          </Typography.Title>
-          <Radio value="none" disabled={readOnly}>
-            {t("do_not_use_recommended_voices")}
-          </Radio>
-        </div>
-        <div className="tsz-ve-pool-scroll">
-          <div
-            className="tsz-ve-pool-recommendations tsz-ve-pool-paired-recommendations"
-            data-single={!!locale}
-          >
-            <div className="tsz-ve-pool-pair tsz-ve-pool-head">
-              <span>{t("recommended_voices")}</span>
-              <span>{t("source_group")}</span>
-              {sides.map((side) => (
-                <div key={side.key} className="tsz-ve-pool-pair-side">
+      <div className="tsz-ve-pool-scroll">
+        <div
+          className="tsz-ve-pool-recommendation-section"
+          data-single={!!locale}
+        >
+          {sides.map((side) => {
+            const selected = selectedRecommendation(side.key);
+            const items = recommendations.filter(
+              (item) => item.locale === side.locale && !item.fallbackOnly
+            );
+            return (
+              <section
+                key={side.key}
+                aria-label={`${side.label} ${t("local_recommendation")}`}
+              >
+                <Typography.Title level={5}>
+                  {side.label} {t("recommended_voices")}
+                </Typography.Title>
+                <div className="tsz-ve-pool-recommendation-row tsz-ve-pool-head">
+                  <span>{t("local_recommendation")}</span>
+                  <span>{t("source_group")}</span>
                   <span>{t("audition")}</span>
-                  <span>{t("accent_voice", { accent: side.label })}</span>
+                  <span>{t("voice")}</span>
                   <span>{t("rate")}</span>
                   <span>{t("volume")}</span>
                 </div>
-              ))}
-            </div>
-            {visiblePairs.map((pair) => (
-              <div
-                className="tsz-ve-pool-pair"
-                data-selected={
-                  selectedPair?.[0]?.groupId === pair[0]!.groupId &&
-                  selectedPair?.[0]?.pairId === pair[0]!.pairId
-                }
-                key={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
-              >
-                <Radio
-                  value={`${pair[0]!.groupId}/${pair[0]!.pairId}`}
-                  disabled={
-                    readOnly ||
-                    pair
-                      .filter((item) => !locale || item.locale === locale)
-                      .some(
-                        (item) =>
+                <Radio.Group
+                  aria-label={`${side.label} ${t("local_recommendation")}`}
+                  value={
+                    selected?.id ??
+                    (profile?.dubbing?.[side.key].mode === "local"
+                      ? "none"
+                      : undefined)
+                  }
+                  onChange={(event) =>
+                    selectRecommendation(
+                      items.filter((item) => item.id === event.target.value),
+                      side.key
+                    )
+                  }
+                >
+                  <Radio value="none" disabled={readOnly}>
+                    {t("do_not_use_recommended_voices")}
+                  </Radio>
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="tsz-ve-pool-recommendation-row"
+                    >
+                      <Radio
+                        value={item.id}
+                        disabled={
+                          readOnly ||
                           !isVoiceRecommendationAvailable(
                             {
                               ...item,
                               setting: effectiveVoiceSetting(
                                 item.setting,
                                 voices.find(
-                                  (v) => v.id === item.setting.voice_id
+                                  (voice) => voice.id === item.setting.voice_id
                                 )
                               )
                             },
@@ -882,29 +854,11 @@ export function LocalVoicePool({
                             content,
                             nativeAuditionLocale
                           )
-                      )
-                  }
-                >
-                  {pair[0]!.name}
-                </Radio>
-                <span className="tsz-ve-pool-group-name">
-                  {pair[0]!.groupName}
-                  {pair[0]!.selected === false
-                    ? t("none_selected_in_group")
-                    : ""}
-                </span>
-                {pair
-                  .filter((item) => !locale || item.locale === locale)
-                  .map((item) => (
-                    <div
-                      className="tsz-ve-pool-pair-side"
-                      data-label={
-                        item.locale === "en-GB"
-                          ? t("british_voice")
-                          : t("american_voice")
-                      }
-                      key={item.id}
-                    >
+                        }
+                      >
+                        {item.name}
+                      </Radio>
+                      <span>{item.groupName}</span>
                       {renderIdentity(
                         {
                           ...item.setting,
@@ -915,74 +869,12 @@ export function LocalVoicePool({
                       )}
                     </div>
                   ))}
-              </div>
-            ))}
-          </div>
+                </Radio.Group>
+              </section>
+            );
+          })}
         </div>
-      </Radio.Group>
-      {legacyRecommendations.length > 0 && (
-        <section aria-label={t("unpaired_historical_recommendation")}>
-          <Typography.Paragraph type="secondary">
-            {t(
-              "unpaired_historical_groups_retain_default_resolution_only_organise_the_grou"
-            )}
-          </Typography.Paragraph>
-          <div className="tsz-ve-pool-scroll">
-            <div className="tsz-ve-pool-recommendations">
-              <div className="tsz-ve-pool-pair tsz-ve-pool-head">
-                <span>
-                  {t("historical_single_accent_recommendation_source")}
-                </span>
-                <div className="tsz-ve-pool-pair-side">
-                  <span>{t("audition")}</span>
-                  <span>{t("voice")}</span>
-                  <span>{t("rate")}</span>
-                  <span>{t("volume")}</span>
-                </div>
-              </div>
-              {legacyRecommendations.map((item) => (
-                <div className="tsz-ve-pool-pair" key={item.id}>
-                  <span>
-                    {item.name}
-                    <small>
-                      {item.groupName} ·{" "}
-                      {item.locale === "en-GB" ? t("british") : t("american")}{" "}
-                      {t("unpaired")}
-                      {item.selected === false
-                        ? t("none_selected_in_group_2")
-                        : ""}
-                    </small>
-                  </span>
-                  <div className="tsz-ve-pool-pair-side">
-                    {renderIdentity(
-                      {
-                        ...item.setting,
-                        version_name: item.name,
-                        version_id: item.id
-                      },
-                      item.locale
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-      {!visiblePairs.length && !loading && (
-        <Typography.Paragraph type="secondary">
-          {t(
-            "no_paired_recommendations_apply_you_can_select_voices_from_the_catalogue"
-          )}
-        </Typography.Paragraph>
-      )}
-      {source && !selectedPair && (
-        <Typography.Paragraph type="secondary">
-          {t(
-            "the_source_recommendation_changed_or_was_removed_applied_local_copies_are_r"
-          )}
-        </Typography.Paragraph>
-      )}
+      </div>
       <details className="tsz-ve-pool-catalog-disclosure">
         <summary>
           <span className="tsz-ve-pool-heading">
@@ -1223,7 +1115,7 @@ export function LocalVoicePool({
             }}
             onSave={(next) => {
               if (readOnly || detail.sourceKey !== sourceKey) return;
-              const local = converted && !inherited ? profile! : detail.profile;
+              const local = detail.profile;
               onChange({
                 ...local,
                 voices: local.voices.map((item) =>

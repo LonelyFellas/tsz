@@ -106,3 +106,14 @@
 .voice-parameter-advanced .ui-select-disabled .ui-select-selection-item {
   color: #606b7b;
 }
+
+.voice-parameter-section {
+  border: 1px solid var(--ui-color-border-secondary, #e6e9ef);
+  border-radius: var(--ui-border-radius, 7px);
+  padding: 12px;
+  margin-top: 12px;
+}
+.voice-parameter-section > .ui-typography {
+  display: block;
+  margin-bottom: 8px;
+}

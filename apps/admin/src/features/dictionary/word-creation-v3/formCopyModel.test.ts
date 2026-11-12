@@ -46,7 +46,13 @@ function profile(id: string, inherited = false): VoiceProfileV3 {
       }
     ],
     ...(inherited
-      ? { dubbing: { mode: "inherit" as const, area: "azure" as const } }
+      ? {
+          dubbing: {
+            area: "azure" as const,
+            uk: { mode: "inherit" as const },
+            us: { mode: "inherit" as const }
+          }
+        }
       : {})
   };
 }
@@ -706,9 +712,9 @@ describe("词形内容定向复制", () => {
     target.voice_profile = {
       voices: [],
       dubbing: {
-        mode: "local",
-        area: "word",
-        recommendation_order: ["us-b", "us-a"]
+        area: "word" as const,
+        uk: { mode: "local" },
+        us: { mode: "local" }
       }
     };
     const before = structuredClone(forms);
@@ -739,7 +745,11 @@ describe("词形内容定向复制", () => {
             rate_percent: 0
           }
         ],
-        dubbing: { mode: "inherit" as const, area: "azure" as const }
+        dubbing: {
+          area: "azure" as const,
+          uk: { mode: "inherit" as const },
+          us: { mode: "inherit" as const }
+        }
       }
     }));
     const copied = variant(
@@ -902,7 +912,7 @@ describe("词形内容定向复制", () => {
     const next = applyFormCopy(forms, plan, resolved);
     const row = variant(next.contents[1]!).pronunciations[0]!;
     expect(row.synthesis!.uk!.ipa_speech!.voice_profile).toMatchObject({
-      dubbing: { mode: "local", area: "azure" },
+      dubbing: { area: "azure", uk: { mode: "local" }, us: { mode: "local" } },
       voices: [
         { voice_id: "resolved-uk" },
         { voice_id: "resolved-uk-disabled" }
@@ -911,7 +921,7 @@ describe("词形内容定向复制", () => {
     expect(
       row.synthesis!.us!.ups_speech!.voice_profile.voices[0]!.voice_id
     ).toBe("resolved-us");
-    source.voice_profile.dubbing!.mode = "local";
+    source.voice_profile.dubbing!.uk.mode = "local";
     expect(() =>
       applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
     ).toThrow("解析");
@@ -960,7 +970,7 @@ describe("词形内容定向复制", () => {
       ["resolved-us", true],
       ["resolved-us-disabled", false]
     ]);
-    expect(copied.voice_profile!.dubbing!.mode).toBe("local");
+    expect(copied.voice_profile!.dubbing!.uk.mode).toBe("local");
     expect(JSON.stringify(copied.voice_profile)).not.toContain(
       "audio_asset_id"
     );

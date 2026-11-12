@@ -3157,9 +3157,9 @@ it.each([false, true])(
       content: { version: 2, text: variants.common.spelling, annotations: [] },
       voice_profile: {
         dubbing: {
-          mode: "local",
-          area: "word",
-          pool_version: "provider_id_v1"
+          area: "word" as const,
+          uk: { mode: "local" },
+          us: { mode: "local" }
         },
         voices: [
           {

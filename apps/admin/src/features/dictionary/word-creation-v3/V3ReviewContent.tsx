@@ -106,25 +106,27 @@ function ReviewPronunciationPlayback({
       audioAssetId={assetId}
       disabled={!assetId}
       disabledReason={
-        !assetId && (content || !pronunciation.synthesis)
-          ? t(
-              "panel_final_audio_has_not_been_saved_return_to_the_editor_to_add_it"
-            )
-          : content
-            ? undefined
-            : (synthesisInputIssue(
-                synthesis.alphabet,
-                synthesis[synthesis.alphabet]
-              ) ??
-              synthesisLocaleIssue(
-                synthesis,
-                synthesis.alphabet,
-                locale,
-                dialect === "common"
-              ) ??
-              (!spelling.trim()
-                ? t("panel_enter_the_form_spelling_first")
-                : undefined))
+        synthesis.source === "none"
+          ? t("creation_accent_not_configured")
+          : !assetId && (content || !pronunciation.synthesis)
+            ? t(
+                "panel_final_audio_has_not_been_saved_return_to_the_editor_to_add_it"
+              )
+            : content
+              ? undefined
+              : (synthesisInputIssue(
+                  synthesis.alphabet,
+                  synthesis[synthesis.alphabet]
+                ) ??
+                synthesisLocaleIssue(
+                  synthesis,
+                  synthesis.alphabet,
+                  locale,
+                  dialect === "common"
+                ) ??
+                (!spelling.trim()
+                  ? t("panel_enter_the_form_spelling_first")
+                  : undefined))
       }
       content={content ?? { version: 2, text: "", annotations: [] }}
       voiceProfile={profile}

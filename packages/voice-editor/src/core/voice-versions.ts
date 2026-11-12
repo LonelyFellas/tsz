@@ -1,4 +1,4 @@
-import { speechSelectionGroup } from "@tsz/shared";
+import { speechSelectionGroup, speechAccentGroup } from "@tsz/shared";
 import type {
   AudioAssetLocale,
   VoiceOption,
@@ -98,4 +98,16 @@ export function selectVoiceVersion(
         : item
   );
   return hasSelected ? next : [...next, { ...selected, enabled: true }];
+}
+
+/** Membership survives changes to catalog classification; eligibility is checked separately. */
+export function voiceSettingAccent(
+  setting: VoiceSetting,
+  voices: readonly VoiceOption[]
+) {
+  const voice = voices.find((voice) => voice.id === setting.voice_id);
+  return speechAccentGroup(
+    setting.locale ?? voice?.locale,
+    setting.accent ?? (setting.locale ? undefined : voice?.accent)
+  );
 }

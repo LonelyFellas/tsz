@@ -1,13 +1,6 @@
 import { useVoiceEditorTranslation } from "../i18n";
 import { Undo2Icon } from "lucide-react";
-import {
-  Alert,
-  Button,
-  Flex,
-  Collapse,
-  Typography,
-  Space
-} from "@tsz/ui/admin/display";
+import { Alert, Button, Flex, Typography, Space } from "@tsz/ui/admin/display";
 import { Form, InputNumber, Select } from "@tsz/ui/admin/forms";
 import type { AdminSpeechVoice } from "@tsz/types";
 import { SpeechRateInput } from "./SpeechRateInput";
@@ -84,8 +77,6 @@ export function VoiceParameterFields({
   const supportsDegree = !!voice.capability_evidence?.supports_style_degree;
   const supportsRole = !!voice.capability_evidence?.roles?.length;
   const hasAdvanced = supportsDegree || supportsRole;
-  const showDegree = (supportsDegree && !!style) || degree != null;
-  const showRole = (supportsRole && !!style) || !!role;
   const advancedHint = !hasAdvanced
     ? degree != null || role
       ? t(
@@ -129,72 +120,95 @@ export function VoiceParameterFields({
           title={t("this_voice_uses_fixed_parameters")}
         />
       )}
-      <div className="voice-parameter-fields">
-        <Form.Item
-          layout="horizontal"
-          colon={false}
-          name="volume_percent"
-          label={t("volume")}
-          tooltip={t("100_is_the_original_volume_0_is_mute")}
-          rules={[
-            {
-              required: true,
-              type: "integer",
-              min: capabilities.supports_volume_percent === false ? 100 : 0,
-              max: 100,
-              message:
-                capabilities.supports_volume_percent === false
-                  ? t(
-                      "this_model_only_supports_the_original_volume_restore_default_parameters_exp"
-                    )
-                  : t("enter_an_integer_from_0_to_100")
-            }
-          ]}
-        >
-          <SpeechVolumeInput
-            ariaLabel={labels.volume}
-            disabled={
-              disabled || capabilities.supports_volume_percent === false
-            }
-          />
-        </Form.Item>
-        <div className="voice-parameter-grid">
+      <section
+        className="voice-parameter-section"
+        aria-label={t("common_parameters")}
+      >
+        <Typography.Text strong>{t("common_parameters")}</Typography.Text>
+        <div className="voice-parameter-fields">
           <Form.Item
             layout="horizontal"
             colon={false}
-            name="rate_percent"
-            className="voice-parameter-number"
-            label={t("rate")}
+            name="volume_percent"
+            label={t("volume")}
+            tooltip={t("100_is_the_original_volume_0_is_mute")}
             rules={[
               {
                 required: true,
                 type: "integer",
-                min: rateMin,
-                max: rateMax,
-                message: t("enter_a_rate_between_and", {
-                  p0: ((100 + rateMin) / 100).toFixed(2),
-                  p1: ((100 + rateMax) / 100).toFixed(2)
-                })
+                min: capabilities.supports_volume_percent === false ? 100 : 0,
+                max: 100,
+                message:
+                  capabilities.supports_volume_percent === false
+                    ? t(
+                        "this_model_only_supports_the_original_volume_restore_default_parameters_exp"
+                      )
+                    : t("enter_an_integer_from_0_to_100")
               }
             ]}
-            tooltip={
-              capabilities.min_rate_percent === capabilities.max_rate_percent
-                ? t("this_voice_uses_a_fixed_rate")
-                : t("1_00_is_the_standard_rate")
-            }
           >
-            <SpeechRateInput
-              compact
-              aria-label={labels.rate ?? t("synthesis_rate")}
-              min={rateMin}
-              max={rateMax}
+            <SpeechVolumeInput
+              ariaLabel={labels.volume}
               disabled={
-                disabled ||
-                capabilities.min_rate_percent === capabilities.max_rate_percent
+                disabled || capabilities.supports_volume_percent === false
               }
-              style={{ width: "100%" }}
             />
           </Form.Item>
+          <div className="voice-parameter-grid">
+            <Form.Item
+              layout="horizontal"
+              colon={false}
+              name="rate_percent"
+              className="voice-parameter-number"
+              label={t("rate")}
+              rules={[
+                {
+                  required: true,
+                  type: "integer",
+                  min: rateMin,
+                  max: rateMax,
+                  message: t("enter_a_rate_between_and", {
+                    p0: ((100 + rateMin) / 100).toFixed(2),
+                    p1: ((100 + rateMax) / 100).toFixed(2)
+                  })
+                }
+              ]}
+              tooltip={
+                capabilities.min_rate_percent === capabilities.max_rate_percent
+                  ? t("this_voice_uses_a_fixed_rate")
+                  : t("1_00_is_the_standard_rate")
+              }
+            >
+              <SpeechRateInput
+                compact
+                aria-label={labels.rate ?? t("synthesis_rate")}
+                min={rateMin}
+                max={rateMax}
+                disabled={
+                  disabled ||
+                  capabilities.min_rate_percent ===
+                    capabilities.max_rate_percent
+                }
+                style={{ width: "100%" }}
+              />
+            </Form.Item>
+          </div>
+        </div>
+      </section>
+      <section
+        className="voice-parameter-section voice-parameter-advanced"
+        aria-label={t("other_parameters")}
+      >
+        <Typography.Text strong>{t("other_parameters")}</Typography.Text>
+        {advancedHint && (
+          <Typography.Paragraph
+            className="voice-parameter-hint"
+            type="secondary"
+          >
+            {advancedHint}
+          </Typography.Paragraph>
+        )}
+        <div className="voice-parameter-grid">
           <Form.Item
             layout="horizontal"
             colon={false}
@@ -235,125 +249,76 @@ export function VoiceParameterFields({
               style={{ width: "100%" }}
             />
           </Form.Item>
-        </div>
-        <Form.Item name="style" label={t("speaking_style")}>
-          <Select
-            aria-label={labels.style ?? t("speaking_style")}
-            disabled={disabled}
-            options={[
-              { value: "", label: t("default") },
-              ...capabilities.styles.map((style) => ({
-                value: style,
-                label: voiceStyleNames(t)[style] ?? style
-              }))
+          <Form.Item name="style" label={t("speaking_style")}>
+            <Select
+              aria-label={labels.style ?? t("speaking_style")}
+              disabled={disabled || capabilities.styles.length === 0}
+              options={[
+                { value: "", label: t("default") },
+                ...capabilities.styles.map((style) => ({
+                  value: style,
+                  label: voiceStyleNames(t)[style] ?? style
+                }))
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item
+            layout="horizontal"
+            colon={false}
+            name="style_degree"
+            className="voice-parameter-number"
+            label={t("style_intensity")}
+            getValueProps={(value: number | undefined) => ({
+              value:
+                value === undefined ? 1 : Number.isFinite(value) ? value : null
+            })}
+            rules={[
+              {
+                type: "number",
+                min: 0.01,
+                max: 2,
+                message: t("enter_a_style_intensity_from_0_01_to_2")
+              }
             ]}
-          />
-        </Form.Item>
-      </div>
-      <Collapse
-        ghost
-        className="voice-parameter-advanced"
-        styles={{ header: { padding: "6px 0" }, body: { padding: "4px 0 0" } }}
-        items={[
-          {
-            key: "expression",
-            label: t("advanced_parameters"),
-            extra: (
-              <Typography.Text
-                className="voice-parameter-advanced-status"
-                type="secondary"
-              >
-                {!hasAdvanced
-                  ? t("no_adjustable_parameters")
-                  : !style
-                    ? t("adjustable_after_selecting_a_style")
-                    : [
-                        supportsDegree && t("style_intensity"),
-                        supportsRole && t("role")
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-              </Typography.Text>
-            ),
-            forceRender: true,
-            children: (
-              <>
-                {advancedHint && (
-                  <Typography.Paragraph
-                    className="voice-parameter-hint"
-                    type="secondary"
-                  >
-                    {advancedHint}
-                  </Typography.Paragraph>
-                )}
-                <div className="voice-parameter-grid">
-                  <Form.Item
-                    layout="horizontal"
-                    colon={false}
-                    name="style_degree"
-                    className="voice-parameter-number"
-                    hidden={!showDegree}
-                    label={t("style_intensity")}
-                    getValueProps={(value: number | undefined) => ({
-                      value:
-                        value === undefined
-                          ? 1
-                          : Number.isFinite(value)
-                            ? value
-                            : null
-                    })}
-                    rules={[
-                      {
-                        type: "number",
-                        min: 0.01,
-                        max: 2,
-                        message: t("enter_a_style_intensity_from_0_01_to_2")
-                      }
-                    ]}
-                  >
-                    <InputNumber
-                      aria-label={labels.degree ?? t("style_intensity")}
-                      min={0.01}
-                      max={2}
-                      step={0.1}
-                      precision={2}
-                      disabled={
-                        disabled ||
-                        !style ||
-                        !voice.capability_evidence?.supports_style_degree
-                      }
-                      style={{ width: "100%" }}
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    layout="horizontal"
-                    colon={false}
-                    name="role"
-                    hidden={!showRole}
-                    label={t("role")}
-                    getValueProps={(value?: string) => ({ value: value ?? "" })}
-                  >
-                    <Select
-                      aria-label={labels.role ?? t("role")}
-                      disabled={
-                        disabled ||
-                        !style ||
-                        !voice.capability_evidence?.roles?.length
-                      }
-                      options={[
-                        { value: "", label: t("default") },
-                        ...(voice.capability_evidence?.roles ?? []).map(
-                          (role) => ({ value: role, label: role })
-                        )
-                      ]}
-                    />
-                  </Form.Item>
-                </div>
-              </>
-            )
-          }
-        ]}
-      />
+          >
+            <InputNumber
+              aria-label={labels.degree ?? t("style_intensity")}
+              min={0.01}
+              max={2}
+              step={0.1}
+              precision={2}
+              disabled={
+                disabled ||
+                !style ||
+                !voice.capability_evidence?.supports_style_degree
+              }
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
+          <Form.Item
+            layout="horizontal"
+            colon={false}
+            name="role"
+            label={t("role")}
+            getValueProps={(value?: string) => ({ value: value ?? "" })}
+          >
+            <Select
+              aria-label={labels.role ?? t("role")}
+              disabled={
+                disabled || !style || !voice.capability_evidence?.roles?.length
+              }
+              options={[
+                { value: "", label: t("default") },
+                ...(voice.capability_evidence?.roles ?? []).map((role) => ({
+                  value: role,
+                  label: role
+                }))
+              ]}
+            />
+          </Form.Item>
+        </div>
+      </section>
     </div>
   );
 }

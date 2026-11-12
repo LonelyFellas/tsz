@@ -109,9 +109,9 @@ describe("文本配音模式", () => {
     const inherited: VoiceProfile = {
       voices: [],
       dubbing: {
-        mode: "inherit",
-        area: "word",
-        recommendation_order: ["second", "first"]
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
       }
     };
     expect(
@@ -120,10 +120,14 @@ describe("文本配音模式", () => {
       )
     ).toEqual(["first"]);
   });
-  it("逐组跳过失效项，适用组耗尽才回退全局，继承不补目录声音", () => {
+  it("逐组跳过失效项，适用组耗尽后回退全局和合格目录，独立空池不兜底", () => {
     const profile: VoiceProfile = {
       voices: [],
-      dubbing: { mode: "inherit", area: "word" }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
     };
     const items = [
       {
@@ -165,20 +169,28 @@ describe("文本配音模式", () => {
       ).map((item) => item.version_id)
     ).toEqual(["global"]);
     expect(
-      resolveRecommendedVoices(profile, [items[0]!], voices, "en-GB")
-    ).toEqual([]);
+      resolveRecommendedVoices(profile, [items[0]!], voices, "en-GB").map(
+        (item) => item.voice_id
+      )
+    ).toEqual(["sonia"]);
     const oldLocal = {
       ...profile,
-      dubbing: { ...profile.dubbing!, mode: "local" as const }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "local" as const },
+        us: { mode: "local" as const }
+      }
     };
-    expect(
-      resolveRecommendedVoices(oldLocal, [], voices, "en-GB")
-    ).toHaveLength(1);
+    expect(resolveRecommendedVoices(oldLocal, [], voices, "en-GB")).toEqual([]);
   });
   it("按实际标记跳过原生地区或模型能力不符项，保留指定发音", () => {
     const profile: VoiceProfile = {
       voices: [],
-      dubbing: { mode: "inherit", area: "word" }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
     };
     const marked = {
       version: 2 as const,
@@ -236,7 +248,11 @@ describe("文本配音模式", () => {
     (annotation) => {
       const profile: VoiceProfile = {
         voices: [],
-        dubbing: { mode: "inherit", area: "word" }
+        dubbing: {
+          area: "word" as const,
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
       };
       const content = {
         version: 2 as const,
@@ -291,7 +307,7 @@ describe("文本配音模式", () => {
       voices,
       "word"
     );
-    expect(local.dubbing?.mode).toBe("local");
+    expect(local.dubbing?.uk.mode).toBe("local");
     expect(local.voices[0]).toMatchObject({
       version_id: expect.any(String),
       locale: "en-GB",

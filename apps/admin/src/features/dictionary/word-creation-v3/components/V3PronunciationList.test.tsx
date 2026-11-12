@@ -168,6 +168,8 @@ const convert = (name: string) =>
   fireEvent.click(screen.getByLabelText(`第 1 条发音转换为美式 Azure ${name}`));
 const change = (name: string, value: string) =>
   changeVoiceText(field(name), { target: { value } });
+const sourceRadios = () =>
+  within(screen.getAllByRole("radiogroup", { name: "美式配音来源" })[0]!);
 const rows = () =>
   JSON.parse(screen.getByTestId("form-state").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
@@ -287,9 +289,8 @@ describe("独立发音输入", () => {
     for (const radio of screen.getAllByRole("radio", { name: "Azure IPA" })) {
       expect(radio).toBeChecked();
     }
-    expect(screen.getByText("/ kæt /")).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: "Azure UPS" })
+      sourceRadios().getByRole("radio", { name: "Azure UPS" })
     ).toBeInTheDocument();
     for (const alphabet of ["IPA", "UPS"]) {
       const label = `第 1 条发音 美式 Azure ${alphabet}`;
@@ -323,7 +324,7 @@ describe("独立发音输入", () => {
     expect(field("Azure UPS")).toHaveValue("K EH T");
     expect(field("Azure IPA")).toHaveValue("kɛt");
     expect(
-      await screen.findByRole("radio", { name: "Azure IPA" })
+      await sourceRadios().findByRole("radio", { name: "Azure IPA" })
     ).toBeChecked();
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(field("Azure UPS")).toHaveValue("H U M");
@@ -347,7 +348,7 @@ describe("独立发音输入", () => {
     change("Azure IPA", "kæt");
     change("Azure UPS", "K AE T");
     for (const selection of ["词形拼写", "Azure IPA", "Azure UPS"]) {
-      fireEvent.click(screen.getByRole("radio", { name: selection }));
+      fireEvent.click(sourceRadios().getByRole("radio", { name: selection }));
       for (const [source, phoneme] of [
         ["IPA", "kæt"],
         ["UPS", "K AE T"]
@@ -389,11 +390,14 @@ describe("独立发音输入", () => {
     renderWithUps(<Harness />);
     change("Azure UPS", "OLD");
     change("Azure UPS", "NEW");
-    fireEvent.click(screen.getByRole("radio", { name: "词形拼写" }));
+    fireEvent.click(sourceRadios().getByRole("radio", { name: "词形拼写" }));
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(field("Azure UPS")).toHaveValue("OLD");
-    expect(screen.getByRole("radio", { name: "词形拼写" })).toBeChecked();
-    expect(rows()[0].synthesis.use_spelling).toBe(true);
+    expect(
+      sourceRadios().getByRole("radio", { name: "词形拼写" })
+    ).toBeChecked();
+    expect(rows()[0].synthesis.us.source).toBe("spelling");
+    expect(rows()[0].synthesis.use_spelling).toBe(false);
   });
   it("通用栏旧候选确认后只归入对应口音，偏好改变不重标", () => {
     const view = renderWithUps(<Harness configured />);

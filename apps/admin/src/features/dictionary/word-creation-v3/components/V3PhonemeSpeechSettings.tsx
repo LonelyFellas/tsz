@@ -178,10 +178,12 @@ export function V3PhonemeSpeechSettings({
     locale,
     spelling,
     candidate[alphabet],
+    candidate.source,
     alphabet === "ups" ? candidate.ups_words : undefined
   ]);
   const latest = useRef({
     spelling,
+    candidate,
     alphabet,
     locale,
     inputError,
@@ -190,6 +192,7 @@ export function V3PhonemeSpeechSettings({
   useLayoutEffect(() => {
     latest.current = {
       spelling,
+      candidate,
       alphabet,
       locale,
       inputError,
@@ -228,25 +231,28 @@ export function V3PhonemeSpeechSettings({
       async resolveVoices(input, options) {
         const { alphabet, locale, inputError, resolveCandidate } =
           latest.current;
+        if (
+          latest.current.candidate.source === "none" ||
+          latest.current.candidate.source === "upload"
+        )
+          return { voices: [], source: { kind: "local" as const } };
         if (inputError) throw new VoiceEditorDisplayError(inputError);
         const candidate = resolveCandidate(input.content);
-        return (
-          await api.speech.resolve(
-            {
-              profile: input.profile,
-              accent: input.accent,
-              source: {
-                kind: "phoneme",
-                phoneme_locale: locale,
-                content: candidate[`${alphabet}_speech`]!.content,
-                alphabet,
-                phoneme: input.content.text,
-                ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
-              }
-            },
-            options?.signal
-          )
-        ).voices;
+        return await api.speech.resolve(
+          {
+            profile: input.profile,
+            accent: input.accent,
+            source: {
+              kind: "phoneme",
+              phoneme_locale: locale,
+              content: candidate[`${alphabet}_speech`]!.content,
+              alphabet,
+              phoneme: input.content.text,
+              ups_words: alphabet === "ups" ? (candidate.ups_words ?? []) : []
+            }
+          },
+          options?.signal
+        );
       },
       async generateAudio(input, options) {
         const { alphabet, locale, inputError, resolveCandidate } =
@@ -401,7 +407,12 @@ export function V3PhonemeSpeechSettings({
                 setDraft((current) => ({ ...current, voice_profile }))
               }
               previewAdapter={adapter}
-              previewEnabled={env.VOICE_PREVIEW && source === sourceKey}
+              previewEnabled={
+                env.VOICE_PREVIEW &&
+                source === sourceKey &&
+                candidate.source !== "none" &&
+                candidate.source !== "upload"
+              }
               previewIsMock={voicePreviewIsMock}
               renderActions={(canComplete, prepareComplete, captureResult) => (
                 <Space>
@@ -436,7 +447,11 @@ export function V3PhonemeSpeechSettings({
                       setSaving(true);
                       setSaveError("");
                       try {
-                        const result = captureResult?.(!!businessSave);
+                        const result = captureResult?.(
+                          !!businessSave &&
+                            candidate.source !== "none" &&
+                            candidate.source !== "upload"
+                        );
                         const next = resolveCandidate(
                           toRichTextV2(result?.value ?? draft.content)
                         );
