@@ -87,6 +87,7 @@
 - `Select` 默认下拉菜单最小宽度为 128px（显式自定义宽度除外），并受视口宽度约束；普通选项单行省略，保留悬浮全文，选中图标不挤压文本。倍速、分页等紧凑触发器不能把菜单压成逐字换行；确需多行的业务选项由自定义内容明确设置换行，并单独验收。
 - 同一字段的播放、输入、转换、编辑等连体控件使用 `Space.Compact`，由共享样式统一外侧圆角、单线接缝和焦点层级，不逐页拼边框。自定义输入包装层标记 `data-ui-compact-item`，让内部 `.ui-input` / `.ui-input-affix-wrapper` 继承组员圆角；长文本撑高时两侧操作随组拉伸，独立删除操作留在组外。
 - `Input` 的 `addonBefore` / `addonAfter` 沿用同一接缝规则。`Space.Compact size` 统一组内按钮、输入、数字输入和下拉框的尺寸，子控件显式指定的尺寸优先；搜索框的尺寸与错误态覆盖整组，聚焦后仍保留错误色。
+- 输入即过滤使用带搜索图标的 `Input type="search"`；需要提交时使用 `Input.Search` 并绑定 `onSearch`。启用 `allowClear` 后由共享样式隐藏原生清除按钮，同一输入只保留一个清除入口；未启用时保留原生能力。
 - `Radio.Group optionType="button"` 使用连体按钮组；普通单选项、卡片式偏好选项及 `Segmented` 保留各自布局。
 - `Radio` / `Radio.Group` 统一封装 shadcn/Radix RadioGroup，保留现有值类型与 `onChange` 接口。圆环和圆点使用控件的 `color`；口音等业务色只作用于实际 Radio，不给外层容器涂选中背景。键盘操作、禁用和表单提交使用同一共享实现。
 - 按钮式 Radio 的完整外框和内边距均可点击；候选列表使用同一个 `Radio.Group`，支持方向键切换并跳过禁用项。

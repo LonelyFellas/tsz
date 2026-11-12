@@ -66,7 +66,9 @@
   flex: none;
   white-space: nowrap;
 }
-.tsz-ve-local-pool .tsz-ve-pool-catalog-column-head .ui-input-search {
+.tsz-ve-local-pool
+  .tsz-ve-pool-catalog-column-head
+  .tsz-ve-pool-catalog-search {
   flex: 1 1 96px;
   width: 0;
   min-width: 64px;
@@ -554,10 +556,6 @@
 }
 .tsz-ve-pool-side-title[data-accent="us"]::before {
   background: #fc007a;
-}
-.tsz-ve-local-pool .ui-input-search {
-  width: 360px;
-  max-width: 100%;
 }
 .tsz-ve-pool-scroll {
   max-width: 100%;
