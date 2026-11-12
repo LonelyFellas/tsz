@@ -15,6 +15,7 @@ import {
   v3IssueMessages,
   shouldRetryV3Detail
 } from "./presentationErrors";
+import { v3SaveProblemMessage } from "./presentationErrors";
 
 function issue(code: V3ValidationIssueCode): V3DraftValidationIssue {
   return {
@@ -29,6 +30,47 @@ function issue(code: V3ValidationIssueCode): V3DraftValidationIssue {
 }
 
 describe("V3 product error presentation", () => {
+  it("英美合成字段按实际错误类型显示，不把配音配置误报为音标缺失", () => {
+    expect(
+      v3IssueMessage({
+        ...issue("pronunciation_required"),
+        field: "synthesis.uk.ipa"
+      })
+    ).toBe("请填写有效的 Azure IPA 合成音素");
+    expect(
+      v3IssueMessage({
+        ...issue("voice_profile_invalid"),
+        field: "synthesis.ipa"
+      })
+    ).toContain("配音配置无法保存");
+  });
+
+  it("保存失败区分校验、版本冲突和网络问题，保留修改且不泄露后端原文", () => {
+    expect(
+      v3SaveProblemMessage({
+        kind: "validation",
+        status: 422,
+        retryable: false,
+        issues: [issue("voice_profile_invalid")]
+      })
+    ).toContain("尚未保存，修改已保留。配音配置无法保存");
+    expect(
+      v3SaveProblemMessage({
+        kind: "revision_conflict",
+        status: 409,
+        retryable: false,
+        invalidates_confirmation: true
+      })
+    ).toContain("词条已有新版本");
+    expect(
+      v3SaveProblemMessage({
+        kind: "network",
+        retryable: true,
+        error: new TypeError("raw network failure")
+      })
+    ).toBe("暂时无法连接保存服务，修改已保留，请稍后重试。");
+  });
+
   it("maps every supported validation code without exposing backend messages", () => {
     for (const code of V3_VALIDATION_ISSUE_CODES) {
       const message = v3IssueMessage(issue(code));

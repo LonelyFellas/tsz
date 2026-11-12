@@ -561,14 +561,6 @@ export function V3FormsAndPronunciationStep({
             </details>
           </div>
           <V3VoiceNotice value={value} />
-          {issues.length > 0 && (
-            <Alert
-              description={t("validation_help")}
-              showIcon
-              title={t("forms_incomplete")}
-              type="warning"
-            />
-          )}
           {catalog.isError && (
             <Alert showIcon title={t("catalog_unavailable")} type="error" />
           )}

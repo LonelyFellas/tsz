@@ -1,4 +1,5 @@
 import { regionalVariants } from "@tsz/shared";
+import { useLexiconEditorTranslation } from "../i18n/editor";
 import { assistantFieldTarget } from "../assistant/fieldNavigation";
 import { LexiconAssistant } from "../assistant/LexiconAssistant";
 import { VoiceSaveContext } from "./voiceSaveContext";
@@ -69,6 +70,7 @@ import {
   toWritableMeanings
 } from "./meaningsModel";
 import { classifyV3Problem, type V3Problem } from "./problem";
+import { v3SaveProblemMessage } from "./presentationErrors";
 import {
   createV3SaveFlow,
   v3MeaningsContentFingerprint,
@@ -317,6 +319,7 @@ function V3WordCreationSession({
   retiredStableNodes = [],
   retiredContentSlots = []
 }: V3WordCreationWizardProps) {
+  const { t } = useLexiconEditorTranslation();
   const stableVariantIdsRef = useRef<V3StableVariantIdFactory | undefined>(
     undefined
   );
@@ -2143,13 +2146,15 @@ function V3WordCreationSession({
       problem?.kind === "validation"
         ? [
             ...new Map(
-              [...currentPublicationIssues, ...problem.issues].map((issue) => [
-                JSON.stringify(issue),
-                issue
-              ])
+              [
+                ...(validation ? currentPublicationIssues : []),
+                ...problem.issues
+              ].map((issue) => [JSON.stringify(issue), issue])
             ).values()
           ]
-        : currentPublicationIssues,
+        : validation
+          ? currentPublicationIssues
+          : [],
     ...(validation ? { validation } : {}),
     ...(impact ? { impact } : {}),
     impactConfirmed,
@@ -2193,6 +2198,7 @@ function V3WordCreationSession({
       <VoiceSaveContext.Provider
         value={{
           audioTasks: audioTasks.current,
+          failure: problem ? v3SaveProblemMessage(problem, t) : undefined,
           save: async (area) => {
             if (pending.size || sessionReadOnly || !word.id) return false;
             if (area === "meaning" || area === "grammar")

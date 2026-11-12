@@ -344,10 +344,10 @@ export function V3SynthesisInputs({
                     (issue) => issue.field === `synthesis.${alphabet}`
                   )
                 : undefined);
-            const invalid =
-              Boolean(inputIssue) ||
-              Boolean(requiredError) ||
-              issues.some((issue) => issue.field === `${field}_speech`);
+            const speechIssue = issues.find(
+              (issue) => issue.field === `${field}_speech`
+            );
+            const invalid = Boolean(inputIssue) || Boolean(requiredError);
             return (
               <div className="word-synthesis-candidate" key={side}>
                 <label
@@ -474,17 +474,14 @@ export function V3SynthesisInputs({
                     }
                   />
                 </Space.Compact>
-                {invalid && !requiredError && (
+                {(inputIssue || speechIssue) && !requiredError && (
                   <Typography.Text className="word-field-help" type="danger">
-                    {localPhoneticDiagnostic(
-                      synthesisInputIssue(alphabet, candidate[alphabet]),
-                      t
-                    ) ??
-                      (inputIssue
-                        ? v3IssueMessage(inputIssue, t)
-                        : t(
-                            "creation_check_synthesis_input_and_word_boundaries"
-                          ))}
+                    {speechIssue
+                      ? v3IssueMessage(speechIssue, t)
+                      : (localPhoneticDiagnostic(
+                          synthesisInputIssue(alphabet, candidate[alphabet]),
+                          t
+                        ) ?? v3IssueMessage(inputIssue!, t))}
                   </Typography.Text>
                 )}
               </div>

@@ -253,8 +253,12 @@ function Slot({ context }: { context: V3WizardSlotContext }) {
       <output data-testid="revision">{context.word.revision}</output>
       <output data-testid="spelling">{spellingOf(context)}</output>
       <output data-testid="active-pos">{context.activePosId}</output>
+      <output data-testid="dirty">{String(context.hasUnsavedChanges)}</output>
       <output data-testid="publication-issues">
         {context.issues.map((issue) => issue.code).join(",")}
+      </output>
+      <output data-testid="editor-issues">
+        {context.editorIssues.map((issue) => issue.code).join(",")}
       </output>
       <button
         type="button"
@@ -576,7 +580,11 @@ describe("V3WordCreationWizard", () => {
       )
     );
 
+    expect(screen.getByTestId("editor-issues")).toHaveTextContent(
+      "node_binding_unknown"
+    );
     fireEvent.click(screen.getByText("编辑"));
+    expect(screen.getByTestId("editor-issues")).toBeEmptyDOMElement();
     fireEvent.click(screen.getByText("保存"));
     await waitFor(() =>
       expect(screen.getByTestId("revision")).toHaveTextContent("2")
@@ -584,6 +592,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("publication-issues")).toHaveTextContent(
       "node_binding_unknown"
     );
+    expect(screen.getByTestId("editor-issues")).toBeEmptyDOMElement();
 
     fireEvent.click(screen.getByText("检查发布条件"));
     await waitFor(() =>
@@ -921,6 +930,7 @@ describe("V3WordCreationWizard", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("revision")).toHaveTextContent("1");
     expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+    expect(screen.getByTestId("dirty")).toHaveTextContent("true");
     expect(screen.queryByText("有未保存的草稿")).toBeNull();
 
     fireEvent.click(screen.getByText("保存"));
@@ -1201,7 +1211,7 @@ describe("V3WordCreationWizard", () => {
     );
     expect(screen.queryByText("版本冲突")).toBeNull();
     expect(screen.getByTestId("spelling")).toHaveTextContent("later edit");
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByTestId("dirty")).toHaveTextContent("true");
   });
 
   it("待决期间撤回本地修改、已无未保存输入时直接采用新版本", async () => {
@@ -1928,7 +1938,7 @@ describe("V3WordCreationWizard", () => {
     renderWizard(source);
 
     fireEvent.click(screen.getByText("编辑"));
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByTestId("dirty")).toHaveTextContent("true");
     fireEvent.click(screen.getByText("保存"));
     expect(await screen.findByText("版本冲突")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "刷新并比较" }));
@@ -1938,7 +1948,7 @@ describe("V3WordCreationWizard", () => {
     );
     expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
     expect(screen.getByTestId("revision")).toHaveTextContent("4");
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByTestId("dirty")).toHaveTextContent("true");
     const comparison = screen.getByRole("region", { name: "草稿差异" });
     expect(comparison).toHaveTextContent("server latest");
     expect(comparison).toHaveTextContent("local edit");
@@ -3207,6 +3217,9 @@ describe("V3WordCreationWizard", () => {
       renderStep: (context) => (
         <>
           <output data-testid="forms-error-step">{context.activeStep}</output>
+          <output data-testid="forms-error-dirty">
+            {String(context.hasUnsavedChanges)}
+          </output>
           <output data-testid="forms-error-pos">{context.activePosId}</output>
           <output data-testid="forms-error-revision">
             {context.word.revision}
@@ -3265,7 +3278,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("forms-error-issues")).toHaveTextContent(
       issue.code
     );
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByTestId("forms-error-dirty")).toHaveTextContent("true");
 
     fireEvent.click(screen.getByText("重试词形完成"));
     await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(2));
@@ -3656,7 +3669,7 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("编辑分步草稿"));
     fireEvent.click(screen.getByText("完成后续失败"));
 
-    expect(await screen.findByText("仍有内容需要完成")).toBeInTheDocument();
+    expect(await screen.findByText("草稿未保存")).toBeInTheDocument();
     expect(screen.getByTestId("partial-complete-issues").textContent).toBe(
       meaningsIssue.code
     );
@@ -4897,7 +4910,8 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("保存"));
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
     expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByTestId("dirty")).toHaveTextContent("true");
+    expect(screen.queryByText("有未保存的草稿")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /重\s*试/ }));
 
     await waitFor(() =>

@@ -345,7 +345,7 @@ describe("WordWizardV3Page", () => {
       { creationSource: "dictionary" },
       client
     );
-    await screen.findByText("有未保存的草稿");
+    await screen.findByText("词条草稿有未保存修改");
     fireEvent.click(screen.getByText("词义与例句"));
     fireEvent.change(await screen.findByLabelText("定义 1 内容"), {
       target: { value: "博客；网络日志" }
@@ -361,7 +361,7 @@ describe("WordWizardV3Page", () => {
       expect(screen.getByText("保存草稿").closest("button")).toBeDisabled()
     );
     expect(screen.getByLabelText("定义 1 内容")).toHaveValue("博客；网络日志");
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByText("词条草稿有未保存修改")).toBeInTheDocument();
   });
 
   it.each([
@@ -1843,13 +1843,13 @@ describe("WordWizardV3Page", () => {
     });
     fireEvent.click(screen.getByText("词形与发音"));
     await contentEditButton();
-    expect(screen.getByText("有未保存的草稿")).toBeVisible();
+    expect(screen.getByText("词条草稿有未保存修改")).toBeVisible();
     const save = screen.getByText("保存草稿").closest("button")!;
     expect(save).toBeEnabled();
     fireEvent.click(save);
 
     await waitFor(() =>
-      expect(screen.queryByText("有未保存的草稿")).toBeNull()
+      expect(screen.queryByText("词条草稿有未保存修改")).toBeNull()
     );
     expect(save).toBeDisabled();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
@@ -1924,7 +1924,7 @@ describe("WordWizardV3Page", () => {
       if (failedStep) {
         await screen.findByText("服务暂时不可用");
         await waitFor(() => expect(save).toBeEnabled());
-        expect(screen.getByText("有未保存的草稿")).toBeVisible();
+        expect(screen.getByText("词条草稿有未保存修改")).toBeVisible();
         if (failedStep === "forms") {
           expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
         }
@@ -1932,7 +1932,7 @@ describe("WordWizardV3Page", () => {
       }
 
       await waitFor(() =>
-        expect(screen.queryByText("有未保存的草稿")).toBeNull()
+        expect(screen.queryByText("词条草稿有未保存修改")).toBeNull()
       );
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(
         failedStep === "forms" ? 2 : 1
@@ -1949,7 +1949,7 @@ describe("WordWizardV3Page", () => {
       expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
         "词形保存后仍保留"
       );
-      expect(screen.queryByText("有未保存的草稿")).toBeNull();
+      expect(screen.queryByText("词条草稿有未保存修改")).toBeNull();
     }
   );
 
@@ -2004,7 +2004,7 @@ describe("WordWizardV3Page", () => {
     );
     fireEvent.click(screen.getByText("词形与发音"));
     expect(await openContentEditor()).toHaveValue("centre-unsaved-forms");
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByText("词条草稿有未保存修改")).toBeInTheDocument();
   });
 
   it("publishes an eligible draft and immediately transitions the live page to read-only", async () => {
@@ -2873,7 +2873,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
       target: { value: "已保存释义组" }
     });
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByText("词条草稿有未保存修改")).toBeInTheDocument();
     fireEvent.click(screen.getByText("保存草稿").closest("button")!);
 
     await waitFor(() =>
@@ -2937,9 +2937,9 @@ describe("WordWizardV3Page", () => {
       })
     );
     await waitFor(() =>
-      expect(screen.queryByText("有未保存的草稿")).toBeNull()
+      expect(screen.queryByText("词条草稿有未保存修改")).toBeNull()
     );
-    expect(screen.queryByText("有未保存的草稿")).toBeNull();
+    expect(screen.queryByText("词条草稿有未保存修改")).toBeNull();
     fireEvent.click(screen.getByText("预览并生效"));
     expect(
       (await screen.findByText("检查发布条件", { exact: true })).closest(
@@ -3055,7 +3055,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "完成并进入预览" })
     );
-    expect(await screen.findByText("仍有内容需要完成")).toBeVisible();
+    expect(await screen.findByText("草稿未保存")).toBeVisible();
     fireEvent.click(screen.getByText("词形与发音"));
     await openContentEditor();
 
@@ -3096,7 +3096,7 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByLabelText("语义区间 1 中文")).toHaveValue(
       "失败后仍保留"
     );
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.getByText("词条草稿有未保存修改")).toBeInTheDocument();
     fireEvent.click(screen.getByText("词形与发音"));
     fireEvent.click(screen.getByText("词义与例句"));
     expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
@@ -3215,9 +3215,7 @@ it.each([false, true])(
     const button = within(dialog).getByLabelText("保存词形英美通用拼写修改");
     fireEvent.click(button);
     if (failFirst) {
-      await screen.findByText(
-        "保存未完成，全部修改已保留；请处理业务校验或版本冲突后重试。"
-      );
+      await screen.findByText("保存失败，全部修改已保留，请重试");
       expect(within(dialog).getByLabelText("词形英美通用拼写")).toHaveValue(
         "centre-saved"
       );

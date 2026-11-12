@@ -91,7 +91,10 @@ function problemTitle(problem: V3Problem): WorkspaceMessage {
     case "entry_archived":
       return "archived";
     case "validation":
-      return "incomplete";
+      return problem.operation === "save_forms" ||
+        problem.operation === "save_meanings"
+        ? "save_failed"
+        : "incomplete";
     // 影响确认失效（后端 409 downstream_confirmation_required）：兜底文案，
     // 正常路径由词形步/词义步的确认条挡在前面。
     case "impact_confirmation":
@@ -354,20 +357,14 @@ function V3WordCreationLayoutContent({
           </div>
         ) : null}
 
-        {!readOnly &&
-        !showRemoteUpdate &&
-        (dirtySteps.forms || dirtySteps.meanings) ? (
-          <Alert
-            showIcon
-            type="warning"
-            title={t("unsaved")}
-            description={t("save_before_publish", { steps: dirtyStepLabel })}
-          />
-        ) : null}
-
         {/* 挂起的新版本已经给出保留/放弃的选择，同一冲突的 409 提示不再并列显示。 */}
         {problem &&
-          !(showRemoteUpdate && problem.kind === "revision_conflict") && (
+          !(showRemoteUpdate && problem.kind === "revision_conflict") &&
+          !(
+            problem.kind === "validation" &&
+            (problem.operation === "validate" ||
+              problem.operation === "publish")
+          ) && (
             <Alert
               showIcon
               type={problem.kind === "validation" ? "warning" : "error"}
@@ -395,11 +392,11 @@ function V3WordCreationLayoutContent({
                   </Flex>
                 ) : operationValidationIssues.length > 0 ? (
                   <Flex vertical gap={4}>
-                    {v3IssueMessages(operationValidationIssues, editorT).map(
-                      (message) => (
+                    {v3IssueMessages(operationValidationIssues, editorT)
+                      .slice(0, 1)
+                      .map((message) => (
                         <span key={message}>{message}</span>
-                      )
-                    )}
+                      ))}
                   </Flex>
                 ) : undefined
               }

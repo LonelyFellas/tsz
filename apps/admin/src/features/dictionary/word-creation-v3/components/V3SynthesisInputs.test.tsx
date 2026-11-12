@@ -20,7 +20,7 @@ import { PronunciationPreviewProvider } from "../../word-creation/PronunciationP
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
 import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
-import { VoiceAudioTasksContext } from "../voiceSaveContext";
+import { VoiceSaveContext, VoiceAudioTasksContext } from "../voiceSaveContext";
 import { pronunciationPlaybackSource } from "@tsz/shared";
 
 const speech = vi.hoisted(() => ({
@@ -330,6 +330,53 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
     fireEvent.click(toggle);
   return view;
 };
+
+it("配音配置问题说明实际原因，不误报为音标或逐词边界问题", () => {
+  renderWithUps(
+    <Harness
+      dialect="uk"
+      issues={[
+        {
+          schema_version: 3,
+          step: "forms",
+          node_id: "p",
+          field: "synthesis.uk.ipa_speech",
+          code: "voice_profile_invalid",
+          message: "invalid voice metadata",
+          node_location: { node_role: "pronunciation", ancestor_node_ids: [] }
+        }
+      ]}
+    />
+  );
+  expect(screen.queryByText("请检查合成输入与逐词边界")).toBeNull();
+  expect(screen.getByText(/配音配置无法保存/)).toBeVisible();
+  expect(
+    screen.getByLabelText("第 1 条发音的英式 Azure IPA")
+  ).not.toHaveAttribute("aria-invalid", "true");
+});
+
+it("配音弹窗展示宿主保存失败原因并保留输入，重试成功后关闭", async () => {
+  const save = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+  const failure = "尚未保存，修改已保留。词条已有新版本，请处理版本冲突。";
+  renderWithUps(
+    <VoiceSaveContext.Provider value={{ save, failure }}>
+      <Harness dialect="uk" />
+    </VoiceSaveContext.Provider>
+  );
+  const label = "第 1 条发音 英式 Azure IPA";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  const input = await screen.findByLabelText(`${label}音标编辑`);
+  fireEvent.change(input, { target: { value: "fɑːɹ" } });
+  const button = screen.getByLabelText(`保存${label}修改`);
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  expect(await screen.findByText(failure)).toBeVisible();
+  expect(input).toHaveValue("fɑːɹ");
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await waitFor(() => expect(input).not.toBeInTheDocument());
+  expect(save).toHaveBeenCalledTimes(2);
+});
 
 it("UPS 缺少当前口音 IPA 时在 IPA 框内提示并聚焦，补齐后恢复转换", () => {
   renderWithUps(<Harness dialect="common" empty />);
