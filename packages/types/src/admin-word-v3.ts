@@ -452,12 +452,12 @@ export interface VoiceProfileV3 {
 
 export interface VoiceSideDubbingV3 {
   mode: "inherit" | "local";
-  recommendation?: {
+  recommendations?: {
     group_id: string;
     recommendation_id: string;
     voice_id: string;
     contribution_id?: string;
-  };
+  }[];
 }
 
 export type SpeechLocaleV3 = `en-${string}`;

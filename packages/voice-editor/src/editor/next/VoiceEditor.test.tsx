@@ -1720,14 +1720,11 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     openVoices();
-    const indian = await screen.findByLabelText("配音版本 印度补充");
+    await screen.findByLabelText("配音版本 印度补充");
     expect(screen.getByText("Other · 其他音色")).toBeInTheDocument();
     expect(screen.getByText("Natasha")).toBeInTheDocument();
     expect(screen.queryByLabelText("启用 Clara")).toBeNull();
     expect(screen.getByText("· 澳大利亚")).toBeInTheDocument();
-    fireEvent.click(
-      within(indian).getByRole("button", { name: "生成正式音频" })
-    );
     await waitFor(() =>
       expect(generateAudio).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2085,7 +2082,7 @@ describe("VoiceEditor 发音区", () => {
     view.unmount();
     onVoiceProfileChange.mockClear();
     const existing = render(<VoiceEditor {...props(base)} />);
-    await screen.findByRole("radiogroup", { name: "英式 局部推荐" });
+    await screen.findByRole("group", { name: "英式 局部推荐" });
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
     existing.unmount();
     render(
@@ -2179,7 +2176,7 @@ describe("VoiceEditor 发音区", () => {
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
       voices: [{ voice_id: "gone", enabled: false, rate_percent: 0 }]
     });
-    expect(screen.getByRole("radio", { name: "有效美式" })).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: "有效美式" })).toBeVisible();
   });
 
   it("音色风格失效后仍可恢复自然", async () => {
@@ -2271,8 +2268,8 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     const radio = await within(
-      await screen.findByRole("radiogroup", { name: "英式 局部推荐" })
-    ).findByRole("radio", { name: /清晰慢读/ });
+      await screen.findByRole("group", { name: "英式 局部推荐" })
+    ).findByRole("checkbox", { name: /清晰慢读/ });
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
     await waitFor(() => expect(radio).toBeEnabled());
     fireEvent.click(radio);
@@ -2281,12 +2278,14 @@ describe("VoiceEditor 发音区", () => {
         area: "grammar",
         uk: {
           mode: "local",
-          recommendation: {
-            group_id: "g",
-            recommendation_id: "r",
-            voice_id: "sonia",
-            contribution_id: expect.any(String)
-          }
+          recommendations: [
+            {
+              group_id: "g",
+              recommendation_id: "r",
+              voice_id: "sonia",
+              contribution_id: expect.any(String)
+            }
+          ]
         },
         us: { mode: "local" }
       },
@@ -2304,7 +2303,7 @@ describe("VoiceEditor 发音区", () => {
         })
       ]
     });
-    const recommended = screen.getByRole("radiogroup", {
+    const recommended = screen.getByRole("group", {
       name: "英式 局部推荐"
     });
     fireEvent.click(
@@ -2421,7 +2420,6 @@ describe("VoiceEditor 发音区", () => {
     );
     openVoices();
     await screen.findByLabelText("启用 Sonia · 英式女声");
-    fireEvent.click(screen.getByRole("button", { name: "生成正式音频" }));
     await waitFor(() => expect(generateAudio).toHaveBeenCalled());
     expect(generateAudio.mock.calls[0]![0].content).toEqual({
       version: 2,
@@ -2473,7 +2471,6 @@ describe("VoiceEditor 发音区", () => {
     );
     openVoices();
     await screen.findByLabelText("启用 Sonia · 英式女声");
-    fireEvent.click(screen.getByRole("button", { name: "生成正式音频" }));
     await waitFor(() =>
       expect(onVoiceProfileChange).toHaveBeenCalledWith({
         voices: [{ ...setting, audio_asset_id: expect.any(String) }]
@@ -2521,8 +2518,6 @@ describe("VoiceEditor 发音区", () => {
     );
     openVoices();
     await screen.findByLabelText("启用 Sonia · 英式女声");
-    expect(onChange).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "生成正式音频" }));
     await waitFor(() => expect(onVoiceProfileChange).toHaveBeenCalled());
     expect(onChange).toHaveBeenCalledWith(
       generateAudio.mock.calls[0]![0].content,
@@ -2659,12 +2654,14 @@ describe("VoiceEditor 发音区", () => {
     );
     openVoices();
     await screen.findByLabelText("启用 Sonia · 英式女声");
-    fireEvent.click(screen.getByRole("button", { name: "生成正式音频" }));
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
+    const finishOld = resolve;
     expect(screen.getByRole("button", { name: "保存编辑" })).toBeDisabled();
     fireEvent.change(screen.getByRole("textbox", { name: "语音编辑器" }), {
       target: { value: "changed text" }
     });
-    await act(async () => resolve(asset()));
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
+    await act(async () => finishOld(asset()));
     expect(
       onVoiceProfileChange.mock.calls.some(([profile]) =>
         profile.voices.some(
@@ -2705,8 +2702,7 @@ describe("VoiceEditor 发音区", () => {
     });
     const view = render(<VoiceEditor {...base} />);
     openVoices();
-    const row = await screen.findByLabelText("配音版本 推荐");
-    fireEvent.click(within(row).getByRole("button", { name: "生成正式音频" }));
+    await screen.findByLabelText("配音版本 推荐");
     await waitFor(() => expect(onVoiceProfileChange).toHaveBeenCalled());
     const saved = onVoiceProfileChange.mock.calls.at(-1)![0];
     expect(saved).toMatchObject({
@@ -2740,7 +2736,13 @@ describe("VoiceEditor 发音区", () => {
           source: { kind: "catalog" }
         };
       });
-    const generateAudio = vi.fn().mockResolvedValue(asset());
+    let finish!: (asset: AudioAsset) => void;
+    const generateAudio = vi.fn(
+      () =>
+        new Promise<AudioAsset>((resolve) => {
+          finish = resolve;
+        })
+    );
     const resolveAudio = vi.fn().mockResolvedValue({
       audioUrl: "blob:old-audio",
       expiresAt: "2099-01-01",
@@ -2768,17 +2770,13 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     openVoices();
-    const row = await screen.findByLabelText("配音版本 推荐");
-    await waitFor(() =>
-      expect(
-        within(row).getByRole("button", { name: "生成正式音频" })
-      ).toBeEnabled()
-    );
+    await screen.findByLabelText("配音版本 推荐");
+    await waitFor(() => expect(generateAudio).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: "播放旧音频 · 推荐" }));
     await waitFor(() =>
       expect(resolveAudio).toHaveBeenCalledWith("old-audio", expect.anything())
     );
-    fireEvent.click(within(row).getByRole("button", { name: "生成正式音频" }));
+    await act(async () => finish(asset()));
     await waitFor(() =>
       expect(generateAudio).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2983,8 +2981,8 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     const radio = await within(
-      await screen.findByRole("radiogroup", { name: "英式 局部推荐" })
-    ).findByRole("radio", { name: /新推荐/ });
+      await screen.findByRole("group", { name: "英式 局部推荐" })
+    ).findByRole("checkbox", { name: /新推荐/ });
     await waitFor(() => expect(radio).toBeEnabled());
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
     fireEvent.click(radio);
@@ -4466,7 +4464,7 @@ it("单侧自动生成不被另一侧待生成缓存阻塞且保留另一侧草�
     );
   }
   render(<Harness />);
-  const radio = await screen.findByRole("radio", { name: "新英式" });
+  const radio = await screen.findByRole("checkbox", { name: "新英式" });
   await waitFor(() => expect(radio).toBeEnabled());
   fireEvent.click(radio);
   await waitFor(() => expect(generateAudio).toHaveBeenCalledOnce());

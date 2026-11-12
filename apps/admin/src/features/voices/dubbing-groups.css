@@ -234,6 +234,13 @@
 .dubbing-editor-drawer .ui-drawer-body {
   padding: var(--ui-space-5) var(--ui-space-6);
 }
+.dubbing-editor-drawer .ui-drawer-body > .ui-form {
+  width: 508px;
+}
+.dubbing-editor-drawer .voice-configuration-layout {
+  width: 508px;
+  grid-template-columns: minmax(0, 1fr);
+}
 .dubbing-editor-drawer .ui-drawer-footer {
   padding: var(--ui-space-4) var(--ui-space-6);
 }
@@ -362,6 +369,10 @@
   margin-left: var(--ui-space-6);
   color: var(--ui-color-text-secondary);
   font-size: var(--ui-font-size-sm);
+}
+.dubbing-pair-controls-panel .voice-configuration-layout {
+  width: 696px;
+  grid-template-columns: minmax(0, 1fr);
 }
 @media (max-width: 700px) {
   .dubbing-editor-drawer .ui-drawer-body,

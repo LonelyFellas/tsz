@@ -55,14 +55,16 @@ export function retainResolvedAudio(
   stored: readonly VoiceSetting[]
 ): VoiceSetting[] {
   return resolved.map((setting) => {
+    // 解析只决定有效参数；正式资产必须来自当前来源仍匹配的宿主草稿。
+    const { audio_asset_id: _audio, ...resolvedSetting } = setting;
     const previous = stored.find(
       (item) =>
         voiceSettingKey(item) === voiceSettingKey(setting) &&
         voiceEffectKey(item) === voiceEffectKey(setting)
     );
     return previous?.audio_asset_id
-      ? { ...setting, audio_asset_id: previous.audio_asset_id }
-      : setting;
+      ? { ...resolvedSetting, audio_asset_id: previous.audio_asset_id }
+      : resolvedSetting;
   });
 }
 

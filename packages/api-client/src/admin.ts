@@ -131,7 +131,7 @@ const SPELLING_MARKUP_HEADERS = {
   "X-TSZ-Spelling-Markup": "v1",
   "X-TSZ-Spelling-Speech": "v1",
   "X-TSZ-Phoneme-Speech": "v1",
-  "X-TSZ-Voice-Versions": "v5",
+  "X-TSZ-Voice-Versions": "v6",
   "X-TSZ-Voice-Locales": "v1",
   "X-TSZ-Voice-Models": "v1",
   "X-TSZ-Form-Contents": "v1",
@@ -336,7 +336,7 @@ export function createAdminEndpoints(http: HttpClient) {
           .post<import("@tsz/types").AdminResolveDubbingResponse>(
             "/speech/resolve",
             input,
-            { signal, headers: { "X-TSZ-Voice-Versions": "v5" } }
+            { signal, headers: { "X-TSZ-Voice-Versions": "v6" } }
           )
           .then((value) => {
             if (!validateRuntimeSchema("ResolveDubbingResponse", value).valid)
@@ -353,7 +353,7 @@ export function createAdminEndpoints(http: HttpClient) {
           {
             signal,
             headers: {
-              "X-TSZ-Voice-Versions": "v5",
+              "X-TSZ-Voice-Versions": "v6",
               "X-TSZ-Voice-Locales": "v1",
               "X-TSZ-Voice-Models": "v1"
             }

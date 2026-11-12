@@ -37,9 +37,6 @@ export function CreationSourceNotice({ source }: { source?: CreationSource }) {
         title={t(
           "creation_prefilled_from_the_built_in_dictionary_check_the_content"
         )}
-        description={t(
-          "creation_parts_of_speech_forms_and_pronunciations_reflect_the_current_draft_continue_editing_then_s"
-        )}
       />
     );
   }
@@ -60,9 +57,6 @@ export function CreationSourceNotice({ source }: { source?: CreationSource }) {
       type="info"
       title={t(
         "creation_no_built_in_dictionary_suggestions_found_a_blank_draft_was_created"
-      )}
-      description={t(
-        "creation_add_parts_of_speech_forms_and_pronunciation_in_the_following_steps"
       )}
     />
   );

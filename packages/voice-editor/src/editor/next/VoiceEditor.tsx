@@ -229,7 +229,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     useVoiceEditorMessageState("");
   const [editingVersionKey, setEditingVersionKey] = useState<string>();
   const [generatingVersion, setGeneratingVersion] = useState<string>();
-  const [automaticAudioKeys, setAutomaticAudioKeys] = useState<string[]>([]);
+  const [, retryAutomaticAudio] = useState(0);
   const automaticAudioAttempts = useRef(new Map<string, string>());
   const generationRequest = useRef<AbortController | null>(null);
   const generationKeys = useRef(
@@ -755,7 +755,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     refreshSavedRecommendations
   ]);
   const resolutionKey = JSON.stringify([
-    voiceProfile,
+    voiceProfile
+      ? {
+          ...voiceProfile,
+          voices: voiceProfile.voices.map(
+            ({ audio_asset_id: _audio, ...setting }) => setting
+          )
+        }
+      : voiceProfile,
     generationContent,
     previewAdapter?.audioSourceKey,
     locale,
@@ -920,12 +927,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   }
   const currentDubbing = useRef({
     settings: effectiveSettings,
-    mode: voiceProfile?.dubbing,
     profile: voiceProfile
   });
   currentDubbing.current = {
     settings: voiceProfile?.dubbing ? displayedSettings : voiceSettings,
-    mode: voiceProfile?.dubbing,
     profile: voiceProfile
   };
   const restoreInheritance = useRef(false);
@@ -1014,8 +1019,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       !previewAdapter?.generateAudio ||
       readOnly ||
       generatingVersion ||
-      unavailableVersions?.has(voiceSettingKey(setting)) ||
-      !setting.version_id
+      unavailableVersions?.has(voiceSettingKey(setting))
     )
       return;
     const content = generationContent;
@@ -1057,7 +1061,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const request = new AbortController();
     generationRequest.current = request;
     const baseline = audioContentRef.current;
-    const modeBaseline = JSON.stringify(voiceProfile?.dubbing);
+    const generationSide = voiceSettingAccent(setting, voices);
+    const dubbingMode = (profile: VoiceProfile | null | undefined) =>
+      profile?.dubbing && (generationSide === "uk" || generationSide === "us")
+        ? [profile.dubbing.area, profile.dubbing[generationSide].mode]
+        : profile?.dubbing;
+    const modeBaseline = JSON.stringify(dubbingMode(voiceProfile));
     setGeneratingVersion(key);
     setRecommendationError("");
     try {
@@ -1076,7 +1085,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       if (
         request.signal.aborted ||
         baseline !== audioContentRef.current ||
-        modeBaseline !== JSON.stringify(currentDubbing.current.mode) ||
+        modeBaseline !==
+          JSON.stringify(dubbingMode(currentDubbing.current.profile)) ||
         !current ||
         (automatic && !current.enabled) ||
         latestReadOnly.current
@@ -1113,11 +1123,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       emittedProfileRef.current = JSON.stringify(profile);
       onVoiceProfileChange?.(profile);
       generationKeys.current.delete(key);
-      setRecommendationError(
-        createVoiceEditorMessage(
-          "final_audio_generated_complete_editing_and_save_the_text"
-        )
-      );
     } catch (error) {
       if (!request.signal.aborted)
         setRecommendationError(
@@ -1579,20 +1584,34 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       (Boolean(previewAdapter?.resolveVoices) &&
         resolvedVoices?.key !== resolutionKey));
 
-  const automaticAudio = displayedSettings.filter(
+  const automaticAudio = effectiveSettings.filter(
     (setting) =>
-      automaticAudioKeys.includes(voiceSettingKey(setting)) &&
       setting.enabled &&
-      (!locale ||
+      (!voiceProfile?.dubbing ||
+        !locale ||
         voiceSettingAccent(setting, voices) === speechAccentGroup(locale)) &&
       !unavailableVersions?.has(voiceSettingKey(setting)) &&
       !setting.audio_asset_id
   );
   const automaticAudioPending =
     !!previewAdapter?.generateAudio &&
+    !!onVoiceProfileChange &&
+    !readOnly &&
+    mode !== "actual-pron" &&
+    !!generationContent.text.trim() &&
     previewEnabled &&
     !previewIsMock &&
     automaticAudio.length > 0;
+  const automaticAudioInput = (setting: VoiceSetting) => {
+    const side = voiceSettingAccent(setting, voices);
+    return JSON.stringify([
+      audioContentKey,
+      voiceEffectKey(setting),
+      side === "uk" || side === "us"
+        ? voiceProfile?.dubbing?.[side].mode
+        : voiceProfile?.dubbing
+    ]);
+  };
   // Read the current controlled draft each render: another selection can join
   // the queue while a request is running, without replacing that request.
   useEffect(() => {
@@ -1601,25 +1620,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       if (generatingVersion) setGeneratingVersion(undefined);
       return;
     }
-    if (!automaticAudioPending || generatingVersion || voiceSavePending) return;
-    const setting = automaticAudio.find((item) => {
-      const input = JSON.stringify([
-        audioContentKey,
-        voiceEffectKey(item),
-        voiceProfile?.dubbing
-      ]);
-      return (
-        automaticAudioAttempts.current.get(voiceSettingKey(item)) !== input
-      );
-    });
+    if (
+      !automaticAudioPending ||
+      generatingVersion ||
+      voiceSavePending ||
+      voicesLoading ||
+      working.error
+    )
+      return;
+    const setting = automaticAudio.find(
+      (item) =>
+        automaticAudioAttempts.current.get(voiceSettingKey(item)) !==
+        automaticAudioInput(item)
+    );
     if (!setting) return;
     automaticAudioAttempts.current.set(
       voiceSettingKey(setting),
-      JSON.stringify([
-        audioContentKey,
-        voiceEffectKey(setting),
-        voiceProfile?.dubbing
-      ])
+      automaticAudioInput(setting)
     );
     void generateVersionAudio(setting, true);
   });
@@ -3568,7 +3585,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     return true;
   });
 
-  const localPool =
+  const localPoolContent =
     recommendationArea && mode !== "actual-pron" && !contentReadOnly ? (
       <LocalVoicePool
         audioAssets={assets}
@@ -3630,7 +3647,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         audioPending={automaticAudioPending}
         onRetryAudio={() => {
           automaticAudioAttempts.current.clear();
-          setAutomaticAudioKeys([...automaticAudioKeys]);
+          retryAutomaticAudio((attempt) => attempt + 1);
           setRecommendationError("");
         }}
         onChange={(profile) => {
@@ -3648,7 +3665,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             generationRequest.current?.abort();
             setGeneratingVersion(undefined);
           }
-          setAutomaticAudioKeys(pending);
           setVoiceSettings(profile.voices);
           emittedProfileRef.current = JSON.stringify(profile);
           onVoiceProfileChange(profile);
@@ -3725,6 +3741,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         )}
       />
     ) : undefined;
+
+  const localPool = localPoolContent ? (
+    <div className="tsz-ve-local-pool-scroll" tabIndex={0}>
+      {localPoolContent}
+    </div>
+  ) : undefined;
 
   const unsupportedSpeech =
     workingValue.annotations.some(

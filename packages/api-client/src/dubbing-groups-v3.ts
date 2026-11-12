@@ -6,7 +6,7 @@ import type {
 import type { HttpClient } from "./http";
 import { validateRuntimeSchema } from "./runtime-schema";
 
-const headers = {};
+const headers = { "X-TSZ-Dubbing-Groups": "v4" };
 
 export function decodeDubbingGroupsV3(
   value: unknown

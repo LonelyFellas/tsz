@@ -264,8 +264,8 @@ export function V3FormContentOverview({
         size="small"
         pagination={false}
         rowKey="key"
-        tableLayout="fixed"
-        scroll={{ x: 1000 }}
+        tableLayout="auto"
+        scroll={{ x: "max-content" }}
         rowHoverable={false}
         dataSource={readings}
         onRow={(row) => ({
@@ -390,7 +390,6 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.spelling,
             key: "spelling",
-            width: "18%",
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
             render: (_, { variant, spellingDialect }) => {
               const dialectLabel =
@@ -432,7 +431,6 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.style,
             key: "style",
-            width: 96,
             render: (_, { pronunciation }) => (
               <div className="v3-overview-reading">
                 {pronunciation?.style ? (
@@ -453,7 +451,6 @@ export function V3FormContentOverview({
               </Space>
             ),
             key: "pronunciation",
-            width: 200,
             onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
             render: (_, row) => (
               <div className="v3-form-copy-content">
@@ -467,7 +464,6 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.voice,
             key: "voice",
-            width: 144,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <div className="v3-form-copy-content">
@@ -481,7 +477,6 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.rate,
             key: "rate",
-            width: 76,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <PronunciationCell reading={row} settings="rate" />
@@ -490,7 +485,6 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.volume,
             key: "volume",
-            width: 76,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <PronunciationCell reading={row} settings="volume" />

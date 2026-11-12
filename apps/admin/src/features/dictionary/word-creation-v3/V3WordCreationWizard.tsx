@@ -377,6 +377,11 @@ function V3WordCreationSession({
   const sentenceLeaveGuard = useRef<(() => Promise<boolean>) | undefined>(
     undefined
   );
+  const formContentOpen = activeStep === "forms" && hasSentenceGuard;
+  const isFormContentOpen = useCallback(
+    () => activeStep === "forms" && !!sentenceLeaveGuard.current,
+    [activeStep]
+  );
   const registerSentenceLeaveGuard = useCallback(
     (guard?: () => Promise<boolean>) => {
       sentenceLeaveGuard.current = guard;
@@ -423,6 +428,13 @@ function V3WordCreationSession({
   const draftMeaningsRef = useRef(draftMeanings);
   draftMeaningsRef.current = draftMeanings;
   const [pending, setPending] = useState<Set<string>>(new Set());
+  const audioTasks = useRef(new Map<string, () => Promise<boolean>>());
+  const waitForSelectedAudio = useCallback(async () => {
+    for (const wait of [...audioTasks.current.values()]) {
+      if (!(await wait())) return false;
+    }
+    return true;
+  }, []);
   const sessionReadOnly =
     readOnly ||
     word.status === "archived" ||
@@ -992,6 +1004,11 @@ function V3WordCreationSession({
         }
         return;
       }
+      if (isFormContentOpen()) {
+        if ((remoteUpdateRef.current?.revision ?? 0) < latest.revision)
+          setRemoteUpdate(latest);
+        return;
+      }
       if (!dirtyRef.current.forms && !dirtyRef.current.meanings) {
         replaceSession(latest, true);
         return;
@@ -1004,7 +1021,12 @@ function V3WordCreationSession({
         setRemoteUpdate(latest);
       }
     },
-    [adoptKeepingLocalDrafts, replaceSession, setRemoteUpdate]
+    [
+      adoptKeepingLocalDrafts,
+      isFormContentOpen,
+      replaceSession,
+      setRemoteUpdate
+    ]
   );
 
   const finishSaveInFlight = useCallback(() => {
@@ -1018,13 +1040,20 @@ function V3WordCreationSession({
   // 待决期间本地已经没有未保存输入（撤回了修改）：没有要保护的内容，直接采用新版本。
   useEffect(() => {
     const pending = remoteUpdateRef.current;
-    if (!pending || dirtySteps.forms || dirtySteps.meanings) return;
+    if (!pending || formContentOpen || dirtySteps.forms || dirtySteps.meanings)
+      return;
     if (pending.revision > flowRef.current.canonical().revision) {
       replaceSession(pending, true);
     } else {
       setRemoteUpdate(undefined);
     }
-  }, [dirtySteps, remoteUpdate, replaceSession, setRemoteUpdate]);
+  }, [
+    dirtySteps,
+    formContentOpen,
+    remoteUpdate,
+    replaceSession,
+    setRemoteUpdate
+  ]);
 
   useEffect(() => {
     const canonical = flowRef.current.canonical();
@@ -1269,13 +1298,27 @@ function V3WordCreationSession({
             )
           : [];
       const baseRevision = flow.canonical().revision;
-      const scope = scopeRef.current;
+      let scope = scopeRef.current;
       const done = markPending("save_forms");
+      const useCurrentDraft = content === draftFormsRef.current;
       const retry = async () => {
         await saveFormsContent(content, intent, confirmationContext);
       };
       savesInFlightRef.current += 1;
       try {
+        if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
+          return false;
+        if (useCurrentDraft) {
+          content = draftFormsRef.current;
+          scope = scopeRef.current;
+        }
+        if (
+          scope !== scopeRef.current ||
+          flow !== flowRef.current ||
+          baseRevision !== flow.canonical().revision ||
+          blockedByRemoteUpdate()
+        )
+          return false;
         let saveConfirmationContext = confirmationContext;
         // 草稿保存自动核对影响；发布仍由预览页显式确认。
         if (intent === "save" && !confirmationContext) {
@@ -1390,7 +1433,8 @@ function V3WordCreationSession({
       markPending,
       replaceStepIssues,
       updateDirty,
-      requests
+      requests,
+      waitForSelectedAudio
     ]
   );
 
@@ -1504,17 +1548,35 @@ function V3WordCreationSession({
       // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
       // 都会经过的管线上，「确认影响并完成」那种旁路才不会漏掉清洗；保存失败或
       // 撞版本冲突时，回填用的本地编辑态也仍是未清洗的，录入位不会凭空少几行。
-      const meaningsPayload =
+      let meaningsPayload =
         intent === "complete"
           ? dropEmptySentenceTranslations(content)
           : content;
-      const scope = scopeRef.current;
+      let scope = scopeRef.current;
       const done = markPending("save_meanings");
+      const useCurrentDraft = content === draftMeaningsRef.current;
       const retry = async () => {
         await saveMeanings(content, intent, saveFormsFirst);
       };
       savesInFlightRef.current += 1;
       try {
+        if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
+          return;
+        if (useCurrentDraft) {
+          content = draftMeaningsRef.current;
+          scope = scopeRef.current;
+          meaningsPayload =
+            intent === "complete"
+              ? dropEmptySentenceTranslations(content)
+              : content;
+        }
+        if (
+          scope !== scopeRef.current ||
+          flow !== flowRef.current ||
+          baseRevision !== flow.canonical().revision ||
+          blockedByRemoteUpdate()
+        )
+          return;
         const result = await flow.runCanonical("save_meanings", () =>
           requests.saveMeanings(flow.canonical().id, {
             schema_version: 3,
@@ -1582,7 +1644,8 @@ function V3WordCreationSession({
       markPending,
       replaceStepIssues,
       requests,
-      saveFormsContent
+      saveFormsContent,
+      waitForSelectedAudio
     ]
   );
 
@@ -1881,13 +1944,18 @@ function V3WordCreationSession({
   );
 
   const refreshConflict = useCallback(async () => {
-    if (!conflict) return;
+    if (!conflict || isFormContentOpen()) return;
     const localConflict = conflict;
     const scope = scopeRef.current;
     const done = markPending("refresh_conflict");
     try {
       const latest = await requests.get(word.id);
-      if (!mountedRef.current || scope !== scopeRef.current) return;
+      if (
+        !mountedRef.current ||
+        scope !== scopeRef.current ||
+        isFormContentOpen()
+      )
+        return;
       const localForms =
         localConflict.step === "forms"
           ? localConflict.localForms
@@ -1925,6 +1993,7 @@ function V3WordCreationSession({
     draftForms,
     draftMeanings,
     handleError,
+    isFormContentOpen,
     markPending,
     onWordChange,
     rebaseKeepingLocalDrafts,
@@ -1934,20 +2003,23 @@ function V3WordCreationSession({
 
   // 录入者知情后继续用本地输入：基线换成挂起的新版本，之后的保存是有意覆盖。
   const keepLocalChanges = useCallback(() => {
+    if (isFormContentOpen()) return;
     const latest = remoteUpdateRef.current;
     if (latest) adoptKeepingLocalDrafts(latest);
-  }, [adoptKeepingLocalDrafts]);
+  }, [adoptKeepingLocalDrafts, isFormContentOpen]);
 
   // 放弃本地输入，整体改用服务端最新版本（挂起的新版本，或「刷新并比较」取回的版本）。
   const discardLocalChanges = useCallback(() => {
+    if (isFormContentOpen()) return;
     const latest = remoteUpdateRef.current ?? conflict?.serverWord;
     if (!latest) return;
     replaceSession(latest, false);
-  }, [conflict, replaceSession]);
+  }, [conflict, isFormContentOpen, replaceSession]);
 
   const retry = useCallback(async () => {
+    if (isFormContentOpen()) return;
     await retryRef.current?.();
-  }, []);
+  }, [isFormContentOpen]);
 
   const actions = useMemo<V3WizardActions>(
     () => ({
@@ -2100,8 +2172,9 @@ function V3WordCreationSession({
     value: { forms: draftForms, meanings: draftMeanings },
     dirty: dirtySteps.forms || dirtySteps.meanings,
     busy: pending.size > 0,
-    restoreAllowed: !sessionReadOnly,
+    restoreAllowed: !sessionReadOnly && !formContentOpen,
     restore: (value) => {
+      if (isFormContentOpen()) return;
       setFormContents(value.forms);
       setDraftMeanings(value.meanings);
     }
@@ -2119,6 +2192,7 @@ function V3WordCreationSession({
       {recovery.notice}
       <VoiceSaveContext.Provider
         value={{
+          audioTasks: audioTasks.current,
           save: async (area) => {
             if (pending.size || sessionReadOnly || !word.id) return false;
             if (area === "meaning" || area === "grammar")
@@ -2173,6 +2247,7 @@ function V3WordCreationSession({
           ? (next, expected) => {
               if (
                 pending.size ||
+                isFormContentOpen() ||
                 conflict ||
                 remoteUpdate ||
                 JSON.stringify(draftFormsRef.current) !== expected
@@ -2186,6 +2261,7 @@ function V3WordCreationSession({
       activeStep={activeStep}
       reachableSteps={reachableSteps}
       readOnly={sessionReadOnly}
+      referenceOnly={formContentOpen}
       dirtySteps={dirtySteps}
       draftForms={draftForms}
       draftMeanings={draftMeanings}

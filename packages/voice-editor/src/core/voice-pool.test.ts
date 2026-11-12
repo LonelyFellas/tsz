@@ -112,7 +112,7 @@ describe("新版局部音色池", () => {
     expect(
       b.profile.voices.find((item) => item.voice_id === "b")!.rate_percent
     ).toBe(-11);
-    expect(b.profile.dubbing!.uk.recommendation).not.toHaveProperty(
+    expect(b.profile.dubbing!.uk.recommendations?.[0]).not.toHaveProperty(
       "contribution_id"
     );
     const none = switchPoolRecommendation(b.profile, [], voices, "uk").profile;
@@ -226,7 +226,7 @@ describe("新版局部音色池", () => {
       "uk"
     ).profile;
     expect(adopted.voices).toEqual([{ ...cached, enabled: true }]);
-    expect(adopted.dubbing!.uk.recommendation).toMatchObject({
+    expect(adopted.dubbing!.uk.recommendations?.[0]).toMatchObject({
       voice_id: "a",
       contribution_id: cached.version_id
     });

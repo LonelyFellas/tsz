@@ -453,6 +453,9 @@ export function V3SynthesisInputs({
                     onClick={() => convert(side, alphabet)}
                   />
                   <V3PhonemeSpeechSettings
+                    active={
+                      !synthesis.use_spelling && synthesis.alphabet === alphabet
+                    }
                     spelling={spelling}
                     nodeId={pronunciation.id}
                     field={`synthesis.${side}.${alphabet}_speech`}

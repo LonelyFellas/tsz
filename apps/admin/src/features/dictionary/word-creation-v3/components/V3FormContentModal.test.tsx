@@ -1,6 +1,11 @@
 import { primaryRegionalVariant } from "@tsz/shared";
-import { VoiceSaveContext, useVoiceSave } from "../voiceSaveContext";
-import { useState } from "react";
+import {
+  VoiceSaveContext,
+  useVoiceAudioTasks,
+  useVoiceSave
+} from "../voiceSaveContext";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   act,
   fireEvent,
@@ -10,7 +15,7 @@ import {
   within
 } from "@testing-library/react";
 import { App } from "@tsz/ui/admin/overlays";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   DraftFormsStepContentV3,
   SharedFormsStepContentV3
@@ -31,6 +36,13 @@ import {
   uuidFromInt
 } from "../fixtures";
 
+const backgroundAudio = vi.hoisted(() => ({
+  enabled: false,
+  finish: (() => {}) as () => void
+}));
+beforeEach(() => {
+  backgroundAudio.enabled = false;
+});
 // 宿主测试只替换重型语音编辑器，嵌套弹窗和本地草稿使用真实实现。
 vi.mock("./V3ConcreteFormRow", () => ({
   V3ConcreteFormRow: ({
@@ -41,6 +53,43 @@ vi.mock("./V3ConcreteFormRow", () => ({
     onChange: (next: DraftFormsStepContentV3) => void;
   }) => {
     const localSave = useVoiceSave();
+    const audioTasks = useVoiceAudioTasks();
+    const latest = useRef({ content, onChange });
+    latest.current = { content, onChange };
+    useEffect(() => {
+      if (!backgroundAudio.enabled || !audioTasks) return;
+      const pending = new Promise<boolean>((resolve) => {
+        backgroundAudio.finish = () => {
+          const next = structuredClone(latest.current.content);
+          const regions = next.pos[0]!.forms[0]!.regional_variants;
+          if (regions.mode !== "common")
+            throw new Error("expected common fixture");
+          regions.common.spelling_speech = {
+            content: {
+              version: 2,
+              text: regions.common.spelling,
+              annotations: []
+            },
+            voice_profile: {
+              voices: [
+                {
+                  voice_id: "sonia",
+                  enabled: true,
+                  rate_percent: 0,
+                  audio_asset_id: "formal-in-drawer"
+                }
+              ]
+            }
+          };
+          flushSync(() => latest.current.onChange(next));
+          resolve(true);
+        };
+      });
+      audioTasks.set("drawer-background-audio", () => pending);
+      return () => {
+        audioTasks.delete("drawer-background-audio");
+      };
+    }, [audioTasks]);
     const regions = content.pos[0]!.forms[0]!.regional_variants;
     return (
       <>
@@ -230,6 +279,64 @@ it("切换语言保留抽屉未应用输入，显式确认前不写页面草稿"
 });
 
 describe("词形内容弹窗的草稿边界", () => {
+  it("收起后不提交或丢失输入，展开复用编辑器并应用草稿", async () => {
+    const { onConfirm, onCancel } = setup();
+    const input = screen.getByRole("textbox", { name: "内容拼写" });
+    input.focus();
+    fireEvent.change(input, { target: { value: "reference draft" } });
+    const dialog = input.closest('[role="dialog"]')!;
+    expect(dialog).toHaveAttribute("aria-modal", "false");
+    fireEvent.click(screen.getByRole("button", { name: "收起" }));
+    expect(screen.queryByRole("textbox", { name: "内容拼写" })).toBeNull();
+    expect(input).toBeInTheDocument();
+    expect(input.closest("[inert]")).toHaveAttribute("aria-hidden", "true");
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "展开" }));
+    expect(screen.getByRole("textbox", { name: "内容拼写" })).toBe(input);
+    expect(input).toHaveValue("reference draft");
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
+    expect(JSON.stringify(onConfirm.mock.calls[0]![0])).toContain(
+      "reference draft"
+    );
+  });
+
+  it("收起期间语音任务继续完成，展开后应用包含语音结果", async () => {
+    backgroundAudio.enabled = true;
+    const { onConfirm } = setup();
+    const input = screen.getByRole("textbox", { name: "内容拼写" });
+    fireEvent.click(screen.getByRole("button", { name: "收起" }));
+    await act(async () => backgroundAudio.finish());
+    fireEvent.click(screen.getByRole("button", { name: "展开" }));
+    expect(screen.getByRole("textbox", { name: "内容拼写" })).toBe(input);
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
+    expect(JSON.stringify(onConfirm.mock.calls[0]![0])).toContain(
+      "formal-in-drawer"
+    );
+  });
+
+  it("嵌套弹窗的 Escape 不关闭浮窗，外层关闭仍经过未保存提示", () => {
+    const { onCancel, onConfirm } = setup();
+    fireEvent.change(screen.getByRole("textbox", { name: "内容拼写" }), {
+      target: { value: "keep this draft" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    const nested = screen
+      .getByText(/为.*指派词形标签/)
+      .closest('[role="dialog"]')!;
+    fireEvent.keyDown(nested, { key: "Escape", keyCode: 27 });
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "内容拼写" })).toHaveValue(
+      "keep this draft"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关闭词形内容设置" }));
+    expect(screen.getByText("词形内容尚未应用")).toBeInTheDocument();
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["unified", "unified", true],
     ["unified", "distinguish", false],
@@ -892,3 +999,27 @@ it("局部保存先交接完整抽屉结果再请求业务保存，失败不关�
   expect(persist.mock.calls[1]![0]).toEqual(persist.mock.calls[0]![0]);
   expect(onConfirm).not.toHaveBeenCalled();
 });
+
+it.each([true, false])(
+  "弹窗先等待全部内部音频再读取最新草稿（业务保存=%s）",
+  async (persisted) => {
+    backgroundAudio.enabled = true;
+    const persist = vi.fn(async (_forms: SharedFormsStepContentV3) => true);
+    const { onConfirm } = setup({ persist: persisted ? persist : undefined });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: persisted ? "保存当前正文" : "确认，应用到草稿"
+      })
+    );
+    expect(persist).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+    await act(async () => backgroundAudio.finish());
+    await waitFor(() =>
+      expect(persisted ? persist : onConfirm).toHaveBeenCalledOnce()
+    );
+    const result = persisted
+      ? persist.mock.calls[0]![0]
+      : onConfirm.mock.calls[0]![0];
+    expect(JSON.stringify(result)).toContain("formal-in-drawer");
+  }
+);

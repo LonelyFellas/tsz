@@ -2601,13 +2601,6 @@
   padding: var(--ui-space-3) var(--ui-space-5);
   border-bottom: 1px solid var(--word-line);
 }
-.word-summary-popover-header p {
-  grid-column: 1 / -1;
-  margin: var(--ui-space-1) 0 0;
-  color: var(--word-muted);
-  font-size: var(--ui-font-size-sm);
-}
-
 .word-summary-popover .word-summary-headword {
   font-size: 28px;
   line-height: 1.2;

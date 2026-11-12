@@ -98,6 +98,12 @@ describe("文本配音模式", () => {
     expect(
       retainResolvedAudio([{ ...setting, volume_percent: 100 }], [stored])[0]
     ).toHaveProperty("audio_asset_id", "audio");
+    expect(retainResolvedAudio([stored], [setting])[0]).not.toHaveProperty(
+      "audio_asset_id"
+    );
+    expect(
+      retainResolvedAudio([{ ...stored, rate_percent: -27 }], [stored])[0]
+    ).not.toHaveProperty("audio_asset_id");
   });
   it("历史快照不靠参数相等转继承，继承取当前组优先级首项而非旧顺序", () => {
     const old = {

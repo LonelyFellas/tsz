@@ -569,6 +569,13 @@ describe("runtime schema fail-closed diagnostics", () => {
     };
     Object.assign(profile.dubbing.uk as object, { recommendation: source });
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    source.voice_ids.push("ryan", "guy", "jenny");
+    source.contribution_ids.push(
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+      "00000000-0000-4000-8000-000000000004"
+    );
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
     Object.assign(source, { guessed: true });
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
   });

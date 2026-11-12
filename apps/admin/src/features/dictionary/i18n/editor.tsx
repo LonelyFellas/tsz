@@ -336,11 +336,6 @@ export const lexiconEditorMessages = {
   delete_confirm: ["确认删除", "確認刪除", "Confirm deletion"],
   cancel: ["取消", "取消", "Cancel"],
   forms_title: ["词形与发音", "詞形與發音", "Forms and pronunciation"],
-  forms_help: [
-    "先添加基本词性，再按英美拼写、规则与不规则变化录入词形。",
-    "先新增基本詞性，再依英美拼寫、規則及不規則變化輸入詞形。",
-    "Add a part of speech, then enter British and American spellings and regular or irregular forms."
-  ],
   pronunciation_help_title: [
     "发音录入说明",
     "發音輸入說明",
@@ -381,6 +376,11 @@ export const lexiconEditorMessages = {
   sense: ["词义", "詞義", "Meaning"],
   collapse: ["收起", "收起", "Collapse"],
   expand: ["展开", "展開", "Expand"],
+  close_content_settings: [
+    "关闭词形内容设置",
+    "關閉詞形內容設定",
+    "Close form content settings"
+  ],
   one_sense_required: [
     "至少保留一条词义",
     "至少保留一個詞義",
@@ -458,9 +458,9 @@ export const lexiconEditorMessages = {
   switch: ["切换", "切換", "Switch"],
   meanings_title: ["词义与例句", "詞義與例句", "Meanings and examples"],
   meanings_help: [
-    "先录入词义，再补充语法结构和例句。每个词义都需填写本语言释义，每条例句都需关联单词。",
-    "先輸入詞義，再補充文法結構和例句。每個詞義都須填寫本語言釋義，每個例句都須關聯單字。",
-    "Enter meanings first, then grammar structures and examples. Every meaning needs a definition in its own language, and every example must link to words."
+    "每个词义都需填写本语言释义，每条例句都需关联单词。",
+    "每個詞義都須填寫本語言釋義，每個例句都須關聯單字。",
+    "Every meaning needs a definition in its own language, and every example must link to words."
   ],
   meanings_incomplete: [
     "词义与例句尚未完成",
@@ -1062,9 +1062,9 @@ export const lexiconEditorMessages = {
   keep_editing: ["继续编辑", "繼續編輯", "Keep editing"],
   apply_leave: ["应用并离开", "套用並離開", "Apply and leave"],
   drawer_leave_help: [
-    "确认后应用到页面草稿；放弃会丢弃本次抽屉修改。",
-    "確認後套用至頁面草稿；放棄則會捨棄本次抽屜修改。",
-    "Confirm to apply changes to the page draft, or discard this drawer's changes."
+    "确认后应用到页面草稿；放弃会丢弃本次修改。",
+    "確認後套用至頁面草稿；放棄則會捨棄本次修改。",
+    "Confirm to apply changes to the page draft, or discard these changes."
   ],
   replace_forms_title: [
     "以下词形的拼写与发音将被替换",

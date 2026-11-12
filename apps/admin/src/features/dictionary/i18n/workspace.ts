@@ -14,26 +14,6 @@ export const workspaceMessages = {
   meanings: ["词义与例句", "詞義與例句", "Meanings and examples"],
   preview: ["预览并生效", "預覽並生效", "Preview and publish"],
   review_publish: ["核对与发布", "核對與發布", "Review and publish"],
-  basics_help: [
-    "所属语言｜英美区分",
-    "所屬語言｜英美區分",
-    "Language | British and American variants"
-  ],
-  forms_help: [
-    "词性分类｜词形变化",
-    "詞性分類｜詞形變化",
-    "Parts of speech | Inflections"
-  ],
-  meanings_help: [
-    "多维释义｜多维例句",
-    "多維釋義｜多維例句",
-    "Definitions | Examples"
-  ],
-  preview_help: [
-    "结构核对｜提交生效",
-    "結構核對｜提交生效",
-    "Check structure | Publish"
-  ],
   progress: ["完成情况", "完成情況", "Progress"],
   progress_badge: [
     "完成情况 {{badge}}",
@@ -47,11 +27,6 @@ export const workspaceMessages = {
   overview: ["词条概览", "詞條概覽", "Entry overview"],
   overview_open: ["展开词条概览", "展開詞條概覽", "Open entry overview"],
   overview_close: ["收起词条概览", "收起詞條概覽", "Close entry overview"],
-  overview_hint: [
-    "点击悬浮球展开或收起，拖动或按方向键调整位置。",
-    "點擊懸浮球展開或收起，拖曳或按方向鍵調整位置。",
-    "Click to expand or collapse. Drag or use arrow keys to reposition."
-  ],
   summary: ["词条摘要", "詞條摘要", "Entry summary"],
   back: ["返回智能词库V1", "返回智慧詞庫V1", "Back to entries V1"],
   current_entry: ["当前词条", "目前詞條", "Current entry"],

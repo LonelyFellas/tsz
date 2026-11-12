@@ -264,11 +264,6 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
           <Typography.Text strong>
             {t("creation_current_draft_forms")}
           </Typography.Text>
-          <Typography.Text type="secondary">
-            {t(
-              "creation_british_and_american_spellings_forms_and_phonetics_were_applied_from_the_built_in_dictiona"
-            )}
-          </Typography.Text>
         </div>
         <ShieldCheckIcon />
       </div>
@@ -309,11 +304,6 @@ function V3BasicsContent({
         <Typography.Title level={2} style={{ margin: 0 }}>
           {t("assistant_step_basics")}
         </Typography.Title>
-        <Typography.Paragraph className="word-step-description">
-          {t(
-            "creation_enter_an_entry_to_identify_its_type_find_existing_base_forms_and_match_british_and_america"
-          )}
-        </Typography.Paragraph>
       </div>
 
       <Card
@@ -347,11 +337,6 @@ function V3BasicsContent({
               value={entryLabel}
               style={{ marginTop: 8 }}
             />
-            <Typography.Text type="secondary" className="word-field-help">
-              {t(
-                "creation_dictionary_detection_is_complete_suggestions_have_been_applied_to_the_current_draft"
-              )}
-            </Typography.Text>
           </div>
         </Space>
       </Card>

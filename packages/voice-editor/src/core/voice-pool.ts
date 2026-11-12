@@ -130,43 +130,64 @@ export function switchPoolRecommendation(
   side: "uk" | "us"
 ): { profile: VoiceProfile; duplicates: string[] } {
   if (!profile.dubbing) throw new Error("缺少配音板块");
-  const source = items.find((item) => speechAccentGroup(item.locale) === side);
-  const previous = profile.dubbing[side].recommendation?.contribution_id;
+  const previous = new Set(
+    profile.dubbing[side].recommendations?.flatMap((item) =>
+      item.contribution_id ? [item.contribution_id] : []
+    ) ?? []
+  );
   const settings = profile.voices.map((item) =>
-    previous === voiceSettingKey(item) ? { ...item, enabled: false } : item
+    previous.has(voiceSettingKey(item)) ? { ...item, enabled: false } : item
   );
   const duplicates: string[] = [];
-  let contribution_id: string | undefined;
-  let voice_id = source?.setting.voice_id;
-  if (source) {
+  const recommendations: NonNullable<
+    NonNullable<VoiceProfile["dubbing"]>["uk"]["recommendations"]
+  > = [];
+  const seen = new Map<
+    string,
+    { voice_id: string; contribution_id?: string }
+  >();
+  for (const source of items.filter(
+    (item) => speechAccentGroup(item.locale) === side
+  )) {
     const key = providerVoiceKey(source.setting.voice_id, voices);
-    const index = settings.findIndex(
-      (setting) => providerVoiceKey(setting.voice_id, voices) === key
-    );
-    if (index >= 0) {
-      const cached = settings[index]!;
-      if (voiceSettingAccent(cached, voices) !== side)
-        throw new Error("此音色已有另一侧的局部配置，请先处理归属冲突。");
-      voice_id = cached.voice_id;
-      if (cached.enabled) duplicates.push(source.setting.voice_id);
-      else contribution_id = voiceSettingKey(cached);
-      settings[index] = { ...cached, enabled: true };
-    } else {
-      contribution_id = newVoiceVersionId();
-      settings.push({
-        ...source.setting,
-        version_id: contribution_id,
-        version_name: source.name,
-        enabled: true,
-        locale: (voices.find((voice) => voice.id === source.setting.voice_id)
-          ?.locale ?? source.locale) as `en-${string}`,
-        ...(speechAccentGroup(
-          voices.find((voice) => voice.id === source.setting.voice_id)?.locale
-        ) !== side
-          ? { accent: side === "uk" ? ("gb" as const) : ("us" as const) }
-          : {})
-      });
+    let contribution = seen.get(key);
+    if (!contribution) {
+      const index = settings.findIndex(
+        (setting) => providerVoiceKey(setting.voice_id, voices) === key
+      );
+      if (index >= 0) {
+        const cached = settings[index]!;
+        if (voiceSettingAccent(cached, voices) !== side)
+          throw new Error("此音色已有另一侧的局部配置，请先处理归属冲突。");
+        contribution = { voice_id: cached.voice_id };
+        if (cached.enabled) duplicates.push(source.setting.voice_id);
+        else contribution.contribution_id = voiceSettingKey(cached);
+        settings[index] = { ...cached, enabled: true };
+      } else {
+        const contribution_id = newVoiceVersionId();
+        contribution = { voice_id: source.setting.voice_id, contribution_id };
+        settings.push({
+          ...source.setting,
+          version_id: contribution_id,
+          version_name: source.name,
+          enabled: true,
+          locale: (voices.find((voice) => voice.id === source.setting.voice_id)
+            ?.locale ?? source.locale) as `en-${string}`,
+          ...(speechAccentGroup(
+            voices.find((voice) => voice.id === source.setting.voice_id)?.locale
+          ) !== side
+            ? { accent: side === "uk" ? ("gb" as const) : ("us" as const) }
+            : {})
+        });
+      }
+      seen.set(key, contribution);
     }
+    if (source.groupId)
+      recommendations.push({
+        group_id: source.groupId,
+        recommendation_id: source.id,
+        ...contribution
+      });
   }
   return {
     profile: {
@@ -175,16 +196,7 @@ export function switchPoolRecommendation(
         ...profile.dubbing,
         [side]: {
           mode: "local",
-          ...(source?.groupId
-            ? {
-                recommendation: {
-                  group_id: source.groupId,
-                  recommendation_id: source.id,
-                  voice_id: voice_id!,
-                  ...(contribution_id ? { contribution_id } : {})
-                }
-              }
-            : {})
+          ...(recommendations.length ? { recommendations } : {})
         }
       }
     },

@@ -12,6 +12,7 @@ import {
   ChevronUpIcon,
   PencilIcon,
   CircleHelpIcon,
+  SearchIcon,
   Volume2Icon
 } from "lucide-react";
 import { Alert, Button, Space, Spin, Typography } from "@tsz/ui/admin/display";
@@ -38,6 +39,8 @@ import type {
 } from "../../types";
 import {
   localVoicePool,
+  clearVoiceAudio,
+  retainResolvedAudio,
   effectiveVoiceSetting,
   isVoiceRecommendationAvailable,
   providerVoiceKey,
@@ -155,7 +158,8 @@ export function LocalVoicePool({
     if (
       detail &&
       (detail.sourceKey !== sourceKey ||
-        detail.baseline !== JSON.stringify(profile ?? null))
+        detail.baseline !==
+          JSON.stringify(profile ? clearVoiceAudio(profile) : null))
     ) {
       setDetail(undefined);
       onCloseDetail();
@@ -206,28 +210,39 @@ export function LocalVoicePool({
   const conflicts = voicePoolConflicts(current, voices);
   const inheritedFor = (side: "uk" | "us") =>
     profile?.dubbing?.[side].mode === "inherit";
-  const selectedRecommendation = (side: "uk" | "us") =>
+  const selectedRecommendations = (side: "uk" | "us") =>
     inheritedFor(side)
-      ? recommendations.find(
+      ? recommendations.filter(
           (item) =>
             speechAccentGroup(item.locale) === side &&
             current.some(
               (voice) => voice.enabled && voiceSettingKey(voice) === item.id
             )
         )
-      : recommendations.find(
-          (item) =>
-            item.id ===
-            profile?.dubbing?.[side].recommendation?.recommendation_id
+      : recommendations.filter((item) =>
+          profile?.dubbing?.[side].recommendations?.some(
+            (source) => source.recommendation_id === item.id
+          )
         );
   const excluded = new Set(
     sides.flatMap(({ key }) => {
-      const id = inheritedFor(key)
-        ? selectedRecommendation(key)?.setting.voice_id
-        : profile?.dubbing?.[key].recommendation?.voice_id;
-      return id ? [providerVoiceKey(id, voices)] : [];
+      const ids = inheritedFor(key)
+        ? selectedRecommendations(key).map((item) => item.setting.voice_id)
+        : (profile?.dubbing?.[key].recommendations?.map(
+            (item) => item.voice_id
+          ) ?? []);
+      return ids.map((id) => providerVoiceKey(id, voices));
     })
   );
+  const catalogSelection = (side: "uk" | "us") =>
+    !inheritedFor(side)
+      ? current.find(
+          (item) =>
+            item.enabled &&
+            sideOf(item) === side &&
+            !excluded.has(providerVoiceKey(item.voice_id, voices))
+        )
+      : undefined;
   const probabilities = voicePoolProbabilities(
     current.filter((item) => !unavailableVersions?.has(voiceSettingKey(item))),
     voices,
@@ -261,17 +276,19 @@ export function LocalVoicePool({
         : setting;
     });
     const local = localVoicePool(profile, raw, voices, area, side);
-    const recommendation = selectedRecommendation(side);
+    const recommendation = selectedRecommendations(side)[0];
     const selected = current.find(
       (item) => item.enabled && item.version_id === recommendation?.id
     );
     if (inheritedFor(side) && recommendation?.groupId && selected)
-      local.dubbing![side].recommendation = {
-        group_id: recommendation.groupId,
-        recommendation_id: recommendation.id,
-        voice_id: selected.voice_id,
-        contribution_id: voiceSettingKey(selected)
-      };
+      local.dubbing![side].recommendations = [
+        {
+          group_id: recommendation.groupId,
+          recommendation_id: recommendation.id,
+          voice_id: selected.voice_id,
+          contribution_id: voiceSettingKey(selected)
+        }
+      ];
     return local;
   }
   function selectRecommendation(
@@ -281,11 +298,9 @@ export function LocalVoicePool({
     if (readOnly) return;
     const local = materialize(side);
     if (!local) return;
-    if (inheritedFor(side) && !local.dubbing?.[side].recommendation)
+    if (inheritedFor(side) && !local.dubbing?.[side].recommendations?.length)
       local.voices = local.voices.map((item) =>
-        speechAccentGroup(item.locale) === side
-          ? { ...item, enabled: false }
-          : item
+        sideOf(item) === side ? { ...item, enabled: false } : item
       );
     let result: ReturnType<typeof switchPoolRecommendation>;
     try {
@@ -301,7 +316,33 @@ export function LocalVoicePool({
           )
         : ""
     );
-    onChange(result.profile);
+    const recommendedKeys = new Set(
+      result.profile.dubbing?.[side].recommendations?.map((item) =>
+        providerVoiceKey(item.voice_id, voices)
+      ) ?? []
+    );
+    const extras = result.profile.voices.filter(
+      (item) =>
+        item.enabled &&
+        sideOf(item) === side &&
+        !recommendedKeys.has(providerVoiceKey(item.voice_id, voices))
+    );
+    const previousCatalog = catalogSelection(side);
+    const retained =
+      extras.find(
+        (item) =>
+          previousCatalog &&
+          providerVoiceKey(item.voice_id, voices) ===
+            providerVoiceKey(previousCatalog.voice_id, voices)
+      ) ?? extras[0];
+    onChange({
+      ...result.profile,
+      voices: result.profile.voices.map((item) =>
+        extras.includes(item) && item !== retained
+          ? { ...item, enabled: false }
+          : item
+      )
+    });
   }
   function toggle(voice: VoiceOption) {
     if (readOnly) return;
@@ -318,7 +359,37 @@ export function LocalVoicePool({
       return;
     }
     const local = materialize(side);
-    if (local) onChange(togglePoolVoice(local, voice, voices));
+    if (local) {
+      const next = togglePoolVoice(local, voice, voices);
+      onChange({
+        ...next,
+        voices: next.voices.map((item) =>
+          providerVoiceKey(item.voice_id, voices) ===
+          providerVoiceKey(voice.id, voices)
+            ? { ...item, enabled: true }
+            : sideOf(item) === side &&
+                providerVoiceKey(item.voice_id, voices) !==
+                  providerVoiceKey(voice.id, voices) &&
+                !excluded.has(providerVoiceKey(item.voice_id, voices))
+              ? { ...item, enabled: false }
+              : item
+        )
+      });
+    }
+  }
+  function clearCatalog(side: "uk" | "us") {
+    if (readOnly) return;
+    const local = materialize(side);
+    if (local)
+      onChange({
+        ...local,
+        voices: local.voices.map((item) =>
+          sideOf(item) === side &&
+          !excluded.has(providerVoiceKey(item.voice_id, voices))
+            ? { ...item, enabled: false }
+            : item
+        )
+      });
   }
   function edit(setting: VoiceSetting) {
     if (readOnly) return;
@@ -341,7 +412,7 @@ export function LocalVoicePool({
       setting: structuredClone(selected),
       profile: local,
       sourceKey,
-      baseline: JSON.stringify(profile ?? null),
+      baseline: JSON.stringify(profile ? clearVoiceAudio(profile) : null),
       dialect
     });
   }
@@ -551,7 +622,7 @@ export function LocalVoicePool({
                               ? recommendations.find(
                                   (item) => item.id === source.recommendation_id
                                 )
-                              : selectedRecommendation(side.key);
+                              : selectedRecommendations(side.key)[0];
                           return source?.kind === "catalog" ||
                             (!source && !recommendation)
                             ? t("inherited_catalog_source")
@@ -675,17 +746,11 @@ export function LocalVoicePool({
                             onClick={() => edit(setting)}
                           />
                         </div>
-                        {adapter?.generateAudio && (
-                          <Typography.Text
-                            type={
-                              setting.audio_asset_id ? "success" : "secondary"
-                            }
-                          >
-                            {setting.audio_asset_id
-                              ? t("final_audio_ready")
-                              : generatingVersion === key
-                                ? t("generating_final_audio")
-                                : t("final_audio_not_generated")}
+                        {adapter?.generateAudio && !setting.audio_asset_id && (
+                          <Typography.Text type="secondary">
+                            {generatingVersion === key
+                              ? t("generating_final_audio")
+                              : t("final_audio_not_generated")}
                           </Typography.Text>
                         )}
                         {probability === undefined && (
@@ -792,7 +857,7 @@ export function LocalVoicePool({
           data-single={!!locale}
         >
           {sides.map((side) => {
-            const selected = selectedRecommendation(side.key);
+            const selected = selectedRecommendations(side.key);
             const items = recommendations.filter(
               (item) => item.locale === side.locale && !item.fallbackOnly
             );
@@ -812,52 +877,62 @@ export function LocalVoicePool({
                   <span>{t("rate")}</span>
                   <span>{t("volume")}</span>
                 </div>
-                <Radio.Group
+                <div
+                  role="group"
                   aria-label={`${side.label} ${t("local_recommendation")}`}
-                  value={
-                    selected?.id ??
-                    (profile?.dubbing?.[side.key].mode === "local"
-                      ? "none"
-                      : undefined)
-                  }
-                  onChange={(event) =>
-                    selectRecommendation(
-                      items.filter((item) => item.id === event.target.value),
-                      side.key
-                    )
-                  }
                 >
-                  <Radio value="none" disabled={readOnly}>
+                  <Checkbox
+                    checked={
+                      !selected.length &&
+                      profile?.dubbing?.[side.key].mode === "local"
+                    }
+                    disabled={readOnly}
+                    onChange={() => selectRecommendation([], side.key)}
+                  >
                     {t("do_not_use_recommended_voices")}
-                  </Radio>
+                  </Checkbox>
                   {items.map((item) => (
                     <div
                       key={item.id}
                       className="tsz-ve-pool-recommendation-row"
                     >
-                      <Radio
-                        value={item.id}
+                      <Checkbox
+                        checked={selected.some(
+                          (source) => source.id === item.id
+                        )}
+                        onChange={(event) =>
+                          selectRecommendation(
+                            event.target.checked
+                              ? [...selected, item]
+                              : selected.filter(
+                                  (source) => source.id !== item.id
+                                ),
+                            side.key
+                          )
+                        }
                         disabled={
                           readOnly ||
-                          !isVoiceRecommendationAvailable(
-                            {
-                              ...item,
-                              setting: effectiveVoiceSetting(
-                                item.setting,
-                                voices.find(
-                                  (voice) => voice.id === item.setting.voice_id
+                          (!selected.some((source) => source.id === item.id) &&
+                            !isVoiceRecommendationAvailable(
+                              {
+                                ...item,
+                                setting: effectiveVoiceSetting(
+                                  item.setting,
+                                  voices.find(
+                                    (voice) =>
+                                      voice.id === item.setting.voice_id
+                                  )
                                 )
-                              )
-                            },
-                            voices,
-                            item.locale,
-                            content,
-                            nativeAuditionLocale
-                          )
+                              },
+                              voices,
+                              item.locale,
+                              content,
+                              nativeAuditionLocale
+                            ))
                         }
                       >
                         {item.name}
-                      </Radio>
+                      </Checkbox>
                       <span>{item.groupName}</span>
                       {renderIdentity(
                         {
@@ -869,7 +944,7 @@ export function LocalVoicePool({
                       )}
                     </div>
                   ))}
-                </Radio.Group>
+                </div>
               </section>
             );
           })}
@@ -936,149 +1011,175 @@ export function LocalVoicePool({
         <div className="tsz-ve-pool-catalog-body">
           {loading && <Spin aria-label={t("loading_voice_catalogue")} />}
           <div className="tsz-ve-pool-scroll">
-            <div className="tsz-ve-pool-catalog" data-single={!!locale}>
-              {sides.flatMap((side) =>
-                ["female", "male"].map((gender) => {
-                  const key = `${side.key}-${gender}`;
-                  const columnVoices = voices.filter(
-                    (voice) =>
-                      speechAccentGroup(voice.locale, voice.accent) ===
-                        side.key &&
-                      (voice.gender === gender ||
-                        (gender === "male" && voice.gender === "neutral"))
-                  );
-                  const isVisible = (voice: VoiceOption) =>
-                    !excluded.has(providerVoiceKey(voice.id, voices)) &&
-                    `${voice.displayName ?? voice.label} ${voice.providerVoiceId ?? voice.id}`
-                      .toLowerCase()
-                      .includes((search[key] ?? "").trim().toLowerCase());
-                  return (
-                    <section
-                      key={key}
-                      aria-label={t("catalogue", {
-                        p0: side.label,
-                        p1: gender === "female" ? t("female") : t("male")
-                      })}
-                    >
-                      <div className="tsz-ve-pool-catalog-column-head">
-                        <Typography.Text
-                          className="tsz-ve-pool-side-title"
-                          data-accent={side.key}
-                          strong
-                        >
-                          {side.label} ·{" "}
-                          {gender === "female" ? t("female") : t("male")}
-                        </Typography.Text>
-                        <Input.Search
-                          size="small"
-                          aria-label={t("search_catalogue", {
-                            p0: side.label,
-                            p1: gender === "female" ? t("female") : t("male")
-                          })}
-                          placeholder={t("search_voices")}
-                          value={search[key] ?? ""}
-                          allowClear
-                          onChange={(event) => {
-                            const list = columns.current.get(key);
-                            if (list) {
-                              if (!search[key] && event.target.value)
-                                unfilteredPositions.current.set(
-                                  key,
-                                  list.scrollTop
-                                );
-                              positions.current.set(key, list.scrollTop);
-                            }
-                            setSearch((previous) => ({
-                              ...previous,
-                              [key]: event.target.value
-                            }));
-                          }}
-                        />
-                      </div>
-                      <div
-                        className="tsz-ve-pool-catalog-list"
-                        ref={(element) => {
-                          if (element) columns.current.set(key, element);
-                          else columns.current.delete(key);
-                        }}
-                        onScroll={(event) =>
-                          positions.current.set(
-                            key,
-                            event.currentTarget.scrollTop
-                          )
-                        }
+            <div className="tsz-ve-pool-catalog-sides" data-single={!!locale}>
+              {sides.map((side) => (
+                <Radio.Group
+                  key={side.key}
+                  className="tsz-ve-pool-catalog"
+                  data-single="true"
+                  aria-label={`${side.label} ${t("full_voice_catalogue")}`}
+                  value={catalogSelection(side.key)?.voice_id ?? ""}
+                  onChange={(event) => {
+                    const voice = voices.find(
+                      (item) => item.id === event.target.value
+                    );
+                    if (voice) toggle(voice);
+                    else clearCatalog(side.key);
+                  }}
+                >
+                  <Radio
+                    value=""
+                    disabled={readOnly}
+                    className="tsz-ve-pool-catalog-clear"
+                  >
+                    {t("no_catalog_voice")}
+                  </Radio>
+                  {["female", "male"].map((gender) => {
+                    const key = `${side.key}-${gender}`;
+                    const columnVoices = voices.filter(
+                      (voice) =>
+                        speechAccentGroup(voice.locale, voice.accent) ===
+                          side.key &&
+                        (voice.gender === gender ||
+                          (gender === "male" && voice.gender === "neutral"))
+                    );
+                    const isVisible = (voice: VoiceOption) =>
+                      !excluded.has(providerVoiceKey(voice.id, voices)) &&
+                      `${voice.displayName ?? voice.label} ${voice.providerVoiceId ?? voice.id}`
+                        .toLowerCase()
+                        .includes((search[key] ?? "").trim().toLowerCase());
+                    return (
+                      <section
+                        key={key}
+                        aria-label={t("catalogue", {
+                          p0: side.label,
+                          p1: gender === "female" ? t("female") : t("male")
+                        })}
                       >
-                        {!loading && !columnVoices.some(isVisible) && (
+                        <div className="tsz-ve-pool-catalog-column-head">
                           <Typography.Text
-                            type="secondary"
-                            className="tsz-ve-pool-catalog-empty"
+                            className="tsz-ve-pool-side-title"
+                            data-accent={side.key}
+                            strong
                           >
-                            {search[key]?.trim()
-                              ? t("no_matching_voices")
-                              : t("no_voices_available")}
+                            {side.label} ·{" "}
+                            {gender === "female" ? t("female") : t("male")}
                           </Typography.Text>
-                        )}
-                        {columnVoices.map((voice) => (
-                          <div key={voice.id} hidden={!isVisible(voice)}>
-                            <div className="tsz-ve-pool-catalog-item-head">
-                              <Checkbox
-                                aria-label={t("select", {
-                                  p0: voice.displayName ?? voice.label
-                                })}
-                                disabled={
-                                  readOnly ||
-                                  (!!phonemeIssue(voice) && !isSelected(voice))
-                                }
-                                checked={isSelected(voice)}
-                                onChange={() => toggle(voice)}
+                          <Input
+                            type="search"
+                            className="tsz-ve-pool-catalog-search"
+                            prefix={<SearchIcon size={14} aria-hidden="true" />}
+                            size="small"
+                            aria-label={t("search_catalogue", {
+                              p0: side.label,
+                              p1: gender === "female" ? t("female") : t("male")
+                            })}
+                            placeholder={t("search_voices")}
+                            value={search[key] ?? ""}
+                            allowClear
+                            onChange={(event) => {
+                              const list = columns.current.get(key);
+                              if (list) {
+                                if (!search[key] && event.target.value)
+                                  unfilteredPositions.current.set(
+                                    key,
+                                    list.scrollTop
+                                  );
+                                positions.current.set(key, list.scrollTop);
+                              }
+                              setSearch((previous) => ({
+                                ...previous,
+                                [key]: event.target.value
+                              }));
+                            }}
+                          />
+                        </div>
+                        <div
+                          className="tsz-ve-pool-catalog-list"
+                          ref={(element) => {
+                            if (element) columns.current.set(key, element);
+                            else columns.current.delete(key);
+                          }}
+                          onScroll={(event) =>
+                            positions.current.set(
+                              key,
+                              event.currentTarget.scrollTop
+                            )
+                          }
+                        >
+                          {!loading && !columnVoices.some(isVisible) && (
+                            <Typography.Text
+                              type="secondary"
+                              className="tsz-ve-pool-catalog-empty"
+                            >
+                              {search[key]?.trim()
+                                ? t("no_matching_voices")
+                                : t("no_voices_available")}
+                            </Typography.Text>
+                          )}
+                          {columnVoices.map((voice) => (
+                            <div key={voice.id} hidden={!isVisible(voice)}>
+                              <div className="tsz-ve-pool-catalog-item-head">
+                                <Radio
+                                  value={voice.id}
+                                  aria-label={t("select", {
+                                    p0: voice.displayName ?? voice.label
+                                  })}
+                                  disabled={
+                                    readOnly ||
+                                    (!!phonemeIssue(voice) &&
+                                      !isSelected(voice))
+                                  }
+                                >
+                                  <PoolVoiceName
+                                    voice={voice}
+                                    fallback={voice.id}
+                                  />
+                                </Radio>
+                                {preview(
+                                  {
+                                    voice_id: voice.id,
+                                    enabled: true,
+                                    rate_percent: 0,
+                                    ...voice.defaultSettings
+                                  },
+                                  side.locale,
+                                  true
+                                )}
+                              </div>
+                              <Typography.Text
+                                code
+                                title={voice.providerVoiceId ?? voice.id}
+                                className="tsz-ve-pool-provider-id"
+                                copyable={{
+                                  text: voice.providerVoiceId ?? voice.id
+                                }}
                               >
-                                <PoolVoiceName
-                                  voice={voice}
-                                  fallback={voice.id}
-                                />
-                              </Checkbox>
-                              {preview(
-                                {
-                                  voice_id: voice.id,
-                                  enabled: true,
-                                  rate_percent: 0,
-                                  ...voice.defaultSettings
-                                },
-                                side.locale,
-                                true
+                                <span className="tsz-ve-pool-provider-value">
+                                  {voice.providerVoiceId ?? voice.id}
+                                </span>
+                              </Typography.Text>
+                              {phonemeIssue(voice) && (
+                                <Typography.Text type="secondary">
+                                  {phonemeIssue(voice)}
+                                </Typography.Text>
                               )}
                             </div>
-                            <Typography.Text
-                              code
-                              title={voice.providerVoiceId ?? voice.id}
-                              className="tsz-ve-pool-provider-id"
-                              copyable={{
-                                text: voice.providerVoiceId ?? voice.id
-                              }}
-                            >
-                              <span className="tsz-ve-pool-provider-value">
-                                {voice.providerVoiceId ?? voice.id}
-                              </span>
-                            </Typography.Text>
-                            {phonemeIssue(voice) && (
-                              <Typography.Text type="secondary">
-                                {phonemeIssue(voice)}
-                              </Typography.Text>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  );
-                })
-              )}
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </Radio.Group>
+              ))}
             </div>
           </div>
         </div>
       </details>
       {detail &&
         detail.sourceKey === sourceKey &&
-        detail.baseline === JSON.stringify(profile ?? null) &&
+        detail.baseline ===
+          JSON.stringify(profile ? clearVoiceAudio(profile) : null) &&
         voices.some((voice) => voice.id === detail.setting.voice_id) && (
           <VoiceDetail
             key={`${sourceKey}/${detail.dialect}/${voiceSettingKey(detail.setting)}`}
@@ -1119,7 +1220,11 @@ export function LocalVoicePool({
               onChange({
                 ...local,
                 voices: local.voices.map((item) =>
-                  voiceSettingKey(item) === voiceSettingKey(next) ? next : item
+                  voiceSettingKey(item) === voiceSettingKey(next)
+                    ? next.audio_asset_id
+                      ? next
+                      : retainResolvedAudio([next], local.voices)[0]!
+                    : item
                 )
               });
               onCloseDetail();

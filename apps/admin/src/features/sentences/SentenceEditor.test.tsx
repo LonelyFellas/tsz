@@ -629,12 +629,17 @@ describe("当前词条关联与离开保护", () => {
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
-    await screen.findByRole("radiogroup", { name: "英式 局部推荐" });
+    await screen.findByRole("group", { name: "英式 局部推荐" });
     fireEvent.change(screen.getByLabelText("例句正文"), {
       target: { value: "A new sentence." }
     });
     await waitFor(() =>
-      expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
+      expect(
+        within(screen.getByRole("group", { name: "英式 局部推荐" })).getByRole(
+          "checkbox",
+          { name: "慢读" }
+        )
+      ).toBeChecked()
     );
     expect(screen.getByLabelText("例句正文")).toHaveValue("A new sentence.");
     fireEvent.click(sentenceSaveButton());
@@ -1342,7 +1347,11 @@ it.each([
     await screen.findByRole("toolbar", { name: "标注工具栏" });
     if (configured)
       await waitFor(() =>
-        expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
+        expect(
+          within(
+            screen.getByRole("group", { name: "英式 局部推荐" })
+          ).getByRole("checkbox", { name: "英式" })
+        ).toBeChecked()
       );
     fireEvent.change(
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
