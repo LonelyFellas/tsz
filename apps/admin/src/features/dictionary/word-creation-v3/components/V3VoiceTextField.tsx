@@ -5,6 +5,7 @@ import {
   type LexiconEditorMessage
 } from "../../i18n/editor";
 import { useVoiceSave } from "../voiceSaveContext";
+import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
 import { usePermission } from "@/lib/auth";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { useContentEditPermissions } from "../../contentEditPermissions";
@@ -220,6 +221,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     };
   }, [nodeId]);
   const canUploadAudio = usePermission("speech.upload_audio");
+  const canGenerateAudio = usePermission("speech.generate");
   const permissions = useContentEditPermissions();
   const contentReadOnly = requestedContentReadOnly ?? !permissions.edit;
   const associationsReadOnly =
@@ -385,6 +387,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       previewAdapter
     ]
   );
+  const editorPreviewAdapter = useMemo(() => {
+    const adapter = sessionPreviewAdapter ?? adminVoicePreviewAdapter;
+    return canGenerateAudio
+      ? adapter
+      : { ...adapter, generateAudio: undefined };
+  }, [canGenerateAudio, sessionPreviewAdapter]);
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   const reportEditorReady = useCallback(
     (ready: boolean) => onDraftPendingChange?.(!ready),
@@ -530,6 +538,51 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     }
   };
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
+  const collapsedAdapter = useMemo(
+    () =>
+      createReadingPreviewAdapter?.(readingLinks ?? []) ??
+      createPreviewAdapter?.(textLinks ?? []) ??
+      previewAdapter ??
+      adminVoicePreviewAdapter,
+    [
+      createReadingPreviewAdapter,
+      createPreviewAdapter,
+      readingLinks,
+      textLinks,
+      previewAdapter
+    ]
+  );
+  const collapsedContent = useMemo(() => {
+    const content = toRichTextV2(value);
+    return mode === "spelling"
+      ? {
+          ...content,
+          annotations: content.annotations.filter((mark) =>
+            ["pause", "say_as", "sub"].includes(mark.type)
+          )
+        }
+      : content;
+  }, [value, mode]);
+  const automaticAudio = useSelectedVoiceAudio({
+    target: JSON.stringify([nodeId, field]),
+    content: collapsedContent,
+    profile: voiceProfile,
+    adapter: collapsedAdapter,
+    locale: voiceLocale(dialect),
+    enabled:
+      env.VOICE_EDITOR &&
+      env.VOICE_PREVIEW &&
+      canGenerateAudio &&
+      !voicePreviewIsMock &&
+      editingEnabled &&
+      !expanded &&
+      !readOnly &&
+      !contentReadOnly &&
+      mode !== "actual-pron" &&
+      !!onVoiceProfileChange,
+    defer: focused,
+    onChange: onVoiceProfileChange
+  });
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。
   const liaisons = useMemo(
     () => (mode !== "dict-phonetic" ? liaisonOnly(value) : undefined),
@@ -944,7 +997,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                     : nextReadingLinks
                 }));
             }}
-            previewAdapter={sessionPreviewAdapter ?? adminVoicePreviewAdapter}
+            previewAdapter={editorPreviewAdapter}
             previewEnabled={env.VOICE_PREVIEW}
             previewIsMock={voicePreviewIsMock}
             onVoiceProfileChange={(next) => {
@@ -983,6 +1036,25 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   return (
     <>
       {fieldView}
+      {automaticAudio.busy && (
+        <span role="status">{t("panel_generating_final_audio")}</span>
+      )}
+      {!expanded && automaticAudio.error != null && (
+        <Alert
+          type="error"
+          showIcon
+          title={
+            automaticAudio.error instanceof Error
+              ? automaticAudio.error.message
+              : t("panel_final_audio_generation_failed")
+          }
+          action={
+            <Button size="small" onClick={() => void automaticAudio.retry()}>
+              {t("panel_retry_final_audio")}
+            </Button>
+          }
+        />
+      )}
       {saved && !editing && (
         <span role="status">{t("panel_changes_saved_as_a_draft")}</span>
       )}

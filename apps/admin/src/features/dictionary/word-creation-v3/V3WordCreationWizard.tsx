@@ -423,6 +423,13 @@ function V3WordCreationSession({
   const draftMeaningsRef = useRef(draftMeanings);
   draftMeaningsRef.current = draftMeanings;
   const [pending, setPending] = useState<Set<string>>(new Set());
+  const audioTasks = useRef(new Map<string, () => Promise<boolean>>());
+  const waitForSelectedAudio = useCallback(async () => {
+    for (const wait of [...audioTasks.current.values()]) {
+      if (!(await wait())) return false;
+    }
+    return true;
+  }, []);
   const sessionReadOnly =
     readOnly ||
     word.status === "archived" ||
@@ -1269,13 +1276,27 @@ function V3WordCreationSession({
             )
           : [];
       const baseRevision = flow.canonical().revision;
-      const scope = scopeRef.current;
+      let scope = scopeRef.current;
       const done = markPending("save_forms");
+      const useCurrentDraft = content === draftFormsRef.current;
       const retry = async () => {
         await saveFormsContent(content, intent, confirmationContext);
       };
       savesInFlightRef.current += 1;
       try {
+        if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
+          return false;
+        if (useCurrentDraft) {
+          content = draftFormsRef.current;
+          scope = scopeRef.current;
+        }
+        if (
+          scope !== scopeRef.current ||
+          flow !== flowRef.current ||
+          baseRevision !== flow.canonical().revision ||
+          blockedByRemoteUpdate()
+        )
+          return false;
         let saveConfirmationContext = confirmationContext;
         // 草稿保存自动核对影响；发布仍由预览页显式确认。
         if (intent === "save" && !confirmationContext) {
@@ -1390,7 +1411,8 @@ function V3WordCreationSession({
       markPending,
       replaceStepIssues,
       updateDirty,
-      requests
+      requests,
+      waitForSelectedAudio
     ]
   );
 
@@ -1504,17 +1526,35 @@ function V3WordCreationSession({
       // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
       // 都会经过的管线上，「确认影响并完成」那种旁路才不会漏掉清洗；保存失败或
       // 撞版本冲突时，回填用的本地编辑态也仍是未清洗的，录入位不会凭空少几行。
-      const meaningsPayload =
+      let meaningsPayload =
         intent === "complete"
           ? dropEmptySentenceTranslations(content)
           : content;
-      const scope = scopeRef.current;
+      let scope = scopeRef.current;
       const done = markPending("save_meanings");
+      const useCurrentDraft = content === draftMeaningsRef.current;
       const retry = async () => {
         await saveMeanings(content, intent, saveFormsFirst);
       };
       savesInFlightRef.current += 1;
       try {
+        if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
+          return;
+        if (useCurrentDraft) {
+          content = draftMeaningsRef.current;
+          scope = scopeRef.current;
+          meaningsPayload =
+            intent === "complete"
+              ? dropEmptySentenceTranslations(content)
+              : content;
+        }
+        if (
+          scope !== scopeRef.current ||
+          flow !== flowRef.current ||
+          baseRevision !== flow.canonical().revision ||
+          blockedByRemoteUpdate()
+        )
+          return;
         const result = await flow.runCanonical("save_meanings", () =>
           requests.saveMeanings(flow.canonical().id, {
             schema_version: 3,
@@ -1582,7 +1622,8 @@ function V3WordCreationSession({
       markPending,
       replaceStepIssues,
       requests,
-      saveFormsContent
+      saveFormsContent,
+      waitForSelectedAudio
     ]
   );
 
@@ -2119,6 +2160,7 @@ function V3WordCreationSession({
       {recovery.notice}
       <VoiceSaveContext.Provider
         value={{
+          audioTasks: audioTasks.current,
           save: async (area) => {
             if (pending.size || sessionReadOnly || !word.id) return false;
             if (area === "meaning" || area === "grammar")

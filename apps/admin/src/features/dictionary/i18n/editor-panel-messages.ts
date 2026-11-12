@@ -1,4 +1,19 @@
 export const lexiconEditorPanelMessages = {
+  panel_generating_final_audio: [
+    "正在生成正式音频…",
+    "正在生成正式音訊…",
+    "Generating final audio…"
+  ],
+  panel_final_audio_generation_failed: [
+    "正式音频生成失败，请重试。",
+    "正式音訊生成失敗，請重試。",
+    "Final audio generation failed. Try again."
+  ],
+  panel_retry_final_audio: [
+    "重试生成音频",
+    "重試生成音訊",
+    "Retry audio generation"
+  ],
   panel_network_error_publication_is_unconfirmed_retry_the_same_request_to_check:
     [
       "网络异常，发布结果尚未确认，可原样重试确认。",
