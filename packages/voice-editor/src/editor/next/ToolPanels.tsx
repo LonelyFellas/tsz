@@ -10,7 +10,12 @@ import {
   speechLocaleMatchesScope,
   speechRegionLabel
 } from "@tsz/shared";
-import { CheckIcon, Volume2Icon } from "lucide-react";
+import {
+  CheckIcon,
+  FileAudioIcon,
+  UploadIcon,
+  Volume2Icon
+} from "lucide-react";
 import {
   Button,
   Space,
@@ -680,6 +685,15 @@ export function UploadPanel({
   const canAdd = available && uploadAllowed && !readOnly && used < limit;
   return (
     <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label={t("audio")}>
+      <div className="tsz-ve-upload-header">
+        <span className="tsz-ve-upload-title">
+          <FileAudioIcon aria-hidden />
+          {t("upload_audio")}
+        </span>
+        <Typography.Text type="secondary" className="tsz-ve-upload-usage">
+          {t("audio_upload_usage", { used, limit })}
+        </Typography.Text>
+      </div>
       {/*
        * 原生 file input 藏起来、只用它的能力：默认控件是英文且无法定制，
        * 更要命的是我们每次添加后会清空 value（好让同名文件能再传一次），
@@ -703,10 +717,10 @@ export function UploadPanel({
        * 归属放在按钮之前：从上往下读即「先定归属 → 再选文件」，
        * 顺序本身说明了它只作用于接下来添加的那批，不必再写一句解释。
        */}
-      <div className="tsz-ve-pop-field">
-        <Typography.Text type="secondary">{t("ownership")}</Typography.Text>
+      <div className="tsz-ve-upload-fields">
+        <span className="tsz-ve-upload-field-label">{t("upload_accent")}</span>
         <Radio.Group
-          size="small"
+          size="middle"
           optionType="button"
           aria-label={t("upload_audio_language")}
           value={upload.locale}
@@ -716,26 +730,36 @@ export function UploadPanel({
             (entry) => !locale || entry.locale === locale
           ).map(({ locale: value, badge }) => ({
             value,
-            label: badge
+            label: (
+              <span className="tsz-ve-upload-accent">
+                <span aria-hidden>
+                  {t(value === "en-GB" ? "british" : "american")}
+                </span>
+                <span className="tsz-ve-upload-accent-code">{badge}</span>
+              </span>
+            )
           }))}
         />
+        <span className="tsz-ve-upload-field-label">{t("upload_gender")}</span>
         <Radio.Group
-          size="small"
+          size="middle"
           optionType="button"
           aria-label={t("upload_audio_gender")}
           value={upload.gender}
           disabled={readOnly || !available || !uploadAllowed}
           onChange={(event) => onUploadChange({ gender: event.target.value })}
-          options={voiceGenderLabels(t).map(({ gender, label }) => ({
+          options={voiceGenderLabels(t).map(({ gender }) => ({
             value: gender,
-            label
+            label: t(gender === "female" ? "female" : "male")
           }))}
         />
       </div>
 
       <Button
         block
-        size="small"
+        type="primary"
+        size="middle"
+        icon={<UploadIcon aria-hidden />}
         disabled={!canAdd}
         onClick={() => fileInputRef.current?.click()}
       >
@@ -749,11 +773,7 @@ export function UploadPanel({
         {!uploadAllowed
           ? t("audio_upload_permission_is_required")
           : available
-            ? t("up_to_items_used", {
-                p0: audioUploadHint(t),
-                p1: limit,
-                p2: used
-              })
+            ? audioUploadHint(t)
             : unavailableReason}
       </Typography.Text>
       {playbackMessage && (
