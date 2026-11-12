@@ -10,7 +10,11 @@ import type {
 import { speechAccentGroup } from "@tsz/shared";
 import { isVoiceRecommendationAvailable } from "./voice-recommendations";
 import { effectiveVoiceSetting } from "./voice-pool";
-import { newVoiceVersionId, voiceSettingKey } from "./voice-versions";
+import {
+  newVoiceVersionId,
+  voiceSettingKey,
+  voiceSettingAccent
+} from "./voice-versions";
 
 export function recommendationVoiceSetting(
   item: VoiceRecommendation,
@@ -22,7 +26,12 @@ export function recommendationVoiceSetting(
     version_name: item.name,
     locale: (voices.find((voice) => voice.id === item.setting.voice_id)
       ?.locale ?? item.locale) as AudioAssetLocale,
-    enabled: true
+    enabled: true,
+    ...(speechAccentGroup(
+      voices.find((voice) => voice.id === item.setting.voice_id)?.locale
+    ) !== speechAccentGroup(item.locale)
+      ? { accent: item.locale === "en-GB" ? ("gb" as const) : ("us" as const) }
+      : {})
   };
 }
 
@@ -30,6 +39,7 @@ export function voiceEffectKey(setting: VoiceSetting): string {
   return JSON.stringify([
     setting.voice_id,
     setting.locale,
+    setting.accent,
     setting.rate_percent,
     setting.pitch_semitones ?? 0,
     setting.volume_percent ?? 100,
@@ -58,16 +68,61 @@ export function retainResolvedAudio(
   });
 }
 
+export function inheritedDubbing(
+  area: VoiceRecommendationArea
+): NonNullable<VoiceProfile["dubbing"]> {
+  return { area, uk: { mode: "inherit" }, us: { mode: "inherit" } };
+}
+
+export function profileHasInheritance(
+  profile: VoiceProfile | null | undefined,
+  locale?: AudioAssetLocale
+): boolean {
+  return (["uk", "us"] as const).some(
+    (side) =>
+      (!locale || speechAccentGroup(locale) === side) &&
+      profile?.dubbing?.[side].mode === "inherit"
+  );
+}
+
 export function localVoiceProfile(
-  voices: readonly VoiceSetting[],
+  settings: readonly VoiceSetting[],
   options: readonly VoiceOption[],
   area?: VoiceRecommendationArea,
-  previous?: VoiceProfile | null
+  previous?: VoiceProfile | null,
+  side?: "uk" | "us"
 ): VoiceProfile {
-  if (!area && !previous?.dubbing) return { voices: [...voices] };
   area ??= previous?.dubbing?.area;
+  const dubbing = area
+    ? {
+        ...(previous?.dubbing ??
+          (previous
+            ? {
+                area,
+                uk: { mode: "local" as const },
+                us: { mode: "local" as const }
+              }
+            : inheritedDubbing(area)))
+      }
+    : undefined;
+  if (dubbing)
+    for (const key of ["uk", "us"] as const) {
+      if (!side || key === side)
+        dubbing[key] = { ...dubbing[key], mode: "local" };
+    }
+  if (!area && !previous?.dubbing) return { voices: [...settings] };
+  const sideOf = (setting: VoiceSetting) => {
+    return voiceSettingAccent(setting, options);
+  };
+  const stored = side
+    ? [
+        ...settings.filter((item) => sideOf(item) === side),
+        ...(previous?.voices ?? []).filter((item) => sideOf(item) !== side)
+      ]
+    : settings;
   return {
-    voices: voices.map((setting) => {
+    voices: stored.map((setting) => {
+      if (side && sideOf(setting) !== side) return { ...setting };
       const voice = options.find((voice) => voice.id === setting.voice_id);
       return setting.version_id || !voice
         ? { ...setting }
@@ -78,23 +133,7 @@ export function localVoiceProfile(
             locale: voice.locale as AudioAssetLocale
           };
     }),
-    ...(area
-      ? {
-          dubbing: {
-            mode: "local" as const,
-            area,
-            recommendation_order: previous?.dubbing?.recommendation_order ?? [],
-            ...(previous?.dubbing?.pool_version
-              ? {
-                  pool_version: previous.dubbing.pool_version,
-                  ...(previous.dubbing.recommendation
-                    ? { recommendation: previous.dubbing.recommendation }
-                    : {})
-                }
-              : {})
-          }
-        }
-      : {})
+    ...(dubbing ? { dubbing } : {})
   };
 }
 
@@ -111,19 +150,16 @@ export function resolveRecommendedVoices(
     .filter((accent) => !locale || accent === locale)
     .flatMap((accent) => {
       const selected =
-        profile.dubbing?.mode === "local"
+        profile.dubbing?.[accent === "en-GB" ? "uk" : "us"].mode === "local"
           ? profile.voices.filter(
               (setting) =>
                 setting.enabled &&
-                speechAccentGroup(
-                  voices.find((voice) => voice.id === setting.voice_id)
-                    ?.locale ?? setting.locale,
-                  voices.find((voice) => voice.id === setting.voice_id)?.accent
-                ) === speechAccentGroup(accent)
+                voiceSettingAccent(setting, voices) ===
+                  speechAccentGroup(accent)
             )
           : [];
       const local =
-        profile.dubbing?.mode === "local"
+        profile.dubbing?.[accent === "en-GB" ? "uk" : "us"].mode === "local"
           ? selected.filter(
               (setting) =>
                 setting.enabled &&
@@ -133,12 +169,10 @@ export function resolveRecommendedVoices(
                     name: setting.version_name ?? "",
                     locale: accent,
                     groupName: "",
-                    setting: profile.dubbing?.pool_version
-                      ? effectiveVoiceSetting(
-                          setting,
-                          voices.find((voice) => voice.id === setting.voice_id)
-                        )
-                      : setting
+                    setting: effectiveVoiceSetting(
+                      setting,
+                      voices.find((voice) => voice.id === setting.voice_id)
+                    )
                   },
                   voices,
                   accent,
@@ -147,9 +181,8 @@ export function resolveRecommendedVoices(
                 )
             )
           : [];
-      if (profile.dubbing?.pool_version && profile.dubbing.mode === "local")
+      if (profile.dubbing?.[accent === "en-GB" ? "uk" : "us"].mode === "local")
         return local;
-      if (selected.length) return local.length === selected.length ? local : [];
       const recommended = recommendations.find(
         (item) =>
           item.selected !== false &&
@@ -163,8 +196,6 @@ export function resolveRecommendedVoices(
           )
       );
       if (recommended) return [recommendationVoiceSetting(recommended, voices)];
-      // Existing local-empty profiles retain their old fallback until pool conversion.
-      if (profile.dubbing?.mode === "inherit") return [];
       const fallback = voices.find(
         (voice) =>
           speechAccentGroup(voice.locale, voice.accent) ===

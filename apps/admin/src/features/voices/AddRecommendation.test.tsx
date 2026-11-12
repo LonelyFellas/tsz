@@ -55,7 +55,8 @@ const initial: AdminDubbingGroupsV3Response = {
       areas: ["word"],
       revision: 3,
       is_global: false,
-      recommendations: { format: "paired", pairs: [] }
+      uk: [],
+      us: []
     },
     {
       id: "b",
@@ -63,7 +64,8 @@ const initial: AdminDubbingGroupsV3Response = {
       areas: ["example"],
       revision: 2,
       is_global: false,
-      recommendations: { format: "paired", pairs: [] }
+      uk: [],
+      us: []
     }
   ]
 };
@@ -134,7 +136,7 @@ afterEach(() => {
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
 });
-describe("完整推荐只应用到分组草稿", () => {
+describe("当前口音推荐只应用到分组草稿", () => {
   async function chooseGroup() {
     fireEvent.mouseDown(screen.getByLabelText("推荐分组"));
     fireEvent.click(
@@ -142,49 +144,61 @@ describe("完整推荐只应用到分组草稿", () => {
         selector: ".ui-select-item-option-content"
       })
     );
-    fireEvent.click(screen.getByRole("button", { name: "创建整套推荐" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增推荐" }));
   }
-  it("预填当前侧完整参数，要求人工另一侧，服务器缓存和 B 草稿不变", async () => {
+  it("预填当前侧参数，不要求另一侧，服务器缓存与B草稿不变", async () => {
     const client = mount();
     fireEvent.click(screen.getByText("编辑B"));
     await chooseGroup();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "配置英式声音" })
-    );
-    expect(
-      await screen.findByRole("radio", { name: "Sonia 女声" })
-    ).toBeChecked();
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
-    await screen.findByText("请明确选择美式音色，每套必须包含英美各一项。");
-    expect(screen.getByTestId("drafts")).not.toHaveTextContent('"a":');
-    fireEvent.click(screen.getByRole("radio", { name: "Guy 男声" }));
-    fireEvent.click(screen.getByRole("button", { name: "保存整套推荐" }));
+    expect(screen.queryByRole("radio", { name: "Guy 男声" })).toBeNull();
+    expect(await screen.findByLabelText("合成语速")).toHaveValue("0.73");
+    expect(screen.getByLabelText("合成音量")).toHaveValue("65");
+    fireEvent.click(screen.getByRole("button", { name: "保存到本组" }));
     await screen.findByText(/已应用到分组草稿/);
     const drafts = JSON.parse(screen.getByTestId("drafts").textContent!);
-    expect(drafts.a.recommendations.pairs[0]).toMatchObject({
-      selected: true,
-      uk: { voice_alias: "sonia", parameters },
-      us: { voice_alias: "guy" }
-    });
+    expect(drafts.a.uk).toEqual([
+      expect.objectContaining({
+        selected: true,
+        voice_alias: "sonia",
+        parameters
+      })
+    ]);
+    expect(drafts.a.us).toEqual([]);
     expect(drafts.b.name).toBe("B draft");
     expect(
       client.getQueryData(["admin-dubbing-groups-v3", "groups-admin"])
     ).toEqual(initial);
     expect(api.speech.saveGroups).not.toHaveBeenCalled();
     expect(api.speech.saveGroup).not.toHaveBeenCalled();
-  }, 15000);
-  it("已有20套时保留分组选择并拒绝追加", async () => {
+  });
+  it("另一侧满20项不限制当前侧，取消编辑不制造草稿", async () => {
     const full = structuredClone(initial);
-    full.groups[0]!.recommendations = {
-      format: "paired",
-      pairs: Array.from({ length: 20 }, (_, i) => ({
-        id: String(i),
-        name: String(i),
-        selected: true,
-        uk: { id: `uk-${i}`, voice_alias: "sonia", parameters },
-        us: { id: `us-${i}`, voice_alias: "guy", parameters }
-      }))
-    };
+    full.groups[0]!.us = Array.from({ length: 20 }, (_, index) => ({
+      id: `us-${index}`,
+      name: String(index),
+      selected: true,
+      voice_alias: "guy",
+      parameters
+    }));
+    const client = mount();
+    await act(async () =>
+      client.setQueryData(["admin-dubbing-groups-v3", "groups-admin"], full)
+    );
+    await chooseGroup();
+    await screen.findByLabelText("合成语速");
+    fireEvent.click(screen.getByRole("button", { name: /^取消$/ }));
+    expect(screen.getByTestId("drafts")).toHaveTextContent("{}");
+    expect(api.speech.saveGroup).not.toHaveBeenCalled();
+  });
+  it("当前侧已有20项时保留分组选择并拒绝追加", async () => {
+    const full = structuredClone(initial);
+    full.groups[0]!.uk = Array.from({ length: 20 }, (_, i) => ({
+      id: `uk-${i}`,
+      name: String(i),
+      selected: true,
+      voice_alias: "sonia",
+      parameters
+    }));
     const client = mount();
     await act(async () =>
       client.setQueryData(["admin-dubbing-groups-v3", "groups-admin"], full)

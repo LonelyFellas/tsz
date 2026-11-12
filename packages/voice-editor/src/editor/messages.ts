@@ -304,6 +304,7 @@ export const voiceEditorMessages = {
     "取消啟用失效音色",
     "Disable unavailable voice"
   ],
+  no_catalog_voice: ["不使用目录音色", "不使用目錄音色", "No catalogue voice"],
   local_recommendation: ["局部推荐", "局部推薦", "Local recommendation"],
   recommended_voices: ["推荐配音", "推薦配音", "Recommended voices"],
   do_not_use_recommended_voices: [
@@ -328,6 +329,29 @@ export const voiceEditorMessages = {
     "历史未配对分组仅保留默认解析；请在分组页明确整理后选用整套推荐。",
     "歷史未配對分組僅保留預設解析；請在分組頁明確整理後選用整套推薦。",
     "Unpaired historical groups retain default resolution only. Organise the group explicitly before selecting a complete recommendation."
+  ],
+  voice_pool_accent_conflict: [
+    "此音色已有另一侧的局部配置，请先处理归属冲突。",
+    "此音色已有另一側的局部配置，請先處理歸屬衝突。",
+    "This voice has local settings for the other accent. Resolve its accent conflict first."
+  ],
+  common_parameters: ["常用参数", "常用參數", "Common parameters"],
+  other_parameters: ["其他参数", "其他參數", "Other parameters"],
+  inherited_catalog_source: [
+    "继承 · 音色目录",
+    "繼承 · 音色目錄",
+    "Inherited · Voice catalogue"
+  ],
+  inherited_recommendation_source: [
+    "继承 · {{p0}} / {{p1}}",
+    "繼承 · {{p0}} / {{p1}}",
+    "Inherited · {{p0}} / {{p1}}"
+  ],
+  local_voice_settings: ["独立配音", "獨立配音", "Local voices"],
+  restore_accent_defaults: [
+    "恢复{{p0}}默认",
+    "恢復{{p0}}預設",
+    "Restore {{p0}} defaults"
   ],
   historical_single_accent_recommendation_source: [
     "历史单侧推荐／来源",

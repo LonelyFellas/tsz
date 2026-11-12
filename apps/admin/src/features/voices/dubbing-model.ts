@@ -3,17 +3,13 @@ import { speechAccentGroup } from "@tsz/shared";
 import type {
   AdminDubbingRecommendation,
   AdminDubbingGroupV3,
-  AdminDubbingRecommendationPair,
-  AdminSpeechVoice,
-  AdminDubbingPairVoice
+  AdminSpeechVoice
 } from "@tsz/types";
 import { newWordNodeId } from "@/features/dictionary/word-model/primitives";
 
 export const dubbingGroupsKey = (accountId: string | undefined) =>
   ["admin-dubbing-groups-v3", accountId] as const;
-export type DubbingDraft = AdminDubbingGroupV3 & {
-  legacyPairs?: AdminDubbingRecommendationPair[];
-};
+export type DubbingDraft = AdminDubbingGroupV3;
 export const sides = ["uk", "us"] as const;
 export type DubbingSide = (typeof sides)[number];
 export const sideName = (
@@ -21,7 +17,9 @@ export const sideName = (
   t: VoiceTranslation = defaultVoiceTranslation
 ) => t(side === "uk" ? "british" : "american");
 
-export function newPairVoice(voice: AdminSpeechVoice): AdminDubbingPairVoice {
+export function newRecommendationVoice(
+  voice: AdminSpeechVoice
+): Omit<AdminDubbingRecommendation, "name" | "selected"> {
   const c = voice.capabilities;
   return {
     id: newWordNodeId(),
@@ -38,18 +36,6 @@ export function newPairVoice(voice: AdminSpeechVoice): AdminDubbingPairVoice {
       style: null
     }
   };
-}
-
-export function legacyComplete(group: DubbingDraft): boolean {
-  const rec = group.recommendations;
-  return (
-    rec.format === "paired" ||
-    sides.every((side) =>
-      rec[side].every((item) =>
-        group.legacyPairs?.some((pair) => pair[side].id === item.id)
-      )
-    )
-  );
 }
 
 export function recommendationError(

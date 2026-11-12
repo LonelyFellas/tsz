@@ -30,15 +30,19 @@ vi.mock("@/lib/auth", () => ({
   }
 }));
 
-function legacyResponse(response: {
+function independentResponse(response: {
   groups: Array<Record<string, unknown>>;
   [key: string]: unknown;
 }) {
   return {
     ...response,
-    groups: response.groups.map(({ uk, us, ...group }) => ({
+    order_revision: 0,
+    groups: response.groups.map((group) => ({
+      revision: 1,
+      is_global: false,
       ...group,
-      recommendations: { format: "legacy", uk: uk ?? [], us: us ?? [] }
+      uk: group.uk ?? [],
+      us: group.us ?? []
     }))
   };
 }
@@ -115,7 +119,7 @@ describe("admin voice preview data source", () => {
       expect(state.preview).toHaveBeenCalled();
     }
   );
-  it("v3配对推荐保留整套双侧身份和组内未选项，单侧正文也能查看完整推荐", async () => {
+  it("独立推荐保留条目身份、顺序与未选项，单侧请求只返回本侧", async () => {
     const voice = (id: string) => ({
       id: `side-${id}`,
       voice_alias: id,
@@ -136,18 +140,11 @@ describe("admin voice preview data source", () => {
           areas: ["word"],
           is_global: false,
           revision: 1,
-          recommendations: {
-            format: "paired",
-            pairs: [
-              {
-                id: "pair",
-                name: "同名",
-                selected: false,
-                uk: voice("sonia"),
-                us: voice("aria")
-              }
-            ]
-          }
+          uk: [
+            { ...voice("sonia"), name: "英式一", selected: false },
+            { ...voice("ryan"), name: "英式二", selected: true }
+          ],
+          us: [{ ...voice("aria"), name: "美式", selected: false }]
         }
       ]
     });
@@ -157,10 +154,9 @@ describe("admin voice preview data source", () => {
       locale: "en-GB"
     });
     expect(
-      result.map(({ id, groupId, pairId, selected, locale }) => ({
+      result.map(({ id, groupId, selected, locale }) => ({
         id,
         groupId,
-        pairId,
         selected,
         locale
       }))
@@ -168,16 +164,15 @@ describe("admin voice preview data source", () => {
       {
         id: "side-sonia",
         groupId: "g",
-        pairId: "pair",
+
         selected: false,
         locale: "en-GB"
       },
       {
-        id: "side-aria",
+        id: "side-ryan",
         groupId: "g",
-        pairId: "pair",
-        selected: false,
-        locale: "en-US"
+        selected: true,
+        locale: "en-GB"
       }
     ]);
     expect(
@@ -190,7 +185,7 @@ describe("admin voice preview data source", () => {
   });
   it("重新读取推荐不能在一分钟内继续使用上次保存前的配置", async () => {
     const response = (rate: number) =>
-      legacyResponse({
+      independentResponse({
         revision: rate === 0 ? 1 : 2,
         groups: [
           {
@@ -259,7 +254,7 @@ describe("admin voice preview data source", () => {
 
   it("推荐按板块和口音加载，并复制完整声音参数", async () => {
     state.groupsV3.mockResolvedValue(
-      legacyResponse({
+      independentResponse({
         revision: 1,
         groups: [
           {
@@ -326,7 +321,7 @@ describe("admin voice preview data source", () => {
       parameters: { rate_percent: -27, pitch_semitones: 0, style: null }
     });
     state.groupsV3.mockResolvedValue(
-      legacyResponse({
+      independentResponse({
         revision: 4,
         groups: [
           {

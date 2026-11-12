@@ -6,7 +6,7 @@ import type { VoiceProfileV3 } from "@tsz/types";
 import spec from "./openapi.snapshot.json";
 
 describe("音色库契约", () => {
-  it("局部池显式版本与推荐来源严格解析，resolve携带v5且原样传输无推荐池", async () => {
+  it("局部池显式版本与推荐来源严格解析，resolve携带v6且原样传输无推荐池", async () => {
     const id = "11111111-1111-4111-8111-111111111111";
     const profile: VoiceProfileV3 = {
       voices: [
@@ -20,22 +20,23 @@ describe("音色库契约", () => {
         }
       ],
       dubbing: {
-        mode: "local" as const,
         area: "word" as const,
-        pool_version: "provider_id_v1" as const
+        uk: { mode: "local" as const },
+        us: { mode: "local" as const }
       }
     };
-    expect(spec.schemas.VoicePoolVersionV3.enum).toEqual(["provider_id_v1"]);
+    expect(spec.schemas.VoiceSideDubbingV3.required).toContain("mode");
     expect(spec.schemas.LocalVoiceRecommendationV3.additionalProperties).toBe(
       false
     );
     expect(spec.schemas.LocalVoiceRecommendationV3.required).toEqual([
       "group_id",
-      "pair_id",
-      "voice_ids",
-      "contribution_ids"
+      "recommendation_id",
+      "voice_id"
     ]);
-    const http = { post: vi.fn().mockResolvedValue({ voices: [] }) };
+    const http = {
+      post: vi.fn().mockResolvedValue({ voices: [], source: { kind: "local" } })
+    };
     const input = {
       profile,
       accent: "gb" as const,
@@ -49,7 +50,7 @@ describe("音色库契约", () => {
     );
     expect(http.post).toHaveBeenCalledWith("/speech/resolve", input, {
       signal: undefined,
-      headers: { "X-TSZ-Voice-Versions": "v5" }
+      headers: { "X-TSZ-Voice-Versions": "v6" }
     });
     expect(http.post.mock.calls[0]![1].profile).toBe(profile);
   });
@@ -209,7 +210,9 @@ describe("音色库契约", () => {
       "name",
       "areas",
       "uk",
-      "us"
+      "us",
+      "revision",
+      "is_global"
     ]);
     expect(
       spec.operationSchemas["put /admin/speech/groups"].responses
@@ -218,177 +221,94 @@ describe("音色库契约", () => {
 });
 
 const groupId = "018f47b8-e3c1-7bd1-9f0a-123456789aa1";
-const pairId = "018f47b8-e3c1-7bd1-9f0a-123456789aa2";
 const ukId = "018f47b8-e3c1-7bd1-9f0a-123456789aa3";
 const usId = "018f47b8-e3c1-7bd1-9f0a-123456789aa4";
-function pairedGroups() {
+function independentGroups() {
+  const item = (id: string, name: string, alias: string, selected = true) => ({
+    id,
+    name,
+    voice_alias: alias,
+    selected,
+    parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
+  });
   return {
     revision: 2,
     order_revision: 1,
     groups: [
       {
         id: groupId,
-        name: "配对组",
+        name: "独立推荐",
         areas: ["word"],
         revision: 1,
         is_global: false,
-        recommendations: {
-          format: "paired" as const,
-          pairs: [
-            {
-              id: pairId,
-              name: "第一套",
-              selected: false,
-              uk: {
-                id: ukId,
-                voice_alias: "en-gb-sonianeural",
-                parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
-              },
-              us: {
-                id: usId,
-                voice_alias: "en-us-jennyneural",
-                parameters: {
-                  rate_percent: 10,
-                  pitch_semitones: 0,
-                  style: null
-                }
-              }
-            }
-          ]
-        }
+        uk: [
+          item(ukId, "英式一", "en-gb-sonianeural", false),
+          item(usId, "英式二", "en-gb-sonianeural")
+        ],
+        us: []
       }
     ]
   };
 }
 
-describe("配对推荐 v3 契约", () => {
-  it("复用路径显式协商，写入及返回同时声明两种表示", () => {
+describe("英美独立推荐契约", () => {
+  it("所有分组读写声明同一严格独立表示与顺序版本", () => {
     for (const operation of [
-      "get /admin/speech/groups",
       "post /admin/speech/groups",
       "put /admin/speech/groups/{id}",
       "delete /admin/speech/groups/{id}"
     ] as const) {
-      expect(spec.operationHeaders[operation]).toContainEqual({
-        name: "X-TSZ-Dubbing-Groups",
-        in: "header",
-        required: false,
-        schema: { type: ["string", "null"] }
-      });
       expect(spec.operationSchemas[operation].responses["200"]).toEqual({
-        $ref: "#/components/schemas/DubbingGroupsReadResponse"
+        $ref: "#/components/schemas/DubbingGroupsResponse"
       });
     }
-    expect(spec.schemas.DubbingGroupsReadResponse.oneOf).toEqual([
-      { $ref: "#/components/schemas/DubbingGroupsResponse" },
-      { $ref: "#/components/schemas/DubbingGroupsV3Response" }
-    ]);
-    expect(spec.schemas.DubbingGroupsV3Response.required).toContain(
+    expect(
+      spec.operationSchemas["get /admin/speech/groups"].responses["200"]
+    ).toEqual({ $ref: "#/components/schemas/DubbingGroupsReadResponse" });
+    expect(spec.schemas.DubbingGroupsReadResponse.oneOf).toContainEqual({
+      $ref: "#/components/schemas/DubbingGroupsResponse"
+    });
+    expect(spec.schemas.DubbingGroupsResponse.required).toContain(
       "order_revision"
     );
-    expect(spec.schemas.DubbingPairVoice.required).toEqual([
-      "id",
-      "voice_alias",
-      "parameters"
+    expect(spec.schemas.DubbingGroup.additionalProperties).toBe(false);
+  });
+  it("保留不等长、空侧、同声多参数与独立选择状态", () => {
+    const value = independentGroups();
+    expect(decodeDubbingGroupsV3(value)).toBe(value);
+    expect(value.groups[0]!.uk.map((item) => item.selected)).toEqual([
+      false,
+      true
     ]);
-    expect(spec.schemas.DubbingPairVoice.additionalProperties).toBe(false);
   });
-
-  it("严格解析完整套和未猜配历史列表，保留同声多参数及不等长数据", () => {
-    const paired = pairedGroups();
-    expect(decodeDubbingGroupsV3(paired)).toBe(paired);
-    const side = paired.groups[0]!.recommendations.pairs[0]!.uk;
-    const legacy = {
-      ...paired,
-      groups: [
-        {
-          ...paired.groups[0],
-          recommendations: {
-            format: "legacy",
-            uk: [
-              { ...side, name: "同名", selected: false },
-              {
-                ...side,
-                id: usId,
-                name: "同名",
-                selected: true,
-                parameters: { ...side.parameters, rate_percent: 20 }
-              }
-            ],
-            us: []
-          }
-        }
-      ]
-    };
-    expect(decodeDubbingGroupsV3(legacy)).toBe(legacy);
-  });
-
-  it("拒绝旧服务响应、缺失侧、未知字段与未知格式，不默默退回 v2", () => {
-    const malformed: unknown[] = [];
-    for (const path of [
-      ["order_revision"],
-      ["groups", 0, "recommendations", "pairs", 0, "us"],
-      ["groups", 0, "recommendations", "pairs", 0, "selected"]
-    ]) {
-      const value = structuredClone(pairedGroups());
-      let parent: unknown = value;
-      for (const key of path.slice(0, -1))
-        parent = (parent as Record<string, unknown>)[key];
-      delete (parent as Record<string, unknown>)[path.at(-1)!];
-      malformed.push(value);
-    }
-    const paired = pairedGroups();
-    malformed.push(
-      { ...paired, order_revision: -1 },
+  it("拒绝缺失侧、旧配对表示和未知字段", () => {
+    const good = independentGroups();
+    const { us: _us, ...missingSide } = good.groups[0]!;
+    for (const value of [
+      { groups: [], revision: 0 },
+      { ...good, groups: [missingSide] },
       {
-        ...paired,
+        ...good,
         groups: [
           {
-            ...paired.groups[0],
-            recommendations: { format: "guessed", pairs: [] }
+            ...good.groups[0],
+            recommendations: { format: "paired", pairs: [] }
           }
         ]
       },
       {
-        ...paired,
+        ...good,
         groups: [
-          {
-            ...paired.groups[0],
-            recommendations: { ...paired.groups[0]!.recommendations, uk: [] }
-          }
-        ]
-      },
-      {
-        ...paired,
-        groups: [
-          {
-            ...paired.groups[0],
-            recommendations: {
-              format: "paired",
-              pairs: [
-                {
-                  ...paired.groups[0]!.recommendations.pairs[0],
-                  uk: {
-                    ...paired.groups[0]!.recommendations.pairs[0]!.uk,
-                    extra: true
-                  }
-                }
-              ]
-            }
-          }
+          { ...good.groups[0], uk: [{ ...good.groups[0]!.uk[0], extra: true }] }
         ]
       }
-    );
-    for (const value of malformed) {
+    ])
       expect(() => decodeDubbingGroupsV3(value)).toThrow(
-        "配对推荐响应不符合接口契约"
+        "分组推荐响应不符合接口契约"
       );
-    }
-    expect(() => decodeDubbingGroupsV3({ groups: [], revision: 1 })).toThrow();
   });
-
-  it("v3 方法单独发送请求和严格解析，现有 v2 调用保持原样", async () => {
-    const value = pairedGroups();
+  it("单组保存、顺序和删除分别发送精确命令，并严格解析返回", async () => {
+    const value = independentGroups();
     const http = {
       get: vi.fn().mockResolvedValue(value),
       post: vi.fn().mockResolvedValue(value),
@@ -398,34 +318,27 @@ describe("配对推荐 v3 契约", () => {
     const endpoints = createAdminEndpoints(
       http as unknown as HttpClient
     ).speech;
-    const headers = {
-      "X-TSZ-Voice-Models": "v1",
-      "X-TSZ-Dubbing-Groups": "v3"
-    };
+    const headers = { "X-TSZ-Dubbing-Groups": "v4" };
     await expect(endpoints.groupsV3()).resolves.toBe(value);
     expect(http.get).toHaveBeenLastCalledWith("/speech/groups", { headers });
-    const input = {
-      base_revision: 1,
-      group: {
-        id: groupId,
-        name: "配对组",
-        areas: [],
-        is_global: false,
-        pairs: value.groups[0]!.recommendations.pairs
-      }
-    };
-    await endpoints.savePairedGroup(input, true);
+    const input = { group: value.groups[0]!, base_revision: 1 };
+    await endpoints.saveIndependentGroup(input, true);
     expect(http.post).toHaveBeenLastCalledWith("/speech/groups", input, {
       headers
     });
-    await endpoints.savePairedGroup(input);
+    await endpoints.saveIndependentGroup(input);
     expect(http.put).toHaveBeenLastCalledWith(
       `/speech/groups/${groupId}`,
       input,
       { headers }
     );
-    const order = { group_ids: [groupId], base_revision: value.order_revision };
-    await expect(endpoints.saveGroupOrder(order)).resolves.toBe(value);
+    const bulk = { groups: value.groups, base_revision: value.revision };
+    await endpoints.saveGroups(bulk);
+    expect(http.put).toHaveBeenLastCalledWith("/speech/groups", bulk, {
+      headers: { "X-TSZ-Voice-Models": "v1", "X-TSZ-Dubbing-Groups": "v4" }
+    });
+    const order = { group_ids: [groupId], base_revision: 1 };
+    await endpoints.saveGroupOrder(order);
     expect(http.put).toHaveBeenLastCalledWith("/speech/groups/order", order, {
       headers
     });
@@ -435,13 +348,9 @@ describe("配对推荐 v3 契约", () => {
       { base_revision: 1 },
       { headers }
     );
-    await endpoints.groups();
-    expect(http.get).toHaveBeenLastCalledWith("/speech/groups", {
-      headers: { ...headers, "X-TSZ-Dubbing-Groups": "v2" }
-    });
     http.get.mockResolvedValueOnce({ groups: [], revision: 0 });
     await expect(endpoints.groupsV3()).rejects.toThrow(
-      "配对推荐响应不符合接口契约"
+      "分组推荐响应不符合接口契约"
     );
   });
 });

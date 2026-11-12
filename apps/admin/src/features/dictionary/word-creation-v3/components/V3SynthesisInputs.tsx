@@ -140,19 +140,24 @@ export function V3SynthesisInputs({
     locale,
     requireLocaleConfirmation
   );
-  const selectedIssue = selectedSynthesis.use_spelling
-    ? undefined
-    : (synthesisInputIssue(
-        selectedSynthesis.alphabet,
-        selectedSynthesis[selectedSynthesis.alphabet]
-      ) ??
-      synthesisLocaleIssue(
-        selectedSynthesis,
-        selectedSynthesis.alphabet,
-        locale,
-        requireLocaleConfirmation
-      ));
-  const source = synthesis.use_spelling ? "spelling" : synthesis.alphabet;
+  const selectedIssue =
+    selectedSynthesis.source === "none" ||
+    selectedSynthesis.source === "upload" ||
+    selectedSynthesis.use_spelling
+      ? undefined
+      : (synthesisInputIssue(
+          selectedSynthesis.alphabet,
+          selectedSynthesis[selectedSynthesis.alphabet]
+        ) ??
+        synthesisLocaleIssue(
+          selectedSynthesis,
+          selectedSynthesis.alphabet,
+          locale,
+          requireLocaleConfirmation
+        ));
+  const source =
+    selectedSynthesis.source ??
+    (selectedSynthesis.use_spelling ? "spelling" : selectedSynthesis.alphabet);
   const writeCandidate = (
     side: Side,
     candidate: PronunciationSynthesisCandidateV3,
@@ -308,6 +313,10 @@ export function V3SynthesisInputs({
             const sideLocale = pronunciationLocale(side, "uk");
             const sideLabel = t(side === "uk" ? "dialect_uk" : "dialect_us");
             const candidate = candidateForSide(synthesis, side, dialect);
+            const selected = synthesisForLocale(synthesis, sideLocale, dialect);
+            const selectedSource =
+              selected.source ??
+              (selected.use_spelling ? "spelling" : selected.alphabet);
             const rowContent = pronunciationSynthesisContent(
               spelling,
               {
@@ -357,7 +366,11 @@ export function V3SynthesisInputs({
                       side: sideLabel,
                       name
                     })}
-                    disabled={!rowContent}
+                    disabled={
+                      !rowContent ||
+                      candidate.source === "none" ||
+                      candidate.source === "upload"
+                    }
                     disabledReason={
                       localPhoneticDiagnostic(
                         synthesisInputIssue(alphabet, candidate[alphabet]),
@@ -446,9 +459,7 @@ export function V3SynthesisInputs({
                     onClick={() => convert(side, alphabet)}
                   />
                   <V3PhonemeSpeechSettings
-                    active={
-                      !synthesis.use_spelling && synthesis.alphabet === alphabet
-                    }
+                    active={selectedSource === alphabet}
                     spelling={spelling}
                     nodeId={pronunciation.id}
                     field={`synthesis.${side}.${alphabet}_speech`}
@@ -589,17 +600,30 @@ export function V3SynthesisInputs({
               </div>
             )}
             <div className="word-synthesis-candidates">
-              {(dialect === "common" ? SIDES : [dialect]).map((side) => {
+              {SIDES.filter(
+                (side) => dialect === "common" || dialect === side
+              ).map((side) => {
                 const sideLabel = t(
                   side === "uk" ? "dialect_uk" : "dialect_us"
                 );
                 const candidate = candidateForSide(synthesis, side, dialect);
+                const current = synthesisForLocale(
+                  synthesis,
+                  side === "uk" ? "en-GB" : "en-US",
+                  dialect
+                );
                 const recordings = (pronunciation.audio_assets ?? []).filter(
                   (asset) => speechAccentGroup(asset.locale) === side
                 );
                 const recording = recordings.find((asset) => asset.is_default);
                 return (
-                  <div className="word-synthesis-source-actions" key={side}>
+                  <section
+                    className="word-synthesis-source-actions"
+                    key={side}
+                    aria-label={t("creation_accent_source", {
+                      side: sideLabel
+                    })}
+                  >
                     {dialect === "common" && (
                       <Typography.Text type="secondary">
                         {sideLabel}
@@ -607,38 +631,36 @@ export function V3SynthesisInputs({
                     )}
                     <Radio.Group
                       name={`synthesis-source-${pronunciation.id}-${side}`}
-                      aria-label={t("creation_synthesis_source_label", {
-                        label: `${label} ${sideLabel}`
+                      data-v3-node-id={pronunciation.id}
+                      data-v3-field={`synthesis.${side}.source`}
+                      aria-label={t("creation_accent_source", {
+                        side: sideLabel
                       })}
-                      value={recording ? "upload" : source}
+                      value={
+                        current.source ??
+                        (recording
+                          ? "upload"
+                          : current.use_spelling
+                            ? "spelling"
+                            : current.alphabet)
+                      }
                       onChange={(event) => {
                         const value = event.target.value;
                         const selected = recording ?? recordings[0];
-                        onChange({
-                          audio_assets: (pronunciation.audio_assets ?? []).map(
-                            (asset) =>
-                              recordings.some((item) => item.id === asset.id)
-                                ? {
-                                    ...asset,
-                                    is_default:
-                                      value === "upload" &&
-                                      asset.id === selected?.id
-                                  }
-                                : asset
-                          ),
-                          ...(value === "upload"
-                            ? {}
-                            : {
-                                synthesis: {
-                                  ...synthesis,
-                                  use_spelling: value === "spelling",
-                                  alphabet:
-                                    value === "spelling"
-                                      ? synthesis.alphabet
-                                      : value
+                        writeCandidate(
+                          side,
+                          { ...candidate, source: value },
+                          (pronunciation.audio_assets ?? []).map((asset) =>
+                            recordings.some((item) => item.id === asset.id)
+                              ? {
+                                  ...asset,
+                                  is_default:
+                                    value === "upload" &&
+                                    asset.id === selected?.id
                                 }
-                              })
-                        });
+                              : asset
+                          )
+                        );
                       }}
                     >
                       {[
@@ -656,16 +678,12 @@ export function V3SynthesisInputs({
                             : "",
                           fontClass: "tsz-phonetics"
                         },
-                        ...(upsExpanded
-                          ? [
-                              {
-                                value: "ups",
-                                name: "Azure UPS",
-                                text: candidate.ups.trim(),
-                                fontClass: "tsz-phonetics"
-                              }
-                            ]
-                          : []),
+                        {
+                          value: "ups",
+                          name: "Azure UPS",
+                          text: candidate.ups.trim(),
+                          fontClass: "tsz-phonetics"
+                        },
                         {
                           value: "upload",
                           name: t("creation_upload_audio"),
@@ -673,6 +691,12 @@ export function V3SynthesisInputs({
                             (recording ?? recordings[0])?.original_name ?? "",
                           fontClass: "",
                           disabled: recordings.length === 0
+                        },
+                        {
+                          value: "none",
+                          name: t("creation_accent_not_configured"),
+                          text: "",
+                          fontClass: ""
                         }
                       ].map((option) => (
                         <Radio
@@ -700,7 +724,7 @@ export function V3SynthesisInputs({
                         </Radio>
                       ))}
                     </Radio.Group>
-                  </div>
+                  </section>
                 );
               })}
             </div>
@@ -712,7 +736,9 @@ export function V3SynthesisInputs({
               showIcon
             />
           )}
-          {!selectedSynthesis.use_spelling &&
+          {selectedSynthesis.source !== "none" &&
+            selectedSynthesis.source !== "upload" &&
+            !selectedSynthesis.use_spelling &&
             !content &&
             Boolean(selectedSynthesis[selectedSynthesis.alphabet].trim()) && (
               <Typography.Text type="warning">
@@ -727,9 +753,14 @@ export function V3SynthesisInputs({
         <Space wrap>
           <Typography.Text>
             {t("creation_current_source", {
-              source: selectedSynthesis.use_spelling
-                ? t("spelling")
-                : `Azure ${selectedSynthesis.alphabet.toUpperCase()}`
+              source:
+                source === "none"
+                  ? t("creation_accent_not_configured")
+                  : source === "upload"
+                    ? t("creation_uploaded_source")
+                    : source === "spelling"
+                      ? t("spelling")
+                      : `Azure ${source.toUpperCase()}`
             })}
           </Typography.Text>
         </Space>

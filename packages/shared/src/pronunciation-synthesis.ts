@@ -53,7 +53,10 @@ export function pronunciationLocaleLabel(locale: PhonemeLocaleV3): string {
   return locale === "en-GB" ? "英式" : "美式";
 }
 type SelectedSynthesis = PronunciationSynthesisV3 &
-  Pick<PronunciationSynthesisCandidateV3, "ipa_speech" | "ups_speech">;
+  Pick<
+    PronunciationSynthesisCandidateV3,
+    "ipa_speech" | "ups_speech" | "source"
+  >;
 
 export function synthesisForLocale(
   synthesis: SelectedSynthesis,
@@ -63,8 +66,13 @@ export function synthesisForLocale(
   const candidate = synthesis[locale === "en-GB" ? "uk" : "us"];
   if (candidate)
     return {
-      alphabet: synthesis.alphabet,
-      use_spelling: synthesis.use_spelling,
+      alphabet:
+        candidate.source === "ipa" || candidate.source === "ups"
+          ? candidate.source
+          : synthesis.alphabet,
+      use_spelling: candidate.source
+        ? candidate.source === "spelling"
+        : synthesis.use_spelling,
       ...candidate,
       ipa_locale: locale,
       ups_locale: locale
@@ -77,6 +85,7 @@ export function synthesisForLocale(
   const upsLocale = synthesis.ups_locale ?? legacyLocale;
   const dual = synthesis.uk || synthesis.us;
   return {
+    ...(synthesis.source ? { source: synthesis.source } : {}),
     alphabet: synthesis.alphabet,
     use_spelling: synthesis.use_spelling,
     ipa: !dual || ipaLocale === locale ? synthesis.ipa : "",
@@ -126,13 +135,18 @@ export function synthesisLocaleIssue(
 /** Spelling is the readable body, never the phoneme string. Offsets count Unicode code points. */
 function basePronunciationSynthesisContent(
   spelling: string,
-  synthesis?: PronunciationSynthesisV3,
+  synthesis?: SelectedSynthesis,
   targetLocale?: PhonemeLocaleV3,
   requireLocaleConfirmation = false
 ): RichTextV2 | undefined {
   if (targetLocale && synthesis)
     synthesis = synthesisForLocale(synthesis, targetLocale);
-  if (!spelling.trim()) return undefined;
+  if (
+    !spelling.trim() ||
+    synthesis?.source === "none" ||
+    synthesis?.source === "upload"
+  )
+    return undefined;
   if (synthesis?.use_spelling)
     return { version: 2, text: spelling, annotations: [] };
   if (
@@ -793,7 +807,8 @@ export function savedVoiceAudioAsset(
     (voice) =>
       voice.enabled &&
       voice.audio_asset_id &&
-      speechAccentGroup(voice.locale) === speechAccentGroup(locale)
+      speechAccentGroup(voice.locale, voice.accent) ===
+        speechAccentGroup(locale)
   )?.audio_asset_id;
 }
 
@@ -809,6 +824,16 @@ export function pronunciationPlaybackSource(
   const synthesis = pronunciation.synthesis
     ? synthesisForLocale(pronunciation.synthesis, locale, legacyDialect)
     : undefined;
+  if (synthesis?.source === "none") return {};
+  if (synthesis?.source === "upload") {
+    const assets =
+      pronunciation.audio_assets?.filter(
+        (asset) => speechAccentGroup(asset.locale) === speechAccentGroup(locale)
+      ) ?? [];
+    return {
+      assetId: (assets.find((asset) => asset.is_default) ?? assets[0])?.id
+    };
+  }
   const speech = synthesis?.use_spelling
     ? spellingSpeech
     : pronunciationSynthesisSpeech(synthesis, locale);
@@ -831,21 +856,26 @@ export function pronunciationPlaybackSource(
       locale,
       requireLocaleConfirmation
     );
-  const assetId =
-    pronunciation.audio_assets?.find(
-      (asset) => asset.is_default && matchesLocale(asset.locale)
-    )?.id ??
-    uploads?.find((asset) => asset.is_default && matchesLocale(asset.locale))
-      ?.id ??
-    savedVoiceAudioAsset(!synthesis || content ? profile : undefined, locale) ??
-    (synthesis?.use_spelling
-      ? uploads?.find((asset) => matchesLocale(asset.locale))?.id
-      : undefined) ??
-    (!recordingChoice
-      ? (uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
-        pronunciation.audio_assets?.find((asset) => matchesLocale(asset.locale))
-          ?.id)
-      : undefined);
+  const assetId = synthesis?.source
+    ? savedVoiceAudioAsset(content ? profile : undefined, locale)
+    : (pronunciation.audio_assets?.find(
+        (asset) => asset.is_default && matchesLocale(asset.locale)
+      )?.id ??
+      uploads?.find((asset) => asset.is_default && matchesLocale(asset.locale))
+        ?.id ??
+      savedVoiceAudioAsset(
+        !synthesis || content ? profile : undefined,
+        locale
+      ) ??
+      (synthesis?.use_spelling
+        ? uploads?.find((asset) => matchesLocale(asset.locale))?.id
+        : undefined) ??
+      (!recordingChoice
+        ? (uploads?.find((asset) => matchesLocale(asset.locale))?.id ??
+          pronunciation.audio_assets?.find((asset) =>
+            matchesLocale(asset.locale)
+          )?.id)
+        : undefined));
   return {
     content,
     profile,

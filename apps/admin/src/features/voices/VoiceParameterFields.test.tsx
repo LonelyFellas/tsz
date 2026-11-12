@@ -79,20 +79,20 @@ function mount(target = voice, initial = defaultVoiceParameters(target)) {
   return onSave;
 }
 afterEach(() => cleanup());
-it("未支持高级项时说明原因，不展示无效空控件", async () => {
+it("未支持高级项时说明原因并置灰控件", async () => {
   mount({ ...voice, capability_evidence: undefined });
-  fireEvent.click(screen.getByText("高级参数", { exact: true }));
+  expect(screen.getByRole("region", { name: "其他参数" })).toBeVisible();
   expect(await screen.findByText("此音色没有可调的高级参数。")).toBeVisible();
-  expect(screen.queryByRole("spinbutton", { name: "风格强度" })).toBeNull();
-  expect(screen.queryByRole("combobox", { name: "角色" })).toBeNull();
+  expect(screen.getByRole("spinbutton", { name: "风格强度" })).toBeDisabled();
+  expect(screen.getByRole("combobox", { name: "角色" })).toBeDisabled();
 });
-it("选定风格后渐进展示可调项，并提交准确设置", async () => {
+it("常用及其他参数直接展开，选定风格后启用可调项并提交准确设置", async () => {
   const onSave = mount();
-  fireEvent.click(screen.getByText("高级参数", { exact: true }));
+  expect(screen.getByRole("region", { name: "其他参数" })).toBeVisible();
   expect(
     await screen.findByText("先选择说话风格，再调节高级参数。")
   ).toBeVisible();
-  expect(screen.queryByRole("spinbutton", { name: "风格强度" })).toBeNull();
+  expect(screen.getByRole("spinbutton", { name: "风格强度" })).toBeDisabled();
   fireEvent.mouseDown(screen.getByLabelText("说话风格"));
   fireEvent.click(
     await screen.findByText(styleNames.cheerful ?? "cheerful", {
@@ -127,7 +127,7 @@ it("不支持的已有高级值仍只读展示，修改基础参数不丢值", a
     role: "Girl"
   };
   const onSave = mount(target, initial);
-  fireEvent.click(screen.getByText("高级参数", { exact: true }));
+  expect(screen.getByRole("region", { name: "其他参数" })).toBeVisible();
   const degree = await screen.findByRole("spinbutton", { name: "风格强度" });
   expect(degree).toBeDisabled();
   expect(degree).toHaveValue("1.30");

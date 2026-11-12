@@ -936,6 +936,17 @@ export const creationResidualMessages = {
     "請檢查合成輸入與逐詞邊界",
     "Check synthesis input and word boundaries"
   ],
+  creation_uploaded_source: ["上传音频", "上傳音訊", "Uploaded audio"],
+  creation_accent_not_configured: [
+    "本侧暂不配置",
+    "本側暫不配置",
+    "Leave this accent unconfigured"
+  ],
+  creation_accent_source: [
+    "{{side}}配音来源",
+    "{{side}}配音來源",
+    "{{side}} speech source"
+  ],
   creation_speech_source: ["语音来源", "語音來源", "Speech source"],
   creation_upload_audio: ["上传音频", "上傳音訊", "Upload audio"],
   creation_loading_audio_upload: ["加载中…", "載入中…", "Loading…"],

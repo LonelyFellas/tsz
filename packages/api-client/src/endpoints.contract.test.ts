@@ -833,7 +833,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "16d65edaed3dc1fb6b447590c5723903acd927c0022b7b4c8c783e86420e33f9"
+      "eaef2e6e444350707e3a92865c9650cafdbdad91eed25144da92c7c452adfa12"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1132,20 +1132,19 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "post"
     ]);
     expect(snapshot.operationHeaders).toEqual({
-      "post /auth/refresh": [currentOnlyHeader, refreshHeader],
-      "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
       "get /admin/speech/groups": [
-        "X-TSZ-Dubbing-Groups",
-        "X-TSZ-Voice-Models"
-      ].map((name) => ({
-        name,
-        in: "header",
-        required: false,
-        schema: { type: ["string", "null"] }
-      })),
+        {
+          name: "X-TSZ-Dubbing-Groups",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        }
+      ],
       ...Object.fromEntries(
         [
           "post /admin/speech/groups",
+          "put /admin/speech/groups",
+          "put /admin/speech/groups/order",
           "put /admin/speech/groups/{id}",
           "delete /admin/speech/groups/{id}"
         ].map((operation) => [
@@ -1154,12 +1153,24 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
             {
               name: "X-TSZ-Dubbing-Groups",
               in: "header",
-              required: false,
-              schema: { type: ["string", "null"] }
-            }
+              required: true,
+              schema: { type: "string" }
+            },
+            ...(operation === "put /admin/speech/groups"
+              ? [
+                  {
+                    name: "X-TSZ-Voice-Models",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : [])
           ]
         ])
       ),
+      "post /auth/refresh": [currentOnlyHeader, refreshHeader],
+      "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
       "get /admin/speech/voices": [
         "X-TSZ-Voice-Catalog",
         "X-TSZ-Voice-Models"
@@ -1171,7 +1182,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       })),
       ...Object.fromEntries(
         [
-          "put /admin/speech/groups",
           "get /admin/speech/library",
           "put /admin/speech/library/{alias}/personal",
           "put /admin/speech/library/{alias}/description",
@@ -1850,7 +1860,7 @@ it("group ordering only accepts persisted IDs and its own revision", () => {
     $ref: "#/components/schemas/SaveDubbingGroupOrderRequest"
   });
   expect(operation.responses["200"]).toEqual({
-    $ref: "#/components/schemas/DubbingGroupsV3Response"
+    $ref: "#/components/schemas/DubbingGroupsResponse"
   });
   const schema = snapshot.schemas.SaveDubbingGroupOrderRequest;
   expect(schema.additionalProperties).toBe(false);

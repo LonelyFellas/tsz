@@ -226,10 +226,12 @@ it("参数改变后不会沿用旧资产，自动生成新参数的正式音频"
 it("继承推荐先解析实际选择，再生成并绑定解析出的音色", async () => {
   const preview = {
     ...adapter(),
-    resolveVoices: vi.fn().mockResolvedValue([setting])
+    resolveVoices: vi
+      .fn()
+      .mockResolvedValue({ voices: [setting], source: { kind: "local" } })
   };
   const view = setup(preview, {
-    dubbing: { mode: "inherit", area: "word", pool_version: "provider_id_v1" },
+    dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "inherit" } },
     voices: []
   });
   await waitFor(() =>
@@ -250,21 +252,24 @@ it.each([true, false])(
     const reassigned = {
       ...setting,
       voice_id: "guy",
-      locale: "en-US" as const
+      locale: "en-US" as const,
+      accent: "gb" as const
     };
     const generate = vi.fn().mockResolvedValue(asset("reassigned"));
     const preview = {
       ...adapter(generate),
-      resolveVoices: vi.fn().mockResolvedValue([reassigned])
+      resolveVoices: vi
+        .fn()
+        .mockResolvedValue({ voices: [reassigned], source: { kind: "local" } })
     };
     const profile: VoiceProfileV3 = {
       voices: [reassigned],
       ...(local
         ? {
             dubbing: {
-              mode: "local",
               area: "grammar",
-              pool_version: "provider_id_v1"
+              uk: { mode: "local" },
+              us: { mode: "local" }
             } as const
           }
         : {})
@@ -295,11 +300,13 @@ it("保存等待空继承配置物化首个有效音色，同一次保存承诺�
   );
   const preview = {
     ...adapter(generate),
-    resolveVoices: vi.fn().mockResolvedValue([setting])
+    resolveVoices: vi
+      .fn()
+      .mockResolvedValue({ voices: [setting], source: { kind: "local" } })
   };
   const view = setup(preview, {
     voices: [],
-    dubbing: { mode: "inherit", area: "word", pool_version: "provider_id_v1" }
+    dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "inherit" } }
   });
   await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
   const waiting = view.audioTasks.get("fixture-field")!();
@@ -351,4 +358,107 @@ it("输入期间暂缓生成，保存仍可主动等待；卸载清除登记并�
     expect(await pending).toBe(false);
   });
   expect(view.changed).not.toHaveBeenCalled();
+});
+
+it("英式生成期间修改美式来源和参数，英式结果仍绑定且美式新状态完整保留", async () => {
+  let finish!: (asset: AudioAsset) => void;
+  const generate = vi.fn(
+    () =>
+      new Promise<AudioAsset>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const american = {
+    ...setting,
+    voice_id: "guy",
+    version_id: "version-us",
+    locale: "en-US" as const,
+    rate_percent: 15,
+    audio_asset_id: "old-us"
+  };
+  const profile: VoiceProfileV3 = {
+    voices: [setting, american],
+    dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } }
+  };
+  const view = setup(adapter(generate), profile);
+  await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+  act(() =>
+    view.result.current.setProfile((current) => ({
+      ...current,
+      dubbing: { ...current.dubbing!, us: { mode: "inherit" } },
+      voices: current.voices.map((item) =>
+        item.voice_id === "guy"
+          ? { ...item, rate_percent: 25, version_name: "美式草稿" }
+          : item
+      )
+    }))
+  );
+  await act(async () => finish(asset("uk-ready")));
+  await waitFor(() =>
+    expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe(
+      "uk-ready"
+    )
+  );
+  expect(view.result.current.profile.dubbing!.us.mode).toBe("inherit");
+  expect(view.result.current.profile.voices[1]).toEqual({
+    ...american,
+    rate_percent: 25,
+    version_name: "美式草稿"
+  });
+  expect(generate).toHaveBeenCalledTimes(1);
+});
+
+it("英式正文变化只使英式继承资产失效，保留美式独立配置和音频", async () => {
+  const american = {
+    ...setting,
+    voice_id: "guy",
+    version_id: "version-us",
+    locale: "en-US" as const,
+    audio_asset_id: "keep-us"
+  };
+  const generate = vi.fn().mockResolvedValue(asset("new-uk"));
+  const preview = {
+    ...adapter(generate),
+    resolveVoices: vi
+      .fn()
+      .mockResolvedValue({ voices: [setting], source: { kind: "catalog" } })
+  };
+  const view = setup(preview, {
+    voices: [{ ...setting, audio_asset_id: "old-uk" }, american],
+    dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "local" } }
+  });
+  await act(async () => {
+    await view.audioTasks.get("fixture-field")!();
+  });
+  expect(generate).not.toHaveBeenCalled();
+  view.rerender({
+    content: { ...content, text: "changed" },
+    enabled: true,
+    defer: false
+  });
+  await waitFor(() =>
+    expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe("new-uk")
+  );
+  expect(view.result.current.profile.voices[1]).toEqual(american);
+  expect(generate).toHaveBeenCalledTimes(1);
+});
+
+it("逐侧解析拒绝局部配置时保留原池并阻止生成，不用缓存绕过后端拒绝", async () => {
+  const generate = vi.fn();
+  const view = setup(
+    {
+      ...adapter(generate),
+      resolveVoices: vi.fn().mockRejectedValue(new Error("当前侧不可用"))
+    },
+    {
+      voices: [setting],
+      dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } }
+    }
+  );
+  await waitFor(() =>
+    expect(view.result.current.error).toEqual(new Error("当前侧不可用"))
+  );
+  expect(await view.audioTasks.get("fixture-field")!()).toBe(false);
+  expect(generate).not.toHaveBeenCalled();
+  expect(view.result.current.profile.voices).toEqual([setting]);
 });

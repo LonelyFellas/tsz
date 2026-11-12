@@ -96,12 +96,12 @@ const version = (id: string, rate = 0): VoiceSetting => ({
 });
 const pool = (voices: VoiceSetting[]): VoiceProfile => ({
   voices,
-  dubbing: { mode: "local", area: "meaning", pool_version: "provider_id_v1" }
+  dubbing: { area: "meaning", uk: { mode: "local" }, us: { mode: "local" } }
 });
 const recommendation = (id: string, pair: string): VoiceRecommendation => ({
   id: `${pair}-${id}`,
   groupId: "group",
-  pairId: pair,
+
   name: pair,
   groupName: "释义组",
   locale: id === "us" ? "en-US" : "en-GB",
@@ -291,7 +291,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     ).toEqual(["b"]);
   });
 
-  it("全部音色跨口音和性别只能选一个，切换保留缓存参数与已选推荐", async () => {
+  it("目录每侧单选，切换英式保留美式、推荐和缓存参数", async () => {
     const onProfile = vi.fn();
     render(
       <Harness
@@ -306,21 +306,27 @@ describe("新版局部主页和唯一声音草稿", () => {
     const american = screen.getByRole("radio", { name: "选用 American" });
     fireEvent.click(beta);
     fireEvent.click(american);
-    expect(beta).not.toBeChecked();
+    expect(beta).toBeChecked();
     expect(american).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "推荐" })).toBeChecked();
+    const saved = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
     expect(
-      onProfile.mock.calls
-        .at(-1)![0]
-        .voices.filter((item: VoiceSetting) => item.enabled)
-        .map((item: VoiceSetting) => item.voice_id)
-    ).toEqual(["a", "us"]);
+      saved.voices.filter((item) => item.enabled).map((item) => item.voice_id)
+    ).toEqual(["b", "a", "us"]);
+    expect(saved.voices.find((item) => item.voice_id === "b")).toMatchObject({
+      rate_percent: -27,
+      version_id: "b-version"
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "推荐" }));
+    fireEvent.click(screen.getByRole("radio", { name: "选用 Alpha 阿尔法" }));
+    expect(beta).not.toBeChecked();
+    expect(american).toBeChecked();
     fireEvent.click(beta);
-    expect(american).not.toBeChecked();
+    expect(american).toBeChecked();
     expect(
-      onProfile.mock.calls
-        .at(-1)![0]
-        .voices.find((item: VoiceSetting) => item.voice_id === "b")
+      (onProfile.mock.calls.at(-1)![0] as VoiceProfile).voices.find(
+        (item) => item.voice_id === "b"
+      )
     ).toMatchObject({
       enabled: true,
       rate_percent: -27,
@@ -328,7 +334,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     });
   });
 
-  it("目录音色被同声推荐采用后，换目录再取消推荐仍只保留新目录音色", async () => {
+  it("目录音色被同声推荐采用后，取消推荐保留原目录参数且另一侧选择不受影响", async () => {
     const onProfile = vi.fn();
     render(
       <Harness
@@ -348,9 +354,9 @@ describe("新版局部主页和唯一声音草稿", () => {
         .at(-1)![0]
         .voices.filter((item: VoiceSetting) => item.enabled)
         .map((item: VoiceSetting) => item.voice_id)
-    ).toEqual(["us"]);
+    ).toEqual(["b", "us"]);
     expect(screen.getByRole("radio", { name: "选用 American" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "选用 Beta" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "选用 Beta" })).toBeChecked();
   });
 
   it("恢复默认推荐后再选择目录，不恢复之前取消的推荐勾选", async () => {
@@ -503,7 +509,7 @@ describe("新版局部主页和唯一声音草稿", () => {
   });
 
   it.each(["en-GB", "en-US", undefined] as const)(
-    "%s 的推荐和目录只展示适用方言，选用推荐仍保留成对来源",
+    "%s 的推荐和目录只展示适用侧，单选不改变另一侧",
     async (locale) => {
       const onProfile = vi.fn();
       render(
@@ -511,59 +517,48 @@ describe("新版局部主页和唯一声音草稿", () => {
           locale={locale}
           initial={pool([])}
           recommendations={[
-            recommendation("a", "第一套"),
-            recommendation("us", "第一套"),
-            { ...recommendation("b", "旧英式"), pairId: undefined },
-            { ...recommendation("us", "旧美式"), pairId: undefined }
+            recommendation("a", "英式推荐"),
+            recommendation("us", "美式推荐")
           ]}
           onProfile={onProfile}
         />
       );
-      const first = await screen.findByRole("checkbox", { name: "第一套" });
+      const side = locale === "en-US" ? "美式" : "英式";
+      const group = await screen.findByRole("group", {
+        name: `${side} 局部推荐`
+      });
+      const first = within(group).getByRole("checkbox", {
+        name: `${side}推荐`
+      });
       await waitFor(() => expect(first).toBeEnabled());
-      const recommended = within(
-        screen.getByRole("region", {
-          name: "局部推荐"
-        })
-      );
       fireEvent.click(screen.getByText("完整音色目录"));
-      for (const [sideLocale, label, voice] of [
-        ["en-GB", "英式", "Alpha 阿尔法"],
-        ["en-US", "美式", "American"]
+      for (const [sideLocale, label] of [
+        ["en-GB", "英式"],
+        ["en-US", "美式"]
       ]) {
-        const applicable = !locale || locale === sideLocale;
         expect(
-          recommended.queryByRole("button", {
-            name: `试听 ${voice}`
-          }) !== null
-        ).toBe(applicable);
-        expect(
-          screen.queryByRole("searchbox", {
-            name: `${label}女声目录搜索`
-          }) !== null
-        ).toBe(applicable);
-        expect(
-          screen.queryByRole("searchbox", {
-            name: `${label}男声目录搜索`
-          }) !== null
-        ).toBe(applicable);
-        expect(
-          screen.queryByText(sideLocale === "en-GB" ? /旧英式/ : /旧美式/) !==
+          screen.queryByRole("searchbox", { name: `${label}女声目录搜索` }) !==
             null
-        ).toBe(applicable);
+        ).toBe(!locale || locale === sideLocale);
+        expect(
+          screen.queryByRole("group", { name: `${label} 局部推荐` }) !== null
+        ).toBe(!locale || locale === sideLocale);
       }
       expect(onProfile).not.toHaveBeenCalled();
       fireEvent.click(first);
       const next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+      const key = locale === "en-US" ? "us" : "uk";
+      const voice = key === "us" ? "us" : "a";
       expect(
         next.voices.filter((item) => item.enabled).map((item) => item.voice_id)
-      ).toEqual(
-        locale === "en-GB" ? ["a"] : locale === "en-US" ? ["us"] : ["a", "us"]
-      );
-      expect(next.dubbing?.recommendation).toMatchObject({
+      ).toEqual([voice]);
+      expect(next.dubbing?.[key].recommendations?.[0]).toMatchObject({
         group_id: "group",
-        pair_id: "第一套",
-        voice_ids: ["a", "us"]
+        recommendation_id: `${side}推荐-${voice}`,
+        voice_id: voice
+      });
+      expect(next.dubbing?.[key === "uk" ? "us" : "uk"]).toEqual({
+        mode: "local"
       });
     }
   );
@@ -627,68 +622,96 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
     expect(preview.synthesize).not.toHaveBeenCalled();
   });
-  it("勾选英美推荐后串行生成正式音频，完成前禁止保存，保存结果保留资产", async () => {
-    const preview = adapter();
-    const pending: Array<(asset: AudioAsset) => void> = [];
-    const generateAudio = vi.fn<
-      NonNullable<VoicePreviewAdapter["generateAudio"]>
-    >(() => new Promise((resolve) => pending.push(resolve)));
-    const saved = vi.fn();
-    function Reproduction() {
-      const [profile, setProfile] = useState(pool([]));
-      return (
-        <App>
-          <VoiceEditor
-            mode="synthesis"
-            value={{ version: 2, text: "hello", annotations: [] }}
-            onChange={vi.fn()}
-            voiceProfile={profile}
-            onVoiceProfileChange={setProfile}
-            previewAdapter={{ ...preview, generateAudio }}
-            recommendationArea="meaning"
-            loadRecommendations={async () => [
-              recommendation("a", "英美推荐"),
-              recommendation("us", "英美推荐")
-            ]}
-            renderActions={(canComplete, _prepare, capture) => (
-              <button
-                disabled={!canComplete}
-                onClick={() => saved(capture?.(true))}
-              >
-                保存复现草稿
-              </button>
-            )}
-          />
-        </App>
-      );
+  it.each([
+    { label: "英美", second: "us", locale: undefined },
+    { label: "同侧", second: "b", locale: "en-GB" as const }
+  ])(
+    "勾选$label推荐后串行生成正式音频，完成前禁止保存，保存结果保留资产",
+    async ({ second, locale }) => {
+      const preview = adapter();
+      const pending: Array<(asset: AudioAsset) => void> = [];
+      const generateAudio = vi.fn<
+        NonNullable<VoicePreviewAdapter["generateAudio"]>
+      >(() => new Promise((resolve) => pending.push(resolve)));
+      const saved = vi.fn();
+      function Reproduction() {
+        const [profile, setProfile] = useState(pool([]));
+        return (
+          <App>
+            <VoiceEditor
+              mode="synthesis"
+              locale={locale}
+              value={{ version: 2, text: "hello", annotations: [] }}
+              onChange={vi.fn()}
+              voiceProfile={profile}
+              onVoiceProfileChange={setProfile}
+              previewAdapter={{ ...preview, generateAudio }}
+              recommendationArea="meaning"
+              loadRecommendations={async () => [
+                recommendation("a", "英美推荐"),
+                recommendation(second, "英美推荐")
+              ]}
+              renderActions={(canComplete, _prepare, capture) => (
+                <button
+                  disabled={!canComplete}
+                  onClick={() => saved(capture?.(true))}
+                >
+                  保存复现草稿
+                </button>
+              )}
+            />
+          </App>
+        );
+      }
+      render(<Reproduction />);
+      for (const [index, side] of [
+        "英式",
+        second === "us" ? "美式" : "英式"
+      ].entries()) {
+        const group = await screen.findByRole("group", {
+          name: `${side} 局部推荐`
+        });
+        await waitFor(() =>
+          expect(
+            within(group).getAllByRole("checkbox", { name: "英美推荐" })[
+              second === "b" ? index : 0
+            ]
+          ).toBeEnabled()
+        );
+        fireEvent.click(
+          within(group).getAllByRole("checkbox", { name: "英美推荐" })[
+            second === "b" ? index : 0
+          ]!
+        );
+      }
+      await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
+      const save = screen.getByRole("button", { name: "保存复现草稿" });
+      expect(save).toBeDisabled();
+      expect(generateAudio).toHaveBeenCalledTimes(1);
+      expect(generateAudio.mock.calls[0]![0].setting.voice_id).toBe("a");
+      await act(async () => pending[0]!(generatedAsset("formal-uk")));
+      await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
+      expect(save).toBeDisabled();
+      expect(generateAudio.mock.calls[1]![0].setting.voice_id).toBe(second);
+      await act(async () => pending[1]!(generatedAsset("formal-us")));
+      await waitFor(() => expect(save).toBeEnabled());
+      fireEvent.click(save);
+      expect(saved).toHaveBeenCalledTimes(1);
+      expect(saved.mock.calls[0]![0].voiceProfile.voices).toEqual([
+        expect.objectContaining({
+          voice_id: "a",
+          enabled: true,
+          audio_asset_id: "formal-uk"
+        }),
+        expect.objectContaining({
+          voice_id: second,
+          enabled: true,
+          audio_asset_id: "formal-us"
+        })
+      ]);
+      expect(preview.synthesize).not.toHaveBeenCalled();
     }
-    render(<Reproduction />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "英美推荐" }));
-    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
-    const save = screen.getByRole("button", { name: "保存复现草稿" });
-    expect(save).toBeDisabled();
-    expect(generateAudio).toHaveBeenCalledTimes(1);
-    await act(async () => pending[0]!(generatedAsset("formal-uk")));
-    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
-    expect(save).toBeDisabled();
-    await act(async () => pending[1]!(generatedAsset("formal-us")));
-    await waitFor(() => expect(save).toBeEnabled());
-    fireEvent.click(save);
-    expect(saved).toHaveBeenCalledTimes(1);
-    expect(saved.mock.calls[0]![0].voiceProfile.voices).toEqual([
-      expect.objectContaining({
-        voice_id: "a",
-        enabled: true,
-        audio_asset_id: "formal-uk"
-      }),
-      expect.objectContaining({
-        voice_id: "us",
-        enabled: true,
-        audio_asset_id: "formal-us"
-      })
-    ]);
-    expect(preview.synthesize).not.toHaveBeenCalled();
-  });
+  );
 
   it("载入已勾选音色无需试听就补齐正式音频，已有资产和未勾选音色不重新生成", async () => {
     const preview = adapter();
@@ -1045,7 +1068,7 @@ describe("新版局部主页和唯一声音草稿", () => {
             {
               ...global[0]!,
               id: "legacy-global",
-              pairId: undefined,
+
               name: "历史全局兜底"
             }
           ]}
@@ -1055,9 +1078,11 @@ describe("新版局部主页和唯一声音草稿", () => {
       await screen.findByRole("radio", { name: "选用 Alpha 阿尔法" });
       if (fallbackOnly) {
         expect(
-          (await screen.findByRole("checkbox", { name: /板块推荐/ })).closest(
-            "label"
-          )
+          (
+            await within(
+              screen.getByRole("group", { name: "英式 局部推荐" })
+            ).findByRole("checkbox", { name: /板块推荐/ })
+          ).closest("label")
         ).toBeVisible();
         expect(screen.queryByRole("checkbox", { name: /全局兜底/ })).toBeNull();
         expect(
@@ -1065,9 +1090,11 @@ describe("新版局部主页和唯一声音草稿", () => {
         ).toBeNull();
       } else {
         expect(
-          (await screen.findByRole("checkbox", { name: /全局兜底/ })).closest(
-            "label"
-          )
+          (
+            await within(
+              screen.getByRole("group", { name: "美式 局部推荐" })
+            ).findByRole("checkbox", { name: /全局兜底/ })
+          ).closest("label")
         ).toBeVisible();
         expect(await screen.findByText("历史全局兜底")).toBeVisible();
       }
@@ -1077,22 +1104,24 @@ describe("新版局部主页和唯一声音草稿", () => {
     "继承分组时 %s 重新解析最近保存配置，不把旧参数继续作为默认",
     async (trigger) => {
       let latestRate = 0;
-      const resolveVoices = vi.fn(async ({ accent }: { accent: string }) => [
-        {
-          ...version(accent === "gb" ? "a" : "us"),
-          rate_percent: accent === "gb" ? latestRate : 0
-        }
-      ]);
+      const resolveVoices = vi.fn(async ({ accent }: { accent: string }) => ({
+        voices: [
+          {
+            ...version(accent === "gb" ? "a" : "us"),
+            rate_percent: accent === "gb" ? latestRate : 0
+          }
+        ],
+        source: { kind: "catalog" as const }
+      }));
       const onProfile = vi.fn();
       render(
         <Harness
           initial={{
             voices: [],
             dubbing: {
-              mode: "inherit",
               area: "meaning",
-              pool_version: "provider_id_v1",
-              recommendation_order: []
+              uk: { mode: "inherit" },
+              us: { mode: "inherit" }
             }
           }}
           preview={{ ...adapter(), resolveVoices }}
@@ -1112,7 +1141,11 @@ describe("新版局部主页和唯一声音草稿", () => {
         expect(onProfile).toHaveBeenLastCalledWith(
           expect.objectContaining({
             voices: [],
-            dubbing: expect.objectContaining({ mode: "inherit" })
+            dubbing: {
+              area: "meaning",
+              uk: { mode: "inherit" },
+              us: { mode: "inherit" }
+            }
           })
         );
     }
@@ -1131,7 +1164,10 @@ describe("新版局部主页和唯一声音草稿", () => {
         onProfile={onProfile}
       />
     );
-    const first = await screen.findByRole("checkbox", { name: /第一套/ });
+    const ukGroup = await screen.findByRole("group", {
+      name: "英式 局部推荐"
+    });
+    const first = within(ukGroup).getByRole("checkbox", { name: /第一套/ });
     await waitFor(() => expect(first).toBeEnabled());
     fireEvent.click(screen.getByText("完整音色目录"));
     const columns = [
@@ -1148,16 +1184,18 @@ describe("新版局部主页和唯一声音草稿", () => {
         .getByRole("radio", { name: "选用 Alpha 阿尔法", hidden: true })
         .closest("[hidden]")
     ).not.toBeNull();
-    fireEvent.click(screen.getByRole("checkbox", { name: /第二套/ }));
+    fireEvent.click(within(ukGroup).getByRole("checkbox", { name: /第二套/ }));
     expect(screen.getByText(/已保留现有局部参数/)).toBeVisible();
     expect(
       onProfile.mock.calls
         .at(-1)![0]
         .voices.find((item: VoiceSetting) => item.voice_id === "b").rate_percent
     ).toBe(-27);
-    expect(screen.getByText("来源分组")).toBeVisible();
+    expect(within(ukGroup.parentElement!).getByText("来源分组")).toBeVisible();
     expect(screen.getAllByText("释义组")[0]).toBeVisible();
-    fireEvent.click(screen.getByRole("checkbox", { name: "不使用推荐配音" }));
+    fireEvent.click(
+      within(ukGroup).getByRole("checkbox", { name: "不使用推荐配音" })
+    );
     expect(
       onProfile.mock.calls
         .at(-1)![0]
@@ -1190,6 +1228,74 @@ describe("新版局部主页和唯一声音草稿", () => {
       screen.queryByRole("button", { name: "查看 SSML" })
     ).not.toBeInTheDocument();
   });
+  it("操作只物化英式；不使用推荐保留额外音色，美式继承及原样保存保持不变", async () => {
+    const initial: VoiceProfile = {
+      voices: [],
+      dubbing: {
+        area: "meaning",
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
+    };
+    const onProfile = vi.fn();
+    const saved = vi.fn();
+    render(
+      <Harness
+        initial={initial}
+        recommendations={[
+          recommendation("a", "首推"),
+          recommendation("us", "首推")
+        ]}
+        onProfile={onProfile}
+        renderActions={(canSave, _prepare, capture) => (
+          <button
+            disabled={!canSave}
+            onClick={() => {
+              try {
+                saved(capture?.(true));
+              } catch (error) {
+                saved(String(error));
+              }
+            }}
+          >
+            保存整段
+          </button>
+        )}
+      />
+    );
+    await screen.findByLabelText("美式池 首推");
+    fireEvent.click(screen.getByText("完整音色目录"));
+    fireEvent.click(screen.getByRole("radio", { name: "选用 Beta" }));
+    let next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+    expect(next.dubbing!.uk.mode).toBe("local");
+    expect(next.dubbing!.us).toEqual({ mode: "inherit" });
+    expect(next.voices.map((item) => item.voice_id)).toEqual(["a", "b"]);
+    const uk = within(screen.getByRole("group", { name: "英式 局部推荐" }));
+    fireEvent.click(uk.getByRole("checkbox", { name: "不使用推荐配音" }));
+    next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+    expect(
+      next.voices.filter((item) => item.enabled).map((item) => item.voice_id)
+    ).toEqual(["b"]);
+    expect(next.dubbing!.us).toEqual({ mode: "inherit" });
+    await waitFor(() => expect(screen.getByText("保存整段")).toBeEnabled());
+    fireEvent.click(screen.getByText("保存整段"));
+    expect(saved.mock.calls.at(-1)![0]).toMatchObject({ voiceProfile: next });
+    expect(await screen.findByLabelText("美式池 首推")).toBeVisible();
+    fireEvent.click(
+      within(
+        screen.getByRole("radiogroup", { name: "英式 完整音色目录" })
+      ).getByRole("radio", { name: "不使用目录音色" })
+    );
+    await waitFor(() => expect(screen.getByText("保存整段")).toBeEnabled());
+    fireEvent.click(screen.getByText("保存整段"));
+    expect(saved.mock.calls.at(-1)![0]).toContain("英式没有实际可用的已选音色");
+    fireEvent.click(screen.getByRole("button", { name: "恢复英式默认" }));
+    next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+    expect(next).toEqual(initial);
+    await waitFor(() => expect(screen.getByText("保存整段")).toBeEnabled());
+    fireEvent.click(screen.getByText("保存整段"));
+    expect(saved.mock.calls.at(-1)![0].voiceProfile).toEqual(initial);
+  });
   it("铅笔只打开当前音色，取消丢草稿，保存0.73倍和格式仅替换当前声音", async () => {
     const onProfile = vi.fn();
     render(
@@ -1206,7 +1312,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     expect(
       within(dialog).getByRole("region", { name: "声音参数" })
     ).toBeVisible();
-    expect(within(dialog).getByText("高级参数")).toBeVisible();
+    expect(within(dialog).getByText("其他参数")).toBeVisible();
     fireEvent.change(dialogField(dialog, "当前音色音量"), {
       target: { value: "65" }
     });
@@ -1326,7 +1432,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     const next = await detail();
     expect(within(next).queryByLabelText(/波形/)).not.toBeInTheDocument();
   });
-  it("历史同声多版本明确选择前不转换，保留选择的资产及另一侧，原快照不变", async () => {
+  it("同官方ID冲突明确阻止局部改写，原始参数、资产及另一侧不变", async () => {
     const old: VoiceProfile = {
       voices: [
         { ...version("a", -27), version_name: "慢读" },
@@ -1338,7 +1444,7 @@ describe("新版局部主页和唯一声音草稿", () => {
         },
         version("us")
       ],
-      dubbing: { mode: "local", area: "meaning" }
+      dubbing: { area: "meaning", uk: { mode: "local" }, us: { mode: "local" } }
     };
     const snapshot = structuredClone(old);
     const onProfile = vi.fn();
@@ -1356,25 +1462,19 @@ describe("新版局部主页和唯一声音草稿", () => {
         }}
       />
     );
-    await screen.findByRole("region", { name: "历史音色冲突" });
-    expect(
-      screen.getByRole("button", { name: "按选择转换为新池" })
-    ).toBeDisabled();
+    await screen.findByText("同一官方音色只能保留一个配置");
+    fireEvent.click(screen.getByRole("button", { name: "修改 快读" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(onProfile).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("radio", { name: /快读/ }));
-    fireEvent.click(screen.getByRole("button", { name: "按选择转换为新池" }));
-    expect(onProfile.mock.calls.at(-1)![0]).toMatchObject({
-      voices: [old.voices[1], old.voices[2]],
-      dubbing: { pool_version: "provider_id_v1" }
-    });
     expect(old).toEqual(snapshot);
   });
   it("正文资格过滤只计算有效已选池，服务端拒绝的声音不参与概率或重新生成", async () => {
     const preview = {
       ...adapter(),
-      resolveVoices: vi.fn(async ({ accent }: { accent: string }) =>
-        accent === "gb" ? [version("b")] : [version("us")]
-      )
+      resolveVoices: vi.fn(async ({ accent }: { accent: string }) => ({
+        voices: accent === "gb" ? [version("b")] : [version("us")],
+        source: { kind: "local" as const }
+      }))
     };
     render(
       <Harness
@@ -1653,7 +1753,9 @@ it("英文局部池说明、表头和目录可及名保留完整词界", async (
       />
     </InterfaceI18nProvider>
   );
-  expect(screen.getByText("British voice")).toBeVisible();
+  expect(
+    screen.getByRole("heading", { name: "British Recommended voices" })
+  ).toBeVisible();
   fireEvent.focus(
     screen.getByRole("button", { name: "Selection and audition guidance" })
   );
@@ -1670,4 +1772,31 @@ it("英文局部池说明、表头和目录可及名保留完整词界", async (
     screen.getByRole("searchbox", { name: "Search British Female catalogue" })
   ).toBeVisible();
   expect(changed).not.toHaveBeenCalled();
+});
+
+it("单侧编辑仍可取消保留的未归类音色，不把它当成另一侧隐藏", async () => {
+  const onProfile = vi.fn();
+  const unclassified = { ...version("a"), accent: "none" as const };
+  render(
+    <Harness
+      initial={pool([unclassified])}
+      locale="en-GB"
+      onProfile={onProfile}
+      preview={{
+        ...adapter(),
+        listVoices: vi
+          .fn()
+          .mockResolvedValue([{ ...options[0]!, accent: "none" }])
+      }}
+    />
+  );
+  const cancel = await screen.findByRole("button", {
+    name: "取消启用失效音色 a"
+  });
+  fireEvent.click(cancel);
+  expect(onProfile).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      voices: [{ ...unclassified, enabled: false }]
+    })
+  );
 });

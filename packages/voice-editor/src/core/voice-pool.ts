@@ -7,7 +7,11 @@ import type {
   VoiceSetting,
   VoicePreviewRequest
 } from "../types";
-import { newVoiceVersionId, voiceSettingKey } from "./voice-versions";
+import {
+  newVoiceVersionId,
+  voiceSettingKey,
+  voiceSettingAccent
+} from "./voice-versions";
 import { isVoiceRecommendationAvailable } from "./voice-recommendations";
 
 /** Official IDs are case-sensitive and include the complete model suffix. */
@@ -58,56 +62,63 @@ export function voicePoolConflicts(
   return [...groups].filter(([, items]) => items.length > 1);
 }
 
-export function convertVoicePool(
+export function localVoicePool(
   profile: VoiceProfile | null | undefined,
   settings: readonly VoiceSetting[],
   voices: readonly VoiceOption[],
   area: VoiceRecommendationArea,
-  choices: Readonly<Record<string, string>> = {}
+  side?: "uk" | "us"
 ): VoiceProfile {
-  const conflicts = voicePoolConflicts(settings, voices);
+  const belongsToSide = (item: VoiceSetting) => {
+    return voiceSettingAccent(item, voices) === side;
+  };
+  // Inherited resolution is a view; retain the other side's stored draft verbatim.
+  const stored = side
+    ? [
+        ...settings.filter(belongsToSide),
+        ...(profile?.voices ?? []).filter((item) => !belongsToSide(item))
+      ]
+    : [...settings];
   if (
-    conflicts.some(
-      ([id, items]) =>
-        !items.some((item) => voiceSettingKey(item) === choices[id])
-    )
+    voicePoolConflicts(side ? stored.filter(belongsToSide) : stored, voices)
+      .length
   )
-    throw new Error("请为每个同官方 ID 的历史冲突明确选择保留配置");
+    throw new Error("同一官方音色只能保留一个配置");
+  const dubbing = profile?.dubbing ?? {
+    area,
+    uk: { mode: profile ? ("local" as const) : ("inherit" as const) },
+    us: { mode: profile ? ("local" as const) : ("inherit" as const) }
+  };
   return {
-    voices: settings
-      .filter((item) => {
-        const conflict = conflicts.find(
-          ([id]) => id === providerVoiceKey(item.voice_id, voices)
-        );
-        return !conflict || voiceSettingKey(item) === choices[conflict[0]];
-      })
-      .map((item) => ({
-        ...item,
-        version_id: item.version_id ?? newVoiceVersionId(),
-        version_name:
-          item.version_name ??
-          Array.from(
-            voices.find((v) => v.id === item.voice_id)?.displayName ??
-              voices.find((v) => v.id === item.voice_id)?.label ??
-              item.voice_id
-          )
-            .slice(0, 40)
-            .join(""),
-        locale:
-          item.locale ??
-          (voices.find((v) => v.id === item.voice_id)?.locale as `en-${string}`)
-      })),
+    voices: stored.map((item) =>
+      side && !belongsToSide(item)
+        ? { ...item }
+        : {
+            ...item,
+            version_id: item.version_id ?? newVoiceVersionId(),
+            version_name:
+              item.version_name ??
+              Array.from(
+                voices.find((v) => v.id === item.voice_id)?.displayName ??
+                  voices.find((v) => v.id === item.voice_id)?.label ??
+                  item.voice_id
+              )
+                .slice(0, 40)
+                .join(""),
+            locale:
+              item.locale ??
+              (voices.find((v) => v.id === item.voice_id)
+                ?.locale as `en-${string}`)
+          }
+    ),
     dubbing: {
-      mode: "local",
-      area,
-      pool_version: "provider_id_v1",
-      ...(profile?.dubbing?.mode === "local" &&
-      profile.dubbing.recommendation_order
-        ? { recommendation_order: profile.dubbing.recommendation_order }
-        : {}),
-      ...(profile?.dubbing?.recommendation
-        ? { recommendation: profile.dubbing.recommendation }
-        : {})
+      ...dubbing,
+      ...(side
+        ? { [side]: { ...dubbing[side], mode: "local" as const } }
+        : {
+            uk: { ...dubbing.uk, mode: "local" as const },
+            us: { ...dubbing.us, mode: "local" as const }
+          })
     }
   };
 }
@@ -115,63 +126,78 @@ export function convertVoicePool(
 export function switchPoolRecommendation(
   profile: VoiceProfile,
   items: readonly VoiceRecommendation[],
-  voices: readonly VoiceOption[]
+  voices: readonly VoiceOption[],
+  side: "uk" | "us"
 ): { profile: VoiceProfile; duplicates: string[] } {
-  if (!profile.dubbing?.pool_version) throw new Error("请先明确转换历史配置");
+  if (!profile.dubbing) throw new Error("缺少配音板块");
   const previous = new Set(
-    profile.dubbing.recommendation?.contribution_ids ?? []
+    profile.dubbing[side].recommendations?.flatMap((item) =>
+      item.contribution_id ? [item.contribution_id] : []
+    ) ?? []
   );
   const settings = profile.voices.map((item) =>
     previous.has(voiceSettingKey(item)) ? { ...item, enabled: false } : item
   );
-  const contribution_ids: string[] = [];
   const duplicates: string[] = [];
-  const seen = new Set<string>();
-  for (const item of items) {
-    const key = providerVoiceKey(item.setting.voice_id, voices);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const index = settings.findIndex(
-      (setting) => providerVoiceKey(setting.voice_id, voices) === key
-    );
-    if (index >= 0) {
-      const cached = settings[index]!;
-      if (cached.enabled) duplicates.push(item.setting.voice_id);
-      else contribution_ids.push(voiceSettingKey(cached));
-      settings[index] = { ...cached, enabled: true };
-    } else {
-      const voice = voices.find((voice) => voice.id === item.setting.voice_id);
-      const version_id = newVoiceVersionId();
-      settings.push({
-        ...item.setting,
-        version_id,
-        version_name: item.name,
-        enabled: true,
-        locale: (voice?.locale ?? item.locale) as `en-${string}`
-      });
-      contribution_ids.push(version_id);
+  const recommendations: NonNullable<
+    NonNullable<VoiceProfile["dubbing"]>["uk"]["recommendations"]
+  > = [];
+  const seen = new Map<
+    string,
+    { voice_id: string; contribution_id?: string }
+  >();
+  for (const source of items.filter(
+    (item) => speechAccentGroup(item.locale) === side
+  )) {
+    const key = providerVoiceKey(source.setting.voice_id, voices);
+    let contribution = seen.get(key);
+    if (!contribution) {
+      const index = settings.findIndex(
+        (setting) => providerVoiceKey(setting.voice_id, voices) === key
+      );
+      if (index >= 0) {
+        const cached = settings[index]!;
+        if (voiceSettingAccent(cached, voices) !== side)
+          throw new Error("此音色已有另一侧的局部配置，请先处理归属冲突。");
+        contribution = { voice_id: cached.voice_id };
+        if (cached.enabled) duplicates.push(source.setting.voice_id);
+        else contribution.contribution_id = voiceSettingKey(cached);
+        settings[index] = { ...cached, enabled: true };
+      } else {
+        const contribution_id = newVoiceVersionId();
+        contribution = { voice_id: source.setting.voice_id, contribution_id };
+        settings.push({
+          ...source.setting,
+          version_id: contribution_id,
+          version_name: source.name,
+          enabled: true,
+          locale: (voices.find((voice) => voice.id === source.setting.voice_id)
+            ?.locale ?? source.locale) as `en-${string}`,
+          ...(speechAccentGroup(
+            voices.find((voice) => voice.id === source.setting.voice_id)?.locale
+          ) !== side
+            ? { accent: side === "uk" ? ("gb" as const) : ("us" as const) }
+            : {})
+        });
+      }
+      seen.set(key, contribution);
     }
+    if (source.groupId)
+      recommendations.push({
+        group_id: source.groupId,
+        recommendation_id: source.id,
+        ...contribution
+      });
   }
-  const source = items[0];
   return {
     profile: {
       voices: settings,
       dubbing: {
-        mode: "local",
-        area: profile.dubbing.area,
-        pool_version: "provider_id_v1",
-        ...(source?.groupId && source.pairId
-          ? {
-              recommendation: {
-                group_id: source.groupId,
-                pair_id: source.pairId,
-                voice_ids: [
-                  ...new Set(items.map((item) => item.setting.voice_id))
-                ],
-                contribution_ids
-              }
-            }
-          : {})
+        ...profile.dubbing,
+        [side]: {
+          mode: "local",
+          ...(recommendations.length ? { recommendations } : {})
+        }
       }
     },
     duplicates
@@ -196,12 +222,25 @@ export function togglePoolVoice(
           .slice(0, 40)
           .join(""),
         locale: voice.locale as `en-${string}`,
+        ...(speechAccentGroup(voice.locale) !==
+          speechAccentGroup(voice.locale, voice.accent) && voice.accent
+          ? { accent: voice.accent }
+          : {}),
         enabled: true,
         rate_percent: 0,
         ...voice.defaultSettings
       };
+  const side = speechAccentGroup(voice.locale, voice.accent);
   return {
     ...profile,
+    ...(profile.dubbing && (side === "uk" || side === "us")
+      ? {
+          dubbing: {
+            ...profile.dubbing,
+            [side]: { ...profile.dubbing[side], mode: "local" as const }
+          }
+        }
+      : {}),
     voices: cached
       ? profile.voices.map((item) => (item === cached ? setting : item))
       : [...profile.voices, setting]
@@ -216,8 +255,7 @@ export function reorderPoolVoice(
 ): VoiceSetting[] {
   const from = settings.findIndex((item) => voiceSettingKey(item) === key);
   const side = (item: VoiceSetting) => {
-    const voice = voices.find((v) => v.id === item.voice_id);
-    return speechAccentGroup(voice?.locale ?? item.locale, voice?.accent);
+    return voiceSettingAccent(item, voices);
   };
   const current = settings[from];
   if (!current) return [...settings];
@@ -246,6 +284,7 @@ export function voicePoolProbabilities(
     const eligible = settings.filter(
       (setting) =>
         setting.enabled &&
+        voiceSettingAccent(setting, voices) === speechAccentGroup(accent) &&
         voices.some(
           (voice) =>
             voice.id === setting.voice_id &&

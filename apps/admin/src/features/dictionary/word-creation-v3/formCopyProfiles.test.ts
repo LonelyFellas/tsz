@@ -61,7 +61,7 @@ const profile: VoiceProfileV3 = {
       pitch_semitones: 1
     }
   ],
-  dubbing: { mode: "inherit", area: "azure" }
+  dubbing: { area: "azure", uk: { mode: "inherit" }, us: { mode: "inherit" } }
 };
 beforeEach(() => {
   voices.mockReset().mockResolvedValue({
@@ -110,7 +110,11 @@ describe("复制前解析完整音色配置", () => {
     async (stale) => {
       const forms = fixture({
         voices: [{ voice_id: "stale", enabled: true, rate_percent: 0 }],
-        dubbing: { mode: "inherit", area: "azure" }
+        dubbing: {
+          area: "azure",
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
       });
       const fromRegions = forms.contents[0]!.regional_variants;
       const toRegions = forms.contents[1]!.regional_variants;
@@ -163,7 +167,7 @@ describe("复制前解析完整音色配置", () => {
           (setting) => setting.voice_id
         )
       ).toEqual(["stored", "resolved"]);
-      expect(next.common.spelling_speech!.voice_profile.dubbing!.mode).toBe(
+      expect(next.common.spelling_speech!.voice_profile.dubbing!.uk.mode).toBe(
         "local"
       );
     }
@@ -226,7 +230,7 @@ describe("复制前解析完整音色配置", () => {
     expect(resolve).not.toHaveBeenCalled();
     const local = fixture({
       ...profile,
-      dubbing: { mode: "local", area: "azure" }
+      dubbing: { area: "azure", uk: { mode: "local" }, us: { mode: "local" } }
     });
     await resolveFormCopyProfiles(
       planFormCopy(local, source, target, "voices"),
@@ -260,7 +264,7 @@ describe("复制前解析完整音色配置", () => {
           rate_percent: 20
         }
       ],
-      dubbing: { mode: "local", area: "azure" }
+      dubbing: { area: "azure", uk: { mode: "local" }, us: { mode: "local" } }
     };
     resolve.mockImplementation(async (input) => ({
       voices: sourceProfile.voices.filter(
@@ -317,4 +321,44 @@ describe("复制前解析完整音色配置", () => {
       resolveFormCopyProfiles(plan, new AbortController().signal)
     ).rejects.toThrow("配置已失效");
   });
+});
+
+it("逐侧拼写选择覆盖旧全局开关，复制前解析实际拼写配置", async () => {
+  const forms = fixture(profile);
+  const region = forms.contents[0]!.regional_variants;
+  if (region.mode !== "common") throw new Error("fixture");
+  const row = region.common.pronunciations[0]!;
+  delete row.voice_profile;
+  row.synthesis!.use_spelling = false;
+  row.synthesis!.uk = { ...row.synthesis!.uk!, source: "spelling" };
+  row.synthesis!.us = { ipa: "", ups: "", source: "none" };
+  region.common.spelling_speech = {
+    content: { version: 2, text: region.common.spelling, annotations: [] },
+    voice_profile: profile
+  };
+  const plan = planFormCopy(
+    forms,
+    forms.pos[0]!.forms[0]!.id,
+    forms.pos[0]!.forms[1]!.id,
+    "voices"
+  );
+  const resolved = await resolveFormCopyProfiles(
+    plan,
+    new AbortController().signal
+  );
+  expect(
+    resolved.some((item) => item.side === "uk" && item.channel === "fallback")
+  ).toBe(true);
+  expect(resolve).toHaveBeenCalledWith(
+    expect.objectContaining({
+      profile,
+      accent: "gb",
+      source: expect.objectContaining({
+        kind: "text",
+        content: expect.objectContaining({ text: region.common.spelling })
+      })
+    }),
+    expect.any(AbortSignal)
+  );
+  expect(resolved.some((item) => item.side === "us")).toBe(false);
 });

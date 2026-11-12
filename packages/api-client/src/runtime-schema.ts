@@ -27,7 +27,8 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "LexiconAssistantResponse",
   "LexiconAssistantEvent",
   "LexiconFormCandidatesResponse",
-  "DubbingGroupsV3Response",
+  "DubbingGroupsResponse",
+  "ResolveDubbingResponse",
   "LearningCapabilities",
   "AiLedgerPage",
   "AiCostLedgerPage",
@@ -179,7 +180,7 @@ type RuntimeSchema = {
   enum?: unknown[];
   required?: string[];
   properties?: Record<string, RuntimeSchema>;
-  additionalProperties?: false;
+  additionalProperties?: boolean;
   items?: RuntimeSchema;
   oneOf?: RuntimeSchema[];
   anyOf?: RuntimeSchema[];
