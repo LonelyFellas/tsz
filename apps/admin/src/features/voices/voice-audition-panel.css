@@ -46,7 +46,7 @@
 .voice-audition-panel .tsz-ve-ssml-review {
   min-width: 0;
 }
-@media (max-width: 700px) {
+@container voice-configuration (max-width: 700px) {
   .voice-audition-toolbar > .ui-flex {
     align-items: flex-start;
   }

@@ -16,6 +16,7 @@ export function VoiceConfigurationPanel({
     <section
       className="voice-configuration-panel"
       aria-label={t("adjust_voice")}
+      tabIndex={0}
     >
       <div className="voice-configuration-layout">
         <section
