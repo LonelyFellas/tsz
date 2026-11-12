@@ -189,7 +189,7 @@ it("未配置音标只在保存时生成当前推荐并保留继承，浏览不�
   }
 });
 
-it("缺省拼写保存时只补未被默认录音覆盖的一侧，录音原样保留", async () => {
+it("缺省拼写保存完整继承声音，默认录音及播放选择原样保留", async () => {
   const initial = fixture();
   const regions = initial.contents[0]!.regional_variants;
   if (regions.mode !== "common") throw new Error("fixture must be common");
@@ -220,11 +220,11 @@ it("缺省拼写保存时只补未被默认录音覆盖的一侧，录音原样�
   await act(async () => {
     for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
   });
-  expect(speech.generate).toHaveBeenCalledTimes(1);
+  expect(speech.generate).toHaveBeenCalledTimes(2);
   expect(speech.resolve).toHaveBeenCalledWith(
     expect.objectContaining({ accent: "us" })
   );
-  expect(speech.resolve).not.toHaveBeenCalledWith(
+  expect(speech.resolve).toHaveBeenCalledWith(
     expect.objectContaining({ accent: "gb" })
   );
   const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
@@ -232,7 +232,10 @@ it("缺省拼写保存时只补未被默认录音覆盖的一侧，录音原样�
   expect(saved.audio_assets).toEqual([recording]);
   expect(saved.voice_profile).toMatchObject({
     dubbing: { mode: "inherit", area: "word" },
-    voices: [expect.objectContaining({ locale: "en-US", rate_percent: -25 })]
+    voices: [
+      expect.objectContaining({ locale: "en-GB", rate_percent: -25 }),
+      expect.objectContaining({ locale: "en-US", rate_percent: -25 })
+    ]
   });
 });
 

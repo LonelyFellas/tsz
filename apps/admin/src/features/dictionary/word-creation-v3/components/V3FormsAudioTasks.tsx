@@ -5,7 +5,6 @@ import type {
   FormContentVariantV3,
   SharedFormsStepContentV3,
   VoiceProfileV3,
-  AudioAssetV3,
   RichTextV2
 } from "@tsz/types";
 import { Alert, Button } from "@tsz/ui/admin/display";
@@ -164,7 +163,6 @@ export function V3FormsAudioTasks({
                   }
                 }
                 profile={variant.spelling_speech?.voice_profile}
-                audioAssets={variant.spelling_speech?.audio_assets}
                 recommendationArea="word"
                 locale={
                   dialect === "common"
@@ -290,14 +288,12 @@ function TextAudioTask({
   enabled,
   onChange,
   recommendationArea,
-  audioAssets,
   locale
 }: {
   target: string;
   content: RichTextV2;
   profile?: VoiceProfileV3;
   recommendationArea?: "word";
-  audioAssets?: AudioAssetV3[];
   locale?: "en-GB" | "en-US";
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
@@ -310,7 +306,6 @@ function TextAudioTask({
     target,
     content,
     profile: effectiveProfile,
-    audioAssets,
     locale,
     adapter: adminVoicePreviewAdapter,
     enabled,

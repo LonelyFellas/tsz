@@ -72,6 +72,23 @@ function adapter(
   return { listVoices: vi.fn(), synthesize: vi.fn(), generateAudio };
 }
 
+it("继承缓存重新成为有效推荐时启用声音并复用已存资产", async () => {
+  const generate = vi.fn();
+  const resolveVoices = vi.fn().mockResolvedValue([setting]);
+  const preview = { ...adapter(generate), resolveVoices };
+  const view = setup(preview, {
+    voices: [{ ...setting, enabled: false, audio_asset_id: "stored-audio" }],
+    dubbing: { mode: "inherit", area: "word" }
+  });
+  await waitFor(() => expect(resolveVoices).toHaveBeenCalled());
+  await waitFor(() => expect(view.result.current.busy).toBe(false));
+  expect(view.result.current.profile.voices[0]).toMatchObject({
+    enabled: true,
+    audio_asset_id: "stored-audio"
+  });
+  expect(generate).not.toHaveBeenCalled();
+});
+
 it("保存等待在途的默认音频并取得资产回写，不重复发起生成", async () => {
   let finish!: (asset: AudioAsset) => void;
   const generate = vi.fn(

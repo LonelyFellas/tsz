@@ -573,7 +573,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     target: JSON.stringify([nodeId, field]),
     content: collapsedContent,
     profile: area ? withDefaultVoiceProfile(voiceProfile, area) : voiceProfile,
-    audioAssets,
     adapter: collapsedAdapter,
     locale: voiceLocale(dialect),
     enabled:

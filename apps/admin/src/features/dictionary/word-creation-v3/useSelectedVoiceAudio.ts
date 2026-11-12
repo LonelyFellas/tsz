@@ -7,8 +7,7 @@ import {
   useState
 } from "react";
 import { flushSync } from "react-dom";
-import type { AudioAssetV3, RichTextV2, VoiceProfileV3 } from "@tsz/types";
-import { speechAccentGroup } from "@tsz/shared";
+import type { RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import {
   newVoiceVersionId,
@@ -49,7 +48,6 @@ export function useSelectedVoiceAudio({
   target,
   content,
   profile,
-  audioAssets,
   adapter,
   locale,
   enabled,
@@ -59,7 +57,6 @@ export function useSelectedVoiceAudio({
   target: string;
   content: RichTextV2;
   profile?: VoiceProfileV3 | null;
-  audioAssets?: readonly AudioAssetV3[] | null;
   adapter: VoicePreviewAdapter;
   locale?: `en-${string}`;
   enabled: boolean;
@@ -80,15 +77,7 @@ export function useSelectedVoiceAudio({
     content,
     adapter.audioSourceKey
   ]);
-  const selectionSourceKey = v3ContentFingerprint([
-    sourceKey,
-    profile?.dubbing?.mode === "inherit"
-      ? audioAssets
-          ?.filter((asset) => asset.is_default)
-          .map((asset) => [asset.id, asset.locale])
-      : undefined
-  ]);
-  const signature = selectionSignature(selectionSourceKey, locale, profile);
+  const signature = selectionSignature(sourceKey, locale, profile);
   const latest = useRef({
     target,
     signature,
@@ -143,7 +132,7 @@ export function useSelectedVoiceAudio({
         : Promise.resolve(false);
     const commit = (next: VoiceProfileV3) => {
       if (!isCurrent()) return;
-      expectedSignature = selectionSignature(selectionSourceKey, locale, next);
+      expectedSignature = selectionSignature(sourceKey, locale, next);
       attempted.current = expectedSignature;
       if (running.current?.controller === controller)
         running.current.signature = expectedSignature;
@@ -195,16 +184,6 @@ export function useSelectedVoiceAudio({
                   !locale ||
                   (locale === "en-GB" ? accent === "gb" : accent === "us")
               )
-              .filter(
-                (accent) =>
-                  stored.dubbing?.mode !== "inherit" ||
-                  !audioAssets?.some(
-                    (asset) =>
-                      asset.is_default &&
-                      speechAccentGroup(asset.locale) ===
-                        (accent === "gb" ? "uk" : "us")
-                  )
-              )
               .map((accent) =>
                 adapter.resolveVoices!(
                   { profile: stored, content, accent },
@@ -242,13 +221,26 @@ export function useSelectedVoiceAudio({
             }
           }
         } else {
+          const reused = new Map(
+            selected
+              .filter((setting) => setting.audio_asset_id)
+              .map((setting) => [voiceSettingKey(setting), setting])
+          );
           stored = {
             ...stored,
-            voices: stored.voices.map((setting) =>
-              selectedKeys.has(voiceSettingKey(setting))
-                ? setting
-                : { ...setting, enabled: false }
-            )
+            voices: stored.voices.map((setting) => {
+              const resolved = reused.get(voiceSettingKey(setting));
+              return resolved
+                ? {
+                    ...resolved,
+                    ...(setting.version_name !== undefined
+                      ? { version_name: setting.version_name }
+                      : {})
+                  }
+                : selectedKeys.has(voiceSettingKey(setting))
+                  ? setting
+                  : { ...setting, enabled: false };
+            })
           };
           if (JSON.stringify(stored) !== JSON.stringify(latest.current.profile))
             commit(stored);
@@ -319,13 +311,11 @@ export function useSelectedVoiceAudio({
     return result;
   }, [
     adapter,
-    audioAssets,
     content,
     effects,
     enabled,
     locale,
     profile,
-    selectionSourceKey,
     signature,
     sourceKey,
     target
