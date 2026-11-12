@@ -893,8 +893,18 @@ it("final playback follows spelling/phoneme selection and retains legacy recordi
   ).toBeUndefined();
   pronunciation.synthesis.use_spelling = true;
   spelling.audio_assets = structuredClone(pronunciation.audio_assets);
+  spelling.audio_assets[0]!.id = "spelling-recording";
   expect(
     pronunciationPlaybackSource("word", pronunciation, spelling, "en-GB", "uk")
       .assetId
   ).toBe("recording");
+  pronunciation.audio_assets[0]!.is_default = false;
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, spelling, "en-GB", "uk")
+      .assetId
+  ).toBe("spelling");
+  expect(
+    pronunciationPlaybackSource("word", pronunciation, undefined, "en-GB", "uk")
+      .assetId
+  ).toBeUndefined();
 });

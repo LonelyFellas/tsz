@@ -34,7 +34,8 @@ import {
   editSynthesisUpsWords,
   pronunciationSynthesisContent,
   synthesisInputIssue,
-  mapSynthesisSpeechContent
+  mapSynthesisSpeechContent,
+  speechAccentGroup
 } from "@tsz/shared";
 import { env } from "@/lib/env";
 import { api, usePermission } from "@/lib/auth";
@@ -64,7 +65,7 @@ export function V3PhonemeSpeechSettings({
   audioAssets = [],
   nodeId,
   field,
-  active,
+  active: requestedActive,
   headless = false,
   onChange
 }: {
@@ -84,6 +85,13 @@ export function V3PhonemeSpeechSettings({
     audioAssets: AudioAssetV3[]
   ) => void;
 }) {
+  const active =
+    requestedActive &&
+    !audioAssets.some(
+      (asset) =>
+        asset.is_default &&
+        speechAccentGroup(asset.locale) === speechAccentGroup(locale)
+    );
   const { t } = useLexiconEditorTranslation();
   const currentT = useRef(t);
   currentT.current = t;
@@ -104,7 +112,6 @@ export function V3PhonemeSpeechSettings({
     };
   }, [targetKey]);
   const { edit: canEdit } = useContentEditPermissions();
-  const canUploadAudio = usePermission("speech.upload_audio");
   const canGenerateAudio = usePermission("speech.generate");
   const [open, setOpen] = useState(false);
   const audioTasks = useVoiceAudioTasks();
@@ -221,14 +228,12 @@ export function V3PhonemeSpeechSettings({
             })
           : { version: 2 as const, text: candidate[alphabet], annotations: [] },
       voice_profile: speech?.voice_profile ?? scopedFallback,
-      audio_assets: audioAssets,
       ups_words: candidate.ups_words
     });
   };
   const [draft, setDraft] = useState<{
     content: RichTextV2;
     voice_profile: VoiceProfileV3 | undefined;
-    audio_assets: AudioAssetV3[];
     ups_words: PronunciationSynthesisCandidateV3["ups_words"];
   }>(capture);
   const [source, setSource] = useState("");
@@ -623,11 +628,8 @@ export function V3PhonemeSpeechSettings({
               audioUploadAdapter={
                 env.VOICE_AUDIO_UPLOAD ? adminAudioUploadAdapter : undefined
               }
-              audioUploadAllowed={canUploadAudio}
-              audioAssets={draft.audio_assets}
-              onAudioAssetsChange={(audio_assets) =>
-                setDraft((current) => ({ ...current, audio_assets }))
-              }
+              showAudioUpload={false}
+              audioAssets={audioAssets}
               voiceProfile={draft.voice_profile}
               onVoiceProfileChange={(voice_profile) =>
                 setDraft((current) => ({ ...current, voice_profile }))
@@ -686,10 +688,7 @@ export function V3PhonemeSpeechSettings({
                               alphabet === "ups" ? next.ups_words : undefined
                             ])
                           );
-                          onChange(
-                            next,
-                            result?.audioAssets ?? draft.audio_assets
-                          );
+                          onChange(next, audioAssets);
                         });
                         if (
                           businessSaveRef.current &&

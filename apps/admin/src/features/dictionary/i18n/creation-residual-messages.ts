@@ -961,6 +961,13 @@ export const creationResidualMessages = {
     "Check synthesis input and word boundaries"
   ],
   creation_speech_source: ["语音来源", "語音來源", "Speech source"],
+  creation_upload_audio: ["上传音频", "上傳音訊", "Upload audio"],
+  creation_loading_audio_upload: ["加载中…", "載入中…", "Loading…"],
+  creation_upload_pronunciation_audio: [
+    "{{label}}上传音频",
+    "{{label}}上傳音訊",
+    "Upload audio for {{label}}"
+  ],
   creation_collapse_ups_input: [
     "收起 UPS 输入",
     "收起 UPS 輸入",
@@ -1389,9 +1396,9 @@ export const creationResidualMessages = {
     "{{action}} UPS for {{label}}"
   ],
   creation_synthesis_source_label: [
-    "{{label}}的合成来源",
-    "{{label}}的合成來源",
-    "Synthesis source for {{label}}"
+    "{{label}}的语音来源",
+    "{{label}}的語音來源",
+    "Speech source for {{label}}"
   ],
   creation_replace_azure: [
     "替换 Azure {{alphabet}}",
