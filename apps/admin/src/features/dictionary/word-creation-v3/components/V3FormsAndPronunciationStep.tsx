@@ -17,6 +17,7 @@ import {
   Typography
 } from "@tsz/ui/admin/display";
 import { App, Tooltip } from "@tsz/ui/admin/overlays";
+import { AdminControls, useAdminDisabled } from "@tsz/ui/admin/context";
 import type {
   Dialect,
   DraftFormsStepContentV3,
@@ -32,7 +33,7 @@ import type {
   RetiredContentSlotV3,
   RetiredStableNodeV3
 } from "@tsz/types";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
@@ -155,7 +156,15 @@ export function V3FormsAndPronunciationStep({
 }: V3FormsAndPronunciationStepProps) {
   const { t, i18n } = useLexiconEditorTranslation();
   const { modal } = App.useApp();
+  const componentDisabled = useAdminDisabled();
   const [editingFormId, setEditingFormId] = useState<string>();
+  const editingTrigger = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (editingFormId) return;
+    if (editingTrigger.current?.isConnected)
+      editingTrigger.current.focus({ preventScroll: true });
+    editingTrigger.current = null;
+  }, [editingFormId]);
   const sharedCounts = new Map<string, number>();
   if (sharedForms) {
     const counts = new Map<string, number>();
@@ -452,7 +461,17 @@ export function V3FormsAndPronunciationStep({
             children: (
               <V3PosTab
                 sharedCounts={sharedForms ? sharedCounts : undefined}
-                onEditContent={sharedForms ? setEditingFormId : undefined}
+                onEditContent={
+                  sharedForms
+                    ? (id) => {
+                        editingTrigger.current =
+                          document.activeElement instanceof HTMLElement
+                            ? document.activeElement
+                            : null;
+                        setEditingFormId(id);
+                      }
+                    : undefined
+                }
                 content={value}
                 formGroupBindingCounts={bindingCounts}
                 renderGroupSenses={(group) => renderGroupSenses(pos, group)}
@@ -495,70 +514,92 @@ export function V3FormsAndPronunciationStep({
         sharedForms &&
         onSharedFormsChange &&
         stableVariantIds && (
-          <V3FormContentModal
-            key={editingFormId}
-            forms={sharedForms}
-            contentReassignmentAvailable={contentReassignmentAvailable}
-            multipleSpellingsAvailable={multipleSpellingsAvailable}
-            savedContentIds={savedContentIds}
-            formId={editingFormId}
-            issues={issues}
-            stableVariantIds={stableVariantIds}
-            pronunciationReferenceIds={pronunciationReferenceIds}
-            retiredContentSlots={retiredContentSlots}
-            retiredStableNodes={retiredStableNodes}
-            registerLeaveGuard={registerLeaveGuard}
-            onApply={onSharedFormsChange}
-            onCancel={() => setEditingFormId(undefined)}
-            onConfirm={(next) => {
-              onSharedFormsChange(next);
-              setEditingFormId(undefined);
-            }}
+          <AdminControls componentDisabled={componentDisabled}>
+            <V3FormContentModal
+              key={editingFormId}
+              forms={sharedForms}
+              contentReassignmentAvailable={contentReassignmentAvailable}
+              multipleSpellingsAvailable={multipleSpellingsAvailable}
+              savedContentIds={savedContentIds}
+              formId={editingFormId}
+              issues={issues}
+              stableVariantIds={stableVariantIds}
+              pronunciationReferenceIds={pronunciationReferenceIds}
+              retiredContentSlots={retiredContentSlots}
+              retiredStableNodes={retiredStableNodes}
+              registerLeaveGuard={registerLeaveGuard}
+              onApply={onSharedFormsChange}
+              onCancel={() => setEditingFormId(undefined)}
+              onConfirm={(next) => {
+                onSharedFormsChange(next);
+                setEditingFormId(undefined);
+              }}
+            />
+          </AdminControls>
+        )}
+      <fieldset
+        className="v3-forms-reference"
+        disabled={!!editingFormId}
+        onClickCapture={(event) => {
+          if (!editingFormId) return;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onDragStartCapture={(event) => {
+          if (editingFormId) event.preventDefault();
+        }}
+      >
+        <Flex className="v3-forms-step" vertical gap="middle">
+          <div className="word-step-heading">
+            <span className="word-step-number">STEP 02</span>
+            <Typography.Title level={2} style={{ margin: 0 }}>
+              {t("forms_title")}
+            </Typography.Title>
+            <Typography.Paragraph className="word-step-description">
+              {t("forms_help")}
+            </Typography.Paragraph>
+            <details className="v3-pronunciation-guide">
+              <summary>{t("pronunciation_help_title")}</summary>
+              <p>{t("pronunciation_help")}</p>
+            </details>
+          </div>
+          <V3VoiceNotice value={value} />
+          {issues.length > 0 && (
+            <Alert
+              description={t("validation_help")}
+              showIcon
+              title={t("forms_incomplete")}
+              type="warning"
+            />
+          )}
+          {catalog.isError && (
+            <Alert showIcon title={t("catalog_unavailable")} type="error" />
+          )}
+          <Tabs
+            activeKey={value.pos.length === 0 ? "empty" : activePosId}
+            className="word-pos-tabs word-forms-tabs"
+            key={value.pos.map((pos) => pos.pos_id).join(":")}
+            onChange={onActivePosChange}
+            items={tabItems}
+            tabBarExtraContent={
+              value.pos.length === 0 ? addPosSelect : undefined
+            }
           />
-        )}
-      <Flex className="v3-forms-step" vertical gap="middle">
-        <div className="word-step-heading">
-          <span className="word-step-number">STEP 02</span>
-          <Typography.Title level={2} style={{ margin: 0 }}>
-            {t("forms_title")}
-          </Typography.Title>
-          <Typography.Paragraph className="word-step-description">
-            {t("forms_help")}
-          </Typography.Paragraph>
-          <details className="v3-pronunciation-guide">
-            <summary>{t("pronunciation_help_title")}</summary>
-            <p>{t("pronunciation_help")}</p>
-          </details>
-        </div>
-        <V3VoiceNotice value={value} />
-        {issues.length > 0 && (
-          <Alert
-            description={t("validation_help")}
-            showIcon
-            title={t("forms_incomplete")}
-            type="warning"
-          />
-        )}
-        {catalog.isError && (
-          <Alert showIcon title={t("catalog_unavailable")} type="error" />
-        )}
-        <Tabs
-          activeKey={value.pos.length === 0 ? "empty" : activePosId}
-          className="word-pos-tabs word-forms-tabs"
-          key={value.pos.map((pos) => pos.pos_id).join(":")}
-          onChange={onActivePosChange}
-          items={tabItems}
-          tabBarExtraContent={value.pos.length === 0 ? addPosSelect : undefined}
-        />
-      </Flex>
+        </Flex>
+      </fieldset>
     </>
   );
   return (
     <PronunciationPreviewProvider>
       {sharedForms && onSharedFormsChange ? (
-        <V3FormCopyProvider forms={sharedForms} onChange={onSharedFormsChange}>
-          {editor}
-        </V3FormCopyProvider>
+        <AdminControls componentDisabled={editingFormId ? true : undefined}>
+          <V3FormCopyProvider
+            forms={sharedForms}
+            onChange={onSharedFormsChange}
+          >
+            {editor}
+          </V3FormCopyProvider>
+        </AdminControls>
       ) : (
         editor
       )}

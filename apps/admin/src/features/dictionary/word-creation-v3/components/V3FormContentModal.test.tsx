@@ -279,6 +279,64 @@ it("切换语言保留抽屉未应用输入，显式确认前不写页面草稿"
 });
 
 describe("词形内容弹窗的草稿边界", () => {
+  it("收起后不提交或丢失输入，展开复用编辑器并应用草稿", async () => {
+    const { onConfirm, onCancel } = setup();
+    const input = screen.getByRole("textbox", { name: "内容拼写" });
+    input.focus();
+    fireEvent.change(input, { target: { value: "reference draft" } });
+    const dialog = input.closest('[role="dialog"]')!;
+    expect(dialog).toHaveAttribute("aria-modal", "false");
+    fireEvent.click(screen.getByRole("button", { name: "收起" }));
+    expect(screen.queryByRole("textbox", { name: "内容拼写" })).toBeNull();
+    expect(input).toBeInTheDocument();
+    expect(input.closest("[inert]")).toHaveAttribute("aria-hidden", "true");
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "展开" }));
+    expect(screen.getByRole("textbox", { name: "内容拼写" })).toBe(input);
+    expect(input).toHaveValue("reference draft");
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
+    expect(JSON.stringify(onConfirm.mock.calls[0]![0])).toContain(
+      "reference draft"
+    );
+  });
+
+  it("收起期间语音任务继续完成，展开后应用包含语音结果", async () => {
+    backgroundAudio.enabled = true;
+    const { onConfirm } = setup();
+    const input = screen.getByRole("textbox", { name: "内容拼写" });
+    fireEvent.click(screen.getByRole("button", { name: "收起" }));
+    await act(async () => backgroundAudio.finish());
+    fireEvent.click(screen.getByRole("button", { name: "展开" }));
+    expect(screen.getByRole("textbox", { name: "内容拼写" })).toBe(input);
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
+    expect(JSON.stringify(onConfirm.mock.calls[0]![0])).toContain(
+      "formal-in-drawer"
+    );
+  });
+
+  it("嵌套弹窗的 Escape 不关闭浮窗，外层关闭仍经过未保存提示", () => {
+    const { onCancel, onConfirm } = setup();
+    fireEvent.change(screen.getByRole("textbox", { name: "内容拼写" }), {
+      target: { value: "keep this draft" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+    const nested = screen
+      .getByText(/为.*指派词形标签/)
+      .closest('[role="dialog"]')!;
+    fireEvent.keyDown(nested, { key: "Escape", keyCode: 27 });
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "内容拼写" })).toHaveValue(
+      "keep this draft"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关闭词形内容设置" }));
+    expect(screen.getByText("词形内容尚未应用")).toBeInTheDocument();
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["unified", "unified", true],
     ["unified", "distinguish", false],
