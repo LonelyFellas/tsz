@@ -1,19 +1,20 @@
 .voice-configuration-panel {
-  container-type: inline-size;
-  container-name: voice-configuration;
   min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.voice-configuration-panel:focus-visible {
+  outline: var(--ui-focus-ring);
+  outline-offset: 2px;
 }
 .voice-configuration-layout {
+  container: voice-configuration / inline-size;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  width: 1072px;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
   gap: 16px;
   align-items: start;
 }
 .voice-configuration-parameters {
   min-width: 0;
-}
-@container voice-configuration (min-width: 900px) {
-  .voice-configuration-layout {
-    grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
-  }
 }

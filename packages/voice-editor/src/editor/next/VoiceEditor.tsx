@@ -3587,7 +3587,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     return true;
   });
 
-  const localPool =
+  const localPoolContent =
     recommendationArea && mode !== "actual-pron" && !contentReadOnly ? (
       <LocalVoicePool
         audioAssets={assets}
@@ -3731,6 +3731,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         )}
       />
     ) : undefined;
+
+  const localPool = localPoolContent ? (
+    <div className="tsz-ve-local-pool-scroll" tabIndex={0}>
+      {localPoolContent}
+    </div>
+  ) : undefined;
 
   const unsupportedSpeech =
     workingValue.annotations.some(

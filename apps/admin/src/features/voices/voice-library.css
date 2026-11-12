@@ -1,15 +1,22 @@
+.voice-library-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.voice-library-scroll:focus-visible {
+  outline: var(--ui-focus-ring);
+  outline-offset: 2px;
+}
+
 .voice-library {
+  container: voice-library / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4);
   min-width: 0;
-  width: 100%;
-  max-width: 1440px;
+  width: 1200px;
   margin-inline: auto;
-}
-
-.voice-library-catalog {
-  max-width: none;
 }
 
 .voice-library-controls > .ui-card-body {
@@ -294,7 +301,7 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 900px) {
+@container voice-library (max-width: 900px) {
   .voice-library-audition {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--ui-space-2);
@@ -306,7 +313,7 @@
   }
 }
 
-@media (max-width: 600px) {
+@container voice-library (max-width: 600px) {
   .voice-library-controls > .ui-card-body,
   .voice-library-content > .ui-card-body {
     padding: var(--ui-space-4);
@@ -353,6 +360,9 @@
   padding: var(--ui-space-4) var(--ui-space-6);
   scrollbar-width: thin;
   scrollbar-color: var(--voice-border) transparent;
+}
+.voice-library-settings .ui-drawer-body > .ui-flex {
+  width: 1072px;
 }
 
 .voice-library-settings .ui-drawer-footer {
@@ -458,7 +468,6 @@
 
 @media (max-width: 480px) {
   .voice-library-settings .ui-drawer-header,
-  .voice-library-settings .ui-drawer-body,
   .voice-library-settings .ui-drawer-footer {
     padding: var(--ui-space-4);
   }
@@ -601,7 +610,7 @@
     position: static;
   }
 }
-@media (max-width: 600px) {
+@container voice-library (max-width: 600px) {
   .voice-library-catalog .voice-library-controls > .ui-card-body,
   .voice-library-catalog .voice-library-content > .ui-card-body {
     padding: var(--ui-space-4);
