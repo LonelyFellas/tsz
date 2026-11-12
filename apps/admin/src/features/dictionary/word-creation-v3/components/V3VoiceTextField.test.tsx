@@ -133,9 +133,11 @@ it("配音校验只阻止保存，不将例句关联编辑标记为未完成", a
   let finish!: (voices: VoiceSetting[]) => void;
   const resolveVoices = vi.fn(
     () =>
-      new Promise<VoiceSetting[]>((resolve) => {
-        finish = resolve;
-      })
+      new Promise<import("@tsz/types").AdminResolveDubbingResponse>(
+        (resolve) => {
+          finish = (voices) => resolve({ voices, source: { kind: "local" } });
+        }
+      )
   );
   const pending = vi.fn();
   render(
@@ -151,9 +153,9 @@ it("配音校验只阻止保存，不将例句关联编辑标记为未完成", a
       voiceProfile={{
         voices: [setting],
         dubbing: {
-          mode: "local",
           area: "example",
-          pool_version: "provider_id_v1"
+          uk: { mode: "local" },
+          us: { mode: "local" }
         }
       }}
       previewAdapter={{
@@ -260,15 +262,19 @@ it("先在折叠字段输入再打开编辑器，保留已应用的首次推荐"
   });
   fireEvent.click(screen.getByLabelText("打开新拼写编辑器"));
   await waitFor(() =>
-    expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
+    expect(
+      within(screen.getByRole("group", { name: "英式 局部推荐" })).getByRole(
+        "checkbox",
+        { name: "慢读" }
+      )
+    ).toBeChecked()
   );
   fireEvent.click(screen.getByLabelText("完成新拼写编辑"));
   expect(onProfile).toHaveBeenCalledWith({
     dubbing: {
-      mode: "inherit",
-      area: "word",
-      pool_version: "provider_id_v1",
-      recommendation_order: ["r"]
+      area: "word" as const,
+      uk: { mode: "inherit" },
+      us: { mode: "inherit" }
     },
     voices: [
       {
@@ -342,10 +348,9 @@ it("折叠拼写输入直接保存后，正文和默认推荐一起读回", asyn
   expect(variantOf(wire).spelling).toBe("hello");
   expect(variantOf(wire).spelling_speech?.voice_profile).toEqual({
     dubbing: {
-      mode: "inherit",
-      area: "word",
-      pool_version: "provider_id_v1",
-      recommendation_order: ["first"]
+      area: "word" as const,
+      uk: { mode: "inherit" },
+      us: { mode: "inherit" }
     },
     voices: [
       {
@@ -529,10 +534,9 @@ it("折叠释义只复制有效口音的首位推荐，不回填失效推荐", a
   );
   expect(changed).toHaveBeenCalledWith({
     dubbing: {
-      mode: "inherit",
       area: "meaning",
-      pool_version: "provider_id_v1",
-      recommendation_order: ["uk"]
+      uk: { mode: "inherit" },
+      us: { mode: "inherit" }
     },
     voices: [
       {
@@ -596,10 +600,9 @@ it.each(["后续适用组", "全局常用"])(
     });
     expect(changed).toHaveBeenCalledWith({
       dubbing: {
-        mode: "inherit",
-        area: "word",
-        pool_version: "provider_id_v1",
-        recommendation_order: ["usable"]
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
       },
       voices: [
         {
@@ -900,7 +903,11 @@ it("宿主统一保存时音色配置直接回传且不显示内部完成按钮"
   );
   fireEvent.click(await screen.findByLabelText("选用 Sonia"));
   expect(onVoiceProfileChange).toHaveBeenCalledWith({
-    dubbing: { mode: "local", area: "example", pool_version: "provider_id_v1" },
+    dubbing: {
+      area: "example",
+      uk: { mode: "local" },
+      us: { mode: "inherit" }
+    },
     voices: [
       {
         voice_id: "sonia",
@@ -2305,7 +2312,11 @@ it("拼写停顿与音色同时编辑：取消恢复，完成同时写回且不�
       annotations: [{ type: "pause", at: 5, duration_ms: 1000 }]
     },
     voice_profile: {
-      dubbing: { mode: "local", area: "word", pool_version: "provider_id_v1" },
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "local" },
+        us: { mode: "inherit" }
+      },
       voices: [
         {
           voice_id: "sonia",
@@ -2343,9 +2354,9 @@ it("业务保存以一次完整快照合并正文和参数，失败保留且连�
       value: VALUE,
       voiceProfile: {
         dubbing: {
-          mode: "local" as const,
           area: "meaning" as const,
-          pool_version: "provider_id_v1" as const
+          uk: { mode: "local" as const },
+          us: { mode: "local" as const }
         },
         voices: [
           {
@@ -2457,9 +2468,9 @@ it("新版无推荐空池整次拒绝保存，保留输入并定位当前编辑�
         voiceProfile={{
           voices: [],
           dubbing: {
-            mode: "local",
             area: "meaning",
-            pool_version: "provider_id_v1"
+            uk: { mode: "local" },
+            us: { mode: "local" }
           }
         }}
         onChange={vi.fn()}

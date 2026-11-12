@@ -7,7 +7,8 @@ import {
   useState
 } from "react";
 import { flushSync } from "react-dom";
-import type { RichTextV2, VoiceProfileV3 } from "@tsz/types";
+import { speechAccentGroup } from "@tsz/shared";
+import type { RichTextV2, VoiceProfileV3, VoiceSettingV3 } from "@tsz/types";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import {
   newVoiceVersionId,
@@ -26,20 +27,53 @@ function enqueue<T>(run: () => Promise<T>): Promise<T> {
   return result;
 }
 
+function inScope(
+  setting: VoiceSettingV3,
+  profile: VoiceProfileV3,
+  locale?: string
+) {
+  return (
+    !profile.dubbing ||
+    !locale ||
+    !setting.locale ||
+    speechAccentGroup(setting.locale, setting.accent) ===
+      speechAccentGroup(locale)
+  );
+}
+function inheritedSetting(
+  setting: VoiceSettingV3,
+  profile: VoiceProfileV3,
+  locale?: string
+) {
+  const side = speechAccentGroup(setting.locale ?? locale, setting.accent);
+  return (
+    (side === "uk" || side === "us") &&
+    profile.dubbing?.[side].mode === "inherit"
+  );
+}
 function selectionSignature(
   sourceKey: string,
   locale: string | undefined,
   profile?: VoiceProfileV3 | null
 ) {
+  const sides = (["uk", "us"] as const).filter(
+    (side) => !locale || speechAccentGroup(locale) === side
+  );
   return v3ContentFingerprint([
     sourceKey,
     locale,
-    profile?.dubbing,
-    profile?.dubbing?.mode === "inherit"
-      ? undefined
-      : profile?.voices
-          .filter((setting) => setting.enabled)
-          .map((setting) => [voiceSettingKey(setting), voiceEffectKey(setting)])
+    profile?.dubbing && [
+      profile.dubbing.area,
+      sides.map((side) => profile.dubbing![side].mode)
+    ],
+    profile?.voices
+      .filter(
+        (setting) =>
+          setting.enabled &&
+          inScope(setting, profile, locale) &&
+          !inheritedSetting(setting, profile, locale)
+      )
+      .map((setting) => [voiceSettingKey(setting), voiceEffectKey(setting)])
   ]);
 }
 
@@ -159,6 +193,7 @@ export function useSelectedVoiceAudio({
           stored = {
             ...stored,
             voices: stored.voices.map((setting) => {
+              if (!inScope(setting, stored, locale)) return setting;
               const previous = lastSource.current.effects.get(
                 voiceSettingKey(setting)
               );
@@ -192,66 +227,77 @@ export function useSelectedVoiceAudio({
               )
           );
           resolved = results.flatMap((result) =>
-            result.status === "fulfilled" ? result.value : []
+            result.status === "fulfilled" ? result.value.voices : []
           );
           const failure = results.find(
             (result) => result.status === "rejected"
           );
           if (
-            !resolved.length &&
-            (stored.dubbing?.mode === "inherit" ||
-              !stored.voices.some((setting) => setting.enabled)) &&
+            (stored.dubbing ||
+              (!resolved.length &&
+                !stored.voices.some((setting) => setting.enabled))) &&
             failure?.status === "rejected"
           )
             throw failure.reason;
         }
         if (!isCurrent()) return resumeCurrent();
         const selected = retainResolvedAudio(resolved, stored.voices).filter(
-          (setting) => setting.enabled
+          (setting) => setting.enabled && inScope(setting, stored, locale)
         );
         const selectedKeys = new Set(selected.map(voiceSettingKey));
-        if (stored.dubbing?.mode !== "inherit") {
-          for (const setting of stored.voices) {
-            if (
-              setting.enabled &&
-              !selectedKeys.has(voiceSettingKey(setting))
-            ) {
-              selected.push(setting);
-              selectedKeys.add(voiceSettingKey(setting));
-            }
+        for (const setting of stored.voices) {
+          if (
+            setting.enabled &&
+            inScope(setting, stored, locale) &&
+            !inheritedSetting(setting, stored, locale) &&
+            !selectedKeys.has(voiceSettingKey(setting))
+          ) {
+            selected.push(setting);
+            selectedKeys.add(voiceSettingKey(setting));
           }
-        } else {
-          const reused = new Map(
-            selected
-              .filter((setting) => setting.audio_asset_id)
-              .map((setting) => [voiceSettingKey(setting), setting])
-          );
-          stored = {
-            ...stored,
-            voices: stored.voices.map((setting) => {
-              const resolved = reused.get(voiceSettingKey(setting));
-              return resolved
-                ? {
-                    ...resolved,
-                    ...(setting.version_name !== undefined
-                      ? { version_name: setting.version_name }
-                      : {})
-                  }
-                : selectedKeys.has(voiceSettingKey(setting))
-                  ? setting
-                  : { ...setting, enabled: false };
-            })
-          };
-          if (JSON.stringify(stored) !== JSON.stringify(latest.current.profile))
-            commit(stored);
         }
+        const reused = new Map(
+          selected
+            .filter((setting) => setting.audio_asset_id)
+            .map((setting) => [voiceSettingKey(setting), setting])
+        );
+        stored = {
+          ...stored,
+          voices: stored.voices.map((setting) => {
+            const resolved = inScope(setting, stored, locale)
+              ? reused.get(voiceSettingKey(setting))
+              : undefined;
+            return resolved
+              ? {
+                  ...resolved,
+                  ...(setting.version_name !== undefined
+                    ? { version_name: setting.version_name }
+                    : {})
+                }
+              : inScope(setting, stored, locale) &&
+                  inheritedSetting(setting, stored, locale) &&
+                  !selectedKeys.has(voiceSettingKey(setting))
+                ? { ...setting, enabled: false }
+                : setting;
+          })
+        };
+        if (JSON.stringify(stored) !== JSON.stringify(latest.current.profile))
+          commit(stored);
         for (const setting of selected) {
           if (setting.audio_asset_id) continue;
           const key = voiceSettingKey(setting);
           const input = v3ContentFingerprint([
             sourceKey,
             voiceEffectKey(setting),
-            stored.dubbing
+            (() => {
+              const side = speechAccentGroup(
+                setting.locale ?? locale,
+                setting.accent
+              );
+              return side === "uk" || side === "us"
+                ? stored.dubbing?.[side].mode
+                : undefined;
+            })()
           ]);
           const previous = requests.current.get(key);
           const requestId =
@@ -273,7 +319,8 @@ export function useSelectedVoiceAudio({
           if (!isCurrent()) return resumeCurrent();
           const voices = (latest.current.profile?.voices ?? stored.voices).map(
             (item) =>
-              stored.dubbing?.mode === "inherit" &&
+              inScope(item, stored, locale) &&
+              inheritedSetting(item, stored, locale) &&
               !selectedKeys.has(voiceSettingKey(item))
                 ? { ...item, enabled: false }
                 : item
@@ -290,7 +337,7 @@ export function useSelectedVoiceAudio({
           };
           if (index < 0) voices.push(generated);
           else voices[index] = generated;
-          stored = { ...stored, voices };
+          stored = { ...(latest.current.profile ?? stored), voices };
           commit(stored);
         }
         return isCurrent() ? true : resumeCurrent();

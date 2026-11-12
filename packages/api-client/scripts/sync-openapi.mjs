@@ -85,7 +85,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "LexiconAssistantResponse",
   "LexiconAssistantEvent",
   "LexiconFormCandidatesResponse",
-  "DubbingGroupsV3Response",
+  "DubbingGroupsResponse",
+  "ResolveDubbingResponse",
   "LearningCapabilities",
   "AiLedgerPage",
   "AiCostLedgerPage",
@@ -244,9 +245,6 @@ const contractSchemaNames = [
   "VoiceLibraryResponse",
   "DubbingGroupsResponse",
   "DubbingGroupsReadResponse",
-  "DubbingGroupsV3Response",
-  "DubbingGroupV3",
-  "DubbingRecommendationsV3",
   "DubbingAudioUpdates",
   "DubbingAudioUpdate",
   "DubbingUpdateSettings",
@@ -526,6 +524,16 @@ function sanitizeRuntimeSchema(schema, path, referencedNames) {
         break;
       }
       case "additionalProperties":
+        if (
+          path ===
+            "components.schemas.VoiceProfileV3.properties.legacy_dubbing" &&
+          schema.type === "object" &&
+          schema.readOnly === true &&
+          value === true
+        ) {
+          sanitized.additionalProperties = true;
+          break;
+        }
         if (value !== false) {
           throw new Error(
             `${path}.additionalProperties 含 evaluator 不支持的开放或 typed map 语义`

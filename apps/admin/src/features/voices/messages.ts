@@ -27,11 +27,6 @@ const fixedVoiceMessages = {
   ],
   try_again: ["重试", "重試", "Try again"],
   recommendation_group: ["推荐分组", "推薦分組", "Recommendation group"],
-  create_recommendation_pair: [
-    "创建整套推荐",
-    "建立整套推薦",
-    "Create recommendation pair"
-  ],
   cancel_addition: ["取消添加", "取消新增", "Cancel addition"],
   awaiting_update: ["等待更新", "等待更新", "Awaiting update"],
   generating: ["生成中", "產生中", "Generating"],
@@ -106,11 +101,6 @@ const fixedVoiceMessages = {
     "請填寫分組名稱。",
     "Enter a group name."
   ],
-  confirm_the_existing_british_and_american_voice_pairs_before_savi: [
-    "请先确认本组原有英美声音的组合，再保存。",
-    "請先確認此組原有英美聲音的組合，再儲存。",
-    "Confirm the existing British and American voice pairs before saving."
-  ],
   enter_a_recommendation_name: [
     "请填写推荐名称。",
     "請填寫推薦名稱。",
@@ -165,11 +155,6 @@ const fixedVoiceMessages = {
   ],
   rate: ["语速", "語速", "Rate"],
   volume: ["音量", "音量", "Volume"],
-  existing_voices_have_been_kept_check_the_british_and_american_pai: [
-    "原有声音已保留，请先核对英美组合。",
-    "原有聲音已保留，請先核對英美組合。",
-    "Existing voices have been kept. Check the British and American pairs first."
-  ],
   review_voices: ["核对声音", "核對聲音", "Review voices"],
   not_selected: ["（未选）", "（未選）", "(not selected)"],
   scroll_horizontally_to_view_all_dubbing_settings: [
@@ -177,17 +162,11 @@ const fixedVoiceMessages = {
     "左右滑動檢視完整配音",
     "Scroll horizontally to view all dubbing settings"
   ],
-  recommendation_pair: ["推荐套", "推薦套", "Recommendation pair"],
   use_first: ["优先使用", "優先使用", "Use first"],
   selected: ["已选用", "已選用", "Selected"],
   not_selected_834924: ["未选用", "未選用", "Not selected"],
   move_up: ["上移", "上移", "Move up"],
   move_down: ["下移", "下移", "Move down"],
-  this_british_and_american_pair_will_be_removed_when_you_save_the_: [
-    "将移除本套英美配音，保存当前组后生效。",
-    "將移除此套英美配音，儲存目前分組後生效。",
-    "This British and American pair will be removed when you save the group."
-  ],
   delete: ["删除", "刪除", "Delete"],
   no_recommendations_yet: ["暂无推荐", "尚無推薦", "No recommendations yet"],
   could_not_load_groups_try_again: [
@@ -256,43 +235,13 @@ const fixedVoiceMessages = {
     "確認原有聲音",
     "Confirm existing voices"
   ],
-  keep_existing_voices_and_parameters_and_confirm_their_british_and: [
-    "保留原有音色与参数，确认英美两侧的对应关系。确认只更新本组草稿。",
-    "保留原有音色與參數，確認英美兩側的對應關係。確認僅更新此組草稿。",
-    "Keep existing voices and parameters and confirm their British and American pairing. Confirmation updates only this group’s draft."
-  ],
-  paired: ["· 已组成推荐套", "· 已組成推薦套", "· Paired"],
-  no_existing_voice_add_this_side_to_the_recommendation_pair: [
-    "尚无原有声音，可为推荐套补充这一侧。",
-    "尚無原有聲音，可為推薦套補充此側。",
-    "No existing voice. Add this side to the recommendation pair."
-  ],
   recommendation_name: ["推荐名称", "推薦名稱", "Recommendation name"],
   existing_voice_recommendation_name: [
     "原有声音推荐名称",
     "原有聲音推薦名稱",
     "Existing voice recommendation name"
   ],
-  select_this_recommendation_pair: [
-    "选用这套推荐",
-    "選用此套推薦",
-    "Select this recommendation pair"
-  ],
-  confirm_these_two_voices_as_one_recommendation_pair: [
-    "确认将这两个声音组成同一套推荐",
-    "確認將這兩個聲音組成同一套推薦",
-    "Confirm these two voices as one recommendation pair"
-  ],
   organise_later: ["暂不整理", "暫不整理", "Organise later"],
-  confirm_pair: ["确认组合", "確認組合", "Confirm pair"],
-  pair_existing_voices_and_add_any_missing_side_all_voice_settings_: [
-    "逐套组合现有声音，也可以补充缺少的一侧。所有声音设置都会保留，包括未选用的声音。",
-    "逐套組合現有聲音，也可補充缺少的一側。所有聲音設定均會保留，包括未選用的聲音。",
-    "Pair existing voices and add any missing side. All voice settings are kept, including unselected voices."
-  ],
-  re_pair: ["重新组合", "重新組合", "Re-pair"],
-  add_a_pair: ["新增一套组合", "新增一套組合", "Add a pair"],
-  confirm_all_pairs: ["确认全部组合", "確認全部組合", "Confirm all pairs"],
   recommendation: ["推荐", "推薦", "Recommendation"],
   voice_parameters: ["声音参数", "聲音參數", "Voice parameters"],
   select_a_voice_from_the_catalog_to_adjust_its_parameters_and_prev: [
@@ -305,16 +254,6 @@ const fixedVoiceMessages = {
     "例如：自然朗讀、慢速跟讀",
     "e.g. Natural reading or slow practice"
   ],
-  select_the_whole_recommendation_pair: [
-    "选用整套推荐",
-    "選用整套推薦",
-    "Select the whole recommendation pair"
-  ],
-  select_existing_voices_to_pair_or_add_a_missing_side_all_existing: [
-    "请选择要组成一套的原有声音，也可以补充缺少的一侧。现有声音设置会全部保留。",
-    "請選擇要配對的原有聲音，也可補充缺少的一側。現有聲音設定均會保留。",
-    "Select existing voices to pair or add a missing side. All existing voice settings are kept."
-  ],
   select_an_existing_voice_or_add_one_below: [
     "选择现有声音，或在下方补充音色",
     "選擇現有聲音，或在下方補充音色",
@@ -324,11 +263,6 @@ const fixedVoiceMessages = {
     "补充音色（下方选择）",
     "補充音色（下方選擇）",
     "Add a voice (select below)"
-  ],
-  british_and_american_voice_pair: [
-    "英美声音组合",
-    "英美聲音組合",
-    "British and American voice pair"
   ],
   voice_not_selected: ["待选音色", "待選音色", "Voice not selected"],
   select_from_catalog: ["从目录选择", "從目錄選擇", "Select from catalog"],
@@ -361,38 +295,8 @@ const fixedVoiceMessages = {
   ],
   british: ["英式", "英式", "British"],
   american: ["美式", "美式", "American"],
-  british_and_american_voices_selected: [
-    "英美声音已选齐",
-    "英美聲音已選齊",
-    "British and American voices selected"
-  ],
   save_to_this_group: ["保存到本组", "儲存至此組", "Save to this group"],
-  save_recommendation_pair: [
-    "保存整套推荐",
-    "儲存整套推薦",
-    "Save recommendation pair"
-  ],
   dubbing_settings: ["配音设置", "配音設定", "Dubbing settings"],
-  pair_existing_voices: [
-    "组合原有声音",
-    "組合原有聲音",
-    "Pair existing voices"
-  ],
-  copy_recommendation_pair: [
-    "复制整套推荐",
-    "複製整套推薦",
-    "Copy recommendation pair"
-  ],
-  create_recommendation_pair_d3784a: [
-    "新建整套推荐",
-    "新增整套推薦",
-    "Create recommendation pair"
-  ],
-  select_british_and_american_voices_to_create_a_recommendation_pai: [
-    "分别选择英美声音，组成一套适用于本组的配音推荐。",
-    "分別選擇英美聲音，組成一套適用於此組的配音推薦。",
-    "Select British and American voices to create a recommendation pair for this group."
-  ],
   preview_and_review: ["试听与审听", "試聽與審聽", "Preview and review"],
   preview_content: ["试听内容", "試聽內容", "Preview content"],
   preview_output_format: [
@@ -851,6 +755,66 @@ const fixedVoiceMessages = {
 } as const satisfies Record<string, readonly [string, string, string]>;
 
 export const voiceMessages = {
+  new_side_recommendation: [
+    "新增{{side}}推荐",
+    "新增{{side}}推薦",
+    "Add {{side}} recommendation"
+  ],
+  use_recommendation: ["选用", "選用", "Use"],
+  order: ["顺序", "順序", "Order"],
+  new_group: ["新分组", "新分組", "New group"],
+  choose_side_voice: [
+    "请选择{{side}}音色。",
+    "請選擇{{side}}音色。",
+    "Select a {{side}} voice."
+  ],
+  side_recommendations: [
+    "{{name}} {{side}}推荐",
+    "{{name}} {{side}}推薦",
+    "{{name}} {{side}} recommendations"
+  ],
+  select_side_recommendation: [
+    "选用{{side}} {{name}}",
+    "選用{{side}} {{name}}",
+    "Use {{side}} {{name}}"
+  ],
+  move_recommendation_up: [
+    "上移{{side}} {{name}}",
+    "上移{{side}} {{name}}",
+    "Move {{side}} {{name}} up"
+  ],
+  move_recommendation_down: [
+    "下移{{side}} {{name}}",
+    "下移{{side}} {{name}}",
+    "Move {{side}} {{name}} down"
+  ],
+  copy_side_recommendation: [
+    "复制{{side}} {{name}}",
+    "複製{{side}} {{name}}",
+    "Copy {{side}} {{name}}"
+  ],
+  delete_side_recommendation: [
+    "删除{{side}} {{name}}",
+    "刪除{{side}} {{name}}",
+    "Delete {{side}} {{name}}"
+  ],
+  recommendation_copy_name: ["{{name}} 副本", "{{name}} 副本", "{{name}} copy"],
+  search_side_gender: [
+    "搜索{{side}}{{gender}}",
+    "搜尋{{side}}{{gender}}",
+    "Search {{side}} {{gender}}"
+  ],
+  side_gender_catalog: [
+    "{{side}}{{gender}}目录",
+    "{{side}}{{gender}}目錄",
+    "{{side}} {{gender}} catalog"
+  ],
+  side_gender_voice: [
+    "{{side}}{{gender}}音色",
+    "{{side}}{{gender}}音色",
+    "{{side}} {{gender}} voice"
+  ],
+
   ...fixedVoiceMessages,
   audio_update_due: [
     "配置已保存，{{count}} 秒后自动更新相关草稿音频",
@@ -902,33 +866,11 @@ export const voiceMessages = {
     "修改{{side}} {{name}}",
     "Edit {{side}} {{name}}"
   ],
-  group_legacy_side: [
-    "{{name}} {{side}}原有声音",
-    "{{name}} {{side}}原有聲音",
-    "{{name}} · Existing {{side}} voices"
-  ],
-  group_pairs: [
-    "{{name}}英美推荐",
-    "{{name}}英美推薦",
-    "{{name}} British and American recommendations"
-  ],
-  select_pair: ["选用 {{name}}", "選用 {{name}}", "Select {{name}}"],
   recommendation_index: [
     "推荐名称 {{index}}",
     "推薦名稱 {{index}}",
     "Recommendation name {{index}}"
   ],
-  move_recommendation_up: [
-    "上移推荐 {{name}}",
-    "上移推薦 {{name}}",
-    "Move recommendation {{name}} up"
-  ],
-  move_recommendation_down: [
-    "下移推荐 {{name}}",
-    "下移推薦 {{name}}",
-    "Move recommendation {{name}} down"
-  ],
-  copy_pair: ["复制整套 {{name}}", "複製整套 {{name}}", "Copy pair {{name}}"],
   delete_recommendation: [
     "删除推荐「{{name}}」？",
     "刪除推薦「{{name}}」？",
@@ -964,37 +906,7 @@ export const voiceMessages = {
     "{{name}} 詞庫推薦預覽",
     "{{name}} lexicon recommendation preview"
   ],
-  legacy_side: [
-    "{{side}}原有声音",
-    "{{side}}原有聲音",
-    "Existing {{side}} voices"
-  ],
-  legacy_progress: [
-    "已确认 {{count}} 套，还有原有声音待安排。",
-    "已確認 {{count}} 套，仍有原有聲音待安排。",
-    "{{count}} pairs confirmed. Some existing voices still need pairing."
-  ],
-  legacy_progress_one: [
-    "已确认 {{count}} 套，还有原有声音待安排。",
-    "已確認 {{count}} 套，仍有原有聲音待安排。",
-    "{{count}} pair confirmed. Some existing voices still need pairing."
-  ],
-  legacy_progress_other: [
-    "已确认 {{count}} 套，还有原有声音待安排。",
-    "已確認 {{count}} 套，仍有原有聲音待安排。",
-    "{{count}} pairs confirmed. Some existing voices still need pairing."
-  ],
-  choose_pair_side: [
-    "请明确选择{{side}}音色，每套必须包含英美各一项。",
-    "請明確選擇{{side}}音色，每套必須各含一個英式和美式音色。",
-    "Select a {{side}} voice. Each pair must contain one British and one American voice."
-  ],
   side_voice: ["{{side}}音色", "{{side}}音色", "{{side}} voice"],
-  select_legacy_side: [
-    "选择{{side}}原有声音",
-    "選擇{{side}}原有聲音",
-    "Select an existing {{side}} voice"
-  ],
   configure_side: [
     "配置{{side}}声音",
     "設定{{side}}聲音",
@@ -1088,11 +1000,6 @@ export const voiceMessages = {
     "音色已無法使用：{{alias}}",
     "Voice unavailable: {{alias}}"
   ],
-  legacy_unavailable_voice: [
-    "声音已不可用：{{alias}}",
-    "聲音已無法使用：{{alias}}",
-    "Voice unavailable: {{alias}}"
-  ],
   no_side_voices: [
     "尚无{{side}}声音",
     "尚無{{side}}聲音",
@@ -1162,11 +1069,6 @@ export const voiceMessages = {
     "还需选择{{side}}声音，保存当前组后生效。",
     "仍須選擇{{side}}聲音，儲存目前分組後生效。",
     "Select a {{side}} voice, then save the group to apply it."
-  ],
-  editor_status_complete: [
-    "英美声音已选齐，保存当前组后生效。",
-    "英美聲音已選齊，儲存目前分組後生效。",
-    "British and American voices are selected. Save the group to apply them."
   ],
   preview_parameters: [
     "本次试听：音量 {{volume}}%，{{rate}}×，{{style}}",

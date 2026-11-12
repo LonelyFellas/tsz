@@ -34,7 +34,7 @@ vi.mock("../../voice-editor/dataSource", () => ({
     resolveVoices: async (input: {
       profile: { voices: VoiceSettingV3[] };
       accent: string;
-    }) => (await speech.resolve(input)).voices,
+    }) => speech.resolve(input),
     generateAudio: async (input: {
       content: RichTextV2;
       setting: VoiceSettingV3;
@@ -177,7 +177,11 @@ it("未配置音标只在保存时生成当前推荐并保留继承，浏览不�
     .contents[0].regional_variants.common.pronunciations[0];
   for (const side of ["uk", "us"]) {
     expect(row.synthesis[side].ipa_speech.voice_profile).toMatchObject({
-      dubbing: { mode: "inherit", area: "azure" },
+      dubbing: {
+        area: "azure",
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      },
       voices: [
         expect.objectContaining({
           rate_percent: -25,
@@ -231,7 +235,7 @@ it("缺省拼写保存完整继承声音，默认录音及播放选择原样保�
     .contents[0].regional_variants.common.spelling_speech;
   expect(saved.audio_assets).toEqual([recording]);
   expect(saved.voice_profile).toMatchObject({
-    dubbing: { mode: "inherit", area: "word" },
+    dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "inherit" } },
     voices: [
       expect.objectContaining({ locale: "en-GB", rate_percent: -25 }),
       expect.objectContaining({ locale: "en-US", rate_percent: -25 })
@@ -386,3 +390,45 @@ it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来
     ).toBe("formal-phoneme-en-GB");
   });
 });
+
+it.each(["none", "upload"] as const)(
+  "汇总页英式%s、美式UPS时只生成美式当前来源，保留英式缓存",
+  async (source) => {
+    const forms = fixture();
+    const variants = forms.contents[0]!.regional_variants;
+    if (variants.mode !== "common") throw new Error("expected common fixture");
+    const row = variants.common.pronunciations[0]!;
+    row.synthesis!.use_spelling = true;
+    row.synthesis!.uk!.source = source;
+    row.synthesis!.us = {
+      ...row.synthesis!.us!,
+      source: "ups",
+      ups: "H EH L OW"
+    };
+    const british = structuredClone(row.voice_profile!.voices[0]!);
+    render(<Host initial={forms} />);
+    await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("saved-forms")).toHaveTextContent(
+        "formal-phoneme-en-US"
+      )
+    );
+    expect(
+      speech.generate.mock.calls.every(
+        (call) =>
+          (call[0] as GenerateVoiceAudioRequest).setting.locale === "en-US"
+      )
+    ).toBe(true);
+    expect(speech.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: expect.objectContaining({ kind: "phoneme", alphabet: "ups" })
+      }),
+      expect.any(AbortSignal)
+    );
+    const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+      .contents[0].regional_variants.common.pronunciations[0];
+    expect(saved.voice_profile.voices[0]).toEqual(british);
+    expect(saved.synthesis.uk).toEqual(row.synthesis!.uk);
+    expect(saved.synthesis.us.source).toBe("ups");
+  }
+);

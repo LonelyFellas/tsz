@@ -57,25 +57,43 @@ describe("文本配音模式", () => {
       expect(withDefaultVoiceProfile(profile, "azure")).toEqual({
         voices: [],
         dubbing: {
-          mode: "inherit",
           area: "azure",
-          pool_version: "provider_id_v1"
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
         }
       });
     const profiles: VoiceProfile[] = [
       {
         voices: [],
         dubbing: {
-          mode: "local",
           area: "azure",
-          pool_version: "provider_id_v1"
+          uk: { mode: "local" },
+          us: { mode: "local" }
         }
       },
       { voices: [{ voice_id: "sonia", enabled: false, rate_percent: -10 }] },
-      { voices: [], dubbing: { mode: "inherit", area: "word" } }
+      {
+        voices: [],
+        dubbing: {
+          area: "word",
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
+      }
     ];
     for (const profile of profiles)
       expect(withDefaultVoiceProfile(profile, "azure")).toBe(profile);
+    const mixed: VoiceProfile = {
+      voices: [],
+      dubbing: { area: "azure", uk: { mode: "local" }, us: { mode: "inherit" } }
+    };
+    expect(withDefaultVoiceProfile(mixed, "azure")).toBe(mixed);
+    expect(
+      withDefaultVoiceProfile(
+        { voices: [], legacy_dubbing: { historical: true } },
+        "azure"
+      ).legacy_dubbing
+    ).toEqual({ historical: true });
   });
   it("已保存版本按人工口音参与候选，原生地区保留且不决定英美侧", () => {
     const reassigned = [{ ...voices[1]!, accent: "gb" as const }];
@@ -141,9 +159,9 @@ describe("文本配音模式", () => {
     const inherited: VoiceProfile = {
       voices: [],
       dubbing: {
-        mode: "inherit",
-        area: "word",
-        recommendation_order: ["second", "first"]
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
       }
     };
     expect(
@@ -152,10 +170,14 @@ describe("文本配音模式", () => {
       )
     ).toEqual(["first"]);
   });
-  it("逐组跳过失效项，适用组耗尽才回退全局，继承不补目录声音", () => {
+  it("逐组跳过失效项，适用组耗尽后回退全局和合格目录，独立空池不兜底", () => {
     const profile: VoiceProfile = {
       voices: [],
-      dubbing: { mode: "inherit", area: "word" }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
     };
     const items = [
       {
@@ -197,20 +219,28 @@ describe("文本配音模式", () => {
       ).map((item) => item.version_id)
     ).toEqual(["global"]);
     expect(
-      resolveRecommendedVoices(profile, [items[0]!], voices, "en-GB")
-    ).toEqual([]);
+      resolveRecommendedVoices(profile, [items[0]!], voices, "en-GB").map(
+        (item) => item.voice_id
+      )
+    ).toEqual(["sonia"]);
     const oldLocal = {
       ...profile,
-      dubbing: { ...profile.dubbing!, mode: "local" as const }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "local" as const },
+        us: { mode: "local" as const }
+      }
     };
-    expect(
-      resolveRecommendedVoices(oldLocal, [], voices, "en-GB")
-    ).toHaveLength(1);
+    expect(resolveRecommendedVoices(oldLocal, [], voices, "en-GB")).toEqual([]);
   });
   it("按实际标记跳过原生地区或模型能力不符项，保留指定发音", () => {
     const profile: VoiceProfile = {
       voices: [],
-      dubbing: { mode: "inherit", area: "word" }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
     };
     const marked = {
       version: 2 as const,
@@ -268,7 +298,11 @@ describe("文本配音模式", () => {
     (annotation) => {
       const profile: VoiceProfile = {
         voices: [],
-        dubbing: { mode: "inherit", area: "word" }
+        dubbing: {
+          area: "word" as const,
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
       };
       const content = {
         version: 2 as const,
@@ -323,7 +357,7 @@ describe("文本配音模式", () => {
       voices,
       "word"
     );
-    expect(local.dubbing?.mode).toBe("local");
+    expect(local.dubbing?.uk.mode).toBe("local");
     expect(local.voices[0]).toMatchObject({
       version_id: expect.any(String),
       locale: "en-GB",

@@ -11,7 +11,7 @@ type RuntimeSchema = {
   enum?: unknown[];
   required?: string[];
   properties?: Record<string, RuntimeSchema>;
-  additionalProperties?: false | RuntimeSchema;
+  additionalProperties?: boolean | RuntimeSchema;
   items?: RuntimeSchema;
   oneOf?: RuntimeSchema[];
   anyOf?: RuntimeSchema[];
@@ -61,7 +61,8 @@ const ROOTS = [
   "LexiconAssistantResponse",
   "LexiconAssistantEvent",
   "LexiconFormCandidatesResponse",
-  "DubbingGroupsV3Response",
+  "DubbingGroupsResponse",
+  "ResolveDubbingResponse",
   "LearningCapabilities",
   "AiLedgerPage",
   "AiCostLedgerPage",
@@ -456,7 +457,7 @@ describe("runtime schema fail-closed diagnostics", () => {
           style_degree: 1.2
         }
       ],
-      dubbing: { mode: "local", area: "meaning", recommendation_order: [id] }
+      dubbing: { area: "meaning", uk: { mode: "local" }, us: { mode: "local" } }
     };
     const reading = {
       id,
@@ -536,11 +537,7 @@ describe("runtime schema fail-closed diagnostics", () => {
           locale: "en-GB"
         }
       ],
-      dubbing: {
-        mode: "local",
-        area: "meaning",
-        pool_version: "provider_id_v1"
-      }
+      dubbing: { area: "meaning", uk: { mode: "local" }, us: { mode: "local" } }
     };
     sense.definitions = [
       {
@@ -561,24 +558,45 @@ describe("runtime schema fail-closed diagnostics", () => {
     pos.senses = [sense];
     word.meanings.pos = [pos];
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
-    profile.dubbing.pool_version = "unknown";
+    expect(
+      runtimeSchemaBundle.$defs.VoiceProfileV3!.properties!.legacy_dubbing
+    ).toMatchObject({ type: "object", additionalProperties: true });
+    expect(runtimeSchemaBundle.$defs.VoiceProfileV3!.additionalProperties).toBe(
+      false
+    );
+    expect(
+      runtimeSchemaBundle.$defs.VoiceSideDubbingV3!.additionalProperties
+    ).toBe(false);
+    Object.assign(profile, {
+      legacy_dubbing: { mode: "local", recommendations: [{ pair_id: id }] }
+    });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    Object.assign(profile, { legacy_dubbing: null });
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
-    profile.dubbing.pool_version = "provider_id_v1";
+    Reflect.deleteProperty(profile, "legacy_dubbing");
+    Object.assign(profile.dubbing, { pool_version: "unknown" });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    Reflect.deleteProperty(profile.dubbing, "pool_version");
     const source = {
       group_id: id,
-      pair_id: id,
-      voice_ids: ["sonia"],
-      contribution_ids: [id]
+      recommendation_id: id,
+      voice_id: "sonia",
+      contribution_id: id
     };
-    Object.assign(profile.dubbing, { recommendation: source });
+    Object.assign(profile.dubbing.uk as object, {
+      recommendations: [
+        source,
+        {
+          ...source,
+          recommendation_id: "00000000-0000-4000-8000-000000000002"
+        }
+      ]
+    });
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
-    source.voice_ids.push("ryan", "guy", "jenny");
-    source.contribution_ids.push(
-      "00000000-0000-4000-8000-000000000002",
-      "00000000-0000-4000-8000-000000000003",
-      "00000000-0000-4000-8000-000000000004"
-    );
-    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    // 同声来源分别保留；旧单项字段不能混入新协议。
+    Object.assign(profile.dubbing.uk as object, { recommendation: source });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    Reflect.deleteProperty(profile.dubbing.uk, "recommendation");
     Object.assign(source, { guessed: true });
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
   });
@@ -1115,6 +1133,15 @@ it("新 reader 接受缺省旧记录和新 synthesis，同时仍拒绝未知格�
     uk: Record<string, unknown>;
     us: Record<string, unknown>;
   };
+  for (const source of ["spelling", "ipa", "ups", "upload", "none"]) {
+    dual.uk.source = source;
+    expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({
+      valid: true
+    });
+  }
+  dual.uk.source = "fallback";
+  expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
+  delete dual.uk.source;
   dual.us.ipa = "a".repeat(201);
   expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
   dual.us.ipa = "fɑɹ";

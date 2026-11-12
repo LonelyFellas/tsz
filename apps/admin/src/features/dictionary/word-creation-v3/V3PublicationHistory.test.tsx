@@ -1322,8 +1322,13 @@ describe("V3PublicationHistory", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: "恢复到草稿" }));
     fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "确认并恢复草稿" })
+    const confirmOldSnapshot = await screen.findByRole("button", {
+      name: "确认并恢复草稿"
+    });
+    await waitFor(() => expect(confirmOldSnapshot).toBeEnabled());
+    fireEvent.click(confirmOldSnapshot);
+    await waitFor(() =>
+      expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(2)
     );
 
     await screen.findByText("replacement-source");
@@ -1338,7 +1343,11 @@ describe("V3PublicationHistory", () => {
     expect(
       screen.queryByText("词形 · old-source · 原形 · 英美通用")
     ).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /确认并恢复草稿/ }));
+    const confirmReplacement = screen.getByRole("button", {
+      name: /确认并恢复草稿/
+    });
+    await waitFor(() => expect(confirmReplacement).toBeEnabled());
+    fireEvent.click(confirmReplacement);
     await waitFor(() =>
       expect(api.restoreDraftFromPublication).toHaveBeenCalledTimes(3)
     );

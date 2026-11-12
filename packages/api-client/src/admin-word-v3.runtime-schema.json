@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task193-voice-selection-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "16d65edaed3dc1fb6b447590c5723903acd927c0022b7b4c8c783e86420e33f9",
+  "_source": "/Users/darwish/.codex/worktrees/task190-backend/tsz-rust/docs/openapi.json",
+  "_source_sha256": "eaef2e6e444350707e3a92865c9650cafdbdad91eed25144da92c7c452adfa12",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",
@@ -29,7 +29,8 @@
     "LexiconAssistantResponse",
     "LexiconAssistantEvent",
     "LexiconFormCandidatesResponse",
-    "DubbingGroupsV3Response",
+    "DubbingGroupsResponse",
+    "ResolveDubbingResponse",
     "LearningCapabilities",
     "AiLedgerPage",
     "AiCostLedgerPage",
@@ -1496,52 +1497,43 @@
       "type": "string",
       "enum": ["word", "azure", "grammar", "meaning", "example"]
     },
-    "DubbingGroupsV3Response": {
+    "DubbingGroup": {
       "type": "object",
-      "required": ["groups", "revision", "order_revision"],
-      "properties": {
-        "groups": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/DubbingGroupV3" }
-        },
-        "order_revision": { "type": "integer", "minimum": 0 },
-        "revision": { "type": "integer", "minimum": 0 }
-      },
-      "additionalProperties": false
-    },
-    "DubbingGroupV3": {
-      "type": "object",
-      "required": [
-        "id",
-        "name",
-        "areas",
-        "revision",
-        "is_global",
-        "recommendations"
-      ],
+      "required": ["id", "name", "areas", "uk", "us", "revision", "is_global"],
       "properties": {
         "areas": { "type": "array", "items": { "type": "string" } },
         "id": { "type": "string", "format": "uuid" },
         "is_global": { "type": "boolean" },
         "name": { "type": "string" },
-        "recommendations": { "$ref": "#/$defs/DubbingRecommendationsV3" },
-        "revision": { "type": "integer", "minimum": 0 }
+        "revision": { "type": "integer", "minimum": 0 },
+        "uk": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DubbingRecommendation" },
+          "maxItems": 20
+        },
+        "us": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DubbingRecommendation" },
+          "maxItems": 20
+        }
       },
       "additionalProperties": false
     },
-    "DubbingPairVoice": {
+    "DubbingGroupsResponse": {
       "type": "object",
-      "required": ["id", "voice_alias", "parameters"],
+      "required": ["groups", "revision", "order_revision"],
       "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "parameters": { "$ref": "#/$defs/VoiceParameters" },
-        "voice_alias": { "type": "string" }
-      },
-      "additionalProperties": false
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DubbingGroup" }
+        },
+        "order_revision": { "type": "integer" },
+        "revision": { "type": "integer" }
+      }
     },
     "DubbingRecommendation": {
       "type": "object",
-      "required": ["id", "name", "voice_alias", "parameters"],
+      "required": ["id", "name", "voice_alias", "parameters", "selected"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "name": { "type": "string" },
@@ -1550,51 +1542,6 @@
         "voice_alias": { "type": "string" }
       },
       "additionalProperties": false
-    },
-    "DubbingRecommendationPair": {
-      "type": "object",
-      "required": ["id", "name", "selected", "uk", "us"],
-      "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "name": { "type": "string" },
-        "selected": { "type": "boolean" },
-        "uk": { "$ref": "#/$defs/DubbingPairVoice" },
-        "us": { "$ref": "#/$defs/DubbingPairVoice" }
-      },
-      "additionalProperties": false
-    },
-    "DubbingRecommendationsV3": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["uk", "us", "format"],
-          "properties": {
-            "format": { "type": "string", "enum": ["legacy"] },
-            "uk": {
-              "type": "array",
-              "items": { "$ref": "#/$defs/DubbingRecommendation" }
-            },
-            "us": {
-              "type": "array",
-              "items": { "$ref": "#/$defs/DubbingRecommendation" }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["pairs", "format"],
-          "properties": {
-            "format": { "type": "string", "enum": ["paired"] },
-            "pairs": {
-              "type": "array",
-              "items": { "$ref": "#/$defs/DubbingRecommendationPair" },
-              "maxItems": 20
-            }
-          },
-          "additionalProperties": false
-        }
-      ]
     },
     "EnglishLanguageV3": { "type": "string", "enum": ["en"] },
     "EnglishLocale": { "type": "string", "pattern": "^en-[A-Z]{2}$" },
@@ -3333,20 +3280,12 @@
     },
     "LocalVoiceRecommendationV3": {
       "type": "object",
-      "required": ["group_id", "pair_id", "voice_ids", "contribution_ids"],
+      "required": ["group_id", "recommendation_id", "voice_id"],
       "properties": {
-        "contribution_ids": {
-          "type": "array",
-          "items": { "type": "string", "format": "uuid" },
-          "maxItems": 2000
-        },
+        "contribution_id": { "type": "string", "format": "uuid" },
         "group_id": { "type": "string", "format": "uuid" },
-        "pair_id": { "type": "string", "format": "uuid" },
-        "voice_ids": {
-          "type": "array",
-          "items": { "type": "string" },
-          "maxItems": 2000
-        }
+        "recommendation_id": { "type": "string", "format": "uuid" },
+        "voice_id": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -4375,6 +4314,10 @@
       "type": "string",
       "enum": ["nfkc_trim_lower_v1"]
     },
+    "PronunciationSpeechSourceV3": {
+      "type": "string",
+      "enum": ["spelling", "ipa", "ups", "upload", "none"]
+    },
     "PronunciationStyle": {
       "type": "string",
       "enum": ["normal", "citation", "strong", "weak"]
@@ -4385,6 +4328,7 @@
       "properties": {
         "ipa": { "type": "string", "maxLength": 200 },
         "ipa_speech": { "$ref": "#/$defs/SynthesisSpeechV3" },
+        "source": { "$ref": "#/$defs/PronunciationSpeechSourceV3" },
         "ups": { "type": "string", "maxLength": 1600 },
         "ups_speech": { "$ref": "#/$defs/SynthesisSpeechV3" },
         "ups_words": {
@@ -4719,6 +4663,41 @@
         "effect_mismatch",
         "object_unavailable"
       ]
+    },
+    "ResolvedDubbingSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": { "kind": { "type": "string", "enum": ["local"] } }
+        },
+        {
+          "type": "object",
+          "required": ["group_id", "recommendation_id", "is_global", "kind"],
+          "properties": {
+            "group_id": { "type": "string", "format": "uuid" },
+            "is_global": { "type": "boolean" },
+            "kind": { "type": "string", "enum": ["recommendation"] },
+            "recommendation_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": { "kind": { "type": "string", "enum": ["catalog"] } }
+        }
+      ]
+    },
+    "ResolveDubbingResponse": {
+      "type": "object",
+      "required": ["voices", "source"],
+      "properties": {
+        "source": { "$ref": "#/$defs/ResolvedDubbingSource" },
+        "voices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/VoiceSettingV3" }
+        }
+      }
     },
     "RetiredContentSlotV3": {
       "type": "object",
@@ -6159,6 +6138,7 @@
         "sense_form_group_required"
       ]
     },
+    "VoiceAccent": { "type": "string", "enum": ["gb", "us", "none"] },
     "VoiceParameters": {
       "type": "object",
       "required": ["rate_percent", "pitch_semitones"],
@@ -6176,29 +6156,13 @@
       },
       "additionalProperties": false
     },
-    "VoicePoolVersionV3": { "type": "string", "enum": ["provider_id_v1"] },
     "VoiceProfileDubbingV3": {
       "type": "object",
-      "required": ["mode", "area"],
+      "required": ["area", "uk", "us"],
       "properties": {
         "area": { "$ref": "#/$defs/DubbingAreaV3" },
-        "mode": { "$ref": "#/$defs/VoiceProfileModeV3" },
-        "pool_version": {
-          "oneOf": [
-            { "$ref": "#/$defs/VoicePoolVersionV3" },
-            { "type": "null" }
-          ]
-        },
-        "recommendation": {
-          "oneOf": [
-            { "$ref": "#/$defs/LocalVoiceRecommendationV3" },
-            { "type": "null" }
-          ]
-        },
-        "recommendation_order": {
-          "type": "array",
-          "items": { "type": "string", "format": "uuid" }
-        }
+        "uk": { "$ref": "#/$defs/VoiceSideDubbingV3" },
+        "us": { "$ref": "#/$defs/VoiceSideDubbingV3" }
       },
       "additionalProperties": false
     },
@@ -6213,6 +6177,7 @@
             { "type": "null" }
           ]
         },
+        "legacy_dubbing": { "type": "object", "additionalProperties": true },
         "voices": {
           "type": "array",
           "items": { "$ref": "#/$defs/VoiceSettingV3" },
@@ -6225,6 +6190,7 @@
       "type": "object",
       "required": ["voice_id", "enabled", "rate_percent"],
       "properties": {
+        "accent": { "$ref": "#/$defs/VoiceAccent" },
         "audio_asset_id": { "type": "string", "format": "uuid" },
         "enabled": { "type": "boolean" },
         "locale": { "$ref": "#/$defs/EnglishLocale" },
@@ -6244,6 +6210,19 @@
         "version_name": { "type": "string", "maxLength": 40, "minLength": 1 },
         "voice_id": { "type": "string" },
         "volume_percent": { "type": "integer", "maximum": 100, "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "VoiceSideDubbingV3": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "$ref": "#/$defs/VoiceProfileModeV3" },
+        "recommendations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LocalVoiceRecommendationV3" },
+          "maxItems": 2000
+        }
       },
       "additionalProperties": false
     },

@@ -89,20 +89,18 @@ export function createGrammarFormPreviewAdapter(
       : undefined,
     resolveVoices: source.resolveVoices
       ? async (input, options) =>
-          (
-            await api.speech.resolve(
-              {
-                profile: input.profile,
-                source: {
-                  kind: "text",
-                  content: input.content,
-                  form_links: formLinks
-                },
-                accent: input.accent
+          await api.speech.resolve(
+            {
+              profile: input.profile,
+              source: {
+                kind: "text",
+                content: input.content,
+                form_links: formLinks
               },
-              options?.signal
-            )
-          ).voices
+              accent: input.accent
+            },
+            options?.signal
+          )
       : undefined,
     generateAudio: source.generateAudio
       ? async (input, options) => {

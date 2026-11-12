@@ -20,6 +20,7 @@ import type { AdminDialectPreference } from "@tsz/shared";
 import {
   retainResolvedAudio,
   voiceSettingFor,
+  profileHasInheritance,
   withDefaultVoiceProfile
 } from "@tsz/voice-editor/core";
 import { queryClient } from "@/lib/queryClient";
@@ -287,7 +288,7 @@ function useResolvedPreviewProfile(
     content,
     locale,
     adapter.audioSourceKey,
-    profile?.dubbing?.mode === "inherit" ? context.recommendationRefresh : 0
+    profileHasInheritance(profile, locale) ? context.recommendationRefresh : 0
   ]);
   const inputRef = useRef({ profile, content, locale, adapter });
   inputRef.current = { profile, content, locale, adapter };
@@ -317,7 +318,7 @@ function useResolvedPreviewProfile(
         staleTime: 0,
         retry: false
       })
-      .then((voices) => {
+      .then(({ voices }) => {
         if (!controller.signal.aborted) setResolved({ key, voices });
       })
       .catch((error) => {

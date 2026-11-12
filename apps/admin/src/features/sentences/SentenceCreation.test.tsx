@@ -360,7 +360,7 @@ describe("按词条关联反查共享多维例句", () => {
     expect(inputs).toHaveLength(3);
     fireEvent.change(inputs[1]!, { target: { value: " \n\t " } });
     fireEvent.change(inputs[2]!, { target: { value: "新增高阶译文。" } });
-    fireEvent.click(screen.getByLabelText("保存例句"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     const saved = vi.mocked(api.sentences.update).mock.calls[0]![1].content
       .sentence;
@@ -438,7 +438,7 @@ describe("按词条关联反查共享多维例句", () => {
       await screen.findByLabelText("标注工具栏");
       await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
       const input = screen.getByLabelText("例句正文");
-      const save = screen.getByLabelText("保存例句");
+      const save = screen.getByLabelText("保存例句正文修改");
       fireEvent.change(input, { target: { value: typo } });
       expect(input).toHaveValue(text);
       fireEvent.click(
@@ -483,7 +483,7 @@ describe("按词条关联反查共享多维例句", () => {
     fireEvent.click(screen.getByLabelText("关联单词"));
     fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
     await screen.findByText("已关联：具体词义");
-    expect(screen.getByLabelText("保存例句")).toBeDisabled();
+    expect(screen.getByLabelText("保存例句正文修改")).toBeDisabled();
     fireEvent.click(
       within(screen.getByText("已关联：具体词义").parentElement!).getByRole(
         "button",
@@ -491,8 +491,8 @@ describe("按词条关联反查共享多维例句", () => {
       )
     );
     expect(screen.queryByText("已关联：具体词义")).toBeNull();
-    expect(screen.getByLabelText("保存例句")).toBeEnabled();
-    fireEvent.click(screen.getByLabelText("保存例句"));
+    expect(screen.getByLabelText("保存例句正文修改")).toBeEnabled();
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
     expect(
       vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations
@@ -505,7 +505,7 @@ describe("按词条关联反查共享多维例句", () => {
       .mockImplementationOnce(async (input) => shared(input.content));
     show(<SentenceEditor onClose={vi.fn()} onSaved={onSaved} />);
     await screen.findByLabelText("标注工具栏");
-    const save = screen.getByLabelText("保存例句");
+    const save = screen.getByLabelText("保存例句正文修改");
     expect(save).toBeDisabled();
     await act(async () => {
       fireEvent.change(screen.getByLabelText("例句正文"), {
@@ -520,7 +520,12 @@ describe("按词条关联反查共享多维例句", () => {
       );
     });
     await waitFor(() =>
-      expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
+      expect(
+        within(screen.getByRole("group", { name: "英式 局部推荐" })).getByRole(
+          "checkbox",
+          { name: "英式" }
+        )
+      ).toBeChecked()
     );
     expect(save).toBeEnabled();
     fireEvent.click(save);
@@ -571,19 +576,21 @@ describe("按词条关联反查共享多维例句", () => {
       screen.getAllByPlaceholderText("请输入对应的中文译文")[0]!,
       { target: { value: "我们编故事。" } }
     );
-    expect(screen.getByLabelText("保存例句")).toBeDisabled();
+    expect(screen.getByLabelText("保存例句正文修改")).toBeDisabled();
     fireEvent.click(await screen.findByText(/确认关联 make up/));
     await screen.findByText("已关联当前词义：make up · 编造（故事、借口等）");
-    fireEvent.click(screen.getByLabelText("保存例句"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await screen.findByText("网络暂时不可用");
     expect(text).toHaveValue("We make up stories.");
     // 与独立创建入口一样，宿主错误可早于外层保存结束；恢复后再重试。
     await waitFor(() =>
       expect(screen.queryByText("正在保存修改…")).not.toBeInTheDocument()
     );
-    fireEvent.click(screen.getByLabelText("保存例句"));
+    fireEvent.click(screen.getByLabelText("保存例句正文修改"));
     await waitFor(() =>
-      expect(screen.queryByLabelText("保存例句")).not.toBeInTheDocument()
+      expect(
+        screen.queryByLabelText("保存例句正文修改")
+      ).not.toBeInTheDocument()
     );
     await screen.findByText("We make up stories.");
     expect(api.sentences.create).toHaveBeenCalledTimes(2);
@@ -673,7 +680,7 @@ describe("按词条关联反查共享多维例句", () => {
     await act(async () => {
       fireEvent.click(confirmPhrase);
     });
-    fireEvent.click(labelled("保存例句"));
+    fireEvent.click(labelled("保存例句正文修改"));
     await waitFor(() => expect(api.sentences.create).toHaveBeenCalledOnce());
     const saved = vi.mocked(api.sentences.create).mock.calls[0]![0].content;
     expect(saved.sentence.en_text).toMatchObject({

@@ -72,15 +72,18 @@ function Harness({
 beforeEach(() => {
   vi.clearAllMocks();
   preview.preference = "uk";
-  preview.resolveVoices.mockImplementation(async ({ accent }) => [
-    {
-      voice_id: accent === "gb" ? "british-voice" : "american-voice",
-      version_id: `recommended-${accent}`,
-      locale: accent === "gb" ? "en-GB" : "en-US",
-      enabled: true,
-      rate_percent: accent === "gb" ? -10 : -25
-    }
-  ]);
+  preview.resolveVoices.mockImplementation(async ({ accent }) => ({
+    source: { kind: "catalog" },
+    voices: [
+      {
+        voice_id: accent === "gb" ? "british-voice" : "american-voice",
+        version_id: `recommended-${accent}`,
+        locale: accent === "gb" ? "en-GB" : "en-US",
+        enabled: true,
+        rate_percent: accent === "gb" ? -10 : -25
+      }
+    ]
+  }));
   preview.synthesize.mockImplementation(async () => ({
     audioUrl: "https://audio.test/job.mp3",
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -146,6 +149,63 @@ it("总览选择词形拼写后，无独立语音配置或正式音频也可播�
       expect.anything()
     )
   );
+});
+
+it("总览明确显示停配侧且不借用旧读法音色，另一侧仍独立", async () => {
+  const form = commonFormFixture({
+    spelling: "job",
+    pronunciations: [
+      pronunciationFixture({
+        voice_profile: {
+          voices: [
+            {
+              voice_id: "british-voice",
+              enabled: true,
+              rate_percent: -27,
+              locale: "en-GB"
+            }
+          ]
+        },
+        synthesis: {
+          alphabet: "ipa",
+          ipa: "",
+          ups: "",
+          use_spelling: true,
+          uk: { source: "none", ipa: "dʒɒb", ups: "JH AA B" },
+          us: { source: "spelling", ipa: "dʒɑb", ups: "JH AA B" }
+        }
+      })
+    ]
+  });
+  const pos = formsFixture({ forms: [form] }).pos[0]!;
+  render(
+    <App>
+      <PronunciationPreviewProvider>
+        <V3FormContentOverview
+          rows={[
+            {
+              membershipId: pos.form_groups[0]!.members[0]!.id,
+              form,
+              formLabel: "原形",
+              formTypeAriaLabel: "词形类型",
+              formTypeDisabled: false,
+              formTypeOptions: ["base"],
+              membershipCount: 1
+            }
+          ]}
+          group={pos.form_groups[0]!}
+          sharedCounts={new Map()}
+          onEdit={() => undefined}
+          onFormTypeChange={() => undefined}
+          issues={[]}
+        />
+      </PronunciationPreviewProvider>
+    </App>
+  );
+  expect(await screen.findByText("本侧暂不配置")).toBeVisible();
+  expect(screen.getByLabelText("读法 1英式 播放语音")).toBeDisabled();
+  expect(screen.queryByText("British")).not.toBeInTheDocument();
+  expect(preview.synthesize).not.toHaveBeenCalled();
 });
 
 it.each(["common", "uk_us"] as const)(

@@ -24,8 +24,16 @@ export async function resolveFormCopyProfiles(
     const row = variant.pronunciations.find(
       (item) => item.id === match.source!.pronunciationId
     )!;
-    if (row.synthesis?.use_spelling)
-      return variant.spelling_speech?.voice_profile;
+    const selected =
+      row.synthesis &&
+      synthesisForLocale(
+        row.synthesis,
+        match.side === "uk" ? "en-GB" : "en-US",
+        match.source.region
+      );
+    if (selected?.source === "none" || selected?.source === "upload")
+      return false;
+    if (selected?.use_spelling) return variant.spelling_speech?.voice_profile;
     return (
       row.voice_profile ||
       row.synthesis?.uk?.ipa_speech ||
@@ -51,6 +59,8 @@ export async function resolveFormCopyProfiles(
     const synthesis = pronunciation.synthesis
       ? synthesisForLocale(pronunciation.synthesis, locale, reference.region)
       : undefined;
+    if (synthesis?.source === "none" || synthesis?.source === "upload")
+      continue;
     const add = (
       channel: ResolvedFormCopyProfile["channel"],
       profile: VoiceProfileV3 | undefined,
@@ -96,7 +106,8 @@ export async function resolveFormCopyProfiles(
             return (
               resolved.has(voiceKey(setting)) ||
               (side === match.side &&
-                (profile.dubbing?.mode !== "inherit" || !setting.enabled))
+                (profile.dubbing?.[match.side].mode !== "inherit" ||
+                  !setting.enabled))
             );
           });
           const merged = stored.map((setting) => {

@@ -231,14 +231,21 @@ it.each([undefined, { voices: [] }])(
         volume_percent: 93
       }
     ];
-    preview.resolveVoices.mockReset().mockResolvedValue(recommended(-10));
+    preview.resolveVoices.mockReset().mockResolvedValue({
+      voices: recommended(-10),
+      source: { kind: "catalog" }
+    });
     render(
       <PreviewHarness recommendationArea="azure" voiceProfile={voiceProfile} />
     );
     await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalled());
     expect(preview.resolveVoices.mock.calls[0]![0].profile).toMatchObject({
       voices: [],
-      dubbing: { mode: "inherit", area: "azure" }
+      dubbing: {
+        area: "azure",
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
     });
     fireEvent.click(screen.getByLabelText("获取语音"));
     await waitFor(() =>
@@ -251,7 +258,10 @@ it.each([undefined, { voices: [] }])(
         expect.anything()
       )
     );
-    preview.resolveVoices.mockResolvedValue(recommended(-25));
+    preview.resolveVoices.mockResolvedValue({
+      voices: recommended(-25),
+      source: { kind: "catalog" }
+    });
     fireEvent(window, new Event("focus"));
     await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalledTimes(2));
     await waitFor(() =>
@@ -275,7 +285,9 @@ it("默认音色摘要与播放合并解析，保存推荐后同步新参数", a
     enabled: true,
     rate_percent: -10
   };
-  preview.resolveVoices.mockReset().mockResolvedValue([setting]);
+  preview.resolveVoices
+    .mockReset()
+    .mockResolvedValue({ voices: [setting], source: { kind: "catalog" } });
   const content: RichTextV2 = { version: 2, text: "hello", annotations: [] };
   render(
     <PronunciationPreviewProvider>
@@ -295,7 +307,10 @@ it("默认音色摘要与播放合并解析，保存推荐后同步新参数", a
   );
   expect(await screen.findByText("0.90×")).toBeVisible();
   expect(preview.resolveVoices).toHaveBeenCalledTimes(1);
-  preview.resolveVoices.mockResolvedValue([{ ...setting, rate_percent: -25 }]);
+  preview.resolveVoices.mockResolvedValue({
+    voices: [{ ...setting, rate_percent: -25 }],
+    source: { kind: "catalog" }
+  });
   act(() =>
     queryClient.setQueryData(["admin-dubbing-groups-v3", "actor"], {
       revision: 2
@@ -489,7 +504,12 @@ describe("PronunciationPreview", () => {
 
   it("音量摘要随继承解析更新，不显示旧快照或失败后的默认音量", async () => {
     const resolved = deferred<VoiceProfileV3["voices"]>();
-    preview.resolveVoices.mockReturnValueOnce(resolved.promise);
+    preview.resolveVoices.mockReturnValueOnce(
+      resolved.promise.then((voices) => ({
+        voices,
+        source: { kind: "catalog" }
+      }))
+    );
     const voiceProfile: VoiceProfileV3 = {
       voices: [
         {
@@ -499,7 +519,11 @@ describe("PronunciationPreview", () => {
           volume_percent: 90
         }
       ],
-      dubbing: { mode: "inherit", area: "word" }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "inherit" },
+        us: { mode: "inherit" }
+      }
     };
     const summary = (content: string) => (
       <PronunciationPreviewProvider>
@@ -533,23 +557,30 @@ describe("PronunciationPreview", () => {
   });
 
   it("继承快捷播放采用当前解析结果且不使用旧快照默认", async () => {
-    preview.resolveVoices.mockResolvedValue([
-      {
-        voice_id: "british-voice",
-        version_id: "current",
-        version_name: "current",
-        locale: "en-GB",
-        enabled: true,
-        rate_percent: -27
-      }
-    ]);
+    preview.resolveVoices.mockResolvedValue({
+      voices: [
+        {
+          voice_id: "british-voice",
+          version_id: "current",
+          version_name: "current",
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: -27
+        }
+      ],
+      source: { kind: "catalog" }
+    });
     render(
       <PreviewHarness
         voiceProfile={{
           voices: [
             { voice_id: "british-voice", enabled: true, rate_percent: 0 }
           ],
-          dubbing: { mode: "inherit", area: "word" }
+          dubbing: {
+            area: "word" as const,
+            uk: { mode: "inherit" },
+            us: { mode: "inherit" }
+          }
         }}
       />
     );
@@ -568,7 +599,11 @@ describe("PronunciationPreview", () => {
       <PreviewHarness
         voiceProfile={{
           voices: [],
-          dubbing: { mode: "inherit", area: "word" }
+          dubbing: {
+            area: "word" as const,
+            uk: { mode: "inherit" },
+            us: { mode: "inherit" }
+          }
         }}
       />
     );

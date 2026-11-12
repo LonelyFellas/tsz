@@ -34,10 +34,11 @@ import type {
 import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
 import {
   MAX_PAUSE_MS,
-  convertVoicePool,
   MIN_PAUSE_MS,
   isVoiceRecommendationAvailable,
   localVoiceProfile,
+  inheritedDubbing,
+  profileHasInheritance,
   recommendationVoiceSetting,
   retainResolvedAudio,
   voiceEffectKey,
@@ -47,6 +48,7 @@ import {
   voiceLocale,
   voiceSettingFor,
   voiceSettingKey,
+  voiceSettingAccent,
   withNativeVoiceVersion,
   normalizeRichTextV2,
   normalizeSpellingRich,
@@ -66,6 +68,7 @@ import type {
   VoiceEditorProps,
   VoiceAssociation,
   VoiceSetting,
+  VoiceProfile,
   VoiceRecommendation
 } from "../../types";
 import {
@@ -671,7 +674,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       next,
       voices,
       recommendationArea,
-      voiceProfile
+      voiceProfile,
+      (() => {
+        const option = voices.find((voice) => voice.id === voiceId);
+        const side = speechAccentGroup(
+          option?.locale ?? updated.locale,
+          option?.accent
+        );
+        return side === "uk" || side === "us" ? side : undefined;
+      })()
     );
     setVoiceSettings(profile.voices);
     emittedProfileRef.current = JSON.stringify(profile);
@@ -724,7 +735,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         : workingValue;
   const phonemeLocale =
     mode === "synthesis" || mode === "phoneme-settings" ? locale : undefined;
-  const inherited = voiceProfile?.dubbing?.mode === "inherit";
+  const inherited = profileHasInheritance(voiceProfile, locale);
   const refreshSavedRecommendations = useCallback(() => {
     if (inherited) {
       stopAudition();
@@ -762,6 +773,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [resolvedVoices, setResolvedVoices] = useState<{
     key: string;
     voices: VoiceSetting[];
+    sources?: Partial<
+      Record<
+        "uk" | "us",
+        import("@tsz/types").AdminResolveDubbingResponse["source"]
+      >
+    >;
   }>();
   useEffect(() => {
     if (!voiceProfile?.dubbing || !previewAdapter?.resolveVoices) return;
@@ -784,7 +801,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         setResolvedVoices({
           key: resolutionKey,
           voices: values.flatMap((value) =>
-            value.status === "fulfilled" ? value.value : []
+            value.status === "fulfilled" ? value.value.voices : []
+          ),
+          sources: Object.fromEntries(
+            values.flatMap((value, index) =>
+              value.status === "fulfilled"
+                ? [
+                    [
+                      locale === "en-US" || (!locale && index === 1)
+                        ? "us"
+                        : "uk",
+                      value.value.source
+                    ]
+                  ]
+                : []
+            )
           )
         });
         const failed = values.find((value) => value.status === "rejected");
@@ -852,7 +883,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         )
       : undefined;
   const displayedSettings =
-    voiceProfile?.dubbing?.pool_version && voiceProfile.dubbing.mode === "local"
+    voiceProfile?.dubbing && !inherited
       ? voiceSettings
       : voiceProfile?.dubbing
         ? [
@@ -885,7 +916,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const ids = next.map(voiceSettingKey);
     const profile = {
       ...voiceProfile,
-      dubbing: { ...voiceProfile.dubbing, recommendation_order: ids },
+      dubbing: voiceProfile.dubbing,
       voices: [...voiceSettings].sort(
         (left, right) =>
           ids.indexOf(voiceSettingKey(left)) -
@@ -898,16 +929,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   }
   const currentDubbing = useRef({
     settings: effectiveSettings,
-    mode: voiceProfile?.dubbing,
     profile: voiceProfile
   });
   currentDubbing.current = {
     settings: voiceProfile?.dubbing ? displayedSettings : voiceSettings,
-    mode: voiceProfile?.dubbing,
     profile: voiceProfile
   };
   const restoreInheritance = useRef(false);
-  async function restoreRecommendations() {
+  async function restoreRecommendations(side?: "uk" | "us") {
     restoreInheritance.current = true;
     if (!recommendationArea || readOnly || !onVoiceProfileChange) return;
     stopAudition();
@@ -916,15 +945,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setGeneratingVersion(undefined);
     setRecommendationRefresh((value) => value + 1);
     const profile = {
-      voices: [],
-      dubbing: {
-        mode: "inherit" as const,
-        area: recommendationArea,
-        pool_version: "provider_id_v1" as const,
-        recommendation_order: voiceProfile?.dubbing?.recommendation_order ?? []
-      }
+      voices: side
+        ? voiceSettings.filter((setting) => {
+            return voiceSettingAccent(setting, voices) !== side;
+          })
+        : [],
+      dubbing: side
+        ? {
+            ...(voiceProfile?.dubbing ?? inheritedDubbing(recommendationArea)),
+            [side]: { mode: "inherit" as const }
+          }
+        : inheritedDubbing(recommendationArea)
     };
-    setVoiceSettings([]);
+    setVoiceSettings(profile.voices);
     emittedProfileRef.current = JSON.stringify(profile);
     onVoiceProfileChange(profile);
   }
@@ -953,12 +986,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setPendingUploads([]);
     stopAssetPlayback();
     setGeneratingVersion(undefined);
-    if (voiceSettingsRef.current.some((setting) => setting.audio_asset_id)) {
+    const affectsSetting = (setting: VoiceSetting) =>
+      !locale ||
+      voiceSettingAccent(setting, voices) === speechAccentGroup(locale);
+    if (
+      voiceSettingsRef.current.some(
+        (setting) => setting.audio_asset_id && affectsSetting(setting)
+      )
+    ) {
       const profile = {
         ...voiceProfile,
-        voices: voiceSettingsRef.current.map(
-          ({ audio_asset_id: _audio, ...setting }) => setting
-        )
+        voices: voiceSettingsRef.current.map((setting) => {
+          if (!affectsSetting(setting)) return setting;
+          const { audio_asset_id: _audio, ...next } = setting;
+          return next;
+        })
       };
       setVoiceSettings(profile.voices);
       emittedProfileRef.current = JSON.stringify(profile);
@@ -1021,7 +1063,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const request = new AbortController();
     generationRequest.current = request;
     const baseline = audioContentRef.current;
-    const modeBaseline = JSON.stringify(voiceProfile?.dubbing);
+    const generationSide = voiceSettingAccent(setting, voices);
+    const dubbingMode = (profile: VoiceProfile | null | undefined) =>
+      profile?.dubbing && (generationSide === "uk" || generationSide === "us")
+        ? [profile.dubbing.area, profile.dubbing[generationSide].mode]
+        : profile?.dubbing;
+    const modeBaseline = JSON.stringify(dubbingMode(voiceProfile));
     setGeneratingVersion(key);
     setRecommendationError("");
     try {
@@ -1040,7 +1087,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       if (
         request.signal.aborted ||
         baseline !== audioContentRef.current ||
-        modeBaseline !== JSON.stringify(currentDubbing.current.mode) ||
+        modeBaseline !==
+          JSON.stringify(dubbingMode(currentDubbing.current.profile)) ||
         !current ||
         (automatic && !current.enabled) ||
         latestReadOnly.current
@@ -1065,11 +1113,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         incomingRef.current = serialized;
         onChange(workingValue, links);
       }
-      const next = currentDubbing.current.settings.map((item) =>
-        voiceSettingKey(item) === key
-          ? { ...item, audio_asset_id: asset.id }
-          : item
-      );
+      const stored = currentDubbing.current.profile?.voices ?? [];
+      const replacement = { ...current, audio_asset_id: asset.id };
+      const next = stored.some((item) => voiceSettingKey(item) === key)
+        ? stored.map((item) =>
+            voiceSettingKey(item) === key ? replacement : item
+          )
+        : [...stored, replacement];
       const profile = { ...currentDubbing.current.profile, voices: next };
       setVoiceSettings(next);
       emittedProfileRef.current = JSON.stringify(profile);
@@ -1292,12 +1342,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     const profile = {
       ...(recommendationArea
         ? {
-            dubbing: {
-              mode: "inherit" as const,
-              area: recommendationArea,
-              pool_version: "provider_id_v1" as const,
-              recommendation_order: usable.map((item) => item.id)
-            }
+            dubbing: inheritedDubbing(recommendationArea)
           }
         : {}),
       voices: usable.map((item) =>
@@ -1536,13 +1581,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const voiceSavePending =
     !contentReadOnly &&
     mode !== "actual-pron" &&
-    Boolean(voiceProfile?.dubbing?.pool_version) &&
+    Boolean(voiceProfile?.dubbing) &&
     (voicesLoading ||
       (Boolean(previewAdapter?.resolveVoices) &&
         resolvedVoices?.key !== resolutionKey));
 
   const automaticAudio = effectiveSettings.filter(
-    (setting) => setting.enabled && !setting.audio_asset_id
+    (setting) =>
+      setting.enabled &&
+      (!voiceProfile?.dubbing ||
+        !locale ||
+        voiceSettingAccent(setting, voices) === speechAccentGroup(locale)) &&
+      !unavailableVersions?.has(voiceSettingKey(setting)) &&
+      !setting.audio_asset_id
   );
   const automaticAudioPending =
     !!previewAdapter?.generateAudio &&
@@ -1553,6 +1604,16 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     previewEnabled &&
     !previewIsMock &&
     automaticAudio.length > 0;
+  const automaticAudioInput = (setting: VoiceSetting) => {
+    const side = voiceSettingAccent(setting, voices);
+    return JSON.stringify([
+      audioContentKey,
+      voiceEffectKey(setting),
+      side === "uk" || side === "us"
+        ? voiceProfile?.dubbing?.[side].mode
+        : voiceProfile?.dubbing
+    ]);
+  };
   // Read the current controlled draft each render: another selection can join
   // the queue while a request is running, without replacing that request.
   useEffect(() => {
@@ -1569,24 +1630,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       working.error
     )
       return;
-    const setting = automaticAudio.find((item) => {
-      const input = JSON.stringify([
-        audioContentKey,
-        voiceEffectKey(item),
-        voiceProfile?.dubbing
-      ]);
-      return (
-        automaticAudioAttempts.current.get(voiceSettingKey(item)) !== input
-      );
-    });
+    const setting = automaticAudio.find(
+      (item) =>
+        automaticAudioAttempts.current.get(voiceSettingKey(item)) !==
+        automaticAudioInput(item)
+    );
     if (!setting) return;
     automaticAudioAttempts.current.set(
       voiceSettingKey(setting),
-      JSON.stringify([
-        audioContentKey,
-        voiceEffectKey(setting),
-        voiceProfile?.dubbing
-      ])
+      automaticAudioInput(setting)
     );
     void generateVersionAudio(setting, true);
   });
@@ -1596,7 +1648,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       throw new Error(
         t("final_audio_for_selected_voices_is_incomplete_wait_or_retry")
       );
-    let profile = voiceProfile;
+    const profile = voiceProfile;
     if (
       forSave &&
       !contentReadOnly &&
@@ -1614,7 +1666,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       forSave &&
       !contentReadOnly &&
       mode !== "actual-pron" &&
-      profile?.dubbing?.pool_version
+      profile?.dubbing
     ) {
       if (voiceSavePending)
         throw new Error(
@@ -1625,11 +1677,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         if (
           !effectiveSettings.some(
             (setting) =>
-              setting.enabled &&
-              speechAccentGroup(
-                voiceLocale(setting, voices),
-                voices.find((voice) => voice.id === setting.voice_id)?.accent
-              ) === accent
+              setting.enabled && voiceSettingAccent(setting, voices) === accent
           )
         )
           throw new Error(
@@ -1638,51 +1686,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             })
           );
       }
-      if (inherited && !restoreInheritance.current) {
-        const activeKeys = new Set(effectiveSettings.map(voiceSettingKey));
-        const rawSettings = displayedSettings.map((setting) => {
-          const key = voiceSettingKey(setting);
-          const recommendation = recommendations.find(
-            (item) => item.id === key
-          );
-          const raw = recommendation
-            ? recommendationVoiceSetting(recommendation, voices)
-            : (voiceSettings.find((item) => voiceSettingKey(item) === key) ??
-              setting);
-          return {
-            ...raw,
-            enabled: activeKeys.has(key),
-            ...(setting.audio_asset_id
-              ? { audio_asset_id: setting.audio_asset_id }
-              : {})
-          };
-        });
-        profile = convertVoicePool(
-          profile,
-          rawSettings,
-          voices,
-          profile.dubbing.area
-        );
-        const active = effectiveSettings.filter((setting) => setting.enabled);
-        const sources = active.map((setting) =>
-          recommendations.find((item) => item.id === voiceSettingKey(setting))
-        );
-        const source = sources[0];
-        if (
-          source?.groupId &&
-          source.pairId &&
-          sources.every(
-            (item) =>
-              item?.groupId === source.groupId && item?.pairId === source.pairId
-          )
-        )
-          profile.dubbing!.recommendation = {
-            group_id: source.groupId,
-            pair_id: source.pairId,
-            voice_ids: active.map((setting) => setting.voice_id),
-            contribution_ids: active.map(voiceSettingKey)
-          };
-      }
+      // Saving an inherited side retains inheritance; only explicit side operations materialize it.
     }
     return structuredClone({
       value: workingValue,
@@ -3594,6 +3598,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         settings={
           inherited
             ? displayedSettings.map((item) =>
+                (() => {
+                  const side = voiceSettingAccent(item, voices);
+                  return (
+                    (side === "uk" || side === "us") &&
+                    voiceProfile?.dubbing?.[side].mode === "local"
+                  );
+                })() ||
                 effectiveSettings.some(
                   (effective) =>
                     voiceSettingKey(effective) === voiceSettingKey(item)
@@ -3662,7 +3673,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           onVoiceProfileChange(profile);
         }}
         onAudition={handleAudition}
-        onRestore={() => void restoreRecommendations()}
+        sources={
+          resolvedVoices?.key === resolutionKey
+            ? resolvedVoices.sources
+            : undefined
+        }
+        onRestore={(side) => void restoreRecommendations(side)}
         onOpenDetail={(dialect) => {
           stopAudition();
           stopAssetPlayback();

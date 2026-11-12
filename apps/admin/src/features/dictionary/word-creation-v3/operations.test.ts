@@ -2643,7 +2643,11 @@ it("显式配音配置保留已选版本的默认播放顺序", () => {
     content: { version: 2 as const, text: "cat", annotations: [] },
     voice_profile: {
       voices,
-      dubbing: { mode: "local" as const, area: "word" as const }
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "local" as const },
+        us: { mode: "local" as const }
+      }
     }
   };
   expect(

@@ -66,7 +66,7 @@ describe("身份和授权缓存边界", () => {
     detach();
     client.clear();
   });
-  it("配对查询与旧文本查询分别缓存，撤销配音权限同时清理两种表示", () => {
+  it("分组列表与文本推荐分别缓存，撤销配音权限同时清理两处", () => {
     const store = createAdminAuthStore();
     const client = new QueryClient();
     store
@@ -77,7 +77,9 @@ describe("身份和授权缓存边界", () => {
       groups: [{ uk: [], us: [] }]
     });
     client.setQueryData(["admin-dubbing-groups-v3", "a"], {
-      groups: [{ recommendations: { format: "paired", pairs: [] } }]
+      groups: [{ uk: [], us: [] }],
+      revision: 1,
+      order_revision: 1
     });
     store.getState().setProfile({ ...profile, permissions: [] });
     expect(client.getQueryData(["admin-dubbing-groups", "a"])).toBeUndefined();

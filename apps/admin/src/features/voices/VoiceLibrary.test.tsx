@@ -360,11 +360,12 @@ describe("配音中心", () => {
           revision: 1,
           is_global: false,
           areas: ["word"],
-          recommendations: { format: "paired", pairs: [] }
+          uk: [],
+          us: []
         }
       ]
     });
-    const save = vi.spyOn(api.speech, "savePairedGroup");
+    const save = vi.spyOn(api.speech, "saveIndependentGroup");
     const { router } = mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
     fireEvent.click(namedButton("加入分组推荐"));
@@ -374,21 +375,18 @@ describe("配音中心", () => {
         selector: ".ui-select-item-option-content"
       })
     );
-    fireEvent.click(namedButton("创建整套推荐"));
-    fireEvent.click(
-      within(await screen.findByLabelText("美式音色滚动列表")).getByRole(
-        "radio",
-        { name: "Guy 男声" }
-      )
-    );
-    fireEvent.click(namedButton("保存整套推荐"));
+    fireEvent.click(namedButton("新增推荐"));
+    expect(screen.queryByLabelText("美式女声目录")).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "保存到本组" }));
     await screen.findByText(/已应用到分组草稿/);
     fireEvent.click(namedButton(/^完\s*成$/));
     await act(() => router.navigate("/voices"));
     const panel = await screen.findByRole("region", {
       name: "测试推荐组 分组配置"
     });
-    expect(within(panel).getByLabelText("推荐名称 1")).toHaveValue("Sonia");
+    expect(within(panel).getByLabelText("英式 1 推荐名称")).toHaveValue(
+      "Sonia"
+    );
     expect(
       within(panel).getByRole("button", { name: /保存当前组/ })
     ).toBeEnabled();

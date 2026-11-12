@@ -19,7 +19,7 @@ import type {
   V3DraftValidationIssue
 } from "@tsz/types";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { pronunciationPlaybackSource } from "@tsz/shared";
+import { pronunciationPlaybackSource, synthesisForLocale } from "@tsz/shared";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
   PronunciationPreviewControls,
@@ -104,8 +104,20 @@ function PronunciationCell({
     locale,
     variant.dialect
   );
-  const profile = activeProfile ?? row.voice_profile;
-  const recommendationArea = row.synthesis?.use_spelling ? "word" : "azure";
+  const source = row.synthesis
+    ? synthesisForLocale(row.synthesis, locale, variant.dialect).source
+    : undefined;
+  const profile = source ? activeProfile : (activeProfile ?? row.voice_profile);
+  const recommendationArea =
+    source === "spelling" || (!source && row.synthesis?.use_spelling)
+      ? "word"
+      : "azure";
+  const sourceLabel =
+    source === "none"
+      ? t("creation_accent_not_configured")
+      : source === "upload"
+        ? t("creation_uploaded_source")
+        : undefined;
   const actualPron = row.actual_pron_rich ?? {
     version: 2 as const,
     text: row.actual_pron,
@@ -118,14 +130,18 @@ function PronunciationCell({
       className={`v3-overview-reading${settings ? " v3-overview-settings" : ""}`}
     >
       {settings ? (
-        <PronunciationPreviewVoiceSummary
-          recommendationArea={recommendationArea}
-          dialect={dialect}
-          voiceProfile={profile}
-          pronunciationId={row.id}
-          content={content}
-          column={settings}
-        />
+        sourceLabel ? (
+          <span>{settings === "voice" ? sourceLabel : "—"}</span>
+        ) : (
+          <PronunciationPreviewVoiceSummary
+            recommendationArea={recommendationArea}
+            dialect={dialect}
+            voiceProfile={profile}
+            pronunciationId={row.id}
+            content={content}
+            column={settings}
+          />
+        )
       ) : (
         <div className="v3-overview-pronunciation">
           <PronunciationPreviewControls
@@ -138,9 +154,11 @@ function PronunciationCell({
             audioAssetId={assetId}
             disabled={!content && !assetId}
             disabledReason={
-              content || !row.synthesis
-                ? t("audio_missing")
-                : t("synthesis_source_required")
+              source === "none"
+                ? t("creation_accent_not_configured")
+                : content || !row.synthesis
+                  ? t("audio_missing")
+                  : t("synthesis_source_required")
             }
             ariaLabelPrefix={t("reading_index", {
               index: pronunciationIndex + 1,

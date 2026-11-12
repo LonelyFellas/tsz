@@ -316,10 +316,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           key: defaultKey,
           profile: {
             dubbing: {
-              mode: "inherit",
-              pool_version: "provider_id_v1",
               area,
-              recommendation_order: usable.map((item) => item.id)
+              uk: { mode: "inherit" },
+              us: { mode: "inherit" }
             },
             voices: usable.map((item) =>
               recommendationVoiceSetting(item, voices)

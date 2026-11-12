@@ -24,7 +24,6 @@ import { HttpError } from "@tsz/api-client";
 import type {
   AdminDubbingGroupsV3Response,
   AdminDubbingRecommendation,
-  AdminDubbingRecommendationPair,
   AdminSpeechVoice
 } from "@tsz/types";
 import {
@@ -47,7 +46,6 @@ import { useDubbingDrafts } from "./DubbingDrafts";
 import { DubbingAudioUpdates } from "./DubbingAudioUpdates";
 import {
   dubbingGroupsKey,
-  legacyComplete,
   recommendationError,
   sideName,
   sides,
@@ -59,7 +57,6 @@ import {
   type RecommendationSeed
 } from "./RecommendationEditor";
 import { VoiceName, VoiceRate, VoiceVolume } from "./VoiceDisplay";
-import { LegacyGroupReview } from "./LegacyGroupReview";
 import "./dubbing-groups.css";
 
 const areas = [
@@ -72,8 +69,7 @@ const areas = [
 type Editing = {
   groupId: string;
   initial: RecommendationSeed;
-  side?: DubbingSide;
-  legacy?: boolean;
+  side: DubbingSide;
 };
 
 export function DubbingGroups({
@@ -117,7 +113,6 @@ export function DubbingGroups({
   const [settingsId, setSettingsId] = useState<string>();
   const [settingsCreating, setSettingsCreating] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
-  const [reviewId, setReviewId] = useState<string>();
   const [previewArea, setPreviewArea] = useState<string>();
   const [settingsForm] = Form.useForm<{ name: string; areas: string[] }>();
   const saving = !!savingId;
@@ -183,7 +178,7 @@ export function DubbingGroups({
     ]);
     if (useAuthStore.getState().profile?.id !== accountId) return false;
     client.setQueryData(dubbingGroupsKey(accountId), result);
-    // 文本消费者仍读取 v2；只使其失效，不把 v3 recommendations 写入旧缓存。
+    // 文本入口使用独立查询缓存，保存后重新读取推荐。
     void client.invalidateQueries({
       queryKey: ["admin-dubbing-groups", accountId],
       exact: true
@@ -197,81 +192,49 @@ export function DubbingGroups({
       setGroupSaveError(id, voiceMessage("enter_a_group_name"));
       return;
     }
-    if (draft.recommendations.format !== "paired") {
-      setGroupSaveError(
-        id,
-        voiceMessage(
-          "confirm_the_existing_british_and_american_voice_pairs_before_savi"
-        )
-      );
-      return;
-    }
     const original = groups.data?.groups.find((g) => g.id === id);
-    for (const pair of draft.recommendations.pairs) {
-      if (!pair.name.trim()) {
-        setGroupSaveError(id, voiceMessage("enter_a_recommendation_name"));
-        return;
-      }
-      if (Array.from(pair.name).length > 40) {
-        setGroupSaveError(
-          id,
-          voiceMessage("recommendation_names_must_be_at_most_40_characters")
-        );
-        return;
-      }
-      for (const side of sides) {
-        const item = {
-          ...pair[side],
-          name: pair.name,
-          selected: pair.selected
-        };
-        const rec = original?.recommendations;
-        const stored =
-          rec?.format === "paired"
-            ? rec.pairs.find((p) => p[side].id === item.id)?.[side]
-            : rec?.[side].find((i) => i.id === item.id);
+    for (const side of sides)
+      for (const item of draft[side]) {
+        const stored = original?.[side].find((value) => value.id === item.id);
         const issue = recommendationError(
           draft.name,
           side,
           item,
-          voices.find((v) => v.alias === item.voice_alias)
+          voices.find((voice) => voice.alias === item.voice_alias)
         );
-        if (
-          issue &&
-          (!stored ||
-            JSON.stringify({
-              id: stored.id,
-              voice_alias: stored.voice_alias,
-              parameters: stored.parameters
-            }) !== JSON.stringify(pair[side]))
-        ) {
+        const retained =
+          stored && item.selected === false
+            ? { ...stored, selected: false }
+            : stored;
+        if (issue && JSON.stringify(retained) !== JSON.stringify(item)) {
           setGroupSaveError(id, {
             format: (t) =>
               recommendationError(
                 draft.name,
                 side,
                 item,
-                voices.find((v) => v.alias === item.voice_alias),
+                voices.find((voice) => voice.alias === item.voice_alias),
                 t
               ) ?? ""
           });
           return;
         }
       }
-    }
     setSavingId(id);
     setError(undefined);
     setGroupSaveError(id);
     setSaved(undefined);
     try {
-      const result = await api.speech.savePairedGroup(
+      const result = await api.speech.saveIndependentGroup(
         {
           group: {
             id,
             name: draft.name.trim(),
             areas: draft.areas,
             is_global: draft.is_global,
-            pairs: draft.recommendations.pairs
+            uk: draft.uk,
+            us: draft.us,
+            revision: draft.revision
           },
           base_revision: draft.revision
         },
@@ -348,9 +311,10 @@ export function DubbingGroups({
     onInvalidatePreview();
     const group: DubbingDraft = {
       id: newWordNodeId(),
-      name: "新分组",
+      name: t("new_group"),
       areas: [],
-      recommendations: { format: "paired", pairs: [] },
+      uk: [],
+      us: [],
       revision: 0,
       is_global: false
     };
@@ -400,113 +364,17 @@ export function DubbingGroups({
       }
     });
   }
-  function updatePairs(
+  function updateSide(
     groupId: string,
+    side: DubbingSide,
     update: (
-      pairs: AdminDubbingRecommendationPair[]
-    ) => AdminDubbingRecommendationPair[]
+      items: AdminDubbingRecommendation[]
+    ) => AdminDubbingRecommendation[]
   ) {
-    change(groupId, (group) =>
-      group.recommendations.format === "paired"
-        ? {
-            ...group,
-            recommendations: {
-              format: "paired",
-              pairs: update(group.recommendations.pairs)
-            }
-          }
-        : { ...group, legacyPairs: update(group.legacyPairs ?? []) }
-    );
-  }
-  function sideRow(
-    pair: AdminDubbingRecommendationPair,
-    side: DubbingSide,
-    group: DubbingDraft,
-    editable: boolean,
-    auditionAllowed = true
-  ) {
-    const item = { ...pair[side], name: pair.name, selected: pair.selected };
-    return voiceRow(
-      item,
-      side,
-      group,
-      editable
-        ? () => setEditing({ groupId: group.id, initial: pair, side })
-        : undefined,
-      auditionAllowed
-    );
-  }
-  function voiceRow(
-    item: AdminDubbingRecommendation,
-    side: DubbingSide,
-    group: DubbingDraft,
-    edit?: () => void,
-    auditionAllowed = true
-  ) {
-    const voice = voices.find((v) => v.alias === item.voice_alias);
-    const issue = recommendationError(group.name, side, item, voice, t);
-    const accent = voice
-      ? speechAccentGroup(voice.locale, voice.accent)
-      : "other";
-    return (
-      <div className="dubbing-pair-side" title={issue ?? undefined}>
-        <div className="dubbing-side-heading">
-          <Button
-            type="text"
-            aria-label={t("audition_side", {
-              side: sideName(side, t),
-              name: item.name
-            })}
-            className={`voice-accent-${accent}`}
-            icon={<Volume2Icon aria-hidden />}
-            disabled={!auditionAllowed || !canAudition || !!issue}
-            onClick={() => voice && onAudition(voice, item)}
-          />
-          <div className="dubbing-side-identity">
-            {voice ? (
-              <VoiceName voice={voice} />
-            ) : (
-              <span>{t("unavailable_voice", { alias: item.voice_alias })}</span>
-            )}
-          </div>
-          {edit && (
-            <Button
-              type="text"
-              icon={<PencilIcon aria-hidden />}
-              aria-label={t("edit_side", {
-                side: sideName(side, t),
-                name: item.name
-              })}
-              onClick={() => {
-                onInvalidatePreview();
-                edit();
-              }}
-            />
-          )}
-        </div>
-        <div className="dubbing-side-parameters">
-          <span>
-            {t("rate")} <VoiceRate parameters={item.parameters} />
-          </span>
-          <span>
-            {t("volume")} <VoiceVolume parameters={item.parameters} />
-          </span>
-        </div>
-        {issue && (
-          <Typography.Text type="danger" className="dubbing-item-issue">
-            {issue}
-          </Typography.Text>
-        )}
-      </div>
-    );
+    change(groupId, (group) => ({ ...group, [side]: update(group[side]) }));
   }
   const editingGroup =
     editing && current.find((group) => group.id === editing.groupId);
-  const reviewGroup = current.find((group) => group.id === reviewId);
-  const legacy =
-    editingGroup?.recommendations.format === "legacy"
-      ? editingGroup.recommendations
-      : undefined;
   const matching =
     groups.data?.groups.filter(
       (group) => !group.is_global && group.areas.includes(previewArea ?? "")
@@ -531,276 +399,305 @@ export function DubbingGroups({
     editable: boolean,
     auditionAllowed = true
   ) {
-    const rec = group.recommendations;
-    const pairs =
-      rec.format === "paired" ? rec.pairs : (group.legacyPairs ?? []);
     return (
-      <>
-        {rec.format === "legacy" && (
-          <>
-            <div className="dubbing-legacy-notice">
-              <Typography.Text type="secondary">
-                {t(
-                  "existing_voices_have_been_kept_check_the_british_and_american_pai"
-                )}
-              </Typography.Text>
-              {editable && (
-                <Button onClick={() => setReviewId(group.id)}>
-                  {t("review_voices")}
-                </Button>
-              )}
-            </div>
-            <div className="dubbing-legacy-overview">
-              {sides.map((side) => (
-                <section
-                  key={side}
-                  aria-label={t("group_legacy_side", {
-                    name: group.name,
-                    side: sideName(side, t)
-                  })}
-                >
+      <div className="dubbing-lists">
+        <Typography.Text type="secondary" className="dubbing-table-scroll-hint">
+          {t("scroll_horizontally_to_view_all_dubbing_settings")}
+        </Typography.Text>
+        <div className="dubbing-lists-scroll" tabIndex={0}>
+          <div className="dubbing-independent-lists">
+            {sides.map((side) => (
+              <section
+                key={side}
+                aria-label={`${group.name} ${sideName(side, t)}`}
+              >
+                <div className="dubbing-list-heading">
                   <Typography.Text className={`voice-accent-${side}`}>
                     {sideName(side, t)}
                   </Typography.Text>
-                  {rec[side].map((item) => (
-                    <div key={item.id} className="dubbing-legacy-voice">
-                      {(item.name.replace(/\s/g, "") !==
-                        voices
-                          .find((voice) => voice.alias === item.voice_alias)
-                          ?.display_name.replace(/\s/g, "") ||
-                        item.selected === false) && (
-                        <span className="dubbing-legacy-label">
-                          {item.name}
-                          {item.selected === false ? t("not_selected") : ""}
-                        </span>
-                      )}
-                      {voiceRow(item, side, group, undefined, auditionAllowed)}
-                    </div>
-                  ))}
-                  {!rec[side].length && (
-                    <Typography.Paragraph type="secondary">
-                      {t("no_side_voices", { side: sideName(side, t) })}
-                    </Typography.Paragraph>
+                  {editable && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      className="dubbing-accent-action"
+                      data-side={side}
+                      icon={<PlusIcon aria-hidden />}
+                      disabled={group[side].length >= 20}
+                      onClick={() =>
+                        setEditing({ groupId: group.id, side, initial: {} })
+                      }
+                    >
+                      {t("add_recommendation")}
+                    </Button>
                   )}
-                </section>
-              ))}
-            </div>
-          </>
-        )}
-        {rec.format === "paired" && (
-          <>
-            {pairs.length > 0 && (
-              <Typography.Text
-                className="dubbing-table-scroll-hint"
-                type="secondary"
-              >
-                {t("scroll_horizontally_to_view_all_dubbing_settings")}
-              </Typography.Text>
-            )}
-            <div
-              className="dubbing-pairs-scroll"
-              tabIndex={pairs.length ? 0 : undefined}
-            >
-              <table
-                className={`dubbing-pairs${pairs.length ? "" : " is-empty"}`}
-                aria-label={t("group_pairs", { name: group.name })}
-              >
-                {pairs.length > 0 && (
+                </div>
+                <table
+                  className="dubbing-side-table"
+                  aria-label={t("side_recommendations", {
+                    side: sideName(side, t),
+                    name: group.name
+                  })}
+                >
                   <thead>
-                    <tr className="dubbing-pair-head">
-                      <th scope="col">{t("recommendation_pair")}</th>
-                      {sides.map((side) => (
-                        <th key={side} scope="col">
-                          <div
-                            className={`dubbing-locale-heading voice-accent-${side}`}
-                          >
-                            <span>{sideName(side, t)}</span>
-                          </div>
-                        </th>
-                      ))}
+                    <tr>
+                      <th scope="col">{t("use_recommendation")}</th>
+                      <th scope="col">{t("order")}</th>
+                      <th scope="col">{t("recommendation_name")}</th>
+                      <th scope="col">{t("voice")}</th>
+                      <th scope="col">{t("rate")}</th>
+                      <th scope="col">{t("volume")}</th>
+                      {editable && <th scope="col">{t("actions")}</th>}
                     </tr>
                   </thead>
-                )}
-                <tbody>
-                  {pairs.map((pair, pairIndex) => (
-                    <tr
-                      key={pair.id}
-                      className="dubbing-pair-row"
-                      data-pair-id={pair.id}
-                    >
-                      <td className="dubbing-pair-controls">
-                        <div className="dubbing-pair-choice">
-                          <Checkbox
-                            aria-label={t("select_pair", { name: pair.name })}
-                            disabled={!editable}
-                            checked={pair.selected}
-                            onChange={(event) =>
-                              updatePairs(group.id, (items) =>
-                                items.map((p) =>
-                                  p.id === pair.id
-                                    ? { ...p, selected: event.target.checked }
-                                    : p
-                                )
-                              )
-                            }
-                          />
-                          <div>
-                            <Input
-                              variant="borderless"
-                              className="dubbing-pair-name"
-                              aria-label={t("recommendation_index", {
-                                index: pairIndex + 1
+                  <tbody>
+                    {group[side].map((item, index) => {
+                      const voice = voices.find(
+                        (voice) => voice.alias === item.voice_alias
+                      );
+                      const issue = recommendationError(
+                        group.name,
+                        side,
+                        item,
+                        voice,
+                        t
+                      );
+                      const accent = voice
+                        ? speechAccentGroup(voice.locale, voice.accent)
+                        : "other";
+                      return (
+                        <tr key={item.id} data-recommendation-id={item.id}>
+                          <td>
+                            <Checkbox
+                              aria-label={t("select_side_recommendation", {
+                                side: sideName(side, t),
+                                name: item.name
                               })}
-                              maxLength={40}
-                              value={pair.name}
                               disabled={!editable}
+                              checked={item.selected !== false}
                               onChange={(event) =>
-                                updatePairs(group.id, (items) =>
-                                  items.map((p) =>
-                                    p.id === pair.id
-                                      ? { ...p, name: event.target.value }
-                                      : p
+                                updateSide(group.id, side, (items) =>
+                                  items.map((value) =>
+                                    value.id === item.id
+                                      ? {
+                                          ...value,
+                                          selected: event.target.checked
+                                        }
+                                      : value
                                   )
                                 )
                               }
                             />
-                            <Typography.Text
-                              type="secondary"
-                              className="dubbing-pair-status"
-                            >
-                              {pair.selected
-                                ? pairIndex ===
-                                  pairs.findIndex((p) => p.selected)
-                                  ? t("use_first")
-                                  : t("selected")
-                                : t("not_selected_834924")}
-                            </Typography.Text>
-                          </div>
-                        </div>
-                        {editable && (
-                          <Space size={0} className="dubbing-pair-actions">
-                            {[-1, 1].map((direction) => (
-                              <Button
-                                key={direction}
-                                size="small"
-                                type="text"
-                                aria-label={t(
-                                  direction < 0
-                                    ? "move_recommendation_up"
-                                    : "move_recommendation_down",
-                                  { name: pair.name }
-                                )}
-                                icon={
-                                  direction < 0 ? (
-                                    <ArrowUpIcon aria-hidden />
-                                  ) : (
-                                    <ArrowDownIcon aria-hidden />
-                                  )
-                                }
-                                disabled={
-                                  pairIndex + direction < 0 ||
-                                  pairIndex + direction >= pairs.length
-                                }
-                                onClick={() =>
-                                  updatePairs(group.id, (items) => {
-                                    const next = [...items];
-                                    [
-                                      next[pairIndex],
-                                      next[pairIndex + direction]
-                                    ] = [
-                                      next[pairIndex + direction]!,
-                                      next[pairIndex]!
-                                    ];
-                                    return next;
-                                  })
-                                }
-                              />
-                            ))}
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<CopyIcon aria-hidden />}
-                              aria-label={t("copy_pair", { name: pair.name })}
-                              disabled={pairs.length >= 20}
-                              onClick={() =>
-                                setEditing({
-                                  groupId: group.id,
-                                  initial: {
-                                    ...structuredClone(pair),
-                                    id: newWordNodeId(),
-                                    name: `${Array.from(pair.name).slice(0, 37).join("")} 副本`,
-                                    uk: {
-                                      ...structuredClone(pair.uk),
-                                      id: newWordNodeId()
-                                    },
-                                    us: {
-                                      ...structuredClone(pair.us),
-                                      id: newWordNodeId()
+                          </td>
+                          <td>
+                            <div className="dubbing-item-order">
+                              <span>{index + 1}</span>
+                              {editable &&
+                                ([-1, 1] as const).map((direction) => (
+                                  <Button
+                                    key={direction}
+                                    size="small"
+                                    type="text"
+                                    aria-label={t(
+                                      direction < 0
+                                        ? "move_recommendation_up"
+                                        : "move_recommendation_down",
+                                      {
+                                        side: sideName(side, t),
+                                        name: item.name
+                                      }
+                                    )}
+                                    icon={
+                                      direction < 0 ? (
+                                        <ArrowUpIcon aria-hidden />
+                                      ) : (
+                                        <ArrowDownIcon aria-hidden />
+                                      )
                                     }
-                                  }
-                                })
-                              }
-                            />
-                            <Popconfirm
-                              title={t("delete_recommendation", {
-                                name: pair.name
-                              })}
-                              description={t(
-                                "this_british_and_american_pair_will_be_removed_when_you_save_the_"
-                              )}
-                              okText={t("delete")}
-                              cancelText={t("cancel")}
-                              okButtonProps={{ danger: true }}
-                              destroyOnHidden
-                              onConfirm={() =>
-                                updatePairs(group.id, (items) =>
-                                  items.filter((p) => p.id !== pair.id)
-                                )
-                              }
+                                    disabled={
+                                      index + direction < 0 ||
+                                      index + direction >= group[side].length
+                                    }
+                                    onClick={() =>
+                                      updateSide(group.id, side, (items) => {
+                                        const next = [...items];
+                                        [next[index], next[index + direction]] =
+                                          [
+                                            next[index + direction]!,
+                                            next[index]!
+                                          ];
+                                        return next;
+                                      })
+                                    }
+                                  />
+                                ))}
+                            </div>
+                          </td>
+                          <td>
+                            {editable ? (
+                              <Input
+                                aria-label={`${sideName(side, t)} ${index + 1} ${t("recommendation_name")}`}
+                                value={item.name}
+                                maxLength={40}
+                                onChange={(event) =>
+                                  updateSide(group.id, side, (items) =>
+                                    items.map((value) =>
+                                      value.id === item.id
+                                        ? { ...value, name: event.target.value }
+                                        : value
+                                    )
+                                  )
+                                }
+                              />
+                            ) : (
+                              item.name
+                            )}
+                          </td>
+                          <td>
+                            <div
+                              className="dubbing-item-voice"
+                              title={issue ?? undefined}
                             >
                               <Button
-                                danger
                                 type="text"
                                 size="small"
-                                icon={<Trash2Icon aria-hidden />}
-                                aria-label={t("remove_recommendation", {
-                                  name: pair.name
+                                aria-label={t("audition_side", {
+                                  side: sideName(side, t),
+                                  name: item.name
                                 })}
+                                className={`voice-accent-${accent}`}
+                                icon={<Volume2Icon aria-hidden />}
+                                disabled={
+                                  !auditionAllowed || !canAudition || !!issue
+                                }
+                                onClick={() => voice && onAudition(voice, item)}
                               />
-                            </Popconfirm>
-                          </Space>
-                        )}
-                      </td>
-                      {sides.map((side) => (
-                        <td key={side}>
-                          {sideRow(
-                            pair,
-                            side,
-                            group,
-                            editable,
-                            auditionAllowed
+                              <span className="dubbing-side-identity">
+                                {voice ? (
+                                  <VoiceName voice={voice} />
+                                ) : (
+                                  <span>
+                                    {t("unavailable_voice", {
+                                      alias: item.voice_alias
+                                    })}
+                                  </span>
+                                )}
+                              </span>
+                              {editable && (
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<PencilIcon aria-hidden />}
+                                  aria-label={t("edit_side", {
+                                    side: sideName(side, t),
+                                    name: item.name
+                                  })}
+                                  onClick={() => {
+                                    onInvalidatePreview();
+                                    setEditing({
+                                      groupId: group.id,
+                                      side,
+                                      initial: item
+                                    });
+                                  }}
+                                />
+                              )}
+                            </div>
+                            {issue && (
+                              <Typography.Text
+                                type="danger"
+                                className="dubbing-item-issue"
+                              >
+                                {issue}
+                              </Typography.Text>
+                            )}
+                          </td>
+                          <td>
+                            <VoiceRate parameters={item.parameters} />
+                          </td>
+                          <td>
+                            <VoiceVolume parameters={item.parameters} />
+                          </td>
+                          {editable && (
+                            <td>
+                              <Space size={0}>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  aria-label={t("copy_side_recommendation", {
+                                    side: sideName(side, t),
+                                    name: item.name
+                                  })}
+                                  icon={<CopyIcon aria-hidden />}
+                                  disabled={group[side].length >= 20}
+                                  onClick={() =>
+                                    setEditing({
+                                      groupId: group.id,
+                                      side,
+                                      initial: {
+                                        ...structuredClone(item),
+                                        id: newWordNodeId(),
+                                        name: t("recommendation_copy_name", {
+                                          name: Array.from(item.name)
+                                            .slice(0, 32)
+                                            .join("")
+                                        })
+                                      }
+                                    })
+                                  }
+                                />
+                                <Popconfirm
+                                  title={t("delete_side_recommendation", {
+                                    side: sideName(side, t),
+                                    name: item.name
+                                  })}
+                                  okText={t("delete")}
+                                  cancelText={t("cancel")}
+                                  onConfirm={() =>
+                                    updateSide(group.id, side, (items) =>
+                                      items.filter(
+                                        (value) => value.id !== item.id
+                                      )
+                                    )
+                                  }
+                                >
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    aria-label={t(
+                                      "delete_side_recommendation",
+                                      {
+                                        side: sideName(side, t),
+                                        name: item.name
+                                      }
+                                    )}
+                                    icon={<Trash2Icon aria-hidden />}
+                                  />
+                                </Popconfirm>
+                              </Space>
+                            </td>
                           )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {!pairs.length && (
-                    <tr>
-                      <td colSpan={3} className="dubbing-pair-empty">
-                        <Typography.Title level={5}>
-                          {t("no_recommendations_yet")}
-                        </Typography.Title>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {!group[side].length && (
+                  <Typography.Paragraph
+                    className="dubbing-list-empty"
+                    type="secondary"
+                  >
+                    {t("no_side_voices", { side: sideName(side, t) })}
+                  </Typography.Paragraph>
+                )}
+              </section>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
+
   if (groups.isError && !dirty)
     return (
       <Alert
@@ -890,7 +787,6 @@ export function DubbingGroups({
         {current.map((group, groupIndex) => {
           const draft = drafts[group.id],
             editable = canEdit && !saving;
-          const rec = group.recommendations;
           const storedIndex = groups.data.groups.findIndex(
             (g) => g.id === group.id
           );
@@ -968,20 +864,10 @@ export function DubbingGroups({
                       <Button
                         type="text"
                         icon={<PencilIcon aria-hidden />}
+                        disabled={saving}
                         onClick={() => openSettings(group)}
                       >
                         {t("edit_group")}
-                      </Button>
-                    )}
-                    {editable && rec.format === "paired" && (
-                      <Button
-                        icon={<PlusIcon aria-hidden />}
-                        disabled={rec.pairs.length >= 20}
-                        onClick={() =>
-                          setEditing({ groupId: group.id, initial: {} })
-                        }
-                      >
-                        {t("add_recommendation")}
                       </Button>
                     )}
                   </Space>
@@ -1126,64 +1012,20 @@ export function DubbingGroups({
           </div>
         </Form>
       </Modal>
-      {reviewGroup?.recommendations.format === "legacy" && (
-        <LegacyGroupReview
-          key={reviewGroup.id}
-          group={reviewGroup}
-          voices={voices}
-          open={!editing?.legacy}
-          disabled={!canEdit || saving}
-          onCancel={() => setReviewId(undefined)}
-          onAdd={() =>
-            setEditing({ groupId: reviewGroup.id, initial: {}, legacy: true })
-          }
-          onRemove={(id) =>
-            updatePairs(reviewGroup.id, (items) =>
-              items.filter((pair) => pair.id !== id)
-            )
-          }
-          onComplete={(pairs) => {
-            if (!legacyComplete({ ...reviewGroup, legacyPairs: pairs })) return;
-            change(reviewGroup.id, (group) => ({
-              ...group,
-              recommendations: { format: "paired", pairs }
-            }));
-            setReviewId(undefined);
-          }}
-        />
-      )}
       {editing && editingGroup && (
         <RecommendationEditor
-          key={`${editing.groupId}-${editing.initial.id ?? "new"}-${editing.side ?? "pair"}`}
+          key={`${editing.groupId}-${editing.initial.id ?? "new"}-${editing.side}`}
           voices={voices}
           initial={editing.initial}
           side={editing.side}
-          legacy={
-            editing.legacy && legacy
-              ? {
-                  uk: legacy.uk.filter(
-                    (i) =>
-                      !editingGroup.legacyPairs?.some(
-                        (pair) => pair.uk.id === i.id
-                      )
-                  ),
-                  us: legacy.us.filter(
-                    (i) =>
-                      !editingGroup.legacyPairs?.some(
-                        (pair) => pair.us.id === i.id
-                      )
-                  )
-                }
-              : undefined
-          }
           disabled={!canEdit || saving}
           onBeforeAudition={onInvalidatePreview}
           onCancel={() => setEditing(undefined)}
-          onSave={(pair) => {
-            updatePairs(editing.groupId, (items) =>
-              items.some((p) => p.id === pair.id)
-                ? items.map((p) => (p.id === pair.id ? pair : p))
-                : [...items, pair]
+          onSave={(item) => {
+            updateSide(editing.groupId, editing.side, (items) =>
+              items.some((value) => value.id === item.id)
+                ? items.map((value) => (value.id === item.id ? item : value))
+                : [...items, item]
             );
             setEditing(undefined);
           }}

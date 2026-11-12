@@ -924,3 +924,122 @@ it("final playback follows spelling/phoneme selection and retains legacy recordi
       .assetId
   ).toBe("spelling-recording");
 });
+
+it("同一读法每侧独立选择来源，停配与上传不使用缓存TTS，切回保留原参数", () => {
+  const profile = (asset: string, locale: "en-GB" | "en-US") => ({
+    voices: [
+      {
+        voice_id: "voice",
+        locale,
+        enabled: true,
+        rate_percent: -27,
+        audio_asset_id: asset
+      }
+    ]
+  });
+  const pronunciation: import("@tsz/types").WordPronunciationV3 = {
+    id: "p",
+    dict_phonetic: "far",
+    actual_pron: "far",
+    style: "normal",
+    synthesis: {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      use_spelling: false,
+      uk: {
+        source: "none",
+        ipa: "fɑː",
+        ups: "F AA",
+        ipa_speech: {
+          content: { version: 2, text: "far", annotations: [] },
+          voice_profile: profile("uk-ipa", "en-GB")
+        }
+      },
+      us: {
+        source: "ipa",
+        ipa: "fɑɹ",
+        ups: "F AA R",
+        ipa_speech: {
+          content: { version: 2, text: "far", annotations: [] },
+          voice_profile: profile("us-ipa", "en-US")
+        }
+      }
+    },
+    audio_assets: [
+      {
+        id: "upload-us",
+        original_name: "fixture.mp3",
+        locale: "en-US",
+        gender: "female",
+        content_type: "audio/mpeg",
+        size_bytes: 1,
+        created_at: "2026-11-12T00:00:00Z",
+        is_default: true
+      }
+    ]
+  };
+  const ukCache = structuredClone(pronunciation.synthesis!.uk);
+  expect(
+    pronunciationPlaybackSource(
+      "far",
+      pronunciation,
+      undefined,
+      "en-GB",
+      "common"
+    )
+  ).toEqual({});
+  expect(
+    pronunciationPlaybackSource(
+      "far",
+      pronunciation,
+      undefined,
+      "en-US",
+      "common"
+    ).assetId
+  ).toBe("us-ipa");
+  pronunciation.synthesis!.us!.source = "upload";
+  expect(
+    pronunciationPlaybackSource(
+      "far",
+      pronunciation,
+      undefined,
+      "en-US",
+      "common"
+    )
+  ).toEqual({ assetId: "upload-us" });
+  pronunciation.synthesis!.uk!.source = "ipa";
+  expect(
+    pronunciationPlaybackSource(
+      "far",
+      pronunciation,
+      undefined,
+      "en-GB",
+      "common"
+    ).assetId
+  ).toBe("uk-ipa");
+  expect(pronunciation.synthesis!.uk).toEqual({ ...ukCache, source: "ipa" });
+  expect(
+    pronunciation.synthesis!.us!.ipa_speech!.voice_profile.voices[0]!
+      .rate_percent
+  ).toBe(-27);
+  pronunciation.synthesis!.uk!.source = "spelling";
+  const customSpelling = {
+    content: { version: 2 as const, text: "far", annotations: [] },
+    voice_profile: {
+      voices: [
+        { ...profile("manual-uk", "en-US").voices[0]!, accent: "gb" as const }
+      ]
+    }
+  };
+  expect(
+    pronunciationPlaybackSource(
+      "far",
+      pronunciation,
+      customSpelling,
+      "en-GB",
+      "common"
+    ).assetId
+  ).toBe("manual-uk");
+  expect(customSpelling.voice_profile.voices[0]!.locale).toBe("en-US");
+});
