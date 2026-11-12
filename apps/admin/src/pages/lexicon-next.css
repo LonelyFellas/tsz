@@ -98,3 +98,38 @@
 .lexicon-next-selectors > [hidden] {
   display: none;
 }
+
+.lexicon-next-create {
+  display: grid;
+  gap: var(--ui-space-6);
+}
+.lexicon-next-match {
+  overflow-wrap: anywhere;
+}
+.lexicon-next-match + .lexicon-next-match {
+  border-top: 1px solid var(--ui-color-border-secondary);
+  margin-top: var(--ui-space-5);
+  padding-top: var(--ui-space-5);
+}
+.lexicon-next-match ul {
+  padding-left: var(--ui-space-5);
+}
+.lexicon-next-match .lexicon-next-phonetics {
+  list-style: none;
+  padding: 0;
+}
+.lexicon-next-match dd {
+  margin-left: 0;
+}
+.lexicon-next-dictionary-form {
+  display: inline-block;
+  margin-right: var(--ui-space-3);
+}
+.lexicon-next-create-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  overflow-wrap: anywhere;
+}

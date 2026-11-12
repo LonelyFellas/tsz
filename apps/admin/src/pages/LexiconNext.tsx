@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  useBeforeUnload,
-  useBlocker,
-  useNavigate,
-  useParams
-} from "react-router-dom";
+import { useBeforeUnload, useBlocker, useParams } from "react-router-dom";
 import {
   Alert,
   Button,
@@ -19,7 +14,6 @@ import { App, Modal } from "@tsz/ui/admin/overlays";
 import { Plus, Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
-  CreateNextEntry,
   NextDefinition,
   NextDraft,
   NextEntry,
@@ -39,6 +33,7 @@ import {
 } from "@/features/lexicon-next/model";
 import { EntryList } from "@/features/lexicon-next/EntryList";
 import { EntryLayout } from "@/features/lexicon-next/EntryLayout";
+import { EntryStart } from "@/features/lexicon-next/EntryStart";
 import "./lexicon-next.css";
 
 export type LexiconNextRequests = typeof api.lexiconNext;
@@ -119,93 +114,6 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
         />
       )}
     </div>
-  );
-}
-function EntryStart({ requests }: { requests: LexiconNextRequests }) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const canCreate = usePermission("words.create");
-  const [busy, setBusy] = useState(false);
-  const lock = useRef(false);
-  const [error, setError] = useState<string>();
-  async function create(values: CreateNextEntry) {
-    if (lock.current || !canCreate) return;
-    lock.current = true;
-    setBusy(true);
-    setError(undefined);
-    try {
-      const entry = await requests.create({
-        ...values,
-        target_language: "en",
-        headword: values.headword.trim()
-      });
-      await Promise.all(
-        ["list", "stats", "creators"].map((key) =>
-          queryClient.invalidateQueries({
-            queryKey: ["admin-lexicon-next", key],
-            refetchType: "all"
-          })
-        )
-      );
-      navigate(`/lexicon-next/${entry.id}`);
-    } catch (error) {
-      setError(`${failure(error)} 创建结果未确认，请先核实，勿重复创建。`);
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
-  }
-  return (
-    <EntryLayout step="basics" exists={false}>
-      <div className="lexicon-next">
-        <section>
-          <h2>创建英语词条</h2>
-          {!canCreate && <Alert type="info" title="当前账号没有创建词条权限" />}
-          {error && <Alert type="error" showIcon title={error} />}
-          <Form<CreateNextEntry>
-            layout="vertical"
-            initialValues={{ kind: "word" }}
-            disabled={busy || !canCreate}
-            onFinish={(values) => void create(values)}
-          >
-            <Form.Item label="目标语言">
-              <Input value="英语" disabled />
-            </Form.Item>
-            <Form.Item name="kind" label="词条类型">
-              <Radio.Group
-                options={[
-                  { label: "单词", value: "word" },
-                  { label: "短语", value: "phrase" }
-                ]}
-              />
-            </Form.Item>
-            <Form.Item
-              name="headword"
-              label="词头"
-              rules={[
-                { required: true, whitespace: true, message: "请输入词头" },
-                {
-                  validator: (_, value: string) =>
-                    !value || [...value].length <= 200
-                      ? Promise.resolve()
-                      : Promise.reject(new Error("词头最多 200 个字符"))
-                }
-              ]}
-            >
-              <Input autoComplete="off" className="tsz-words" />
-            </Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={busy}
-              disabled={!canCreate}
-            >
-              创建词条
-            </Button>
-          </Form>
-        </section>
-      </div>
-    </EntryLayout>
   );
 }
 function EntryLoader({

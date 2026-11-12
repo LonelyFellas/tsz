@@ -69,6 +69,42 @@ function client(reply: unknown, status = 200) {
 }
 
 describe("lexicon-next authoritative wire contract", () => {
+  it("detects through the independent read-only endpoint and rejects incomplete reference records", async () => {
+    const reply = {
+      surface: "Colour",
+      kind: "word",
+      matches: [
+        {
+          id: "1:noun",
+          term: "colour",
+          part_of_speech: "noun",
+          glosses: ["a hue"],
+          forms: [],
+          phonetics: [],
+          source_name: "Test",
+          source_version: "v1"
+        }
+      ]
+    };
+    const { api, fetch } = client(reply);
+    expect(
+      await api.detect({ target_language: "en", surface: "Colour" })
+    ).toEqual(reply);
+    expect(fetch.mock.calls[0]![0]).toBe(
+      "https://test.invalid/api/v1/admin/lexicon-next/detections"
+    );
+    expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual({
+      target_language: "en",
+      surface: "Colour"
+    });
+    const invalid = client({
+      ...reply,
+      matches: [{ ...reply.matches[0], glosses: "a hue" }]
+    });
+    await expect(
+      invalid.api.detect({ target_language: "en", surface: "Colour" })
+    ).rejects.toThrow("接口契约");
+  });
   it("preserves all locales and uses independent documented paths and save revision", async () => {
     const { api, fetch } = client(entry);
     expect(await api.save(entry.id, { expected_revision: 1, draft })).toEqual(

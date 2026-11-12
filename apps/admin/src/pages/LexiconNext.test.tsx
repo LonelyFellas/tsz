@@ -9,7 +9,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
-import type { NextCapabilities, NextEntry } from "@tsz/types";
+import type {
+  NextCapabilities,
+  NextEntry,
+  NextDetection,
+  NextDetectionInput
+} from "@tsz/types";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { useAuthStore } from "@/lib/auth";
 import { LexiconNextPage, type LexiconNextRequests } from "./LexiconNext";
@@ -54,6 +59,15 @@ function requests() {
     }),
     capabilities: vi.fn().mockResolvedValue(caps),
     get: vi.fn().mockResolvedValue(structuredClone(entry)),
+    detect: vi
+      .fn()
+      .mockImplementation(
+        async (input: NextDetectionInput): Promise<NextDetection> => ({
+          surface: input.surface,
+          kind: input.surface.includes(" ") ? "phrase" : "word",
+          matches: []
+        })
+      ),
     create: vi.fn().mockResolvedValue(structuredClone(entry)),
     save: vi.fn().mockImplementation(async (_id, input) => ({
       ...entry,
@@ -90,6 +104,119 @@ function mount(api: LexiconNextRequests, path = `/lexicon-next/${id}`) {
   return { client, router };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
+
+it("多条词典记录平等展示，按原输入创建且不带入参考内容", async () => {
+  const api = requests();
+  api.detect.mockResolvedValue({
+    surface: "Colour",
+    kind: "word",
+    matches: ["visible hue", "a flag"].map((gloss, index) => ({
+      id: `dictionary:${index}`,
+      term: "color",
+      part_of_speech: "noun",
+      glosses: [gloss],
+      forms: [{ text: "colors", tags: ["plural"] }],
+      phonetics: [{ ipa: "/ˈkʌlə/", tags: ["UK"] }],
+      source_name: "Test dictionary",
+      source_version: "v1"
+    }))
+  });
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("词头"), {
+    target: { value: "  Colour  " }
+  });
+  fireEvent.click(button("检测词条"));
+  await screen.findByText("visible hue");
+  expect(screen.getByText("a flag")).toBeVisible();
+  expect(screen.getByText("2 条匹配")).toBeVisible();
+  expect(screen.queryByLabelText("英美通用主词")).toBeNull();
+  expect(api.detect).toHaveBeenCalledWith({
+    target_language: "en",
+    surface: "Colour"
+  });
+  expect(api.create).not.toHaveBeenCalled();
+  fireEvent.click(button("确认创建"));
+  await waitFor(() =>
+    expect(api.create).toHaveBeenCalledExactlyOnceWith({
+      target_language: "en",
+      kind: "word",
+      headword: "Colour"
+    })
+  );
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("输入变化清除旧结果，短语自动识别；检测失败保留输入并支持重试", async () => {
+  const api = requests();
+  mount(api, "/lexicon-next/new");
+  const input = await screen.findByLabelText("词头");
+  fireEvent.change(input, { target: { value: "centre" } });
+  fireEvent.click(button("检测词条"));
+  await screen.findByRole("button", { name: "确认创建" });
+  fireEvent.change(input, { target: { value: " give   up " } });
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
+  api.detect.mockRejectedValueOnce(new Error("内置词典暂时不可用"));
+  fireEvent.click(button("检测词条"));
+  await screen.findByText("内置词典暂时不可用");
+  expect(input).toHaveValue("give up");
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
+  fireEvent.click(button("检测词条"));
+  await screen.findByText("短语");
+  fireEvent.click(button("确认创建"));
+  await waitFor(() =>
+    expect(api.create).toHaveBeenCalledExactlyOnceWith({
+      target_language: "en",
+      kind: "phrase",
+      headword: "give up"
+    })
+  );
+});
+
+it("检测 pending 不重复请求，非法输入和不对应的检测结果不能创建", async () => {
+  const api = requests();
+  let finish!: (detection: NextDetection) => void;
+  api.detect.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  mount(api, "/lexicon-next/new");
+  const input = await screen.findByLabelText("词头");
+  fireEvent.change(input, { target: { value: "中文" } });
+  fireEvent.click(button("检测词条"));
+  expect(api.detect).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: "centre" } });
+  fireEvent.click(button("检测词条"));
+  fireEvent.click(button("检测词条"));
+  await waitFor(() => expect(api.detect).toHaveBeenCalledTimes(1));
+  expect(input).toBeDisabled();
+  await act(async () =>
+    finish({ surface: "another", kind: "word", matches: [] })
+  );
+  await screen.findByText("检测结果与当前输入不一致，请重新检测。");
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
+  expect(api.create).not.toHaveBeenCalled();
+});
+
+it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻止重复写入", async () => {
+  const api = requests();
+  api.detect.mockResolvedValue({ surface: "café", kind: "word", matches: [] });
+  api.create.mockRejectedValue(new Error("网络连接中断"));
+  mount(api, "/lexicon-next/new");
+  const input = await screen.findByLabelText("词头");
+  fireEvent.change(input, { target: { value: "cafe\u0301" } });
+  fireEvent.click(button("检测词条"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  await screen.findByText(/创建结果未确认/);
+  expect(api.create).toHaveBeenCalledExactlyOnceWith({
+    target_language: "en",
+    kind: "word",
+    headword: "cafe\u0301"
+  });
+  expect(input).toHaveValue("cafe\u0301");
+  expect(input).toBeDisabled();
+  expect(button("确认创建")).toBeDisabled();
+});
 async function edit(label: string, value: string) {
   fireEvent.click(button(label.includes("词形") ? /词性与词形/ : /词义与译词/));
   fireEvent.click(button(`添加${label}`));
@@ -233,7 +360,7 @@ describe("新版词库手工闭环", () => {
     );
     await act(() => mounted.router.navigate("/lexicon-next/new"));
     await screen.findByText("当前账号没有创建词条权限");
-    expect(button("创建词条")).toBeDisabled();
+    expect(button("检测词条")).toBeDisabled();
   });
   it("创建只发送一次；保存 pending 不接收编辑，离开需要确认；重新打开读取新版本", async () => {
     const api = requests();
@@ -248,8 +375,10 @@ describe("新版词库手工闭环", () => {
     fireEvent.change(screen.getByLabelText("词头"), {
       target: { value: "centre" }
     });
-    fireEvent.click(button("创建词条"));
-    fireEvent.click(button("创建词条"));
+    fireEvent.click(button("检测词条"));
+    await screen.findByText("未找到内置词典匹配，可继续创建空白草稿。");
+    fireEvent.click(button("确认创建"));
+    fireEvent.click(button("确认创建"));
     await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
     await act(async () => finishCreate(structuredClone(entry)));
     await screen.findByText("版本 1");
@@ -683,8 +812,10 @@ it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", a
   fireEvent.change(screen.getByLabelText("词头"), {
     target: { value: "centre" }
   });
-  fireEvent.click(button("创建词条"));
-  await screen.findByDisplayValue("centre");
+  fireEvent.click(button("检测词条"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
+  await screen.findByText("版本 1");
   await act(() => router.navigate("/lexicon-next"));
   await waitFor(() =>
     expect(client.getQueryData(["admin-lexicon-next", "stats"])).toEqual({

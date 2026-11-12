@@ -41,6 +41,25 @@ export interface CreateNextEntry {
   kind: "word" | "phrase";
   headword: string;
 }
+export interface NextDetectionInput {
+  target_language: string;
+  surface: string;
+}
+export interface NextDictionaryMatch {
+  id: string;
+  term: string;
+  part_of_speech: string;
+  glosses: string[];
+  forms: { text: string; tags: string[] }[];
+  phonetics: { ipa: string; tags: string[] }[];
+  source_name: string;
+  source_version: string;
+}
+export interface NextDetection {
+  surface: string;
+  kind: "word" | "phrase";
+  matches: NextDictionaryMatch[];
+}
 export interface NextListQuery {
   headword?: string;
   kind?: "word" | "phrase";

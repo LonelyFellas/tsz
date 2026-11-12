@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-list-parity-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-11T10:45:27.818Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-create-matches-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-11T13:23:58.940Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -32,6 +32,7 @@
     "/admin/coins/operations": ["get"],
     "/admin/dashboard/overview": ["get"],
     "/admin/lexicon-next/capabilities": ["get"],
+    "/admin/lexicon-next/detections": ["post"],
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/view": ["get"],
@@ -2598,6 +2599,16 @@
         "200": { "$ref": "#/components/schemas/NextCapabilities" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/detections": {
+      "request": { "$ref": "#/components/schemas/NextDetectionInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextDetection" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/lexicon-next/entries": {
@@ -8196,6 +8207,15 @@
     "NextDefinitionStyle": {
       "type": "string",
       "enum": ["definition", "sentence"]
+    },
+    "NextDetectionInput": {
+      "type": "object",
+      "required": ["target_language", "surface"],
+      "properties": {
+        "surface": { "type": "string" },
+        "target_language": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "NextDraft": {
       "type": "object",
