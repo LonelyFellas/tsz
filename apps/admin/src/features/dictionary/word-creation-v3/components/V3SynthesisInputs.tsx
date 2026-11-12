@@ -5,6 +5,7 @@ import {
   createLexiconEditorMessage as creationMessage
 } from "../../i18n/editor";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
+import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
 import { ChevronDownIcon, ArrowLeftRightIcon } from "lucide-react";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Input, Radio } from "@tsz/ui/admin/forms";
@@ -26,7 +27,8 @@ import {
   synthesisInputIssue,
   pronunciationLocale,
   synthesisLocaleIssue,
-  synthesisForLocale
+  synthesisForLocale,
+  speechAccentGroup
 } from "@tsz/shared";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -538,6 +540,13 @@ export function V3SynthesisInputs({
               <Typography.Text className="word-pronunciation-label">
                 {t("creation_speech_source")}
               </Typography.Text>
+              <V3PronunciationAudioUpload
+                nodeId={pronunciation.id}
+                locale={dialect === "common" ? undefined : locale}
+                label={t("creation_upload_pronunciation_audio", { label })}
+                assets={pronunciation.audio_assets ?? []}
+                onChange={(audio_assets) => onChange({ audio_assets })}
+              />
               <Button
                 className="word-synthesis-ups-toggle"
                 type="text"
@@ -579,70 +588,121 @@ export function V3SynthesisInputs({
                 {renderInputs("ups")}
               </div>
             )}
-            <div className="word-synthesis-source-actions">
-              <Radio.Group
-                name={`synthesis-source-${pronunciation.id}`}
-                aria-label={t("creation_synthesis_source_label", { label })}
-                value={source}
-                onChange={(event) =>
-                  onChange({
-                    synthesis: {
-                      ...synthesis,
-                      use_spelling: event.target.value === "spelling",
-                      alphabet:
-                        event.target.value === "spelling"
-                          ? synthesis.alphabet
-                          : event.target.value
-                    }
-                  })
-                }
-              >
-                {[
-                  {
-                    value: "spelling",
-                    name: t("spelling"),
-                    text: spelling,
-                    fontClass: "tsz-words"
-                  },
-                  {
-                    value: "ipa",
-                    name: "Azure IPA",
-                    text: selectedSynthesis.ipa.trim()
-                      ? `/ ${selectedSynthesis.ipa.trim()} /`
-                      : "",
-                    fontClass: "tsz-phonetics"
-                  },
-                  ...(upsExpanded
-                    ? [
+            <div className="word-synthesis-candidates">
+              {(dialect === "common" ? SIDES : [dialect]).map((side) => {
+                const sideLabel = t(
+                  side === "uk" ? "dialect_uk" : "dialect_us"
+                );
+                const candidate = candidateForSide(synthesis, side, dialect);
+                const recordings = (pronunciation.audio_assets ?? []).filter(
+                  (asset) => speechAccentGroup(asset.locale) === side
+                );
+                const recording = recordings.find((asset) => asset.is_default);
+                return (
+                  <div className="word-synthesis-source-actions" key={side}>
+                    {dialect === "common" && (
+                      <Typography.Text type="secondary">
+                        {sideLabel}
+                      </Typography.Text>
+                    )}
+                    <Radio.Group
+                      name={`synthesis-source-${pronunciation.id}-${side}`}
+                      aria-label={t("creation_synthesis_source_label", {
+                        label: `${label} ${sideLabel}`
+                      })}
+                      value={recording ? "upload" : source}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        const selected = recording ?? recordings[0];
+                        onChange({
+                          audio_assets: (pronunciation.audio_assets ?? []).map(
+                            (asset) =>
+                              recordings.some((item) => item.id === asset.id)
+                                ? {
+                                    ...asset,
+                                    is_default:
+                                      value === "upload" &&
+                                      asset.id === selected?.id
+                                  }
+                                : asset
+                          ),
+                          ...(value === "upload"
+                            ? {}
+                            : {
+                                synthesis: {
+                                  ...synthesis,
+                                  use_spelling: value === "spelling",
+                                  alphabet:
+                                    value === "spelling"
+                                      ? synthesis.alphabet
+                                      : value
+                                }
+                              })
+                        });
+                      }}
+                    >
+                      {[
                         {
-                          value: "ups",
-                          name: "Azure UPS",
-                          text: selectedSynthesis.ups.trim(),
+                          value: "spelling",
+                          name: t("spelling"),
+                          text: spelling,
+                          fontClass: "tsz-words"
+                        },
+                        {
+                          value: "ipa",
+                          name: "Azure IPA",
+                          text: candidate.ipa.trim()
+                            ? `/ ${candidate.ipa.trim()} /`
+                            : "",
                           fontClass: "tsz-phonetics"
+                        },
+                        ...(upsExpanded
+                          ? [
+                              {
+                                value: "ups",
+                                name: "Azure UPS",
+                                text: candidate.ups.trim(),
+                                fontClass: "tsz-phonetics"
+                              }
+                            ]
+                          : []),
+                        {
+                          value: "upload",
+                          name: t("creation_upload_audio"),
+                          text:
+                            (recording ?? recordings[0])?.original_name ?? "",
+                          fontClass: "",
+                          disabled: recordings.length === 0
                         }
-                      ]
-                    : [])
-                ].map((option) => (
-                  <Radio
-                    key={option.value}
-                    value={option.value}
-                    aria-label={option.name}
-                    className="word-synthesis-choice"
-                  >
-                    <span className="word-synthesis-choice-content">
-                      <span className="word-synthesis-choice-tag">
-                        {option.name}
-                      </span>
-                      <span
-                        className={`word-synthesis-choice-preview ${option.fontClass}`}
-                        title={option.text}
-                      >
-                        {option.text}
-                      </span>
-                    </span>
-                  </Radio>
-                ))}
-              </Radio.Group>
+                      ].map((option) => (
+                        <Radio
+                          key={option.value}
+                          value={option.value}
+                          aria-label={
+                            dialect === "common"
+                              ? `${sideLabel} ${option.name}`
+                              : option.name
+                          }
+                          disabled={"disabled" in option && option.disabled}
+                          className="word-synthesis-choice"
+                        >
+                          <span className="word-synthesis-choice-content">
+                            <span className="word-synthesis-choice-tag">
+                              {option.name}
+                            </span>
+                            <span
+                              className={`word-synthesis-choice-preview ${option.fontClass}`}
+                              title={option.text}
+                            >
+                              {option.text}
+                            </span>
+                          </span>
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </div>
+                );
+              })}
             </div>
           </div>
           {diagnostic && (
