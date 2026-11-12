@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/task190-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-12T06:22:04.228Z",
+  "_generatedAt": "2026-11-12T08:52:25.026Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1448,12 +1448,58 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "get /admin/speech/groups": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/speech/groups": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
     "put /admin/speech/groups": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
       {
         "name": "X-TSZ-Voice-Models",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "put /admin/speech/groups/order": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
+    "delete /admin/speech/groups/{id}": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
+    "put /admin/speech/groups/{id}": [
+      {
+        "name": "X-TSZ-Dubbing-Groups",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
       }
     ],
     "get /admin/speech/library": [
@@ -3487,9 +3533,10 @@
     "get /admin/speech/groups": {
       "request": null,
       "responses": {
-        "200": { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        "200": { "$ref": "#/components/schemas/DubbingGroupsReadResponse" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/speech/groups": {
@@ -4159,6 +4206,14 @@
         "order_revision": { "type": "integer", "format": "int64" },
         "revision": { "type": "integer", "format": "int64" }
       }
+    },
+    "DubbingGroupsReadResponse": {
+      "oneOf": [
+        { "$ref": "#/components/schemas/DubbingGroupsResponse" },
+        { "$ref": "#/components/schemas/LegacyDubbingGroupsResponse" },
+        { "$ref": "#/components/schemas/UnversionedDubbingGroupsResponse" }
+      ],
+      "description": "Compatibility is read-only: independent sides are never fabricated into pairs."
     },
     "DubbingAudioUpdates": {
       "type": "object",
@@ -8018,7 +8073,7 @@
     },
     "LocalVoiceRecommendationV3": {
       "type": "object",
-      "description": "A local base recommendation contributes at most one voice to this side's pool.",
+      "description": "A selected source contributes one deduplicated voice; sources may share a contribution.",
       "required": ["group_id", "recommendation_id", "voice_id"],
       "properties": {
         "contribution_id": { "type": "string", "format": "uuid" },
@@ -9401,6 +9456,10 @@
             { "type": "null" }
           ]
         },
+        "legacy_dubbing": {
+          "type": "object",
+          "description": "Original stored provenance, retained by the server during lazy v6 upgrades."
+        },
         "voices": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/VoiceSettingV3" },
@@ -9464,8 +9523,12 @@
       "required": ["mode"],
       "properties": {
         "mode": { "$ref": "#/components/schemas/VoiceProfileModeV3" },
-        "recommendation": {
-          "$ref": "#/components/schemas/LocalVoiceRecommendationV3"
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/LocalVoiceRecommendationV3"
+          },
+          "maxItems": 2000
         }
       },
       "additionalProperties": false

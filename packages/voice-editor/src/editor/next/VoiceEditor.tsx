@@ -68,6 +68,7 @@ import type {
   VoiceEditorProps,
   VoiceAssociation,
   VoiceSetting,
+  VoiceProfile,
   VoiceRecommendation
 } from "../../types";
 import {

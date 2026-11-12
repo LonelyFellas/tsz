@@ -442,6 +442,8 @@ export interface VoiceSettingV3 {
 
 /** 未出现的音色默认不勾选、原速；voice_id 使用目录 alias。 */
 export interface VoiceProfileV3 {
+  /** 服务端保留的只读历史来源，不用于当前配音解析或编辑。 */
+  legacy_dubbing?: Record<string, unknown>;
   voices: VoiceSettingV3[];
   dubbing?: {
     area: "word" | "azure" | "grammar" | "meaning" | "example";

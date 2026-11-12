@@ -833,7 +833,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "11d01490c46db52a6b9c7fd7b523aaf3d68613c3450e40e0f9fc7eacec25f5d4"
+      "f41a65dfd9f17181c55c5cca18516a260324076983546099d19a7c185f57c888"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1132,6 +1132,43 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "post"
     ]);
     expect(snapshot.operationHeaders).toEqual({
+      "get /admin/speech/groups": [
+        {
+          name: "X-TSZ-Dubbing-Groups",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        }
+      ],
+      ...Object.fromEntries(
+        [
+          "post /admin/speech/groups",
+          "put /admin/speech/groups",
+          "put /admin/speech/groups/order",
+          "put /admin/speech/groups/{id}",
+          "delete /admin/speech/groups/{id}"
+        ].map((operation) => [
+          operation,
+          [
+            {
+              name: "X-TSZ-Dubbing-Groups",
+              in: "header",
+              required: true,
+              schema: { type: "string" }
+            },
+            ...(operation === "put /admin/speech/groups"
+              ? [
+                  {
+                    name: "X-TSZ-Voice-Models",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : [])
+          ]
+        ])
+      ),
       "post /auth/refresh": [currentOnlyHeader, refreshHeader],
       "post /admin/auth/refresh": [currentOnlyHeader, refreshHeader],
       "get /admin/speech/voices": [
@@ -1145,7 +1182,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       })),
       ...Object.fromEntries(
         [
-          "put /admin/speech/groups",
           "get /admin/speech/library",
           "put /admin/speech/library/{alias}/personal",
           "put /admin/speech/library/{alias}/description",

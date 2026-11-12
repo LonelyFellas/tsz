@@ -254,7 +254,6 @@ function independentGroups() {
 describe("英美独立推荐契约", () => {
   it("所有分组读写声明同一严格独立表示与顺序版本", () => {
     for (const operation of [
-      "get /admin/speech/groups",
       "post /admin/speech/groups",
       "put /admin/speech/groups/{id}",
       "delete /admin/speech/groups/{id}"
@@ -263,6 +262,12 @@ describe("英美独立推荐契约", () => {
         $ref: "#/components/schemas/DubbingGroupsResponse"
       });
     }
+    expect(
+      spec.operationSchemas["get /admin/speech/groups"].responses["200"]
+    ).toEqual({ $ref: "#/components/schemas/DubbingGroupsReadResponse" });
+    expect(spec.schemas.DubbingGroupsReadResponse.oneOf).toContainEqual({
+      $ref: "#/components/schemas/DubbingGroupsResponse"
+    });
     expect(spec.schemas.DubbingGroupsResponse.required).toContain(
       "order_revision"
     );
@@ -327,6 +332,11 @@ describe("英美独立推荐契约", () => {
       input,
       { headers }
     );
+    const bulk = { groups: value.groups, base_revision: value.revision };
+    await endpoints.saveGroups(bulk);
+    expect(http.put).toHaveBeenLastCalledWith("/speech/groups", bulk, {
+      headers: { "X-TSZ-Voice-Models": "v1", "X-TSZ-Dubbing-Groups": "v4" }
+    });
     const order = { group_ids: [groupId], base_revision: 1 };
     await endpoints.saveGroupOrder(order);
     expect(http.put).toHaveBeenLastCalledWith("/speech/groups/order", order, {

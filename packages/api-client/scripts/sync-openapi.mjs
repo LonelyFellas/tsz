@@ -244,7 +244,7 @@ const contractSchemaNames = [
   "VoiceLibraryItem",
   "VoiceLibraryResponse",
   "DubbingGroupsResponse",
-  "DubbingGroupsResponse",
+  "DubbingGroupsReadResponse",
   "DubbingAudioUpdates",
   "DubbingAudioUpdate",
   "DubbingUpdateSettings",

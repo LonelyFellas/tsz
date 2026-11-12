@@ -520,7 +520,12 @@ describe("按词条关联反查共享多维例句", () => {
       );
     });
     await waitFor(() =>
-      expect(screen.getByLabelText("选用 Sonia")).toBeChecked()
+      expect(
+        within(screen.getByRole("group", { name: "英式 局部推荐" })).getByRole(
+          "checkbox",
+          { name: "英式" }
+        )
+      ).toBeChecked()
     );
     expect(save).toBeEnabled();
     fireEvent.click(save);

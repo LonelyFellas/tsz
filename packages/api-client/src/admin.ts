@@ -1,6 +1,9 @@
 import { validateRuntimeSchema } from "./runtime-schema";
 import { createLexiconNextEndpoints } from "./lexicon-next";
-import { createDubbingGroupsV3Endpoints } from "./dubbing-groups-v3";
+import {
+  createDubbingGroupsV3Endpoints,
+  decodeDubbingGroupsV3
+} from "./dubbing-groups-v3";
 import { createAiLedgerEndpoints } from "./ai-ledger";
 import { createLexiconAssistantEndpoints } from "./lexicon-assistant";
 import { createOpenCodeEndpoints } from "./opencode";
@@ -47,7 +50,6 @@ import type {
   AdminVoiceLibraryItem,
   SaveAdminVoiceSettingsInput,
   SaveAdminVoiceDescriptionInput,
-  AdminDubbingGroupsResponse,
   SaveAdminDubbingGroupsInput,
   AudioAssetUrlResponse,
   ConfirmAudioAssetInput,
@@ -437,9 +439,14 @@ export function createAdminEndpoints(http: HttpClient) {
           `/speech/audio-updates/${encodeURIComponent(id)}/retry`
         ),
       saveGroups: (input: SaveAdminDubbingGroupsInput) =>
-        http.put<AdminDubbingGroupsResponse>("/speech/groups", input, {
-          headers: { "X-TSZ-Voice-Models": "v1" }
-        }),
+        http
+          .put<unknown>("/speech/groups", input, {
+            headers: {
+              "X-TSZ-Voice-Models": "v1",
+              "X-TSZ-Dubbing-Groups": "v4"
+            }
+          })
+          .then(decodeDubbingGroupsV3),
       library: (signal?: AbortSignal) =>
         http.get<AdminVoiceLibraryResponse>("/speech/library", {
           signal,

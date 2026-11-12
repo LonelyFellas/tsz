@@ -558,6 +558,13 @@ describe("runtime schema fail-closed diagnostics", () => {
     pos.senses = [sense];
     word.meanings.pos = [pos];
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    Object.assign(profile, {
+      legacy_dubbing: { mode: "local", recommendations: [{ pair_id: id }] }
+    });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    Object.assign(profile, { legacy_dubbing: null });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    Reflect.deleteProperty(profile, "legacy_dubbing");
     Object.assign(profile.dubbing, { pool_version: "unknown" });
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
     Reflect.deleteProperty(profile.dubbing, "pool_version");
@@ -567,15 +574,20 @@ describe("runtime schema fail-closed diagnostics", () => {
       voice_id: "sonia",
       contribution_id: id
     };
+    Object.assign(profile.dubbing.uk as object, {
+      recommendations: [
+        source,
+        {
+          ...source,
+          recommendation_id: "00000000-0000-4000-8000-000000000002"
+        }
+      ]
+    });
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    // 同声来源分别保留；旧单项字段不能混入新协议。
     Object.assign(profile.dubbing.uk as object, { recommendation: source });
-    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
-    source.voice_ids.push("ryan", "guy", "jenny");
-    source.contribution_ids.push(
-      "00000000-0000-4000-8000-000000000002",
-      "00000000-0000-4000-8000-000000000003",
-      "00000000-0000-4000-8000-000000000004"
-    );
-    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(true);
+    expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
+    Reflect.deleteProperty(profile.dubbing.uk, "recommendation");
     Object.assign(source, { guessed: true });
     expect(validateRuntimeSchema("AdminWordV3", word).valid).toBe(false);
   });
