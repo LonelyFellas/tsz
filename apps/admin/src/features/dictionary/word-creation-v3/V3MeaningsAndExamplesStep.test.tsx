@@ -1538,7 +1538,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   }, 30_000);
 
-  it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
+  it("音色与语速落到语法结构变体的 voice_profile 上，重复单选保持启用", async () => {
     const previous = env.VOICE_PREVIEW;
     Object.assign(env, { VOICE_PREVIEW: true });
     const listing = vi
@@ -1590,6 +1590,9 @@ describe("V3MeaningsAndExamplesStep", () => {
         within(detail).getByRole("button", { name: "保存配音设置" })
       );
       fireEvent.click(within(editor).getByLabelText("选用 Sonia"));
+      expect(
+        within(editor).getByRole("radio", { name: "选用 Sonia" })
+      ).toBeChecked();
       const complete = screen.getByLabelText("完成语法结构 1 英美通用内容编辑");
       await waitFor(() => expect(complete).toBeEnabled());
       fireEvent.click(complete);
@@ -1602,7 +1605,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         voices: [
           {
             voice_id: expect.any(String),
-            enabled: false,
+            enabled: true,
             rate_percent: 20,
             version_id: expect.any(String),
             version_name: "Sonia",

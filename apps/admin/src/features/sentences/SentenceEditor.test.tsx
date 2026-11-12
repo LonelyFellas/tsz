@@ -631,7 +631,7 @@ describe("当前词条关联与离开保护", () => {
     show(
       <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
     );
-    await screen.findByRole("radiogroup", { name: "局部推荐" });
+    await screen.findByRole("region", { name: "局部推荐" });
     fireEvent.change(screen.getByLabelText("例句正文"), {
       target: { value: "A new sentence." }
     });
