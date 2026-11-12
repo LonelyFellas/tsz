@@ -709,6 +709,9 @@ describe("英美独立多条拼写", () => {
     }
     const regions = editor.pos[0]!.forms[0]!.regional_variants;
     if (regions.mode !== "uk_us_many") throw new Error("fixture");
+    for (const variant of [...regions.uk.slice(1), ...regions.us.slice(1)]) {
+      expect(variant.pronunciations[0]!.style).toBe("citation");
+    }
     regions.uk[1]!.spelling = "alternative";
     regions.uk[1]!.spelling_speech = {
       content: { version: 2, text: "alternative", annotations: [] },

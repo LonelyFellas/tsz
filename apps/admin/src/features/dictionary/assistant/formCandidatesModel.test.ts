@@ -3,7 +3,7 @@ import type {
   AssistantCandidatePos,
   SharedFormsStepContentV3
 } from "@tsz/types";
-import { expandFormContents } from "@tsz/shared";
+import { expandFormContents, regionalVariants } from "@tsz/shared";
 import {
   applyFormsStructure,
   assignSharedFormContent
@@ -131,6 +131,11 @@ describe("AI 候选本地导入", () => {
     ).toBe(2);
     const forms = expandFormContents(result).pos[0]!.forms;
     expect(forms.map((form) => form.form_type)).toEqual(["base", "plural"]);
+    for (const form of forms) {
+      for (const variant of regionalVariants(form.regional_variants)) {
+        expect(variant.pronunciations[0]!.style).toBe("citation");
+      }
+    }
     const base = forms[0]!.regional_variants;
     if (base.mode !== "common") throw new Error("expected common form");
     expect(base.common.pronunciations[0]!.dict_phonetic).toBe("/bæŋk/");
@@ -169,6 +174,7 @@ describe("AI 候选本地导入", () => {
     const base = filled.contents[0]!.regional_variants;
     if (base.mode !== "common") throw new Error("expected common form");
     const row = base.common.pronunciations[0]!;
+    expect(row.style).toBe("normal");
     row.dict_phonetic = "人工音标";
     row.actual_pron = "人工实际发音";
     row.style = "strong";
@@ -251,6 +257,8 @@ describe("AI 候选本地导入", () => {
     expect(result.contents[0]!.dialect_rules.spelling_mode).toBe("distinguish");
     const regions = result.contents[0]!.regional_variants;
     if (regions.mode !== "uk_us") throw new Error("expected regional form");
+    expect(regions.uk.pronunciations[0]!.style).toBe("citation");
+    expect(regions.us.pronunciations[0]!.style).toBe("citation");
     const british = structuredClone(regions.uk);
     regions.us.spelling = "";
     const completed = planFormCandidates(result, regional, catalog.items)

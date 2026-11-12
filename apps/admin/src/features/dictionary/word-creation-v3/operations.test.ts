@@ -879,7 +879,7 @@ describe("V3 forms operations", () => {
                         id: UUIDS.pronunciation,
                         dict_phonetic: "",
                         actual_pron: "",
-                        style: "normal"
+                        style: "citation"
                       }
                     ]
                   }
@@ -949,7 +949,7 @@ describe("V3 forms operations", () => {
                         id: UUIDS.pronunciation_2,
                         dict_phonetic: "",
                         actual_pron: "",
-                        style: "normal"
+                        style: "citation"
                       }
                     ]
                   }
@@ -1014,7 +1014,7 @@ describe("V3 forms operations", () => {
                   id: ids[6],
                   dict_phonetic: "",
                   actual_pron: "",
-                  style: "normal"
+                  style: "citation"
                 }
               ]
             },
@@ -1029,7 +1029,7 @@ describe("V3 forms operations", () => {
                   id: ids[7],
                   dict_phonetic: "",
                   actual_pron: "",
-                  style: "normal"
+                  style: "citation"
                 }
               ]
             }
@@ -1380,7 +1380,7 @@ describe("V3 forms operations", () => {
               id: UUIDS.pronunciation,
               dict_phonetic: "",
               actual_pron: "",
-              style: "normal"
+              style: "citation"
             }
           ]
         }
@@ -1418,7 +1418,7 @@ describe("V3 forms operations", () => {
         id: UUIDS.pronunciation_2,
         dict_phonetic: "",
         actual_pron: "",
-        style: "normal"
+        style: "citation"
       }
     ]);
   });
@@ -1526,7 +1526,7 @@ describe("V3 forms operations", () => {
         expect(variant.pronunciations[0]).toMatchObject({
           dict_phonetic: "",
           actual_pron: "",
-          style: "normal"
+          style: "citation"
         });
       }
       expect(new Set(generated).size).toBe(generated.length);
@@ -1649,7 +1649,7 @@ describe("V3 forms operations", () => {
               id: UUIDS.pronunciation,
               dict_phonetic: "",
               actual_pron: "",
-              style: "normal"
+              style: "citation"
             }
           ]
         },
@@ -1664,7 +1664,7 @@ describe("V3 forms operations", () => {
               id: UUIDS.pronunciation_2,
               dict_phonetic: "",
               actual_pron: "",
-              style: "normal"
+              style: "citation"
             }
           ]
         }
