@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-create-matches-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "a8f101054386e7fc63555cece9716a7cf2570ee3ae922b61ed62c351534d708c",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-existing-matches-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "226972ef41a132dd878899e20c0c0463c8ede55ea9d4f7c322f454c81140947b",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",
@@ -18,6 +18,8 @@
     "CreateNextEntry",
     "NextDetection",
     "NextDetectionInput",
+    "NextEntryMatchInput",
+    "NextEntryMatches",
     "SaveNextDraft",
     "InterfaceCapabilities",
     "InterfaceLocaleV1",
@@ -3749,6 +3751,34 @@
           "items": { "$ref": "#/$defs/NextEntrySummary" }
         },
         "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "NextEntryMatches": {
+      "type": "object",
+      "required": ["surface", "items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextWorkspaceEntry" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" },
+        "surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextEntryMatchInput": {
+      "type": "object",
+      "required": ["target_language", "surface"],
+      "properties": {
+        "page": { "type": ["integer", "null"], "minimum": 1 },
+        "page_size": {
+          "type": ["integer", "null"],
+          "maximum": 100,
+          "minimum": 1
+        },
+        "surface": { "type": "string" },
+        "target_language": { "type": "string" }
       },
       "additionalProperties": false
     },

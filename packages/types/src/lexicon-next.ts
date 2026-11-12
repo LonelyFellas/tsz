@@ -60,6 +60,15 @@ export interface NextDetection {
   kind: "word" | "phrase";
   matches: NextDictionaryMatch[];
 }
+export interface NextEntryMatchInput extends NextDetectionInput {
+  page?: number | null;
+  page_size?: number | null;
+}
+export interface NextEntryMatches {
+  surface: string;
+  items: NextWorkspaceEntry[];
+  pagination: NextEntryList["pagination"];
+}
 export interface NextListQuery {
   headword?: string;
   kind?: "word" | "phrase";

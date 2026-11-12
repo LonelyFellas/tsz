@@ -69,6 +69,48 @@ function client(reply: unknown, status = 200) {
 }
 
 describe("lexicon-next authoritative wire contract", () => {
+  it("已有词条匹配使用新版分页端点和严格响应，不回退 V1", async () => {
+    const page = {
+      surface: "café",
+      items: [],
+      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+    };
+    const { api, fetch } = client(page);
+    const input = {
+      target_language: "en",
+      surface: "café",
+      page: 2,
+      page_size: 20
+    };
+    expect(await api.matchEntries(input)).toEqual(page);
+    expect(fetch.mock.calls[0]![0]).toBe(
+      "https://test.invalid/api/v1/admin/lexicon-next/entry-matches"
+    );
+    expect(fetch.mock.calls[0]![1].method).toBe("POST");
+    expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual(input);
+    expect(
+      validateRuntimeSchema("NextEntryMatchInput", {
+        target_language: "en",
+        surface: "café",
+        page: null
+      }).valid
+    ).toBe(true);
+    for (const invalid of [
+      { ...input, page: 0 },
+      { ...input, page_size: 101 }
+    ]) {
+      expect(validateRuntimeSchema("NextEntryMatchInput", invalid).valid).toBe(
+        false
+      );
+    }
+    const malformed = client({ ...page, items: [entry] });
+    await expect(malformed.api.matchEntries(input)).rejects.toThrow("接口契约");
+    const missing = client({}, 404);
+    await expect(missing.api.matchEntries(input)).rejects.toBeInstanceOf(
+      HttpError
+    );
+    expect(missing.fetch).toHaveBeenCalledTimes(1);
+  });
   it("detects through the independent read-only endpoint and rejects incomplete reference records", async () => {
     const reply = {
       surface: "Colour",

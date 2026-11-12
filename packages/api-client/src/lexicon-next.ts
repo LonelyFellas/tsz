@@ -11,6 +11,8 @@ import type {
   CreateNextEntry,
   NextDetection,
   NextDetectionInput,
+  NextEntryMatchInput,
+  NextEntryMatches,
   NextCapabilities,
   NextEntry,
   NextEntryList,
@@ -121,6 +123,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       http
         .post<unknown>(`${root}/detections`, input)
         .then((value) => decode<NextDetection>("NextDetection", value)),
+    matchEntries: (input: NextEntryMatchInput) =>
+      http
+        .post<unknown>(`${root}/entry-matches`, input)
+        .then((value) => decode<NextEntryMatches>("NextEntryMatches", value)),
     get: (id: string) => http.get<unknown>(entry(id)).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) =>
       http.put<unknown>(entry(id), input).then(decodeNextEntry),

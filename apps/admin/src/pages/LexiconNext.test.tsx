@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -13,7 +14,10 @@ import type {
   NextCapabilities,
   NextEntry,
   NextDetection,
-  NextDetectionInput
+  NextDetectionInput,
+  NextEntryMatchInput,
+  NextEntryMatches,
+  NextWorkspaceEntry
 } from "@tsz/types";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { useAuthStore } from "@/lib/auth";
@@ -68,6 +72,20 @@ function requests() {
           matches: []
         })
       ),
+    matchEntries: vi
+      .fn()
+      .mockImplementation(
+        async (input: NextEntryMatchInput): Promise<NextEntryMatches> => ({
+          surface: input.surface,
+          items: [],
+          pagination: {
+            page: input.page ?? 1,
+            page_size: input.page_size ?? 20,
+            total: 0,
+            total_pages: 0
+          }
+        })
+      ),
     create: vi.fn().mockResolvedValue(structuredClone(entry)),
     save: vi.fn().mockImplementation(async (_id, input) => ({
       ...entry,
@@ -104,6 +122,147 @@ function mount(api: LexiconNextRequests, path = `/lexicon-next/${id}`) {
   return { client, router };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
+
+it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保留独立创建", async () => {
+  const api = requests();
+  const archivedId = "00000000-0000-4000-8000-000000000002";
+  api.matchEntries.mockResolvedValue({
+    surface: "center",
+    items: [
+      listRow({
+        forms: [{ id: "form", locale: "en-US", text: "center" }],
+        annotation_visible: true,
+        annotation: "2",
+        gloss: "已有词条的释义"
+      }),
+      listRow({
+        id: archivedId,
+        status: "archived",
+        headword: "center",
+        kind: "phrase",
+        gloss: "垃圾桶词条的释义"
+      })
+    ],
+    pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("词头"), {
+    target: { value: "center" }
+  });
+  fireEvent.click(button("检测词条"));
+  const matches = within(
+    await screen.findByRole("region", { name: "智能词库匹配结果" })
+  );
+  expect(matches.getByText("已有词条的释义")).toBeVisible();
+  expect(matches.getByText("垃圾桶词条的释义")).toBeVisible();
+  expect(matches.getByText("2 条匹配")).toBeVisible();
+  expect(matches.getByText("草稿")).toBeVisible();
+  expect(matches.getByText("垃圾桶")).toBeVisible();
+  expect(matches.getByText("2", { selector: "sup" })).toBeVisible();
+  expect(matches.getByRole("link", { name: "继续创建" })).toHaveAttribute(
+    "href",
+    `/lexicon-next/${id}`
+  );
+  expect(matches.getByRole("link", { name: "查看词条" })).toHaveAttribute(
+    "href",
+    `/lexicon-next/${archivedId}`
+  );
+  expect(
+    screen.getByText("未找到内置词典匹配，可继续创建空白草稿。")
+  ).toBeVisible();
+  expect(api.matchEntries).toHaveBeenCalledExactlyOnceWith({
+    target_language: "en",
+    surface: "center",
+    page: 1,
+    page_size: 20
+  });
+  fireEvent.click(button("确认创建"));
+  await waitFor(() =>
+    expect(api.create).toHaveBeenCalledExactlyOnceWith({
+      target_language: "en",
+      kind: "word",
+      headword: "center"
+    })
+  );
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("已有词条翻页只重查新版匹配，失败保留原结果并支持重试；改输入清空结果", async () => {
+  const api = requests();
+  api.matchEntries
+    .mockResolvedValueOnce({
+      surface: "center",
+      items: Array.from({ length: 20 }, (_, index) =>
+        listRow({
+          id: `entry-${index}`,
+          gloss: index === 0 ? "第一页已有释义" : null
+        })
+      ),
+      pagination: { page: 1, page_size: 20, total: 21, total_pages: 2 }
+    })
+    .mockRejectedValueOnce(new Error("匹配分页暂不可用"))
+    .mockResolvedValueOnce({
+      surface: "center",
+      items: [listRow({ gloss: "第二页已有释义" })],
+      pagination: { page: 2, page_size: 20, total: 21, total_pages: 2 }
+    });
+  mount(api, "/lexicon-next/new");
+  const input = await screen.findByLabelText("词头");
+  fireEvent.change(input, { target: { value: "center" } });
+  fireEvent.click(button("检测词条"));
+  const region = await screen.findByRole("region", {
+    name: "智能词库匹配结果"
+  });
+  fireEvent.click(within(region).getByRole("button", { name: /2.*页/ }));
+  await screen.findByText("匹配分页暂不可用");
+  expect(screen.getByText("第一页已有释义")).toBeVisible();
+  fireEvent.click(within(region).getByRole("button", { name: /2.*页/ }));
+  await screen.findByText("第二页已有释义");
+  expect(region).toHaveFocus();
+  expect(api.detect).toHaveBeenCalledTimes(1);
+  expect(api.matchEntries).toHaveBeenLastCalledWith({
+    target_language: "en",
+    surface: "center",
+    page: 2,
+    page_size: 20
+  });
+  fireEvent.change(input, { target: { value: "another" } });
+  expect(screen.queryByRole("region", { name: "智能词库匹配结果" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
+});
+
+it("已有匹配未完成、失败或回显不符时不能创建，也不伪装成无匹配", async () => {
+  const api = requests();
+  let finish!: (value: NextEntryMatches) => void;
+  api.matchEntries.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  mount(api, "/lexicon-next/new");
+  const input = await screen.findByLabelText("词头");
+  fireEvent.change(input, { target: { value: "center" } });
+  fireEvent.click(button("检测词条"));
+  await waitFor(() => expect(api.matchEntries).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
+  await act(async () =>
+    finish({
+      surface: "another",
+      items: [],
+      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+    })
+  );
+  await screen.findByText("检测结果与当前输入不一致，请重新检测。");
+  expect(screen.queryByText("未找到智能词库中的匹配词条。")).toBeNull();
+  api.matchEntries.mockRejectedValueOnce(
+    new HttpError(404, "已有词条检测暂不可用")
+  );
+  fireEvent.click(button("检测词条"));
+  await screen.findByText("已有词条检测暂不可用");
+  expect(input).toHaveValue("center");
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
+  expect(api.create).not.toHaveBeenCalled();
+});
 
 it("多条词典记录平等展示，按原输入创建且不带入参考内容", async () => {
   const api = requests();
@@ -595,7 +754,9 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
 });
 
-function listRow(overrides: Record<string, unknown> = {}) {
+function listRow(
+  overrides: Partial<NextWorkspaceEntry> = {}
+): NextWorkspaceEntry {
   return {
     id,
     headword: "centre",

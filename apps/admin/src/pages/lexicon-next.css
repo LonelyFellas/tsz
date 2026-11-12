@@ -133,3 +133,6 @@
   gap: var(--ui-space-4);
   overflow-wrap: anywhere;
 }
+.lexicon-next-existing-heading {
+  margin: 0;
+}
