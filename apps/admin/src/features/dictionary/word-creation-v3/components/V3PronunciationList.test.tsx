@@ -329,9 +329,12 @@ describe("独立发音输入", () => {
     expect(field("Azure UPS")).toHaveValue("H U M");
     change("Azure IPA", "");
     convert("UPS");
+    const missingIpa = field("Azure IPA");
+    expect(missingIpa).toHaveFocus();
+    expect(missingIpa).toHaveAttribute("aria-invalid", "true");
     expect(
-      screen.getByText("请先填写对应口音的 Azure IPA")
-    ).toBeInTheDocument();
+      document.getElementById(missingIpa.getAttribute("aria-describedby")!)
+    ).toBeVisible();
     expect(field("Azure UPS")).toHaveValue("H U M");
     await change("实际发音", "kæt?");
     convert("IPA");

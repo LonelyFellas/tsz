@@ -45,7 +45,8 @@ import {
   useId,
   useMemo,
   useRef,
-  useState
+  useState,
+  type ComponentProps
 } from "react";
 import { RequiredFieldFeedback } from "../RequiredFieldFeedback";
 import { adminWordsDataSource } from "../dataSource";
@@ -637,22 +638,34 @@ function HeadwordInput({
   value,
   disabled,
   error,
-  onChange
+  onChange,
+  id,
+  "aria-required": required,
+  "aria-describedby": describedBy
 }: {
   label: string;
   value: string;
   disabled?: boolean;
   error?: string;
   onChange: (value: string) => void;
-}) {
+} & Pick<
+  ComponentProps<typeof Input>,
+  "id" | "aria-required" | "aria-describedby"
+>) {
   const messageId = useId();
   const requiredError = !value.trim() ? error : undefined;
   return (
     <RequiredFieldFeedback message={requiredError} messageId={messageId}>
       <Input
+        id={id}
         aria-label={label}
         aria-invalid={Boolean(error)}
-        aria-describedby={requiredError ? messageId : undefined}
+        aria-required={required}
+        aria-describedby={
+          [requiredError ? messageId : undefined, describedBy]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
         status={error ? "error" : undefined}
         className="tsz-words"
         disabled={disabled}
@@ -1376,6 +1389,7 @@ export function UnifiedCreateEntryStep({
           </Form.Item>
           <Form.Item
             label={t("creation_entry_text")}
+            htmlFor={entryInputId}
             validateStatus={fieldError ? "error" : undefined}
             help={value.trim() ? fieldError : undefined}
           >
@@ -1388,8 +1402,10 @@ export function UnifiedCreateEntryStep({
                 aria-label={t("creation_entry_text")}
                 aria-invalid={Boolean(fieldError)}
                 aria-describedby={
-                  !value.trim() && fieldError
-                    ? `${entryInputId}-required`
+                  fieldError
+                    ? !value.trim()
+                      ? `${entryInputId}-required`
+                      : `${entryInputId}-help`
                     : undefined
                 }
                 status={fieldError ? "error" : undefined}

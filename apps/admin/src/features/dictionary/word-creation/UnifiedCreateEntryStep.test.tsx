@@ -2377,3 +2377,33 @@ it.each(["unified", "distinguish"])(
     expect(supplied.createV3).not.toHaveBeenCalled();
   }
 );
+
+it("组合输入保留表单标签、必填语义及非空格式错误的帮助关联", async () => {
+  const supplied = requests();
+  vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("novel-term"));
+  renderStep(supplied);
+  const entry = input();
+  expect(screen.getByText("录入词条", { selector: "label" })).toHaveAttribute(
+    "for",
+    entry.id
+  );
+  fireEvent.change(entry, { target: { value: "123" } });
+  fireEvent.click(screen.getByText("词典检测"));
+  expect(entry).toHaveAttribute("aria-invalid", "true");
+  const entryHelp = entry.getAttribute("aria-describedby");
+  expect(entryHelp).toBeTruthy();
+  expect(document.getElementById(entryHelp!)).toBeVisible();
+  expect(supplied.detectV3).not.toHaveBeenCalled();
+  fireEvent.change(entry, { target: { value: "novel-term" } });
+  fireEvent.click(screen.getByText("词典检测"));
+  const headword = await screen.findByLabelText("英美通用主词");
+  expect(
+    screen.getByText("英美通用主词", { selector: "label" })
+  ).toHaveAttribute("for", headword.id);
+  expect(headword).toHaveAttribute("aria-required", "true");
+  fireEvent.change(headword, { target: { value: "苹果" } });
+  expect(headword).toHaveAttribute("aria-invalid", "true");
+  const headwordHelp = headword.getAttribute("aria-describedby");
+  expect(headwordHelp).toBeTruthy();
+  expect(document.getElementById(headwordHelp!)).toBeVisible();
+});
