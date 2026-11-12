@@ -33,6 +33,7 @@ export function VoiceDetail({
   content,
   sourceKey,
   dialect,
+  phonemeLocale,
   profile,
   adapter,
   readOnly,
@@ -51,6 +52,7 @@ export function VoiceDetail({
   content: RichTextV2;
   sourceKey: string;
   dialect: "en-GB" | "en-US";
+  phonemeLocale?: `en-${string}`;
   profile: VoiceProfile;
   adapter?: VoicePreviewAdapter;
   readOnly: boolean;
@@ -101,7 +103,8 @@ export function VoiceDetail({
       },
       [voice],
       dialect,
-      content
+      content,
+      phonemeLocale
     );
   function stop() {
     request.current?.abort();
@@ -298,7 +301,13 @@ export function VoiceDetail({
               <Alert
                 type="warning"
                 title={t(
-                  "the_voice_or_text_reading_is_unavailable_resolve_it_to_continue_existing_pa"
+                  voice.supportsPhoneme === false &&
+                    (phonemeLocale ||
+                      content.annotations.some(
+                        (mark) => mark.type === "phoneme"
+                      ))
+                    ? "this_voice_does_not_support_specified_phonemes_select_another_voice"
+                    : "the_voice_or_text_reading_is_unavailable_resolve_it_to_continue_existing_pa"
                 )}
               />
             )}
@@ -329,7 +338,7 @@ export function VoiceDetail({
                 }}
               />
             )}
-            {adapter?.renderSsml && (
+            {adapter?.renderSsml && available && (
               <SsmlReview
                 automaticAvailable={parametersValid}
                 adapter={adapter}
