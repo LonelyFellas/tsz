@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Alert, Button, Card, Space, Tag } from "@tsz/ui/admin/display";
-import { Form, Input } from "@tsz/ui/admin/forms";
+import {
+  Alert,
+  Button,
+  Card,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
+import { Form, Input, Select } from "@tsz/ui/admin/forms";
 import { Search, Plus } from "lucide-react";
 import type { NextDetection, NextEntryMatches } from "@tsz/types";
 import { usePermission } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { validateEntryInput } from "@/features/dictionary/word-creation/entryClassification";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
 
@@ -17,6 +25,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const queryClient = useQueryClient();
   const canCreate = usePermission("words.create");
   const posLabel = usePartOfSpeechLabel();
+  const { t } = useLexiconEditorTranslation();
   const [value, setValue] = useState("");
   const [detection, setDetection] = useState<NextDetection>();
   const [expandedGlosses, setExpandedGlosses] = useState<Set<string>>(
@@ -143,23 +152,52 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
 
   return (
     <EntryLayout step="basics" exists={false}>
-      <div className="lexicon-next lexicon-next-create">
+      <div
+        className={`lexicon-next lexicon-next-create word-basics-workflow${detection ? " is-detected" : ""}`}
+      >
+        <div className="word-step-heading">
+          <span className="word-step-number">STEP 01</span>
+          <Typography.Title level={2} style={{ margin: 0 }}>
+            {t("assistant_step_basics")}
+          </Typography.Title>
+        </div>
         {!canCreate && <Alert type="info" title="当前账号没有创建词条权限" />}
         {error && <Alert type="error" showIcon title={error} />}
-        <Card title="录入与检测">
+        <Card
+          className="word-basics-input-card"
+          size="small"
+          title={t("creation_input_and_detection")}
+        >
           <Form layout="vertical" onFinish={() => void detect()}>
+            <Form.Item label={t("creation_entry_language")}>
+              <Select
+                value="en"
+                options={[{ value: "en", label: t("creation_english") }]}
+                disabled
+              />
+            </Form.Item>
             <Form.Item
-              label="词头"
-              required
+              label={t("creation_entry_text")}
               validateStatus={fieldError ? "error" : undefined}
               help={fieldError}
             >
-              <Input
+              <Input.Search
                 value={value}
                 autoComplete="off"
-                placeholder="输入英语单词或短语"
+                autoFocus
+                placeholder={t("creation_e_g_center_or_give_up")}
                 className="tsz-words"
+                size="large"
+                status={fieldError ? "error" : undefined}
                 disabled={Boolean(busy) || !canCreate || uncertain}
+                loading={busy === "detect"}
+                enterButton={
+                  <Space size={6}>
+                    <Search aria-hidden />
+                    {t("creation_dictionary_detection")}
+                  </Space>
+                }
+                onSearch={() => void detect()}
                 onChange={(event) => {
                   setValue(event.target.value);
                   setDetection(undefined);
@@ -169,20 +207,11 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                 }}
               />
             </Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              icon={<Search aria-hidden />}
-              loading={busy === "detect"}
-              disabled={
-                !canCreate ||
-                busy === "create" ||
-                busy === "matches" ||
-                uncertain
-              }
-            >
-              检测词条
-            </Button>
+            <Typography.Text type="secondary" className="word-field-help">
+              {t(
+                "creation_press_enter_to_run_detection_then_confirm_to_create"
+              )}
+            </Typography.Text>
           </Form>
         </Card>
         {detection && (
