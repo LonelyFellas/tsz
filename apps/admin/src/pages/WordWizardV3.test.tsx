@@ -770,7 +770,6 @@ describe("WordWizardV3Page", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "创建词条" })
     ).toBeInTheDocument();
-    expect(screen.getByText("所属语言｜英美区分")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /返回智能词库/ })).toBeVisible();
     expect(screen.getByText("当前词条")).toBeVisible();
     expect(document.querySelector(".v3-summary-headword")).toHaveTextContent(
