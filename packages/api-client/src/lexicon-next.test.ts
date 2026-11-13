@@ -69,6 +69,50 @@ function client(reply: unknown, status = 200) {
 }
 
 describe("lexicon-next authoritative wire contract", () => {
+  it("按能力协商 V1 编辑器，完整保存新版草稿并拒绝畸形嵌套内容", async () => {
+    const next = {
+      ...entry,
+      draft: {
+        ...draft,
+        form_editor: {
+          forms_format: "shared_v1" as const,
+          contents: [],
+          pos: []
+        }
+      }
+    };
+    const { api, fetch } = client(next);
+    expect(
+      await api.save(entry.id, { expected_revision: 1, draft: next.draft })
+    ).toEqual(next);
+    expect(JSON.parse(fetch.mock.calls[0]![1].body).draft.form_editor).toEqual(
+      next.draft.form_editor
+    );
+    expect(decodeNextEntry(next).draft.form_editor).toEqual(
+      next.draft.form_editor
+    );
+    for (const form_editor of [
+      null,
+      { ...next.draft.form_editor, forms_format: "unknown" },
+      { ...next.draft.form_editor, contents: [{ id: uuid(9) }] }
+    ]) {
+      expect(() =>
+        decodeNextEntry({ ...next, draft: { ...next.draft, form_editor } })
+      ).toThrow();
+    }
+    client({
+      schema_version: 1,
+      language_rules_version: "lexicon-next-en-zh-1",
+      languages: [],
+      manual_drafts: true,
+      generation: false,
+      publishing: false,
+      form_editor: true
+    });
+    await api.capabilities();
+    const request = vi.mocked(globalThis.fetch).mock.calls[0]![1];
+    expect(new Headers(request?.headers).get("x-tsz-next-forms")).toBe("v1");
+  });
   it("已有词条匹配使用新版分页端点和严格响应，不回退 V1", async () => {
     const page = {
       surface: "café",

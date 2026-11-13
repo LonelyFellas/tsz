@@ -141,3 +141,16 @@
 .lexicon-next-existing-heading {
   margin: 0;
 }
+
+.lexicon-next [hidden],
+.lexicon-next[hidden] {
+  display: none;
+}
+.lexicon-next-forms {
+  max-width: none;
+  padding: 0;
+  background: transparent;
+}
+.lexicon-next-forms .lexicon-next-toolbar {
+  margin-bottom: var(--ui-space-4);
+}

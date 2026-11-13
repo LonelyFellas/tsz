@@ -1,4 +1,6 @@
-/** Independent lexicon-next wire model; never an AdminWordV3 conversion. */
+import type { SharedFormsStepContentV3 } from "./admin-word-v3";
+
+/** Independent lexicon-next identities; the forms editor shares the V1 content contract. */
 export interface NextForm {
   id: string;
   locale: string;
@@ -26,6 +28,7 @@ export interface NextDraft {
   headword: string;
   forms: NextForm[];
   senses: NextSense[];
+  form_editor?: SharedFormsStepContentV3;
 }
 export interface NextEntry {
   id: string;
@@ -116,6 +119,7 @@ export interface NextCapabilities {
   manual_drafts: boolean;
   generation: boolean;
   publishing: boolean;
+  form_editor?: boolean;
 }
 export interface NextViewQuery {
   target_locale: string;

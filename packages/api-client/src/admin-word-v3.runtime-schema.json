@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-filters/tsz-rust/docs/openapi.json",
-  "_source_sha256": "4c8b13060ef449bd817d5d16fb67949393652f56cdf003a3cc68d7b29bf6b052",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-step2-parity/tsz-rust/docs/openapi.json",
+  "_source_sha256": "f464ffc43aae1689bad4b0f9f1b56e5596e1094d85c9e7b7c2b7dc72ec576626",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",
@@ -3550,6 +3550,7 @@
         "publishing"
       ],
       "properties": {
+        "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
         "language_rules_version": { "type": "string" },
         "languages": {
@@ -3651,6 +3652,7 @@
       "type": "object",
       "required": ["schema_version", "headword", "forms", "senses"],
       "properties": {
+        "form_editor": { "$ref": "#/$defs/SharedFormsStepContentV3" },
         "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
         "headword": { "type": "string" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
