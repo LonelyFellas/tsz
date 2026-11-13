@@ -10,6 +10,8 @@ export const adminShellMessages = {
   nav_lexicon_next: ["智能词库", "智慧詞庫", "Entries"],
   nav_words: ["智能词库V1", "智慧詞庫V1", "Entries V1"],
   nav_trash: ["垃圾桶", "垃圾桶", "Trash"],
+  nav_registers: ["语体色彩", "語體色彩", "Registers"],
+  nav_domains: ["行业领域", "行業領域", "Industry domains"],
   nav_parts: ["词性配置", "詞性設定", "Parts of speech"],
   nav_custom_dictionary: ["自定义词库", "自訂詞庫", "Custom dictionaries"],
   nav_voice: ["配音中心", "配音中心", "Speech"],

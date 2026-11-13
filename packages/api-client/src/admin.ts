@@ -1,3 +1,4 @@
+import { createLexiconTaxonomyEndpoints } from "./lexicon-taxonomies";
 import { validateRuntimeSchema } from "./runtime-schema";
 import { createLexiconNextEndpoints } from "./lexicon-next";
 import {
@@ -262,6 +263,7 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    lexiconTaxonomies: createLexiconTaxonomyEndpoints(http),
     aiLedger: createAiLedgerEndpoints(http),
     lexiconAssistant: createLexiconAssistantEndpoints(http),
     lexiconNext: createLexiconNextEndpoints(http),

@@ -1,5 +1,78 @@
 // Fixed UI messages only. Names, prose and catalogue data stay unchanged.
 export const contentMessages = {
+  taxonomy_name_zh: ["中文名", "中文名", "Chinese name"],
+  taxonomy_name_en: ["英文名", "英文名", "English name"],
+  taxonomy_updated_at: ["更新时间", "更新時間", "Updated at"],
+  taxonomy_refresh: ["刷新", "重新整理", "Refresh"],
+  taxonomy_registers: ["语体色彩", "語體色彩", "Registers"],
+  taxonomy_domains: ["行业领域", "行業領域", "Industry domains"],
+  taxonomy_add: ["新增{{kind}}", "新增{{kind}}", "Add {{kind}}"],
+  taxonomy_edit: ["编辑{{kind}}", "編輯{{kind}}", "Edit {{kind}}"],
+  taxonomy_delete: [
+    "删除「{{name}}」？",
+    "刪除「{{name}}」？",
+    "Delete ‘{{name}}’ ?"
+  ],
+  taxonomy_delete_help: [
+    "删除后无法恢复。",
+    "刪除後無法恢復。",
+    "This cannot be undone."
+  ],
+  taxonomy_empty: ["暂无{{kind}}", "暫無{{kind}}", "No {{kind}}"],
+  taxonomy_failed: [
+    "配置加载失败",
+    "設定載入失敗",
+    "Could not load configuration"
+  ],
+  taxonomy_save_failed: [
+    "保存失败，请重试。",
+    "儲存失敗，請重試。",
+    "Could not save. Try again."
+  ],
+  taxonomy_delete_failed: [
+    "删除失败，请重试。",
+    "刪除失敗，請重試。",
+    "Could not delete. Try again."
+  ],
+  taxonomy_saved: ["已保存", "已儲存", "Saved"],
+  taxonomy_deleted: ["已删除", "已刪除", "Deleted"],
+  taxonomy_search: [
+    "中文名 / 英文名 / 编码",
+    "中文名 / 英文名 / 編碼",
+    "Chinese name / English name / code"
+  ],
+  taxonomy_code: ["编码", "編碼", "Code"],
+  taxonomy_code_help: [
+    "小写字母开头，仅含小写字母、数字和下划线，最多 32 位；创建后不可修改。",
+    "以小寫字母開頭，僅含小寫字母、數字及底線，最多 32 位；建立後不可修改。",
+    "Start with a lowercase letter; use lowercase letters, digits and underscores, up to 32 characters. Cannot be changed after creation."
+  ],
+  taxonomy_code_required: [
+    "请输入有效编码",
+    "請輸入有效編碼",
+    "Enter a valid code"
+  ],
+  taxonomy_conflict: [
+    "同类别的编码或名称已存在，请修改后重试。",
+    "同類別的編碼或名稱已存在，請修改後重試。",
+    "A code or name already exists in this category. Change it and retry."
+  ],
+  taxonomy_stale: [
+    "此配置已被其他人修改，请关闭后重新打开再编辑。",
+    "此設定已被其他人修改，請關閉後重新開啟再編輯。",
+    "This item has changed. Close and reopen it before editing."
+  ],
+  taxonomy_missing: [
+    "此配置已被删除，请刷新列表。",
+    "此設定已被刪除，請重新整理清單。",
+    "This item has been deleted. Refresh the list."
+  ],
+  taxonomy_permission: [
+    "需要词库配置查看权限。",
+    "需要詞庫設定檢視權限。",
+    "Lexicon configuration viewing permission is required."
+  ],
+
   pending: ["待审核", "待審核", "Pending review"],
   approved: ["审核通过", "審核通過", "Approved"],
   rejected: ["审核未通过", "審核未通過", "Rejected"],

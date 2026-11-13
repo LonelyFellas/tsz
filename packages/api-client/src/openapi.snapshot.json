@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-step3-sense-groups/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-13T09:53:47.858Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-taxonomies-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-13T11:45:13.020Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -102,6 +102,8 @@
     "/admin/lexicon/sentences/{id}/withdraw": ["post"],
     "/admin/lexicon/sentences/{id}/withdrawal-impact": ["get"],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
+    "/admin/lexicon/taxonomies/{kind}": ["get", "post"],
+    "/admin/lexicon/taxonomies/{kind}/{id}": ["delete", "patch"],
     "/admin/me/coins/entries": ["get"],
     "/admin/me/coins/wallet": ["get"],
     "/admin/opencode": ["get"],
@@ -3687,6 +3689,55 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/lexicon/taxonomies/{kind}": {
+      "request": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/PaginatedResponse_LexiconTaxonomy"
+        },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/taxonomies/{kind}": {
+      "request": { "$ref": "#/components/schemas/CreateTaxonomyRequest" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/LexiconTaxonomy" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "delete /admin/lexicon/taxonomies/{kind}/{id}": {
+      "request": null,
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "patch /admin/lexicon/taxonomies/{kind}/{id}": {
+      "request": { "$ref": "#/components/schemas/UpdateTaxonomyRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/LexiconTaxonomy" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/me/coins/entries": {
       "request": null,
       "responses": {
@@ -5284,6 +5335,7 @@
         "sub_part_of_speech_not_found",
         "part_of_speech_conflict",
         "sub_part_of_speech_conflict",
+        "taxonomy_conflict",
         "annotation_conflict",
         "revision_conflict",
         "cefr_level_locked",
@@ -7679,6 +7731,22 @@
       },
       "additionalProperties": false
     },
+    "CreateTaxonomyRequest": {
+      "type": "object",
+      "required": ["code", "name_zh", "name_en", "sort_order"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
+        "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "sort_order": { "type": "integer", "format": "int32" }
+      },
+      "additionalProperties": false
+    },
     "CycleOperation": {
       "type": "string",
       "enum": ["next", "restart_blocked", "refresh_sources"]
@@ -9687,6 +9755,17 @@
         "content": { "$ref": "#/components/schemas/SharedSentenceContent" },
         "context_entry_id": { "type": "string", "format": "uuid" },
         "context_sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "UpdateTaxonomyRequest": {
+      "type": "object",
+      "required": ["base_revision", "name_zh", "name_en", "sort_order"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "sort_order": { "type": "integer", "format": "int32" }
       },
       "additionalProperties": false
     },

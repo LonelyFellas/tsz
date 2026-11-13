@@ -184,6 +184,19 @@ export const router = createBrowserRouter([
             })
           },
           {
+            ...ADMIN_PAGE_ROUTES.registers,
+            lazy: async () => ({
+              Component: (await import("@/pages/LexiconTaxonomies"))
+                .RegistersPage
+            })
+          },
+          {
+            ...ADMIN_PAGE_ROUTES.domains,
+            lazy: async () => ({
+              Component: (await import("@/pages/LexiconTaxonomies")).DomainsPage
+            })
+          },
+          {
             ...ADMIN_PAGE_ROUTES.partsOfSpeech,
             lazy: async () => ({
               Component: (await import("@/pages/PartOfSpeechSettings"))

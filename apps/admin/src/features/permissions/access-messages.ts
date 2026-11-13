@@ -1,4 +1,27 @@
 const fixedAccessMessages = {
+  taxonomy_settings: ["词库配置管理", "詞庫設定管理", "Lexicon configuration"],
+  taxonomy_view: ["查看词库配置", "檢視詞庫設定", "View lexicon configuration"],
+  taxonomy_view_description: [
+    "查看基本词性、细分词性、词形变化、语体色彩和行业领域配置",
+    "檢視基本詞性、細分詞性、詞形變化、語體色彩和行業領域設定",
+    "View parts of speech, subcategories, form types, registers and industry domains"
+  ],
+  taxonomy_edit: [
+    "编辑语体色彩和行业领域",
+    "編輯語體色彩和行業領域",
+    "Edit registers and industry domains"
+  ],
+  taxonomy_delete: [
+    "删除词库配置",
+    "刪除詞庫設定",
+    "Delete lexicon configuration"
+  ],
+  taxonomy_delete_description: [
+    "删除细分词性、词形变化、语体色彩和行业领域；基本词性仅超级管理员可删除",
+    "刪除細分詞性、詞形變化、語體色彩和行業領域；基本詞性僅超級管理員可刪除",
+    "Delete subcategories, form types, registers and industry domains. Only super administrators can delete basic parts of speech"
+  ],
+
   disable: ["禁用", "停用", "Disable"],
   enable: ["启用", "啟用", "Enable"],
   disabled: ["已禁用", "已停用", "Disabled"],

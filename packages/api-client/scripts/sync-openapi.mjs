@@ -63,6 +63,9 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "LexiconTaxonomy",
+  "LexiconTaxonomyKind",
+  "PaginatedResponse_LexiconTaxonomy",
   "NextWorkspaceEntry",
   "NextWorkspaceList",
   "NextWorkspaceStats",

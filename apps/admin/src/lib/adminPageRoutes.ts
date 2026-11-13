@@ -43,6 +43,14 @@ export const ADMIN_PAGE_ROUTES = {
   permissions: { path: "permissions", handle: { superOnly: true } },
   admins: { path: "admins", handle: { superOnly: true } },
   profileSettings: { path: "settings/profile", handle: {} },
+  registers: {
+    path: "words/registers",
+    handle: { permission: "lexicon_settings.access" }
+  },
+  domains: {
+    path: "words/domains",
+    handle: { permission: "lexicon_settings.access" }
+  },
   partsOfSpeech: {
     path: "settings/parts-of-speech",
     handle: { permission: "lexicon_settings.access" }

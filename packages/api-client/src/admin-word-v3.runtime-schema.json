@@ -1,8 +1,11 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-step3-sense-groups/tsz-rust/docs/openapi.json",
-  "_source_sha256": "4be0c837b7fcb1a973e773ad4ceb2d0b1507966023ec559e980a33bcf119be7e",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-taxonomies-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "e6b15bad415f4db36e25b04d0e995f4f0ff087aa642b81032c5cb05a83ffe4ac",
   "roots": [
+    "LexiconTaxonomy",
+    "LexiconTaxonomyKind",
+    "PaginatedResponse_LexiconTaxonomy",
     "NextWorkspaceEntry",
     "NextWorkspaceList",
     "NextWorkspaceStats",
@@ -1768,6 +1771,7 @@
         "sub_part_of_speech_not_found",
         "part_of_speech_conflict",
         "sub_part_of_speech_conflict",
+        "taxonomy_conflict",
         "annotation_conflict",
         "revision_conflict",
         "cefr_level_locked",
@@ -3191,6 +3195,33 @@
       },
       "additionalProperties": false
     },
+    "LexiconTaxonomy": {
+      "type": "object",
+      "required": [
+        "id",
+        "code",
+        "name_zh",
+        "name_en",
+        "sort_order",
+        "revision",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "code": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "id": { "type": "string", "format": "uuid" },
+        "name_en": { "type": "string" },
+        "name_zh": { "type": "string" },
+        "revision": { "type": "integer" },
+        "sort_order": { "type": "integer" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "LexiconTaxonomyKind": {
+      "type": "string",
+      "enum": ["registers", "domains"]
+    },
     "LibraryCrumb": {
       "type": "object",
       "required": ["id", "name"],
@@ -4197,6 +4228,39 @@
       "enum": ["credit", "debit", "transfer", "account_closure_forfeit"]
     },
     "OwnerType": { "type": "string", "enum": ["user", "admin"] },
+    "PaginatedResponse_LexiconTaxonomy": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "code",
+              "name_zh",
+              "name_en",
+              "sort_order",
+              "revision",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "code": { "type": "string" },
+              "created_at": { "type": "string", "format": "date-time" },
+              "id": { "type": "string", "format": "uuid" },
+              "name_en": { "type": "string" },
+              "name_zh": { "type": "string" },
+              "revision": { "type": "integer" },
+              "sort_order": { "type": "integer" },
+              "updated_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      }
+    },
     "PaginationMeta": {
       "type": "object",
       "required": ["page", "page_size", "total", "total_pages"],

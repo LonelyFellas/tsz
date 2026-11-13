@@ -46,7 +46,7 @@ const MODULE_QUERY_ROOTS: Record<string, readonly string[]> = {
   ],
   users: ["admin-users"],
   teacherapply: ["teacher-applications", "teacher-application"],
-  lexicon_settings: ["part-of-speech-config"],
+  lexicon_settings: ["part-of-speech-config", "lexicon-taxonomies"],
   speech: [
     "admin-words",
     "admin-speech-library",
