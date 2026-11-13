@@ -1,0 +1,21 @@
+.v3-regional-merge-help {
+  margin: 0;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  color: var(--ui-color-text-secondary);
+  background: var(--ui-color-fill-alter);
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+}
+
+.v3-regional-merge .word-form-matrix-shared-header > span {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+
+.v3-regional-merge[data-selected-region="uk"]
+  :is(.v3-spelling-list-uk, .word-shared-pronunciation-uk),
+.v3-regional-merge[data-selected-region="us"]
+  :is(.v3-spelling-list-us, .word-shared-pronunciation-us) {
+  outline: var(--ui-focus-ring);
+  outline-offset: -2px;
+}

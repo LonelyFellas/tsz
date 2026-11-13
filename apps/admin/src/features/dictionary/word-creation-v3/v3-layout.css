@@ -210,6 +210,23 @@
   background: transparent;
 }
 
+.v3-meanings-v2 .word-grammar-can-merge {
+  flex-wrap: wrap;
+}
+
+.v3-meanings-v2 .word-grammar-merge-actions {
+  flex-basis: 100%;
+}
+
+.v3-meanings-v2 .word-grammar-merge-header {
+  margin-bottom: var(--ui-space-2);
+}
+
+.v3-meanings-v2 .word-grammar-panel[data-merge-selected="true"] {
+  outline: var(--ui-focus-ring);
+  outline-offset: var(--ui-focus-offset);
+}
+
 .v3-meanings-v2 .word-grammar-panel .tsz-ve-toolbar {
   background: #f5faf7;
 }

@@ -344,7 +344,9 @@ export function createSharedContentDialectNormalizer(
   return (
     editor: FormContentEditor,
     rules: DialectRulesV3,
-    preference: "uk" | "us"
+    preference: "uk" | "us",
+    spellingSource?: "uk" | "us",
+    pronunciationSource?: "uk" | "us"
   ) => {
     const source = editor.pos[0]!.forms[0]!.regional_variants;
     if (source.mode === "uk_us_many") {
@@ -365,14 +367,31 @@ export function createSharedContentDialectNormalizer(
         us: source.us[0]!
       };
     }
+    if (rules.spelling_mode === "unified" && spellingSource) {
+      editor = structuredClone(editor);
+      const variants = editor.pos[0]!.forms[0]!.regional_variants;
+      if (variants.mode === "uk_us") {
+        const selected = variants[spellingSource];
+        const target = variants[spellingSource === "uk" ? "us" : "uk"];
+        target.spelling = selected.spelling;
+        for (const field of ["spelling_rich", "spelling_speech"] as const) {
+          delete target[field];
+          if (selected[field] !== undefined)
+            Object.assign(target, {
+              [field]: structuredClone(selected[field])
+            });
+        }
+      }
+    }
     const result = normalizeGroupDialectRules(
       editor,
       content.id,
       content.id,
       rules,
-      preference,
+      spellingSource ?? preference,
       newWordNodeId,
-      regionIds
+      regionIds,
+      pronunciationSource
     );
     if (!result.ok) return result;
     const before = editor.pos[0]!.forms[0]!.regional_variants;
@@ -433,35 +452,50 @@ export function createSharedContentDialectNormalizer(
       }
       mergeUndo = undefined;
     } else if (before.mode === "uk_us" && after.mode === "common") {
-      // The explicit merge joins the equal reading sequences accepted above.
-      // Existing correspondence must agree; equal text alone cannot replace it.
-      for (let index = 0; index < before.uk.pronunciations.length; index++) {
-        const uk = before.uk.pronunciations[index]!;
-        const us = before.us.pronunciations[index]!;
-        const ukMapping = bySlot.get(uk.id);
-        const usMapping = bySlot.get(us.id);
-        if (ukMapping && usMapping && ukMapping !== usMapping)
-          return {
-            ok: false as const,
-            reason: "pronunciation_merge_required" as const
-          };
-        const mapping: FormPronunciationSlotsV3 = ukMapping ??
-          usMapping ?? { id: newWordNodeId() };
-        if (
-          (mapping.uk && mapping.uk.id !== uk.id) ||
-          (mapping.us && mapping.us.id !== us.id)
-        )
-          return {
-            ok: false as const,
-            reason: "pronunciation_merge_required" as const
-          };
-        if (!ukMapping && !usMapping) mappings.push(mapping);
-        mapping.uk = { id: uk.id, variant_slot_id: before.uk.id };
-        mapping.us = { id: us.id, variant_slot_id: before.us.id };
-        bySlot.set(uk.id, mapping);
-        bySlot.set(us.id, mapping);
+      if (pronunciationSource) {
+        // Choosing one list retires the other; keep its identities without pairing by position.
+        for (const side of ["uk", "us"] as const)
+          for (const row of before[side].pronunciations) {
+            if (bySlot.has(row.id)) continue;
+            const mapping: FormPronunciationSlotsV3 = {
+              id: newWordNodeId(),
+              [side]: { id: row.id, variant_slot_id: before[side].id }
+            };
+            mappings.push(mapping);
+            bySlot.set(row.id, mapping);
+          }
+      } else {
+        // Merging equal reading sequences joins their slots.
+        // Existing correspondence must agree; equal text alone cannot replace it.
+        for (let index = 0; index < before.uk.pronunciations.length; index++) {
+          const uk = before.uk.pronunciations[index]!;
+          const us = before.us.pronunciations[index]!;
+          const ukMapping = bySlot.get(uk.id);
+          const usMapping = bySlot.get(us.id);
+          if (ukMapping && usMapping && ukMapping !== usMapping)
+            return {
+              ok: false as const,
+              reason: "pronunciation_merge_required" as const
+            };
+          const mapping: FormPronunciationSlotsV3 = ukMapping ??
+            usMapping ?? { id: newWordNodeId() };
+          if (
+            (mapping.uk && mapping.uk.id !== uk.id) ||
+            (mapping.us && mapping.us.id !== us.id)
+          )
+            return {
+              ok: false as const,
+              reason: "pronunciation_merge_required" as const
+            };
+          if (!ukMapping && !usMapping) mappings.push(mapping);
+          mapping.uk = { id: uk.id, variant_slot_id: before.uk.id };
+          mapping.us = { id: us.id, variant_slot_id: before.us.id };
+          bySlot.set(uk.id, mapping);
+          bySlot.set(us.id, mapping);
+        }
       }
-      copy(before[preference], preference, after.common, "common");
+      const selected = pronunciationSource ?? preference;
+      copy(before[selected], selected, after.common, "common");
       const regional = contentFromEditor(editor).regional_variants;
       const merged = contentFromEditor(result.value).regional_variants;
       if (regional.mode === "uk_us" && merged.mode === "common")

@@ -957,7 +957,7 @@ export function ensureV3MeaningsForForms(
 
   // 语法结构方言形态跟随词性拼写模式双向归一（对齐 forms 侧 applyDialectRules）：
   // distinguish 把单条 common 拆成 uk/us 双条（文本复制），unified 把 uk/us 合回
-  // 单条 common（取英式文本，英式为空则取美式——与后端补全偏英式同口径）。
+  // 单条 common；两侧内容或配置不同时保留原值，交由用户显式选择。
   // 转换一律旧节点退场换新 ID：text_variant 的 node_role 编入方言，原 ID 换方言
   // 会被后端 422 拒。missingPosTemplates 里同 ID 结构若已是目标形态则直接复用其
   // variants，让 draft 与 clean 两次装配产出相同节点 ID，不产生虚假脏标记。
@@ -1008,6 +1008,53 @@ function variantDialectsMatch(
   );
 }
 
+function grammarVariantEmpty(row: GrammarVariantV3): boolean {
+  return (
+    !row.content.text.trim() &&
+    (row.content.version === 2
+      ? row.content.annotations.length === 0
+      : row.content.spans.length === 0 && row.content.liaisons.length === 0) &&
+    !row.voice_profile &&
+    !row.form_links?.length &&
+    !row.audio_assets?.length
+  );
+}
+
+export function grammarMergeRequiresChoice(
+  grammar: GrammarStructureV3
+): boolean {
+  const uk = grammar.variants.find((row) => row.dialect === "uk");
+  const us = grammar.variants.find((row) => row.dialect === "us");
+  if (grammar.variants.length !== 2 || !uk || !us) return false;
+  if (grammarVariantEmpty(uk) || grammarVariantEmpty(us)) return false;
+  const value = (row: GrammarVariantV3) =>
+    JSON.stringify({
+      content: row.content,
+      voice_profile: row.voice_profile ?? null,
+      form_links: row.form_links ?? []
+    });
+  return value(uk) !== value(us);
+}
+
+export function mergeGrammarVariants(
+  grammar: GrammarStructureV3,
+  side: "uk" | "us",
+  idFactory: () => string
+): GrammarStructureV3 {
+  const source = grammar.variants.find((row) => row.dialect === side)!;
+  return {
+    ...grammar,
+    variants: [
+      {
+        id: idFactory(),
+        dialect: "common",
+        content: cloneRichText(source.content),
+        ...variantSidecars(source)
+      }
+    ]
+  };
+}
+
 /**
  * 返回归一后的 variants；形态已符合或属于无法安全转换的畸形（交给发布校验兜底）
  * 时返回 undefined 表示不动。
@@ -1051,7 +1098,8 @@ function normalizeGrammarVariants(
   const uk = grammar.variants.find((variant) => variant.dialect === "uk");
   const us = grammar.variants.find((variant) => variant.dialect === "us");
   if (grammar.variants.length !== 2 || !uk || !us) return undefined;
-  const source = uk.content.text.trim() ? uk : us;
+  if (grammarMergeRequiresChoice(grammar)) return undefined;
+  const source = grammarVariantEmpty(uk) ? us : uk;
   // 合并时两侧音频都保留（英式在前）；超过单变体上限由面板的「已用」计数与发布校验兜底
   const audioAssets =
     uk.audio_assets === undefined && us.audio_assets === undefined

@@ -1692,6 +1692,76 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(container.querySelector(".word-grammar-add")).toBeNull();
   });
 
+  it.each(["uk", "us"] as const)(
+    "不同英美语法复用原面板选择 %s，取消保留原值，确认只采用所选侧",
+    (side) => {
+      withoutSpeechService();
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.grammar_structures[0]!.variants = (
+        ["uk", "us"] as const
+      ).map((dialect) => ({
+        id: `grammar-${dialect}`,
+        dialect,
+        content: {
+          version: 2,
+          text: dialect === "uk" ? "a centre" : "a center",
+          annotations: []
+        },
+        voice_profile: {
+          voices: [{ voice_id: dialect, enabled: true, rate_percent: 0 }]
+        }
+      }));
+      const before = structuredClone(initial);
+      render(
+        <Harness
+          initial={initial}
+          forms={formsFixture({ pos_id: "pos-1" })}
+          idFactory={() => "new-common-variant"}
+        />
+      );
+      const start = () =>
+        fireEvent.click(
+          screen.getByRole("button", { name: "统一语法结构 1 的英美内容" })
+        );
+      const choose = () =>
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: side === "uk" ? "采用英式内容" : "采用美式内容"
+          })
+        );
+      start();
+      expect(screen.getByRole("button", { name: "确认选择" })).toBeDisabled();
+      choose();
+      fireEvent.click(
+        screen.getByRole("button", { name: "取消统一语法结构 1" })
+      );
+      expect(value()).toEqual(before);
+      expect(
+        screen.queryByRole("button", { name: "采用英式内容" })
+      ).not.toBeInTheDocument();
+      start();
+      choose();
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: side === "uk" ? "使用英式语法内容" : "使用美式语法内容"
+        })
+      );
+      expect(screen.getByLabelText("语法结构 1 英美通用内容")).toHaveValue(
+        side === "uk" ? "a centre" : "a center"
+      );
+      expect(value().pos[0]!.grammar_structures[0]!.variants).toEqual([
+        {
+          ...before.pos[0]!.grammar_structures[0]!.variants.find(
+            (row) => row.dialect === side
+          )!,
+          id: "new-common-variant",
+          dialect: "common"
+        }
+      ]);
+      expect(initial).toEqual(before);
+    }
+  );
+
   it("区分英美式词性的语法结构提供英式美式双栏，新增也按方言建双条", async () => {
     withoutSpeechService();
     const initial = structuredClone(meaningsFixture);

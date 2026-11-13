@@ -12,7 +12,7 @@ import {
   SettingsIcon
 } from "lucide-react";
 import type { SpellingSettingsOpener } from "./V3VoiceTextField";
-import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
 import { Input, Radio } from "@tsz/ui/admin/forms";
 import { Modal } from "@tsz/ui/admin/overlays";
 import { useEffect, useId, useRef, useState } from "react";
@@ -861,7 +861,32 @@ export function V3SynthesisInputs({
             "creation_the_following_result_will_replace_the_existing_content_you_can_undo_it_after_applying"
           )}
         </Typography.Paragraph>
-        <Typography.Paragraph code>{pending?.value}</Typography.Paragraph>
+        <Flex gap="middle" align="stretch">
+          <Flex vertical gap="small" style={{ flex: 1, minWidth: 0 }}>
+            <Typography.Text strong>
+              {t("conversion_current_value")}
+            </Typography.Text>
+            <Input.TextArea
+              aria-label={t("conversion_current_value")}
+              className="tsz-phonetics"
+              readOnly
+              autoSize
+              value={pending?.previous ?? ""}
+            />
+          </Flex>
+          <Flex vertical gap="small" style={{ flex: 1, minWidth: 0 }}>
+            <Typography.Text strong>
+              {t("conversion_proposed_value")}
+            </Typography.Text>
+            <Input.TextArea
+              aria-label={t("conversion_proposed_value")}
+              className="tsz-phonetics"
+              readOnly
+              autoSize
+              value={pending?.value ?? ""}
+            />
+          </Flex>
+        </Flex>
       </Modal>
     </div>
   );

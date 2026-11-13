@@ -489,7 +489,10 @@ function variantMappingFrom(
 }
 
 /** 英美规则按组生效：只转换本组成员词形，同词性其他组的词形与规则原样保留。 */
-function spellingMarksEqual(uk: VariantMapping, us: VariantMapping): boolean {
+export function spellingMarksEqual(
+  uk: Pick<VariantMapping, "spelling" | "spelling_rich" | "spelling_speech">,
+  us: Pick<VariantMapping, "spelling" | "spelling_rich" | "spelling_speech">
+): boolean {
   return (
     spellingSpeechEqual(uk.spelling_speech, us.spelling_speech) &&
     spellingAnnotationsEqual(
@@ -506,7 +509,8 @@ export function normalizeGroupDialectRules(
   rules: DialectRulesV3,
   preferredDialect: "uk" | "us" = "us",
   idFactory: V3IdFactory = defaultIdFactory,
-  stableVariantIds?: V3StableVariantIdFactory
+  stableVariantIds?: V3StableVariantIdFactory,
+  pronunciationSource?: "uk" | "us"
 ): OperationResult<DraftFormsStepContentV3> {
   if (!validDialectRules(rules)) {
     return { ok: false, reason: "invalid_dialect_rules" };
@@ -575,16 +579,18 @@ export function normalizeGroupDialectRules(
     ) {
       if (form.regional_variants.mode === "common") continue;
       if (
+        !pronunciationSource &&
         JSON.stringify(
           variantMappingFrom(form.regional_variants.uk).pronunciations
         ) !==
-        JSON.stringify(
-          variantMappingFrom(form.regional_variants.us).pronunciations
-        )
+          JSON.stringify(
+            variantMappingFrom(form.regional_variants.us).pronunciations
+          )
       ) {
         return { ok: false, reason: "pronunciation_merge_required" };
       }
-      const source = form.regional_variants[preferredDialect];
+      const source =
+        form.regional_variants[pronunciationSource ?? preferredDialect];
       let mergeIdIndex = 0;
       const converted = convertUkUsToCommon(
         form,
