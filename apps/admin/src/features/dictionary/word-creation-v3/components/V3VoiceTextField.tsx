@@ -13,6 +13,7 @@ import type {
   AudioAssetLocaleV3,
   AudioAssetV3,
   Dialect,
+  PhonemeLocaleV3,
   RichTextV2,
   RichTextV3,
   VoiceProfileV3,
@@ -115,6 +116,8 @@ export interface V3VoiceTextFieldProps<
   /** 拼写所有者的来源行共用此入口，不额外挂载字段或音频任务。 */
   spellingSettingsRef?: RefObject<SpellingSettingsOpener | null>;
   spellingSettingsHint?: ReactNode;
+  /** 缺省沿用旧调用方；显式空集合表示拼写仅为未启用候选。 */
+  spellingAudioLocales?: readonly PhonemeLocaleV3[];
   onEditingChange?: (editing: boolean) => void;
   onDraftPendingChange?: (pending: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
@@ -183,6 +186,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   spellingTextOnly = false,
   spellingSettingsRef,
   spellingSettingsHint,
+  spellingAudioLocales,
   onEditingChange,
   onDraftPendingChange,
   onAssociationPendingChange,
@@ -662,13 +666,18 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     content: collapsedContent,
     profile: area ? withDefaultVoiceProfile(voiceProfile, area) : voiceProfile,
     adapter: collapsedAdapter,
-    locale: voiceLocale(dialect),
+    activeLocales: spellingAudioLocales,
+    locale:
+      spellingAudioLocales?.length === 1
+        ? spellingAudioLocales[0]
+        : voiceLocale(dialect),
     enabled:
       env.VOICE_EDITOR &&
       env.VOICE_PREVIEW &&
       canGenerateAudio &&
       !voicePreviewIsMock &&
       editingEnabled &&
+      (!spellingAudioLocales || spellingAudioLocales.length > 0) &&
       (!expanded || settingsCommitting) &&
       !readOnly &&
       !contentReadOnly &&

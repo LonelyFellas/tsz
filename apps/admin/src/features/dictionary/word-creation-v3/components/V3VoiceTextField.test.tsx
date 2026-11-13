@@ -2609,6 +2609,104 @@ it("首次正文的目录加载失败不能按历史缺省 profile 绕过整次�
   expect(persist).not.toHaveBeenCalled();
 });
 
+it("未启用的拼写设置可保存且不生成正式音频，启用后才补齐", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const generateAudio = vi.fn().mockResolvedValue({ id: "activated-spelling" });
+  const audioTasks = new Map<string, () => Promise<boolean>>();
+  const persisted = vi.fn();
+  function Host() {
+    const opener = useRef<SpellingSettingsOpener | null>(null);
+    const [active, setActive] = useState(false);
+    const [value, setValue] = useState<RichTextV3>({
+      ...VALUE,
+      annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+    });
+    const [profile, setProfile] = useState<VoiceProfileV3>({
+      dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } },
+      voices: [
+        {
+          voice_id: "sonia",
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "cached-spelling"
+        }
+      ]
+    });
+    const latest = useRef({ value, profile });
+    latest.current = { value, profile };
+    return (
+      <VoiceSaveContext.Provider
+        value={{
+          audioTasks,
+          save: async () => {
+            for (const wait of audioTasks.values())
+              if (!(await wait())) return false;
+            persisted(structuredClone(latest.current));
+            return true;
+          }
+        }}
+      >
+        <button onClick={() => opener.current?.({ dialect: "uk" })}>
+          候选拼写设置
+        </button>
+        <button onClick={() => setActive(true)}>启用拼写来源</button>
+        <V3VoiceTextField
+          mode="spelling"
+          value={value}
+          nodeId="inactive-spelling-owner"
+          field="spelling"
+          ariaLabel="未启用拼写"
+          spellingSettingsRef={opener}
+          spellingAudioLocales={active ? ["en-GB"] : []}
+          voiceProfile={profile}
+          onVoiceProfileChange={setProfile}
+          onCommit={(result) => {
+            setValue(result.value);
+            setProfile(result.voiceProfile!);
+          }}
+          onChange={setValue}
+          previewAdapter={{
+            listVoices: state.listVoices,
+            synthesize: state.synthesize,
+            generateAudio
+          }}
+        />
+      </VoiceSaveContext.Provider>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByText("候选拼写设置"));
+  fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
+  fireEvent.click(screen.getByLabelText("停顿 1 秒"));
+  const save = screen.getByRole("button", {
+    name: "保存未启用拼写修改",
+    exact: true
+  });
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+  await waitFor(() => expect(persisted).toHaveBeenCalledOnce());
+  expect(persisted.mock.calls[0]![0].value.annotations).toEqual([
+    { type: "pause", at: 5, duration_ms: 1000 }
+  ]);
+  expect(
+    persisted.mock.calls[0]![0].profile.voices[0].audio_asset_id
+  ).toBeUndefined();
+  expect(generateAudio).not.toHaveBeenCalled();
+  expect(audioTasks.size).toBe(0);
+  fireEvent.click(screen.getByText("启用拼写来源"));
+  await waitFor(() => expect(generateAudio).toHaveBeenCalledOnce());
+  expect(generateAudio).toHaveBeenCalledWith(
+    expect.objectContaining({
+      content: expect.objectContaining({
+        annotations: [{ type: "pause", at: 5, duration_ms: 1000 }]
+      }),
+      setting: expect.objectContaining({ locale: "en-GB" })
+    }),
+    expect.anything()
+  );
+});
+
 it("来源设置复用拼写字段，打开不生成音频或物化继承，取消恢复唯一的折叠任务", async () => {
   state.flags.VOICE_PREVIEW = true;
   const initial: VoiceProfileV3 = {

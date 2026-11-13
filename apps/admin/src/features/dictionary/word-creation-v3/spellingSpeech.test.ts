@@ -1,9 +1,84 @@
 import { expect, it } from "vitest";
 import type { AudioAssetV3, VoiceProfileV3 } from "@tsz/types";
 import { withDefaultVoiceProfile } from "@tsz/voice-editor/core";
-import { mergeSpellingSettings } from "./spellingSpeech";
+import { mergeSpellingSettings, spellingAudioLocales } from "./spellingSpeech";
+import { pronunciationFixture } from "./fixtures";
 
 const value = { version: 2 as const, text: "hello there", annotations: [] };
+
+it("拼写任务聚合所有共享读法的活动口音并保留旧协议资产要求", () => {
+  const first = pronunciationFixture({
+    synthesis: {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      uk: { source: "none", ipa: "", ups: "" },
+      us: { source: "spelling", ipa: "", ups: "" }
+    }
+  });
+  const common = { dialect: "common" as const, pronunciations: [first] };
+  expect(spellingAudioLocales([common])).toEqual(["en-US"]);
+  const second = pronunciationFixture({
+    synthesis: {
+      ...first.synthesis!,
+      uk: { source: "spelling", ipa: "", ups: "" }
+    }
+  });
+  expect(
+    spellingAudioLocales([{ ...common, pronunciations: [first, second] }])
+  ).toEqual(["en-GB", "en-US"]);
+  expect(spellingAudioLocales([{ ...common, dialect: "uk" }])).toEqual([]);
+  expect(
+    spellingAudioLocales([
+      { dialect: "common", pronunciations: [pronunciationFixture()] }
+    ])
+  ).toEqual(["en-GB", "en-US"]);
+});
+
+it("修改未启用拼写的音色参数也清除对应旧音频，不影响另一侧", () => {
+  const profile: VoiceProfileV3 = {
+    voices: [
+      {
+        voice_id: "uk",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: 0,
+        audio_asset_id: "old-uk"
+      },
+      {
+        voice_id: "us",
+        locale: "en-US",
+        enabled: true,
+        rate_percent: 0,
+        audio_asset_id: "kept-us"
+      }
+    ]
+  };
+  const merged = mergeSpellingSettings(
+    { value, voiceProfile: profile },
+    { value, voiceProfile: profile },
+    {
+      value,
+      voiceProfile: {
+        voices: profile.voices.map((voice) =>
+          voice.locale === "en-GB" ? { ...voice, rate_percent: -20 } : voice
+        )
+      }
+    },
+    "uk"
+  );
+  expect(
+    merged.voiceProfile?.voices.find((voice) => voice.locale === "en-GB")
+  ).toMatchObject({ rate_percent: -20 });
+  expect(
+    merged.voiceProfile?.voices.find((voice) => voice.locale === "en-GB")
+      ?.audio_asset_id
+  ).toBeUndefined();
+  expect(
+    merged.voiceProfile?.voices.find((voice) => voice.locale === "en-US")
+      ?.audio_asset_id
+  ).toBe("kept-us");
+});
 const asset = (id: string, locale: "en-GB" | "en-US"): AudioAssetV3 => ({
   id,
   locale,

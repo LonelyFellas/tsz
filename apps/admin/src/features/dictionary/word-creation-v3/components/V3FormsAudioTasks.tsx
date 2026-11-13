@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { synthesisForLocale, speechAccentGroup } from "@tsz/shared";
+import { synthesisForLocale } from "@tsz/shared";
 import type {
   Dialect,
+  PhonemeLocaleV3,
   FormContentVariantV3,
   SharedFormsStepContentV3,
   VoiceProfileV3,
@@ -17,31 +18,35 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
-import {
-  toRichTextV2,
-  voiceSettingKey,
-  withDefaultVoiceProfile
-} from "@tsz/voice-editor/core";
+import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
+import { spellingAudioLocales } from "../spellingSpeech";
 import type { VoiceOption } from "@tsz/voice-editor/types";
 import { flushSync } from "react-dom";
 import { useVoiceAudioTasks } from "../voiceSaveContext";
 
 function variants(forms: SharedFormsStepContentV3) {
-  return forms.contents.flatMap<{
-    variant: FormContentVariantV3;
-    dialect: Dialect;
-  }>((content) => {
-    const regions = content.regional_variants;
-    if (regions.mode === "common")
-      return [{ variant: regions.common, dialect: "common" as const }];
-    return (["uk", "us"] as const).flatMap((dialect) =>
-      (regions.mode === "uk_us_many"
-        ? regions[dialect]
-        : [regions[dialect]]
-      ).map((variant) => ({ variant, dialect }))
-    );
-  });
+  return forms.contents
+    .flatMap<{
+      variant: FormContentVariantV3;
+      dialect: Dialect;
+    }>((content) => {
+      const regions = content.regional_variants;
+      if (regions.mode === "common")
+        return [{ variant: regions.common, dialect: "common" as const }];
+      return (["uk", "us"] as const).flatMap((dialect) =>
+        (regions.mode === "uk_us_many"
+          ? regions[dialect]
+          : [regions[dialect]]
+        ).map((variant) => ({ variant, dialect }))
+      );
+    })
+    .map((item) => ({
+      ...item,
+      spellingLocales: spellingAudioLocales([
+        { ...item.variant, dialect: item.dialect }
+      ])
+    }));
 }
 
 /** 汇总表没有挂载字段编辑器；在这里承接词典带入、复制和载入的已选配音。 */
@@ -73,10 +78,13 @@ export function V3FormsAudioTasks({
   const needsCatalog =
     !rowOnly &&
     variants(forms).some(({ variant }) =>
-      variant.pronunciations.some((row) =>
-        row.voice_profile?.voices.some(
-          (setting) => setting.enabled && !setting.locale
-        )
+      variant.pronunciations.some(
+        (row) =>
+          !row.synthesis?.uk?.source &&
+          !row.synthesis?.us?.source &&
+          row.voice_profile?.voices.some(
+            (setting) => setting.enabled && !setting.locale
+          )
       )
     );
   useEffect(() => {
@@ -150,9 +158,10 @@ export function V3FormsAudioTasks({
           }
         />
       )}
-      {variants(forms).map(({ variant, dialect }) => (
+      {variants(forms).map(({ variant, dialect, spellingLocales }) => (
         <div key={variant.id}>
           {!rowOnly &&
+            spellingLocales.length > 0 &&
             (variant.spelling_speech ||
               variant.pronunciations.some(
                 (row) =>
@@ -170,13 +179,10 @@ export function V3FormsAudioTasks({
                   }
                 }
                 profile={variant.spelling_speech?.voice_profile}
+                activeLocales={spellingLocales}
                 recommendationArea="word"
                 locale={
-                  dialect === "common"
-                    ? undefined
-                    : dialect === "uk"
-                      ? "en-GB"
-                      : "en-US"
+                  spellingLocales.length === 1 ? spellingLocales[0] : undefined
                 }
                 enabled={ready}
                 onChange={(voice_profile) =>
@@ -199,23 +205,9 @@ export function V3FormsAudioTasks({
             const explicitSources = !!(
               synthesis?.uk?.source || synthesis?.us?.source
             );
-            const activeLocales = (["en-GB", "en-US"] as const).filter(
-              (locale) => {
-                if (
-                  dialect !== "common" &&
-                  (locale === "en-GB" ? "uk" : "us") !== dialect
-                )
-                  return false;
-                const selected =
-                  synthesis && synthesisForLocale(synthesis, locale, dialect);
-                return (
-                  selected?.source !== "none" && selected?.source !== "upload"
-                );
-              }
-            );
-            const rowAudio = pronunciation.voice_profile
-              ? (explicitSources ? activeLocales : [undefined]).map(
-                  (locale) => {
+            const rowAudio =
+              pronunciation.voice_profile && !explicitSources
+                ? [undefined].map((locale) => {
                     const profile = pronunciation.voice_profile!;
                     const scoped = {
                       ...profile,
@@ -224,13 +216,6 @@ export function V3FormsAudioTasks({
                           setting.locale ??
                           catalog.find((voice) => voice.id === setting.voice_id)
                             ?.locale;
-                        if (
-                          locale &&
-                          native &&
-                          speechAccentGroup(native, setting.accent) !==
-                            speechAccentGroup(locale)
-                        )
-                          return [];
                         return [
                           native
                             ? { ...setting, locale: native as `en-${string}` }
@@ -262,39 +247,13 @@ export function V3FormsAudioTasks({
                               (item) => item.id === pronunciation.id
                             );
                             if (!row?.voice_profile) return;
-                            if (!locale) {
-                              row.voice_profile = voice_profile;
-                              return;
-                            }
-                            const replacements = new Map(
-                              voice_profile.voices.map((item) => [
-                                voiceSettingKey(item),
-                                item
-                              ])
-                            );
-                            const oldKeys = new Set(
-                              row.voice_profile.voices.map(voiceSettingKey)
-                            );
-                            row.voice_profile = {
-                              ...row.voice_profile,
-                              voices: [
-                                ...row.voice_profile.voices.map(
-                                  (item) =>
-                                    replacements.get(voiceSettingKey(item)) ??
-                                    item
-                                ),
-                                ...voice_profile.voices.filter(
-                                  (item) => !oldKeys.has(voiceSettingKey(item))
-                                )
-                              ]
-                            };
+                            row.voice_profile = voice_profile;
                           })
                         }
                       />
                     );
-                  }
-                )
-              : [];
+                  })
+                : [];
             if (rowOnly || !synthesis) return rowAudio;
             const phonemes = (["uk", "us"] as const)
               .filter((side) => dialect === "common" || dialect === side)
@@ -374,13 +333,15 @@ function TextAudioTask({
   enabled,
   onChange,
   recommendationArea,
-  locale
+  locale,
+  activeLocales
 }: {
   target: string;
   content: RichTextV2;
   profile?: VoiceProfileV3;
   recommendationArea?: "word";
   locale?: `en-${string}`;
+  activeLocales?: readonly PhonemeLocaleV3[];
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
 }) {
@@ -394,6 +355,7 @@ function TextAudioTask({
     profile: effectiveProfile,
     adapter: adminVoicePreviewAdapter,
     locale,
+    activeLocales,
     enabled,
     defer: effectiveProfile !== profile,
     onChange

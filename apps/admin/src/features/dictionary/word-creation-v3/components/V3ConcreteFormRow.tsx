@@ -44,7 +44,7 @@ import {
   updateFormRegularity,
   type V3IdFactory
 } from "../operations";
-import { spellingEditorValue } from "../spellingSpeech";
+import { spellingAudioLocales, spellingEditorValue } from "../spellingSpeech";
 import { variantRegularity } from "../model";
 import { dialectLabel } from "../presentation";
 import { spellingConflictReferences } from "../referenceGuard";
@@ -444,6 +444,7 @@ function V3DialectFormCell({
         <V3VoiceTextField
           mode="spelling"
           spellingTextOnly
+          spellingAudioLocales={spellingAudioLocales([variant])}
           spellingSettingsRef={spellingSettingsRef}
           spellingSettingsHint={
             <SpellingSettingsHint
@@ -940,6 +941,7 @@ export function V3ConcreteFormRow({
               <V3VoiceTextField
                 mode="spelling"
                 spellingTextOnly
+                spellingAudioLocales={spellingAudioLocales(variants)}
                 spellingSettingsRef={spellingSettingsRef}
                 spellingSettingsHint={
                   <SpellingSettingsHint
@@ -1068,6 +1070,7 @@ export function V3ConcreteFormRow({
               <V3VoiceTextField
                 mode="spelling"
                 spellingTextOnly
+                spellingAudioLocales={spellingAudioLocales(variants)}
                 spellingSettingsRef={spellingSettingsRef}
                 spellingSettingsHint={
                   <SpellingSettingsHint

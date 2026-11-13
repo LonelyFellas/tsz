@@ -332,12 +332,16 @@ it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续�
   variant.common.pronunciations[0]!.voice_profile = {
     voices: voices.map(({ locale: _locale, ...setting }) => setting)
   };
-  speech.catalog.mockRejectedValueOnce(new Error("目录暂不可用"));
+  speech.catalog.mockRejectedValue(new Error("目录暂不可用"));
   render(<Host initial={forms} />);
-  await screen.findByText("目录暂不可用");
+  expect(await screen.findAllByText("目录暂不可用")).not.toHaveLength(0);
   expect(await tasks.get("forms:audio-catalog")!()).toBe(false);
   expect(speech.generate).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "重试生成音频" }));
+  speech.catalog.mockResolvedValue(
+    voices.map((setting) => ({ id: setting.voice_id, locale: setting.locale }))
+  );
+  for (const retry of screen.getAllByRole("button", { name: "重试生成音频" }))
+    fireEvent.click(retry);
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   expect(screen.getByTestId("saved-forms")).toHaveTextContent(
     "formal-phoneme-en-US"
@@ -367,6 +371,45 @@ it("词形拼写来源只补缺失的已选音频，不生成未启用的音标�
     })
   );
 });
+
+it.each([false, true])(
+  "显式来源下未启用的拼写口音不生成，活动美式=%s",
+  async (activeUs) => {
+    const forms = fixture();
+    const variants = forms.contents[0]!.regional_variants;
+    if (variants.mode !== "common") throw new Error("expected common fixture");
+    const variant = variants.common;
+    variant.spelling_speech = {
+      content: { version: 2, text: "hello", annotations: [] },
+      voice_profile: { voices: structuredClone(voices) }
+    };
+    const row = variant.pronunciations[0]!;
+    row.synthesis!.uk!.source = "none";
+    row.synthesis!.us!.source = activeUs ? "spelling" : "none";
+    row.voice_profile = {
+      voices: voices.map(({ locale: _locale, ...voice }) => voice)
+    };
+    render(<Host initial={forms} />);
+    await act(async () => {
+      for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
+    });
+    expect(speech.generate).toHaveBeenCalledTimes(activeUs ? 1 : 0);
+    expect(speech.catalog).not.toHaveBeenCalled();
+    if (activeUs)
+      expect(speech.generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: expect.objectContaining({ kind: "text" }),
+          setting: expect.objectContaining({ locale: "en-US" })
+        })
+      );
+    const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+      .contents[0].regional_variants.common;
+    expect(
+      saved.spelling_speech.voice_profile.voices[0].audio_asset_id
+    ).toBeUndefined();
+    expect(saved.pronunciations[0].synthesis.uk.source).toBe("none");
+  }
+);
 
 it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来源之间不混用", async () => {
   const forms = fixture();
@@ -418,7 +461,7 @@ it.each(["none", "upload"] as const)(
     };
     const british = structuredClone(row.voice_profile!.voices[0]!);
     render(<Host initial={forms} />);
-    await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(screen.getByTestId("saved-forms")).toHaveTextContent(
         "formal-phoneme-en-US"
