@@ -14,8 +14,12 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Outlet, useMatch } from "react-router-dom";
 import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
+import { AdminConnectionStatus } from "@/features/auth/AdminConnectionStatus";
 
-export type RootOutletContext = { connectionNotice: ReactNode };
+export type RootOutletContext = {
+  connectionNotice: ReactNode;
+  connectionStatus: ReactNode;
+};
 
 // 单例 QueryClient：全局唯一，避免每次渲染重建缓存。默认项（staleTime 等）取自
 // @tsz/shared 的 browserQueryDefaults，与 web 共用同一份，避免两处漂移。
@@ -27,6 +31,7 @@ bindAdminAuthorizationCache(useAuthStore, queryClient);
 export function RootProviders({ children }: { children?: ReactNode }) {
   const { t } = useAdminTranslation();
   const isLoginPage = useMatch("/login") !== null;
+  const isChangePasswordPage = useMatch("/change-password") !== null;
   const permissionModelIncompatible = useAuthStore(
     (s) => s.permissionModelIncompatible
   );
@@ -61,6 +66,7 @@ export function RootProviders({ children }: { children?: ReactNode }) {
   const refreshUnconfirmed = useAuthStore((s) => s.refreshUnconfirmed);
   const connectionError = useAuthStore((s) => s.connectionError);
   const hydrated = useAuthStore((s) => s.hydrated);
+  const hasProfile = useAuthStore((s) => !!s.profile);
   const localeReady = useAdminLocaleReady();
   const connectionNotice = !permissionModelIncompatible &&
     (connectionError || refreshUnconfirmed) && (
@@ -112,10 +118,24 @@ export function RootProviders({ children }: { children?: ReactNode }) {
           {permissionModelIncompatible && !isLoginPage && (
             <Alert type="error" showIcon title={t("auth_upgrade")} />
           )}
-          {!isLoginPage && connectionNotice}
+          {!isLoginPage &&
+            (isChangePasswordPage || !hydrated || !hasProfile || children) &&
+            connectionNotice}
           {children ?? (
             <Outlet
-              context={{ connectionNotice } satisfies RootOutletContext}
+              context={
+                {
+                  connectionNotice,
+                  connectionStatus: !permissionModelIncompatible && (
+                    <AdminConnectionStatus
+                      connectionError={connectionError}
+                      refreshUnconfirmed={refreshUnconfirmed}
+                      retrying={retrying}
+                      onRetry={() => void retry()}
+                    />
+                  )
+                } satisfies RootOutletContext
+              }
             />
           )}
         </FeedbackApp>

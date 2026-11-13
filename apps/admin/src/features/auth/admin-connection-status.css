@@ -1,0 +1,66 @@
+.admin-connection__trigger.ui-btn {
+  flex-shrink: 0;
+  gap: var(--ui-space-2);
+  min-width: 120px;
+  color: var(--ui-color-warning);
+  background: var(--ui-color-warning-bg);
+  font-size: var(--ui-font-size-compact);
+  white-space: nowrap;
+}
+
+.admin-connection__trigger.ui-btn:hover,
+.admin-connection__trigger.ui-btn[aria-expanded="true"] {
+  color: var(--ui-color-warning);
+  background: var(--ui-color-warning-bg);
+  border-color: var(--ui-color-warning-border);
+}
+
+.admin-connection__trigger.ui-btn[data-state="connected"] {
+  color: var(--ui-color-text-secondary);
+  background: var(--ui-color-fill-alter);
+  border-color: transparent;
+}
+
+.admin-connection__trigger.ui-btn[data-state="connecting"] {
+  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-bg);
+  border-color: transparent;
+}
+
+.admin-connection__popover.ui-popover-container {
+  box-sizing: border-box;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: var(--ui-space-5);
+}
+
+.admin-connection__title {
+  margin: 0 0 var(--ui-space-2);
+  font-size: var(--ui-font-size-section);
+  font-weight: 600;
+}
+
+.admin-connection__description {
+  margin: 0 0 var(--ui-space-4);
+  color: var(--ui-color-text-secondary);
+}
+
+.admin-connection__description:last-child {
+  margin-bottom: 0;
+}
+
+.admin-connection__trigger .admin-connection__spinner {
+  animation: admin-connection-spin 1s linear infinite;
+}
+
+@keyframes admin-connection-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-connection__trigger .admin-connection__spinner {
+    animation: none;
+  }
+}

@@ -15,7 +15,7 @@ function Lines({
       {rows.map((row) => (
         <li key={row.id}>
           <span className="lexicon-next-muted">
-            {localeLabels[row.locale]}：
+            {localeLabels[row.locale] ?? row.locale}：
           </span>
           <span className={textClassName}>{row.text || "（空白）"}</span>
         </li>

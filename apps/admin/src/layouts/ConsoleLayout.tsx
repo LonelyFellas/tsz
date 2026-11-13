@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useOutletContext } from "react-router-dom";
+import type { RootOutletContext } from "@/providers";
 import { AdminHeader } from "@/features/auth/AdminHeader";
 import { BusinessPermissionGuard } from "@/features/auth/BusinessPermissionGuard";
 import { adminAccountIdentity } from "@/lib/adminAuthorization";
@@ -24,6 +25,7 @@ export const CONSOLE_HEADER_Z_INDEX = 100;
 
 export function ConsoleLayout() {
   const { t } = useAdminTranslation();
+  const rootContext = useOutletContext<RootOutletContext | undefined>();
   const identity = useAuthStore((s) => adminAccountIdentity(s.profile));
   const { pathname } = useLocation();
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -103,9 +105,7 @@ export function ConsoleLayout() {
                 </Dialog.Trigger>
               </div>
               <div className="console-header-account">
-                <span className="console-platform-label">
-                  {t("nav_platform")}
-                </span>
+                {rootContext?.connectionStatus}
                 <AdminHeader />
               </div>
             </header>

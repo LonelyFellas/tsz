@@ -39,6 +39,7 @@ import { MeaningsStep } from "@/features/lexicon-next/MeaningsStep";
 import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
   draftProblem,
+  initialTargetLocale,
   localeLabels,
   previewDraft
 } from "@/features/lexicon-next/model";
@@ -233,8 +234,10 @@ function EntryEditor({
     },
     []
   );
-  const [target, setTarget] = useState("en-GB");
-  const [medium, setMedium] = useState("zh-Hans");
+  const [target, setTarget] = useState(() =>
+    initialTargetLocale(initial.draft, language)
+  );
+  const [medium, setMedium] = useState(language.medium_locales[0]!);
   const [common, setCommon] = useState(false);
   const [saving, setBusy] = useState(false);
   const busy = saving;
@@ -496,6 +499,7 @@ function EntryEditor({
                       value={draft.form_editor ?? emptyEditor}
                       saved={saved.draft.form_editor}
                       kind={saved.kind}
+                      locale={target === "en-US" ? "en-US" : "en-GB"}
                       issues={formIssues}
                       onChange={(form_editor) =>
                         setDraft((current) => ({ ...current, form_editor }))

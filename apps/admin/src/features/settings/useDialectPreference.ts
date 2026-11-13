@@ -4,7 +4,8 @@
 // 之所以不再自建共享状态：偏好是**跨屏读取**的（创建向导四步、只读预览、语音发音人
 // locale 都要读同一个值），而 profile 本身就在 auth store 里——把偏好挂在 profile 上，
 // 一次 setProfile 就让所有订阅者同步，比再维护一份模块级快照少一处会漂移的真相。
-import { useCallback, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
+import type { PhonemeLocaleV3 } from "@tsz/types";
 import {
   createDialectPreferenceCache,
   resolveDialectPreference,
@@ -19,6 +20,9 @@ const cache = createDialectPreferenceCache({
   }
 });
 
+/** 新词库复用旧编辑器时，通用内容的口音由当前词条决定，不读取账号偏好。 */
+export const EntryDialectContext = createContext<PhonemeLocaleV3 | null>(null);
+
 export interface DialectPreferenceHandle {
   preference: AdminDialectPreference;
   /** 保存失败时抛错；调用方负责提示，显示值因 profile 未更新而自动停在原值。 */
@@ -26,18 +30,27 @@ export interface DialectPreferenceHandle {
 }
 
 export function useDialectPreference(): DialectPreferenceHandle {
+  const entryLocale = useContext(EntryDialectContext);
   const profile = useAuthStore((s) => s.profile);
   const setProfile = useAuthStore((s) => s.setProfile);
   const adminProfileId = profile?.id;
-  const serverPreference = profile?.preferences?.dialect;
+  const serverPreference = entryLocale
+    ? undefined
+    : profile?.preferences?.dialect;
 
   const preference = useMemo(
     () =>
-      resolveDialectPreference(
-        serverPreference,
-        adminProfileId === undefined ? undefined : cache.read(adminProfileId)
-      ),
-    [adminProfileId, serverPreference]
+      entryLocale
+        ? entryLocale === "en-GB"
+          ? "uk"
+          : "us"
+        : resolveDialectPreference(
+            serverPreference,
+            adminProfileId === undefined
+              ? undefined
+              : cache.read(adminProfileId)
+          ),
+    [entryLocale, adminProfileId, serverPreference]
   );
 
   const savePreference = useCallback(

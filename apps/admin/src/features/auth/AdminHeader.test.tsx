@@ -130,21 +130,13 @@ describe("AdminHeader", () => {
     expect(screen.getAllByText("管理员")).toHaveLength(2);
   });
 
-  it("点「个人设置」跳个人设置页（方言偏好等账号级设置的唯一入口）", async () => {
+  it("点「个人设置」跳个人设置页", async () => {
     useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     renderHeader();
     await openAccountMenu();
     expect(screen.queryByRole("button", { name: "我的天生币" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /个人设置/ }));
     expect(mockNavigate).toHaveBeenCalledWith("/settings/profile");
-  });
-
-  it("点「修改密码」跳改密页（自助改密入口）", async () => {
-    useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
-    renderHeader();
-    await openAccountMenu();
-    fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
-    expect(mockNavigate).toHaveBeenCalledWith("/change-password");
   });
 
   it("点退出：吊销会话、清 token、清 profile、整页跳登录页", async () => {

@@ -154,6 +154,25 @@ function mount(
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
 
+it("列表保留词条自身的非英语地区信息，不标成美式拼写", async () => {
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [
+      listRow({
+        target_language: "fr",
+        forms: [{ id: "fr-ca", locale: "fr-CA", text: "centre" }]
+      })
+    ],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next");
+  const label = new Intl.DisplayNames(["zh-Hans"], { type: "language" }).of(
+    "fr-CA"
+  )!;
+  expect(await screen.findByText(label)).toBeVisible();
+  expect(screen.queryByRole("img", { name: /美式/ })).toBeNull();
+});
+
 it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保留独立创建", async () => {
   const api = requests();
   const archivedId = "00000000-0000-4000-8000-000000000002";
@@ -499,6 +518,37 @@ beforeEach(() => {
   });
 });
 describe("新版词库手工闭环", () => {
+  it.each(["uk", "us"] as const)(
+    "账号偏好为 %s 时仍按词条已有方言打开，词条内切换不改账号偏好",
+    async (dialect) => {
+      useAuthStore.setState({
+        profile: {
+          ...useAuthStore.getState().profile!,
+          preferences: { dialect }
+        }
+      });
+      const api = requests();
+      api.get.mockResolvedValue({
+        ...entry,
+        draft: {
+          ...entry.draft,
+          forms: [{ id: "us-form", locale: "en-US", text: "center" }]
+        }
+      });
+      mount(api);
+      await screen.findByDisplayValue("centre");
+      fireEvent.click(button(/^词义与译词/));
+      expect(screen.getByRole("radio", { name: "美式英语" })).toBeChecked();
+      fireEvent.click(screen.getByRole("radio", { name: "英式英语" }));
+      expect(useAuthStore.getState().profile?.preferences.dialect).toBe(
+        dialect
+      );
+      fireEvent.click(button(/^词性与发音/));
+      fireEvent.click(button(/^词义与译词/));
+      expect(screen.getByRole("radio", { name: "英式英语" })).toBeChecked();
+    }
+  );
+
   it("切换四组合保留全部未保存内容和义项身份，完整保存；预览不回写本地稿", async () => {
     const api = requests();
     api.get.mockResolvedValue({

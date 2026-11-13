@@ -94,34 +94,6 @@ export const adminShellMessages = {
     "儲存失敗：{{detail}}",
     "Could not save: {{detail}}"
   ],
-  settings_session_changed: [
-    "当前会话已变化，请重试",
-    "目前的登入狀態已變更，請重試",
-    "Your session has changed. Try again."
-  ],
-  settings_session_expired: [
-    "当前会话已失效，请重新登录",
-    "目前的登入狀態已失效，請重新登入",
-    "Your session is no longer valid. Sign in again."
-  ],
-  settings_english: ["英语偏好", "英語偏好", "English preference"],
-  settings_english_help: [
-    "用于录入、查看和试听。",
-    "用於輸入、檢視和試聽。",
-    "Used for editing, viewing and audio previews."
-  ],
-  settings_british: ["英式英语", "英式英語", "British English"],
-  settings_american: ["美式英语", "美式英語", "American English"],
-  settings_british_label: [
-    "英式（BrE）",
-    "英式（BrE）",
-    "British English (BrE)"
-  ],
-  settings_american_label: [
-    "美式（AmE）",
-    "美式（AmE）",
-    "American English (AmE)"
-  ],
   login_platform: ["内容管理平台", "內容管理平台", "Content management"],
   login_title: ["管理员登录", "管理員登入", "Administrator sign-in"],
   login_phone: ["手机号", "手機號碼", "Phone number"],
@@ -320,23 +292,62 @@ export const adminShellMessages = {
     "Connection unavailable"
   ],
   recovery_uncertain: [
-    "会话刷新结果尚未确认，请重新登录；当前操作请先查看结果",
-    "無法確認登入更新結果，請重新登入；目前操作請先確認結果",
-    "Could not confirm the session refresh. Sign in again and check the result of your last action."
+    "需要重新登录。最近一次操作是否成功，请登录后查看。",
+    "需要重新登入。最近一次操作是否成功，請登入後查看。",
+    "Sign in again, then check whether your last action succeeded."
   ],
   recovery_disconnected: [
-    "连接暂时中断，联网后将自动恢复；当前内容已保留",
-    "連線暫時中斷，連線後將自動恢復；目前內容已保留",
-    "Connection lost. Your content is preserved; reconnection will be automatic."
+    "暂时无法连接，请稍后重试。",
+    "暫時無法連線，請稍後重試。",
+    "Can't connect right now. Try again shortly."
   ],
   recovery_connecting: [
-    "正在恢复连接，联网后将自动继续",
-    "正在恢復連線，連線後將自動繼續",
-    "Reconnecting. Work will resume when the connection returns."
+    "正在连接，请稍候。",
+    "正在連線，請稍候。",
+    "Connecting. Please wait."
   ],
   recovery_sign_in: ["重新登录", "重新登入", "Sign in again"],
   recovery_retry: ["重试", "重試", "Retry"],
   recovery_retry_connection: ["重试连接", "重試連線", "Reconnect"],
+  connection_offline: ["离线", "離線", "Offline"],
+  connection_offline_title: ["网络已断开", "網路已中斷", "You're offline"],
+  connection_offline_help: [
+    "可以继续编辑，联网后再保存。未保存前，请勿关闭页面。",
+    "可以繼續編輯，連線後再儲存。未儲存前，請勿關閉頁面。",
+    "You can keep editing and save when you're back online. Keep this page open if you have unsaved changes."
+  ],
+  connection_unavailable: ["无法连接", "無法連線", "Can't connect"],
+  connection_unavailable_title: [
+    "暂时无法连接",
+    "暫時無法連線",
+    "Can't connect right now"
+  ],
+  connection_unavailable_help: [
+    "可以继续编辑，请稍后重试。未保存前，请勿关闭页面。",
+    "可以繼續編輯，請稍後重試。未儲存前，請勿關閉頁面。",
+    "You can keep editing. Try again shortly, and keep this page open if you have unsaved changes."
+  ],
+  connection_connecting: ["正在连接…", "正在連線…", "Connecting…"],
+  connection_connecting_title: ["正在连接…", "正在連線…", "Connecting…"],
+  connection_connecting_help: [
+    "可以继续编辑，请稍候。",
+    "可以繼續編輯，請稍候。",
+    "You can keep editing while you wait."
+  ],
+  connection_connected: ["已连接", "已連線", "Connected"],
+  connection_connected_title: ["已连接", "已連線", "Connected"],
+  connection_connected_help: [
+    "可以保存当前修改。",
+    "可以儲存目前的修改。",
+    "You can save your changes."
+  ],
+  connection_sign_in: ["请重新登录", "請重新登入", "Sign in again"],
+  connection_sign_in_title: ["需要重新登录", "需要重新登入", "Sign in again"],
+  connection_sign_in_help: [
+    "请重新登录。最近一次操作是否成功，请登录后查看。",
+    "請重新登入。最近一次操作是否成功，請登入後查看。",
+    "Sign in again, then check whether your last action succeeded."
+  ],
   error_permission_title: ["没有访问权限", "沒有存取權限", "Access denied"],
   error_permission_help: [
     "请联系超级管理员开通权限。你仍可查看首页和个人设置。",

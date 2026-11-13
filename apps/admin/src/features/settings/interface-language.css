@@ -1,9 +1,6 @@
 .admin-language {
   min-width: 0;
 }
-.admin-language + .settings-row {
-  margin-top: var(--ui-space-6);
-}
 .admin-language__control {
   width: 220px;
   max-width: 100%;

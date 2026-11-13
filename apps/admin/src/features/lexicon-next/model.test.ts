@@ -1,7 +1,61 @@
 import { describe, expect, it } from "vitest";
-import type { NextDraft } from "@tsz/types";
-import { previewDraft, draftProblem } from "./model";
+import type { NextDraft, NextLanguageCapability } from "@tsz/types";
+import { previewDraft, draftProblem, initialTargetLocale } from "./model";
 describe("本地草稿预览", () => {
+  it("预览按所选语言寻找通用内容，不拿通用英语补齐其他语言", () => {
+    const draft: NextDraft = {
+      schema_version: 1,
+      headword: "centre",
+      forms: [{ id: "english", locale: "en", text: "center" }],
+      senses: [
+        { id: "sense", part_of_speech: null, definitions: [], equivalents: [] }
+      ]
+    };
+    expect(previewDraft(draft, "fr-CA", "zh-Hans").missing_forms).toBe(true);
+    draft.forms.push({ id: "french", locale: "fr", text: "centre" });
+    expect(previewDraft(draft, "fr-CA", "zh-Hans").forms).toEqual([
+      draft.forms[1]
+    ]);
+  });
+
+  it("初始方言先取已有词形，再取释义，空稿使用当前语言能力提供的顺序", () => {
+    const language: NextLanguageCapability = {
+      target_language: "en",
+      target_locales: ["en-GB", "en-US"],
+      medium_locales: ["zh-Hans"],
+      common_target_locale: "en",
+      part_of_speech_codes: []
+    };
+    const draft: NextDraft = {
+      schema_version: 1,
+      headword: "center",
+      forms: [{ id: "us", locale: "en-US", text: "center" }],
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: null,
+          definitions: [
+            { id: "uk", locale: "en-GB", text: "middle", style: "definition" }
+          ],
+          equivalents: []
+        }
+      ]
+    };
+    expect(initialTargetLocale(draft, language)).toBe("en-US");
+    expect(initialTargetLocale({ ...draft, forms: [] }, language)).toBe(
+      "en-GB"
+    );
+    expect(
+      initialTargetLocale(
+        { ...draft, forms: [], senses: [] },
+        {
+          ...language,
+          target_locales: ["en-US", "en-GB"]
+        }
+      )
+    ).toBe("en-US");
+  });
+
   it("只回退显式通用英语，绝不跨英美或简繁补齐，不改变原稿", () => {
     const draft: NextDraft = {
       schema_version: 1,
