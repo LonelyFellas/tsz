@@ -38,7 +38,8 @@ export function WordListFilters({
   creators,
   creatorOptions,
   kindLabel,
-  posDisplayName
+  posDisplayName,
+  languages
 }: {
   form: ReturnType<typeof Form.useForm<WordFilterValues>>[0];
   filters: WordFilterValues;
@@ -54,11 +55,42 @@ export function WordListFilters({
   creatorOptions: Options[];
   kindLabel: (kind: AdminWordKind) => string;
   posDisplayName: (code: string) => string;
+  languages?: {
+    targets: Options[];
+    media: Options[];
+    onTargetChange: (target?: string) => void;
+  };
 }) {
   const { t } = useLexiconListTranslation();
   const token = adminTokens;
   const filterSummaries: Array<{ key: keyof WordFilterValues; label: string }> =
     [
+      ...(languages && filters.targetLanguage
+        ? [
+            {
+              key: "targetLanguage" as const,
+              label: t("filter_target_language", {
+                value:
+                  languages.targets.find(
+                    (item) => item.value === filters.targetLanguage
+                  )?.label ?? filters.targetLanguage
+              })
+            }
+          ]
+        : []),
+      ...(languages && filters.mediumLocale
+        ? [
+            {
+              key: "mediumLocale" as const,
+              label: t("filter_medium_language", {
+                value:
+                  languages.media.find(
+                    (item) => item.value === filters.mediumLocale
+                  )?.label ?? filters.mediumLocale
+              })
+            }
+          ]
+        : []),
       ...(filters.headword || filters.keyword
         ? [
             {
@@ -179,6 +211,25 @@ export function WordListFilters({
         onFinish={applyFilters}
         className="word-search-form"
       >
+        {languages && (
+          <div className="word-search-languages">
+            <Form.Item name="targetLanguage" label={t("target_language")}>
+              <Select
+                placeholder={t("all")}
+                options={languages.targets}
+                allowClear
+                onChange={languages.onTargetChange}
+              />
+            </Form.Item>
+            <Form.Item name="mediumLocale" label={t("medium_language")}>
+              <Select
+                placeholder={t("all")}
+                options={languages.media}
+                allowClear
+              />
+            </Form.Item>
+          </div>
+        )}
         <div className="word-search-main">
           <Form.Item
             name="headword"

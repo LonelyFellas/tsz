@@ -96,6 +96,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           requests={requests}
           trashMode
           partOfSpeechCodes={language.part_of_speech_codes}
+          languages={capability.data?.languages ?? []}
         />
       ) : entryId === "new" ? (
         <EntryStart requests={requests} />
@@ -111,6 +112,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           key="library"
           requests={requests}
           partOfSpeechCodes={language.part_of_speech_codes}
+          languages={capability.data?.languages ?? []}
         />
       )}
     </div>

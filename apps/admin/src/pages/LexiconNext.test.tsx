@@ -903,6 +903,110 @@ it("列表组合条件只在提交后生效，翻页保留，状态切换及移�
   );
   expect(api.list).not.toHaveBeenCalled();
 });
+it("语言条件贯穿搜索、统计、分页、垃圾桶导航与重置", async () => {
+  grantListPermissions();
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow()],
+    pagination: { total: 45, page: 2, page_size: 20, total_pages: 3 }
+  });
+  const { router } = mount(
+    api,
+    "/lexicon-next?target_language=en&medium_locale=zh-Hans&headword=centre&page=2"
+  );
+  await screen.findByText("centre");
+  expect(api.stats).toHaveBeenLastCalledWith({
+    target_language: "en",
+    medium_locale: "zh-Hans",
+    headword: "centre"
+  });
+  fireEvent.click(button("第 3 页"));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
+      headword: "centre",
+      page: 3,
+      page_size: 20
+    })
+  );
+  fireEvent.click(
+    await screen.findByRole("checkbox", { name: "选择「centre」" })
+  );
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "媒介语言" }));
+  fireEvent.click(
+    await screen.findByText(/繁/, {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  expect(api.workspaceList).toHaveBeenCalledTimes(2);
+  fireEvent.click(button("搜索"));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hant",
+      headword: "centre",
+      page: 1,
+      page_size: 20
+    })
+  );
+  expect(
+    screen.getByRole("checkbox", { name: "选择「centre」" })
+  ).not.toBeChecked();
+  expect(api.stats).toHaveBeenLastCalledWith({
+    target_language: "en",
+    medium_locale: "zh-Hant",
+    headword: "centre"
+  });
+  expect(
+    new URLSearchParams(router.state.location.search).get("medium_locale")
+  ).toBe("zh-Hant");
+  fireEvent.click(
+    await screen.findByRole("checkbox", { name: "选择「centre」" })
+  );
+  await act(() => router.navigate(-1));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
+      headword: "centre",
+      page: 3,
+      page_size: 20
+    })
+  );
+  expect(
+    await screen.findByRole("checkbox", { name: "选择「centre」" })
+  ).not.toBeChecked();
+  fireEvent.click(screen.getByRole("link", { name: "查看垃圾桶" }));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
+      status: "archived",
+      page: 1,
+      page_size: 20
+    })
+  );
+  fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
+      page: 1,
+      page_size: 20
+    })
+  );
+  fireEvent.click(button("重置"));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith({
+      page: 1,
+      page_size: 20
+    })
+  );
+  expect(api.stats).toHaveBeenLastCalledWith({});
+  expect(router.state.location.search).toBe("");
+});
+
 it("批量操作冻结版本、锁住 pending，未知结果沿用同一请求重试；发布入口保持不可用", async () => {
   grantListPermissions();
   const api = requests();
@@ -974,6 +1078,75 @@ it("权限与冲突不丢失选择，垃圾桶固定归档，归档词条打开�
   expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
   expect(api.save).not.toHaveBeenCalled();
 });
+it("更多操作与 V1 一致，支持悬停、聚焦和逐行切换，归档仍走新版命令", async () => {
+  grantListPermissions();
+  const api = requests();
+  const secondId = "00000000-0000-4000-8000-000000000002";
+  api.workspaceList.mockResolvedValue({
+    items: [listRow(), listRow({ id: secondId, headword: "center" })],
+    pagination: { total: 2, page: 1, page_size: 20, total_pages: 1 }
+  });
+  api.command.mockResolvedValue({});
+  mount(api, "/lexicon-next");
+  const first = await screen.findByRole("button", { name: "更多操作：centre" });
+  const second = button("更多操作：center");
+  expect(
+    within(first.closest("tr")!).getByRole("button", { name: "继续创建" })
+  ).toBeVisible();
+  expect(first).toHaveAttribute("aria-expanded", "false");
+  fireEvent.mouseEnter(first);
+  await waitFor(() => expect(first).toHaveAttribute("aria-expanded", "true"));
+  fireEvent.focus(second);
+  await waitFor(() => {
+    expect(first).toHaveAttribute("aria-expanded", "false");
+    expect(second).toHaveAttribute("aria-expanded", "true");
+  });
+  fireEvent.keyDown(second, { key: "ArrowDown" });
+  const archive = await screen.findByRole("menuitem", { name: "移入垃圾桶" });
+  await waitFor(() => expect(archive).toHaveFocus());
+  fireEvent.keyDown(archive, { key: "Escape" });
+  await waitFor(() => {
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute("aria-expanded", "false");
+  });
+  fireEvent.mouseEnter(second);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "移入垃圾桶" }));
+  await waitFor(() => expect(second).toHaveAttribute("aria-expanded", "false"));
+  fireEvent.click(
+    within(await screen.findByRole("dialog")).getByRole("button", {
+      name: "移入垃圾桶"
+    })
+  );
+  await waitFor(() =>
+    expect(api.command).toHaveBeenCalledWith({
+      request_id: expect.any(String),
+      action: "archive",
+      items: [
+        { entry_id: secondId, base_revision: 2, base_lifecycle_revision: 1 }
+      ]
+    })
+  );
+});
+
+it("垃圾桶与 V1 一致保留直接恢复入口，并按权限禁用", async () => {
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow({ status: "archived", annotation_visible: true })],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next/trash");
+  const restore = await screen.findByRole("button", { name: "恢复「centre」" });
+  expect(restore).toBeDisabled();
+  act(() => grantListPermissions());
+  await waitFor(() => expect(restore).toBeEnabled());
+  fireEvent.mouseEnter(button("更多操作：centre"));
+  await screen.findByRole("menuitem", { name: "永久删除" });
+  expect(screen.queryByRole("menuitem", { name: "标注" })).toBeNull();
+  fireEvent.click(restore);
+  expect(await screen.findByRole("dialog")).toBeVisible();
+  expect(api.command).not.toHaveBeenCalled();
+});
+
 it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", async () => {
   grantListPermissions();
   const api = requests();
@@ -988,7 +1161,7 @@ it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", asyn
     new HttpError(409, "标注已变化，请重新打开后确认", [], "revision_conflict")
   );
   mount(api, "/lexicon-next");
-  fireEvent.click(
+  fireEvent.mouseEnter(
     await screen.findByRole("button", { name: "更多操作：centre" })
   );
   fireEvent.click(await screen.findByText("标注"));
@@ -1014,7 +1187,7 @@ it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", asyn
     annotation: "10",
     annotation_revision: 5
   });
-  fireEvent.click(button("更多操作：centre"));
+  fireEvent.mouseEnter(button("更多操作：centre"));
   fireEvent.click(await screen.findByText("标注"));
   const reopened = await screen.findByDisplayValue("9");
   fireEvent.change(reopened, { target: { value: "10" } });
@@ -1046,7 +1219,7 @@ it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", a
   await screen.findByText("版本 1");
   await act(() => router.navigate("/lexicon-next"));
   await waitFor(() =>
-    expect(client.getQueryData(["admin-lexicon-next", "stats"])).toEqual({
+    expect(client.getQueryData(["admin-lexicon-next", "stats", {}])).toEqual({
       total: 1,
       today: 1,
       month: 1

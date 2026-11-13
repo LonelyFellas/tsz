@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/task190-backend/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-12T10:39:50.446Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-filters/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-13T01:20:27.730Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1883,6 +1883,44 @@
         "schema": { "type": "string" }
       }
     ],
+    "get /admin/lexicon-next/entries": [
+      {
+        "name": "headword",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "kind",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/NextEntryKind" }
+      },
+      {
+        "name": "medium_locale",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "target_language",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    ],
     "get /admin/lexicon-next/entries/{id}/view": [
       {
         "name": "medium_locale",
@@ -1894,6 +1932,246 @@
         "name": "target_locale",
         "in": "query",
         "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
+    "get /admin/lexicon-next/workspace/creators": [
+      {
+        "name": "created_by",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "created_from",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "created_to",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "gloss",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "headword",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "kind",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "level",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "medium_locale",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "pos",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "target_language",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    ],
+    "get /admin/lexicon-next/workspace/entries": [
+      {
+        "name": "created_by",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "created_from",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "created_to",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "gloss",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "headword",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "kind",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "level",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "medium_locale",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "pos",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "target_language",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    ],
+    "get /admin/lexicon-next/workspace/stats": [
+      {
+        "name": "created_by",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      {
+        "name": "created_from",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "created_to",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      {
+        "name": "gloss",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "headword",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "kind",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "level",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "medium_locale",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      {
+        "name": "pos",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "target_language",
+        "in": "query",
+        "required": false,
         "schema": { "type": "string" }
       }
     ],
@@ -2696,7 +2974,8 @@
           "items": { "$ref": "#/components/schemas/NextWorkspaceCreator" }
         },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/lexicon-next/workspace/entries": {
@@ -2733,7 +3012,8 @@
       "responses": {
         "200": { "$ref": "#/components/schemas/NextWorkspaceStats" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon/assistant": {

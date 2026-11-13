@@ -355,6 +355,35 @@ it("管理列表使用独立 wire 契约，保留查询参数且拒绝旧列表�
   }).api;
   await expect(missing.workspaceList()).rejects.toThrow("接口契约");
 });
+it("语言筛选作为真实 query 发送，列表、统计和创建人参数与 OpenAPI 一致", async () => {
+  const query = {
+    target_language: "en",
+    medium_locale: "zh-Hant",
+    gloss: "a & b"
+  };
+  for (const endpoint of ["workspaceList", "stats", "creators"] as const) {
+    const reply =
+      endpoint === "workspaceList"
+        ? {
+            items: [],
+            pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+          }
+        : endpoint === "stats"
+          ? { total: 0, today: 0, month: 0 }
+          : [];
+    const { api, fetch } = client(reply);
+    await api[endpoint](query);
+    const url = new URL(fetch.mock.calls[0]![0] as string);
+    const names = snapshot.operationQueryParameters[
+      `get ${url.pathname.replace("/api/v1", "")}` as keyof typeof snapshot.operationQueryParameters
+    ].map((p) => p.name);
+    for (const [key, value] of Object.entries(query)) {
+      expect(url.searchParams.get(key)).toBe(value);
+      expect(names).toContain(key);
+    }
+  }
+});
+
 it("生命周期请求保留重试标识与精确版本，不回退 V1；标注走独立 PATCH", async () => {
   const { api, fetch } = client({ entry_ids: [uuid(1)] });
   const input = {

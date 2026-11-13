@@ -212,6 +212,12 @@
   justify-content: start;
   gap: var(--ui-space-3);
 }
+.word-search-languages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 300px));
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-4);
+}
 .word-search-main .ui-form-item-label {
   position: absolute;
   width: 1px;

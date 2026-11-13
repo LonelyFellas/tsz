@@ -1,6 +1,18 @@
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconListMessages = {
+  target_language: ["目标语言", "目標語言", "Target language"],
+  medium_language: ["媒介语言", "媒介語言", "Medium language"],
+  filter_target_language: [
+    "目标语言：{{value}}",
+    "目標語言：{{value}}",
+    "Target language: {{value}}"
+  ],
+  filter_medium_language: [
+    "媒介语言：{{value}}",
+    "媒介語言：{{value}}",
+    "Medium language: {{value}}"
+  ],
   visibility_only: ["仅公开可见性", "僅公開可見性", "Public visibility only"],
   homograph_only: ["仅普通同形提示", "僅一般同形提示", "Homograph notice only"],
   visibility_homograph: [

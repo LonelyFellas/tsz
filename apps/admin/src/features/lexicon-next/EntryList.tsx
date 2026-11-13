@@ -2,7 +2,13 @@ import { PartOfSpeechAbbreviation } from "@/features/dictionary/part-of-speech/P
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDownIcon, PlusIcon, Trash2Icon, Undo2Icon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  createLucideIcon,
+  PlusIcon,
+  Trash2Icon,
+  Undo2Icon
+} from "lucide-react";
 import dayjs from "dayjs";
 import { HttpError } from "@tsz/api-client";
 import { canAdminResourceAction, hasAdminPermission } from "@tsz/shared/auth";
@@ -18,6 +24,7 @@ import { Form } from "@tsz/ui/admin/forms";
 import { App, Dropdown, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   NextListCommand,
+  NextLanguageCapability,
   NextWorkspaceEntry,
   NextWorkspaceQuery
 } from "@tsz/types";
@@ -48,14 +55,23 @@ import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
 
+const WastebasketIcon = createLucideIcon("Wastebasket", [
+  ["ellipse", { cx: 12, cy: 5, rx: 8, ry: 3, key: "rim" }],
+  ["path", { d: "m4 5 2 15c0 1 3 2 6 2s6-1 6-2l2-15", key: "basket" }],
+  ["path", { d: "m8 8 1 12m3-12v13m4-13-1 12", key: "ribs" }],
+  ["path", { d: "M5 11c4 2 10 2 14 0M6 16c3 2 9 2 12 0", key: "mesh" }]
+]);
+
 export function EntryList({
   requests,
   trashMode = false,
-  partOfSpeechCodes
+  partOfSpeechCodes,
+  languages
 }: {
   requests: LexiconNextRequests;
   trashMode?: boolean;
   partOfSpeechCodes: string[];
+  languages: NextLanguageCapability[];
 }) {
   const { t, i18n } = useLexiconListTranslation();
   const { t: shell } = useAdminTranslation();
@@ -72,6 +88,20 @@ export function EntryList({
   const { filters, pageSize } = parsed;
   const page = parsed.page <= 4294967295 ? parsed.page : 1;
   const [form] = Form.useForm<WordFilterValues>();
+  const selectedTarget = Form.useWatch("targetLanguage", form);
+  const languageNames = new Intl.DisplayNames([i18n.language], {
+    type: "language"
+  });
+  const mediumOptions = [
+    ...new Set(
+      languages
+        .filter(
+          (language) =>
+            !selectedTarget || language.target_language === selectedTarget
+        )
+        .flatMap((language) => language.medium_locales)
+    )
+  ].map((value) => ({ value, label: languageNames.of(value) ?? value }));
   const [advancedExpanded, setAdvancedExpanded] = useState(
     Boolean(
       filters.kind ||
@@ -96,21 +126,42 @@ export function EntryList({
     pageSize
   );
   delete mapped.q;
-  const query: NextWorkspaceQuery = mapped;
+  const languageQuery = {
+    ...(filters.targetLanguage
+      ? { target_language: filters.targetLanguage }
+      : {}),
+    ...(filters.mediumLocale ? { medium_locale: filters.mediumLocale } : {})
+  };
+  const languageSearch = serializeWordListSearchParams(
+    {
+      targetLanguage: filters.targetLanguage,
+      mediumLocale: filters.mediumLocale
+    },
+    1,
+    20
+  ).toString();
+  const query: NextWorkspaceQuery = { ...mapped, ...languageQuery };
+  const statsQuery = { ...query };
+  delete statsQuery.page;
+  delete statsQuery.page_size;
   const result = useQuery({
     queryKey: ["admin-lexicon-next", "list", query],
     queryFn: () => requests.workspaceList(query),
     retry: false
   });
   const stats = useQuery({
-    queryKey: ["admin-lexicon-next", "stats"],
-    queryFn: requests.stats,
+    queryKey: ["admin-lexicon-next", "stats", statsQuery],
+    queryFn: () => requests.stats(statsQuery),
     enabled: !trashMode,
     retry: false
   });
   const creators = useQuery({
-    queryKey: ["admin-lexicon-next", "creators"],
-    queryFn: requests.creators,
+    queryKey: ["admin-lexicon-next", "creators", languageQuery, trashMode],
+    queryFn: () =>
+      requests.creators({
+        ...languageQuery,
+        ...(trashMode ? { status: "archived" } : {})
+      }),
     enabled: advancedExpanded,
     retry: false
   });
@@ -144,6 +195,7 @@ export function EntryList({
   }>();
   const [annotationEntry, setAnnotationEntry] = useState<NextWorkspaceEntry>();
   const [loadingAnnotationId, setLoadingAnnotationId] = useState<string>();
+  const [openActionRow, setOpenActionRow] = useState<string>();
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState<string>();
@@ -157,7 +209,14 @@ export function EntryList({
   }, [filters, form]);
   useEffect(() => {
     setSelected({});
-  }, [trashMode, actor?.id, actor?.permission_version]);
+    setOpenActionRow(undefined);
+  }, [
+    trashMode,
+    actor?.id,
+    actor?.permission_version,
+    filters.targetLanguage,
+    filters.mediumLocale
+  ]);
   function applyFilters(values: WordFilterValues) {
     if (
       values.range?.some(Boolean) &&
@@ -165,6 +224,7 @@ export function EntryList({
     )
       return;
     setSelected({});
+    setOpenActionRow(undefined);
     setSearch(serializeWordListSearchParams(values, 1, pageSize));
   }
   function reset() {
@@ -433,51 +493,79 @@ export function EntryList({
       width: 190,
       fixed: "right",
       render: (row) => (
-        <Space size={4}>
-          <Button
-            type="link"
-            onClick={() => navigate(`/lexicon-next/${row.id}`)}
-          >
-            {t(
-              row.status === "archived" || !allowed(row, "edit")
-                ? "action_view"
-                : "action_create"
+        <div className="word-list-row-actions">
+          <div className="word-list-primary-actions">
+            {row.status === "archived" && (
+              <Button
+                type="link"
+                size="small"
+                className="word-list-row-action"
+                aria-label={t("restore_label", {
+                  label: `「${row.headword}」`
+                })}
+                disabled={!allowed(row, "restore") || pending}
+                onClick={() => begin("restore", [row])}
+              >
+                {t("restore")}
+              </Button>
             )}
-          </Button>
+            <Button
+              type={row.status === "archived" ? "text" : "link"}
+              size="small"
+              className="word-list-row-action"
+              onClick={() => navigate(`/lexicon-next/${row.id}`)}
+            >
+              {t(
+                row.status === "archived" || !allowed(row, "edit")
+                  ? "action_view"
+                  : "action_create"
+              )}
+            </Button>
+          </div>
           <Dropdown
-            trigger={["click"]}
+            trigger={["hover"]}
+            placement="bottomRight"
+            open={openActionRow === row.id}
+            onOpenChange={(open) =>
+              setOpenActionRow((current) =>
+                open ? row.id : current === row.id ? undefined : current
+              )
+            }
+            classNames={{ root: "word-list-action-menu" }}
             menu={{
+              onClick: () => setOpenActionRow(undefined),
               items: [
-                ...(row.annotation_visible
+                ...(row.annotation_visible &&
+                row.status !== "archived" &&
+                allowed(row, "edit")
                   ? [
                       {
                         key: "annotation",
                         label: t("annotation"),
-                        disabled:
-                          row.status === "archived" || !allowed(row, "edit"),
                         onClick: () => void openAnnotation(row.id)
                       }
                     ]
                   : []),
-                {
-                  key: "lifecycle",
-                  label: t(row.status === "archived" ? "restore" : "archive"),
-                  disabled: !allowed(
-                    row,
-                    row.status === "archived" ? "restore" : "archive"
-                  ),
-                  onClick: () =>
-                    begin(row.status === "archived" ? "restore" : "archive", [
-                      row
-                    ])
-                },
+                ...(row.status !== "archived"
+                  ? [
+                      {
+                        key: "lifecycle",
+                        label: t("archive"),
+                        danger: true,
+                        icon: <Trash2Icon />,
+                        disabled: !mayCommand("archive", [row]) || pending,
+                        onClick: () => begin("archive", [row])
+                      }
+                    ]
+                  : []),
                 ...(row.status === "archived"
                   ? [
                       {
                         key: "delete",
                         label: t("delete"),
                         danger: true,
-                        disabled: actor?.role !== "super_admin",
+                        icon: <Trash2Icon />,
+                        disabled: actor?.role !== "super_admin" || pending,
                         onClick: () => begin("delete", [row])
                       }
                     ]
@@ -486,15 +574,27 @@ export function EntryList({
             }}
           >
             <Button
-              type="link"
+              type="text"
+              size="small"
+              className="word-list-more-action"
               aria-label={t("next_more_actions", { label: row.headword })}
+              aria-haspopup="menu"
+              aria-expanded={openActionRow === row.id}
+              onFocus={(event) => {
+                if (
+                  event.relatedTarget instanceof HTMLElement &&
+                  event.relatedTarget.closest('[role="menu"]')
+                )
+                  return;
+                setOpenActionRow(row.id);
+              }}
               loading={loadingAnnotationId === row.id}
             >
               {t("next_more")}
               <ChevronDownIcon />
             </Button>
           </Dropdown>
-        </Space>
+        </div>
       )
     }
   ];
@@ -512,8 +612,10 @@ export function EntryList({
         title={trashMode ? t("status_archived") : shell("nav_lexicon_next")}
         actions={
           <div className="word-list-page-actions">
-            <Link to={trashMode ? "/lexicon-next" : "/lexicon-next/trash"}>
-              {trashMode ? <Undo2Icon /> : <Trash2Icon />}
+            <Link
+              to={`${trashMode ? "/lexicon-next" : "/lexicon-next/trash"}${languageSearch ? `?${languageSearch}` : ""}`}
+            >
+              {trashMode ? <Undo2Icon /> : <WastebasketIcon />}
               {trashMode ? shell("nav_lexicon_next") : t("view_trash")}
             </Link>
             {!trashMode && canCreate && (
@@ -566,6 +668,25 @@ export function EntryList({
         creatorOptions={creatorOptions}
         kindLabel={kindLabel}
         posDisplayName={posDisplayName}
+        languages={{
+          targets: languages.map(({ target_language: value }) => ({
+            value,
+            label: languageNames.of(value) ?? value
+          })),
+          media: mediumOptions,
+          onTargetChange: (target) => {
+            const medium = form.getFieldValue("mediumLocale");
+            if (
+              medium &&
+              target &&
+              !languages
+                .find((language) => language.target_language === target)
+                ?.medium_locales.includes(medium)
+            ) {
+              form.setFieldValue("mediumLocale", undefined);
+            }
+          }
+        }}
       />
       <section
         className="word-list-panel word-list-results-panel"
