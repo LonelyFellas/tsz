@@ -1,7 +1,6 @@
 import {
   UnplugIcon,
   ChevronDownIcon,
-  LockKeyholeIcon,
   LogOutIcon,
   SettingsIcon
 } from "lucide-react";
@@ -22,7 +21,7 @@ import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
 
 /**
  * 后台顶栏内容：把身份与账户操作收进头像 Popover——顶栏只留一个头像，
- * 点开展开「已登录为 X」+ 修改密码 + 退出登录，供 ConsoleLayout 的 Layout.Header 承载。
+ * 点开展开「已登录为 X」+ 个人设置 + 退出登录，供 ConsoleLayout 的 Layout.Header 承载。
  * 身份来自 store.profile —— 登录与会话恢复（useAdminSessionRestore）已写入，
  * 守卫保证进到这里时 profile 必有值，无需再单独探一次 /admin/profile。
  */
@@ -45,14 +44,10 @@ export function AdminHeader() {
         : "account_admin"
   );
 
-  // 选一项后先收起 Popover，再执行动作（改密/个人设置走 SPA 导航，登出走整页跳转）。
+  // 选一项后先收起 Popover，再执行动作（个人设置走 SPA 导航，登出走整页跳转）。
   const goProfileSettings = () => {
     setOpen(false);
     navigate("/settings/profile");
-  };
-  const goChangePassword = () => {
-    setOpen(false);
-    navigate("/change-password");
   };
   const doLogout = () => {
     setOpen(false);
@@ -118,15 +113,6 @@ export function AdminHeader() {
           onClick={goProfileSettings}
         >
           {t("account_settings")}
-        </Button>
-        <Button
-          type="text"
-          block
-          icon={<LockKeyholeIcon />}
-          style={{ justifyContent: "flex-start" }}
-          onClick={goChangePassword}
-        >
-          {t("account_change_password")}
         </Button>
         <Button
           type="text"

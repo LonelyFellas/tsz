@@ -10,7 +10,6 @@ import {
   ArrowUpRightIcon
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { DialectPreference } from "@/features/settings/DialectPreference";
 import { OpenCodeConnection } from "@/features/ai-ledger/OpenCodeConnection";
 import { ChatGPTConnection } from "@/features/ai-ledger/ChatGPTConnection";
 import { OpenCodeModels } from "@/features/ai-ledger/OpenCodeModels";
@@ -42,7 +41,6 @@ export function ProfileSettingsPage() {
           <h2 id="settings-preferences-title">{t("settings_preferences")}</h2>
         </header>
         <InterfaceLanguage />
-        <DialectPreference />
       </section>
       <section
         className="settings-section"

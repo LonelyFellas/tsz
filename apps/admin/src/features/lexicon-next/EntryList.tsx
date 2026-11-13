@@ -52,6 +52,7 @@ import {
 import { useAdminTranslation } from "@/i18n";
 import { useAuthStore } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
+import { localeLabels } from "./model";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
 
@@ -352,17 +353,25 @@ export function EntryList({
                         {row.annotation}
                       </sup>
                     )}
-                    {!locales.includes("en") &&
-                      locales.map((locale) => (
-                        <span
-                          key={locale}
-                          className={`word-list-dialect-dot word-list-dialect-dot-${locale === "en-GB" ? "uk" : "us"}`}
-                          role="img"
-                          aria-label={t(
-                            locale === "en-GB" ? "spelling_uk" : "spelling_us"
-                          )}
-                        />
-                      ))}
+                    {!locales.includes(row.target_language) &&
+                      locales.map((locale) =>
+                        locale === "en-GB" || locale === "en-US" ? (
+                          <span
+                            key={locale}
+                            className={`word-list-dialect-dot word-list-dialect-dot-${locale === "en-GB" ? "uk" : "us"}`}
+                            role="img"
+                            aria-label={t(
+                              locale === "en-GB" ? "spelling_uk" : "spelling_us"
+                            )}
+                          />
+                        ) : (
+                          <Tag key={locale}>
+                            {localeLabels[locale] ??
+                              languageNames.of(locale) ??
+                              locale}
+                          </Tag>
+                        )
+                      )}
                   </div>
                 );
               })}

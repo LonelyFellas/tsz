@@ -41,10 +41,6 @@
 .console-header-account {
   gap: var(--ui-space-4);
 }
-.console-platform-label {
-  color: var(--console-muted);
-  font-size: var(--ui-font-size-sm);
-}
 
 .console-brand {
   flex-shrink: 0;
@@ -348,9 +344,6 @@
   }
   .console-header-left {
     gap: var(--ui-space-3);
-  }
-  .console-platform-label {
-    display: none;
   }
   .console-content {
     padding: var(--ui-space-4);

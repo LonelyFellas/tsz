@@ -59,8 +59,8 @@ const profile: AdminProfile = {
   permissions: ["words.access", "words.create", "words.edit"]
 };
 const input = () => screen.getByPlaceholderText("例如 center 或 give up");
-function show() {
-  render(
+function EditorHarness() {
+  return (
     <MemoryRouter initialEntries={["/words/new"]}>
       <Routes>
         <Route element={<RootProviders />}>
@@ -71,6 +71,9 @@ function show() {
       </Routes>
     </MemoryRouter>
   );
+}
+function show() {
+  return render(<EditorHarness />);
 }
 beforeEach(() => {
   localStorage.clear();
@@ -181,14 +184,61 @@ describe("登录页连接提示", () => {
     ).toBeInTheDocument();
   });
 
-  it("后台其他页面保留全局连接提示与原重试入口", () => {
+  it("后台在导航中重试连接，状态切换不重挂或清空正在编辑的表单", async () => {
     useAuthStore.setState({ connectionError: true });
-    show();
-    const notice = screen.getByRole("alert");
-    expect(
-      within(notice).getByText("连接暂时中断，联网后将自动恢复；当前内容已保留")
-    ).toBeInTheDocument();
-    fireEvent.click(within(notice).getByRole("button", { name: "重试连接" }));
+    const view = show();
+    fireEvent.change(input(), { target: { value: "unsaved center" } });
+    const original = input();
+    const header = screen.getByRole("banner");
+    const trigger = within(header).getByRole("button", { name: "无法连接" });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    const retry = await screen.findByRole("button", { name: "重试" });
+    fireEvent.click(retry);
     expect(sessionRestore.retry).toHaveBeenCalledTimes(1);
+
+    sessionRestore.retrying = true;
+    view.rerender(<EditorHarness />);
+    expect(trigger).toHaveAccessibleName("正在连接…");
+    expect(retry).toBeDisabled();
+    fireEvent.click(retry);
+    expect(sessionRestore.retry).toHaveBeenCalledTimes(1);
+
+    sessionRestore.retrying = false;
+    act(() => useAuthStore.setState({ connectionError: false }));
+    expect(trigger).toHaveAccessibleName("已连接");
+    expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
+    expect(input()).toBe(original);
+    expect(input()).toHaveValue("unsaved center");
   });
+
+  it.each(["change-password", "route-error"])(
+    "没有导航的 %s 页面仍保留连接恢复入口",
+    (page) => {
+      useAuthStore.setState({ connectionError: true });
+      render(
+        <MemoryRouter initialEntries={[`/${page}`]}>
+          <Routes>
+            <Route
+              element={
+                page === "route-error" ? (
+                  <RootProviders>
+                    <div>资源加载失败</div>
+                  </RootProviders>
+                ) : (
+                  <RootProviders />
+                )
+              }
+            >
+              <Route path={page} element={<div>修改密码</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      );
+      const notice = screen.getByRole("alert");
+      fireEvent.click(within(notice).getByRole("button", { name: "重试连接" }));
+      expect(sessionRestore.retry).toHaveBeenCalledTimes(1);
+    }
+  );
 });

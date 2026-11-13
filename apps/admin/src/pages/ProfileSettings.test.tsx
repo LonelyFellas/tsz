@@ -9,9 +9,6 @@ const auth = vi.hoisted(() => ({
 vi.mock("@/lib/auth", () => ({
   useAuthStore: (selector: (state: typeof auth) => unknown) => selector(auth)
 }));
-vi.mock("@/features/settings/DialectPreference", () => ({
-  DialectPreference: () => <div>方言偏好</div>
-}));
 vi.mock("@/features/ai-ledger/OpenCodeConnection", () => ({
   OpenCodeConnection: () => <div>OpenCode 连接</div>
 }));
@@ -47,7 +44,7 @@ beforeEach(() => {
 
 it("默认只加载偏好，账号和模型分组按需打开，地址保留当前分组", async () => {
   mount();
-  expect(screen.getByText("方言偏好")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "使用偏好" })).toBeVisible();
   expect(screen.queryByText("OpenCode 连接")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("tab", { name: "模型账号" }));
   expect(await screen.findByText("ChatGPT 连接")).toBeVisible();
@@ -72,7 +69,7 @@ it("地址可直接打开模型组，普通管理员不能通过地址挂载模�
   expect(
     screen.queryByRole("tab", { name: "模型账号" })
   ).not.toBeInTheDocument();
-  expect(screen.getByText("方言偏好")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "使用偏好" })).toBeVisible();
 });
 
 it("模型账号分组打开后撤权会移除账号管理", async () => {
@@ -86,7 +83,7 @@ it("模型账号分组打开后撤权会移除账号管理", async () => {
 
 it("修改密码使用现有页面，未知分组回到偏好", () => {
   mount("/settings/profile?section=unknown");
-  expect(screen.getByText("方言偏好")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "使用偏好" })).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "修改密码" }));
   expect(screen.getByLabelText("页面地址")).toHaveTextContent(
     "/change-password"

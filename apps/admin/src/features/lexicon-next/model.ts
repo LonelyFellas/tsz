@@ -1,4 +1,9 @@
-import type { NextDraft, NextEntryView, NextForm } from "@tsz/types";
+import type {
+  NextDraft,
+  NextEntryView,
+  NextForm,
+  NextLanguageCapability
+} from "@tsz/types";
 
 export const localeLabels: Record<string, string> = {
   "en-GB": "英式英语",
@@ -30,6 +35,23 @@ export function draftForms(draft: NextDraft): NextForm[] {
   ];
 }
 
+export function initialTargetLocale(
+  draft: NextDraft,
+  language: NextLanguageCapability
+): string {
+  const forms = draftForms(draft);
+  const definitions = draft.senses.flatMap((sense) => sense.definitions);
+  const existingLocale = (rows: { locale: string; text: string }[]) =>
+    language.target_locales.find((locale) =>
+      rows.some((row) => row.locale === locale && row.text.trim())
+    );
+  return (
+    existingLocale(forms) ??
+    existingLocale(definitions) ??
+    language.target_locales[0]!
+  );
+}
+
 /** Local preview only; never replaces the complete editable draft. */
 export function previewDraft(
   draft: NextDraft,
@@ -38,7 +60,9 @@ export function previewDraft(
 ): NextEntryView {
   const targetRows = <T extends { locale: string }>(rows: T[]) => {
     const exact = rows.filter((row) => row.locale === target);
-    return exact.length ? exact : rows.filter((row) => row.locale === "en");
+    return exact.length
+      ? exact
+      : rows.filter((row) => row.locale === target.split("-")[0]);
   };
   const forms = targetRows(draftForms(draft));
   return {
@@ -93,19 +117,19 @@ export function draftProblem(draft: NextDraft): string | null {
     { text: draft.headword, label: "词头", max: 200 },
     ...draft.forms.map((row) => ({
       ...row,
-      label: `${localeLabels[row.locale]}词形`,
+      label: `${localeLabels[row.locale] ?? row.locale}词形`,
       max: 200
     })),
     ...draft.senses.flatMap((sense, index) => [
       ...sense.definitions.map((row) => ({
         ...row,
-        label: `义项 ${index + 1} · ${localeLabels[row.locale]}释义`,
+        label: `义项 ${index + 1} · ${localeLabels[row.locale] ?? row.locale}释义`,
         max: 5000,
         multiline: true
       })),
       ...sense.equivalents.map((row) => ({
         ...row,
-        label: `义项 ${index + 1} · ${localeLabels[row.locale]}译词`,
+        label: `义项 ${index + 1} · ${localeLabels[row.locale] ?? row.locale}译词`,
         max: 200
       }))
     ])
