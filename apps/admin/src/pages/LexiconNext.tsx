@@ -359,7 +359,7 @@ function EntryEditor({
       }
     >
       <div
-        className={`lexicon-next${step === "forms" ? " lexicon-next-forms" : ""}`}
+        className={`lexicon-next lexicon-next-editor${step === "forms" ? " lexicon-next-forms" : ""}`}
       >
         <div className="lexicon-next-toolbar">
           <Space wrap>

@@ -13,13 +13,9 @@
   padding-bottom: var(--ui-space-3);
   isolation: isolate;
 }
-.v3-form-overview .ui-table table {
-  /* rc-table 的横向滚动默认以内联 min-width: 100% 撑满容器。 */
-  min-width: 0 !important;
-}
 .v3-form-overview .ui-table.ui-table-small .ui-table-thead > tr > th {
   padding: 10px var(--ui-space-3);
-  color: #8d929b;
+  color: var(--ui-color-text-secondary);
   font-size: var(--ui-font-size-compact);
   font-weight: 400;
   white-space: nowrap;
@@ -142,7 +138,11 @@
   font-size: var(--ui-font-size);
   white-space: nowrap;
   overflow-wrap: normal;
-  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v3-overview-phonetic {
+  flex-shrink: 1;
 }
 .v3-overview-pronunciation .word-pronunciation-play-action.ui-btn {
   justify-content: flex-start;
@@ -154,7 +154,7 @@
   box-shadow: none;
 }
 .v3-overview-settings {
-  color: #8d929b;
+  color: var(--ui-color-text-secondary);
   font-size: var(--ui-font-size);
 }
 .v3-overview-numeric-cell .v3-overview-reading {
@@ -162,10 +162,11 @@
 }
 .v3-overview-settings .word-pronunciation-voice-label {
   min-width: 0;
-  color: var(--ui-color-text-disabled);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.v3-overview-settings .word-pronunciation-voice-label[data-has-voice="true"] {
+.v3-overview-settings [data-has-voice="true"] {
   color: var(--ui-color-text);
 }
 .v3-overview-settings .word-pronunciation-voice-summary {
@@ -184,6 +185,8 @@
   align-items: center;
   min-height: 28px;
   color: var(--word-ink);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .v3-form-overview .v3-overview-spelling {
   min-width: 0;
@@ -191,7 +194,9 @@
   font-weight: 600;
   white-space: nowrap;
   overflow-wrap: normal;
-  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 .v3-overview-type-fix.ui-btn {
   max-width: 100%;
@@ -355,16 +360,16 @@
 .v3-label-assignment-modal .ui-modal-header {
   padding: var(--ui-space-5) var(--ui-space-6);
   margin: -20px -24px var(--ui-space-6);
-  background: #a3a7b2;
-  border-radius: 8px 8px 0 0;
+  background: var(--ui-color-fill-alter);
+  border-radius: var(--ui-border-radius-lg) var(--ui-border-radius-lg) 0 0;
 }
 .v3-label-assignment-modal .ui-modal-title {
   padding-inline-end: 32px;
-  color: var(--ui-color-text-light-solid);
+  color: var(--ui-color-text);
   font-size: 20px;
 }
 .v3-label-assignment-modal .ui-modal-close {
-  color: var(--ui-color-text-light-solid);
+  color: var(--ui-color-text-secondary);
 }
 .v3-label-assignment-columns {
   display: grid;
