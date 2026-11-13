@@ -2687,7 +2687,8 @@ it("未启用的拼写设置可保存且不生成正式音频，启用后才补�
     const opener = useRef<SpellingSettingsOpener | null>(null);
     const [active, setActive] = useState(false);
     const [value, setValue] = useState<RichTextV3>({
-      ...VALUE,
+      version: 2,
+      text: VALUE.text,
       annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
     });
     const [profile, setProfile] = useState<VoiceProfileV3>({
@@ -2752,8 +2753,7 @@ it("未启用的拼写设置可保存且不生成正式音频，启用后才补�
   fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
   fireEvent.click(screen.getByLabelText("停顿 1 秒"));
   const save = screen.getByRole("button", {
-    name: "保存未启用拼写修改",
-    exact: true
+    name: "保存未启用拼写修改"
   });
   await waitFor(() => expect(save).toBeEnabled());
   fireEvent.click(save);
@@ -3008,7 +3008,7 @@ it("词形文本入口保留展示标注和配音资产，保存失败可重试"
   fireEvent.click(screen.getByLabelText("打开词形文本编辑器"));
   await screen.findByLabelText("标注工具栏");
   for (const name of ["停顿", "配音", "特殊读法", "音频"])
-    expect(screen.queryByRole("button", { name, exact: true })).toBeNull();
+    expect(screen.queryByRole("button", { name })).toBeNull();
   expect(screen.queryByLabelText("局部配音音色池")).toBeNull();
   expect(screen.getByLabelText("斜体")).toBeVisible();
   expect(screen.getByLabelText("连读")).toBeVisible();
@@ -3088,10 +3088,10 @@ it("词形文本改字后宿主保存等待唯一所有者生成，旧音频引�
   fireEvent.click(screen.getByLabelText("打开改字拼写编辑器"));
   await screen.findByLabelText("标注工具栏");
   const dialog = screen.getByRole("dialog");
-  fireEvent.input(
-    within(dialog).getByRole("textbox", { name: "改字拼写", exact: true }),
-    { target: { value: "hello friend" }, inputType: "insertFromPaste" }
-  );
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "改字拼写" }), {
+    target: { value: "hello friend" },
+    inputType: "insertFromPaste"
+  });
   const save = within(dialog).getByLabelText("保存改字拼写修改");
   await waitFor(() => expect(save).toBeEnabled());
   fireEvent.click(save);
