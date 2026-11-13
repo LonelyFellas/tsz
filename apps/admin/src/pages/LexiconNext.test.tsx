@@ -13,6 +13,7 @@ import { HttpError } from "@tsz/api-client";
 import type {
   NextCapabilities,
   NextEntry,
+  NextDraft,
   NextDetection,
   NextDetectionInput,
   NextEntryMatchInput,
@@ -22,6 +23,28 @@ import type {
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { useAuthStore } from "@/lib/auth";
 import { LexiconNextPage, type LexiconNextRequests } from "./LexiconNext";
+
+import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
+import { formsFixture } from "@/features/dictionary/word-creation-v3/fixtures";
+import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
+import { emptyFormEditor } from "@/features/lexicon-next/FormsStep";
+import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
+
+vi.mock("@/lib/env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/env")>();
+  return { ...actual, env: { ...actual.env, VOICE_PREVIEW: false } };
+});
+vi.mock("@/features/dictionary/dataSource", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/features/dictionary/dataSource")>();
+  return {
+    ...actual,
+    partOfSpeechDataSource: {
+      ...actual.partOfSpeechDataSource,
+      catalog: async () => partOfSpeechCatalogFixture
+    }
+  };
+});
 
 const id = "00000000-0000-4000-8000-000000000001";
 const caps: NextCapabilities = {
@@ -451,8 +474,11 @@ it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻�
   expect(button("确认创建")).toBeDisabled();
 });
 async function edit(label: string, value: string) {
-  fireEvent.click(button(label.includes("词形") ? /词性与词形/ : /词义与译词/));
-  fireEvent.click(button(`添加${label}`));
+  fireEvent.click(button(label.includes("词形") ? /词性与发音/ : /词义与译词/));
+  if (label.includes("词形")) {
+    if (!screen.queryByRole("textbox", { name: `${label} 1` }))
+      fireEvent.click(button("已有词形"));
+  } else fireEvent.click(button(`添加${label}`));
   fireEvent.change(await screen.findByRole("textbox", { name: `${label} 1` }), {
     target: { value }
   });
@@ -474,8 +500,19 @@ beforeEach(() => {
 describe("新版词库手工闭环", () => {
   it("切换四组合保留全部未保存内容和义项身份，完整保存；预览不回写本地稿", async () => {
     const api = requests();
+    api.get.mockResolvedValue({
+      ...entry,
+      draft: {
+        ...entry.draft,
+        forms: [
+          { id: crypto.randomUUID(), locale: "en-GB", text: "centre" },
+          { id: crypto.randomUUID(), locale: "en-US", text: "center" }
+        ]
+      }
+    });
     mount(api);
     await screen.findByDisplayValue("centre");
+    fireEvent.click(button(/词义与译词/));
     await edit("英式英语词形", "centre");
     fireEvent.click(button(/词义与译词/));
     fireEvent.click(button("添加义项"));
@@ -489,7 +526,7 @@ describe("新版词库手工闭环", () => {
     await edit("繁体中文解释", "中心位置（繁體）");
     await edit("繁体中文译词", "中心處");
     fireEvent.click(screen.getByRole("radio", { name: "英式英语" }));
-    fireEvent.click(button(/词性与词形/));
+    fireEvent.click(button(/词性与发音/));
     expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
       "centre"
     );
@@ -540,6 +577,7 @@ describe("新版词库手工闭环", () => {
       api.save.mockRejectedValue(new HttpError(status, "rejected"));
       mount(api);
       await screen.findByDisplayValue("centre");
+      fireEvent.click(button(/词义与译词/));
       fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
         target: { value: "local" }
       });
@@ -580,6 +618,7 @@ describe("新版词库手工闭环", () => {
     api.get.mockResolvedValue({ ...entry, owner_id: "another-editor" });
     fireEvent.click(button("重新检查"));
     await screen.findByDisplayValue("centre");
+    fireEvent.click(button(/词义与译词/));
     expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
     fireEvent.click(button(/词义与译词/));
     expect(button("添加义项")).toBeDisabled();
@@ -615,6 +654,7 @@ describe("新版词库手工闭环", () => {
     await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
     await act(async () => finishCreate(structuredClone(entry)));
     await screen.findByText("版本 1");
+    fireEvent.click(button(/词义与译词/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local" }
     });
@@ -652,6 +692,7 @@ describe("新版词库手工闭环", () => {
     const api = requests();
     mount(api);
     await screen.findByDisplayValue("centre");
+    fireEvent.click(button(/词义与译词/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "unsaved after revocation" }
     });
@@ -675,6 +716,7 @@ describe("新版词库手工闭环", () => {
     const api = requests();
     mount(api);
     await screen.findByDisplayValue("centre");
+    fireEvent.click(button(/词义与译词/));
     fireEvent.click(button(/词义与译词/));
     fireEvent.click(button("添加义项"));
     await edit("英式英语释义", "");
@@ -825,6 +867,7 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
   );
   fireEvent.click(button("继续创建"));
   await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/词义与译词/));
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
 });
 
@@ -1081,6 +1124,7 @@ it("权限与冲突不丢失选择，垃圾桶固定归档，归档词条打开�
   ).toBeChecked();
   fireEvent.click(button("查看"));
   await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/词义与译词/));
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
   expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
   expect(api.save).not.toHaveBeenCalled();
@@ -1243,6 +1287,7 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   fireEvent.click(button("继续创建"));
   await screen.findByDisplayValue("centre");
   fireEvent.click(button(/词义与译词/));
+  fireEvent.click(button(/词义与译词/));
   fireEvent.click(button("删除简体中文解释 1"));
   api.workspaceList.mockResolvedValue({
     items: [],
@@ -1303,6 +1348,7 @@ it("编辑期间被归档后保留本地输入并转只读，不引导丢弃草�
   );
   const { client } = mount(api);
   await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/词义与译词/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local unsaved" }
   });
@@ -1317,4 +1363,95 @@ it("编辑期间被归档后保留本地输入并转只读，不引导丢弃草�
   expect(
     client.getQueryData(["admin-lexicon-next", "workspace-entry", id])
   ).toMatchObject({ status: "archived" });
+});
+
+it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，保存并重新打开不丢内容", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  const mounted = mount(api);
+  const addPos = await screen.findByRole("combobox", { name: "添加基本词性" });
+  expect(screen.queryByRole("radiogroup", { name: "目标语言变体" })).toBeNull();
+  expect(
+    screen.queryByRole("checkbox", { name: "编辑通用英语内容" })
+  ).toBeNull();
+  await waitFor(() => expect(addPos).toBeEnabled());
+  fireEvent.mouseDown(addPos);
+  fireEvent.click(
+    screen
+      .getAllByText("名词")
+      .find((node) => node.classList.contains("ui-select-item-option-content"))!
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "编辑原形内容" }));
+  const spelling = await screen.findByRole("textbox", {
+    name: "词形英美通用拼写"
+  });
+  await changeVoiceText(spelling, { target: { value: "centre" } });
+  fireEvent.click(button("确认，应用到草稿"));
+  await waitFor(() => expect(button("保存草稿")).toBeEnabled());
+  fireEvent.click(button("保存草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  const draft: NextDraft = api.save.mock.calls[0]![1].draft;
+  expect(draft.form_editor?.pos[0]?.pos).toBe("noun");
+  expect(
+    draft.form_editor?.contents.some(
+      (content) =>
+        content.regional_variants.mode === "common" &&
+        content.regional_variants.common.spelling === "centre"
+    )
+  ).toBe(true);
+  expect(draft.forms).toEqual([]);
+  await screen.findByText("版本 2");
+  // Reopen from the server response rather than retaining editor component state.
+  api.get.mockResolvedValue({ ...entry, revision: 2, draft });
+  await act(() => mounted.router.navigate("/lexicon-next"));
+  await screen.findByRole("button", { name: "创建词条" });
+  await act(() => mounted.router.navigate(`/lexicon-next/${id}`));
+  await screen.findByRole("button", { name: "编辑原形内容" });
+  expect(
+    screen.getAllByText("centre").some((element) => element.closest("td"))
+  ).toBe(true);
+  expect(api.get).toHaveBeenCalledTimes(2);
+});
+
+it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳服务器版本", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  const form_editor = applyFormsStructure(emptyFormEditor(), formsFixture());
+  if (!("forms_format" in form_editor))
+    throw new Error("Expected shared fixture");
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: { ...entry.draft, form_editor }
+  });
+  api.save.mockRejectedValue(new HttpError(409, "rejected"));
+  mount(api);
+  await screen.findByRole("button", { name: "编辑原形内容" });
+  fireEvent.click(button(/^词义与译词/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findByText(/服务器版本已更新/);
+  fireEvent.click(button(/词性与发音/));
+  fireEvent.click(button("编辑原形内容"));
+  fireEvent.click(await screen.findByRole("button", { name: "收起" }));
+  expect(button("比较服务器版本")).toBeDisabled();
+  fireEvent.click(button("关闭词形内容设置"));
+  await waitFor(() => expect(button("比较服务器版本")).toBeEnabled());
+  api.get.mockResolvedValue({
+    ...entry,
+    revision: 5,
+    draft: {
+      ...entry.draft,
+      headword: "remote",
+      form_editor: emptyFormEditor()
+    }
+  });
+  fireEvent.click(button("比较服务器版本"));
+  await screen.findByText("服务器 · 版本 5");
+  fireEvent.click(button("放弃本地修改并重载"));
+  fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
+  await screen.findByText("版本 5");
+  expect(screen.getByText("暂无词性")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "编辑原形内容" })).toBeNull();
 });

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-filters/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-13T01:20:27.730Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-step2-parity/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-13T03:40:08.373Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -8414,6 +8414,10 @@
       "type": "object",
       "required": ["schema_version", "headword", "forms", "senses"],
       "properties": {
+        "form_editor": {
+          "$ref": "#/components/schemas/SharedFormsStepContentV3",
+          "description": "V1 editor content, with independent lexicon-next identities."
+        },
         "forms": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/NextForm" }

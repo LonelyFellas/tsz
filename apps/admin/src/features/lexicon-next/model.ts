@@ -1,4 +1,4 @@
-import type { NextDraft, NextEntryView } from "@tsz/types";
+import type { NextDraft, NextEntryView, NextForm } from "@tsz/types";
 
 export const localeLabels: Record<string, string> = {
   "en-GB": "英式英语",
@@ -7,6 +7,28 @@ export const localeLabels: Record<string, string> = {
   "zh-Hans": "简体中文",
   "zh-Hant": "繁体中文"
 };
+
+export function draftForms(draft: NextDraft): NextForm[] {
+  return [
+    ...draft.forms,
+    ...(
+      draft.form_editor?.contents.flatMap((content) => {
+        const regional = content.regional_variants;
+        const row = (
+          variant: { id: string; spelling: string },
+          locale: string
+        ): NextForm => ({ id: variant.id, locale, text: variant.spelling });
+        if (regional.mode === "common") return [row(regional.common, "en")];
+        return (["uk", "us"] as const).flatMap((side) =>
+          (regional.mode === "uk_us_many"
+            ? regional[side]
+            : [regional[side]]
+          ).map((variant) => row(variant, side === "uk" ? "en-GB" : "en-US"))
+        );
+      }) ?? []
+    ).filter((row) => row.text.trim())
+  ];
+}
 
 /** Local preview only; never replaces the complete editable draft. */
 export function previewDraft(
@@ -18,7 +40,7 @@ export function previewDraft(
     const exact = rows.filter((row) => row.locale === target);
     return exact.length ? exact : rows.filter((row) => row.locale === "en");
   };
-  const forms = targetRows(draft.forms);
+  const forms = targetRows(draftForms(draft));
   return {
     entry_id: "",
     revision: 0,

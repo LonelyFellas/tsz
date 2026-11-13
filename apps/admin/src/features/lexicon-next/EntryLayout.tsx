@@ -3,7 +3,7 @@ import type { NextDraft, NextForm, WordCreationStep } from "@tsz/types";
 import { WordCreationLayout } from "@/features/dictionary/word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "@/features/dictionary/word-creation-v3/components/V3ProductProgressList";
 import { Tag } from "@tsz/ui/admin/display";
-import { localeLabels } from "./model";
+import { draftForms, localeLabels } from "./model";
 import "@/features/dictionary/word-creation-v3/v3-layout.css";
 
 export function EntryLayout({
@@ -26,7 +26,7 @@ export function EntryLayout({
     {
       key: "forms",
       label: "英语词形",
-      rows: draft?.forms ?? [],
+      rows: draft ? draftForms(draft) : [],
       locales: ["en-GB", "en-US"]
     },
     {
@@ -93,7 +93,7 @@ export function EntryLayout({
         back: "返回智能词库"
       }}
       stepLabels={{
-        forms: { title: "词性与词形", subtitle: "英式英语｜美式英语" },
+        forms: { title: "词性与发音", subtitle: "基本词性｜词形变化｜多发音" },
         meanings: { title: "词义与译词", subtitle: "目标语言｜媒介语言" },
         preview: { title: "预览", subtitle: "结构核对｜语言组合" }
       }}

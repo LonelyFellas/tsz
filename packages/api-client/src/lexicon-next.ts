@@ -52,6 +52,7 @@ export function decodeNextEntryView(value: unknown): NextEntryView {
 /** Uses the admin HttpClient (baseUrl=/api/v1/admin). Capability failure (including 404 on an old backend) must not fall back to V3. */
 export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
+  const formsOptions = { headers: { "x-tsz-next-forms": "v1" } };
   const entry = (id: string) => `${root}/entries/${encodeURIComponent(id)}`;
   const decode = <T>(
     schema: Parameters<typeof validateRuntimeSchema>[0],
@@ -115,7 +116,9 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .get<unknown>(`${root}/entries${search(query)}`)
         .then(decodeNextEntryList),
     capabilities: () =>
-      http.get<unknown>(`${root}/capabilities`).then(decodeNextCapabilities),
+      http
+        .get<unknown>(`${root}/capabilities`, formsOptions)
+        .then(decodeNextCapabilities),
     create: (input: CreateNextEntry) =>
       http.post<unknown>(`${root}/entries`, input).then(decodeNextEntry),
     detect: (input: NextDetectionInput) =>

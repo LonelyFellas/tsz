@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBeforeUnload, useBlocker, useParams } from "react-router-dom";
 import {
@@ -11,6 +17,11 @@ import {
 } from "@tsz/ui/admin/display";
 import { Checkbox, Form, Input, Radio, Select } from "@tsz/ui/admin/forms";
 import { App, Modal } from "@tsz/ui/admin/overlays";
+import { AdminControls } from "@tsz/ui/admin/context";
+import { ContentEditPermissions } from "@/features/dictionary/contentEditPermissions";
+import { FormsStep, emptyFormEditor } from "@/features/lexicon-next/FormsStep";
+import { VoiceSaveContext } from "@/features/dictionary/word-creation-v3/voiceSaveContext";
+import { V3StepActions } from "@/features/dictionary/word-creation-v3/components/V3StepActions";
 import { Plus, Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
@@ -21,6 +32,7 @@ import type {
   NextWorkspaceEntry,
   NextLanguageCapability,
   NextSense,
+  V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
@@ -106,6 +118,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           id={entryId}
           requests={requests}
           language={language}
+          formEditorAvailable={capability.data?.form_editor === true}
         />
       ) : (
         <EntryList
@@ -121,8 +134,10 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
 function EntryLoader({
   id,
   requests,
-  language
+  language,
+  formEditorAvailable
 }: {
+  formEditorAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -174,6 +189,7 @@ function EntryLoader({
       requests={requests}
       language={language}
       archived={metadata.data.status === "archived"}
+      formEditorAvailable={formEditorAvailable}
     />
   );
 }
@@ -181,8 +197,10 @@ function EntryEditor({
   initial,
   requests,
   language,
-  archived
+  archived,
+  formEditorAvailable
 }: {
+  formEditorAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -193,6 +211,23 @@ function EntryEditor({
   const [step, setStep] = useState<WordCreationStep>("forms");
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
+  const draftRef = useRef(draft);
+  useLayoutEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+  const [formContentOpen, setFormContentOpen] = useState(false);
+  const contentLeaveGuard = useRef<(() => Promise<boolean>) | undefined>(
+    undefined
+  );
+  const audioTasks = useRef(new Map<string, () => Promise<boolean>>());
+  const [emptyEditor] = useState(emptyFormEditor);
+  const registerContentLeaveGuard = useCallback(
+    (guard?: () => Promise<boolean>) => {
+      contentLeaveGuard.current = guard;
+      setFormContentOpen(!!guard);
+    },
+    []
+  );
   const [target, setTarget] = useState("en-GB");
   const [medium, setMedium] = useState("zh-Hans");
   const [common, setCommon] = useState(false);
@@ -200,6 +235,7 @@ function EntryEditor({
   const busy = saving;
   const lock = useRef(false);
   const [error, setError] = useState<string>();
+  const [formIssues, setFormIssues] = useState<V3DraftValidationIssue[]>([]);
   const [conflict, setConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
   const [view, setView] = useState<NextEntryView>();
@@ -210,9 +246,9 @@ function EntryEditor({
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
   const disabled = busy || !writable;
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved.draft);
-  const blocker = useBlocker(dirty || busy);
+  const blocker = useBlocker(dirty || busy || formContentOpen);
   useBeforeUnload((event) => {
-    if (dirty || busy) {
+    if (dirty || busy || formContentOpen) {
       event.preventDefault();
       event.returnValue = "";
     }
@@ -227,13 +263,16 @@ function EntryEditor({
     }));
   }
   async function run(operation: () => Promise<void>) {
-    if (lock.current) return;
+    if (lock.current) return false;
     lock.current = true;
     setBusy(true);
     setError(undefined);
+    setFormIssues([]);
     try {
       await operation();
+      return true;
     } catch (error) {
+      if (error instanceof HttpError) setFormIssues(error.field_issues);
       if (
         error instanceof HttpError &&
         error.status === 409 &&
@@ -263,22 +302,24 @@ function EntryEditor({
       } else {
         setError(failure(error));
       }
+      return false;
     } finally {
       lock.current = false;
       setBusy(false);
     }
   }
-  function save() {
-    if (!writable || conflict) return;
-    const problem = draftProblem(draft);
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    void run(async () => {
+  async function save() {
+    if (!writable || conflict) return false;
+    return run(async () => {
+      for (const wait of [...audioTasks.current.values()]) {
+        if (!(await wait())) throw new Error("发音处理尚未完成，请重试保存。");
+      }
+      const current = draftRef.current;
+      const problem = draftProblem(current);
+      if (problem) throw new Error(problem);
       const result = await requests.save(saved.id, {
         expected_revision: saved.revision,
-        draft
+        draft: current
       });
       setSaved(result);
       setDraft(result.draft);
@@ -302,9 +343,24 @@ function EntryEditor({
     <EntryLayout
       draft={draft}
       step={step}
-      onStepChange={busy ? undefined : setStep}
+      onStepChange={
+        busy
+          ? undefined
+          : (next) => {
+              void (async () => {
+                if (
+                  contentLeaveGuard.current &&
+                  !(await contentLeaveGuard.current())
+                )
+                  return;
+                setStep(next);
+              })();
+            }
+      }
     >
-      <div className="lexicon-next">
+      <div
+        className={`lexicon-next${step === "forms" ? " lexicon-next-forms" : ""}`}
+      >
         <div className="lexicon-next-toolbar">
           <Space wrap>
             <Tag>{saved.kind === "word" ? "单词" : "短语"} · 英语</Tag>
@@ -313,6 +369,7 @@ function EntryEditor({
           </Space>
           <Space wrap>
             <Button
+              hidden={step === "forms"}
               disabled={busy}
               onClick={() =>
                 void run(async () =>
@@ -330,9 +387,10 @@ function EntryEditor({
             <Button
               type="primary"
               icon={<Save aria-hidden="true" />}
+              hidden={step === "forms"}
               loading={busy}
-              disabled={!writable || !dirty || conflict}
-              onClick={save}
+              disabled={!writable || !dirty || conflict || formContentOpen}
+              onClick={() => void save()}
             >
               保存完整草稿
             </Button>
@@ -352,7 +410,7 @@ function EntryEditor({
             action={
               conflict && (
                 <Button
-                  disabled={busy}
+                  disabled={busy || formContentOpen}
                   onClick={() =>
                     void run(async () =>
                       setRemote(await requests.get(saved.id))
@@ -365,7 +423,12 @@ function EntryEditor({
             }
           />
         )}
-        <Form layout="vertical" className="lexicon-next-basics">
+        <Form
+          hidden={step === "forms"}
+          inert={step === "forms"}
+          layout="vertical"
+          className="lexicon-next-basics"
+        >
           <Form.Item label="词头">
             <Input
               aria-label="词头"
@@ -376,9 +439,13 @@ function EntryEditor({
             />
           </Form.Item>
         </Form>
-        <div className="lexicon-next-selectors">
+        <div
+          hidden={step === "forms"}
+          inert={step === "forms"}
+          className="lexicon-next-selectors"
+        >
           <section>
-            <h3>目标语言</h3>
+            <h3>语言变体</h3>
             <Radio.Group
               disabled={busy}
               aria-label="目标语言变体"
@@ -404,7 +471,7 @@ function EntryEditor({
             />
           </section>
         </div>
-        {language.common_target_locale === "en" && (
+        {step !== "forms" && language.common_target_locale === "en" && (
           <Checkbox
             disabled={busy}
             checked={common}
@@ -413,20 +480,92 @@ function EntryEditor({
             编辑通用英语内容
           </Checkbox>
         )}
-        {common && (
+        {step !== "forms" && common && (
           <p className="lexicon-next-muted">
             通用英语仅在所选英美变体没有对应内容时使用。
           </p>
         )}
         <div hidden={step !== "forms"} inert={step !== "forms"}>
-          <ContentRows
-            rows={draft.forms}
-            textClassName="tsz-words"
-            locale={editingLocale}
-            label={`${localeLabels[editingLocale]}词形`}
-            disabled={disabled}
-            onChange={(forms) => setDraft({ ...draft, forms })}
-          />
+          {formEditorAvailable ? (
+            <>
+              <VoiceSaveContext.Provider
+                value={{ save, failure: error, audioTasks: audioTasks.current }}
+              >
+                <ContentEditPermissions.Provider
+                  value={{ edit: writable, associate: false }}
+                >
+                  <AdminControls componentDisabled={disabled}>
+                    <FormsStep
+                      value={draft.form_editor ?? emptyEditor}
+                      saved={saved.draft.form_editor}
+                      kind={saved.kind}
+                      issues={formIssues}
+                      onChange={(form_editor) =>
+                        setDraft((current) => ({ ...current, form_editor }))
+                      }
+                      registerLeaveGuard={registerContentLeaveGuard}
+                    />
+                  </AdminControls>
+                </ContentEditPermissions.Provider>
+              </VoiceSaveContext.Provider>
+              <V3StepActions
+                status={
+                  busy
+                    ? "正在保存草稿"
+                    : dirty
+                      ? "有未保存修改"
+                      : `草稿版本 ${saved.revision}`
+                }
+              >
+                <Button
+                  loading={busy}
+                  disabled={!writable || !dirty || conflict || formContentOpen}
+                  onClick={() => void save()}
+                >
+                  保存草稿
+                </Button>
+                <Button
+                  type="primary"
+                  disabled={busy || formContentOpen}
+                  onClick={() => setStep("meanings")}
+                >
+                  下一步：词义与译词
+                </Button>
+              </V3StepActions>
+            </>
+          ) : (
+            <Alert
+              type="warning"
+              title="当前服务尚未支持词性与发音编辑，请更新服务后重试。"
+            />
+          )}
+          {draft.forms.length > 0 && (
+            <Collapse
+              items={[
+                {
+                  key: "legacy-forms",
+                  label: "已有词形",
+                  children: (
+                    <>
+                      {["en", "en-GB", "en-US"].map((locale) => (
+                        <ContentRows
+                          key={locale}
+                          rows={draft.forms}
+                          textClassName="tsz-words"
+                          locale={locale}
+                          label={`${localeLabels[locale]}词形`}
+                          disabled={disabled}
+                          onChange={(forms) =>
+                            setDraft((current) => ({ ...current, forms }))
+                          }
+                        />
+                      ))}
+                    </>
+                  )
+                }
+              ]}
+            />
+          )}
         </div>
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <div className="lexicon-next-section-heading">
@@ -546,15 +685,17 @@ function EntryEditor({
           <h2>预览</h2>
           <Preview view={previewDraft(draft, target, medium)} />
         </div>
-        <Collapse
-          items={[
-            {
-              key: "preview",
-              label: "当前草稿预览（含未保存修改）",
-              children: <Preview view={previewDraft(draft, target, medium)} />
-            }
-          ]}
-        />
+        {step !== "forms" && (
+          <Collapse
+            items={[
+              {
+                key: "preview",
+                label: "当前草稿预览（含未保存修改）",
+                children: <Preview view={previewDraft(draft, target, medium)} />
+              }
+            ]}
+          />
+        )}
         <Modal
           open={!!view}
           title={`已保存预览 · 版本 ${view?.revision ?? ""}`}
@@ -573,6 +714,7 @@ function EntryEditor({
               <Button onClick={() => setRemote(undefined)}>保留本地草稿</Button>
               <Button
                 danger
+                disabled={busy || formContentOpen}
                 onClick={() =>
                   modal.confirm({
                     title: "放弃本地修改并重载？",
@@ -580,7 +722,7 @@ function EntryEditor({
                     okText: "放弃并重载",
                     cancelText: "取消",
                     onOk: () => {
-                      if (remote) {
+                      if (remote && !contentLeaveGuard.current) {
                         setSaved(remote);
                         setDraft(remote.draft);
                         setRemote(undefined);
@@ -623,7 +765,16 @@ function EntryEditor({
               <Button
                 danger
                 disabled={busy}
-                onClick={() => blocker.state === "blocked" && blocker.proceed()}
+                onClick={() => {
+                  void (async () => {
+                    if (
+                      contentLeaveGuard.current &&
+                      !(await contentLeaveGuard.current())
+                    )
+                      return;
+                    if (blocker.state === "blocked") blocker.proceed();
+                  })();
+                }}
               >
                 放弃修改并离开
               </Button>

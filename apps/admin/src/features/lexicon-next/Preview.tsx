@@ -1,5 +1,5 @@
 import type { NextDraft, NextEntryView } from "@tsz/types";
-import { localeLabels } from "./model";
+import { draftForms, localeLabels } from "./model";
 
 function Lines({
   rows,
@@ -45,7 +45,11 @@ export function DraftSummary({ draft }: { draft: NextDraft }) {
   return (
     <div className="lexicon-next-preview">
       <h4 className="tsz-words">{draft.headword}</h4>
-      <Lines rows={draft.forms} missing="词形" textClassName="tsz-words" />
+      <Lines
+        rows={draftForms(draft)}
+        missing="词形"
+        textClassName="tsz-words"
+      />
       {draft.senses.map((sense, index) => (
         <section key={sense.id}>
           <h4>
