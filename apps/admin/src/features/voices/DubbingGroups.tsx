@@ -14,10 +14,9 @@ import {
   CopyIcon,
   Trash2Icon,
   PencilIcon,
+  GripVerticalIcon,
   Volume2Icon,
-  PlusIcon,
-  SaveIcon,
-  CheckIcon
+  PlusIcon
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
@@ -110,6 +109,15 @@ export function DubbingGroups({
   >({});
   const [saved, setSaved] = useVoiceMessageState();
   const [editing, setEditing] = useState<Editing>();
+  const [dragging, setDragging] = useState<{
+    groupId: string;
+    side: DubbingSide;
+    id: string;
+  }>();
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    after: boolean;
+  }>();
   const [settingsId, setSettingsId] = useState<string>();
   const [settingsCreating, setSettingsCreating] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
@@ -373,6 +381,32 @@ export function DubbingGroups({
   ) {
     change(groupId, (group) => ({ ...group, [side]: update(group[side]) }));
   }
+  function moveRecommendation(
+    groupId: string,
+    side: DubbingSide,
+    id: string,
+    targetId: string,
+    after: boolean
+  ) {
+    if (!canEdit || saving || id === targetId) return;
+    const items = current.find((group) => group.id === groupId)?.[side];
+    if (!items) return;
+    const from = items.findIndex((item) => item.id === id);
+    const target = items.findIndex((item) => item.id === targetId);
+    if (from < 0 || target < 0) return;
+    const to = target + Number(after) - Number(from < target);
+    if (from === to) return;
+    updateSide(groupId, side, (values) => {
+      const next = [...values];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item!);
+      return next;
+    });
+  }
+  function finishDrag() {
+    setDragging(undefined);
+    setDropTarget(undefined);
+  }
   const editingGroup =
     editing && current.find((group) => group.id === editing.groupId);
   const matching =
@@ -418,9 +452,6 @@ export function DubbingGroups({
                   {editable && (
                     <Button
                       size="small"
-                      type="primary"
-                      className="dubbing-accent-action"
-                      data-side={side}
                       icon={<PlusIcon aria-hidden />}
                       disabled={group[side].length >= 20}
                       onClick={() =>
@@ -464,8 +495,90 @@ export function DubbingGroups({
                       const accent = voice
                         ? speechAccentGroup(voice.locale, voice.accent)
                         : "other";
+                      const canReorder = editable && group[side].length > 1;
+                      const sameList =
+                        editable &&
+                        dragging?.groupId === group.id &&
+                        dragging.side === side;
+                      const dropPosition =
+                        sameList && dropTarget?.id === item.id
+                          ? dropTarget.after
+                            ? "after"
+                            : "before"
+                          : undefined;
                       return (
-                        <tr key={item.id} data-recommendation-id={item.id}>
+                        <tr
+                          key={item.id}
+                          data-recommendation-id={item.id}
+                          draggable={canReorder}
+                          className={
+                            sameList && dragging.id === item.id
+                              ? "dubbing-recommendation-dragging"
+                              : undefined
+                          }
+                          data-drop-position={dropPosition}
+                          onDragStart={(event) => {
+                            const control = (
+                              event.target as HTMLElement
+                            ).closest('input, button, a, [role="checkbox"]');
+                            if (
+                              !canReorder ||
+                              (control &&
+                                !control.hasAttribute(
+                                  "data-dubbing-drag-handle"
+                                ))
+                            ) {
+                              event.preventDefault();
+                              return;
+                            }
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", item.id);
+                            event.dataTransfer.setDragImage(
+                              event.currentTarget,
+                              24,
+                              24
+                            );
+                            setDragging({
+                              groupId: group.id,
+                              side,
+                              id: item.id
+                            });
+                          }}
+                          onDragEnd={finishDrag}
+                          onDragOver={(event) => {
+                            if (!sameList || dragging.id === item.id) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            setDropTarget({
+                              id: item.id,
+                              after: event.clientY > rect.top + rect.height / 2
+                            });
+                          }}
+                          onDragLeave={(event) => {
+                            if (
+                              !event.currentTarget.contains(
+                                event.relatedTarget as Node | null
+                              )
+                            )
+                              setDropTarget(undefined);
+                          }}
+                          onDrop={(event) => {
+                            if (!sameList) return;
+                            event.preventDefault();
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            moveRecommendation(
+                              group.id,
+                              side,
+                              dragging.id,
+                              item.id,
+                              event.clientY > rect.top + rect.height / 2
+                            );
+                            finishDrag();
+                          }}
+                        >
                           <td>
                             <Checkbox
                               aria-label={t("select_side_recommendation", {
@@ -491,45 +604,40 @@ export function DubbingGroups({
                           <td>
                             <div className="dubbing-item-order">
                               <span>{index + 1}</span>
-                              {editable &&
-                                ([-1, 1] as const).map((direction) => (
-                                  <Button
-                                    key={direction}
-                                    size="small"
-                                    type="text"
-                                    aria-label={t(
-                                      direction < 0
-                                        ? "move_recommendation_up"
-                                        : "move_recommendation_down",
-                                      {
-                                        side: sideName(side, t),
-                                        name: item.name
-                                      }
-                                    )}
-                                    icon={
-                                      direction < 0 ? (
-                                        <ArrowUpIcon aria-hidden />
-                                      ) : (
-                                        <ArrowDownIcon aria-hidden />
-                                      )
-                                    }
-                                    disabled={
-                                      index + direction < 0 ||
-                                      index + direction >= group[side].length
-                                    }
-                                    onClick={() =>
-                                      updateSide(group.id, side, (items) => {
-                                        const next = [...items];
-                                        [next[index], next[index + direction]] =
-                                          [
-                                            next[index + direction]!,
-                                            next[index]!
-                                          ];
-                                        return next;
-                                      })
-                                    }
-                                  />
-                                ))}
+                              {editable && (
+                                <Button
+                                  size="small"
+                                  type="text"
+                                  data-dubbing-drag-handle=""
+                                  aria-label={t("drag_recommendation", {
+                                    side: sideName(side, t),
+                                    name: item.name
+                                  })}
+                                  title={t("drag_recommendation_help")}
+                                  icon={<GripVerticalIcon aria-hidden />}
+                                  draggable={canReorder}
+                                  disabled={!canReorder}
+                                  onKeyDown={(event) => {
+                                    const direction =
+                                      event.key === "ArrowUp"
+                                        ? -1
+                                        : event.key === "ArrowDown"
+                                          ? 1
+                                          : 0;
+                                    const target =
+                                      group[side][index + direction];
+                                    if (!direction || !target) return;
+                                    event.preventDefault();
+                                    moveRecommendation(
+                                      group.id,
+                                      side,
+                                      item.id,
+                                      target.id,
+                                      direction > 0
+                                    );
+                                  }}
+                                />
+                              )}
                             </div>
                           </td>
                           <td>
@@ -886,42 +994,32 @@ export function DubbingGroups({
                     }
                   />
                 )}
-                <div className="dubbing-group-footer">
-                  <Typography.Text
-                    type={draft ? undefined : "secondary"}
-                    className={draft ? "dubbing-group-dirty" : undefined}
-                  >
-                    {draft ? (
-                      t("unsaved")
-                    ) : (
-                      <>
-                        <CheckIcon aria-hidden /> {t("saved")}
-                      </>
-                    )}
-                  </Typography.Text>
-                  {(canEdit || draft) && (
+                {draft && (
+                  <div className="dubbing-group-footer">
+                    <Typography.Text className="dubbing-group-dirty">
+                      {t("unsaved")}
+                    </Typography.Text>
                     <Space>
                       <Button
-                        disabled={!draft || saving}
+                        disabled={saving}
                         onClick={() => {
                           discard(group.id);
                           void groups.refetch();
                         }}
                       >
-                        {t("discard_changes")}
+                        {t("cancel")}
                       </Button>
                       <Button
                         type="primary"
-                        icon={<SaveIcon aria-hidden />}
                         loading={savingId === group.id}
-                        disabled={!draft || !canEdit || saving}
+                        disabled={!canEdit || saving}
                         onClick={() => void save(group.id)}
                       >
-                        {t("save_current_group")}
+                        {t("done")}
                       </Button>
                     </Space>
-                  )}
-                </div>
+                  </div>
+                )}
                 {canEdit &&
                   groups.data.groups.some((g) => g.id === group.id) && (
                     <div className="dubbing-group-updates">
