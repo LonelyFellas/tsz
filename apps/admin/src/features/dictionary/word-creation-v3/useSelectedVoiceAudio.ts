@@ -40,7 +40,6 @@ function inScope(
 ) {
   if (
     activeLocales &&
-    setting.locale &&
     !activeLocales.some(
       (active) =>
         speechAccentGroup(active) ===
@@ -264,7 +263,8 @@ export function useSelectedVoiceAudio({
             (result) => result.status === "rejected"
           );
           if (
-            (stored.dubbing ||
+            (activeLocales !== undefined ||
+              stored.dubbing ||
               (!resolved.length &&
                 !stored.voices.some((setting) => setting.enabled))) &&
             failure?.status === "rejected"

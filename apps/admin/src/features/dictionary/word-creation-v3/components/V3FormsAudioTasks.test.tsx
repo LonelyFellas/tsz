@@ -381,7 +381,9 @@ it.each([false, true])(
     const variant = variants.common;
     variant.spelling_speech = {
       content: { version: 2, text: "hello", annotations: [] },
-      voice_profile: { voices: structuredClone(voices) }
+      voice_profile: {
+        voices: voices.map(({ locale: _locale, ...voice }) => voice)
+      }
     };
     const row = variant.pronunciations[0]!;
     row.synthesis!.uk!.source = "none";
@@ -410,6 +412,30 @@ it.each([false, true])(
     expect(saved.pronunciations[0].synthesis.uk.source).toBe("none");
   }
 );
+
+it("显式拼写来源的历史音色解析失败时不兜底生成未知口音", async () => {
+  const forms = fixture();
+  const variants = forms.contents[0]!.regional_variants;
+  if (variants.mode !== "common") throw new Error("expected common fixture");
+  variants.common.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: {
+      voices: voices.map(({ locale: _locale, ...voice }) => voice)
+    }
+  };
+  const row = variants.common.pronunciations[0]!;
+  row.synthesis!.uk!.source = "none";
+  row.synthesis!.us!.source = "spelling";
+  speech.resolve.mockRejectedValue(new Error("解析暂不可用"));
+  render(<Host initial={forms} />);
+  expect(await screen.findAllByText("解析暂不可用")).not.toHaveLength(0);
+  for (const wait of tasks.values()) expect(await wait()).toBe(false);
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(
+    JSON.parse(screen.getByTestId("saved-forms").textContent!).contents[0]
+      .regional_variants.common.spelling_speech
+  ).toEqual(variants.common.spelling_speech);
+});
 
 it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来源之间不混用", async () => {
   const forms = fixture();
