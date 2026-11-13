@@ -35,6 +35,9 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "LexiconTaxonomy",
+  "LexiconTaxonomyKind",
+  "PaginatedResponse_LexiconTaxonomy",
   "NextWorkspaceEntry",
   "NextWorkspaceList",
   "NextWorkspaceStats",
