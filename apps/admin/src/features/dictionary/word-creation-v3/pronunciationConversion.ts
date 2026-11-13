@@ -39,9 +39,6 @@ export function planPronunciationConversion(
   );
   if (!actual.ok) return { ...actual, field: "actual_pron" };
   let synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
-  const undoSynthesis = pronunciation.synthesis
-    ? { ...pronunciation.synthesis }
-    : undefined;
   const rows: PronunciationConversionPlan["rows"] = [
     {
       field: "actual_pron",
@@ -72,17 +69,6 @@ export function planPronunciationConversion(
       ups: ups.value,
       ups_words: ups.ups_words
     });
-    // Undo restores text and settings, without resurrecting invalidated audio references.
-    if (undoSynthesis?.[side])
-      undoSynthesis[side] = {
-        ...undoSynthesis[side],
-        ...(previous.ipa_speech
-          ? { ipa_speech: synthesis[side]!.ipa_speech }
-          : {}),
-        ...(previous.ups_speech
-          ? { ups_speech: synthesis[side]!.ups_speech }
-          : {})
-      };
   }
   const rich = pronunciation.actual_pron_rich;
   const hasAnnotations = Boolean(
@@ -99,7 +85,7 @@ export function planPronunciationConversion(
       undo: {
         actual_pron: pronunciation.actual_pron,
         actual_pron_rich: pronunciation.actual_pron_rich,
-        synthesis: undoSynthesis
+        synthesis: pronunciation.synthesis
       },
       rows,
       requiresConfirmation:
@@ -114,5 +100,68 @@ export function pronunciationConversionRevision(
   spelling: string,
   dialect: Dialect
 ) {
-  return JSON.stringify([pronunciation, spelling, dialect]);
+  const synthesis = pronunciation.synthesis;
+  // Generated audio and voice resolution can arrive without a text edit.
+  const candidate = (side: "uk" | "us") => {
+    const value = synthesis?.[side];
+    return [
+      value?.source,
+      value?.ipa ?? "",
+      value?.ups ?? "",
+      value?.ups_words
+    ];
+  };
+  return JSON.stringify([
+    pronunciation.id,
+    pronunciation.style,
+    pronunciation.dict_phonetic,
+    pronunciation.actual_pron,
+    pronunciation.actual_pron_rich,
+    spelling,
+    dialect,
+    synthesis?.alphabet,
+    synthesis?.use_spelling,
+    synthesis?.ipa,
+    synthesis?.ups,
+    synthesis?.ups_words,
+    synthesis?.ipa_locale,
+    synthesis?.ups_locale,
+    candidate("uk"),
+    candidate("us")
+  ]);
+}
+
+/** Restore only conversion fields against current settings; never restore old asset IDs. */
+export function undoPronunciationConversion(
+  pronunciation: WordPronunciationV3,
+  plan: PronunciationConversionPlan,
+  dialect: Dialect
+): PronunciationConversionPatch {
+  let synthesis = pronunciation.synthesis;
+  if (synthesis) {
+    const sides = dialect === "common" ? (["uk", "us"] as const) : [dialect];
+    for (const side of sides) {
+      const previous = candidateForSide(
+        plan.undo.synthesis ?? EMPTY_SYNTHESIS,
+        side,
+        dialect
+      );
+      synthesis = updateSynthesisCandidate(synthesis, side, dialect, {
+        ...candidateForSide(synthesis, side, dialect),
+        ipa: previous.ipa,
+        ups: previous.ups,
+        ups_words: previous.ups_words
+      });
+      const restored = synthesis[side]!;
+      if (
+        !plan.undo.synthesis?.[side] &&
+        !restored.ipa_speech &&
+        !restored.ups_speech
+      )
+        delete synthesis[side];
+    }
+    if (!plan.undo.synthesis && !synthesis.uk && !synthesis.us)
+      synthesis = undefined;
+  }
+  return { ...plan.undo, synthesis };
 }

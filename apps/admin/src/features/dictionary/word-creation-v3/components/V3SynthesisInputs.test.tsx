@@ -19,6 +19,7 @@ import type {
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
+import { V3PronunciationConvertAll } from "./V3PronunciationConvertAll";
 import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
 import { VoiceSaveContext, VoiceAudioTasksContext } from "../voiceSaveContext";
 import { pronunciationPlaybackSource } from "@tsz/shared";
@@ -330,6 +331,105 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
     fireEvent.click(toggle);
   return view;
 };
+
+it.each(["ipa", "ups"] as const)(
+  "活动 %s 自动生成回写后仍可撤销全部转换，旧资产不复活",
+  async (alphabet) => {
+    function ConversionHarness() {
+      const [pronunciation, setPronunciation] = useState<WordPronunciationV3>({
+        id: "convert-active",
+        style: "normal",
+        dict_phonetic: "fɑː",
+        actual_pron: "manual",
+        synthesis: {
+          alphabet,
+          ipa: "",
+          ups: "",
+          use_spelling: false,
+          uk: {
+            source: alphabet,
+            ipa: "fɑɹ",
+            ups: "F AA R",
+            [`${alphabet}_speech`]: {
+              content: { version: 2, text: "far", annotations: [] },
+              voice_profile: {
+                voices: [
+                  {
+                    voice_id: "en-gb-sonia",
+                    locale: "en-GB",
+                    enabled: true,
+                    rate_percent: -20,
+                    audio_asset_id: "original-audio"
+                  }
+                ],
+                dubbing: {
+                  area: "azure",
+                  uk: { mode: "local" },
+                  us: { mode: "local" }
+                }
+              }
+            }
+          }
+        }
+      });
+      const change = (patch: Partial<WordPronunciationV3>) =>
+        setPronunciation((current) => ({ ...current, ...patch }));
+      return (
+        <App>
+          <PronunciationPreviewProvider>
+            <V3PronunciationConvertAll
+              pronunciation={pronunciation}
+              spelling="far"
+              dialect="uk"
+              onChange={change}
+            />
+            <V3SynthesisInputs
+              pronunciation={pronunciation}
+              spelling="far"
+              dialect="uk"
+              index={0}
+              issues={[]}
+              synthesisEditable
+              onChange={change}
+            />
+            <output data-testid="conversion-wire">
+              {JSON.stringify(pronunciation)}
+            </output>
+          </PronunciationPreviewProvider>
+        </App>
+      );
+    }
+    const wire = () =>
+      JSON.parse(
+        screen.getByTestId("conversion-wire").textContent!
+      ) as WordPronunciationV3;
+    render(<ConversionHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "全部转换" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "应用转换结果"
+      })
+    );
+    await waitFor(() =>
+      expect(
+        wire().synthesis?.uk?.[`${alphabet}_speech`]?.voice_profile.voices[0]
+          ?.audio_asset_id
+      ).toBe("new-audio")
+    );
+    const undo = screen.getByRole("button", { name: "撤销全部转换" });
+    fireEvent.click(undo);
+    expect(wire()).toMatchObject({
+      actual_pron: "manual",
+      synthesis: { uk: { source: alphabet, ipa: "fɑɹ", ups: "F AA R" } }
+    });
+    expect(
+      wire().synthesis?.uk?.[`${alphabet}_speech`]?.voice_profile.voices[0]
+    ).toMatchObject({ rate_percent: -20 });
+    expect(
+      wire().synthesis?.uk?.[`${alphabet}_speech`]?.voice_profile.voices[0]
+    ).not.toHaveProperty("audio_asset_id");
+  }
+);
 
 it("配音配置问题说明实际原因，不误报为音标或逐词边界问题", () => {
   renderWithUps(

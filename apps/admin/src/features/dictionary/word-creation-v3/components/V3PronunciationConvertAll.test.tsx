@@ -71,6 +71,34 @@ function Harness({
         >
           修改目标
         </button>
+        <button
+          onClick={() =>
+            setCurrent((previous) => ({
+              ...previous,
+              synthesis: {
+                ...previous.synthesis!,
+                uk: {
+                  ...previous.synthesis!.uk!,
+                  ipa_speech: {
+                    content: { version: 2, text: spelling, annotations: [] },
+                    voice_profile: {
+                      voices: [
+                        {
+                          voice_id: "latest-voice",
+                          enabled: true,
+                          rate_percent: -35,
+                          audio_asset_id: "async-audio"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }))
+          }
+        >
+          更新配音结果
+        </button>
         <output data-testid="current">{JSON.stringify(current)}</output>
       </ContentEditPermissions>
     </App>
@@ -115,6 +143,29 @@ it("覆盖前显示所有新旧值，取消不写回，确认一次写入并整�
   });
   fireEvent.click(screen.getByRole("button", { name: "撤销全部转换" }));
   expect(current()).toEqual(initial);
+});
+
+it("确认期间和转换后的配音回写不覆盖最新参数，撤销仅恢复转换内容", () => {
+  onChange.mockClear();
+  render(<Harness />);
+  start();
+  fireEvent.click(screen.getByRole("button", { name: "更新配音结果" }));
+  apply();
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(current().synthesis?.uk?.ipa_speech?.voice_profile.voices[0]).toEqual({
+    voice_id: "latest-voice",
+    enabled: true,
+    rate_percent: -35
+  });
+  fireEvent.click(screen.getByRole("button", { name: "更新配音结果" }));
+  fireEvent.click(screen.getByRole("button", { name: "撤销全部转换" }));
+  expect(current().actual_pron).toBe(initial.actual_pron);
+  expect(current().synthesis?.uk?.ipa).toBe(initial.synthesis?.uk?.ipa);
+  expect(current().synthesis?.uk?.ipa_speech?.voice_profile.voices[0]).toEqual({
+    voice_id: "latest-voice",
+    enabled: true,
+    rate_percent: -35
+  });
 });
 
 it.each(["修改来源", "修改目标"])(

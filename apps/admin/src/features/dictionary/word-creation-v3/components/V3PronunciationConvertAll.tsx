@@ -9,6 +9,7 @@ import { useLexiconEditorTranslation } from "../../i18n/editor";
 import {
   planPronunciationConversion,
   pronunciationConversionRevision,
+  undoPronunciationConversion,
   type ConversionField,
   type PronunciationConversionPlan
 } from "../pronunciationConversion";
@@ -99,7 +100,9 @@ export function V3PronunciationConvertAll({
           title={t("panel_undo_convert_all")}
           onClick={() => {
             if (!canEdit || history.revision !== revision) return;
-            onChange(history.plan.undo);
+            onChange(
+              undoPronunciationConversion(pronunciation, history.plan, dialect)
+            );
             setHistory(undefined);
           }}
         />
@@ -122,7 +125,13 @@ export function V3PronunciationConvertAll({
             setPending(undefined);
             return;
           }
-          apply(pending.plan);
+          // Rebase voice settings/asset updates that arrived while confirmation was open.
+          const latest = planPronunciationConversion(
+            pronunciation,
+            spelling,
+            dialect
+          );
+          if (latest.ok) apply(latest.plan);
         }}
       >
         <Typography.Paragraph>

@@ -1,6 +1,9 @@
 import { expect, it } from "vitest";
 import type { SynthesisSpeechV3, WordPronunciationV3 } from "@tsz/types";
-import { planPronunciationConversion } from "./pronunciationConversion";
+import {
+  planPronunciationConversion,
+  undoPronunciationConversion
+} from "./pronunciationConversion";
 
 const pronunciation: WordPronunciationV3 = {
   id: "reading",
@@ -79,6 +82,11 @@ it("转换与撤销只失效改动音素的旧音频引用，保留来源、参�
   const result = planPronunciationConversion(input, "bib", "uk");
   expect(result.ok).toBe(true);
   if (!result.ok) throw new Error(result.message);
+  const undone = undoPronunciationConversion(
+    { ...input, ...result.plan.patch },
+    result.plan,
+    "uk"
+  );
   expect(result.plan.requiresConfirmation).toBe(true);
   expect(result.plan.patch.synthesis?.us).toEqual(input.synthesis?.us);
   expect(result.plan.patch.synthesis?.uk).toMatchObject({
@@ -93,7 +101,7 @@ it("转换与撤销只失效改动音素的旧音频引用，保留来源、参�
         voices: [{ voice_id: "voice", enabled: true, rate_percent: -20 }]
       }
     });
-    expect(result.plan.undo.synthesis?.uk?.[field]).toEqual(
+    expect(undone.synthesis?.uk?.[field]).toEqual(
       result.plan.patch.synthesis?.uk?.[field]
     );
   }
