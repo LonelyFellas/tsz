@@ -1,6 +1,5 @@
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
-  CheckIcon,
   ChevronDownIcon,
   CircleAlertIcon,
   LoaderCircleIcon,
@@ -47,14 +46,17 @@ export function AdminConnectionStatus({
         : connectionError
           ? "unavailable"
           : "connected";
+  useEffect(() => {
+    if (state === "connected") setOpen(false);
+  }, [state]);
+  if (state === "connected") return null;
+
   const Icon =
     state === "connecting"
       ? LoaderCircleIcon
       : state === "offline"
         ? WifiOffIcon
-        : state === "connected"
-          ? CheckIcon
-          : CircleAlertIcon;
+        : CircleAlertIcon;
 
   const changeOpen = (next: boolean) => {
     setOpen(next);
@@ -79,21 +81,19 @@ export function AdminConnectionStatus({
           <p className="admin-connection__description">
             {t(`connection_${state}_help`)}
           </p>
-          {state !== "connected" && (
-            <Button
-              block
-              loading={retrying}
-              onClick={() => {
-                if (refreshUnconfirmed) window.location.assign("/login");
-                else {
-                  triggerRef.current?.focus({ preventScroll: true });
-                  onRetry();
-                }
-              }}
-            >
-              {t(refreshUnconfirmed ? "recovery_sign_in" : "recovery_retry")}
-            </Button>
-          )}
+          <Button
+            block
+            loading={retrying}
+            onClick={() => {
+              if (refreshUnconfirmed) window.location.assign("/login");
+              else {
+                triggerRef.current?.focus({ preventScroll: true });
+                onRetry();
+              }
+            }}
+          >
+            {t(refreshUnconfirmed ? "recovery_sign_in" : "recovery_retry")}
+          </Button>
         </div>
       }
     >

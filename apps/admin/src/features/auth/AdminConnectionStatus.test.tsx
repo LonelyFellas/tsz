@@ -11,6 +11,24 @@ const props = {
 
 afterEach(() => vi.restoreAllMocks());
 
+it("正常连接时隐藏入口，恢复后关闭浮层，再次断线从收起状态显示", async () => {
+  const view = render(
+    <AdminConnectionStatus {...props} connectionError={false} />
+  );
+  expect(screen.queryByRole("button")).toBeNull();
+  view.rerender(<AdminConnectionStatus {...props} />);
+  fireEvent.click(screen.getByRole("button", { name: "无法连接" }));
+  expect(await screen.findByRole("button", { name: "重试" })).toBeVisible();
+  view.rerender(<AdminConnectionStatus {...props} connectionError={false} />);
+  expect(screen.queryByRole("button")).toBeNull();
+  view.rerender(<AdminConnectionStatus {...props} />);
+  expect(screen.getByRole("button", { name: "无法连接" })).toHaveAttribute(
+    "aria-expanded",
+    "false"
+  );
+  expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
+});
+
 it("区分浏览器离线和服务连接失败，网络事件只更新提示，不额外调用恢复逻辑", async () => {
   const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
   const retry = vi.fn();

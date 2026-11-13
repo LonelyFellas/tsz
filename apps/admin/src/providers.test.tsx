@@ -207,7 +207,7 @@ describe("登录页连接提示", () => {
 
     sessionRestore.retrying = false;
     act(() => useAuthStore.setState({ connectionError: false }));
-    expect(trigger).toHaveAccessibleName("已连接");
+    expect(trigger).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
     expect(input()).toBe(original);
     expect(input()).toHaveValue("unsaved center");
