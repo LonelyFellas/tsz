@@ -46,6 +46,7 @@
   font: inherit;
   color: var(--ui-color-text-secondary);
   cursor: inherit;
+  border-radius: var(--ui-border-radius);
   outline-offset: -2px;
 }
 .ui-tabs-small .ui-tabs-tab-btn {
@@ -59,8 +60,7 @@
   cursor: default;
   opacity: 0.5;
 }
-.ui-tabs-tab-btn:focus-visible,
-.ui-tabs-tab-focus > .ui-tabs-tab-btn {
+.ui-tabs-tab-btn:focus-visible {
   outline: var(--ui-focus-ring);
 }
 .ui-tabs-body-holder {

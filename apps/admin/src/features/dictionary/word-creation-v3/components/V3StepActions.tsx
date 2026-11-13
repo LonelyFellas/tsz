@@ -20,14 +20,17 @@ export function V3StepActions({
   useLayoutEffect(() => {
     const shell = anchor.current?.closest<HTMLElement>(".word-creation-shell");
     const summary = shell?.querySelector<HTMLElement>(".word-creation-summary");
-    if (!shell || !summary) return;
+    if (!shell) return;
     const follow = () => {
       const rect = shell.getBoundingClientRect();
       if (rect.width === 0) return;
       const style = getComputedStyle(shell);
+      const sidebar = shell.querySelector<HTMLElement>(
+        ".word-creation-summary"
+      );
       const left =
-        style.display === "grid"
-          ? summary.getBoundingClientRect().right
+        style.display === "grid" && sidebar
+          ? sidebar.getBoundingClientRect().right
           : rect.left + parseFloat(style.borderLeftWidth);
       const width = rect.right - parseFloat(style.borderRightWidth) - left;
       const bottom = Math.max(
@@ -45,7 +48,7 @@ export function V3StepActions({
     follow();
     const observer = new ResizeObserver(follow);
     observer.observe(shell);
-    observer.observe(summary);
+    if (summary) observer.observe(summary);
     window.addEventListener("resize", follow);
     window.addEventListener("scroll", follow, { passive: true });
     return () => {

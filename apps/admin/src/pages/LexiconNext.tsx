@@ -508,30 +508,34 @@ function EntryEditor({
                   </AdminControls>
                 </ContentEditPermissions.Provider>
               </VoiceSaveContext.Provider>
-              <V3StepActions
-                status={
-                  busy
-                    ? "正在保存草稿"
-                    : dirty
-                      ? "有未保存修改"
-                      : `草稿版本 ${saved.revision}`
-                }
-              >
-                <Button
-                  loading={busy}
-                  disabled={!writable || !dirty || conflict || formContentOpen}
-                  onClick={() => void save()}
+              {step === "forms" && (
+                <V3StepActions
+                  status={
+                    busy
+                      ? "正在保存草稿"
+                      : dirty
+                        ? "有未保存修改"
+                        : `草稿版本 ${saved.revision}`
+                  }
                 >
-                  保存草稿
-                </Button>
-                <Button
-                  type="primary"
-                  disabled={busy || formContentOpen}
-                  onClick={() => setStep("meanings")}
-                >
-                  下一步：词义与译词
-                </Button>
-              </V3StepActions>
+                  <Button
+                    loading={busy}
+                    disabled={
+                      !writable || !dirty || conflict || formContentOpen
+                    }
+                    onClick={() => void save()}
+                  >
+                    保存草稿
+                  </Button>
+                  <Button
+                    type="primary"
+                    disabled={busy || formContentOpen}
+                    onClick={() => setStep("meanings")}
+                  >
+                    下一步：词义与译词
+                  </Button>
+                </V3StepActions>
+              )}
             </>
           ) : (
             <Alert

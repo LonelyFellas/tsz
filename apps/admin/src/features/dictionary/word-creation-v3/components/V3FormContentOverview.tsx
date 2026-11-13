@@ -483,6 +483,8 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.rate,
             key: "rate",
+            align: "center",
+            className: "v3-overview-numeric-cell",
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <PronunciationCell reading={row} settings="rate" />
@@ -491,6 +493,8 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.volume,
             key: "volume",
+            align: "center",
+            className: "v3-overview-numeric-cell",
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <PronunciationCell reading={row} settings="volume" />

@@ -51,9 +51,10 @@ export function FloatingEntryOverview({
       const top = (viewport?.offsetTop ?? 0) + GAP;
       const right = left + (viewport?.width ?? window.innerWidth) - GAP * 2;
       let bottom = top + (viewport?.height ?? window.innerHeight) - GAP * 2;
-      const footer = pageRef.current
-        ?.querySelector(".word-step-actions")
-        ?.getBoundingClientRect();
+      const footer = (
+        pageRef.current?.querySelector(".word-step-actions") ??
+        document.querySelector(".v3-step-actions .word-step-actions")
+      )?.getBoundingClientRect();
       if (
         footer &&
         footer.height > 0 &&
