@@ -360,22 +360,24 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
   });
 
-  it("个人设置页渲染方言偏好，默认英式", () => {
+  it("个人设置页保留改密入口，不再显示全局英美偏好", () => {
     // 依赖路由与 antd App context。
     render(
       <MemoryRouter>
         <FeedbackApp>
           <ProfileSettingsPage />
+          <LocationProbe />
         </FeedbackApp>
       </MemoryRouter>
     );
     expect(
       screen.getByRole("heading", { name: "个人设置" })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("radiogroup", { name: "英语偏好" })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "英式（BrE）" })).toBeChecked();
+    expect(screen.queryByRole("radiogroup", { name: "英语偏好" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "修改密码" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/change-password"
+    );
   });
 
   it("创建页挂载统一创建入口", () => {
