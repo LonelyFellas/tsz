@@ -616,6 +616,7 @@ export function V3PhonemeSpeechSettings({
             <VoiceEditor
               readOnly={!canEdit || saving || source !== sourceKey}
               mode="phoneme-settings"
+              textReadOnly
               autoRecommend={defaultProfile !== storedProfile}
               loadRecommendations={loadAdminVoiceRecommendations}
               recommendationArea="azure"

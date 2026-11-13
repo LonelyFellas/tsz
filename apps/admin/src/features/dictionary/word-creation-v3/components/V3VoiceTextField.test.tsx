@@ -2828,6 +2828,16 @@ it("来源设置复用拼写字段，打开不生成音频或物化继承，取�
   await screen.findByLabelText("标注工具栏");
   await screen.findByLabelText("选用 Sonia");
   expect(screen.getByRole("dialog")).toHaveTextContent("英式词形拼写配音设置");
+  const text = within(screen.getByRole("dialog")).getByLabelText("共享拼写");
+  expect(text).toHaveAttribute("readonly");
+  fireEvent.click(text);
+  fireEvent.change(text, { target: { value: "changed spelling" } });
+  expect(text).toHaveValue(VALUE.text);
+  expect(
+    within(screen.getByRole("dialog")).queryByRole("button", {
+      name: "编辑文本"
+    })
+  ).toBeNull();
   expect(generateAudio).not.toHaveBeenCalled();
   expect(onProfile).not.toHaveBeenCalled();
   expect(audioTasks.size).toBe(0);

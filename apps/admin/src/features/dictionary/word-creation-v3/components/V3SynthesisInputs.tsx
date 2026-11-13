@@ -31,6 +31,7 @@ import type {
 import {
   convertDictionaryToAzureIpa,
   convertAzureIpaToUps,
+  editSynthesisUpsWords,
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
   synthesisInputIssue,
@@ -184,7 +185,14 @@ export function V3SynthesisInputs({
       ...candidate,
       ...(normalizedIpa !== undefined ? { ipa: normalizedIpa } : {}),
       [alphabet]: value,
-      ...(alphabet === "ups" ? { ups_words: words ?? null } : {})
+      ...(alphabet === "ups"
+        ? {
+            ups_words:
+              words === undefined
+                ? editSynthesisUpsWords(spelling, candidate, value)
+                : words
+          }
+        : {})
     });
   };
   const undo = (side: Side, alphabet: Alphabet) => {
@@ -628,17 +636,14 @@ export function V3SynthesisInputs({
                             (recording ?? recordings[0])?.original_name ?? "",
                           fontClass: "",
                           disabled: recordings.length === 0
-                        },
-                        {
-                          value: "none",
-                          name: t("creation_accent_not_configured"),
-                          text: "",
-                          fontClass: ""
                         }
                       ].map((option) => (
                         <div
                           key={option.value}
                           className="word-synthesis-source-option"
+                          hidden={option.value === "ups" && !upsExpanded}
+                          aria-hidden={option.value === "ups" && !upsExpanded}
+                          inert={option.value === "ups" && !upsExpanded}
                         >
                           <Radio
                             id={`${inputPrefix}-${side}-source-${option.value}`}
