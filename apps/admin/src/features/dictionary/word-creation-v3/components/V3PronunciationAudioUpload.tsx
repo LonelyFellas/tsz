@@ -1,6 +1,6 @@
 import { lazy, Suspense, useLayoutEffect, useRef, useState } from "react";
 import type { AudioAssetV3, PhonemeLocaleV3 } from "@tsz/types";
-import { UploadIcon } from "lucide-react";
+import { SettingsIcon } from "lucide-react";
 import { Button } from "@tsz/ui/admin/display";
 import { Popover } from "@tsz/ui/admin/overlays";
 import { usePermission } from "@/lib/auth";
@@ -92,9 +92,17 @@ export function V3PronunciationAudioUpload({
         </div>
       }
     >
-      <Button size="small" icon={<UploadIcon />} aria-label={label}>
-        {t("creation_upload_audio")}
-      </Button>
+      <Button
+        type="text"
+        size="small"
+        icon={<SettingsIcon />}
+        aria-label={label}
+        disabled={!edit}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      />
     </Popover>
   );
 }

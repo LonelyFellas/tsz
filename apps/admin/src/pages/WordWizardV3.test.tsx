@@ -3206,9 +3206,7 @@ it.each([false, true])(
     );
     const toolbar = await screen.findByRole("toolbar", { name: "标注工具栏" });
     const dialog = toolbar.closest('[role="dialog"]')! as HTMLElement;
-    await waitFor(() =>
-      expect(within(dialog).getByLabelText("选用 Sonia")).toBeChecked()
-    );
+    expect(within(dialog).queryByLabelText("局部配音音色池")).toBeNull();
     fireEvent.change(within(dialog).getByLabelText("词形英美通用拼写"), {
       target: { value: "centre-saved" }
     });

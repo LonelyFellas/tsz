@@ -8,7 +8,12 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { speechAccentGroup } from "@tsz/shared";
-import type { RichTextV2, VoiceProfileV3, VoiceSettingV3 } from "@tsz/types";
+import type {
+  PhonemeLocaleV3,
+  RichTextV2,
+  VoiceProfileV3,
+  VoiceSettingV3
+} from "@tsz/types";
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import {
   newVoiceVersionId,
@@ -30,8 +35,18 @@ function enqueue<T>(run: () => Promise<T>): Promise<T> {
 function inScope(
   setting: VoiceSettingV3,
   profile: VoiceProfileV3,
-  locale?: string
+  locale?: string,
+  activeLocales?: readonly PhonemeLocaleV3[]
 ) {
+  if (
+    activeLocales &&
+    !activeLocales.some(
+      (active) =>
+        speechAccentGroup(active) ===
+        speechAccentGroup(setting.locale, setting.accent)
+    )
+  )
+    return false;
   return (
     !profile.dubbing ||
     !locale ||
@@ -54,7 +69,9 @@ function inheritedSetting(
 function selectionSignature(
   sourceKey: string,
   locale: string | undefined,
-  profile?: VoiceProfileV3 | null
+  profile?: VoiceProfileV3 | null,
+  activeLocales?: readonly PhonemeLocaleV3[],
+  requiredLocales?: readonly PhonemeLocaleV3[]
 ) {
   const sides = (["uk", "us"] as const).filter(
     (side) => !locale || speechAccentGroup(locale) === side
@@ -62,6 +79,8 @@ function selectionSignature(
   return v3ContentFingerprint([
     sourceKey,
     locale,
+    activeLocales,
+    requiredLocales,
     profile?.dubbing && [
       profile.dubbing.area,
       sides.map((side) => profile.dubbing![side].mode)
@@ -70,7 +89,7 @@ function selectionSignature(
       .filter(
         (setting) =>
           setting.enabled &&
-          inScope(setting, profile, locale) &&
+          inScope(setting, profile, locale, activeLocales) &&
           !inheritedSetting(setting, profile, locale)
       )
       .map((setting) => [voiceSettingKey(setting), voiceEffectKey(setting)])
@@ -84,6 +103,8 @@ export function useSelectedVoiceAudio({
   profile,
   adapter,
   locale,
+  activeLocales,
+  requiredLocales,
   enabled,
   defer,
   onChange
@@ -93,6 +114,8 @@ export function useSelectedVoiceAudio({
   profile?: VoiceProfileV3 | null;
   adapter: VoicePreviewAdapter;
   locale?: `en-${string}`;
+  activeLocales?: readonly PhonemeLocaleV3[];
+  requiredLocales?: readonly PhonemeLocaleV3[];
   enabled: boolean;
   defer: boolean;
   onChange?: (profile: VoiceProfileV3) => void;
@@ -111,7 +134,13 @@ export function useSelectedVoiceAudio({
     content,
     adapter.audioSourceKey
   ]);
-  const signature = selectionSignature(sourceKey, locale, profile);
+  const signature = selectionSignature(
+    sourceKey,
+    locale,
+    profile,
+    activeLocales,
+    requiredLocales
+  );
   const latest = useRef({
     target,
     signature,
@@ -166,7 +195,13 @@ export function useSelectedVoiceAudio({
         : Promise.resolve(false);
     const commit = (next: VoiceProfileV3) => {
       if (!isCurrent()) return;
-      expectedSignature = selectionSignature(sourceKey, locale, next);
+      expectedSignature = selectionSignature(
+        sourceKey,
+        locale,
+        next,
+        activeLocales,
+        requiredLocales
+      );
       attempted.current = expectedSignature;
       if (running.current?.controller === controller)
         running.current.signature = expectedSignature;
@@ -193,7 +228,8 @@ export function useSelectedVoiceAudio({
           stored = {
             ...stored,
             voices: stored.voices.map((setting) => {
-              if (!inScope(setting, stored, locale)) return setting;
+              if (!inScope(setting, stored, locale, activeLocales))
+                return setting;
               const previous = lastSource.current.effects.get(
                 voiceSettingKey(setting)
               );
@@ -212,43 +248,44 @@ export function useSelectedVoiceAudio({
         lastSource.current = { target, sourceKey, effects };
         let resolved = stored.voices;
         if (adapter.resolveVoices) {
+          const accents = (["gb", "us"] as const).filter(
+            (accent) =>
+              !locale ||
+              (locale === "en-GB" ? accent === "gb" : accent === "us")
+          );
           const results = await Promise.allSettled(
-            (["gb", "us"] as const)
-              .filter(
-                (accent) =>
-                  !locale ||
-                  (locale === "en-GB" ? accent === "gb" : accent === "us")
+            accents.map((accent) =>
+              adapter.resolveVoices!(
+                { profile: stored, content, accent },
+                { signal: controller.signal }
               )
-              .map((accent) =>
-                adapter.resolveVoices!(
-                  { profile: stored, content, accent },
-                  { signal: controller.signal }
-                )
-              )
+            )
           );
           resolved = results.flatMap((result) =>
             result.status === "fulfilled" ? result.value.voices : []
           );
           const failure = results.find(
-            (result) => result.status === "rejected"
+            (result, index) =>
+              result.status === "rejected" &&
+              (stored.dubbing ||
+                requiredLocales?.includes(
+                  accents[index] === "gb" ? "en-GB" : "en-US"
+                ) ||
+                (!resolved.length &&
+                  !stored.voices.some((setting) => setting.enabled)))
           );
-          if (
-            (stored.dubbing ||
-              (!resolved.length &&
-                !stored.voices.some((setting) => setting.enabled))) &&
-            failure?.status === "rejected"
-          )
-            throw failure.reason;
+          if (failure?.status === "rejected") throw failure.reason;
         }
         if (!isCurrent()) return resumeCurrent();
         const selected = retainResolvedAudio(resolved, stored.voices).filter(
-          (setting) => setting.enabled && inScope(setting, stored, locale)
+          (setting) =>
+            setting.enabled && inScope(setting, stored, locale, activeLocales)
         );
         const selectedKeys = new Set(selected.map(voiceSettingKey));
         for (const setting of stored.voices) {
           if (
             setting.enabled &&
-            inScope(setting, stored, locale) &&
+            inScope(setting, stored, locale, activeLocales) &&
             !inheritedSetting(setting, stored, locale) &&
             !selectedKeys.has(voiceSettingKey(setting))
           ) {
@@ -265,7 +302,8 @@ export function useSelectedVoiceAudio({
           ...stored,
           voices: stored.voices.map((setting) => {
             const resolved =
-              !setting.enabled && inScope(setting, stored, locale)
+              !setting.enabled &&
+              inScope(setting, stored, locale, activeLocales)
                 ? reused.get(voiceSettingKey(setting))
                 : undefined;
             return resolved
@@ -275,7 +313,7 @@ export function useSelectedVoiceAudio({
                     ? { version_name: setting.version_name }
                     : {})
                 }
-              : inScope(setting, stored, locale) &&
+              : inScope(setting, stored, locale, activeLocales) &&
                   inheritedSetting(setting, stored, locale) &&
                   !selectedKeys.has(voiceSettingKey(setting))
                 ? { ...setting, enabled: false }
@@ -320,7 +358,7 @@ export function useSelectedVoiceAudio({
           if (!isCurrent()) return resumeCurrent();
           const voices = (latest.current.profile?.voices ?? stored.voices).map(
             (item) =>
-              inScope(item, stored, locale) &&
+              inScope(item, stored, locale, activeLocales) &&
               inheritedSetting(item, stored, locale) &&
               !selectedKeys.has(voiceSettingKey(item))
                 ? { ...item, enabled: false }
@@ -359,11 +397,13 @@ export function useSelectedVoiceAudio({
     return result;
   }, [
     adapter,
+    activeLocales,
     content,
     effects,
     enabled,
     locale,
     profile,
+    requiredLocales,
     signature,
     sourceKey,
     target

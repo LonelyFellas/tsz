@@ -332,12 +332,16 @@ it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续�
   variant.common.pronunciations[0]!.voice_profile = {
     voices: voices.map(({ locale: _locale, ...setting }) => setting)
   };
-  speech.catalog.mockRejectedValueOnce(new Error("目录暂不可用"));
+  speech.catalog.mockRejectedValue(new Error("目录暂不可用"));
   render(<Host initial={forms} />);
-  await screen.findByText("目录暂不可用");
+  expect(await screen.findAllByText("目录暂不可用")).not.toHaveLength(0);
   expect(await tasks.get("forms:audio-catalog")!()).toBe(false);
   expect(speech.generate).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "重试生成音频" }));
+  speech.catalog.mockResolvedValue(
+    voices.map((setting) => ({ id: setting.voice_id, locale: setting.locale }))
+  );
+  for (const retry of screen.getAllByRole("button", { name: "重试生成音频" }))
+    fireEvent.click(retry);
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   expect(screen.getByTestId("saved-forms")).toHaveTextContent(
     "formal-phoneme-en-US"
@@ -366,6 +370,98 @@ it("词形拼写来源只补缺失的已选音频，不生成未启用的音标�
       setting: expect.objectContaining({ locale: "en-US" })
     })
   );
+});
+
+it.each([false, true])(
+  "显式来源下未启用的拼写口音不生成，活动美式=%s",
+  async (activeUs) => {
+    const forms = fixture();
+    const variants = forms.contents[0]!.regional_variants;
+    if (variants.mode !== "common") throw new Error("expected common fixture");
+    const variant = variants.common;
+    variant.spelling_speech = {
+      content: { version: 2, text: "hello", annotations: [] },
+      voice_profile: {
+        voices: voices.map(({ locale: _locale, ...voice }) => voice)
+      }
+    };
+    const row = variant.pronunciations[0]!;
+    row.synthesis!.uk!.source = "none";
+    row.synthesis!.us!.source = activeUs ? "spelling" : "none";
+    row.voice_profile = {
+      voices: voices.map(({ locale: _locale, ...voice }) => voice)
+    };
+    render(<Host initial={forms} />);
+    await act(async () => {
+      for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
+    });
+    expect(speech.generate).toHaveBeenCalledTimes(activeUs ? 1 : 0);
+    expect(speech.catalog).not.toHaveBeenCalled();
+    if (activeUs)
+      expect(speech.generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: expect.objectContaining({ kind: "text" }),
+          setting: expect.objectContaining({ locale: "en-US" })
+        })
+      );
+    const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+      .contents[0].regional_variants.common;
+    expect(
+      saved.spelling_speech.voice_profile.voices[0].audio_asset_id
+    ).toBeUndefined();
+    expect(saved.pronunciations[0].synthesis.uk.source).toBe("none");
+  }
+);
+
+it("显式拼写来源的历史音色解析失败时不兜底生成未知口音", async () => {
+  const forms = fixture();
+  const variants = forms.contents[0]!.regional_variants;
+  if (variants.mode !== "common") throw new Error("expected common fixture");
+  variants.common.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: {
+      voices: voices.map(({ locale: _locale, ...voice }) => voice)
+    }
+  };
+  const row = variants.common.pronunciations[0]!;
+  row.synthesis!.uk!.source = "none";
+  row.synthesis!.us!.source = "spelling";
+  speech.resolve.mockRejectedValue(new Error("解析暂不可用"));
+  render(<Host initial={forms} />);
+  expect(await screen.findAllByText("解析暂不可用")).not.toHaveLength(0);
+  for (const wait of tasks.values()) expect(await wait()).toBe(false);
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(
+    JSON.parse(screen.getByTestId("saved-forms").textContent!).contents[0]
+      .regional_variants.common.spelling_speech
+  ).toEqual(variants.common.spelling_speech);
+});
+
+it("无显式来源的旧拼写单侧池不要求缺少音色的另一侧解析成功", async () => {
+  const forms = fixture();
+  const variants = forms.contents[0]!.regional_variants;
+  if (variants.mode !== "common") throw new Error("expected common fixture");
+  const profile = { voices: [{ ...voices[0]!, audio_asset_id: "legacy-uk" }] };
+  variants.common.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: profile
+  };
+  const row = variants.common.pronunciations[0]!;
+  delete row.voice_profile;
+  row.synthesis!.use_spelling = true;
+  speech.resolve.mockImplementation(async ({ accent }) => {
+    if (accent === "us") throw new Error("此口音未配置音色");
+    return { voices: profile.voices };
+  });
+  render(<Host initial={forms} />);
+  await act(async () => {
+    for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
+  });
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(screen.queryByText("此口音未配置音色")).toBeNull();
+  const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+    .contents[0].regional_variants.common.spelling_speech;
+  expect(saved.voice_profile).toEqual(profile);
 });
 
 it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来源之间不混用", async () => {
@@ -418,7 +514,7 @@ it.each(["none", "upload"] as const)(
     };
     const british = structuredClone(row.voice_profile!.voices[0]!);
     render(<Host initial={forms} />);
-    await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(screen.getByTestId("saved-forms")).toHaveTextContent(
         "formal-phoneme-en-US"

@@ -291,6 +291,7 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
     | "dict-phonetic"
     | "actual-pron"
     | "spelling"
+    | "spelling-settings"
     | "synthesis"
     | "audio-upload"
     | "phoneme-settings"
@@ -320,6 +321,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** 宿主正文相关字段放在配音设置之前。 */
   afterText?: ReactNode;
   collapseVoiceSettings?: boolean;
+  /** 词形正文宿主将配音操作集中到来源行时关闭；其他编辑器默认保留。 */
+  speechSettingsEnabled?: boolean;
   /** prepareComplete normalizes spelling through the editor history; false asks the user to review. */
   renderActions?: (
     canComplete: boolean,

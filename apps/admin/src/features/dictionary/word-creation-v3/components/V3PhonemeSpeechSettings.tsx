@@ -9,7 +9,7 @@ import { useVoiceAudioTasks, useVoiceSave } from "../voiceSaveContext";
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
 import { v3ContentFingerprint } from "../saveFlow";
 import { flushSync } from "react-dom";
-import { PencilIcon } from "lucide-react";
+import { SettingsIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import {
@@ -124,7 +124,6 @@ export function V3PhonemeSpeechSettings({
   const audioTasks = useVoiceAudioTasks();
   const speech = candidate[`${alphabet}_speech`];
   const needsFallbackCatalog =
-    active &&
     !speech &&
     !!fallbackVoiceProfile?.voices.some(
       (setting) => setting.enabled && !setting.locale
@@ -350,11 +349,6 @@ export function V3PhonemeSpeechSettings({
       async resolveVoices(input, options) {
         const { alphabet, locale, inputError, resolveCandidate } =
           latest.current;
-        if (
-          latest.current.candidate.source === "none" ||
-          latest.current.candidate.source === "upload"
-        )
-          return { voices: [], source: { kind: "local" as const } };
         if (inputError) throw new VoiceEditorDisplayError(inputError);
         const candidate = resolveCandidate(input.content);
         return await api.speech.resolve(
@@ -415,8 +409,9 @@ export function V3PhonemeSpeechSettings({
           latest.current;
         if (inputError) throw new VoiceEditorDisplayError(inputError);
         const content = pronunciationSynthesisContent(spelling, {
-          alphabet,
           ...resolveCandidate(input.content),
+          alphabet,
+          source: alphabet,
           use_spelling: false,
           ipa_locale: locale,
           ups_locale: locale
@@ -437,8 +432,10 @@ export function V3PhonemeSpeechSettings({
   );
   const editorAdapter = useMemo(
     () =>
-      canGenerateAudio ? adapter : { ...adapter, generateAudio: undefined },
-    [adapter, canGenerateAudio]
+      canGenerateAudio && active
+        ? adapter
+        : { ...adapter, generateAudio: undefined },
+    [adapter, canGenerateAudio, active]
   );
   const collapsedContent = speech
     ? mapSynthesisSpeechContent(
@@ -549,12 +546,16 @@ export function V3PhonemeSpeechSettings({
       )}
       {!headless && (
         <Button
-          icon={<PencilIcon />}
+          type="text"
+          size="small"
+          icon={<SettingsIcon />}
           aria-label={t("creation_open_tts_settings", { label })}
           data-v3-node-id={nodeId}
           data-v3-field={field}
           disabled={!canEdit || fallbackPending || fallbackError != null}
-          onClick={() => {
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
             setDraft(capture());
             setSaveError("");
             setBusinessSaveFailed(false);
@@ -662,12 +663,7 @@ export function V3PhonemeSpeechSettings({
                 setDraft((current) => ({ ...current, voice_profile }))
               }
               previewAdapter={editorAdapter}
-              previewEnabled={
-                env.VOICE_PREVIEW &&
-                source === sourceKey &&
-                candidate.source !== "none" &&
-                candidate.source !== "upload"
-              }
+              previewEnabled={env.VOICE_PREVIEW && source === sourceKey}
               previewIsMock={voicePreviewIsMock}
               renderActions={(canComplete, prepareComplete, captureResult) => (
                 <Space>
@@ -704,9 +700,7 @@ export function V3PhonemeSpeechSettings({
                       setBusinessSaveFailed(false);
                       try {
                         const result = captureResult?.(
-                          !!businessSave &&
-                            candidate.source !== "none" &&
-                            candidate.source !== "upload"
+                          !!businessSave && active
                         );
                         const next = resolveCandidate(
                           toRichTextV2(result?.value ?? draft.content)

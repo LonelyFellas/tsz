@@ -519,6 +519,7 @@ describe("双口音真实试听控件", () => {
         }
       ]);
       renderWithUps(<Harness dialect="uk" recording />);
+      fireEvent.click(sourceRadio(`Azure ${alphabet.toUpperCase()}`, "英式"));
       const label = `第 1 条发音 英式 Azure ${alphabet.toUpperCase()}`;
       fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
       const input = await screen.findByLabelText(`${label}音标编辑`);
@@ -559,7 +560,7 @@ describe("双口音真实试听控件", () => {
         })
       );
       expect(saved.audio_assets[0].id).toBe("old-recording");
-      expect(saved.audio_assets[0].is_default).toBe(true);
+      expect(saved.audio_assets[0].is_default).toBe(false);
     }
   );
   it("默认录音不能启用空音标，填写音标后按字段内容试听", async () => {
@@ -1142,6 +1143,7 @@ it.each([
 
 it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位置保存并在重开时映射回音标", async () => {
   renderWithUps(<Harness dialect="common" settingsPhrase />);
+  fireEvent.click(sourceRadio("Azure UPS", "英式"));
   const label = "第 1 条发音 英式 Azure UPS";
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   const input = await screen.findByLabelText(`${label}音标编辑`);
@@ -1236,6 +1238,7 @@ it("未配置的音素设置器采用首位推荐，完成时保存参数", asyn
     }
   ]);
   render(<Harness dialect="uk" />);
+  fireEvent.click(sourceRadio("Azure IPA", "英式"));
   const label = "第 1 条发音 英式 Azure IPA";
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   await waitFor(() =>
@@ -1273,6 +1276,7 @@ it.each([
   "%s %s %s TTS 设置器完成后独立保存，取消不影响字段试听",
   async (accent, side, alphabet, duration, voice, voiceId) => {
     renderWithUps(<Harness dialect="common" settingsPhrase />);
+    fireEvent.click(sourceRadio(`Azure ${alphabet}`, accent));
     const wire = () =>
       JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
     const initial = wire();
@@ -1429,6 +1433,7 @@ it("已显示的音素后端兼容诊断随语言更新，不重建设置器或�
     </InterfaceI18nProvider>
   );
   const view = render(content("zh-Hans"));
+  fireEvent.click(sourceRadio("Azure IPA", "英式"));
   fireEvent.click(
     screen.getByLabelText("打开第 1 条发音 英式 Azure IPA TTS 设置器")
   );
@@ -1477,16 +1482,12 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
   render(<Harness dialect="common" recording audioTasks={tasks} />);
   expect(screen.getByRole("radio", { name: "英式 上传音频" })).toBeChecked();
   expect(screen.getByRole("radio", { name: "美式 上传音频" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "第 1 条发音 美式上传音频" })
+  );
   const fileInput = await screen.findByLabelText("上传音频", {
     selector: "input"
   });
-  fireEvent.click(
-    within(screen.getByRole("radiogroup", { name: "上传音频语种" })).getByRole(
-      "radio",
-      { name: "AmE" }
-    )
-  );
   const file = new File(["fixture"], "american.mp3", { type: "audio/mpeg" });
   fireEvent.change(fileInput, { target: { files: [file] } });
   await waitFor(() =>
@@ -1494,7 +1495,7 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
       expect.objectContaining({ file, locale: "en-US" })
     )
   );
-  expect(await tasks.get("p:common:upload")!()).toBe(false);
+  expect(await tasks.get("p:en-US:upload")!()).toBe(false);
   const settingsLabel = "第 1 条发音 美式 Azure IPA";
   fireEvent.click(screen.getByLabelText(`打开${settingsLabel} TTS 设置器`));
   const settings = await phonemeDialog(settingsLabel);
@@ -1512,7 +1513,7 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
       "uploaded-us"
     )
   );
-  expect(await tasks.get("p:common:upload")!()).toBe(true);
+  expect(await tasks.get("p:en-US:upload")!()).toBe(true);
   expect(
     JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
       .audio_assets
@@ -1546,7 +1547,9 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
 it("外层上传权限不足时保留已有录音，文件校验和失败重试仍使用原上传流程", async () => {
   speech.canUpload = false;
   const view = render(<Harness dialect="uk" recording />);
-  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "第 1 条发音 英式上传音频" })
+  );
   expect(
     await screen.findByLabelText("上传音频", { selector: "input" })
   ).toBeDisabled();
@@ -1567,7 +1570,9 @@ it("外层上传权限不足时保留已有录音，文件校验和失败重试�
       created_at: "2026-11-12T00:00:00Z"
     });
   render(<Harness dialect="us" />);
-  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "第 1 条发音 美式上传音频" })
+  );
   const input = await screen.findByLabelText("上传音频", { selector: "input" });
   fireEvent.change(input, {
     target: { files: [new File(["bad"], "bad.txt", { type: "text/plain" })] }
@@ -1592,7 +1597,9 @@ it("面板取消和移除默认录音均保留显式选择，不把本口音旧�
   render(<Harness dialect="uk" recording extraRecording />);
   const saved = () =>
     JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
-  fireEvent.click(screen.getByRole("button", { name: "第 1 条发音上传音频" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "第 1 条发音 英式上传音频" })
+  );
   fireEvent.click(await screen.findByLabelText("取消默认播放 recording.mp3"));
   await waitFor(() =>
     expect(
@@ -1742,5 +1749,117 @@ it("明确选择IPA来源时，旧录音默认标记不阻止本侧生成", asyn
       }),
       expect.any(AbortSignal)
     )
+  );
+});
+
+it.each([
+  ["词形拼写", "spelling", "IPA"],
+  ["上传音频", "upload", "IPA"],
+  ["本侧暂不配置", "none", "IPA"],
+  ["词形拼写", "spelling", "UPS"],
+  ["上传音频", "upload", "UPS"],
+  ["本侧暂不配置", "none", "UPS"]
+] as const)(
+  "%s 时配置非活动 %s %s：试听和保存不启用候选，也不要求正式音频",
+  async (sourceLabel, source, alphabet) => {
+    const tasks = new Map<string, () => Promise<boolean>>();
+    const save = vi.fn().mockResolvedValue(true);
+    render(
+      <VoiceSaveContext.Provider value={{ save }}>
+        <Harness dialect="uk" recording audioTasks={tasks} />
+      </VoiceSaveContext.Provider>
+    );
+    fireEvent.click(sourceRadio(sourceLabel, "英式"));
+    const wire = () =>
+      JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+    const selectedSource = wire().synthesis.uk.source;
+    const label = `第 1 条发音 英式 Azure ${alphabet}`;
+    const open = screen.getByLabelText(`打开${label} TTS 设置器`);
+    expect(open.closest(".word-synthesis-source-option")).not.toBeNull();
+    expect(open.closest("label")).toBeNull();
+    expect(open.closest(".word-synthesis-control")).toBeNull();
+    fireEvent.click(open);
+    const dialog = await phonemeDialog(label);
+    expect(sourceRadio(sourceLabel, "英式")).toBeChecked();
+    const input = within(dialog).getByLabelText(`${label}音标编辑`);
+    fireEvent.change(input, {
+      target: { value: alphabet === "IPA" ? "fɑːɹ" : "F AA R" }
+    });
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText("试听 Sonia")).toBeEnabled()
+    );
+    fireEvent.click(within(dialog).getByLabelText("试听 Sonia"));
+    await waitFor(() =>
+      expect(speech.synthesize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            annotations: expect.arrayContaining([
+              expect.objectContaining({
+                type: "phoneme",
+                alphabet: alphabet.toLowerCase(),
+                phoneme: alphabet === "IPA" ? "fɑːɹ" : "F AA R"
+              })
+            ])
+          })
+        }),
+        expect.anything()
+      )
+    );
+    expect(speech.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: expect.objectContaining({
+          kind: "phoneme",
+          alphabet: alphabet.toLowerCase()
+        })
+      }),
+      expect.anything()
+    );
+    const complete = within(dialog).getByLabelText(`保存${label}修改`);
+    await waitFor(() => expect(complete).toBeEnabled());
+    fireEvent.click(complete);
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(save).toHaveBeenCalledWith("azure");
+    expect(wire().synthesis.uk.source).toBe(selectedSource);
+    expect(sourceRadio(sourceLabel, "英式")).toBeChecked();
+    if (selectedSource) expect(selectedSource).toBe(source);
+    expect(wire().synthesis.uk[alphabet.toLowerCase()]).toBe(
+      alphabet === "IPA" ? "fɑːɹ" : "F AA R"
+    );
+    expect(
+      wire().synthesis.uk[`${alphabet.toLowerCase()}_speech`]
+    ).toBeDefined();
+    expect(speech.generateAudio).not.toHaveBeenCalled();
+    expect(
+      [...tasks.keys()].filter((key) => key.includes("synthesis.uk."))
+    ).toEqual([]);
+    expect(wire().audio_assets[0].id).toBe("old-recording");
+  }
+);
+
+it("UPS 设置与音频任务在输入区首次展开前已经存在，收起不卸载设置器", async () => {
+  const tasks = new Map<string, () => Promise<boolean>>();
+  render(<Harness dialect="uk" audioTasks={tasks} />);
+  fireEvent.click(sourceRadio("Azure UPS", "英式"));
+  await waitFor(() =>
+    expect(
+      [...tasks.keys()].some((key) => key.includes("synthesis.uk.ups_speech"))
+    ).toBe(true)
+  );
+  expect(screen.queryByLabelText("第 1 条发音的英式 Azure UPS")).toBeNull();
+  fireEvent.click(
+    screen.getByLabelText("打开第 1 条发音 英式 Azure UPS TTS 设置器")
+  );
+  const dialog = await phonemeDialog("第 1 条发音 英式 Azure UPS");
+  fireEvent.click(screen.getByLabelText("展开第 1 条发音的 UPS"));
+  fireEvent.click(screen.getByLabelText("收起第 1 条发音的 UPS"));
+  expect(dialog).toBeVisible();
+  fireEvent.click(
+    within(dialog).getByLabelText("取消第 1 条发音 英式 Azure UPS设置")
+  );
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  await waitFor(() =>
+    expect(
+      [...tasks.keys()].some((key) => key.includes("synthesis.uk.ups_speech"))
+    ).toBe(true)
   );
 });

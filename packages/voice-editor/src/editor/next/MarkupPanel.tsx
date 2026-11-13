@@ -120,6 +120,7 @@ export function MarkupPanel({
     grammarMode ||
     associationMode ||
     mode === "spelling" ||
+    mode === "spelling-settings" ||
     mode === "actual-pron" ||
     mode === "phoneme-settings" ||
     mode === "voice-trial";
@@ -345,6 +346,7 @@ export function MarkupPanel({
           </div>
         )}
         {selectionMode &&
+          mode !== "spelling-settings" &&
           (mode !== "voice-trial" ||
             tools.some((tool) => !tool.disabledReason)) && (
             <div className="tsz-ve-selection-status" role="status">
@@ -380,6 +382,7 @@ export function MarkupPanel({
           )}
         {topTools.length === 0 &&
           !contentReadOnly &&
+          mode !== "spelling-settings" &&
           mode !== "voice-trial" && (
             <div className="tsz-ve-top-hint">
               {mode === "phoneme-settings"

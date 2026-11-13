@@ -255,21 +255,35 @@
   }
 }
 
-.word-synthesis-choice.ui-radio-wrapper {
+.word-synthesis-source-option {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
   width: 100%;
+  min-width: 0;
+}
+
+.word-synthesis-choice.ui-radio-wrapper {
   min-width: 0;
   margin-inline-end: 0;
   font-weight: 400;
 }
 
-.word-synthesis-choice.ui-radio-wrapper > span:last-child {
+.word-synthesis-source-option > .word-synthesis-choice-content {
   flex: 1;
   min-width: 0;
+}
+
+.word-synthesis-source-option:has(.ui-radio-wrapper-disabled)
+  > .word-synthesis-choice-content {
+  color: var(--ui-color-text-disabled);
+  cursor: not-allowed;
 }
 
 .word-synthesis-choice-content {
   display: flex;
   align-items: baseline;
+  cursor: pointer;
   gap: var(--ui-space-2);
   min-width: 0;
 }
@@ -294,7 +308,8 @@
   font-weight: 700;
 }
 
-.word-synthesis-choice.ui-radio-wrapper-checked .word-synthesis-choice-tag {
+.word-synthesis-source-option:has(.ui-radio-wrapper-checked)
+  .word-synthesis-choice-tag {
   color: var(--ui-color-text-light-solid);
   background: var(--ui-color-primary);
   border-color: var(--ui-color-primary);
@@ -305,7 +320,7 @@
     .v3-dialect-panel-us,
     .word-form-matrix-dialect-cell-us
   )
-  .word-synthesis-choice.ui-radio-wrapper-checked
+  .word-synthesis-source-option:has(.ui-radio-wrapper-checked)
   .word-synthesis-choice-tag {
   background-color: #d42a91;
   border-color: #d42a91;

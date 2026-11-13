@@ -25,6 +25,7 @@ import type {
   VoiceEditResult
 } from "@tsz/voice-editor/types";
 import {
+  clearVoiceAudio,
   editRichText,
   isVoiceRecommendationAvailable,
   normalizeSpellingRich,
@@ -65,6 +66,13 @@ import "@tsz/voice-editor/styles.css";
 import "./V3VoiceTextField.css";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 import { RequiredFieldFeedback } from "../../RequiredFieldFeedback";
+import {
+  mergeSpellingSettings,
+  type SpellingAudioScope
+} from "../spellingSpeech";
+
+export type SpellingSettingsRequest = { dialect: "uk" | "us" };
+export type SpellingSettingsOpener = (request: SpellingSettingsRequest) => void;
 
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -77,6 +85,17 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
   if (dialect === "uk") return "en-GB";
   if (dialect === "us") return "en-US";
   return undefined;
+}
+
+/** 拼写的展示标注不参与配音内容和音频失效判断。 */
+function spellingAudioContent(value: RichTextV3): RichTextV2 {
+  const content = toRichTextV2(value);
+  return {
+    ...content,
+    annotations: content.annotations.filter((mark) =>
+      ["pause", "say_as", "sub"].includes(mark.type)
+    )
+  };
 }
 
 export interface V3VoiceTextFieldProps<
@@ -94,6 +113,13 @@ export interface V3VoiceTextFieldProps<
   showSaveButton?: boolean;
   afterText?: ReactNode;
   collapseVoiceSettings?: boolean;
+  /** 本词形宿主的文本入口只编辑拼写及展示标注。 */
+  spellingTextOnly?: boolean;
+  /** 拼写所有者的来源行共用此入口，不额外挂载字段或音频任务。 */
+  spellingSettingsRef?: RefObject<SpellingSettingsOpener | null>;
+  spellingSettingsHint?: ReactNode;
+  /** 共享拼写的生成范围和显式来源解析要求；缺省沿用旧调用方。 */
+  spellingAudioScope?: SpellingAudioScope;
   onEditingChange?: (editing: boolean) => void;
   onDraftPendingChange?: (pending: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
@@ -159,6 +185,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   showSaveButton = true,
   afterText,
   collapseVoiceSettings,
+  spellingTextOnly = false,
+  spellingSettingsRef,
+  spellingSettingsHint,
+  spellingAudioScope,
   onEditingChange,
   onDraftPendingChange,
   onAssociationPendingChange,
@@ -200,6 +230,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
   const { t } = useLexiconEditorTranslation();
+  const spellingAudioLocales = spellingAudioScope?.activeLocales;
   const requiredErrorId = useId();
   const businessSave = useVoiceSave();
   const saveRef = useRef({ onSave, businessSave });
@@ -235,6 +266,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     requestedReadOnly ||
     (contentReadOnly && (!renderAssociationPicker || associationsReadOnly));
   const [editing, setEditing] = useState(false);
+  const [spellingSettings, setSpellingSettings] =
+    useState<SpellingSettingsRequest>();
+  const [settingsCommitting, setSettingsCommitting] = useState(false);
+  const settingsInitial = useRef<ReturnType<typeof captureSession> | null>(
+    null
+  );
   const [focused, setFocused] = useState(false);
   const [recorded, setRecorded] = useState(value.text.length > 0);
   const initialVoiceState = useRef({
@@ -359,6 +396,23 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       }),
     [nodeId, value, textLinks, readingLinks, voiceProfile, audioAssets]
   );
+  useLayoutEffect(() => {
+    if (!spellingSettingsRef) return;
+    spellingSettingsRef.current = (request) => {
+      if (readOnly || savingRef.current || !env.VOICE_EDITOR) return;
+      const session = captureSession();
+      settingsInitial.current = session;
+      setDraftState(session);
+      setSaveError("");
+      setSavedTarget(null);
+      setSpellingSettings(request);
+      setRecorded(true);
+      setEditing(true);
+    };
+    return () => {
+      spellingSettingsRef.current = null;
+    };
+  });
   const [draftState, setDraftState] = useState(captureSession);
   const incomingKey = JSON.stringify({
     nodeId,
@@ -373,8 +427,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     if (incomingRef.current === incomingKey) return;
     incomingRef.current = incomingKey;
     const next = captureSession();
+    if (editing && spellingSettings && draftState.nodeId === nodeId) return;
     setDraftState(next);
-  }, [incomingKey, captureSession]);
+  }, [
+    incomingKey,
+    captureSession,
+    editing,
+    spellingSettings,
+    draftState.nodeId,
+    nodeId
+  ]);
+  const textOnly = spellingTextOnly && !spellingSettings;
   const editorState = showDone
     ? draftState
     : { nodeId, value, textLinks, readingLinks, voiceProfile, audioAssets };
@@ -393,10 +456,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const editorPreviewAdapter = useMemo(() => {
     const adapter = sessionPreviewAdapter ?? adminVoicePreviewAdapter;
-    return canGenerateAudio
+    // 拼写来源设置只试听；正式生成统一由所有者在提交后等待，避免同一内容重复生成。
+    return canGenerateAudio && !spellingSettings
       ? adapter
       : { ...adapter, generateAudio: undefined };
-  }, [canGenerateAudio, sessionPreviewAdapter]);
+  }, [canGenerateAudio, sessionPreviewAdapter, spellingSettings]);
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   const reportEditorReady = useCallback(
     (ready: boolean) => onDraftPendingChange?.(!ready),
@@ -429,6 +493,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     history.current.past = [];
     history.current.future = [];
     setEditing(false);
+    setSpellingSettings(undefined);
     setEditorSession((current) => current + 1);
     onAssociationPendingChange?.(false);
     onCancel?.();
@@ -451,7 +516,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     setSavedTarget(null);
     try {
       const captured = (onCommit || onSave || businessSave
-        ? capture?.(!!(onSave || businessSave))
+        ? capture?.(!textOnly && !!(onSave || businessSave))
         : undefined) ?? {
         ...draftState,
         value:
@@ -460,18 +525,52 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             : toRichTextV2(draftState.value),
         audioAssets: draftState.audioAssets ?? undefined
       };
-      const result = contentReadOnly
-        ? {
-            ...captured,
-            value,
-            readingLinks,
-            voiceProfile,
-            audioAssets: audioAssets ?? undefined
-          }
-        : captured;
+      const settingsSnapshot = settingsInitial.current;
+      if (
+        spellingSettings &&
+        settingsSnapshot &&
+        (settingsSnapshot.nodeId !== nodeId ||
+          settingsSnapshot.value.text !== value.text)
+      )
+        throw new Error(t("spelling_settings_target_changed"));
+      const result =
+        spellingSettings && settingsSnapshot
+          ? mergeSpellingSettings(
+              { value: toRichTextV2(value), voiceProfile, audioAssets },
+              {
+                value: toRichTextV2(settingsSnapshot.value),
+                voiceProfile: settingsSnapshot.voiceProfile,
+                audioAssets: settingsSnapshot.audioAssets
+              },
+              captured,
+              spellingSettings.dialect
+            )
+          : textOnly
+            ? {
+                ...captured,
+                voiceProfile:
+                  voiceProfile &&
+                  JSON.stringify(spellingAudioContent(value)) !==
+                    JSON.stringify(spellingAudioContent(captured.value))
+                    ? clearVoiceAudio(voiceProfile)
+                    : voiceProfile,
+                audioAssets: audioAssets ?? undefined
+              }
+            : contentReadOnly
+              ? {
+                  ...captured,
+                  value,
+                  readingLinks,
+                  voiceProfile,
+                  audioAssets: audioAssets ?? undefined
+                }
+              : captured;
       const next = { ...draftState, ...result, nodeId: target };
       if (callbacks.current.onCommit) {
-        flushSync(() => callbacks.current.onCommit!(result));
+        flushSync(() => {
+          if (spellingSettings || textOnly) setSettingsCommitting(true);
+          callbacks.current.onCommit!(result);
+        });
       } else {
         // 宿主回调可能捕获旧表单，逐项刷新闭包，避免正文、音色和录音互相覆盖。
         if (
@@ -527,7 +626,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       setDraftState(next);
       setSavedTarget(persist ? target : null);
       if (onDone) onDone();
-      else if (showDone) setEditing(false);
+      else if (showDone) {
+        setEditing(false);
+        setSpellingSettings(undefined);
+      }
       return true;
     } catch (error) {
       if (activeTarget.current !== target) return false;
@@ -540,6 +642,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     } finally {
       savingRef.current = false;
       setSaving(false);
+      setSettingsCommitting(false);
     }
   };
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
@@ -559,28 +662,27 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const collapsedContent = useMemo(() => {
     const content = toRichTextV2(value);
-    return mode === "spelling"
-      ? {
-          ...content,
-          annotations: content.annotations.filter((mark) =>
-            ["pause", "say_as", "sub"].includes(mark.type)
-          )
-        }
-      : content;
+    return mode === "spelling" ? spellingAudioContent(value) : content;
   }, [value, mode]);
   const automaticAudio = useSelectedVoiceAudio({
     target: JSON.stringify([nodeId, field]),
     content: collapsedContent,
     profile: area ? withDefaultVoiceProfile(voiceProfile, area) : voiceProfile,
     adapter: collapsedAdapter,
-    locale: voiceLocale(dialect),
+    activeLocales: spellingAudioLocales,
+    requiredLocales: spellingAudioScope?.requiredLocales,
+    locale:
+      spellingAudioLocales?.length === 1
+        ? spellingAudioLocales[0]
+        : voiceLocale(dialect),
     enabled:
       env.VOICE_EDITOR &&
       env.VOICE_PREVIEW &&
       canGenerateAudio &&
       !voicePreviewIsMock &&
       editingEnabled &&
-      !expanded &&
+      (!spellingAudioLocales || spellingAudioLocales.length > 0) &&
+      (!expanded || settingsCommitting) &&
       !readOnly &&
       !contentReadOnly &&
       mode !== "actual-pron" &&
@@ -875,6 +977,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           disabled={readOnly}
           icon={<PencilIcon />}
           onClick={() => {
+            setSpellingSettings(undefined);
             setDraftState(captureSession());
             setSaveError("");
             setRecorded(true);
@@ -970,19 +1073,24 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             key={`${nodeId}:${editorSession}`}
             renderActions={renderActions}
             onValidationChange={showDone ? undefined : reportEditorReady}
-            afterText={afterText}
+            afterText={spellingSettings ? spellingSettingsHint : afterText}
             collapseVoiceSettings={collapseVoiceSettings}
+            speechSettingsEnabled={!textOnly}
             onAssociationPendingChange={onAssociationPendingChange}
-            textReadOnly={contentReadOnly}
+            textReadOnly={contentReadOnly || Boolean(spellingSettings)}
             contentReadOnly={contentReadOnly}
             associationsReadOnly={associationsReadOnly}
-            mode={mode}
+            mode={spellingSettings ? "spelling-settings" : mode}
             textRole={textRole}
-            autoRecommend={initialVoiceState.current.unconfigured}
+            autoRecommend={
+              !textOnly &&
+              !spellingSettings &&
+              initialVoiceState.current.unconfigured
+            }
             loadRecommendations={loadAdminVoiceRecommendations}
-            recommendationArea={area}
+            recommendationArea={textOnly ? undefined : area}
             textFormattingEnabled={env.SENTENCE_FORMATTING}
-            locale={voiceLocale(dialect)}
+            locale={voiceLocale(spellingSettings?.dialect ?? dialect)}
             textLinks={editorState.textLinks}
             restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
             renderAssociationPicker={renderAssociationPicker}
@@ -1014,8 +1122,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                     : nextReadingLinks
                 }));
             }}
-            previewAdapter={editorPreviewAdapter}
-            previewEnabled={env.VOICE_PREVIEW}
+            previewAdapter={textOnly ? undefined : editorPreviewAdapter}
+            previewEnabled={!textOnly && env.VOICE_PREVIEW}
             previewIsMock={voicePreviewIsMock}
             onVoiceProfileChange={(next) => {
               if (readOnly || contentReadOnly) return;
@@ -1033,7 +1141,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 ? adminAudioUploadAdapter
                 : undefined
             }
-            audioAssets={editorState.audioAssets ?? undefined}
+            audioAssets={
+              textOnly ? undefined : (editorState.audioAssets ?? undefined)
+            }
             onAudioAssetsChange={(next) => {
               if (readOnly || contentReadOnly) return;
               if (!showDone) onAudioAssetsChange?.(next);
@@ -1041,13 +1151,26 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 setDraftState((current) => ({ ...current, audioAssets: next }));
             }}
             readOnly={readOnly || saving}
-            value={editorState.value}
+            value={
+              spellingSettings
+                ? {
+                    ...toRichTextV2(editorState.value),
+                    annotations: toRichTextV2(
+                      editorState.value
+                    ).annotations.filter((mark) =>
+                      ["pause", "say_as", "sub"].includes(mark.type)
+                    )
+                  }
+                : editorState.value
+            }
             voiceProfile={
-              area &&
-              env.VOICE_PREVIEW &&
-              !initialVoiceState.current.unconfigured
-                ? withDefaultVoiceProfile(editorState.voiceProfile, area)
-                : editorState.voiceProfile
+              textOnly
+                ? undefined
+                : area &&
+                    env.VOICE_PREVIEW &&
+                    !initialVoiceState.current.unconfigured
+                  ? withDefaultVoiceProfile(editorState.voiceProfile, area)
+                  : editorState.voiceProfile
             }
           />
         </Suspense>
@@ -1094,7 +1217,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       {editing && (
         <VoiceEditorModal
           {...(area ? { width: 1200 } : {})}
-          title={editorTitle ?? t("panel_edit_2", { p0: ariaLabel })}
+          title={
+            spellingSettings
+              ? t("spelling_speech_settings", {
+                  side: t(
+                    spellingSettings.dialect === "uk"
+                      ? "dialect_uk"
+                      : "dialect_us"
+                  )
+                })
+              : (editorTitle ?? t("panel_edit_2", { p0: ariaLabel }))
+          }
           open={editing}
           footer={null}
           onCancel={cancelEditing}

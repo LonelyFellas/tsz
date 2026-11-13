@@ -190,6 +190,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   renderActions,
   afterText,
   collapseVoiceSettings = false,
+  speechSettingsEnabled = true,
   speechCapabilities,
   onValidationChange,
   language = "en",
@@ -725,7 +726,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const generationContent =
     mode === "synthesis"
       ? toRichTextV2(value)
-      : mode === "spelling"
+      : mode === "spelling" || mode === "spelling-settings"
         ? {
             ...workingValue,
             annotations: workingValue.annotations.filter((mark) =>
@@ -3551,11 +3552,18 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       )
     }
   ].filter((tool) => {
+    if (
+      !speechSettingsEnabled &&
+      ["pause", "voices", "reading", "uploads"].includes(tool.key)
+    )
+      return false;
     if (tool.key === "uploads" && !showAudioUpload) return false;
     if (mode === "voice-trial")
       return ["phoneme", "reading-link", "reading", "pause"].includes(tool.key);
     if (contentReadOnly) return tool.key === "roles" || tool.key === "text";
     if (textReadOnly && tool.key === "text") return false;
+    if (mode === "spelling-settings")
+      return ["pause", "voices", "reading", "uploads"].includes(tool.key);
     // 字典音标只负责喂语音合成，连读是展示用的标注，归实际发音那一侧。
     // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
     // 摘在默认值上会连带把它们的连读也拿掉。
@@ -3589,7 +3597,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   });
 
   const localPoolContent =
-    recommendationArea && mode !== "actual-pron" && !contentReadOnly ? (
+    speechSettingsEnabled &&
+    recommendationArea &&
+    mode !== "actual-pron" &&
+    !contentReadOnly ? (
       <LocalVoicePool
         audioAssets={assets}
         profile={voiceProfile}
