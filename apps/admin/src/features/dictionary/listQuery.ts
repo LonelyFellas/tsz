@@ -10,6 +10,8 @@ import type { Dayjs } from "dayjs";
 
 /** 搜索行表单值(antd Form 收集,camelCase 属前端本地 state)。 */
 export interface WordFilterValues {
+  targetLanguage?: string;
+  mediumLocale?: string;
   /** 兼容旧 URL 的词面/创建人混合搜索。 */
   keyword?: string;
   headword?: string;

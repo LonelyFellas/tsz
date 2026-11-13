@@ -61,36 +61,40 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       throw new ClientResponseError("智能词库列表响应不符合接口契约");
     return value as T;
   };
+  const search = (query: NextWorkspaceQuery) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== "") params.set(key, String(value));
+    }
+    return params.size ? `?${params}` : "";
+  };
   return {
-    workspaceList: (query: NextWorkspaceQuery = {}) => {
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined && value !== "") params.set(key, String(value));
-      }
-      return http
-        .get<unknown>(`${root}/workspace/entries?${params}`)
-        .then((value) => decode<NextWorkspaceList>("NextWorkspaceList", value));
-    },
+    workspaceList: (query: NextWorkspaceQuery = {}) =>
+      http
+        .get<unknown>(`${root}/workspace/entries${search(query)}`)
+        .then((value) => decode<NextWorkspaceList>("NextWorkspaceList", value)),
     workspaceEntry: (id: string) =>
       http
         .get<unknown>(`${root}/workspace/entries/${encodeURIComponent(id)}`)
         .then((value) =>
           decode<NextWorkspaceEntry>("NextWorkspaceEntry", value)
         ),
-    stats: () =>
+    stats: (query: NextWorkspaceQuery = {}) =>
       http
-        .get<unknown>(`${root}/workspace/stats`)
+        .get<unknown>(`${root}/workspace/stats${search(query)}`)
         .then((value) =>
           decode<NextWorkspaceStats>("NextWorkspaceStats", value)
         ),
-    creators: () =>
-      http.get<unknown>(`${root}/workspace/creators`).then((value) => {
-        if (!Array.isArray(value))
-          throw new ClientResponseError("智能词库创建人响应不符合接口契约");
-        return value.map((row) =>
-          decode<NextWorkspaceCreator>("NextWorkspaceCreator", row)
-        );
-      }),
+    creators: (query: NextWorkspaceQuery = {}) =>
+      http
+        .get<unknown>(`${root}/workspace/creators${search(query)}`)
+        .then((value) => {
+          if (!Array.isArray(value))
+            throw new ClientResponseError("智能词库创建人响应不符合接口契约");
+          return value.map((row) =>
+            decode<NextWorkspaceCreator>("NextWorkspaceCreator", row)
+          );
+        }),
     command: (input: NextListCommand) =>
       http
         .post<unknown>(`${root}/workspace/commands`, input)
@@ -106,15 +110,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .then((value) =>
           decode<NextAnnotationResult>("NextAnnotationResult", value)
         ),
-    list: (query: NextListQuery = {}) => {
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined && value !== "") params.set(key, String(value));
-      }
-      return http
-        .get<unknown>(`${root}/entries?${params}`)
-        .then(decodeNextEntryList);
-    },
+    list: (query: NextListQuery = {}) =>
+      http
+        .get<unknown>(`${root}/entries${search(query)}`)
+        .then(decodeNextEntryList),
     capabilities: () =>
       http.get<unknown>(`${root}/capabilities`).then(decodeNextCapabilities),
     create: (input: CreateNextEntry) =>
