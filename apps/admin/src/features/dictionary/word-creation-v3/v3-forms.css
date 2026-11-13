@@ -157,6 +157,9 @@
   color: #8d929b;
   font-size: var(--ui-font-size);
 }
+.v3-overview-numeric-cell .v3-overview-reading {
+  justify-content: center;
+}
 .v3-overview-settings .word-pronunciation-voice-label {
   min-width: 0;
   white-space: nowrap;
