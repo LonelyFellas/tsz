@@ -218,3 +218,11 @@ pnpm exec vitest run \
 新增“无显式source、无dubbing、仅英式已有资产、美式解析422仍可保存”的回归，在 `1e85534a` 上先失败，修复后连同字段、拼写设置、汇总任务和音频核心5文件123项通过。其他有效结果复用，未重建云环境。证据 `task195-legacy-pool-before.log` / `task195-legacy-pool-after.log` 已归入协调聊天 `task195-ship/`。当前修复范围为该协议判定、summary fallback locale和对应测试，待同一reviewer增量复查。
 
 审查：3轮；确认缺陷2（原活动来源问题及修复引入的legacy兼容问题，均已修待复查）；证据排除误报0；关联回归/回退：已记录本次legacy兼容回归，未观察线上回退。
+
+第4轮对 `1e85534a` → `8180817e318e9d6423bd39673d30a7b879f472b9` 的增量复查确认，同一legacy兼容根因在统一拼写的混合协议资料仍可达：UK显式spelling、US仍legacy时，不能把legacy允许的整个池升级为US必须解析成功。新增真实字段回归先在原提交稳定失败。
+
+现将策略统一为 `SpellingAudioScope`：`activeLocales` 控制允许生成的范围（有legacy消费者时保留旧池范围），`requiredLocales` 仅收集显式启用spelling的口音，分别约束生成过滤和解析失败；两者都进入音频任务身份以保护来源切换。字段和汇总页复用同一聚合，不在各入口猜协议。无显式source的变体、及同一变体内仍以legacy spelling消费的读法，保留legacy池要求；显式来源独立收集必须解析的口音。其他字段不传这两项时继续原行为。
+
+混合协议回归同时证明：GB成功、legacy US解析失败可继续；显式GB解析失败仍阻止保存。修复后7文件135项通过，最后任务身份增量后的音频核心/字段/汇总3文件115项通过；其余有效结果复用。证据 `task195-mixed-before.log`、`task195-mixed-after.log`、`task195-scope-final.log` 在协调聊天 `task195-ship/`，均未创建新云资源。待同一reviewer对本次策略收敛增量复查。
+
+审查：4轮；确认缺陷2（同根因残留合并计数）；证据排除误报0；关联回归/回退：本地已修复legacy兼容回归，未观察线上回退。

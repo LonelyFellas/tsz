@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import type { AudioAssetV3, VoiceProfileV3 } from "@tsz/types";
 import { withDefaultVoiceProfile } from "@tsz/voice-editor/core";
-import { mergeSpellingSettings, spellingAudioLocales } from "./spellingSpeech";
+import { mergeSpellingSettings, spellingAudioScope } from "./spellingSpeech";
 import { pronunciationFixture } from "./fixtures";
 
 const value = { version: 2 as const, text: "hello there", annotations: [] };
@@ -17,7 +17,10 @@ it("拼写任务聚合所有共享读法的活动口音并保留旧协议资产�
     }
   });
   const common = { dialect: "common" as const, pronunciations: [first] };
-  expect(spellingAudioLocales([common])).toEqual(["en-US"]);
+  expect(spellingAudioScope([common])).toEqual({
+    activeLocales: ["en-US"],
+    requiredLocales: ["en-US"]
+  });
   const second = pronunciationFixture({
     synthesis: {
       ...first.synthesis!,
@@ -25,14 +28,20 @@ it("拼写任务聚合所有共享读法的活动口音并保留旧协议资产�
     }
   });
   expect(
-    spellingAudioLocales([{ ...common, pronunciations: [first, second] }])
-  ).toEqual(["en-GB", "en-US"]);
-  expect(spellingAudioLocales([{ ...common, dialect: "uk" }])).toEqual([]);
+    spellingAudioScope([{ ...common, pronunciations: [first, second] }])
+  ).toEqual({
+    activeLocales: ["en-GB", "en-US"],
+    requiredLocales: ["en-GB", "en-US"]
+  });
+  expect(spellingAudioScope([{ ...common, dialect: "uk" }])).toEqual({
+    activeLocales: [],
+    requiredLocales: []
+  });
   expect(
-    spellingAudioLocales([
+    spellingAudioScope([
       { dialect: "common", pronunciations: [pronunciationFixture()] }
     ])
-  ).toBeUndefined();
+  ).toEqual({ activeLocales: undefined, requiredLocales: [] });
 });
 
 it("修改未启用拼写的音色参数也清除对应旧音频，不影响另一侧", () => {

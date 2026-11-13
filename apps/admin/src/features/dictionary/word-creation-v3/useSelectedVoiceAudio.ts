@@ -70,7 +70,8 @@ function selectionSignature(
   sourceKey: string,
   locale: string | undefined,
   profile?: VoiceProfileV3 | null,
-  activeLocales?: readonly PhonemeLocaleV3[]
+  activeLocales?: readonly PhonemeLocaleV3[],
+  requiredLocales?: readonly PhonemeLocaleV3[]
 ) {
   const sides = (["uk", "us"] as const).filter(
     (side) => !locale || speechAccentGroup(locale) === side
@@ -79,6 +80,7 @@ function selectionSignature(
     sourceKey,
     locale,
     activeLocales,
+    requiredLocales,
     profile?.dubbing && [
       profile.dubbing.area,
       sides.map((side) => profile.dubbing![side].mode)
@@ -102,6 +104,7 @@ export function useSelectedVoiceAudio({
   adapter,
   locale,
   activeLocales,
+  requiredLocales,
   enabled,
   defer,
   onChange
@@ -112,6 +115,7 @@ export function useSelectedVoiceAudio({
   adapter: VoicePreviewAdapter;
   locale?: `en-${string}`;
   activeLocales?: readonly PhonemeLocaleV3[];
+  requiredLocales?: readonly PhonemeLocaleV3[];
   enabled: boolean;
   defer: boolean;
   onChange?: (profile: VoiceProfileV3) => void;
@@ -134,7 +138,8 @@ export function useSelectedVoiceAudio({
     sourceKey,
     locale,
     profile,
-    activeLocales
+    activeLocales,
+    requiredLocales
   );
   const latest = useRef({
     target,
@@ -194,7 +199,8 @@ export function useSelectedVoiceAudio({
         sourceKey,
         locale,
         next,
-        activeLocales
+        activeLocales,
+        requiredLocales
       );
       attempted.current = expectedSignature;
       if (running.current?.controller === controller)
@@ -242,34 +248,33 @@ export function useSelectedVoiceAudio({
         lastSource.current = { target, sourceKey, effects };
         let resolved = stored.voices;
         if (adapter.resolveVoices) {
+          const accents = (["gb", "us"] as const).filter(
+            (accent) =>
+              !locale ||
+              (locale === "en-GB" ? accent === "gb" : accent === "us")
+          );
           const results = await Promise.allSettled(
-            (["gb", "us"] as const)
-              .filter(
-                (accent) =>
-                  !locale ||
-                  (locale === "en-GB" ? accent === "gb" : accent === "us")
+            accents.map((accent) =>
+              adapter.resolveVoices!(
+                { profile: stored, content, accent },
+                { signal: controller.signal }
               )
-              .map((accent) =>
-                adapter.resolveVoices!(
-                  { profile: stored, content, accent },
-                  { signal: controller.signal }
-                )
-              )
+            )
           );
           resolved = results.flatMap((result) =>
             result.status === "fulfilled" ? result.value.voices : []
           );
           const failure = results.find(
-            (result) => result.status === "rejected"
+            (result, index) =>
+              result.status === "rejected" &&
+              (stored.dubbing ||
+                requiredLocales?.includes(
+                  accents[index] === "gb" ? "en-GB" : "en-US"
+                ) ||
+                (!resolved.length &&
+                  !stored.voices.some((setting) => setting.enabled)))
           );
-          if (
-            (activeLocales !== undefined ||
-              stored.dubbing ||
-              (!resolved.length &&
-                !stored.voices.some((setting) => setting.enabled))) &&
-            failure?.status === "rejected"
-          )
-            throw failure.reason;
+          if (failure?.status === "rejected") throw failure.reason;
         }
         if (!isCurrent()) return resumeCurrent();
         const selected = retainResolvedAudio(resolved, stored.voices).filter(
@@ -398,6 +403,7 @@ export function useSelectedVoiceAudio({
     enabled,
     locale,
     profile,
+    requiredLocales,
     signature,
     sourceKey,
     target

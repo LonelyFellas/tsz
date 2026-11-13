@@ -20,7 +20,7 @@ import {
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
 import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
-import { spellingAudioLocales } from "../spellingSpeech";
+import { spellingAudioScope } from "../spellingSpeech";
 import type { VoiceOption } from "@tsz/voice-editor/types";
 import { flushSync } from "react-dom";
 import { useVoiceAudioTasks } from "../voiceSaveContext";
@@ -43,7 +43,7 @@ function variants(forms: SharedFormsStepContentV3) {
     })
     .map((item) => ({
       ...item,
-      spellingLocales: spellingAudioLocales([
+      spellingScope: spellingAudioScope([
         { ...item.variant, dialect: item.dialect }
       ])
     }));
@@ -158,10 +158,11 @@ export function V3FormsAudioTasks({
           }
         />
       )}
-      {variants(forms).map(({ variant, dialect, spellingLocales }) => (
+      {variants(forms).map(({ variant, dialect, spellingScope }) => (
         <div key={variant.id}>
           {!rowOnly &&
-            (!spellingLocales || spellingLocales.length > 0) &&
+            (!spellingScope.activeLocales ||
+              spellingScope.activeLocales.length > 0) &&
             (variant.spelling_speech ||
               variant.pronunciations.some(
                 (row) =>
@@ -179,11 +180,12 @@ export function V3FormsAudioTasks({
                   }
                 }
                 profile={variant.spelling_speech?.voice_profile}
-                activeLocales={spellingLocales}
+                activeLocales={spellingScope.activeLocales}
+                requiredLocales={spellingScope.requiredLocales}
                 recommendationArea="word"
                 locale={
-                  spellingLocales?.length === 1
-                    ? spellingLocales[0]
+                  spellingScope.activeLocales?.length === 1
+                    ? spellingScope.activeLocales[0]
                     : dialect === "common"
                       ? undefined
                       : dialect === "uk"
@@ -340,7 +342,8 @@ function TextAudioTask({
   onChange,
   recommendationArea,
   locale,
-  activeLocales
+  activeLocales,
+  requiredLocales
 }: {
   target: string;
   content: RichTextV2;
@@ -348,6 +351,7 @@ function TextAudioTask({
   recommendationArea?: "word";
   locale?: `en-${string}`;
   activeLocales?: readonly PhonemeLocaleV3[];
+  requiredLocales?: readonly PhonemeLocaleV3[];
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
 }) {
@@ -362,6 +366,7 @@ function TextAudioTask({
     adapter: adminVoicePreviewAdapter,
     locale,
     activeLocales,
+    requiredLocales,
     enabled,
     defer: effectiveProfile !== profile,
     onChange

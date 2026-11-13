@@ -58,8 +58,8 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   } satisfies AudioUploadAdapter
 }));
 
-import { formsFixture, UUIDS } from "../fixtures";
-import { spellingEditorValue } from "../spellingSpeech";
+import { formsFixture, pronunciationFixture, UUIDS } from "../fixtures";
+import { spellingAudioScope, spellingEditorValue } from "../spellingSpeech";
 import {
   updateVariantSpelling,
   updateSpellingVoiceProfile
@@ -2609,6 +2609,75 @@ it("首次正文的目录加载失败不能按历史缺省 profile 绕过整次�
   expect(persist).not.toHaveBeenCalled();
 });
 
+it.each([false, true])(
+  "统一拼写混合协议只要求显式来源口音解析成功，英式失败=%s",
+  async (failUk) => {
+    state.flags.VOICE_PREVIEW = true;
+    const profile: VoiceProfileV3 = {
+      voices: [
+        {
+          voice_id: "sonia",
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "legacy-uk"
+        }
+      ]
+    };
+    const variants = [
+      {
+        dialect: "uk" as const,
+        pronunciations: [
+          pronunciationFixture({
+            synthesis: {
+              alphabet: "ipa",
+              ipa: "",
+              ups: "",
+              uk: { source: "spelling", ipa: "", ups: "" }
+            }
+          })
+        ]
+      },
+      { dialect: "us" as const, pronunciations: [pronunciationFixture()] }
+    ];
+    const audioTasks = new Map<string, () => Promise<boolean>>();
+    const generateAudio = vi.fn();
+    render(
+      <VoiceSaveContext.Provider value={{ audioTasks, save: async () => true }}>
+        <V3VoiceTextField
+          mode="spelling"
+          value={VALUE}
+          nodeId="mixed-protocol"
+          field="spelling"
+          ariaLabel="混合拼写"
+          spellingAudioScope={spellingAudioScope(variants)}
+          voiceProfile={profile}
+          onVoiceProfileChange={vi.fn()}
+          onChange={vi.fn()}
+          previewAdapter={{
+            listVoices: state.listVoices,
+            synthesize: state.synthesize,
+            generateAudio,
+            resolveVoices: async ({ accent }) => {
+              if (accent === "us" || failUk) throw new Error("此口音解析失败");
+              return {
+                voices: profile.voices,
+                source: { kind: "local" as const }
+              };
+            }
+          }}
+        />
+      </VoiceSaveContext.Provider>
+    );
+    await waitFor(() => expect(audioTasks.size).toBe(1));
+    await act(async () => {
+      for (const wait of audioTasks.values())
+        expect(await wait()).toBe(!failUk);
+    });
+    expect(generateAudio).not.toHaveBeenCalled();
+  }
+);
+
 it("未启用的拼写设置可保存且不生成正式音频，启用后才补齐", async () => {
   state.flags.VOICE_PREVIEW = true;
   const generateAudio = vi.fn().mockResolvedValue({ id: "activated-spelling" });
@@ -2658,7 +2727,10 @@ it("未启用的拼写设置可保存且不生成正式音频，启用后才补�
           field="spelling"
           ariaLabel="未启用拼写"
           spellingSettingsRef={opener}
-          spellingAudioLocales={active ? ["en-GB"] : []}
+          spellingAudioScope={{
+            activeLocales: active ? ["en-GB"] : [],
+            requiredLocales: active ? ["en-GB"] : []
+          }}
           voiceProfile={profile}
           onVoiceProfileChange={setProfile}
           onCommit={(result) => {

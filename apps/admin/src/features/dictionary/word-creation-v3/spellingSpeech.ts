@@ -21,39 +21,48 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 
-/** 显式来源按共享所有者聚合；旧协议仍要求独立拼写音频，保持发布兼容。 */
-export function spellingAudioLocales(
+export interface SpellingAudioScope {
+  /** legacy 消费者仍需要整个已选池；undefined 保留该范围。 */
+  activeLocales?: readonly PhonemeLocaleV3[];
+  /** 仅显式选用拼写的口音必须解析成功。 */
+  requiredLocales: readonly PhonemeLocaleV3[];
+}
+
+/** 统一拼写可同时承载显式来源和 legacy 消费者，两种约束分别聚合。 */
+export function spellingAudioScope(
   variants: readonly {
     dialect: Dialect;
     pronunciations: readonly WordPronunciationV3[];
   }[]
-): PhonemeLocaleV3[] | undefined {
-  if (
-    !variants.some((variant) =>
-      variant.pronunciations.some(
-        (row) => row.synthesis?.uk?.source || row.synthesis?.us?.source
-      )
-    )
-  )
-    return undefined;
-  return (["en-GB", "en-US"] as const).filter((locale) => {
-    const side = locale === "en-GB" ? "uk" : "us";
-    return variants.some((variant) => {
-      if (variant.dialect !== "common" && variant.dialect !== side)
-        return false;
-      const explicitSources = variant.pronunciations.some(
-        (row) => row.synthesis?.uk?.source || row.synthesis?.us?.source
-      );
-      return (
-        !explicitSources ||
-        variant.pronunciations.some(
-          (row) =>
-            (row.synthesis?.[side]?.source ??
-              (row.synthesis?.use_spelling ? "spelling" : "ipa")) === "spelling"
+): SpellingAudioScope {
+  let legacyPool = false;
+  const required = new Set<PhonemeLocaleV3>();
+  for (const variant of variants) {
+    const explicit = (row: WordPronunciationV3) =>
+      !!(row.synthesis?.uk?.source || row.synthesis?.us?.source);
+    if (!variant.pronunciations.some(explicit)) legacyPool = true;
+    for (const row of variant.pronunciations) {
+      if (!explicit(row)) {
+        if (row.synthesis?.use_spelling) legacyPool = true;
+        continue;
+      }
+      for (const side of ["uk", "us"] as const) {
+        if (variant.dialect !== "common" && variant.dialect !== side) continue;
+        if (
+          (row.synthesis?.[side]?.source ??
+            (row.synthesis?.use_spelling ? "spelling" : "ipa")) === "spelling"
         )
-      );
-    });
-  });
+          required.add(side === "uk" ? "en-GB" : "en-US");
+      }
+    }
+  }
+  const requiredLocales = (["en-GB", "en-US"] as const).filter((locale) =>
+    required.has(locale)
+  );
+  return {
+    activeLocales: legacyPool ? undefined : requiredLocales,
+    requiredLocales
+  };
 }
 
 /** 设置只替换当前口音；停顿共享，变更后另一口音的旧音频引用必须失效。 */

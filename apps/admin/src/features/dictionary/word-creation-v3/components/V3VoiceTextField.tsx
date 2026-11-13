@@ -13,7 +13,6 @@ import type {
   AudioAssetLocaleV3,
   AudioAssetV3,
   Dialect,
-  PhonemeLocaleV3,
   RichTextV2,
   RichTextV3,
   VoiceProfileV3,
@@ -67,7 +66,10 @@ import "@tsz/voice-editor/styles.css";
 import "./V3VoiceTextField.css";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 import { RequiredFieldFeedback } from "../../RequiredFieldFeedback";
-import { mergeSpellingSettings } from "../spellingSpeech";
+import {
+  mergeSpellingSettings,
+  type SpellingAudioScope
+} from "../spellingSpeech";
 
 export type SpellingSettingsRequest = { dialect: "uk" | "us" };
 export type SpellingSettingsOpener = (request: SpellingSettingsRequest) => void;
@@ -116,8 +118,8 @@ export interface V3VoiceTextFieldProps<
   /** 拼写所有者的来源行共用此入口，不额外挂载字段或音频任务。 */
   spellingSettingsRef?: RefObject<SpellingSettingsOpener | null>;
   spellingSettingsHint?: ReactNode;
-  /** 缺省沿用旧调用方；显式空集合表示拼写仅为未启用候选。 */
-  spellingAudioLocales?: readonly PhonemeLocaleV3[];
+  /** 共享拼写的生成范围和显式来源解析要求；缺省沿用旧调用方。 */
+  spellingAudioScope?: SpellingAudioScope;
   onEditingChange?: (editing: boolean) => void;
   onDraftPendingChange?: (pending: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
@@ -186,7 +188,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   spellingTextOnly = false,
   spellingSettingsRef,
   spellingSettingsHint,
-  spellingAudioLocales,
+  spellingAudioScope,
   onEditingChange,
   onDraftPendingChange,
   onAssociationPendingChange,
@@ -228,6 +230,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
   const { t } = useLexiconEditorTranslation();
+  const spellingAudioLocales = spellingAudioScope?.activeLocales;
   const requiredErrorId = useId();
   const businessSave = useVoiceSave();
   const saveRef = useRef({ onSave, businessSave });
@@ -667,6 +670,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     profile: area ? withDefaultVoiceProfile(voiceProfile, area) : voiceProfile,
     adapter: collapsedAdapter,
     activeLocales: spellingAudioLocales,
+    requiredLocales: spellingAudioScope?.requiredLocales,
     locale:
       spellingAudioLocales?.length === 1
         ? spellingAudioLocales[0]
