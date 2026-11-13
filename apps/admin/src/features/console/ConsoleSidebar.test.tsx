@@ -406,3 +406,13 @@ describe("ConsoleSidebar 顶部面板", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it("词库配置查看权限在词库管理下提供独立语体和行业菜单", () => {
+  setLevel("admin", ["lexicon_settings.access"]);
+  renderAt("/words/registers");
+  fireEvent.click(screen.getByText("词库管理"));
+  fireEvent.click(screen.getByText("行业领域"));
+  expect(mockNavigate).toHaveBeenCalledWith("/words/domains");
+  fireEvent.click(screen.getByText("语体色彩"));
+  expect(mockNavigate).toHaveBeenCalledWith("/words/registers");
+});

@@ -112,6 +112,8 @@ const GROUPS: Group[] = [
       pageLeaf(ADMIN_PAGE_ROUTES.words, "nav_words"),
       pageLeaf(ADMIN_PAGE_ROUTES.wordsTrash, "nav_trash"),
       pageLeaf(ADMIN_PAGE_ROUTES.partsOfSpeech, "nav_parts"),
+      pageLeaf(ADMIN_PAGE_ROUTES.registers, "nav_registers"),
+      pageLeaf(ADMIN_PAGE_ROUTES.domains, "nav_domains"),
       {
         key: "todo:custom-dict",
         label: "nav_custom_dictionary",
