@@ -15,12 +15,6 @@
   border-color: var(--ui-color-warning-border);
 }
 
-.admin-connection__trigger.ui-btn[data-state="connected"] {
-  color: var(--ui-color-text-secondary);
-  background: var(--ui-color-fill-alter);
-  border-color: transparent;
-}
-
 .admin-connection__trigger.ui-btn[data-state="connecting"] {
   color: var(--ui-color-primary);
   background: var(--ui-color-primary-bg);
@@ -43,10 +37,6 @@
 .admin-connection__description {
   margin: 0 0 var(--ui-space-4);
   color: var(--ui-color-text-secondary);
-}
-
-.admin-connection__description:last-child {
-  margin-bottom: 0;
 }
 
 .admin-connection__trigger .admin-connection__spinner {

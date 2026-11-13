@@ -334,13 +334,6 @@ export const adminShellMessages = {
     "可以繼續編輯，請稍候。",
     "You can keep editing while you wait."
   ],
-  connection_connected: ["已连接", "已連線", "Connected"],
-  connection_connected_title: ["已连接", "已連線", "Connected"],
-  connection_connected_help: [
-    "可以保存当前修改。",
-    "可以儲存目前的修改。",
-    "You can save your changes."
-  ],
   connection_sign_in: ["请重新登录", "請重新登入", "Sign in again"],
   connection_sign_in_title: ["需要重新登录", "需要重新登入", "Sign in again"],
   connection_sign_in_help: [
