@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
+import { isSharedForms } from "@tsz/shared";
 import type {
   NextCapabilities,
   NextEntry,
@@ -1442,7 +1443,12 @@ it("词形底栏随步骤切换移除，切回词形仍保留编辑面板", asyn
       expect(
         screen.queryByRole("button", { name: "下一步：词义与译词" })
       ).toBeNull();
-      expect(document.querySelector(".v3-step-actions")).toBeNull();
+      if (step.source.includes("词义")) {
+        expect(
+          button("下一步：预览").closest(".v3-step-actions")
+        ).not.toBeNull();
+        expect(document.querySelectorAll(".v3-step-actions")).toHaveLength(1);
+      } else expect(document.querySelector(".v3-step-actions")).toBeNull();
     }
     fireEvent.click(button(/^词性与发音/));
     expect(await screen.findByRole("button", { name: "编辑原形内容" })).toBe(
@@ -1495,4 +1501,89 @@ it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳�
   await screen.findByText("版本 5");
   expect(screen.getByText("暂无词性")).toBeVisible();
   expect(screen.queryByRole("button", { name: "编辑原形内容" })).toBeNull();
+});
+
+it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容，完整保存保留其他义项", async () => {
+  const api = requests();
+  const nounId = crypto.randomUUID();
+  const verbId = crypto.randomUUID();
+  const definitionId = crypto.randomUUID();
+  const formEditor = applyFormsStructure(emptyFormEditor(), formsFixture());
+  if (!isSharedForms(formEditor)) throw new Error("expected shared forms");
+  const original: NextDraft = {
+    ...entry.draft,
+    form_editor: formEditor,
+    senses: [
+      {
+        id: nounId,
+        part_of_speech: "noun",
+        definitions: [
+          {
+            id: definitionId,
+            locale: "en-GB",
+            text: "a centre",
+            style: "definition"
+          },
+          {
+            id: crypto.randomUUID(),
+            locale: "en-US",
+            text: "a center",
+            style: "sentence"
+          }
+        ],
+        equivalents: []
+      },
+      {
+        id: verbId,
+        part_of_speech: "verb",
+        definitions: [],
+        equivalents: [
+          { id: crypto.randomUUID(), locale: "zh-Hant", text: "集中" }
+        ]
+      }
+    ]
+  };
+  api.get.mockResolvedValue({ ...entry, draft: original });
+  mount(api);
+  await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/^词义与译词/));
+  expect(screen.getByRole("tab", { name: "名词" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "英式英语释义 1" }), {
+    target: { value: "the middle" }
+  });
+  fireEvent.click(button("收起英式英语释义"));
+  expect(screen.queryByRole("textbox", { name: "英式英语释义 1" })).toBeNull();
+  fireEvent.click(button("展开英式英语释义"));
+  expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
+    "the middle"
+  );
+  fireEvent.click(screen.getByRole("tab", { name: "动词" }));
+  fireEvent.click(button("添加义项"));
+  fireEvent.click(button("添加简体中文译词"));
+  fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
+    target: { value: "集中于" }
+  });
+  fireEvent.click(screen.getByRole("tab", { name: "名词" }));
+  expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
+    "the middle"
+  );
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  const result = api.save.mock.calls[0]![1].draft;
+  expect(result.senses[0]).toEqual({
+    ...original.senses[0],
+    definitions: [
+      { ...original.senses[0]!.definitions[0], text: "the middle" },
+      original.senses[0]!.definitions[1]
+    ]
+  });
+  expect(result.senses[1]).toEqual(original.senses[1]);
+  expect(result.senses[2]).toMatchObject({
+    part_of_speech: "verb",
+    equivalents: [{ locale: "zh-Hans", text: "集中于" }]
+  });
+  expect(result.form_editor).toEqual(original.form_editor);
 });

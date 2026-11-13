@@ -2,6 +2,12 @@ import { Button, Space } from "@tsz/ui/admin/display";
 import { Input, Select } from "@tsz/ui/admin/forms";
 import { Trash2, Plus } from "lucide-react";
 import type { NextDefinition, NextEquivalent } from "@tsz/types";
+import { useState } from "react";
+import {
+  SenseSectionBody,
+  SenseSectionTitle
+} from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
+import { V3RowIndex } from "@/features/dictionary/word-creation-v3/components/V3RowIndex";
 
 type Row = NextEquivalent | NextDefinition;
 export function ContentRows({
@@ -9,6 +15,7 @@ export function ContentRows({
   locale,
   label,
   definition = false,
+  grouped = false,
   textClassName,
   disabled,
   onChange
@@ -17,17 +24,21 @@ export function ContentRows({
   locale: string;
   label: string;
   definition?: boolean;
+  grouped?: boolean;
   textClassName?: string;
   disabled: boolean;
   onChange: (rows: Row[]) => void;
 }) {
   const visible = rows.filter((row) => row.locale === locale);
-  return (
-    <section className="lexicon-next-rows" aria-label={label}>
-      <h4>{label}</h4>
-      {!visible.length && <p className="lexicon-next-muted">尚无{label}</p>}
+  const [collapsed, setCollapsed] = useState(false);
+  const content = (
+    <>
       {visible.map((row, index) => (
-        <div key={row.id} className="lexicon-next-row">
+        <div
+          key={row.id}
+          className={grouped ? "lexicon-next-content-row" : "lexicon-next-row"}
+        >
+          {grouped && <V3RowIndex index={index} />}
           {definition ? (
             <Input.TextArea
               className={textClassName}
@@ -84,6 +95,8 @@ export function ContentRows({
             <Button
               aria-label={`删除${label} ${index + 1}`}
               icon={<Trash2 aria-hidden="true" />}
+              danger={grouped}
+              type={grouped ? "text" : "default"}
               disabled={disabled}
               onClick={() =>
                 onChange(rows.filter((item) => item.id !== row.id))
@@ -93,6 +106,9 @@ export function ContentRows({
         </div>
       ))}
       <Button
+        block={grouped}
+        type={grouped ? "dashed" : "default"}
+        className={grouped ? "word-section-add-button" : undefined}
         icon={<Plus aria-hidden="true" />}
         disabled={disabled}
         onClick={() =>
@@ -109,6 +125,27 @@ export function ContentRows({
       >
         添加{label}
       </Button>
+    </>
+  );
+  return grouped ? (
+    <section
+      className={`word-sense-section${collapsed ? " is-collapsed" : ""}`}
+      aria-label={label}
+    >
+      <SenseSectionTitle
+        label={label}
+        count={visible.length}
+        unit="条"
+        collapsed={collapsed}
+        onToggle={() => setCollapsed(!collapsed)}
+      />
+      <SenseSectionBody collapsed={collapsed}>{content}</SenseSectionBody>
+    </section>
+  ) : (
+    <section className="lexicon-next-rows" aria-label={label}>
+      <h4>{label}</h4>
+      {!visible.length && <p className="lexicon-next-muted">尚无{label}</p>}
+      {content}
     </section>
   );
 }

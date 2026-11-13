@@ -15,28 +15,27 @@ import {
   Spin,
   Tag
 } from "@tsz/ui/admin/display";
-import { Checkbox, Form, Input, Radio, Select } from "@tsz/ui/admin/forms";
+import { Checkbox, Form, Input, Radio } from "@tsz/ui/admin/forms";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { ContentEditPermissions } from "@/features/dictionary/contentEditPermissions";
 import { FormsStep, emptyFormEditor } from "@/features/lexicon-next/FormsStep";
 import { VoiceSaveContext } from "@/features/dictionary/word-creation-v3/voiceSaveContext";
 import { V3StepActions } from "@/features/dictionary/word-creation-v3/components/V3StepActions";
-import { Plus, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
-  NextDefinition,
   NextDraft,
   NextEntry,
   NextEntryView,
   NextWorkspaceEntry,
   NextLanguageCapability,
-  NextSense,
   V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { ContentRows } from "@/features/lexicon-next/ContentRows";
+import { MeaningsStep } from "@/features/lexicon-next/MeaningsStep";
 import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
   draftProblem,
@@ -254,14 +253,6 @@ function EntryEditor({
     }
   });
   const editingLocale = common ? "en" : target;
-  function updateSense(id: string, update: Partial<NextSense>) {
-    setDraft((current) => ({
-      ...current,
-      senses: current.senses.map((sense) =>
-        sense.id === id ? { ...sense, ...update } : sense
-      )
-    }));
-  }
   async function run(operation: () => Promise<void>) {
     if (lock.current) return false;
     lock.current = true;
@@ -359,7 +350,7 @@ function EntryEditor({
       }
     >
       <div
-        className={`lexicon-next lexicon-next-editor${step === "forms" ? " lexicon-next-forms" : ""}`}
+        className={`lexicon-next lexicon-next-editor${step !== "preview" ? " lexicon-next-forms" : ""}`}
       >
         <div className="lexicon-next-toolbar">
           <Space wrap>
@@ -387,7 +378,7 @@ function EntryEditor({
             <Button
               type="primary"
               icon={<Save aria-hidden="true" />}
-              hidden={step === "forms"}
+              hidden={step !== "preview"}
               loading={busy}
               disabled={!writable || !dirty || conflict || formContentOpen}
               onClick={() => void save()}
@@ -572,118 +563,47 @@ function EntryEditor({
           )}
         </div>
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
-          <div className="lexicon-next-section-heading">
-            <h2>义项</h2>
-            <Button
-              icon={<Plus aria-hidden="true" />}
-              disabled={disabled}
-              onClick={() =>
-                setDraft({
-                  ...draft,
-                  senses: [
-                    ...draft.senses,
-                    {
-                      id: crypto.randomUUID(),
-                      part_of_speech: null,
-                      definitions: [],
-                      equivalents: []
-                    }
-                  ]
-                })
+          <MeaningsStep
+            value={draft}
+            target={editingLocale}
+            medium={medium}
+            partOfSpeechCodes={language.part_of_speech_codes}
+            disabled={disabled}
+            onChange={setDraft}
+          />
+          {step === "meanings" && (
+            <V3StepActions
+              status={
+                busy
+                  ? "正在保存草稿"
+                  : dirty
+                    ? "有未保存修改"
+                    : `草稿版本 ${saved.revision}`
               }
             >
-              添加义项
-            </Button>
-          </div>
-          {!draft.senses.length && (
-            <p className="lexicon-next-muted">尚无义项</p>
+              <Button
+                type="text"
+                disabled={busy}
+                onClick={() => setStep("forms")}
+              >
+                上一步
+              </Button>
+              <Button
+                loading={busy}
+                disabled={!writable || !dirty || conflict}
+                onClick={() => void save()}
+              >
+                保存完整草稿
+              </Button>
+              <Button
+                type="primary"
+                disabled={busy}
+                onClick={() => setStep("preview")}
+              >
+                下一步：预览
+              </Button>
+            </V3StepActions>
           )}
-          {draft.senses.map((sense, index) => (
-            <section
-              className="lexicon-next-sense"
-              key={sense.id}
-              aria-label={`义项 ${index + 1}`}
-            >
-              <div className="lexicon-next-section-heading">
-                <h3>义项 {index + 1}</h3>
-                <Space wrap>
-                  <Select
-                    aria-label={`义项 ${index + 1} 词性`}
-                    placeholder="未指定词性"
-                    allowClear
-                    value={sense.part_of_speech ?? undefined}
-                    disabled={disabled}
-                    options={language.part_of_speech_codes.map((value) => ({
-                      value,
-                      label: value
-                    }))}
-                    onChange={(value) =>
-                      updateSense(sense.id, { part_of_speech: value ?? null })
-                    }
-                  />
-                  <Button
-                    danger
-                    disabled={disabled}
-                    onClick={() =>
-                      modal.confirm({
-                        title: `删除义项 ${index + 1}？`,
-                        content:
-                          "这将从草稿移除此义项的所有语言内容。保存后生效。",
-                        okText: "删除义项",
-                        cancelText: "取消",
-                        onOk: () =>
-                          setDraft((current) => ({
-                            ...current,
-                            senses: current.senses.filter(
-                              (item) => item.id !== sense.id
-                            )
-                          }))
-                      })
-                    }
-                  >
-                    删除义项
-                  </Button>
-                </Space>
-              </div>
-              <div className="lexicon-next-columns">
-                <ContentRows
-                  rows={sense.definitions}
-                  locale={editingLocale}
-                  label={`${localeLabels[editingLocale]}释义`}
-                  definition
-                  disabled={disabled}
-                  onChange={(definitions) =>
-                    updateSense(sense.id, {
-                      definitions: definitions as NextDefinition[]
-                    })
-                  }
-                />
-                <div>
-                  <ContentRows
-                    rows={sense.definitions}
-                    locale={medium}
-                    label={`${localeLabels[medium]}解释`}
-                    definition
-                    disabled={disabled}
-                    onChange={(definitions) =>
-                      updateSense(sense.id, {
-                        definitions: definitions as NextDefinition[]
-                      })
-                    }
-                  />
-                  <ContentRows
-                    rows={sense.equivalents}
-                    locale={medium}
-                    label={`${localeLabels[medium]}译词`}
-                    disabled={disabled}
-                    onChange={(equivalents) =>
-                      updateSense(sense.id, { equivalents })
-                    }
-                  />
-                </div>
-              </div>
-            </section>
-          ))}
         </div>
         <div hidden={step !== "preview"} inert={step !== "preview"}>
           <h2>预览</h2>
