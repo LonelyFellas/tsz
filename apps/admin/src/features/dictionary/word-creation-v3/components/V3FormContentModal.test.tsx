@@ -4,7 +4,7 @@ import {
   useVoiceAudioTasks,
   useVoiceSave
 } from "../voiceSaveContext";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import {
   act,
@@ -47,10 +47,12 @@ beforeEach(() => {
 vi.mock("./V3ConcreteFormRow", () => ({
   V3ConcreteFormRow: ({
     content,
-    onChange
+    onChange,
+    dialectActions
   }: {
     content: DraftFormsStepContentV3;
     onChange: (next: DraftFormsStepContentV3) => void;
+    dialectActions?: Partial<Record<"uk" | "us", ReactNode>>;
   }) => {
     const localSave = useVoiceSave();
     const audioTasks = useVoiceAudioTasks();
@@ -93,6 +95,8 @@ vi.mock("./V3ConcreteFormRow", () => ({
     const regions = content.pos[0]!.forms[0]!.regional_variants;
     return (
       <>
+        {dialectActions?.uk}
+        {dialectActions?.us}
         {localSave && (
           <button onClick={() => void localSave.save("word")}>
             保存当前正文
@@ -481,8 +485,8 @@ describe("词形内容弹窗的草稿边界", () => {
       const confirm = within(dialog).getByRole("button", { name: "确认选择" });
       expect(confirm).toBeDisabled();
       fireEvent.click(
-        within(dialog).getByText(side === "uk" ? "BrE 英式" : "AmE 美式", {
-          exact: true
+        within(dialog).getByRole("button", {
+          name: side === "uk" ? "采用英式内容" : "采用美式内容"
         })
       );
       expect(confirm).toHaveAccessibleName(
@@ -531,14 +535,17 @@ describe("词形内容弹窗的草稿边界", () => {
     fireEvent.click(spelling);
     let dialog = screen.getByRole("dialog", { name: "选择主拼写" });
     fireEvent.click(
-      within(dialog).getByRole("radio", { name: /BrE 英式：\s*centre/ })
+      within(dialog).getByRole("button", { name: "采用英式内容" })
     );
-    fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "取消统一" }));
     expect(spelling).toBeChecked();
     fireEvent.click(spelling);
     dialog = screen.getByRole("dialog", { name: "选择主拼写" });
-    for (const radio of within(dialog).getAllByRole("radio"))
-      expect(radio).not.toBeChecked();
+    for (const name of ["采用英式内容", "采用美式内容"])
+      expect(within(dialog).getByRole("button", { name })).toHaveAttribute(
+        "aria-pressed",
+        "false"
+      );
     expect(
       within(dialog).getByRole("button", { name: "确认选择" })
     ).toBeDisabled();
@@ -548,7 +555,75 @@ describe("词形内容弹窗的草稿边界", () => {
     expect(onConfirm).toHaveBeenCalledWith(initial);
   });
 
-  it("英美发音不同时关闭音标开关仍拦截合并，原值和旧数据保持不变", () => {
+  it.each(["uk", "us"] as const)(
+    "音标文字相同而配音配置不同，选择 %s 后统一发音并保留所选配置",
+    (side) => {
+      const initial = applyFormsStructure(
+        { forms_format: "shared_v1", contents: [], pos: [] },
+        formsFixture({
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "distinguish"
+          },
+          forms: [ukUsFormFixture({ us: { spelling: "centre" } })]
+        })
+      ) as SharedFormsStepContentV3;
+      const regions = initial.contents[0]!.regional_variants;
+      if (regions.mode !== "uk_us") throw new Error("fixture");
+      for (const dialect of ["uk", "us"] as const)
+        regions[dialect].pronunciations[0]!.synthesis = {
+          alphabet: "ipa",
+          ipa: "",
+          ups: "",
+          [dialect]: {
+            source: "ipa",
+            ipa: dialect === "uk" ? "uk-ipa" : "us-ipa",
+            ups: ""
+          }
+        };
+      const before = structuredClone(initial);
+      const { onConfirm, unmount } = setup({
+        initialForms: initial,
+        baseOnly: true
+      });
+      const phonetics = screen.getByRole("switch", { name: "音标有英美区别" });
+      fireEvent.click(phonetics);
+      const dialog = screen.getByRole("dialog", { name: "选择统一发音" });
+      expect(phonetics).toBeChecked();
+      expect(
+        within(dialog).getByRole("button", { name: "确认选择" })
+      ).toBeDisabled();
+      fireEvent.click(
+        within(dialog).getByRole("button", {
+          name: side === "uk" ? "采用英式内容" : "采用美式内容"
+        })
+      );
+      fireEvent.click(
+        within(dialog).getByRole("button", {
+          name: side === "uk" ? "使用英式发音" : "使用美式发音"
+        })
+      );
+      expect(phonetics).not.toBeChecked();
+      expect(initial).toEqual(before);
+      fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+      const saved = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+      const common = saved.contents[0]!.regional_variants;
+      if (common.mode !== "common") throw new Error("expected common");
+      const { id: _id, ...value } = common.common.pronunciations[0]!;
+      const { id: _sourceId, ...source } = regions[side].pronunciations[0]!;
+      expect(value).toEqual(source);
+      expect(common.common.spelling).toBe("centre");
+      unmount();
+      const reopened = setup({ initialForms: saved, baseOnly: true });
+      expect(
+        screen.getByRole("switch", { name: "音标有英美区别" })
+      ).not.toBeChecked();
+      fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+      expect(reopened.onConfirm).toHaveBeenCalledWith(saved);
+    }
+  );
+
+  it("取消统一发音选择，原值和旧数据保持不变", () => {
     const expanded = formsFixture({
       dialect_rules: { spelling_mode: "unified", phonetic_mode: "distinguish" },
       forms: [
@@ -571,7 +646,11 @@ describe("词形内容弹窗的草稿边界", () => {
     ) as SharedFormsStepContentV3;
     const { onConfirm } = setup({ initialForms: initial, baseOnly: true });
     fireEvent.click(screen.getByRole("switch", { name: "音标有英美区别" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("英美内容或配置不同");
+    const dialog = screen.getByRole("dialog", { name: "选择统一发音" });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "采用英式内容" })
+    );
+    fireEvent.keyDown(dialog, { key: "Escape", keyCode: 27 });
     expect(
       screen.getByRole("switch", { name: "拼写有英美区别" })
     ).not.toBeChecked();

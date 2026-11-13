@@ -174,6 +174,7 @@ export interface V3ConcreteFormRowProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   showMatrixHeader?: boolean;
   presentation?: "matrix" | "content";
+  dialectActions?: Partial<Record<"uk" | "us", ReactNode>>;
   multipleSpellingsAvailable?: boolean;
   spellingRemovalReason?: (slotId: string) => string | undefined;
   showRegularity?: boolean;
@@ -772,6 +773,7 @@ export function V3ConcreteFormRow({
   onChange,
   showMatrixHeader = true,
   presentation = "matrix",
+  dialectActions,
   showRegularity = true,
   multipleSpellingsAvailable = false,
   spellingRemovalReason,
@@ -872,9 +874,11 @@ export function V3ConcreteFormRow({
               <div className="word-form-matrix-shared-header">
                 <span className="word-form-matrix-shared-header-uk">
                   {t("british_short")}
+                  {dialectActions?.uk}
                 </span>
                 <span className="word-form-matrix-shared-header-us">
                   {t("american_short")}
+                  {dialectActions?.us}
                 </span>
               </div>
             ) : commonVariant ? (

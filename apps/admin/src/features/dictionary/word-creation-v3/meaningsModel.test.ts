@@ -28,6 +28,8 @@ import {
   newSentenceTranslations,
   prepareTextLinksForSave,
   ensureV3MeaningsForForms,
+  grammarMergeRequiresChoice,
+  mergeGrammarVariants,
   fillDefaultSenseGroups,
   DEFAULT_SENSE_GROUP_SLOTS,
   relationDisplaySnapshots,
@@ -540,7 +542,7 @@ describe("V3 meanings writable model", () => {
     expect(variants.every((variant) => variant.content.text === "")).toBe(true);
   });
 
-  it("unified 词性把 uk/us 双条语法结构合并回单条 common，英式为空则取美式", () => {
+  it("统一拼写保留不同的英美语法结构，空白侧仍可安全合并", () => {
     const existing = toWritableMeanings(meaningsCanonicalFixture);
     existing.pos[0]!.grammar_structures[0]!.variants = [
       {
@@ -564,13 +566,10 @@ describe("V3 meanings writable model", () => {
       idFactory
     );
 
-    expect(result.pos[0]!.grammar_structures[0]!.variants).toEqual([
-      {
-        id: "merged-variant-1",
-        dialect: "common",
-        content: { version: 2, text: "a centre", annotations: [] }
-      }
-    ]);
+    expect(result.pos[0]!.grammar_structures[0]!.variants).toEqual(
+      existing.pos[0]!.grammar_structures[0]!.variants
+    );
+    expect(idFactory).not.toHaveBeenCalled();
 
     const blankUk = toWritableMeanings(meaningsCanonicalFixture);
     blankUk.pos[0]!.grammar_structures[0]!.variants = [
@@ -595,6 +594,50 @@ describe("V3 meanings writable model", () => {
       fallback.pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a center");
   });
+
+  it.each(["uk", "us"] as const)(
+    "语法文字相同但配置不同需选择，采用 %s 时保留完整配置和新节点身份",
+    (side) => {
+      const existing = toWritableMeanings(meaningsCanonicalFixture);
+      const grammar = existing.pos[0]!.grammar_structures[0]!;
+      grammar.variants = (["uk", "us"] as const).map((dialect) => ({
+        id: `variant-${dialect}`,
+        dialect,
+        content: { version: 2, text: "a centre", annotations: [] },
+        voice_profile: {
+          voices: [
+            {
+              voice_id: dialect,
+              enabled: true,
+              rate_percent: dialect === "uk" ? 0 : 10
+            }
+          ]
+        },
+        audio_assets: [
+          audioAsset(`asset-${dialect}`, dialect === "uk" ? "en-GB" : "en-US")
+        ]
+      }));
+      const before = structuredClone(grammar);
+      expect(grammarMergeRequiresChoice(grammar)).toBe(true);
+      const aligned = ensureV3MeaningsForForms(
+        "entry-1",
+        formsFixture({ pos_id: "pos-1" }),
+        existing,
+        () => "automatic"
+      );
+      expect(aligned.pos[0]!.grammar_structures[0]).toEqual(before);
+      const merged = mergeGrammarVariants(grammar, side, () => "common-new-id");
+      const selected = before.variants.find((row) => row.dialect === side)!;
+      expect(merged.variants).toEqual([
+        { ...selected, id: "common-new-id", dialect: "common" }
+      ]);
+      expect(merged.variants[0]!.voice_profile).not.toBe(
+        selected.voice_profile
+      );
+      expect(merged.variants[0]!.audio_assets).not.toBe(selected.audio_assets);
+      expect(grammar).toEqual(before);
+    }
+  );
 
   it("拆分复用 missingPosTemplates 里同 ID 结构的 variants，draft 与 clean 两次装配产出相同节点 ID", () => {
     const forms = formsFixture({

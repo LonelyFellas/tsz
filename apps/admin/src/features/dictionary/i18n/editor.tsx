@@ -1032,6 +1032,51 @@ export const lexiconEditorMessages = {
     "拼寫有英美區別",
     "Different British and American spellings"
   ],
+  adopt_this_side: ["采用此侧", "採用此側", "Accept this side"],
+  selected_for_merge: ["已选用", "已選用", "Selected"],
+  adopt_british_side: [
+    "采用英式内容",
+    "採用英式內容",
+    "Accept British content"
+  ],
+  adopt_american_side: [
+    "采用美式内容",
+    "採用美式內容",
+    "Accept American content"
+  ],
+  cancel_unification: ["取消统一", "取消統一", "Cancel merge"],
+  merge_grammar_content: [
+    "统一英美内容",
+    "統一英美內容",
+    "Merge British and American content"
+  ],
+  merge_grammar: [
+    "统一语法结构 {{index}} 的英美内容",
+    "統一語法結構 {{index}} 的英美內容",
+    "Merge British and American grammar structure {{index}}"
+  ],
+  cancel_grammar_merge: [
+    "取消统一语法结构 {{index}}",
+    "取消統一語法結構 {{index}}",
+    "Cancel merging grammar structure {{index}}"
+  ],
+  merge_grammar_help: [
+    "选择要保留的正文、配音及词形关联。确认前两侧内容保持不变。",
+    "選擇要保留的正文、配音及詞形關聯。確認前兩側內容保持不變。",
+    "Choose the text, voice settings and form links to keep. Both sides stay unchanged until confirmed."
+  ],
+  use_british_grammar: [
+    "使用英式语法内容",
+    "使用英式語法內容",
+    "Use British grammar content"
+  ],
+  use_american_grammar: [
+    "使用美式语法内容",
+    "使用美式語法內容",
+    "Use American grammar content"
+  ],
+  conversion_current_value: ["当前内容", "目前內容", "Current content"],
+  conversion_proposed_value: ["转换结果", "轉換結果", "Conversion result"],
   choose_primary_spelling: [
     "选择主拼写",
     "選擇主拼寫",
@@ -1056,6 +1101,26 @@ export const lexiconEditorMessages = {
     "音标有英美区别？",
     "音標有英美區別？",
     "Different British and American transcriptions?"
+  ],
+  choose_common_pronunciation: [
+    "选择统一发音",
+    "選擇統一發音",
+    "Choose the shared pronunciation"
+  ],
+  common_pronunciation_help: [
+    "保留所选侧的全部读法、音标及配音设置，替换另一侧内容。拼写保持不变。",
+    "保留所選側的全部讀法、音標及配音設定，取代另一側內容。拼寫保持不變。",
+    "Keep all readings, transcriptions and voice settings from the selected side, replacing the other side. The spelling stays the same."
+  ],
+  use_british_pronunciation: [
+    "使用英式发音",
+    "使用英式發音",
+    "Use British pronunciations"
+  ],
+  use_american_pronunciation: [
+    "使用美式发音",
+    "使用美式發音",
+    "Use American pronunciations"
   ],
   form_pronunciation: ["词形发音", "詞形發音", "Form pronunciation"],
   distinguish_phonetic: [

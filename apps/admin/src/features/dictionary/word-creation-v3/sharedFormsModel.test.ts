@@ -363,6 +363,137 @@ describe("共享词形内容", () => {
     }
   );
 
+  it.each([
+    ["uk", false],
+    ["us", false],
+    ["us", true]
+  ] as const)(
+    "选择 %s 整组发音（已有对应关系=%s）支持不同读法数量且不重配身份",
+    (side, paired) => {
+      const initial = applyFormsStructure(
+        { forms_format: "shared_v1", contents: [], pos: [] },
+        formsFixture({
+          forms: [
+            ukUsFormFixture({
+              uk: {
+                pronunciations: [
+                  pronunciationFixture(),
+                  pronunciationFixture({
+                    id: uuidFromInt(821),
+                    actual_pron: "second UK reading"
+                  })
+                ]
+              },
+              us: {
+                spelling: "centre",
+                pronunciations: [
+                  pronunciationFixture({
+                    id: uuidFromInt(822),
+                    actual_pron: "US reading"
+                  })
+                ]
+              }
+            })
+          ],
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "distinguish"
+          }
+        })
+      ) as SharedFormsStepContentV3;
+      const original = initial.contents[0]!;
+      const regions = original.regional_variants;
+      if (regions.mode !== "uk_us") throw new Error("fixture");
+      original.pronunciation_slots = (["uk", "us"] as const).flatMap(
+        (dialect, sideIndex) =>
+          regions[dialect].pronunciations.map((row, index) => ({
+            id: uuidFromInt(830 + sideIndex * 10 + index),
+            [dialect]: { id: row.id, variant_slot_id: regions[dialect].id }
+          }))
+      );
+      if (paired) {
+        const first = original.pronunciation_slots[0]!;
+        first.us = original.pronunciation_slots.pop()!.us;
+        first.common = {
+          id: uuidFromInt(850),
+          variant_slot_id: uuidFromInt(851)
+        };
+      }
+      const before = structuredClone(original);
+      const normalize = createSharedContentDialectNormalizer(original, []);
+      const rules = {
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      } as const;
+      const blocked = normalize(contentEditorForms(original), rules, "uk");
+      expect(blocked.ok).toBe(false);
+      const result = normalize(
+        contentEditorForms(original),
+        rules,
+        "uk",
+        undefined,
+        side
+      );
+      if (!result.ok) throw new Error(result.reason);
+      const merged = contentFromEditor(result.value);
+      if (merged.regional_variants.mode !== "common")
+        throw new Error("fixture");
+      expect(
+        merged.regional_variants.common.pronunciations.map(({ id, ...row }) => {
+          void id;
+          return row;
+        })
+      ).toEqual(
+        regions[side].pronunciations.map(({ id, ...row }) => {
+          void id;
+          return row;
+        })
+      );
+      expect(original).toEqual(before);
+      for (const mapping of before.pronunciation_slots!) {
+        const updated = merged.pronunciation_slots!.find(
+          (row) => row.id === mapping.id
+        )!;
+        expect(updated.uk).toEqual(mapping.uk);
+        expect(updated.us).toEqual(mapping.us);
+        expect(Boolean(updated.common)).toBe(Boolean(mapping[side]));
+        if (mapping.common) expect(updated.common).toEqual(mapping.common);
+      }
+      const undo = normalize(result.value, original.dialect_rules, "uk");
+      if (!undo.ok) throw new Error(undo.reason);
+      expect(contentFromEditor(undo.value).regional_variants).toEqual(regions);
+      const ids = stableIds(initial);
+      const referenceIds = createPronunciationReferenceIds(initial);
+      const saved = replaceSharedContent(initial, merged, ids, referenceIds);
+      const reopened = createSharedContentDialectNormalizer(merged, []);
+      const split = reopened(
+        contentEditorForms(merged),
+        original.dialect_rules,
+        "uk"
+      );
+      if (!split.ok) throw new Error(split.reason);
+      const restoredContent = contentFromEditor(split.value);
+      const restored = replaceSharedContent(
+        saved,
+        restoredContent,
+        ids,
+        referenceIds
+      );
+      for (const mapping of before.pronunciation_slots!) {
+        const updated = restoredContent.pronunciation_slots!.find(
+          (row) => row.id === mapping.id
+        )!;
+        if (mapping.uk) expect(updated.uk).toEqual(mapping.uk);
+        if (mapping.us) expect(updated.us).toEqual(mapping.us);
+      }
+      const restoredRegions = restored.pos[0]!.forms[0]!.regional_bindings;
+      const oldRegions = initial.pos[0]!.forms[0]!.regional_bindings;
+      if (restoredRegions.mode !== "uk_us" || oldRegions.mode !== "uk_us")
+        throw new Error("fixture");
+      expect(restoredRegions[side]).toEqual(oldRegions[side]);
+    }
+  );
+
   it("地区切换保存并重开后，恢复原读法槽位与绑定引用", () => {
     const forms = sharedFormsFixture();
     const original = forms.contents[0]!;

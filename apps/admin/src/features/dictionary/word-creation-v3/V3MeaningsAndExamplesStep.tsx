@@ -25,6 +25,7 @@ import {
   CopyIcon,
   Trash2Icon,
   CircleMinusIcon,
+  GitMergeIcon,
   PlusIcon
 } from "lucide-react";
 import {
@@ -63,7 +64,7 @@ import type {
   WordSenseWritableV3
 } from "@tsz/types";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { groupRelations } from "./relationGroups";
 import { CEFR_OPTIONS } from "../labels";
 import { newWordNodeId } from "../word-model/primitives";
@@ -71,6 +72,8 @@ import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
 import {
   DEFAULT_SENSE_LEVEL,
   defaultDefinitions,
+  grammarMergeRequiresChoice,
+  mergeGrammarVariants,
   definitionSummary,
   editableEnglishText,
   newDefinition,
@@ -95,6 +98,7 @@ import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3GrammarVoiceTextField } from "./components/V3GrammarVoiceTextField";
+import { V3RegionalAdoptButton } from "./components/V3RegionalAdoptButton";
 import { V3LinkedEnglishTextField } from "./components/V3LinkedEnglishTextField";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
 import {
@@ -386,6 +390,17 @@ function GrammarStructuresCard({
 }) {
   const { t } = useLexiconEditorTranslation();
   const { modal } = App.useApp();
+  const [mergingGrammar, setMergingGrammar] = useState<{
+    id: string;
+    side?: "uk" | "us";
+  }>();
+  const firstChoice = useRef<HTMLButtonElement>(null);
+  const mergeTrigger = useRef<HTMLButtonElement | null>(null);
+  const mergingGrammarId = mergingGrammar?.id;
+  useEffect(() => {
+    if (mergingGrammarId) firstChoice.current?.focus();
+    else mergeTrigger.current?.focus();
+  }, [mergingGrammarId]);
   const removeStructure = (structureId: string) =>
     change((draft) => {
       const target = draft.pos[posIndex]!;
@@ -418,176 +433,290 @@ function GrammarStructuresCard({
         <Typography.Text type="secondary">{t("no_grammar")}</Typography.Text>
       ) : (
         <Flex vertical gap={0}>
-          {pos.grammar_structures.map((structure, structureIndex) => (
-            <div
-              className={sortableRowClass(
-                "word-table-row word-grammar-row",
-                sorting,
-                structureIndex
-              )}
-              data-v3-field="variants"
-              data-v3-node-id={structure.id}
-              key={structure.id}
-              onDragLeave={sorting.handleDragLeave}
-              onDragOver={(event) =>
-                sorting.handleDragOver(event, structureIndex)
-              }
-              onDrop={(event) => sorting.handleDrop(event, structureIndex)}
-              tabIndex={-1}
-            >
-              <span className="word-sort-leading">
-                <SortableDragHandle
-                  dragImageSelector={SORTABLE_ROW_SELECTOR}
-                  index={structureIndex}
-                  label={t("drag_grammar", { index: structureIndex + 1 })}
-                  singleItemTitle={t("two_grammar_required")}
-                  sorting={sorting}
-                />
-                <V3RowIndex index={structureIndex} />
-              </span>
-              <div className="word-grammar-variants">
-                {structure.variants.map((variant, variantIndex) => (
-                  <div
-                    className={
-                      variant.dialect === "common"
-                        ? "word-grammar-panel"
-                        : `word-grammar-panel word-grammar-panel-${variant.dialect}`
-                    }
-                    data-v3-node-id={variant.id}
-                    key={variant.id}
-                  >
-                    <V3GrammarVoiceTextField
-                      wordId={wordId}
-                      forms={forms}
-                      meanings={meanings}
-                      textLinks={variant.form_links}
-                      dialect={variant.dialect}
-                      ariaLabel={t("grammar_content", {
-                        index: structureIndex + 1,
-                        dialect: t(
-                          variant.dialect === "uk"
-                            ? "dialect_uk"
-                            : variant.dialect === "us"
-                              ? "dialect_us"
-                              : "common"
-                        )
-                      })}
-                      editorTitle={
-                        <V3EditorTitle
-                          index={structureIndex}
-                          title={t("grammar")}
-                          details={t(
+          {pos.grammar_structures.map((structure, structureIndex) => {
+            const canMerge =
+              spellingMode === "unified" &&
+              grammarMergeRequiresChoice(structure);
+            const merging = canMerge && mergingGrammar?.id === structure.id;
+            return (
+              <div
+                className={sortableRowClass(
+                  "word-table-row word-grammar-row",
+                  sorting,
+                  structureIndex
+                )}
+                data-v3-field="variants"
+                data-v3-node-id={structure.id}
+                key={structure.id}
+                onDragLeave={sorting.handleDragLeave}
+                onDragOver={(event) =>
+                  sorting.handleDragOver(event, structureIndex)
+                }
+                onDrop={(event) => sorting.handleDrop(event, structureIndex)}
+                tabIndex={-1}
+              >
+                <span className="word-sort-leading">
+                  <SortableDragHandle
+                    dragImageSelector={SORTABLE_ROW_SELECTOR}
+                    index={structureIndex}
+                    label={t("drag_grammar", { index: structureIndex + 1 })}
+                    singleItemTitle={t("two_grammar_required")}
+                    sorting={sorting}
+                  />
+                  <V3RowIndex index={structureIndex} />
+                </span>
+                <div
+                  className={`word-grammar-variants${canMerge ? " word-grammar-can-merge" : ""}`}
+                >
+                  {canMerge && (
+                    <Flex
+                      className="word-grammar-merge-actions"
+                      align="center"
+                      gap="small"
+                      wrap
+                    >
+                      <Button
+                        size="small"
+                        icon={<GitMergeIcon />}
+                        aria-label={t(
+                          merging ? "cancel_grammar_merge" : "merge_grammar",
+                          { index: structureIndex + 1 }
+                        )}
+                        onClick={(event) => {
+                          if (merging) setMergingGrammar(undefined);
+                          else {
+                            mergeTrigger.current = event.currentTarget;
+                            setMergingGrammar({ id: structure.id });
+                          }
+                        }}
+                      >
+                        {t(
+                          merging
+                            ? "cancel_unification"
+                            : "merge_grammar_content"
+                        )}
+                      </Button>
+                      {merging && (
+                        <Typography.Text type="secondary">
+                          {t("merge_grammar_help")}
+                        </Typography.Text>
+                      )}
+                    </Flex>
+                  )}
+                  {structure.variants.map((variant, variantIndex) => (
+                    <div
+                      className={
+                        variant.dialect === "common"
+                          ? "word-grammar-panel"
+                          : `word-grammar-panel word-grammar-panel-${variant.dialect}`
+                      }
+                      data-v3-node-id={variant.id}
+                      data-merge-selected={
+                        merging && mergingGrammar?.side === variant.dialect
+                          ? true
+                          : undefined
+                      }
+                      key={variant.id}
+                    >
+                      {merging && variant.dialect !== "common" && (
+                        <Flex
+                          className="word-grammar-merge-header"
+                          justify="space-between"
+                          align="center"
+                          gap="small"
+                        >
+                          <Typography.Text strong>
+                            {t(
+                              variant.dialect === "uk"
+                                ? "british_short"
+                                : "american_short"
+                            )}
+                          </Typography.Text>
+                          <V3RegionalAdoptButton
+                            ref={
+                              variant.dialect === "uk" ? firstChoice : undefined
+                            }
+                            side={variant.dialect}
+                            selected={mergingGrammar?.side === variant.dialect}
+                            onSelect={() =>
+                              setMergingGrammar({
+                                id: structure.id,
+                                side: variant.dialect as "uk" | "us"
+                              })
+                            }
+                          />
+                        </Flex>
+                      )}
+                      <V3GrammarVoiceTextField
+                        wordId={wordId}
+                        forms={forms}
+                        meanings={meanings}
+                        textLinks={variant.form_links}
+                        dialect={variant.dialect}
+                        ariaLabel={t("grammar_content", {
+                          index: structureIndex + 1,
+                          dialect: t(
                             variant.dialect === "uk"
                               ? "dialect_uk"
                               : variant.dialect === "us"
                                 ? "dialect_us"
                                 : "common"
-                          )}
-                        />
-                      }
-                      field="content"
-                      nodeId={variant.id}
-                      onAssociationsChange={(links) =>
-                        change((draft) => {
-                          draft.pos[posIndex]!.grammar_structures[
-                            structureIndex
-                          ]!.variants[variantIndex]!.form_links = links;
-                        })
-                      }
-                      onChange={(next, links) =>
-                        change((draft) => {
-                          const target =
+                          )
+                        })}
+                        editorTitle={
+                          <V3EditorTitle
+                            index={structureIndex}
+                            title={t("grammar")}
+                            details={t(
+                              variant.dialect === "uk"
+                                ? "dialect_uk"
+                                : variant.dialect === "us"
+                                  ? "dialect_us"
+                                  : "common"
+                            )}
+                          />
+                        }
+                        field="content"
+                        nodeId={variant.id}
+                        onAssociationsChange={(links) =>
+                          change((draft) => {
                             draft.pos[posIndex]!.grammar_structures[
                               structureIndex
-                            ]!.variants[variantIndex]!;
-                          target.content = next;
-                          target.form_links = links ?? [];
-                        })
-                      }
-                      onCommit={(result) =>
-                        change((draft) => {
-                          const target =
-                            draft.pos[posIndex]!.grammar_structures[
-                              structureIndex
-                            ]!.variants[variantIndex]!;
-                          target.content = result.value;
-                          target.form_links = result.textLinks ?? [];
-                          target.voice_profile = result.voiceProfile;
-                          target.audio_assets = result.audioAssets;
-                        })
-                      }
-                      onVoiceProfileChange={(next) =>
-                        change((draft) => {
-                          const target =
-                            draft.pos[posIndex]!.grammar_structures[
-                              structureIndex
-                            ]!.variants[variantIndex]!;
-                          target.voice_profile = next;
-                        })
-                      }
-                      onAudioAssetsChange={(next) =>
-                        change((draft) => {
-                          const target =
-                            draft.pos[posIndex]!.grammar_structures[
-                              structureIndex
-                            ]!.variants[variantIndex]!;
-                          target.audio_assets = next;
-                        })
-                      }
-                      audioAssets={variant.audio_assets}
-                      placeholder={t(GRAMMAR_PLACEHOLDER[variant.dialect])}
-                      value={variant.content}
-                      voiceProfile={variant.voice_profile}
-                    />
-                  </div>
-                ))}
-              </div>
-              <Space
-                className="word-sort-actions"
-                orientation="horizontal"
-                size={8}
-              >
-                <Button
-                  aria-label={t("delete_grammar", {
-                    index: structureIndex + 1
-                  })}
-                  danger
-                  disabled={pos.grammar_structures.length <= 1 || undefined}
-                  title={
-                    pos.grammar_structures.length <= 1
-                      ? t("one_grammar_required")
-                      : undefined
-                  }
-                  icon={<Trash2Icon />}
-                  onClick={() => {
-                    if (
-                      structure.variants.some(
-                        (variant) => variant.form_links?.length
-                      )
-                    ) {
-                      modal.confirm({
-                        title: (
-                          <LexiconEditorText message="delete_grammar_title" />
-                        ),
-                        content: (
-                          <LexiconEditorText message="delete_grammar_help" />
-                        ),
-                        okText: <LexiconEditorText message="delete" />,
-                        cancelText: <LexiconEditorText message="cancel" />,
-                        okButtonProps: { danger: true },
-                        autoFocusButton: "cancel",
-                        onOk: () => removeStructure(structure.id)
-                      });
-                    } else {
-                      removeStructure(structure.id);
+                            ]!.variants[variantIndex]!.form_links = links;
+                          })
+                        }
+                        onChange={(next, links) =>
+                          change((draft) => {
+                            const target =
+                              draft.pos[posIndex]!.grammar_structures[
+                                structureIndex
+                              ]!.variants[variantIndex]!;
+                            target.content = next;
+                            target.form_links = links ?? [];
+                          })
+                        }
+                        onCommit={(result) =>
+                          change((draft) => {
+                            const target =
+                              draft.pos[posIndex]!.grammar_structures[
+                                structureIndex
+                              ]!.variants[variantIndex]!;
+                            target.content = result.value;
+                            target.form_links = result.textLinks ?? [];
+                            target.voice_profile = result.voiceProfile;
+                            target.audio_assets = result.audioAssets;
+                          })
+                        }
+                        onVoiceProfileChange={(next) =>
+                          change((draft) => {
+                            const target =
+                              draft.pos[posIndex]!.grammar_structures[
+                                structureIndex
+                              ]!.variants[variantIndex]!;
+                            target.voice_profile = next;
+                          })
+                        }
+                        onAudioAssetsChange={(next) =>
+                          change((draft) => {
+                            const target =
+                              draft.pos[posIndex]!.grammar_structures[
+                                structureIndex
+                              ]!.variants[variantIndex]!;
+                            target.audio_assets = next;
+                          })
+                        }
+                        audioAssets={variant.audio_assets}
+                        placeholder={t(GRAMMAR_PLACEHOLDER[variant.dialect])}
+                        value={variant.content}
+                        voiceProfile={variant.voice_profile}
+                      />
+                    </div>
+                  ))}
+                  {merging && (
+                    <Flex
+                      className="word-grammar-merge-actions"
+                      justify="flex-end"
+                    >
+                      <Button
+                        type="primary"
+                        disabled={!mergingGrammar?.side}
+                        onClick={() => {
+                          const side = mergingGrammar?.side;
+                          if (!side) return;
+                          change((draft) => {
+                            const structures =
+                              draft.pos[posIndex]!.grammar_structures;
+                            const index = structures.findIndex(
+                              (row) => row.id === structure.id
+                            );
+                            if (index >= 0)
+                              structures[index] = mergeGrammarVariants(
+                                structures[index]!,
+                                side,
+                                idFactory
+                              );
+                          });
+                          setMergingGrammar(undefined);
+                        }}
+                      >
+                        {t(
+                          mergingGrammar?.side === "uk"
+                            ? "use_british_grammar"
+                            : mergingGrammar?.side === "us"
+                              ? "use_american_grammar"
+                              : "confirm_selection"
+                        )}
+                      </Button>
+                    </Flex>
+                  )}
+                </div>
+                <Space
+                  className="word-sort-actions"
+                  orientation="horizontal"
+                  size={8}
+                >
+                  <Button
+                    aria-label={t("delete_grammar", {
+                      index: structureIndex + 1
+                    })}
+                    danger
+                    disabled={pos.grammar_structures.length <= 1 || undefined}
+                    title={
+                      pos.grammar_structures.length <= 1
+                        ? t("one_grammar_required")
+                        : undefined
                     }
-                  }}
-                  size="small"
-                  type="text"
-                />
-              </Space>
-            </div>
-          ))}
+                    icon={<Trash2Icon />}
+                    onClick={() => {
+                      if (
+                        structure.variants.some(
+                          (variant) => variant.form_links?.length
+                        )
+                      ) {
+                        modal.confirm({
+                          title: (
+                            <LexiconEditorText message="delete_grammar_title" />
+                          ),
+                          content: (
+                            <LexiconEditorText message="delete_grammar_help" />
+                          ),
+                          okText: <LexiconEditorText message="delete" />,
+                          cancelText: <LexiconEditorText message="cancel" />,
+                          okButtonProps: { danger: true },
+                          autoFocusButton: "cancel",
+                          onOk: () => removeStructure(structure.id)
+                        });
+                      } else {
+                        removeStructure(structure.id);
+                      }
+                    }}
+                    size="small"
+                    type="text"
+                  />
+                </Space>
+              </div>
+            );
+          })}
         </Flex>
       )}
       <Button

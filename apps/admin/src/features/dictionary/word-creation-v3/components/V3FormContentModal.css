@@ -1,66 +1,21 @@
-.v3-primary-spelling-choice {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-5);
-}
-
-.v3-primary-spelling-options.ui-radio-group {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ui-space-3);
-  align-items: stretch;
-}
-
-.v3-primary-spelling-option.ui-radio-wrapper {
-  align-items: flex-start;
-  gap: var(--ui-space-3);
-  min-width: 0;
+.v3-regional-merge-help {
   margin: 0;
-  padding: var(--ui-space-5);
-  border: 1px solid var(--ui-color-border);
-  border-radius: var(--ui-border-radius-lg);
-  transition:
-    border-color var(--ui-motion-duration) var(--ui-motion-easing),
-    background-color var(--ui-motion-duration) var(--ui-motion-easing);
-}
-
-.v3-primary-spelling-option:hover {
-  border-color: var(--ui-color-border-hover);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  color: var(--ui-color-text-secondary);
   background: var(--ui-color-fill-alter);
+  border-bottom: 1px solid var(--ui-color-border-secondary);
 }
 
-.v3-primary-spelling-option.ui-radio-wrapper-checked {
-  border-color: var(--ui-color-primary);
+.v3-regional-merge .word-form-matrix-shared-header > span {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
 }
 
-.v3-primary-spelling-option:has(.ui-radio-input:focus-visible) {
+.v3-regional-merge[data-selected-region="uk"]
+  :is(.v3-spelling-list-uk, .word-shared-pronunciation-uk),
+.v3-regional-merge[data-selected-region="us"]
+  :is(.v3-spelling-list-us, .word-shared-pronunciation-us) {
   outline: var(--ui-focus-ring);
-  outline-offset: var(--ui-focus-offset);
-}
-
-.v3-primary-spelling-option .ui-radio-input {
-  flex-shrink: 0;
-  margin-top: var(--ui-space-1);
-}
-
-.v3-primary-spelling-option .ui-radio-input:focus-visible {
-  outline: none;
-}
-
-.v3-primary-spelling-option .ui-radio-label {
-  flex: 1;
-  min-width: 0;
-}
-
-.v3-primary-spelling-region {
-  display: block;
-  margin-bottom: var(--ui-space-3);
-  font-weight: 600;
-}
-
-.v3-primary-spelling-value.tsz-words {
-  display: block;
-  font-size: var(--ui-font-size-title);
-  line-height: 1.6;
-  overflow-wrap: anywhere;
+  outline-offset: -2px;
 }
