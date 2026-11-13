@@ -437,6 +437,33 @@ it("显式拼写来源的历史音色解析失败时不兜底生成未知口音"
   ).toEqual(variants.common.spelling_speech);
 });
 
+it("无显式来源的旧拼写单侧池不要求缺少音色的另一侧解析成功", async () => {
+  const forms = fixture();
+  const variants = forms.contents[0]!.regional_variants;
+  if (variants.mode !== "common") throw new Error("expected common fixture");
+  const profile = { voices: [{ ...voices[0]!, audio_asset_id: "legacy-uk" }] };
+  variants.common.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: profile
+  };
+  const row = variants.common.pronunciations[0]!;
+  delete row.voice_profile;
+  row.synthesis!.use_spelling = true;
+  speech.resolve.mockImplementation(async ({ accent }) => {
+    if (accent === "us") throw new Error("此口音未配置音色");
+    return { voices: profile.voices };
+  });
+  render(<Host initial={forms} />);
+  await act(async () => {
+    for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
+  });
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(screen.queryByText("此口音未配置音色")).toBeNull();
+  const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+    .contents[0].regional_variants.common.spelling_speech;
+  expect(saved.voice_profile).toEqual(profile);
+});
+
 it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来源之间不混用", async () => {
   const forms = fixture();
   const variant = forms.contents[0]!.regional_variants;

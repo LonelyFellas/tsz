@@ -161,7 +161,7 @@ export function V3FormsAudioTasks({
       {variants(forms).map(({ variant, dialect, spellingLocales }) => (
         <div key={variant.id}>
           {!rowOnly &&
-            spellingLocales.length > 0 &&
+            (!spellingLocales || spellingLocales.length > 0) &&
             (variant.spelling_speech ||
               variant.pronunciations.some(
                 (row) =>
@@ -182,7 +182,13 @@ export function V3FormsAudioTasks({
                 activeLocales={spellingLocales}
                 recommendationArea="word"
                 locale={
-                  spellingLocales.length === 1 ? spellingLocales[0] : undefined
+                  spellingLocales?.length === 1
+                    ? spellingLocales[0]
+                    : dialect === "common"
+                      ? undefined
+                      : dialect === "uk"
+                        ? "en-GB"
+                        : "en-US"
                 }
                 enabled={ready}
                 onChange={(voice_profile) =>

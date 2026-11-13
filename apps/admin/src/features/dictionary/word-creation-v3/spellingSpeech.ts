@@ -27,7 +27,15 @@ export function spellingAudioLocales(
     dialect: Dialect;
     pronunciations: readonly WordPronunciationV3[];
   }[]
-): PhonemeLocaleV3[] {
+): PhonemeLocaleV3[] | undefined {
+  if (
+    !variants.some((variant) =>
+      variant.pronunciations.some(
+        (row) => row.synthesis?.uk?.source || row.synthesis?.us?.source
+      )
+    )
+  )
+    return undefined;
   return (["en-GB", "en-US"] as const).filter((locale) => {
     const side = locale === "en-GB" ? "uk" : "us";
     return variants.some((variant) => {

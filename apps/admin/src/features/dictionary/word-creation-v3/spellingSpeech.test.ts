@@ -32,7 +32,7 @@ it("拼写任务聚合所有共享读法的活动口音并保留旧协议资产�
     spellingAudioLocales([
       { dialect: "common", pronunciations: [pronunciationFixture()] }
     ])
-  ).toEqual(["en-GB", "en-US"]);
+  ).toBeUndefined();
 });
 
 it("修改未启用拼写的音色参数也清除对应旧音频，不影响另一侧", () => {
