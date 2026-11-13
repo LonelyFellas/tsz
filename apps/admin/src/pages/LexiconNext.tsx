@@ -415,8 +415,8 @@ function EntryEditor({
           />
         )}
         <Form
-          hidden={step === "forms"}
-          inert={step === "forms"}
+          hidden={step !== "preview"}
+          inert={step !== "preview"}
           layout="vertical"
           className="lexicon-next-basics"
         >
@@ -436,10 +436,10 @@ function EntryEditor({
           className="lexicon-next-selectors"
         >
           <section>
-            <h3>语言变体</h3>
+            <h3>方言</h3>
             <Radio.Group
               disabled={busy}
-              aria-label="目标语言变体"
+              aria-label="方言"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               options={[

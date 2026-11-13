@@ -551,6 +551,7 @@ describe("新版词库手工闭环", () => {
     ).toEqual(["en-GB", "zh-Hans", "en-US", "zh-Hant"]);
     const senseId = saved.draft.senses[0].id;
     await screen.findByText("版本 2");
+    fireEvent.click(button(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local unsaved" }
     });
@@ -579,6 +580,7 @@ describe("新版词库手工闭环", () => {
       mount(api);
       await screen.findByDisplayValue("centre");
       fireEvent.click(button(/词义与译词/));
+      fireEvent.click(button(/^预览/));
       fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
         target: { value: "local" }
       });
@@ -620,7 +622,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(button("重新检查"));
     await screen.findByDisplayValue("centre");
     fireEvent.click(button(/词义与译词/));
-    expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
+    expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
     fireEvent.click(button(/词义与译词/));
     expect(button("添加义项")).toBeDisabled();
     act(() =>
@@ -656,6 +658,7 @@ describe("新版词库手工闭环", () => {
     await act(async () => finishCreate(structuredClone(entry)));
     await screen.findByText("版本 1");
     fireEvent.click(button(/词义与译词/));
+    fireEvent.click(button(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local" }
     });
@@ -694,6 +697,7 @@ describe("新版词库手工闭环", () => {
     mount(api);
     await screen.findByDisplayValue("centre");
     fireEvent.click(button(/词义与译词/));
+    fireEvent.click(button(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "unsaved after revocation" }
     });
@@ -1127,6 +1131,7 @@ it("权限与冲突不丢失选择，垃圾桶固定归档，归档词条打开�
   await screen.findByDisplayValue("centre");
   fireEvent.click(button(/词义与译词/));
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
+  fireEvent.click(button(/^预览/));
   expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
   expect(api.save).not.toHaveBeenCalled();
 });
@@ -1350,6 +1355,7 @@ it("编辑期间被归档后保留本地输入并转只读，不引导丢弃草�
   const { client } = mount(api);
   await screen.findByDisplayValue("centre");
   fireEvent.click(button(/词义与译词/));
+  fireEvent.click(button(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local unsaved" }
   });
@@ -1378,7 +1384,7 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   );
   expect(formProgress.getByText("0 项")).toBeVisible();
   expect(formProgress.getByText("暂未添加")).toBeVisible();
-  expect(screen.queryByRole("radiogroup", { name: "目标语言变体" })).toBeNull();
+  expect(screen.queryByRole("radiogroup", { name: "方言" })).toBeNull();
   expect(
     screen.queryByRole("checkbox", { name: "编辑通用英语内容" })
   ).toBeNull();
@@ -1484,6 +1490,7 @@ it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳�
   mount(api);
   await screen.findByRole("button", { name: "编辑原形内容" });
   fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(button(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local" }
   });
@@ -1596,4 +1603,75 @@ it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容
     equivalents: [{ locale: "zh-Hans", text: "集中于" }]
   });
   expect(result.form_editor).toEqual(original.form_editor);
+});
+
+it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草稿", async () => {
+  const api = requests();
+  const definitions = [
+    {
+      id: crypto.randomUUID(),
+      locale: "en",
+      text: "the middle",
+      style: "definition" as const
+    },
+    {
+      id: crypto.randomUUID(),
+      locale: "en-GB",
+      text: "a centre",
+      style: "definition" as const
+    },
+    {
+      id: crypto.randomUUID(),
+      locale: "en-US",
+      text: "a center",
+      style: "definition" as const
+    }
+  ];
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      senses: [
+        {
+          id: crypto.randomUUID(),
+          part_of_speech: "noun",
+          definitions,
+          equivalents: []
+        }
+      ]
+    }
+  });
+  mount(api);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/^词义与译词/));
+  expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "语言变体" })).toBeNull();
+  expect(screen.getByRole("radiogroup", { name: "方言" })).toBeVisible();
+  expect(
+    screen.getByRole("radiogroup", { name: "媒介语言文字形式" })
+  ).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
+    "a centre"
+  );
+  fireEvent.click(screen.getByRole("radio", { name: "美式英语" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "美式英语释义 1" }), {
+    target: { value: "the center" }
+  });
+  fireEvent.click(screen.getByRole("checkbox", { name: "编辑通用英语内容" }));
+  expect(screen.getByRole("textbox", { name: "通用英语释义 1" })).toHaveValue(
+    "the middle"
+  );
+  fireEvent.click(screen.getByRole("checkbox", { name: "编辑通用英语内容" }));
+  fireEvent.click(screen.getByRole("radio", { name: "繁体中文" }));
+  expect(screen.getByRole("textbox", { name: "美式英语释义 1" })).toHaveValue(
+    "the center"
+  );
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  expect(api.save.mock.calls[0]![1].draft.headword).toBe("centre");
+  expect(api.save.mock.calls[0]![1].draft.senses[0].definitions).toEqual([
+    definitions[0],
+    definitions[1],
+    { ...definitions[2], text: "the center" }
+  ]);
 });
