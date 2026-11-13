@@ -386,12 +386,20 @@ export function PronunciationPreviewVoiceSummary({
   );
   const enabled = resolved.profile?.voices.filter((row) => row.enabled) ?? [];
   if (column === "rate")
-    return <span>{voice ? `${(1 + rate / 100).toFixed(2)}×` : "—"}</span>;
+    return (
+      <span data-has-voice={Boolean(voice)}>
+        {voice ? `${(1 + rate / 100).toFixed(2)}×` : "—"}
+      </span>
+    );
   if (column === "volume") {
     const setting = voice
       ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
       : undefined;
-    return <span>{voice ? `${setting?.volume_percent ?? 100}%` : "—"}</span>;
+    return (
+      <span data-has-voice={Boolean(voice)}>
+        {voice ? `${setting?.volume_percent ?? 100}%` : "—"}
+      </span>
+    );
   }
   const summary = (
     <span

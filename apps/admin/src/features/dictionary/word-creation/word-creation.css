@@ -46,7 +46,7 @@
 .word-editor-step:not(:disabled) {
   cursor: pointer;
 }
-.word-editor-step:not(:disabled):hover {
+.word-editor-step:not(:disabled):not([aria-current="step"]):hover {
   background: var(--ui-color-fill-alter);
 }
 .word-editor-step[aria-current="step"] {

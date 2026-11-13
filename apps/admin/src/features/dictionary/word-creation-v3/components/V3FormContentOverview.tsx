@@ -270,8 +270,8 @@ export function V3FormContentOverview({
         size="small"
         pagination={false}
         rowKey="key"
-        tableLayout="auto"
-        scroll={{ x: "max-content" }}
+        tableLayout="fixed"
+        scroll={{ x: 1080 }}
         rowHoverable={false}
         dataSource={readings}
         onRow={(row) => ({
@@ -396,6 +396,7 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.spelling,
             key: "spelling",
+            width: 160,
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
             render: (_, { variant, spellingDialect }) => {
               const dialectLabel =
@@ -405,7 +406,10 @@ export function V3FormContentOverview({
                     ? t("british_spelling")
                     : t("american_spelling");
               return (
-                <div className="v3-overview-spellings">
+                <div
+                  className="v3-overview-spellings"
+                  title={variant.spelling || undefined}
+                >
                   <Tooltip title={dialectLabel}>
                     <span
                       className={`dialect-dot dialect-dot-${spellingDialect} v3-overview-dialect-dot`}
@@ -437,6 +441,7 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.style,
             key: "style",
+            width: 112,
             render: (_, { pronunciation }) => (
               <div className="v3-overview-reading">
                 {pronunciation?.style ? (
@@ -457,6 +462,7 @@ export function V3FormContentOverview({
               </Space>
             ),
             key: "pronunciation",
+            width: 240,
             onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
             render: (_, row) => (
               <div className="v3-form-copy-content">
@@ -470,6 +476,7 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.voice,
             key: "voice",
+            width: 208,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
               <div className="v3-form-copy-content">
@@ -483,6 +490,7 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.rate,
             key: "rate",
+            width: 88,
             align: "center",
             className: "v3-overview-numeric-cell",
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
@@ -493,6 +501,7 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.volume,
             key: "volume",
+            width: 88,
             align: "center",
             className: "v3-overview-numeric-cell",
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
