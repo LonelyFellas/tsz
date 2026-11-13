@@ -1,4 +1,8 @@
 import { localPhoneticDiagnostic } from "./localPhoneticDiagnostic";
+import {
+  candidateForSide,
+  updateSynthesisCandidate
+} from "../synthesisCandidates";
 import { useLexiconEditorTranslation } from "../../i18n/editor";
 import {
   useLexiconEditorMessageState as useCreationMessageState,
@@ -44,25 +48,6 @@ import { useContentEditPermissions } from "../../contentEditPermissions";
 type Alphabet = "ipa" | "ups";
 type Side = "uk" | "us";
 const SIDES = ["uk", "us"] as const;
-function candidateForSide(
-  synthesis: PronunciationSynthesisV3,
-  side: Side,
-  dialect: Dialect
-): PronunciationSynthesisCandidateV3 {
-  if (synthesis[side]) return synthesis[side];
-  const locale = pronunciationLocale(side, "uk");
-  const ipaMatches = synthesis.ipa_locale
-    ? synthesis.ipa_locale === locale
-    : dialect === side;
-  const upsMatches = synthesis.ups_locale
-    ? synthesis.ups_locale === locale
-    : dialect === side;
-  return {
-    ipa: ipaMatches ? synthesis.ipa : "",
-    ups: upsMatches ? synthesis.ups : "",
-    ...(upsMatches ? { ups_words: synthesis.ups_words } : {})
-  };
-}
 export function V3SynthesisInputs({
   pronunciation,
   synthesisEditable,
@@ -172,36 +157,7 @@ export function V3SynthesisInputs({
     candidate: PronunciationSynthesisCandidateV3,
     audioAssets?: AudioAssetV3[]
   ) => {
-    const previous = candidateForSide(synthesis, side, dialect);
-    const updated = { ...candidate };
-    for (const alphabet of ["ipa", "ups"] as const) {
-      if (
-        previous[alphabet] !== candidate[alphabet] ||
-        (alphabet === "ups" &&
-          JSON.stringify(previous.ups_words) !==
-            JSON.stringify(candidate.ups_words))
-      ) {
-        const speech = candidate[`${alphabet}_speech`];
-        const previousAssets = new Set(
-          previous[`${alphabet}_speech`]?.voice_profile.voices.map(
-            (setting) => setting.audio_asset_id
-          )
-        );
-        if (speech)
-          updated[`${alphabet}_speech`] = {
-            ...speech,
-            voice_profile: {
-              ...speech.voice_profile,
-              voices: speech.voice_profile.voices.map((setting) => {
-                if (!previousAssets.has(setting.audio_asset_id)) return setting;
-                const { audio_asset_id: _audio, ...rest } = setting;
-                return rest;
-              })
-            }
-          };
-      }
-    }
-    const next = { ...synthesis, [side]: updated };
+    const next = updateSynthesisCandidate(synthesis, side, dialect, candidate);
     expected.current = next;
     onChange({
       synthesis: next,

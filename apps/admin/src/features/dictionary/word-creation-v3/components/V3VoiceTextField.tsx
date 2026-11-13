@@ -247,8 +247,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const saveError = failure?.target === nodeId ? failure.message : "";
   const setSaveError = (message: string, business = false) =>
     setFailure({ target: nodeId, message, business });
-  const [savedTarget, setSavedTarget] = useState<string | null>(null);
-  const saved = savedTarget === nodeId;
   const activeTarget = useRef<string | null>(nodeId);
   useLayoutEffect(() => {
     activeTarget.current = nodeId;
@@ -404,7 +402,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       settingsInitial.current = session;
       setDraftState(session);
       setSaveError("");
-      setSavedTarget(null);
       setSpellingSettings(request);
       setRecorded(true);
       setEditing(true);
@@ -513,7 +510,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     savingRef.current = true;
     setSaving(true);
     setSaveError("");
-    setSavedTarget(null);
     try {
       const captured = (onCommit || onSave || businessSave
         ? capture?.(!textOnly && !!(onSave || businessSave))
@@ -624,7 +620,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       }
       if (activeTarget.current !== target) return false;
       setDraftState(next);
-      setSavedTarget(persist ? target : null);
       if (onDone) onDone();
       else if (showDone) {
         setEditing(false);
@@ -1063,9 +1058,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           />
         )}
         {saving && <span role="status">{t("panel_saving_changes")}</span>}
-        {saved && (
-          <span role="status">{t("panel_changes_saved_as_a_draft")}</span>
-        )}
         <Suspense
           fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}
         >
@@ -1200,9 +1192,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             </Button>
           }
         />
-      )}
-      {saved && !editing && (
-        <span role="status">{t("panel_changes_saved_as_a_draft")}</span>
       )}
       {defaultLoading && (
         <span role="status">{t("panel_loading_default_voices")}</span>

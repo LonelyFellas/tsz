@@ -1,4 +1,15 @@
 export const lexiconEditorPanelMessages = {
+  panel_convert_all: ["全部转换", "全部轉換", "Convert all"],
+  panel_undo_convert_all: [
+    "撤销全部转换",
+    "撤銷全部轉換",
+    "Undo all conversions"
+  ],
+  panel_convert_all_overwrite: [
+    "将替换当前读法的实际发音及音素，清除实际发音标注。应用后可整体撤销。",
+    "將替換目前讀法的實際發音及音素，清除實際發音標註。套用後可整體撤銷。",
+    "Replace the actual pronunciation and phonemes for this reading and clear its pronunciation annotations. You can undo the conversion."
+  ],
   panel_generating_final_audio: [
     "正在生成正式音频…",
     "正在生成正式音訊…",
@@ -791,11 +802,6 @@ export const lexiconEditorPanelMessages = {
   panel_save_changes_2: ["保存修改", "儲存修改", "Save changes"],
   panel_done: ["完成", "完成", "Done"],
   panel_saving_changes: ["正在保存修改…", "正在儲存修改…", "Saving changes…"],
-  panel_changes_saved_as_a_draft: [
-    "修改已保存为草稿",
-    "修改已儲存為草稿",
-    "Changes saved as a draft"
-  ],
   panel_loading_default_voices: [
     "正在加载默认配音…",
     "正在載入預設配音…",

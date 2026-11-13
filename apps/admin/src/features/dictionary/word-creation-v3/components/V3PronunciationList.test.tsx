@@ -102,12 +102,14 @@ function Harness({
   phrase = false,
   word = "cat",
   phonetic = "kæt",
+  multipleReadings = false,
   initialSynthesis
 }: {
   configured?: boolean;
   phrase?: boolean;
   word?: string;
   phonetic?: string;
+  multipleReadings?: boolean;
   initialSynthesis?: PronunciationSynthesisV3;
 } = {}) {
   const [content, setContent] = useState(() => {
@@ -119,6 +121,13 @@ function Harness({
     if (configured)
       row.synthesis = { alphabet: "ups", ipa: "kæt", ups: "K AE T" };
     if (initialSynthesis) row.synthesis = initialSynthesis;
+    if (multipleReadings)
+      form.regional_variants.common.pronunciations.push({
+        ...row,
+        id: "other-reading",
+        dict_phonetic: "dɒg",
+        actual_pron: "manual-other"
+      });
     return formsFixture({ forms: [form] });
   });
   const form = content.pos[0]!.forms[0]!;
@@ -174,6 +183,60 @@ const rows = () =>
   JSON.parse(screen.getByTestId("form-state").textContent!).pos[0].forms[0]
     .regional_variants.common.pronunciations;
 describe("独立发音输入", () => {
+  it("全部转换一次填入当前读法的实际发音及英美 IPA/UPS，保留其他读法", () => {
+    renderWithUps(<Harness multipleReadings />);
+    const before = rows();
+    fireEvent.click(
+      within(
+        field("字典音标").closest("[data-pronunciation-id]") as HTMLElement
+      ).getByRole("button", { name: "全部转换" })
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(rows()[0]).toMatchObject({
+      actual_pron: "kæt",
+      synthesis: {
+        uk: {
+          ipa: "kæt",
+          ups: "K AE T",
+          ups_words: [{ text: "cat", phoneme: "K AE T" }]
+        },
+        us: {
+          ipa: "kæt",
+          ups: "K AE T",
+          ups_words: [{ text: "cat", phoneme: "K AE T" }]
+        }
+      }
+    });
+    expect(rows().slice(1)).toEqual(before.slice(1));
+    fireEvent.click(screen.getByRole("button", { name: "撤销全部转换" }));
+    expect(rows()).toEqual(before);
+  });
+
+  it("英美分开时全部转换只写当前侧，不修改另一侧", () => {
+    renderWithUps(<RegionalHarness />);
+    changeVoiceText(
+      within(screen.getByRole("region", { name: "uk" })).getByLabelText(
+        "第 1 条发音的字典音标"
+      ),
+      { target: { value: "sɛn.tə" } }
+    );
+    const before = JSON.parse(screen.getByTestId("regional-state").textContent!)
+      .pos[0].forms[0].regional_variants;
+    fireEvent.click(
+      within(screen.getByRole("region", { name: "uk" })).getByRole("button", {
+        name: "全部转换"
+      })
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByText("应用转换结果")
+    );
+    const after = JSON.parse(screen.getByTestId("regional-state").textContent!)
+      .pos[0].forms[0].regional_variants;
+    expect(after.us).toEqual(before.us);
+    expect(after.uk.pronunciations[0].synthesis.uk.ipa).not.toBe("");
+    expect(after.uk.pronunciations[0].synthesis.us).toBeUndefined();
+  });
+
   it("区分词形时英式和美式各只编辑自身的 IPA、UPS", () => {
     renderWithUps(<RegionalHarness />);
     const uk = screen.getByRole("region", { name: "uk" });
