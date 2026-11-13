@@ -460,3 +460,88 @@ it("生命周期请求保留重试标识与精确版本，不回退 V1；标注�
   await expect(missing.api.workspaceList()).rejects.toBeInstanceOf(HttpError);
   expect(missing.fetch).toHaveBeenCalledTimes(1);
 });
+
+it("协商语义区间并严格回读名称、身份与归属，兼容不含区间的旧草稿", async () => {
+  const groups = [{ id: uuid(50), name_zh: "位置", name_en: "position" }];
+  const next: NextEntry = {
+    ...entry,
+    draft: {
+      ...draft,
+      sense_groups: groups,
+      senses: draft.senses.map((sense) => ({
+        ...sense,
+        sense_group_id: groups[0]!.id
+      }))
+    }
+  };
+  const { api, fetch } = client(next);
+  expect(
+    await api.save(entry.id, { expected_revision: 1, draft: next.draft })
+  ).toEqual(next);
+  expect(
+    new Headers(fetch.mock.calls[0]![1].headers).get("x-tsz-next-sense-groups")
+  ).toBe("v1");
+  expect(JSON.parse(fetch.mock.calls[0]![1].body).draft.sense_groups).toEqual(
+    groups
+  );
+  expect(await api.get(entry.id)).toEqual(next);
+  expect(
+    new Headers(fetch.mock.calls[1]![1].headers).get("x-tsz-next-sense-groups")
+  ).toBe("v1");
+  expect(decodeNextEntry(entry)).toEqual(entry);
+  for (const invalid of [
+    { ...next, draft: { ...next.draft, sense_groups: null } },
+    {
+      ...next,
+      draft: { ...next.draft, sense_groups: [{ ...groups[0], id: "bad-id" }] }
+    },
+    {
+      ...next,
+      draft: {
+        ...next.draft,
+        sense_groups: [{ ...groups[0], voice_profile: {} }]
+      }
+    },
+    {
+      ...next,
+      draft: {
+        ...next.draft,
+        senses: [{ ...next.draft.senses[0], sense_group_id: null }]
+      }
+    }
+  ])
+    expect(() => decodeNextEntry(invalid)).toThrow();
+  const view = {
+    entry_id: entry.id,
+    revision: 2,
+    target_locale: "en-US",
+    medium_locale: "zh-Hant",
+    forms: [],
+    missing_forms: true,
+    sense_groups: groups,
+    senses: [
+      {
+        id: draft.senses[0]!.id,
+        sense_group_id: groups[0]!.id,
+        target_definitions: [],
+        medium_definitions: [],
+        equivalents: [],
+        missing_target_definitions: true,
+        missing_medium_definitions: true,
+        missing_equivalents: true
+      }
+    ]
+  };
+  const previewClient = client(view);
+  expect(
+    await previewClient.api.view(entry.id, {
+      target_locale: "en-US",
+      medium_locale: "zh-Hant"
+    })
+  ).toEqual(view);
+  expect(
+    new Headers(previewClient.fetch.mock.calls[0]![1].headers).get(
+      "x-tsz-next-sense-groups"
+    )
+  ).toBe("v1");
+});

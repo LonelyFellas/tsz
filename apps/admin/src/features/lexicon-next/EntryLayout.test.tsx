@@ -66,3 +66,34 @@ it("概览统计通用英语一次，忽略空白，随草稿切换英美、删�
   expect(definitions.getByText("暂未添加")).toBeVisible();
   expect(screen.getByText("0/4")).toBeVisible();
 });
+
+it("语义区间摘要随名称修改更新完成状态，保留区间顺序和身份", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "centre",
+    forms: [],
+    senses: [],
+    sense_groups: [{ id: "group", name_zh: "", name_en: "" }]
+  };
+  const layout = (value: NextDraft) => (
+    <MemoryRouter>
+      <EntryLayout draft={value} step="meanings">
+        正文
+      </EntryLayout>
+    </MemoryRouter>
+  );
+  const { rerender } = render(layout(draft));
+  fireEvent.click(screen.getByRole("button", { name: "展开词条概览" }));
+  fireEvent.click(screen.getByRole("button", { name: "展开语义区间" }));
+  const summary = within(screen.getByRole("region", { name: "语义区间摘要" }));
+  expect(summary.getByText("待填写语义区间")).toBeVisible();
+  expect(screen.getByText("0/5")).toBeVisible();
+  rerender(
+    layout({
+      ...draft,
+      sense_groups: [{ id: "group", name_zh: "位置", name_en: "position" }]
+    })
+  );
+  expect(summary.getByText("位置 · position")).toBeVisible();
+  expect(screen.getByText("1/5")).toBeVisible();
+});

@@ -1675,3 +1675,116 @@ it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草�
     { ...definitions[2], text: "the center" }
   ]);
 });
+
+it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐藏词性的归属并完整保存", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, sense_groups: true });
+  const group = {
+    id: crypto.randomUUID(),
+    name_zh: "位置",
+    name_en: "position"
+  };
+  const original: NextDraft = {
+    ...entry.draft,
+    sense_groups: [group],
+    senses: [
+      {
+        id: crypto.randomUUID(),
+        part_of_speech: "noun",
+        sense_group_id: group.id,
+        definitions: [],
+        equivalents: []
+      },
+      {
+        id: crypto.randomUUID(),
+        part_of_speech: "verb",
+        sense_group_id: group.id,
+        definitions: [
+          {
+            id: crypto.randomUUID(),
+            locale: "en-US",
+            text: "to center",
+            style: "definition"
+          }
+        ],
+        equivalents: []
+      }
+    ]
+  };
+  api.get.mockResolvedValue({ ...entry, draft: original });
+  mount(api);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/^词义与译词/));
+  expect(button("删除语义区间 1")).toBeDisabled();
+  fireEvent.click(button("添加语义区间"));
+  fireEvent.change(screen.getByRole("textbox", { name: "语义区间 2 中文" }), {
+    target: { value: "机构" }
+  });
+  fireEvent.change(screen.getByRole("textbox", { name: "语义区间 2 英文" }), {
+    target: { value: "institution" }
+  });
+  fireEvent.keyDown(screen.getByLabelText("拖动语义区间 2"), {
+    key: "ArrowUp"
+  });
+  expect(screen.getByRole("textbox", { name: "语义区间 1 中文" })).toHaveValue(
+    "机构"
+  );
+  fireEvent.mouseDown(
+    screen.getByRole("combobox", { name: "释义 1 所属语义区间" })
+  );
+  fireEvent.click(
+    screen
+      .getAllByText("机构")
+      .find((node) => node.classList.contains("ui-select-item-option-content"))!
+  );
+  expect(
+    screen
+      .getByRole("combobox", { name: "释义 1 所属语义区间" })
+      .closest(".ui-select")
+  ).toHaveTextContent("机构");
+  fireEvent.click(button("删除语义区间 2"));
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  const saved = api.save.mock.calls[0]![1].draft;
+  expect(saved.sense_groups).toEqual([
+    { id: expect.any(String), name_zh: "机构", name_en: "institution" }
+  ]);
+  expect(saved.sense_groups![0]!.id).not.toBe(group.id);
+  expect(saved.senses[0]!.sense_group_id).toBe(saved.sense_groups![0]!.id);
+  const ungrouped = { ...original.senses[1]! };
+  delete ungrouped.sense_group_id;
+  expect(saved.senses[1]).toEqual(ungrouped);
+  await screen.findByText("版本 2");
+});
+
+it("语义区间在只读词条中不能新增、修改、删除或排序", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, sense_groups: true });
+  api.get.mockResolvedValue({
+    ...entry,
+    owner_id: "other",
+    draft: {
+      ...entry.draft,
+      sense_groups: [
+        { id: crypto.randomUUID(), name_zh: "位置", name_en: "position" },
+        { id: crypto.randomUUID(), name_zh: "机构", name_en: "institution" }
+      ]
+    }
+  });
+  mount(api);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/^词义与译词/));
+  expect(
+    screen.getByRole("textbox", { name: "语义区间 1 中文" })
+  ).toBeDisabled();
+  expect(button("添加语义区间")).toBeDisabled();
+  expect(button("删除语义区间 1")).toBeDisabled();
+  expect(button("拖动语义区间 1")).toBeDisabled();
+  fireEvent.keyDown(screen.getByLabelText("拖动语义区间 1"), {
+    key: "ArrowDown"
+  });
+  expect(screen.getByRole("textbox", { name: "语义区间 1 中文" })).toHaveValue(
+    "位置"
+  );
+  expect(api.save).not.toHaveBeenCalled();
+});

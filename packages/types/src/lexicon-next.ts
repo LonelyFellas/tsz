@@ -17,13 +17,20 @@ export interface NextEquivalent {
   locale: string;
   text: string;
 }
+export interface NextSenseGroup {
+  id: string;
+  name_zh: string;
+  name_en: string;
+}
 export interface NextSense {
+  sense_group_id?: string;
   id: string;
   part_of_speech: string | null;
   definitions: NextDefinition[];
   equivalents: NextEquivalent[];
 }
 export interface NextDraft {
+  sense_groups?: NextSenseGroup[];
   schema_version: 1;
   headword: string;
   forms: NextForm[];
@@ -120,12 +127,14 @@ export interface NextCapabilities {
   generation: boolean;
   publishing: boolean;
   form_editor?: boolean;
+  sense_groups?: boolean;
 }
 export interface NextViewQuery {
   target_locale: string;
   medium_locale: string;
 }
 export interface NextSenseView {
+  sense_group_id?: string;
   id: string;
   target_definitions: NextDefinition[];
   medium_definitions: NextDefinition[];
@@ -135,6 +144,7 @@ export interface NextSenseView {
   missing_equivalents: boolean;
 }
 export interface NextEntryView {
+  sense_groups?: NextSenseGroup[];
   entry_id: string;
   revision: number;
   target_locale: string;

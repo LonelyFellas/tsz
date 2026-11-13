@@ -42,6 +42,9 @@ export function previewDraft(
   };
   const forms = targetRows(draftForms(draft));
   return {
+    ...(draft.sense_groups !== undefined
+      ? { sense_groups: draft.sense_groups }
+      : {}),
     entry_id: "",
     revision: 0,
     target_locale: target,
@@ -58,6 +61,9 @@ export function previewDraft(
       );
       return {
         id: sense.id,
+        ...(sense.sense_group_id
+          ? { sense_group_id: sense.sense_group_id }
+          : {}),
         target_definitions,
         medium_definitions,
         equivalents,
@@ -70,6 +76,14 @@ export function previewDraft(
 }
 
 export function draftProblem(draft: NextDraft): string | null {
+  for (const group of draft.sense_groups ?? []) {
+    if (
+      [group.name_zh, group.name_en].some(
+        (name) => [...name].length > 200 || /\p{Cc}/u.test(name)
+      )
+    )
+      return "语义区间名称最多 200 个字符，且不能包含换行或控制字符。";
+  }
   const texts: {
     text: string;
     label: string;
@@ -106,7 +120,10 @@ export function draftProblem(draft: NextDraft): string | null {
   );
   if (control)
     return `${control.label}${control.multiline ? "不能包含制表符或其他控制字符。" : "必须为单行，且不能包含制表符或其他控制字符。"}`;
-  if (texts.length - 1 + draft.senses.length > 500)
+  if (
+    texts.length - 1 + draft.senses.length + (draft.sense_groups?.length ?? 0) >
+    500
+  )
     return "草稿最多包含 500 个内容节点，请删除多余内容。";
   return null;
 }

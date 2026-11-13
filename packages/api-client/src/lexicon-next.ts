@@ -52,7 +52,9 @@ export function decodeNextEntryView(value: unknown): NextEntryView {
 /** Uses the admin HttpClient (baseUrl=/api/v1/admin). Capability failure (including 404 on an old backend) must not fall back to V3. */
 export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
-  const formsOptions = { headers: { "x-tsz-next-forms": "v1" } };
+  const editorOptions = {
+    headers: { "x-tsz-next-forms": "v1", "x-tsz-next-sense-groups": "v1" }
+  };
   const entry = (id: string) => `${root}/entries/${encodeURIComponent(id)}`;
   const decode = <T>(
     schema: Parameters<typeof validateRuntimeSchema>[0],
@@ -117,7 +119,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .then(decodeNextEntryList),
     capabilities: () =>
       http
-        .get<unknown>(`${root}/capabilities`, formsOptions)
+        .get<unknown>(`${root}/capabilities`, editorOptions)
         .then(decodeNextCapabilities),
     create: (input: CreateNextEntry) =>
       http.post<unknown>(`${root}/entries`, input).then(decodeNextEntry),
@@ -129,16 +131,17 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       http
         .post<unknown>(`${root}/entry-matches`, input)
         .then((value) => decode<NextEntryMatches>("NextEntryMatches", value)),
-    get: (id: string) => http.get<unknown>(entry(id)).then(decodeNextEntry),
+    get: (id: string) =>
+      http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) =>
-      http.put<unknown>(entry(id), input).then(decodeNextEntry),
+      http.put<unknown>(entry(id), input, editorOptions).then(decodeNextEntry),
     view: (id: string, selection: NextViewQuery) => {
       const params = new URLSearchParams({
         target_locale: selection.target_locale,
         medium_locale: selection.medium_locale
       });
       return http
-        .get<unknown>(`${entry(id)}/view?${params}`)
+        .get<unknown>(`${entry(id)}/view?${params}`, editorOptions)
         .then(decodeNextEntryView);
     }
   };
