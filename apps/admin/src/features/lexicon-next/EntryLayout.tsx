@@ -48,41 +48,41 @@ export function EntryLayout({
       locales: ["zh-Hans", "zh-Hant"]
     }
   ];
+  const matchesLocale = (row: NextForm, locale: string) =>
+    row.locale === locale || (locale.startsWith("en-") && row.locale === "en");
   const hasLocales = (rows: NextForm[], locales: string[]) =>
     locales.every((locale) =>
-      rows.some(
-        (row) =>
-          (row.locale === locale ||
-            (locale.startsWith("en-") && row.locale === "en")) &&
-          row.text.trim()
-      )
+      rows.some((row) => matchesLocale(row, locale) && row.text.trim())
     );
-  const progress = groups.map((group, index) => ({
-    key: group.key,
-    index: index + 1,
-    label: group.label,
-    completed:
-      group.key === "forms"
-        ? hasLocales(group.rows, group.locales)
-        : Boolean(senses.length) &&
-          senses.every((sense) =>
-            hasLocales(
-              group.key === "equivalents"
-                ? sense.equivalents
-                : sense.definitions,
-              group.locales
-            )
-          ),
-    details: group.rows
-      .filter((row) => group.locales.includes(row.locale))
-      .map((row) => ({
+  const progress = groups.map((group, index) => {
+    const rows = group.rows.filter(
+      (row) =>
+        row.text.trim() &&
+        group.locales.some((locale) => matchesLocale(row, locale))
+    );
+    return {
+      key: group.key,
+      index: index + 1,
+      label: group.label,
+      completed:
+        group.key === "forms"
+          ? hasLocales(group.rows, group.locales)
+          : Boolean(senses.length) &&
+            senses.every((sense) =>
+              hasLocales(
+                group.key === "equivalents"
+                  ? sense.equivalents
+                  : sense.definitions,
+                group.locales
+              )
+            ),
+      details: rows.map((row) => ({
         key: row.id,
         label: `${localeLabels[row.locale] ?? row.locale}：${row.text}`
       })),
-    value: group.rows.filter(
-      (row) => group.locales.includes(row.locale) && row.text.trim()
-    ).length
-  }));
+      value: rows.length
+    };
+  });
   return (
     <WordCreationLayout
       currentStep={step}

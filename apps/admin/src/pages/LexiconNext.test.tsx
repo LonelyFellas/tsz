@@ -1371,6 +1371,13 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
   const mounted = mount(api);
   const addPos = await screen.findByRole("combobox", { name: "添加基本词性" });
+  fireEvent.click(button("展开词条概览"));
+  fireEvent.click(button("展开英语词形"));
+  const formProgress = within(
+    screen.getByRole("region", { name: "英语词形摘要" })
+  );
+  expect(formProgress.getByText("0 项")).toBeVisible();
+  expect(formProgress.getByText("暂未添加")).toBeVisible();
   expect(screen.queryByRole("radiogroup", { name: "目标语言变体" })).toBeNull();
   expect(
     screen.queryByRole("checkbox", { name: "编辑通用英语内容" })
@@ -1388,6 +1395,9 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   });
   await changeVoiceText(spelling, { target: { value: "centre" } });
   fireEvent.click(button("确认，应用到草稿"));
+  expect(await formProgress.findByText("1 项")).toBeVisible();
+  expect(formProgress.getByText("通用英语：centre")).toBeVisible();
+  expect(formProgress.queryByText("暂未添加")).toBeNull();
   await waitFor(() => expect(button("保存草稿")).toBeEnabled());
   fireEvent.click(button("保存草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
