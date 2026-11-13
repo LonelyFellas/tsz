@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-step2-parity/tsz-rust/docs/openapi.json",
-  "_source_sha256": "f464ffc43aae1689bad4b0f9f1b56e5596e1094d85c9e7b7c2b7dc72ec576626",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-step3-sense-groups/tsz-rust/docs/openapi.json",
+  "_source_sha256": "4be0c837b7fcb1a973e773ad4ceb2d0b1507966023ec559e980a33bcf119be7e",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",
@@ -3559,7 +3559,8 @@
         },
         "manual_drafts": { "type": "boolean" },
         "publishing": { "type": "boolean" },
-        "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 }
+        "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
+        "sense_groups": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -3656,6 +3657,10 @@
         "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
         "headword": { "type": "string" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
+        "sense_groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSenseGroup" }
+        },
         "senses": { "type": "array", "items": { "$ref": "#/$defs/NextSense" } }
       },
       "additionalProperties": false
@@ -3766,6 +3771,10 @@
         "medium_locale": { "type": "string" },
         "missing_forms": { "type": "boolean" },
         "revision": { "type": "integer" },
+        "sense_groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSenseGroup" }
+        },
         "senses": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextSenseView" }
@@ -3866,7 +3875,18 @@
           "items": { "$ref": "#/$defs/NextEquivalent" }
         },
         "id": { "type": "string", "format": "uuid" },
-        "part_of_speech": { "type": ["string", "null"] }
+        "part_of_speech": { "type": ["string", "null"] },
+        "sense_group_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextSenseGroup": {
+      "type": "object",
+      "required": ["id", "name_zh", "name_en"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name_en": { "type": "string", "maxLength": 200 },
+        "name_zh": { "type": "string", "maxLength": 200 }
       },
       "additionalProperties": false
     },
@@ -3894,6 +3914,7 @@
         "missing_equivalents": { "type": "boolean" },
         "missing_medium_definitions": { "type": "boolean" },
         "missing_target_definitions": { "type": "boolean" },
+        "sense_group_id": { "type": "string", "format": "uuid" },
         "target_definitions": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextDefinition" }

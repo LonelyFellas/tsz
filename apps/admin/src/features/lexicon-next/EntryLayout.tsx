@@ -83,6 +83,29 @@ export function EntryLayout({
       value: rows.length
     };
   });
+  if (draft?.sense_groups) {
+    progress.unshift({
+      key: "sense_groups",
+      index: 0,
+      label: "语义区间",
+      completed:
+        draft.sense_groups.length > 0 &&
+        draft.sense_groups.every((group) =>
+          Boolean(group.name_zh.trim() && group.name_en.trim())
+        ),
+      details: draft.sense_groups.map((group) => ({
+        key: group.id,
+        label:
+          [group.name_zh.trim(), group.name_en.trim()]
+            .filter(Boolean)
+            .join(" · ") || "待填写语义区间"
+      })),
+      value: draft.sense_groups.length
+    });
+    progress.forEach((row, index) => {
+      row.index = index + 1;
+    });
+  }
   return (
     <WordCreationLayout
       currentStep={step}

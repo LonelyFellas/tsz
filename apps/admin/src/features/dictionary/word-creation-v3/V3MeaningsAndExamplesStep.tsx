@@ -90,6 +90,7 @@ import {
   type SortableRowsController
 } from "./sortableRows";
 import { SortableDragHandle } from "./components/SortableDragHandle";
+import { V3SenseGroupsCard } from "./components/V3SenseGroupsCard";
 import { V3RowIndex } from "./components/V3RowIndex";
 import { V3StepActions } from "./components/V3StepActions";
 import { V3EditorTitle } from "./components/V3EditorTitle";
@@ -191,7 +192,6 @@ type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
 type SenseSectionKind =
   "definitions" | "component_usages" | "sentences" | "relations";
 
-const SENSE_GROUP_DRAG_TYPE = "application/x-tsz-v3-sense-group";
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-v3-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-v3-definition";
 // const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
@@ -757,180 +757,6 @@ function newSense(
   };
 }
 
-function SenseGroupsCard({
-  value,
-  wordId,
-  change,
-  idFactory
-}: {
-  value: DraftMeaningsStepContentWritableV3;
-  wordId?: string;
-  change: (mutation: DraftMutation) => void;
-  idFactory: () => string;
-}) {
-  const { t } = useLexiconEditorTranslation();
-  const groups = value.sense_groups;
-  const sorting = useSortableRows({
-    items: groups,
-    scopeId: wordId ?? "current-entry",
-    dragType: SENSE_GROUP_DRAG_TYPE,
-    onChange: (next) =>
-      change((draft) => {
-        // 按拖拽结果重排 draft 里已有的区间；draft 中晚于本次渲染快照新增的
-        // 区间不在 next 里，保留在尾部而不是被整体重建时静默抹掉。
-        const order = new Map(next.map((group, index) => [group.id, index]));
-        draft.sense_groups = [
-          ...draft.sense_groups
-            .filter((group) => order.has(group.id))
-            .sort((a, b) => order.get(a.id)! - order.get(b.id)!),
-          ...draft.sense_groups.filter((group) => !order.has(group.id))
-        ];
-      })
-  });
-  return (
-    <Card
-      className="word-sense-groups-card"
-      data-v3-field="sense_groups"
-      data-v3-node-id={wordId ?? "current-entry"}
-      size="small"
-      title={t("sense_groups")}
-    >
-      <div className="word-sense-group-list">
-        {/* 列名只出一次：每行都重复「中文 / 英文」会把下一行的输入框推远，
-            行与行之间的留白就跟着不对称了。 */}
-        <div className="word-sense-group-heads">
-          <span />
-          <span>{t("chinese")}</span>
-          <span>{t("english")}</span>
-          <span />
-        </div>
-        {groups.map((group, groupIndex) => (
-          <div
-            className={sortableRowClass(
-              "word-sense-group-item",
-              sorting,
-              groupIndex
-            )}
-            data-v3-node-id={group.id}
-            key={group.id}
-            onDragLeave={sorting.handleDragLeave}
-            onDragOver={(event) => sorting.handleDragOver(event, groupIndex)}
-            onDrop={(event) => sorting.handleDrop(event, groupIndex)}
-          >
-            <span className="word-sort-leading">
-              <SortableDragHandle
-                dragImageSelector={SORTABLE_ROW_SELECTOR}
-                index={groupIndex}
-                label={t("drag_group", { index: groupIndex + 1 })}
-                singleItemTitle={t("two_groups_required")}
-                sorting={sorting}
-              />
-              <span
-                aria-label={t("group_index", { index: groupIndex + 1 })}
-                className="word-sense-group-index"
-              >
-                {groupIndex + 1}
-              </span>
-            </span>
-            <div className="word-sense-group-field">
-              <Input
-                aria-label={t("group_chinese", { index: groupIndex + 1 })}
-                data-v3-field="name_zh"
-                data-v3-node-id={group.id}
-                onChange={(event) =>
-                  change((draft) => {
-                    const target = draft.sense_groups.find(
-                      (candidate) => candidate.id === group.id
-                    );
-                    if (target) target.name_zh = event.target.value;
-                  })
-                }
-                placeholder={t("group_placeholder_zh")}
-                value={group.name_zh}
-              />
-            </div>
-            <div className="word-sense-group-field">
-              <Input
-                aria-label={t("group_english", { index: groupIndex + 1 })}
-                className="tsz-entry-en"
-                data-v3-field="name_en"
-                data-v3-node-id={group.id}
-                onChange={(event) =>
-                  change((draft) => {
-                    const target = draft.sense_groups.find(
-                      (candidate) => candidate.id === group.id
-                    );
-                    if (target) {
-                      target.name_en = event.target.value;
-                      if (target.name_en_rich) {
-                        target.name_en_rich = {
-                          version: 2,
-                          text: event.target.value,
-                          annotations: []
-                        };
-                      }
-                    }
-                  })
-                }
-                placeholder={t("group_placeholder_en")}
-                value={group.name_en}
-              />
-            </div>
-            <Space
-              className="word-sort-actions"
-              orientation="horizontal"
-              size={8}
-            >
-              <Button
-                aria-label={t("delete_group", { index: groupIndex + 1 })}
-                danger
-                disabled={groups.length <= 1}
-                icon={<Trash2Icon />}
-                onClick={() =>
-                  change((draft) => {
-                    if (draft.sense_groups.length <= 1) {
-                      return;
-                    }
-                    draft.sense_groups = draft.sense_groups.filter(
-                      (candidate) => candidate.id !== group.id
-                    );
-                    for (const candidate of draft.pos) {
-                      for (const sense of candidate.senses) {
-                        if (sense.sense_group_id === group.id) {
-                          delete sense.sense_group_id;
-                        }
-                      }
-                    }
-                  })
-                }
-                size="small"
-                type="text"
-              />
-            </Space>
-          </div>
-        ))}
-      </div>
-      <Button
-        block
-        className="word-section-add-button"
-        icon={<PlusIcon aria-hidden />}
-        onClick={() =>
-          change((draft) => {
-            draft.sense_groups.push({
-              id: idFactory(),
-              name_zh: "",
-              name_en: ""
-            });
-          })
-        }
-        type="dashed"
-      >
-        {t("add_sense_group")}
-      </Button>
-    </Card>
-  );
-}
-
 const GRAMMAR_STRUCTURE_PREVIEW_LIMIT = 24;
 
 function grammarStructureText(
@@ -1294,11 +1120,23 @@ function V3MeaningsAndExamplesStepContent({
         <Alert showIcon title={t("catalog_unavailable")} type="error" />
       ) : null}
 
-      <SenseGroupsCard
-        change={change}
+      <V3SenseGroupsCard
+        change={(mutation) => change((draft) => mutation(draft.sense_groups))}
         idFactory={idFactory}
-        value={value}
+        groups={value.sense_groups}
         wordId={wordId}
+        onDelete={(id) =>
+          change((draft) => {
+            if (draft.sense_groups.length <= 1) return;
+            draft.sense_groups = draft.sense_groups.filter(
+              (group) => group.id !== id
+            );
+            for (const pos of draft.pos)
+              for (const sense of pos.senses) {
+                if (sense.sense_group_id === id) delete sense.sense_group_id;
+              }
+          })
+        }
       />
 
       {visiblePosIds.length === 0 ? (

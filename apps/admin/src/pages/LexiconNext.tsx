@@ -118,6 +118,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           requests={requests}
           language={language}
           formEditorAvailable={capability.data?.form_editor === true}
+          senseGroupsAvailable={capability.data?.sense_groups === true}
         />
       ) : (
         <EntryList
@@ -134,9 +135,11 @@ function EntryLoader({
   id,
   requests,
   language,
-  formEditorAvailable
+  formEditorAvailable,
+  senseGroupsAvailable
 }: {
   formEditorAvailable: boolean;
+  senseGroupsAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -189,6 +192,7 @@ function EntryLoader({
       language={language}
       archived={metadata.data.status === "archived"}
       formEditorAvailable={formEditorAvailable}
+      senseGroupsAvailable={senseGroupsAvailable}
     />
   );
 }
@@ -197,9 +201,11 @@ function EntryEditor({
   requests,
   language,
   archived,
-  formEditorAvailable
+  formEditorAvailable,
+  senseGroupsAvailable
 }: {
   formEditorAvailable: boolean;
+  senseGroupsAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -415,8 +421,8 @@ function EntryEditor({
           />
         )}
         <Form
-          hidden={step === "forms"}
-          inert={step === "forms"}
+          hidden={step !== "preview"}
+          inert={step !== "preview"}
           layout="vertical"
           className="lexicon-next-basics"
         >
@@ -436,10 +442,10 @@ function EntryEditor({
           className="lexicon-next-selectors"
         >
           <section>
-            <h3>语言变体</h3>
+            <h3>方言</h3>
             <Radio.Group
               disabled={busy}
-              aria-label="目标语言变体"
+              aria-label="方言"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               options={[
@@ -568,6 +574,7 @@ function EntryEditor({
             target={editingLocale}
             medium={medium}
             partOfSpeechCodes={language.part_of_speech_codes}
+            senseGroupsAvailable={senseGroupsAvailable}
             disabled={disabled}
             onChange={setDraft}
           />

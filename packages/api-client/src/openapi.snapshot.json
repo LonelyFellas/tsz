@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-step2-parity/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-13T03:40:08.373Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-step3-sense-groups/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-13T09:53:47.858Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -8429,6 +8429,10 @@
           "maximum": 1,
           "minimum": 1
         },
+        "sense_groups": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextSenseGroup" }
+        },
         "senses": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/NextSense" }
@@ -8527,7 +8531,18 @@
         "part_of_speech": {
           "type": ["string", "null"],
           "description": "Language-specific code; null is an incomplete draft, not an inferred POS."
-        }
+        },
+        "sense_group_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextSenseGroup": {
+      "type": "object",
+      "required": ["id", "name_zh", "name_en"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name_en": { "type": "string", "maxLength": 200 },
+        "name_zh": { "type": "string", "maxLength": 200 }
       },
       "additionalProperties": false
     },

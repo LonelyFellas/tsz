@@ -80,3 +80,31 @@ describe("本地草稿预览", () => {
     }
   });
 });
+
+it("语义区间允许未填名称，限制 Unicode 名称长度，预览保留顺序与归属且不改草稿", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "centre",
+    forms: [],
+    sense_groups: [{ id: "group", name_zh: "", name_en: "" }],
+    senses: [
+      {
+        id: "sense",
+        sense_group_id: "group",
+        part_of_speech: null,
+        definitions: [],
+        equivalents: []
+      }
+    ]
+  };
+  expect(draftProblem(draft)).toBeNull();
+  const before = structuredClone(draft);
+  const view = previewDraft(draft, "en-US", "zh-Hant");
+  expect(view.sense_groups).toEqual(draft.sense_groups);
+  expect(view.senses[0]!.sense_group_id).toBe("group");
+  expect(draft).toEqual(before);
+  draft.sense_groups![0]!.name_zh = "𠮷".repeat(200);
+  expect(draftProblem(draft)).toBeNull();
+  draft.sense_groups![0]!.name_zh += "字";
+  expect(draftProblem(draft)).toContain("语义区间名称");
+});

@@ -8,6 +8,8 @@ import {
   Tabs,
   Typography
 } from "@tsz/ui/admin/display";
+import { AdminControls } from "@tsz/ui/admin/context";
+import { V3SenseGroupsCard } from "@/features/dictionary/word-creation-v3/components/V3SenseGroupsCard";
 import { Select } from "@tsz/ui/admin/forms";
 import { App } from "@tsz/ui/admin/overlays";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
@@ -24,6 +26,7 @@ export function MeaningsStep({
   medium,
   partOfSpeechCodes,
   disabled,
+  senseGroupsAvailable = false,
   onChange
 }: {
   value: NextDraft;
@@ -31,10 +34,21 @@ export function MeaningsStep({
   medium: string;
   partOfSpeechCodes: string[];
   disabled: boolean;
+  senseGroupsAvailable?: boolean;
   onChange: (next: NextDraft) => void;
 }) {
   const { modal } = App.useApp();
   const { t } = useLexiconEditorTranslation();
+  const [emptyGroup] = useState(() => ({
+    id: crypto.randomUUID(),
+    name_zh: "",
+    name_en: ""
+  }));
+  const groups = value.sense_groups ?? [emptyGroup];
+  const groupOptions = groups.flatMap((group) => {
+    const label = group.name_zh.trim() || group.name_en.trim();
+    return label ? [{ value: group.id, label }] : [];
+  });
   const [selectedPos, setSelectedPos] = useState<string>();
   const [expanded, setExpanded] = useState<Record<string, string | null>>({});
   const codes = [
@@ -63,6 +77,33 @@ export function MeaningsStep({
       gap={16}
       className="word-meanings-step v3-meanings-v2 lexicon-next-meanings"
     >
+      {senseGroupsAvailable && (
+        <AdminControls componentDisabled={disabled}>
+          <V3SenseGroupsCard
+            groups={groups}
+            idFactory={() => crypto.randomUUID()}
+            change={(mutation) => {
+              const next = structuredClone(value);
+              next.sense_groups ??= structuredClone(groups);
+              mutation(next.sense_groups);
+              onChange(next);
+            }}
+            onDelete={(id) => {
+              if (groups.length <= 1) return;
+              onChange({
+                ...value,
+                sense_groups: groups.filter((group) => group.id !== id),
+                senses: value.senses.map((sense) => {
+                  if (sense.sense_group_id !== id) return sense;
+                  const next = { ...sense };
+                  delete next.sense_group_id;
+                  return next;
+                })
+              });
+            }}
+          />
+        </AdminControls>
+      )}
       <Tabs
         className="word-pos-tabs"
         activeKey={activePos}
@@ -183,6 +224,47 @@ export function MeaningsStep({
                                       }));
                                     }}
                                   />
+                                  {senseGroupsAvailable && (
+                                    <span>{t("sense_groups")}</span>
+                                  )}
+                                  {senseGroupsAvailable && (
+                                    <Select
+                                      aria-label={t("sense_group_label", {
+                                        index: index + 1
+                                      })}
+                                      disabled={disabled}
+                                      placeholder={t("select_group")}
+                                      value={
+                                        sense.sense_group_id &&
+                                        !groupOptions.some(
+                                          (group) =>
+                                            group.value === sense.sense_group_id
+                                        )
+                                          ? undefined
+                                          : (sense.sense_group_id ?? "")
+                                      }
+                                      options={[
+                                        {
+                                          value: "",
+                                          label: t("no_sense_group")
+                                        },
+                                        ...groupOptions
+                                      ]}
+                                      onChange={(id) => {
+                                        const next = { ...sense };
+                                        if (id) next.sense_group_id = id;
+                                        else delete next.sense_group_id;
+                                        onChange({
+                                          ...value,
+                                          sense_groups:
+                                            value.sense_groups ?? groups,
+                                          senses: value.senses.map((row) =>
+                                            row.id === sense.id ? next : row
+                                          )
+                                        });
+                                      }}
+                                    />
+                                  )}
                                 </Space>
                                 <ContentRows
                                   grouped
@@ -239,12 +321,23 @@ export function MeaningsStep({
                   disabled={disabled}
                   onClick={() => {
                     const id = crypto.randomUUID();
+                    const inheritedGroup =
+                      [...senses]
+                        .reverse()
+                        .find((sense) => sense.sense_group_id)
+                        ?.sense_group_id ?? groups[0]?.id;
                     onChange({
                       ...value,
+                      ...(senseGroupsAvailable
+                        ? { sense_groups: value.sense_groups ?? groups }
+                        : {}),
                       senses: [
                         ...value.senses,
                         {
                           id,
+                          ...(senseGroupsAvailable && inheritedGroup
+                            ? { sense_group_id: inheritedGroup }
+                            : {}),
                           part_of_speech: code || null,
                           definitions: [],
                           equivalents: []
