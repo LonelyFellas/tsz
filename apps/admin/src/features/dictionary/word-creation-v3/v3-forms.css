@@ -289,10 +289,29 @@
   overflow: auto;
   overscroll-behavior: contain;
 }
-.v3-content-window > footer {
+.v3-content-window > footer:not([hidden]) {
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: var(--ui-space-3);
   padding: var(--ui-space-3) var(--ui-space-6);
   border-top: 1px solid var(--ui-color-border-secondary);
+}
+.v3-content-window-footer-handle {
+  display: flex;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0;
+  color: var(--ui-color-text-secondary);
+}
+.v3-content-window-footer-handle:hover {
+  background: var(--ui-color-fill-secondary);
+}
+.v3-content-window-footer-actions {
+  flex: 1;
+  min-width: 0;
 }
 @media (max-width: 767px) {
   .v3-content-window:not(.is-collapsed) {

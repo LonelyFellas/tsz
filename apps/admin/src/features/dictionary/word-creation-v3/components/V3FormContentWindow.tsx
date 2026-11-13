@@ -5,17 +5,24 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ButtonHTMLAttributes,
   type PointerEvent,
   type ReactNode
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  GripHorizontalIcon,
+  XIcon
+} from "lucide-react";
 import { Button } from "@tsz/ui/admin/display";
 import { OverlayLayer } from "@tsz/ui/admin/overlays";
 import { useLexiconEditorTranslation } from "../../i18n/editor";
 
 type Point = { x: number; y: number };
 const GAP = 16;
+const VISIBLE_EDGE = 48;
 
 /** 收起只隐藏内容，保持本地草稿、语音任务及嵌套弹窗的挂载。 */
 export function V3FormContentWindow({
@@ -56,7 +63,10 @@ export function V3FormContentWindow({
     const requested = next ??
       point.current ?? {
         x: left + (width - GAP * 2 - rect.width) / 2,
-        y: top + 32
+        y: Math.max(
+          top,
+          Math.min(top + 32, top + height - GAP * 2 - rect.height)
+        )
       };
     const current = {
       x: Math.max(
@@ -64,8 +74,8 @@ export function V3FormContentWindow({
         Math.min(requested.x, left + width - GAP * 2 - rect.width)
       ),
       y: Math.max(
-        top,
-        Math.min(requested.y, top + height - GAP * 2 - rect.height)
+        top - GAP - rect.height + VISIBLE_EDGE,
+        Math.min(requested.y, top - GAP + height - VISIBLE_EDGE)
       )
     };
     point.current = current;
@@ -100,6 +110,49 @@ export function V3FormContentWindow({
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
+  const dragHandlers: ButtonHTMLAttributes<HTMLButtonElement> = {
+    onPointerDown: (event) => {
+      if (event.button !== 0 || event.isPrimary === false || !point.current)
+        return;
+      if (!collapsed && window.innerWidth <= 767) return;
+      drag.current = {
+        id: event.pointerId,
+        start: { x: event.clientX, y: event.clientY },
+        origin: point.current
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    onPointerMove: (event) => {
+      const active = drag.current;
+      if (!active || active.id !== event.pointerId) return;
+      event.preventDefault();
+      place({
+        x: active.origin.x + event.clientX - active.start.x,
+        y: active.origin.y + event.clientY - active.start.y
+      });
+    },
+    onPointerUp: finishDrag,
+    onPointerCancel: finishDrag,
+    onLostPointerCapture: finishDrag,
+    onKeyDown: (event) => {
+      if (!collapsed && window.innerWidth <= 767) return;
+      const step = event.shiftKey ? 24 : 8;
+      const moves: Record<string, Point> = {
+        ArrowLeft: { x: -step, y: 0 },
+        ArrowRight: { x: step, y: 0 },
+        ArrowUp: { x: 0, y: -step },
+        ArrowDown: { x: 0, y: step }
+      };
+      const move = moves[event.key];
+      if (!move || !point.current) return;
+      event.preventDefault();
+      place({
+        x: point.current.x + move.x,
+        y: point.current.y + move.y
+      });
+    }
+  };
+
   return createPortal(
     <OverlayLayer.Provider value={layer}>
       <section
@@ -126,50 +179,7 @@ export function V3FormContentWindow({
             type="button"
             className="v3-content-window-handle"
             aria-label={t("drag_item", { label: title })}
-            onPointerDown={(event) => {
-              if (
-                event.button !== 0 ||
-                event.isPrimary === false ||
-                !point.current
-              )
-                return;
-              if (!collapsed && window.innerWidth <= 767) return;
-              drag.current = {
-                id: event.pointerId,
-                start: { x: event.clientX, y: event.clientY },
-                origin: point.current
-              };
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
-            onPointerMove={(event) => {
-              const active = drag.current;
-              if (!active || active.id !== event.pointerId) return;
-              event.preventDefault();
-              place({
-                x: active.origin.x + event.clientX - active.start.x,
-                y: active.origin.y + event.clientY - active.start.y
-              });
-            }}
-            onPointerUp={finishDrag}
-            onPointerCancel={finishDrag}
-            onLostPointerCapture={finishDrag}
-            onKeyDown={(event) => {
-              if (!collapsed && window.innerWidth <= 767) return;
-              const step = event.shiftKey ? 24 : 8;
-              const moves: Record<string, Point> = {
-                ArrowLeft: { x: -step, y: 0 },
-                ArrowRight: { x: step, y: 0 },
-                ArrowUp: { x: 0, y: -step },
-                ArrowDown: { x: 0, y: step }
-              };
-              const move = moves[event.key];
-              if (!move || !point.current) return;
-              event.preventDefault();
-              place({
-                x: point.current.x + move.x,
-                y: point.current.y + move.y
-              });
-            }}
+            {...dragHandlers}
           >
             <span id={id}>{title}</span>
           </button>
@@ -198,7 +208,15 @@ export function V3FormContentWindow({
           {children}
         </div>
         <footer hidden={collapsed} aria-hidden={collapsed} inert={collapsed}>
-          {footer}
+          <button
+            type="button"
+            className="v3-content-window-handle v3-content-window-footer-handle"
+            aria-label={t("drag_item", { label: title })}
+            {...dragHandlers}
+          >
+            <GripHorizontalIcon size={20} aria-hidden="true" />
+          </button>
+          <div className="v3-content-window-footer-actions">{footer}</div>
         </footer>
       </section>
     </OverlayLayer.Provider>,
