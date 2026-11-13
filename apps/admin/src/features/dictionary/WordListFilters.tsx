@@ -1,8 +1,5 @@
-import { Button as PilotButton } from "@tsz/ui/components/button";
-import { Input as PilotInput } from "@tsz/ui/components/input";
 import { Button } from "@tsz/ui/admin/display";
-import { DatePicker, Form, Select } from "@tsz/ui/admin/forms";
-import { adminTokens } from "@tsz/ui/admin/context";
+import { DatePicker, Form, Input, Select } from "@tsz/ui/admin/forms";
 import {
   SearchIcon,
   SlidersHorizontalIcon,
@@ -62,7 +59,6 @@ export function WordListFilters({
   };
 }) {
   const { t } = useLexiconListTranslation();
-  const token = adminTokens;
   const filterSummaries: Array<{ key: keyof WordFilterValues; label: string }> =
     [
       ...(languages && filters.targetLanguage
@@ -236,9 +232,9 @@ export function WordListFilters({
             label={t("entry")}
             labelCol={{ flex: "none" }}
           >
-            <PilotInput
+            <Input
               type="search"
-              className="tsz-words min-h-9 rounded-lg px-3 py-1"
+              className="tsz-words"
               placeholder={t("search_entry")}
             />
           </Form.Item>
@@ -247,47 +243,32 @@ export function WordListFilters({
             label={t("meaning")}
             labelCol={{ flex: "none" }}
           >
-            <PilotInput
-              type="search"
-              className="min-h-9 rounded-lg px-3 py-1"
-              placeholder={t("search_meaning")}
-            />
+            <Input type="search" placeholder={t("search_meaning")} />
           </Form.Item>
           <div className="word-search-actions">
-            <PilotButton
-              variant="default"
-              size="compact"
-              className="rounded-lg"
-              type="submit"
-            >
-              <SearchIcon />
+            <Button type="primary" htmlType="submit" icon={<SearchIcon />}>
               {t("search")}
-            </PilotButton>
-            <PilotButton
-              type="button"
-              variant="ghost"
-              size="compact"
-              className="rounded-lg"
+            </Button>
+            <Button
+              type="text"
               onClick={() => {
                 form.resetFields();
                 applyFilters({});
               }}
             >
               {t("reset")}
-            </PilotButton>
-            <PilotButton
-              type="button"
-              variant="ghost"
-              size="compact"
+            </Button>
+            <Button
+              type="text"
+              icon={<SlidersHorizontalIcon />}
               className="word-search-toggle"
               aria-expanded={advancedExpanded}
               aria-controls={advancedPanelId}
               onClick={() => setAdvancedExpanded((value) => !value)}
             >
-              <SlidersHorizontalIcon />
               {advancedExpanded ? t("collapse_filters") : t("more_filters")}
               {advancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            </PilotButton>
+            </Button>
           </div>
         </div>
         <div
@@ -296,9 +277,6 @@ export function WordListFilters({
           hidden={!advancedExpanded}
           aria-hidden={!advancedExpanded}
           inert={!advancedExpanded}
-          style={{
-            borderTop: `1px solid ${token.colorSplit}`
-          }}
         >
           <Form.Item name="kind" label={t("entry_kind")}>
             <Select placeholder={t("all")} options={kindOptions} allowClear />
