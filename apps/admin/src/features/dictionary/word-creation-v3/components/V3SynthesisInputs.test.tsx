@@ -464,9 +464,11 @@ it("配音弹窗展示宿主保存失败原因并保留输入，重试成功后�
     </VoiceSaveContext.Provider>
   );
   const label = "第 1 条发音 英式 Azure IPA";
+  fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+    target: { value: "fɑːɹ" }
+  });
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   const input = await screen.findByLabelText(`${label}音标编辑`);
-  fireEvent.change(input, { target: { value: "fɑːɹ" } });
   const button = screen.getByLabelText(`保存${label}修改`);
   await waitFor(() => expect(button).toBeEnabled());
   fireEvent.click(button);
@@ -556,7 +558,7 @@ describe("双口音真实试听控件", () => {
       }
     }
   });
-  it("展开音素编辑器保留生成权限门禁，改字不触发自动正式生成", async () => {
+  it("展开音素设置器保留生成权限门禁，禁止改字且不触发自动正式生成", async () => {
     speech.canGenerate = false;
     renderWithUps(<Harness dialect="uk" profiled />);
     const label = "第 1 条发音 英式 Azure IPA";
@@ -567,7 +569,9 @@ describe("双口音真实试听控件", () => {
     const dialog = input.closest<HTMLElement>('[role="dialog"]')!;
     expect(within(dialog).queryByRole("button", { name: "音频" })).toBeNull();
     expect(within(dialog).queryByLabelText("上传音频")).toBeNull();
+    expect(input).toHaveAttribute("readonly");
     fireEvent.change(input, { target: { value: "fɑːɹ" } });
+    expect(input).toHaveValue("fɑː");
     await waitFor(() =>
       expect(screen.getByLabelText(`完成${label}设置`)).toBeEnabled()
     );
@@ -600,7 +604,7 @@ describe("双口音真实试听控件", () => {
     expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
   });
   it.each(["ipa", "ups"] as const)(
-    "%s 弹窗改音素后生成并完成，字段播放新配音而非整条发音的默认录音",
+    "%s 外部改音素后配置配音并完成，字段播放新配音而非整条发音的默认录音",
     async (alphabet) => {
       speech.recommendations.mockResolvedValue([
         {
@@ -621,11 +625,16 @@ describe("双口音真实试听控件", () => {
       renderWithUps(<Harness dialect="uk" recording />);
       fireEvent.click(sourceRadio(`Azure ${alphabet.toUpperCase()}`, "英式"));
       const label = `第 1 条发音 英式 Azure ${alphabet.toUpperCase()}`;
+      fireEvent.change(
+        screen.getByLabelText(
+          `第 1 条发音的英式 Azure ${alphabet.toUpperCase()}`
+        ),
+        {
+          target: { value: alphabet === "ipa" ? "fɑːɹ" : "F AA R" }
+        }
+      );
       fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
       const input = await screen.findByLabelText(`${label}音标编辑`);
-      fireEvent.change(input, {
-        target: { value: alphabet === "ipa" ? "fɑːɹ" : "F AA R" }
-      });
       const editor = input.closest('[role="dialog"]') as HTMLElement;
       const complete = within(editor).getByLabelText(`完成${label}设置`);
       await waitFor(() => expect(complete).toBeEnabled());
@@ -890,6 +899,8 @@ describe("双口音真实试听控件", () => {
 
   it("UPS 默认收起，展开后可编辑，收起再展开不丢失内容或回退选择", () => {
     render(<Harness dialect="common" />);
+    expect(screen.queryByRole("radio", { name: "英式 Azure UPS" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "美式 Azure UPS" })).toBeNull();
     expect(screen.queryByLabelText("第 1 条发音的美式 Azure UPS")).toBeNull();
     expect(screen.getByLabelText("第 1 条发音的美式 Azure IPA")).toBeVisible();
     const toggle = screen.getByRole("button", {
@@ -902,6 +913,8 @@ describe("双口音真实试听控件", () => {
     );
     fireEvent.click(toggle);
     expect(toggle).toHaveTextContent("UPS");
+    expect(sourceRadio("Azure UPS", "英式")).toBeVisible();
+    expect(sourceRadio("Azure UPS", "美式")).toBeVisible();
     const ups = screen.getByLabelText("第 1 条发音的美式 Azure UPS");
     expect(ups).toHaveValue("F AA R");
     fireEvent.change(ups, { target: { value: "K AE T" } });
@@ -910,6 +923,7 @@ describe("双口音真实试听控件", () => {
     );
     expect(ups).toBeInTheDocument();
     expect(ups).not.toBeVisible();
+    expect(screen.queryByRole("radio", { name: "美式 Azure UPS" })).toBeNull();
     expect(sourceRadio("词形拼写")).toBeChecked();
     expect(
       JSON.parse(screen.getByTestId("pronunciation-wire").textContent!)
@@ -957,29 +971,29 @@ describe("双口音真实试听控件", () => {
     ).toHaveAttribute("aria-invalid", "true");
   });
 
-  it("同拼写读法两侧选源独立，停配保留本侧资料，切回IPA恢复原缓存", () => {
+  it("同拼写读法两侧选源独立，切换UPS保留本侧资料，切回IPA恢复原缓存", () => {
     renderWithUps(<Harness dialect="common" generated />);
     const before = JSON.parse(
       screen.getByTestId("pronunciation-wire").textContent!
     );
-    fireEvent.click(sourceRadio("本侧暂不配置", "英式"));
+    fireEvent.click(sourceRadio("Azure UPS", "英式"));
     let saved = JSON.parse(
       screen.getByTestId("pronunciation-wire").textContent!
     );
     expect(saved.synthesis.uk).toEqual({
       ...before.synthesis.uk,
-      source: "none"
+      source: "ups"
     });
     expect(saved.synthesis.us).toEqual(before.synthesis.us);
     expect(
       screen.getByLabelText("第 1 条发音 英式 Azure IPA 最终读音 播放语音")
     ).toBeDisabled();
-    fireEvent.click(sourceRadio("Azure UPS", "美式"));
+    fireEvent.click(sourceRadio("Azure IPA", "美式"));
     saved = JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
-    expect(saved.synthesis.uk.source).toBe("none");
+    expect(saved.synthesis.uk.source).toBe("ups");
     expect(saved.synthesis.us).toEqual({
       ...before.synthesis.us,
-      source: "ups"
+      source: "ipa"
     });
     fireEvent.click(sourceRadio("Azure IPA", "英式"));
     saved = JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
@@ -987,7 +1001,7 @@ describe("双口音真实试听控件", () => {
       ...before.synthesis.uk,
       source: "ipa"
     });
-    expect(saved.synthesis.us.source).toBe("ups");
+    expect(saved.synthesis.us.source).toBe("ipa");
   });
   it("不在每条发音下重复说明 UPS 选源规则", () => {
     renderWithUps(<Harness dialect="common" />);
@@ -1017,7 +1031,7 @@ describe("双口音真实试听控件", () => {
 
   it("单侧选源与 UPS 输入收展独立，收起后仍保留来源和缓存", () => {
     render(<Harness dialect="common" />);
-    expect(sourceRadio("Azure UPS")).toBeVisible();
+    expect(screen.queryByRole("radio", { name: "美式 Azure UPS" })).toBeNull();
     fireEvent.click(
       screen.getByRole("button", { name: "展开第 1 条发音的 UPS" })
     );
@@ -1032,7 +1046,7 @@ describe("双口音真实试听控件", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "收起第 1 条发音的 UPS" })
     );
-    expect(sourceRadio("Azure UPS")).toBeVisible();
+    expect(screen.queryByRole("radio", { name: "美式 Azure UPS" })).toBeNull();
     expect(
       screen.getByLabelText("第 1 条发音的美式 Azure UPS")
     ).not.toBeVisible();
@@ -1177,7 +1191,7 @@ it.each([
   ["英式", "uk", "IPA", "fɑː", "dʒɒb"],
   ["美式", "us", "UPS", "F AA R", "JH AA B"]
 ] as const)(
-  "%s %s 编辑器编辑当前音标，完成回写，取消不保存",
+  "%s %s 配音设置禁止改音标，试听和保存保留原音标，取消不保存",
   async (accent, side, alphabet, initial, edited) => {
     renderWithUps(<Harness dialect="common" />);
     const label = `第 1 条发音 ${accent} Azure ${alphabet}`;
@@ -1187,8 +1201,9 @@ it.each([
     };
     const input = await open();
     expect(input).toHaveValue(initial);
-    expect(input).not.toHaveAttribute("readonly");
+    expect(input).toHaveAttribute("readonly");
     fireEvent.change(input, { target: { value: edited } });
+    expect(input).toHaveValue(initial);
     const voice = side === "uk" ? "Sonia" : "Aria";
     const selectedVoice = await screen.findByLabelText<HTMLInputElement>(
       `选用 ${voice}`
@@ -1207,7 +1222,7 @@ it.each([
                 start: 0,
                 end: 3,
                 alphabet: alphabet.toLowerCase(),
-                phoneme: edited
+                phoneme: initial
               }
             ]
           }
@@ -1222,16 +1237,16 @@ it.each([
     await waitFor(() => expect(input).not.toBeInTheDocument());
     expect(
       screen.getByLabelText(`第 1 条发音的${accent} Azure ${alphabet}`)
-    ).toHaveValue(edited);
+    ).toHaveValue(initial);
     const saved = JSON.parse(
       screen.getByTestId("pronunciation-wire").textContent!
     );
-    expect(saved.synthesis[side][alphabet.toLowerCase()]).toBe(edited);
+    expect(saved.synthesis[side][alphabet.toLowerCase()]).toBe(initial);
     expect(
       saved.synthesis[side][`${alphabet.toLowerCase()}_speech`].content.text
     ).toBe("far");
     const reopened = await open();
-    expect(reopened).toHaveValue(edited);
+    expect(reopened).toHaveValue(initial);
     fireEvent.change(reopened, { target: { value: initial } });
     fireEvent.click(screen.getByLabelText(`取消${label}设置`));
     await waitFor(() => expect(reopened).not.toBeInTheDocument());
@@ -1241,26 +1256,17 @@ it.each([
   }
 );
 
-it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位置保存并在重开时映射回音标", async () => {
+it("短语 UPS 设置器只配置停顿并保留原音素及词界，重开时恢复停顿", async () => {
   renderWithUps(<Harness dialect="common" settingsPhrase />);
   fireEvent.click(sourceRadio("Azure UPS", "英式"));
   const label = "第 1 条发音 英式 Azure UPS";
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   const input = await screen.findByLabelText(`${label}音标编辑`);
-  fireEvent.input(input, {
-    target: { value: "F AA R lng AX . S1 W EY" },
-    inputType: "insertFromPaste"
-  });
-  fireEvent.input(input, {
-    target: { value: "JH Q B" },
-    inputType: "insertFromPaste"
-  });
-  fireEvent.keyDown(input, { key: "z", ctrlKey: true });
-  expect(input).toHaveValue("F AA R lng AX . S1 W EY");
+  expect(input).toHaveAttribute("readonly");
   fireEvent.click(screen.getByLabelText("停顿"));
   fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
   const dialog = screen.getByRole("dialog");
-  fireEvent.mouseDown(dialog.querySelectorAll(".tsz-ve-gap")[3]!);
+  fireEvent.mouseDown(dialog.querySelectorAll(".tsz-ve-gap")[2]!);
   fireEvent.click(screen.getByLabelText("选用 Sonia"));
   fireEvent.click(screen.getByLabelText("试听 Sonia"));
   await waitFor(() =>
@@ -1275,7 +1281,7 @@ it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位�
               start: 0,
               end: 3,
               alphabet: "ups",
-              phoneme: "F AA R lng"
+              phoneme: "F AA lng"
             },
             {
               type: "phoneme",
@@ -1299,7 +1305,7 @@ it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位�
     screen.getByTestId("pronunciation-wire").textContent!
   ).synthesis.uk;
   expect(saved.ups_words).toEqual([
-    { text: "far", phoneme: "F AA R lng" },
+    { text: "far", phoneme: "F AA lng" },
     { text: "away", phoneme: "AX . S1 W EY" }
   ]);
   expect(saved.ups_speech.content.annotations).toEqual([
@@ -1312,7 +1318,7 @@ it("短语 UPS 在一个词内增改音素后保留词界，停顿按正文位�
   expect(await screen.findByLabelText(`${label}音标编辑`)).toHaveValue(
     saved.ups
   );
-  expect(screen.getByLabelText("编辑第 4 处停顿 0.5 秒")).toBeInTheDocument();
+  expect(screen.getByLabelText("编辑第 3 处停顿 0.5 秒")).toBeInTheDocument();
 });
 
 it("UPS 音素间空格不能被保存为英文词间停顿", async () => {
@@ -1397,7 +1403,7 @@ it.each([
     ).not.toBeNull();
     for (const name of ["连读", "斜体", "语法结构", "编辑文本"])
       expect(control(name)).toBeNull();
-    expect(control(`${label}音标编辑`)).not.toHaveAttribute("readonly");
+    expect(control(`${label}音标编辑`)).toHaveAttribute("readonly");
     expect(control(`${label}音标编辑`)).toHaveValue(
       wire().synthesis[side][alphabet.toLowerCase()]
     );
@@ -1533,6 +1539,9 @@ it("已显示的音素后端兼容诊断随语言更新，不重建设置器或�
     </InterfaceI18nProvider>
   );
   const view = render(content("zh-Hans"));
+  fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+    target: { value: "fɑːɹ" }
+  });
   fireEvent.click(sourceRadio("Azure IPA", "英式"));
   fireEvent.click(
     screen.getByLabelText("打开第 1 条发音 英式 Azure IPA TTS 设置器")
@@ -1540,7 +1549,7 @@ it("已显示的音素后端兼容诊断随语言更新，不重建设置器或�
   const input = await screen.findByLabelText(
     "第 1 条发音 英式 Azure IPA音标编辑"
   );
-  fireEvent.change(input, { target: { value: "fɑːɹ" } });
+  expect(input).toHaveAttribute("readonly");
   const editVoice = await screen.findByLabelText("修改 自然");
   await waitFor(() => expect(editVoice).toBeEnabled());
   fireEvent.click(editVoice);
@@ -1855,16 +1864,14 @@ it("明确选择IPA来源时，旧录音默认标记不阻止本侧生成", asyn
 it.each([
   ["词形拼写", "spelling", "IPA"],
   ["上传音频", "upload", "IPA"],
-  ["本侧暂不配置", "none", "IPA"],
   ["词形拼写", "spelling", "UPS"],
-  ["上传音频", "upload", "UPS"],
-  ["本侧暂不配置", "none", "UPS"]
+  ["上传音频", "upload", "UPS"]
 ] as const)(
   "%s 时配置非活动 %s %s：试听和保存不启用候选，也不要求正式音频",
   async (sourceLabel, source, alphabet) => {
     const tasks = new Map<string, () => Promise<boolean>>();
     const save = vi.fn().mockResolvedValue(true);
-    render(
+    renderWithUps(
       <VoiceSaveContext.Provider value={{ save }}>
         <Harness dialect="uk" recording audioTasks={tasks} />
       </VoiceSaveContext.Provider>
@@ -1874,6 +1881,12 @@ it.each([
       JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
     const selectedSource = wire().synthesis.uk.source;
     const label = `第 1 条发音 英式 Azure ${alphabet}`;
+    fireEvent.change(
+      screen.getByLabelText(`第 1 条发音的英式 Azure ${alphabet}`),
+      {
+        target: { value: alphabet === "IPA" ? "fɑːɹ" : "F AA R" }
+      }
+    );
     const open = screen.getByLabelText(`打开${label} TTS 设置器`);
     expect(open.closest(".word-synthesis-source-option")).not.toBeNull();
     expect(open.closest("label")).toBeNull();
@@ -1882,9 +1895,7 @@ it.each([
     const dialog = await phonemeDialog(label);
     expect(sourceRadio(sourceLabel, "英式")).toBeChecked();
     const input = within(dialog).getByLabelText(`${label}音标编辑`);
-    fireEvent.change(input, {
-      target: { value: alphabet === "IPA" ? "fɑːɹ" : "F AA R" }
-    });
+    expect(input).toHaveAttribute("readonly");
     await waitFor(() =>
       expect(within(dialog).getByLabelText("试听 Sonia")).toBeEnabled()
     );
@@ -1936,21 +1947,27 @@ it.each([
   }
 );
 
-it("UPS 设置与音频任务在输入区首次展开前已经存在，收起不卸载设置器", async () => {
+it("UPS 来源收起时保留音频任务，重新展开后仍可打开设置器", async () => {
   const tasks = new Map<string, () => Promise<boolean>>();
-  render(<Harness dialect="uk" audioTasks={tasks} />);
+  renderWithUps(<Harness dialect="uk" audioTasks={tasks} />);
   fireEvent.click(sourceRadio("Azure UPS", "英式"));
   await waitFor(() =>
     expect(
       [...tasks.keys()].some((key) => key.includes("synthesis.uk.ups_speech"))
     ).toBe(true)
   );
-  expect(screen.queryByLabelText("第 1 条发音的英式 Azure UPS")).toBeNull();
+  fireEvent.click(screen.getByLabelText("收起第 1 条发音的 UPS"));
+  expect(
+    screen.getByLabelText("第 1 条发音的英式 Azure UPS")
+  ).not.toBeVisible();
+  expect(
+    [...tasks.keys()].some((key) => key.includes("synthesis.uk.ups_speech"))
+  ).toBe(true);
+  fireEvent.click(screen.getByLabelText("展开第 1 条发音的 UPS"));
   fireEvent.click(
     screen.getByLabelText("打开第 1 条发音 英式 Azure UPS TTS 设置器")
   );
   const dialog = await phonemeDialog("第 1 条发音 英式 Azure UPS");
-  fireEvent.click(screen.getByLabelText("展开第 1 条发音的 UPS"));
   fireEvent.click(screen.getByLabelText("收起第 1 条发音的 UPS"));
   expect(dialog).toBeVisible();
   fireEvent.click(
