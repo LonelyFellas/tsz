@@ -2,16 +2,26 @@ import { createRef } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FloatingEntryOverview } from "./FloatingEntryOverview";
+import { createPortal } from "react-dom";
 
 const key = "tsz:entry-overview-position";
-function mount() {
+function mount(portal = false) {
   const pageRef = createRef<HTMLDivElement>();
   const view = render(
     <div ref={pageRef}>
       <FloatingEntryOverview pageRef={pageRef}>
         <input aria-label="概览筛选" defaultValue="保留内容" />
       </FloatingEntryOverview>
-      <footer className="word-step-actions">保存草稿</footer>
+      {portal ? (
+        createPortal(
+          <div className="v3-step-actions">
+            <footer className="word-step-actions">保存草稿</footer>
+          </div>,
+          document.body
+        )
+      ) : (
+        <footer className="word-step-actions">保存草稿</footer>
+      )}
     </div>
   );
   const button = screen.getByRole("button", { name: "展开词条概览" });
@@ -99,8 +109,8 @@ describe("FloatingEntryOverview", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("窗口缩小时重新约束位置，并避开底部保存栏", () => {
-    const { button } = mount();
+  it.each([false, true])("避开底部保存栏（portal: %s）", (portal) => {
+    const { button } = mount(portal);
     const footer = screen.getByText("保存草稿");
     vi.spyOn(footer, "getBoundingClientRect").mockReturnValue({
       top: 500,

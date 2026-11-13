@@ -124,7 +124,7 @@
 }
 .v3-overview-pronunciation {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--ui-space-1);
   min-width: 0;
   width: 100%;
@@ -145,9 +145,10 @@
   flex-shrink: 0;
 }
 .v3-overview-pronunciation .word-pronunciation-play-action.ui-btn {
-  width: 24px;
+  justify-content: flex-start;
+  width: 20px;
   height: 28px;
-  flex-basis: 24px;
+  flex-basis: 20px;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -161,6 +162,7 @@
   white-space: nowrap;
 }
 .v3-overview-settings .word-pronunciation-voice-summary {
+  justify-content: flex-start;
   min-width: 0;
   max-width: 100%;
   padding-inline: 0;

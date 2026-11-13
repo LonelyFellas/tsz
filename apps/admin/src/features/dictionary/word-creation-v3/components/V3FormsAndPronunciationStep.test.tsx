@@ -3710,10 +3710,14 @@ describe("V3FormsAndPronunciationStep", () => {
     ).mockReturnValue(160);
     fireEvent.dragStart(grips[0]!, { dataTransfer });
     expect(handles[0]!).toHaveClass("is-dragging");
-    const preview = dataTransfer.setDragImage.mock.calls[0]![0] as HTMLElement;
-    expect(preview).not.toBe(handles[0]);
+    const preview = document.querySelector<HTMLElement>(
+      ".word-pos-tab-drag-preview"
+    )!;
     expect(preview).toHaveAttribute("aria-hidden", "true");
-    expect(preview).toHaveTextContent(handles[0]!.textContent!);
+    expect(preview).toHaveTextContent(
+      handles[0]!.querySelector(".word-pos-tab-label")!.textContent!
+    );
+    expect(preview.querySelector("button, input")).toBeNull();
     expect(preview).not.toHaveClass("is-dragging");
     fireEvent.dragOver(handles[1]!, { dataTransfer });
     expect(handles[1]!).toHaveClass("is-drag-over");
@@ -3747,6 +3751,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       document.querySelector(".word-pos-tab-handle.is-dragging")
     ).toBeNull();
+    expect(document.querySelector(".word-pos-tab-drag-preview")).toBeNull();
+    expect(document.querySelector(".word-pos-tab-native-preview")).toBeNull();
 
     const value = JSON.parse(
       screen.getByTestId("canonical-value").textContent!
@@ -3755,6 +3761,18 @@ describe("V3FormsAndPronunciationStep", () => {
       uuidFromInt(902),
       uuidFromInt(901)
     ]);
+
+    fireEvent.dragStart(grips[1]!, { dataTransfer });
+    fireEvent.dragEnd(grips[1]!);
+    expect(document.querySelector(".word-pos-tab-drag-preview")).toBeNull();
+    expect(canonicalValue().pos.map((pos) => pos.pos_id)).toEqual([
+      uuidFromInt(902),
+      uuidFromInt(901)
+    ]);
+    fireEvent.dragStart(grips[1]!, { dataTransfer });
+    view.unmount();
+    expect(document.querySelector(".word-pos-tab-drag-preview")).toBeNull();
+    expect(document.querySelector(".word-pos-tab-native-preview")).toBeNull();
 
     // 只剩一个词性时没有可排的顺序，把手不再可拖
     render(<Harness initial={formsFixture({ pos_id: uuidFromInt(903) })} />);

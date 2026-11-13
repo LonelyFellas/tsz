@@ -2077,11 +2077,7 @@ export const lexiconEditorPanelMessages = {
   panel_default: ["默认 · ", "預設 · ", "Default · "],
   panel_label_7: ["{{p0}}{{p1}}", "{{p0}}{{p1}}", "{{p0}}{{p1}}"],
   panel_loading_voices: ["正在读取音色", "正在讀取音色", "Loading voices"],
-  panel_no_voices_available_for_this_accent: [
-    "当前口音没有可用音色",
-    "當前口音沒有可用音色",
-    "No voices available for this accent"
-  ],
+  panel_no_voices_available_for_this_accent: ["无音色", "無音色", "No voices"],
   panel_enabled_voices: ["已启用音色", "已啟用音色", "Enabled voices"],
   panel_unavailable: ["不可用", "不可用", "Unavailable"],
   panel_rate: ["语速", "語速", "Rate"],
