@@ -21,6 +21,7 @@
 }
 
 .v3-step-actions[data-at-end="true"] > .word-step-actions {
+  border-end-start-radius: 16px;
   border-end-end-radius: 16px;
 }
 
@@ -59,10 +60,6 @@
     gap: var(--ui-space-2);
     min-height: 0;
     padding: 14px var(--ui-space-3) max(14px, env(safe-area-inset-bottom));
-  }
-
-  .v3-step-actions[data-at-end="true"] > .word-step-actions {
-    border-end-start-radius: 16px;
   }
 
   .v3-step-actions .ui-btn {
