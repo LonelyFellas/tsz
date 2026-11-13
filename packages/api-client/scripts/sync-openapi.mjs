@@ -31,6 +31,10 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "head", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
+  "get /admin/lexicon-next/entries",
+  "get /admin/lexicon-next/workspace/entries",
+  "get /admin/lexicon-next/workspace/stats",
+  "get /admin/lexicon-next/workspace/creators",
   "get /admin/lexicon-next/entries/{id}/view",
   "get /me/wordlist-tips",
   "get /wordlists",

@@ -51,6 +51,12 @@ export function parseWordFilterSearchParams(
   const createdFrom = dateParam(params.get("created_from"));
   const createdTo = dateParam(params.get("created_to"));
   return {
+    ...(trimmed(params.get("target_language"))
+      ? { targetLanguage: trimmed(params.get("target_language")) }
+      : {}),
+    ...(trimmed(params.get("medium_locale"))
+      ? { mediumLocale: trimmed(params.get("medium_locale")) }
+      : {}),
     ...(keyword ? { keyword } : {}),
     ...(headword ? { headword } : {}),
     ...(createdBy && ADMIN_ID.test(createdBy) ? { createdBy } : {}),
@@ -80,6 +86,9 @@ export function serializeWordFilterSearchParams(
   values: WordFilterValues
 ): URLSearchParams {
   const params = new URLSearchParams();
+  if (values.targetLanguage)
+    params.set("target_language", values.targetLanguage);
+  if (values.mediumLocale) params.set("medium_locale", values.mediumLocale);
   const keyword = values.keyword?.trim();
   const gloss = values.gloss?.trim();
   if (keyword) params.set("keyword", keyword);
