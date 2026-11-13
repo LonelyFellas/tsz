@@ -99,9 +99,16 @@ const detachCaches: (() => void)[] = [];
 afterEach(() => {
   detachCaches.splice(0).forEach((detach) => detach());
 });
-function mount(api: LexiconNextRequests, path = `/lexicon-next/${id}`) {
+function mount(
+  api: LexiconNextRequests,
+  path = `/lexicon-next/${id}`,
+  staleTime = 0
+) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    defaultOptions: {
+      queries: { retry: false, staleTime },
+      mutations: { retry: false }
+    }
   });
   detachCaches.push(bindAdminAuthorizationCache(useAuthStore, client));
   const router = createMemoryRouter(
@@ -1199,6 +1206,68 @@ it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", asyn
     })
   );
 });
+it("保存移除最后一项媒介内容后，返回列表立即刷新统计与创建人，不等待生产缓存过期", async () => {
+  const api = requests();
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: null,
+          definitions: [
+            {
+              id: "definition",
+              locale: "zh-Hans",
+              text: "简体内容",
+              style: "definition"
+            }
+          ],
+          equivalents: []
+        }
+      ]
+    }
+  });
+  api.workspaceList.mockResolvedValue({
+    items: [listRow()],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  api.stats.mockResolvedValue({ total: 1, today: 1, month: 1 });
+  api.creators.mockResolvedValue([{ id: "editor", display_name: "编辑" }]);
+  const path =
+    "/lexicon-next?target_language=en&medium_locale=zh-Hans&kind=word";
+  const { router, client } = mount(api, path, 60000);
+  await screen.findByText("centre");
+  await waitFor(() => expect(api.creators).toHaveBeenCalledTimes(1));
+  fireEvent.click(button("继续创建"));
+  await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/词义与译词/));
+  fireEvent.click(button("删除简体中文解释 1"));
+  api.workspaceList.mockResolvedValue({
+    items: [],
+    pagination: { total: 0, page: 1, page_size: 20, total_pages: 0 }
+  });
+  api.stats.mockResolvedValue({ total: 0, today: 0, month: 0 });
+  api.creators.mockResolvedValue([]);
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findByText("版本 2");
+  expect(api.save.mock.calls[0]![1].draft.senses[0].definitions).toEqual([]);
+  await act(() => router.navigate(-1));
+  await screen.findByText("未找到符合条件的数据");
+  await waitFor(() => {
+    expect(api.stats).toHaveBeenCalledTimes(2);
+    expect(api.creators).toHaveBeenCalledTimes(2);
+  });
+  expect(
+    client.getQueryData([
+      "admin-lexicon-next",
+      "stats",
+      { target_language: "en", medium_locale: "zh-Hans", kind: "word" }
+    ])
+  ).toEqual({ total: 0, today: 0, month: 0 });
+});
+
 it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", async () => {
   const api = requests();
   const { client, router } = mount(api, "/lexicon-next");

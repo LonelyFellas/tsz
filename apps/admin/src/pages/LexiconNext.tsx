@@ -284,9 +284,13 @@ function EntryEditor({
       setDraft(result.draft);
       setConflict(false);
       setRemote(undefined);
-      void queryClient.invalidateQueries({
-        queryKey: ["admin-lexicon-next", "list"]
-      });
+      void Promise.all(
+        ["list", "stats", "creators"].map((key) =>
+          queryClient.invalidateQueries({
+            queryKey: ["admin-lexicon-next", key]
+          })
+        )
+      );
       void message.success("草稿已保存");
     });
   }

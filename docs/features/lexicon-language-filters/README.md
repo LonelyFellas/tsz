@@ -25,7 +25,7 @@
 ## 验证结果
 
 - 后端 `cargo test --locked --all-features --test lexicon_next`：15 项通过；`cargo test --locked --all-features --lib lexicon_next`：2 项通过。Clippy 全目标/全特性及格式检查通过。查询使用动态绑定 SQL，无新增迁移或 SQLx 离线缓存。
-- 前端词库、列表 URL 回归：99 项通过；API 客户端完整套件：718 项通过。全仓 typecheck、lint、改动格式检查通过；lint 保留 Web 既有的两条整页跳转警告。
+- 前端词库、列表 URL 回归：100 项通过（含保存后语言统计/创建人缓存失效回归）；API 客户端完整套件：718 项通过。全仓 typecheck、lint、改动格式检查通过；lint 保留 Web 既有的两条整页跳转警告。
 - OpenAPI 来自后端 `d8d4ab0` 加本任务工作区改动，原生导出并同步。SHA-256：`4c8b13060ef449bd817d5d16fb67949393652f56cdf003a3cc68d7b29bf6b052`；runtime bundle 来源哈希相符，响应 schema 未变化。
 - 内置浏览器通过本任务 Vite 代理访问本任务后端，所有查询使用真实接口与 PostgreSQL；鉴权使用隔离管理员及测试签发 token，不包含真实登录流程验收。默认列表 5 条；英语＋简体 2 条，英语＋繁体 1 条，搜索与统计一致；垃圾桶简体 1 条、繁体 0 条。刷新保留语言条件，1440px / 1024px 布局通过。
 - 已清理全部 6 个临时词条及专用数据库、Redis、凭据、入口文件与浏览器会话标记；任务服务全部停止，相关数据目录移除。未创建 OSS 对象。
