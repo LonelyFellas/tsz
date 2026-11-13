@@ -13,7 +13,10 @@ import {
 import { Button, Flex, Typography } from "@tsz/ui/admin/display";
 import { Radio, Select, type TextAreaRef } from "@tsz/ui/admin/forms";
 import { Tooltip } from "@tsz/ui/admin/overlays";
-import { V3VoiceTextField } from "./V3VoiceTextField";
+import {
+  V3VoiceTextField,
+  type SpellingSettingsOpener
+} from "./V3VoiceTextField";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -64,6 +67,37 @@ function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
         spelling: literals.join(i18n.language.startsWith("en") ? "’, ‘" : "”“")
       })}
     </Typography.Text>
+  );
+}
+
+function SpellingSettingsHint({
+  count,
+  labelCount = 1,
+  sharedPauses = false
+}: {
+  count: number;
+  labelCount?: number;
+  sharedPauses?: boolean;
+}) {
+  const { t } = useLexiconEditorTranslation();
+  return (
+    <>
+      {labelCount > 1 && (
+        <Typography.Paragraph>
+          {t("shared_label_count", { count: labelCount })}
+        </Typography.Paragraph>
+      )}
+      {count > 1 && (
+        <Typography.Paragraph>
+          {t("spelling_settings_shared_readings", { count })}
+        </Typography.Paragraph>
+      )}
+      {sharedPauses && (
+        <Typography.Paragraph>
+          {t("spelling_settings_shared_pauses")}
+        </Typography.Paragraph>
+      )}
+    </>
   );
 }
 
@@ -348,6 +382,7 @@ function V3DialectFormCell({
 }: V3DialectFormCellProps) {
   const { t } = useLexiconEditorTranslation();
   const spellingRef = useRef<TextAreaRef>(null);
+  const spellingSettingsRef = useRef<SpellingSettingsOpener | null>(null);
   const [spellingRequired, setSpellingRequired] = useState(false);
   const referenceGuard = useV3ReferenceGuard();
   if (form.regional_variants.mode === "common") return null;
@@ -408,6 +443,17 @@ function V3DialectFormCell({
         </Flex>
         <V3VoiceTextField
           mode="spelling"
+          spellingTextOnly
+          spellingSettingsRef={spellingSettingsRef}
+          spellingSettingsHint={
+            <SpellingSettingsHint
+              count={variant.pronunciations.length}
+              labelCount={
+                referenceVariantIds?.get(variant.id)?.length ??
+                referenceForms?.length
+              }
+            />
+          }
           inputRef={spellingRef}
           requiredError={
             spellingRequired && !variant.spelling.trim()
@@ -509,6 +555,9 @@ function V3DialectFormCell({
         />
         <SpellingConflictNote literals={conflictLiteralList} />
         <V3PronunciationList
+          onSpellingSettings={(request) =>
+            spellingSettingsRef.current?.(request)
+          }
           content={content}
           idFactory={idFactory}
           issues={issues}
@@ -733,6 +782,7 @@ export function V3ConcreteFormRow({
 }: V3ConcreteFormRowProps) {
   const { t } = useLexiconEditorTranslation();
   const spellingRef = useRef<TextAreaRef>(null);
+  const spellingSettingsRef = useRef<SpellingSettingsOpener | null>(null);
   const [spellingRequired, setSpellingRequired] = useState(false);
   const requireSpelling = () => {
     setSpellingRequired(true);
@@ -745,6 +795,10 @@ export function V3ConcreteFormRow({
   const variants: Array<
     WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3
   > = regionalVariants(form.regional_variants);
+  const spellingReadingCount = variants.reduce(
+    (count, item) => count + item.pronunciations.length,
+    0
+  );
   const commonVariant =
     form.regional_variants.mode === "common"
       ? form.regional_variants.common
@@ -885,6 +939,15 @@ export function V3ConcreteFormRow({
               </Flex>
               <V3VoiceTextField
                 mode="spelling"
+                spellingTextOnly
+                spellingSettingsRef={spellingSettingsRef}
+                spellingSettingsHint={
+                  <SpellingSettingsHint
+                    count={spellingReadingCount}
+                    labelCount={referenceForms?.length}
+                    sharedPauses
+                  />
+                }
                 inputRef={spellingRef}
                 requiredError={
                   spellingRequired && !commonVariant.spelling.trim()
@@ -971,6 +1034,9 @@ export function V3ConcreteFormRow({
             <div className="word-shared-pronunciation-grid word-shared-pronunciation-grid-single">
               <div className="word-shared-pronunciation word-shared-pronunciation-common">
                 <V3PronunciationList
+                  onSpellingSettings={(request) =>
+                    spellingSettingsRef.current?.(request)
+                  }
                   content={content}
                   idFactory={idFactory}
                   issues={issues}
@@ -1001,6 +1067,15 @@ export function V3ConcreteFormRow({
               </Flex>
               <V3VoiceTextField
                 mode="spelling"
+                spellingTextOnly
+                spellingSettingsRef={spellingSettingsRef}
+                spellingSettingsHint={
+                  <SpellingSettingsHint
+                    count={spellingReadingCount}
+                    labelCount={referenceForms?.length}
+                    sharedPauses
+                  />
+                }
                 inputRef={spellingRef}
                 requiredError={
                   spellingRequired &&
@@ -1095,6 +1170,9 @@ export function V3ConcreteFormRow({
                     key={variant.id}
                   >
                     <V3PronunciationList
+                      onSpellingSettings={(request) =>
+                        spellingSettingsRef.current?.(request)
+                      }
                       content={content}
                       idFactory={idFactory}
                       issues={issues}

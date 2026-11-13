@@ -1,5 +1,117 @@
-import { spellingAnnotationsEqual } from "@tsz/voice-editor/core";
-import type { RichTextV2, RichTextV2V3, SpellingSpeechV3 } from "@tsz/types";
+import {
+  clearVoiceAudio,
+  spellingAnnotationsEqual,
+  voiceSettingKey,
+  toRichTextV2,
+  withDefaultVoiceProfile
+} from "@tsz/voice-editor/core";
+import { speechAccentGroup } from "@tsz/shared";
+import type {
+  VoiceAssociation,
+  VoiceEditResult
+} from "@tsz/voice-editor/types";
+import type {
+  RichTextV2,
+  RichTextV2V3,
+  SpellingSpeechV3,
+  VoiceProfileV3
+} from "@tsz/types";
+
+/** 设置只替换当前口音；停顿共享，变更后另一口音的旧音频引用必须失效。 */
+export function mergeSpellingSettings<T extends VoiceAssociation>(
+  latest: {
+    value: RichTextV2;
+    voiceProfile?: VoiceProfileV3 | null;
+    audioAssets?: SpellingSpeechV3["audio_assets"] | null;
+  },
+  initial: {
+    value: RichTextV2;
+    voiceProfile?: VoiceProfileV3 | null;
+    audioAssets?: SpellingSpeechV3["audio_assets"] | null;
+  },
+  result: VoiceEditResult<T>,
+  side: "uk" | "us"
+): VoiceEditResult<T> & { value: RichTextV2 } {
+  const speechMarks = (value: RichTextV2) =>
+    value.annotations.filter((mark) =>
+      ["pause", "say_as", "sub"].includes(mark.type)
+    );
+  const changedContent =
+    JSON.stringify(speechMarks(initial.value)) !==
+    JSON.stringify(speechMarks(toRichTextV2(result.value)));
+  const value = changedContent
+    ? {
+        ...latest.value,
+        annotations: [
+          ...latest.value.annotations.filter(
+            (mark) => !["pause", "say_as", "sub"].includes(mark.type)
+          ),
+          ...speechMarks(toRichTextV2(result.value))
+        ]
+      }
+    : latest.value;
+  const original = withDefaultVoiceProfile(initial.voiceProfile, "word");
+  const edited = result.voiceProfile;
+  const profileChanged = JSON.stringify(original) !== JSON.stringify(edited);
+  let voiceProfile = latest.voiceProfile ?? undefined;
+  if (profileChanged && edited) {
+    const originalKeys = new Set(original.voices.map(voiceSettingKey));
+    const editedKeys = new Set(edited.voices.map(voiceSettingKey));
+    const selected = edited.voices.filter(
+      (voice) => speechAccentGroup(voice.locale, voice.accent) === side
+    );
+    const selectedKeys = new Set(selected.map(voiceSettingKey));
+    voiceProfile = {
+      ...latest.voiceProfile,
+      ...(edited.dubbing
+        ? {
+            dubbing: {
+              ...(withDefaultVoiceProfile(latest.voiceProfile, "word")
+                .dubbing ?? {
+                area: "word" as const,
+                uk: { mode: "local" as const },
+                us: { mode: "local" as const }
+              }),
+              [side]: edited.dubbing[side]
+            }
+          }
+        : {}),
+      voices: [
+        ...(latest.voiceProfile?.voices ?? []).filter(
+          (voice) =>
+            speechAccentGroup(voice.locale, voice.accent) !== side &&
+            !selectedKeys.has(voiceSettingKey(voice)) &&
+            !(
+              speechAccentGroup(voice.locale, voice.accent) === "other" &&
+              originalKeys.has(voiceSettingKey(voice)) &&
+              !editedKeys.has(voiceSettingKey(voice))
+            )
+        ),
+        ...selected
+      ]
+    };
+  }
+  if (changedContent && voiceProfile) {
+    voiceProfile = clearVoiceAudio(voiceProfile);
+  }
+  return {
+    ...result,
+    value,
+    voiceProfile,
+    audioAssets:
+      JSON.stringify(initial.audioAssets ?? []) ===
+      JSON.stringify(result.audioAssets ?? [])
+        ? (latest.audioAssets ?? undefined)
+        : [
+            ...(latest.audioAssets ?? []).filter(
+              (asset) => speechAccentGroup(asset.locale) !== side
+            ),
+            ...(result.audioAssets ?? []).filter(
+              (asset) => speechAccentGroup(asset.locale) === side
+            )
+          ]
+  };
+}
 
 /** 编辑器合并显示标注与独立试听停顿，wire 仍分别保存。 */
 export function spellingEditorValue(variant: {

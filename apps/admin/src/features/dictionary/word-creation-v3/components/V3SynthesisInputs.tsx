@@ -6,7 +6,12 @@ import {
 } from "../../i18n/editor";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
-import { ChevronDownIcon, ArrowLeftRightIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ArrowLeftRightIcon,
+  SettingsIcon
+} from "lucide-react";
+import type { SpellingSettingsOpener } from "./V3VoiceTextField";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Input, Radio } from "@tsz/ui/admin/forms";
 import { Modal } from "@tsz/ui/admin/overlays";
@@ -35,6 +40,7 @@ import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { v3IssueMessage } from "../presentationErrors";
 import "./V3SynthesisInputs.css";
 import { RequiredFieldFeedback } from "../../RequiredFieldFeedback";
+import { useContentEditPermissions } from "../../contentEditPermissions";
 type Alphabet = "ipa" | "ups";
 type Side = "uk" | "us";
 const SIDES = ["uk", "us"] as const;
@@ -66,6 +72,7 @@ export function V3SynthesisInputs({
   issues,
   onMissingDictionary,
   onMissingSpelling,
+  onSpellingSettings,
   onChange
 }: {
   pronunciation: WordPronunciationV3;
@@ -76,9 +83,11 @@ export function V3SynthesisInputs({
   issues: readonly V3DraftValidationIssue[];
   onMissingDictionary?: () => void;
   onMissingSpelling?: () => void;
+  onSpellingSettings?: SpellingSettingsOpener;
   onChange: (patch: Partial<WordPronunciationV3>) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const { edit: canEdit } = useContentEditPermissions();
   const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
   const inputPrefix = useId();
   const [missingIpa, setMissingIpa] = useState<Side>();
@@ -313,17 +322,14 @@ export function V3SynthesisInputs({
             const sideLocale = pronunciationLocale(side, "uk");
             const sideLabel = t(side === "uk" ? "dialect_uk" : "dialect_us");
             const candidate = candidateForSide(synthesis, side, dialect);
-            const selected = synthesisForLocale(synthesis, sideLocale, dialect);
-            const selectedSource =
-              selected.source ??
-              (selected.use_spelling ? "spelling" : selected.alphabet);
             const rowContent = pronunciationSynthesisContent(
               spelling,
               {
+                ...candidate,
                 alphabet,
+                source: undefined,
                 use_spelling:
                   synthesis.use_spelling == null ? undefined : false,
-                ...candidate,
                 ipa_locale: sideLocale,
                 ups_locale: sideLocale
               },
@@ -367,11 +373,7 @@ export function V3SynthesisInputs({
                       side: sideLabel,
                       name
                     })}
-                    disabled={
-                      !rowContent ||
-                      candidate.source === "none" ||
-                      candidate.source === "upload"
-                    }
+                    disabled={!rowContent}
                     disabledReason={
                       localPhoneticDiagnostic(
                         synthesisInputIssue(alphabet, candidate[alphabet]),
@@ -459,21 +461,6 @@ export function V3SynthesisInputs({
                     }
                     onClick={() => convert(side, alphabet)}
                   />
-                  <V3PhonemeSpeechSettings
-                    active={selectedSource === alphabet}
-                    spelling={spelling}
-                    nodeId={pronunciation.id}
-                    field={`synthesis.${side}.${alphabet}_speech`}
-                    candidate={candidate}
-                    alphabet={alphabet}
-                    locale={sideLocale}
-                    label={`${label} ${sideLabel} ${name}`}
-                    fallbackVoiceProfile={pronunciation.voice_profile}
-                    audioAssets={pronunciation.audio_assets}
-                    onChange={(next, audioAssets) =>
-                      writeCandidate(side, next, audioAssets)
-                    }
-                  />
                 </Space.Compact>
                 {(inputIssue || speechIssue) && !requiredError && (
                   <Typography.Text className="word-field-help" type="danger">
@@ -552,13 +539,6 @@ export function V3SynthesisInputs({
               <Typography.Text className="word-pronunciation-label">
                 {t("creation_speech_source")}
               </Typography.Text>
-              <V3PronunciationAudioUpload
-                nodeId={pronunciation.id}
-                locale={dialect === "common" ? undefined : locale}
-                label={t("creation_upload_pronunciation_audio", { label })}
-                assets={pronunciation.audio_assets ?? []}
-                onChange={(audio_assets) => onChange({ audio_assets })}
-              />
               <Button
                 className="word-synthesis-ups-toggle"
                 type="text"
@@ -617,6 +597,13 @@ export function V3SynthesisInputs({
                   (asset) => speechAccentGroup(asset.locale) === side
                 );
                 const recording = recordings.find((asset) => asset.is_default);
+                const currentSource =
+                  current.source ??
+                  (recording
+                    ? "upload"
+                    : current.use_spelling
+                      ? "spelling"
+                      : current.alphabet);
                 return (
                   <section
                     className="word-synthesis-source-actions"
@@ -637,14 +624,7 @@ export function V3SynthesisInputs({
                       aria-label={t("creation_accent_source", {
                         side: sideLabel
                       })}
-                      value={
-                        current.source ??
-                        (recording
-                          ? "upload"
-                          : current.use_spelling
-                            ? "spelling"
-                            : current.alphabet)
-                      }
+                      value={currentSource}
                       onChange={(event) => {
                         const value = event.target.value;
                         const selected = recording ?? recordings[0];
@@ -700,18 +680,75 @@ export function V3SynthesisInputs({
                           fontClass: ""
                         }
                       ].map((option) => (
-                        <Radio
+                        <div
                           key={option.value}
-                          value={option.value}
-                          aria-label={
-                            dialect === "common"
-                              ? `${sideLabel} ${option.name}`
-                              : option.name
-                          }
-                          disabled={"disabled" in option && option.disabled}
-                          className="word-synthesis-choice"
+                          className="word-synthesis-source-option"
                         >
-                          <span className="word-synthesis-choice-content">
+                          <Radio
+                            id={`${inputPrefix}-${side}-source-${option.value}`}
+                            value={option.value}
+                            aria-label={
+                              dialect === "common"
+                                ? `${sideLabel} ${option.name}`
+                                : option.name
+                            }
+                            disabled={"disabled" in option && option.disabled}
+                            className="word-synthesis-choice"
+                          />
+                          {option.value === "spelling" &&
+                            onSpellingSettings && (
+                              <Button
+                                type="text"
+                                size="small"
+                                disabled={!canEdit}
+                                icon={<SettingsIcon />}
+                                aria-label={t("spelling_speech_settings", {
+                                  side: sideLabel
+                                })}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  onSpellingSettings({
+                                    dialect: side
+                                  });
+                                }}
+                              />
+                            )}
+                          {(option.value === "ipa" ||
+                            option.value === "ups") && (
+                            <V3PhonemeSpeechSettings
+                              active={currentSource === option.value}
+                              spelling={spelling}
+                              nodeId={pronunciation.id}
+                              field={`synthesis.${side}.${option.value}_speech`}
+                              candidate={candidate}
+                              alphabet={option.value}
+                              locale={side === "uk" ? "en-GB" : "en-US"}
+                              label={`${label} ${sideLabel} ${option.name}`}
+                              fallbackVoiceProfile={pronunciation.voice_profile}
+                              audioAssets={pronunciation.audio_assets}
+                              onChange={(next, audioAssets) =>
+                                writeCandidate(side, next, audioAssets)
+                              }
+                            />
+                          )}
+                          {option.value === "upload" && (
+                            <V3PronunciationAudioUpload
+                              nodeId={pronunciation.id}
+                              locale={side === "uk" ? "en-GB" : "en-US"}
+                              label={t("creation_upload_pronunciation_audio", {
+                                label: `${label} ${sideLabel}`
+                              })}
+                              assets={pronunciation.audio_assets ?? []}
+                              onChange={(audio_assets) =>
+                                onChange({ audio_assets })
+                              }
+                            />
+                          )}
+                          <label
+                            htmlFor={`${inputPrefix}-${side}-source-${option.value}`}
+                            className="word-synthesis-choice-content"
+                          >
                             <span className="word-synthesis-choice-tag">
                               {option.name}
                             </span>
@@ -721,8 +758,8 @@ export function V3SynthesisInputs({
                             >
                               {option.text}
                             </span>
-                          </span>
-                        </Radio>
+                          </label>
+                        </div>
                       ))}
                     </Radio.Group>
                   </section>

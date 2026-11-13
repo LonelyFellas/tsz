@@ -120,6 +120,26 @@ export const lexiconEditorMessages = {
   ],
   edit_content: ["编辑词形内容", "編輯詞形內容", "Edit form content"],
   adjust_form_type: ["调整词形类型", "調整詞形類型", "Change form type"],
+  spelling_speech_settings: [
+    "{{side}}词形拼写配音设置",
+    "{{side}}詞形拼寫配音設定",
+    "{{side}} spelling speech settings"
+  ],
+  spelling_settings_target_changed: [
+    "拼写内容已变化，请关闭设置后重新打开。",
+    "拼寫內容已變更，請關閉設定後重新開啟。",
+    "The spelling has changed. Close and reopen these settings."
+  ],
+  spelling_settings_shared_readings: [
+    "此拼写的配音设置由 {{count}} 个读法共用。",
+    "此拼寫的配音設定由 {{count}} 個讀法共用。",
+    "Speech settings for this spelling are shared by {{count}} readings."
+  ],
+  spelling_settings_shared_pauses: [
+    "停顿应用于此拼写的英美配音。",
+    "停頓套用於此拼寫的英美配音。",
+    "Pauses apply to both British and American speech for this spelling."
+  ],
   shared_label_count: [
     "共用于 {{count}} 个标签",
     "共用於 {{count}} 個標籤",

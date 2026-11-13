@@ -17,7 +17,7 @@ import type {
   TextLinkV3,
   VoiceProfileV3
 } from "@tsz/types";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { AudioUploadAdapter, VoiceSetting } from "@tsz/voice-editor/types";
 
@@ -64,7 +64,10 @@ import {
   updateVariantSpelling,
   updateSpellingVoiceProfile
 } from "../operations";
-import { V3VoiceTextField } from "./V3VoiceTextField";
+import {
+  V3VoiceTextField,
+  type SpellingSettingsOpener
+} from "./V3VoiceTextField";
 import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
 
 const render = (
@@ -2604,4 +2607,334 @@ it("首次正文的目录加载失败不能按历史缺省 profile 绕过整次�
   expect(screen.getByLabelText("首次快照")).toHaveValue("A new sentence.");
   expect(commit).not.toHaveBeenCalled();
   expect(persist).not.toHaveBeenCalled();
+});
+
+it("来源设置复用拼写字段，打开不生成音频或物化继承，取消恢复唯一的折叠任务", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const initial: VoiceProfileV3 = {
+    dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "inherit" } },
+    voices: [
+      {
+        voice_id: "sonia",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: 0,
+        audio_asset_id: "cached-uk"
+      }
+    ]
+  };
+  const onProfile = vi.fn();
+  const generateAudio = vi.fn();
+  const audioTasks = new Map<string, () => Promise<boolean>>();
+  function Host() {
+    const opener = useRef<SpellingSettingsOpener | null>(null);
+    return (
+      <VoiceSaveContext.Provider value={{ save: async () => true, audioTasks }}>
+        <button onClick={() => opener.current?.({ dialect: "uk" })}>
+          来源设置
+        </button>
+        <V3VoiceTextField
+          mode="spelling"
+          value={VALUE}
+          nodeId="shared-spelling-owner"
+          field="spelling"
+          ariaLabel="共享拼写"
+          voiceProfile={initial}
+          spellingSettingsRef={opener}
+          onVoiceProfileChange={onProfile}
+          onChange={vi.fn()}
+          previewAdapter={{
+            listVoices: state.listVoices,
+            synthesize: state.synthesize,
+            generateAudio
+          }}
+        />
+      </VoiceSaveContext.Provider>
+    );
+  }
+  render(<Host />);
+  await waitFor(() => expect(audioTasks.size).toBe(1));
+  fireEvent.click(screen.getByRole("button", { name: "来源设置" }));
+  await screen.findByLabelText("标注工具栏");
+  await screen.findByLabelText("选用 Sonia");
+  expect(screen.getByRole("dialog")).toHaveTextContent("英式词形拼写配音设置");
+  expect(generateAudio).not.toHaveBeenCalled();
+  expect(onProfile).not.toHaveBeenCalled();
+  expect(audioTasks.size).toBe(0);
+  fireEvent.click(screen.getByRole("button", { name: "取消共享拼写编辑" }));
+  await waitFor(() => expect(audioTasks.size).toBe(1));
+  expect(generateAudio).not.toHaveBeenCalled();
+  expect(onProfile).not.toHaveBeenCalled();
+});
+
+it("口音设置修改共享停顿后，宿主保存等待另一口音补齐音频且保留文本标注", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  state.listVoices.mockResolvedValue([
+    {
+      id: "sonia",
+      label: "Sonia",
+      locale: "en-GB",
+      gender: "female",
+      styles: [],
+      supportsRate: true,
+      supportsPitch: true
+    },
+    {
+      id: "aria",
+      label: "Aria",
+      locale: "en-US",
+      gender: "female",
+      styles: [],
+      supportsRate: true,
+      supportsPitch: true
+    }
+  ]);
+  const generateAudio = vi
+    .fn()
+    .mockImplementation(async ({ setting }: { setting: VoiceSetting }) => ({
+      id: `fresh-${setting.locale}`
+    }));
+  const audioTasks = new Map<string, () => Promise<boolean>>();
+  const persisted = vi.fn();
+  function Host() {
+    const opener = useRef<SpellingSettingsOpener | null>(null);
+    const [value, setValue] = useState<RichTextV3>({
+      version: 2,
+      text: "hello there",
+      annotations: [
+        { type: "italic", start: 0, end: 5 },
+        { type: "pause", at: 5, duration_ms: 500 }
+      ]
+    });
+    const [profile, setProfile] = useState<VoiceProfileV3>({
+      dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } },
+      voices: [
+        {
+          voice_id: "sonia",
+          version_id: UUIDS.pronunciation,
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "cached-uk"
+        },
+        {
+          voice_id: "aria",
+          version_id: UUIDS.pronunciation_2,
+          locale: "en-US",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "cached-us"
+        }
+      ]
+    });
+    const latest = useRef({ value, profile });
+    latest.current = { value, profile };
+    return (
+      <VoiceSaveContext.Provider
+        value={{
+          audioTasks,
+          save: async () => {
+            for (const wait of audioTasks.values())
+              if (!(await wait())) return false;
+            persisted(structuredClone(latest.current));
+            return true;
+          }
+        }}
+      >
+        <button onClick={() => opener.current?.({ dialect: "uk" })}>
+          共享停顿设置
+        </button>
+        <V3VoiceTextField
+          mode="spelling"
+          value={value}
+          nodeId="pause-owner"
+          field="spelling"
+          ariaLabel="停顿拼写"
+          spellingSettingsRef={opener}
+          voiceProfile={profile}
+          onChange={setValue}
+          onVoiceProfileChange={setProfile}
+          onCommit={(result) => {
+            setValue(result.value);
+            setProfile(result.voiceProfile!);
+          }}
+          previewAdapter={{
+            listVoices: state.listVoices,
+            synthesize: state.synthesize,
+            generateAudio
+          }}
+        />
+      </VoiceSaveContext.Provider>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByText("共享停顿设置"));
+  await screen.findByLabelText("标注工具栏");
+  expect(screen.queryByLabelText("斜体")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("连读")).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
+  fireEvent.click(screen.getByLabelText("停顿 1 秒"));
+  const save = await screen.findByRole("button", { name: "保存停顿拼写修改" });
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+  await waitFor(() => expect(persisted).toHaveBeenCalledOnce());
+  const result = persisted.mock.calls[0]![0];
+  expect(result.value.annotations).toEqual([
+    { type: "italic", start: 0, end: 5 },
+    { type: "pause", at: 5, duration_ms: 1000 }
+  ]);
+  expect(
+    result.profile.voices
+      .map((voice: VoiceSetting) => voice.audio_asset_id)
+      .sort()
+  ).toEqual(["fresh-en-GB", "fresh-en-US"]);
+  expect(
+    generateAudio.mock.calls.map(([request]) => request.setting.locale).sort()
+  ).toEqual(["en-GB", "en-US"]);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("词形文本入口保留展示标注和配音资产，保存失败可重试", async () => {
+  const commit = vi.fn();
+  const save = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  const profile: VoiceProfileV3 = {
+    voices: [
+      {
+        voice_id: "sonia",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: -20,
+        audio_asset_id: "kept-audio"
+      }
+    ]
+  };
+  const assets = [
+    {
+      id: "kept-recording",
+      locale: "en-GB" as const,
+      gender: "female" as const,
+      content_type: "audio/mpeg",
+      size_bytes: 7,
+      original_name: "kept.mp3",
+      created_at: "2026-11-13T00:00:00Z"
+    }
+  ];
+  render(
+    <VoiceSaveContext.Provider value={{ save }}>
+      <V3VoiceTextField
+        mode="spelling"
+        spellingTextOnly
+        value={VALUE}
+        nodeId="text-owner"
+        field="spelling"
+        ariaLabel="词形文本"
+        voiceProfile={profile}
+        audioAssets={assets}
+        onChange={() => {}}
+        onCommit={commit}
+      />
+    </VoiceSaveContext.Provider>
+  );
+  fireEvent.click(screen.getByLabelText("打开词形文本编辑器"));
+  await screen.findByLabelText("标注工具栏");
+  for (const name of ["停顿", "配音", "特殊读法", "音频"])
+    expect(screen.queryByRole("button", { name, exact: true })).toBeNull();
+  expect(screen.queryByLabelText("局部配音音色池")).toBeNull();
+  expect(screen.getByLabelText("斜体")).toBeVisible();
+  expect(screen.getByLabelText("连读")).toBeVisible();
+  const complete = screen.getByLabelText("保存词形文本修改");
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  expect(screen.getByRole("dialog")).toBeVisible();
+  expect(complete).toBeEnabled();
+  fireEvent.click(complete);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(commit).toHaveBeenLastCalledWith(
+    expect.objectContaining({ voiceProfile: profile, audioAssets: assets })
+  );
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(state.recommendations).not.toHaveBeenCalled();
+  expect(state.synthesize).not.toHaveBeenCalled();
+});
+
+it("词形文本改字后宿主保存等待唯一所有者生成，旧音频引用不被写回", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const generateAudio = vi.fn().mockResolvedValue({ id: "changed-text-audio" });
+  const tasks = new Map<string, () => Promise<boolean>>();
+  const persisted = vi.fn();
+  function Host() {
+    const [value, setValue] = useState(VALUE);
+    const [profile, setProfile] = useState<VoiceProfileV3>({
+      voices: [
+        {
+          voice_id: "sonia",
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "old-text-audio"
+        }
+      ]
+    });
+    const latest = useRef({ value, profile });
+    latest.current = { value, profile };
+    return (
+      <VoiceSaveContext.Provider
+        value={{
+          audioTasks: tasks,
+          save: async () => {
+            for (const wait of tasks.values())
+              if (!(await wait())) return false;
+            persisted(structuredClone(latest.current));
+            return true;
+          }
+        }}
+      >
+        <V3VoiceTextField
+          mode="spelling"
+          spellingTextOnly
+          dialect="uk"
+          value={value}
+          voiceProfile={profile}
+          nodeId="text-generation-owner"
+          field="spelling"
+          ariaLabel="改字拼写"
+          onChange={setValue}
+          onVoiceProfileChange={setProfile}
+          onCommit={(result) => {
+            setValue(result.value);
+            setProfile(result.voiceProfile!);
+          }}
+          previewAdapter={{
+            listVoices: state.listVoices,
+            synthesize: state.synthesize,
+            generateAudio
+          }}
+        />
+      </VoiceSaveContext.Provider>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByLabelText("打开改字拼写编辑器"));
+  await screen.findByLabelText("标注工具栏");
+  const dialog = screen.getByRole("dialog");
+  fireEvent.input(
+    within(dialog).getByRole("textbox", { name: "改字拼写", exact: true }),
+    { target: { value: "hello friend" }, inputType: "insertFromPaste" }
+  );
+  const save = within(dialog).getByLabelText("保存改字拼写修改");
+  await waitFor(() => expect(save).toBeEnabled());
+  fireEvent.click(save);
+  await waitFor(() => expect(persisted).toHaveBeenCalledOnce());
+  expect(persisted.mock.calls[0]![0]).toMatchObject({
+    value: { text: "hello friend" },
+    profile: { voices: [{ audio_asset_id: "changed-text-audio" }] }
+  });
+  expect(generateAudio).toHaveBeenCalledOnce();
+  expect(generateAudio).toHaveBeenCalledWith(
+    expect.objectContaining({
+      content: expect.objectContaining({ text: "hello friend" })
+    }),
+    expect.anything()
+  );
 });

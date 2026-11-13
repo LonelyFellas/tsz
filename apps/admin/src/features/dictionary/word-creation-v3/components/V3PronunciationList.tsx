@@ -20,6 +20,7 @@ import type {
   WordUsFormVariantV3
 } from "@tsz/types";
 import { useEffect, useId, useState, type DragEvent } from "react";
+import type { SpellingSettingsOpener } from "./V3VoiceTextField";
 import { issuesForPronunciation } from "../model";
 import {
   reorderPronunciations,
@@ -66,6 +67,7 @@ export interface V3PronunciationListProps {
   issues: readonly V3DraftValidationIssue[];
   idFactory: V3IdFactory;
   onMissingSpelling?: () => void;
+  onSpellingSettings?: SpellingSettingsOpener;
   onChange: (next: DraftFormsStepContentV3) => void;
 }
 
@@ -75,6 +77,7 @@ export function V3PronunciationList({
   issues,
   idFactory,
   onMissingSpelling,
+  onSpellingSettings,
   onChange
 }: V3PronunciationListProps) {
   const { t } = useLexiconEditorTranslation();
@@ -492,6 +495,9 @@ export function V3PronunciationList({
                         synthesisEditable={env.AZURE_PRONUNCIATION_INPUTS}
                         pronunciation={pronunciation}
                         spelling={variant.spelling}
+                        onSpellingSettings={
+                          env.VOICE_EDITOR ? onSpellingSettings : undefined
+                        }
                         dialect={variant.dialect}
                         index={index}
                         issues={rowIssues}
