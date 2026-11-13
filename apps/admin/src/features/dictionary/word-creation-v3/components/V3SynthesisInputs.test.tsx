@@ -1256,17 +1256,31 @@ it.each([
   }
 );
 
-it("短语 UPS 设置器只配置停顿并保留原音素及词界，重开时恢复停顿", async () => {
+it("外部修改短语 UPS 并撤销保留词界，设置器保存配音和停顿", async () => {
   renderWithUps(<Harness dialect="common" settingsPhrase />);
   fireEvent.click(sourceRadio("Azure UPS", "英式"));
   const label = "第 1 条发音 英式 Azure UPS";
+  const field = screen.getByLabelText("第 1 条发音的英式 Azure UPS");
+  fireEvent.change(field, {
+    target: { value: "F AA R lng AX . S1 W EY" }
+  });
+  fireEvent.change(field, { target: { value: "JH Q B" } });
+  fireEvent.keyDown(field, { key: "z", ctrlKey: true });
+  expect(field).toHaveValue("F AA R lng AX . S1 W EY");
+  expect(
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!).synthesis
+      .uk.ups_words
+  ).toEqual([
+    { text: "far", phoneme: "F AA R lng" },
+    { text: "away", phoneme: "AX . S1 W EY" }
+  ]);
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   const input = await screen.findByLabelText(`${label}音标编辑`);
   expect(input).toHaveAttribute("readonly");
   fireEvent.click(screen.getByLabelText("停顿"));
   fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
   const dialog = screen.getByRole("dialog");
-  fireEvent.mouseDown(dialog.querySelectorAll(".tsz-ve-gap")[2]!);
+  fireEvent.mouseDown(dialog.querySelectorAll(".tsz-ve-gap")[3]!);
   fireEvent.click(screen.getByLabelText("选用 Sonia"));
   fireEvent.click(screen.getByLabelText("试听 Sonia"));
   await waitFor(() =>
@@ -1281,7 +1295,7 @@ it("短语 UPS 设置器只配置停顿并保留原音素及词界，重开时�
               start: 0,
               end: 3,
               alphabet: "ups",
-              phoneme: "F AA lng"
+              phoneme: "F AA R lng"
             },
             {
               type: "phoneme",
@@ -1305,7 +1319,7 @@ it("短语 UPS 设置器只配置停顿并保留原音素及词界，重开时�
     screen.getByTestId("pronunciation-wire").textContent!
   ).synthesis.uk;
   expect(saved.ups_words).toEqual([
-    { text: "far", phoneme: "F AA lng" },
+    { text: "far", phoneme: "F AA R lng" },
     { text: "away", phoneme: "AX . S1 W EY" }
   ]);
   expect(saved.ups_speech.content.annotations).toEqual([
@@ -1318,7 +1332,7 @@ it("短语 UPS 设置器只配置停顿并保留原音素及词界，重开时�
   expect(await screen.findByLabelText(`${label}音标编辑`)).toHaveValue(
     saved.ups
   );
-  expect(screen.getByLabelText("编辑第 3 处停顿 0.5 秒")).toBeInTheDocument();
+  expect(screen.getByLabelText("编辑第 4 处停顿 0.5 秒")).toBeInTheDocument();
 });
 
 it("UPS 音素间空格不能被保存为英文词间停顿", async () => {
