@@ -596,6 +596,43 @@ describe("V3 meanings writable model", () => {
   });
 
   it.each(["uk", "us"] as const)(
+    "只有 %s 侧保存了配音设置而正文全空时，自动归一仍保留该侧设置",
+    (side) => {
+      const existing = toWritableMeanings(meaningsCanonicalFixture);
+      const grammar = existing.pos[0]!.grammar_structures[0]!;
+      grammar.variants = (["uk", "us"] as const).map((dialect) => ({
+        id: `empty-${dialect}`,
+        dialect,
+        content: { version: 2, text: "", annotations: [] },
+        ...(dialect === side
+          ? {
+              voice_profile: {
+                voices: [{ voice_id: dialect, enabled: true, rate_percent: 10 }]
+              }
+            }
+          : {})
+      }));
+      const original = structuredClone(existing);
+      const selected = grammar.variants.find((row) => row.dialect === side)!;
+      const normalized = ensureV3MeaningsForForms(
+        "entry-1",
+        formsFixture({ pos_id: "pos-1" }),
+        existing,
+        () => "new-common"
+      );
+      expect(normalized.pos[0]!.grammar_structures[0]!.variants).toEqual([
+        {
+          id: "new-common",
+          dialect: "common",
+          content: selected.content,
+          voice_profile: selected.voice_profile
+        }
+      ]);
+      expect(existing).toEqual(original);
+    }
+  );
+
+  it.each(["uk", "us"] as const)(
     "语法文字相同但配置不同需选择，采用 %s 时保留完整配置和新节点身份",
     (side) => {
       const existing = toWritableMeanings(meaningsCanonicalFixture);

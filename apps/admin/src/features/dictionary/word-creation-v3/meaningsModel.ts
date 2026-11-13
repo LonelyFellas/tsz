@@ -1008,21 +1008,25 @@ function variantDialectsMatch(
   );
 }
 
-export function grammarMergeRequiresChoice(
-  grammar: GrammarStructureV3
-): boolean {
-  const uk = grammar.variants.find((row) => row.dialect === "uk");
-  const us = grammar.variants.find((row) => row.dialect === "us");
-  if (grammar.variants.length !== 2 || !uk || !us) return false;
-  const empty = (row: GrammarVariantV3) =>
+function grammarVariantEmpty(row: GrammarVariantV3): boolean {
+  return (
     !row.content.text.trim() &&
     (row.content.version === 2
       ? row.content.annotations.length === 0
       : row.content.spans.length === 0 && row.content.liaisons.length === 0) &&
     !row.voice_profile &&
     !row.form_links?.length &&
-    !row.audio_assets?.length;
-  if (empty(uk) || empty(us)) return false;
+    !row.audio_assets?.length
+  );
+}
+
+export function grammarMergeRequiresChoice(
+  grammar: GrammarStructureV3
+): boolean {
+  const uk = grammar.variants.find((row) => row.dialect === "uk");
+  const us = grammar.variants.find((row) => row.dialect === "us");
+  if (grammar.variants.length !== 2 || !uk || !us) return false;
+  if (grammarVariantEmpty(uk) || grammarVariantEmpty(us)) return false;
   const value = (row: GrammarVariantV3) =>
     JSON.stringify({
       content: row.content,
@@ -1095,7 +1099,7 @@ function normalizeGrammarVariants(
   const us = grammar.variants.find((variant) => variant.dialect === "us");
   if (grammar.variants.length !== 2 || !uk || !us) return undefined;
   if (grammarMergeRequiresChoice(grammar)) return undefined;
-  const source = uk.content.text.trim() ? uk : us;
+  const source = grammarVariantEmpty(uk) ? us : uk;
   // 合并时两侧音频都保留（英式在前）；超过单变体上限由面板的「已用」计数与发布校验兜底
   const audioAssets =
     uk.audio_assets === undefined && us.audio_assets === undefined
