@@ -25,6 +25,9 @@ import { useAuthStore } from "@/lib/auth";
 import { LexiconNextPage, type LexiconNextRequests } from "./LexiconNext";
 
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
+import { formsFixture } from "@/features/dictionary/word-creation-v3/fixtures";
+import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
+import { emptyFormEditor } from "@/features/lexicon-next/FormsStep";
 import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
 
 vi.mock("@/lib/env", async (importOriginal) => {
@@ -1408,4 +1411,47 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
     screen.getAllByText("centre").some((element) => element.closest("td"))
   ).toBe(true);
   expect(api.get).toHaveBeenCalledTimes(2);
+});
+
+it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳服务器版本", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  const form_editor = applyFormsStructure(emptyFormEditor(), formsFixture());
+  if (!("forms_format" in form_editor))
+    throw new Error("Expected shared fixture");
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: { ...entry.draft, form_editor }
+  });
+  api.save.mockRejectedValue(new HttpError(409, "rejected"));
+  mount(api);
+  await screen.findByRole("button", { name: "编辑原形内容" });
+  fireEvent.click(button(/^词义与译词/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findByText(/服务器版本已更新/);
+  fireEvent.click(button(/词性与发音/));
+  fireEvent.click(button("编辑原形内容"));
+  fireEvent.click(await screen.findByRole("button", { name: "收起" }));
+  expect(button("比较服务器版本")).toBeDisabled();
+  fireEvent.click(button("关闭词形内容设置"));
+  await waitFor(() => expect(button("比较服务器版本")).toBeEnabled());
+  api.get.mockResolvedValue({
+    ...entry,
+    revision: 5,
+    draft: {
+      ...entry.draft,
+      headword: "remote",
+      form_editor: emptyFormEditor()
+    }
+  });
+  fireEvent.click(button("比较服务器版本"));
+  await screen.findByText("服务器 · 版本 5");
+  fireEvent.click(button("放弃本地修改并重载"));
+  fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
+  await screen.findByText("版本 5");
+  expect(screen.getByText("暂无词性")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "编辑原形内容" })).toBeNull();
 });

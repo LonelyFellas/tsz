@@ -410,7 +410,7 @@ function EntryEditor({
             action={
               conflict && (
                 <Button
-                  disabled={busy}
+                  disabled={busy || formContentOpen}
                   onClick={() =>
                     void run(async () =>
                       setRemote(await requests.get(saved.id))
@@ -714,6 +714,7 @@ function EntryEditor({
               <Button onClick={() => setRemote(undefined)}>保留本地草稿</Button>
               <Button
                 danger
+                disabled={busy || formContentOpen}
                 onClick={() =>
                   modal.confirm({
                     title: "放弃本地修改并重载？",
@@ -721,7 +722,7 @@ function EntryEditor({
                     okText: "放弃并重载",
                     cancelText: "取消",
                     onOk: () => {
-                      if (remote) {
+                      if (remote && !contentLeaveGuard.current) {
                         setSaved(remote);
                         setDraft(remote.draft);
                         setRemote(undefined);
