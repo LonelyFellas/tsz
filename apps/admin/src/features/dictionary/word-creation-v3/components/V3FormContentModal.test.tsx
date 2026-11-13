@@ -433,6 +433,121 @@ describe("词形内容弹窗的草稿边界", () => {
     ).not.toBeChecked();
   });
 
+  it.each([
+    ["uk", false],
+    ["us", false],
+    ["us", true]
+  ] as const)(
+    "关闭拼写区别时显式选择 %s（同拼写=%s），保留所选拼写及两侧发音，确认后重开回显",
+    (side, sameSpelling) => {
+      const initial = applyFormsStructure(
+        { forms_format: "shared_v1", contents: [], pos: [] },
+        formsFixture({
+          forms: [
+            ukUsFormFixture({
+              us: {
+                spelling: sameSpelling ? "centre" : "center",
+                pronunciations: [
+                  pronunciationFixture({
+                    id: uuidFromInt(951),
+                    actual_pron: "American pronunciation"
+                  })
+                ]
+              }
+            })
+          ]
+        })
+      ) as SharedFormsStepContentV3;
+      const regions = initial.contents[0]!.regional_variants;
+      if (regions.mode !== "uk_us") throw new Error("fixture");
+      regions.uk.spelling_rich = {
+        version: 2,
+        text: "centre",
+        annotations: [{ type: "italic", start: 0, end: 1 }]
+      };
+      regions.us.spelling_speech = {
+        content: { version: 2, text: regions.us.spelling, annotations: [] },
+        voice_profile: { voices: [] }
+      };
+      const before = structuredClone(initial);
+      const { onConfirm, unmount } = setup({
+        initialForms: initial,
+        baseOnly: true
+      });
+      const spelling = screen.getByRole("switch", { name: "拼写有英美区别" });
+      fireEvent.click(spelling);
+      const dialog = screen.getByRole("dialog", { name: "选择主拼写" });
+      expect(spelling).toBeChecked();
+      const confirm = within(dialog).getByRole("button", { name: "确认选择" });
+      expect(confirm).toBeDisabled();
+      fireEvent.click(
+        within(dialog).getByText(side === "uk" ? "BrE 英式" : "AmE 美式", {
+          exact: true
+        })
+      );
+      expect(confirm).toHaveAccessibleName(
+        side === "uk" ? "使用英式拼写" : "使用美式拼写"
+      );
+      fireEvent.click(confirm);
+      expect(spelling).not.toBeChecked();
+      expect(
+        screen.getByRole("switch", { name: "音标有英美区别" })
+      ).toBeChecked();
+      expect(initial).toEqual(before);
+      fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+      const saved = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+      const next = saved.contents[0]!.regional_variants;
+      if (next.mode !== "uk_us")
+        throw new Error("expected separate pronunciations");
+      for (const target of ["uk", "us"] as const) {
+        expect(next[target].spelling).toBe(regions[side].spelling);
+        expect(next[target].spelling_rich).toEqual(regions[side].spelling_rich);
+        expect(next[target].spelling_speech).toEqual(
+          regions[side].spelling_speech
+        );
+        expect(next[target].id).toBe(regions[target].id);
+        expect(next[target].pronunciations).toEqual(
+          regions[target].pronunciations
+        );
+      }
+      expect(saved.pos).toEqual(initial.pos);
+      unmount();
+      const reopened = setup({ initialForms: saved, baseOnly: true });
+      expect(
+        screen.getByRole("switch", { name: "拼写有英美区别" })
+      ).not.toBeChecked();
+      fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+      expect(reopened.onConfirm).toHaveBeenCalledWith(saved);
+    }
+  );
+
+  it("取消主拼写选择不更改开关或草稿，再次打开须重新选择", () => {
+    const initial = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      formsFixture({ forms: [ukUsFormFixture()] })
+    ) as SharedFormsStepContentV3;
+    const { onConfirm } = setup({ initialForms: initial, baseOnly: true });
+    const spelling = screen.getByRole("switch", { name: "拼写有英美区别" });
+    fireEvent.click(spelling);
+    let dialog = screen.getByRole("dialog", { name: "选择主拼写" });
+    fireEvent.click(
+      within(dialog).getByRole("radio", { name: /BrE 英式：\s*centre/ })
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+    expect(spelling).toBeChecked();
+    fireEvent.click(spelling);
+    dialog = screen.getByRole("dialog", { name: "选择主拼写" });
+    for (const radio of within(dialog).getAllByRole("radio"))
+      expect(radio).not.toBeChecked();
+    expect(
+      within(dialog).getByRole("button", { name: "确认选择" })
+    ).toBeDisabled();
+    fireEvent.keyDown(dialog, { key: "Escape", keyCode: 27 });
+    expect(spelling).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    expect(onConfirm).toHaveBeenCalledWith(initial);
+  });
+
   it("英美发音不同时关闭音标开关仍拦截合并，原值和旧数据保持不变", () => {
     const expanded = formsFixture({
       dialect_rules: { spelling_mode: "unified", phonetic_mode: "distinguish" },

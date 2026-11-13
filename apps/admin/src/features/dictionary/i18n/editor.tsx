@@ -1032,6 +1032,26 @@ export const lexiconEditorMessages = {
     "拼寫有英美區別",
     "Different British and American spellings"
   ],
+  choose_primary_spelling: [
+    "选择主拼写",
+    "選擇主拼寫",
+    "Choose the primary spelling"
+  ],
+  use_british_spelling: [
+    "使用英式拼写",
+    "使用英式拼寫",
+    "Use British spelling"
+  ],
+  use_american_spelling: [
+    "使用美式拼写",
+    "使用美式拼寫",
+    "Use American spelling"
+  ],
+  primary_spelling_help: [
+    "统一使用所选拼写及其拼写标记、试听设置，英美音标和发音分别保留。",
+    "統一使用所選拼寫及其拼寫標記、試聽設定，英美音標和發音分別保留。",
+    "Use the selected spelling, its annotations and playback settings for both regions. Keep British and American transcriptions and pronunciations separate."
+  ],
   distinguish_phonetic_question: [
     "音标有英美区别？",
     "音標有英美區別？",

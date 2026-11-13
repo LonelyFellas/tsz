@@ -344,7 +344,8 @@ export function createSharedContentDialectNormalizer(
   return (
     editor: FormContentEditor,
     rules: DialectRulesV3,
-    preference: "uk" | "us"
+    preference: "uk" | "us",
+    spellingSource?: "uk" | "us"
   ) => {
     const source = editor.pos[0]!.forms[0]!.regional_variants;
     if (source.mode === "uk_us_many") {
@@ -365,12 +366,28 @@ export function createSharedContentDialectNormalizer(
         us: source.us[0]!
       };
     }
+    if (rules.spelling_mode === "unified" && spellingSource) {
+      editor = structuredClone(editor);
+      const variants = editor.pos[0]!.forms[0]!.regional_variants;
+      if (variants.mode === "uk_us") {
+        const selected = variants[spellingSource];
+        const target = variants[spellingSource === "uk" ? "us" : "uk"];
+        target.spelling = selected.spelling;
+        for (const field of ["spelling_rich", "spelling_speech"] as const) {
+          delete target[field];
+          if (selected[field] !== undefined)
+            Object.assign(target, {
+              [field]: structuredClone(selected[field])
+            });
+        }
+      }
+    }
     const result = normalizeGroupDialectRules(
       editor,
       content.id,
       content.id,
       rules,
-      preference,
+      spellingSource ?? preference,
       newWordNodeId,
       regionIds
     );

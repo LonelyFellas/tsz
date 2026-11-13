@@ -31,7 +31,7 @@ import {
 } from "@tsz/ui/admin/display";
 import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { V3FormContentWindow } from "./V3FormContentWindow";
-import { Checkbox, Switch } from "@tsz/ui/admin/forms";
+import { Checkbox, Radio, Switch } from "@tsz/ui/admin/forms";
 import type {
   DialectRulesV3,
   RetiredContentSlotV3,
@@ -52,7 +52,10 @@ import {
   replaceSharedContent,
   sharedContentForForm
 } from "../sharedFormsModel";
-import type { V3StableVariantIdFactory } from "../operations";
+import {
+  spellingMarksEqual,
+  type V3StableVariantIdFactory
+} from "../operations";
 import { partOfSpeechLabel } from "../presentation";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
@@ -63,6 +66,9 @@ import {
 } from "../referenceGuard";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { expandFormContents } from "@tsz/shared";
+import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import { spellingEditorValue } from "../spellingSpeech";
+import "./V3FormContentModal.css";
 
 type FormContentIssue =
   { message: LexiconEditorKey } | { detail: string } | null;
@@ -140,6 +146,8 @@ export function V3FormContentModal({
   const [labels, setLabels] = useState(() => structuredClone(forms));
   const [error, setError] = useState<FormContentIssue>(null);
   const [choosing, setChoosing] = useState(false);
+  const [choosingSpelling, setChoosingSpelling] = useState(false);
+  const [primarySpelling, setPrimarySpelling] = useState<"uk" | "us">();
   const [assignmentError, setAssignmentError] =
     useState<FormContentIssue>(null);
   const [assignment, setAssignment] = useState<SharedFormsStepContentV3>();
@@ -336,7 +344,7 @@ export function V3FormContentModal({
     return () => registerLeaveGuard?.(undefined);
   }, [registerLeaveGuard]);
 
-  const changeRules = (rules: DialectRulesV3) => {
+  const changeRules = (rules: DialectRulesV3, spellingSource?: "uk" | "us") => {
     const stored = content.regional_variants;
     if (
       rules.spelling_mode === "unified" &&
@@ -346,7 +354,28 @@ export function V3FormContentModal({
       setError({ message: "save_reduced_spellings" });
       return;
     }
-    const result = normalizeDialect(editor, rules, preference);
+    const regions = current.regional_variants;
+    if (
+      !spellingSource &&
+      current.dialect_rules.spelling_mode === "distinguish" &&
+      rules.spelling_mode === "unified" &&
+      regions.mode !== "common"
+    ) {
+      const uk = regionalVariants(regions, "uk");
+      const us = regionalVariants(regions, "us");
+      if (
+        uk.length === 1 &&
+        us.length === 1 &&
+        (uk[0]!.spelling !== us[0]!.spelling ||
+          !spellingMarksEqual(uk[0]!, us[0]!))
+      ) {
+        setPrimarySpelling(undefined);
+        setChoosingSpelling(true);
+        setError(null);
+        return;
+      }
+    }
+    const result = normalizeDialect(editor, rules, preference, spellingSource);
     if (!result.ok) {
       setError(
         editor.pos[0]!.forms[0]!.regional_variants.mode === "uk_us_many"
@@ -811,6 +840,71 @@ export function V3FormContentModal({
           </>
         )}
       </div>
+      <Modal
+        open={choosingSpelling}
+        title={t("choose_primary_spelling")}
+        width={640}
+        okText={
+          primarySpelling
+            ? t(
+                primarySpelling === "uk"
+                  ? "use_british_spelling"
+                  : "use_american_spelling"
+              )
+            : t("confirm_selection")
+        }
+        cancelText={t("cancel")}
+        okButtonProps={{ disabled: !primarySpelling }}
+        destroyOnHidden
+        onCancel={() => setChoosingSpelling(false)}
+        onOk={() => {
+          if (!primarySpelling) return;
+          changeRules(
+            { spelling_mode: "unified", phonetic_mode: "distinguish" },
+            primarySpelling
+          );
+          setChoosingSpelling(false);
+        }}
+      >
+        <div className="v3-primary-spelling-choice">
+          <Typography.Text type="secondary">
+            {t("primary_spelling_help")}
+          </Typography.Text>
+          <Radio.Group
+            aria-label={t("choose_primary_spelling")}
+            className="v3-primary-spelling-options"
+            value={primarySpelling ?? ""}
+            onChange={(event) =>
+              setPrimarySpelling(event.target.value as "uk" | "us")
+            }
+          >
+            {(["uk", "us"] as const).map((side) => {
+              const variant = primaryRegionalVariant(
+                current.regional_variants,
+                side
+              );
+              const name = t(
+                side === "uk" ? "british_short" : "american_short"
+              );
+              return (
+                <Radio
+                  key={side}
+                  value={side}
+                  className="v3-primary-spelling-option"
+                  aria-label={`${name}：${variant.spelling || t("blank")}`}
+                >
+                  <span className="v3-primary-spelling-region">{name}</span>
+                  <RichTextReadOnly
+                    className="tsz-words v3-primary-spelling-value"
+                    value={spellingEditorValue(variant)}
+                    emptyText={t("blank")}
+                  />
+                </Radio>
+              );
+            })}
+          </Radio.Group>
+        </div>
+      </Modal>
       <Modal
         open={leavePrompt}
         title={t("unapplied_content")}

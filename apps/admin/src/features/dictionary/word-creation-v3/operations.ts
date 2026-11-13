@@ -489,7 +489,10 @@ function variantMappingFrom(
 }
 
 /** 英美规则按组生效：只转换本组成员词形，同词性其他组的词形与规则原样保留。 */
-function spellingMarksEqual(uk: VariantMapping, us: VariantMapping): boolean {
+export function spellingMarksEqual(
+  uk: Pick<VariantMapping, "spelling" | "spelling_rich" | "spelling_speech">,
+  us: Pick<VariantMapping, "spelling" | "spelling_rich" | "spelling_speech">
+): boolean {
   return (
     spellingSpeechEqual(uk.spelling_speech, us.spelling_speech) &&
     spellingAnnotationsEqual(
