@@ -226,3 +226,9 @@ pnpm exec vitest run \
 混合协议回归同时证明：GB成功、legacy US解析失败可继续；显式GB解析失败仍阻止保存。修复后7文件135项通过，最后任务身份增量后的音频核心/字段/汇总3文件115项通过；其余有效结果复用。证据 `task195-mixed-before.log`、`task195-mixed-after.log`、`task195-scope-final.log` 在协调聊天 `task195-ship/`，均未创建新云资源。待同一reviewer对本次策略收敛增量复查。
 
 审查：4轮；确认缺陷2（同根因残留合并计数）；证据排除误报0；关联回归/回退：本地已修复legacy兼容回归，未观察线上回退。
+
+## PR 与 CI 跟进
+
+最终生产实现及测试类型修正已由同一reviewer增量审查覆盖至 `e1ce69881a951c65df843aa92ccb87030629791a`，共6轮、确认缺陷2且均闭合、证据排除误报0。首次原生pre-push捕获测试夹具联合类型与Testing Library查询参数类型错误，修正仅测试声明后82项通过；正常重推时全仓7个类型任务通过，没有绕过hooks。PR：https://github.com/LonelyFellas/tsz/pull/759。
+
+首轮CI `43350778877` 对应head e1ce6988。quality、tooling、Web/共享包及admin-1已通过；admin-3有2项WordWizardV3用例失败：仍从已收拢的拼写文本编辑器查找音色池“选用 Sonia”。修复只将该过时UI断言更新为文本入口不提供配音池；原完整schema/base_revision/intent、修改文本、完整配音profile随请求保留、失败输入保留、重试相同payload和impact次数断言全部保留。两项沿原路径本地通过，不更改生产行为或测试超时。日志 `task195-ci-admin3.log` / `task195-wizard-ci-fix.log` 在协调聊天task195-ship证据目录。新精确提交独立增量复核及PR/main CI继续正常执行。
