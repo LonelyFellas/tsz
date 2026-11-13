@@ -24,6 +24,7 @@
 
 .word-pos-tab-handle {
   position: relative;
+  z-index: 1;
   display: inline-block;
 }
 
@@ -97,6 +98,7 @@
 }
 
 .word-pos-tab-handle.is-dragging {
+  z-index: 0;
   background: var(--ui-color-fill-secondary);
   border-radius: var(--ui-border-radius);
 }
