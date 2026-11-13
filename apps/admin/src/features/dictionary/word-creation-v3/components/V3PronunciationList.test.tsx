@@ -437,7 +437,7 @@ describe("独立发音输入", () => {
       }
     }
   });
-  it("短语连续显示，词界保存；手改后禁止复用，撤销恢复", () => {
+  it("短语连续显示，词内修改保留词界；跨词修改后禁止复用，撤销恢复", () => {
     renderWithUps(<Harness phrase />);
     change("Azure IPA", "hə.ˈloʊ kæt");
     convert("UPS");
@@ -454,9 +454,19 @@ describe("独立发音输入", () => {
       JSON.parse(preview.getAttribute("data-content")!).annotations
     ).toHaveLength(2);
     change("Azure UPS", "H AX . S1 L O K AE T T");
+    expect(preview).toBeEnabled();
+    expect(rows()[0].synthesis.us.ups_words).toEqual([
+      { text: "hello", phoneme: "H AX . S1 L O" },
+      { text: "cat", phoneme: "K AE T T" }
+    ]);
+    change("Azure UPS", "H AX . S1 L O");
     expect(preview).toBeDisabled();
+    expect(rows()[0].synthesis.us.ups_words).toBeNull();
     fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
     expect(preview).toBeEnabled();
+    expect(field("Azure UPS")).toHaveValue("H AX . S1 L O K AE T T");
+    fireEvent.keyDown(field("Azure UPS"), { key: "z", ctrlKey: true });
+    expect(field("Azure UPS")).toHaveValue("H AX . S1 L O K AE T");
     expect(rows()[0].synthesis.us.ups_words).toHaveLength(2);
   });
   it("撤销 UPS 内容不会撤销后来选择的回退来源", () => {
