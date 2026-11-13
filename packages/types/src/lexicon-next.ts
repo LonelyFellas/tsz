@@ -70,6 +70,8 @@ export interface NextEntryMatches {
   pagination: NextEntryList["pagination"];
 }
 export interface NextListQuery {
+  target_language?: string;
+  medium_locale?: string;
   headword?: string;
   kind?: "word" | "phrase";
   page?: number;

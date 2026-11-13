@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task190-backend/tsz-rust/docs/openapi.json",
-  "_source_sha256": "eaef2e6e444350707e3a92865c9650cafdbdad91eed25144da92c7c452adfa12",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-filters/tsz-rust/docs/openapi.json",
+  "_source_sha256": "4c8b13060ef449bd817d5d16fb67949393652f56cdf003a3cc68d7b29bf6b052",
   "roots": [
     "NextWorkspaceEntry",
     "NextWorkspaceList",

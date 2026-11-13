@@ -387,9 +387,7 @@ describe("配音中心", () => {
     expect(within(panel).getByLabelText("英式 1 推荐名称")).toHaveValue(
       "Sonia"
     );
-    expect(
-      within(panel).getByRole("button", { name: /保存当前组/ })
-    ).toBeEnabled();
+    expect(within(panel).getByRole("button", { name: "完成" })).toBeEnabled();
     expect(save).not.toHaveBeenCalled();
   }, 15000);
   it("音色库切换到分组菜单前确认未保存的听感，取消保留输入", async () => {

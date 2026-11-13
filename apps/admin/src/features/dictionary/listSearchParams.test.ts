@@ -9,6 +9,32 @@ import {
 } from "./listSearchParams";
 
 describe("word list search params", () => {
+  it("语言条件随分页和搜索往返，V1 查询映射不携带新版参数", () => {
+    const values = {
+      targetLanguage: "en",
+      mediumLocale: "zh-Hant",
+      headword: "centre"
+    };
+    const params = serializeWordListSearchParams(values, 3, 50);
+    expect(parseWordListSearchParams(params)).toEqual({
+      filters: values,
+      page: 3,
+      pageSize: 50
+    });
+    expect(params.get("target_language")).toBe("en");
+    expect(params.get("medium_locale")).toBe("zh-Hant");
+    expect(toListQuery(values, 3, 50)).toEqual({
+      headword: "centre",
+      page: 3,
+      page_size: 50
+    });
+    expect(
+      parseWordFilterSearchParams(
+        new URLSearchParams("target_language=&medium_locale=")
+      )
+    ).toEqual({});
+  });
+
   it("独立词条和创建人条件可在 URL 中往返", () => {
     const id = "01991111-2222-7333-8444-555566667777";
     const params = serializeWordFilterSearchParams({

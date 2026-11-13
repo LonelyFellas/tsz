@@ -15,9 +15,9 @@ const fixedVoiceMessages = {
     "Correct the preview parameters first. Your input has been kept."
   ],
   applied_to_the_group_draft_return_to_the_workspace_and_save_the_g: [
-    "已应用到分组草稿，请回到工作台保存当前组后生效。",
-    "已套用至分組草稿，請回到工作台儲存目前分組後生效。",
-    "Applied to the group draft. Return to the workspace and save the group to apply it."
+    "已应用到分组草稿，请回到工作台点击本组“完成”后生效。",
+    "已套用至分組草稿，請回到工作台點擊此組「完成」後生效。",
+    "Applied to the group draft. Return to the workspace and click Done for this group to apply it."
   ],
   done: ["完成", "完成", "Done"],
   could_not_load_groups: [
@@ -206,8 +206,6 @@ const fixedVoiceMessages = {
   add_recommendation: ["新增推荐", "新增推薦", "Add recommendation"],
   unsaved: ["未保存", "未儲存", "Unsaved"],
   saved: ["已保存", "已儲存", "Saved"],
-  discard_changes: ["取消修改", "取消修改", "Discard changes"],
-  save_current_group: ["保存当前组", "儲存目前分組", "Save current group"],
   create_group: ["新建分组", "新增分組", "Create group"],
   group_name: ["分组名称", "分組名稱", "Group name"],
   enter_a_group_name_c4069d: [
@@ -778,15 +776,15 @@ export const voiceMessages = {
     "選用{{side}} {{name}}",
     "Use {{side}} {{name}}"
   ],
-  move_recommendation_up: [
-    "上移{{side}} {{name}}",
-    "上移{{side}} {{name}}",
-    "Move {{side}} {{name}} up"
+  drag_recommendation: [
+    "拖动排序{{side}} {{name}}",
+    "拖曳排序{{side}} {{name}}",
+    "Reorder {{side}} {{name}}"
   ],
-  move_recommendation_down: [
-    "下移{{side}} {{name}}",
-    "下移{{side}} {{name}}",
-    "Move {{side}} {{name}} down"
+  drag_recommendation_help: [
+    "拖动排序，或使用上下方向键",
+    "拖曳排序，或使用上下方向鍵",
+    "Drag to reorder, or use the Up and Down arrow keys"
   ],
   copy_side_recommendation: [
     "复制{{side}} {{name}}",
@@ -1061,14 +1059,14 @@ export const voiceMessages = {
     "{{location}}: this role is unsupported. Restore the default role."
   ],
   editor_status_side: [
-    "调整先存入本组草稿，保存当前组后生效。",
-    "調整先存入此組草稿，儲存目前分組後生效。",
-    "Changes stay in this group’s draft and apply when you save the group."
+    "调整先存入本组草稿，点击本组“完成”后生效。",
+    "調整先存入此組草稿，點擊此組「完成」後生效。",
+    "Changes stay in this group’s draft and apply when you click Done for this group."
   ],
   editor_status_missing: [
-    "还需选择{{side}}声音，保存当前组后生效。",
-    "仍須選擇{{side}}聲音，儲存目前分組後生效。",
-    "Select a {{side}} voice, then save the group to apply it."
+    "还需选择{{side}}声音，点击本组“完成”后生效。",
+    "仍須選擇{{side}}聲音，點擊此組「完成」後生效。",
+    "Select a {{side}} voice, then click Done for this group to apply it."
   ],
   preview_parameters: [
     "本次试听：音量 {{volume}}%，{{rate}}×，{{style}}",
