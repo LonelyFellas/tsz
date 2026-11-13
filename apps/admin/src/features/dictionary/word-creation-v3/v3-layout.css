@@ -701,6 +701,11 @@
   list-style: none;
 }
 
+.v3-product-progress-details {
+  margin-block: 0;
+  padding-block: var(--ui-space-1) var(--ui-space-2);
+}
+
 .v3-product-progress-items {
   margin-block: 0;
   padding-inline: 0;
