@@ -159,3 +159,32 @@
 .lexicon-next-forms .lexicon-next-toolbar {
   margin-bottom: var(--ui-space-4);
 }
+
+.lexicon-next-content-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-3);
+}
+.lexicon-next-content-row > .word-grammar-index {
+  margin-top: var(--ui-space-1);
+}
+.lexicon-next-content-row .ui-select {
+  min-width: 128px;
+}
+.lexicon-next-meanings .word-sense-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container (width <= 640px) {
+  .lexicon-next-content-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .lexicon-next-content-row > .ui-space {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+}
