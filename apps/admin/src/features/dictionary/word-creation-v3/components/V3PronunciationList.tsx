@@ -3,6 +3,7 @@ import { regionalVariants } from "@tsz/shared";
 import { env } from "@/lib/env";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
 import { V3ActualPronunciationCopy } from "./V3ActualPronunciationCopy";
+import { V3PronunciationConvertAll } from "./V3PronunciationConvertAll";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import {
   GripVerticalIcon,
@@ -361,6 +362,25 @@ export function V3PronunciationList({
                               id={`${inputPrefix}-${pronunciation.id}-dict`}
                               mode="dict-phonetic"
                               editingEnabled={false}
+                              trailingAction={
+                                env.AZURE_PRONUNCIATION_INPUTS && (
+                                  <V3PronunciationConvertAll
+                                    pronunciation={pronunciation}
+                                    spelling={variant.spelling}
+                                    dialect={variant.dialect}
+                                    onMissingSpelling={onMissingSpelling}
+                                    onChange={(patch) =>
+                                      onChange(
+                                        updatePronunciation(
+                                          content,
+                                          pronunciation.id,
+                                          patch
+                                        )
+                                      )
+                                    }
+                                  />
+                                )
+                              }
                               dialect={variant.dialect}
                               ariaLabel={t("dictionary_phonetic_label", {
                                 index: index + 1
