@@ -162,7 +162,11 @@
 }
 .v3-overview-settings .word-pronunciation-voice-label {
   min-width: 0;
+  color: var(--ui-color-text-disabled);
   white-space: nowrap;
+}
+.v3-overview-settings .word-pronunciation-voice-label[data-has-voice="true"] {
+  color: var(--ui-color-text);
 }
 .v3-overview-settings .word-pronunciation-voice-summary {
   justify-content: flex-start;

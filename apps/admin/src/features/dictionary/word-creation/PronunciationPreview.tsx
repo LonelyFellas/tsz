@@ -396,6 +396,7 @@ export function PronunciationPreviewVoiceSummary({
   const summary = (
     <span
       className="word-pronunciation-voice-label"
+      data-has-voice={Boolean(voice)}
       title={
         voice
           ? t("panel_label_7", {

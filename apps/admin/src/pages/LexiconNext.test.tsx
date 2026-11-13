@@ -1413,6 +1413,47 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   expect(api.get).toHaveBeenCalledTimes(2);
 });
 
+it("词形底栏随步骤切换移除，切回词形仍保留编辑面板", async () => {
+  const bounds = HTMLElement.prototype.getBoundingClientRect;
+  const spy = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("word-creation-shell")
+        ? ({ left: 24, right: 824, bottom: 650, width: 800 } as DOMRect)
+        : bounds.call(this);
+    });
+  try {
+    const api = requests();
+    api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+    api.get.mockResolvedValue({
+      ...entry,
+      draft: {
+        ...entry.draft,
+        form_editor: applyFormsStructure(emptyFormEditor(), formsFixture())
+      }
+    });
+    mount(api);
+    const editor = await screen.findByRole("button", { name: "编辑原形内容" });
+    expect(
+      button("下一步：词义与译词").closest(".v3-step-actions")
+    ).not.toBeNull();
+    for (const step of [/^词义与译词/, /^预览/]) {
+      fireEvent.click(button(step));
+      expect(
+        screen.queryByRole("button", { name: "下一步：词义与译词" })
+      ).toBeNull();
+      expect(document.querySelector(".v3-step-actions")).toBeNull();
+    }
+    fireEvent.click(button(/^词性与发音/));
+    expect(await screen.findByRole("button", { name: "编辑原形内容" })).toBe(
+      editor
+    );
+    expect(button("下一步：词义与译词")).toBeVisible();
+  } finally {
+    spy.mockRestore();
+  }
+});
+
 it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳服务器版本", async () => {
   const api = requests();
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
