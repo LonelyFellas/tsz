@@ -123,15 +123,14 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
 
   return (
     <div className="settings-models">
-      <div role="region" aria-label={t("current_model")}>
+      <div
+        className="settings-model-summary"
+        role="region"
+        aria-label={t("current_model")}
+      >
         <div className="settings-model-note">{t("current")}</div>
-        <Flex align="center" gap={12} wrap style={{ marginTop: 8 }}>
-          <Typography.Title
-            level={4}
-            style={{ margin: 0, overflowWrap: "anywhere" }}
-          >
-            {currentName}
-          </Typography.Title>
+        <Flex className="settings-model-current" align="center" gap={12} wrap>
+          <Typography.Title level={4}>{currentName}</Typography.Title>
           {current.data && <Tag>{sourceName(current.data)}</Tag>}
         </Flex>
       </div>

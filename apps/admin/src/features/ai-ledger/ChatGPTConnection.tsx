@@ -255,7 +255,7 @@ export function ChatGPTConnection({ adminId }: { adminId: string }) {
           {!!accounts.data?.accounts.length && !accounts.isError && (
             <Select
               aria-label={t("chatgpt_account")}
-              style={{ width: 520, maxWidth: "100%" }}
+              className="settings-chatgpt-device"
               value={accounts.data.active ?? undefined}
               disabled={busy || pending}
               loading={useAccount.isPending}

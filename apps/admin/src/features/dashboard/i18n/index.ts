@@ -34,16 +34,10 @@ export const dashboardMessages = {
   task_unit_other: ["个", "個", "tasks"],
   created_week: ["本周创建", "本週建立", "Created this week"],
   production: ["词库建设", "詞庫建置", "Lexicon growth"],
-  weekly_entries: ["每周新增词条", "每週新增詞條", "New entries by week"],
   manage_lexicon: ["管理词库", "管理詞庫", "Manage lexicon"],
   new_month: ["本月新增", "本月新增", "Added this month"],
   new_today: ["今日新增", "今日新增", "Added today"],
   learning_today: ["今日学习", "今日學習", "Learning today"],
-  today_scope: [
-    "按今日学习任务统计",
-    "依今日學習任務統計",
-    "Based on today's learning tasks"
-  ],
   task_count_one: [
     "{{count, number}} 个任务",
     "{{count, number}} 個任務",
@@ -101,11 +95,6 @@ export const dashboardMessages = {
     "Periods use Beijing time: calendar day, Monday to date and calendar month. Entry totals include all publication states."
   ],
   queue: ["待处理", "待處理", "Pending reviews"],
-  queue_scope: [
-    "词表与教师申请审核",
-    "詞表與教師申請審核",
-    "Word lists and teacher applications"
-  ],
   queue_empty: ["暂无待审事项", "尚無待審事項", "No pending reviews"],
   review_wordlists: ["词表审核", "詞表審核", "Word list reviews"],
   queue_failed: [
@@ -170,11 +159,6 @@ export const dashboardMessages = {
     "查看 {{date}} 当周",
     "檢視 {{date}} 當週",
     "View week starting {{date}}"
-  ],
-  week_help: [
-    "近六周 · 选择周次查看对应内容",
-    "近六週 · 選擇週次檢視對應內容",
-    "Last six weeks · select a week to view its entries"
   ],
   week_entries: [
     "查看该周词条 →",

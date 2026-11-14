@@ -124,7 +124,7 @@
   .ui-btn-lg {
     min-height: var(--ui-control-height-lg);
     padding: 6px var(--ui-space-4);
-    font-size: 16px;
+    font-size: var(--ui-font-size);
   }
   .ui-btn-block {
     width: 100%;
@@ -279,8 +279,8 @@
     padding: 10px 14px;
   }
   .ui-alert-info {
-    background: #eff5ff;
-    border-color: #c5d8fc;
+    background: var(--ui-color-info-bg);
+    border-color: var(--ui-color-info-border);
   }
   .ui-alert-error {
     background: var(--ui-color-error-bg);

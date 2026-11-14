@@ -35,6 +35,12 @@
     --ui-color-warning: #925d09;
     --ui-color-warning-bg: #fffaeb;
     --ui-color-warning-border: #f2da9d;
+    --ui-color-info: var(--ui-color-primary);
+    --ui-color-info-bg: #eff5ff;
+    --ui-color-info-border: #c5d8fc;
+    /* 登录等品牌整屏底色，不用于工具页面。 */
+    --ui-color-brand-deep: #193d91;
+    --ui-color-brand-deep-text: #d2def5;
     --ui-focus-ring: 2px solid var(--ui-color-primary);
     --ui-focus-offset: 2px;
     --ui-control-focus-offset: -2px;
@@ -45,7 +51,16 @@
     --ui-border-radius: 7px;
     --ui-border-radius-sm: 4px;
     --ui-border-radius-lg: 12px;
+    --ui-border-radius-xl: 16px;
+    --ui-border-radius-full: 999px;
     --ui-font-size: 14px;
+    --ui-font-size-display: 28px;
+    --ui-font-weight-regular: 400;
+    --ui-font-weight-medium: 500;
+    --ui-font-weight-semibold: 600;
+    --ui-font-weight-bold: 650;
+    --ui-line-height: 1.57;
+    --ui-line-height-tight: 1.25;
     --ui-font-size-sm: 12px;
     --ui-font-size-compact: 13px;
     --ui-font-size-title: 24px;
@@ -59,13 +74,21 @@
     --ui-space-4: 16px;
     --ui-space-5: 20px;
     --ui-space-6: 24px;
+    --ui-space-8: 32px;
+    --ui-space-10: 40px;
+    --ui-shadow-xs: 0 1px 2px rgb(16 24 40 / 5%);
+    --ui-shadow-sm: 0 1px 3px rgb(16 24 40 / 8%), 0 1px 2px rgb(16 24 40 / 4%);
     --ui-shadow-overlay: 0 12px 32px rgb(16 24 40 / 14%);
     --ui-motion-duration: 150ms;
     --ui-motion-easing: ease-out;
+    /* 概览页入场与数据变化；工具页不使用。 */
+    --ui-motion-duration-enter: 420ms;
+    --ui-motion-easing-enter: cubic-bezier(0.22, 1, 0.36, 1);
   }
   @media (prefers-reduced-motion: reduce) {
     :root {
       --ui-motion-duration: 0ms;
+      --ui-motion-duration-enter: 0ms;
     }
   }
 }

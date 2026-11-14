@@ -5,7 +5,7 @@ import { adminAuthError } from "@/i18n/auth";
 import type { AdminShellKey } from "@/i18n/resources";
 import { InterfaceLanguage } from "@/features/settings/InterfaceLanguage";
 import { ArrowRightIcon } from "lucide-react";
-import { Alert, Button } from "@tsz/ui/admin/display";
+import { Alert, Button, Space } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -259,7 +259,7 @@ export function AdminLoginForm({
                 label={t("login_code")}
                 htmlFor="admin-login-code"
               >
-                <div className="admin-login__code-control">
+                <Space.Compact block size="large">
                   <Input
                     id="admin-login-code"
                     size="large"
@@ -271,7 +271,6 @@ export function AdminLoginForm({
                   />
                   <Button
                     className="admin-login__send-code"
-                    type="text"
                     htmlType="button"
                     onClick={() => void handleSendCode()}
                     disabled={!canSendCode}
@@ -282,7 +281,7 @@ export function AdminLoginForm({
                         ? t("login_sending")
                         : t("login_send_code")}
                   </Button>
-                </div>
+                </Space.Compact>
               </Form.Item>
 
               {(error || permissionModelIncompatible) && (
