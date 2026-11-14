@@ -1141,7 +1141,6 @@ export const lexiconEditorMessages = {
   irregular: ["词形不规则变化", "詞形是不規則變化", "Irregular form"],
   not_unified: ["未统一", "尚未統一", "Not unified"],
   form_labels: ["词形标签", "詞形標籤", "Form labels"],
-  multiple_selection: ["可多选", "可多選", "Multiple selection allowed"],
   add_label: ["新增标签", "新增標籤", "Add label"],
   content_marked_deleted: [
     "这份内容已标记删除，确认后应用到页面草稿。",

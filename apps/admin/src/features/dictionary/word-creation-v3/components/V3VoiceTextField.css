@@ -64,6 +64,29 @@
   margin-inline-end: 0;
 }
 
+.v3-voice-text-field-loading {
+  position: absolute;
+  inset: 1px;
+  justify-content: flex-start;
+  padding-inline: 11px;
+  color: var(--ui-color-text-secondary);
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size-compact);
+  pointer-events: none;
+}
+
+.v3-voice-text-field-loading > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-voice-text-field-loading .ui-spinner {
+    animation: none;
+  }
+}
+
 .v3-voice-text-liaison-overlay {
   position: absolute;
   inset: 0;

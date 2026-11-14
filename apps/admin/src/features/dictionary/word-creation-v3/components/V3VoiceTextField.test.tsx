@@ -464,12 +464,56 @@ it("默认推荐加载期间不能提交正文，失败后保留手动录入入�
   );
   const input = screen.getByLabelText("等待推荐");
   expect(input).toHaveAttribute("readonly");
-  expect(screen.getByRole("status")).toHaveTextContent("正在加载默认配音");
+  const loading = screen.getByRole("status");
+  expect(loading).toHaveTextContent("正在加载默认配音");
+  expect(input).toHaveAttribute("aria-busy", "true");
+  expect(input).toHaveAccessibleDescription(loading.textContent!);
+  expect(input.parentElement).toContainElement(loading);
   fireEvent.change(input, { target: { value: "hello" } });
   expect(onChange).not.toHaveBeenCalled();
   reject(new Error("offline"));
   await screen.findByText("默认配音加载失败，可继续输入并打开编辑器选择音色。");
   expect(input).not.toHaveAttribute("readonly");
+  expect(input).not.toHaveAttribute("aria-busy");
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "hello" } });
+  expect(onChange).toHaveBeenCalledWith(
+    { version: 2, text: "hello", annotations: [] },
+    undefined
+  );
+});
+
+it("默认配音就绪后保留输入框并恢复占位提示和录入", async () => {
+  let finish!: () => void;
+  state.recommendations.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = () => resolve([]);
+      })
+  );
+  const onChange = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      ariaLabel="等待推荐"
+      placeholder="词形拼写"
+      field="spelling"
+      nodeId="pending"
+      value={{ version: 2, text: "", annotations: [] }}
+      onChange={onChange}
+      onVoiceProfileChange={vi.fn()}
+    />
+  );
+  const input = screen.getByLabelText("等待推荐");
+  expect(input).not.toHaveAttribute("placeholder");
+  fireEvent.focus(input);
+  await act(async () => finish());
+  expect(screen.getByLabelText("等待推荐")).toBe(input);
+  expect(input).toHaveAttribute("placeholder", "词形拼写");
+  expect(input).not.toHaveAttribute("aria-busy");
+  expect(input).not.toHaveAttribute("aria-describedby");
+  expect(input).not.toHaveAttribute("readonly");
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
   fireEvent.change(input, { target: { value: "hello" } });
   expect(onChange).toHaveBeenCalledWith(
     { version: 2, text: "hello", annotations: [] },
