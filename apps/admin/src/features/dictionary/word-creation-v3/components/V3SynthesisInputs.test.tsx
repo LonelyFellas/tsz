@@ -689,6 +689,32 @@ describe("双口音真实试听控件", () => {
       { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "fɑː" }
     ]);
   });
+  it.each(["IPA", "UPS"] as const)(
+    "清空已生成的 %s 移除失效配音绑定，撤销恢复参数但不复活旧音频",
+    (alphabet) => {
+      renderWithUps(<Harness dialect="common" generated />);
+      const wire = () =>
+        JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+      const initial = wire();
+      const field = screen.getByLabelText(
+        `第 1 条发音的英式 Azure ${alphabet}`
+      );
+      fireEvent.change(field, { target: { value: " " } });
+      expect(wire().synthesis.uk[alphabet.toLowerCase()]).toBe(" ");
+      expect(
+        wire().synthesis.uk[`${alphabet.toLowerCase()}_speech`]
+      ).toBeUndefined();
+      expect(wire().synthesis.us).toEqual(initial.synthesis.us);
+      fireEvent.keyDown(field, { key: "z", ctrlKey: true });
+      expect(wire().synthesis.uk[alphabet.toLowerCase()]).toBe(
+        initial.synthesis.uk[alphabet.toLowerCase()]
+      );
+      expect(
+        wire().synthesis.uk[`${alphabet.toLowerCase()}_speech`].voice_profile
+          .voices[0]
+      ).toEqual({ voice_id: "en-gb-sonia", enabled: true, rate_percent: 0 });
+    }
+  );
   it("改音素只清除对应音频引用，保留参数、另一读法和另一口音", () => {
     renderWithUps(<Harness dialect="common" generated />);
     fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {

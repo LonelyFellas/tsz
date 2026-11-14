@@ -46,6 +46,7 @@ import { v3IssueMessage } from "../presentationErrors";
 import "./V3SynthesisInputs.css";
 import { RequiredFieldFeedback } from "../../RequiredFieldFeedback";
 import { useContentEditPermissions } from "../../contentEditPermissions";
+import { clearVoiceAudio } from "@tsz/voice-editor/core";
 type Alphabet = "ipa" | "ups";
 type Side = "uk" | "us";
 const SIDES = ["uk", "us"] as const;
@@ -197,12 +198,23 @@ export function V3SynthesisInputs({
   };
   const undo = (side: Side, alphabet: Alphabet) => {
     const previous = history.current[`${side}.${alphabet}`].pop();
-    if (previous)
+    if (previous) {
+      const current = candidateForSide(synthesis, side, dialect);
+      const previousSpeech = previous[`${alphabet}_speech`];
       writeCandidate(side, {
-        ...candidateForSide(synthesis, side, dialect),
+        ...current,
         [alphabet]: previous[alphabet],
+        ...(!current[`${alphabet}_speech`] && previousSpeech
+          ? {
+              [`${alphabet}_speech`]: {
+                ...previousSpeech,
+                voice_profile: clearVoiceAudio(previousSpeech.voice_profile)
+              }
+            }
+          : {}),
         ...(alphabet === "ups" ? { ups_words: previous.ups_words } : {})
       });
+    }
   };
   const convert = (side: Side, alphabet: Alphabet) => {
     const source =

@@ -1,4 +1,14 @@
 export const lexiconEditorPanelMessages = {
+  panel_save_invalid_speech: [
+    "尚未保存，修改已保留。配音内容或参数无效，请检查 IPA/UPS、停顿和音色设置后重试。",
+    "尚未儲存，修改已保留。配音內容或參數無效，請檢查 IPA/UPS、停頓與音色設定後重試。",
+    "Not saved; your changes are retained. Speech content or parameters are invalid. Check IPA/UPS, pauses and voice settings, then try again."
+  ],
+  panel_save_invalid_request: [
+    "尚未保存，修改已保留。请求内容未被接受，请检查填写内容后重试。",
+    "尚未儲存，修改已保留。請求內容未被接受，請檢查填寫內容後重試。",
+    "Not saved; your changes are retained. The request was rejected. Check the entered content and try again."
+  ],
   panel_convert_all: ["全部转换", "全部轉換", "Convert all"],
   panel_undo_convert_all: [
     "撤销全部转换",

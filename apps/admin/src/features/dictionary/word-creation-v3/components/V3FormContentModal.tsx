@@ -732,6 +732,8 @@ export function V3FormContentModal({
             </Button>
             <Button
               type="primary"
+              icon={<span aria-hidden style={{ width: "1em" }} />}
+              loading={saving}
               disabled={saving || Boolean(regionalChoice && !primaryRegion)}
               onClick={() =>
                 regionalChoice ? applyRegionalChoice() : void confirmed()

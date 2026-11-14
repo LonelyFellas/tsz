@@ -27,7 +27,7 @@ import { V3ReferenceList } from "./components/V3ReferenceList";
 import { useV3ReferenceGuard } from "./referenceGuardContext";
 import type { V3Problem } from "./problem";
 import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
-import { v3IssueMessages } from "./presentationErrors";
+import { v3IssueMessages, v3SaveProblemMessage } from "./presentationErrors";
 import "./v3-layout.css";
 
 const STEP_TITLE: Record<WordCreationStep, WorkspaceMessage> = {
@@ -95,6 +95,11 @@ function problemTitle(problem: V3Problem): WorkspaceMessage {
         problem.operation === "save_meanings"
         ? "save_failed"
         : "incomplete";
+    case "request":
+      return problem.operation === "save_forms" ||
+        problem.operation === "save_meanings"
+        ? "save_failed"
+        : "operation_incomplete";
     // 影响确认失效（后端 409 downstream_confirmation_required）：兜底文案，
     // 正常路径由词形步/词义步的确认条挡在前面。
     case "impact_confirmation":
@@ -398,6 +403,10 @@ function V3WordCreationLayoutContent({
                         <span key={message}>{message}</span>
                       ))}
                   </Flex>
+                ) : problem.kind === "request" &&
+                  (problem.operation === "save_forms" ||
+                    problem.operation === "save_meanings") ? (
+                  v3SaveProblemMessage(problem, editorT)
                 ) : undefined
               }
               action={

@@ -91,7 +91,7 @@ export type V3Problem =
     })
   | (HttpProblemBase & { kind: "service_unavailable" })
   | (HttpProblemBase & { kind: "server" })
-  | (HttpProblemBase & { kind: "request" })
+  | (HttpProblemBase & { kind: "request"; operation?: V3ProblemOperation })
   | { kind: "network"; error: unknown; retryable: true }
   | { kind: "cancelled"; error: unknown; retryable: false }
   | {
@@ -262,7 +262,12 @@ export function classifyV3Problem(
   if (error.status >= 500) {
     return { ...base, kind: "server", retryable: true };
   }
-  return { ...base, kind: "request", retryable: false };
+  return {
+    ...base,
+    kind: "request",
+    ...(operation ? { operation } : {}),
+    retryable: false
+  };
 }
 
 export function invalidatesV3Confirmations(problem: V3Problem): boolean {
