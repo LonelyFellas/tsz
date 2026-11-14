@@ -48,6 +48,14 @@ describe("V3 product error presentation", () => {
   it("保存失败区分校验、版本冲突和网络问题，保留修改且不泄露后端原文", () => {
     expect(
       v3SaveProblemMessage({
+        kind: "request",
+        status: 400,
+        code: "invalid_speech_preview",
+        retryable: false
+      })
+    ).toContain("配音内容或参数无效");
+    expect(
+      v3SaveProblemMessage({
         kind: "validation",
         status: 422,
         retryable: false,

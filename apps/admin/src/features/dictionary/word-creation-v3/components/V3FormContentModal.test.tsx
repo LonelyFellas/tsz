@@ -38,7 +38,7 @@ import {
 
 const backgroundAudio = vi.hoisted(() => ({
   enabled: false,
-  finish: (() => {}) as () => void
+  finish: (() => {}) as (ready?: boolean) => void
 }));
 beforeEach(() => {
   backgroundAudio.enabled = false;
@@ -61,7 +61,11 @@ vi.mock("./V3ConcreteFormRow", () => ({
     useEffect(() => {
       if (!backgroundAudio.enabled || !audioTasks) return;
       const pending = new Promise<boolean>((resolve) => {
-        backgroundAudio.finish = () => {
+        backgroundAudio.finish = (ready = true) => {
+          if (!ready) {
+            resolve(false);
+            return;
+          }
           const next = structuredClone(latest.current.content);
           const regions = next.pos[0]!.forms[0]!.regional_variants;
           if (regions.mode !== "common")
@@ -1200,6 +1204,7 @@ it.each([true, false])(
     backgroundAudio.enabled = true;
     const persist = vi.fn(async (_forms: SharedFormsStepContentV3) => true);
     const { onConfirm } = setup({ persist: persisted ? persist : undefined });
+    const apply = screen.getByRole("button", { name: "确认，应用到草稿" });
     fireEvent.click(
       screen.getByRole("button", {
         name: persisted ? "保存当前正文" : "确认，应用到草稿"
@@ -1207,6 +1212,9 @@ it.each([true, false])(
     );
     expect(persist).not.toHaveBeenCalled();
     expect(onConfirm).not.toHaveBeenCalled();
+    expect(apply).toHaveAttribute("aria-busy", "true");
+    expect(apply).toBeDisabled();
+    fireEvent.click(apply);
     await act(async () => backgroundAudio.finish());
     await waitFor(() =>
       expect(persisted ? persist : onConfirm).toHaveBeenCalledOnce()
@@ -1215,5 +1223,25 @@ it.each([true, false])(
       ? persist.mock.calls[0]![0]
       : onConfirm.mock.calls[0]![0];
     expect(JSON.stringify(result)).toContain("formal-in-drawer");
+    if (persisted) {
+      expect(apply).not.toHaveAttribute("aria-busy", "true");
+      expect(apply).toBeEnabled();
+    }
   }
 );
+
+it("音频生成失败后停止应用按钮的 loading，保留输入和弹窗", async () => {
+  backgroundAudio.enabled = true;
+  const { onConfirm } = setup();
+  fireEvent.change(screen.getByLabelText("内容拼写"), {
+    target: { value: "retained input" }
+  });
+  const apply = screen.getByRole("button", { name: "确认，应用到草稿" });
+  fireEvent.click(apply);
+  expect(apply).toHaveAttribute("aria-busy", "true");
+  await act(async () => backgroundAudio.finish(false));
+  expect(apply).not.toHaveAttribute("aria-busy", "true");
+  expect(apply).toBeEnabled();
+  expect(screen.getByLabelText("内容拼写")).toHaveValue("retained input");
+  expect(onConfirm).not.toHaveBeenCalled();
+});

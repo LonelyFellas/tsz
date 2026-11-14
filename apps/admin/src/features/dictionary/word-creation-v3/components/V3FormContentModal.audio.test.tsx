@@ -223,3 +223,33 @@ it("两侧 IPA 都为空时原样应用，不生成语音或修改草稿", async
   expect(confirmed).toHaveBeenCalledWith(forms);
   expect(speech.generate).not.toHaveBeenCalled();
 });
+
+it.each(["ipa", "ups"] as const)(
+  "已生成 %s 清空后可应用，提交草稿不携带旧配音绑定或再次生成",
+  async (source) => {
+    const { confirmed } = setup(source);
+    if (source === "ups")
+      fireEvent.click(screen.getByLabelText("展开第 1 条发音的 UPS"));
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    await waitFor(() => expect(confirmed).toHaveBeenCalledOnce());
+    const generated = speech.generate.mock.calls.length;
+    for (const side of ["英式", "美式"]) {
+      fireEvent.change(
+        screen.getByLabelText(
+          `第 1 条发音的${side} Azure ${source.toUpperCase()}`
+        ),
+        { target: { value: "" } }
+      );
+    }
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    await waitFor(() => expect(confirmed).toHaveBeenCalledTimes(2));
+    const regions = confirmed.mock.calls[1]![0].contents[0].regional_variants;
+    for (const side of ["uk", "us"] as const) {
+      expect(regions.common.pronunciations[0].synthesis[side][source]).toBe("");
+      expect(
+        regions.common.pronunciations[0].synthesis[side][`${source}_speech`]
+      ).toBeUndefined();
+    }
+    expect(speech.generate).toHaveBeenCalledTimes(generated);
+  }
+);

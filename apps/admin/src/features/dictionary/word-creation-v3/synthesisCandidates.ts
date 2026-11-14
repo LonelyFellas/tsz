@@ -35,6 +35,10 @@ export function updateSynthesisCandidate(
   const previous = candidateForSide(synthesis, side, dialect);
   const updated = { ...candidate };
   for (const alphabet of ["ipa", "ups"] as const) {
+    if (!candidate[alphabet].trim()) {
+      delete updated[`${alphabet}_speech`];
+      continue;
+    }
     if (
       previous[alphabet] !== candidate[alphabet] ||
       (alphabet === "ups" &&
