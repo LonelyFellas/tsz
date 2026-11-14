@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task-165-form-sharing-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b620cee8b93dcdaa211457bb4149af85625d3281c52dfd07702d6cf4d17a61cc",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-ownership/tsz-rust/docs/openapi.json",
+  "_source_sha256": "320901e1dcd2975cb19daee1eaf96c0bb336775a7975d2148f52f5286f19c5af",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",

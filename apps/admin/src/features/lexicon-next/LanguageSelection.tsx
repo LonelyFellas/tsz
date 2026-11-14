@@ -1,16 +1,20 @@
 import {
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useState,
+  useSyncExternalStore,
   type ReactNode
 } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Select } from "@tsz/ui/admin/forms";
-import type { NextLanguageCapability } from "@tsz/types";
+import { Alert, Button, Spin } from "@tsz/ui/admin/display";
+import type { AdminLexiconLanguages, NextLanguageCapability } from "@tsz/types";
 import { useAuthStore } from "@/lib/auth";
+import { accountLanguagePreferences } from "./accountLanguagePreferences";
 import { localeLabels } from "./model";
 
 const PREFERENCE_PREFIX = "tsz:admin:lexicon-languages:v1:";
@@ -31,6 +35,7 @@ const LanguageContext = createContext<{
   medium: string;
   search: string;
   setLocked: (locked: boolean) => void;
+  cancelLanguageChange: () => void;
 } | null>(null);
 
 export function useLexiconLanguages() {
@@ -50,7 +55,50 @@ export function LexiconLanguages({
   const storageKey = accountId
     ? `${PREFERENCE_PREFIX}${encodeURIComponent(accountId)}:${language.target_language}`
     : undefined;
-  const preference = readPreference(storageKey);
+  const owner = accountLanguagePreferences.owner();
+  const scopeKey = `${owner}:${language.target_language}`;
+  const account = useSyncExternalStore(
+    accountLanguagePreferences.subscribe,
+    accountLanguagePreferences.getSnapshot
+  );
+  const [loadedScope, setLoadedScope] = useState("");
+  const refreshAccount = useCallback(async () => {
+    if (!owner || accountLanguagePreferences.owner() !== owner) return;
+    const cached = readPreference(storageKey);
+    const legacy =
+      typeof cached.target_locale === "string" &&
+      language.target_locales.includes(cached.target_locale) &&
+      typeof cached.medium_locale === "string" &&
+      language.medium_locales.includes(cached.medium_locale)
+        ? {
+            target_language: language.target_language,
+            target_locale: cached.target_locale,
+            medium_locale: cached.medium_locale
+          }
+        : undefined;
+    await accountLanguagePreferences.refresh(legacy);
+  }, [owner, storageKey, language]);
+  useEffect(() => {
+    let active = true;
+    void refreshAccount().then(() => {
+      if (active) setLoadedScope(scopeKey);
+    });
+    return () => {
+      active = false;
+    };
+  }, [scopeKey, refreshAccount]);
+  const accountReady =
+    loadedScope === scopeKey &&
+    (account.status === "ready" || account.status === "unsupported");
+  const saved = account.desired ?? account.preference;
+  const preference =
+    saved?.target_language === language.target_language
+      ? saved
+      : readPreference(storageKey);
+  const [intent, setIntent] = useState<{
+    owner: string;
+    selection: AdminLexiconLanguages;
+  } | null>(null);
   const preferredTarget =
     typeof preference.target_locale === "string" &&
     language.target_locales.includes(preference.target_locale)
@@ -83,18 +131,19 @@ export function LexiconLanguages({
     params.get("target_locale") !== target ||
     params.get("medium_locale") !== medium ||
     params.get("target_language") !== language.target_language;
-  const [ready, setReady] = useState(!needsRestore);
+  const [ready, setReady] = useState(false);
   const restored = new URLSearchParams(params);
   restored.set("target_language", language.target_language);
   restored.set("target_locale", target);
   restored.set("medium_locale", medium);
   const restoredSearch = restored.toString();
   useEffect(() => {
+    if (!accountReady) return;
     if (needsRestore) setParams(restoredSearch, { replace: true });
     else setReady(true);
-  }, [needsRestore, restoredSearch, setParams]);
+  }, [accountReady, needsRestore, restoredSearch, setParams]);
   useEffect(() => {
-    if (!storageKey || needsRestore) return;
+    if (!storageKey || needsRestore || !accountReady) return;
     try {
       localStorage.setItem(
         storageKey,
@@ -103,7 +152,23 @@ export function LexiconLanguages({
     } catch {
       // 浏览器禁止存储或空间不足时，仍保留当前 URL 中的选择。
     }
-  }, [storageKey, needsRestore, target, medium]);
+  }, [storageKey, needsRestore, accountReady, target, medium]);
+  useEffect(() => {
+    if (!intent) return;
+    if (intent.owner !== owner) {
+      setIntent(null);
+      return;
+    }
+    if (
+      account.status === "ready" &&
+      !needsRestore &&
+      intent.selection.target_locale === target &&
+      intent.selection.medium_locale === medium
+    ) {
+      setIntent(null);
+      accountLanguagePreferences.save(intent.selection);
+    }
+  }, [intent, owner, account.status, needsRestore, target, medium]);
   const search = new URLSearchParams({
     target_language: language.target_language,
     target_locale: target,
@@ -114,6 +179,15 @@ export function LexiconLanguages({
     new URLSearchParams(search).forEach((value, name) => next.set(name, value));
     next.set(key, value);
     next.delete("page");
+    if (account.status === "ready")
+      setIntent({
+        owner,
+        selection: {
+          target_language: language.target_language,
+          target_locale: next.get("target_locale")!,
+          medium_locale: next.get("medium_locale")!
+        }
+      });
     if (
       key === "medium_locale" &&
       entryId &&
@@ -163,7 +237,17 @@ export function LexiconLanguages({
       </label>
     </div>
   );
-  if (!ready) return null;
+  if (account.status === "error" && loadedScope === scopeKey)
+    return (
+      <Alert
+        type="error"
+        title="读取账号语言选择失败"
+        description={account.error}
+        action={<Button onClick={() => void refreshAccount()}>重试读取</Button>}
+      />
+    );
+  if (!ready || !accountReady)
+    return <Spin aria-label="正在读取账号语言选择" />;
   return (
     <LanguageContext.Provider
       value={{
@@ -171,10 +255,26 @@ export function LexiconLanguages({
         target,
         medium,
         search,
-        setLocked
+        setLocked,
+        cancelLanguageChange: () => setIntent(null)
       }}
     >
       {header ? createPortal(selectors, header) : selectors}
+      {account.status === "unsupported" && (
+        <Alert type="info" title="当前服务只能在本浏览器记住语言选择" />
+      )}
+      {account.error && (
+        <Alert
+          type="error"
+          title="语言选择尚未保存到账号"
+          description={account.error}
+          action={
+            <Button onClick={() => accountLanguagePreferences.retry()}>
+              重试保存语言
+            </Button>
+          }
+        />
+      )}
       {children}
     </LanguageContext.Provider>
   );

@@ -271,7 +271,8 @@ function EntryEditor({
     target,
     medium,
     search: languageSearch,
-    setLocked
+    setLocked,
+    cancelLanguageChange
   } = useLexiconLanguages();
   const [common, setCommon] = useState(false);
   const [saving, setBusy] = useState(false);
@@ -715,7 +716,12 @@ function EntryEditor({
           footer={
             <Space>
               <Button
-                onClick={() => blocker.state === "blocked" && blocker.reset()}
+                onClick={() => {
+                  if (blocker.state === "blocked") {
+                    blocker.reset();
+                    cancelLanguageChange();
+                  }
+                }}
               >
                 继续编辑
               </Button>
