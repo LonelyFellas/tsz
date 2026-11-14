@@ -760,30 +760,28 @@ export function V3FormContentModal({
         {rows.length > 0 && (
           <div className="v3-content-rules">
             <div className="v3-content-rule-row">
-              <Typography.Text strong>
-                {t("distinguish_spelling_question")}
-              </Typography.Text>
-              <Switch
-                aria-label={t("distinguish_spelling")}
-                disabled={Boolean(regionalChoice)}
-                checked={rules.spelling_mode === "distinguish"}
-                onChange={(checked) =>
-                  changeRules({
-                    spelling_mode: checked ? "distinguish" : "unified",
-                    phonetic_mode: "distinguish"
-                  })
-                }
-              />
+              <div className="v3-content-rule-control">
+                <Typography.Text strong>
+                  1. {t("distinguish_spelling_question")}
+                </Typography.Text>
+                <Switch
+                  aria-label={t("distinguish_spelling")}
+                  disabled={Boolean(regionalChoice)}
+                  checked={rules.spelling_mode === "distinguish"}
+                  onChange={(checked) =>
+                    changeRules({
+                      spelling_mode: checked ? "distinguish" : "unified",
+                      phonetic_mode: "distinguish"
+                    })
+                  }
+                />
+              </div>
             </div>
             <div className="v3-content-rule-row">
-              <Typography.Text strong>
-                {t("distinguish_phonetic_question")}
-              </Typography.Text>
-              <Space wrap>
-                <V3ReferenceBadge
-                  nodeIds={referenceForms.flatMap(formNodeIds)}
-                  label={t("form_pronunciation")}
-                />
+              <div className="v3-content-rule-control">
+                <Typography.Text strong>
+                  2. {t("distinguish_phonetic_question")}
+                </Typography.Text>
                 <Switch
                   aria-label={t("distinguish_phonetic")}
                   checked={rules.phonetic_mode === "distinguish"}
@@ -798,18 +796,17 @@ export function V3FormContentModal({
                     })
                   }
                 />
-              </Space>
+              </div>
+              <V3ReferenceBadge
+                nodeIds={referenceForms.flatMap(formNodeIds)}
+                label={t("form_pronunciation")}
+              />
             </div>
             <div className="v3-content-rule-row">
-              <Typography.Text strong>
-                {t("irregular_question")}
-              </Typography.Text>
-              <Space wrap>
-                {regularity === undefined && (
-                  <Typography.Text id={regularityHintId} type="secondary">
-                    {t("different_label_settings")}
-                  </Typography.Text>
-                )}
+              <div className="v3-content-rule-control">
+                <Typography.Text strong>
+                  3. {t("irregular_question")}
+                </Typography.Text>
                 <Switch
                   aria-label={t("irregular")}
                   disabled={Boolean(regionalChoice)}
@@ -822,7 +819,12 @@ export function V3FormContentModal({
                   }
                   onChange={(checked) => changeRegularity(!checked)}
                 />
-              </Space>
+              </div>
+              {regularity === undefined && (
+                <Typography.Text id={regularityHintId} type="secondary">
+                  {t("different_label_settings")}
+                </Typography.Text>
+              )}
             </div>
           </div>
         )}

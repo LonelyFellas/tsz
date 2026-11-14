@@ -372,13 +372,18 @@
 .v3-content-rule-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--ui-space-1) var(--ui-space-3);
   min-width: 0;
   min-height: 32px;
 }
-.v3-content-rule-row > .ui-typography,
+.v3-content-rule-control {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+.v3-content-rule-control > .ui-typography,
 .v3-content-labels > .ui-space {
   font-size: var(--ui-font-size);
 }
