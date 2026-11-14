@@ -1,6 +1,6 @@
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { Alert } from "@tsz/ui/admin/display";
-import type { NextDraft, NextEntryView } from "@tsz/types";
+import type { NextDraft, NextEntryView, NextSense } from "@tsz/types";
 import { draftForms, localeLabels } from "./model";
 
 function Lines({
@@ -50,6 +50,19 @@ function senseGroupName(groups: NextDraft["sense_groups"], id?: string) {
     ? ` · ${group.name_zh || group.name_en || "未填写语义区间"}`
     : "";
 }
+function SenseMetadataSummary({
+  sense
+}: {
+  sense: Pick<NextSense, "level" | "frequency" | "depends_on_context">;
+}) {
+  const items = [
+    sense.level && `词义等级：${sense.level}`,
+    sense.frequency !== undefined && `词频：${sense.frequency}%`,
+    sense.depends_on_context !== undefined &&
+      `是否依赖语境：${sense.depends_on_context ? "是" : "否"}`
+  ].filter(Boolean);
+  return items.length ? <p>{items.join(" · ")}</p> : null;
+}
 export function Preview({ view }: { view: NextEntryView }) {
   return (
     <div className="lexicon-next-preview">
@@ -77,6 +90,7 @@ export function Preview({ view }: { view: NextEntryView }) {
             义项 {index + 1}
             {senseGroupName(view.sense_groups, sense.sense_group_id)}
           </h4>
+          <SenseMetadataSummary sense={sense} />
           <Lines rows={sense.target_definitions} missing="英文释义" />
           <Lines rows={sense.medium_definitions} missing="中文解释" />
           <Lines rows={sense.equivalents} missing="译词" />
@@ -133,6 +147,7 @@ export function DraftSummary({ draft }: { draft: NextDraft }) {
             义项 {index + 1} · {sense.part_of_speech ?? "未指定词性"}
             {senseGroupName(draft.sense_groups, sense.sense_group_id)}
           </h4>
+          <SenseMetadataSummary sense={sense} />
           <Lines rows={sense.definitions} missing="释义" />
           <Lines rows={sense.equivalents} missing="译词" />
         </section>

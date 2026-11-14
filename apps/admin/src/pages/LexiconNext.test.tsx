@@ -1266,7 +1266,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(button("保存完整草稿"));
     await screen.findByText(/不能为空/);
     expect(api.save).not.toHaveBeenCalled();
-    fireEvent.click(button("删除义项"));
+    fireEvent.click(button("删除词义 1"));
     fireEvent.click(await screen.findByRole("button", { name: /取\s*消/ }));
     expect(
       screen.getByRole("textbox", { name: "英式英语释义 1" })
@@ -2692,5 +2692,82 @@ it("目录缓存更新后，停留在预览页也立即去除失效结构且不�
   expect(api.save).not.toHaveBeenCalled();
   await expect(api.get.mock.results[0]!.value).resolves.toMatchObject({
     draft: original
+  });
+});
+
+it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不复制义项", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({
+    ...caps,
+    sense_metadata: true,
+    sense_groups: true,
+    grammar_structures: true
+  });
+  const sense = {
+    id: "sense-metadata",
+    part_of_speech: null,
+    sub_pos: "N-COUNT",
+    level: "A1",
+    frequency: "0",
+    depends_on_context: false,
+    definitions: [],
+    equivalents: []
+  };
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: { ...entry.draft, senses: [sense] }
+  });
+  mount(api);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/词义与译词/));
+  fireEvent.mouseDown(
+    await screen.findByRole("combobox", { name: "义项 1 词性" })
+  );
+  fireEvent.click(
+    await screen.findByText("名词", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  const level = await screen.findByRole("combobox", { name: "释义 1 等级" });
+  fireEvent.mouseDown(level);
+  fireEvent.click(
+    await screen.findByText("B2", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  fireEvent.change(screen.getByRole("spinbutton", { name: "释义 1 频率" }), {
+    target: { value: "95.5" }
+  });
+  fireEvent.click(screen.getByRole("switch", { name: "释义 1 是否依赖语境" }));
+  await chooseLanguage("美式英语");
+  expect(screen.getByRole("spinbutton", { name: "释义 1 频率" })).toHaveValue(
+    "95.50"
+  );
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalled());
+  expect(api.save.mock.calls[0]![1]).toMatchObject({
+    expected_revision: 1,
+    draft: {
+      senses: [
+        {
+          ...sense,
+          part_of_speech: "noun",
+          level: "B2",
+          frequency: "95.5",
+          depends_on_context: true
+        }
+      ]
+    }
+  });
+  await screen.findByText("版本 2");
+  expect(screen.getByRole("button", { name: "删除词义 1" })).toBeDisabled();
+  fireEvent.click(button("添加义项"));
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+  expect(api.save.mock.calls[1]![1].draft.senses).toHaveLength(2);
+  expect(api.save.mock.calls[1]![1].draft.senses[1]).toMatchObject({
+    level: "A1",
+    frequency: "0",
+    depends_on_context: false
   });
 });

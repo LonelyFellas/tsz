@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-dubbing/tsz-rust/docs/openapi.json",
-  "_source_sha256": "64408adfb1a32829620f067d93a3803c083f3748c2c8005d5bc4d7a2390ef37a",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-sense-metadata/tsz-rust/docs/openapi.json",
+  "_source_sha256": "9694fe81b28e727eb440167899558065af63e08ae3248f340747bf5b974ec098",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3595,7 +3595,8 @@
         "medium_ownership": { "type": "boolean" },
         "publishing": { "type": "boolean" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
-        "sense_groups": { "type": "boolean" }
+        "sense_groups": { "type": "boolean" },
+        "sense_metadata": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -3960,11 +3961,14 @@
           "type": "array",
           "items": { "$ref": "#/$defs/NextDefinition" }
         },
+        "depends_on_context": { "type": "boolean" },
         "equivalents": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextEquivalent" }
         },
+        "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
         "part_of_speech": { "type": ["string", "null"] },
         "sense_group_id": { "type": "string", "format": "uuid" },
         "sub_pos": { "type": "string" }
@@ -3993,11 +3997,14 @@
         "missing_equivalents"
       ],
       "properties": {
+        "depends_on_context": { "type": "boolean" },
         "equivalents": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextEquivalent" }
         },
+        "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
         "medium_definitions": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextDefinition" }

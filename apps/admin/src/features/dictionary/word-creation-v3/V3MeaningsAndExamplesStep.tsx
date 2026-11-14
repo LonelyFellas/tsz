@@ -20,8 +20,6 @@ import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { PronunciationPreviewProvider } from "../word-creation/PronunciationPreview";
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
   CopyIcon,
   Trash2Icon,
   CircleMinusIcon,
@@ -33,22 +31,14 @@ import {
   Badge,
   Button,
   Card,
-  Collapse,
   Empty,
   Flex,
   Space,
-  Tag,
   Tabs,
   Typography
 } from "@tsz/ui/admin/display";
-import { App, Modal, Popover, Tooltip } from "@tsz/ui/admin/overlays";
-import {
-  Input,
-  InputNumber,
-  Select,
-  type SelectProps,
-  Switch
-} from "@tsz/ui/admin/forms";
+import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
+import { Input, Select, type SelectProps } from "@tsz/ui/admin/forms";
 import type {
   Dialect,
   DialectModeV3,
@@ -86,10 +76,14 @@ import { partOfSpeechLabel } from "./presentation";
 import {
   sortableRowClass,
   sortableTabOffset,
-  useSortableRows,
-  type SortableRowsController
+  useSortableRows
 } from "./sortableRows";
 import { SortableDragHandle } from "./components/SortableDragHandle";
+import {
+  SenseEditorShell,
+  SortableRows
+} from "./components/V3SenseEditorShell";
+import { V3SenseMetadataFields } from "./components/V3SenseMetadataFields";
 import { V3SenseGroupsCard } from "./components/V3SenseGroupsCard";
 import { V3RowIndex } from "./components/V3RowIndex";
 import { V3StepActions } from "./components/V3StepActions";
@@ -198,167 +192,6 @@ const DEFINITION_DRAG_TYPE = "application/x-tsz-v3-definition";
 /** 拖影取整行而不是把手上那颗小图标；与提取前硬编码的选择器一致。 */
 const SORTABLE_ROW_SELECTOR =
   ".word-sense-group-item, .word-grammar-row, .word-definition-row, .word-sentence-row";
-
-function SortableRows<T>({
-  items,
-  scopeId,
-  dragType,
-  onChange,
-  children
-}: {
-  items: readonly T[];
-  scopeId: string;
-  dragType: string;
-  onChange: (next: T[]) => void;
-  children: (sorting: SortableRowsController) => ReactNode;
-}) {
-  const sorting = useSortableRows({ items, scopeId, dragType, onChange });
-  return children(sorting);
-}
-
-function SenseEditorShell({
-  children,
-  index,
-  level,
-  summary,
-  subPosLabel,
-  sorting,
-  expanded,
-  onExpandedChange,
-  onDelete,
-  confirmDelete,
-  canDelete,
-  nodeId,
-  referenceCount = 0
-}: {
-  children: ReactNode;
-  index: number;
-  level: string;
-  summary: string;
-  subPosLabel?: string;
-  sorting: SortableRowsController;
-  expanded: boolean;
-  onExpandedChange: (expanded: boolean) => void;
-  onDelete: () => void;
-  confirmDelete: boolean;
-  canDelete: boolean;
-  nodeId: string;
-  /** 指向本词义的引用数；大于 0 时不能删除。 */
-  referenceCount?: number;
-}) {
-  const { t } = useLexiconEditorTranslation();
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const safeLevel = /^(?:A1|A2|B1|B2|C1|C2)$/u.test(level) ? level : "A1";
-  return (
-    <div
-      data-v3-field="sense"
-      data-v3-node-id={nodeId}
-      tabIndex={-1}
-      className={sortableRowClass("word-sense-sortable", sorting, index)}
-      onDragOver={(event) => sorting.handleDragOver(event, index)}
-      onDragLeave={sorting.handleDragLeave}
-      onDrop={(event) => sorting.handleDrop(event, index)}
-    >
-      <Collapse
-        activeKey={expanded ? [nodeId] : []}
-        className={`word-sense-editor word-sense-editor-v3 word-sense-editor-${safeLevel.toLowerCase()}`}
-        onChange={(keys) =>
-          onExpandedChange(
-            (Array.isArray(keys) ? keys : [keys]).includes(nodeId)
-          )
-        }
-        items={[
-          {
-            key: nodeId,
-            showArrow: false,
-            label: (
-              <div className="word-sense-header-label">
-                <div className="word-sense-header-content">
-                  <span
-                    className="word-sort-leading"
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    <SortableDragHandle
-                      sorting={sorting}
-                      index={index}
-                      label={t("drag_sense", { index: index + 1 })}
-                      singleItemTitle={t("two_senses_required")}
-                      dragImageSelector=".word-sense-sortable"
-                    />
-                  </span>
-                  <Tag className="word-sense-level-badge">{level}</Tag>
-                  <Typography.Text className="word-sense-summary tsz-entry-en">
-                    {index + 1}. {summary}
-                  </Typography.Text>
-                  {subPosLabel ? (
-                    <Tag className="word-sense-sub-pos-badge">
-                      {subPosLabel}
-                    </Tag>
-                  ) : null}
-                  <V3ReferenceBadge label={t("sense")} nodeIds={[nodeId]} />
-                </div>
-                <span className="word-form-card-toggle-state">
-                  <span>{expanded ? t("collapse") : t("expand")}</span>
-                  {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                </span>
-              </div>
-            ),
-            extra: (
-              <Space
-                className="word-sense-header-actions"
-                size={2}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <Tooltip
-                  title={
-                    !canDelete
-                      ? t("one_sense_required")
-                      : referenceCount > 0
-                        ? referenceBlockedHint(referenceCount, t)
-                        : undefined
-                  }
-                >
-                  <Button
-                    aria-label={t("delete_sense", { index: index + 1 })}
-                    icon={<Trash2Icon />}
-                    disabled={!canDelete || undefined}
-                    danger
-                    size="small"
-                    type="text"
-                    onClick={() => {
-                      if (!canDelete) return;
-                      if (confirmDelete) setDeleteOpen(true);
-                      else onDelete();
-                    }}
-                  />
-                </Tooltip>
-              </Space>
-            ),
-            children
-          }
-        ]}
-      />
-      <Modal
-        title={t("delete_sense_title")}
-        open={deleteOpen}
-        style={{ top: 48 }}
-        maskClosable={false}
-        okText={t("delete_confirm")}
-        cancelText={t("cancel")}
-        okButtonProps={{ danger: true, disabled: !canDelete }}
-        cancelButtonProps={{ autoFocus: true }}
-        onCancel={() => setDeleteOpen(false)}
-        onOk={() => {
-          setDeleteOpen(false);
-          if (canDelete) onDelete();
-        }}
-      >
-        <Typography.Text>{summary}</Typography.Text>
-      </Modal>
-    </div>
-  );
-}
 
 const GRAMMAR_PLACEHOLDER: Record<
   Dialect,
@@ -1321,14 +1154,6 @@ function V3MeaningsAndExamplesStepContent({
                               (item) => item.code === sense.sub_pos
                             );
                             const visibleSubPos = selectedSubPos?.name_zh;
-                            // 任意基本词性都能挂细分词性；目录里没有该词性时保留原有可选行为，
-                            // 避免目录加载失败把字段整体藏掉。
-                            const subPosExtensible =
-                              catalogPos?.sub_parts_extensible ?? true;
-                            // 目录说这个基本词性必须挂细分词性时，就别把「不指定」摆成默认值，
-                            // 否则新建的每条释义一进来就是校验通不过的状态。
-                            const subPosRequired =
-                              catalogPos?.sub_pos_required ?? true;
                             const definitionsCollapsed = Boolean(
                               collapsedSenseSections[`${sense.id}:definitions`]
                             );
@@ -1401,252 +1226,46 @@ function V3MeaningsAndExamplesStepContent({
                                 )}
                               >
                                 <Flex vertical gap="small">
-                                  <div className="word-sense-meta-grid">
-                                    <label className="word-sense-field">
-                                      <Typography.Text type="secondary">
-                                        {t("sense_level")}
-                                      </Typography.Text>
-                                      <Select
-                                        aria-label={t("sense_level_label", {
-                                          index: senseIndex + 1
-                                        })}
-                                        data-v3-field="level"
-                                        data-v3-node-id={sense.id}
-                                        onChange={(level: string) =>
-                                          change((draft) => {
-                                            const target =
-                                              draft.pos[posIndex]!.senses[
-                                                senseIndex
-                                              ]!;
-                                            // 先按改之前的等级判断：这组释义还是原样的
-                                            // 默认铺排才跟着换，动过一行就不碰。
-                                            const stillDefault =
-                                              definitionsStillDefault(
-                                                target.definitions,
-                                                target.level
-                                              );
-                                            target.level = level;
-                                            if (stillDefault)
-                                              target.definitions =
-                                                defaultDefinitions(
-                                                  level,
-                                                  idFactory
-                                                );
-                                          })
-                                        }
-                                        options={CEFR_OPTIONS}
-                                        style={{ width: "100%" }}
-                                        value={sense.level}
-                                      />
-                                    </label>
-                                    <label className="word-sense-field word-sense-field-group">
-                                      <Typography.Text type="secondary">
-                                        {t("sense_groups")}
-                                      </Typography.Text>
-                                      <Select
-                                        aria-label={t("sense_group_label", {
-                                          index: senseIndex + 1
-                                        })}
-                                        data-v3-field="sense_group_id"
-                                        data-v3-node-id={sense.id}
-                                        onChange={(nextValue: string) =>
-                                          change((draft) => {
-                                            const target =
-                                              draft.pos[posIndex]!.senses[
-                                                senseIndex
-                                              ]!;
-                                            if (!nextValue)
-                                              delete target.sense_group_id;
-                                            else
-                                              target.sense_group_id = nextValue;
-                                          })
-                                        }
-                                        options={[
-                                          {
-                                            label: t("no_sense_group"),
-                                            value: ""
-                                          },
-                                          ...senseGroupOptions
-                                        ]}
-                                        labelRender={({ value: selectedId }) =>
-                                          selectedId === ""
-                                            ? t("no_sense_group")
-                                            : (senseGroupOptions.find(
-                                                (option) =>
-                                                  option.value === selectedId
-                                              )?.label ?? "")
-                                        }
-                                        placeholder={t("select_group")}
-                                        value={
-                                          senseGroupOptions.some(
-                                            (option) =>
-                                              option.value ===
-                                              sense.sense_group_id
+                                  <V3SenseMetadataFields
+                                    sense={sense}
+                                    index={senseIndex}
+                                    catalogPos={catalogPos}
+                                    groupOptions={senseGroupOptions}
+                                    subPosIssue={subPosIssue}
+                                    frequencyIssue={frequencyIssue}
+                                    onChange={(patch) =>
+                                      change((draft) => {
+                                        const target =
+                                          draft.pos[posIndex]!.senses[
+                                            senseIndex
+                                          ]!;
+                                        if (
+                                          patch.level !== undefined &&
+                                          definitionsStillDefault(
+                                            target.definitions,
+                                            target.level
                                           )
-                                            ? sense.sense_group_id
-                                            : undefined
+                                        ) {
+                                          target.definitions =
+                                            defaultDefinitions(
+                                              patch.level,
+                                              idFactory
+                                            );
                                         }
-                                      />
-                                    </label>
-                                    {(subPosExtensible ||
-                                      Boolean(sense.sub_pos) ||
-                                      Boolean(subPosIssue)) && (
-                                      <label className="word-sense-field word-sense-field-pos">
-                                        <Typography.Text type="secondary">
-                                          {t("sub_pos")}
-                                        </Typography.Text>
-                                        {subPosExtensible ? (
-                                          <Select
-                                            aria-label={t(
-                                              "sense_sub_pos_label",
-                                              { index: senseIndex + 1 }
-                                            )}
-                                            data-v3-field="sub_pos"
-                                            data-v3-node-id={sense.id}
-                                            onChange={(subPos) =>
-                                              change((draft) => {
-                                                draft.pos[posIndex]!.senses[
-                                                  senseIndex
-                                                ]!.sub_pos = subPos;
-                                              })
-                                            }
-                                            options={(() => {
-                                              const code = formPosById.get(
-                                                pos.pos_id
-                                              );
-                                              const configured = code
-                                                ? (catalogByCode.get(code)
-                                                    ?.sub_parts ?? [])
-                                                : [];
-                                              const known = configured.some(
-                                                (item) =>
-                                                  item.code === sense.sub_pos
-                                              );
-                                              return [
-                                                ...(subPosRequired
-                                                  ? []
-                                                  : [
-                                                      {
-                                                        label: t("no_sub_pos"),
-                                                        value: ""
-                                                      }
-                                                    ]),
-                                                ...(!sense.sub_pos || known
-                                                  ? []
-                                                  : [
-                                                      {
-                                                        label: t(
-                                                          "sub_pos_unconfigured"
-                                                        ),
-                                                        value: sense.sub_pos
-                                                      }
-                                                    ]),
-                                                ...configured.map((item) => ({
-                                                  label: item.name_zh,
-                                                  value: item.code
-                                                }))
-                                              ];
-                                            })()}
-                                            placeholder={t("select_sub_pos")}
-                                            status={
-                                              subPosIssue ? "error" : undefined
-                                            }
-                                            value={
-                                              subPosRequired && !sense.sub_pos
-                                                ? undefined
-                                                : sense.sub_pos
-                                            }
-                                          />
-                                        ) : (
-                                          <Typography.Text
-                                            data-v3-field="sub_pos"
-                                            data-v3-node-id={sense.id}
-                                          >
-                                            {visibleSubPos ?? sense.sub_pos}
-                                          </Typography.Text>
-                                        )}
-                                        <FieldIssueHelp issue={subPosIssue} />
-                                      </label>
-                                    )}
-                                    <label className="word-sense-field word-sense-field-frequency">
-                                      <Typography.Text type="secondary">
-                                        {t("frequency")}
-                                      </Typography.Text>
-                                      <InputNumber
-                                        aria-label={t("sense_frequency_label", {
-                                          index: senseIndex + 1
-                                        })}
-                                        data-v3-field="frequency"
-                                        data-v3-node-id={sense.id}
-                                        placeholder="0–100"
-                                        max={100}
-                                        min={0}
-                                        onChange={(nextValue) =>
-                                          change((draft) => {
-                                            const target =
-                                              draft.pos[posIndex]!.senses[
-                                                senseIndex
-                                              ]!;
-                                            if (nextValue === null)
-                                              delete target.frequency;
-                                            else
-                                              target.frequency =
-                                                String(nextValue);
-                                          })
-                                        }
-                                        precision={2}
-                                        step={0.01}
-                                        suffix="%"
-                                        status={
-                                          frequencyIssue ? "error" : undefined
-                                        }
-                                        value={
-                                          sense.frequency === undefined
-                                            ? null
-                                            : Number(sense.frequency)
-                                        }
-                                      />
-                                      <FieldIssueHelp issue={frequencyIssue} />
-                                    </label>
-                                    <div className="word-sense-context-toggle">
-                                      <Typography.Text type="secondary">
-                                        {t("context_dependent")}
-                                      </Typography.Text>
-                                      <div
-                                        className="word-sense-context-control"
-                                        onKeyDown={(event) => {
-                                          if (
-                                            event.key !== "Enter" &&
-                                            event.key !== " "
-                                          ) {
-                                            return;
-                                          }
-                                          event.preventDefault();
-                                          change((draft) => {
-                                            const target =
-                                              draft.pos[posIndex]!.senses[
-                                                senseIndex
-                                              ]!;
-                                            target.depends_on_context =
-                                              !target.depends_on_context;
-                                          });
-                                        }}
-                                      >
-                                        <Switch
-                                          aria-label={t("sense_context_label", {
-                                            index: senseIndex + 1
-                                          })}
-                                          checked={sense.depends_on_context}
-                                          onChange={(checked) =>
-                                            change((draft) => {
-                                              draft.pos[posIndex]!.senses[
-                                                senseIndex
-                                              ]!.depends_on_context = checked;
-                                            })
-                                          }
-                                        />
-                                      </div>
-                                    </div>
+                                        Object.assign(target, patch);
+                                        if (
+                                          "frequency" in patch &&
+                                          patch.frequency === undefined
+                                        )
+                                          delete target.frequency;
+                                        if (
+                                          "sense_group_id" in patch &&
+                                          patch.sense_group_id === undefined
+                                        )
+                                          delete target.sense_group_id;
+                                      })
+                                    }
+                                  >
                                     {formGroupIssue ? (
                                       <div
                                         className="word-sense-field word-sense-field-form-group"
@@ -1662,7 +1281,7 @@ function V3MeaningsAndExamplesStepContent({
                                         />
                                       </div>
                                     ) : null}
-                                  </div>
+                                  </V3SenseMetadataFields>
 
                                   <section
                                     className={`word-sense-section${definitionsCollapsed ? " is-collapsed" : ""}`}

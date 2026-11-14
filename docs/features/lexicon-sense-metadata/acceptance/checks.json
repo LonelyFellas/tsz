@@ -1,0 +1,86 @@
+{
+  "frontend_base": "731436c6ff17ff21bd68575ec012d56b378a9bd1",
+  "backend_base": "eb29c5595bac959e5567cdb46621457c809be651",
+  "source_state": "base SHA + uncommitted task changes",
+  "branch": "codex/lexicon-sense-metadata",
+  "openapi_sha256": "9694fe81b28e727eb440167899558065af63e08ae3248f340747bf5b974ec098",
+  "backend_binary_sha256": "dfa8438b911123e493633b88f80f128b8b55f1930cc638c6c33c1f0242d9227e",
+  "chain": "Codex built-in browser -> task Vite proxy -> task Rust binary -> private PostgreSQL cluster and Redis",
+  "mock_flags": {
+    "words": false,
+    "part_of_speech": false,
+    "tts": false,
+    "local_speech": false
+  },
+  "login_delivery": "Existing backend development OTP sender (no external SMS)",
+  "tests": {
+    "v1_meanings_component": 114,
+    "next_page_component_model": 71,
+    "api_client": 732,
+    "backend_real_postgres_handler": 24,
+    "backend_unit": 5
+  },
+  "checks": {
+    "workspace_typecheck": "pass",
+    "workspace_lint": "pass (2 existing Web warnings)",
+    "admin_build": "pass",
+    "admin_ui_scan": "pass",
+    "admin_ui_tighten": "pass, no baseline change needed",
+    "backend_clippy_all_targets_all_features": "pass",
+    "backend_fmt": "pass"
+  },
+  "browser": {
+    "create": "201",
+    "save": "200",
+    "refresh_get": "200",
+    "revision_after_reference_preservation": 5,
+    "viewport_widths": [1440, 900],
+    "narrow_document_width": 900,
+    "read_only_fields_disabled": true,
+    "sorted_ids_stable": true,
+    "level_filter_current_revision_only": true,
+    "screenshots": ["desktop.jpg", "narrow.jpg", "readonly.jpg"]
+  },
+  "speech": "Not in scope; grammar editor attempted synthesis returned 503 with provider/storage unconfigured. No OSS objects were created. The persisted no-audio grammar fixture was prepared via authenticated HTTP.",
+  "cleanup": {
+    "browser_logout": true,
+    "tab_closed": true,
+    "viewport_restored": true,
+    "dedicated_origin_cache": "unverified: Storage.clearDataForOrigin unsupported by the built-in browser",
+    "private_postgres_cluster_and_all_fixture_databases_removed": true,
+    "private_redis_stopped_and_in_memory_fixture_keys_removed": true,
+    "task_api_and_vite_stopped": true,
+    "temporary_credentials_scripts_logs_binary_copies_removed": true,
+    "independent_port_recheck_closed": {
+      "56371": true,
+      "56372": true,
+      "18371": true,
+      "30371": true
+    },
+    "temporary_root_absent": true,
+    "shared_data_modified": false,
+    "oss_objects_created": 0
+  },
+  "persistence": {
+    "revision": 5,
+    "senses": [
+      {
+        "id": "3cffb0b2-7245-435f-8397-bc3d8dfafd95",
+        "level": "A1",
+        "frequency": "100",
+        "depends_on_context": false,
+        "grammar_refs": [null]
+      },
+      {
+        "id": "d83efb57-cb9f-4488-bf17-96a943706679",
+        "level": "C1",
+        "frequency": "27.25",
+        "depends_on_context": false,
+        "grammar_refs": ["466d6afd-d378-401a-a8ec-433712ef2cc1"]
+      }
+    ],
+    "language_view_matches": true,
+    "C1_count": 1,
+    "B2_count": 0
+  }
+}

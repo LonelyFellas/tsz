@@ -1,27 +1,17 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
-import {
-  Button,
-  Alert,
-  Collapse,
-  Empty,
-  Flex,
-  Space,
-  Tabs,
-  Typography
-} from "@tsz/ui/admin/display";
+import { Button, Alert, Empty, Flex, Space, Tabs } from "@tsz/ui/admin/display";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { V3SenseGroupsCard } from "@/features/dictionary/word-creation-v3/components/V3SenseGroupsCard";
+import {
+  SenseEditorShell,
+  SortableRows
+} from "@/features/dictionary/word-creation-v3/components/V3SenseEditorShell";
+import { V3SenseMetadataFields } from "@/features/dictionary/word-creation-v3/components/V3SenseMetadataFields";
 import { Select } from "@tsz/ui/admin/forms";
 import { App } from "@tsz/ui/admin/overlays";
-import {
-  ChevronDown,
-  ChevronUp,
-  CircleMinus,
-  Plus,
-  Trash2
-} from "lucide-react";
+import { CircleMinus, Plus } from "lucide-react";
 import type {
   DraftFormsStepContentV3,
   NextDefinition,
@@ -65,6 +55,7 @@ export function MeaningsStep({
   partOfSpeechCodes,
   disabled,
   senseGroupsAvailable = false,
+  senseMetadataAvailable = false,
   grammarAvailable = false,
   grammarAudioAvailable = false,
   registerLeaveGuard,
@@ -78,6 +69,7 @@ export function MeaningsStep({
   partOfSpeechCodes: string[];
   disabled: boolean;
   senseGroupsAvailable?: boolean;
+  senseMetadataAvailable?: boolean;
   grammarAvailable?: boolean;
   grammarAudioAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
@@ -88,7 +80,7 @@ export function MeaningsStep({
   const catalog = useQuery({
     queryKey: partOfSpeechKeys.catalog(),
     queryFn: () => partOfSpeechDataSource.catalog(),
-    enabled: formEditorAvailable || grammarAvailable,
+    enabled: formEditorAvailable || grammarAvailable || senseMetadataAvailable,
     staleTime: 5 * 60 * 1000
   });
   const editor = value.form_editor ?? emptyFormEditor();
@@ -172,15 +164,23 @@ export function MeaningsStep({
       )
   });
   function updateSense(id: string, patch: Partial<NextSense>) {
-    onChange({
-      ...value,
+    onChange((current) => ({
+      ...current,
       ...(grammarAvailable
-        ? { grammar_structures: value.grammar_structures ?? [] }
+        ? { grammar_structures: current.grammar_structures ?? [] }
         : {}),
-      senses: value.senses.map((sense) =>
+      ...(senseGroupsAvailable && patch.sense_group_id
+        ? { sense_groups: current.sense_groups ?? groups }
+        : {}),
+      senses: current.senses.map((sense) =>
         sense.id === id ? { ...sense, ...patch } : sense
       )
-    });
+    }));
+  }
+  function updateSensePos(id: string, next: string | undefined) {
+    updateSense(id, { part_of_speech: next ?? null });
+    setSelectedPos(next ?? "");
+    setExpanded((current) => ({ ...current, [next ?? ""]: id }));
   }
   return (
     <Flex
@@ -382,83 +382,128 @@ export function MeaningsStep({
                   />
                 )}
                 {!senses.length && <Empty description="尚无义项" />}
-                {senses.map((sense, index) => {
-                  const summary =
-                    sense.equivalents.find(
-                      (row) => row.locale === medium && row.text.trim()
-                    )?.text ||
-                    sense.definitions.find(
-                      (row) =>
-                        [medium, target].includes(row.locale) && row.text.trim()
-                    )?.text ||
-                    "未填写释义";
-                  const isExpanded = expandedId === sense.id;
-                  return (
-                    <section key={sense.id} aria-label={`义项 ${index + 1}`}>
-                      <Collapse
-                        className="word-sense-editor word-sense-editor-v3"
-                        activeKey={isExpanded ? [sense.id] : []}
-                        onChange={(keys) =>
-                          setExpanded((current) => ({
-                            ...current,
-                            [code]: (Array.isArray(keys)
-                              ? keys
-                              : [keys]
-                            ).includes(sense.id)
-                              ? sense.id
-                              : null
-                          }))
-                        }
-                        items={[
-                          {
-                            key: sense.id,
-                            showArrow: false,
-                            label: (
-                              <div className="word-sense-header-label">
-                                <Typography.Text className="word-sense-summary">
-                                  {index + 1}. {summary}
-                                </Typography.Text>
-                                <span className="word-form-card-toggle-state">
-                                  {isExpanded ? "收起" : "展开"}
-                                  {isExpanded ? <ChevronUp /> : <ChevronDown />}
-                                </span>
-                              </div>
-                            ),
-                            extra: (
-                              <Button
-                                aria-label="删除义项"
-                                title={`删除义项 ${index + 1}`}
-                                danger
-                                type="text"
-                                size="small"
-                                icon={<Trash2 aria-hidden />}
-                                disabled={disabled}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  modal.confirm({
-                                    title: `删除义项 ${index + 1}？`,
-                                    content:
-                                      "这将从草稿移除此义项的所有语言内容。保存后生效。",
-                                    okText: "删除义项",
-                                    cancelText: "取消",
-                                    onOk: () =>
-                                      onChange((current) => ({
-                                        ...current,
-                                        senses: current.senses.filter(
-                                          (item) => item.id !== sense.id
-                                        )
-                                      }))
-                                  });
-                                }}
-                              />
-                            ),
-                            children: (
-                              <Flex
-                                vertical
-                                gap={8}
-                                aria-hidden={!isExpanded}
-                                inert={!isExpanded}
-                              >
+                <SortableRows
+                  items={disabled ? [] : senses}
+                  scopeId={`lexicon-next-senses-${code}`}
+                  dragType="application/x-tsz-v3-sense"
+                  onChange={(next) =>
+                    onChange((current) => {
+                      const order = new Map(
+                        next.map((sense, index) => [sense.id, index])
+                      );
+                      const sorted = current.senses
+                        .filter((sense) => order.has(sense.id))
+                        .sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+                      return {
+                        ...current,
+                        senses: current.senses.map((sense) =>
+                          order.has(sense.id) ? sorted.shift()! : sense
+                        )
+                      };
+                    })
+                  }
+                >
+                  {(senseSorting) =>
+                    senses.map((sense, index) => {
+                      const summary =
+                        sense.equivalents.find(
+                          (row) => row.locale === medium && row.text.trim()
+                        )?.text ||
+                        sense.definitions.find(
+                          (row) =>
+                            [medium, target].includes(row.locale) &&
+                            row.text.trim()
+                        )?.text ||
+                        "未填写释义";
+                      const isExpanded = expandedId === sense.id;
+                      return (
+                        <section
+                          key={sense.id}
+                          aria-label={`义项 ${index + 1}`}
+                        >
+                          <SenseEditorShell
+                            index={index}
+                            nodeId={sense.id}
+                            level={sense.level ?? ""}
+                            summary={summary}
+                            subPosLabel={(() => {
+                              const sub = catalog.data?.items
+                                .find(
+                                  (part) => part.code === sense.part_of_speech
+                                )
+                                ?.sub_parts.find(
+                                  (part) => part.code === sense.sub_pos
+                                );
+                              return sub
+                                ? [sub.name_en, sub.name_zh]
+                                    .filter(Boolean)
+                                    .join(" ")
+                                : undefined;
+                            })()}
+                            sorting={senseSorting}
+                            expanded={isExpanded}
+                            onExpandedChange={(open) =>
+                              setExpanded((current) => ({
+                                ...current,
+                                [code]: open ? sense.id : null
+                              }))
+                            }
+                            canDelete={
+                              !disabled &&
+                              (!senseMetadataAvailable || senses.length > 1)
+                            }
+                            confirmDelete
+                            onDelete={() =>
+                              onChange((current) => ({
+                                ...current,
+                                senses: current.senses.filter(
+                                  (item) => item.id !== sense.id
+                                )
+                              }))
+                            }
+                          >
+                            <Flex
+                              vertical
+                              gap={8}
+                              aria-hidden={!isExpanded}
+                              inert={!isExpanded}
+                            >
+                              {senseMetadataAvailable ? (
+                                <AdminControls componentDisabled={disabled}>
+                                  {!sense.part_of_speech && (
+                                    <Space wrap>
+                                      <span>词性</span>
+                                      <Select
+                                        aria-label={`义项 ${index + 1} 词性`}
+                                        placeholder="未指定词性"
+                                        options={partOfSpeechCodes.map(
+                                          (value) => ({
+                                            value,
+                                            label: label(value)
+                                          })
+                                        )}
+                                        onChange={(next: string) =>
+                                          updateSensePos(sense.id, next)
+                                        }
+                                      />
+                                    </Space>
+                                  )}
+                                  <V3SenseMetadataFields
+                                    sense={sense}
+                                    index={index}
+                                    catalogPos={catalog.data?.items.find(
+                                      (part) =>
+                                        part.code === sense.part_of_speech
+                                    )}
+                                    groupOptions={groupOptions}
+                                    groupsAvailable={senseGroupsAvailable}
+                                    subPosAvailable={grammarAvailable}
+                                    onChange={(patch) =>
+                                      updateSense(sense.id, patch)
+                                    }
+                                  />
+                                </AdminControls>
+                              ) : (
                                 <Space wrap>
                                   <span>词性</span>
                                   <Select
@@ -472,14 +517,7 @@ export function MeaningsStep({
                                       label: label(value)
                                     }))}
                                     onChange={(next) => {
-                                      updateSense(sense.id, {
-                                        part_of_speech: next ?? null
-                                      });
-                                      setSelectedPos(next ?? "");
-                                      setExpanded((current) => ({
-                                        ...current,
-                                        [next ?? ""]: sense.id
-                                      }));
+                                      updateSensePos(sense.id, next);
                                     }}
                                   />
                                   {grammarAvailable && (
@@ -575,79 +613,78 @@ export function MeaningsStep({
                                     />
                                   )}
                                 </Space>
-                                <ContentRows
-                                  grouped
-                                  rows={sense.definitions}
-                                  locale={target}
-                                  label={`${localeLabels[target]}释义`}
-                                  definition
-                                  grammars={
-                                    grammarAvailable
-                                      ? (value.grammar_structures ?? []).filter(
-                                          (g) =>
-                                            grammarMatchesSense(
-                                              g,
-                                              sense,
-                                              catalog.data
-                                            )
-                                        )
-                                      : undefined
-                                  }
-                                  grammarLocale={target}
-                                  textClassName="tsz-words"
-                                  disabled={disabled}
-                                  onChange={(definitions) =>
-                                    updateSense(sense.id, {
-                                      definitions:
-                                        definitions as NextDefinition[]
-                                    })
-                                  }
-                                />
-                                <ContentRows
-                                  grouped
-                                  rows={sense.definitions}
-                                  locale={medium}
-                                  label={`${localeLabels[medium]}解释`}
-                                  definition
-                                  grammars={
-                                    grammarAvailable
-                                      ? (value.grammar_structures ?? []).filter(
-                                          (g) =>
-                                            grammarMatchesSense(
-                                              g,
-                                              sense,
-                                              catalog.data
-                                            )
-                                        )
-                                      : undefined
-                                  }
-                                  grammarLocale={target}
-                                  disabled={disabled}
-                                  onChange={(definitions) =>
-                                    updateSense(sense.id, {
-                                      definitions:
-                                        definitions as NextDefinition[]
-                                    })
-                                  }
-                                />
-                                <ContentRows
-                                  grouped
-                                  rows={sense.equivalents}
-                                  locale={medium}
-                                  label={`${localeLabels[medium]}译词`}
-                                  disabled={disabled}
-                                  onChange={(equivalents) =>
-                                    updateSense(sense.id, { equivalents })
-                                  }
-                                />
-                              </Flex>
-                            )
-                          }
-                        ]}
-                      />
-                    </section>
-                  );
-                })}
+                              )}
+
+                              <ContentRows
+                                grouped
+                                rows={sense.definitions}
+                                locale={target}
+                                label={`${localeLabels[target]}释义`}
+                                definition
+                                grammars={
+                                  grammarAvailable
+                                    ? (value.grammar_structures ?? []).filter(
+                                        (g) =>
+                                          grammarMatchesSense(
+                                            g,
+                                            sense,
+                                            catalog.data
+                                          )
+                                      )
+                                    : undefined
+                                }
+                                grammarLocale={target}
+                                textClassName="tsz-words"
+                                disabled={disabled}
+                                onChange={(definitions) =>
+                                  updateSense(sense.id, {
+                                    definitions: definitions as NextDefinition[]
+                                  })
+                                }
+                              />
+                              <ContentRows
+                                grouped
+                                rows={sense.definitions}
+                                locale={medium}
+                                label={`${localeLabels[medium]}解释`}
+                                definition
+                                grammars={
+                                  grammarAvailable
+                                    ? (value.grammar_structures ?? []).filter(
+                                        (g) =>
+                                          grammarMatchesSense(
+                                            g,
+                                            sense,
+                                            catalog.data
+                                          )
+                                      )
+                                    : undefined
+                                }
+                                grammarLocale={target}
+                                disabled={disabled}
+                                onChange={(definitions) =>
+                                  updateSense(sense.id, {
+                                    definitions: definitions as NextDefinition[]
+                                  })
+                                }
+                              />
+                              <ContentRows
+                                grouped
+                                rows={sense.equivalents}
+                                locale={medium}
+                                label={`${localeLabels[medium]}译词`}
+                                disabled={disabled}
+                                onChange={(equivalents) =>
+                                  updateSense(sense.id, { equivalents })
+                                }
+                              />
+                            </Flex>
+                          </SenseEditorShell>
+                        </section>
+                      );
+                    })
+                  }
+                </SortableRows>
                 <Button
                   block
                   type="dashed"
@@ -670,6 +707,13 @@ export function MeaningsStep({
                         ...value.senses,
                         {
                           id,
+                          ...(senseMetadataAvailable
+                            ? {
+                                level: "A1",
+                                frequency: "0",
+                                depends_on_context: false
+                              }
+                            : {}),
                           ...(senseGroupsAvailable && inheritedGroup
                             ? { sense_group_id: inheritedGroup }
                             : {}),

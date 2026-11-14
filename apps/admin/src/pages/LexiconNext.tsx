@@ -133,6 +133,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               language={language}
               formEditorAvailable={capability.data?.form_editor === true}
               senseGroupsAvailable={capability.data?.sense_groups === true}
+              senseMetadataAvailable={capability.data?.sense_metadata === true}
               grammarAvailable={capability.data?.grammar_structures === true}
               grammarAudioAvailable={capability.data?.grammar_audio === true}
             />
@@ -154,11 +155,13 @@ function EntryLoader({
   language,
   formEditorAvailable,
   senseGroupsAvailable,
+  senseMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
+  senseMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
   id: string;
@@ -236,6 +239,7 @@ function EntryLoader({
       archived={metadata.data.status === "archived"}
       formEditorAvailable={formEditorAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
+      senseMetadataAvailable={senseMetadataAvailable}
       grammarAvailable={grammarAvailable}
       grammarAudioAvailable={grammarAudioAvailable}
     />
@@ -248,11 +252,13 @@ function EntryEditor({
   archived,
   formEditorAvailable,
   senseGroupsAvailable,
+  senseMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
+  senseMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
   archived: boolean;
@@ -612,6 +618,7 @@ function EntryEditor({
             medium={medium}
             partOfSpeechCodes={language.part_of_speech_codes}
             senseGroupsAvailable={senseGroupsAvailable}
+            senseMetadataAvailable={senseMetadataAvailable}
             grammarAvailable={grammarAvailable}
             grammarAudioAvailable={grammarAudioAvailable}
             disabled={disabled}

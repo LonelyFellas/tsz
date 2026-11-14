@@ -154,6 +154,13 @@ export function previewDraft(
       );
       return {
         id: sense.id,
+        ...(sense.level !== undefined ? { level: sense.level } : {}),
+        ...(sense.frequency !== undefined
+          ? { frequency: sense.frequency }
+          : {}),
+        ...(sense.depends_on_context !== undefined
+          ? { depends_on_context: sense.depends_on_context }
+          : {}),
         ...(sense.sense_group_id
           ? { sense_group_id: sense.sense_group_id }
           : {}),
@@ -169,6 +176,19 @@ export function previewDraft(
 }
 
 export function draftProblem(draft: NextDraft): string | null {
+  for (const [index, sense] of draft.senses.entries()) {
+    if (
+      sense.level !== undefined &&
+      !/^(A1|A2|B1|B2|C1|C2)$/u.test(sense.level)
+    )
+      return `义项 ${index + 1} 请选择有效的词义等级。`;
+    if (
+      sense.frequency !== undefined &&
+      (!/^\d+(?:\.\d{1,2})?$/u.test(sense.frequency) ||
+        Number(sense.frequency) > 100)
+    )
+      return `义项 ${index + 1} 词频必须为 0–100，最多两位小数。`;
+  }
   for (const group of draft.sense_groups ?? []) {
     if (
       [group.name_zh, group.name_en].some(

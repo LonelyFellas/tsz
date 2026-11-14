@@ -97,14 +97,14 @@ it("确认删除义项只移除目标，保留弹窗打开期间回写的草稿�
       </App>
     </QueryClientProvider>
   );
-  fireEvent.click(screen.getAllByRole("button", { name: "删除义项" })[0]!);
+  fireEvent.click(screen.getAllByRole("button", { name: "删除词义 1" })[0]!);
   const dialog = within(await screen.findByRole("dialog"));
-  expect(dialog.getByText("删除义项 1？")).toBeVisible();
+  expect(dialog.getByText("确定删除该词义吗？")).toBeVisible();
   act(() => completeBackgroundUpdate());
   expect(JSON.parse(screen.getByLabelText("当前草稿").textContent!)).toEqual(
     updated
   );
-  fireEvent.click(dialog.getByRole("button", { name: "删除义项" }));
+  fireEvent.click(dialog.getByRole("button", { name: "确认删除" }));
   expect(JSON.parse(screen.getByLabelText("当前草稿").textContent!)).toEqual({
     ...updated,
     senses: [updated.senses[1]]
@@ -250,3 +250,56 @@ it("新词库语法富文本与细分词性绑定，改绑保留引用并筛选�
     catalog.mockRestore();
   }
 }, 15_000);
+
+it("只读词义总体数据禁用输入、排序和键盘语境切换", async () => {
+  const catalog = vi
+    .spyOn(partOfSpeechDataSource, "catalog")
+    .mockResolvedValue(partOfSpeechCatalogFixture);
+  const onChange = vi.fn();
+  const value: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    senses: [
+      {
+        id: "first",
+        part_of_speech: "noun",
+        level: "B2",
+        frequency: "95.5",
+        depends_on_context: false,
+        definitions: [],
+        equivalents: []
+      },
+      { id: "second", part_of_speech: "noun", definitions: [], equivalents: [] }
+    ]
+  };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <App>
+        <MeaningsStep
+          value={value}
+          kind="word"
+          formEditorAvailable={false}
+          senseMetadataAvailable
+          target="en-GB"
+          medium="zh-Hans"
+          partOfSpeechCodes={["noun"]}
+          disabled
+          onChange={onChange}
+        />
+      </App>
+    </QueryClientProvider>
+  );
+  expect(
+    await screen.findByRole("spinbutton", { name: "释义 1 频率" })
+  ).toBeDisabled();
+  const toggle = screen.getByRole("switch", { name: "释义 1 是否依赖语境" });
+  expect(toggle).toBeDisabled();
+  fireEvent.keyDown(toggle.parentElement!, { key: "Enter" });
+  fireEvent.keyDown(screen.getByRole("button", { name: "拖动词义 1" }), {
+    key: "ArrowDown"
+  });
+  expect(screen.getByRole("button", { name: "删除词义 1" })).toBeDisabled();
+  expect(onChange).not.toHaveBeenCalled();
+  catalog.mockRestore();
+});
