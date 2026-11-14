@@ -28,7 +28,7 @@ import type {
 export interface SpellingAudioScope {
   /** 仅当前选用拼写来源的口音参与生成。 */
   activeLocales?: readonly PhonemeLocaleV3[];
-  /** 仅显式选用拼写的口音必须解析成功。 */
+  /** 读法已有显式来源时，选用拼写的口音必须解析成功。 */
   requiredLocales: readonly PhonemeLocaleV3[];
 }
 
@@ -43,6 +43,9 @@ export function spellingAudioScope(
   const required = new Set<PhonemeLocaleV3>();
   for (const variant of variants) {
     for (const row of variant.pronunciations) {
+      const explicit = !!(
+        row.synthesis?.uk?.source || row.synthesis?.us?.source
+      );
       for (const side of ["uk", "us"] as const) {
         if (variant.dialect !== "common" && variant.dialect !== side) continue;
         const locale = side === "uk" ? "en-GB" : "en-US";
@@ -64,7 +67,7 @@ export function spellingAudioScope(
               : current.alphabet);
         if (source !== "spelling") continue;
         active.add(locale);
-        if (current.source === "spelling") required.add(locale);
+        if (explicit) required.add(locale);
       }
     }
   }

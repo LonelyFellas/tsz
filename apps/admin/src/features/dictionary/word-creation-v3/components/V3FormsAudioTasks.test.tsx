@@ -437,6 +437,30 @@ it("显式拼写来源的历史音色解析失败时不兜底生成未知口音"
   ).toEqual(variants.common.spelling_speech);
 });
 
+it("部分显式来源的拼写侧解析失败时保留配置并阻止保存", async () => {
+  const forms = fixture();
+  const variants = forms.contents[0]!.regional_variants;
+  if (variants.mode !== "common") throw new Error("expected common fixture");
+  const variant = variants.common;
+  variant.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: { voices: [{ ...voices[0]!, audio_asset_id: "stored-uk" }] }
+  };
+  const row = variant.pronunciations[0]!;
+  delete row.voice_profile;
+  row.synthesis!.use_spelling = true;
+  row.synthesis!.uk = { source: "ipa", ipa: "", ups: "" };
+  row.synthesis!.us = { ipa: "", ups: "" };
+  speech.resolve.mockRejectedValue(new Error("美式拼写解析失败"));
+  render(<Host initial={forms} />);
+  expect(await screen.findByText("美式拼写解析失败")).toBeVisible();
+  for (const wait of [...tasks.values()]) expect(await wait()).toBe(false);
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(JSON.parse(screen.getByTestId("saved-forms").textContent!)).toEqual(
+    forms
+  );
+});
+
 it("无显式来源的旧拼写单侧池不要求缺少音色的另一侧解析成功", async () => {
   const forms = fixture();
   const variants = forms.contents[0]!.regional_variants;

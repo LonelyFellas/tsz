@@ -64,7 +64,10 @@ it("隐式 IPA/UPS 不启用拼写，旧拼写配置和单侧来源仍按当前�
     requiredLocales: []
   });
   row.synthesis!.uk!.source = "ipa";
-  expect(scope()).toEqual({ activeLocales: ["en-US"], requiredLocales: [] });
+  expect(scope()).toEqual({
+    activeLocales: ["en-US"],
+    requiredLocales: ["en-US"]
+  });
   row.synthesis!.us!.source = "spelling";
   expect(scope()).toEqual({
     activeLocales: ["en-US"],
