@@ -596,3 +596,51 @@ it("语法扩展读取保持闭合契约、存量可省略且拒绝 null", () =>
     })
   ).toThrow();
 });
+
+it("语法配音协商和持久化字段遵循运行时契约", async () => {
+  const extended = structuredClone(entry);
+  const variant = {
+    id: uuid(602),
+    locale: "en-GB",
+    content: { version: 2 as const, text: "a job", annotations: [] },
+    voice_profile: {
+      voices: [{ voice_id: "saved-voice", enabled: true, rate_percent: 25 }]
+    },
+    audio_assets: [
+      {
+        id: uuid(603),
+        locale: "en-GB" as const,
+        gender: "female" as const,
+        content_type: "audio/mpeg",
+        size_bytes: 3,
+        original_name: "fixture.mp3",
+        created_at: "2026-11-14T00:00:00Z"
+      }
+    ]
+  };
+  extended.draft.grammar_structures = [
+    { id: uuid(601), part_of_speech: "noun", variants: [variant] }
+  ];
+  const request = client(extended);
+  expect(
+    await request.api.save(entry.id, {
+      expected_revision: 1,
+      draft: extended.draft
+    })
+  ).toEqual(extended);
+  expect(
+    new Headers(request.fetch.mock.calls[0]![1].headers).get(
+      "x-tsz-next-grammar-audio"
+    )
+  ).toBe("v1");
+  for (const patch of [
+    { voice_profile: null },
+    { audio_assets: null },
+    { voice_profile: { voices: [], unknown: true } },
+    { audio_assets: [{ ...variant.audio_assets[0], unknown: true }] }
+  ]) {
+    const invalid = structuredClone(extended);
+    Object.assign(invalid.draft.grammar_structures![0]!.variants[0]!, patch);
+    expect(() => decodeNextEntry(invalid)).toThrow();
+  }
+});

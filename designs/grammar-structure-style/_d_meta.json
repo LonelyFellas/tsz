@@ -1,0 +1,21 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "语法结构样式预览": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-11-14T12:16:20.352Z",
+          "status": "needs-review",
+          "viewport": {
+            "width": 1440
+          }
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-11-14T12:16:20.353Z",
+  "updatedAt": "2026-11-14T12:16:20.353Z"
+}

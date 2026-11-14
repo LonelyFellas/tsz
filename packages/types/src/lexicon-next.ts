@@ -1,4 +1,9 @@
-import type { RichTextV3, SharedFormsStepContentV3 } from "./admin-word-v3";
+import type {
+  AudioAssetV3,
+  VoiceProfileV3,
+  RichTextV3,
+  SharedFormsStepContentV3
+} from "./admin-word-v3";
 
 /** Independent lexicon-next identities; the forms editor shares the V1 content contract. */
 export interface NextForm {
@@ -32,6 +37,8 @@ export interface NextSense {
   equivalents: NextEquivalent[];
 }
 export interface NextGrammarVariant {
+  voice_profile?: VoiceProfileV3;
+  audio_assets?: AudioAssetV3[];
   id: string;
   locale: string;
   content: RichTextV3;
@@ -142,6 +149,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  grammar_audio?: boolean;
   grammar_structures?: boolean;
   medium_ownership?: boolean;
   schema_version: 1;
