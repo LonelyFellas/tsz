@@ -1311,3 +1311,43 @@ it("音频生成失败后停止应用按钮的 loading，保留输入和弹窗",
   expect(screen.getByLabelText("内容拼写")).toHaveValue("retained input");
   expect(onConfirm).not.toHaveBeenCalled();
 });
+
+it("指定共享标签独立编辑保留内容、引用身份与其他绑定，不能用移除标签替代", async () => {
+  const expanded = formsFixture({
+    forms: [
+      commonFormFixture(),
+      commonFormFixture({ id: uuidFromInt(901), form_type: "plural" })
+    ]
+  });
+  const original = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    expanded
+  ) as SharedFormsStepContentV3;
+  const selected = original.pos[0]!.forms[1]!;
+  const shared = assignSharedFormContent(
+    original,
+    original.contents[0]!.id,
+    selected.id,
+    createStableVariantIdFactory(expanded, [])
+  );
+  const { onConfirm } = setup({
+    initialForms: shared,
+    catalog: {
+      ...partOfSpeechCatalogFixture,
+      form_sharing: { revision: 1, groups: [] }
+    }
+  });
+  const dialog = screen.getByRole("dialog");
+  const actions = within(dialog).getAllByRole("button", { name: /^独立编辑/ });
+  expect(actions).toHaveLength(2);
+  fireEvent.click(actions[1]!);
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
+  const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+  expect(expandFormContents(next)).toEqual(expandFormContents(shared));
+  expect(next.pos[0]!.forms[0]).toEqual(shared.pos[0]!.forms[0]);
+  expect(next.pos[0]!.forms[1]!.id).toBe(selected.id);
+  expect(next.pos[0]!.forms[1]!.content_id).not.toBe(
+    next.pos[0]!.forms[0]!.content_id
+  );
+  expect(next.pos[0]!.form_groups).toEqual(shared.pos[0]!.form_groups);
+});

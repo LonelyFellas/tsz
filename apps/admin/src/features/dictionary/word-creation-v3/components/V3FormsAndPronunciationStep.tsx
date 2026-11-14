@@ -72,7 +72,11 @@ import { SortableDragHandle } from "./SortableDragHandle";
 import { V3FormContentModal } from "./V3FormContentModal";
 import { V3FormsAudioTasks } from "./V3FormsAudioTasks";
 import { V3FormCopyProvider } from "./V3FormCopyProvider";
-import type { createPronunciationReferenceIds } from "../sharedFormsModel";
+import {
+  applyFormsStructure,
+  type createPronunciationReferenceIds
+} from "../sharedFormsModel";
+import { applyDefaultFormSharing } from "../defaultFormSharing";
 
 /** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
 const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
@@ -287,14 +291,25 @@ export function V3FormsAndPronunciationStep({
     if (!result.ok) return;
     const added = result.value.pos.at(-1)!;
     // 手动加的词性也按该词性的配置铺一遍「新建模板」，省得逐个「添加派生词形」。
-    onChange(
-      fillFormTypeTemplate(
-        result.value,
-        catalog.data?.items,
-        idFactory,
-        added.pos_id
-      )
+    const filled = fillFormTypeTemplate(
+      result.value,
+      catalog.data?.items,
+      idFactory,
+      added.pos_id
     );
+    if (sharedForms && onSharedFormsChange) {
+      const next = applyFormsStructure(
+        sharedForms,
+        filled
+      ) as SharedFormsStepContentV3;
+      onSharedFormsChange(
+        applyDefaultFormSharing(
+          next,
+          catalog.data,
+          new Set(filled.pos.at(-1)!.forms.map((form) => form.id))
+        )
+      );
+    } else onChange(filled);
     onActivePosChange?.(added.pos_id);
   };
 

@@ -8,6 +8,8 @@ export type AdminWordsDataSource = AdminWordsApi;
 export type AdminPartOfSpeechDataSource = Pick<
   AdminPartOfSpeechSettingsApi,
   | "catalog"
+  | "getFormSharing"
+  | "updateFormSharing"
   | "list"
   | "create"
   | "update"

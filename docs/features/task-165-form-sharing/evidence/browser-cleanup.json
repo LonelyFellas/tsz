@@ -1,0 +1,10 @@
+{
+  "origin": "http://127.0.0.1:49551",
+  "local_storage": 0,
+  "session_storage": 0,
+  "indexed_db": 0,
+  "cache_storage": 0,
+  "service_workers": 0,
+  "logged_out": true,
+  "refresh_cookie_remaining": false
+}

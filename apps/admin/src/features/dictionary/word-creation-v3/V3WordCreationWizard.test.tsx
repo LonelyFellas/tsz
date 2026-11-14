@@ -5,6 +5,7 @@ import { expandFormContents } from "@tsz/shared";
 import { snapshotKey } from "@tsz/shared/recovery";
 import {
   applyFormsStructure,
+  detachSharedFormContent,
   contentEditorForms,
   contentFromEditor,
   replaceSharedContent
@@ -7698,4 +7699,66 @@ it("参考浮窗打开期间不能恢复备份草稿，关闭后恢复仍然可�
   expect(restore).toBeEnabled();
   fireEvent.click(restore);
   expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+});
+
+it("新建 shared_v1 草稿首次初始化共享默认标签，手动拆分与重新挂载历史草稿不重复合并", async () => {
+  const catalog = structuredClone(partOfSpeechCatalogFixture);
+  const noun = catalog.items.find((row) => row.code === "noun")!;
+  const verb = catalog.items.find((row) => row.code === "verb")!;
+  catalog.form_sharing = {
+    revision: 1,
+    groups: [
+      {
+        id: "base-sharing",
+        members: [noun, verb].map((row) => ({
+          part_of_speech_id: row.id,
+          form_type_id: "form-type-base"
+        }))
+      }
+    ]
+  };
+  const initial: AdminWordV3 = word();
+  const inline = formsFixture({ forms: [commonFormFixture()] });
+  const verbForms = formsFixture({
+    pos_id: "new-verb",
+    pos: "verb",
+    forms: [commonFormFixture({ id: "verb-base" })]
+  });
+  inline.pos.push(verbForms.pos[0]!);
+  initial.forms = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    inline
+  );
+  let context: V3WizardSlotContext | undefined;
+  const renderStep = (next: V3WizardSlotContext) => {
+    context = next;
+    return null;
+  };
+  const first = renderWizard(requests(), {
+    initialWord: initial,
+    partOfSpeechCatalog: catalog,
+    prefillNewDraft: true,
+    renderStep
+  });
+  await waitFor(() => {
+    const forms = context!.formContents;
+    if (!("contents" in forms)) throw new Error("fixture");
+    expect(forms.pos[0]!.forms[0]!.content_id).toBe(
+      forms.pos[1]!.forms[0]!.content_id
+    );
+  });
+  const shared = context!.formContents;
+  if (!("contents" in shared)) throw new Error("fixture");
+  const detached = detachSharedFormContent(shared, shared.pos[1]!.forms[0]!.id);
+  act(() => context!.setFormContents(detached));
+  expect(context!.formContents).toEqual(detached);
+  first.unmount();
+  const reopened: AdminWordV3 = { ...initial, revision: 2, forms: detached };
+  renderWizard(requests(), {
+    initialWord: reopened,
+    partOfSpeechCatalog: catalog,
+    prefillNewDraft: true,
+    renderStep
+  });
+  expect(context!.formContents).toEqual(detached);
 });

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-ownership/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-14T01:57:45.404Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-165-form-sharing-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-14T02:55:40.276Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -135,6 +135,7 @@
     "/admin/settings/form-types/{id}": ["delete", "patch"],
     "/admin/settings/parts-of-speech": ["get", "post"],
     "/admin/settings/parts-of-speech/catalog": ["get"],
+    "/admin/settings/parts-of-speech/form-sharing": ["get", "put"],
     "/admin/settings/parts-of-speech/{id}": ["delete", "patch"],
     "/admin/settings/parts-of-speech/{id}/sub-parts": ["get", "post"],
     "/admin/settings/parts-of-speech/{id}/sub-parts/{sub_id}": [
@@ -5242,9 +5243,10 @@
     },
     "CatalogResponse": {
       "type": "object",
-      "required": ["form_types", "catalog_version", "items"],
+      "required": ["form_sharing", "form_types", "catalog_version", "items"],
       "properties": {
         "catalog_version": { "type": "integer", "format": "int64" },
+        "form_sharing": { "$ref": "#/components/schemas/FormSharingTemplate" },
         "form_types": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/FormTypeCatalogItem" }
@@ -5254,6 +5256,56 @@
           "items": { "$ref": "#/components/schemas/CatalogPart" }
         }
       }
+    },
+    "FormSharingTemplate": {
+      "type": "object",
+      "required": ["revision", "groups"],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/FormSharingGroup" },
+          "maxItems": 100
+        },
+        "revision": { "type": "integer", "format": "int64", "minimum": 1 }
+      }
+    },
+    "FormSharingGroup": {
+      "type": "object",
+      "required": ["id", "members"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/FormSharingMember" },
+          "maxItems": 100,
+          "minItems": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "FormSharingMember": {
+      "type": "object",
+      "description": "稳定目录 ID；原形允许搭配任意单词词性，其余词形必须属于所选词性。",
+      "required": ["part_of_speech_id", "form_type_id"],
+      "properties": {
+        "form_type_id": { "type": "string", "format": "uuid" },
+        "part_of_speech_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "UpdateFormSharingTemplate": {
+      "type": "object",
+      "description": "整体替换模板；空 groups 关闭默认共享，不影响既有词条。",
+      "required": ["base_revision", "groups"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/FormSharingGroup" },
+          "maxItems": 100
+        }
+      },
+      "additionalProperties": false
     },
     "ErrorCode": {
       "type": "string",

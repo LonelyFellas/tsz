@@ -28,7 +28,8 @@ import type {
   V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
-import { expandFormContents } from "@tsz/shared";
+import { expandFormContents, isSharedForms } from "@tsz/shared";
+import { applyDefaultFormSharing } from "./defaultFormSharing";
 import {
   applyFormsStructure,
   createPronunciationReferenceIds
@@ -647,7 +648,23 @@ function V3WordCreationSession({
             )
               form.regional_variants.common.spelling =
                 word.presentation.matched_surfaces[0]!;
-        content = applyFormsStructure(draftFormsRef.current, initialized);
+        if (isSharedForms(content)) {
+          const next = structuredClone(content);
+          for (const pos of next.pos)
+            for (const form of pos.forms) {
+              if (form.form_type !== "base") continue;
+              const shared = next.contents.find(
+                (row) => row.id === form.content_id
+              )!;
+              if (
+                shared.regional_variants.mode === "common" &&
+                !shared.regional_variants.common.spelling.trim()
+              )
+                shared.regional_variants.common.spelling =
+                  word.presentation.matched_surfaces[0]!;
+            }
+          content = next;
+        } else content = initialized;
       }
       supersede();
       setDraftFormsState(content);
@@ -770,7 +787,17 @@ function V3WordCreationSession({
             newWordNodeId
           );
     const filledMeanings = fillDefaultSenseGroups(baseMeanings, newWordNodeId);
-    if (filledForms !== projectedForms) setDraftForms(filledForms);
+    const structured = applyFormsStructure(draftForms, filledForms);
+    const shared = isSharedForms(structured)
+      ? applyDefaultFormSharing(
+          structured,
+          partOfSpeechCatalog,
+          new Set(
+            structured.pos.flatMap((pos) => pos.forms.map((form) => form.id))
+          )
+        )
+      : structured;
+    if (shared !== draftForms) setFormContents(shared);
     if (filledMeanings !== draftMeanings) setDraftMeanings(filledMeanings);
   }, [
     contentEditing,
@@ -779,7 +806,7 @@ function V3WordCreationSession({
     partOfSpeechCatalog,
     prefillNewDraft,
     sessionReadOnly,
-    setDraftForms,
+    setFormContents,
     setDraftMeanings,
     word
   ]);

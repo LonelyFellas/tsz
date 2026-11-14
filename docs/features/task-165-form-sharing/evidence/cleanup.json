@@ -1,0 +1,24 @@
+{
+  "run_id": "task165-b3-20261114",
+  "owned_databases_removed": 1,
+  "remaining_non_system_databases_before_cluster_removal": 0,
+  "dedicated_redis_keys_discarded": 61,
+  "postgres_cluster_removed": true,
+  "redis_data_directory_removed": true,
+  "api_admin_cleanup_services_stopped": true,
+  "ports_no_longer_listening": [49548, 49549, 49550, 49551],
+  "private_credentials_tokens_raw_payloads_logs_and_temp_registry_removed": true,
+  "browser": {
+    "origin": "http://127.0.0.1:49551",
+    "local_storage": 0,
+    "session_storage": 0,
+    "indexed_db": 0,
+    "cache_storage": 0,
+    "service_workers": 0,
+    "logged_out": true,
+    "refresh_cookie_remaining": false
+  },
+  "oss_created": false,
+  "shared_services_and_cargo_cache_untouched": true,
+  "remaining_owned_resources": 0
+}

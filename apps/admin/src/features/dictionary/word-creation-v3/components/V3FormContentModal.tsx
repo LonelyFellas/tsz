@@ -47,6 +47,7 @@ import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
   assignSharedFormContent,
+  detachSharedFormContent,
   contentEditorForms,
   contentFromEditor,
   createPronunciationReferenceIds,
@@ -334,13 +335,14 @@ export function V3FormContentModal({
         )
       : local;
   };
-  const confirmed = async (leave = false) => {
+  const confirmed = async (leave = false, detachId?: string) => {
     if (savingRef.current) return false;
     savingRef.current = true;
     setSaving(true);
     try {
       if (audioTasks.current.size > 0 && !(await waitForAudio())) return false;
-      onConfirm(completeForms());
+      const next = completeForms();
+      onConfirm(detachId ? detachSharedFormContent(next, detachId) : next);
       if (leave) finishLeave(true);
       return true;
     } catch (cause) {
@@ -855,6 +857,21 @@ export function V3FormContentModal({
                   {partOfSpeechLabel(pos.pos)}
                   {label(binding.form_type)}
                   {number && <sup>{number}</sup>}
+                  {contentReassignmentAvailable &&
+                    catalog?.form_sharing &&
+                    rows.length > 1 && (
+                      <Button
+                        size="small"
+                        type="link"
+                        disabled={saving || choosing || Boolean(regionalChoice)}
+                        aria-label={t("edit_label_independently", {
+                          label: `${partOfSpeechLabel(pos.pos)}${label(binding.form_type)}${number ? ` ${number}` : ""}`
+                        })}
+                        onClick={() => void confirmed(false, binding.id)}
+                      >
+                        {t("edit_independently")}
+                      </Button>
+                    )}
                   <Tooltip title={removalReason(binding.id)}>
                     <Button
                       size="small"

@@ -1,5 +1,69 @@
 // Fixed UI messages only. Names, prose and catalogue data stay unchanged.
 export const contentMessages = {
+  sharing_delete_group: [
+    "删除共享组合 {{count}}",
+    "刪除共用組合 {{count}}",
+    "Delete sharing group {{count}}"
+  ],
+  sharing_title: ["默认共享模板", "預設共用範本", "Default sharing template"],
+  sharing_load_failed: [
+    "共享模板加载失败",
+    "共用範本載入失敗",
+    "Could not load the sharing template"
+  ],
+  sharing_unsupported: [
+    "当前服务不支持默认共享模板",
+    "目前服務不支援預設共用範本",
+    "This server does not support default sharing templates"
+  ],
+  sharing_saved: ["共享模板已保存", "共用範本已儲存", "Sharing template saved"],
+  sharing_conflict: [
+    "模板已被其他人修改。本地输入已保留，请重新加载后核对并重试。",
+    "範本已被其他人修改。本機輸入已保留，請重新載入後核對並重試。",
+    "Someone else changed the template. Your input is retained. Reload, review the changes and try again."
+  ],
+  sharing_min_members: [
+    "每个共享组合须选择 2–100 个标签",
+    "每個共用組合須選擇 2–100 個標籤",
+    "Select 2–100 labels for each sharing group"
+  ],
+  sharing_scope_help: [
+    "仅应用于新建词条或新增词性的首个默认变化组；关闭默认生成的词形不会新增。",
+    "僅套用至新建詞條或新增詞性的首個預設變化組；關閉預設生成的詞形不會新增。",
+    "Applies only to the first default group when creating an entry or adding a part of speech. Disabled default forms are not added."
+  ],
+  sharing_reload_title: [
+    "重新加载模板？",
+    "重新載入範本？",
+    "Reload the template?"
+  ],
+  sharing_reload_help: [
+    "将读取服务器版本并放弃本地模板修改。",
+    "將讀取伺服器版本並放棄本機範本修改。",
+    "This loads the server version and discards your local template changes."
+  ],
+  sharing_reload: ["重新加载", "重新載入", "Reload"],
+  sharing_empty: [
+    "未配置默认共享组合",
+    "未設定預設共用組合",
+    "No default sharing groups"
+  ],
+  sharing_group: [
+    "共享组合 {{count}}",
+    "共用組合 {{count}}",
+    "Sharing group {{count}}"
+  ],
+  sharing_add_group: ["新增共享组合", "新增共用組合", "Add sharing group"],
+  sharing_remove_reference: [
+    "该配置用于默认共享模板，请先移除模板引用再删除。",
+    "此設定用於預設共用範本，請先移除範本引用再刪除。",
+    "Remove this configuration from the default sharing template before deleting it."
+  ],
+  sharing_reparent_blocked: [
+    "该词形用于默认共享模板，请先移除模板引用再更改所属词性。",
+    "此詞形用於預設共用範本，請先移除範本引用再變更所屬詞性。",
+    "Remove this form from the default sharing template before changing its part of speech."
+  ],
   taxonomy_name_zh: ["中文名", "中文名", "Chinese name"],
   taxonomy_name_en: ["英文名", "英文名", "English name"],
   taxonomy_updated_at: ["更新时间", "更新時間", "Updated at"],

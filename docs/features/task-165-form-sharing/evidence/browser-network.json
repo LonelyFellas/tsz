@@ -1,0 +1,254 @@
+{
+  "origin": "http://127.0.0.1:49551",
+  "proxy": "http://127.0.0.1:49550/api/v1",
+  "mock": false,
+  "events": [
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4681",
+      "method": "POST",
+      "url": "http://127.0.0.1:49551/api/v1/admin/auth/refresh"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4681",
+      "url": "http://127.0.0.1:49551/api/v1/admin/auth/refresh",
+      "status": 200,
+      "request_id": "01a1d804-7051-7081-98ff-c6e5cba2fb0c"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4693",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/profile"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4693",
+      "url": "http://127.0.0.1:49551/api/v1/admin/profile",
+      "status": 200,
+      "request_id": "01a1d804-7056-7207-ae42-484bc8a4303c"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4694",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/i18n/capabilities?surface=admin"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4694",
+      "url": "http://127.0.0.1:49551/api/v1/i18n/capabilities?surface=admin",
+      "status": 200,
+      "request_id": "01a1d804-705b-73b6-b473-948a16e52063"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4695",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/profile"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4695",
+      "url": "http://127.0.0.1:49551/api/v1/admin/profile",
+      "status": 200,
+      "request_id": "01a1d804-705d-7724-b179-749f132f3767"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4696",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/sentences?view=draft&entry_id=01a1d801-6e0d-7074-9a5d-0a79dddd79f8&page_size=1"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4697",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4698",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4697",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200,
+      "request_id": "01a1d804-706c-768d-aa0a-4555295a905c"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4696",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/sentences?view=draft&entry_id=01a1d801-6e0d-7074-9a5d-0a79dddd79f8&page_size=1",
+      "status": 200,
+      "request_id": "01a1d804-706c-768d-aa0a-4554cf1ccf93"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4698",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8",
+      "status": 200,
+      "request_id": "01a1d804-706c-768d-aa0a-455625578cd7"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4699",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4700",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/inbound-references"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4701",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4699",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200,
+      "request_id": "01a1d804-70da-7165-9042-6a57dab2485e"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4700",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/inbound-references",
+      "status": 200,
+      "request_id": "01a1d804-70da-7165-9042-6a5677ea05e8"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4701",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200,
+      "request_id": "01a1d804-70df-7435-85aa-1fef8d0206d4"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4961",
+      "method": "PUT",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/form-sharing"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4961",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/form-sharing",
+      "status": 200,
+      "request_id": "01a1d806-3ea8-7364-ba1a-49ae330e3e40"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4962",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech?kind=word&page=1&page_size=10"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4963",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.4964",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/form-sharing"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4964",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/form-sharing",
+      "status": 200,
+      "request_id": "01a1d806-3eb9-723b-a97e-9551a4b7a8e8"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4963",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200,
+      "request_id": "01a1d806-3eb9-723b-a97e-95507bf78639"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.4962",
+      "url": "http://127.0.0.1:49551/api/v1/admin/settings/parts-of-speech?kind=word&page=1&page_size=10",
+      "status": 200,
+      "request_id": "01a1d806-3eb9-723b-a97e-954f0889c26f"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.5655",
+      "method": "PUT",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon-next/entries/01a1d7fe-6b2a-75a3-b81d-269d67feb4c5"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.5655",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon-next/entries/01a1d7fe-6b2a-75a3-b81d-269d67feb4c5",
+      "status": 200,
+      "request_id": "01a1d807-0d7e-76f8-9fb0-00fde0b14669"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.6123",
+      "method": "POST",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/steps/forms/impact"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.6123",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/steps/forms/impact",
+      "status": 200,
+      "request_id": "01a1d807-4158-7704-98c6-85181f1fb713"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.6124",
+      "method": "PUT",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/steps/forms"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.6124",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/steps/forms",
+      "status": 200,
+      "request_id": "01a1d807-4169-7026-bd82-c2619feec35a"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.6125",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "89783.6126",
+      "method": "GET",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/inbound-references"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.6125",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8",
+      "status": 200,
+      "request_id": "01a1d807-41af-757d-81a0-1f0217d98a6a"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "89783.6126",
+      "url": "http://127.0.0.1:49551/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8/inbound-references",
+      "status": 200,
+      "request_id": "01a1d807-41c0-71cf-b039-075ec69ded92"
+    }
+  ]
+}

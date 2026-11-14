@@ -81,6 +81,8 @@ import type {
   UpdateAdminPreferencesResponse,
   PermissionCatalogResponse,
   PartOfSpeechCatalogResponse,
+  FormSharingTemplate,
+  UpdateFormSharingTemplate,
   PartOfSpeechConfig,
   FormTypeConfig,
   CreateFormTypeInput,
@@ -821,6 +823,13 @@ export function createAdminEndpoints(http: HttpClient) {
      * super_admin 专属。契约已在 tsz-rust 落地。
      */
     partOfSpeechSettings: {
+      getFormSharing: () =>
+        http.get<FormSharingTemplate>("/settings/parts-of-speech/form-sharing"),
+      updateFormSharing: (input: UpdateFormSharingTemplate) =>
+        http.put<FormSharingTemplate>(
+          "/settings/parts-of-speech/form-sharing",
+          input
+        ),
       listFormTypes: (query: FormTypeConfigListQuery = {}) =>
         http.get<FormTypeConfigListResponse>(
           `/settings/form-types${qs({ ...query })}`

@@ -833,7 +833,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "15569acea2a771ca37bfd8ea04052b74dada8fabf53948eec83ea362686576bc"
+      "b620cee8b93dcdaa211457bb4149af85625d3281c52dfd07702d6cf4d17a61cc"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1869,4 +1869,22 @@ it("group ordering only accepts persisted IDs and its own revision", () => {
     "base_revision",
     "group_ids"
   ]);
+});
+
+it("默认共享配置的 GET/PUT 与 catalog 来自同一后端契约", () => {
+  expect(specPaths["/admin/settings/parts-of-speech/form-sharing"]).toEqual([
+    "get",
+    "put"
+  ]);
+  expect(snapshot.schemas.CatalogResponse.properties.form_sharing.$ref).toBe(
+    "#/components/schemas/FormSharingTemplate"
+  );
+  expect(snapshot.schemas.FormSharingMember.required).toEqual(
+    expect.arrayContaining(["part_of_speech_id", "form_type_id"])
+  );
+  expect(snapshot.schemas.UpdateFormSharingTemplate.required).toEqual(
+    expect.arrayContaining(["base_revision", "groups"])
+  );
+  expect(snapshot.schemas.FormSharingGroup.properties.members.minItems).toBe(2);
+  expect(snapshot.schemas.FormSharingGroup.additionalProperties).toBe(false);
 });
