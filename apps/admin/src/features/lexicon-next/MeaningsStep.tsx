@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   Button,
   Collapse,
@@ -35,7 +35,7 @@ export function MeaningsStep({
   partOfSpeechCodes: string[];
   disabled: boolean;
   senseGroupsAvailable?: boolean;
-  onChange: (next: NextDraft) => void;
+  onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
   const { modal } = App.useApp();
   const { t } = useLexiconEditorTranslation();
@@ -184,12 +184,12 @@ export function MeaningsStep({
                                     okText: "删除义项",
                                     cancelText: "取消",
                                     onOk: () =>
-                                      onChange({
-                                        ...value,
-                                        senses: value.senses.filter(
+                                      onChange((current) => ({
+                                        ...current,
+                                        senses: current.senses.filter(
                                           (item) => item.id !== sense.id
                                         )
-                                      })
+                                      }))
                                   });
                                 }}
                               />
