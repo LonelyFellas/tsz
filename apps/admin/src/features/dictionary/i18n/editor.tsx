@@ -8,12 +8,6 @@ import { lexiconEditorPanelMessages } from "./editor-panel-messages";
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconEditorMessages = {
-  edit_independently: ["独立编辑", "獨立編輯", "Edit independently"],
-  edit_label_independently: [
-    "独立编辑{{label}}",
-    "獨立編輯{{label}}",
-    "Edit {{label}} independently"
-  ],
   ...lexiconEditorPanelMessages,
   ...publishingWorkspaceMessages,
   ...batchPublicationMessages,

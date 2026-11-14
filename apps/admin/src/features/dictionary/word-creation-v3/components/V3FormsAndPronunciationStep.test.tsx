@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { FormsStep } from "@/features/lexicon-next/FormsStep";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import { primaryRegionalVariant } from "@tsz/shared";
 import { changeVoiceText } from "./V3VoiceTextField.test-helper";
@@ -47,7 +49,11 @@ import {
   updateConcreteFormType,
   createStableVariantIdFactory
 } from "../operations";
-import { applyFormsStructure, expandFormContents } from "../sharedFormsModel";
+import {
+  applyFormsStructure,
+  assignSharedFormContent,
+  expandFormContents
+} from "../sharedFormsModel";
 import { V3FormsAndPronunciationStep } from "./V3FormsAndPronunciationStep";
 import { V3PosTab } from "./V3PosTab";
 import { V3PronunciationList } from "./V3PronunciationList";
@@ -4003,3 +4009,72 @@ it("共享编辑器新增词性只对本次新增标签应用 catalog 模板", a
     next.pos[1]!.forms.find((row) => row.form_type === "base")!.content_id
   ).toBe(forms.pos[0]!.forms[0]!.content_id);
 });
+
+it.each(["words", "lexicon-next"])(
+  "%s 复用的共享词形弹窗不再提供独立编辑，仍可删除或新增标签",
+  async (entry) => {
+    const catalog = {
+      ...partOfSpeechCatalogFixture,
+      form_sharing: { revision: 1, groups: [] }
+    };
+    catalogState.data = catalog;
+    const initial = formsFixture({
+      forms: [
+        commonFormFixture(),
+        commonFormFixture({ id: uuidFromInt(901), form_type: "plural" })
+      ]
+    });
+    const original = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      initial
+    ) as SharedFormsStepContentV3;
+    const stableVariantIds = createStableVariantIdFactory(initial, []);
+    const forms = assignSharedFormContent(
+      original,
+      original.contents[0]!.id,
+      original.pos[0]!.forms[1]!.id,
+      stableVariantIds
+    );
+    const client = new QueryClient();
+    client.setQueryData(["part-of-speech-config", "catalog"], catalog);
+    render(
+      <QueryClientProvider client={client}>
+        <FeedbackApp>
+          {entry === "lexicon-next" ? (
+            <FormsStep
+              value={forms}
+              saved={forms}
+              kind="word"
+              locale="en-GB"
+              issues={[]}
+              onChange={vi.fn()}
+              registerLeaveGuard={vi.fn()}
+            />
+          ) : (
+            <V3FormsAndPronunciationStep
+              value={expandFormContents(forms)}
+              sharedForms={forms}
+              onSharedFormsChange={vi.fn()}
+              onChange={vi.fn()}
+              stableVariantIds={stableVariantIds}
+              contentReassignmentAvailable
+            />
+          )}
+        </FeedbackApp>
+      </QueryClientProvider>
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "编辑原形内容" })
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).queryByRole("button", { name: /^独立编辑/ })
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getAllByRole("button", { name: /^移除.*标签$/ })
+    ).toHaveLength(2);
+    fireEvent.click(within(dialog).getByRole("button", { name: "新增标签" }));
+    expect(await screen.findByText(/为.*指派词形标签/)).toBeVisible();
+    client.clear();
+  }
+);

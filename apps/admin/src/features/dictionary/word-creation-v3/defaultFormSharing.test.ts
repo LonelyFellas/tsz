@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { regionalVariants, expandFormContents } from "@tsz/shared";
 import type { SharedFormsStepContentV3 } from "@tsz/types";
 import { applyDefaultFormSharing } from "./defaultFormSharing";
-import {
-  applyFormsStructure,
-  detachSharedFormContent
-} from "./sharedFormsModel";
+import { applyFormsStructure } from "./sharedFormsModel";
 import { addPartOfSpeech, fillFormTypeTemplate } from "./operations";
 import { partOfSpeechCatalogFixture } from "../word-creation/partOfSpeech.test.helper";
 import { uuidFromInt } from "./fixtures";
@@ -177,36 +174,19 @@ describe("默认共享模板", () => {
     catalog.items.find((part) => part.code === "verb")!.default_form_types = [];
     expect(applyDefaultFormSharing(forms, catalog, newIds)).toBe(forms);
   });
-  it("独立编辑复制全部内容和槽位，保留公开引用 ID、组成员与其他标签；刷新不会重合并", () => {
-    const { catalog, forms, bases, newIds, ids } = fixture();
-    const shared = applyDefaultFormSharing(forms, catalog, newIds);
-    const source = content(shared, bases[1]!.id);
-    const variant = regionalVariants(source.regional_variants)[0]!;
-    source.pronunciation_slots = [
-      {
-        id: ids(),
-        common: {
-          id: variant.pronunciations[0]!.id,
-          variant_slot_id: variant.id
-        }
-      }
-    ];
-    const before = expandFormContents(shared);
-    const detached = detachSharedFormContent(shared, bases[1]!.id, ids);
-    expect(expandFormContents(detached)).toEqual(before);
-    expect(detached.pos[0]).toEqual(shared.pos[0]);
-    expect(detached.pos.map((pos) => pos.form_groups)).toEqual(
-      shared.pos.map((pos) => pos.form_groups)
+  it("历史独立内容即使拼写相同，刷新和结构更新也不重新合并", () => {
+    const { catalog, forms, bases } = fixture();
+    for (const base of bases)
+      regionalVariants(content(forms, base.id).regional_variants)[0]!.spelling =
+        "read";
+    expect(content(forms, bases[0]!.id).id).not.toBe(
+      content(forms, bases[1]!.id).id
     );
-    const copied = content(detached, bases[1]!.id);
-    expect(copied.id).not.toBe(source.id);
-    expect(copied.pronunciation_slots![0]!.common!.variant_slot_id).toBe(
-      regionalVariants(copied.regional_variants)[0]!.id
-    );
-    regionalVariants(copied.regional_variants)[0]!.spelling = "independent";
-    expect(content(detached, bases[0]!.id)).toEqual(source);
-    expect(applyDefaultFormSharing(detached, catalog, new Set())).toBe(
-      detached
-    );
+    const before = structuredClone(forms);
+    const refreshed = applyDefaultFormSharing(forms, catalog, new Set());
+    expect(refreshed).toBe(forms);
+    expect(
+      applyFormsStructure(refreshed, expandFormContents(refreshed))
+    ).toEqual(before);
   });
 });

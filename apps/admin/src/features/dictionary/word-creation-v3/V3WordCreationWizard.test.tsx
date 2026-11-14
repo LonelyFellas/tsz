@@ -5,7 +5,6 @@ import { expandFormContents } from "@tsz/shared";
 import { snapshotKey } from "@tsz/shared/recovery";
 import {
   applyFormsStructure,
-  detachSharedFormContent,
   contentEditorForms,
   contentFromEditor,
   replaceSharedContent
@@ -7701,7 +7700,7 @@ it("参考浮窗打开期间不能恢复备份草稿，关闭后恢复仍然可�
   expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
 });
 
-it("新建 shared_v1 草稿首次初始化共享默认标签，手动拆分与重新挂载历史草稿不重复合并", async () => {
+it("新建 shared_v1 草稿首次初始化共享默认标签，切回历史独立内容与重新挂载不重复合并", async () => {
   const catalog = structuredClone(partOfSpeechCatalogFixture);
   const noun = catalog.items.find((row) => row.code === "noun")!;
   const verb = catalog.items.find((row) => row.code === "verb")!;
@@ -7747,9 +7746,11 @@ it("新建 shared_v1 草稿首次初始化共享默认标签，手动拆分与�
       forms.pos[1]!.forms[0]!.content_id
     );
   });
-  const shared = context!.formContents;
-  if (!("contents" in shared)) throw new Error("fixture");
-  const detached = detachSharedFormContent(shared, shared.pos[1]!.forms[0]!.id);
+  const detached = structuredClone(initial.forms);
+  if (!("contents" in detached)) throw new Error("fixture");
+  expect(detached.pos[0]!.forms[0]!.content_id).not.toBe(
+    detached.pos[1]!.forms[0]!.content_id
+  );
   act(() => context!.setFormContents(detached));
   expect(context!.formContents).toEqual(detached);
   first.unmount();
