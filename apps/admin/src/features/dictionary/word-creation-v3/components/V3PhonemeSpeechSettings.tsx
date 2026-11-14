@@ -9,7 +9,7 @@ import { useVoiceAudioTasks, useVoiceSave } from "../voiceSaveContext";
 import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
 import { v3ContentFingerprint } from "../saveFlow";
 import { flushSync } from "react-dom";
-import { SettingsIcon } from "lucide-react";
+import { LoaderCircleIcon, SettingsIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
 import {
@@ -548,8 +548,18 @@ export function V3PhonemeSpeechSettings({
         <Button
           type="text"
           size="small"
-          icon={<SettingsIcon />}
+          icon={
+            automaticAudio.busy ? (
+              <LoaderCircleIcon className="ui-spinner" />
+            ) : (
+              <SettingsIcon />
+            )
+          }
           aria-label={t("creation_open_tts_settings", { label })}
+          aria-busy={automaticAudio.busy || undefined}
+          title={
+            automaticAudio.busy ? t("panel_generating_final_audio") : undefined
+          }
           data-v3-node-id={nodeId}
           data-v3-field={field}
           disabled={!canEdit || fallbackPending || fallbackError != null}
@@ -565,7 +575,9 @@ export function V3PhonemeSpeechSettings({
         />
       )}
       {!headless && automaticAudio.busy && (
-        <span role="status">{t("panel_generating_final_audio")}</span>
+        <span className="sr-only" role="status">
+          {t("panel_generating_final_audio")}
+        </span>
       )}
       {!open && automaticAudio.error != null && (
         <Alert
