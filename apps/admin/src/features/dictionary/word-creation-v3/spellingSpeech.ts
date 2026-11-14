@@ -6,7 +6,11 @@ import {
   toRichTextV2,
   withDefaultVoiceProfile
 } from "@tsz/voice-editor/core";
-import { speechAccentGroup } from "@tsz/shared";
+import {
+  EMPTY_SYNTHESIS,
+  speechAccentGroup,
+  synthesisForLocale
+} from "@tsz/shared";
 import type {
   VoiceAssociation,
   VoiceEditResult
@@ -22,37 +26,48 @@ import type {
 } from "@tsz/types";
 
 export interface SpellingAudioScope {
-  /** legacy 消费者仍需要整个已选池；undefined 保留该范围。 */
+  /** 仅当前选用拼写来源的口音参与生成。 */
   activeLocales?: readonly PhonemeLocaleV3[];
-  /** 仅显式选用拼写的口音必须解析成功。 */
+  /** 读法已有显式来源时，选用拼写的口音必须解析成功。 */
   requiredLocales: readonly PhonemeLocaleV3[];
 }
 
-/** 统一拼写可同时承载显式来源和 legacy 消费者，两种约束分别聚合。 */
+/** 共用拼写聚合各读法当前选用的口音；旧配置仍允许只保留已有的单侧音色池。 */
 export function spellingAudioScope(
   variants: readonly {
     dialect: Dialect;
     pronunciations: readonly WordPronunciationV3[];
   }[]
 ): SpellingAudioScope {
-  let legacyPool = false;
+  const active = new Set<PhonemeLocaleV3>();
   const required = new Set<PhonemeLocaleV3>();
   for (const variant of variants) {
-    const explicit = (row: WordPronunciationV3) =>
-      !!(row.synthesis?.uk?.source || row.synthesis?.us?.source);
-    if (!variant.pronunciations.some(explicit)) legacyPool = true;
     for (const row of variant.pronunciations) {
-      if (!explicit(row)) {
-        if (row.synthesis?.use_spelling) legacyPool = true;
-        continue;
-      }
+      const explicit = !!(
+        row.synthesis?.uk?.source || row.synthesis?.us?.source
+      );
       for (const side of ["uk", "us"] as const) {
         if (variant.dialect !== "common" && variant.dialect !== side) continue;
-        if (
-          (row.synthesis?.[side]?.source ??
-            (row.synthesis?.use_spelling ? "spelling" : "ipa")) === "spelling"
-        )
-          required.add(side === "uk" ? "en-GB" : "en-US");
+        const locale = side === "uk" ? "en-GB" : "en-US";
+        const current = synthesisForLocale(
+          row.synthesis ?? EMPTY_SYNTHESIS,
+          locale,
+          variant.dialect
+        );
+        const recording = row.audio_assets?.some(
+          (asset) =>
+            asset.is_default && speechAccentGroup(asset.locale) === side
+        );
+        const source =
+          current.source ??
+          (recording
+            ? "upload"
+            : current.use_spelling
+              ? "spelling"
+              : current.alphabet);
+        if (source !== "spelling") continue;
+        active.add(locale);
+        if (explicit) required.add(locale);
       }
     }
   }
@@ -60,7 +75,9 @@ export function spellingAudioScope(
     required.has(locale)
   );
   return {
-    activeLocales: legacyPool ? undefined : requiredLocales,
+    activeLocales: (["en-GB", "en-US"] as const).filter((locale) =>
+      active.has(locale)
+    ),
     requiredLocales
   };
 }

@@ -437,6 +437,30 @@ it("显式拼写来源的历史音色解析失败时不兜底生成未知口音"
   ).toEqual(variants.common.spelling_speech);
 });
 
+it("部分显式来源的拼写侧解析失败时保留配置并阻止保存", async () => {
+  const forms = fixture();
+  const variants = forms.contents[0]!.regional_variants;
+  if (variants.mode !== "common") throw new Error("expected common fixture");
+  const variant = variants.common;
+  variant.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: { voices: [{ ...voices[0]!, audio_asset_id: "stored-uk" }] }
+  };
+  const row = variant.pronunciations[0]!;
+  delete row.voice_profile;
+  row.synthesis!.use_spelling = true;
+  row.synthesis!.uk = { source: "ipa", ipa: "", ups: "" };
+  row.synthesis!.us = { ipa: "", ups: "" };
+  speech.resolve.mockRejectedValue(new Error("美式拼写解析失败"));
+  render(<Host initial={forms} />);
+  expect(await screen.findByText("美式拼写解析失败")).toBeVisible();
+  for (const wait of [...tasks.values()]) expect(await wait()).toBe(false);
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(JSON.parse(screen.getByTestId("saved-forms").textContent!)).toEqual(
+    forms
+  );
+});
+
 it("无显式来源的旧拼写单侧池不要求缺少音色的另一侧解析成功", async () => {
   const forms = fixture();
   const variants = forms.contents[0]!.regional_variants;
@@ -464,7 +488,7 @@ it("无显式来源的旧拼写单侧池不要求缺少音色的另一侧解析�
   expect(saved.voice_profile).toEqual(profile);
 });
 
-it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来源之间不混用", async () => {
+it("旧行级配音和当前音标来源分别生成，未选拼写保持原配置且不生成", async () => {
   const forms = fixture();
   const variant = forms.contents[0]!.regional_variants;
   if (variant.mode !== "common") throw new Error("expected common fixture");
@@ -473,13 +497,12 @@ it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来
     voice_profile: { voices }
   };
   render(<Host initial={forms} />);
-  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(6));
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   await waitFor(() => {
     const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
       .contents[0].regional_variants.common;
     const row = saved.pronunciations[0];
     const owners = [
-      saved.spelling_speech,
       { voice_profile: row.voice_profile },
       row.synthesis.uk.ipa_speech,
       row.synthesis.us.ipa_speech
@@ -488,9 +511,7 @@ it("发布检查要求的行级与非活跃拼写 owner 都有资产，音频来
       for (const setting of owner.voice_profile.voices as VoiceSettingV3[])
         if (setting.enabled) expect(setting.audio_asset_id).toBeTruthy();
     }
-    expect(saved.spelling_speech.voice_profile.voices[0].audio_asset_id).toBe(
-      "formal-spelling-en-GB"
-    );
+    expect(saved.spelling_speech).toEqual(variant.common.spelling_speech);
     expect(row.voice_profile.voices[0].audio_asset_id).toBe("formal-row-en-GB");
     expect(
       row.synthesis.uk.ipa_speech.voice_profile.voices[0].audio_asset_id
