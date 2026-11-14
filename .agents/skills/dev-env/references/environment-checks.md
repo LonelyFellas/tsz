@@ -24,14 +24,9 @@ Linux 用 `ss -ltnp`、`/proc/<pid>/cwd`、`/proc/<pid>/exe`；权限不足标�
 功能开关只核对目标路径需要的项；voice preview/editor、related search、audio upload 等状态不能用「全开」替代已实现契约。
 还要检查 browser route 拦截、service worker 或 fixture 是否替换了目标请求；不得输出登录凭据。
 
-## 后端依赖与启动
+## 服务端依赖
 
-- `src/config.rs` 定义端口与配置，默认端口 8383；实际值以目标进程配置/监听为准。
-- `src/lib.rs` 启动时执行 `sqlx::migrate!`。先核实 `DATABASE_URL` 对应环境和迁移影响，再允许启动；裸 `cargo run` 会启动主服务。
-- `docker-compose.yml` 默认 PG 端口 5433、Redis 6379；默认数据库和持久卷不等于任务隔离资源。复用前核实所有权及共享情况。
-- 参考目标 `tests/*.rs` 的连接逻辑，例如 `tests/lexicon_handler.rs` 使用 `TEST_REDIS_URL` → `REDIS_URL` → localhost fallback。测试子进程显式传隔离连接，不能只改一个未被该测试读取的变量。
-- `.cargo/config.toml`：`SQLX_OFFLINE=true` 适用于编译时读取 `.sqlx`，不意味着运行中的服务/测试无需真实数据库；`cargo sqlx prepare` 也不是只读环境探针。
-- Smart Lexicon V3 按目标端点核实当前配置中的 read/create/edit/publish 等依赖；不沿用旧文档猜变量名，不顺便开启未实现能力。
+前端转发目标涉及 Rust/Agent 时，核实对应任务 checkout 并按需读取其 `.agents/skills/dev-env/SKILL.md`。数据库连接、启动迁移与 worker 规则由服务所属仓库维护，前端不复制默认值。
 
 登录、refresh、草稿创建等会改变会话或数据。明确真实验收范围后可使用已有授权，不为每次请求重复确认；仅诊断时不自动写业务数据。
 隔离库/Redis DB 或键空间仍有其他任务数据时不能整库清理。只删除本任务确实创建且可识别的 fixture；保留共享服务。
