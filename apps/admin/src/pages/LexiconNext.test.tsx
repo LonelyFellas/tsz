@@ -2252,7 +2252,7 @@ it("Step3 释义跟随顶部语言选择，保留已有通用英语内容及完�
   ]);
 });
 
-it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同一份结构", async () => {
+it("Step3 从标签添加基本词性、排序，Step2 和保存请求沿用同一份结构", async () => {
   const api = requests();
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
   const original: NextDraft = {
@@ -2273,12 +2273,16 @@ it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同�
     ]
   };
   api.get.mockResolvedValue({ ...entry, draft: original });
-  const mounted = mount(api);
+  mount(api);
   await screen.findByRole("button", { name: "编辑原形内容" });
-  fireEvent.click(button(/^词义与译词/));
-  expect(screen.getByRole("button", { name: "拖动名词" })).toBeDisabled();
-  expect(screen.queryByRole("button", { name: "删除名词" })).toBeNull();
-  const addPos = screen.getByRole("combobox", { name: "添加基本词性" });
+  const steps = within(
+    screen.getByRole("navigation", { name: "词条编辑步骤" })
+  );
+  fireEvent.click(steps.getByRole("button", { name: /^词义与译词/ }));
+  const tabs = within(screen.getByRole("tablist"));
+  expect(tabs.getByRole("button", { name: "拖动名词" })).toBeDisabled();
+  expect(tabs.queryByRole("button", { name: "删除名词" })).toBeNull();
+  const addPos = tabs.getByRole("combobox", { name: "添加基本词性" });
   await waitFor(() => expect(addPos).toBeEnabled());
   fireEvent.mouseDown(addPos);
   expect(
@@ -2289,16 +2293,17 @@ it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同�
       selector: ".ui-select-item-option-content"
     })
   );
-  expect(screen.getByRole("tab", { name: /动词/ })).toHaveAttribute(
+  expect(tabs.getByRole("tab", { name: /动词/ })).toHaveAttribute(
     "aria-selected",
     "true"
   );
-  fireEvent.click(button("添加义项"));
-  fireEvent.click(button("添加简体中文译词"));
-  fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
+  const meanings = within(screen.getByRole("tabpanel"));
+  fireEvent.click(meanings.getByRole("button", { name: "添加义项" }));
+  fireEvent.click(meanings.getByRole("button", { name: "添加简体中文译词" }));
+  fireEvent.change(meanings.getByRole("textbox", { name: "简体中文译词 1" }), {
     target: { value: "集中于" }
   });
-  fireEvent.keyDown(screen.getByRole("button", { name: "拖动动词" }), {
+  fireEvent.keyDown(tabs.getByRole("button", { name: "拖动动词" }), {
     key: "ArrowUp"
   });
   const visiblePosOrder = () =>
@@ -2310,14 +2315,14 @@ it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同�
           .getAttribute("aria-label")
       );
   expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
-  fireEvent.click(button(/^词性与发音/));
+  fireEvent.click(steps.getByRole("button", { name: /^词性与发音/ }));
   expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
-  fireEvent.click(screen.getByRole("tab", { name: /动词/ }));
-  expect(
-    screen.getAllByRole("button", { name: /编辑.*内容/ }).length
-  ).toBeGreaterThan(1);
-  fireEvent.click(button(/^词义与译词/));
-  expect(screen.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
+  fireEvent.click(
+    within(screen.getByRole("tablist")).getByRole("tab", { name: /动词/ })
+  );
+  expect(screen.getByRole("button", { name: "编辑过去式内容" })).toBeVisible();
+  fireEvent.click(steps.getByRole("button", { name: /^词义与译词/ }));
+  expect(meanings.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
     "集中于"
   );
   fireEvent.click(button("保存完整草稿"));
@@ -2332,12 +2337,58 @@ it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同�
     part_of_speech: "verb",
     equivalents: [{ locale: "zh-Hans", text: "集中于" }]
   });
+});
+
+it("Step3 保存后重新打开保留词性顺序和词义，只读时禁用标签操作", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  const forms = formsFixture();
+  forms.pos.unshift(
+    ...formsFixture({ pos: "verb", pos_id: crypto.randomUUID(), forms: [] }).pos
+  );
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      form_editor: applyFormsStructure(emptyFormEditor(), forms) as NonNullable<
+        NextDraft["form_editor"]
+      >,
+      senses: [
+        {
+          id: crypto.randomUUID(),
+          part_of_speech: "verb",
+          definitions: [],
+          equivalents: [
+            { id: crypto.randomUUID(), locale: "zh-Hans", text: "集中" }
+          ]
+        }
+      ]
+    }
+  });
+  const mounted = mount(api);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/^词义与译词/));
+  fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
+    target: { value: "集中于" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  const saved: NextDraft = api.save.mock.calls[0]![1].draft;
   mounted.unmount();
   api.get.mockResolvedValue({ ...entry, revision: 2, draft: saved });
   mount(api);
   await screen.findByText("版本 2");
   fireEvent.click(button(/^词义与译词/));
-  expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
+  const tabs = within(screen.getByRole("tablist"));
+  expect(
+    tabs
+      .getAllByRole("tab")
+      .map((tab) =>
+        within(tab)
+          .getByRole("button", { name: /^拖动/ })
+          .getAttribute("aria-label")
+      )
+  ).toEqual(["拖动动词", "拖动名词"]);
   expect(screen.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
     "集中于"
   );
@@ -2346,10 +2397,10 @@ it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同�
       profile: { ...useAuthStore.getState().profile!, permissions: [] }
     })
   );
-  expect(screen.getByRole("button", { name: "拖动动词" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "删除动词" })).toBeDisabled();
+  expect(tabs.getByRole("button", { name: "拖动动词" })).toBeDisabled();
+  expect(tabs.getByRole("button", { name: "删除动词" })).toBeDisabled();
   expect(
-    screen
+    tabs
       .getAllByRole("combobox", { name: "添加基本词性" })
       .every((select) => select.hasAttribute("disabled"))
   ).toBe(true);
