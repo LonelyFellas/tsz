@@ -26,6 +26,7 @@ import { localizedCatalogName } from "./catalog";
 import { errorMessage } from "./PartOfSpeechSettings";
 
 const memberKey = (part: string, form: string) => `${part}:${form}`;
+const formSharingKey = () => [...partOfSpeechKeys.all, "form-sharing"] as const;
 
 export function FormSharingSettings() {
   const { t } = useContentTranslation();
@@ -33,7 +34,7 @@ export function FormSharingSettings() {
   // Old backends can return 403 for unknown paths. The catalog advertises support first.
   const supported = catalog.data?.form_sharing !== undefined;
   const template = useQuery({
-    queryKey: [...partOfSpeechKeys.all, "form-sharing"],
+    queryKey: formSharingKey(),
     queryFn: () => partOfSpeechDataSource.getFormSharing(),
     enabled: supported
   });
@@ -75,10 +76,11 @@ function TemplateEditor({
   const { message, modal } = App.useApp();
   const client = useQueryClient();
   const canEdit = usePermission("lexicon_settings.edit_form_sharing");
-  const [revision, setRevision] = useState(initial.revision);
-  const [groups, setGroups] = useState<FormSharingGroup[]>(() =>
-    structuredClone(initial.groups)
-  );
+  // Clean editors follow query data; editing pins the groups and their server revision.
+  const [draft, setDraft] = useState<FormSharingTemplate>();
+  const { revision, groups } = draft ?? initial;
+  const setGroups = (groups: FormSharingGroup[]) =>
+    setDraft({ revision, groups });
   const [error, setError] = useState<string>();
   const [conflict, setConflict] = useState(false);
   const options = catalog.items
@@ -112,8 +114,8 @@ function TemplateEditor({
         groups
       }),
     onSuccess: async (result) => {
-      setRevision(result.revision);
-      setGroups(structuredClone(result.groups));
+      client.setQueryData(formSharingKey(), result);
+      setDraft(undefined);
       setError(undefined);
       setConflict(false);
       await client.invalidateQueries({ queryKey: partOfSpeechKeys.all });
@@ -127,10 +129,13 @@ function TemplateEditor({
     }
   });
   const reload = useMutation({
-    mutationFn: () => partOfSpeechDataSource.getFormSharing(),
+    mutationFn: async () => {
+      await client.cancelQueries({ queryKey: formSharingKey() });
+      return partOfSpeechDataSource.getFormSharing();
+    },
     onSuccess: (result) => {
-      setRevision(result.revision);
-      setGroups(structuredClone(result.groups));
+      client.setQueryData(formSharingKey(), result);
+      setDraft(undefined);
       setError(undefined);
       setConflict(false);
     },
@@ -152,6 +157,7 @@ function TemplateEditor({
             return;
           }
           setError(undefined);
+          setDraft({ revision, groups });
           save.mutate();
         }}
       >
