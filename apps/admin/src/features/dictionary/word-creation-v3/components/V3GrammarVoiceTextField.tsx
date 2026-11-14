@@ -34,6 +34,7 @@ export function V3GrammarVoiceTextField({
     <V3VoiceTextField<GrammarFormLinkV3>
       {...props}
       mode="grammar"
+      editingEnabled={false}
       textLinks={textLinks}
       previewAdapter={previewAdapter}
       createPreviewAdapter={createPreviewAdapter}
