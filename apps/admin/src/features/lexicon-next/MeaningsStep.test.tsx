@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it } from "vitest";
 import type { NextDraft } from "@tsz/types";
 import { App } from "@tsz/ui/admin/overlays";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MeaningsStep } from "./MeaningsStep";
 
 it("确认删除义项只移除目标，保留弹窗打开期间回写的草稿和音频", async () => {
@@ -68,6 +69,8 @@ it("确认删除义项只移除目标，保留弹窗打开期间回写的草稿�
       <>
         <MeaningsStep
           value={draft}
+          kind="word"
+          formEditorAvailable={false}
           target="en-GB"
           medium="zh-Hans"
           partOfSpeechCodes={["noun"]}
@@ -79,9 +82,11 @@ it("确认删除义项只移除目标，保留弹窗打开期间回写的草稿�
     );
   }
   render(
-    <App>
-      <Harness />
-    </App>
+    <QueryClientProvider client={new QueryClient()}>
+      <App>
+        <Harness />
+      </App>
+    </QueryClientProvider>
   );
   fireEvent.click(screen.getAllByRole("button", { name: "删除义项" })[0]!);
   const dialog = within(await screen.findByRole("dialog"));

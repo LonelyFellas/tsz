@@ -2,6 +2,7 @@ import { localizedCatalogName } from "../../part-of-speech/catalog";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { CirclePlusIcon, PlusIcon } from "lucide-react";
 import { Select } from "@tsz/ui/admin/forms";
+import { useAdminDisabled } from "@tsz/ui/admin/context";
 import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
@@ -30,6 +31,7 @@ export function V3AddBasicPosSelect({
   onAdd
 }: V3AddBasicPosSelectProps) {
   const { t, i18n } = useLexiconEditorTranslation();
+  const disabled = useAdminDisabled();
   const usedPosCodes = new Set(forms.pos.map((pos) => pos.pos));
   // 挂错一侧后端会以 part_of_speech_kind_mismatch 拒绝，不放进候选。
   const availableItems = (catalog?.items ?? []).filter(
@@ -41,7 +43,7 @@ export function V3AddBasicPosSelect({
     <Select
       aria-label={t("add_pos")}
       className="word-add-basic-pos-select"
-      disabled={isError || isPending}
+      disabled={disabled || isError || isPending}
       loading={isPending}
       onChange={(code) => {
         const item = availableItems.find(
@@ -79,7 +81,7 @@ export function V3AddBasicPosSelect({
       }
       variant={compact ? "borderless" : undefined}
       suffixIcon={compact ? <CirclePlusIcon /> : <PlusIcon />}
-      value={undefined}
+      value={null}
     />
   );
 }
