@@ -1,11 +1,31 @@
 import type {
   AdminWordKind,
+  FormTypeCatalogItem,
   PartOfSpeechCatalogItem,
   PartOfSpeechCatalogResponse,
   PartOfSpeechCode,
   SubPartOfSpeechCatalogItem,
   SubPartOfSpeechCode
 } from "@tsz/types";
+
+export function createFormTypeComparator(
+  formTypes: readonly FormTypeCatalogItem[] | undefined,
+  posCatalog: PartOfSpeechCatalogItem | undefined
+) {
+  const configuredTypes = formTypes?.length
+    ? [...formTypes]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((item) => item.code)
+    : posCatalog
+      ? ["base", ...(posCatalog.allowed_form_types ?? [])]
+      : [];
+  const typeOrder = new Map(
+    configuredTypes.map((type, index) => [type, index])
+  );
+  return (a: string, b: string) =>
+    (typeOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
+    (typeOrder.get(b) ?? Number.MAX_SAFE_INTEGER);
+}
 
 // 业务页面一律展示「简洁显示」，正式中文名只出现在词性配置页。
 export interface PartOfSpeechLookup {

@@ -517,6 +517,7 @@ export function V3FormsAndPronunciationStep({
           <AdminControls componentDisabled={componentDisabled}>
             <V3FormContentModal
               key={editingFormId}
+              catalog={catalog.data}
               forms={sharedForms}
               contentReassignmentAvailable={contentReassignmentAvailable}
               multipleSpellingsAvailable={multipleSpellingsAvailable}
