@@ -18,7 +18,7 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
     function (this: HTMLElement) {
       return {
-        width: 1200,
+        width: this.classList.contains("is-collapsed") ? 420 : 1200,
         height: this.classList.contains("is-collapsed") ? 72 : 800
       } as DOMRect;
     }
@@ -30,7 +30,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function drag(handle: HTMLElement, deltaY: number, cancel = false) {
+function drag(handle: HTMLElement, deltaY: number, cancel = false, deltaX = 0) {
   handle.setPointerCapture = vi.fn();
   handle.hasPointerCapture = vi.fn(() => true);
   handle.releasePointerCapture = vi.fn();
@@ -42,7 +42,7 @@ function drag(handle: HTMLElement, deltaY: number, cancel = false) {
   });
   fireEvent.pointerMove(handle, {
     pointerId: 1,
-    clientX: 300,
+    clientX: 300 + deltaX,
     clientY: 100 + deltaY
   });
   fireEvent[cancel ? "pointerCancel" : "pointerUp"](handle, { pointerId: 1 });
@@ -90,4 +90,43 @@ it("上下可移出视口，始终留出可拖回区域，往返保留草稿", (
   vi.stubGlobal("innerHeight", 600);
   fireEvent(window, new Event("resize"));
   expect(parseFloat(panel.style.top)).toBe(552);
+});
+
+it.each([
+  { x: -1, y: -1 },
+  { x: 1, y: -1 },
+  { x: -1, y: 1 },
+  { x: 1, y: 1 }
+])("左右及四角可拖回（方向 $x, $y）", ({ x, y }) => {
+  render(
+    <V3FormContentWindow title="词形内容设置" footer="操作" onClose={vi.fn()}>
+      <input aria-label="词形" defaultValue="center" />
+    </V3FormContentWindow>
+  );
+  const panel = screen.getByRole("dialog");
+  const header = screen.getAllByRole("button", {
+    name: "拖动词形内容设置"
+  })[0]!;
+  drag(header, y * 2000, false, x * 2000);
+  expect(parseFloat(panel.style.left)).toBe(x < 0 ? -1152 : 1392);
+  expect(parseFloat(panel.style.top)).toBe(y < 0 ? -752 : 852);
+  const recovery = screen.getAllByRole("button", {
+    name: "拖动词形内容设置"
+  })[2]!;
+  expect(recovery).toBeVisible();
+  drag(recovery, -y * 800, false, -x * 1200);
+  expect(parseFloat(panel.style.left)).toBe(x < 0 ? 48 : 192);
+  expect(parseFloat(panel.style.top)).toBe(y < 0 ? 48 : 52);
+  expect(recovery).not.toBeVisible();
+  expect(screen.getByRole("textbox")).toHaveValue("center");
+
+  drag(header, 0, false, x * 2000);
+  fireEvent.click(screen.getByRole("button", { name: "收起" }));
+  expect(parseFloat(panel.style.left)).toBe(x < 0 ? -372 : 1392);
+  expect(recovery).toBeVisible();
+  vi.stubGlobal("innerWidth", 1024);
+  fireEvent(window, new Event("resize"));
+  expect(parseFloat(panel.style.left)).toBe(x < 0 ? -372 : 976);
+  fireEvent.click(screen.getByRole("button", { name: "展开" }));
+  expect(screen.getByRole("textbox")).toHaveValue("center");
 });

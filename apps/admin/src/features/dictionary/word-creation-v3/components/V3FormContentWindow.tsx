@@ -14,6 +14,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   GripHorizontalIcon,
+  GripVerticalIcon,
   XIcon
 } from "lucide-react";
 import { Button } from "@tsz/ui/admin/display";
@@ -42,6 +43,7 @@ export function V3FormContentWindow({
   const panel = useRef<HTMLElement>(null);
   const handle = useRef<HTMLButtonElement>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [horizontalEdge, setHorizontalEdge] = useState<"left" | "right">();
   const point = useRef<Point | undefined>(undefined);
   const drag = useRef<
     | {
@@ -70,8 +72,8 @@ export function V3FormContentWindow({
       };
     const current = {
       x: Math.max(
-        left,
-        Math.min(requested.x, left + width - GAP * 2 - rect.width)
+        left - GAP - rect.width + VISIBLE_EDGE,
+        Math.min(requested.x, left - GAP + width - VISIBLE_EDGE)
       ),
       y: Math.max(
         top - GAP - rect.height + VISIBLE_EDGE,
@@ -81,6 +83,19 @@ export function V3FormContentWindow({
     point.current = current;
     node.style.left = `${current.x}px`;
     node.style.top = `${current.y}px`;
+    setHorizontalEdge(
+      current.x < left - GAP
+        ? "left"
+        : current.x + rect.width > left - GAP + width
+          ? "right"
+          : undefined
+    );
+    const visibleTop = Math.max(0, top - GAP - current.y);
+    const visibleBottom = Math.min(rect.height, top - GAP + height - current.y);
+    node.style.setProperty(
+      "--v3-content-window-edge-top",
+      `${(visibleTop + visibleBottom - 32) / 2}px`
+    );
   }, []);
 
   useLayoutEffect(() => {
@@ -218,6 +233,16 @@ export function V3FormContentWindow({
           </button>
           <div className="v3-content-window-footer-actions">{footer}</div>
         </footer>
+        <button
+          type="button"
+          className="v3-content-window-handle v3-content-window-edge-handle"
+          data-side={horizontalEdge}
+          hidden={!horizontalEdge}
+          aria-label={t("drag_item", { label: title })}
+          {...dragHandlers}
+        >
+          <GripVerticalIcon size={20} aria-hidden="true" />
+        </button>
       </section>
     </OverlayLayer.Provider>,
     document.body
