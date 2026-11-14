@@ -294,10 +294,18 @@ function EntryEditor({
     return () => setLocked(false);
   }, [busy, formContentOpen, setLocked]);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    const requestedMedium = new URLSearchParams(nextLocation.search).get(
+      "medium_locale"
+    );
+    const nextMedium = language.medium_locales.includes(requestedMedium ?? "")
+      ? requestedMedium
+      : language.medium_locales[0];
     return (
       busy ||
       formContentOpen ||
-      (dirty && currentLocation.pathname !== nextLocation.pathname)
+      (dirty &&
+        (currentLocation.pathname !== nextLocation.pathname ||
+          nextMedium !== medium))
     );
   });
   useBeforeUnload((event) => {

@@ -306,6 +306,18 @@ it("深链接归属不匹配时不挂载编辑器，可显式进入词条所属�
   expect(
     new URLSearchParams(router.state.location.search).get("medium_locale")
   ).toBe("zh-Hant");
+  fireEvent.click(button(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "unsaved deep link" }
+  });
+  await act(() => router.navigate(-1));
+  fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "unsaved deep link"
+  );
+  expect(
+    new URLSearchParams(router.state.location.search).get("medium_locale")
+  ).toBe("zh-Hant");
 });
 
 it("列表保留词条自身的非英语地区信息，不标成美式拼写", async () => {
@@ -643,6 +655,9 @@ it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻�
   fireEvent.click(button("词典检测"));
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await screen.findByText(/创建结果未确认/);
+  await chooseLanguage("繁体中文");
+  expect(screen.getByText(/创建结果未确认/)).toBeVisible();
+  expect(screen.getByLabelText("录入词条")).toBeDisabled();
   expect(api.create).toHaveBeenCalledExactlyOnceWith({
     medium_locale: "zh-Hans",
     target_language: "en",
@@ -651,7 +666,7 @@ it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻�
   });
   expect(input).toHaveValue("cafe\u0301");
   expect(input).toBeDisabled();
-  expect(button("确认创建")).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
 });
 async function edit(label: string, value: string) {
   fireEvent.click(button(label.includes("词形") ? /词性与发音/ : /词义与译词/));

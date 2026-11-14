@@ -5,7 +5,7 @@
 后台顶栏头像左侧显示目标语言、媒介语言下拉框，列表、新建、编辑与垃圾桶共用上下文；列表不再重复筛选语言。用户确认新词条创建时绑定媒介语言，严格按归属隔离，不以是否已经填写释义判断归属。
 
 前端工作区：`/Users/darwish/.codex/worktrees/editor-global-languages/tsz`，基线 `604045729dea2f710e46ef3ab8fade0831bceacd`。
-后端工作区：`/Users/darwish/.codex/worktrees/lexicon-language-ownership/tsz-rust`，基线 `863d8d1ea911bd41daefa9462b7a41dcc4a5714a`。
+后端工作区：`/Users/darwish/.codex/worktrees/lexicon-language-ownership/tsz-rust`，基线 `863d8d1ea911bd41daefa9462b7a41dcc4a5714a`，候选 `2c0d4605a03e51dd8781492d3e998ca6970b1c81`。前端已正常合入主线更新 `3edf2d78fbc2d8f88b06195123c05bfe0d379ecb`。
 
 ## 数据与接口
 
@@ -45,6 +45,8 @@
 
 ## 当前阶段
 
-前端已有初始提交 `5d564581303aa38db2d17a1f68f3d6b77c11bdec`，未推送。初审两个 P2 已在工作区配套修复，准备提交并扩大范围重新审查。尚无 PR、合并或部署。
+前端当前基于 `c534a242fa2694267c2ef215e7f197f9c14f6f23` 补齐第 2 轮审查修复：有效媒介语言与路径共同构成离页条件；创建结果不确定时保留原因提示。相关 4 项回归通过。共同根因是 URL 媒介上下文会决定编辑器是否仍挂载，因此不能只比较 pathname；目标英美变体切换仍允许保留草稿。
 
-审查：1 轮；确认缺陷 2；证据排除误报 0；关联回归/回退：未知。
+两仓提交 hooks 通过，后端独立审查中，前端待第 3 轮增量复查。尚无 PR、合并或部署。
+
+审查：前端 2 轮，后端进行中；确认缺陷 4（P2 × 3、P3 × 1）；证据排除误报 0；关联回归/回退：未知。

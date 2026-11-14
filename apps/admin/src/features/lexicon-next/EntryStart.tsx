@@ -56,9 +56,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setDetection(undefined);
     setEntryMatches(undefined);
     setExpandedGlosses(new Set());
-    setError(undefined);
+    if (!uncertain) setError(undefined);
     setFieldError(undefined);
-  }, [targetLanguage, medium]);
+  }, [targetLanguage, medium, uncertain]);
   useEffect(
     () => () => {
       generation.current += 1;
