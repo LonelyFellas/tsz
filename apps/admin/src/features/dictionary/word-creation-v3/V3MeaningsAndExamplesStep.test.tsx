@@ -2,7 +2,7 @@ import type { RelatedWordResultAny } from "@tsz/types";
 import type { RelatedWordChoice } from "../relatedSuggestions";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
-import { api } from "@/lib/auth";
+import { api, useAuthStore } from "@/lib/auth";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import {
   fireEvent,
@@ -1387,92 +1387,270 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   }, 15_000);
 
-  it("语法结构直接输入，重新聚焦仍可编辑且不提供专业编辑器", () => {
+  it("语法结构挂上语音编辑器，完成后回写标注且不丢正文", async () => {
     withoutSpeechService();
-    render(<Harness />);
+    // 关联编辑器共存时，语法结构仍使用原来的标注工具。
+    render(<Harness initial={meaningsFixture} />);
+
+    await changeVoiceText(screen.getByLabelText("语法结构 1 英美通用内容"), {
+      target: { value: "a centre of the city" }
+    });
+    fireEvent.click(screen.getByLabelText("打开语法结构 1 英美通用内容编辑器"));
+    // 等的是按需加载的编辑器分块，给足超时：默认 1 秒在负载高的 CI runner 上不够
+    const editor = await screen.findByLabelText(
+      "标注工具栏",
+      {},
+      { timeout: 10_000 }
+    );
+    expect(editor).toBeInTheDocument();
+
     const input = screen.getByLabelText("语法结构 1 英美通用内容");
-    expect(input.tagName).toBe("TEXTAREA");
-    expect(input).not.toHaveAttribute("readonly");
+    // 错误定位靠 focus() + activeElement 校验，属性必须落在输入框本身
     expect(input).toHaveAttribute("data-v3-field", "content");
-    expect(input).toHaveAttribute("data-v3-node-id", "grammar-variant-1");
-    expect(
-      screen.queryByLabelText("打开语法结构 1 英美通用内容编辑器")
-    ).not.toBeInTheDocument();
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "a job" } });
-    fireEvent.blur(input);
-    fireEvent.focus(input);
+    expect(input.tagName).toBe("TEXTAREA");
+
     expect(input).not.toHaveAttribute("readonly");
-    fireEvent.change(input, { target: { value: "a good job" } });
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
-    ).toBe("a good job");
-    expect(screen.queryByLabelText("标注工具栏")).not.toBeInTheDocument();
-  });
+    ).toBe("a centre of the city");
 
-  it("普通文本改字平移已有标注和词形关联，撤销恢复且保留配音数据", () => {
-    withoutSpeechService();
-    const initial = structuredClone(meaningsFixture);
-    const original = initial.pos[0]!.grammar_structures[0]!.variants[0]!;
-    original.content = {
-      version: 2,
-      text: "a job",
-      annotations: [{ type: "emphasis", start: 2, end: 5, level: "core" }]
-    };
-    original.form_links = [
-      {
-        id: "grammar-form-link",
-        source_segments: [{ start: 2, end: 5, surface: "job" }],
-        target_word_id: "linked-word",
-        target_pos_id: "linked-pos",
-        target_form_id: "linked-form",
-        target_variant_id: "linked-variant",
-        target_dialect: "common"
+    // 选区标注保留在编辑器本地草稿内，完成之前不影响外层。
+    const activeEditor = input.closest(".tsz-ve-editor") as HTMLElement;
+    input.focus();
+    (input as HTMLTextAreaElement).setSelectionRange(2, 8);
+    fireEvent.mouseUp(input);
+    fireEvent.select(input);
+    // 只查询当前编辑器，避免全页大量字段的可及名计算拖慢并发测试。
+    const core = within(activeEditor).getByLabelText("标记为固定核心词");
+    expect(core).toBeEnabled();
+    fireEvent.click(core);
+
+    const before = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
+    expect(before.version === 2 ? before.annotations : []).toEqual([]);
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
+    const content = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
+    expect(content.text).toBe("a centre of the city");
+    expect(content.version).toBe(2);
+    expect(content.version === 2 ? content.annotations : []).toEqual([
+      { type: "emphasis", start: 2, end: 8, level: "core" }
+    ]);
+    expect(
+      document.querySelector('.v3-grammar-preview strong[data-level="core"]')
+    ).toHaveTextContent("centre");
+    expect(value().pos[0]!.grammar_structures[0]!.variants[0]!.content).toEqual(
+      content
+    );
+  }, 15_000);
+
+  it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
+    // 正向生成场景显式提供授权身份，目录读取不触发无关鉴权请求。
+    const previousProfile = useAuthStore.getState().profile;
+    useAuthStore.setState({
+      profile: {
+        id: "audio-assets-fixture",
+        role: "admin",
+        phone: "test-phone",
+        display_name: "配音测试",
+        permission_version: 1,
+        catalog_version: "test",
+        preferences: { dialect: "uk" },
+        permissions: ["words.access", "words.edit", "speech.generate"]
       }
-    ];
-    original.audio_assets = [
-      {
-        id: "asset-1",
+    });
+    const groups = vi
+      .spyOn(api.speech, "groupsV3")
+      .mockResolvedValue({ groups: [], revision: 0, order_revision: 0 });
+    const resolving = vi
+      .spyOn(api.speech, "resolve")
+      .mockImplementation(async ({ profile, accent }) => ({
+        source: { kind: "local" as const },
+        voices: profile.voices.filter(
+          (setting) => setting.locale === (accent === "gb" ? "en-GB" : "en-US")
+        )
+      }));
+    const generating = vi.spyOn(api.speech, "generateAudio").mockResolvedValue({
+      asset: {
+        id: "formal-grammar-audio",
         locale: "en-GB",
         gender: "female",
         content_type: "audio/mpeg",
         size_bytes: 3,
-        original_name: "old.mp3",
-        created_at: "2026-09-06T00:00:00Z"
+        original_name: "generated.mp3",
+        created_at: "2026-11-03T00:00:00Z"
       }
-    ];
-    original.voice_profile = {
-      voices: [
-        {
-          voice_id: "sonia",
-          enabled: true,
-          rate_percent: 20,
-          locale: "en-GB"
-        }
-      ]
-    };
-    render(<Harness initial={initial} />);
-    const input = screen.getByLabelText("语法结构 1 英美通用内容");
-    fireEvent.change(input, { target: { value: "a good job" } });
-    const changed = value().pos[0]!.grammar_structures[0]!.variants[0]!;
-    expect(changed.content).toEqual({
-      version: 2,
-      text: "a good job",
-      annotations: [{ type: "emphasis", start: 7, end: 10, level: "core" }]
     });
-    expect(changed.form_links).toEqual([
-      {
-        ...original.form_links[0],
-        source_segments: [{ start: 7, end: 10, surface: "job" }]
-      }
-    ]);
-    expect(changed.audio_assets).toEqual(original.audio_assets);
-    expect(changed.voice_profile).toEqual(original.voice_profile);
-    fireEvent.keyDown(input, { key: "z", ctrlKey: true });
-    expect(value().pos[0]!.grammar_structures[0]!.variants[0]).toEqual(
-      original
-    );
-  });
+    const listing = vi
+      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .mockResolvedValue([
+        {
+          id: "sonia",
+          label: "Sonia",
+          locale: "en-GB",
+          gender: "female",
+          styles: [],
+          supportsRate: true,
+          supportsPitch: false,
+          isDefault: true
+        }
+      ]);
+    try {
+      const initial = structuredClone(meaningsFixture);
+      // 此用例只验证语法音频回写，避免无关释义/例句扩大 DOM 和可及名查询成本。
+      initial.pos[0]!.senses = [];
+      initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets = [
+        {
+          id: "asset-1",
+          locale: "en-GB",
+          gender: "female",
+          content_type: "audio/mpeg",
+          size_bytes: 3,
+          original_name: "old.mp3",
+          created_at: "2026-09-06T00:00:00Z"
+        }
+      ];
+      render(<Harness initial={initial} />);
+      fireEvent.click(
+        screen.getByLabelText("打开语法结构 1 英美通用内容编辑器")
+      );
+      await screen.findByLabelText("标注工具栏", {}, { timeout: 10_000 });
+      const editor = screen
+        .getByLabelText("标注工具栏")
+        .closest('[role="dialog"]') as HTMLElement;
+      fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
+      await waitFor(() => expect(generating).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(
+          within(editor).queryByText("正在生成正式音频")
+        ).not.toBeInTheDocument()
+      );
+      const editVoice = await within(editor).findByLabelText("修改 Sonia");
+      await waitFor(() => expect(editVoice).toBeEnabled());
+      fireEvent.click(editVoice);
+      expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText("移除 old.mp3"));
+      // Popconfirm 的确认键：这一页 DOM 很大，findByRole 逐个算可及名在 CI 上会拖到超时，按类名定位
+      const confirm = await waitFor(() => {
+        const found = document.querySelector<HTMLButtonElement>(
+          ".ui-popconfirm-buttons .ui-btn-primary"
+        );
+        expect(found).not.toBeNull();
+        return found!;
+      });
+      fireEvent.click(confirm);
+      expect(
+        value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+      ).toEqual(
+        initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+      );
+      const detail = screen
+        .getByLabelText("当前音色语速")
+        .closest('[role="dialog"]') as HTMLElement;
+      fireEvent.click(
+        within(detail).getByRole("button", { name: "保存配音设置" })
+      );
+      const complete = screen.getByLabelText("完成语法结构 1 英美通用内容编辑");
+      await waitFor(() => expect(complete).toBeEnabled());
+      fireEvent.click(complete);
+      expect(
+        value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+      ).toEqual([]);
+      expect(
+        value().pos[0]!.grammar_structures[0]!.variants[0]!.voice_profile!
+          .voices[0]!.audio_asset_id
+      ).toBe("formal-grammar-audio");
+    } finally {
+      useAuthStore.setState({ profile: previousProfile });
+      groups.mockRestore();
+      listing.mockRestore();
+      resolving.mockRestore();
+      generating.mockRestore();
+    }
+  }, 30_000);
+
+  it("音色与语速落到语法结构变体的 voice_profile 上，重复单选保持启用", async () => {
+    const previous = env.VOICE_PREVIEW;
+    Object.assign(env, { VOICE_PREVIEW: true });
+    const listing = vi
+      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .mockResolvedValue([
+        {
+          id: "sonia",
+          label: "Sonia",
+          locale: "en-GB",
+          gender: "female",
+          styles: [],
+          supportsRate: true,
+          supportsPitch: false,
+          isDefault: true
+        }
+      ]);
+    try {
+      render(<Harness initial={meaningsFixture} />);
+      fireEvent.click(
+        screen.getByLabelText("打开语法结构 1 英美通用内容编辑器")
+      );
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10_000 }
+      );
+
+      const variant = () => value().pos[0]!.grammar_structures[0]!.variants[0]!;
+      // 没动过之前不该凭空写出一份配置
+      expect(variant().voice_profile).toBeUndefined();
+
+      const editor = screen
+        .getByLabelText("标注工具栏")
+        .closest('[role="dialog"]') as HTMLElement;
+      const checkbox = (await within(editor).findByLabelText(
+        "选用 Sonia"
+      )) as HTMLInputElement;
+      if (!checkbox.checked) fireEvent.click(checkbox);
+      fireEvent.click(await within(editor).findByLabelText("修改 Sonia"));
+      const rate = await screen.findByLabelText("当前音色语速");
+      fireEvent.change(rate, { target: { value: "1.20" } });
+      expect(variant().voice_profile).toBeUndefined();
+      const detail = screen
+        .getByLabelText("当前音色语速")
+        .closest('[role="dialog"]') as HTMLElement;
+      await waitFor(() =>
+        expect(
+          within(detail).getByRole("button", { name: "保存配音设置" })
+        ).toBeEnabled()
+      );
+      fireEvent.click(
+        within(detail).getByRole("button", { name: "保存配音设置" })
+      );
+      fireEvent.click(within(editor).getByLabelText("选用 Sonia"));
+      expect(
+        within(editor).getByRole("radio", { name: "选用 Sonia" })
+      ).toBeChecked();
+      const complete = screen.getByLabelText("完成语法结构 1 英美通用内容编辑");
+      await waitFor(() => expect(complete).toBeEnabled());
+      fireEvent.click(complete);
+      expect(variant().voice_profile).toEqual({
+        dubbing: {
+          area: "grammar",
+          uk: { mode: "local" },
+          us: { mode: "inherit" }
+        },
+        voices: [
+          {
+            voice_id: expect.any(String),
+            enabled: true,
+            rate_percent: 20,
+            version_id: expect.any(String),
+            version_name: "Sonia",
+            locale: "en-GB"
+          }
+        ]
+      });
+    } finally {
+      Object.assign(env, { VOICE_PREVIEW: previous });
+      listing.mockRestore();
+    }
+  }, 15_000);
 
   it("语法结构复用 V2 单栏文本区且不显示地区下拉", () => {
     const { container } = render(<Harness initial={meaningsFixture} />);
