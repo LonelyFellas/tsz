@@ -37,7 +37,7 @@ import {
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { PencilIcon } from "lucide-react";
 import { flushSync } from "react-dom";
-import { Alert, Button, Space } from "@tsz/ui/admin/display";
+import { Alert, Button, Space, Spin } from "@tsz/ui/admin/display";
 import { Input, type TextAreaRef } from "@tsz/ui/admin/forms";
 import { message } from "@tsz/ui/admin/overlays";
 import {
@@ -232,6 +232,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const { t } = useLexiconEditorTranslation();
   const spellingAudioLocales = spellingAudioScope?.activeLocales;
   const requiredErrorId = useId();
+  const defaultVoiceStatusId = useId();
   const businessSave = useVoiceSave();
   const saveRef = useRef({ onSave, businessSave });
   useLayoutEffect(() => {
@@ -823,7 +824,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       }}
       aria-label={expanded ? t("panel_preview", { p0: ariaLabel }) : ariaLabel}
       aria-invalid={invalid || Boolean(requiredError)}
-      aria-describedby={requiredError ? requiredErrorId : undefined}
+      aria-describedby={
+        requiredError
+          ? requiredErrorId
+          : defaultLoading
+            ? defaultVoiceStatusId
+            : undefined
+      }
       status={invalid || requiredError ? "error" : undefined}
       // 无连读时用自然高度；有连读时显式设置最小行数。
       // 单改 padding 不会触发 antd autoSize，须切换 minRows，确保只增删标记也重测且不重挂输入框。
@@ -885,7 +892,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             )
           );
       }}
-      placeholder={requiredError ? undefined : placeholder}
+      placeholder={requiredError || defaultLoading ? undefined : placeholder}
       aria-busy={defaultLoading || undefined}
       readOnly={
         readOnly ||
@@ -905,6 +912,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}`}
     >
       {fallback}
+      {defaultLoading && !requiredError && (
+        <Spin
+          id={defaultVoiceStatusId}
+          size="small"
+          className="v3-voice-text-field-loading"
+          description={<span>{t("panel_loading_default_voices")}</span>}
+        />
+      )}
       {grammarPreview ? (
         <div
           className={`v3-grammar-preview-content ${fontClass}${mode === "association" ? " v3-association-preview-content" : ""}`}
@@ -1192,9 +1207,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             </Button>
           }
         />
-      )}
-      {defaultLoading && (
-        <span role="status">{t("panel_loading_default_voices")}</span>
       )}
       {!editing && defaultVoice?.key === defaultKey && defaultVoice.error && (
         <Alert

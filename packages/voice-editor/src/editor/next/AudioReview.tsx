@@ -3,7 +3,7 @@ import {
   useVoiceEditorMessageState,
   createVoiceEditorMessage
 } from "../i18n";
-import { Button, Typography } from "@tsz/ui/admin/display";
+import { Button, Spin, Typography } from "@tsz/ui/admin/display";
 import {
   DownloadIcon,
   PauseIcon,
@@ -225,14 +225,27 @@ export function AudioReview({
       aria-label={t("review", { p0: media.name })}
     >
       {!compact && <Typography.Text strong>{media.name}</Typography.Text>}
-      {loading && (
-        <Typography.Text type="secondary">
-          {t("loading_audio_waveform")}
-        </Typography.Text>
+      {error && peaks.length > 0 && (
+        <Typography.Text type="danger">{error}</Typography.Text>
       )}
-      {error && <Typography.Text type="danger">{error}</Typography.Text>}
-      {peaks.length > 0 && (
-        <>
+      <div className="tsz-ve-waveform-frame" aria-busy={loading || undefined}>
+        {loading && (
+          <Spin
+            size="small"
+            className="tsz-ve-waveform-status"
+            description={t("loading_audio_waveform")}
+          />
+        )}
+        {error && peaks.length === 0 && (
+          <Typography.Text
+            role="alert"
+            type="danger"
+            className="tsz-ve-waveform-status"
+          >
+            {error}
+          </Typography.Text>
+        )}
+        {peaks.length > 0 && (
           <svg
             viewBox="0 0 720 100"
             preserveAspectRatio="none"
@@ -311,18 +324,18 @@ export function AudioReview({
               className="tsz-ve-wave-cursor"
             />
           </svg>
-          {!compact && (
-            <div className="tsz-ve-wave-scale">
-              <span>{t("0_seconds")}</span>
-              <span>
-                {at.toFixed(2)} {t("seconds_peak")} {peak.toFixed(3)}
-              </span>
-              <span>
-                {duration.toFixed(2)} {t("seconds")}
-              </span>
-            </div>
-          )}
-        </>
+        )}
+      </div>
+      {!compact && (
+        <div className="tsz-ve-wave-scale" aria-hidden={peaks.length === 0}>
+          <span>{t("0_seconds")}</span>
+          <span>
+            {at.toFixed(2)} {t("seconds_peak")} {peak.toFixed(3)}
+          </span>
+          <span>
+            {duration.toFixed(2)} {t("seconds")}
+          </span>
+        </div>
       )}
       <div className="tsz-ve-review-controls">
         <div className="tsz-ve-review-playback">

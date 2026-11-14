@@ -62,6 +62,66 @@ it("波形保留每个窗口所有声道的真实峰值，静音不伪造振幅"
 });
 
 it.each([false, true])(
+  "波形 compact=%s：加载、失败和重试复用同一显示区域",
+  async (compact) => {
+    let finish!: (blob: Blob) => void;
+    const audio = new Media() as unknown as HTMLAudioElement;
+    const blob = new Blob([new Uint8Array(4)]);
+    Object.defineProperty(blob, "arrayBuffer", {
+      value: async () => new ArrayBuffer(4)
+    });
+    const result = {
+      audioUrl: "blob:pending",
+      expiresAt: "2099-01-01",
+      cached: false,
+      loadAudio: () =>
+        new Promise<Blob>((resolve) => {
+          finish = resolve;
+        })
+    };
+    const view = render(
+      <AudioReview
+        compact={compact}
+        media={{ audio, name: "sample", result }}
+      />
+    );
+    const frame = screen.getByRole("status").parentElement!;
+    expect(frame).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    await act(async () => finish(blob));
+    expect(screen.getByRole("slider").parentElement).toBe(frame);
+    expect(frame).not.toHaveAttribute("aria-busy");
+    let fail!: (error: Error) => void;
+    const failed = {
+      ...result,
+      loadAudio: () =>
+        new Promise<Blob>((_, reject) => {
+          fail = reject;
+        })
+    };
+    view.rerender(
+      <AudioReview
+        compact={compact}
+        media={{ audio, name: "sample", result: failed }}
+      />
+    );
+    await act(async () => fail(new Error("offline")));
+    expect(screen.getByRole("alert").parentElement).toBe(frame);
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    view.rerender(
+      <AudioReview
+        compact={compact}
+        media={{ audio, name: "sample", result }}
+      />
+    );
+    expect(screen.getByRole("status").parentElement).toBe(frame);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await act(async () => finish(blob));
+    expect(screen.getByRole("slider").parentElement).toBe(frame);
+  }
+);
+
+it.each([false, true])(
   "审听 compact=%s：定位与循环、静音、下载和卸载保留原始媒体行为",
   async (compact) => {
     const media = new Media();

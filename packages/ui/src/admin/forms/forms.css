@@ -444,6 +444,13 @@ textarea.ui-input {
   font: inherit;
   color: inherit;
 }
+.ui-select-input[readonly] {
+  cursor: inherit;
+}
+.ui-select-disabled,
+.ui-select-disabled .ui-select-input {
+  cursor: not-allowed;
+}
 .ui-select-single .ui-select-input {
   position: absolute;
   inset: 0;

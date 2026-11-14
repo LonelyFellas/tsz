@@ -34,6 +34,9 @@
   display: none;
 }
 .tsz-ve-pool-catalog-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2, 8px);
   color: var(--ui-color-primary, #2053ff);
   font-size: 12px;
   font-weight: 400;

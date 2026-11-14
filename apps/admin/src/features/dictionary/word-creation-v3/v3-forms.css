@@ -261,6 +261,18 @@
   flex-shrink: 0;
   color: inherit;
 }
+.v3-content-window-header .ui-btn:is(:hover, :focus-visible):not(:disabled) {
+  color: var(--ui-color-text-light-solid);
+  background: color-mix(
+    in srgb,
+    var(--ui-color-text-light-solid) 12%,
+    transparent
+  );
+}
+.v3-content-window-header .ui-btn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
 .v3-content-window-handle {
   flex: 1;
   min-width: 0;
@@ -447,6 +459,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   margin: 0;
+  border: 1px solid var(--ui-color-border);
   border-radius: var(--ui-border-radius-lg);
   overflow: hidden;
 }
@@ -462,7 +475,9 @@
 .v3-content-form-row .word-form-matrix-shared-cell {
   grid-column: 1 / -1;
 }
-.v3-content-form-row .word-form-matrix-last-row {
+.v3-content-form-row .word-form-matrix .word-form-matrix-dialect-cell,
+.v3-content-form-row .word-form-matrix-shared-cell {
+  border: 0;
   border-radius: 0;
 }
 .v3-content-form-row .word-form-matrix-shared-cell .word-shared-form-spelling {
@@ -482,8 +497,9 @@
 .v3-content-form-row .word-form-matrix-shared-cell .word-shared-pronunciation {
   padding: var(--ui-space-3);
 }
-.v3-content-form-row .word-form-matrix-dialect-cell-us {
-  border-inline-start: 0;
+.v3-content-form-row .word-form-matrix > .word-form-matrix-dialect-cell-us,
+.v3-content-form-row .v3-spelling-list-us {
+  border-inline-start: 1px solid var(--ui-color-border);
 }
 .v3-content-form-row .word-pronunciation-editor {
   margin-top: var(--ui-space-2);
@@ -514,8 +530,10 @@
     border-inline-start: 0;
     border-top: 1px solid var(--ui-color-border);
   }
-  .v3-content-form-row .word-form-matrix-dialect-cell-us {
-    border-inline-start: 1px solid #f3c5de;
+  .v3-content-form-row .word-form-matrix > .word-form-matrix-dialect-cell-us,
+  .v3-content-form-row .v3-spelling-list-us {
+    border-inline-start: 0;
+    border-top: 1px solid var(--ui-color-border);
   }
 }
 
