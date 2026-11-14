@@ -1,132 +1,63 @@
+/* 个人设置：设置类页面样板。页头 → 共享 Tabs → Card 分区 → 设置项行。 */
 .profile-settings {
-  --settings-blue: var(--ui-color-primary);
-  --settings-ink: var(--ui-color-text);
-  --settings-muted: var(--ui-color-text-secondary);
-  --settings-line: var(--ui-color-border-secondary);
-  max-width: 1120px;
-  color: var(--settings-ink);
-}
-
-.profile-settings__header {
-  margin: 0 0 var(--ui-space-6);
-}
-.profile-settings__tabs > .ui-tabs-nav {
-  align-self: flex-start;
-  margin: 0 0 var(--ui-space-6);
-  padding: var(--ui-space-1);
-  border: 0;
-  border-radius: 9px;
-  background: var(--ui-color-fill-secondary);
-}
-.profile-settings__tabs .ui-tabs-nav-list {
-  gap: var(--ui-space-1);
-}
-.profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab {
-  margin: 0;
-  padding: 0;
-  border-radius: 6px;
-}
-.profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-btn {
-  padding: 9px 15px;
-  border-radius: 6px;
-  font-size: var(--ui-font-size-compact);
-  color: var(--ui-color-text-secondary);
-}
-.profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-active {
-  background: var(--ui-color-bg-container);
-  box-shadow: 0 1px 4px rgb(31 43 70 / 7%);
-}
-.profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-active .ui-tabs-tab-btn {
-  color: var(--ui-color-primary);
-  font-weight: 600;
-}
-.profile-settings__tabs .ui-tabs-ink-bar {
-  display: none;
-}
-.profile-settings__tab-label {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2);
-  white-space: nowrap;
-}
-.profile-settings__tab-label svg {
-  width: 16px;
-  height: 16px;
-  stroke-width: 1.8;
-}
-.profile-settings__tabs > .ui-tabs-body-holder,
-.profile-settings__content {
-  min-width: 0;
-}
-
-.settings-section {
-  padding: var(--ui-space-6);
-  border: 1px solid var(--settings-line);
-  border-radius: var(--ui-border-radius-lg);
-  background: var(--ui-color-bg-container);
-}
-.settings-section + .settings-section {
-  margin-top: var(--ui-space-4);
-}
-.settings-section__heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: var(--ui-space-6);
-}
-.settings-section__heading h2 {
-  margin: 0;
-  color: var(--settings-ink);
-  font-size: 16px;
-  font-weight: 600;
-}
-.settings-section__icon {
   display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  color: var(--ui-color-text-secondary);
-  background: var(--ui-color-fill-secondary);
+  gap: var(--ui-space-6);
+  max-width: 880px;
 }
-.settings-section__icon svg {
-  width: 17px;
-  height: 17px;
-  stroke-width: 1.8;
+
+.settings-stack {
+  display: grid;
+  gap: var(--ui-space-4);
 }
+
+.profile-settings__tabs > .ui-tabs-nav {
+  margin-bottom: var(--ui-space-5);
+}
+
+.profile-settings .ui-card-head-title h2 {
+  margin: 0;
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+  line-height: var(--ui-line-height);
+}
+
+.profile-settings .ui-card-head {
+  padding: var(--ui-space-4) var(--ui-space-6);
+}
+
+.profile-settings .ui-card-body {
+  padding: var(--ui-space-2) var(--ui-space-6);
+}
+
+/* 设置项行：左侧名称与说明，右侧控件；行间细线分隔。 */
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--ui-space-5);
-}
-.settings-row__label {
-  color: var(--settings-ink);
-  font-size: var(--ui-font-size);
-  font-weight: 500;
-}
-.settings-row > .ui-btn {
-  min-height: 36px;
-  border-radius: var(--ui-border-radius);
-  font-size: var(--ui-font-size-compact);
+  gap: var(--ui-space-3) var(--ui-space-5);
+  min-height: var(--ui-control-height-lg);
+  padding: var(--ui-space-4) 0;
 }
 
+.settings-row + .settings-row {
+  border-top: 1px solid var(--ui-color-border-secondary);
+}
+
+.settings-row__label {
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size);
+  font-weight: var(--ui-font-weight-medium);
+}
+
+/* 模型账号：每个服务商一行。 */
 .settings-provider {
   min-width: 0;
-  padding: var(--ui-space-6) 0;
-}
-
-.settings-provider:first-child {
-  padding-top: 0;
-}
-
-.settings-provider:last-child {
-  padding-bottom: 0;
+  padding: var(--ui-space-5) 0;
 }
 
 .settings-provider + .settings-provider {
-  border-top: 1px solid var(--settings-line, var(--ui-color-border-secondary));
+  border-top: 1px solid var(--ui-color-border-secondary);
 }
 
 .settings-provider__summary {
@@ -137,14 +68,18 @@
 
 .settings-provider__icon {
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: var(--ui-control-height-lg);
+  height: var(--ui-control-height-lg);
   flex-shrink: 0;
   place-items: center;
-  border-radius: 10px;
-  background: var(--ui-color-fill-alter);
+  border: 1px solid var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius);
   color: var(--ui-color-text-secondary);
-  font-size: 20px;
+}
+
+.settings-provider__icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .settings-provider__identity {
@@ -157,8 +92,8 @@
   align-items: center;
   gap: var(--ui-space-3);
   color: var(--ui-color-text);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--ui-font-size);
+  font-weight: var(--ui-font-weight-semibold);
 }
 
 .settings-provider__description {
@@ -166,13 +101,13 @@
   overflow-wrap: anywhere;
   color: var(--ui-color-text-secondary);
   font-size: var(--ui-font-size-compact);
-  line-height: 1.6;
+  line-height: var(--ui-line-height);
 }
 
 .settings-provider__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--ui-space-2);
   flex-shrink: 0;
 }
 
@@ -199,16 +134,21 @@
   max-width: 100%;
 }
 
+.settings-chatgpt-device {
+  width: 520px;
+  max-width: 100%;
+}
+
 .settings-ssh .ui-form-item {
   margin-bottom: 0;
 }
 
 .settings-ssh__command {
   margin: 0;
-  padding: 14px;
+  padding: var(--ui-space-3);
   overflow-wrap: anywhere;
   border: 1px solid var(--ui-color-border-secondary);
-  border-radius: 8px;
+  border-radius: var(--ui-border-radius);
   background: var(--ui-color-fill-alter);
   font-size: var(--ui-font-size-sm);
   line-height: 1.8;
@@ -221,11 +161,31 @@
   background: transparent;
 }
 
+/* 出题模型 */
+.settings-models {
+  padding: var(--ui-space-4) 0;
+}
+
+.settings-model-summary {
+  padding: var(--ui-space-4) var(--ui-space-5);
+  border-radius: var(--ui-border-radius);
+  background: var(--ui-color-fill-alter);
+}
+
+.settings-model-current {
+  margin-top: var(--ui-space-2);
+}
+
+.settings-model-current h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .settings-model-controls {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--ui-space-3);
   margin: var(--ui-space-5) 0 var(--ui-space-3);
 }
 
@@ -235,15 +195,20 @@
 }
 
 .settings-model-note {
+  margin: var(--ui-space-3) 0 0;
   color: var(--ui-color-text-secondary);
   font-size: var(--ui-font-size-compact);
-  line-height: 1.6;
+  line-height: var(--ui-line-height);
+}
+
+.settings-model-summary .settings-model-note {
+  margin: 0;
 }
 
 .settings-model-details {
-  margin-top: 28px;
+  margin-top: var(--ui-space-6);
   padding-top: var(--ui-space-5);
-  border-top: 1px solid var(--settings-line, var(--ui-color-border-secondary));
+  border-top: 1px solid var(--ui-color-border-secondary);
 }
 
 .settings-model-details summary {
@@ -273,49 +238,30 @@
 
 .settings-model-result small {
   display: block;
-  margin-top: 3px;
+  margin-top: var(--ui-space-1);
   overflow-wrap: anywhere;
   color: var(--ui-color-text-secondary);
 }
 
 @media (max-width: 767px) {
-  .profile-settings__header {
-    margin: 0 0 var(--ui-space-5);
+  .profile-settings {
+    gap: var(--ui-space-5);
   }
-  .profile-settings__tabs > .ui-tabs-nav {
-    max-width: 100%;
-    margin-bottom: var(--ui-space-5);
+  .profile-settings .ui-card-head,
+  .profile-settings .ui-card-body {
+    padding-inline: var(--ui-space-4);
   }
-  .profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-btn {
-    padding: 9px var(--ui-space-3);
-  }
-  .profile-settings__tab-label {
-    gap: 6px;
-  }
-  .settings-section {
-    padding: var(--ui-space-5);
-  }
-  .settings-section__heading {
-    margin-bottom: var(--ui-space-5);
-  }
-  .settings-row {
-    gap: var(--ui-space-4);
-  }
-
   .settings-provider__summary {
     flex-wrap: wrap;
     gap: var(--ui-space-3);
   }
-
   .settings-provider__name {
     flex-wrap: wrap;
     gap: var(--ui-space-1) var(--ui-space-2);
   }
-
   .settings-provider__actions {
     margin-left: auto;
   }
-
   .settings-model-controls .ui-select {
     flex-basis: 100%;
     min-width: 0;
@@ -328,39 +274,6 @@
   }
 }
 
-.settings-models {
-  max-width: 720px;
-}
-.settings-models > [aria-label="当前出题模型"] {
-  padding: 18px var(--ui-space-5);
-  border-radius: 9px;
-  background: var(--ui-color-fill-alter);
-}
-.settings-model-controls {
-  gap: 10px;
-}
-.settings-model-controls .ui-select-selector {
-  border-radius: var(--ui-border-radius);
-}
-.settings-provider__actions .ui-btn {
-  min-height: 36px;
-  font-size: var(--ui-font-size-compact);
-  border-radius: var(--ui-border-radius);
-}
-.settings-provider__icon svg {
-  width: 21px;
-  height: 21px;
-}
-@media (max-width: 390px) {
-  .profile-settings__tabs > .ui-tabs-nav .ui-tabs-tab-btn {
-    padding: 9px 10px;
-  }
-  .profile-settings__tab-label {
-    gap: 5px;
-    font-size: var(--ui-font-size-sm);
-  }
-  .profile-settings__tab-label svg {
-    width: 14px;
-    height: 14px;
-  }
+.settings-models > .ui-alert {
+  margin-top: var(--ui-space-3);
 }

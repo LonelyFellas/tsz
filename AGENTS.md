@@ -95,6 +95,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 ### admin（后台组件）
 
 - 修改后台页面、样式或 `packages/ui/src/admin` 前，先读 [Admin 界面规范](apps/admin/style.md)，再核对其中最接近的样板。沿用现有业务布局，以共享设计变量和控件统一细节；通用设计技能服从项目规范。公共规则改变时同步更新规范、变量及受影响样板，不能只在页面覆盖。
+- 后台样式改动须通过 `pnpm check:admin-ui`（偏差基线只降不升，修复后运行 `pnpm check:admin-ui:tighten`），交付前按规范第 8 节逐条自查。
 - 后台及共享语音编辑器使用项目控件与 Lucide 图标，沿用品牌蓝 #2053FF、中文日期与 Day.js。
 - 普通表单使用 `@tsz/ui/admin/forms`；复杂草稿继续由业务模型持有。仅更换 UI 组件，不改变业务行为、接口或持久化格式。
 - reader 入口不依赖 AntD、MUI、Emotion 或后台 Provider；C 端保留现有设计体系。

@@ -59,3 +59,96 @@ test("自动纳入新页面与共享样式，仅排除变量定义来源", async
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("计数原始颜色、字号、圆角、阴影；自定义属性声明与变量引用不计", async () => {
+  const { findStyleDeviations } = await import("./check-admin-ui.mjs");
+  const found = findStyleDeviations(
+    `.a {\n  --login-paper: #f9f5e9;\n  color: var(--login-paper);\n  background: #fff;\n  font-size: 15px;\n  font-size: var(--ui-font-size);\n  border-radius: 6px;\n  border-radius: 50%;\n  border-radius: 0;\n  box-shadow: var(--ui-shadow-sm);\n  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);\n}`
+  );
+  assert.deepEqual(
+    found.map(({ rule, line }) => `${rule}@${line}`),
+    [
+      "raw-color@4",
+      "raw-font-size@5",
+      "raw-radius@7",
+      "raw-color@11",
+      "raw-shadow@11"
+    ]
+  );
+});
+
+test("行内样式只计视觉字面量，运行时值与非视觉属性放行", async () => {
+  const { findInlineStyleDeviations } = await import("./check-admin-ui.mjs");
+  const found = findInlineStyleDeviations(
+    `<div style={{ width: \`\${p}%\`, marginBottom: 16, color: tone(x) }} />\n<span style={{ fontSize: "12px", padding: "var(--ui-space-2)" }} />`
+  );
+  assert.deepEqual(
+    found.map((f) => f.text.replace(/\s/g, "")),
+    ["marginBottom:16", 'fontSize:"12px"']
+  );
+});
+
+test("新增样式的字重与 font 简写不能绕过零偏差门禁", async () => {
+  const { countDeviations, compareBaseline } =
+    await import("./check-admin-ui.mjs");
+  const { counts, details } = countDeviations({
+    "new.css": ".probe { font-weight: 900; font: 900 37px/1.2 Arial; }"
+  });
+  assert.deepEqual(counts["new.css"], {
+    "raw-font-weight": 1,
+    "raw-font-shorthand": 1
+  });
+  assert.equal(compareBaseline({}, counts, details).errors.length, 2);
+  for (const value of [
+    "900 !important",
+    "900 ! IMPORTANT",
+    "BOLD !important",
+    "+900",
+    "9e2",
+    "calc(300 * 3)"
+  ]) {
+    const probe = countDeviations({
+      "new.css": `.probe { font-weight: ${value}; }`
+    });
+    assert.equal(
+      compareBaseline({}, probe.counts, probe.details).errors.length,
+      1
+    );
+  }
+});
+
+test("字体变量与继承放行，font 简写中的字重和字号分别检测", async () => {
+  const { findStyleDeviations } = await import("./check-admin-ui.mjs");
+  assert.deepEqual(
+    findStyleDeviations(
+      ".probe { font-weight: var(--ui-font-weight-semibold); font: inherit; font: var(--ui-font-size) / 1.57 var(--ui-font-family); }"
+    ),
+    []
+  );
+  for (const value of [
+    "37px Arial",
+    "900 var(--ui-font-size) Arial",
+    "bold var(--ui-font-size) Arial",
+    "BOLD var(--ui-font-size) Arial ! IMPORTANT",
+    "+900 var(--ui-font-size) Arial",
+    "9e2 var(--ui-font-size) Arial"
+  ]) {
+    assert.deepEqual(
+      findStyleDeviations(`.probe { font: ${value}; }`).map(({ rule }) => rule),
+      ["raw-font-shorthand"]
+    );
+  }
+});
+
+test("基线只降不升：新增文件与超出基线报错，下降给出收紧提示", async () => {
+  const { compareBaseline } = await import("./check-admin-ui.mjs");
+  const { errors, tighten } = compareBaseline(
+    { "old.css": { "raw-color": 3 } },
+    { "old.css": { "raw-color": 2 }, "new.css": { "raw-radius": 1 } },
+    { "new.css": [{ rule: "raw-radius", line: 4, text: "border-radius: 6px" }] }
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^new\.css: raw-radius 1 处，超过基线 0/);
+  assert.match(errors[0], /new\.css:4:/);
+  assert.deepEqual(tighten, ["old.css: raw-color 3 → 2"]);
+});

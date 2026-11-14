@@ -1,0 +1,318 @@
+{
+  "apps/admin/src/components/ColumnSettings.css": {
+    "raw-font-size": 1,
+    "raw-radius": 3
+  },
+  "apps/admin/src/features/admins/AdminManagement.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/features/admins/CreateAdminModal.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/admins/ResetPasswordResult.tsx": {
+    "inline-visual-style": 5
+  },
+  "apps/admin/src/features/auth/AdminHeader.tsx": {
+    "inline-visual-style": 7
+  },
+  "apps/admin/src/features/auth/ChangePassword.tsx": {
+    "inline-visual-style": 3
+  },
+  "apps/admin/src/features/auth/admin-connection-status.css": {
+    "raw-font-weight": 1
+  },
+  "apps/admin/src/features/auth/admin-login.css": {
+    "raw-font-shorthand": 1,
+    "raw-font-size": 3
+  },
+  "apps/admin/src/features/coins/AccountLabel.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/console/ConsoleSidebar.tsx": {
+    "inline-visual-style": 4
+  },
+  "apps/admin/src/features/dashboard/AiCostOverview.tsx": {
+    "inline-visual-style": 6
+  },
+  "apps/admin/src/features/dictionary/EntryAnnotationModal.css": {
+    "raw-color": 2
+  },
+  "apps/admin/src/features/dictionary/EntryAnnotationModal.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/features/dictionary/SmartDictionary.tsx": {
+    "inline-visual-style": 5
+  },
+  "apps/admin/src/features/dictionary/assistant/assistant.css": {
+    "raw-color": 4
+  },
+  "apps/admin/src/features/dictionary/part-of-speech/FormSharingSettings.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/part-of-speech/FormTypeSettings.tsx": {
+    "inline-visual-style": 4
+  },
+  "apps/admin/src/features/dictionary/part-of-speech/FullNameEnCell.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/part-of-speech/PartOfSpeechSettings.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/part-of-speech/PartOfSpeechSharedFields.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/part-of-speech/SubPartOfSpeechDrawer.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/required-field-feedback.css": {
+    "raw-shadow": 1
+  },
+  "apps/admin/src/features/dictionary/smart-dictionary.css": {
+    "raw-font-weight": 7,
+    "raw-color": 11,
+    "raw-font-size": 7,
+    "raw-radius": 8
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/V3BasicsStep.tsx": {
+    "inline-visual-style": 4
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/V3MeaningsPreview.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/V3PublicationHistory.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/V3ReviewContent.tsx": {
+    "inline-visual-style": 3
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3EditorTitle.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3EnglishTextPreview.css": {
+    "raw-radius": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3FormGroupSenseEditor.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3GrammarFormPicker.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3PhraseComponentUsagesCard.tsx": {
+    "inline-visual-style": 5
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3ReferenceBadge.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3RelationsGrid.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3SentenceTargetDiscovery.css": {
+    "raw-color": 23,
+    "raw-radius": 6,
+    "raw-shadow": 3,
+    "raw-font-weight": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3StepActions.css": {
+    "raw-color": 2,
+    "raw-shadow": 1,
+    "raw-radius": 2,
+    "raw-font-weight": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3SynthesisInputs.css": {
+    "raw-radius": 2,
+    "raw-font-size": 2,
+    "raw-font-weight": 6,
+    "raw-color": 4
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3TargetCascader.tsx": {
+    "inline-visual-style": 3
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3VoiceTextField.css": {
+    "raw-color": 2,
+    "raw-font-weight": 2,
+    "raw-font-size": 2
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/V3VoiceTextField.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/components/VoiceEditorModal.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/posTabs.css": {
+    "raw-color": 4,
+    "raw-radius": 2
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/v3-forms.css": {
+    "raw-font-weight": 6,
+    "raw-color": 15,
+    "raw-shadow": 1,
+    "raw-font-size": 4,
+    "raw-radius": 3
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/v3-layout.css": {
+    "raw-radius": 3,
+    "raw-font-weight": 4,
+    "raw-color": 9,
+    "raw-font-size": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation-v3/v3-preview.css": {
+    "raw-font-size": 20,
+    "raw-font-weight": 6,
+    "raw-radius": 9,
+    "raw-color": 14,
+    "raw-shadow": 1
+  },
+  "apps/admin/src/features/dictionary/word-creation/UnifiedCreateEntryStep.tsx": {
+    "inline-visual-style": 7
+  },
+  "apps/admin/src/features/dictionary/word-creation/word-creation.css": {
+    "raw-radius": 35,
+    "raw-color": 105,
+    "raw-font-weight": 20,
+    "raw-shadow": 13,
+    "raw-font-size": 14
+  },
+  "apps/admin/src/features/lexicon-next/EntryList.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/lexicon-next/EntryStart.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/permissions/AdminPermissionEditor.tsx": {
+    "inline-visual-style": 31
+  },
+  "apps/admin/src/features/permissions/PermissionChangeDialog.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/permissions/PermissionManagement.tsx": {
+    "inline-visual-style": 17
+  },
+  "apps/admin/src/features/roles/AssignRoleModal.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/roles/RoleFormModal.tsx": {
+    "inline-visual-style": 3
+  },
+  "apps/admin/src/features/roles/RoleManagement.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/sentences/SentenceEditor.css": {
+    "raw-radius": 3,
+    "raw-font-size": 1,
+    "raw-font-weight": 1
+  },
+  "apps/admin/src/features/sentences/SentenceLibrary.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/sentences/WordSentences.css": {
+    "raw-font-weight": 1
+  },
+  "apps/admin/src/features/sentences/WordSentences.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/teacher-certification/TeacherApplications.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/features/users/EditUserModal.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/users/UserManagement.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/features/users/UserResources.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/features/voices/dubbing-groups.css": {
+    "raw-font-size": 2,
+    "raw-font-weight": 3,
+    "raw-shadow": 2,
+    "raw-color": 4
+  },
+  "apps/admin/src/features/voices/voice-audition-panel.css": {
+    "raw-radius": 2,
+    "raw-font-size": 2
+  },
+  "apps/admin/src/features/voices/voice-library.css": {
+    "raw-font-weight": 3,
+    "raw-font-size": 5,
+    "raw-color": 1,
+    "raw-radius": 2
+  },
+  "apps/admin/src/features/wordlists/WordlistDetails.tsx": {
+    "inline-visual-style": 3
+  },
+  "apps/admin/src/features/wordlists/wordlist-editor.css": {
+    "raw-font-size": 3,
+    "raw-radius": 4,
+    "raw-font-weight": 1,
+    "raw-color": 6,
+    "raw-shadow": 1
+  },
+  "apps/admin/src/layouts/FullscreenCenter.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/layouts/console-shell.css": {
+    "raw-font-size": 4,
+    "raw-font-weight": 4,
+    "raw-radius": 6,
+    "raw-color": 5,
+    "raw-shadow": 2
+  },
+  "apps/admin/src/pages/AiLedger.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/pages/Coins.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/pages/MyCoins.tsx": {
+    "inline-visual-style": 1
+  },
+  "apps/admin/src/pages/RouteError.tsx": {
+    "inline-visual-style": 2
+  },
+  "apps/admin/src/pages/ai-ledger.css": {
+    "raw-font-size": 1,
+    "raw-font-weight": 1
+  },
+  "apps/admin/src/pages/lexicon-next.css": {
+    "raw-font-size": 4,
+    "raw-font-weight": 1
+  },
+  "packages/ui/src/admin/display/disclosure.css": {
+    "raw-font-weight": 1,
+    "raw-radius": 2,
+    "raw-color": 2,
+    "raw-shadow": 1
+  },
+  "packages/ui/src/admin/display/display.css": {
+    "raw-color": 22,
+    "raw-font-weight": 5,
+    "raw-radius": 5,
+    "raw-font-size": 2
+  },
+  "packages/ui/src/admin/forms/forms.css": {
+    "raw-radius": 9,
+    "raw-color": 6,
+    "raw-shadow": 2,
+    "raw-font-weight": 2
+  },
+  "packages/ui/src/admin/overlays/overlays.css": {
+    "raw-color": 4,
+    "raw-font-size": 2,
+    "raw-font-weight": 2,
+    "raw-radius": 8,
+    "raw-font-shorthand": 2,
+    "raw-shadow": 2
+  },
+  "packages/ui/src/admin/table/table.css": {
+    "raw-font-weight": 1,
+    "raw-radius": 2,
+    "raw-color": 3
+  }
+}

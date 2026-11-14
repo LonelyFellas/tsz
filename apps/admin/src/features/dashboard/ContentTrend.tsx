@@ -1,4 +1,5 @@
 import { useDashboardTranslation } from "@/features/dashboard/i18n";
+import { CountUp } from "./CountUp";
 import { useState } from "react";
 import type { DashboardWeeklyPoint } from "@tsz/types";
 import {
@@ -30,6 +31,9 @@ export function ContentTrend({
   data: DashboardWeeklyPoint[];
   generatedAt?: string;
 }) {
+  const reducedMotion =
+    !window.matchMedia ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const { t, i18n } = useDashboardTranslation();
   const [table, setTable] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string>();
@@ -63,7 +67,14 @@ export function ContentTrend({
             {ongoing && <small>{t("ongoing_week")}</small>}
           </span>
           <strong>
-            {selected?.value.toLocaleString(i18n.language) ?? "—"}
+            {selected ? (
+              <CountUp
+                value={selected.value}
+                format={(value) => value.toLocaleString(i18n.language)}
+              />
+            ) : (
+              "—"
+            )}
             <small>{t("new_entries")}</small>
           </strong>
         </div>
@@ -174,7 +185,9 @@ export function ContentTrend({
                 name={t("new_entries")}
                 maxBarSize={24}
                 radius={[4, 4, 0, 0]}
-                isAnimationActive={false}
+                isAnimationActive={!reducedMotion}
+                animationDuration={600}
+                animationEasing="ease-out"
                 onClick={(_entry, index) =>
                   setSelectedWeek(data[index]?.week_start)
                 }
@@ -215,7 +228,6 @@ export function ContentTrend({
         ))}
       </div>
       <div className="dashboard-chart-footer">
-        <span>{t("week_help")}</span>
         {selected && canVisitAdminRoute(profile, "/words") && (
           <Link to={detailLink}>{t("week_entries")}</Link>
         )}

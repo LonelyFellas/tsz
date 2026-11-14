@@ -1,14 +1,6 @@
 import { useAdminTranslation } from "@/i18n";
-import { Button, PageHeader, Tabs } from "@tsz/ui/admin/display";
-import {
-  SlidersHorizontalIcon,
-  KeyRoundIcon,
-  CpuIcon,
-  LanguagesIcon,
-  ShieldCheckIcon,
-  CableIcon,
-  ArrowUpRightIcon
-} from "lucide-react";
+import { Button, Card, PageHeader, Tabs } from "@tsz/ui/admin/display";
+import { ArrowUpRightIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { OpenCodeConnection } from "@/features/ai-ledger/OpenCodeConnection";
 import { ChatGPTConnection } from "@/features/ai-ledger/ChatGPTConnection";
@@ -29,29 +21,21 @@ export function ProfileSettingsPage() {
       ? requested
       : "preferences";
   const preferences = (
-    <>
-      <section
-        className="settings-section"
+    <div className="settings-stack">
+      <Card
+        role="region"
         aria-labelledby="settings-preferences-title"
-      >
-        <header className="settings-section__heading">
-          <span className="settings-section__icon">
-            <LanguagesIcon aria-hidden="true" />
-          </span>
+        title={
           <h2 id="settings-preferences-title">{t("settings_preferences")}</h2>
-        </header>
-        <InterfaceLanguage />
-      </section>
-      <section
-        className="settings-section"
-        aria-labelledby="settings-security-title"
+        }
       >
-        <header className="settings-section__heading">
-          <span className="settings-section__icon">
-            <ShieldCheckIcon aria-hidden="true" />
-          </span>
-          <h2 id="settings-security-title">{t("settings_security")}</h2>
-        </header>
+        <InterfaceLanguage />
+      </Card>
+      <Card
+        role="region"
+        aria-labelledby="settings-security-title"
+        title={<h2 id="settings-security-title">{t("settings_security")}</h2>}
+      >
         <div className="settings-row">
           <div className="settings-row__label">{t("login_password")}</div>
           <Button onClick={() => navigate("/change-password")}>
@@ -59,15 +43,12 @@ export function ProfileSettingsPage() {
             <ArrowUpRightIcon aria-hidden="true" />
           </Button>
         </div>
-      </section>
-    </>
+      </Card>
+    </div>
   );
   return (
     <div className="profile-settings">
-      <PageHeader
-        className="profile-settings__header"
-        title={t("account_settings")}
-      />
+      <PageHeader title={t("account_settings")} />
       {isSuper && profile ? (
         <Tabs
           key={profile.id}
@@ -89,37 +70,14 @@ export function ProfileSettingsPage() {
           items={[
             {
               key: "preferences",
-              label: (
-                <span className="profile-settings__tab-label">
-                  <SlidersHorizontalIcon aria-hidden="true" />
-
-                  {t("settings_preferences_tab")}
-                </span>
-              ),
+              label: t("settings_preferences_tab"),
               children: preferences
             },
             {
               key: "accounts",
-              label: (
-                <span className="profile-settings__tab-label">
-                  <KeyRoundIcon aria-hidden="true" />
-
-                  {t("settings_model_accounts")}
-                </span>
-              ),
+              label: t("settings_model_accounts"),
               children: (
-                <section
-                  className="settings-section"
-                  aria-labelledby="settings-accounts-title"
-                >
-                  <header className="settings-section__heading">
-                    <span className="settings-section__icon">
-                      <CableIcon aria-hidden="true" />
-                    </span>
-                    <h2 id="settings-accounts-title">
-                      {t("settings_model_accounts")}
-                    </h2>
-                  </header>
+                <Card aria-label={t("settings_model_accounts")} role="region">
                   <div className="settings-provider-list">
                     <ChatGPTConnection
                       key={`chatgpt:${profile.id}`}
@@ -130,39 +88,22 @@ export function ProfileSettingsPage() {
                       adminId={profile.id}
                     />
                   </div>
-                </section>
+                </Card>
               )
             },
             {
               key: "models",
-              label: (
-                <span className="profile-settings__tab-label">
-                  <CpuIcon aria-hidden="true" />
-
-                  {t("settings_question_model")}
-                </span>
-              ),
+              label: t("settings_question_model"),
               children: (
-                <section
-                  className="settings-section"
-                  aria-labelledby="settings-models-title"
-                >
-                  <header className="settings-section__heading">
-                    <span className="settings-section__icon">
-                      <CpuIcon aria-hidden="true" />
-                    </span>
-                    <h2 id="settings-models-title">
-                      {t("settings_question_model")}
-                    </h2>
-                  </header>
+                <Card aria-label={t("settings_question_model")} role="region">
                   <OpenCodeModels adminId={profile.id} />
-                </section>
+                </Card>
               )
             }
           ]}
         />
       ) : (
-        <div className="profile-settings__content">{preferences}</div>
+        preferences
       )}
     </div>
   );
