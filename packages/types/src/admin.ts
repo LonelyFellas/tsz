@@ -62,13 +62,20 @@ export interface AdminPaginationMeta extends PageMeta {
 export type AdminDialectPreference = "uk" | "us";
 
 /**
- * 管理员个人偏好。眼下只有方言一项，仍嵌一层对象：将来加第二项时
- * profile 响应的形状不用再变，前端也不必区分「顶层字段」与「偏好」。
+ * 管理员个人偏好，各字段独立更新。词库工作语言与界面语言、朗读方言分开保存。
  */
+export interface AdminLexiconLanguages {
+  target_language: string;
+  target_locale: string;
+  medium_locale: string;
+}
+
 export interface AdminPreferences {
   dialect: AdminDialectPreference;
   /** 新后端恒返回可空值；旧后端省略此字段。 */
   interface_locale?: InterfaceLocaleV1 | null;
+  /** 新后端恒返回；null 为尚未设置，旧后端省略。 */
+  lexicon_languages?: AdminLexiconLanguages | null;
 }
 
 /** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」+ 动态菜单。 */
@@ -92,6 +99,9 @@ export interface AdminProfile {
 export interface UpdateAdminPreferencesInput {
   dialect?: AdminDialectPreference;
   interface_locale?: InterfaceLocaleV1 | null;
+  lexicon_languages?: AdminLexiconLanguages;
+  /** 首次导入旧浏览器记忆时不覆盖账号已有值。 */
+  lexicon_languages_if_unset?: boolean;
 }
 
 /** PATCH /admin/profile/preferences 的响应：落库后的完整偏好。 */

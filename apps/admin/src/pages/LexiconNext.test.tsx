@@ -22,7 +22,7 @@ import type {
   NextWorkspaceEntry
 } from "@tsz/types";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
-import { useAuthStore } from "@/lib/auth";
+import { api as profileApi, tokens, useAuthStore } from "@/lib/auth";
 import { LexiconNextPage, type LexiconNextRequests } from "./LexiconNext";
 
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
@@ -132,9 +132,11 @@ async function chooseLanguage(label: string) {
     })
   );
 }
+let preferenceGeneration = 0;
 const detachCaches: (() => void)[] = [];
 afterEach(() => {
   detachCaches.splice(0).forEach((detach) => detach());
+  vi.restoreAllMocks();
 });
 function mount(
   api: LexiconNextRequests,
@@ -169,6 +171,133 @@ function mount(
   return { client, router, unmount: rendered.unmount };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
+
+const accountChoice = {
+  target_language: "en",
+  target_locale: "en-US",
+  medium_locale: "zh-Hant"
+};
+function withAccountChoice(value: typeof accountChoice | null) {
+  useAuthStore.getState().setProfile({
+    ...useAuthStore.getState().profile!,
+    preferences: {
+      ...useAuthStore.getState().profile!.preferences,
+      lexicon_languages: value
+    }
+  });
+}
+
+it("账号值优先于旧浏览器记忆；无缓存的新客户端从账号恢复且首个请求正确", async () => {
+  withAccountChoice(accountChoice);
+  const key = "tsz:admin:lexicon-languages:v1:editor:en";
+  localStorage.setItem(
+    key,
+    JSON.stringify({ target_locale: "en-GB", medium_locale: "zh-Hans" })
+  );
+  const api = requests();
+  const first = mount(api, "/lexicon-next");
+  await screen.findByRole("combobox", { name: "目标语言" });
+  expect(
+    screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+  ).toHaveTextContent("美式英语");
+  expect(api.workspaceList).toHaveBeenCalledExactlyOnceWith({
+    target_language: "en",
+    medium_locale: "zh-Hant",
+    page: 1,
+    page_size: 20
+  });
+  first.unmount();
+  localStorage.removeItem(key);
+  const another = requests();
+  mount(another, "/lexicon-next");
+  await screen.findByRole("combobox", { name: "媒介语言" });
+  expect(
+    screen.getByRole("combobox", { name: "媒介语言" }).closest(".ui-select")
+  ).toHaveTextContent("繁体中文");
+  expect(another.workspaceList).toHaveBeenCalledExactlyOnceWith({
+    target_language: "en",
+    medium_locale: "zh-Hant",
+    page: 1,
+    page_size: 20
+  });
+  expect(profileApi.profile).toHaveBeenCalledTimes(2);
+  expect(profileApi.updateProfilePreferences).not.toHaveBeenCalled();
+});
+
+it("旧链接只覆盖当前视图，不把旧组合反写账号", async () => {
+  withAccountChoice(accountChoice);
+  const linked = mount(
+    requests(),
+    "/lexicon-next?target_locale=en-GB&medium_locale=zh-Hans"
+  );
+  await screen.findByRole("combobox", { name: "目标语言" });
+  expect(
+    screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+  ).toHaveTextContent("英式英语");
+  linked.unmount();
+  mount(requests(), "/lexicon-next");
+  await screen.findByRole("combobox", { name: "目标语言" });
+  expect(
+    screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+  ).toHaveTextContent("美式英语");
+  expect(profileApi.updateProfilePreferences).not.toHaveBeenCalled();
+  expect(
+    useAuthStore.getState().profile!.preferences.lexicon_languages
+  ).toEqual(accountChoice);
+});
+
+it("账号模式下取消切换不保存，确认离页后才保存生效的组合", async () => {
+  withAccountChoice(accountChoice);
+  const api = requests();
+  api.get.mockResolvedValue({ ...entry, medium_locale: "zh-Hant" });
+  mount(api, `/lexicon-next/${id}?target_locale=en-US&medium_locale=zh-Hant`);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local kept" }
+  });
+  await chooseLanguage("简体中文");
+  fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
+  expect(profileApi.updateProfilePreferences).not.toHaveBeenCalled();
+  await chooseLanguage("简体中文");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
+  await waitFor(() =>
+    expect(profileApi.updateProfilePreferences).toHaveBeenCalledExactlyOnceWith(
+      { lexicon_languages: { ...accountChoice, medium_locale: "zh-Hans" } }
+    )
+  );
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("账号读取失败不加载错误范围，读取和保存均可重试", async () => {
+  withAccountChoice(accountChoice);
+  vi.mocked(profileApi.profile).mockRejectedValueOnce(
+    new Error("offline read")
+  );
+  const api = requests();
+  mount(api, "/lexicon-next");
+  await screen.findByText("读取账号语言选择失败");
+  expect(api.workspaceList).not.toHaveBeenCalled();
+  fireEvent.click(button("重试读取"));
+  await screen.findByRole("combobox", { name: "目标语言" });
+  vi.mocked(profileApi.updateProfilePreferences).mockRejectedValueOnce(
+    new Error("offline save")
+  );
+  await chooseLanguage("英式英语");
+  await screen.findByText("语言选择尚未保存到账号");
+  expect(
+    screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+  ).toHaveTextContent("英式英语");
+  fireEvent.click(button("重试保存语言"));
+  await waitFor(() =>
+    expect(screen.queryByText("语言选择尚未保存到账号")).toBeNull()
+  );
+  expect(
+    useAuthStore.getState().profile!.preferences.lexicon_languages
+  ).toEqual({ ...accountChoice, target_locale: "en-GB" });
+});
 
 it("语言选择在离开重进和整页重新挂载后恢复，首个请求即使用记忆范围", async () => {
   const api = requests();
@@ -827,6 +956,21 @@ async function edit(label: string, value: string) {
   });
 }
 beforeEach(() => {
+  const generation = ++preferenceGeneration;
+  vi.spyOn(tokens, "getSessionGeneration").mockReturnValue(generation);
+  vi.spyOn(profileApi, "profile").mockImplementation(async () =>
+    structuredClone(useAuthStore.getState().profile!)
+  );
+  vi.spyOn(profileApi, "updateProfilePreferences").mockImplementation(
+    async (input) => ({
+      preferences: {
+        ...useAuthStore.getState().profile!.preferences,
+        ...(input.lexicon_languages
+          ? { lexicon_languages: input.lexicon_languages }
+          : {})
+      }
+    })
+  );
   for (const key of Object.keys(localStorage)) {
     if (key.startsWith("tsz:admin:lexicon-languages:v1:"))
       localStorage.removeItem(key);

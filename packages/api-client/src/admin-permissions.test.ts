@@ -83,6 +83,56 @@ describe("真实请求层权限 API method/path/wire", () => {
     });
   });
 
+  it("账号语言偏好走原 PATCH，profile 与完整偏好保持 snake_case", async () => {
+    const languages = {
+      target_language: "en",
+      target_locale: "en-US",
+      medium_locale: "zh-Hant"
+    };
+    const preferences = {
+      dialect: "uk",
+      interface_locale: null,
+      lexicon_languages: languages
+    };
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async (_url, init) =>
+          new Response(
+            JSON.stringify(
+              init?.method === "PATCH"
+                ? { preferences }
+                : { ...profile, preferences }
+            ),
+            { status: 200 }
+          )
+      );
+    const api = createAdminEndpoints(
+      createHttpClient({ baseUrl: "/api/v1/admin" })
+    );
+    expect((await api.profile()).preferences.lexicon_languages).toEqual(
+      languages
+    );
+    expect(
+      (
+        await api.updateProfilePreferences({
+          lexicon_languages: languages,
+          lexicon_languages_if_unset: true
+        })
+      ).preferences
+    ).toEqual(preferences);
+    expect(fetch.mock.calls[1]?.[0]).toBe("/api/v1/admin/profile/preferences");
+    expect(fetch.mock.calls[1]?.[1]?.method).toBe("PATCH");
+    expect(JSON.parse(fetch.mock.calls[1]?.[1]?.body as string)).toEqual({
+      lexicon_languages: languages,
+      lexicon_languages_if_unset: true
+    });
+    await api.updateProfilePreferences({ dialect: "us" });
+    expect(JSON.parse(fetch.mock.calls[2]?.[1]?.body as string)).toEqual({
+      dialect: "us"
+    });
+  });
+
   it("单人与批量同用preview/commit，依赖差异与版本逐人传输", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
       async (url) =>
