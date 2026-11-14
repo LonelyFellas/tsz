@@ -35,6 +35,7 @@ import { ContentRows } from "./ContentRows";
 import { localeLabels, removePosDescription, replaceFormEditor } from "./model";
 import { emptyFormEditor } from "./FormsStep";
 import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
+import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
 import { localizedCatalogName } from "@/features/dictionary/part-of-speech/catalog";
 import { V3AddBasicPosSelect } from "@/features/dictionary/word-creation-v3/components/V3AddBasicPosSelect";
 import { SortableDragHandle } from "@/features/dictionary/word-creation-v3/components/SortableDragHandle";
@@ -77,10 +78,10 @@ export function MeaningsStep({
   const { modal } = App.useApp();
   const { t, i18n } = useLexiconEditorTranslation();
   const catalog = useQuery({
-    queryKey: ["lexicon-next", "part-of-speech-catalog"],
+    queryKey: partOfSpeechKeys.catalog(),
     queryFn: () => partOfSpeechDataSource.catalog(),
     enabled: formEditorAvailable,
-    staleTime: Infinity
+    staleTime: 5 * 60 * 1000
   });
   const editor = value.form_editor ?? emptyFormEditor();
   const forms = expandFormContents(editor);

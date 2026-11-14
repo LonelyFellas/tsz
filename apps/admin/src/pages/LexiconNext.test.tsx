@@ -29,6 +29,8 @@ import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/
 import { formsFixture } from "@/features/dictionary/word-creation-v3/fixtures";
 import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { emptyFormEditor } from "@/features/lexicon-next/FormsStep";
+import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
+import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
 import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
 
 vi.mock("@/lib/env", async (importOriginal) => {
@@ -2351,6 +2353,42 @@ it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同�
       .getAllByRole("combobox", { name: "添加基本词性" })
       .every((select) => select.hasAttribute("disabled"))
   ).toBe(true);
+});
+
+it("词性配置失效后，Step3 新增词性使用最新词形模板", async () => {
+  const source = vi.spyOn(partOfSpeechDataSource, "catalog");
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  const mounted = mount(api);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/^词义与译词/));
+  await waitFor(() =>
+    expect(screen.getByRole("combobox", { name: "添加基本词性" })).toBeEnabled()
+  );
+  source.mockResolvedValue({
+    ...partOfSpeechCatalogFixture,
+    catalog_version: 2,
+    items: partOfSpeechCatalogFixture.items.map((item) =>
+      item.code === "verb"
+        ? { ...item, default_form_types: ["past_tense"] }
+        : item
+    )
+  });
+  await act(() =>
+    mounted.client.invalidateQueries({ queryKey: partOfSpeechKeys.all })
+  );
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "添加基本词性" }));
+  fireEvent.click(
+    await screen.findByText("动词", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  const saved: NextDraft = api.save.mock.calls[0]![1].draft;
+  expect(
+    saved.form_editor!.pos[0]!.forms.map((form) => form.form_type)
+  ).toEqual(["base", "past_tense"]);
 });
 
 it.each(["词性与发音", "词义与译词"])(
