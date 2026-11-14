@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-ownership/tsz-rust/docs/openapi.json",
-  "_source_sha256": "320901e1dcd2975cb19daee1eaf96c0bb336775a7975d2148f52f5286f19c5af",
+  "_source": "/Users/darwish/.codex/worktrees/grammar-validation/tsz-rust/docs/openapi.json",
+  "_source_sha256": "659e3e538422ad0b4c8dfe1f1216cfc94223edb68568b93c2782f20645bb63e5",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3584,6 +3584,7 @@
       "properties": {
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
+        "grammar_structures": { "type": "boolean" },
         "language_rules_version": { "type": "string" },
         "languages": {
           "type": "array",
@@ -3601,6 +3602,7 @@
       "type": "object",
       "required": ["id", "locale", "text", "style"],
       "properties": {
+        "grammar_structure_id": { "type": "string", "format": "uuid" },
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
         "style": { "$ref": "#/$defs/NextDefinitionStyle" },
@@ -3688,6 +3690,10 @@
       "properties": {
         "form_editor": { "$ref": "#/$defs/SharedFormsStepContentV3" },
         "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
+        "grammar_structures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextGrammarStructure" }
+        },
         "headword": { "type": "string" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
         "sense_groups": {
@@ -3803,6 +3809,14 @@
       "properties": {
         "entry_id": { "type": "string", "format": "uuid" },
         "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
+        "grammar_issues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextGrammarIssue" }
+        },
+        "grammar_structures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextGrammarStructure" }
+        },
         "medium_locale": { "type": "string" },
         "missing_forms": { "type": "boolean" },
         "revision": { "type": "integer" },
@@ -3835,6 +3849,40 @@
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
         "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextGrammarIssue": {
+      "type": "object",
+      "required": ["node_id", "field", "message"],
+      "properties": {
+        "field": { "type": "string" },
+        "message": { "type": "string" },
+        "node_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextGrammarStructure": {
+      "type": "object",
+      "required": ["id", "part_of_speech", "variants"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "part_of_speech": { "type": "string" },
+        "sub_pos": { "type": "string" },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextGrammarVariant" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextGrammarVariant": {
+      "type": "object",
+      "required": ["id", "locale", "content"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -3911,7 +3959,8 @@
         },
         "id": { "type": "string", "format": "uuid" },
         "part_of_speech": { "type": ["string", "null"] },
-        "sense_group_id": { "type": "string", "format": "uuid" }
+        "sense_group_id": { "type": "string", "format": "uuid" },
+        "sub_pos": { "type": "string" }
       },
       "additionalProperties": false
     },

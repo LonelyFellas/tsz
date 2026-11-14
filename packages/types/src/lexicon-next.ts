@@ -1,4 +1,4 @@
-import type { SharedFormsStepContentV3 } from "./admin-word-v3";
+import type { RichTextV3, SharedFormsStepContentV3 } from "./admin-word-v3";
 
 /** Independent lexicon-next identities; the forms editor shares the V1 content contract. */
 export interface NextForm {
@@ -7,6 +7,7 @@ export interface NextForm {
   text: string;
 }
 export interface NextDefinition {
+  grammar_structure_id?: string;
   id: string;
   locale: string;
   text: string;
@@ -23,13 +24,31 @@ export interface NextSenseGroup {
   name_en: string;
 }
 export interface NextSense {
+  sub_pos?: string;
   sense_group_id?: string;
   id: string;
   part_of_speech: string | null;
   definitions: NextDefinition[];
   equivalents: NextEquivalent[];
 }
+export interface NextGrammarVariant {
+  id: string;
+  locale: string;
+  content: RichTextV3;
+}
+export interface NextGrammarStructure {
+  id: string;
+  part_of_speech: string;
+  sub_pos?: string;
+  variants: NextGrammarVariant[];
+}
+export interface NextGrammarIssue {
+  node_id: string;
+  field: string;
+  message: string;
+}
 export interface NextDraft {
+  grammar_structures?: NextGrammarStructure[];
   sense_groups?: NextSenseGroup[];
   schema_version: 1;
   headword: string;
@@ -123,6 +142,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  grammar_structures?: boolean;
   medium_ownership?: boolean;
   schema_version: 1;
   language_rules_version: string;
@@ -148,6 +168,8 @@ export interface NextSenseView {
   missing_equivalents: boolean;
 }
 export interface NextEntryView {
+  grammar_structures?: NextGrammarStructure[];
+  grammar_issues?: NextGrammarIssue[];
   sense_groups?: NextSenseGroup[];
   entry_id: string;
   revision: number;

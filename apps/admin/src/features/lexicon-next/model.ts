@@ -1,5 +1,9 @@
 import type {
   NextDraft,
+  NextGrammarStructure,
+  NextSense,
+  NextGrammarIssue,
+  PartOfSpeechCatalogResponse,
   NextEntryView,
   NextForm,
   NextLanguageCapability,
@@ -15,7 +19,7 @@ export const localeLabels: Record<string, string> = {
 };
 
 export const removePosDescription =
-  "会移除此词性下的词形和所有语言的词义、解释及译词。保存后生效。";
+  "会移除此词性下的词形、语法结构和所有语言的词义、解释及译词。保存后生效。";
 
 export function replaceFormEditor(
   draft: NextDraft,
@@ -29,6 +33,13 @@ export function replaceFormEditor(
   return {
     ...draft,
     form_editor,
+    ...(draft.grammar_structures
+      ? {
+          grammar_structures: draft.grammar_structures.filter(
+            (grammar) => !removed.has(grammar.part_of_speech)
+          )
+        }
+      : {}),
     senses: draft.senses.filter(
       (sense) => !removed.has(sense.part_of_speech ?? "")
     )
@@ -78,7 +89,8 @@ export function initialTargetLocale(
 export function previewDraft(
   draft: NextDraft,
   target: string,
-  medium: string
+  medium: string,
+  catalog?: PartOfSpeechCatalogResponse
 ): NextEntryView {
   const targetRows = <T extends { locale: string }>(rows: T[]) => {
     const exact = rows.filter((row) => row.locale === target);
@@ -91,6 +103,15 @@ export function previewDraft(
     ...(draft.sense_groups !== undefined
       ? { sense_groups: draft.sense_groups }
       : {}),
+    ...(draft.grammar_structures !== undefined
+      ? {
+          grammar_structures: draft.grammar_structures.map((grammar) => ({
+            ...grammar,
+            variants: targetRows(grammar.variants)
+          })),
+          grammar_issues: grammarBindingIssues(draft, catalog)
+        }
+      : {}),
     entry_id: "",
     revision: 0,
     target_locale: target,
@@ -98,10 +119,28 @@ export function previewDraft(
     forms,
     missing_forms: !forms.length,
     senses: draft.senses.map((sense) => {
-      const target_definitions = targetRows(sense.definitions);
-      const medium_definitions = sense.definitions.filter(
-        (row) => row.locale === medium
+      const validReferences = (
+        definition: (typeof sense.definitions)[number]
+      ) => {
+        if (
+          !definition.grammar_structure_id ||
+          draft.grammar_structures?.some(
+            (g) =>
+              g.id === definition.grammar_structure_id &&
+              grammarMatchesSense(g, sense)
+          )
+        )
+          return definition;
+        const next = { ...definition };
+        delete next.grammar_structure_id;
+        return next;
+      };
+      const target_definitions = targetRows(sense.definitions).map(
+        validReferences
       );
+      const medium_definitions = sense.definitions
+        .filter((row) => row.locale === medium)
+        .map(validReferences);
       const equivalents = sense.equivalents.filter(
         (row) => row.locale === medium
       );
@@ -172,4 +211,81 @@ export function draftProblem(draft: NextDraft): string | null {
   )
     return "草稿最多包含 500 个内容节点，请删除多余内容。";
   return null;
+}
+
+export function grammarMatchesSense(
+  grammar: NextGrammarStructure,
+  sense: NextSense
+): boolean {
+  return (
+    grammar.part_of_speech === sense.part_of_speech &&
+    (grammar.sub_pos ?? "") === (sense.sub_pos ?? "")
+  );
+}
+export function grammarText(
+  grammar: NextGrammarStructure,
+  locale: string
+): string {
+  return (
+    (
+      grammar.variants.find((variant) => variant.locale === locale) ??
+      grammar.variants.find((variant) => variant.locale === "en")
+    )?.content.text ?? ""
+  );
+}
+export function grammarBindingIssues(
+  draft: NextDraft,
+  catalog?: PartOfSpeechCatalogResponse
+): NextGrammarIssue[] {
+  if (draft.grammar_structures === undefined) return [];
+  const issues: NextGrammarIssue[] = [];
+  const part = (code?: string | null) =>
+    catalog?.items.find((item) => item.code === code);
+  const invalidSub = (code: string | null, sub?: string) => {
+    const item = part(code);
+    return (
+      item &&
+      ((!sub && (item.sub_pos_required ?? item.sub_parts.length > 0)) ||
+        (!!sub && !item.sub_parts.some((p) => p.code === sub)))
+    );
+  };
+  for (const grammar of draft.grammar_structures) {
+    if (invalidSub(grammar.part_of_speech, grammar.sub_pos))
+      issues.push({
+        node_id: grammar.id,
+        field: "sub_pos",
+        message: "语法结构需要绑定当前基本词性下有效的细分词性"
+      });
+    if (
+      !grammar.variants.length ||
+      grammar.variants.some((v) => !v.content.text.trim()) ||
+      (grammar.variants.some((v) => v.locale !== "en") &&
+        grammar.variants.length !== 2)
+    )
+      issues.push({
+        node_id: grammar.id,
+        field: "variants",
+        message: "请完整填写语法结构的英美内容"
+      });
+  }
+  for (const sense of draft.senses) {
+    if (invalidSub(sense.part_of_speech, sense.sub_pos))
+      issues.push({
+        node_id: sense.id,
+        field: "sub_pos",
+        message: "请选择义项的细分词性"
+      });
+    for (const definition of sense.definitions) {
+      const grammar = draft.grammar_structures.find(
+        (row) => row.id === definition.grammar_structure_id
+      );
+      if (!grammar || !grammarMatchesSense(grammar, sense))
+        issues.push({
+          node_id: definition.id,
+          field: "grammar_structure_id",
+          message: "请选择与义项细分词性匹配的语法结构"
+        });
+    }
+  }
+  return issues;
 }

@@ -2489,7 +2489,7 @@ it.each(["词性与发音", "词义与译词"])(
     fireEvent.click(button(new RegExp(`^${step}`)));
     fireEvent.click(screen.getByRole("button", { name: "删除名词" }));
     let dialog = within(await screen.findByRole("dialog"));
-    expect(dialog.getByText(/会移除此词性下的词形和所有语言/)).toBeVisible();
+    expect(dialog.getByText(/会移除此词性下的词形.*所有语言/)).toBeVisible();
     fireEvent.click(dialog.getByRole("button", { name: "取消" }));
     expect(screen.getByRole("tab", { name: /名词/ })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "删除名词" }));

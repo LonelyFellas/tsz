@@ -1,7 +1,12 @@
 import { Button, Space } from "@tsz/ui/admin/display";
 import { Input, Select } from "@tsz/ui/admin/forms";
 import { Trash2, Plus } from "lucide-react";
-import type { NextDefinition, NextEquivalent } from "@tsz/types";
+import type {
+  NextDefinition,
+  NextEquivalent,
+  NextGrammarStructure
+} from "@tsz/types";
+import { grammarText } from "./model";
 import { useState } from "react";
 import {
   SenseSectionBody,
@@ -18,6 +23,8 @@ export function ContentRows({
   grouped = false,
   textClassName,
   disabled,
+  grammars,
+  grammarLocale = locale,
   onChange
 }: {
   rows: Row[];
@@ -27,6 +34,8 @@ export function ContentRows({
   grouped?: boolean;
   textClassName?: string;
   disabled: boolean;
+  grammars?: NextGrammarStructure[];
+  grammarLocale?: string;
   onChange: (rows: Row[]) => void;
 }) {
   const visible = rows.filter((row) => row.locale === locale);
@@ -74,6 +83,50 @@ export function ContentRows({
             />
           )}
           <Space>
+            {definition && grammars !== undefined && (
+              <Select
+                aria-label={`${label} ${index + 1} 语法结构`}
+                placeholder="请选择语法结构"
+                disabled={disabled}
+                value={(row as NextDefinition).grammar_structure_id}
+                status={
+                  (row as NextDefinition).grammar_structure_id &&
+                  !grammars.some(
+                    (g) => g.id === (row as NextDefinition).grammar_structure_id
+                  )
+                    ? "error"
+                    : undefined
+                }
+                options={[
+                  ...((row as NextDefinition).grammar_structure_id &&
+                  !grammars.some(
+                    (g) => g.id === (row as NextDefinition).grammar_structure_id
+                  )
+                    ? [
+                        {
+                          value: (row as NextDefinition).grammar_structure_id!,
+                          label: "细分词性不匹配，请重新选择",
+                          disabled: true
+                        }
+                      ]
+                    : []),
+                  ...grammars.map((g, i) => ({
+                    value: g.id,
+                    label: `${i + 1}. ${grammarText(g, grammarLocale) || "未填写当前方言内容"}`
+                  }))
+                ]}
+                notFoundContent="请先为当前细分词性添加语法结构"
+                onChange={(grammar_structure_id: string) =>
+                  onChange(
+                    rows.map((item) =>
+                      item.id === row.id
+                        ? { ...item, grammar_structure_id }
+                        : item
+                    )
+                  )
+                }
+              />
+            )}
             {"style" in row && (
               <Select
                 aria-label={`${label} ${index + 1} 格式`}
