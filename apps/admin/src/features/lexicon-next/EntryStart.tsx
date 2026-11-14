@@ -9,7 +9,7 @@ import {
   Tag,
   Typography
 } from "@tsz/ui/admin/display";
-import { Form, Input, Select } from "@tsz/ui/admin/forms";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { Search, Plus } from "lucide-react";
 import type { NextDetection, NextEntryMatches } from "@tsz/types";
 import { usePermission } from "@/lib/auth";
@@ -17,11 +17,13 @@ import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { validateEntryInput } from "@/features/dictionary/word-creation/entryClassification";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { useLexiconLanguages } from "./LanguageSelection";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
 
 export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const navigate = useNavigate();
+  const { search: languageSearch, targetLanguage } = useLexiconLanguages();
   const queryClient = useQueryClient();
   const canCreate = usePermission("words.create");
   const posLabel = usePartOfSpeechLabel();
@@ -62,7 +64,10 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setExpandedGlosses(new Set());
     setEntryMatches(undefined);
     try {
-      const query = { target_language: "en", surface: input.normalized };
+      const query = {
+        target_language: targetLanguage,
+        surface: input.normalized
+      };
       const [result, entries] = await Promise.all([
         requests.detect(query),
         requests.matchEntries({ ...query, page: 1, page_size: 20 })
@@ -96,7 +101,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setError(undefined);
     try {
       const result = await requests.matchEntries({
-        target_language: "en",
+        target_language: targetLanguage,
         surface: detection.surface,
         page,
         page_size: entryMatches.pagination.page_size
@@ -126,7 +131,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setError(undefined);
     try {
       const entry = await requests.create({
-        target_language: "en",
+        target_language: targetLanguage,
         kind: detection.kind,
         headword: detection.surface
       });
@@ -138,7 +143,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
           })
         )
       );
-      navigate(`/lexicon-next/${entry.id}`);
+      navigate(`/lexicon-next/${entry.id}?${languageSearch}`);
     } catch (error) {
       setUncertain(true);
       setError(
@@ -151,7 +156,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   }
 
   return (
-    <EntryLayout step="basics" exists={false}>
+    <EntryLayout step="basics" exists={false} languageSearch={languageSearch}>
       <div
         className={`lexicon-next lexicon-next-create word-basics-workflow${detection ? " is-detected" : ""}`}
       >
@@ -169,13 +174,6 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
           title={t("creation_input_and_detection")}
         >
           <Form layout="vertical" onFinish={() => void detect()}>
-            <Form.Item label={t("creation_entry_language")}>
-              <Select
-                value="en"
-                options={[{ value: "en", label: t("creation_english") }]}
-                disabled
-              />
-            </Form.Item>
             <Form.Item
               label={t("creation_entry_text")}
               validateStatus={fieldError ? "error" : undefined}
@@ -219,6 +217,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
             {entryMatches && (
               <ExistingEntryMatches
                 result={entryMatches}
+                languageSearch={languageSearch}
                 disabled={Boolean(busy) || uncertain}
                 loading={busy === "matches"}
                 onPageChange={(page) => void matchPage(page)}

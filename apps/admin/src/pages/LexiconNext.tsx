@@ -15,7 +15,7 @@ import {
   Spin,
   Tag
 } from "@tsz/ui/admin/display";
-import { Checkbox, Form, Input, Radio } from "@tsz/ui/admin/forms";
+import { Checkbox, Form, Input } from "@tsz/ui/admin/forms";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { ContentEditPermissions } from "@/features/dictionary/contentEditPermissions";
@@ -39,10 +39,13 @@ import { MeaningsStep } from "@/features/lexicon-next/MeaningsStep";
 import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
   draftProblem,
-  initialTargetLocale,
   localeLabels,
   previewDraft
 } from "@/features/lexicon-next/model";
+import {
+  LexiconLanguages,
+  useLexiconLanguages
+} from "@/features/lexicon-next/LanguageSelection";
 import { EntryList } from "@/features/lexicon-next/EntryList";
 import { EntryLayout } from "@/features/lexicon-next/EntryLayout";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
@@ -102,32 +105,34 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
             <Button onClick={() => void capability.refetch()}>重新检查</Button>
           }
         />
-      ) : entryId === "trash" ? (
-        <EntryList
-          key="trash"
-          requests={requests}
-          trashMode
-          partOfSpeechCodes={language.part_of_speech_codes}
-          languages={capability.data?.languages ?? []}
-        />
-      ) : entryId === "new" ? (
-        <EntryStart requests={requests} />
-      ) : entryId ? (
-        <EntryLoader
-          key={entryId}
-          id={entryId}
-          requests={requests}
-          language={language}
-          formEditorAvailable={capability.data?.form_editor === true}
-          senseGroupsAvailable={capability.data?.sense_groups === true}
-        />
       ) : (
-        <EntryList
-          key="library"
-          requests={requests}
-          partOfSpeechCodes={language.part_of_speech_codes}
-          languages={capability.data?.languages ?? []}
-        />
+        <LexiconLanguages language={language}>
+          {entryId === "trash" ? (
+            <EntryList
+              key="trash"
+              requests={requests}
+              trashMode
+              partOfSpeechCodes={language.part_of_speech_codes}
+            />
+          ) : entryId === "new" ? (
+            <EntryStart requests={requests} />
+          ) : entryId ? (
+            <EntryLoader
+              key={entryId}
+              id={entryId}
+              requests={requests}
+              language={language}
+              formEditorAvailable={capability.data?.form_editor === true}
+              senseGroupsAvailable={capability.data?.sense_groups === true}
+            />
+          ) : (
+            <EntryList
+              key="library"
+              requests={requests}
+              partOfSpeechCodes={language.part_of_speech_codes}
+            />
+          )}
+        </LexiconLanguages>
       )}
     </div>
   );
@@ -234,10 +239,12 @@ function EntryEditor({
     },
     []
   );
-  const [target, setTarget] = useState(() =>
-    initialTargetLocale(initial.draft, language)
-  );
-  const [medium, setMedium] = useState(language.medium_locales[0]!);
+  const {
+    target,
+    medium,
+    search: languageSearch,
+    setLocked
+  } = useLexiconLanguages();
   const [common, setCommon] = useState(false);
   const [saving, setBusy] = useState(false);
   const busy = saving;
@@ -254,7 +261,16 @@ function EntryEditor({
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
   const disabled = busy || !writable;
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved.draft);
-  const blocker = useBlocker(dirty || busy || formContentOpen);
+  useEffect(() => {
+    setLocked(busy || formContentOpen);
+    return () => setLocked(false);
+  }, [busy, formContentOpen, setLocked]);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    return (
+      currentLocation.pathname !== nextLocation.pathname &&
+      (dirty || busy || formContentOpen)
+    );
+  });
   useBeforeUnload((event) => {
     if (dirty || busy || formContentOpen) {
       event.preventDefault();
@@ -342,6 +358,7 @@ function EntryEditor({
   return (
     <EntryLayout
       draft={draft}
+      languageSearch={languageSearch}
       step={step}
       onStepChange={
         busy
@@ -439,38 +456,6 @@ function EntryEditor({
             />
           </Form.Item>
         </Form>
-        <div
-          hidden={step === "forms"}
-          inert={step === "forms"}
-          className="lexicon-next-selectors"
-        >
-          <section>
-            <h3>方言</h3>
-            <Radio.Group
-              disabled={busy}
-              aria-label="方言"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              options={[
-                { label: "英式英语", value: "en-GB" },
-                { label: "美式英语", value: "en-US" }
-              ]}
-            />
-          </section>
-          <section hidden={step === "forms"} inert={step === "forms"}>
-            <h3>媒介语言</h3>
-            <Radio.Group
-              disabled={busy}
-              aria-label="媒介语言文字形式"
-              value={medium}
-              onChange={(e) => setMedium(e.target.value)}
-              options={[
-                { label: "简体中文", value: "zh-Hans" },
-                { label: "繁体中文", value: "zh-Hant" }
-              ]}
-            />
-          </section>
-        </div>
         {step !== "forms" && language.common_target_locale === "en" && (
           <Checkbox
             disabled={busy}
