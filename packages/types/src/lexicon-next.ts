@@ -29,6 +29,9 @@ export interface NextSenseGroup {
   name_en: string;
 }
 export interface NextSense {
+  level?: string;
+  frequency?: string;
+  depends_on_context?: boolean;
   sub_pos?: string;
   sense_group_id?: string;
   id: string;
@@ -149,6 +152,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  sense_metadata?: boolean;
   grammar_audio?: boolean;
   grammar_structures?: boolean;
   medium_ownership?: boolean;
@@ -166,6 +170,9 @@ export interface NextViewQuery {
   medium_locale: string;
 }
 export interface NextSenseView {
+  level?: string;
+  frequency?: string;
+  depends_on_context?: boolean;
   sense_group_id?: string;
   id: string;
   target_definitions: NextDefinition[];

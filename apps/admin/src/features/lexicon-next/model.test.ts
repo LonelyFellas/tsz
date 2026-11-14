@@ -287,3 +287,33 @@ it("当前目录改码后，同编码的结构与义项也不能作为有效语�
   ).toEqual(["g", "s"]);
   expect(draft).toEqual(before);
 });
+
+it("词义总体数据保留空白存量，预览共享元数据并按 V1 校验词频", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    senses: [
+      { id: "sense", part_of_speech: "noun", definitions: [], equivalents: [] }
+    ]
+  };
+  expect(draftProblem(draft)).toBeNull();
+  expect(previewDraft(draft, "en-GB", "zh-Hans").senses[0]).not.toHaveProperty(
+    "level"
+  );
+  Object.assign(draft.senses[0]!, {
+    level: "B2",
+    frequency: "100.00",
+    depends_on_context: false
+  });
+  expect(draftProblem(draft)).toBeNull();
+  expect(previewDraft(draft, "en-US", "zh-Hans").senses[0]).toMatchObject({
+    level: "B2",
+    frequency: "100.00",
+    depends_on_context: false
+  });
+  for (const frequency of ["-1", "100.01", "1.234", "1e1", ""]) {
+    draft.senses[0]!.frequency = frequency;
+    expect(draftProblem(draft)).toContain("词频");
+  }
+});

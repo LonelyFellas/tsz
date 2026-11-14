@@ -644,3 +644,28 @@ it("语法配音协商和持久化字段遵循运行时契约", async () => {
     expect(() => decodeNextEntry(invalid)).toThrow();
   }
 });
+
+it("词义总体数据协商新契约，兼容旧响应且拒绝 null 与错误 wire 类型", async () => {
+  const updated = structuredClone(entry);
+  Object.assign(updated.draft.senses[0]!, {
+    level: "B2",
+    frequency: "95.50",
+    depends_on_context: false
+  });
+  const { api, fetch } = client(updated);
+  expect(await api.get(updated.id)).toEqual(updated);
+  const options = fetch.mock.calls[0]![1] as RequestInit;
+  expect(new Headers(options.headers).get("x-tsz-next-sense-metadata")).toBe(
+    "v1"
+  );
+  expect(decodeNextEntry(entry)).toEqual(entry);
+  for (const [field, value] of [
+    ["level", null],
+    ["frequency", 95.5],
+    ["depends_on_context", "false"]
+  ]) {
+    const invalid = structuredClone(updated);
+    Object.assign(invalid.draft.senses[0]!, { [field as string]: value });
+    expect(() => decodeNextEntry(invalid)).toThrow();
+  }
+});

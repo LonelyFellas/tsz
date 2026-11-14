@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-dubbing/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-14T12:25:40.152Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-sense-metadata/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-14T14:27:11.212Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -8683,11 +8683,14 @@
           "type": "array",
           "items": { "$ref": "#/components/schemas/NextDefinition" }
         },
+        "depends_on_context": { "type": "boolean" },
         "equivalents": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/NextEquivalent" }
         },
+        "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
         "part_of_speech": {
           "type": ["string", "null"],
           "description": "Language-specific code; null is an incomplete draft, not an inferred POS."
