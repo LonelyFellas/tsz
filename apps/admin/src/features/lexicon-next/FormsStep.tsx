@@ -13,6 +13,7 @@ import {
 import { createStableVariantIdFactory } from "@/features/dictionary/word-creation-v3/operations";
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
+import { removePosDescription } from "./model";
 
 export const emptyFormEditor = (): SharedFormsStepContentV3 => ({
   forms_format: "shared_v1",
@@ -61,6 +62,7 @@ export function FormsStep({
             if (isSharedForms(updated)) onChange(updated);
           }}
           entryKind={kind}
+          deletePosDescription={removePosDescription}
           activePosId={
             value.pos.some((pos) => pos.pos_id === activePosId)
               ? activePosId

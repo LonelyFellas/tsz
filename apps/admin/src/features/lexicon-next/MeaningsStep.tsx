@@ -1,6 +1,9 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { expandFormContents, isSharedForms } from "@tsz/shared";
 import {
   Button,
+  Alert,
   Collapse,
   Empty,
   Flex,
@@ -12,16 +15,48 @@ import { AdminControls } from "@tsz/ui/admin/context";
 import { V3SenseGroupsCard } from "@/features/dictionary/word-creation-v3/components/V3SenseGroupsCard";
 import { Select } from "@tsz/ui/admin/forms";
 import { App } from "@tsz/ui/admin/overlays";
-import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
-import type { NextDefinition, NextDraft, NextSense } from "@tsz/types";
+import {
+  ChevronDown,
+  ChevronUp,
+  CircleMinus,
+  Plus,
+  Trash2
+} from "lucide-react";
+import type {
+  DraftFormsStepContentV3,
+  NextDefinition,
+  NextDraft,
+  NextSense,
+  PartOfSpeechCatalogItem
+} from "@tsz/types";
 import { partOfSpeechLabel } from "@/features/dictionary/word-creation-v3/presentation";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { ContentRows } from "./ContentRows";
-import { localeLabels } from "./model";
+import { localeLabels, removePosDescription, replaceFormEditor } from "./model";
+import { emptyFormEditor } from "./FormsStep";
+import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
+import { localizedCatalogName } from "@/features/dictionary/part-of-speech/catalog";
+import { V3AddBasicPosSelect } from "@/features/dictionary/word-creation-v3/components/V3AddBasicPosSelect";
+import { SortableDragHandle } from "@/features/dictionary/word-creation-v3/components/SortableDragHandle";
+import {
+  addPartOfSpeech,
+  deletePartOfSpeech,
+  fillFormTypeTemplate,
+  reorderPos
+} from "@/features/dictionary/word-creation-v3/operations";
+import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
+import { applyDefaultFormSharing } from "@/features/dictionary/word-creation-v3/defaultFormSharing";
+import {
+  sortableRowClass,
+  sortableTabOffset,
+  useSortableRows
+} from "@/features/dictionary/word-creation-v3/sortableRows";
 import "@/features/dictionary/word-creation-v3/posTabs.css";
 
 export function MeaningsStep({
   value,
+  kind,
+  formEditorAvailable,
   target,
   medium,
   partOfSpeechCodes,
@@ -30,6 +65,8 @@ export function MeaningsStep({
   onChange
 }: {
   value: NextDraft;
+  kind: "word" | "phrase";
+  formEditorAvailable: boolean;
   target: string;
   medium: string;
   partOfSpeechCodes: string[];
@@ -38,7 +75,15 @@ export function MeaningsStep({
   onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
   const { modal } = App.useApp();
-  const { t } = useLexiconEditorTranslation();
+  const { t, i18n } = useLexiconEditorTranslation();
+  const catalog = useQuery({
+    queryKey: ["lexicon-next", "part-of-speech-catalog"],
+    queryFn: () => partOfSpeechDataSource.catalog(),
+    enabled: formEditorAvailable,
+    staleTime: Infinity
+  });
+  const editor = value.form_editor ?? emptyFormEditor();
+  const forms = expandFormContents(editor);
   const [emptyGroup] = useState(() => ({
     id: crypto.randomUUID(),
     name_zh: "",
@@ -61,8 +106,60 @@ export function MeaningsStep({
   const activePos = codes.includes(selectedPos ?? "")
     ? (selectedPos ?? "")
     : codes[0]!;
-  const label = (code: string) =>
-    code ? partOfSpeechLabel(code, t) : "未指定词性";
+  const label = (code: string) => {
+    const item = catalog.data?.items.find((item) => item.code === code);
+    return item
+      ? localizedCatalogName(item, i18n.language)
+      : code
+        ? partOfSpeechLabel(code, t)
+        : "未指定词性";
+  };
+  function updateForms(next: DraftFormsStepContentV3) {
+    onChange((current) => {
+      const updated = applyFormsStructure(
+        current.form_editor ?? emptyFormEditor(),
+        next
+      );
+      return isSharedForms(updated)
+        ? replaceFormEditor(current, updated)
+        : current;
+    });
+  }
+  function addPos(item: PartOfSpeechCatalogItem) {
+    const result = addPartOfSpeech(forms, item);
+    if (!result.ok) return;
+    const added = result.value.pos.at(-1)!;
+    const filled = fillFormTypeTemplate(
+      result.value,
+      catalog.data?.items,
+      undefined,
+      added.pos_id
+    );
+    const updated = applyFormsStructure(editor, filled);
+    if (!isSharedForms(updated)) return;
+    const shared = applyDefaultFormSharing(
+      updated,
+      catalog.data,
+      new Set(filled.pos.at(-1)!.forms.map((form) => form.id))
+    );
+    onChange((current) => replaceFormEditor(current, shared));
+    setSelectedPos(item.code);
+  }
+  const posSorting = useSortableRows({
+    items:
+      formEditorAvailable && !disabled && forms.pos.length === codes.length
+        ? forms.pos
+        : [],
+    scopeId: "lexicon-next-meanings-pos-tabs",
+    dragType: "application/x-tsz-v3-pos",
+    onChange: (next) =>
+      updateForms(
+        reorderPos(
+          forms,
+          next.map((pos) => pos.pos_id)
+        )
+      )
+  });
   function updateSense(id: string, patch: Partial<NextSense>) {
     onChange({
       ...value,
@@ -77,6 +174,9 @@ export function MeaningsStep({
       gap={16}
       className="word-meanings-step v3-meanings-v2 lexicon-next-meanings"
     >
+      {formEditorAvailable && catalog.isError && (
+        <Alert type="error" title={t("catalog_unavailable")} />
+      )}
       {senseGroupsAvailable && (
         <AdminControls componentDisabled={disabled}>
           <V3SenseGroupsCard
@@ -108,7 +208,8 @@ export function MeaningsStep({
         className="word-pos-tabs"
         activeKey={activePos}
         onChange={setSelectedPos}
-        items={codes.map((code) => {
+        items={codes.map((code, posIndex) => {
+          const formPos = forms.pos.find((pos) => pos.pos === code);
           const senses = value.senses.filter(
             (sense) => (sense.part_of_speech ?? "") === code
           );
@@ -117,8 +218,94 @@ export function MeaningsStep({
           return {
             key: code,
             label: (
-              <span className="word-pos-tab-content">
-                <strong>{label(code)}</strong>
+              <span
+                className={sortableRowClass(
+                  "word-pos-tab-handle",
+                  posSorting,
+                  posIndex
+                )}
+                data-pos-id={formPos?.pos_id}
+                onDragLeave={posSorting.handleDragLeave}
+                onDragOver={(event) =>
+                  posSorting.handleDragOver(event, posIndex)
+                }
+                onDrop={(event) => posSorting.handleDrop(event, posIndex)}
+              >
+                <span
+                  className="word-pos-tab-content"
+                  style={{
+                    transform: `translateX(${sortableTabOffset(posSorting, posIndex)}px)`
+                  }}
+                >
+                  <SortableDragHandle
+                    dragImageSelector=".word-pos-tab-handle"
+                    index={posIndex}
+                    label={t("drag_item", { label: label(code) })}
+                    singleItemTitle={t("two_pos_required")}
+                    sorting={posSorting}
+                  />
+                  <span className="word-pos-tab-label">
+                    <strong>{label(code)}</strong>
+                  </span>
+                  {formEditorAvailable && (
+                    <span
+                      className="word-pos-tab-actions"
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <AdminControls componentDisabled={disabled}>
+                        <V3AddBasicPosSelect
+                          compact
+                          catalog={catalog.data}
+                          forms={forms}
+                          entryKind={kind}
+                          isError={catalog.isError}
+                          isPending={catalog.isPending}
+                          onAdd={addPos}
+                        />
+                      </AdminControls>
+                      {formPos && forms.pos.length > 1 && (
+                        <Button
+                          aria-label={t("delete_item", { label: label(code) })}
+                          danger
+                          icon={<CircleMinus />}
+                          disabled={disabled}
+                          onClick={() =>
+                            modal.confirm({
+                              title: t("delete_pos_title", {
+                                label: label(code)
+                              }),
+                              content: removePosDescription,
+                              okText: t("delete"),
+                              okButtonProps: { danger: true },
+                              onOk: () => {
+                                onChange((current) => {
+                                  const currentEditor =
+                                    current.form_editor ?? emptyFormEditor();
+                                  const result = deletePartOfSpeech(
+                                    expandFormContents(currentEditor),
+                                    formPos.pos_id
+                                  );
+                                  if (!result.ok) return current;
+                                  const updated = applyFormsStructure(
+                                    currentEditor,
+                                    result.value
+                                  );
+                                  return isSharedForms(updated)
+                                    ? replaceFormEditor(current, updated)
+                                    : current;
+                                });
+                              }
+                            })
+                          }
+                          size="small"
+                          type="text"
+                        />
+                      )}
+                    </span>
+                  )}
+                </span>
               </span>
             ),
             children: (

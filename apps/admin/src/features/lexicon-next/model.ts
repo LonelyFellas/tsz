@@ -2,7 +2,8 @@ import type {
   NextDraft,
   NextEntryView,
   NextForm,
-  NextLanguageCapability
+  NextLanguageCapability,
+  SharedFormsStepContentV3
 } from "@tsz/types";
 
 export const localeLabels: Record<string, string> = {
@@ -12,6 +13,27 @@ export const localeLabels: Record<string, string> = {
   "zh-Hans": "简体中文",
   "zh-Hant": "繁体中文"
 };
+
+export const removePosDescription =
+  "会移除此词性下的词形和所有语言的词义、解释及译词。保存后生效。";
+
+export function replaceFormEditor(
+  draft: NextDraft,
+  form_editor: SharedFormsStepContentV3
+): NextDraft {
+  const removed = new Set(
+    draft.form_editor?.pos
+      .filter((pos) => !form_editor.pos.some((next) => next.pos === pos.pos))
+      .map((pos) => pos.pos)
+  );
+  return {
+    ...draft,
+    form_editor,
+    senses: draft.senses.filter(
+      (sense) => !removed.has(sense.part_of_speech ?? "")
+    )
+  };
+}
 
 export function draftForms(draft: NextDraft): NextForm[] {
   return [

@@ -33,7 +33,7 @@ import type {
   RetiredContentSlotV3,
   RetiredStableNodeV3
 } from "@tsz/types";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
@@ -94,6 +94,7 @@ export interface V3FormsAndPronunciationStepProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   /** 词条是单词还是短语；决定「添加基本词性」只列哪一侧。 */
   entryKind?: WordEntryKindV3;
+  deletePosDescription?: ReactNode;
   activePosId?: string;
   onActivePosChange?: (posId: string) => void;
   issues?: readonly V3DraftValidationIssue[];
@@ -145,6 +146,7 @@ export function V3FormsAndPronunciationStep({
   value,
   onChange,
   entryKind,
+  deletePosDescription,
   activePosId,
   onActivePosChange,
   issues = [],
@@ -456,7 +458,7 @@ export function V3FormsAndPronunciationStep({
                                   params={{ label: label }}
                                 />
                               ),
-                              content: (
+                              content: deletePosDescription ?? (
                                 <LexiconEditorText message="remove_pos_impact" />
                               ),
                               okText: <LexiconEditorText message="delete" />,

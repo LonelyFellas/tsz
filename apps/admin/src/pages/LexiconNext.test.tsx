@@ -2124,7 +2124,7 @@ it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容
   mount(api);
   await screen.findByDisplayValue("centre");
   fireEvent.click(button(/^词义与译词/));
-  expect(screen.getByRole("tab", { name: "名词" })).toHaveAttribute(
+  expect(screen.getByRole("tab", { name: /名词/ })).toHaveAttribute(
     "aria-selected",
     "true"
   );
@@ -2137,13 +2137,13 @@ it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容
   expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
     "the middle"
   );
-  fireEvent.click(screen.getByRole("tab", { name: "动词" }));
+  fireEvent.click(screen.getByRole("tab", { name: /动词/ }));
   fireEvent.click(button("添加义项"));
   fireEvent.click(button("添加简体中文译词"));
   fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
     target: { value: "集中于" }
   });
-  fireEvent.click(screen.getByRole("tab", { name: "名词" }));
+  fireEvent.click(screen.getByRole("tab", { name: /名词/ }));
   expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
     "the middle"
   );
@@ -2165,7 +2165,7 @@ it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容
   expect(result.form_editor).toEqual(original.form_editor);
 });
 
-it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草稿", async () => {
+it("Step3 释义跟随顶部语言选择，保留已有通用英语内容及完整多语言草稿", async () => {
   const api = requests();
   const definitions = [
     {
@@ -2204,6 +2204,9 @@ it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草�
   mount(api);
   await screen.findByText("版本 1");
   fireEvent.click(button(/^词义与译词/));
+  expect(
+    screen.queryByRole("checkbox", { name: "编辑通用英语内容" })
+  ).toBeNull();
   expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
   expect(screen.queryByRole("heading", { name: "语言变体" })).toBeNull();
   expect(screen.queryByRole("radiogroup", { name: "方言" })).toBeNull();
@@ -2224,11 +2227,11 @@ it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草�
   fireEvent.change(screen.getByRole("textbox", { name: "美式英语释义 1" }), {
     target: { value: "the center" }
   });
-  fireEvent.click(screen.getByRole("checkbox", { name: "编辑通用英语内容" }));
-  expect(screen.getByRole("textbox", { name: "通用英语释义 1" })).toHaveValue(
-    "the middle"
+  await chooseLanguage("英式英语");
+  expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
+    "a centre"
   );
-  fireEvent.click(screen.getByRole("checkbox", { name: "编辑通用英语内容" }));
+  await chooseLanguage("美式英语");
   await chooseLanguage("繁体中文");
   fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
   expect(
@@ -2246,6 +2249,178 @@ it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草�
     { ...definitions[2], text: "the center" }
   ]);
 });
+
+it("Step3 从标签添加基本词性、排序，Step2 和重新打开沿用同一份结构", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  const original: NextDraft = {
+    ...entry.draft,
+    form_editor: applyFormsStructure(
+      emptyFormEditor(),
+      formsFixture()
+    ) as NonNullable<NextDraft["form_editor"]>,
+    senses: [
+      {
+        id: crypto.randomUUID(),
+        part_of_speech: "noun",
+        definitions: [],
+        equivalents: [
+          { id: crypto.randomUUID(), locale: "zh-Hant", text: "中心" }
+        ]
+      }
+    ]
+  };
+  api.get.mockResolvedValue({ ...entry, draft: original });
+  const mounted = mount(api);
+  await screen.findByRole("button", { name: "编辑原形内容" });
+  fireEvent.click(button(/^词义与译词/));
+  expect(screen.getByRole("button", { name: "拖动名词" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "删除名词" })).toBeNull();
+  const addPos = screen.getByRole("combobox", { name: "添加基本词性" });
+  await waitFor(() => expect(addPos).toBeEnabled());
+  fireEvent.mouseDown(addPos);
+  expect(
+    screen.queryByText("名词", { selector: ".ui-select-item-option-content" })
+  ).toBeNull();
+  fireEvent.click(
+    await screen.findByText("动词", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  expect(screen.getByRole("tab", { name: /动词/ })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  fireEvent.click(button("添加义项"));
+  fireEvent.click(button("添加简体中文译词"));
+  fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
+    target: { value: "集中于" }
+  });
+  fireEvent.keyDown(screen.getByRole("button", { name: "拖动动词" }), {
+    key: "ArrowUp"
+  });
+  const visiblePosOrder = () =>
+    screen
+      .getAllByRole("tab")
+      .map((tab) =>
+        within(tab)
+          .getByRole("button", { name: /^拖动/ })
+          .getAttribute("aria-label")
+      );
+  expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
+  fireEvent.click(button(/^词性与发音/));
+  expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
+  fireEvent.click(screen.getByRole("tab", { name: /动词/ }));
+  expect(
+    screen.getAllByRole("button", { name: /编辑.*内容/ }).length
+  ).toBeGreaterThan(1);
+  fireEvent.click(button(/^词义与译词/));
+  expect(screen.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
+    "集中于"
+  );
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  const saved: NextDraft = api.save.mock.calls[0]![1].draft;
+  expect(saved.form_editor!.pos.map((pos) => pos.pos)).toEqual([
+    "verb",
+    "noun"
+  ]);
+  expect(saved.senses[0]).toEqual(original.senses[0]);
+  expect(saved.senses[1]).toMatchObject({
+    part_of_speech: "verb",
+    equivalents: [{ locale: "zh-Hans", text: "集中于" }]
+  });
+  mounted.unmount();
+  api.get.mockResolvedValue({ ...entry, revision: 2, draft: saved });
+  mount(api);
+  await screen.findByText("版本 2");
+  fireEvent.click(button(/^词义与译词/));
+  expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
+  expect(screen.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
+    "集中于"
+  );
+  act(() =>
+    useAuthStore.setState({
+      profile: { ...useAuthStore.getState().profile!, permissions: [] }
+    })
+  );
+  expect(screen.getByRole("button", { name: "拖动动词" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "删除动词" })).toBeDisabled();
+  expect(
+    screen
+      .getAllByRole("combobox", { name: "添加基本词性" })
+      .every((select) => select.hasAttribute("disabled"))
+  ).toBe(true);
+});
+
+it.each(["词性与发音", "词义与译词"])(
+  "在%s标签删除词性，取消保留数据，确认后只移除对应的词形和全部语言词义",
+  async (step) => {
+    const api = requests();
+    api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+    const forms = formsFixture();
+    forms.pos.push(
+      ...formsFixture({ pos: "verb", pos_id: crypto.randomUUID(), forms: [] })
+        .pos
+    );
+    const original: NextDraft = {
+      ...entry.draft,
+      form_editor: applyFormsStructure(emptyFormEditor(), forms) as NonNullable<
+        NextDraft["form_editor"]
+      >,
+      senses: [
+        {
+          id: crypto.randomUUID(),
+          part_of_speech: "noun",
+          definitions: [
+            {
+              id: crypto.randomUUID(),
+              locale: "en-US",
+              text: "a center",
+              style: "definition"
+            }
+          ],
+          equivalents: [
+            { id: crypto.randomUUID(), locale: "zh-Hant", text: "中心" }
+          ]
+        },
+        {
+          id: crypto.randomUUID(),
+          part_of_speech: "verb",
+          definitions: [],
+          equivalents: [
+            { id: crypto.randomUUID(), locale: "zh-Hans", text: "集中于" }
+          ]
+        }
+      ]
+    };
+    api.get.mockResolvedValue({ ...entry, draft: original });
+    mount(api);
+    await screen.findByRole("button", { name: "编辑原形内容" });
+    fireEvent.click(button(new RegExp(`^${step}`)));
+    fireEvent.click(screen.getByRole("button", { name: "删除名词" }));
+    let dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByText(/会移除此词性下的词形和所有语言/)).toBeVisible();
+    fireEvent.click(dialog.getByRole("button", { name: "取消" }));
+    expect(screen.getByRole("tab", { name: /名词/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "删除名词" }));
+    dialog = within(await screen.findByRole("dialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "删除" }));
+    expect(screen.queryByRole("tab", { name: /名词/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "删除动词" })).toBeNull();
+    expect(screen.getByRole("button", { name: "拖动动词" })).toBeDisabled();
+    fireEvent.click(button(/^词义与译词/));
+    expect(screen.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
+      "集中于"
+    );
+    fireEvent.click(button("保存完整草稿"));
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+    const saved: NextDraft = api.save.mock.calls[0]![1].draft;
+    expect(saved.form_editor!.pos).toEqual([original.form_editor!.pos[1]]);
+    expect(saved.form_editor!.contents).toEqual([]);
+    expect(saved.senses).toEqual([original.senses[1]]);
+  }
+);
 
 it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐藏词性的归属并完整保存", async () => {
   const api = requests();

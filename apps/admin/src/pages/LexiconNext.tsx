@@ -20,7 +20,7 @@ import {
   Spin,
   Tag
 } from "@tsz/ui/admin/display";
-import { Checkbox, Form, Input } from "@tsz/ui/admin/forms";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { ContentEditPermissions } from "@/features/dictionary/contentEditPermissions";
@@ -45,7 +45,8 @@ import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
   draftProblem,
   localeLabels,
-  previewDraft
+  previewDraft,
+  replaceFormEditor
 } from "@/features/lexicon-next/model";
 import {
   LexiconLanguages,
@@ -274,7 +275,6 @@ function EntryEditor({
     setLocked,
     cancelLanguageChange
   } = useLexiconLanguages();
-  const [common, setCommon] = useState(false);
   const [saving, setBusy] = useState(false);
   const busy = saving;
   const lock = useRef(false);
@@ -315,7 +315,6 @@ function EntryEditor({
       event.returnValue = "";
     }
   });
-  const editingLocale = common ? "en" : target;
   async function run(operation: () => Promise<void>) {
     if (lock.current) return false;
     lock.current = true;
@@ -494,20 +493,6 @@ function EntryEditor({
             />
           </Form.Item>
         </Form>
-        {step !== "forms" && language.common_target_locale === "en" && (
-          <Checkbox
-            disabled={busy}
-            checked={common}
-            onChange={(e) => setCommon(e.target.checked)}
-          >
-            编辑通用英语内容
-          </Checkbox>
-        )}
-        {step !== "forms" && common && (
-          <p className="lexicon-next-muted">
-            通用英语仅在所选英美变体没有对应内容时使用。
-          </p>
-        )}
         <div hidden={step !== "forms"} inert={step !== "forms"}>
           {formEditorAvailable ? (
             <>
@@ -525,7 +510,9 @@ function EntryEditor({
                       locale={target === "en-US" ? "en-US" : "en-GB"}
                       issues={formIssues}
                       onChange={(form_editor) =>
-                        setDraft((current) => ({ ...current, form_editor }))
+                        setDraft((current) =>
+                          replaceFormEditor(current, form_editor)
+                        )
                       }
                       registerLeaveGuard={registerContentLeaveGuard}
                     />
@@ -598,7 +585,9 @@ function EntryEditor({
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <MeaningsStep
             value={draft}
-            target={editingLocale}
+            kind={saved.kind}
+            formEditorAvailable={formEditorAvailable}
+            target={target}
             medium={medium}
             partOfSpeechCodes={language.part_of_speech_codes}
             senseGroupsAvailable={senseGroupsAvailable}
