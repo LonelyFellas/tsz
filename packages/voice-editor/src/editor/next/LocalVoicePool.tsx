@@ -1000,6 +1000,9 @@ export function LocalVoicePool({
             </Popover>
           </span>
           <span className="tsz-ve-pool-catalog-toggle">
+            {loading && (
+              <Spin size="small" aria-label={t("loading_voice_catalogue")} />
+            )}
             <span className="tsz-ve-pool-catalog-expand">
               {t("expand")} <ChevronDownIcon />
             </span>
@@ -1009,7 +1012,6 @@ export function LocalVoicePool({
           </span>
         </summary>
         <div className="tsz-ve-pool-catalog-body">
-          {loading && <Spin aria-label={t("loading_voice_catalogue")} />}
           <div className="tsz-ve-pool-scroll">
             <div className="tsz-ve-pool-catalog-sides" data-single={!!locale}>
               {sides.map((side) => (

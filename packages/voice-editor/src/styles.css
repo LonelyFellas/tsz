@@ -1269,6 +1269,28 @@
   display: none;
 }
 
+.tsz-ve-waveform-frame {
+  position: relative;
+  min-height: 100px;
+}
+
+.tsz-ve-waveform-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: var(--ui-space-2, 8px);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.tsz-ve-waveform-status, .tsz-ve-pool-catalog-toggle) .ui-spinner {
+    animation: none;
+  }
+}
+
 .tsz-ve-waveform {
   display: block;
   width: 100%;
@@ -1301,6 +1323,9 @@
   color: var(--ui-color-text-secondary, #666);
   font-size: 12px;
 }
+.tsz-ve-wave-scale[aria-hidden="true"] {
+  visibility: hidden;
+}
 .tsz-ve-audio-review .ui-input-number {
   width: 100px;
 }
@@ -1326,6 +1351,10 @@
 .tsz-ve-audio-review-compact .tsz-ve-waveform {
   height: 64px;
   border-radius: var(--ui-border-radius, 7px);
+}
+
+.tsz-ve-audio-review-compact .tsz-ve-waveform-frame {
+  min-height: 64px;
 }
 
 .tsz-ve-audio-review-compact .tsz-ve-review-playback,

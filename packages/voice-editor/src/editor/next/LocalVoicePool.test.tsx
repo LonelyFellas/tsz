@@ -243,6 +243,33 @@ function generatedAsset(id: string): AudioAsset {
 }
 
 describe("新版局部主页和唯一声音草稿", () => {
+  it("音色目录加载状态留在标题内，就绪后保留已展开的搜索输入", async () => {
+    let finish!: (voices: VoiceOption[]) => void;
+    const preview = adapter();
+    vi.mocked(preview.listVoices).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    render(<Harness initial={pool([])} preview={preview} />);
+    const title = screen.getByText("完整音色目录").closest("summary")!;
+    expect(
+      await screen.findByLabelText("正在加载音色目录")
+    ).toBeInTheDocument();
+    expect(within(title).getByRole("status")).toBeInTheDocument();
+    fireEvent.click(title);
+    const search = screen.getByRole("searchbox", { name: "英式女声目录搜索" });
+    fireEvent.change(search, { target: { value: "Alpha" } });
+    await act(async () => finish(options));
+    expect(screen.getByRole("searchbox", { name: "英式女声目录搜索" })).toBe(
+      search
+    );
+    expect(search).toHaveValue("Alpha");
+    expect(within(title).queryByRole("status")).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("选用 Alpha 阿尔法")).toBeVisible();
+  });
+
   it("推荐可多选、逐项取消，序列化后重新打开仍保留勾选", async () => {
     const onProfile = vi.fn();
     const recommendations = [

@@ -827,12 +827,7 @@ export function V3FormContentModal({
           </div>
         )}
         <div className="v3-content-labels">
-          <Space>
-            <Typography.Text strong>{t("form_labels")}</Typography.Text>
-            <Typography.Text type="secondary">
-              {t("multiple_selection")}
-            </Typography.Text>
-          </Space>
+          <Typography.Text strong>{t("form_labels")}</Typography.Text>
           <Space wrap className="v3-content-label-list">
             {rows.map(({ pos, binding, group }) => {
               const sameType = group.members.flatMap((member) =>
