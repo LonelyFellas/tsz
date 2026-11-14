@@ -3,6 +3,7 @@ import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import type { InterfaceLocale } from "@tsz/shared/i18n";
 import { App } from "@tsz/ui/admin/overlays";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -522,6 +523,24 @@ async function phonemeDialog(label: string) {
 }
 
 describe("双口音真实试听控件", () => {
+  it("后台生成在设置按钮原位反馈，生成期间仍可打开配音设置", async () => {
+    let finish!: (value: { asset: { id: string } }) => void;
+    speech.generateAudio.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    renderWithUps(<Harness dialect="uk" profiled />);
+    const label = "第 1 条发音 英式 Azure IPA";
+    const open = screen.getByLabelText(`打开${label} TTS 设置器`);
+    await waitFor(() => expect(speech.generateAudio).toHaveBeenCalled());
+    expect(open).toHaveAttribute("aria-busy", "true");
+    expect(open).toBeEnabled();
+    fireEvent.click(open);
+    await phonemeDialog(label);
+    await act(async () => finish({ asset: { id: "completed-in-background" } }));
+  });
   it("可见音素入口的闭合生成和打开编辑都只采用当前原生地区的 fallback", async () => {
     renderWithUps(<Harness dialect="common" profiled bothVoices />);
     const label = "第 1 条发音 英式 Azure IPA";
