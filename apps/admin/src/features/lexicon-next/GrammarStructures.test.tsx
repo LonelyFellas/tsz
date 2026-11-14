@@ -16,36 +16,43 @@ const profile: VoiceProfileV3 = {
   voices: [{ voice_id: "saved-voice", enabled: true, rate_percent: 25 }]
 };
 vi.mock("@tsz/voice-editor/editor", () => ({
-  VoiceEditor: (props: VoiceEditorProps) => (
-    <>
-      <output aria-label="配音入口">
-        {JSON.stringify({
-          locale: props.locale,
-          area: props.recommendationArea,
-          speech: props.speechSettingsEnabled
-        })}
-      </output>
-      <button onClick={() => props.onVoiceProfileChange?.(profile)}>
-        修改配音
-      </button>
-      <button
-        onClick={() =>
-          props.onChange({ version: 2, text: "a new job", annotations: [] })
-        }
-      >
-        修改正文
-      </button>
-      {props.renderActions?.(
-        true,
-        () => true,
-        () => ({
-          value: props.value,
-          voiceProfile: props.voiceProfile,
-          audioAssets: props.audioAssets
-        })
-      )}
-    </>
-  )
+  VoiceEditor: function VoiceEditor(props: VoiceEditorProps) {
+    const [unavailable, setUnavailable] = useState(false);
+    return (
+      <>
+        <output aria-label="配音入口">
+          {JSON.stringify({
+            locale: props.locale,
+            area: props.recommendationArea,
+            speech: props.speechSettingsEnabled
+          })}
+        </output>
+        <button onClick={() => props.onVoiceProfileChange?.(profile)}>
+          修改配音
+        </button>
+        <button
+          onClick={() =>
+            props.onChange({ version: 2, text: "a new job", annotations: [] })
+          }
+        >
+          修改正文
+        </button>
+        <button onClick={() => setUnavailable(true)}>停用所有音色</button>
+        {props.renderActions?.(
+          true,
+          () => true,
+          () => {
+            if (unavailable) throw new Error("当前口音没有可用音色");
+            return {
+              value: props.value,
+              voiceProfile: props.voiceProfile,
+              audioAssets: props.audioAssets
+            };
+          }
+        )}
+      </>
+    );
+  }
 }));
 
 it("配音和正文只在完成时一起写回，取消及切换方言保留另一侧配置", async () => {
@@ -103,6 +110,13 @@ it("配音和正文只在完成时一起写回，取消及切换方言保留另�
   ).toEqual({ locale: "en-GB", area: "grammar", speech: true });
   fireEvent.click(screen.getByRole("button", { name: "修改配音" }));
   fireEvent.click(screen.getByRole("button", { name: "修改正文" }));
+  expect(draft()).toEqual(initial);
+  fireEvent.click(screen.getByRole("button", { name: "停用所有音色" }));
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "完成" })
+  );
+  expect(await screen.findByText("当前口音没有可用音色")).toBeVisible();
+  expect(screen.getByRole("dialog")).toBeVisible();
   expect(draft()).toEqual(initial);
   fireEvent.click(
     within(screen.getByRole("dialog")).getByRole("button", { name: "取消" })

@@ -59,7 +59,7 @@ function GrammarText({
   );
   const dirty =
     draft !== undefined && JSON.stringify(draft) !== JSON.stringify(variant);
-  const { modal } = App.useApp();
+  const { modal, message } = App.useApp();
   useLayoutEffect(() => {
     if (draft === undefined || !registerLeaveGuard) return;
     registerLeaveGuard(async () => {
@@ -188,24 +188,32 @@ function GrammarText({
                     type="primary"
                     disabled={disabled || !canComplete}
                     onClick={() => {
-                      if (prepareComplete && !prepareComplete()) return;
-                      const result = captureResult?.(true);
-                      onChange(
-                        result
-                          ? {
-                              ...draft,
-                              content: result.value,
-                              ...(audioAvailable
-                                ? {
-                                    voice_profile:
-                                      result.voiceProfile ?? undefined,
-                                    audio_assets: result.audioAssets ?? []
-                                  }
-                                : {})
-                            }
-                          : draft
-                      );
-                      setDraft(undefined);
+                      try {
+                        if (prepareComplete && !prepareComplete()) return;
+                        const result = captureResult?.(true);
+                        onChange(
+                          result
+                            ? {
+                                ...draft,
+                                content: result.value,
+                                ...(audioAvailable
+                                  ? {
+                                      voice_profile:
+                                        result.voiceProfile ?? undefined,
+                                      audio_assets: result.audioAssets ?? []
+                                    }
+                                  : {})
+                              }
+                            : draft
+                        );
+                        setDraft(undefined);
+                      } catch (error) {
+                        message.error(
+                          error instanceof Error
+                            ? error.message
+                            : "无法完成语法结构编辑，请检查配音设置"
+                        );
+                      }
                     }}
                   >
                     完成
