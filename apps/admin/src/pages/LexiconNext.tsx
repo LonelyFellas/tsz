@@ -299,7 +299,7 @@ function EntryEditor({
     );
     const nextMedium = language.medium_locales.includes(requestedMedium ?? "")
       ? requestedMedium
-      : language.medium_locales[0];
+      : undefined;
     return (
       busy ||
       formContentOpen ||
