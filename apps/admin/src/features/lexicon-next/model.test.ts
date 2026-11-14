@@ -162,3 +162,60 @@ it("语义区间允许未填名称，限制 Unicode 名称长度，预览保留�
   draft.sense_groups![0]!.name_zh += "字";
   expect(draftProblem(draft)).toContain("语义区间名称");
 });
+
+it("新语法预览只投影当前方言与有效引用，草稿中的失效引用和另一侧保留", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [
+      {
+        id: "g",
+        part_of_speech: "noun",
+        sub_pos: "N-COUNT",
+        variants: [
+          {
+            id: "gb",
+            locale: "en-GB",
+            content: { version: 2, text: "a job", annotations: [] }
+          },
+          {
+            id: "us",
+            locale: "en-US",
+            content: { version: 2, text: "a role", annotations: [] }
+          }
+        ]
+      }
+    ],
+    senses: [
+      {
+        id: "s",
+        part_of_speech: "noun",
+        sub_pos: "N-COUNT",
+        definitions: [
+          {
+            id: "d",
+            locale: "en-US",
+            text: "role",
+            style: "definition",
+            grammar_structure_id: "g"
+          }
+        ],
+        equivalents: []
+      }
+    ]
+  };
+  const good = previewDraft(draft, "en-US", "zh-Hans");
+  expect(
+    good.grammar_structures![0]!.variants.map((v) => v.content.text)
+  ).toEqual(["a role"]);
+  expect(good.senses[0]!.target_definitions[0]!.grammar_structure_id).toBe("g");
+  draft.senses[0]!.sub_pos = "N-UNCOUNT";
+  const before = structuredClone(draft);
+  const invalid = previewDraft(draft, "en-US", "zh-Hans");
+  expect(invalid.grammar_issues).toHaveLength(1);
+  expect(
+    invalid.senses[0]!.target_definitions[0]!.grammar_structure_id
+  ).toBeUndefined();
+  expect(draft).toEqual(before);
+});

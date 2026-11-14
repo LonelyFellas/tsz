@@ -1,3 +1,4 @@
+import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
 import {
   useCallback,
   useEffect,
@@ -31,6 +32,7 @@ import { Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextDraft,
+  PartOfSpeechCatalogResponse,
   NextEntry,
   NextEntryView,
   NextWorkspaceEntry,
@@ -131,6 +133,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               language={language}
               formEditorAvailable={capability.data?.form_editor === true}
               senseGroupsAvailable={capability.data?.sense_groups === true}
+              grammarAvailable={capability.data?.grammar_structures === true}
             />
           ) : (
             <EntryList
@@ -149,10 +152,12 @@ function EntryLoader({
   requests,
   language,
   formEditorAvailable,
-  senseGroupsAvailable
+  senseGroupsAvailable,
+  grammarAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
+  grammarAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -228,6 +233,7 @@ function EntryLoader({
       archived={metadata.data.status === "archived"}
       formEditorAvailable={formEditorAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
+      grammarAvailable={grammarAvailable}
     />
   );
 }
@@ -237,10 +243,12 @@ function EntryEditor({
   language,
   archived,
   formEditorAvailable,
-  senseGroupsAvailable
+  senseGroupsAvailable,
+  grammarAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
+  grammarAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -585,12 +593,14 @@ function EntryEditor({
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <MeaningsStep
             value={draft}
+            registerLeaveGuard={registerContentLeaveGuard}
             kind={saved.kind}
             formEditorAvailable={formEditorAvailable}
             target={target}
             medium={medium}
             partOfSpeechCodes={language.part_of_speech_codes}
             senseGroupsAvailable={senseGroupsAvailable}
+            grammarAvailable={grammarAvailable}
             disabled={disabled}
             onChange={setDraft}
           />
@@ -630,7 +640,16 @@ function EntryEditor({
         </div>
         <div hidden={step !== "preview"} inert={step !== "preview"}>
           <h2>预览</h2>
-          <Preview view={previewDraft(draft, target, medium)} />
+          <Preview
+            view={previewDraft(
+              draft,
+              target,
+              medium,
+              queryClient.getQueryData<PartOfSpeechCatalogResponse>(
+                partOfSpeechKeys.catalog()
+              )
+            )}
+          />
         </div>
         {step !== "forms" && (
           <Collapse
@@ -638,7 +657,18 @@ function EntryEditor({
               {
                 key: "preview",
                 label: "当前草稿预览（含未保存修改）",
-                children: <Preview view={previewDraft(draft, target, medium)} />
+                children: (
+                  <Preview
+                    view={previewDraft(
+                      draft,
+                      target,
+                      medium,
+                      queryClient.getQueryData<PartOfSpeechCatalogResponse>(
+                        partOfSpeechKeys.catalog()
+                      )
+                    )}
+                  />
+                )
               }
             ]}
           />

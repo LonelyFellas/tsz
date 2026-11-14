@@ -553,3 +553,46 @@ it("协商语义区间并严格回读名称、身份与归属，兼容不含区�
     )
   ).toBe("v1");
 });
+
+it("语法扩展读取保持闭合契约、存量可省略且拒绝 null", () => {
+  const extended = structuredClone(entry);
+  extended.draft.grammar_structures = [
+    {
+      id: uuid(501),
+      part_of_speech: "noun",
+      sub_pos: "N-COUNT",
+      variants: [
+        {
+          id: uuid(502),
+          locale: "en-GB",
+          content: {
+            version: 2,
+            text: "a job",
+            annotations: [{ type: "emphasis", start: 2, end: 5, level: "core" }]
+          }
+        }
+      ]
+    }
+  ];
+  extended.draft.senses[0]!.sub_pos = "N-COUNT";
+  extended.draft.senses[0]!.definitions[0]!.grammar_structure_id = uuid(501);
+  expect(decodeNextEntry(extended)).toEqual(extended);
+  expect(decodeNextEntry(entry)).toEqual(entry);
+  for (const field of ["grammar_structures", "unknown_grammar"]) {
+    expect(() =>
+      decodeNextEntry({
+        ...extended,
+        draft: { ...extended.draft, [field]: null }
+      })
+    ).toThrow();
+  }
+  expect(() =>
+    decodeNextEntry({
+      ...extended,
+      draft: {
+        ...extended.draft,
+        senses: [{ ...extended.draft.senses[0], sub_pos: null }]
+      }
+    })
+  ).toThrow();
+});

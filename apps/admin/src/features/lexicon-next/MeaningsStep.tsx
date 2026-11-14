@@ -31,6 +31,8 @@ import type {
 } from "@tsz/types";
 import { partOfSpeechLabel } from "@/features/dictionary/word-creation-v3/presentation";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { GrammarStructures } from "./GrammarStructures";
+import { grammarMatchesSense } from "./model";
 import { ContentRows } from "./ContentRows";
 import { localeLabels, removePosDescription, replaceFormEditor } from "./model";
 import { emptyFormEditor } from "./FormsStep";
@@ -63,6 +65,8 @@ export function MeaningsStep({
   partOfSpeechCodes,
   disabled,
   senseGroupsAvailable = false,
+  grammarAvailable = false,
+  registerLeaveGuard,
   onChange
 }: {
   value: NextDraft;
@@ -73,6 +77,8 @@ export function MeaningsStep({
   partOfSpeechCodes: string[];
   disabled: boolean;
   senseGroupsAvailable?: boolean;
+  grammarAvailable?: boolean;
+  registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
   const { modal } = App.useApp();
@@ -80,7 +86,7 @@ export function MeaningsStep({
   const catalog = useQuery({
     queryKey: partOfSpeechKeys.catalog(),
     queryFn: () => partOfSpeechDataSource.catalog(),
-    enabled: formEditorAvailable,
+    enabled: formEditorAvailable || grammarAvailable,
     staleTime: 5 * 60 * 1000
   });
   const editor = value.form_editor ?? emptyFormEditor();
@@ -100,7 +106,9 @@ export function MeaningsStep({
   const codes = [
     ...new Set([
       ...(value.form_editor?.pos.map((pos) => pos.pos) ?? []),
-      ...value.senses.map((sense) => sense.part_of_speech ?? "")
+      ...value.senses.map((sense) => sense.part_of_speech ?? ""),
+      ...(value.grammar_structures?.map((grammar) => grammar.part_of_speech) ??
+        [])
     ])
   ];
   if (!codes.length) codes.push("");
@@ -164,6 +172,9 @@ export function MeaningsStep({
   function updateSense(id: string, patch: Partial<NextSense>) {
     onChange({
       ...value,
+      ...(grammarAvailable
+        ? { grammar_structures: value.grammar_structures ?? [] }
+        : {}),
       senses: value.senses.map((sense) =>
         sense.id === id ? { ...sense, ...patch } : sense
       )
@@ -311,6 +322,62 @@ export function MeaningsStep({
             ),
             children: (
               <Flex vertical gap={12}>
+                {grammarAvailable && (
+                  <GrammarStructures
+                    rows={value.grammar_structures ?? []}
+                    registerLeaveGuard={registerLeaveGuard}
+                    pos={code}
+                    catalog={catalog.data?.items.find(
+                      (item) => item.code === code
+                    )}
+                    target={target}
+                    disabled={disabled}
+                    referenceCount={(id) =>
+                      value.senses.reduce(
+                        (count, sense) =>
+                          count +
+                          sense.definitions.filter(
+                            (d) => d.grammar_structure_id === id
+                          ).length,
+                        0
+                      )
+                    }
+                    onChange={(update) =>
+                      onChange((current) => {
+                        const grammar_structures = update(
+                          current.grammar_structures ?? []
+                        );
+                        const removed = new Set(
+                          (current.grammar_structures ?? [])
+                            .filter(
+                              (g) =>
+                                !grammar_structures.some(
+                                  (row) => row.id === g.id
+                                )
+                            )
+                            .map((g) => g.id)
+                        );
+                        return {
+                          ...current,
+                          grammar_structures,
+                          senses: current.senses.map((sense) => ({
+                            ...sense,
+                            definitions: sense.definitions.map((definition) => {
+                              if (
+                                !definition.grammar_structure_id ||
+                                !removed.has(definition.grammar_structure_id)
+                              )
+                                return definition;
+                              const next = { ...definition };
+                              delete next.grammar_structure_id;
+                              return next;
+                            })
+                          }))
+                        };
+                      })
+                    }
+                  />
+                )}
                 {!senses.length && <Empty description="尚无义项" />}
                 {senses.map((sense, index) => {
                   const summary =
@@ -412,6 +479,57 @@ export function MeaningsStep({
                                       }));
                                     }}
                                   />
+                                  {grammarAvailable && (
+                                    <>
+                                      <span>细分词性</span>
+                                      <Select
+                                        aria-label={`义项 ${index + 1} 细分词性`}
+                                        disabled={disabled}
+                                        placeholder="请选择细分词性"
+                                        value={sense.sub_pos || undefined}
+                                        options={(() => {
+                                          const item = catalog.data?.items.find(
+                                            (part) =>
+                                              part.code === sense.part_of_speech
+                                          );
+                                          const parts = item?.sub_parts ?? [];
+                                          return [
+                                            ...(!item?.sub_pos_required
+                                              ? [
+                                                  {
+                                                    value: "",
+                                                    label: "不指定细分词性"
+                                                  }
+                                                ]
+                                              : []),
+                                            ...(sense.sub_pos &&
+                                            !parts.some(
+                                              (part) =>
+                                                part.code === sense.sub_pos
+                                            )
+                                              ? [
+                                                  {
+                                                    value: sense.sub_pos,
+                                                    label: "已失效的细分词性",
+                                                    disabled: true
+                                                  }
+                                                ]
+                                              : []),
+                                            ...parts.map((part) => ({
+                                              value: part.code,
+                                              label: localizedCatalogName(
+                                                part,
+                                                i18n.language
+                                              )
+                                            }))
+                                          ];
+                                        })()}
+                                        onChange={(sub_pos: string) =>
+                                          updateSense(sense.id, { sub_pos })
+                                        }
+                                      />
+                                    </>
+                                  )}
                                   {senseGroupsAvailable && (
                                     <span>{t("sense_groups")}</span>
                                   )}
@@ -460,6 +578,14 @@ export function MeaningsStep({
                                   locale={target}
                                   label={`${localeLabels[target]}释义`}
                                   definition
+                                  grammars={
+                                    grammarAvailable
+                                      ? (value.grammar_structures ?? []).filter(
+                                          (g) => grammarMatchesSense(g, sense)
+                                        )
+                                      : undefined
+                                  }
+                                  grammarLocale={target}
                                   textClassName="tsz-words"
                                   disabled={disabled}
                                   onChange={(definitions) =>
@@ -475,6 +601,14 @@ export function MeaningsStep({
                                   locale={medium}
                                   label={`${localeLabels[medium]}解释`}
                                   definition
+                                  grammars={
+                                    grammarAvailable
+                                      ? (value.grammar_structures ?? []).filter(
+                                          (g) => grammarMatchesSense(g, sense)
+                                        )
+                                      : undefined
+                                  }
+                                  grammarLocale={target}
                                   disabled={disabled}
                                   onChange={(definitions) =>
                                     updateSense(sense.id, {

@@ -209,3 +209,22 @@
     flex-wrap: wrap;
   }
 }
+
+.lexicon-next-grammar-row {
+  display: grid;
+  grid-template-columns: 24px 210px minmax(120px, 1fr) 32px;
+  align-items: center;
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-3);
+}
+.lexicon-next-grammar-text {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+.lexicon-next-grammar-text > .tsz-ve-readonly {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

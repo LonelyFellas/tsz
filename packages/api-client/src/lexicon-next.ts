@@ -55,6 +55,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   const editorOptions = {
     headers: {
       "x-tsz-next-forms": "v1",
+      "x-tsz-next-grammar": "v1",
       "x-tsz-next-sense-groups": "v1",
       "x-tsz-next-medium-ownership": "v1"
     }
