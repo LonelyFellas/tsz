@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-validation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-14T09:32:30.711Z",
+  "_source": "/Users/darwish/.codex/worktrees/grammar-dubbing/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-14T12:25:40.152Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -8632,9 +8632,15 @@
       "type": "object",
       "required": ["id", "locale", "content"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/AudioAsset" },
+          "maxItems": 8
+        },
         "content": { "$ref": "#/components/schemas/RichTextV3" },
         "id": { "type": "string", "format": "uuid" },
-        "locale": { "type": "string" }
+        "locale": { "type": "string" },
+        "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
       },
       "additionalProperties": false
     },

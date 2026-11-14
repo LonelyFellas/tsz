@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-validation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "659e3e538422ad0b4c8dfe1f1216cfc94223edb68568b93c2782f20645bb63e5",
+  "_source": "/Users/darwish/.codex/worktrees/grammar-dubbing/tsz-rust/docs/openapi.json",
+  "_source_sha256": "64408adfb1a32829620f067d93a3803c083f3748c2c8005d5bc4d7a2390ef37a",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3584,6 +3584,7 @@
       "properties": {
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
+        "grammar_audio": { "type": "boolean" },
         "grammar_structures": { "type": "boolean" },
         "language_rules_version": { "type": "string" },
         "languages": {
@@ -3880,9 +3881,15 @@
       "type": "object",
       "required": ["id", "locale", "content"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioAsset" },
+          "maxItems": 8
+        },
         "content": { "$ref": "#/$defs/RichTextV3" },
         "id": { "type": "string", "format": "uuid" },
-        "locale": { "type": "string" }
+        "locale": { "type": "string" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false
     },

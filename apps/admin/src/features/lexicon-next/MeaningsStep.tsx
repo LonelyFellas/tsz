@@ -66,6 +66,7 @@ export function MeaningsStep({
   disabled,
   senseGroupsAvailable = false,
   grammarAvailable = false,
+  grammarAudioAvailable = false,
   registerLeaveGuard,
   onChange
 }: {
@@ -78,6 +79,7 @@ export function MeaningsStep({
   disabled: boolean;
   senseGroupsAvailable?: boolean;
   grammarAvailable?: boolean;
+  grammarAudioAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
@@ -330,6 +332,7 @@ export function MeaningsStep({
                     catalog={catalog.data?.items.find(
                       (item) => item.code === code
                     )}
+                    audioAvailable={grammarAudioAvailable}
                     target={target}
                     disabled={disabled || catalog.isPending || catalog.isError}
                     referenceCount={(id) =>

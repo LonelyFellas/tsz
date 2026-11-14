@@ -1,17 +1,29 @@
-import { lazy, Suspense, useLayoutEffect, useState } from "react";
+import { lazy, Suspense, useLayoutEffect, useMemo, useState } from "react";
 import type {
   NextGrammarStructure,
   NextGrammarVariant,
-  PartOfSpeechCatalogItem,
-  RichTextV3
+  PartOfSpeechCatalogItem
 } from "@tsz/types";
 import { Button, Card, Space } from "@tsz/ui/admin/display";
 import { Select } from "@tsz/ui/admin/forms";
 import { App } from "@tsz/ui/admin/overlays";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
 import { VoiceEditorModal } from "@/features/dictionary/word-creation-v3/components/VoiceEditorModal";
+import { usePermission } from "@/lib/auth";
+import { env } from "@/lib/env";
+import {
+  adminAudioUploadAdapter,
+  adminVoicePreviewAdapter,
+  loadAdminVoiceRecommendations,
+  voicePreviewIsMock
+} from "@/features/dictionary/voice-editor/dataSource";
+import {
+  PronunciationPreviewControls,
+  PronunciationPreviewProvider
+} from "@/features/dictionary/word-creation/PronunciationPreview";
+import { EntryDialectContext } from "@/features/settings/useDialectPreference";
 import { localeLabels } from "./model";
 import "@tsz/voice-editor/styles.css";
 const VoiceEditor = lazy(() =>
@@ -24,19 +36,29 @@ function GrammarText({
   variant,
   label,
   disabled,
+  audioAvailable,
   onChange,
   registerLeaveGuard
 }: {
   variant: NextGrammarVariant;
   label: string;
   disabled: boolean;
-  onChange: (value: RichTextV3) => void;
+  audioAvailable: boolean;
+  onChange: (value: NextGrammarVariant) => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
-  const [draft, setDraft] = useState<RichTextV3>();
+  const [draft, setDraft] = useState<NextGrammarVariant>();
+  const canGenerate = usePermission("speech.generate");
+  const canUpload = usePermission("speech.upload_audio");
+  const previewAdapter = useMemo(
+    () =>
+      canGenerate
+        ? adminVoicePreviewAdapter
+        : { ...adminVoicePreviewAdapter, generateAudio: undefined },
+    [canGenerate]
+  );
   const dirty =
-    draft !== undefined &&
-    JSON.stringify(draft) !== JSON.stringify(variant.content);
+    draft !== undefined && JSON.stringify(draft) !== JSON.stringify(variant);
   const { modal } = App.useApp();
   useLayoutEffect(() => {
     if (draft === undefined || !registerLeaveGuard) return;
@@ -48,7 +70,7 @@ function GrammarText({
       return new Promise<boolean>((resolve) =>
         modal.confirm({
           title: "放弃语法结构修改？",
-          content: "尚未完成的标注和正文修改将被丢弃。",
+          content: "尚未完成的正文、标注和配音修改将被丢弃。",
           okText: "放弃修改",
           cancelText: "继续编辑",
           onOk: () => {
@@ -63,20 +85,48 @@ function GrammarText({
   }, [draft, dirty, modal, registerLeaveGuard]);
   return (
     <>
-      <div className="lexicon-next-grammar-text">
-        <RichTextReadOnly
-          className="tsz-words"
-          value={variant.content}
-          emptyText="未填写语法结构"
-        />
+      <Space.Compact block>
+        {audioAvailable && (
+          <PronunciationPreviewControls
+            pronunciationId={variant.id}
+            recommendationArea="grammar"
+            playbackOnly
+            assetOnly={disabled}
+            dialect={
+              variant.locale === "en-GB"
+                ? "uk"
+                : variant.locale === "en-US"
+                  ? "us"
+                  : "common"
+            }
+            ariaLabelPrefix={label}
+            content={toRichTextV2(variant.content)}
+            voiceProfile={variant.voice_profile}
+            audioAssets={variant.audio_assets}
+          />
+        )}
         <Button
+          className="lexicon-next-grammar-text"
+          block
           icon={<Pencil />}
+          iconPlacement="end"
           aria-label={`编辑${label}`}
           disabled={disabled}
-          onClick={() => setDraft(structuredClone(variant.content))}
-        />
-      </div>
+          onClick={() => setDraft(structuredClone(variant))}
+        >
+          <RichTextReadOnly
+            className={
+              variant.content.text
+                ? "tsz-words lexicon-next-grammar-content"
+                : "lexicon-next-grammar-empty"
+            }
+            value={variant.content}
+            emptyText="未填写语法结构"
+          />
+        </Button>
+      </Space.Compact>
       <VoiceEditorModal
+        width={audioAvailable ? 1200 : 960}
         open={draft !== undefined}
         title={label}
         footer={null}
@@ -87,21 +137,74 @@ function GrammarText({
           <Suspense fallback={<span role="status">正在加载编辑器</span>}>
             <VoiceEditor
               mode="grammar"
-              value={toRichTextV2(draft)}
+              readOnly={disabled}
+              value={toRichTextV2(draft.content)}
               contextLabel={label}
               contextKey={variant.id}
-              speechSettingsEnabled={false}
-              showAudioUpload={false}
-              previewEnabled={false}
-              onChange={setDraft}
-              renderActions={(canComplete) => (
+              locale={
+                variant.locale === "en-GB" || variant.locale === "en-US"
+                  ? variant.locale
+                  : undefined
+              }
+              speechSettingsEnabled={audioAvailable}
+              showAudioUpload={audioAvailable}
+              previewEnabled={audioAvailable && env.VOICE_PREVIEW}
+              previewAdapter={audioAvailable ? previewAdapter : undefined}
+              previewIsMock={voicePreviewIsMock}
+              recommendationArea={audioAvailable ? "grammar" : undefined}
+              loadRecommendations={
+                audioAvailable ? loadAdminVoiceRecommendations : undefined
+              }
+              voiceProfile={
+                audioAvailable
+                  ? withDefaultVoiceProfile(draft.voice_profile, "grammar")
+                  : undefined
+              }
+              onVoiceProfileChange={
+                audioAvailable
+                  ? (voice_profile) =>
+                      setDraft(
+                        (current) => current && { ...current, voice_profile }
+                      )
+                  : undefined
+              }
+              audioAssets={draft.audio_assets}
+              audioUploadAllowed={canUpload}
+              audioUploadAdapter={
+                audioAvailable && env.VOICE_AUDIO_UPLOAD
+                  ? adminAudioUploadAdapter
+                  : undefined
+              }
+              onAudioAssetsChange={(audio_assets) =>
+                setDraft((current) => current && { ...current, audio_assets })
+              }
+              onChange={(content) =>
+                setDraft((current) => current && { ...current, content })
+              }
+              renderActions={(canComplete, prepareComplete, captureResult) => (
                 <Space>
                   <Button onClick={() => setDraft(undefined)}>取消</Button>
                   <Button
                     type="primary"
-                    disabled={!canComplete}
+                    disabled={disabled || !canComplete}
                     onClick={() => {
-                      onChange(draft);
+                      if (prepareComplete && !prepareComplete()) return;
+                      const result = captureResult?.(true);
+                      onChange(
+                        result
+                          ? {
+                              ...draft,
+                              content: result.value,
+                              ...(audioAvailable
+                                ? {
+                                    voice_profile:
+                                      result.voiceProfile ?? undefined,
+                                    audio_assets: result.audioAssets ?? []
+                                  }
+                                : {})
+                            }
+                          : draft
+                      );
                       setDraft(undefined);
                     }}
                   >
@@ -124,6 +227,7 @@ export function GrammarStructures({
   target,
   disabled,
   referenceCount,
+  audioAvailable = false,
   registerLeaveGuard,
   onChange
 }: {
@@ -133,14 +237,25 @@ export function GrammarStructures({
   target: string;
   disabled: boolean;
   referenceCount: (id: string) => number;
+  audioAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onChange: (
     update: (rows: NextGrammarStructure[]) => NextGrammarStructure[]
   ) => void;
 }) {
   const { modal } = App.useApp();
-  return (
-    <Card size="small" title={`语法结构 · ${localeLabels[target] ?? target}`}>
+  const card = (
+    <Card
+      className="lexicon-next-grammar"
+      size="small"
+      title={`语法结构 · ${localeLabels[target] ?? target}`}
+    >
+      {rows.some((row) => row.part_of_speech === pos) && (
+        <div className="lexicon-next-grammar-heading" aria-hidden="true">
+          <span>细分词性</span>
+          <span>语法结构</span>
+        </div>
+      )}
       {rows
         .filter((row) => row.part_of_speech === pos)
         .map((row, index) => {
@@ -150,7 +265,7 @@ export function GrammarStructures({
           const subParts = catalog?.sub_parts ?? [];
           return (
             <div key={row.id} className="lexicon-next-grammar-row">
-              <span>{index + 1}</span>
+              <span className="lexicon-next-grammar-index">{index + 1}</span>
               <Select
                 aria-label={`语法结构 ${index + 1} 细分词性`}
                 disabled={disabled}
@@ -186,17 +301,18 @@ export function GrammarStructures({
               {variant ? (
                 <GrammarText
                   variant={variant}
+                  audioAvailable={audioAvailable}
                   registerLeaveGuard={registerLeaveGuard}
                   label={`语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
                   disabled={disabled}
-                  onChange={(content) =>
+                  onChange={(variant) =>
                     onChange((rows) =>
                       rows.map((item) =>
                         item.id === row.id
                           ? {
                               ...item,
                               variants: item.variants.map((v) =>
-                                v.id === variant.id ? { ...v, content } : v
+                                v.id === variant.id ? variant : v
                               )
                             }
                           : item
@@ -284,5 +400,16 @@ export function GrammarStructures({
         添加语法结构
       </Button>
     </Card>
+  );
+  return audioAvailable ? (
+    <EntryDialectContext.Provider
+      value={target === "en-US" ? "en-US" : "en-GB"}
+    >
+      <PronunciationPreviewProvider readOnly={disabled}>
+        {card}
+      </PronunciationPreviewProvider>
+    </EntryDialectContext.Provider>
+  ) : (
+    card
   );
 }
