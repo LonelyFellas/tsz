@@ -161,6 +161,12 @@ export function v3SaveProblemMessage(
   t: CreationTranslation = creationDefaultT
 ): string {
   switch (problem.kind) {
+    case "request":
+      return t(
+        problem.code === "invalid_speech_preview"
+          ? "panel_save_invalid_speech"
+          : "panel_save_invalid_request"
+      );
     case "validation":
       return problem.issues[0]
         ? t("panel_save_validation", {

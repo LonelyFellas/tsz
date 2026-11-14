@@ -1,5 +1,6 @@
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
+import { createFormTypeComparator } from "../../part-of-speech/catalog";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -120,17 +121,7 @@ export function V3FormGroupCard({
     }))
   );
   const hasOverview = !!(onEditContent && sharedCounts);
-  const configuredTypes = formTypes?.length
-    ? [...formTypes]
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((item) => item.code)
-    : ["base", ...(posCatalog?.allowed_form_types ?? [])];
-  const typeOrder = new Map(
-    configuredTypes.map((type, index) => [type, index])
-  );
-  const compareTypes = (a: string, b: string) =>
-    (typeOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
-    (typeOrder.get(b) ?? Number.MAX_SAFE_INTEGER);
+  const compareTypes = createFormTypeComparator(formTypes, posCatalog);
   const formTypeOptions = posCatalog
     ? [
         ...new Set<WordFormTypeV3>([

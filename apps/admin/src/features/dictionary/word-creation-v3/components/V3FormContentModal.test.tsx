@@ -18,6 +18,7 @@ import { App } from "@tsz/ui/admin/overlays";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   DraftFormsStepContentV3,
+  PartOfSpeechCatalogResponse,
   SharedFormsStepContentV3
 } from "@tsz/types";
 import { V3FormContentModal } from "./V3FormContentModal";
@@ -27,7 +28,12 @@ import {
   applyFormsStructure,
   expandFormContents
 } from "../sharedFormsModel";
-import { createStableVariantIdFactory } from "../operations";
+import {
+  addConcreteForm,
+  deleteConcreteForm,
+  createStableVariantIdFactory
+} from "../operations";
+import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
 import {
   commonFormFixture,
   formsFixture,
@@ -38,7 +44,7 @@ import {
 
 const backgroundAudio = vi.hoisted(() => ({
   enabled: false,
-  finish: (() => {}) as () => void
+  finish: (() => {}) as (ready?: boolean) => void
 }));
 beforeEach(() => {
   backgroundAudio.enabled = false;
@@ -61,7 +67,11 @@ vi.mock("./V3ConcreteFormRow", () => ({
     useEffect(() => {
       if (!backgroundAudio.enabled || !audioTasks) return;
       const pending = new Promise<boolean>((resolve) => {
-        backgroundAudio.finish = () => {
+        backgroundAudio.finish = (ready = true) => {
+          if (!ready) {
+            resolve(false);
+            return;
+          }
           const next = structuredClone(latest.current.content);
           const regions = next.pos[0]!.forms[0]!.regional_variants;
           if (regions.mode !== "common")
@@ -127,9 +137,11 @@ function setup({
   editFormId,
   contentReassignmentAvailable = true,
   savedContentIds,
-  persist
+  persist,
+  catalog
 }: {
   persist?: (value: SharedFormsStepContentV3) => Promise<boolean>;
+  catalog?: PartOfSpeechCatalogResponse;
   multipleGroups?: boolean;
   serverFieldOrder?: boolean;
   multiplePos?: boolean;
@@ -199,6 +211,7 @@ function setup({
         >
           {open && (
             <V3FormContentModal
+              catalog={catalog}
               forms={applied}
               onApply={setApplied}
               contentReassignmentAvailable={contentReassignmentAvailable}
@@ -228,6 +241,63 @@ function setup({
   const { unmount } = render(<Host />);
   return { forms, onConfirm, onCancel, leave: () => leaveGuard!(), unmount };
 }
+
+it.each(["form_types", "allowed_form_types"])(
+  "删除词形后重加并反复打开标签弹窗，仍按 %s 配置显示且不改草稿顺序",
+  (source) => {
+    const expanded = formsFixture({
+      pos: "verb",
+      forms: ["base", "present_participle", "past_tense"].map(
+        (form_type, index) =>
+          commonFormFixture({ id: uuidFromInt(940 + index), form_type })
+      )
+    });
+    const pos = expanded.pos[0]!;
+    const removed = deleteConcreteForm(expanded, pos.pos_id, pos.forms[1]!.id);
+    if (!removed.ok) throw new Error(removed.reason);
+    let nextId = 950;
+    const added = addConcreteForm(
+      removed.value,
+      pos.pos_id,
+      pos.form_groups[0]!.id,
+      "present_participle",
+      () => uuidFromInt(nextId++)
+    );
+    if (!added.ok) throw new Error(added.reason);
+    const forms = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      added.value
+    ) as SharedFormsStepContentV3;
+    const original = structuredClone(forms);
+    const { onConfirm } = setup({
+      initialForms: forms,
+      editFormId: pos.forms[0]!.id,
+      catalog: {
+        ...partOfSpeechCatalogFixture,
+        form_types:
+          source === "form_types"
+            ? partOfSpeechCatalogFixture.form_types
+            : undefined
+      }
+    });
+    for (let index = 0; index < 2; index++) {
+      fireEvent.click(screen.getByRole("button", { name: "新增标签" }));
+      const dialog = screen
+        .getByText(/为.*指派词形标签/)
+        .closest('[role="dialog"]')!;
+      expect(
+        within(dialog as HTMLElement)
+          .getAllByRole("checkbox")
+          .map((item) => item.getAttribute("aria-label"))
+      ).toEqual(["动词原形", "动词现在分词", "动词过去式"]);
+      fireEvent.click(
+        within(dialog as HTMLElement).getByRole("button", { name: "取消" })
+      );
+    }
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(forms).toEqual(original);
+  }
+);
 
 it("切换语言保留抽屉未应用输入，显式确认前不写页面草稿", () => {
   const forms = applyFormsStructure(
@@ -1200,6 +1270,7 @@ it.each([true, false])(
     backgroundAudio.enabled = true;
     const persist = vi.fn(async (_forms: SharedFormsStepContentV3) => true);
     const { onConfirm } = setup({ persist: persisted ? persist : undefined });
+    const apply = screen.getByRole("button", { name: "确认，应用到草稿" });
     fireEvent.click(
       screen.getByRole("button", {
         name: persisted ? "保存当前正文" : "确认，应用到草稿"
@@ -1207,6 +1278,9 @@ it.each([true, false])(
     );
     expect(persist).not.toHaveBeenCalled();
     expect(onConfirm).not.toHaveBeenCalled();
+    expect(apply).toHaveAttribute("aria-busy", "true");
+    expect(apply).toBeDisabled();
+    fireEvent.click(apply);
     await act(async () => backgroundAudio.finish());
     await waitFor(() =>
       expect(persisted ? persist : onConfirm).toHaveBeenCalledOnce()
@@ -1215,5 +1289,25 @@ it.each([true, false])(
       ? persist.mock.calls[0]![0]
       : onConfirm.mock.calls[0]![0];
     expect(JSON.stringify(result)).toContain("formal-in-drawer");
+    if (persisted) {
+      expect(apply).not.toHaveAttribute("aria-busy", "true");
+      expect(apply).toBeEnabled();
+    }
   }
 );
+
+it("音频生成失败后停止应用按钮的 loading，保留输入和弹窗", async () => {
+  backgroundAudio.enabled = true;
+  const { onConfirm } = setup();
+  fireEvent.change(screen.getByLabelText("内容拼写"), {
+    target: { value: "retained input" }
+  });
+  const apply = screen.getByRole("button", { name: "确认，应用到草稿" });
+  fireEvent.click(apply);
+  expect(apply).toHaveAttribute("aria-busy", "true");
+  await act(async () => backgroundAudio.finish(false));
+  expect(apply).not.toHaveAttribute("aria-busy", "true");
+  expect(apply).toBeEnabled();
+  expect(screen.getByLabelText("内容拼写")).toHaveValue("retained input");
+  expect(onConfirm).not.toHaveBeenCalled();
+});

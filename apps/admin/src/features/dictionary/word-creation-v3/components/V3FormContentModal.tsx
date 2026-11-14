@@ -34,6 +34,7 @@ import { V3FormContentWindow } from "./V3FormContentWindow";
 import { Checkbox, Switch } from "@tsz/ui/admin/forms";
 import type {
   DialectRulesV3,
+  PartOfSpeechCatalogResponse,
   RetiredContentSlotV3,
   RetiredStableNodeV3,
   SharedFormsStepContentV3,
@@ -41,6 +42,7 @@ import type {
   WordConcreteFormV3
 } from "@tsz/types";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
+import { createFormTypeComparator } from "../../part-of-speech/catalog";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
@@ -84,6 +86,7 @@ function issueForCause(
 
 export function V3FormContentModal({
   forms,
+  catalog,
   contentReassignmentAvailable = false,
   multipleSpellingsAvailable = false,
   savedContentIds,
@@ -99,6 +102,7 @@ export function V3FormContentModal({
   onApply
 }: {
   forms: SharedFormsStepContentV3;
+  catalog?: PartOfSpeechCatalogResponse;
   contentReassignmentAvailable?: boolean;
   multipleSpellingsAvailable?: boolean;
   savedContentIds?: ReadonlySet<string>;
@@ -180,8 +184,13 @@ export function V3FormContentModal({
   const [normalizeDialect] = useState(() =>
     createSharedContentDialectNormalizer(content, retiredContentSlots)
   );
-  const rows = labels.pos.flatMap((pos) =>
-    pos.forms
+  const rows = labels.pos.flatMap((pos) => {
+    const compareTypes = createFormTypeComparator(
+      catalog?.form_types,
+      catalog?.items.find((item) => item.code === pos.pos)
+    );
+    return [...pos.forms]
+      .sort((a, b) => compareTypes(a.form_type, b.form_type))
       .filter((binding) => binding.content_id === content.id)
       .map((binding) => ({
         pos,
@@ -189,20 +198,26 @@ export function V3FormContentModal({
         group: pos.form_groups.find((group) =>
           group.members.some((member) => member.form_id === binding.id)
         )!
-      }))
-  );
+      }));
+  });
   const assignmentGroups = useMemo(() => {
     if (!choosing) return [];
     const contents = new Map(labels.contents.map((row) => [row.id, row]));
     return labels.pos.map((pos) => {
       const forms = new Map(pos.forms.map((row) => [row.id, row]));
+      const compareTypes = createFormTypeComparator(
+        catalog?.form_types,
+        catalog?.items.find((item) => item.code === pos.pos)
+      );
       return {
         pos,
         groups: pos.form_groups.flatMap((group, groupIndex) => {
-          const members = group.members.flatMap((member) => {
-            const binding = forms.get(member.form_id);
-            return binding ? [binding] : [];
-          });
+          const members = group.members
+            .flatMap((member) => {
+              const binding = forms.get(member.form_id);
+              return binding ? [binding] : [];
+            })
+            .sort((a, b) => compareTypes(a.form_type, b.form_type));
           if (!members.length) return [];
           const totals = new Map<string, number>();
           const seen = new Map<string, number>();
@@ -236,7 +251,7 @@ export function V3FormContentModal({
         })
       };
     });
-  }, [choosing, labels, t]);
+  }, [choosing, labels, catalog, t]);
   const assignmentCandidates = useMemo(
     () =>
       new Map(
@@ -717,6 +732,8 @@ export function V3FormContentModal({
             </Button>
             <Button
               type="primary"
+              icon={<span aria-hidden style={{ width: "1em" }} />}
+              loading={saving}
               disabled={saving || Boolean(regionalChoice && !primaryRegion)}
               onClick={() =>
                 regionalChoice ? applyRegionalChoice() : void confirmed()

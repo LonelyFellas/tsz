@@ -15,6 +15,8 @@ import {
   uuidFromInt
 } from "./fixtures";
 import type { V3Problem } from "./problem";
+import { classifyV3Problem } from "./problem";
+import { HttpError } from "@tsz/api-client";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import {
   V3WordCreationLayout,
@@ -233,6 +235,28 @@ describe("V3WordCreationLayout", () => {
     expect(screen.getByText("step body")).toBeVisible();
     expect(onRefreshConflict).not.toHaveBeenCalled();
     expect(onDiscardLocalChanges).not.toHaveBeenCalled();
+  });
+
+  it("配音保存被拒时说明原因和恢复方式，保留编辑内容且不显示后端原文", () => {
+    renderLayout({
+      problem: classifyV3Problem(
+        new HttpError(
+          400,
+          "raw provider payload",
+          [],
+          "invalid_speech_preview"
+        ),
+        "save_forms"
+      )
+    });
+    expect(screen.getByText("草稿未保存")).toBeVisible();
+    expect(screen.getByText(/配音内容或参数无效/)).toBeVisible();
+    expect(
+      screen.getByText(/请检查 IPA\/UPS、停顿和音色设置后重试/)
+    ).toBeVisible();
+    expect(screen.getByText("step body")).toBeVisible();
+    expect(screen.queryByText("raw provider payload")).toBeNull();
+    expect(screen.queryByText("操作未完成")).toBeNull();
   });
 
   it("关联冲突 409 展示操作建议与关联列表，不直接显示后端技术文案", () => {
