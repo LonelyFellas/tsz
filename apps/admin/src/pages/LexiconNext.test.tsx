@@ -2623,3 +2623,74 @@ it("语义区间在只读词条中不能新增、修改、删除或排序", asyn
   );
   expect(api.save).not.toHaveBeenCalled();
 });
+
+it("目录缓存更新后，停留在预览页也立即去除失效结构且不改草稿", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, grammar_structures: true });
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [
+      {
+        id: "g",
+        part_of_speech: "noun",
+        sub_pos: "N-COUNT",
+        variants: ["en-GB", "en-US"].map((locale) => ({
+          id: locale,
+          locale,
+          content: { version: 2, text: "a job", annotations: [] }
+        }))
+      }
+    ],
+    senses: [
+      {
+        id: "s",
+        part_of_speech: "noun",
+        sub_pos: "N-COUNT",
+        definitions: [
+          {
+            id: "d",
+            locale: "en-GB",
+            style: "definition",
+            text: "paid work",
+            grammar_structure_id: "g"
+          }
+        ],
+        equivalents: []
+      }
+    ]
+  };
+  const original = structuredClone(draft);
+  api.get.mockResolvedValue({ ...entry, draft });
+  const mounted = mount(
+    api,
+    `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
+  );
+  await screen.findByText("版本 1");
+  await waitFor(() =>
+    expect(
+      mounted.client.getQueryData(partOfSpeechKeys.catalog())
+    ).toBeDefined()
+  );
+  fireEvent.click(button(/^预览/));
+  const pane = screen.getByRole("heading", {
+    name: "预览"
+  }).parentElement!;
+  expect(within(pane).getByLabelText("语法结构")).toHaveTextContent("a job");
+  const changed = structuredClone(partOfSpeechCatalogFixture);
+  changed.items.find((item) => item.code === "noun")!.sub_parts = changed.items
+    .find((item) => item.code === "noun")!
+    .sub_parts.filter((item) => item.code !== "N-COUNT");
+  await act(async () => {
+    mounted.client.setQueryData(partOfSpeechKeys.catalog(), changed);
+  });
+  await waitFor(() =>
+    expect(within(pane).queryByLabelText("语法结构")).toBeNull()
+  );
+  expect(within(pane).getByText("语法结构尚未完整配置")).toBeVisible();
+  expect(api.save).not.toHaveBeenCalled();
+  await expect(api.get.mock.results[0]!.value).resolves.toMatchObject({
+    draft: original
+  });
+});

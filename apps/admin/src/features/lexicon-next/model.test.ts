@@ -1,3 +1,4 @@
+import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import { describe, expect, it } from "vitest";
 import type { NextDraft, NextLanguageCapability } from "@tsz/types";
 import { previewDraft, draftProblem, initialTargetLocale } from "./model";
@@ -80,7 +81,12 @@ describe("本地草稿预览", () => {
     expect(gb.forms).toEqual([draft.forms[0]]);
     expect(gb.senses[0]?.missing_target_definitions).toBe(true);
     expect(gb.senses[0]?.missing_equivalents).toBe(true);
-    const us = previewDraft(draft, "en-US", "zh-Hans");
+    const us = previewDraft(
+      draft,
+      "en-US",
+      "zh-Hans",
+      partOfSpeechCatalogFixture
+    );
     expect(us.forms).toEqual([draft.forms[1]]);
     expect(us.senses[0]?.equivalents).toEqual(draft.senses[0]?.equivalents);
     expect(draft).toEqual(original);
@@ -205,17 +211,79 @@ it("新语法预览只投影当前方言与有效引用，草稿中的失效引�
       }
     ]
   };
-  const good = previewDraft(draft, "en-US", "zh-Hans");
+  const good = previewDraft(
+    draft,
+    "en-US",
+    "zh-Hans",
+    partOfSpeechCatalogFixture
+  );
   expect(
     good.grammar_structures![0]!.variants.map((v) => v.content.text)
   ).toEqual(["a role"]);
   expect(good.senses[0]!.target_definitions[0]!.grammar_structure_id).toBe("g");
   draft.senses[0]!.sub_pos = "N-UNCOUNT";
   const before = structuredClone(draft);
-  const invalid = previewDraft(draft, "en-US", "zh-Hans");
+  const invalid = previewDraft(
+    draft,
+    "en-US",
+    "zh-Hans",
+    partOfSpeechCatalogFixture
+  );
   expect(invalid.grammar_issues).toHaveLength(1);
   expect(
     invalid.senses[0]!.target_definitions[0]!.grammar_structure_id
   ).toBeUndefined();
+  expect(draft).toEqual(before);
+});
+
+it("当前目录改码后，同编码的结构与义项也不能作为有效语法投影", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [
+      {
+        id: "g",
+        part_of_speech: "noun",
+        sub_pos: "N-COUNT",
+        variants: ["en-GB", "en-US"].map((locale) => ({
+          id: locale,
+          locale,
+          content: { version: 2, text: "a job", annotations: [] }
+        }))
+      }
+    ],
+    senses: [
+      {
+        id: "s",
+        part_of_speech: "noun",
+        sub_pos: "N-COUNT",
+        definitions: [
+          {
+            id: "d",
+            locale: "en-GB",
+            style: "definition",
+            text: "work",
+            grammar_structure_id: "g"
+          }
+        ],
+        equivalents: []
+      }
+    ]
+  };
+  const catalog = structuredClone(partOfSpeechCatalogFixture);
+  const noun = catalog.items.find((part) => part.code === "noun")!;
+  noun.sub_parts = noun.sub_parts.filter((part) => part.code !== "N-COUNT");
+  const before = structuredClone(draft);
+  const view = previewDraft(draft, "en-GB", "zh-Hans", catalog);
+  expect(view.grammar_structures).toEqual([]);
+  expect(
+    view.senses[0]!.target_definitions[0]!.grammar_structure_id
+  ).toBeUndefined();
+  expect(
+    view
+      .grammar_issues!.filter((issue) => issue.field === "sub_pos")
+      .map((issue) => issue.node_id)
+  ).toEqual(["g", "s"]);
   expect(draft).toEqual(before);
 });
