@@ -41,7 +41,7 @@ description: 审查 tsz 前端 Next Web、React Admin 与共享包改动，关�
 
 - 沿用 React Router + TanStack Query + `@tsz/ui/admin/*`，检查控件的只读、焦点和请求行为，不套 Next 路由或 Web SEO 规则。
 - 检查筛选/翻页/排序联动、删除最后一行后的页码、编辑切换的旧表单值、保存失败时草稿保留和重复提交。
-- `Form.List` 动态行使用 `field.key`，避免删除/重排造成行状态错位；检查 noStyle Form.Item 的无效 style、v6 Alert 的 `title` 等实际命中的 API 变化。
+- 动态业务行使用稳定业务 ID，检查删除/重排后的状态与焦点。仅对实际使用的控件核对 API，不把旧 AntD 表单约定套到项目共享控件。
 - 沿真实业务 ID 追踪词条/词形/义项/例句等选中关系、批量操作与回填，不因展示文本相同混用实体；仅对本次涉及的领域展开。
 
 ## 最小验证与交付

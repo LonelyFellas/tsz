@@ -6,7 +6,7 @@
 - [C 端设计规范](../apps/web/style.md)：统一颜色、排版、布局、按钮、菜单、表单状态与文案；新页面和逐步迁移按此接入。
 - [词条编辑指南](word-editor.md)：保留跨任务仍有效的交互和数据约束。
 - [契约同步](../.agents/skills/contract-sync/SKILL.md)、[后端对接](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/frontend-integration.md)、[OpenAPI](https://github.com/LonelyFellas/tsz-rust/blob/main/docs/openapi.json)。
-- 产品范围与品牌规范统一维护在配套总文档仓库的 `product.md`、`visual.md`；该仓库暂无远端，需取得本地 checkout 后阅读。
+- 产品范围以本仓相关功能设计为依据，界面规范见 `apps/web/style.md`、`apps/admin/style.md`；共享文档仓中的历史说明需核实时效，不依赖缺失的 product.md/visual.md。
 
 ## 尚未关闭或需重新核实的事项
 

@@ -1,43 +1,18 @@
 ---
 name: dev-env
-description: 诊断或按授权准备 tsz/tsz-rust 的本地联调环境，核实监听进程、实际版本、API 代理、Postgres/Redis 隔离和 mock 来源。用于服务版本不明、联调失败、旧构建或真实后端验收准备；不用于服务器部署。
+description: 诊断或按授权准备 tsz 前端本地环境，核实 Web/Admin 构建、进程、API 代理与 mock；服务端数据和启动由对应仓库流程负责。
 ---
 
-# TSZ 联调环境
+# 前端环境与真实请求去向
 
-通用授权与任务记录遵循 [AGENTS.md](../../../AGENTS.md)。复用主任务中仍有效的版本、代理和隔离证据，只补缺项或变化；进程/构建身份未知时重新核实，不重新评估产品需求。
+遵循 [AGENTS.md](../../../AGENTS.md)，复用主任务有效版本证据。诊断默认只读；明确要求启动/修复本地环境时完成必要可逆操作，不能接管未知进程或扩大到服务器部署。
 
-先解释当前运行的是什么，再处理缺少的依赖。诊断请求默认只读；明确要求启动/修复本地环境时，完成范围内的必要可逆操作，不重复索要同一授权。
+1. 核实任务 checkout、SHA/脏差异、目标页面、实际 URL、监听 PID、进程 cwd/启动时间与构建来源。端口、mtime、HEAD 和 health 均不能单独证明运行版本，默认 3000/3001 只是查找起点。
+2. 按 [环境核对](references/environment-checks.md) 核实 Next rewrites、Vite 当前 mode/代理、API 基地址及 cookie 路径，保留 `/api/v1` 前缀。preview/生产不能套用 dev 代理结论。
+3. 检查构建开关、实际 client 装配、service worker 和浏览器请求拦截；关闭 env mock 不代表请求已真实化。用实际只读请求或 Network 证明目标链，不输出 token、cookie 或整份 env。
+4. web 验收使用 `pnpm build` + `next start`，不使用 `next dev`。代理/构建输入变化需重建，不能用旧 `.next` 证明新配置。Admin 按实际启动模式验证路由。
 
-## 1. 找到真实目标
+涉及服务端时，从用户目标、Git 身份和工作树列表定位所选 tsz-rust/tsz-agent checkout，按需读取各自 `.agents/skills/dev-env/SKILL.md`；不能从前端健康或代理成功推断数据库隔离、迁移安全及 worker 可用。缺少配套环境就明确未验证项。
 
-从当前 checkout、用户指定路径和 remotes 确认前后端仓库，读取各自项目规则。
-列出要验收的端、页面/端点、目标环境和已有服务；只检查与问题有关的依赖。
-需要实际命令和项目陷阱时读取 [环境核对](references/environment-checks.md)。
-
-默认 3000/3001/8383 只是排查起点。记录实际 URL、监听 PID、启动时间、进程 cwd/可执行文件、checkout HEAD/脏状态和构建来源。
-checkout 更新不证明旧进程已加载新代码；无法绑定构建与提交时标记版本未知。历史文档里的端口/PID 只作历史证据。
-
-## 2. 验证请求与数据去向
-
-- 分别确认浏览器 API 基地址、前端代理目标与后端监听地址，完整保留 `/api/v1` 前缀；用浏览器 Network 或实际只读请求证明转发链。
-- 检查当前构建/启动模式下生效的 mock 和功能开关，再看请求层是否直接组装 mock client。环境变量关闭 mock 不代表所有页面都已真实化。
-- 识别 Postgres 的 host/port/数据库与 Redis 的 host/port/DB/键隔离，只报告脱敏地址和必要标识，不输出密码、token、cookie 或整份 `.env`。
-- 后端启动会自动执行 migration，不能用「先启动试试」诊断未知数据库。测试前核实实际测试文件的连接选择逻辑，避免 Redis fallback 命中共享实例。
-
-## 3. 按范围准备或修复
-
-诊断时交付证据与最小修复路径。已授权搭建联调时，优先复用来源明确且隔离正确的服务；不足则用任务隔离的数据与空闲端口启动新服务。
-仅停止/重启本任务启动且身份已核实的进程；需要接管其他任务服务时先交付诊断结果并取得该动作授权。不能只按端口批量 kill。
-不用 FLUSHALL/FLUSHDB、清空共享库或 `docker compose down -v` 解决联调；不修改生产配置、不将生产 `COOKIE_SECURE` 设为 false。
-
-web 验收按项目要求用 `pnpm build` + `next start`，不使用 `next dev`。代理/构建开关变化需重建相应产物，不能用旧 `.next` 证明新配置。
-admin 可用明确配置的 Vite dev 代理做本地真实联调；若验收 production build/preview，必须另外证明该模式的 API 路由，不套用 dev 代理假设。
-记录新增服务句柄、日志位置、隔离资源及清理方式。数据写入限当前已授权测试路径，清理只处理本任务拥有的资源。
-
-## 4. 完成条件
-
-交付「端 → 实际 URL/进程 → 构建或版本证据 → API/数据库去向 → mock 状态 → 已验证与待验证」的简表。
-单个 health 成功只证明该探针；不替代 ready、鉴权或目标业务链路。
-需要页面到真实存储的验收时，读取选定前端仓库 `.agents/skills/test/references/real-backend-acceptance.md`；契约不一致则读取同仓的 [contract-sync](../contract-sync/SKILL.md)。
-版本、凭据或隔离仍未知时，完成可做的只读诊断并标清阻塞，不把环境可用写成验收通过。
+只停止/重启本任务拥有且身份明确的进程；记录新服务句柄、日志与清理方式。仅诊断不写业务数据；授权验收的数据清理遵循项目规则，不批量清共享库/缓存或杀原服务。
+交付「页面 → URL/进程 → 构建版本 → API 去向 → mock → 已验证/待验证」。真实页面与持久化验收按 [真实后端验收](../test/references/real-backend-acceptance.md)，契约疑点按 [contract-sync](../contract-sync/SKILL.md)。

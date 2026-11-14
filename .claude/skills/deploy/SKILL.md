@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: 将已合入 GitHub main 且精确 CI 成功的 tsz 前端部署到 tshb-test，使用仓库导出构建与 rsync 脚本，验证页面、API 和制品来源。用于明确的前端部署请求；不部署后端。 兼容入口，规则复用本仓库 .agents 技能。
+description: 将已合入 GitHub main 且精确 CI 成功的 tsz 前端部署到 tshb-test，消费精确 CI 的 Linux 发布包，通过原生 rsync 发布入口，验证页面、API 和制品来源。用于明确的前端部署请求；不部署后端。 兼容入口，规则复用本仓库 .agents 技能。
 ---
 
 # deploy 项目入口
