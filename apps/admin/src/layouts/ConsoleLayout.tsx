@@ -106,6 +106,7 @@ export function ConsoleLayout() {
               </div>
               <div className="console-header-account">
                 {rootContext?.connectionStatus}
+                <div id="console-header-tools" />
                 <AdminHeader />
               </div>
             </header>

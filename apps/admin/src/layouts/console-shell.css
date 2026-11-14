@@ -38,6 +38,10 @@
   gap: var(--ui-space-5);
   min-width: 0;
 }
+#console-header-tools:empty {
+  display: none;
+}
+
 .console-header-account {
   gap: var(--ui-space-4);
 }

@@ -6,7 +6,12 @@ import {
   useState
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useBeforeUnload, useBlocker, useParams } from "react-router-dom";
+import {
+  useBeforeUnload,
+  useBlocker,
+  useNavigate,
+  useParams
+} from "react-router-dom";
 import {
   Alert,
   Button,
@@ -15,7 +20,7 @@ import {
   Spin,
   Tag
 } from "@tsz/ui/admin/display";
-import { Checkbox, Form, Input, Radio } from "@tsz/ui/admin/forms";
+import { Checkbox, Form, Input } from "@tsz/ui/admin/forms";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { ContentEditPermissions } from "@/features/dictionary/contentEditPermissions";
@@ -39,10 +44,13 @@ import { MeaningsStep } from "@/features/lexicon-next/MeaningsStep";
 import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
   draftProblem,
-  initialTargetLocale,
   localeLabels,
   previewDraft
 } from "@/features/lexicon-next/model";
+import {
+  LexiconLanguages,
+  useLexiconLanguages
+} from "@/features/lexicon-next/LanguageSelection";
 import { EntryList } from "@/features/lexicon-next/EntryList";
 import { EntryLayout } from "@/features/lexicon-next/EntryLayout";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
@@ -77,6 +85,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
   );
   const supported =
     capability.data?.manual_drafts &&
+    capability.data.medium_ownership === true &&
     language &&
     ["en-GB", "en-US"].every((locale) =>
       language.target_locales.includes(locale)
@@ -96,38 +105,40 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           description={
             capability.error
               ? failure(capability.error)
-              : "当前服务尚未开放英语与中文草稿。"
+              : "当前服务尚未开放按媒介语言归属的英语草稿。"
           }
           action={
             <Button onClick={() => void capability.refetch()}>重新检查</Button>
           }
         />
-      ) : entryId === "trash" ? (
-        <EntryList
-          key="trash"
-          requests={requests}
-          trashMode
-          partOfSpeechCodes={language.part_of_speech_codes}
-          languages={capability.data?.languages ?? []}
-        />
-      ) : entryId === "new" ? (
-        <EntryStart requests={requests} />
-      ) : entryId ? (
-        <EntryLoader
-          key={entryId}
-          id={entryId}
-          requests={requests}
-          language={language}
-          formEditorAvailable={capability.data?.form_editor === true}
-          senseGroupsAvailable={capability.data?.sense_groups === true}
-        />
       ) : (
-        <EntryList
-          key="library"
-          requests={requests}
-          partOfSpeechCodes={language.part_of_speech_codes}
-          languages={capability.data?.languages ?? []}
-        />
+        <LexiconLanguages language={language}>
+          {entryId === "trash" ? (
+            <EntryList
+              key="trash"
+              requests={requests}
+              trashMode
+              partOfSpeechCodes={language.part_of_speech_codes}
+            />
+          ) : entryId === "new" ? (
+            <EntryStart requests={requests} />
+          ) : entryId ? (
+            <EntryLoader
+              key={entryId}
+              id={entryId}
+              requests={requests}
+              language={language}
+              formEditorAvailable={capability.data?.form_editor === true}
+              senseGroupsAvailable={capability.data?.sense_groups === true}
+            />
+          ) : (
+            <EntryList
+              key="library"
+              requests={requests}
+              partOfSpeechCodes={language.part_of_speech_codes}
+            />
+          )}
+        </LexiconLanguages>
       )}
     </div>
   );
@@ -145,6 +156,8 @@ function EntryLoader({
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
 }) {
+  const { medium, search: languageSearch } = useLexiconLanguages();
+  const navigate = useNavigate();
   const query = useQuery({
     queryKey: ["admin-lexicon-next", "entry", id],
     queryFn: () => requests.get(id),
@@ -186,6 +199,26 @@ function EntryLoader({
     );
   if (query.data.target_language !== "en")
     return <Alert type="warning" title="当前编辑器尚未开放此目标语言" />;
+  if (query.data.medium_locale !== medium) {
+    const selection = new URLSearchParams(languageSearch);
+    if (query.data.medium_locale)
+      selection.set("medium_locale", query.data.medium_locale);
+    return (
+      <Alert
+        type="warning"
+        title="该词条不属于当前媒介语言"
+        action={
+          query.data.medium_locale && (
+            <Button
+              onClick={() => navigate(`/lexicon-next/${id}?${selection}`)}
+            >
+              进入词条所属语言
+            </Button>
+          )
+        }
+      />
+    );
+  }
   return (
     <EntryEditor
       initial={query.data}
@@ -234,10 +267,12 @@ function EntryEditor({
     },
     []
   );
-  const [target, setTarget] = useState(() =>
-    initialTargetLocale(initial.draft, language)
-  );
-  const [medium, setMedium] = useState(language.medium_locales[0]!);
+  const {
+    target,
+    medium,
+    search: languageSearch,
+    setLocked
+  } = useLexiconLanguages();
   const [common, setCommon] = useState(false);
   const [saving, setBusy] = useState(false);
   const busy = saving;
@@ -254,7 +289,25 @@ function EntryEditor({
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
   const disabled = busy || !writable;
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved.draft);
-  const blocker = useBlocker(dirty || busy || formContentOpen);
+  useEffect(() => {
+    setLocked(busy || formContentOpen);
+    return () => setLocked(false);
+  }, [busy, formContentOpen, setLocked]);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    const requestedMedium = new URLSearchParams(nextLocation.search).get(
+      "medium_locale"
+    );
+    const nextMedium = language.medium_locales.includes(requestedMedium ?? "")
+      ? requestedMedium
+      : language.medium_locales[0];
+    return (
+      busy ||
+      formContentOpen ||
+      (dirty &&
+        (currentLocation.pathname !== nextLocation.pathname ||
+          nextMedium !== medium))
+    );
+  });
   useBeforeUnload((event) => {
     if (dirty || busy || formContentOpen) {
       event.preventDefault();
@@ -342,6 +395,7 @@ function EntryEditor({
   return (
     <EntryLayout
       draft={draft}
+      languageSearch={languageSearch}
       step={step}
       onStepChange={
         busy
@@ -439,38 +493,6 @@ function EntryEditor({
             />
           </Form.Item>
         </Form>
-        <div
-          hidden={step === "forms"}
-          inert={step === "forms"}
-          className="lexicon-next-selectors"
-        >
-          <section>
-            <h3>方言</h3>
-            <Radio.Group
-              disabled={busy}
-              aria-label="方言"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              options={[
-                { label: "英式英语", value: "en-GB" },
-                { label: "美式英语", value: "en-US" }
-              ]}
-            />
-          </section>
-          <section hidden={step === "forms"} inert={step === "forms"}>
-            <h3>媒介语言</h3>
-            <Radio.Group
-              disabled={busy}
-              aria-label="媒介语言文字形式"
-              value={medium}
-              onChange={(e) => setMedium(e.target.value)}
-              options={[
-                { label: "简体中文", value: "zh-Hans" },
-                { label: "繁体中文", value: "zh-Hant" }
-              ]}
-            />
-          </section>
-        </div>
         {step !== "forms" && language.common_target_locale === "en" && (
           <Checkbox
             disabled={busy}

@@ -53,7 +53,11 @@ export function decodeNextEntryView(value: unknown): NextEntryView {
 export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
   const editorOptions = {
-    headers: { "x-tsz-next-forms": "v1", "x-tsz-next-sense-groups": "v1" }
+    headers: {
+      "x-tsz-next-forms": "v1",
+      "x-tsz-next-sense-groups": "v1",
+      "x-tsz-next-medium-ownership": "v1"
+    }
   };
   const entry = (id: string) => `${root}/entries/${encodeURIComponent(id)}`;
   const decode = <T>(
@@ -122,14 +126,16 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .get<unknown>(`${root}/capabilities`, editorOptions)
         .then(decodeNextCapabilities),
     create: (input: CreateNextEntry) =>
-      http.post<unknown>(`${root}/entries`, input).then(decodeNextEntry),
+      http
+        .post<unknown>(`${root}/entries`, input, editorOptions)
+        .then(decodeNextEntry),
     detect: (input: NextDetectionInput) =>
       http
         .post<unknown>(`${root}/detections`, input)
         .then((value) => decode<NextDetection>("NextDetection", value)),
     matchEntries: (input: NextEntryMatchInput) =>
       http
-        .post<unknown>(`${root}/entry-matches`, input)
+        .post<unknown>(`${root}/entry-matches`, input, editorOptions)
         .then((value) => decode<NextEntryMatches>("NextEntryMatches", value)),
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),

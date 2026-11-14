@@ -49,6 +49,7 @@ vi.mock("@/features/dictionary/dataSource", async (importOriginal) => {
 
 const id = "00000000-0000-4000-8000-000000000001";
 const caps: NextCapabilities = {
+  medium_ownership: true,
   schema_version: 1,
   language_rules_version: "lexicon-next-en-zh-1",
   manual_drafts: true,
@@ -65,6 +66,7 @@ const caps: NextCapabilities = {
   ]
 };
 const entry: NextEntry = {
+  medium_locale: "zh-Hans",
   id,
   owner_id: "editor",
   target_language: "en",
@@ -119,6 +121,17 @@ function requests() {
     view: vi.fn()
   } satisfies LexiconNextRequests;
 }
+async function chooseLanguage(label: string) {
+  const field = label.includes("英语") ? "目标语言" : "媒介语言";
+  const select = screen.getByRole("combobox", { name: field });
+  await waitFor(() => expect(select).toBeEnabled());
+  fireEvent.mouseDown(select);
+  fireEvent.click(
+    await screen.findByText(label, {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+}
 const detachCaches: (() => void)[] = [];
 afterEach(() => {
   detachCaches.splice(0).forEach((detach) => detach());
@@ -147,12 +160,165 @@ function mount(
   );
   render(
     <QueryClientProvider client={client}>
+      <header>
+        <div id="console-header-tools" />
+      </header>
       <RouterProvider router={router} />
     </QueryClientProvider>
   );
   return { client, router };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
+
+it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词库后移除", async () => {
+  grantListPermissions();
+  const api = requests();
+  const boundEntry = { ...entry, medium_locale: "zh-Hant" };
+  api.create.mockResolvedValue(boundEntry);
+  api.get.mockResolvedValue(boundEntry);
+  const { router } = mount(api, "/lexicon-next");
+  await screen.findByRole("button", { name: "创建词条" });
+  await chooseLanguage("美式英语");
+  await chooseLanguage("繁体中文");
+  await waitFor(() =>
+    expect(api.stats).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hant"
+    })
+  );
+  fireEvent.click(button("创建词条"));
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "centre" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  await screen.findByText("版本 1");
+  const languages = within(screen.getByRole("banner"));
+  expect(
+    languages.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+  ).toHaveTextContent("美式英语");
+  expect(
+    languages.getByRole("combobox", { name: "媒介语言" }).closest(".ui-select")
+  ).toHaveTextContent("繁体中文");
+  fireEvent.click(button(/^词义与译词/));
+  expect(screen.getByRole("button", { name: "添加义项" })).toBeVisible();
+  fireEvent.click(button(/^预览/));
+  expect(
+    languages.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+  ).toHaveTextContent("美式英语");
+  expect(
+    languages.getByRole("combobox", { name: "媒介语言" }).closest(".ui-select")
+  ).toHaveTextContent("繁体中文");
+  fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
+  await screen.findByRole("button", { name: "创建词条" });
+  expect(
+    new URLSearchParams(router.state.location.search).get("target_locale")
+  ).toBe("en-US");
+  expect(
+    new URLSearchParams(router.state.location.search).get("medium_locale")
+  ).toBe("zh-Hant");
+  await act(() => router.navigate("/words"));
+  expect(screen.queryByRole("group", { name: "智能词库语言" })).toBeNull();
+});
+
+it("预览请求进行中，浏览器返回不能绕过语言锁", async () => {
+  const api = requests();
+  let finish!: (
+    value: Awaited<ReturnType<LexiconNextRequests["view"]>>
+  ) => void;
+  api.view.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    })
+  );
+  const { router } = mount(api);
+  await screen.findByText("版本 1");
+  await chooseLanguage("美式英语");
+  fireEvent.click(button(/^预览/));
+  fireEvent.click(button("查看已保存预览"));
+  await waitFor(() =>
+    expect(api.view).toHaveBeenCalledWith(id, {
+      target_locale: "en-US",
+      medium_locale: "zh-Hans"
+    })
+  );
+  await act(() => router.navigate(-1));
+  expect(
+    new URLSearchParams(router.state.location.search).get("target_locale")
+  ).toBe("en-US");
+  fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
+  await act(async () =>
+    finish({
+      entry_id: id,
+      revision: 1,
+      target_locale: "en-US",
+      medium_locale: "zh-Hans",
+      forms: [],
+      missing_forms: true,
+      senses: []
+    })
+  );
+  await screen.findByText("已保存预览 · 版本 1");
+  expect(
+    screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+  ).toHaveTextContent("美式英语");
+});
+
+it("新建中切换媒介语言清除旧范围匹配，保留输入并重新检测", async () => {
+  const api = requests();
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "centre" }
+  });
+  fireEvent.click(button("词典检测"));
+  await screen.findByRole("button", { name: "确认创建" });
+  await chooseLanguage("繁体中文");
+  expect(screen.getByLabelText("录入词条")).toHaveValue("centre");
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
+  fireEvent.click(button("词典检测"));
+  await screen.findByRole("button", { name: "确认创建" });
+  expect(api.matchEntries).toHaveBeenLastCalledWith({
+    target_language: "en",
+    medium_locale: "zh-Hant",
+    surface: "centre",
+    page: 1,
+    page_size: 20
+  });
+});
+
+it("旧API未开放归属能力时不发起词条读写", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, medium_ownership: undefined });
+  mount(api);
+  await screen.findByText("智能词库手工编辑暂不可用");
+  expect(api.get).not.toHaveBeenCalled();
+  expect(api.create).not.toHaveBeenCalled();
+});
+
+it("深链接归属不匹配时不挂载编辑器，可显式进入词条所属语言", async () => {
+  const api = requests();
+  api.get.mockResolvedValue({ ...entry, medium_locale: "zh-Hant" });
+  const { router } = mount(api);
+  await screen.findByText("该词条不属于当前媒介语言");
+  expect(screen.queryByRole("button", { name: "添加义项" })).toBeNull();
+  fireEvent.click(button("进入词条所属语言"));
+  await screen.findByText("版本 1");
+  expect(
+    new URLSearchParams(router.state.location.search).get("medium_locale")
+  ).toBe("zh-Hant");
+  fireEvent.click(button(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "unsaved deep link" }
+  });
+  await act(() => router.navigate(-1));
+  fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "unsaved deep link"
+  );
+  expect(
+    new URLSearchParams(router.state.location.search).get("medium_locale")
+  ).toBe("zh-Hant");
+});
 
 it("列表保留词条自身的非英语地区信息，不标成美式拼写", async () => {
   const api = requests();
@@ -211,16 +377,17 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保�
   expect(matches.getByText("2", { selector: "sup" })).toBeVisible();
   expect(matches.getByRole("link", { name: "继续创建" })).toHaveAttribute(
     "href",
-    `/lexicon-next/${id}`
+    `/lexicon-next/${id}?target_language=en&target_locale=en-GB&medium_locale=zh-Hans`
   );
   expect(matches.getByRole("link", { name: "查看词条" })).toHaveAttribute(
     "href",
-    `/lexicon-next/${archivedId}`
+    `/lexicon-next/${archivedId}?target_language=en&target_locale=en-GB&medium_locale=zh-Hans`
   );
   expect(
     screen.getByText("未找到内置词典匹配，可继续创建空白草稿。")
   ).toBeVisible();
   expect(api.matchEntries).toHaveBeenCalledExactlyOnceWith({
+    medium_locale: "zh-Hans",
     target_language: "en",
     surface: "center",
     page: 1,
@@ -229,6 +396,7 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保�
   fireEvent.click(button("确认创建"));
   await waitFor(() =>
     expect(api.create).toHaveBeenCalledExactlyOnceWith({
+      medium_locale: "zh-Hans",
       target_language: "en",
       kind: "word",
       headword: "center"
@@ -271,6 +439,7 @@ it("已有词条翻页只重查新版匹配，失败保留原结果并支持重�
   await waitFor(() => expect(region).toHaveFocus());
   expect(api.detect).toHaveBeenCalledTimes(1);
   expect(api.matchEntries).toHaveBeenLastCalledWith({
+    medium_locale: "zh-Hans",
     target_language: "en",
     surface: "center",
     page: 2,
@@ -347,6 +516,7 @@ it("多条词典记录平等展示，按原输入创建且不带入参考内容"
   fireEvent.click(button("确认创建"));
   await waitFor(() =>
     expect(api.create).toHaveBeenCalledExactlyOnceWith({
+      medium_locale: "zh-Hans",
       target_language: "en",
       kind: "word",
       headword: "Colour"
@@ -433,6 +603,7 @@ it("输入变化清除旧结果，短语自动识别；检测失败保留输入�
   fireEvent.click(button("确认创建"));
   await waitFor(() =>
     expect(api.create).toHaveBeenCalledExactlyOnceWith({
+      medium_locale: "zh-Hans",
       target_language: "en",
       kind: "phrase",
       headword: "give up"
@@ -484,14 +655,18 @@ it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻�
   fireEvent.click(button("词典检测"));
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await screen.findByText(/创建结果未确认/);
+  await chooseLanguage("繁体中文");
+  expect(screen.getByText(/创建结果未确认/)).toBeVisible();
+  expect(screen.getByLabelText("录入词条")).toBeDisabled();
   expect(api.create).toHaveBeenCalledExactlyOnceWith({
+    medium_locale: "zh-Hans",
     target_language: "en",
     kind: "word",
     headword: "cafe\u0301"
   });
   expect(input).toHaveValue("cafe\u0301");
   expect(input).toBeDisabled();
-  expect(button("确认创建")).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
 });
 async function edit(label: string, value: string) {
   fireEvent.click(button(label.includes("词形") ? /词性与发音/ : /词义与译词/));
@@ -519,7 +694,7 @@ beforeEach(() => {
 });
 describe("新版词库手工闭环", () => {
   it.each(["uk", "us"] as const)(
-    "账号偏好为 %s 时仍按词条已有方言打开，词条内切换不改账号偏好",
+    "账号偏好为 %s 时沿用全局语言组合，跨步骤切换不改账号偏好",
     async (dialect) => {
       useAuthStore.setState({
         profile: {
@@ -535,21 +710,28 @@ describe("新版词库手工闭环", () => {
           forms: [{ id: "us-form", locale: "en-US", text: "center" }]
         }
       });
-      mount(api);
+      mount(
+        api,
+        `/lexicon-next/${id}?target_locale=en-US&medium_locale=zh-Hans`
+      );
       await screen.findByDisplayValue("centre");
+      expect(
+        screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+      ).toHaveTextContent("美式英语");
       fireEvent.click(button(/^词义与译词/));
-      expect(screen.getByRole("radio", { name: "美式英语" })).toBeChecked();
-      fireEvent.click(screen.getByRole("radio", { name: "英式英语" }));
+      await chooseLanguage("英式英语");
       expect(useAuthStore.getState().profile?.preferences.dialect).toBe(
         dialect
       );
       fireEvent.click(button(/^词性与发音/));
       fireEvent.click(button(/^词义与译词/));
-      expect(screen.getByRole("radio", { name: "英式英语" })).toBeChecked();
+      expect(
+        screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
+      ).toHaveTextContent("英式英语");
     }
   );
 
-  it("切换四组合保留全部未保存内容和义项身份，完整保存；预览不回写本地稿", async () => {
+  it("切换目标变体保留未保存内容和义项身份，完整保存；预览不回写本地稿", async () => {
     const api = requests();
     api.get.mockResolvedValue({
       ...entry,
@@ -570,20 +752,15 @@ describe("新版词库手工闭环", () => {
     await edit("英式英语释义", "the middle");
     await edit("简体中文解释", "中心位置");
     await edit("简体中文译词", "中心");
-    fireEvent.click(screen.getByRole("radio", { name: "美式英语" }));
+    await chooseLanguage("美式英语");
     await edit("美式英语词形", "center");
     await edit("美式英语释义", "the center");
-    fireEvent.click(screen.getByRole("radio", { name: "繁体中文" }));
-    await edit("繁体中文解释", "中心位置（繁體）");
-    await edit("繁体中文译词", "中心處");
-    fireEvent.click(screen.getByRole("radio", { name: "英式英语" }));
+    await chooseLanguage("英式英语");
     fireEvent.click(button(/词性与发音/));
     expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
       "centre"
     );
     fireEvent.click(button(/词义与译词/));
-    expect(screen.getByDisplayValue("中心位置（繁體）")).toBeVisible();
-    fireEvent.click(screen.getByRole("radio", { name: "简体中文" }));
     expect(screen.getByDisplayValue("中心位置")).toBeVisible();
     fireEvent.click(button("保存完整草稿"));
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
@@ -598,7 +775,7 @@ describe("新版词库手工闭环", () => {
       saved.draft.senses[0].definitions.map(
         (row: { locale: string }) => row.locale
       )
-    ).toEqual(["en-GB", "zh-Hans", "en-US", "zh-Hant"]);
+    ).toEqual(["en-GB", "zh-Hans", "en-US"]);
     const senseId = saved.draft.senses[0].id;
     await screen.findByText("版本 2");
     fireEvent.click(button(/^预览/));
@@ -705,6 +882,15 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(button("确认创建"));
     fireEvent.click(button("确认创建"));
     await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("combobox", { name: "目标语言" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "媒介语言" })).toBeDisabled();
+    await act(() =>
+      router.navigate(
+        "/lexicon-next/new?target_locale=en-US&medium_locale=zh-Hant"
+      )
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
+    expect(router.state.location.search).toBe("");
     await act(async () => finishCreate(structuredClone(entry)));
     await screen.findByText("版本 1");
     fireEvent.click(button(/词义与译词/));
@@ -724,6 +910,8 @@ describe("新版词库手工闭环", () => {
     );
     fireEvent.click(button("保存完整草稿"));
     expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "目标语言" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "媒介语言" })).toBeDisabled();
     await act(async () =>
       finishSave({
         ...entry,
@@ -760,7 +948,7 @@ describe("新版词库手工闭环", () => {
         }
       })
     );
-    fireEvent.click(screen.getByRole("radio", { name: "美式英语" }));
+    await chooseLanguage("美式英语");
     fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
     await screen.findByRole("dialog", { name: "有未保存修改" });
     fireEvent.click(button("继续编辑"));
@@ -805,6 +993,8 @@ it.each([true, false])(
     await screen.findByText("暂无词条");
     expect(screen.getByRole("searchbox", { name: "词条" })).toHaveValue("");
     expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
       page: 1,
       page_size: 20
     });
@@ -857,6 +1047,8 @@ it("越界空页可返回有效页，并保留已应用的筛选条件", async (
   fireEvent.click(button("上一页"));
   await screen.findByText("centre");
   expect(api.workspaceList).toHaveBeenLastCalledWith({
+    target_language: "en",
+    medium_locale: "zh-Hans",
     headword: "centre",
     kind: "word",
     page: 2,
@@ -900,6 +1092,8 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
   fireEvent.click(button("搜索"));
   await waitFor(() =>
     expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
       headword: "centre",
       page: 1,
       page_size: 20
@@ -908,6 +1102,8 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
   fireEvent.click(button("第 2 页"));
   await waitFor(() =>
     expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
       headword: "centre",
       page: 2,
       page_size: 20
@@ -916,6 +1112,8 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
   await act(() => router.navigate("/lexicon-next?page_size=10"));
   await waitFor(() =>
     expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
       page: 1,
       page_size: 10
     })
@@ -978,6 +1176,8 @@ it("列表组合条件只在提交后生效，翻页保留，状态切换及移�
   );
   await screen.findByText("centre");
   expect(api.workspaceList).toHaveBeenLastCalledWith({
+    target_language: "en",
+    medium_locale: "zh-Hans",
     headword: "centre",
     gloss: "middle",
     kind: "word",
@@ -992,6 +1192,8 @@ it("列表组合条件只在提交后生效，翻页保留，状态切换及移�
   fireEvent.click(button("搜索"));
   await waitFor(() =>
     expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
       headword: "centre",
       gloss: "中心",
       kind: "word",
@@ -1038,14 +1240,7 @@ it("语言条件贯穿搜索、统计、分页、垃圾桶导航与重置", asyn
   fireEvent.click(
     await screen.findByRole("checkbox", { name: "选择「centre」" })
   );
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "媒介语言" }));
-  fireEvent.click(
-    await screen.findByText(/繁/, {
-      selector: ".ui-select-item-option-content"
-    })
-  );
-  expect(api.workspaceList).toHaveBeenCalledTimes(2);
-  fireEvent.click(button("搜索"));
+  await chooseLanguage("繁体中文");
   await waitFor(() =>
     expect(api.workspaceList).toHaveBeenLastCalledWith({
       target_language: "en",
@@ -1104,12 +1299,19 @@ it("语言条件贯穿搜索、统计、分页、垃圾桶导航与重置", asyn
   fireEvent.click(button("重置"));
   await waitFor(() =>
     expect(api.workspaceList).toHaveBeenLastCalledWith({
+      target_language: "en",
+      medium_locale: "zh-Hans",
       page: 1,
       page_size: 20
     })
   );
-  expect(api.stats).toHaveBeenLastCalledWith({});
-  expect(router.state.location.search).toBe("");
+  expect(api.stats).toHaveBeenLastCalledWith({
+    target_language: "en",
+    medium_locale: "zh-Hans"
+  });
+  expect(
+    new URLSearchParams(router.state.location.search).get("medium_locale")
+  ).toBe("zh-Hans");
 });
 
 it("批量操作冻结版本、锁住 pending，未知结果沿用同一请求重试；发布入口保持不可用", async () => {
@@ -1164,6 +1366,8 @@ it("权限与冲突不丢失选择，垃圾桶固定归档，归档词条打开�
     await screen.findByRole("checkbox", { name: "选择「centre」" })
   );
   expect(api.workspaceList).toHaveBeenLastCalledWith({
+    target_language: "en",
+    medium_locale: "zh-Hans",
     status: "archived",
     page: 1,
     page_size: 20
@@ -1389,7 +1593,13 @@ it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", a
   await screen.findByText("版本 1");
   await act(() => router.navigate("/lexicon-next"));
   await waitFor(() =>
-    expect(client.getQueryData(["admin-lexicon-next", "stats", {}])).toEqual({
+    expect(
+      client.getQueryData([
+        "admin-lexicon-next",
+        "stats",
+        { target_language: "en", medium_locale: "zh-Hans" }
+      ])
+    ).toEqual({
       total: 1,
       today: 1,
       month: 1
@@ -1449,6 +1659,8 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   const spelling = await screen.findByRole("textbox", {
     name: "词形英美通用拼写"
   });
+  expect(screen.getByRole("combobox", { name: "目标语言" })).toBeDisabled();
+  expect(screen.getByRole("combobox", { name: "媒介语言" })).toBeDisabled();
   await changeVoiceText(spelling, { target: { value: "centre" } });
   fireEvent.click(button("确认，应用到草稿"));
   expect(await formProgress.findByText("1 项")).toBeVisible();
@@ -1696,14 +1908,21 @@ it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草�
   fireEvent.click(button(/^词义与译词/));
   expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
   expect(screen.queryByRole("heading", { name: "语言变体" })).toBeNull();
-  expect(screen.getByRole("radiogroup", { name: "方言" })).toBeVisible();
+  expect(screen.queryByRole("radiogroup", { name: "方言" })).toBeNull();
   expect(
-    screen.getByRole("radiogroup", { name: "媒介语言文字形式" })
+    within(screen.getByRole("banner")).getByRole("combobox", {
+      name: "目标语言"
+    })
+  ).toBeVisible();
+  expect(
+    within(screen.getByRole("banner")).getByRole("combobox", {
+      name: "媒介语言"
+    })
   ).toBeVisible();
   expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
     "a centre"
   );
-  fireEvent.click(screen.getByRole("radio", { name: "美式英语" }));
+  await chooseLanguage("美式英语");
   fireEvent.change(screen.getByRole("textbox", { name: "美式英语释义 1" }), {
     target: { value: "the center" }
   });
@@ -1712,7 +1931,11 @@ it("Step3 移除重复词头，按方言切换编辑并保留完整多语言草�
     "the middle"
   );
   fireEvent.click(screen.getByRole("checkbox", { name: "编辑通用英语内容" }));
-  fireEvent.click(screen.getByRole("radio", { name: "繁体中文" }));
+  await chooseLanguage("繁体中文");
+  fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
+  expect(
+    screen.getByRole("combobox", { name: "媒介语言" }).closest(".ui-select")
+  ).toHaveTextContent("简体中文");
   expect(screen.getByRole("textbox", { name: "美式英语释义 1" })).toHaveValue(
     "the center"
   );

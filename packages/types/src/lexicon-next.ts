@@ -39,6 +39,7 @@ export interface NextDraft {
 }
 export interface NextEntry {
   id: string;
+  medium_locale?: string;
   target_language: string;
   kind: "word" | "phrase";
   owner_id: string;
@@ -48,6 +49,7 @@ export interface NextEntry {
 }
 export interface CreateNextEntry {
   target_language: string;
+  medium_locale: string;
   kind: "word" | "phrase";
   headword: string;
 }
@@ -71,6 +73,7 @@ export interface NextDetection {
   matches: NextDictionaryMatch[];
 }
 export interface NextEntryMatchInput extends NextDetectionInput {
+  medium_locale?: string;
   page?: number | null;
   page_size?: number | null;
 }
@@ -120,6 +123,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  medium_ownership?: boolean;
   schema_version: 1;
   language_rules_version: string;
   languages: NextLanguageCapability[];

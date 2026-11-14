@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-taxonomies-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-13T11:45:13.020Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-ownership/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-14T01:57:45.404Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -7713,6 +7713,10 @@
       "properties": {
         "headword": { "type": "string" },
         "kind": { "$ref": "#/components/schemas/NextEntryKind" },
+        "medium_locale": {
+          "type": "string",
+          "description": "Old clients default to Simplified Chinese; ownership does not change on save."
+        },
         "target_language": { "type": "string" }
       },
       "additionalProperties": false
@@ -8513,6 +8517,7 @@
       "type": "object",
       "required": ["target_language", "surface"],
       "properties": {
+        "medium_locale": { "type": ["string", "null"] },
         "page": {
           "type": ["integer", "null"],
           "format": "int32",
