@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-taxonomies-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "e6b15bad415f4db36e25b04d0e995f4f0ff087aa642b81032c5cb05a83ffe4ac",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-language-ownership/tsz-rust/docs/openapi.json",
+  "_source_sha256": "15569acea2a771ca37bfd8ea04052b74dada8fabf53948eec83ea362686576bc",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -1193,6 +1193,7 @@
       "properties": {
         "headword": { "type": "string" },
         "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "medium_locale": { "type": "string" },
         "target_language": { "type": "string" }
       },
       "additionalProperties": false
@@ -3589,6 +3590,7 @@
           "items": { "$ref": "#/$defs/NextLanguageCapability" }
         },
         "manual_drafts": { "type": "boolean" },
+        "medium_ownership": { "type": "boolean" },
         "publishing": { "type": "boolean" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
         "sense_groups": { "type": "boolean" }
@@ -3711,6 +3713,7 @@
         "draft": { "$ref": "#/$defs/NextDraft" },
         "id": { "type": "string", "format": "uuid" },
         "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "medium_locale": { "type": "string" },
         "owner_id": { "type": "string", "format": "uuid" },
         "revision": { "type": "integer" },
         "target_language": { "type": "string" },
@@ -3748,6 +3751,7 @@
       "type": "object",
       "required": ["target_language", "surface"],
       "properties": {
+        "medium_locale": { "type": ["string", "null"] },
         "page": { "type": ["integer", "null"], "minimum": 1 },
         "page_size": {
           "type": ["integer", "null"],

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useBlocker, useNavigate } from "react-router-dom";
 import {
   Alert,
   Button,
@@ -9,19 +9,27 @@ import {
   Tag,
   Typography
 } from "@tsz/ui/admin/display";
-import { Form, Input, Select } from "@tsz/ui/admin/forms";
+import { Form, Input } from "@tsz/ui/admin/forms";
 import { Search, Plus } from "lucide-react";
 import type { NextDetection, NextEntryMatches } from "@tsz/types";
+import { Modal } from "@tsz/ui/admin/overlays";
 import { usePermission } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { validateEntryInput } from "@/features/dictionary/word-creation/entryClassification";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { useLexiconLanguages } from "./LanguageSelection";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
 
 export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const navigate = useNavigate();
+  const {
+    search: languageSearch,
+    targetLanguage,
+    medium,
+    setLocked
+  } = useLexiconLanguages();
   const queryClient = useQueryClient();
   const canCreate = usePermission("words.create");
   const posLabel = usePartOfSpeechLabel();
@@ -38,6 +46,19 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const [uncertain, setUncertain] = useState(false);
   const lock = useRef(false);
   const generation = useRef(0);
+  const blocker = useBlocker(() => lock.current);
+  useEffect(() => {
+    setLocked(Boolean(busy));
+    return () => setLocked(false);
+  }, [busy, setLocked]);
+  useEffect(() => {
+    generation.current += 1;
+    setDetection(undefined);
+    setEntryMatches(undefined);
+    setExpandedGlosses(new Set());
+    if (!uncertain) setError(undefined);
+    setFieldError(undefined);
+  }, [targetLanguage, medium, uncertain]);
   useEffect(
     () => () => {
       generation.current += 1;
@@ -62,10 +83,18 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setExpandedGlosses(new Set());
     setEntryMatches(undefined);
     try {
-      const query = { target_language: "en", surface: input.normalized };
+      const query = {
+        target_language: targetLanguage,
+        surface: input.normalized
+      };
       const [result, entries] = await Promise.all([
         requests.detect(query),
-        requests.matchEntries({ ...query, page: 1, page_size: 20 })
+        requests.matchEntries({
+          ...query,
+          medium_locale: medium,
+          page: 1,
+          page_size: 20
+        })
       ]);
       if (current !== generation.current) return;
       if (
@@ -96,7 +125,8 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setError(undefined);
     try {
       const result = await requests.matchEntries({
-        target_language: "en",
+        target_language: targetLanguage,
+        medium_locale: medium,
         surface: detection.surface,
         page,
         page_size: entryMatches.pagination.page_size
@@ -121,12 +151,14 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   async function create() {
     if (lock.current || !canCreate || !detection || !entryMatches || uncertain)
       return;
+    const current = generation.current;
     lock.current = true;
     setBusy("create");
     setError(undefined);
     try {
       const entry = await requests.create({
-        target_language: "en",
+        target_language: targetLanguage,
+        medium_locale: medium,
         kind: detection.kind,
         headword: detection.surface
       });
@@ -138,7 +170,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
           })
         )
       );
-      navigate(`/lexicon-next/${entry.id}`);
+      if (current !== generation.current) return;
+      lock.current = false;
+      navigate(`/lexicon-next/${entry.id}?${languageSearch}`);
     } catch (error) {
       setUncertain(true);
       setError(
@@ -151,7 +185,21 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   }
 
   return (
-    <EntryLayout step="basics" exists={false}>
+    <EntryLayout step="basics" exists={false} languageSearch={languageSearch}>
+      <Modal
+        open={blocker.state === "blocked"}
+        title="请求尚未完成"
+        closable={false}
+        footer={
+          <Button
+            onClick={() => blocker.state === "blocked" && blocker.reset()}
+          >
+            继续编辑
+          </Button>
+        }
+      >
+        请等待当前请求完成后再离开。
+      </Modal>
       <div
         className={`lexicon-next lexicon-next-create word-basics-workflow${detection ? " is-detected" : ""}`}
       >
@@ -169,13 +217,6 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
           title={t("creation_input_and_detection")}
         >
           <Form layout="vertical" onFinish={() => void detect()}>
-            <Form.Item label={t("creation_entry_language")}>
-              <Select
-                value="en"
-                options={[{ value: "en", label: t("creation_english") }]}
-                disabled
-              />
-            </Form.Item>
             <Form.Item
               label={t("creation_entry_text")}
               validateStatus={fieldError ? "error" : undefined}
@@ -219,6 +260,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
             {entryMatches && (
               <ExistingEntryMatches
                 result={entryMatches}
+                languageSearch={languageSearch}
                 disabled={Boolean(busy) || uncertain}
                 loading={busy === "matches"}
                 onPageChange={(page) => void matchPage(page)}

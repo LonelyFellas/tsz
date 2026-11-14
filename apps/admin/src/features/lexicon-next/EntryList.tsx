@@ -24,7 +24,6 @@ import { Form } from "@tsz/ui/admin/forms";
 import { App, Dropdown, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
   NextListCommand,
-  NextLanguageCapability,
   NextWorkspaceEntry,
   NextWorkspaceQuery
 } from "@tsz/types";
@@ -52,6 +51,7 @@ import {
 import { useAdminTranslation } from "@/i18n";
 import { useAuthStore } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
+import { useLexiconLanguages } from "./LanguageSelection";
 import { localeLabels } from "./model";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
@@ -66,15 +66,19 @@ const WastebasketIcon = createLucideIcon("Wastebasket", [
 export function EntryList({
   requests,
   trashMode = false,
-  partOfSpeechCodes,
-  languages
+  partOfSpeechCodes
 }: {
   requests: LexiconNextRequests;
   trashMode?: boolean;
   partOfSpeechCodes: string[];
-  languages: NextLanguageCapability[];
 }) {
   const { t, i18n } = useLexiconListTranslation();
+  const {
+    search: languageSearch,
+    targetLanguage,
+    medium,
+    target
+  } = useLexiconLanguages();
   const { t: shell } = useAdminTranslation();
   const { message } = App.useApp();
   const actor = useAuthStore((state) => state.profile);
@@ -86,23 +90,18 @@ export function EntryList({
     () => parseWordListSearchParams(new URLSearchParams(serialized)),
     [serialized]
   );
-  const { filters, pageSize } = parsed;
+  const filters = useMemo(() => {
+    const value = { ...parsed.filters };
+    delete value.targetLanguage;
+    delete value.mediumLocale;
+    return value;
+  }, [parsed]);
+  const { pageSize } = parsed;
   const page = parsed.page <= 4294967295 ? parsed.page : 1;
   const [form] = Form.useForm<WordFilterValues>();
-  const selectedTarget = Form.useWatch("targetLanguage", form);
   const languageNames = new Intl.DisplayNames([i18n.language], {
     type: "language"
   });
-  const mediumOptions = [
-    ...new Set(
-      languages
-        .filter(
-          (language) =>
-            !selectedTarget || language.target_language === selectedTarget
-        )
-        .flatMap((language) => language.medium_locales)
-    )
-  ].map((value) => ({ value, label: languageNames.of(value) ?? value }));
   const [advancedExpanded, setAdvancedExpanded] = useState(
     Boolean(
       filters.kind ||
@@ -128,19 +127,15 @@ export function EntryList({
   );
   delete mapped.q;
   const languageQuery = {
-    ...(filters.targetLanguage
-      ? { target_language: filters.targetLanguage }
-      : {}),
-    ...(filters.mediumLocale ? { medium_locale: filters.mediumLocale } : {})
+    target_language: targetLanguage,
+    medium_locale: medium
   };
-  const languageSearch = serializeWordListSearchParams(
-    {
-      targetLanguage: filters.targetLanguage,
-      mediumLocale: filters.mediumLocale
-    },
-    1,
-    20
-  ).toString();
+  const withLanguages = (params: URLSearchParams) => {
+    new URLSearchParams(languageSearch).forEach((value, name) =>
+      params.set(name, value)
+    );
+    return params;
+  };
   const query: NextWorkspaceQuery = { ...mapped, ...languageQuery };
   const statsQuery = { ...query };
   delete statsQuery.page;
@@ -211,13 +206,7 @@ export function EntryList({
   useEffect(() => {
     setSelected({});
     setOpenActionRow(undefined);
-  }, [
-    trashMode,
-    actor?.id,
-    actor?.permission_version,
-    filters.targetLanguage,
-    filters.mediumLocale
-  ]);
+  }, [trashMode, actor?.id, actor?.permission_version, target, medium]);
   function applyFilters(values: WordFilterValues) {
     if (
       values.range?.some(Boolean) &&
@@ -226,7 +215,9 @@ export function EntryList({
       return;
     setSelected({});
     setOpenActionRow(undefined);
-    setSearch(serializeWordListSearchParams(values, 1, pageSize));
+    setSearch(
+      withLanguages(serializeWordListSearchParams(values, 1, pageSize))
+    );
   }
   function reset() {
     form.resetFields();
@@ -522,7 +513,9 @@ export function EntryList({
               type={row.status === "archived" ? "text" : "link"}
               size="small"
               className="word-list-row-action"
-              onClick={() => navigate(`/lexicon-next/${row.id}`)}
+              onClick={() =>
+                navigate(`/lexicon-next/${row.id}?${languageSearch}`)
+              }
             >
               {t(
                 row.status === "archived" || !allowed(row, "edit")
@@ -631,7 +624,7 @@ export function EntryList({
               <Button
                 type="primary"
                 icon={<PlusIcon />}
-                onClick={() => navigate("/lexicon-next/new")}
+                onClick={() => navigate(`/lexicon-next/new?${languageSearch}`)}
               >
                 {t("create")}
               </Button>
@@ -677,25 +670,6 @@ export function EntryList({
         creatorOptions={creatorOptions}
         kindLabel={kindLabel}
         posDisplayName={posDisplayName}
-        languages={{
-          targets: languages.map(({ target_language: value }) => ({
-            value,
-            label: languageNames.of(value) ?? value
-          })),
-          media: mediumOptions,
-          onTargetChange: (target) => {
-            const medium = form.getFieldValue("mediumLocale");
-            if (
-              medium &&
-              target &&
-              !languages
-                .find((language) => language.target_language === target)
-                ?.medium_locales.includes(medium)
-            ) {
-              form.setFieldValue("mediumLocale", undefined);
-            }
-          }
-        }}
       />
       <section
         className="word-list-panel word-list-results-panel"
@@ -803,10 +777,12 @@ export function EntryList({
             total={result.data?.pagination.total ?? 0}
             onPageChange={(next, size) =>
               setSearch(
-                serializeWordListSearchParams(
-                  filters,
-                  size === pageSize ? next : 1,
-                  size
+                withLanguages(
+                  serializeWordListSearchParams(
+                    filters,
+                    size === pageSize ? next : 1,
+                    size
+                  )
                 )
               )
             }

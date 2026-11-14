@@ -6,11 +6,13 @@ import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartO
 
 export function ExistingEntryMatches({
   result,
+  languageSearch,
   disabled,
   loading,
   onPageChange
 }: {
   result: NextEntryMatches;
+  languageSearch?: string;
   disabled: boolean;
   loading: boolean;
   onPageChange: (page: number) => void;
@@ -62,7 +64,7 @@ export function ExistingEntryMatches({
                     </Space>
                     <Button
                       type="link"
-                      href={`/lexicon-next/${entry.id}`}
+                      href={`/lexicon-next/${entry.id}${languageSearch ? `?${languageSearch}` : ""}`}
                       disabled={disabled}
                     >
                       {entry.status === "draft" ? "继续创建" : "查看词条"}

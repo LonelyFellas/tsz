@@ -11,6 +11,7 @@ export function EntryLayout({
   step,
   onStepChange,
   children,
+  languageSearch,
   exists = true
 }: {
   draft?: NextDraft;
@@ -18,6 +19,7 @@ export function EntryLayout({
   onStepChange?: (step: WordCreationStep) => void;
   children: ReactNode;
   exists?: boolean;
+  languageSearch?: string;
 }) {
   const senses = draft?.senses ?? [];
   const definitions = senses.flatMap((sense) => sense.definitions);
@@ -111,7 +113,7 @@ export function EntryLayout({
       currentStep={step}
       onStepChange={onStepChange}
       dictionary={{
-        path: "/lexicon-next",
+        path: `/lexicon-next${languageSearch ? `?${languageSearch}` : ""}`,
         label: "智能词库",
         back: "返回智能词库"
       }}
