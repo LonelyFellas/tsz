@@ -6,7 +6,7 @@ import {
   type ReactNode
 } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Select } from "@tsz/ui/admin/forms";
 import type { NextLanguageCapability } from "@tsz/types";
 import { localeLabels } from "./model";
@@ -33,6 +33,8 @@ export function LexiconLanguages({
   children: ReactNode;
 }) {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { entryId } = useParams();
   const [locked, setLocked] = useState(false);
   const [header, setHeader] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => {
@@ -58,7 +60,18 @@ export function LexiconLanguages({
     new URLSearchParams(search).forEach((value, name) => next.set(name, value));
     next.set(key, value);
     next.delete("page");
-    setParams(next);
+    if (
+      key === "medium_locale" &&
+      entryId &&
+      entryId !== "new" &&
+      entryId !== "trash"
+    ) {
+      const selection = new URLSearchParams(search);
+      selection.set(key, value);
+      navigate(`/lexicon-next?${selection}`);
+    } else {
+      setParams(next);
+    }
   };
   const selectors = (
     <div

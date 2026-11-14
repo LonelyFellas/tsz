@@ -112,6 +112,13 @@ describe("lexicon-next authoritative wire contract", () => {
     await api.capabilities();
     const request = vi.mocked(globalThis.fetch).mock.calls[0]![1];
     expect(new Headers(request?.headers).get("x-tsz-next-forms")).toBe("v1");
+    expect(
+      new Headers(request?.headers).get("x-tsz-next-medium-ownership")
+    ).toBe("v1");
+    expect(
+      decodeNextEntry({ ...entry, medium_locale: "zh-Hant" }).medium_locale
+    ).toBe("zh-Hant");
+    expect(() => decodeNextEntry({ ...entry, medium_locale: null })).toThrow();
   });
   it("已有词条匹配使用新版分页端点和严格响应，不回退 V1", async () => {
     const page = {
@@ -212,6 +219,7 @@ describe("lexicon-next authoritative wire contract", () => {
     const created = client(entry);
     await created.api.create({
       target_language: "en",
+      medium_locale: "zh-Hans",
       kind: "word",
       headword: "centre"
     });

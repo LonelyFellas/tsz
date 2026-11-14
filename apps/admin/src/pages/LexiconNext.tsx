@@ -6,7 +6,12 @@ import {
   useState
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useBeforeUnload, useBlocker, useParams } from "react-router-dom";
+import {
+  useBeforeUnload,
+  useBlocker,
+  useNavigate,
+  useParams
+} from "react-router-dom";
 import {
   Alert,
   Button,
@@ -80,6 +85,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
   );
   const supported =
     capability.data?.manual_drafts &&
+    capability.data.medium_ownership === true &&
     language &&
     ["en-GB", "en-US"].every((locale) =>
       language.target_locales.includes(locale)
@@ -99,7 +105,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
           description={
             capability.error
               ? failure(capability.error)
-              : "当前服务尚未开放英语与中文草稿。"
+              : "当前服务尚未开放按媒介语言归属的英语草稿。"
           }
           action={
             <Button onClick={() => void capability.refetch()}>重新检查</Button>
@@ -150,6 +156,8 @@ function EntryLoader({
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
 }) {
+  const { medium, search: languageSearch } = useLexiconLanguages();
+  const navigate = useNavigate();
   const query = useQuery({
     queryKey: ["admin-lexicon-next", "entry", id],
     queryFn: () => requests.get(id),
@@ -191,6 +199,26 @@ function EntryLoader({
     );
   if (query.data.target_language !== "en")
     return <Alert type="warning" title="当前编辑器尚未开放此目标语言" />;
+  if (query.data.medium_locale !== medium) {
+    const selection = new URLSearchParams(languageSearch);
+    if (query.data.medium_locale)
+      selection.set("medium_locale", query.data.medium_locale);
+    return (
+      <Alert
+        type="warning"
+        title="该词条不属于当前媒介语言"
+        action={
+          query.data.medium_locale && (
+            <Button
+              onClick={() => navigate(`/lexicon-next/${id}?${selection}`)}
+            >
+              进入词条所属语言
+            </Button>
+          )
+        }
+      />
+    );
+  }
   return (
     <EntryEditor
       initial={query.data}
@@ -267,8 +295,9 @@ function EntryEditor({
   }, [busy, formContentOpen, setLocked]);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     return (
-      currentLocation.pathname !== nextLocation.pathname &&
-      (dirty || busy || formContentOpen)
+      busy ||
+      formContentOpen ||
+      (dirty && currentLocation.pathname !== nextLocation.pathname)
     );
   });
   useBeforeUnload((event) => {
