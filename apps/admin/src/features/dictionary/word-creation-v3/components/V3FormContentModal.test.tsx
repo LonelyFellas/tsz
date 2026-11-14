@@ -1312,7 +1312,7 @@ it("音频生成失败后停止应用按钮的 loading，保留输入和弹窗",
   expect(onConfirm).not.toHaveBeenCalled();
 });
 
-it("指定共享标签独立编辑保留内容、引用身份与其他绑定，不能用移除标签替代", async () => {
+it("共享标签只提供删除和新增，修改内容仍应用到全部共享标签", async () => {
   const expanded = formsFixture({
     forms: [
       commonFormFixture(),
@@ -1323,11 +1323,10 @@ it("指定共享标签独立编辑保留内容、引用身份与其他绑定，�
     { forms_format: "shared_v1", contents: [], pos: [] },
     expanded
   ) as SharedFormsStepContentV3;
-  const selected = original.pos[0]!.forms[1]!;
   const shared = assignSharedFormContent(
     original,
     original.contents[0]!.id,
-    selected.id,
+    original.pos[0]!.forms[1]!.id,
     createStableVariantIdFactory(expanded, [])
   );
   const { onConfirm } = setup({
@@ -1338,16 +1337,25 @@ it("指定共享标签独立编辑保留内容、引用身份与其他绑定，�
     }
   });
   const dialog = screen.getByRole("dialog");
-  const actions = within(dialog).getAllByRole("button", { name: /^独立编辑/ });
-  expect(actions).toHaveLength(2);
-  fireEvent.click(actions[1]!);
+  expect(
+    within(dialog).queryByRole("button", { name: /^独立编辑/ })
+  ).not.toBeInTheDocument();
+  expect(
+    within(dialog).getAllByRole("button", { name: /^移除.*标签$/ })
+  ).toHaveLength(2);
+  expect(
+    within(dialog).getByRole("button", { name: "新增标签" })
+  ).toBeEnabled();
+  fireEvent.change(screen.getByLabelText("内容拼写"), {
+    target: { value: "shared edit" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
   await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
   const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
-  expect(expandFormContents(next)).toEqual(expandFormContents(shared));
-  expect(next.pos[0]!.forms[0]).toEqual(shared.pos[0]!.forms[0]);
-  expect(next.pos[0]!.forms[1]!.id).toBe(selected.id);
-  expect(next.pos[0]!.forms[1]!.content_id).not.toBe(
-    next.pos[0]!.forms[0]!.content_id
-  );
-  expect(next.pos[0]!.form_groups).toEqual(shared.pos[0]!.form_groups);
+  expect(next.pos).toEqual(shared.pos);
+  expect(next.contents).toHaveLength(1);
+  for (const form of expandFormContents(next).pos[0]!.forms)
+    expect(primaryRegionalVariant(form.regional_variants, "uk").spelling).toBe(
+      "shared edit"
+    );
 });
