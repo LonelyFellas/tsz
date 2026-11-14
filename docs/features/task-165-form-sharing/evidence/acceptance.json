@@ -1,0 +1,83 @@
+{
+  "run_id": "task165-b3-20261114",
+  "scope": "local implementation and acceptance only",
+  "versions": {
+    "frontend_head": "a1bfa3fe818d5bff90bfc0a81062fa7a707afa54 + task diff",
+    "backend_head": "863d8d1ea911bd41daefa9462b7a41dcc4a5714a + task diff + reused 56f2b85 patch",
+    "backend_binary_sha256": "c93e4bf97007d2f2294d306bdfa6238e5fe4b3a4b3316991ed7e49277c98f026",
+    "openapi_sha256": "b620cee8b93dcdaa211457bb4149af85625d3281c52dfd07702d6cf4d17a61cc",
+    "frontend_source_diff_sha256": "125171249474a05308b4ee96e1515d5639eaaa98fc9956434e6bafe0bb7cd43f",
+    "frontend_source_diff_files": 24,
+    "backend_source_diff_sha256": "8f35795cb17abe7e840e6949affbba35d42d4679a7f7825fc4b55209cc4d2890",
+    "backend_source_diff_files": 32
+  },
+  "environment": {
+    "admin": "http://127.0.0.1:49551",
+    "api": "http://127.0.0.1:49550",
+    "postgres": "127.0.0.1:49548/task165_b3",
+    "redis": "127.0.0.1:49549/0",
+    "mock": false,
+    "audio_generation": false,
+    "launch_mode": "explicit Vite dev same-origin proxy; separate production build passed"
+  },
+  "readbacks": [
+    {
+      "component": "next",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1d7fe-6b2a-75a3-b81d-269d67feb4c5",
+      "status": 200,
+      "revision": 6,
+      "request_id": "01a1d808-46f3-733e-82fa-555d59a180ae",
+      "stable_public_references": true,
+      "original_contents_preserved": true
+    },
+    {
+      "component": "old",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/entries/01a1d801-6e0d-7074-9a5d-0a79dddd79f8",
+      "status": 200,
+      "revision": 6,
+      "request_id": "01a1d808-46f6-7224-aa90-a685b5bd7af6",
+      "stable_public_references": true,
+      "original_contents_preserved": true
+    }
+  ],
+  "verified": {
+    "configuration_changed_persisted_and_reopened": true,
+    "configuration_conflict_preserves_local_input_and_requires_explicit_reload": true,
+    "new_and_legacy_creation_and_add_pos": true,
+    "dictionary_distinct_ipa_preserved": true,
+    "disabled_third_person_singular_not_recreated": true,
+    "only_first_default_group_shared": true,
+    "historical_reopen_preserves_split": true,
+    "ordinary_edit_forms_permission_does_not_allow_template_put": true,
+    "desktop_1440_and_narrow_1050_visual": true
+  },
+  "checks": {
+    "api_client": "728 passed / 40 files",
+    "admin_affected": "327 passed / 10 files",
+    "legacy_shared_forms_integration": "21 passed",
+    "lexicon_next_integration": "21 passed including medium ownership up/down",
+    "backend_fmt_clippy": "passed",
+    "frontend_affected_type_lint_prettier": "passed; second-batch evidence reused and changed API canary rechecked",
+    "admin_ui": "44 styles and 4 tests passed",
+    "frontend_workspace_typecheck": "all 7 executable package typechecks passed",
+    "admin_production_build": "passed after final OpenAPI synchronization, mock disabled"
+  },
+  "compatibility": {
+    "actual_http_payloads_baseline_and_candidate_decoders": "3 payloads each accepted",
+    "new_frontend_old_catalog": "component regression proves unsupported fallback and no new management path call",
+    "old_binary_with_new_migration_ledger": "not run; default SQLx migrator rejects missing migration version, direct rollback unsafe"
+  },
+  "not_run": [
+    "full PR/main CI",
+    "commit",
+    "push",
+    "PR",
+    "merge",
+    "deploy",
+    "actual old deployed binaries with candidate schema",
+    "OSS synthesis and upload (not needed)"
+  ],
+  "cleanup": "complete; see cleanup.json"
+}

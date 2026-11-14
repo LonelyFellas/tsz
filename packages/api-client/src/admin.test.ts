@@ -1831,3 +1831,28 @@ describe("createAdminEndpoints — dashboard", () => {
     ).resolves.toEqual(overview);
   });
 });
+
+it("默认共享模板以稳定目录 ID 整体 PUT，携带并发版本", () => {
+  const api = createAdminEndpoints(http).partOfSpeechSettings;
+  const input = {
+    base_revision: 3,
+    groups: [
+      {
+        id: "group-id",
+        members: [
+          { part_of_speech_id: "noun-id", form_type_id: "base-id" },
+          { part_of_speech_id: "verb-id", form_type_id: "base-id" }
+        ]
+      }
+    ]
+  };
+  api.getFormSharing();
+  api.updateFormSharing(input);
+  expect(http.get).toHaveBeenCalledWith(
+    "/settings/parts-of-speech/form-sharing"
+  );
+  expect(http.put).toHaveBeenCalledWith(
+    "/settings/parts-of-speech/form-sharing",
+    input
+  );
+});

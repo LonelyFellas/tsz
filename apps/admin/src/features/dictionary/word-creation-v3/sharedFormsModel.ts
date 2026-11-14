@@ -732,4 +732,54 @@ export function sharedContentForForm(
     : undefined;
 }
 
+/** Copy slots, keep every public binding identity and all other labels unchanged. */
+export function detachSharedFormContent(
+  forms: SharedFormsStepContentV3,
+  formId: string,
+  idFactory = newWordNodeId
+): SharedFormsStepContentV3 {
+  const source = sharedContentForForm(forms, formId);
+  if (!source) throw new LocalLexiconError("local_form_missing");
+  if (
+    forms.pos
+      .flatMap((pos) => pos.forms)
+      .filter((row) => row.content_id === source.id).length < 2
+  )
+    return forms;
+  const next = structuredClone(forms);
+  const copied = structuredClone(source);
+  const ids = new Map<string, string>();
+  const copyId = (id: string) => {
+    const value = ids.get(id) ?? idFactory();
+    ids.set(id, value);
+    return value;
+  };
+  copied.id = copyId(source.id);
+  for (const variant of regionalVariants(copied.regional_variants)) {
+    variant.id = copyId(variant.id);
+    for (const row of variant.pronunciations) row.id = copyId(row.id);
+  }
+  for (const mapping of copied.pronunciation_slots ?? []) {
+    mapping.id = copyId(mapping.id);
+    for (const side of ["common", "uk", "us"] as const) {
+      const slot = mapping[side];
+      if (slot) {
+        slot.id = copyId(slot.id);
+        slot.variant_slot_id = copyId(slot.variant_slot_id);
+      }
+    }
+  }
+  const binding = next.pos
+    .flatMap((pos) => pos.forms)
+    .find((row) => row.id === formId)!;
+  binding.content_id = copied.id;
+  for (const variant of regionalVariants(binding.regional_bindings)) {
+    variant.content_slot_id = copyId(variant.content_slot_id);
+    for (const row of variant.pronunciations)
+      row.content_slot_id = copyId(row.content_slot_id);
+  }
+  next.contents.push(copied);
+  return next;
+}
+
 export { expandFormContents, isSharedForms };

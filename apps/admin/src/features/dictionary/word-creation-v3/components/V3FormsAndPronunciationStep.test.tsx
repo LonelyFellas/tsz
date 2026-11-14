@@ -3953,3 +3953,53 @@ it("词形浮窗打开和收起时背景只供参考，关闭后恢复编辑", a
   expect(edit).toBeEnabled();
   expect(edit).toHaveFocus();
 });
+
+it("共享编辑器新增词性只对本次新增标签应用 catalog 模板", async () => {
+  const catalog = structuredClone(partOfSpeechCatalogFixture);
+  const noun = catalog.items.find((row) => row.code === "noun")!;
+  const verb = catalog.items.find((row) => row.code === "verb")!;
+  catalog.form_sharing = {
+    revision: 1,
+    groups: [
+      {
+        id: "base-sharing",
+        members: [noun, verb].map((row) => ({
+          part_of_speech_id: row.id,
+          form_type_id: "form-type-base"
+        }))
+      }
+    ]
+  };
+  catalogState.data = catalog;
+  const forms = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    formsFixture({ forms: [commonFormFixture({ spelling: "saved" })] })
+  ) as SharedFormsStepContentV3;
+  const onSharedFormsChange = vi.fn();
+  const onChange = vi.fn();
+  render(
+    <FeedbackApp>
+      <V3FormsAndPronunciationStep
+        value={expandFormContents(forms)}
+        sharedForms={forms}
+        onSharedFormsChange={onSharedFormsChange}
+        onChange={onChange}
+      />
+    </FeedbackApp>
+  );
+  await waitFor(() =>
+    expect(screen.getAllByLabelText("添加基本词性")[0]!).not.toBeDisabled()
+  );
+  chooseOption("添加基本词性", "动词");
+  expect(onSharedFormsChange).toHaveBeenCalledOnce();
+  expect(onChange).not.toHaveBeenCalled();
+  const next = onSharedFormsChange.mock
+    .calls[0]![0] as SharedFormsStepContentV3;
+  expect(next.pos[0]).toEqual(forms.pos[0]);
+  expect(next.contents.find((row) => row.id === forms.contents[0]!.id)).toEqual(
+    forms.contents[0]
+  );
+  expect(
+    next.pos[1]!.forms.find((row) => row.form_type === "base")!.content_id
+  ).toBe(forms.pos[0]!.forms[0]!.content_id);
+});

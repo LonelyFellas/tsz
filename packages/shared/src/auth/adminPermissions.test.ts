@@ -276,13 +276,14 @@ it.each(["visibility", "recommend", "delete"])(
   }
 );
 
-it("教师材料和三类配置分别授权，废弃权限无效", () => {
+it("教师材料和各类配置分别授权，废弃权限无效", () => {
   const split = [
     "teacherapply.read_certificates",
     "teacherapply.read_identity",
     "lexicon_settings.edit_basic",
     "lexicon_settings.edit_sub",
     "lexicon_settings.edit_forms",
+    "lexicon_settings.edit_form_sharing",
     "lexicon_settings.delete"
   ];
   for (const granted of split) {

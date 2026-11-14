@@ -94,10 +94,32 @@ export interface PartOfSpeechCatalogItem {
 }
 
 export interface PartOfSpeechCatalogResponse {
+  /** 旧服务缺省；只在创建/新增词性时消费，不回写历史草稿。 */
+  form_sharing?: FormSharingTemplate;
   /** Absent only when connected to a pre-catalog backend. */
   form_types?: FormTypeCatalogItem[];
   catalog_version: number;
   items: PartOfSpeechCatalogItem[];
+}
+
+export interface FormSharingMember {
+  part_of_speech_id: string;
+  form_type_id: string;
+}
+
+export interface FormSharingGroup {
+  id: string;
+  members: FormSharingMember[];
+}
+
+export interface FormSharingTemplate {
+  revision: number;
+  groups: FormSharingGroup[];
+}
+
+export interface UpdateFormSharingTemplate {
+  base_revision: number;
+  groups: FormSharingGroup[];
 }
 
 export interface PartOfSpeechConfigListQuery {

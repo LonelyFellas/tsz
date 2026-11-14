@@ -8,6 +8,7 @@ import {
 import { AdminTable as Table } from "@/components/AdminTable";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import { useIsSuperAdmin, usePermission } from "@/lib/auth";
+import { FormSharingSettings } from "./FormSharingSettings";
 import { FormTypeSettings } from "./FormTypeSettings";
 import { PlusIcon, RotateCwIcon, SearchIcon } from "lucide-react";
 import {
@@ -68,6 +69,17 @@ export function errorMessage(
   t: ContentTranslation = defaultContentTranslation
 ): string {
   if (error instanceof HttpError) {
+    if (
+      (error.code === "form_type_in_use" ||
+        error.code === "part_of_speech_in_use") &&
+      error.problem?.field === "form_sharing"
+    )
+      return t("sharing_remove_reference");
+    if (
+      error.code === "form_type_in_use" &&
+      error.problem?.field === "part_of_speech_id"
+    )
+      return t("sharing_reparent_blocked");
     if (error.code === "form_type_conflict")
       return conflictMessage(t("form_type"), error.problem?.field, t);
     if (error.code === "form_type_in_use") return t("form_in_use");
@@ -111,9 +123,9 @@ export function PartOfSpeechSettings() {
   const [pageSize, setPageSize] = useState(10);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PartOfSpeechConfig>();
-  const [activeTab, setActiveTab] = useState<"basic" | "detailed" | "forms">(
-    "basic"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "basic" | "detailed" | "forms" | "sharing"
+  >("basic");
   // 单词与短语共用这一套配置界面，只是各看各的一侧；短语没有词形变化。
   const [kind, setKind] = useState<AdminWordKind>("word");
   const [selectedPartId, setSelectedPartId] = useState("");
@@ -140,7 +152,9 @@ export function PartOfSpeechSettings() {
     setSelectedPartId("");
     // 短语没有词形变化，停在那个 Tab 上会看到一片和当前分页无关的内容。
     setActiveTab((current) =>
-      next === "phrase" && current === "forms" ? "basic" : current
+      next === "phrase" && (current === "forms" || current === "sharing")
+        ? "basic"
+        : current
     );
   };
   // 空串表示「全部」：面板并排展示所有词性的细分词性；新增时在弹窗里选所属词性。
@@ -297,18 +311,25 @@ export function PartOfSpeechSettings() {
       <Segmented
         aria-label={t("settings_section")}
         value={activeTab}
-        onChange={(key) => setActiveTab(key as "basic" | "detailed" | "forms")}
+        onChange={(key) =>
+          setActiveTab(key as "basic" | "detailed" | "forms" | "sharing")
+        }
         style={{ alignSelf: "flex-start" }}
         options={[
           { value: "basic", label: t("basic_parts") },
           { value: "detailed", label: t("sub_parts") },
           ...(kind === "phrase"
             ? []
-            : [{ value: "forms", label: t("form_types") }])
+            : [
+                { value: "forms", label: t("form_types") },
+                { value: "sharing", label: t("sharing_title") }
+              ])
         ]}
       />
 
-      {activeTab === "forms" && kind === "word" ? (
+      {activeTab === "sharing" && kind === "word" ? (
+        <FormSharingSettings />
+      ) : activeTab === "forms" && kind === "word" ? (
         <FormTypeSettings />
       ) : activeTab === "basic" ? (
         <>

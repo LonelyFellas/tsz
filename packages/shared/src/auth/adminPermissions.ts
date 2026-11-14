@@ -46,6 +46,7 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "lexicon_settings.edit_basic": ["lexicon_settings.access"],
   "lexicon_settings.edit_sub": ["lexicon_settings.access"],
   "lexicon_settings.edit_forms": ["lexicon_settings.access"],
+  "lexicon_settings.edit_form_sharing": ["lexicon_settings.access"],
   "lexicon_settings.edit_taxonomies": ["lexicon_settings.access"],
   "lexicon_settings.delete": ["lexicon_settings.access"],
   "speech.upload_audio": [],
