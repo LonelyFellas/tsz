@@ -115,7 +115,7 @@ up/down 不回写词条、历史草稿或已有共享内容/绑定，不修改�
 
 ## 当前阶段
 
-**本地实施、真实联调和清理已完成；当前进入前端 PR 交付。** 后端 PR #410 已提交并冻结契约，最新 head CI 由后端聊天跟进；前端与唯一主记录由前端交付聊天持有写入权，正执行正常 hooks、精确提交独立审查、PR 和完整 CI。合并和部署未授权。
+**前后端业务提交的 PR、独立审查与完整 CI 均已通过。** 前端 PR #784、后端 PR #410 均保持打开，未合并或部署。当前仅补齐本文档交付回执；文档提交仍执行正常 hooks、增量审查与最新 head CI，最终结果以 PR 最新检查及交付回复为准。
 
 ## 跨批依赖（第三批已解决，保留发现依据）
 
@@ -210,7 +210,7 @@ up/down 不回写词条、历史草稿或已有共享内容/绑定，不修改�
 
 两仓工作树及未提交变更保留；没有 commit、push、PR、CI、合并或部署。全仓 PR/main 运行时 CI、真实已部署版本组合、OSS 合成/上传均未执行，不在本地验收结论内。**本任务约定的本地实施与验证终点已完成，第三批释放两仓和唯一主记录写入权。**
 
-## 后端 PR 交付（最新 CI 进行中）
+## 后端 PR 交付（已完成）
 
 本轮复用原后端任务工作树及分支；后端源码继续由后端交付批持有写入权，主记录现已交给前端交付聊天（见本节交接声明），未操作前端源码/生成物。已 fetch 并快进到主线 `56f2b85e0cd1f457ff1b570c4f64a83646c0d468`；第三批复制的所属语言补丁逐文件与主线核实一致，已消除重复差异。本任务源码及最终 spec 的接管内容均保留。
 
@@ -231,9 +231,9 @@ up/down 不回写词条、历史草稿或已有共享内容/绑定，不修改�
 
 ### 最新 CI 与清理
 
-最新 CI：[43553767720](https://github.com/LonelyFellas/tsz-rust/actions/runs/43553767720)，**attempt 1**，已核实 run 的 `head_sha` 为 `78f4c7010cb4269b178a8876882fb88e8c171c57`。当前运行中；已通过 Dependency audit、Quality checks、Quality、Unit and doc tests，7 个集成分片执行中，尚无本轮失败。待该 head 完整检查结束。PR 事件的发布制品构建/验证按原条件跳过，不冒称完成发布验收。
+最新 CI：[43553767720](https://github.com/LonelyFellas/tsz-rust/actions/runs/43553767720)，**attempt 1**，已核实 run 的 `head_sha` 为 `78f4c7010cb4269b178a8876882fb88e8c171c57`。已完成，结论 **success**；15 个任务成功，包含全部7个集成分片、单元/文档测试、质量门及最终汇总。PR 事件的发布制品构建/验证按原条件跳过，不冒称完成发布验收。
 
-本轮专用资源已完整清理：第一组 PG/fixture 数据库、Redis 的 60 个本批测试键随独占实例及目录删除移除，63147/63148 无监听；第二组 PG 的 helper template/probes 已由原 helper 清理，admin_profile 临时库已自动移除，专属 fixture 库随后删除，集群仅余系统库后停止，53579 无监听。两组数据/日志/临时 manifest、symlink、源码保护备份和登记均删除，未使用 FLUSHDB/FLUSHALL；原工作树/源码/缓存完整，无 OSS 对象。后端工作区干净。后端最终 CI 结果由本聊天及后端 PR 继续记录；本批不再写入此主记录，前端交付聊天可从最终后端结果补记。
+本轮专用资源已完整清理：第一组 PG/fixture 数据库、Redis 的 60 个本批测试键随独占实例及目录删除移除，63147/63148 无监听；第二组 PG 的 helper template/probes 已由原 helper 清理，admin_profile 临时库已自动移除，专属 fixture 库随后删除，集群仅余系统库后停止，53579 无监听。两组数据/日志/临时 manifest、symlink、源码保护备份和登记均删除，未使用 FLUSHDB/FLUSHALL；原工作树/源码/缓存完整，无 OSS 对象。后端工作区干净。后端最终 CI 已通过，后端聊天已释放源码写入权；前端交付聊天只读核实最终结果后在本记录补齐。
 
 **后端交付契约已冻结，主记录写入权交给前端交付聊天。** 后端 PR #410 的 head `78f4c7010cb4269b178a8876882fb88e8c171c57`、base `56f2b85e0cd1f457ff1b570c4f64a83646c0d468`、3 轮审查与最新 CI `43553767720` attempt 1 已完整交接；OpenAPI SHA-256 仍为 `b620cee8b93dcdaa211457bb4149af85625d3281c52dfd07702d6cf4d17a61cc`。前端可以据此并行提交/审查/PR，无需等待后端 CI。后端源码写入权继续由后端交付聊天持有，只在该聊天和后端 PR 跟进最新 head CI 全绿；若需改契约，会先在该聊天即时说明，由协调聊天安排。后端本回合不再修改此主记录。未合并、未部署。
 
@@ -245,3 +245,15 @@ up/down 不回写词条、历史草稿或已有共享内容/绑定，不修改�
 - 真实页面验收与清理复用第三批精确输入证据；该证据的历史 `not_run` 字段保留当时事实，PR/CI当前进展以本节为准。脱敏后端关联日志仅含method/route/status/request_id，已核实并将显式暂存通用 `*.log` 忽略的此单个文件，保证证据链接完整。
 - 快进主线后补跑 `pnpm --filter @tsz/api-client test`：40 文件/728 项通过；Admin 的本任务7个文件，加最新主线直接相关语音/新版入口4个文件，合计11文件/403项通过（`pnpm --filter @tsz/admin exec vitest run` 显式文件列表）。没有新增失败，既有 jsdom pseudo-elements 提示不影响退出码。
 - 审查与最终CI状态在后续结果中补齐。仅提交、推送、开PR并跟进CI；未合并或部署。
+
+### 前端精确提交审查与 CI 回执
+
+- 前端 [PR #784](https://github.com/LonelyFellas/tsz/pull/784)，base `f55a99db70679dfeeeaa0cb6419b4a29c15e1f05`，业务 head `a2733440c6d7553957080c4cff3e5ab3ca9d4c9d`；PR 可合并、未开启自动合并。实现提交 `e65224dcf163ebcb4cbdb80bf72067a215f4c0bf` 与修复提交 `a2733440…4c9d` 均已正常提交、推送。
+- 独立 reviewer `/root/frontend_ship_review` 的业务审查共 **2轮**，确认 **1个P2、已修复，未解决0、已报告误报0；关联回归/回退未知**。初审覆盖 `f55a99db..e65224dc` 的完整34文件及直接调用链/四张截图；第2轮覆盖 `e65224dc..a2733440` 和原问题，未变范围复用初审。没有让 reviewer 重跑全量门，没有以自审替代独立门。
+- 初审确认：模板页用 query 缓存值初始化后不再接受新 GET；显式 reload 未更新缓存，离开重入可再次回到旧 revision。新增回归在旧实现实际失败2项（界面仍显示旧组、保存继续传 base_revision=2 而不是3）；已有本地编辑后台刷新场景旧实现通过。最小修复以本地 draft 覆盖 query 数据：干净时跟随服务器，首次编辑/提交固定内容及 revision；保存/reload 成功写回缓存，显式 reload 取消旧在途查询避免迟到响应回滚。配置相关两文件45项通过，含缓存重入、409恢复重入、旧请求迟到、后台 GET 不覆盖脏输入；没有放宽原断言。
+- 所有实现/修复提交正常执行 pre-commit 的 Prettier/分包 ESLint 与 commit-msg；实际 pre-push 的 `pnpm typecheck` 全7个可执行包通过（按原生 Turbo 输入复用有效缓存），没有跳过 hooks 或 force push。修复未改变 API、共享内容算法或持久化协议；真实浏览器证据仍归属于第三批精确输入，本轮新增缓存行为由组件回归证明，不冒称每个新 SHA 均重新做完整页面验收。
+- 前端业务 head **`a2733440c6d7553957080c4cff3e5ab3ca9d4c9d`** 的 [CI run 43554933715](https://github.com/LonelyFellas/tsz/actions/runs/43554933715)，**attempt1，completed/success，10个任务全部success**。具体包括 quality（lint/typecheck/format/生产build）、tooling-tests、commitlint、packages/web/admin-1/admin-2/admin-3 五个覆盖率分片、coverage-merge（每测试文件恰执行一次）及 verify。PR 不生成 main 发布制品，也未部署。
+- 后端最终 [PR #410](https://github.com/LonelyFellas/tsz-rust/pull/410)，head **`78f4c7010cb4269b178a8876882fb88e8c171c57`**、base `56f2b85e0cd1f457ff1b570c4f64a83646c0d468`，精确 [CI run 43553767720](https://github.com/LonelyFellas/tsz-rust/actions/runs/43553767720)，**attempt1，completed/success，15 success，2个发布制品任务按PR条件skipped**。后端3轮审查的1个P2及2处CI配套遗漏均已处理，未解决0。该结果已由前端交付聊天独立读取 GitHub 核实；后端已释放源码写入权，OpenAPI摘要保持不变，专属资源清理完成。
+- 两仓 PR 互相关联并复用此唯一主记录。未来发布仍须核实已部署版本、迁移与回退；实际旧部署二进制启动/回退、OSS合成/上传未验证，限制保持。用户仅授权提交/推送/PR/CI，未合并、部署或扩大数据操作范围。
+
+本文档回执是上述业务 CI 成功后的唯一追加变更，不包含运行时代码；它继续由同一 reviewer 做增量复查并走正常 hooks/完整 CI。**前端最终 head、该文档提交的精确成功 run/attempt 与总审查轮次在 [PR #784正文及最新检查](https://github.com/LonelyFellas/tsz/pull/784) 和最终交付回复记录**，避免把旧 head 的成功冒认为新 head 已通过。验证完成前保持本聊天持有前端及主记录写入权；完成后在交付回复明确释放，两仓变更均不自动合并或部署。
