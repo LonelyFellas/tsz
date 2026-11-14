@@ -81,7 +81,7 @@ beforeEach(() => {
     }));
 });
 function setup(
-  source: "ipa" | "ups" | "spelling",
+  source: "ipa" | "ups" | "spelling" | undefined,
   emptySides: readonly ("uk" | "us")[] = [],
   distinguish = false
 ) {
@@ -92,12 +92,12 @@ function setup(
       ups: "",
       use_spelling: false,
       uk: {
-        source,
+        ...(source ? { source } : {}),
         ipa: emptySides.includes("uk") ? "" : "sentə",
         ups: emptySides.includes("uk") ? "" : "S EH N T AX"
       },
       us: {
-        source,
+        ...(source ? { source } : {}),
         ipa: emptySides.includes("us") ? "" : "sentɚ",
         ups: emptySides.includes("us") ? "" : "S EH N T ER"
       }
@@ -172,6 +172,25 @@ it.each([
           (voice) => voice.locale === (side === "uk" ? "en-GB" : "en-US")
         )!.audio_asset_id
       ).toBe(`formal-${side === "uk" ? "en-GB" : "en-US"}`);
+    }
+  }
+);
+
+it.each([
+  { emptySides: [] },
+  { emptySides: ["uk"] },
+  { emptySides: ["uk", "us"] }
+] as const)(
+  "默认 IPA 首次应用只生成已填口音，空侧 $emptySides 跳过且不生成拼写语音",
+  async ({ emptySides }) => {
+    const { confirmed } = setup(undefined, emptySides);
+    await act(async () => {});
+    expect(speech.generate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    await waitFor(() => expect(confirmed).toHaveBeenCalledOnce());
+    expect(speech.generate).toHaveBeenCalledTimes(2 - emptySides.length);
+    for (const [input] of speech.generate.mock.calls) {
+      expect(input.source).toMatchObject({ kind: "phoneme", alphabet: "ipa" });
     }
   }
 );

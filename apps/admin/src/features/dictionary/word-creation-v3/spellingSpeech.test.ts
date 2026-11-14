@@ -41,7 +41,42 @@ it("拼写任务聚合所有共享读法的活动口音并保留旧协议资产�
     spellingAudioScope([
       { dialect: "common", pronunciations: [pronunciationFixture()] }
     ])
-  ).toEqual({ activeLocales: undefined, requiredLocales: [] });
+  ).toEqual({ activeLocales: [], requiredLocales: [] });
+});
+
+it("隐式 IPA/UPS 不启用拼写，旧拼写配置和单侧来源仍按当前口音聚合", () => {
+  const row = pronunciationFixture({
+    synthesis: {
+      alphabet: "ups",
+      use_spelling: false,
+      ipa: "",
+      ups: "",
+      uk: { ipa: "", ups: "" },
+      us: { ipa: "", ups: "" }
+    }
+  });
+  const scope = () =>
+    spellingAudioScope([{ dialect: "common", pronunciations: [row] }]);
+  expect(scope()).toEqual({ activeLocales: [], requiredLocales: [] });
+  row.synthesis!.use_spelling = true;
+  expect(scope()).toEqual({
+    activeLocales: ["en-GB", "en-US"],
+    requiredLocales: []
+  });
+  row.synthesis!.uk!.source = "ipa";
+  expect(scope()).toEqual({ activeLocales: ["en-US"], requiredLocales: [] });
+  row.synthesis!.us!.source = "spelling";
+  expect(scope()).toEqual({
+    activeLocales: ["en-US"],
+    requiredLocales: ["en-US"]
+  });
+  row.audio_assets = [{ ...asset("uploaded-us", "en-US"), is_default: true }];
+  expect(scope()).toEqual({
+    activeLocales: ["en-US"],
+    requiredLocales: ["en-US"]
+  });
+  delete row.synthesis!.us!.source;
+  expect(scope()).toEqual({ activeLocales: [], requiredLocales: [] });
 });
 
 it("修改未启用拼写的音色参数也清除对应旧音频，不影响另一侧", () => {
