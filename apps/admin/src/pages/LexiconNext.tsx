@@ -134,6 +134,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               formEditorAvailable={capability.data?.form_editor === true}
               senseGroupsAvailable={capability.data?.sense_groups === true}
               grammarAvailable={capability.data?.grammar_structures === true}
+              grammarAudioAvailable={capability.data?.grammar_audio === true}
             />
           ) : (
             <EntryList
@@ -153,11 +154,13 @@ function EntryLoader({
   language,
   formEditorAvailable,
   senseGroupsAvailable,
-  grammarAvailable
+  grammarAvailable,
+  grammarAudioAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
   grammarAvailable: boolean;
+  grammarAudioAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -234,6 +237,7 @@ function EntryLoader({
       formEditorAvailable={formEditorAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
       grammarAvailable={grammarAvailable}
+      grammarAudioAvailable={grammarAudioAvailable}
     />
   );
 }
@@ -244,11 +248,13 @@ function EntryEditor({
   archived,
   formEditorAvailable,
   senseGroupsAvailable,
-  grammarAvailable
+  grammarAvailable,
+  grammarAudioAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
   grammarAvailable: boolean;
+  grammarAudioAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -607,6 +613,7 @@ function EntryEditor({
             partOfSpeechCodes={language.part_of_speech_codes}
             senseGroupsAvailable={senseGroupsAvailable}
             grammarAvailable={grammarAvailable}
+            grammarAudioAvailable={grammarAudioAvailable}
             disabled={disabled}
             onChange={setDraft}
           />

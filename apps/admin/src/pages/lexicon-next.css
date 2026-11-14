@@ -210,21 +210,71 @@
   }
 }
 
+.lexicon-next-grammar {
+  container: lexicon-grammar / inline-size;
+}
+.lexicon-next-grammar-heading,
 .lexicon-next-grammar-row {
   display: grid;
-  grid-template-columns: 24px 210px minmax(120px, 1fr) 32px;
-  align-items: center;
+  grid-template-columns: 24px 210px minmax(0, 1fr) var(--ui-control-height);
+  align-items: start;
   gap: var(--ui-space-3);
+}
+.lexicon-next-grammar-heading {
+  margin-bottom: var(--ui-space-2);
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-sm);
+}
+.lexicon-next-grammar-heading > :first-child {
+  grid-column: 2;
+}
+.lexicon-next-grammar-row {
   margin-bottom: var(--ui-space-3);
 }
-.lexicon-next-grammar-text {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2);
+.lexicon-next-grammar-index {
+  padding-top: var(--ui-space-1);
+  color: var(--ui-color-text-secondary);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 24px;
+}
+.lexicon-next-grammar-row > .ui-select {
   min-width: 0;
 }
-.lexicon-next-grammar-text > .tsz-ve-readonly {
+.lexicon-next-grammar-text {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  min-height: var(--ui-control-height);
+  text-align: left;
+  white-space: normal;
+}
+.lexicon-next-grammar-text > :first-child {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.lexicon-next-grammar-content {
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+}
+.lexicon-next-grammar-empty {
+  color: var(--ui-color-text-placeholder);
+}
+@container lexicon-grammar (width <= 640px) {
+  .lexicon-next-grammar-heading {
+    display: none;
+  }
+  .lexicon-next-grammar-row {
+    grid-template-columns: 24px minmax(0, 1fr) var(--ui-control-height);
+    gap: var(--ui-space-2);
+    margin-bottom: var(--ui-space-4);
+  }
+  .lexicon-next-grammar-row > :nth-child(3) {
+    grid-column: 2;
+  }
+  .lexicon-next-grammar-row > :last-child {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
 }

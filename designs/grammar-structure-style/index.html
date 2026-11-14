@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>语法结构样式预览</title>
+    <!-- 本地视觉样例，使用实际 GrammarStructures 与后台控件，不连接后端。
+         依据：apps/admin/style.md、packages/ui/src/admin/tokens.css。
+         只调整行内层级、空状态和容器响应布局，沿用现有编辑弹窗与数据模型。 -->
+    <style>
+      body {
+        background: var(--ui-color-bg-layout);
+      }
+      main {
+        padding: var(--ui-space-6);
+      }
+      .preview-toolbar {
+        display: flex;
+        align-items: center;
+        gap: var(--ui-space-3);
+        margin-bottom: var(--ui-space-6);
+      }
+      .preview-toolbar label {
+        color: var(--ui-color-text-secondary);
+      }
+      .preview-panel {
+        width: 100%;
+      }
+      .preview-panel[data-narrow="true"] {
+        width: 580px;
+        max-width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./preview.tsx"></script>
+  </body>
+</html>
