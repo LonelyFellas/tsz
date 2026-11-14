@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor
+} from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { NextDraft } from "@tsz/types";
 import { App } from "@tsz/ui/admin/overlays";
@@ -192,6 +199,11 @@ it("新词库语法富文本与细分词性绑定，改绑保留引用并筛选�
       name: "语法结构 1 细分词性"
     });
     expect(screen.getByText("job", { selector: "strong" })).toBeVisible();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "编辑语法结构 1 英式英语内容" })
+      ).toBeEnabled()
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "编辑语法结构 1 英式英语内容" })
     );

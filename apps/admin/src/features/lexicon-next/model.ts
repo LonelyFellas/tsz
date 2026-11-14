@@ -105,10 +105,18 @@ export function previewDraft(
       : {}),
     ...(draft.grammar_structures !== undefined
       ? {
-          grammar_structures: draft.grammar_structures.map((grammar) => ({
-            ...grammar,
-            variants: targetRows(grammar.variants)
-          })),
+          grammar_structures: draft.grammar_structures
+            .filter((grammar) =>
+              grammarSubPosValid(
+                grammar.part_of_speech,
+                grammar.sub_pos,
+                catalog
+              )
+            )
+            .map((grammar) => ({
+              ...grammar,
+              variants: targetRows(grammar.variants)
+            })),
           grammar_issues: grammarBindingIssues(draft, catalog)
         }
       : {}),
@@ -127,7 +135,7 @@ export function previewDraft(
           draft.grammar_structures?.some(
             (g) =>
               g.id === definition.grammar_structure_id &&
-              grammarMatchesSense(g, sense)
+              grammarMatchesSense(g, sense, catalog)
           )
         )
           return definition;
@@ -213,13 +221,27 @@ export function draftProblem(draft: NextDraft): string | null {
   return null;
 }
 
+function grammarSubPosValid(
+  pos: string | null,
+  subPos: string | undefined,
+  catalog: PartOfSpeechCatalogResponse | undefined
+): boolean {
+  const part = catalog?.items.find((item) => item.code === pos);
+  if (!part) return false;
+  return subPos
+    ? part.sub_parts.some((item) => item.code === subPos)
+    : part.sub_parts.length === 0;
+}
+
 export function grammarMatchesSense(
   grammar: NextGrammarStructure,
-  sense: NextSense
+  sense: NextSense,
+  catalog?: PartOfSpeechCatalogResponse
 ): boolean {
   return (
     grammar.part_of_speech === sense.part_of_speech &&
-    (grammar.sub_pos ?? "") === (sense.sub_pos ?? "")
+    (grammar.sub_pos ?? "") === (sense.sub_pos ?? "") &&
+    grammarSubPosValid(grammar.part_of_speech, grammar.sub_pos, catalog)
   );
 }
 export function grammarText(
@@ -239,18 +261,8 @@ export function grammarBindingIssues(
 ): NextGrammarIssue[] {
   if (draft.grammar_structures === undefined) return [];
   const issues: NextGrammarIssue[] = [];
-  const part = (code?: string | null) =>
-    catalog?.items.find((item) => item.code === code);
-  const invalidSub = (code: string | null, sub?: string) => {
-    const item = part(code);
-    return (
-      item &&
-      ((!sub && (item.sub_pos_required ?? item.sub_parts.length > 0)) ||
-        (!!sub && !item.sub_parts.some((p) => p.code === sub)))
-    );
-  };
   for (const grammar of draft.grammar_structures) {
-    if (invalidSub(grammar.part_of_speech, grammar.sub_pos))
+    if (!grammarSubPosValid(grammar.part_of_speech, grammar.sub_pos, catalog))
       issues.push({
         node_id: grammar.id,
         field: "sub_pos",
@@ -269,7 +281,7 @@ export function grammarBindingIssues(
       });
   }
   for (const sense of draft.senses) {
-    if (invalidSub(sense.part_of_speech, sense.sub_pos))
+    if (!grammarSubPosValid(sense.part_of_speech, sense.sub_pos, catalog))
       issues.push({
         node_id: sense.id,
         field: "sub_pos",
@@ -279,7 +291,7 @@ export function grammarBindingIssues(
       const grammar = draft.grammar_structures.find(
         (row) => row.id === definition.grammar_structure_id
       );
-      if (!grammar || !grammarMatchesSense(grammar, sense))
+      if (!grammar || !grammarMatchesSense(grammar, sense, catalog))
         issues.push({
           node_id: definition.id,
           field: "grammar_structure_id",

@@ -186,7 +186,7 @@ export function MeaningsStep({
       gap={16}
       className="word-meanings-step v3-meanings-v2 lexicon-next-meanings"
     >
-      {formEditorAvailable && catalog.isError && (
+      {(formEditorAvailable || grammarAvailable) && catalog.isError && (
         <Alert type="error" title={t("catalog_unavailable")} />
       )}
       {senseGroupsAvailable && (
@@ -331,7 +331,7 @@ export function MeaningsStep({
                       (item) => item.code === code
                     )}
                     target={target}
-                    disabled={disabled}
+                    disabled={disabled || catalog.isPending || catalog.isError}
                     referenceCount={(id) =>
                       value.senses.reduce(
                         (count, sense) =>
@@ -581,7 +581,12 @@ export function MeaningsStep({
                                   grammars={
                                     grammarAvailable
                                       ? (value.grammar_structures ?? []).filter(
-                                          (g) => grammarMatchesSense(g, sense)
+                                          (g) =>
+                                            grammarMatchesSense(
+                                              g,
+                                              sense,
+                                              catalog.data
+                                            )
                                         )
                                       : undefined
                                   }
@@ -604,7 +609,12 @@ export function MeaningsStep({
                                   grammars={
                                     grammarAvailable
                                       ? (value.grammar_structures ?? []).filter(
-                                          (g) => grammarMatchesSense(g, sense)
+                                          (g) =>
+                                            grammarMatchesSense(
+                                              g,
+                                              sense,
+                                              catalog.data
+                                            )
                                         )
                                       : undefined
                                   }

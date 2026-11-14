@@ -1,3 +1,4 @@
+import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
 import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
 import {
   useCallback,
@@ -32,7 +33,6 @@ import { Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextDraft,
-  PartOfSpeechCatalogResponse,
   NextEntry,
   NextEntryView,
   NextWorkspaceEntry,
@@ -256,6 +256,12 @@ function EntryEditor({
 }) {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
+  const grammarCatalog = useQuery({
+    queryKey: partOfSpeechKeys.catalog(),
+    queryFn: () => partOfSpeechDataSource.catalog(),
+    enabled: grammarAvailable,
+    staleTime: 5 * 60 * 1000
+  });
   const [step, setStep] = useState<WordCreationStep>("forms");
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
@@ -641,14 +647,7 @@ function EntryEditor({
         <div hidden={step !== "preview"} inert={step !== "preview"}>
           <h2>预览</h2>
           <Preview
-            view={previewDraft(
-              draft,
-              target,
-              medium,
-              queryClient.getQueryData<PartOfSpeechCatalogResponse>(
-                partOfSpeechKeys.catalog()
-              )
-            )}
+            view={previewDraft(draft, target, medium, grammarCatalog.data)}
           />
         </div>
         {step !== "forms" && (
@@ -663,9 +662,7 @@ function EntryEditor({
                       draft,
                       target,
                       medium,
-                      queryClient.getQueryData<PartOfSpeechCatalogResponse>(
-                        partOfSpeechKeys.catalog()
-                      )
+                      grammarCatalog.data
                     )}
                   />
                 )
