@@ -46,6 +46,13 @@ it("空白释义模板只在填写后进入草稿，切换英美保留已填内�
       style: "sentence"
     }
   ]);
+  fireEvent.change(screen.getByRole("textbox", { name: "英文释义 1" }), {
+    target: { value: "the centre" }
+  });
+  expect(draft().map((row) => row.text)).toEqual([
+    "the centre",
+    "It is the middle."
+  ]);
   const saved = draft();
   fireEvent.click(screen.getByRole("button", { name: "切换英美" }));
   expect(screen.getByRole("textbox", { name: "英文释义 2" })).toHaveValue("");
@@ -57,10 +64,61 @@ it("空白释义模板只在填写后进入草稿，切换英美保留已填内�
   fireEvent.change(screen.getByRole("textbox", { name: "英文释义 2" }), {
     target: { value: "" }
   });
+  expect(draft().map((row) => row.text)).toEqual(["the centre"]);
+  fireEvent.change(screen.getByRole("textbox", { name: "英文释义 1" }), {
+    target: { value: "" }
+  });
   expect(draft()).toEqual([]);
   fireEvent.click(screen.getByRole("button", { name: "删除英文释义 1" }));
   expect(screen.getAllByRole("textbox")).toHaveLength(1);
   expect(draft()).toEqual([]);
+});
+
+it("词义等级变化时更新未填写的默认计划，保留已填写的释义", () => {
+  function Harness() {
+    const [rows, setRows] = useState<NextDefinition[]>([]);
+    const [advanced, setAdvanced] = useState(false);
+    return (
+      <>
+        <button onClick={() => setAdvanced(!advanced)}>切换等级</button>
+        <ContentRows
+          rows={rows}
+          locale="en-GB"
+          label="英文释义"
+          definition
+          grouped
+          definitionTemplates={advanced ? [{ style: "sentence" }] : [{}, {}]}
+          disabled={false}
+          onChange={(next) => setRows(next as NextDefinition[])}
+        />
+        <output aria-label="草稿释义">{JSON.stringify(rows)}</output>
+      </>
+    );
+  }
+  render(<Harness />);
+  expect(screen.getAllByRole("textbox")).toHaveLength(2);
+  fireEvent.click(screen.getByRole("button", { name: "切换等级" }));
+  expect(screen.getAllByRole("textbox")).toHaveLength(1);
+  expect(
+    screen
+      .getByRole("combobox", { name: "英文释义 1 格式" })
+      .closest(".ui-select")
+  ).toHaveTextContent("整句释义");
+  expect(JSON.parse(screen.getByLabelText("草稿释义").textContent!)).toEqual(
+    []
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "英文释义 1" }), {
+    target: { value: "It is the middle." }
+  });
+  const saved = JSON.parse(screen.getByLabelText("草稿释义").textContent!);
+  fireEvent.click(screen.getByRole("button", { name: "切换等级" }));
+  expect(screen.getAllByRole("textbox")).toHaveLength(1);
+  expect(screen.getByRole("textbox", { name: "英文释义 1" })).toHaveValue(
+    "It is the middle."
+  );
+  expect(JSON.parse(screen.getByLabelText("草稿释义").textContent!)).toEqual(
+    saved
+  );
 });
 
 it("已有释义不补空行，只读时保留原值", () => {

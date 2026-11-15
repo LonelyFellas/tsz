@@ -40,48 +40,77 @@ export function ContentRows({
   grammarLocale?: string;
   onChange: (rows: Row[]) => void;
 }) {
-  const [templates, setTemplates] = useState<Record<string, NextDefinition[]>>(
-    {}
-  );
-  if (definition && definitionTemplates && !Object.hasOwn(templates, locale)) {
+  const [templates, setTemplates] = useState<
+    Record<string, { plan: string; rows: NextDefinition[] }>
+  >({});
+  const stored = rows.filter((row) => row.locale === locale);
+  const template = templates[locale];
+  const plan = definitionTemplates
+    ?.map((row) => row.style ?? "definition")
+    .join(",");
+  const untouched =
+    template &&
+    template.rows.every(
+      (row) => !row.text.trim() && !row.grammar_structure_id
+    ) &&
+    template.rows.map((row) => row.style).join(",") === template.plan;
+  if (
+    definition &&
+    definitionTemplates &&
+    (!template || (template.plan !== plan && !stored.length && untouched))
+  ) {
     setTemplates({
       ...templates,
-      [locale]: rows.some((row) => row.locale === locale)
-        ? []
-        : definitionTemplates.map((plan) => ({
-            id: crypto.randomUUID(),
-            locale,
-            text: "",
-            style: plan.style ?? "definition"
-          }))
+      [locale]: {
+        plan: plan!,
+        rows: stored.length
+          ? []
+          : definitionTemplates.map((plan) => ({
+              id: crypto.randomUUID(),
+              locale,
+              text: "",
+              style: plan.style ?? "definition"
+            }))
+      }
     });
   }
-  const slots = templates[locale] ?? [];
-  const stored = rows.filter((row) => row.locale === locale);
+  const slots = template?.rows ?? [];
   const visible = [
     ...slots.map((slot) => stored.find((row) => row.id === slot.id) ?? slot),
     ...stored.filter((row) => !slots.some((slot) => slot.id === row.id))
   ];
   function updateRow(next: Row) {
-    const template = slots.some((slot) => slot.id === next.id);
+    const slotIndex = slots.findIndex((slot) => slot.id === next.id);
     const existing = rows.some((row) => row.id === next.id);
-    if (template) {
+    if (slotIndex >= 0) {
       setTemplates((current) => ({
         ...current,
-        [locale]: current[locale]!.map((row) =>
-          row.id === next.id ? (next as NextDefinition) : row
-        )
+        [locale]: {
+          ...current[locale]!,
+          rows: current[locale]!.rows.map((row) =>
+            row.id === next.id ? (next as NextDefinition) : row
+          )
+        }
       }));
       if (!next.text.trim()) {
         if (existing) onChange(rows.filter((row) => row.id !== next.id));
         return;
       }
     }
-    onChange(
-      existing
-        ? rows.map((row) => (row.id === next.id ? next : row))
-        : [...rows, next]
-    );
+    if (existing) {
+      onChange(rows.map((row) => (row.id === next.id ? next : row)));
+      return;
+    }
+    const before =
+      slotIndex < 0
+        ? -1
+        : rows.findIndex((row) => {
+            if (row.locale !== locale) return false;
+            const index = slots.findIndex((slot) => slot.id === row.id);
+            return index < 0 || index > slotIndex;
+          });
+    const index = before < 0 ? rows.length : before;
+    onChange([...rows.slice(0, index), next, ...rows.slice(index)]);
   }
   const [collapsed, setCollapsed] = useState(false);
   const content = (
@@ -168,12 +197,16 @@ export function ContentRows({
               type={grouped ? "text" : "default"}
               disabled={disabled}
               onClick={() => {
-                setTemplates((current) => ({
-                  ...current,
-                  [locale]: (current[locale] ?? []).filter(
-                    (item) => item.id !== row.id
-                  )
-                }));
+                if (slots.some((slot) => slot.id === row.id))
+                  setTemplates((current) => ({
+                    ...current,
+                    [locale]: {
+                      ...current[locale]!,
+                      rows: current[locale]!.rows.filter(
+                        (item) => item.id !== row.id
+                      )
+                    }
+                  }));
                 onChange(rows.filter((item) => item.id !== row.id));
               }}
             />
