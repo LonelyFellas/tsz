@@ -527,7 +527,7 @@ it("未指定词性的旧义项保留内容并锁定下方录入，指定词性�
       "添加例句",
       "引用已有例句"
     ]) {
-      expect(screen.getByRole("button", { name, exact: true })).toBeDisabled();
+      expect(screen.getByRole("button", { name })).toBeDisabled();
     }
     expect(
       screen.getByRole("textbox", { name: "批量录入常见译词" })
@@ -553,7 +553,7 @@ it("未指定词性的旧义项保留内容并锁定下方录入，指定词性�
       "添加例句",
       "引用已有例句"
     ]) {
-      expect(screen.getByRole("button", { name, exact: true })).toBeEnabled();
+      expect(screen.getByRole("button", { name })).toBeEnabled();
     }
     expect(
       screen.getByRole("textbox", { name: "批量录入常见译词" })
