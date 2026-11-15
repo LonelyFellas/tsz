@@ -1864,6 +1864,10 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   api.creators.mockResolvedValue([]);
   fireEvent.click(button("保存完整草稿"));
   await screen.findByText("版本 2");
+  // The revision renders before the save finally releases the navigation lock.
+  await waitFor(() =>
+    expect(screen.getByRole("combobox", { name: "媒介语言" })).toBeEnabled()
+  );
   expect(api.save.mock.calls[0]![1].draft.senses[0].definitions).toEqual([]);
   await act(() => router.navigate(-1));
   await screen.findByText("未找到符合条件的数据");
