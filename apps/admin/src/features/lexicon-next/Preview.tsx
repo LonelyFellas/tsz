@@ -1,3 +1,4 @@
+import { RelationsPreview } from "./Relations";
 import { SentenceExamplesPreview } from "./SenseSentenceExamples";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { EquivalentPreview } from "./EquivalentPreview";
@@ -217,6 +218,14 @@ export function Preview({
                   requests={requests}
                 />
               )}
+              {requests && sense.relations && (
+                <RelationsPreview
+                  rows={sense.relations}
+                  target={view.target_locale}
+                  medium={view.medium_locale}
+                  requests={requests}
+                />
+              )}
               {[
                 ...new Set(
                   [...sense.target_definitions, ...sense.medium_definitions]
@@ -247,7 +256,17 @@ export function Preview({
     </EntryDialectContext.Provider>
   );
 }
-export function DraftSummary({ draft }: { draft: NextDraft }) {
+export function DraftSummary({
+  draft,
+  requests,
+  target = "en-GB",
+  medium = "zh-Hans"
+}: {
+  draft: NextDraft;
+  requests?: LexiconNextRequests;
+  target?: string;
+  medium?: string;
+}) {
   return (
     <PronunciationPreviewProvider readOnly>
       <div className="lexicon-next-preview">
@@ -281,6 +300,14 @@ export function DraftSummary({ draft }: { draft: NextDraft }) {
             <SenseMetadataSummary sense={sense} />
             <Definitions rows={sense.definitions} missing="释义" />
             <DraftEquivalentSummary sense={sense} />
+            {requests && sense.relations && (
+              <RelationsPreview
+                rows={sense.relations}
+                target={target}
+                medium={medium}
+                requests={requests}
+              />
+            )}
           </section>
         ))}
       </div>

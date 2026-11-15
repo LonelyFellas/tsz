@@ -462,8 +462,21 @@ textarea.ui-input {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.ui-select-single .ui-select-content-has-search-value {
+.ui-select-single:not(.ui-select-customize-input)
+  .ui-select-content-has-search-value {
   visibility: hidden;
+}
+.ui-select-customize-input {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  min-height: 0;
+}
+.ui-select-customize-input .ui-select-content {
+  overflow: visible;
+}
+.ui-select-customize-input .ui-input-affix-wrapper {
+  width: 100%;
 }
 .ui-select-content-value,
 .ui-select-placeholder {

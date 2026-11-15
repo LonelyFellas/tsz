@@ -59,8 +59,10 @@ export function decodeNextEntryView(value: unknown): NextEntryView {
 export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
   let definitionDetails = false;
+  let relations = false;
   const editorOptions = {
     headers: {
+      "x-tsz-next-relations": "v1",
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
       "x-tsz-next-sentences": "v1",
@@ -168,6 +170,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       http.get<unknown>(`${root}/capabilities`, editorOptions).then((value) => {
         const capabilities = decodeNextCapabilities(value);
         definitionDetails = capabilities.definition_details === true;
+        relations = capabilities.relations === true;
         return capabilities;
       }),
     create: (input: CreateNextEntry) =>
@@ -185,6 +188,14 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) => {
+      if (
+        !relations &&
+        input.draft.senses.some((sense) => sense.relations !== undefined)
+      ) {
+        return Promise.reject(
+          new ClientResponseError("拓展词能力尚未确认，请重新打开词条")
+        );
+      }
       if (
         !definitionDetails &&
         input.draft.senses.some((sense) =>

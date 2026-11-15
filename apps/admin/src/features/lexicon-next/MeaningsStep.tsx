@@ -1,3 +1,4 @@
+import { Relations } from "./Relations";
 import { SenseSentenceExamples } from "./SenseSentenceExamples";
 import { EquivalentRows } from "./EquivalentRows";
 import { draftNodeCount, ensureMeaningTemplates, newSense } from "./model";
@@ -60,6 +61,8 @@ import "@/features/dictionary/word-creation-v3/posTabs.css";
 
 export function MeaningsStep({
   value,
+  entryId,
+  relationsAvailable = false,
   kind,
   formEditorAvailable,
   target,
@@ -81,6 +84,8 @@ export function MeaningsStep({
   onChange
 }: {
   value: NextDraft;
+  entryId?: string;
+  relationsAvailable?: boolean;
   kind: "word" | "phrase";
   formEditorAvailable: boolean;
   target: string;
@@ -859,6 +864,32 @@ export function MeaningsStep({
                                     disabled={contentDisabled}
                                     onChange={(equivalents) =>
                                       updateSense(sense.id, { equivalents })
+                                    }
+                                  />
+                                )}
+                                {relationsAvailable && requests && entryId && (
+                                  <Relations
+                                    rows={sense.relations ?? []}
+                                    entryId={entryId}
+                                    senseId={sense.id}
+                                    target={target}
+                                    medium={medium}
+                                    requests={requests}
+                                    disabled={contentDisabled}
+                                    onChange={(update) =>
+                                      onChange((current) => ({
+                                        ...current,
+                                        senses: current.senses.map((row) =>
+                                          row.id === sense.id
+                                            ? {
+                                                ...row,
+                                                relations: update(
+                                                  row.relations ?? []
+                                                )
+                                              }
+                                            : row
+                                        )
+                                      }))
                                     }
                                   />
                                 )}

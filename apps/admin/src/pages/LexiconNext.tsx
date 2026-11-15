@@ -131,6 +131,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               id={entryId}
               requests={requests}
               language={language}
+              relationsAvailable={capability.data?.relations === true}
               formEditorAvailable={capability.data?.form_editor === true}
               senseGroupsAvailable={capability.data?.sense_groups === true}
               senseMetadataAvailable={capability.data?.sense_metadata === true}
@@ -171,7 +172,8 @@ function EntryLoader({
   grammarAudioAvailable,
   definitionDetailsAvailable,
   sentencesAvailable,
-  sentenceDetailsAvailable
+  sentenceDetailsAvailable,
+  relationsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -182,6 +184,7 @@ function EntryLoader({
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
   sentenceDetailsAvailable: boolean;
+  relationsAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -255,6 +258,7 @@ function EntryLoader({
       requests={requests}
       language={language}
       archived={metadata.data.status === "archived"}
+      relationsAvailable={relationsAvailable}
       formEditorAvailable={formEditorAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
       senseMetadataAvailable={senseMetadataAvailable}
@@ -280,7 +284,8 @@ function EntryEditor({
   grammarAudioAvailable,
   definitionDetailsAvailable,
   sentencesAvailable,
-  sentenceDetailsAvailable
+  sentenceDetailsAvailable,
+  relationsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -291,6 +296,7 @@ function EntryEditor({
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
   sentenceDetailsAvailable: boolean;
+  relationsAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -460,6 +466,7 @@ function EntryEditor({
   }
   return (
     <EntryLayout
+      relationsAvailable={relationsAvailable}
       draft={draft}
       languageSearch={languageSearch}
       step={step}
@@ -652,6 +659,8 @@ function EntryEditor({
         </div>
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <MeaningsStep
+            entryId={saved.id}
+            relationsAvailable={relationsAvailable}
             selectedPos={activePos}
             onSelectedPosChange={setSelectedPos}
             value={draft}
@@ -792,11 +801,21 @@ function EntryEditor({
             <div className="lexicon-next-columns">
               <section>
                 <h3>本地草稿 · 基于版本 {saved.revision}</h3>
-                <DraftSummary draft={draft} />
+                <DraftSummary
+                  draft={draft}
+                  requests={requests}
+                  target={target}
+                  medium={medium}
+                />
               </section>
               <section>
                 <h3>服务器 · 版本 {remote.revision}</h3>
-                <DraftSummary draft={remote.draft} />
+                <DraftSummary
+                  draft={remote.draft}
+                  requests={requests}
+                  target={target}
+                  medium={medium}
+                />
               </section>
             </div>
           )}
