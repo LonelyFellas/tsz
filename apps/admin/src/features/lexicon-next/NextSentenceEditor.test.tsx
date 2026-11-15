@@ -45,7 +45,7 @@ const source: NextSentence = {
   owner_id: "owner",
   revision: 3,
   updated_at: "2026-11-15T00:00:00Z",
-  reference_count: 2,
+  reference_count: 0,
   draft: {
     schema_version: 1,
     variants: [
@@ -126,6 +126,9 @@ it("编辑不请求 Azure，完成才生成当前目标语言并保存当前媒�
       })
   );
   const { saveSentence, onSaved } = setup();
+  expect(
+    screen.getByText("保存将同步更新引用此例句的所有义项。")
+  ).toBeVisible();
   const editor = await screen.findByRole("textbox", { name: "英式英语例句" });
   for (const text of ["h", "hh", "hha"]) {
     fireEvent.change(editor, { target: { value: text } });

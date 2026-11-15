@@ -233,11 +233,11 @@ export function NextSentenceEditor({
       }}
     >
       <Flex vertical gap={16}>
-        {!!base?.reference_count && (
+        {base && (
           <Alert
             type="info"
             showIcon
-            title={`此例句已被 ${base.reference_count} 个义项引用，保存后将同步更新。`}
+            title="保存将同步更新引用此例句的所有义项。"
           />
         )}
         {error && (
