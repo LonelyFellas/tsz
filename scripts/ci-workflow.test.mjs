@@ -75,6 +75,31 @@ test("deployment shares one task-scoped SSH master and always closes it", async 
   assert.match(source, /ssh -S "\$DEPLOY_SSH_CONTROL_PATH".*-O exit tshb-test/);
 });
 
+test("superseded candidates are checked before setup and cannot configure SSH or deploy", async () => {
+  const source = await readFile(deployWorkflowUrl, "utf8");
+  const gate = source.indexOf("- name: Check deployment candidate");
+  assert.ok(gate > source.indexOf("fetch-depth: 0"));
+  assert.ok(gate < source.indexOf("- name: Setup Node and pnpm"));
+  assert.match(source, /ref: \$\{\{ github.sha \}\}/);
+  assert.match(
+    source,
+    /deploy_candidate_checkpoint before-setup\n\s+\[\[ "\$\(git rev-parse HEAD\)" = "\$DEPLOY_EXPECTED_SHA" \]\]\n\s+echo 'current=true'/
+  );
+  for (const name of [
+    "Setup Node and pnpm",
+    "Install contract generator dependencies",
+    "Configure SSH",
+    "Deploy verified CI packages"
+  ]) {
+    assert.ok(
+      source.includes(
+        `- name: ${name}\n        if: steps.candidate.outputs.current == 'true'`
+      )
+    );
+  }
+  assert.match(source, /DEPLOY_AUTO_SKIP_STALE: "1"/);
+});
+
 test("W01: workflow identity, triggers, permissions and concurrency stay stable", async () => {
   const { source } = await workflowFixture();
   assert.equal(await prettier.check(source, { parser: "yaml" }), true);
