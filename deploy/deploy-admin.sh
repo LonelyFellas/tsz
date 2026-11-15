@@ -12,6 +12,9 @@ deploy_phase source-check
 deploy_tmp=""
 cleanup() {
   local status=$? cleanup_status=0
+  if [[ "$status" != 0 && -n "${DEPLOY_REMOTE_STAGE:-}" ]]; then
+    echo "!! remote stage retained for recovery: $DEPLOY_REMOTE_STAGE" >&2
+  fi
   if [[ "$status" = 0 ]]; then deploy_phase local-cleanup
   else deploy_phase local-cleanup failure; fi
   remove_deploy_build_tree || cleanup_status=1
@@ -31,6 +34,7 @@ trap 'exit 143' TERM
 
 # Reject invalid settings before even querying the server.
 node --input-type=module -e 'import {buildConfig} from "./deploy/release-artifact.mjs"; buildConfig("admin");'
+deploy_candidate_checkpoint before-component
 prepare_deploy_source admin
 deploy_tmp="$(mktemp -d /tmp/tsz-admin-deploy.XXXXXX)"
 deploy_transport_init "$deploy_tmp"
