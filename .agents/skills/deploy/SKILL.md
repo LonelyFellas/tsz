@@ -40,6 +40,8 @@ Web 默认 `NEXT_PUBLIC_SITE_URL=https://test.tianshengzhi.com`。Admin 默认 t
 
 每组件将已验证制品、manifest 和精确 Git 对象中的受信工具组成独立上传目录，单次 rsync 传入新建的远端 stage；不额外复制整份制品，不引入远端构建或执行包内脚本。SSH 使用任务专属 ControlMaster/ControlPersist，保留 BatchMode、连接超时和严格主机密钥检查。自动发布的契约检查与 Web/Admin 共用一个 socket，工作流无论成功失败均关闭；手动组件入口只清理自己创建的连接。
 
+远端发布由有时限的进程直接写私有日志文件并转发当前内容，不依赖 `tee`/管道 EOF。共享 SSH master 可能在客户端超时后继续持有输出 FD，不能让日志收集延长发布时限，也不能为了日志结束而提前关闭借用的 master。超时仍保留远端 stage/事务供核实，不自动重发。
+
 上传前和上传后、事务开始前复核 exact-main 与最新 CI run/attempt。查询与远端锁不是跨系统原子事务；上传后失败可能留下独立暂存，不能报告零远端写入。不删未完成事务记录继续发。
 
 ## 3. 验收

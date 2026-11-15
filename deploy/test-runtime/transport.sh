@@ -74,6 +74,26 @@ DEPLOY_SSH_CONTROL_PATH="$DEPLOY_SSH_CONTROL_PATH" bash -c '
 [[ "$(deploy_ssh tshb-test 'printf reused')" = reused ]]
 [[ "$(grep -c 'Accepted publickey for' "$root/server.log")" = 1 ]]
 deploy_ssh -O check tshb-test
+# The borrowed master keeps output FDs alive after a timed-out client. The log
+# collector must return without waiting for that master or the remote command.
+began=$SECONDS
+set +e
+python3 -I /repo/deploy/run-with-progress.py --log-file "$root/timeout.log" \
+  1 remote-timeout ssh "${DEPLOY_SSH_OPTIONS[@]}" tshb-test 'printf remote-start; sleep 10; printf remote-end'
+status=$?
+set -e
+[[ "$status" = 124 ]]
+((SECONDS - began < 5))
+grep -q remote-start "$root/timeout.log"
+deploy_ssh -O check tshb-test
+set +e
+python3 -I /repo/deploy/run-with-progress.py --log-file "$root/failure.log" \
+  5 remote-failure ssh "${DEPLOY_SSH_OPTIONS[@]}" tshb-test 'printf remote-failure; exit 42'
+status=$?
+set -e
+[[ "$status" = 42 ]]
+grep -q remote-failure "$root/failure.log"
+[[ "$(grep -c 'Accepted publickey for' "$root/server.log")" = 1 ]]
 # A disconnected master may be recreated; publication commands are never retried.
 deploy_ssh -O exit tshb-test
 [[ "$(deploy_ssh tshb-test 'printf reconnected')" = reconnected ]]
@@ -89,4 +109,4 @@ if deploy_ssh -o "UserKnownHostsFile=$root/untrusted_hosts" tshb-test true 2>/de
   echo 'unknown host key was accepted' >&2
   exit 1
 fi
-echo 'PASS: one SSH authentication for commands/rsync/components, reconnect, owner cleanup, strict host key'
+echo 'PASS: one SSH authentication, bounded logs with shared master, failure status, reconnect, owner cleanup, strict host key'

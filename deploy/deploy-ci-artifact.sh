@@ -76,9 +76,10 @@ NODE
   [[ -z "$expected_api_sha" || "$expected_api_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
   local publish_command="bash '$remote_stage/publish-compatible.sh' '$remote_stage' '$component' '$expected_api_sha'"
   deploy_phase remote-publish
-  python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" 480 remote-publish \
+  python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" \
+    --log-file "$destination/remote-publish.log" 480 remote-publish \
     ssh "${DEPLOY_SSH_OPTIONS[@]}" tshb-test \
-    "$publish_command" 2>&1 | tee "$destination/remote-publish.log"
+    "$publish_command"
   deploy_phase remote-cleanup
   deploy_ssh tshb-test "rm -rf -- '$remote_stage'"
 }

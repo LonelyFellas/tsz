@@ -225,6 +225,65 @@ ${normal ? "sys.exit(0)" : "time.sleep(60)"}
   }
 });
 
+test("captured logs return without EOF from a detached writer and preserve command status", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tsz-shared-log."));
+  const wrapper = new URL("./run-with-progress.py", import.meta.url).pathname;
+  try {
+    for (const normal of [true, false]) {
+      const pidFile = path.join(root, `writer-${normal}`);
+      const log = path.join(root, `log with spaces-${normal}`);
+      const writer = `import os,pathlib,time; print('master-output',flush=True); pathlib.Path(${JSON.stringify(pidFile)}).write_text(str(os.getpid())); time.sleep(30)`;
+      const client = `import subprocess,sys,time,pathlib
+subprocess.Popen([sys.executable,'-I','-c',${JSON.stringify(writer)}],start_new_session=True,stdin=subprocess.DEVNULL)
+while not pathlib.Path(${JSON.stringify(pidFile)}).exists(): time.sleep(0.01)
+print('client-output',flush=True)
+print('client-error',file=sys.stderr,flush=True)
+${normal ? "sys.exit(7)" : "time.sleep(30)"}
+`;
+      let pid;
+      try {
+        const began = performance.now();
+        const result = spawnSync(
+          "python3",
+          [
+            "-I",
+            wrapper,
+            "--log-file",
+            log,
+            "1",
+            "shared-writer",
+            "python3",
+            "-I",
+            "-c",
+            client
+          ],
+          { encoding: "utf8", timeout: 10000 }
+        );
+        pid = Number(await readFile(pidFile, "utf8"));
+        assert.equal(result.status, normal ? 7 : 124, result.stderr);
+        assert.ok(
+          performance.now() - began < 5000,
+          "waited for the detached writer to close its output FD"
+        );
+        const contents = await readFile(log, "utf8");
+        assert.match(contents, /client-output/);
+        assert.match(contents, /client-error/);
+        assert.equal(result.stdout, contents);
+        assert.equal((await stat(log)).mode & 0o777, 0o600);
+      } finally {
+        if (!pid) pid = Number(await readFile(pidFile, "utf8").catch(() => ""));
+        if (pid) {
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch {}
+        }
+      }
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("archive extraction refuses path traversal, external links and link ancestors", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "tsz-release-unpack."));
   try {
