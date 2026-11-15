@@ -24,6 +24,7 @@ import type {
   VoiceEditorProps,
   VoiceEditResult
 } from "@tsz/voice-editor/types";
+import { VoiceEditorDisplayError } from "@tsz/voice-editor/types";
 import {
   clearVoiceAudio,
   editRichText,
@@ -229,7 +230,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onChange,
   onAssociationsChange
 }: V3VoiceTextFieldProps<TLink>) {
-  const { t } = useLexiconEditorTranslation();
+  const { t, i18n } = useLexiconEditorTranslation();
   const spellingAudioLocales = spellingAudioScope?.activeLocales;
   const requiredErrorId = useId();
   const defaultVoiceStatusId = useId();
@@ -239,6 +240,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     saveRef.current = { onSave, businessSave };
   });
   const [saving, setSaving] = useState(false);
+  const [formalAudioFailed, setFormalAudioFailed] = useState(false);
   const savingRef = useRef(false);
   const [failure, setFailure] = useState<{
     target: string;
@@ -251,6 +253,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const activeTarget = useRef<string | null>(nodeId);
   useLayoutEffect(() => {
     activeTarget.current = nodeId;
+    setFormalAudioFailed(false);
     return () => {
       activeTarget.current = null;
     };
@@ -403,6 +406,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       settingsInitial.current = session;
       setDraftState(session);
       setSaveError("");
+      setFormalAudioFailed(false);
       setSpellingSettings(request);
       setRecorded(true);
       setEditing(true);
@@ -454,11 +458,56 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const editorPreviewAdapter = useMemo(() => {
     const adapter = sessionPreviewAdapter ?? adminVoicePreviewAdapter;
-    // 拼写来源设置只试听；正式生成统一由所有者在提交后等待，避免同一内容重复生成。
-    return canGenerateAudio && !spellingSettings
-      ? adapter
-      : { ...adapter, generateAudio: undefined };
-  }, [canGenerateAudio, sessionPreviewAdapter, spellingSettings]);
+    // 编辑期间只试听，正式音频由完成/保存动作统一补齐。
+    return { ...adapter, generateAudio: undefined };
+  }, [sessionPreviewAdapter]);
+  const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
+  const draftSpeechEnabled =
+    expanded &&
+    canGenerateAudio &&
+    env.VOICE_PREVIEW &&
+    !voicePreviewIsMock &&
+    !readOnly &&
+    !contentReadOnly &&
+    !textOnly &&
+    !spellingSettings &&
+    mode !== "actual-pron" &&
+    Boolean((sessionPreviewAdapter ?? adminVoicePreviewAdapter).generateAudio);
+  const draftSpeechContent = useMemo(
+    () =>
+      mode === "spelling"
+        ? spellingAudioContent(draftState.value)
+        : toRichTextV2(draftState.value),
+    [draftState.value, mode]
+  );
+  const draftSpeechProfile = useMemo(
+    () =>
+      area
+        ? withDefaultVoiceProfile(draftState.voiceProfile, area)
+        : draftState.voiceProfile,
+    [area, draftState.voiceProfile]
+  );
+  const draftAudio = useSelectedVoiceAudio({
+    target: JSON.stringify([nodeId, field, dialect, "dialog"]),
+    content: draftSpeechContent,
+    profile: draftSpeechProfile,
+    adapter: sessionPreviewAdapter ?? adminVoicePreviewAdapter,
+    locale,
+    enabled: draftSpeechEnabled,
+    defer: true,
+    onChange: (voiceProfile) =>
+      setDraftState((current) => ({ ...current, voiceProfile }))
+  });
+  const draftAudioRef = useRef({
+    generate: draftAudio.retry,
+    state: draftState
+  });
+  const sourceAudioRef = useRef<() => Promise<boolean>>(() =>
+    Promise.resolve(true)
+  );
+  useLayoutEffect(() => {
+    draftAudioRef.current = { generate: draftAudio.retry, state: draftState };
+  });
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   const reportEditorReady = useCallback(
     (ready: boolean) => onDraftPendingChange?.(!ready),
@@ -491,6 +540,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     history.current.past = [];
     history.current.future = [];
     setEditing(false);
+    setFormalAudioFailed(false);
     setSpellingSettings(undefined);
     setEditorSession((current) => current + 1);
     onAssociationPendingChange?.(false);
@@ -510,9 +560,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     const target = nodeId;
     savingRef.current = true;
     setSaving(true);
+    setFormalAudioFailed(false);
     setSaveError("");
     try {
-      const captured = (onCommit || onSave || businessSave
+      let captured = (onCommit || onSave || businessSave
         ? capture?.(!textOnly && !!(onSave || businessSave))
         : undefined) ?? {
         ...draftState,
@@ -522,6 +573,22 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             : toRichTextV2(draftState.value),
         audioAssets: draftState.audioAssets ?? undefined
       };
+      if (draftSpeechEnabled) {
+        flushSync(() =>
+          setDraftState({ ...draftState, ...captured, nodeId: target })
+        );
+        const generated = await draftAudioRef.current.generate();
+        if (activeTarget.current !== target) return false;
+        if (!generated) {
+          setFormalAudioFailed(true);
+          return false;
+        }
+        if (activeTarget.current !== target) return false;
+        captured = {
+          ...captured,
+          voiceProfile: draftAudioRef.current.state.voiceProfile
+        };
+      }
       const settingsSnapshot = settingsInitial.current;
       if (
         spellingSettings &&
@@ -563,9 +630,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 }
               : captured;
       const next = { ...draftState, ...result, nodeId: target };
+      if (spellingSettings || textOnly)
+        flushSync(() => setSettingsCommitting(true));
       if (callbacks.current.onCommit) {
         flushSync(() => {
-          if (spellingSettings || textOnly) setSettingsCommitting(true);
           callbacks.current.onCommit!(result);
         });
       } else {
@@ -604,6 +672,20 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           );
         }
       }
+      if (
+        (spellingSettings || textOnly) &&
+        canGenerateAudio &&
+        env.VOICE_PREVIEW &&
+        !voicePreviewIsMock
+      ) {
+        const generated = await sourceAudioRef.current();
+        if (activeTarget.current !== target) return false;
+        if (!generated) {
+          setFormalAudioFailed(true);
+          return false;
+        }
+      }
+      if (activeTarget.current !== target) return false;
       const persist =
         saveRef.current.onSave ??
         (saveRef.current.businessSave
@@ -641,7 +723,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       setSettingsCommitting(false);
     }
   };
-  const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   const collapsedAdapter = useMemo(
     () =>
       createReadingPreviewAdapter?.(readingLinks ?? []) ??
@@ -683,11 +764,21 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       !contentReadOnly &&
       mode !== "actual-pron" &&
       !!onVoiceProfileChange,
-    defer:
-      focused ||
-      (!!area && withDefaultVoiceProfile(voiceProfile, area) !== voiceProfile),
+    defer: true,
     onChange: onVoiceProfileChange
   });
+  useLayoutEffect(() => {
+    sourceAudioRef.current = automaticAudio.retry;
+  });
+  const formalAudioError =
+    spellingSettings || textOnly ? automaticAudio.error : draftAudio.error;
+  const displayedSaveError = formalAudioFailed
+    ? formalAudioError instanceof VoiceEditorDisplayError
+      ? formalAudioError.displayMessage(i18n.language)
+      : formalAudioError instanceof Error
+        ? formalAudioError.message
+        : t("panel_final_audio_generation_failed")
+    : saveError;
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。
   const liaisons = useMemo(
     () => (mode !== "dict-phonetic" ? liaisonOnly(value) : undefined),
@@ -990,6 +1081,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             setSpellingSettings(undefined);
             setDraftState(captureSession());
             setSaveError("");
+            setFormalAudioFailed(false);
             setRecorded(true);
             setEditing(true);
           }}
@@ -1061,14 +1153,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     >
       <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
         {feedbackHolder}
-        {saveError && (
+        {displayedSaveError && (
           <Alert
             type="error"
             showIcon
             title={
-              failure?.business
-                ? (businessSave?.failure ?? saveError)
-                : saveError
+              failure?.business && !formalAudioFailed
+                ? (businessSave?.failure ?? displayedSaveError)
+                : displayedSaveError
             }
           />
         )}

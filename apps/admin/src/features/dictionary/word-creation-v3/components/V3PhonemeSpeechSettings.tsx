@@ -98,7 +98,7 @@ export function V3PhonemeSpeechSettings({
             asset.is_default &&
             speechAccentGroup(asset.locale) === speechAccentGroup(locale)
         ));
-  const { t } = useLexiconEditorTranslation();
+  const { t, i18n } = useLexiconEditorTranslation();
   const currentT = useRef(t);
   currentT.current = t;
   const businessSave = useVoiceSave();
@@ -107,6 +107,7 @@ export function V3PhonemeSpeechSettings({
     businessSaveRef.current = businessSave;
   });
   const [saving, setSaving] = useState(false);
+  const [formalAudioFailed, setFormalAudioFailed] = useState(false);
   const savingRef = useRef(false);
   const [saveError, setSaveError] = useCreationMessageState();
   const [businessSaveFailed, setBusinessSaveFailed] = useState(false);
@@ -114,6 +115,7 @@ export function V3PhonemeSpeechSettings({
   const activeTarget = useRef<string | null>(targetKey);
   useLayoutEffect(() => {
     activeTarget.current = targetKey;
+    setFormalAudioFailed(false);
     return () => {
       activeTarget.current = null;
     };
@@ -431,12 +433,52 @@ export function V3PhonemeSpeechSettings({
     []
   );
   const editorAdapter = useMemo(
-    () =>
-      canGenerateAudio && active
-        ? adapter
-        : { ...adapter, generateAudio: undefined },
-    [adapter, canGenerateAudio, active]
+    () => ({ ...adapter, generateAudio: undefined }),
+    [adapter]
   );
+  const draftSourceKey = v3ContentFingerprint([
+    spelling,
+    alphabet,
+    locale,
+    draft.ups_words
+  ]);
+  const draftAdapter = useMemo(
+    () => ({ ...adapter, audioSourceKey: draftSourceKey }),
+    [adapter, draftSourceKey]
+  );
+  const draftSpeechEnabled =
+    open &&
+    active &&
+    canEdit &&
+    canGenerateAudio &&
+    env.VOICE_PREVIEW &&
+    !voicePreviewIsMock &&
+    source === sourceKey &&
+    !inputIssue;
+  const draftAudio = useSelectedVoiceAudio({
+    target: `${audioTarget}:dialog`,
+    content: draft.content,
+    profile: withDefaultVoiceProfile(
+      draft.voice_profile ?? scopedProfile,
+      "azure"
+    ),
+    adapter: draftAdapter,
+    locale,
+    enabled: draftSpeechEnabled,
+    defer: true,
+    onChange: (voice_profile) =>
+      setDraft((current) => ({ ...current, voice_profile }))
+  });
+  const draftAudioRef = useRef({ generate: draftAudio.retry, draft });
+  useLayoutEffect(() => {
+    draftAudioRef.current = { generate: draftAudio.retry, draft };
+  });
+  const formalAudioError =
+    draftAudio.error instanceof VoiceEditorDisplayError
+      ? draftAudio.error.displayMessage(i18n.language)
+      : draftAudio.error instanceof Error
+        ? draftAudio.error.message
+        : t("panel_final_audio_generation_failed");
   const collapsedContent = speech
     ? mapSynthesisSpeechContent(
         speech.content,
@@ -508,7 +550,7 @@ export function V3PhonemeSpeechSettings({
       !voicePreviewIsMock &&
       !!spelling.trim() &&
       !synthesisInputIssue(alphabet, candidate[alphabet]),
-    defer: defaultProfile !== storedProfile,
+    defer: true,
     onChange: (voice_profile) =>
       onChange(
         {
@@ -568,6 +610,7 @@ export function V3PhonemeSpeechSettings({
             event.stopPropagation();
             setDraft(capture());
             setSaveError("");
+            setFormalAudioFailed(false);
             setBusinessSaveFailed(false);
             setSource(sourceKey);
             setOpen(true);
@@ -607,14 +650,16 @@ export function V3PhonemeSpeechSettings({
           closable={!saving}
           keyboard={!saving}
         >
-          {saveError && (
+          {(saveError || formalAudioFailed) && (
             <Alert
               type="error"
               showIcon
               title={
-                businessSaveFailed
-                  ? (businessSave?.failure ?? saveError)
-                  : saveError
+                formalAudioFailed
+                  ? formalAudioError
+                  : businessSaveFailed
+                    ? (businessSave?.failure ?? saveError)
+                    : saveError
               }
             />
           )}
@@ -709,18 +754,40 @@ export function V3PhonemeSpeechSettings({
                         return;
                       savingRef.current = true;
                       setSaving(true);
+                      setFormalAudioFailed(false);
                       setSaveError("");
                       setBusinessSaveFailed(false);
                       try {
                         const result = captureResult?.(
                           !!businessSave && active
                         );
-                        const next = resolveCandidate(
-                          toRichTextV2(result?.value ?? draft.content)
+                        const content = toRichTextV2(
+                          result?.value ?? draft.content
                         );
-                        if (result?.voiceProfile)
-                          next[`${alphabet}_speech`]!.voice_profile =
-                            result.voiceProfile;
+                        flushSync(() =>
+                          setDraft((current) => ({
+                            ...current,
+                            content,
+                            voice_profile:
+                              result?.voiceProfile ?? current.voice_profile
+                          }))
+                        );
+                        if (draftSpeechEnabled) {
+                          const generated =
+                            await draftAudioRef.current.generate();
+                          if (activeTarget.current !== targetKey) return;
+                          if (!generated) {
+                            setFormalAudioFailed(true);
+                            return;
+                          }
+                        }
+                        if (activeTarget.current !== targetKey) return;
+                        const next = latest.current.resolveCandidate(content);
+                        const profile = draftSpeechEnabled
+                          ? draftAudioRef.current.draft.voice_profile
+                          : result?.voiceProfile;
+                        if (profile)
+                          next[`${alphabet}_speech`]!.voice_profile = profile;
                         flushSync(() => {
                           setSource(
                             JSON.stringify([

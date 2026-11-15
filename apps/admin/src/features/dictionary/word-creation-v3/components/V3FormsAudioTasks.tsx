@@ -368,7 +368,7 @@ function TextAudioTask({
     activeLocales,
     requiredLocales,
     enabled,
-    defer: effectiveProfile !== profile,
+    defer: true,
     onChange
   });
   return task.error == null ? null : (
