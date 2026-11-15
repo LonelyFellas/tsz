@@ -1,5 +1,10 @@
 import type {
   NextEquivalentCatalog,
+  NextSentence,
+  NextSentenceList,
+  NextSentenceQuery,
+  CreateNextSentence,
+  SaveNextSentence,
   NextWorkspaceQuery,
   NextWorkspaceEntry,
   NextWorkspaceList,
@@ -58,6 +63,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     headers: {
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
+      "x-tsz-next-sentences": "v1",
       "x-tsz-next-equivalents": "v1",
       "x-tsz-next-sense-metadata": "v1",
       "x-tsz-next-grammar": "v1",
@@ -75,7 +81,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       throw new ClientResponseError("智能词库列表响应不符合接口契约");
     return value as T;
   };
-  const search = (query: NextWorkspaceQuery) => {
+  const search = (query: NextWorkspaceQuery | NextSentenceQuery) => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== "") params.set(key, String(value));
@@ -83,6 +89,22 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     return params.size ? `?${params}` : "";
   };
   return {
+    sentences: (query: NextSentenceQuery) =>
+      http
+        .get<unknown>(`${root}/sentences${search(query)}`)
+        .then((value) => decode<NextSentenceList>("NextSentenceList", value)),
+    sentence: (id: string) =>
+      http
+        .get<unknown>(`${root}/sentences/${encodeURIComponent(id)}`)
+        .then((value) => decode<NextSentence>("NextSentence", value)),
+    createSentence: (input: CreateNextSentence) =>
+      http
+        .post<unknown>(`${root}/sentences`, input)
+        .then((value) => decode<NextSentence>("NextSentence", value)),
+    saveSentence: (id: string, input: SaveNextSentence) =>
+      http
+        .put<unknown>(`${root}/sentences/${encodeURIComponent(id)}`, input)
+        .then((value) => decode<NextSentence>("NextSentence", value)),
     equivalentCatalog: () =>
       http
         .get<unknown>(`${root}/equivalent-catalog`)

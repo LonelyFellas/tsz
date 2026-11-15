@@ -82,6 +82,10 @@ const entry: NextEntry = {
 };
 function requests() {
   return {
+    sentences: vi.fn(),
+    sentence: vi.fn(),
+    createSentence: vi.fn(),
+    saveSentence: vi.fn(),
     equivalentCatalog: vi
       .fn()
       .mockResolvedValue({ registers: [], domains: [] }),
@@ -3118,5 +3122,85 @@ it("已归档词条的新版释义表格保持只读", async () => {
     screen.getByRole("textbox", { name: "简体中文解释 1" })
   ).toBeDisabled();
   fireEvent.keyDown(button("拖动英式英语释义 1"), { key: "ArrowDown" });
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("Step3下一步和当前草稿预览都读取当前目标语言例句", async () => {
+  useAuthStore.setState({
+    profile: {
+      ...useAuthStore.getState().profile!,
+      permissions: ["words.access", "words.edit", "sentences.access"]
+    }
+  });
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, sentences: true });
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: "noun",
+          definitions: [],
+          equivalents: [],
+          sentence_ids: ["example"]
+        }
+      ]
+    }
+  });
+  api.sentence.mockResolvedValue({
+    id: "example",
+    target_language: "en",
+    owner_id: "editor",
+    revision: 1,
+    reference_count: 1,
+    updated_at: entry.updated_at,
+    draft: {
+      schema_version: 1,
+      variants: [
+        {
+          id: "example-uk",
+          locale: "en-GB",
+          level: "A2",
+          content: { version: 2, text: "Scoped example", annotations: [] },
+          translations: []
+        },
+        {
+          id: "example-us",
+          locale: "en-US",
+          level: "A2",
+          content: {
+            version: 2,
+            text: "Other target example",
+            annotations: []
+          },
+          translations: []
+        }
+      ]
+    }
+  });
+  mount(api, `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`);
+  await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/词义与译词/));
+  fireEvent.click(button("下一步：预览"));
+  await waitFor(() =>
+    expect(
+      screen
+        .getAllByText("Scoped example")
+        .filter((node) => !isInaccessible(node))
+    ).toHaveLength(1)
+  );
+  expect(screen.queryByText("Other target example")).toBeNull();
+  fireEvent.click(button("当前草稿预览（含未保存修改）"));
+  await waitFor(() =>
+    expect(
+      screen
+        .getAllByText("Scoped example")
+        .filter((node) => !isInaccessible(node))
+    ).toHaveLength(2)
+  );
+  expect(api.sentence).toHaveBeenCalledWith("example");
+  expect(api.view).not.toHaveBeenCalled();
   expect(api.save).not.toHaveBeenCalled();
 });

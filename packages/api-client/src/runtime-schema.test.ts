@@ -51,6 +51,10 @@ const ROOTS = [
   "NextCapabilities",
   "NextEquivalentCatalog",
   "NextEntryView",
+  "NextSentence",
+  "NextSentenceList",
+  "CreateNextSentence",
+  "SaveNextSentence",
   "CreateNextEntry",
   "NextDetection",
   "NextDetectionInput",
@@ -250,6 +254,7 @@ function buildValidValue(
         buildValidValue(schema.items!, activeRefs)
       );
     case "string":
+      if (schema.pattern === "^(A1|A2|B1|B2|C1|C2)$") return "A1";
       if (schema.pattern === "^[A-F0-9]{16}$") return "0123456789ABCDEF";
       if (schema.pattern === "^[0-9a-f]{64}$") return "a".repeat(64);
       if (schema.pattern && new RegExp(schema.pattern).test("1")) return "1";
