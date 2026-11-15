@@ -2889,3 +2889,213 @@ it("已保存预览读取服务器版本，关闭后保留本地未保存修改"
   );
   expect(screen.getByRole("status")).toHaveTextContent("有未保存修改");
 });
+
+it("确认释义能力后开放双语表格，完整稿保存保留其他语言、音频及并发版本", async () => {
+  const api = requests();
+  let ready!: (value: NextCapabilities) => void;
+  api.capabilities.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        ready = resolve;
+      })
+  );
+  const original: NextDraft = {
+    ...entry.draft,
+    forms: [{ id: "form", locale: "en-US", text: "center" }],
+    grammar_structures: [],
+    senses: [
+      {
+        id: "sense",
+        part_of_speech: "noun",
+        level: "B2",
+        definitions: [
+          {
+            id: "def-en",
+            locale: "en-GB",
+            text: "a centre",
+            style: "definition",
+            level: "A1",
+            grammar_unbound: true,
+            content: {
+              version: 2,
+              text: "a centre",
+              annotations: [
+                { type: "emphasis", start: 2, end: 8, level: "core" }
+              ]
+            },
+            voice_profile: {
+              voices: [
+                {
+                  voice_id: "sonia",
+                  locale: "en-GB",
+                  enabled: true,
+                  rate_percent: 0,
+                  audio_asset_id: "existing-generated"
+                }
+              ]
+            }
+          },
+          {
+            id: "def-zh",
+            locale: "zh-Hans",
+            text: "中心",
+            style: "definition"
+          },
+          { id: "def-us", locale: "en-US", text: "a center", style: "sentence" }
+        ],
+        equivalents: [{ id: "equivalent", locale: "zh-Hans", text: "中心" }]
+      },
+      { id: "other", part_of_speech: "verb", definitions: [], equivalents: [] }
+    ]
+  };
+  api.get.mockResolvedValue({ ...entry, revision: 7, draft: original });
+  mount(api);
+  expect(screen.queryByRole("table", { name: "英式英语释义" })).toBeNull();
+  expect(api.get).not.toHaveBeenCalled();
+  await act(async () =>
+    ready({ ...caps, definition_details: true, sense_metadata: true })
+  );
+  await screen.findByText("版本 7");
+  fireEvent.click(button(/^词义与译词/));
+  expect(screen.getByRole("table", { name: "英式英语释义" })).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "编辑英式英语释义 1" })
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "编辑简体中文解释 1" })
+  ).toBeNull();
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "释义 1 等级" }));
+  fireEvent.click(
+    await screen.findByText("B1", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  const field = screen.getByRole("combobox", { name: "英式英语释义 1 等级" });
+  fireEvent.mouseDown(field);
+  fireEvent.click(
+    await screen.findByText("C1", {
+      selector:
+        ".ui-select-dropdown:not(.ui-select-dropdown-hidden) .ui-select-item-option-content"
+    })
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "简体中文解释 1" }), {
+    target: { value: "中央位置" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  expect(api.save).toHaveBeenCalledWith(id, {
+    expected_revision: 7,
+    draft: {
+      ...original,
+      senses: [
+        {
+          ...original.senses[0],
+          level: "B1",
+          definitions: [
+            { ...original.senses[0]!.definitions[0], level: "C1" },
+            { ...original.senses[0]!.definitions[1], text: "中央位置" },
+            original.senses[0]!.definitions[2]
+          ]
+        },
+        original.senses[1]
+      ]
+    }
+  });
+});
+
+it("释义弹窗未应用时锁住语言切换和保存，取消不写宿主正文", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, definition_details: true });
+  const definition = {
+    id: "def",
+    locale: "en-GB",
+    text: "centre",
+    style: "definition" as const
+  };
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: "noun",
+          definitions: [definition],
+          equivalents: []
+        }
+      ]
+    }
+  });
+  mount(api);
+  await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "center" }
+  });
+  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(button("编辑英式英语释义 1"));
+  const editor = await screen.findByRole("textbox", { name: "英式英语释义 1" });
+  fireEvent.change(editor, { target: { value: "unapplied body" } });
+  expect(button("保存完整草稿")).toBeDisabled();
+  expect(screen.getByRole("combobox", { name: "目标语言" })).toBeDisabled();
+  fireEvent.click(button("保存完整草稿"));
+  expect(api.save).not.toHaveBeenCalled();
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "取消" })
+  );
+  await waitFor(() => expect(button("保存完整草稿")).toBeEnabled());
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  expect(api.save.mock.calls[0]![1].draft.senses[0].definitions).toEqual([
+    definition
+  ]);
+});
+
+it("已归档词条的新版释义表格保持只读", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, definition_details: true });
+  api.workspaceEntry.mockResolvedValue(listRow({ status: "archived" }));
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: "noun",
+          definitions: [
+            {
+              id: "en1",
+              locale: "en-GB",
+              text: "centre",
+              style: "definition",
+              level: "A1"
+            },
+            {
+              id: "en2",
+              locale: "en-GB",
+              text: "middle",
+              style: "definition",
+              level: "B2"
+            },
+            { id: "zh", locale: "zh-Hans", text: "中心", style: "definition" }
+          ],
+          equivalents: []
+        }
+      ]
+    }
+  });
+  mount(api);
+  await screen.findByText("版本 1");
+  fireEvent.click(button(/^词义与译词/));
+  expect(button("编辑英式英语释义 1")).toBeDisabled();
+  expect(button("添加英式英语释义")).toBeDisabled();
+  expect(
+    screen.getByRole("combobox", { name: "英式英语释义 1 等级" })
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("textbox", { name: "简体中文解释 1" })
+  ).toBeDisabled();
+  fireEvent.keyDown(button("拖动英式英语释义 1"), { key: "ArrowDown" });
+  expect(api.save).not.toHaveBeenCalled();
+});

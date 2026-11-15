@@ -13,6 +13,12 @@ export interface NextForm {
   text: string;
 }
 export interface NextDefinition {
+  level?: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+  /** true = explicitly unbound; omitted = not selected. */
+  grammar_unbound?: true;
+  content?: RichTextV3;
+  voice_profile?: VoiceProfileV3;
+  audio_assets?: AudioAssetV3[];
   grammar_structure_id?: string;
   id: string;
   locale: string;
@@ -169,6 +175,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  definition_details?: boolean;
   equivalent_metadata?: boolean;
   sense_metadata?: boolean;
   grammar_audio?: boolean;

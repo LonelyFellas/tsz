@@ -1,7 +1,19 @@
 import { EquivalentPreview } from "./EquivalentPreview";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import { toRichTextV2 } from "@tsz/voice-editor/core";
+import {
+  PronunciationPreviewControls,
+  PronunciationPreviewProvider
+} from "@/features/dictionary/word-creation/PronunciationPreview";
+import { EntryDialectContext } from "@/features/settings/useDialectPreference";
 import { Alert } from "@tsz/ui/admin/display";
-import type { NextDraft, NextEntryView, NextSense } from "@tsz/types";
+import type {
+  NextDefinition,
+  NextDraft,
+  NextEntryView,
+  NextGrammarIssue,
+  NextSense
+} from "@tsz/types";
 import { draftForms, localeLabels } from "./model";
 
 function Lines({
@@ -23,6 +35,78 @@ function Lines({
           <span className={textClassName}>{row.text || "（空白）"}</span>
         </li>
       ))}
+    </ul>
+  ) : (
+    <p className="lexicon-next-muted">缺少{missing}</p>
+  );
+}
+function Definitions({
+  rows,
+  missing,
+  issues
+}: {
+  rows: NextDefinition[];
+  missing: string;
+  issues?: NextGrammarIssue[];
+}) {
+  return rows.length ? (
+    <ul>
+      {rows.map((row) => {
+        const english = row.locale === "en" || row.locale.startsWith("en-");
+        const content = row.content ?? {
+          version: 2 as const,
+          text: row.text,
+          annotations: []
+        };
+        return (
+          <li key={row.id}>
+            <span className="lexicon-next-muted">
+              {localeLabels[row.locale] ?? row.locale} · {row.level ?? "未评估"}{" "}
+              · {row.style === "sentence" ? "整句" : "定义"} ·{" "}
+              {row.grammar_unbound
+                ? "不绑定"
+                : row.grammar_structure_id
+                  ? issues?.some(
+                      (issue) =>
+                        issue.node_id === row.id &&
+                        issue.field === "grammar_structure_id"
+                    )
+                    ? "语法引用失效"
+                    : "已关联语法"
+                  : "未选择语法"}
+              ：
+            </span>
+            {english ? (
+              <>
+                <PronunciationPreviewControls
+                  pronunciationId={row.id}
+                  recommendationArea="meaning"
+                  playbackOnly
+                  assetOnly
+                  dialect={
+                    row.locale === "en-GB"
+                      ? "uk"
+                      : row.locale === "en-US"
+                        ? "us"
+                        : "common"
+                  }
+                  ariaLabelPrefix={missing}
+                  content={toRichTextV2(content)}
+                  voiceProfile={row.voice_profile}
+                  audioAssets={row.audio_assets}
+                />
+                <RichTextReadOnly
+                  className="tsz-words"
+                  value={content}
+                  emptyText="（空白）"
+                />
+              </>
+            ) : (
+              <span>{row.text || "（空白）"}</span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   ) : (
     <p className="lexicon-next-muted">缺少{missing}</p>
@@ -66,97 +150,120 @@ function SenseMetadataSummary({
 }
 export function Preview({ view }: { view: NextEntryView }) {
   return (
-    <div className="lexicon-next-preview">
-      <SenseGroups groups={view.sense_groups} />
-      {!!view.grammar_issues?.length && (
-        <Alert
-          type="warning"
-          title="语法结构尚未完整配置"
-          description={
-            <ul>
+    <EntryDialectContext.Provider
+      value={view.target_locale === "en-US" ? "en-US" : "en-GB"}
+    >
+      <PronunciationPreviewProvider readOnly>
+        <div className="lexicon-next-preview">
+          <SenseGroups groups={view.sense_groups} />
+          {!!view.grammar_issues?.length && (
+            <Alert
+              type="warning"
+              title="语法结构尚未完整配置"
+              description={
+                <ul>
+                  {[
+                    ...new Set(
+                      view.grammar_issues.map((issue) => issue.message)
+                    )
+                  ].map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              }
+            />
+          )}
+          <Lines rows={view.forms} missing="词形" textClassName="tsz-words" />
+          {!view.senses.length && <p>尚无词义</p>}
+          {view.senses.map((sense, index) => (
+            <section key={sense.id}>
+              <h4>
+                词义 {index + 1}
+                {senseGroupName(view.sense_groups, sense.sense_group_id)}
+              </h4>
+              <SenseMetadataSummary sense={sense} />
+              <Definitions
+                rows={sense.target_definitions}
+                missing="英文释义"
+                issues={view.grammar_issues}
+              />
+              <Definitions
+                rows={sense.medium_definitions}
+                missing="中文解释"
+                issues={view.grammar_issues}
+              />
+              <EquivalentPreview
+                rows={sense.equivalents}
+                noEquivalents={sense.no_equivalents}
+              />
               {[
-                ...new Set(view.grammar_issues.map((issue) => issue.message))
-              ].map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          }
-        />
-      )}
-      <Lines rows={view.forms} missing="词形" textClassName="tsz-words" />
-      {!view.senses.length && <p>尚无词义</p>}
-      {view.senses.map((sense, index) => (
-        <section key={sense.id}>
-          <h4>
-            词义 {index + 1}
-            {senseGroupName(view.sense_groups, sense.sense_group_id)}
-          </h4>
-          <SenseMetadataSummary sense={sense} />
-          <Lines rows={sense.target_definitions} missing="英文释义" />
-          <Lines rows={sense.medium_definitions} missing="中文解释" />
-          <EquivalentPreview
-            rows={sense.equivalents}
-            noEquivalents={sense.no_equivalents}
-          />
-          {[
-            ...new Set(
-              [...sense.target_definitions, ...sense.medium_definitions]
-                .map((d) => d.grammar_structure_id)
-                .filter(Boolean)
-            )
-          ].map((id) => {
-            const grammar = view.grammar_structures?.find((g) => g.id === id);
-            return grammar ? (
-              <div key={id} aria-label="语法结构">
-                {grammar.variants.map((variant) => (
-                  <RichTextReadOnly
-                    className="tsz-words"
-                    key={variant.id}
-                    value={variant.content}
-                    emptyText="未填写语法结构"
-                  />
-                ))}
-              </div>
-            ) : null;
-          })}
-        </section>
-      ))}
-    </div>
+                ...new Set(
+                  [...sense.target_definitions, ...sense.medium_definitions]
+                    .map((d) => d.grammar_structure_id)
+                    .filter(Boolean)
+                )
+              ].map((id) => {
+                const grammar = view.grammar_structures?.find(
+                  (g) => g.id === id
+                );
+                return grammar ? (
+                  <div key={id} aria-label="语法结构">
+                    {grammar.variants.map((variant) => (
+                      <RichTextReadOnly
+                        className="tsz-words"
+                        key={variant.id}
+                        value={variant.content}
+                        emptyText="未填写语法结构"
+                      />
+                    ))}
+                  </div>
+                ) : null;
+              })}
+            </section>
+          ))}
+        </div>
+      </PronunciationPreviewProvider>
+    </EntryDialectContext.Provider>
   );
 }
 export function DraftSummary({ draft }: { draft: NextDraft }) {
   return (
-    <div className="lexicon-next-preview">
-      <h4 className="tsz-words">{draft.headword}</h4>
-      <SenseGroups groups={draft.sense_groups} />
-      <Lines
-        rows={draftForms(draft)}
-        missing="词形"
-        textClassName="tsz-words"
-      />
-      {draft.grammar_structures?.map((grammar, index) => (
-        <section key={grammar.id}>
-          <h4>语法结构 {index + 1}</h4>
-          {grammar.variants.map((variant) => (
-            <div key={variant.id}>
-              {localeLabels[variant.locale]}：
-              <RichTextReadOnly className="tsz-words" value={variant.content} />
-            </div>
-          ))}
-        </section>
-      ))}
-      {draft.senses.map((sense, index) => (
-        <section key={sense.id}>
-          <h4>
-            词义 {index + 1} · {sense.part_of_speech ?? "未指定词性"}
-            {senseGroupName(draft.sense_groups, sense.sense_group_id)}
-          </h4>
-          <SenseMetadataSummary sense={sense} />
-          <Lines rows={sense.definitions} missing="释义" />
-          <DraftEquivalentSummary sense={sense} />
-        </section>
-      ))}
-    </div>
+    <PronunciationPreviewProvider readOnly>
+      <div className="lexicon-next-preview">
+        <h4 className="tsz-words">{draft.headword}</h4>
+        <SenseGroups groups={draft.sense_groups} />
+        <Lines
+          rows={draftForms(draft)}
+          missing="词形"
+          textClassName="tsz-words"
+        />
+        {draft.grammar_structures?.map((grammar, index) => (
+          <section key={grammar.id}>
+            <h4>语法结构 {index + 1}</h4>
+            {grammar.variants.map((variant) => (
+              <div key={variant.id}>
+                {localeLabels[variant.locale]}：
+                <RichTextReadOnly
+                  className="tsz-words"
+                  value={variant.content}
+                />
+              </div>
+            ))}
+          </section>
+        ))}
+        {draft.senses.map((sense, index) => (
+          <section key={sense.id}>
+            <h4>
+              词义 {index + 1} · {sense.part_of_speech ?? "未指定词性"}
+              {senseGroupName(draft.sense_groups, sense.sense_group_id)}
+            </h4>
+            <SenseMetadataSummary sense={sense} />
+            <Definitions rows={sense.definitions} missing="释义" />
+            <DraftEquivalentSummary sense={sense} />
+          </section>
+        ))}
+      </div>
+    </PronunciationPreviewProvider>
   );
 }
 

@@ -1,0 +1,12 @@
+{
+  "bucket": "tshb-test-assets",
+  "run_id": "20261115-lexdef3-d82e71",
+  "prefix": "temporary-tests/20261115-lexdef3-d82e71/",
+  "started_at": "2026-11-15T06:42:49.063631+00:00",
+  "status": "permissions_ok",
+  "planned": [],
+  "deleted": [],
+  "errors": [],
+  "remaining": [],
+  "finished_at": "2026-11-15T06:42:49.411996+00:00"
+}

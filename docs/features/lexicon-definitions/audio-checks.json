@@ -1,0 +1,34 @@
+{
+  "independent_get": true,
+  "stable_ids_order": true,
+  "sense_level_independent": true,
+  "other_sense_forms_equivalents_preserved": true,
+  "formal_audio": [
+    {
+      "definition_id": "b7b643ac-ba55-4fd3-8acc-3c96f5a84bcc",
+      "asset_id": "01a1ddf8-f85b-74f6-9d3c-5d3319fa3d80",
+      "locale": "en-GB",
+      "bytes": 23904,
+      "decoded_duration_seconds": 1.992,
+      "sha256": "4f4e24c40edecd406f6d1117d155bdd87d8d8e963709a1046c0b33628661e1fd",
+      "area": "meaning",
+      "pcm_peak": 14764
+    },
+    {
+      "definition_id": "8e0e0e74-23cf-4c2c-b28a-10682bce378a",
+      "asset_id": "01a1ddf8-33d1-7429-bfe9-d9f2ea193326",
+      "locale": "en-US",
+      "bytes": 29664,
+      "decoded_duration_seconds": 2.472,
+      "sha256": "48f685e612ae7abacf95a4f77cfae11eb33541d511c00c979f4d447a054f1f74",
+      "area": "meaning",
+      "pcm_peak": 22276
+    }
+  ],
+  "recording_fixture": {
+    "id": "01a1ddf9-de75-765c-97db-d53d6ae5f423",
+    "type": "0.5s local sine tone, not speech synthesis",
+    "upload_confirm_status": 201
+  },
+  "revision": 7
+}

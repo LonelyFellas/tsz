@@ -1,0 +1,37 @@
+{
+  "run_id": "20261115-lexdef3-d82e71",
+  "status": "backend_and_oss_clean_browser_site_data_unknown",
+  "steps": [
+    {
+      "process": 57490,
+      "cwd_verified": "/Users/darwish/.codex/worktrees/lexicon-definitions-api/tsz-rust",
+      "stopped": true
+    },
+    {
+      "process": 41742,
+      "cwd_verified": "/Users/darwish/.codex/worktrees/3226/tsz/apps/admin",
+      "stopped": true
+    },
+    {
+      "oss": "all exact versions and delete markers removed; independent relist clean"
+    }
+  ],
+  "before": {
+    "admins": 1,
+    "entries": 1,
+    "assets": 5,
+    "generations": 4,
+    "revisions": 10,
+    "redis_keys": 1,
+    "all_actor_and_asset_ownership_verified": true
+  },
+  "after_registry": {
+    "fixture_database_exists": false,
+    "redis_keys": 0
+  },
+  "ports_released": [55593, 56593, 18593, 31593],
+  "local_data_directory_removed": true,
+  "raw_audio_and_secrets_removed": true,
+  "protected_scope": "No remote DB/Redis, normal OSS prefix, existing browser tab, or user account was modified; only this owned local cluster and exact OSS run prefix.",
+  "browser_limitation": "See browser-cleanup.json; logout and tab closure succeeded; per-origin storage-clear command unsupported."
+}
