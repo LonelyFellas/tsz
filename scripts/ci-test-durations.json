@@ -74,7 +74,6 @@
     "apps/admin/src/features/dictionary/voice-editor/dataSource.test.ts": 1041,
     "apps/admin/src/features/dictionary/voice-editor/diagnostics.test.ts": 682,
     "apps/admin/src/features/dictionary/voice-editor/generationFlow.test.tsx": 2605,
-    "apps/admin/src/features/dictionary/voice-editor/mock.test.ts": 974,
     "apps/admin/src/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep.test.tsx": 58556,
     "apps/admin/src/features/dictionary/word-creation-v3/V3MeaningsPreview.test.tsx": 1533,
     "apps/admin/src/features/dictionary/word-creation-v3/V3PreviewAndPublishStep.test.tsx": 9682,
