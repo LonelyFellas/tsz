@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
 import type {
   SharedFormsStepContentV3,
@@ -28,7 +28,9 @@ export function FormsStep({
   locale,
   issues,
   onChange,
-  registerLeaveGuard
+  registerLeaveGuard,
+  selectedPos,
+  onSelectedPosChange
 }: {
   value: SharedFormsStepContentV3;
   saved?: SharedFormsStepContentV3;
@@ -37,8 +39,19 @@ export function FormsStep({
   issues: readonly V3DraftValidationIssue[];
   onChange: (next: SharedFormsStepContentV3) => void;
   registerLeaveGuard: (guard?: () => Promise<boolean>) => void;
+  selectedPos?: string;
+  onSelectedPosChange?: (code: string) => void;
 }) {
   const [activePosId, setActivePosId] = useState<string>();
+  // 新增词性先回写结构，再报告选中 ID；此时父级 props 可能尚未更新。
+  const latestForms = useRef(value);
+  useLayoutEffect(() => {
+    latestForms.current = value;
+  }, [value]);
+  const applyForms = (next: SharedFormsStepContentV3) => {
+    latestForms.current = next;
+    onChange(next);
+  };
   const [stableVariantIds] = useState(() =>
     createStableVariantIdFactory(expandFormContents(value), [])
   );
@@ -56,19 +69,30 @@ export function FormsStep({
           value={expandFormContents(value)}
           issues={issues}
           sharedForms={value}
-          onSharedFormsChange={onChange}
+          onSharedFormsChange={applyForms}
           onChange={(next) => {
             const updated = applyFormsStructure(value, next);
-            if (isSharedForms(updated)) onChange(updated);
+            if (isSharedForms(updated)) applyForms(updated);
           }}
           entryKind={kind}
           deletePosDescription={removePosDescription}
           activePosId={
+            value.pos.find((pos) => pos.pos === selectedPos)?.pos_id ??
+            (!onSelectedPosChange &&
             value.pos.some((pos) => pos.pos_id === activePosId)
               ? activePosId
-              : value.pos[0]?.pos_id
+              : value.pos[0]?.pos_id)
           }
-          onActivePosChange={setActivePosId}
+          onActivePosChange={(id) => {
+            if (!onSelectedPosChange) {
+              setActivePosId(id);
+              return;
+            }
+            const pos = latestForms.current.pos.find(
+              (pos) => pos.pos_id === id
+            );
+            if (pos) onSelectedPosChange(pos.pos);
+          }}
           stableVariantIds={stableVariantIds}
           pronunciationReferenceIds={pronunciationIds}
           multipleSpellingsAvailable

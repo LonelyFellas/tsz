@@ -2371,13 +2371,22 @@ it("Step3 从标签添加基本词性、排序，Step2 和保存请求沿用同�
   expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
   fireEvent.click(steps.getByRole("button", { name: /^词性与发音/ }));
   expect(visiblePosOrder()).toEqual(["拖动动词", "拖动名词"]);
-  fireEvent.click(
+  expect(
     within(screen.getByRole("tablist")).getByRole("tab", { name: /动词/ })
-  );
+  ).toHaveAttribute("aria-selected", "true");
   expect(
     screen.getByLabelText("编辑过去式内容", { selector: "button" })
   ).toBeVisible();
+  fireEvent.click(
+    within(screen.getByRole("tablist")).getByRole("tab", { name: /名词/ })
+  );
   fireEvent.click(steps.getByRole("button", { name: /^词义与译词/ }));
+  expect(
+    within(screen.getByRole("tablist")).getByRole("tab", { name: /名词/ })
+  ).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(
+    within(screen.getByRole("tablist")).getByRole("tab", { name: /动词/ })
+  );
   expect(meanings.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
     "集中于"
   );
@@ -3213,5 +3222,97 @@ it("Step3下一步和当前草稿预览都读取当前目标语言例句", async
   );
   expect(api.sentence).toHaveBeenCalledWith("example");
   expect(api.view).not.toHaveBeenCalled();
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("Step 2 未指定词性时保留已有词形但禁止录入，选定词性后开放", async () => {
+  const api = requests();
+  const legacyForms = [
+    { id: "old-form", locale: "en-GB", text: "existing spelling" }
+  ];
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      forms: legacyForms,
+      form_editor: emptyFormEditor()
+    }
+  });
+  mount(api);
+  const addPos = await screen.findByRole("combobox", { name: "添加基本词性" });
+  fireEvent.click(button("已有词形"));
+  expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
+    "existing spelling"
+  );
+  expect(
+    screen.getByRole("textbox", { name: "英式英语词形 1" })
+  ).toBeDisabled();
+  for (const name of [
+    "添加通用英语词形",
+    "添加英式英语词形",
+    "添加美式英语词形"
+  ]) {
+    expect(button(name)).toBeDisabled();
+  }
+  expect(
+    screen.queryByLabelText("编辑原形内容", { selector: "button" })
+  ).toBeNull();
+  await waitFor(() => expect(addPos).toBeEnabled());
+  fireEvent.mouseDown(addPos);
+  fireEvent.click(
+    await screen.findByText("名词", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  expect(
+    await screen.findByLabelText("编辑原形内容", { selector: "button" })
+  ).toBeEnabled();
+  expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toBeEnabled();
+  for (const name of [
+    "添加通用英语词形",
+    "添加英式英语词形",
+    "添加美式英语词形"
+  ]) {
+    expect(button(name)).toBeEnabled();
+  }
+  fireEvent.click(button("保存草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  expect(api.save.mock.calls[0]![1].draft.forms).toEqual(legacyForms);
+});
+
+it("Step2 新增词性和双向切换时，Step3 选中同一词性", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      form_editor: applyFormsStructure(emptyFormEditor(), formsFixture())
+    }
+  });
+  mount(api);
+  await screen.findByLabelText("编辑原形内容", { selector: "button" });
+  const posPicker = within(screen.getByRole("tablist")).getByRole("combobox", {
+    name: "添加基本词性"
+  });
+  await waitFor(() => expect(posPicker).toBeEnabled());
+  fireEvent.mouseDown(posPicker);
+  fireEvent.click(
+    await screen.findByText("动词", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+  const selectedTab = (name: RegExp) =>
+    within(screen.getByRole("tablist")).getByRole("tab", { name });
+  expect(selectedTab(/动词/)).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(button("下一步：词义与译词"));
+  expect(selectedTab(/动词/)).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(selectedTab(/名词/));
+  fireEvent.click(button("上一步"));
+  expect(selectedTab(/名词/)).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(selectedTab(/动词/));
+  fireEvent.click(stepButton(/^词义与译词/));
+  expect(selectedTab(/动词/)).toHaveAttribute("aria-selected", "true");
   expect(api.save).not.toHaveBeenCalled();
 });

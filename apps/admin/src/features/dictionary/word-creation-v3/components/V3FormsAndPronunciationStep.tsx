@@ -523,7 +523,7 @@ export function V3FormsAndPronunciationStep({
       {sharedForms && onSharedFormsChange && (
         <V3FormsAudioTasks
           forms={sharedForms}
-          paused={!!editingFormId}
+          paused={!!editingFormId || value.pos.length === 0}
           onChange={onSharedFormsChange}
         />
       )}
