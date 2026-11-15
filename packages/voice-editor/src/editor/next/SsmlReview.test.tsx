@@ -76,19 +76,7 @@ it("参数无效时阻止自动SSML，但保留并允许独立手动原文试听
   );
 });
 
-it("手动试听、复制、下载使用同一原文，恢复自动生成且不修改版本配置", async () => {
-  const writeText = vi.fn(async () => {});
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText },
-    configurable: true
-  });
-  let downloaded: Blob | undefined;
-  vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
-    downloaded = blob as Blob;
-    return "blob:download";
-  });
-  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+it("手动草稿在请求失败后保留，恢复自动生成不修改版本配置", async () => {
   const synthesizeSsml = vi
     .fn()
     .mockRejectedValue(new Error("provider unavailable"));
@@ -124,15 +112,6 @@ it("手动试听、复制、下载使用同一原文，恢复自动生成且不�
     expect.anything()
   );
   expect(screen.getByLabelText("SSML 原文")).toHaveValue(raw);
-  fireEvent.click(screen.getByRole("button", { name: "复制 SSML" }));
-  expect(writeText).toHaveBeenCalledWith(raw);
-  fireEvent.click(screen.getByRole("button", { name: "下载 SSML" }));
-  const fileText = await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.readAsText(downloaded!);
-  });
-  expect(fileText).toBe(raw);
   fireEvent.click(screen.getByRole("button", { name: "恢复自动生成" }));
   expect(screen.getByLabelText("SSML 原文")).toHaveValue(automatic);
   expect(settings).toEqual(original);

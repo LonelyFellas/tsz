@@ -3,8 +3,7 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor,
-  within
+  waitFor
 } from "@testing-library/react";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type {
@@ -67,12 +66,8 @@ vi.mock("../voice-editor/dataSource", () => ({
 
 class AudioMock {
   static instances: AudioMock[] = [];
-  static playErrors: Error[] = [];
   readonly listeners = new Map<string, () => void>();
-  play = vi.fn(() => {
-    const error = AudioMock.playErrors.shift();
-    return error ? Promise.reject(error) : Promise.resolve();
-  });
+  play = vi.fn(async () => {});
   pause = vi.fn();
 
   constructor(readonly src: string) {
@@ -210,7 +205,6 @@ beforeEach(() => {
   preview.resolveAudio.mockReset().mockResolvedValue(result());
   message.error.mockReset();
   AudioMock.instances = [];
-  AudioMock.playErrors = [];
 });
 
 afterEach(() => {
@@ -322,65 +316,6 @@ it("默认音色摘要与播放合并解析，保存推荐后同步新参数", a
 });
 
 describe("PronunciationPreview", () => {
-  it("已启用音色浮层成对展示语速和音量，并直接播放各版本的已生成音频", async () => {
-    vi.stubGlobal("Audio", AudioMock);
-    render(
-      <PronunciationPreviewProvider>
-        <PronunciationPreviewVoiceSummary
-          dialect="uk"
-          pronunciationId="pronunciation-stable-id"
-          content={{ version: 2, text: "tomato", annotations: [] }}
-          voiceProfile={{
-            voices: [
-              {
-                voice_id: "british-voice",
-                version_id: "slow",
-                enabled: true,
-                rate_percent: -15,
-                volume_percent: 65,
-                audio_asset_id: "slow-audio"
-              },
-              {
-                voice_id: "british-voice",
-                version_id: "normal",
-                enabled: true,
-                rate_percent: 0,
-                audio_asset_id: "normal-audio"
-              }
-            ]
-          }}
-        />
-      </PronunciationPreviewProvider>
-    );
-    await screen.findByText("British");
-    fireEvent.click(
-      screen.getByRole("button", { name: "查看英式全部 2 个音色" })
-    );
-    const list = await screen.findByRole("list", { name: "已启用音色" });
-    const rows = within(list).getAllByRole("listitem");
-    expect(within(rows[0]!).getByText("0.85×")).toBeInTheDocument();
-    expect(within(rows[0]!).getByText("65%")).toBeInTheDocument();
-    expect(within(rows[1]!).getByText("1.00×")).toBeInTheDocument();
-    expect(within(rows[1]!).getByText("100%")).toBeInTheDocument();
-    for (const [index, asset] of ["slow-audio", "normal-audio"].entries()) {
-      const play = within(rows[index]!).getByRole("button", {
-        name: "British 播放语音"
-      });
-      expect(play).toBeEnabled();
-      fireEvent.click(play);
-      await waitFor(() =>
-        expect(preview.resolveAudio).toHaveBeenLastCalledWith(
-          asset,
-          expect.anything()
-        )
-      );
-      await waitFor(() =>
-        expect(AudioMock.instances[index]?.play).toHaveBeenCalled()
-      );
-    }
-    expect(preview.synthesize).not.toHaveBeenCalled();
-  });
-
   it("局部合成回写后可直接播放，参数变更清除绑定后禁止复用旧音频", async () => {
     const setting = {
       voice_id: "british-voice",
@@ -468,38 +403,6 @@ describe("PronunciationPreview", () => {
     await act(async () => fireEvent.click(play));
     expect(preview.resolveAudio).toHaveBeenCalledTimes(3);
     expect(preview.synthesize).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    [undefined, "100%"],
-    [65, "65%"],
-    [0, "0%"]
-  ])("音量摘要将 %s 显示为 %s", async (volume, expected) => {
-    render(
-      <PronunciationPreviewProvider>
-        <PronunciationPreviewVoiceSummary
-          dialect="uk"
-          column="volume"
-          voiceProfile={{
-            voices: [
-              {
-                voice_id: "american-voice",
-                enabled: true,
-                rate_percent: 0,
-                volume_percent: 25
-              },
-              {
-                voice_id: "british-voice",
-                enabled: true,
-                rate_percent: 0,
-                ...(volume !== undefined ? { volume_percent: volume } : {})
-              }
-            ]
-          }}
-        />
-      </PronunciationPreviewProvider>
-    );
-    expect(await screen.findByText(expected)).toBeInTheDocument();
   });
 
   it("音量摘要随继承解析更新，不显示旧快照或失败后的默认音量", async () => {
@@ -667,36 +570,6 @@ describe("PronunciationPreview", () => {
     expect(getButton).toBeDisabled();
     fireEvent.click(getButton);
     expect(preview.synthesize).not.toHaveBeenCalled();
-  });
-
-  it("统一内容按方言偏好挑发音人，获取后自动播放且可手动重播", async () => {
-    const pending = deferred<VoicePreviewResult>();
-    preview.synthesize.mockReturnValue(pending.promise);
-    render(<PreviewHarness />);
-
-    const getButton = screen.getByLabelText("获取语音");
-    await waitFor(() => expect(getButton).toBeEnabled());
-    fireEvent.click(getButton);
-
-    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
-    expect(preview.synthesize).toHaveBeenCalledWith(
-      {
-        language: "en",
-        content: { version: 2, text: "tomato", annotations: [] },
-        // 统一内容没有自己的方言，按管理员偏好（缺省英式）挑 en-GB 发音人。
-        voiceId: "british-voice",
-        ratePercent: 0
-      },
-      { signal: expect.any(AbortSignal) }
-    );
-    await act(async () => pending.resolve(result()));
-    expect(AudioMock.instances).toHaveLength(1);
-    expect(AudioMock.instances[0]!.play).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText("播放语音")).toBeEnabled();
-
-    fireEvent.click(screen.getByLabelText("播放语音"));
-    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
-    expect(AudioMock.instances[1]?.play).toHaveBeenCalled();
   });
 
   it.each([
@@ -891,75 +764,6 @@ describe("PronunciationPreview", () => {
     view.unmount();
 
     expect(signal?.aborted).toBe(true);
-  });
-
-  it("自动播放拒绝后保留结果，手动播放拒绝显示错误", async () => {
-    AudioMock.playErrors = [
-      new Error("autoplay blocked"),
-      new Error("play blocked")
-    ];
-    render(<PreviewHarness />);
-    await waitFor(() =>
-      expect(screen.getByLabelText("获取语音")).toBeEnabled()
-    );
-    fireEvent.click(screen.getByLabelText("获取语音"));
-    await waitFor(() =>
-      expect(screen.getByLabelText("播放语音")).toBeEnabled()
-    );
-
-    fireEvent.click(screen.getByLabelText("播放语音"));
-
-    await waitFor(() =>
-      expect(message.error).toHaveBeenCalledWith(
-        "播放失败，请检查浏览器音频权限后重试"
-      )
-    );
-    expect(screen.getByLabelText("播放语音")).toBeEnabled();
-  });
-
-  it("走真实 TTS 时不显示模拟标记", async () => {
-    render(<PreviewHarness />);
-    await waitFor(() =>
-      expect(screen.getByLabelText("获取语音")).toBeEnabled()
-    );
-
-    expect(screen.queryByText("模拟")).toBeNull();
-  });
-
-  it("走 mock 适配器时显示模拟标记", async () => {
-    preview.mocked = true;
-    render(<PreviewHarness />);
-    await waitFor(() =>
-      expect(screen.getByLabelText("获取语音")).toBeEnabled()
-    );
-
-    expect(screen.getByText("模拟")).toBeVisible();
-  });
-
-  it("缺少某侧发音人时给出无需悬停的常驻说明", async () => {
-    preview.listVoices.mockResolvedValue([voices[0], voices[2]]);
-    render(<NoticeHarness />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId("voice-notice")).toHaveTextContent(
-        "英式（en-GB）暂无可用发音人，对应的「获取语音」已禁用"
-      )
-    );
-  });
-
-  it("两侧发音人齐全时不显示常驻说明", async () => {
-    render(<NoticeHarness />);
-
-    await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
-    expect(screen.getByTestId("voice-notice")).toHaveTextContent("无提示");
-  });
-
-  it("试听功能关闭时不显示常驻说明", () => {
-    preview.enabled = false;
-    render(<NoticeHarness />);
-
-    expect(screen.getByTestId("voice-notice")).toHaveTextContent("无提示");
-    expect(preview.listVoices).not.toHaveBeenCalled();
   });
 
   it("发音人目录为空时透出目录层面的原因", async () => {

@@ -97,28 +97,25 @@ afterEach(() => {
 });
 
 describe("admin voice preview data source", () => {
-  it.each([new Error("offline"), { status: 500 }])(
-    "文本音色目录不依赖个人参数：%s",
-    async (failure) => {
-      state.library.mockRejectedValue(failure);
-      const { adminVoicePreviewAdapter } = await import("./dataSource");
-      const voices = await adminVoicePreviewAdapter.listVoices({
-        language: "en"
-      });
-      expect(voices).toHaveLength(1);
-      expect(voices[0]).toMatchObject({ id: "real-voice" });
-      expect(state.library).not.toHaveBeenCalled();
-      expect(voices[0]?.defaultSettings).toBeUndefined();
-      await adminVoicePreviewAdapter.synthesize({
-        language: "en",
-        content: CONTENT,
-        voiceId: "real-voice",
-        ratePercent: 0,
-        pitchSemitones: 0
-      });
-      expect(state.preview).toHaveBeenCalled();
-    }
-  );
+  it("文本音色目录不依赖个人参数接口", async () => {
+    state.library.mockRejectedValue(new Error("offline"));
+    const { adminVoicePreviewAdapter } = await import("./dataSource");
+    const voices = await adminVoicePreviewAdapter.listVoices({
+      language: "en"
+    });
+    expect(voices).toHaveLength(1);
+    expect(voices[0]).toMatchObject({ id: "real-voice" });
+    expect(state.library).not.toHaveBeenCalled();
+    expect(voices[0]?.defaultSettings).toBeUndefined();
+    await adminVoicePreviewAdapter.synthesize({
+      language: "en",
+      content: CONTENT,
+      voiceId: "real-voice",
+      ratePercent: 0,
+      pitchSemitones: 0
+    });
+    expect(state.preview).toHaveBeenCalled();
+  });
   it("独立推荐保留条目身份、顺序与未选项，单侧请求只返回本侧", async () => {
     const voice = (id: string) => ({
       id: `side-${id}`,

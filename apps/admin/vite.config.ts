@@ -1,6 +1,5 @@
 import { resourceRecoveryScript } from "../../packages/shared/src/recovery/bootstrap.ts";
 import { randomUUID } from "node:crypto";
-import { localSpeechMock } from "./scripts/local-speech-mock.ts";
 import { fileURLToPath, URL } from "node:url";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
@@ -89,12 +88,7 @@ export default defineConfig(({ mode, command }) => {
             source: JSON.stringify({ release_id: releaseId })
           });
         }
-      },
-      localSpeechMock(
-        command === "serve" &&
-          !production &&
-          buildEnv.VITE_LOCAL_SPEECH_MOCK === "true"
-      )
+      }
     ],
     resolve: {
       alias: {
