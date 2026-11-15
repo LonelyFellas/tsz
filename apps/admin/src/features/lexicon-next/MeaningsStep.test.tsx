@@ -303,3 +303,106 @@ it("只读词义总体数据禁用输入、排序和键盘语境切换", async (
   expect(onChange).not.toHaveBeenCalled();
   catalog.mockRestore();
 });
+
+it("已配置词性默认显示展开的词义与语法模板，切换英美保留同一草稿", async () => {
+  const catalog = vi
+    .spyOn(partOfSpeechDataSource, "catalog")
+    .mockResolvedValue(partOfSpeechCatalogFixture);
+  const initial: NextDraft = {
+    schema_version: 1,
+    headword: "centre",
+    forms: [],
+    senses: [],
+    form_editor: {
+      forms_format: "shared_v1",
+      contents: [],
+      pos: [{ pos_id: "noun", pos: "noun", forms: [], form_groups: [] }]
+    }
+  };
+  function Harness() {
+    const [draft, setDraft] = useState(initial);
+    const [target, setTarget] = useState("en-GB");
+    const [disabled, setDisabled] = useState(true);
+    return (
+      <>
+        <button onClick={() => setTarget("en-US")}>切换美式</button>
+        <button onClick={() => setDisabled(false)}>开启编辑</button>
+        <MeaningsStep
+          value={draft}
+          kind="word"
+          formEditorAvailable={false}
+          grammarAvailable
+          senseGroupsAvailable
+          senseMetadataAvailable
+          target={target}
+          medium="zh-Hans"
+          partOfSpeechCodes={["noun"]}
+          disabled={disabled}
+          onChange={setDraft}
+        />
+        <output aria-label="模板草稿">{JSON.stringify(draft)}</output>
+      </>
+    );
+  }
+  try {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <App>
+          <Harness />
+        </App>
+      </QueryClientProvider>
+    );
+    expect(JSON.parse(screen.getByLabelText("模板草稿").textContent!)).toEqual(
+      initial
+    );
+    fireEvent.click(screen.getByRole("button", { name: "开启编辑" }));
+    await screen.findByRole("combobox", { name: "语法结构 1 细分词性" });
+    expect(
+      screen.getByRole("button", { name: "添加英式英语释义" })
+    ).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
+      ""
+    );
+    expect(screen.getByRole("textbox", { name: "英式英语释义 2" })).toHaveValue(
+      ""
+    );
+    expect(screen.getByRole("textbox", { name: "简体中文解释 1" })).toHaveValue(
+      ""
+    );
+    expect(screen.getByRole("textbox", { name: "简体中文解释 2" })).toHaveValue(
+      ""
+    );
+    expect(screen.getByRole("button", { name: "删除词义 1" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "删除语法结构 1" })
+    ).toBeDisabled();
+    const first: NextDraft = JSON.parse(
+      screen.getByLabelText("模板草稿").textContent!
+    );
+    expect(first.senses).toHaveLength(1);
+    expect(first.senses[0]).toMatchObject({
+      part_of_speech: "noun",
+      level: "A1",
+      sense_group_id: first.sense_groups![0]!.id
+    });
+    expect(first.grammar_structures).toHaveLength(1);
+    expect(
+      first.grammar_structures![0]!.variants.map((row) => row.locale)
+    ).toEqual(["en-GB", "en-US"]);
+    fireEvent.click(screen.getByRole("button", { name: "切换美式" }));
+    expect(
+      await screen.findByRole("button", { name: "添加美式英语释义" })
+    ).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "美式英语释义 1" })).toHaveValue(
+      ""
+    );
+    expect(screen.getByRole("textbox", { name: "美式英语释义 2" })).toHaveValue(
+      ""
+    );
+    expect(JSON.parse(screen.getByLabelText("模板草稿").textContent!)).toEqual(
+      first
+    );
+  } finally {
+    catalog.mockRestore();
+  }
+});

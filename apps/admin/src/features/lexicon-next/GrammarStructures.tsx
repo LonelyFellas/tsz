@@ -1,4 +1,11 @@
-import { lazy, Suspense, useLayoutEffect, useMemo, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useState
+} from "react";
 import type {
   NextGrammarStructure,
   NextGrammarVariant,
@@ -24,7 +31,7 @@ import {
   PronunciationPreviewProvider
 } from "@/features/dictionary/word-creation/PronunciationPreview";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
-import { localeLabels } from "./model";
+import { localeLabels, newGrammarStructure } from "./model";
 import "@tsz/voice-editor/styles.css";
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -252,13 +259,25 @@ export function GrammarStructures({
   ) => void;
 }) {
   const { modal } = App.useApp();
+  const headingId = useId();
+  const hasRows = rows.some((row) => row.part_of_speech === pos);
   const card = (
     <Card
       className="lexicon-next-grammar"
       size="small"
-      title={`语法结构 · ${localeLabels[target] ?? target}`}
+      aria-labelledby={headingId}
+      title={
+        <div className="lexicon-next-section-caption">
+          <h2 id={headingId} className="lexicon-next-section-title">
+            语法结构 · {localeLabels[target] ?? target}
+          </h2>
+          {!hasRows && (
+            <span className="lexicon-next-section-status">暂无语法结构</span>
+          )}
+        </div>
+      }
     >
-      {rows.some((row) => row.part_of_speech === pos) && (
+      {hasRows && (
         <div className="lexicon-next-grammar-heading" aria-hidden="true">
           <span>细分词性</span>
           <span>语法结构</span>
@@ -362,7 +381,10 @@ export function GrammarStructures({
                 icon={<Trash2 />}
                 type="text"
                 danger
-                disabled={disabled}
+                disabled={
+                  disabled ||
+                  rows.filter((row) => row.part_of_speech === pos).length <= 1
+                }
                 aria-label={`删除语法结构 ${index + 1}`}
                 onClick={() => {
                   const count = referenceCount(row.id);
@@ -387,23 +409,12 @@ export function GrammarStructures({
         })}
       <Button
         block
+        className="word-section-add-button"
+        size="large"
         type="dashed"
-        icon={<Plus />}
+        icon={<Plus aria-hidden />}
         disabled={disabled || !pos}
-        onClick={() =>
-          onChange((rows) => [
-            ...rows,
-            {
-              id: crypto.randomUUID(),
-              part_of_speech: pos,
-              variants: ["en-GB", "en-US"].map((locale) => ({
-                id: crypto.randomUUID(),
-                locale,
-                content: { version: 2, text: "", annotations: [] }
-              }))
-            }
-          ])
-        }
+        onClick={() => onChange((rows) => [...rows, newGrammarStructure(pos)])}
       >
         添加语法结构
       </Button>

@@ -199,13 +199,13 @@ describe("媒介语译词", () => {
     rerender(<Editor disabled error remaining={0} retry={retry} />);
     expect(input()).toBeDisabled();
     expect(
-      screen.getByRole("checkbox", { name: "本义项无合适常见译词" })
+      screen.getByRole("checkbox", { name: "本词义无合适常见译词" })
     ).toBeDisabled();
   });
   it("无译词声明与未填写区分，非法分数和重复编辑不能保存", () => {
     render(<Editor />);
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "本义项无合适常见译词" })
+      screen.getByRole("checkbox", { name: "本词义无合适常见译词" })
     );
     const draft = {
       schema_version: 1 as const,

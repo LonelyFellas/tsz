@@ -20,6 +20,7 @@ export function ContentRows({
   locale,
   label,
   definition = false,
+  definitionTemplates,
   grouped = false,
   textClassName,
   disabled,
@@ -31,6 +32,7 @@ export function ContentRows({
   locale: string;
   label: string;
   definition?: boolean;
+  definitionTemplates?: readonly { style?: "definition" | "sentence" }[];
   grouped?: boolean;
   textClassName?: string;
   disabled: boolean;
@@ -38,7 +40,78 @@ export function ContentRows({
   grammarLocale?: string;
   onChange: (rows: Row[]) => void;
 }) {
-  const visible = rows.filter((row) => row.locale === locale);
+  const [templates, setTemplates] = useState<
+    Record<string, { plan: string; rows: NextDefinition[] }>
+  >({});
+  const stored = rows.filter((row) => row.locale === locale);
+  const template = templates[locale];
+  const plan = definitionTemplates
+    ?.map((row) => row.style ?? "definition")
+    .join(",");
+  const untouched =
+    template &&
+    template.rows.every(
+      (row) => !row.text.trim() && !row.grammar_structure_id
+    ) &&
+    template.rows.map((row) => row.style).join(",") === template.plan;
+  if (
+    definition &&
+    definitionTemplates &&
+    (!template || (template.plan !== plan && !stored.length && untouched))
+  ) {
+    setTemplates({
+      ...templates,
+      [locale]: {
+        plan: plan!,
+        rows: stored.length
+          ? []
+          : definitionTemplates.map((plan) => ({
+              id: crypto.randomUUID(),
+              locale,
+              text: "",
+              style: plan.style ?? "definition"
+            }))
+      }
+    });
+  }
+  const slots = template?.rows ?? [];
+  const visible = [
+    ...slots.map((slot) => stored.find((row) => row.id === slot.id) ?? slot),
+    ...stored.filter((row) => !slots.some((slot) => slot.id === row.id))
+  ];
+  function updateRow(next: Row) {
+    const slotIndex = slots.findIndex((slot) => slot.id === next.id);
+    const existing = rows.some((row) => row.id === next.id);
+    if (slotIndex >= 0) {
+      setTemplates((current) => ({
+        ...current,
+        [locale]: {
+          ...current[locale]!,
+          rows: current[locale]!.rows.map((row) =>
+            row.id === next.id ? (next as NextDefinition) : row
+          )
+        }
+      }));
+      if (!next.text.trim()) {
+        if (existing) onChange(rows.filter((row) => row.id !== next.id));
+        return;
+      }
+    }
+    if (existing) {
+      onChange(rows.map((row) => (row.id === next.id ? next : row)));
+      return;
+    }
+    const before =
+      slotIndex < 0
+        ? -1
+        : rows.findIndex((row) => {
+            if (row.locale !== locale) return false;
+            const index = slots.findIndex((slot) => slot.id === row.id);
+            return index < 0 || index > slotIndex;
+          });
+    const index = before < 0 ? rows.length : before;
+    onChange([...rows.slice(0, index), next, ...rows.slice(index)]);
+  }
   const [collapsed, setCollapsed] = useState(false);
   const content = (
     <>
@@ -55,15 +128,7 @@ export function ContentRows({
               value={row.text}
               disabled={disabled}
               autoSize={{ minRows: 2, maxRows: 8 }}
-              onChange={(e) =>
-                onChange(
-                  rows.map((item) =>
-                    item.id === row.id
-                      ? { ...item, text: e.target.value }
-                      : item
-                  )
-                )
-              }
+              onChange={(e) => updateRow({ ...row, text: e.target.value })}
             />
           ) : (
             <Input
@@ -71,15 +136,7 @@ export function ContentRows({
               aria-label={`${label} ${index + 1}`}
               value={row.text}
               disabled={disabled}
-              onChange={(e) =>
-                onChange(
-                  rows.map((item) =>
-                    item.id === row.id
-                      ? { ...item, text: e.target.value }
-                      : item
-                  )
-                )
-              }
+              onChange={(e) => updateRow({ ...row, text: e.target.value })}
             />
           )}
           <Space>
@@ -117,13 +174,7 @@ export function ContentRows({
                 ]}
                 notFoundContent="请先为当前细分词性添加语法结构"
                 onChange={(grammar_structure_id: string) =>
-                  onChange(
-                    rows.map((item) =>
-                      item.id === row.id
-                        ? { ...item, grammar_structure_id }
-                        : item
-                    )
-                  )
+                  updateRow({ ...row, grammar_structure_id })
                 }
               />
             )}
@@ -136,13 +187,7 @@ export function ContentRows({
                   { value: "definition", label: "定义" },
                   { value: "sentence", label: "整句释义" }
                 ]}
-                onChange={(style) =>
-                  onChange(
-                    rows.map((item) =>
-                      item.id === row.id ? { ...item, style } : item
-                    )
-                  )
-                }
+                onChange={(style) => updateRow({ ...row, style })}
               />
             )}
             <Button
@@ -151,9 +196,19 @@ export function ContentRows({
               danger={grouped}
               type={grouped ? "text" : "default"}
               disabled={disabled}
-              onClick={() =>
-                onChange(rows.filter((item) => item.id !== row.id))
-              }
+              onClick={() => {
+                if (slots.some((slot) => slot.id === row.id))
+                  setTemplates((current) => ({
+                    ...current,
+                    [locale]: {
+                      ...current[locale]!,
+                      rows: current[locale]!.rows.filter(
+                        (item) => item.id !== row.id
+                      )
+                    }
+                  }));
+                onChange(rows.filter((item) => item.id !== row.id));
+              }}
             />
           </Space>
         </div>

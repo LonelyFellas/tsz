@@ -21,6 +21,92 @@ export const localeLabels: Record<string, string> = {
 export const removePosDescription =
   "会移除此词性下的词形、语法结构和所有语言的词义、解释及译词。保存后生效。";
 
+export function newGrammarStructure(
+  pos: string,
+  idFactory: () => string = () => crypto.randomUUID()
+): NextGrammarStructure {
+  return {
+    id: idFactory(),
+    part_of_speech: pos,
+    variants: ["en-GB", "en-US"].map((locale) => ({
+      id: idFactory(),
+      locale,
+      content: { version: 2, text: "", annotations: [] }
+    }))
+  };
+}
+
+export function newSense(
+  pos: string,
+  groupId: string | undefined,
+  metadataAvailable: boolean,
+  idFactory: () => string = () => crypto.randomUUID()
+): NextSense {
+  return {
+    id: idFactory(),
+    part_of_speech: pos || null,
+    ...(groupId ? { sense_group_id: groupId } : {}),
+    ...(metadataAvailable
+      ? { level: "A1", frequency: "0", depends_on_context: false }
+      : {}),
+    definitions: [],
+    equivalents: []
+  };
+}
+
+export function ensureMeaningTemplates(
+  draft: NextDraft,
+  capabilities: {
+    grammarAvailable: boolean;
+    senseGroupsAvailable: boolean;
+    senseMetadataAvailable: boolean;
+  },
+  idFactory: () => string = () => crypto.randomUUID()
+): NextDraft {
+  const codes = draft.form_editor?.pos.map((pos) => pos.pos) ?? [];
+  const missingSenses = codes.filter(
+    (code) => !draft.senses.some((sense) => sense.part_of_speech === code)
+  );
+  const missingGrammars = capabilities.grammarAvailable
+    ? codes.filter(
+        (code) =>
+          !draft.grammar_structures?.some((row) => row.part_of_speech === code)
+      )
+    : [];
+  if (!missingSenses.length && !missingGrammars.length) return draft;
+  const groups =
+    capabilities.senseGroupsAvailable && missingSenses.length
+      ? draft.sense_groups?.length
+        ? draft.sense_groups
+        : [{ id: idFactory(), name_zh: "", name_en: "" }]
+      : undefined;
+  return {
+    ...draft,
+    ...(groups ? { sense_groups: groups } : {}),
+    senses: [
+      ...draft.senses,
+      ...missingSenses.map((code) =>
+        newSense(
+          code,
+          groups?.[0]?.id,
+          capabilities.senseMetadataAvailable,
+          idFactory
+        )
+      )
+    ],
+    ...(missingGrammars.length
+      ? {
+          grammar_structures: [
+            ...(draft.grammar_structures ?? []),
+            ...missingGrammars.map((code) =>
+              newGrammarStructure(code, idFactory)
+            )
+          ]
+        }
+      : {})
+  };
+}
+
 export function replaceFormEditor(
   draft: NextDraft,
   form_editor: SharedFormsStepContentV3
@@ -188,7 +274,7 @@ export function draftProblem(
       const keys = new Set<string>();
       for (const row of sense.equivalents) {
         const key = row.locale + ":" + equivalentKey(row.text);
-        if (keys.has(key)) return "当前义项与媒介语言内已有该译词。";
+        if (keys.has(key)) return "当前词义与媒介语言内已有该译词。";
         keys.add(key);
         if (
           row.metadata?.commonness.some(
@@ -207,13 +293,13 @@ export function draftProblem(
       sense.level !== undefined &&
       !/^(A1|A2|B1|B2|C1|C2)$/u.test(sense.level)
     )
-      return `义项 ${index + 1} 请选择有效的词义等级。`;
+      return `词义 ${index + 1} 请选择有效的词义等级。`;
     if (
       sense.frequency !== undefined &&
       (!/^\d+(?:\.\d{1,2})?$/u.test(sense.frequency) ||
         Number(sense.frequency) > 100)
     )
-      return `义项 ${index + 1} 词频必须为 0–100，最多两位小数。`;
+      return `词义 ${index + 1} 词频必须为 0–100，最多两位小数。`;
   }
   for (const group of draft.sense_groups ?? []) {
     if (
@@ -238,13 +324,13 @@ export function draftProblem(
     ...draft.senses.flatMap((sense, index) => [
       ...sense.definitions.map((row) => ({
         ...row,
-        label: `义项 ${index + 1} · ${localeLabels[row.locale] ?? row.locale}释义`,
+        label: `词义 ${index + 1} · ${localeLabels[row.locale] ?? row.locale}释义`,
         max: 5000,
         multiline: true
       })),
       ...sense.equivalents.map((row) => ({
         ...row,
-        label: `义项 ${index + 1} · ${localeLabels[row.locale] ?? row.locale}译词`,
+        label: `词义 ${index + 1} · ${localeLabels[row.locale] ?? row.locale}译词`,
         max: 200
       }))
     ])
@@ -331,7 +417,7 @@ export function grammarBindingIssues(
       issues.push({
         node_id: sense.id,
         field: "sub_pos",
-        message: "请选择义项的细分词性"
+        message: "请选择词义的细分词性"
       });
     for (const definition of sense.definitions) {
       const grammar = draft.grammar_structures.find(
@@ -341,7 +427,7 @@ export function grammarBindingIssues(
         issues.push({
           node_id: definition.id,
           field: "grammar_structure_id",
-          message: "请选择与义项细分词性匹配的语法结构"
+          message: "请选择与词义细分词性匹配的语法结构"
         });
     }
   }
