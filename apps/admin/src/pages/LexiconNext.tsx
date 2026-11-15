@@ -375,6 +375,9 @@ function EntryEditor({
     JSON.stringify(draft) !== JSON.stringify(saved.draft) ||
     (sentenceDraftsAvailable && sentenceWorkspace.dirty);
   useEffect(() => {
+    if (!dirty && !conflict) setError(undefined);
+  }, [dirty, conflict]);
+  useEffect(() => {
     setLocked(busy || formContentOpen);
     return () => setLocked(false);
   }, [busy, formContentOpen, setLocked]);
