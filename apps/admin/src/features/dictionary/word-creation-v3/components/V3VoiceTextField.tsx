@@ -630,10 +630,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 }
               : captured;
       const next = { ...draftState, ...result, nodeId: target };
-      if (spellingSettings || textOnly)
-        flushSync(() => setSettingsCommitting(true));
+      const commitSourceAudio =
+        (spellingSettings || textOnly) &&
+        canGenerateAudio &&
+        env.VOICE_PREVIEW &&
+        !voicePreviewIsMock;
       if (callbacks.current.onCommit) {
         flushSync(() => {
+          if (commitSourceAudio) setSettingsCommitting(true);
           callbacks.current.onCommit!(result);
         });
       } else {
@@ -671,13 +675,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             callbacks.current.onAudioAssetsChange?.(next.audioAssets ?? [])
           );
         }
+        if (commitSourceAudio) flushSync(() => setSettingsCommitting(true));
       }
-      if (
-        (spellingSettings || textOnly) &&
-        canGenerateAudio &&
-        env.VOICE_PREVIEW &&
-        !voicePreviewIsMock
-      ) {
+      if (commitSourceAudio) {
         const generated = await sourceAudioRef.current();
         if (activeTarget.current !== target) return false;
         if (!generated) {
