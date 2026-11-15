@@ -50,8 +50,9 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/tshb-test-key"
           printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/tshb-test-key" "$HOME/.ssh/known_hosts"
-          printf 'Host tshb-test\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/tshb-test-key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$DEPLOY_SSH_HOST" "$DEPLOY_SSH_USER" > "$HOME/.ssh/config"
+          printf 'Host tshb-test\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/tshb-test-key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  BatchMode yes\n  ConnectTimeout 10\n  ControlMaster auto\n  ControlPersist 60\n  ControlPath "%s"\n' "$DEPLOY_SSH_HOST" "$DEPLOY_SSH_USER" "$HOME/.ssh/tsz-deploy-control" > "$HOME/.ssh/config"
           chmod 600 "$HOME/.ssh/config"
+          printf 'DEPLOY_SSH_CONTROL_PATH=%s\n' "$HOME/.ssh/tsz-deploy-control" >> "$GITHUB_ENV"
 
       - name: Deploy verified CI packages
         env:
@@ -61,8 +62,15 @@ jobs:
           DEPLOY_EXPECTED_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           DEPLOY_AUTO_CONFIG: "1"
         run: |
-          DEPLOY_EXPECTED_API_SHA="$(node deploy/check-api-contract.mjs)"
+          DEPLOY_EXPECTED_API_SHA="$(node deploy/deploy-metrics.mjs run web local api-contract -- node deploy/check-api-contract.mjs)"
           export DEPLOY_EXPECTED_API_SHA
           ./deploy/deploy-web.sh
-          DEPLOY_EXPECTED_API_SHA="$(node deploy/check-api-contract.mjs)"
+          DEPLOY_EXPECTED_API_SHA="$(node deploy/deploy-metrics.mjs run admin local api-contract -- node deploy/check-api-contract.mjs)"
           ./deploy/deploy-admin.sh
+
+      - name: Close deployment SSH connection
+        if: ${{ always() }}
+        run: |
+          if [[ -n "${DEPLOY_SSH_CONTROL_PATH:-}" ]]; then
+            ssh -S "$DEPLOY_SSH_CONTROL_PATH" -o BatchMode=yes -o ConnectTimeout=10 -O exit tshb-test >/dev/null 2>&1 || true
+          fi

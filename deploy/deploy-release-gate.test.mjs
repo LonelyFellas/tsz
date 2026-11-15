@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -119,19 +128,23 @@ async function run(component, scenario, approved = true) {
       "ssh",
       `printf 'ssh %s\n' "$*" >> '${log}'
       case "$*" in
-        *'/usr/bin/node --version') echo '${process.version}' ;;
+        *'/usr/bin/node --version') [[ '${scenario}' != ssh-failure ]] || exit 255; echo '${process.version}' ;;
         *'mktemp -d '*) echo /opt/tsz-release-stage.ABC123 ;;
-        *publish-compatible.sh*|*'rm -rf '*) ;;
+        *publish-compatible.sh*) [[ '${scenario}' != publish-failure ]] || exit 42 ;;
+        *'rm -rf '*) [[ '${scenario}' != cleanup-failure ]] || exit 37 ;;
+        *'-O exit '*) ;;
         *) exit 92 ;;
       esac`
     );
     await script(
       "rsync",
       `printf 'rsync %s\n' "$*" >> '${log}'
+      [[ '${scenario}' != upload-failure ]] || exit 23
       [[ '${scenario}' != *-upload ]] || touch '${phase}'
-      if [[ '${component}' = web && "$*" = *'/artifact/ tshb-test:'* ]]; then
-        args=("$@"); count=\${#args[@]}
-        cp "\${args[count-2]}apps/web/public/font-licenses/Andika-OFL.txt" '${root}/uploaded-license'
+      args=("$@"); count=\${#args[@]}
+      cp -R "\${args[count-2]}" '${root}/uploaded'
+      if [[ '${component}' = web ]]; then
+        cp "\${args[count-2]}artifact/apps/web/public/font-licenses/Andika-OFL.txt" '${root}/uploaded-license'
       fi`
     );
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
@@ -146,6 +159,9 @@ async function run(component, scenario, approved = true) {
       });
     if (scenario === "stale") env.DEPLOY_EXPECTED_SHA = "c".repeat(40);
     if (scenario === "auto-config") env.DEPLOY_AUTO_CONFIG = "1";
+    if (scenario === "shared-ssh")
+      env.DEPLOY_SSH_CONTROL_PATH = join(root, "shared-control");
+    env.GITHUB_STEP_SUMMARY = join(root, "summary.md");
     const result = spawnSync(
       "bash",
       [join(root, `deploy/deploy-${component}.sh`)],
@@ -154,6 +170,11 @@ async function run(component, scenario, approved = true) {
     return {
       ...result,
       calls: await readFile(log, "utf8").catch(() => ""),
+      summary: await readFile(env.GITHUB_STEP_SUMMARY, "utf8").catch(() => ""),
+      uploaded: await readdir(join(root, "uploaded")).catch(() => []),
+      uploadMode: await stat(join(root, "uploaded"))
+        .then((value) => value.mode & 0o777)
+        .catch(() => undefined),
       license: await readFile(join(root, "uploaded-license"), "utf8").catch(
         () => undefined
       )
@@ -263,6 +284,23 @@ for (const component of ["admin", "web"]) {
       assert.match(result.calls, /ssh .*publish-compatible.sh/);
       if (approved) assert.match(result.calls, new RegExp("d{40}"));
       assert.doesNotMatch(result.calls, /forbidden-build/);
+      assert.equal(
+        result.calls.split("\n").filter((line) => line.startsWith("rsync "))
+          .length,
+        1
+      );
+      assert.match(result.calls, /ControlMaster=auto/);
+      assert.match(result.calls, /StrictHostKeyChecking=yes/);
+      assert.match(result.calls, /--no-o --no-g --timeout=180/);
+      assert.ok(result.uploaded.includes("artifact"));
+      assert.equal(result.uploadMode, 0o700);
+      assert.ok(result.uploaded.includes("candidate.json"));
+      assert.ok(result.uploaded.includes("ci-release.json"));
+      assert.ok(result.uploaded.includes("publish-compatible.sh"));
+      assert.ok(result.uploaded.includes("deploy-metrics.mjs"));
+      assert.ok(!result.uploaded.includes("download.zip"));
+      assert.match(result.summary, /local \| upload \| success/);
+      assert.match(result.summary, /local \| total \| success/);
       if (component === "web") assert.equal(result.license, "font license");
     });
   for (const scenario of [
@@ -283,13 +321,38 @@ for (const component of ["admin", "web"]) {
     test(`${component}: stop before publishing on ${scenario}`, async () => {
       const result = await run(component, scenario);
       assert.notEqual(result.status, 0, result.stdout + result.stderr);
-      assert.doesNotMatch(result.calls, /ssh .*publish-release.sh/);
+      assert.doesNotMatch(result.calls, /ssh .*publish-compatible.sh/);
       if (!scenario.endsWith("-upload"))
         assert.doesNotMatch(result.calls, /mktemp|tshb-test:/);
       else assert.match(result.calls, /mktemp/);
     });
   }
 }
+
+for (const [scenario, phase, status] of [
+  ["ssh-failure", "node-check", 1],
+  ["upload-failure", "upload", 23],
+  ["publish-failure", "remote-publish", 42],
+  ["cleanup-failure", "remote-cleanup", 37]
+]) {
+  test(`transport failure: ${scenario} keeps its exit status and records the failed phase`, async () => {
+    const result = await run("admin", scenario);
+    assert.equal(result.status, status, result.stdout + result.stderr);
+    assert.match(result.summary, new RegExp(`local \\| ${phase} \\| failure`));
+    assert.match(result.summary, /local \| total \| failure/);
+    assert.match(result.calls, /-O exit tshb-test/);
+    if (scenario === "upload-failure") {
+      assert.doesNotMatch(result.calls, /publish-compatible.sh|rm -rf/);
+    }
+  });
+}
+
+test("a component reuses the CI socket without closing another component's connection", async () => {
+  const result = await run("admin", "shared-ssh");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.calls, /-S .*shared-control/);
+  assert.doesNotMatch(result.calls, /-O exit/);
+});
 
 test("admin: automatic deployment uses the verified package flags", async () => {
   const result = await run("admin", "auto-config");

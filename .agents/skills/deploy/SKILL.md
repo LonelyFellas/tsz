@@ -38,6 +38,8 @@ Web 默认 `NEXT_PUBLIC_SITE_URL=https://test.tianshengzhi.com`。Admin 默认 t
 
 制品发现最多 60 秒、下载最多 300 秒、远端事务调用最多 480 秒，长调用每 30 秒报告状态；rsync 有 180 秒无 IO 超时。断线或超时不代表远端未执行，按原事务核对现场，不盲目重发。
 
+每组件将已验证制品、manifest 和精确 Git 对象中的受信工具组成独立上传目录，单次 rsync 传入新建的远端 stage；不额外复制整份制品，不引入远端构建或执行包内脚本。SSH 使用任务专属 ControlMaster/ControlPersist，保留 BatchMode、连接超时和严格主机密钥检查。自动发布的契约检查与 Web/Admin 共用一个 socket，工作流无论成功失败均关闭；手动组件入口只清理自己创建的连接。
+
 上传前和上传后、事务开始前复核 exact-main 与最新 CI run/attempt。查询与远端锁不是跨系统原子事务；上传后失败可能留下独立暂存，不能报告零远端写入。不删未完成事务记录继续发。
 
 ## 3. 验收
@@ -49,3 +51,5 @@ Web 在 CI 先验证裁剪包启动与 Sharp，远端继续备用实例验活、
 按 [验收清单](references/verification.md)复用已输出的同状态证据，仅补缺项。`release.json` 保存到组件 manifests 下的 `<release-id>.ci.json`，accepted manifest 仍由远端验收后生成。只在 smoke、manifest 复算和清理均通过后报告成功。
 
 汇报组件实际 SHA、CI run/attempt、制品 ID/摘要、构建参数、HTTP/服务及 manifest 结果、阶段耗时和 `local build=0`。失败说明已完成组件、暂存及回退状态。不得强制 nginx reload、重启后端、补造 manifest 或绕过门禁。
+
+日志中的 `[deploy-metrics]` 和 GitHub Actions 摘要按 local/remote 记录阶段、结果及毫秒耗时，失败和回滚也记录，计时输出不覆盖原退出码。自动发布在组件入口前单列 `api-contract`，工作流环境准备和整体耗时沿用 Actions 步骤计时。`verified-available` 表示切流、冒烟及 accepted manifest 均通过时的远端累计时间；远端 total 还包含清理和 Web 的 30 秒旧实例排空，本地 total 还包含来源检查、传输及本地清理，不含前置契约检查。嵌套阶段和累计值不能相加；SSH 断线时缺失的远端计时保持未知，不自动重试发布。
