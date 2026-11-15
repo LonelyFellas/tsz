@@ -12,6 +12,8 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "@tsz/api-client";
 import { isSharedForms } from "@tsz/shared";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { adminShellResources } from "@/i18n";
 import type {
   NextCapabilities,
   NextEntry,
@@ -171,16 +173,23 @@ function mount(
     { initialEntries: [path] }
   );
   const rendered = render(
-    <QueryClientProvider client={client}>
-      <header>
-        <div id="console-header-tools" />
-      </header>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <InterfaceI18nProvider resources={adminShellResources}>
+      <QueryClientProvider client={client}>
+        <header>
+          <div id="console-header-tools" />
+        </header>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </InterfaceI18nProvider>
   );
   return { client, router, unmount: rendered.unmount };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
+const stepButton = (name: string | RegExp) =>
+  within(screen.getByRole("navigation", { name: "词条编辑步骤" })).getByRole(
+    "button",
+    { name }
+  );
 // 大型词形表单按唯一动作文字定位，避免每一步遍历全页计算按钮可及名。
 const textAction = (name: string) => {
   const targets = [
@@ -199,6 +208,14 @@ const textAction = (name: string) => {
   expect(target).toBeVisible();
   return target!;
 };
+
+async function waitForEntryReady(revision: number) {
+  await screen.findByText(`版本 ${revision}`);
+  const languages = within(screen.getByRole("group", { name: "智能词库语言" }));
+  await waitFor(() =>
+    expect(languages.getByRole("combobox", { name: "媒介语言" })).toBeEnabled()
+  );
+}
 
 const accountChoice = {
   target_language: "en",
@@ -280,7 +297,7 @@ it("账号模式下取消切换不保存，确认离页后才保存生效的组�
   api.get.mockResolvedValue({ ...entry, medium_locale: "zh-Hant" });
   mount(api, `/lexicon-next/${id}?target_locale=en-US&medium_locale=zh-Hant`);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local kept" }
   });
@@ -416,7 +433,7 @@ it("取消跨媒介离页不会覆盖记忆，裸链接返回仍保护未保存�
     `/lexicon-next/${id}?target_locale=en-US&medium_locale=zh-Hant`
   );
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local kept" }
   });
@@ -505,9 +522,9 @@ it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词�
   expect(
     languages.getByRole("combobox", { name: "媒介语言" }).closest(".ui-select")
   ).toHaveTextContent("繁体中文");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   expect(screen.getByRole("button", { name: "添加词义" })).toBeVisible();
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   expect(
     languages.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
   ).toHaveTextContent("美式英语");
@@ -537,7 +554,7 @@ it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
   const { router } = mount(api);
   await screen.findByText("版本 1");
   await chooseLanguage("美式英语");
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "center" }
   });
@@ -603,7 +620,7 @@ it("深链接归属不匹配时不挂载编辑器，可显式进入词条所属�
   expect(
     new URLSearchParams(router.state.location.search).get("medium_locale")
   ).toBe("zh-Hant");
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "unsaved deep link" }
   });
@@ -966,7 +983,9 @@ it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻�
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
 });
 async function edit(label: string, value: string) {
-  fireEvent.click(button(label.includes("词形") ? /词性与发音/ : /词义与译词/));
+  fireEvent.click(
+    stepButton(label.includes("词形") ? /词性与发音/ : /词义与译词/)
+  );
   if (label.includes("词形")) {
     if (!screen.queryByRole("textbox", { name: `${label} 1` }))
       fireEvent.click(button("已有词形"));
@@ -1036,13 +1055,13 @@ describe("新版词库手工闭环", () => {
       expect(
         screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
       ).toHaveTextContent("美式英语");
-      fireEvent.click(button(/^词义与译词/));
+      fireEvent.click(stepButton(/^词义与译词/));
       await chooseLanguage("英式英语");
       expect(useAuthStore.getState().profile?.preferences.dialect).toBe(
         dialect
       );
-      fireEvent.click(button(/^词性与发音/));
-      fireEvent.click(button(/^词义与译词/));
+      fireEvent.click(stepButton(/^词性与发音/));
+      fireEvent.click(stepButton(/^词义与译词/));
       expect(
         screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
       ).toHaveTextContent("英式英语");
@@ -1063,9 +1082,9 @@ describe("新版词库手工闭环", () => {
     });
     mount(api);
     await screen.findByDisplayValue("centre");
-    fireEvent.click(button(/词义与译词/));
+    fireEvent.click(stepButton(/词义与译词/));
     await edit("英式英语词形", "centre");
-    fireEvent.click(button(/词义与译词/));
+    fireEvent.click(stepButton(/词义与译词/));
     fireEvent.click(button("添加词义"));
     await edit("英式英语释义", "the middle");
     await edit("简体中文解释", "中心位置");
@@ -1074,11 +1093,11 @@ describe("新版词库手工闭环", () => {
     await edit("美式英语词形", "center");
     await edit("美式英语释义", "the center");
     await chooseLanguage("英式英语");
-    fireEvent.click(button(/词性与发音/));
+    fireEvent.click(stepButton(/词性与发音/));
     expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
       "centre"
     );
-    fireEvent.click(button(/词义与译词/));
+    fireEvent.click(stepButton(/词义与译词/));
     expect(screen.getByDisplayValue("中心位置")).toBeVisible();
     fireEvent.click(button("保存完整草稿"));
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
@@ -1095,8 +1114,8 @@ describe("新版词库手工闭环", () => {
       )
     ).toEqual(["en-GB", "zh-Hans", "en-US"]);
     const senseId = saved.draft.senses[0].id;
-    await screen.findByText("版本 2");
-    fireEvent.click(button(/^预览/));
+    await waitForEntryReady(2);
+    fireEvent.click(stepButton(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local unsaved" }
     });
@@ -1115,8 +1134,8 @@ describe("新版词库手工闭环", () => {
       api.save.mockRejectedValue(new HttpError(status, "rejected"));
       mount(api);
       await screen.findByDisplayValue("centre");
-      fireEvent.click(button(/词义与译词/));
-      fireEvent.click(button(/^预览/));
+      fireEvent.click(stepButton(/词义与译词/));
+      fireEvent.click(stepButton(/^预览/));
       fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
         target: { value: "local" }
       });
@@ -1157,9 +1176,9 @@ describe("新版词库手工闭环", () => {
     api.get.mockResolvedValue({ ...entry, owner_id: "another-editor" });
     fireEvent.click(button("重新检查"));
     await screen.findByDisplayValue("centre");
-    fireEvent.click(button(/词义与译词/));
+    fireEvent.click(stepButton(/词义与译词/));
     expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
-    fireEvent.click(button(/词义与译词/));
+    fireEvent.click(stepButton(/词义与译词/));
     expect(button("添加词义")).toBeDisabled();
     act(() =>
       useAuthStore.setState({
@@ -1204,8 +1223,8 @@ describe("新版词库手工闭环", () => {
     ).toBe("zh-Hans");
     await act(async () => finishCreate(structuredClone(entry)));
     await screen.findByText("版本 1");
-    fireEvent.click(button(/词义与译词/));
-    fireEvent.click(button(/^预览/));
+    fireEvent.click(stepButton(/词义与译词/));
+    fireEvent.click(stepButton(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local" }
     });
@@ -1245,8 +1264,8 @@ describe("新版词库手工闭环", () => {
     const api = requests();
     mount(api);
     await screen.findByDisplayValue("centre");
-    fireEvent.click(button(/词义与译词/));
-    fireEvent.click(button(/^预览/));
+    fireEvent.click(stepButton(/词义与译词/));
+    fireEvent.click(stepButton(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "unsaved after revocation" }
     });
@@ -1270,8 +1289,8 @@ describe("新版词库手工闭环", () => {
     const api = requests();
     mount(api);
     await screen.findByDisplayValue("centre");
-    fireEvent.click(button(/词义与译词/));
-    fireEvent.click(button(/词义与译词/));
+    fireEvent.click(stepButton(/词义与译词/));
+    fireEvent.click(stepButton(/词义与译词/));
     fireEvent.click(button("添加词义"));
     fireEvent.click(button("添加英式英语释义"));
     fireEvent.click(button("保存完整草稿"));
@@ -1431,7 +1450,7 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
   );
   fireEvent.click(button("继续创建"));
   await screen.findByDisplayValue("centre");
-  fireEvent.click(button(/词义与译词/));
+  fireEvent.click(stepButton(/词义与译词/));
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
 });
 
@@ -1694,9 +1713,9 @@ it("权限与冲突不丢失选择，垃圾桶固定归档，归档词条打开�
   ).toBeChecked();
   fireEvent.click(button("查看"));
   await screen.findByDisplayValue("centre");
-  fireEvent.click(button(/词义与译词/));
+  fireEvent.click(stepButton(/词义与译词/));
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   expect(screen.getByRole("textbox", { name: "词头" })).toBeDisabled();
   expect(api.save).not.toHaveBeenCalled();
 });
@@ -1857,8 +1876,8 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   await waitFor(() => expect(api.creators).toHaveBeenCalledTimes(1));
   fireEvent.click(button("继续创建"));
   await screen.findByDisplayValue("centre");
-  fireEvent.click(button(/词义与译词/));
-  fireEvent.click(button(/词义与译词/));
+  fireEvent.click(stepButton(/词义与译词/));
+  fireEvent.click(stepButton(/词义与译词/));
   fireEvent.click(button("删除简体中文解释 1"));
   api.workspaceList.mockResolvedValue({
     items: [],
@@ -1867,11 +1886,8 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   api.stats.mockResolvedValue({ total: 0, today: 0, month: 0 });
   api.creators.mockResolvedValue([]);
   fireEvent.click(button("保存完整草稿"));
-  await screen.findByText("版本 2");
   // The revision renders before the save finally releases the navigation lock.
-  await waitFor(() =>
-    expect(screen.getByRole("combobox", { name: "媒介语言" })).toBeEnabled()
-  );
+  await waitForEntryReady(2);
   expect(api.save.mock.calls[0]![1].draft.senses[0].definitions).toEqual([]);
   await act(() => router.navigate(-1));
   await screen.findByText("未找到符合条件的数据");
@@ -1929,8 +1945,8 @@ it("编辑期间被归档后保留本地输入并转只读，不引导丢弃草�
   );
   const { client } = mount(api);
   await screen.findByDisplayValue("centre");
-  fireEvent.click(button(/词义与译词/));
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/词义与译词/));
+  fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local unsaved" }
   });
@@ -2000,7 +2016,7 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
     )
   ).toBe(true);
   expect(draft.forms).toEqual([]);
-  await screen.findByText("版本 2");
+  await waitForEntryReady(2);
   // Reopen from the server response rather than retaining editor component state.
   api.get.mockResolvedValue({ ...entry, revision: 2, draft });
   await act(() => mounted.router.navigate("/lexicon-next"));
@@ -2038,7 +2054,7 @@ it("词形底栏随步骤切换移除，切回词形仍保留编辑面板", asyn
       button("下一步：词义与译词").closest(".v3-step-actions")
     ).not.toBeNull();
     for (const step of [/^词义与译词/, /^预览/]) {
-      fireEvent.click(button(step));
+      fireEvent.click(stepButton(step));
       expect(
         screen.queryByRole("button", { name: "下一步：词义与译词" })
       ).toBeNull();
@@ -2049,7 +2065,7 @@ it("词形底栏随步骤切换移除，切回词形仍保留编辑面板", asyn
         expect(document.querySelectorAll(".v3-step-actions")).toHaveLength(1);
       } else expect(document.querySelector(".v3-step-actions")).toBeNull();
     }
-    fireEvent.click(button(/^词性与发音/));
+    fireEvent.click(stepButton(/^词性与发音/));
     expect(await screen.findByRole("button", { name: "编辑原形内容" })).toBe(
       editor
     );
@@ -2153,7 +2169,7 @@ it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容
   api.get.mockResolvedValue({ ...entry, draft: original });
   mount(api);
   await screen.findByDisplayValue("centre");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   expect(screen.getByRole("tab", { name: /名词/ })).toHaveAttribute(
     "aria-selected",
     "true"
@@ -2233,7 +2249,7 @@ it("Step3 释义跟随顶部语言选择，保留已有通用英语内容及完�
   });
   mount(api);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   expect(
     screen.queryByRole("checkbox", { name: "编辑通用英语内容" })
   ).toBeNull();
@@ -2396,18 +2412,19 @@ it("Step3 保存后重新打开保留词性顺序和词义，只读时禁用标�
   });
   const mounted = mount(api);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
     target: { value: "集中于" }
   });
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   const saved: NextDraft = api.save.mock.calls[0]![1].draft;
+  await waitForEntryReady(2);
   mounted.unmount();
   api.get.mockResolvedValue({ ...entry, revision: 2, draft: saved });
   mount(api);
   await screen.findByText("版本 2");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   const tabs = within(screen.getByRole("tablist"));
   expect(
     tabs
@@ -2441,7 +2458,7 @@ it("词性配置失效后，Step3 新增词性使用最新词形模板", async (
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
   const mounted = mount(api);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   await waitFor(() =>
     expect(screen.getByRole("combobox", { name: "添加基本词性" })).toBeEnabled()
   );
@@ -2515,7 +2532,7 @@ it.each(["词性与发音", "词义与译词"])(
     api.get.mockResolvedValue({ ...entry, draft: original });
     mount(api);
     await screen.findByRole("button", { name: "编辑原形内容" });
-    fireEvent.click(button(new RegExp(`^${step}`)));
+    fireEvent.click(stepButton(new RegExp(`^${step}`)));
     fireEvent.click(screen.getByRole("button", { name: "删除名词" }));
     let dialog = within(await screen.findByRole("dialog"));
     expect(dialog.getByText(/会移除此词性下的词形.*所有语言/)).toBeVisible();
@@ -2527,7 +2544,7 @@ it.each(["词性与发音", "词义与译词"])(
     expect(screen.queryByRole("tab", { name: /名词/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "删除动词" })).toBeNull();
     expect(screen.getByRole("button", { name: "拖动动词" })).toBeDisabled();
-    fireEvent.click(button(/^词义与译词/));
+    fireEvent.click(stepButton(/^词义与译词/));
     expect(screen.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
       "集中于"
     );
@@ -2578,7 +2595,7 @@ it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐�
   api.get.mockResolvedValue({ ...entry, draft: original });
   mount(api);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   expect(button("删除语义区间 1")).toBeDisabled();
   fireEvent.click(button("添加语义区间"));
   fireEvent.change(screen.getByRole("textbox", { name: "语义区间 2 中文" }), {
@@ -2637,7 +2654,7 @@ it("语义区间在只读词条中不能新增、修改、删除或排序", asyn
   });
   mount(api);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   expect(
     screen.getByRole("textbox", { name: "语义区间 1 中文" })
   ).toBeDisabled();
@@ -2702,7 +2719,7 @@ it("目录缓存更新后，停留在预览页也立即去除失效结构且不�
       mounted.client.getQueryData(partOfSpeechKeys.catalog())
     ).toBeDefined()
   );
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   const pane = screen.getByRole("heading", {
     name: "预览"
   }).parentElement!;
@@ -2748,7 +2765,7 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
   });
   mount(api);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/词义与译词/));
+  fireEvent.click(stepButton(/词义与译词/));
   fireEvent.mouseDown(
     await screen.findByRole("combobox", { name: "词义 1 词性" })
   );
@@ -2788,7 +2805,7 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
       ]
     }
   });
-  await screen.findByText("版本 2");
+  await waitForEntryReady(2);
   expect(screen.getByRole("button", { name: "删除词义 1" })).toBeDisabled();
   fireEvent.click(button("添加词义"));
   fireEvent.click(button("保存完整草稿"));
@@ -2824,7 +2841,7 @@ it.each([false, true])(
     });
     mount(api);
     await screen.findByDisplayValue("centre");
-    fireEvent.click(button(/^预览/));
+    fireEvent.click(stepButton(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "center" }
     });
@@ -2876,7 +2893,7 @@ it("已保存预览读取服务器版本，关闭后保留本地未保存修改"
   });
   mount(api);
   await screen.findByDisplayValue("centre");
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local-unsaved" }
   });
@@ -2964,7 +2981,7 @@ it("确认释义能力后开放双语表格，完整稿保存保留其他语言�
     ready({ ...caps, definition_details: true, sense_metadata: true })
   );
   await screen.findByText("版本 7");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   expect(screen.getByRole("table", { name: "英式英语释义" })).toBeVisible();
   expect(
     screen.getByRole("button", { name: "编辑英式英语释义 1" })
@@ -3036,11 +3053,11 @@ it("释义弹窗未应用时锁住语言切换和保存，取消不写宿主正�
   });
   mount(api);
   await screen.findByDisplayValue("centre");
-  fireEvent.click(button(/^预览/));
+  fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "center" }
   });
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   fireEvent.click(button("编辑英式英语释义 1"));
   const editor = await screen.findByRole("textbox", { name: "英式英语释义 1" });
   fireEvent.change(editor, { target: { value: "unapplied body" } });
@@ -3095,7 +3112,7 @@ it("已归档词条的新版释义表格保持只读", async () => {
   });
   mount(api);
   await screen.findByText("版本 1");
-  fireEvent.click(button(/^词义与译词/));
+  fireEvent.click(stepButton(/^词义与译词/));
   expect(button("编辑英式英语释义 1")).toBeDisabled();
   expect(button("添加英式英语释义")).toBeDisabled();
   expect(

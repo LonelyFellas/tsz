@@ -3,6 +3,8 @@ import { useVoiceSave } from "./voiceSaveContext";
 import { confirmedPublicationAudioFixture } from "../PublicationAudioReviewPanel.test-helper";
 import { expandFormContents } from "@tsz/shared";
 import { snapshotKey } from "@tsz/shared/recovery";
+import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { adminShellResources } from "@/i18n";
 import {
   applyFormsStructure,
   contentEditorForms,
@@ -330,7 +332,11 @@ function Slot({ context }: { context: V3WizardSlotContext }) {
 }
 
 function inRouter(node: ReactNode) {
-  return <MemoryRouter>{node}</MemoryRouter>;
+  return (
+    <InterfaceI18nProvider resources={adminShellResources}>
+      <MemoryRouter>{node}</MemoryRouter>
+    </InterfaceI18nProvider>
+  );
 }
 
 function renderWizard(
@@ -622,6 +628,11 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("保存"));
 
     await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId("editor-issues")).toHaveTextContent(
+        "node_binding_unknown"
+      )
+    );
     expect(screen.getByTestId("publication-issues")).toBeEmptyDOMElement();
   });
   it("initializes empty meanings once per session and preserves every generated UUID across step changes and rerenders", () => {
@@ -2777,7 +2788,7 @@ describe("V3WordCreationWizard", () => {
         pronunciation_id: pronunciation.id
       }
     };
-    renderWizard(
+    const { container } = renderWizard(
       requests({
         validate: vi.fn(async () => ({
           schema_version: 3 as const,
@@ -2814,23 +2825,28 @@ describe("V3WordCreationWizard", () => {
       }
     );
 
+    const pronunciationFields = () => [
+      ...container.querySelectorAll<HTMLElement>(
+        `[data-v3-node-id="${pronunciation.id}"][data-v3-field="actual_pron"]:is(input, textarea)`
+      )
+    ];
     fireEvent.click(screen.getByLabelText("收起第 2 组词形变化"));
     expect(screen.getByLabelText("展开第 2 组词形变化")).toBeVisible();
     const ambiguousButton = screen.getByText("定位无分组共享词形");
     ambiguousButton.focus();
     fireEvent.click(ambiguousButton);
     await screen.findByLabelText("收起第 2 组词形变化");
-    const ambiguousMatches = screen.getAllByLabelText("第 1 条发音的实际发音");
+    const ambiguousMatches = pronunciationFields();
     expect(ambiguousMatches).toHaveLength(2);
+    for (const field of ambiguousMatches) {
+      expect(field).toBeVisible();
+      expect(field).toHaveAccessibleName("第 1 条发音的实际发音");
+    }
     expect(ambiguousButton).toHaveFocus();
 
     fireEvent.click(screen.getByText("定位共享词形"));
 
-    await waitFor(() =>
-      expect(screen.getAllByLabelText("第 1 条发音的实际发音")).toHaveLength(2)
-    );
-    const matches = screen.getAllByLabelText("第 1 条发音的实际发音");
-    expect(matches).toHaveLength(2);
+    await waitFor(() => expect(pronunciationFields()).toHaveLength(2));
     await waitFor(() =>
       expect(document.activeElement).toHaveAttribute(
         "data-v3-node-id",
@@ -6976,6 +6992,10 @@ it.each(["supersede", "unmount"] as const)(
         );
       }
     });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     await act(async () => {
       await actions!.navigateIssue(issue);
     });
@@ -6988,9 +7008,7 @@ it.each(["supersede", "unmount"] as const)(
           node_location: { node_role: "meanings.sense", ancestor_node_ids: [] }
         });
       });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 30));
-    });
+    await act(() => vi.runAllTimersAsync());
     expect(open).not.toHaveBeenCalled();
   }
 );
@@ -7523,6 +7541,9 @@ it("局部词义保存只发一次有 revision 的聚合请求，保留另一步
   fireEvent.click(screen.getByText("编辑"));
   fireEvent.click(screen.getByText("保存局部语法"));
   await waitFor(() => expect(source.saveMeanings).toHaveBeenCalledOnce());
+  await waitFor(() =>
+    expect(screen.getByTestId("revision")).toHaveTextContent("2")
+  );
   expect(source.saveForms).not.toHaveBeenCalled();
   expect(vi.mocked(source.saveMeanings).mock.calls[0]![1]).toMatchObject({
     base_revision: 1,
