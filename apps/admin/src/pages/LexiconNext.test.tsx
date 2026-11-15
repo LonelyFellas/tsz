@@ -1250,7 +1250,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(button(/词义与译词/));
     fireEvent.click(button(/词义与译词/));
     fireEvent.click(button("添加词义"));
-    await edit("英式英语释义", "");
+    fireEvent.click(button("添加英式英语释义"));
     fireEvent.click(button("保存完整草稿"));
     await screen.findByText(/不能为空/);
     expect(api.save).not.toHaveBeenCalled();
