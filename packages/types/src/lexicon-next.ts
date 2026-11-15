@@ -91,6 +91,7 @@ export interface NextDraft {
   form_editor?: SharedFormsStepContentV3;
 }
 export interface NextEntry {
+  sentence_resources?: NextSentence[];
   id: string;
   medium_locale?: string;
   target_language: string;
@@ -164,6 +165,7 @@ export interface NextEntryList {
   };
 }
 export interface SaveNextDraft {
+  sentence_changes?: NextSentenceDraftChange[];
   expected_revision: number;
   /** Complete draft across all locales; omission removes a current node. */
   draft: NextDraft;
@@ -176,6 +178,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  sentence_drafts?: boolean;
   sentence_details?: boolean;
   definition_details?: boolean;
   sentences?: boolean;
@@ -213,6 +216,7 @@ export interface NextSenseView {
   missing_equivalents: boolean;
 }
 export interface NextEntryView {
+  sentence_resources?: NextSentence[];
   grammar_structures?: NextGrammarStructure[];
   grammar_issues?: NextGrammarIssue[];
   sense_groups?: NextSenseGroup[];
@@ -363,4 +367,12 @@ export interface NextSentenceListItem {
 export interface NextSentenceList {
   items: NextSentenceListItem[];
   pagination: NextEntryList["pagination"];
+}
+
+export interface NextSentenceDraftChange {
+  id: string;
+  expected_revision?: number | null;
+  target_locale: string;
+  medium_locale: string;
+  variant: NextSentenceVariant;
 }

@@ -799,6 +799,88 @@ it("协商释义能力后发送扩展；旧 API 或能力未确认时阻止扩�
   );
 });
 
+it("统一例句草稿须先确认能力，并随词条一次提交、严格解析资源", async () => {
+  const variant = {
+    id: uuid(13),
+    locale: "en-GB",
+    level: "A1",
+    content: { version: 2 as const, text: "A bank.", annotations: [] },
+    translations: []
+  };
+  const sentence = {
+    id: uuid(12),
+    target_language: "en",
+    owner_id: uuid(8),
+    revision: 1,
+    updated_at: "2026-11-15T00:00:00Z",
+    reference_count: 1,
+    draft: { schema_version: 1, variants: [variant] }
+  };
+  const input = {
+    expected_revision: 2,
+    draft,
+    sentence_changes: [
+      {
+        id: sentence.id,
+        expected_revision: 1,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans",
+        variant
+      }
+    ]
+  };
+  const connected = client({
+    schema_version: 1,
+    language_rules_version: "lexicon-next-en-zh-1",
+    languages: [],
+    manual_drafts: true,
+    generation: false,
+    publishing: false
+  });
+  await expect(connected.api.save(entry.id, input)).rejects.toThrow(
+    "能力尚未确认"
+  );
+  expect(connected.fetch).not.toHaveBeenCalled();
+  await connected.api.capabilities();
+  await expect(connected.api.save(entry.id, input)).rejects.toThrow(
+    "能力尚未确认"
+  );
+  expect(connected.fetch).toHaveBeenCalledTimes(1);
+  connected.fetch.mockImplementationOnce(
+    async () =>
+      new Response(
+        JSON.stringify({
+          schema_version: 1,
+          language_rules_version: "lexicon-next-en-zh-1",
+          languages: [],
+          manual_drafts: true,
+          generation: false,
+          publishing: false,
+          sentence_drafts: true
+        }),
+        { status: 200 }
+      )
+  );
+  await connected.api.capabilities();
+  expect(
+    new Headers(connected.fetch.mock.calls[1]![1].headers).get(
+      "x-tsz-next-sentence-drafts"
+    )
+  ).toBe("v1");
+  const saved = { ...entry, sentence_resources: [sentence] };
+  connected.fetch.mockImplementationOnce(
+    async () => new Response(JSON.stringify(saved), { status: 200 })
+  );
+  await expect(connected.api.save(entry.id, input)).resolves.toEqual(saved);
+  expect(JSON.parse(connected.fetch.mock.calls[2]![1].body)).toEqual(input);
+  expect(() =>
+    decodeNextEntry({
+      ...saved,
+      sentence_resources: [{ ...sentence, revision: "bad" }]
+    })
+  ).toThrow();
+});
+
 it("新版例句使用独立身份和当前语言写入范围，严格拒绝畸形响应", async () => {
   const variant = {
     id: uuid(13),

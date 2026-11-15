@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/sentence-manual-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "0293921c167c4b2543a8702f0ff8512e55e8929d98b3f29987c92b2983c19748",
+  "_source_sha256": "6e20d606c09f84e5d62a25623b144ba8f72aaed87bd3662f36db6608363255ec",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3623,6 +3623,7 @@
         "sense_groups": { "type": "boolean" },
         "sense_metadata": { "type": "boolean" },
         "sentence_details": { "type": "boolean" },
+        "sentence_drafts": { "type": "boolean" },
         "sentences": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -3760,6 +3761,10 @@
         "medium_locale": { "type": "string" },
         "owner_id": { "type": "string", "format": "uuid" },
         "revision": { "type": "integer" },
+        "sentence_resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentence" }
+        },
         "target_language": { "type": "string" },
         "updated_at": { "type": "string", "format": "date-time" }
       },
@@ -3865,6 +3870,10 @@
         "senses": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextSenseView" }
+        },
+        "sentence_resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentence" }
         },
         "target_locale": { "type": "string" }
       },
@@ -4145,6 +4154,18 @@
           "type": "array",
           "items": { "$ref": "#/$defs/NextSentenceVariant" }
         }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceDraftChange": {
+      "type": "object",
+      "required": ["id", "target_locale", "medium_locale", "variant"],
+      "properties": {
+        "expected_revision": { "type": ["integer", "null"], "minimum": 1 },
+        "id": { "type": "string", "format": "uuid" },
+        "medium_locale": { "type": "string" },
+        "target_locale": { "type": "string" },
+        "variant": { "$ref": "#/$defs/NextSentenceVariant" }
       },
       "additionalProperties": false
     },
@@ -5559,7 +5580,12 @@
       "required": ["expected_revision", "draft"],
       "properties": {
         "draft": { "$ref": "#/$defs/NextDraft" },
-        "expected_revision": { "type": "integer", "minimum": 1 }
+        "expected_revision": { "type": "integer", "minimum": 1 },
+        "sentence_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceDraftChange" },
+          "maxItems": 1000
+        }
       },
       "additionalProperties": false
     },

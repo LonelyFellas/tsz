@@ -1,6 +1,10 @@
 import { useRef, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import type { NextSentenceTranslation, NextSentenceVariant } from "@tsz/types";
+import type {
+  NextSentence,
+  NextSentenceTranslation,
+  NextSentenceVariant
+} from "@tsz/types";
 import {
   Alert,
   Button,
@@ -198,12 +202,14 @@ function TranslationChoice({
 
 export function SentenceReadingPreview({
   ids,
+  resources,
   target,
   medium,
   senseLevel,
   requests
 }: {
   ids: string[];
+  resources?: Record<string, NextSentence>;
   target: string;
   medium: string;
   senseLevel?: string;
@@ -224,7 +230,7 @@ export function SentenceReadingPreview({
     queries: ids.map((id) => ({
       queryKey: ["admin-lexicon-next", "sentence", actor?.id, id],
       queryFn: () => requests.sentence(id),
-      enabled: canRead,
+      enabled: canRead && !resources,
       retry: false
     }))
   });
@@ -236,9 +242,9 @@ export function SentenceReadingPreview({
     retry: false
   });
   if (!canRead) return <Alert type="warning" title="没有例句查看权限" />;
-  if (queries.some((q) => q.isPending))
+  if (!resources && queries.some((q) => q.isPending))
     return <Skeleton active paragraph={{ rows: 3 }} />;
-  if (queries.some((q) => q.isError))
+  if (!resources && queries.some((q) => q.isError))
     return (
       <Alert
         type="error"
@@ -256,8 +262,11 @@ export function SentenceReadingPreview({
         }
       />
     );
-  const variants = queries.flatMap(
-    (q) => q.data?.draft.variants.filter((v) => v.locale === target) ?? []
+  const loaded = resources
+    ? ids.flatMap((id) => (resources[id] ? [resources[id]!] : []))
+    : queries.flatMap((q) => (q.data ? [q.data] : []));
+  const variants = loaded.flatMap((q) =>
+    q.draft.variants.filter((v) => v.locale === target)
   );
   const rows = variants.filter(
     (row) =>
@@ -379,16 +388,18 @@ export function SentenceReadingPreview({
             />
           )}
           {sorted.slice(0, shown).map((row) => {
-            const source = queries.find((q) =>
-              q.data?.draft.variants.some((v) => v.id === row.id)
-            )!.data!;
+            const source = loaded.find((q) =>
+              q.draft.variants.some((v) => v.id === row.id)
+            )!;
             const scope = JSON.stringify([
               actor?.id,
               source.id,
               source.revision,
               target,
               medium,
-              reading
+              reading,
+              row.content,
+              row.translations
             ]);
             return (
               <div className="next-sentence-reading-row" key={row.id}>

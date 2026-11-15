@@ -1,3 +1,8 @@
+import {
+  SentenceDraftContext,
+  SentenceDraftAudioTasks,
+  useSentenceDrafts
+} from "@/features/lexicon-next/sentenceDrafts";
 import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
 import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
 import {
@@ -140,6 +145,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               grammarAvailable={capability.data?.grammar_structures === true}
               grammarAudioAvailable={capability.data?.grammar_audio === true}
               sentencesAvailable={capability.data?.sentences === true}
+              sentenceDraftsAvailable={
+                capability.data?.sentence_drafts === true
+              }
               sentenceDetailsAvailable={
                 capability.data?.sentence_details === true
               }
@@ -171,7 +179,8 @@ function EntryLoader({
   grammarAudioAvailable,
   definitionDetailsAvailable,
   sentencesAvailable,
-  sentenceDetailsAvailable
+  sentenceDetailsAvailable,
+  sentenceDraftsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -182,6 +191,7 @@ function EntryLoader({
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
   sentenceDetailsAvailable: boolean;
+  sentenceDraftsAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -262,6 +272,7 @@ function EntryLoader({
       grammarAvailable={grammarAvailable}
       grammarAudioAvailable={grammarAudioAvailable}
       definitionDetailsAvailable={definitionDetailsAvailable}
+      sentenceDraftsAvailable={sentenceDraftsAvailable}
       sentenceDetailsAvailable={sentenceDetailsAvailable}
       sentencesAvailable={sentencesAvailable}
     />
@@ -280,7 +291,8 @@ function EntryEditor({
   grammarAudioAvailable,
   definitionDetailsAvailable,
   sentencesAvailable,
-  sentenceDetailsAvailable
+  sentenceDetailsAvailable,
+  sentenceDraftsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -291,6 +303,7 @@ function EntryEditor({
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
   sentenceDetailsAvailable: boolean;
+  sentenceDraftsAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -333,6 +346,11 @@ function EntryEditor({
     setLocked,
     cancelLanguageChange
   } = useLexiconLanguages();
+  const sentenceWorkspace = useSentenceDrafts(
+    saved.sentence_resources ?? [],
+    draft,
+    medium
+  );
   const [saving, setBusy] = useState(false);
   const busy = saving;
   const lock = useRef(false);
@@ -347,7 +365,9 @@ function EntryEditor({
   const writable =
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
   const disabled = busy || !writable;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved.draft);
+  const dirty =
+    JSON.stringify(draft) !== JSON.stringify(saved.draft) ||
+    (sentenceDraftsAvailable && sentenceWorkspace.dirty);
   useEffect(() => {
     setLocked(busy || formContentOpen);
     return () => setLocked(false);
@@ -422,18 +442,36 @@ function EntryEditor({
   async function save() {
     if (!writable || conflict || contentLeaveGuard.current) return false;
     return run(async () => {
+      const validation =
+        draftProblem(draftRef.current, equivalentMetadataAvailable) ||
+        (sentenceDraftsAvailable && sentenceWorkspace.validate());
+      if (validation) {
+        requestAnimationFrame(() =>
+          document
+            .querySelector<HTMLElement>(
+              '.next-sentence-inline-card [aria-invalid="true"]'
+            )
+            ?.focus()
+        );
+        throw new Error(validation);
+      }
       for (const wait of [...audioTasks.current.values()]) {
         if (!(await wait())) throw new Error("发音处理尚未完成，请重试保存。");
       }
       const current = draftRef.current;
       const problem = draftProblem(current, equivalentMetadataAvailable);
       if (problem) throw new Error(problem);
+      const changes = sentenceDraftsAvailable
+        ? await sentenceWorkspace.prepare()
+        : [];
       const result = await requests.save(saved.id, {
         expected_revision: saved.revision,
-        draft: current
+        draft: draftRef.current,
+        ...(changes.length ? { sentence_changes: changes } : {})
       });
       setSaved(result);
       setDraft(result.draft);
+      sentenceWorkspace.reset();
       setConflict(false);
       setRemote(undefined);
       void Promise.all(
@@ -458,7 +496,7 @@ function EntryEditor({
     }
     setStep(next);
   }
-  return (
+  const editor = (
     <EntryLayout
       draft={draft}
       languageSearch={languageSearch}
@@ -563,7 +601,11 @@ function EntryEditor({
           {formEditorAvailable ? (
             <>
               <VoiceSaveContext.Provider
-                value={{ save, failure: error, audioTasks: audioTasks.current }}
+                value={{
+                  save,
+                  failure: error,
+                  audioTasks: audioTasks.current
+                }}
               >
                 <ContentEditPermissions.Provider
                   value={{ edit: writable, associate: false }}
@@ -712,6 +754,9 @@ function EntryEditor({
           <Preview
             requests={requests}
             sentenceDetailsAvailable={sentenceDetailsAvailable}
+            sentenceResources={
+              sentenceDraftsAvailable ? sentenceWorkspace.resources : undefined
+            }
             view={previewDraft(draft, target, medium, grammarCatalog.data)}
           />
         </div>
@@ -726,6 +771,11 @@ function EntryEditor({
                   <Preview
                     requests={requests}
                     sentenceDetailsAvailable={sentenceDetailsAvailable}
+                    sentenceResources={
+                      sentenceDraftsAvailable
+                        ? sentenceWorkspace.resources
+                        : undefined
+                    }
                     view={previewDraft(
                       draft,
                       target,
@@ -775,6 +825,7 @@ function EntryEditor({
                       if (remote && !contentLeaveGuard.current) {
                         setSaved(remote);
                         setDraft(remote.draft);
+                        sentenceWorkspace.reset();
                         setRemote(undefined);
                         setConflict(false);
                         setError(undefined);
@@ -792,11 +843,27 @@ function EntryEditor({
             <div className="lexicon-next-columns">
               <section>
                 <h3>本地草稿 · 基于版本 {saved.revision}</h3>
-                <DraftSummary draft={draft} />
+                <DraftSummary
+                  draft={draft}
+                  sentenceResources={
+                    sentenceDraftsAvailable
+                      ? sentenceWorkspace.resources
+                      : undefined
+                  }
+                />
               </section>
               <section>
                 <h3>服务器 · 版本 {remote.revision}</h3>
-                <DraftSummary draft={remote.draft} />
+                <DraftSummary
+                  draft={remote.draft}
+                  sentenceResources={
+                    remote.sentence_resources
+                      ? Object.fromEntries(
+                          remote.sentence_resources.map((v) => [v.id, v])
+                        )
+                      : undefined
+                  }
+                />
               </section>
             </div>
           )}
@@ -840,5 +907,15 @@ function EntryEditor({
         </Modal>
       </div>
     </EntryLayout>
+  );
+  return (
+    <SentenceDraftContext.Provider
+      value={sentenceDraftsAvailable ? sentenceWorkspace : null}
+    >
+      {sentenceDraftsAvailable && (
+        <SentenceDraftAudioTasks workspace={sentenceWorkspace} />
+      )}
+      {editor}
+    </SentenceDraftContext.Provider>
   );
 }
