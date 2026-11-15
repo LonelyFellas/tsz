@@ -6,7 +6,6 @@ import type {
   PartOfSpeechCatalogResponse,
   NextEntryView,
   NextForm,
-  NextLanguageCapability,
   SharedFormsStepContentV3
 } from "@tsz/types";
 
@@ -66,23 +65,6 @@ export function draftForms(draft: NextDraft): NextForm[] {
       }) ?? []
     ).filter((row) => row.text.trim())
   ];
-}
-
-export function initialTargetLocale(
-  draft: NextDraft,
-  language: NextLanguageCapability
-): string {
-  const forms = draftForms(draft);
-  const definitions = draft.senses.flatMap((sense) => sense.definitions);
-  const existingLocale = (rows: { locale: string; text: string }[]) =>
-    language.target_locales.find((locale) =>
-      rows.some((row) => row.locale === locale && row.text.trim())
-    );
-  return (
-    existingLocale(forms) ??
-    existingLocale(definitions) ??
-    language.target_locales[0]!
-  );
 }
 
 /** Local preview only; never replaces the complete editable draft. */
