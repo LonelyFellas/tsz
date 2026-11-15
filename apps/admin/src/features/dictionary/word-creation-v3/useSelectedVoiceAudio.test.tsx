@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { expect, it, vi } from "vitest";
 import type { RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { AudioAsset, VoicePreviewAdapter } from "@tsz/voice-editor/types";
-import { VoiceSaveContext } from "./voiceSaveContext";
+import { VoiceAudioTasksContext, VoiceSaveContext } from "./voiceSaveContext";
 import { useSelectedVoiceAudio } from "./useSelectedVoiceAudio";
 
 const content: RichTextV2 = { version: 2, text: "hello", annotations: [] };
@@ -15,6 +15,47 @@ const setting = {
   rate_percent: -25
 };
 const initial: VoiceProfileV3 = { voices: [setting] };
+
+it("内容弹窗的显式音色也等待应用动作，编辑期间不自动生成", async () => {
+  const tasks = new Map<string, () => Promise<boolean>>();
+  const generateAudio = vi.fn().mockResolvedValue(asset("applied"));
+  const adapter: VoicePreviewAdapter = {
+    listVoices: vi.fn(),
+    synthesize: vi.fn(),
+    generateAudio
+  };
+  const view = renderHook(
+    ({ text }) => {
+      const [profile, setProfile] = useState(initial);
+      return useSelectedVoiceAudio({
+        target: "modal-field",
+        content: { ...content, text },
+        profile,
+        adapter,
+        enabled: true,
+        defer: false,
+        onChange: setProfile
+      });
+    },
+    {
+      initialProps: { text: "first" },
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <VoiceAudioTasksContext.Provider value={tasks}>
+          {children}
+        </VoiceAudioTasksContext.Provider>
+      )
+    }
+  );
+  await act(async () => {});
+  view.rerender({ text: "latest" });
+  await act(async () => {});
+  expect(generateAudio).not.toHaveBeenCalled();
+  await act(async () => {
+    expect(await tasks.get("modal-field")!()).toBe(true);
+  });
+  expect(generateAudio).toHaveBeenCalledOnce();
+  expect(generateAudio.mock.calls[0]![0].content.text).toBe("latest");
+});
 function setup(adapter: VoicePreviewAdapter, profile = initial) {
   const audioTasks = new Map<string, () => Promise<boolean>>();
   const changed = vi.fn();

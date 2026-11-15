@@ -1,6 +1,7 @@
 import {
   act,
   fireEvent,
+  isInaccessible,
   render,
   screen,
   within,
@@ -176,6 +177,24 @@ function mount(
   return { client, router, unmount: rendered.unmount };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
+// 大型词形表单按唯一动作文字定位，避免每一步遍历全页计算按钮可及名。
+const textAction = (name: string) => {
+  const targets = [
+    ...new Set(
+      screen
+        .getAllByText(name, { exact: true })
+        .map((element) => element.closest("button"))
+        .filter(
+          (element): element is HTMLButtonElement =>
+            !!element && !isInaccessible(element)
+        )
+    )
+  ];
+  expect(targets).toHaveLength(1);
+  const target = targets[0]!;
+  expect(target).toBeVisible();
+  return target!;
+};
 
 const accountChoice = {
   target_language: "en",
@@ -1925,8 +1944,12 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
   const mounted = mount(api);
   const addPos = await screen.findByRole("combobox", { name: "添加基本词性" });
-  fireEvent.click(button("展开词条概览"));
-  fireEvent.click(button("展开英语词形"));
+  fireEvent.click(
+    screen.getByLabelText("展开词条概览", { selector: "button" })
+  );
+  fireEvent.click(
+    screen.getByLabelText("展开英语词形", { selector: "button" })
+  );
   const formProgress = within(
     screen.getByRole("region", { name: "英语词形摘要" })
   );
@@ -1943,19 +1966,21 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
       .getAllByText("名词")
       .find((node) => node.classList.contains("ui-select-item-option-content"))!
   );
-  fireEvent.click(await screen.findByRole("button", { name: "编辑原形内容" }));
+  fireEvent.click(
+    await screen.findByLabelText("编辑原形内容", { selector: "button" })
+  );
   const spelling = await screen.findByRole("textbox", {
     name: "词形英美通用拼写"
   });
   expect(screen.getByRole("combobox", { name: "目标语言" })).toBeDisabled();
   expect(screen.getByRole("combobox", { name: "媒介语言" })).toBeDisabled();
   await changeVoiceText(spelling, { target: { value: "centre" } });
-  fireEvent.click(button("确认，应用到草稿"));
+  fireEvent.click(textAction("确认，应用到草稿"));
   expect(await formProgress.findByText("1 项")).toBeVisible();
   expect(formProgress.getByText("通用英语：centre")).toBeVisible();
   expect(formProgress.queryByText("暂未添加")).toBeNull();
-  await waitFor(() => expect(button("保存草稿")).toBeEnabled());
-  fireEvent.click(button("保存草稿"));
+  await waitFor(() => expect(textAction("保存草稿")).toBeEnabled());
+  fireEvent.click(textAction("保存草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   const draft: NextDraft = api.save.mock.calls[0]![1].draft;
   expect(draft.form_editor?.pos[0]?.pos).toBe("noun");
@@ -1973,7 +1998,7 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   await act(() => mounted.router.navigate("/lexicon-next"));
   await screen.findByRole("button", { name: "创建词条" });
   await act(() => mounted.router.navigate(`/lexicon-next/${id}`));
-  await screen.findByRole("button", { name: "编辑原形内容" });
+  await screen.findByLabelText("编辑原形内容", { selector: "button" });
   expect(
     screen.getAllByText("centre").some((element) => element.closest("td"))
   ).toBe(true);
@@ -2038,20 +2063,27 @@ it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳�
   });
   api.save.mockRejectedValue(new HttpError(409, "rejected"));
   mount(api);
-  await screen.findByRole("button", { name: "编辑原形内容" });
-  fireEvent.click(button(/^词义与译词/));
-  fireEvent.click(button(/^预览/));
+  await screen.findByLabelText("编辑原形内容", { selector: "button" });
+  const steps = within(
+    screen.getByRole("navigation", { name: "词条编辑步骤" })
+  );
+  fireEvent.click(steps.getByRole("button", { name: /^词义与译词/ }));
+  fireEvent.click(steps.getByRole("button", { name: /^预览/ }));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local" }
   });
-  fireEvent.click(button("保存完整草稿"));
+  fireEvent.click(textAction("保存完整草稿"));
   await screen.findByText(/服务器版本已更新/);
-  fireEvent.click(button(/词性与发音/));
-  fireEvent.click(button("编辑原形内容"));
+  fireEvent.click(steps.getByRole("button", { name: /词性与发音/ }));
+  fireEvent.click(
+    screen.getByLabelText("编辑原形内容", { selector: "button" })
+  );
   fireEvent.click(await screen.findByRole("button", { name: "收起" }));
-  expect(button("比较服务器版本")).toBeDisabled();
-  fireEvent.click(button("关闭词形内容设置"));
-  await waitFor(() => expect(button("比较服务器版本")).toBeEnabled());
+  expect(textAction("比较服务器版本")).toBeDisabled();
+  fireEvent.click(
+    screen.getByLabelText("关闭词形内容设置", { selector: "button" })
+  );
+  await waitFor(() => expect(textAction("比较服务器版本")).toBeEnabled());
   api.get.mockResolvedValue({
     ...entry,
     revision: 5,
@@ -2061,9 +2093,9 @@ it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳�
       form_editor: emptyFormEditor()
     }
   });
-  fireEvent.click(button("比较服务器版本"));
+  fireEvent.click(textAction("比较服务器版本"));
   await screen.findByText("服务器 · 版本 5");
-  fireEvent.click(button("放弃本地修改并重载"));
+  fireEvent.click(textAction("放弃本地修改并重载"));
   fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
   await screen.findByText("版本 5");
   expect(screen.getByText("暂无词性")).toBeVisible();
@@ -2262,7 +2294,7 @@ it("Step3 从标签添加基本词性、排序，Step2 和保存请求沿用同�
   };
   api.get.mockResolvedValue({ ...entry, draft: original });
   mount(api);
-  await screen.findByRole("button", { name: "编辑原形内容" });
+  await screen.findByLabelText("编辑原形内容", { selector: "button" });
   const steps = within(
     screen.getByRole("navigation", { name: "词条编辑步骤" })
   );
@@ -2307,12 +2339,14 @@ it("Step3 从标签添加基本词性、排序，Step2 和保存请求沿用同�
   fireEvent.click(
     within(screen.getByRole("tablist")).getByRole("tab", { name: /动词/ })
   );
-  expect(screen.getByRole("button", { name: "编辑过去式内容" })).toBeVisible();
+  expect(
+    screen.getByLabelText("编辑过去式内容", { selector: "button" })
+  ).toBeVisible();
   fireEvent.click(steps.getByRole("button", { name: /^词义与译词/ }));
   expect(meanings.getByRole("textbox", { name: "简体中文译词 1" })).toHaveValue(
     "集中于"
   );
-  fireEvent.click(button("保存完整草稿"));
+  fireEvent.click(textAction("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   const saved: NextDraft = api.save.mock.calls[0]![1].draft;
   expect(saved.form_editor!.pos.map((pos) => pos.pos)).toEqual([

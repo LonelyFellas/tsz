@@ -1517,12 +1517,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         .getByLabelText("标注工具栏")
         .closest('[role="dialog"]') as HTMLElement;
       fireEvent.click(await within(editor).findByLabelText("选用 Sonia"));
-      await waitFor(() => expect(generating).toHaveBeenCalled());
-      await waitFor(() =>
-        expect(
-          within(editor).queryByText("正在生成正式音频")
-        ).not.toBeInTheDocument()
-      );
+      expect(generating).not.toHaveBeenCalled();
       const editVoice = await within(editor).findByLabelText("修改 Sonia");
       await waitFor(() => expect(editVoice).toBeEnabled());
       fireEvent.click(editVoice);
@@ -1552,6 +1547,8 @@ describe("V3MeaningsAndExamplesStep", () => {
       const complete = screen.getByLabelText("完成语法结构 1 英美通用内容编辑");
       await waitFor(() => expect(complete).toBeEnabled());
       fireEvent.click(complete);
+      await waitFor(() => expect(generating).toHaveBeenCalledOnce());
+      await waitFor(() => expect(editor).not.toBeInTheDocument());
       expect(
         value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
       ).toEqual([]);
