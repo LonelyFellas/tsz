@@ -14,6 +14,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import { MeaningsStep } from "./MeaningsStep";
+import { api } from "@/lib/auth";
+
+vi.mock("@/lib/auth", async (original) => ({
+  ...(await original<typeof import("@/lib/auth")>()),
+  usePermission: () => true
+}));
 
 it("确认删除义项只移除目标，保留弹窗打开期间回写的草稿和音频", async () => {
   const initial: NextDraft = {
@@ -402,6 +408,161 @@ it("已配置词性默认显示展开的词义与语法模板，切换英美保�
     expect(JSON.parse(screen.getByLabelText("模板草稿").textContent!)).toEqual(
       first
     );
+  } finally {
+    catalog.mockRestore();
+  }
+});
+
+it.each([false, true])(
+  "未指定词性的空草稿不能新增语法结构或词义（词性编辑器：%s）",
+  async (formEditorAvailable) => {
+    const catalog = vi
+      .spyOn(partOfSpeechDataSource, "catalog")
+      .mockResolvedValue(partOfSpeechCatalogFixture);
+    const changed = vi.fn();
+    try {
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <App>
+            <MeaningsStep
+              value={{
+                schema_version: 1,
+                headword: "word",
+                forms: [],
+                senses: []
+              }}
+              kind="word"
+              formEditorAvailable={formEditorAvailable}
+              grammarAvailable
+              target="en-GB"
+              medium="zh-Hans"
+              partOfSpeechCodes={["noun"]}
+              disabled={false}
+              onChange={changed}
+            />
+          </App>
+        </QueryClientProvider>
+      );
+      await waitFor(() =>
+        expect(partOfSpeechDataSource.catalog).toHaveBeenCalled()
+      );
+      expect(
+        screen.getByRole("button", { name: "添加语法结构" })
+      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "添加词义" })).toBeDisabled();
+      const beforeClick = changed.mock.calls.length;
+      fireEvent.click(screen.getByRole("button", { name: "添加词义" }));
+      expect(changed).toHaveBeenCalledTimes(beforeClick);
+    } finally {
+      catalog.mockRestore();
+    }
+  }
+);
+
+it("未指定词性的旧义项保留内容并锁定下方录入，指定词性后开放", async () => {
+  const catalog = vi
+    .spyOn(partOfSpeechDataSource, "catalog")
+    .mockResolvedValue(partOfSpeechCatalogFixture);
+  const initial: NextDraft = {
+    schema_version: 1,
+    headword: "word",
+    forms: [],
+    senses: [
+      {
+        id: "unassigned",
+        part_of_speech: null,
+        definitions: [
+          {
+            id: "definition",
+            locale: "en-GB",
+            style: "definition",
+            text: "existing definition"
+          }
+        ],
+        equivalents: [{ id: "equivalent", locale: "zh-Hans", text: "原有译词" }]
+      }
+    ]
+  };
+  const requests = {
+    ...api.lexiconNext,
+    equivalentCatalog: vi.fn().mockResolvedValue({ registers: [], domains: [] })
+  };
+  function Harness() {
+    const [draft, setDraft] = useState(initial);
+    return (
+      <>
+        <MeaningsStep
+          value={draft}
+          kind="word"
+          formEditorAvailable={false}
+          grammarAvailable
+          definitionDetailsAvailable
+          senseMetadataAvailable
+          equivalentMetadataAvailable
+          sentencesAvailable
+          requests={requests}
+          target="en-GB"
+          medium="zh-Hans"
+          partOfSpeechCodes={["noun"]}
+          disabled={false}
+          onChange={setDraft}
+        />
+        <output aria-label="词性前置草稿">{JSON.stringify(draft)}</output>
+      </>
+    );
+  }
+  try {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <App>
+          <Harness />
+        </App>
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(requests.equivalentCatalog).toHaveBeenCalled());
+    for (const name of [
+      "添加词义",
+      "添加英式英语释义",
+      "添加简体中文解释",
+      "添加例句",
+      "引用已有例句"
+    ]) {
+      expect(screen.getByRole("button", { name, exact: true })).toBeDisabled();
+    }
+    expect(
+      screen.getByRole("textbox", { name: "批量录入常见译词" })
+    ).toBeDisabled();
+    expect(
+      JSON.parse(screen.getByLabelText("词性前置草稿").textContent!)
+    ).toEqual(initial);
+    const pos = screen.getByRole("combobox", { name: "词义 1 词性" });
+    expect(pos).toBeEnabled();
+    fireEvent.mouseDown(pos);
+    fireEvent.click(
+      await screen.findByText("名词", {
+        selector: ".ui-select-item-option-content"
+      })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "添加词义" })).toBeEnabled()
+    );
+    for (const name of [
+      "添加语法结构",
+      "添加英式英语释义",
+      "添加简体中文解释",
+      "添加例句",
+      "引用已有例句"
+    ]) {
+      expect(screen.getByRole("button", { name, exact: true })).toBeEnabled();
+    }
+    expect(
+      screen.getByRole("textbox", { name: "批量录入常见译词" })
+    ).toBeEnabled();
+    const saved = JSON.parse(screen.getByLabelText("词性前置草稿").textContent!)
+      .senses[0];
+    expect(saved.part_of_speech).toBe("noun");
+    expect(saved.definitions).toEqual(initial.senses[0]!.definitions);
+    expect(saved.equivalents).toEqual(initial.senses[0]!.equivalents);
   } finally {
     catalog.mockRestore();
   }
