@@ -34,6 +34,11 @@ async function run(component, scenario, approved = true) {
     await cp(new URL("./", import.meta.url), join(root, "deploy"), {
       recursive: true
     });
+    await mkdir(join(root, "scripts"));
+    await cp(
+      new URL("../scripts/check-node-runtime.mjs", import.meta.url),
+      join(root, "scripts/check-node-runtime.mjs")
+    );
     await writeFile(join(root, ".node-version"), process.version.slice(1));
     const artifact = join(root, "fixture");
     await mkdir(artifact);
@@ -73,6 +78,20 @@ async function run(component, scenario, approved = true) {
       data.identity.sha = "c".repeat(40);
       await writeFile(file, JSON.stringify(data));
     }
+    const state = {
+      schema_version: 1,
+      manifest: {
+        ...JSON.parse(await readFile(join(bundle, "candidate.json"))),
+        accepted_at: "2026-11-15T00:00:00.000Z"
+      },
+      receipt: JSON.parse(await readFile(join(bundle, "release.json")))
+    };
+    if (scenario === "select-missing") state.receipt = null;
+    if (scenario === "select-config")
+      state.receipt.config = buildConfig(component, {
+        DEPLOY_VOICE_EDITOR: "false"
+      });
+    await writeFile(join(root, "accepted-state.json"), JSON.stringify(state));
     const zip = join(root, "package.zip");
     assert.equal(
       spawnSync("python3", [
@@ -100,8 +119,10 @@ async function run(component, scenario, approved = true) {
         if [[ '${scenario}' = main-* && -f '${phase}' ]]; then echo '${"c".repeat(40)} refs/heads/main'; else echo '${sha} refs/heads/main'; fi ;;
       'cat-file -e '*) ;;
       'rev-parse '*'^'{tree}) echo ${identity.tree} ;;
+      'merge-base --is-ancestor '*) ;;
+      'diff --name-only '*) [[ '${scenario}' != select-input ]] || printf 'packages/ui/changed.tsx\\0' ;;
       'show '*) echo '${process.version.slice(1)}' ;;
-      'archive --format=tar '*) tar -cf - -C '${root}' deploy .node-version ;;
+      'archive --format=tar '*) tar -cf - -C '${root}' deploy scripts .node-version ;;
       *) exit 91 ;;
     esac`
     );
@@ -128,6 +149,9 @@ async function run(component, scenario, approved = true) {
       "ssh",
       `printf 'ssh %s\n' "$*" >> '${log}'
       case "$*" in
+        *'timeout --kill-after=3s 45s /usr/bin/node --input-type=module -'*)
+          if [[ '${scenario}' = select-failure ]]; then echo 'accepted artifact mismatch' >&2; exit 43; fi
+          cat '${root}/accepted-state.json' ;;
         *'/usr/bin/node --version')
           [[ '${scenario}' != ssh-failure ]] || exit 255
           if [[ '${scenario}' = node-mismatch ]]; then echo v0.0.0; else echo '${process.version}'; fi ;;
@@ -163,6 +187,7 @@ async function run(component, scenario, approved = true) {
     if (scenario === "auto-config") env.DEPLOY_AUTO_CONFIG = "1";
     if (scenario === "shared-ssh")
       env.DEPLOY_SSH_CONTROL_PATH = join(root, "shared-control");
+    if (scenario.startsWith("select-")) env.DEPLOY_SELECT_COMPONENTS = "1";
     env.GITHUB_STEP_SUMMARY = join(root, "summary.md");
     const result = spawnSync(
       "bash",
@@ -370,4 +395,43 @@ test("admin: automatic deployment uses the verified package flags", async () => 
   const result = await run("admin", "auto-config");
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.calls, /ssh .*publish-compatible.sh/);
+});
+
+for (const component of ["web", "admin"]) {
+  test(`${component}: unchanged verified inputs skip before remote staging and preserve actual identity`, async () => {
+    const result = await run(component, "select-skip");
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /"action":"skip"/);
+    assert.match(result.stdout, /remote writes=0/);
+    assert.doesNotMatch(
+      result.calls,
+      /ssh .*mktemp -d|rsync|publish-compatible.sh|rm -rf/
+    );
+    assert.match(result.summary, /Action: \*\*skip\*\*/);
+    assert.match(result.summary, /Actual accepted:/);
+  });
+  for (const scenario of ["select-missing", "select-input"]) {
+    test(`${component}: ${scenario} requires a complete verified publication`, async () => {
+      const result = await run(component, scenario);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.calls, /rsync/);
+      assert.match(result.calls, /publish-compatible.sh/);
+    });
+  }
+  test(`${component}: a failed live verification cannot be treated as unchanged`, async () => {
+    const result = await run(component, "select-failure");
+    assert.equal(result.status, 43, result.stdout + result.stderr);
+    assert.match(result.stderr, /accepted artifact mismatch/);
+    assert.doesNotMatch(
+      result.calls,
+      /ssh .*mktemp -d|rsync|publish-compatible.sh/
+    );
+  });
+}
+
+test("admin: identical source with changed build settings publishes", async () => {
+  const result = await run("admin", "select-config");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /build-config-changed/);
+  assert.match(result.calls, /publish-compatible.sh/);
 });

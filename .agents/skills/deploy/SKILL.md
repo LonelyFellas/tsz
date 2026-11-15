@@ -30,6 +30,8 @@ CI `quality` 在 Ubuntu 22.04 构建并验证 Web standalone/Sharp 与 Admin tes
 
 先执行 `./deploy/deploy-web.sh`，成功后执行 `./deploy/deploy-admin.sh`；用户只选一个组件则只运行该入口。共享 nginx 和远端发布锁继续串行。
 
+自动发布设置 `DEPLOY_SELECT_COMPONENTS=1`；手动入口可设置同值启用组件选择。候选包仍完整验证，再在只读共享锁内复算在线制品、绑定已验收 CI 回执并核对 HTTPS 版本、页面和未登录 API。仅当构建参数、Node 及各组件最后验收 SHA 到候选 SHA 的输入均未变时跳过上传；另一端应用和文档可忽略，共享包、发布工具、根配置与未知路径保守触发发布。缺少历史回执或 Git 对象时发布，校验失败则停止。跳过保留该端原 SHA、CI、摘要和验收时间，不把候选写成已上线。
+
 可传入 `DEPLOY_EXPECTED_SHA`、`DEPLOY_EXPECTED_CI_RUN_ID`、`DEPLOY_EXPECTED_CI_RUN_ATTEMPT` 绑定已批准的精确元组；SHA 必须是首次读取的当前 main，CI 两个参数须成对匹配最新成功 run/attempt。不传时自动选择并固定当前元组。
 
 Web 默认 `NEXT_PUBLIC_SITE_URL=https://test.tianshengzhi.com`。Admin 默认 test mode、真实词库/词性/TTS API，四个兼容开关默认 true：`DEPLOY_VOICE_EDITOR`、`DEPLOY_AZURE_PRONUNCIATION_INPUTS`、`DEPLOY_FORM_SPELLING_REGULARITY`、`DEPLOY_SENTENCE_FORMATTING`，只接受 true/false。
