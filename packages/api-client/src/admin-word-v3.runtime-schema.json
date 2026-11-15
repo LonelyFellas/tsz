@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/next-sense-examples-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "cd8e797f64ac52c85c274972b49d4e361d4648d6bea338c076d258737ede1150",
+  "_source": "/Users/darwish/.codex/worktrees/sentence-manual-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "0293921c167c4b2543a8702f0ff8512e55e8929d98b3f29987c92b2983c19748",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3622,6 +3622,7 @@
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
         "sense_groups": { "type": "boolean" },
         "sense_metadata": { "type": "boolean" },
+        "sentence_details": { "type": "boolean" },
         "sentences": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -4185,6 +4186,44 @@
       },
       "additionalProperties": false
     },
+    "NextSentenceMetadata": {
+      "type": "object",
+      "required": ["register_ids", "domain_ids", "sources"],
+      "properties": {
+        "domain_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 1000
+        },
+        "register_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 1000
+        },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceSource" },
+          "maxItems": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceSource": {
+      "type": "object",
+      "required": ["id", "source_type", "title", "url", "locator"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locator": { "type": "string", "maxLength": 2000 },
+        "source_type": { "$ref": "#/$defs/NextSentenceSourceType" },
+        "title": { "type": "string", "maxLength": 500 },
+        "url": { "type": "string", "maxLength": 2000 }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceSourceType": {
+      "type": "string",
+      "enum": ["dictionary", "web", "adapted", "ai_composed", "human_composed"]
+    },
     "NextSentenceTranslation": {
       "type": "object",
       "required": ["id", "locale", "style", "content"],
@@ -4192,7 +4231,26 @@
         "content": { "$ref": "#/$defs/RichTextV3" },
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/NextSentenceTranslationMetadata" },
         "style": { "$ref": "#/$defs/NextSentenceTranslationStyle" }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceTranslationMetadata": {
+      "type": "object",
+      "required": ["sources"],
+      "properties": {
+        "freedom": {
+          "type": ["number", "null"],
+          "multipleOf": 0.1,
+          "maximum": 100,
+          "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceSource" },
+          "maxItems": 20
+        }
       },
       "additionalProperties": false
     },
@@ -4213,6 +4271,7 @@
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string", "pattern": "^(A1|A2|B1|B2|C1|C2)$" },
         "locale": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/NextSentenceMetadata" },
         "translations": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextSentenceTranslation" }

@@ -152,9 +152,11 @@ function SenseMetadataSummary({
 }
 export function Preview({
   view,
-  requests
+  requests,
+  sentenceDetailsAvailable = false
 }: {
   view: NextEntryView;
+  sentenceDetailsAvailable?: boolean;
   requests?: LexiconNextRequests;
 }) {
   return (
@@ -207,6 +209,8 @@ export function Preview({
               />
               {requests && (
                 <SentenceExamplesPreview
+                  detailsAvailable={sentenceDetailsAvailable}
+                  senseLevel={sense.level}
                   ids={sense.sentence_ids}
                   target={view.target_locale}
                   medium={view.medium_locale}

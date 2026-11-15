@@ -10,11 +10,10 @@ import { flushSync } from "react-dom";
 import type {
   NextSentence,
   NextSentenceTranslation,
-  NextSentenceTranslationStyle,
   NextSentenceVariant
 } from "@tsz/types";
-import { Alert, Button, Flex, Space } from "@tsz/ui/admin/display";
-import { Select } from "@tsz/ui/admin/forms";
+import { Alert, Button, Card, Flex, Space, Tag } from "@tsz/ui/admin/display";
+import { InputNumber, Select, Slider } from "@tsz/ui/admin/forms";
 import { App } from "@tsz/ui/admin/overlays";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
@@ -36,11 +35,17 @@ const VoiceEditor = lazy(() =>
     default: module.VoiceEditor
   }))
 );
-export const sentenceStyles: Record<NextSentenceTranslationStyle, string> = {
-  word_for_word: "逐词直译",
-  balanced_fluency: "均衡意译",
-  adapted_creation: "改编创作"
-};
+import {
+  sentenceError,
+  sentenceStyles,
+  freedomCategory,
+  translationStyle
+} from "./sentenceModel";
+import {
+  SentenceMetadataFields,
+  SentenceSourceFields
+} from "./SentenceDetails";
+import "./sentences.css";
 const blank = () => ({ version: 2 as const, text: "", annotations: [] });
 function newVariant(locale: string): NextSentenceVariant {
   return {
@@ -136,6 +141,7 @@ function TranslationField({
 
 export function NextSentenceEditor({
   source,
+  detailsAvailable = false,
   target,
   medium,
   requests,
@@ -144,6 +150,7 @@ export function NextSentenceEditor({
   registerLeaveGuard
 }: {
   source: NextSentence | null;
+  detailsAvailable?: boolean;
   target: "en-GB" | "en-US";
   medium: string;
   requests: LexiconNextRequests;
@@ -151,16 +158,24 @@ export function NextSentenceEditor({
   onClose: () => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
-  const [base, setBase] = useState(source);
-  const [id] = useState(() => source?.id ?? crypto.randomUUID());
-  const [draft, setDraft] = useState<NextSentenceVariant>(() => {
+  const editable = (source: NextSentence | null) => {
     const saved = source?.draft.variants.find((v) => v.locale === target);
     const variant = saved ? structuredClone(saved) : newVariant(target);
     variant.translations = variant.translations.filter(
       (v) => v.locale === medium
     );
+    if (detailsAvailable) {
+      variant.metadata ??= { register_ids: [], domain_ids: [], sources: [] };
+      for (const row of variant.translations)
+        row.metadata ??= { freedom: null, sources: [] };
+    }
     return variant;
-  });
+  };
+  const [base, setBase] = useState(source);
+  const [id] = useState(() => source?.id ?? crypto.randomUUID());
+  const [draft, setDraft] = useState<NextSentenceVariant>(() =>
+    editable(source)
+  );
   const [translationOpen, setTranslationOpen] = useState(false);
   const initial = useRef(JSON.stringify(draft));
   const [applying, setApplying] = useState(false);
@@ -257,15 +272,7 @@ export function NextSentenceEditor({
                     onOk: async () => {
                       try {
                         const current = await requests.sentence(id);
-                        const saved = current.draft.variants.find(
-                          (v) => v.locale === target
-                        );
-                        const next = saved
-                          ? structuredClone(saved)
-                          : newVariant(target);
-                        next.translations = next.translations.filter(
-                          (v) => v.locale === medium
-                        );
+                        const next = editable(current);
                         setBase(current);
                         setDraft(next);
                         initial.current = JSON.stringify(next);
@@ -284,6 +291,14 @@ export function NextSentenceEditor({
                 重新加载
               </Button>
             }
+          />
+        )}
+        {detailsAvailable && (
+          <SentenceMetadataFields
+            value={draft}
+            requests={requests}
+            disabled={applying}
+            onChange={setDraft}
           />
         )}
         <Space>
@@ -357,6 +372,9 @@ export function NextSentenceEditor({
                             audio_assets: result.audioAssets ?? []
                           }))
                         );
+                      const invalid =
+                        detailsAvailable && sentenceError(latest.current.draft);
+                      if (invalid) throw new Error(invalid);
                       if (
                         generationAvailable &&
                         !(await latest.current.generate())
@@ -401,24 +419,92 @@ export function NextSentenceEditor({
         </Suspense>
         <Flex vertical gap={8}>
           <strong>{localeLabels[medium]}译文</strong>
-          {draft.translations.map((row) => (
-            <Space.Compact key={row.id} block>
-              <Select
-                aria-label="译文风格"
-                value={row.style}
-                disabled={applying}
-                options={Object.entries(sentenceStyles).map(
-                  ([value, label]) => ({ value, label })
-                )}
-                onChange={(style) =>
-                  setDraft((current) => ({
-                    ...current,
-                    translations: current.translations.map((v) =>
-                      v.id === row.id ? { ...v, style } : v
-                    )
-                  }))
-                }
-              />
+          {draft.translations.map((row, index) => (
+            <Card key={row.id} size="small" title={`译文 ${index + 1}`}>
+              {detailsAvailable ? (
+                <>
+                  <div className="next-sentence-freedom">
+                    <Tag>
+                      {translationStyle(row)
+                        ? sentenceStyles[translationStyle(row)!]
+                        : "待评估"}
+                    </Tag>
+                    <span>自由度</span>
+                    <InputNumber
+                      aria-label={`译文 ${index + 1} 自由度`}
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={row.metadata?.freedom ?? null}
+                      disabled={applying}
+                      onChange={(value) => {
+                        const freedom = value === null ? null : Number(value);
+                        setDraft((current) => ({
+                          ...current,
+                          translations: current.translations.map((v) =>
+                            v.id === row.id
+                              ? {
+                                  ...v,
+                                  style:
+                                    freedom === null
+                                      ? v.style
+                                      : (freedomCategory(freedom) ?? v.style),
+                                  metadata: {
+                                    sources: v.metadata?.sources ?? [],
+                                    freedom
+                                  }
+                                }
+                              : v
+                          )
+                        }));
+                      }}
+                    />
+                    <span>%</span>
+                    <Slider
+                      ariaLabelForHandle={`译文 ${index + 1} 自由度滑块`}
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={row.metadata?.freedom ?? 50}
+                      disabled={applying}
+                      onChange={(freedom) =>
+                        setDraft((current) => ({
+                          ...current,
+                          translations: current.translations.map((v) =>
+                            v.id === row.id
+                              ? {
+                                  ...v,
+                                  style: freedomCategory(freedom)!,
+                                  metadata: {
+                                    sources: v.metadata?.sources ?? [],
+                                    freedom
+                                  }
+                                }
+                              : v
+                          )
+                        }))
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <Select
+                  aria-label="译文风格"
+                  value={row.style}
+                  disabled={applying}
+                  options={Object.entries(sentenceStyles).map(
+                    ([value, label]) => ({ value, label })
+                  )}
+                  onChange={(style) =>
+                    setDraft((current) => ({
+                      ...current,
+                      translations: current.translations.map((v) =>
+                        v.id === row.id ? { ...v, style } : v
+                      )
+                    }))
+                  }
+                />
+              )}
               <TranslationField
                 onOpenChange={setTranslationOpen}
                 value={row}
@@ -432,6 +518,29 @@ export function NextSentenceEditor({
                   }))
                 }
               />
+              {detailsAvailable && (
+                <SentenceSourceFields
+                  label={`译文 ${index + 1} 来源`}
+                  rows={row.metadata?.sources ?? []}
+                  disabled={applying}
+                  onChange={(sources) =>
+                    setDraft((current) => ({
+                      ...current,
+                      translations: current.translations.map((v) =>
+                        v.id === row.id
+                          ? {
+                              ...v,
+                              metadata: {
+                                freedom: v.metadata?.freedom ?? null,
+                                sources
+                              }
+                            }
+                          : v
+                      )
+                    }))
+                  }
+                />
+              )}
               <Button
                 danger
                 disabled={applying}
@@ -446,7 +555,7 @@ export function NextSentenceEditor({
               >
                 移除译文
               </Button>
-            </Space.Compact>
+            </Card>
           ))}
           <Button
             disabled={applying}
@@ -459,7 +568,10 @@ export function NextSentenceEditor({
                     id: crypto.randomUUID(),
                     locale: medium,
                     style: "balanced_fluency",
-                    content: blank()
+                    content: blank(),
+                    ...(detailsAvailable
+                      ? { metadata: { freedom: null, sources: [] } }
+                      : {})
                   }
                 ]
               }))

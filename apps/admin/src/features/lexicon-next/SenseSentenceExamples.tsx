@@ -1,3 +1,6 @@
+import { SentenceSources } from "./SentenceDetails";
+import { sentenceStyles, translationStyle } from "./sentenceModel";
+import { SentenceReadingPreview } from "./SentenceReadingPreview";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { canAdminResourceAction } from "@tsz/shared/auth";
@@ -27,7 +30,7 @@ import {
   SenseSectionBody,
   SenseSectionTitle
 } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
-import { NextSentenceEditor, sentenceStyles } from "./NextSentenceEditor";
+import { NextSentenceEditor } from "./NextSentenceEditor";
 import { localeLabels } from "./model";
 const sentenceKey = (actor: string | undefined, id: string) => [
   "admin-lexicon-next",
@@ -55,6 +58,15 @@ function SentenceResource({
     queryKey: sentenceKey(actor?.id, id),
     queryFn: () => requests.sentence(id),
     enabled: canRead,
+    retry: false
+  });
+  const catalog = useQuery({
+    queryKey: ["admin-lexicon-next", "equivalent-catalog"],
+    queryFn: requests.equivalentCatalog,
+    enabled:
+      canRead &&
+      !!query.data?.draft.variants.find((v) => v.locale === target)?.metadata,
+    staleTime: 5 * 60 * 1000,
     retry: false
   });
   if (!canRead) return <Alert type="warning" title="没有例句查看权限" />;
@@ -88,13 +100,55 @@ function SentenceResource({
             />
             <RichTextReadOnly className="tsz-words" value={variant.content} />
           </Space>
+          {variant.metadata && (
+            <>
+              {catalog.isError && (
+                <Alert
+                  type="error"
+                  title="语体与领域目录加载失败"
+                  action={
+                    <Button onClick={() => void catalog.refetch()}>重试</Button>
+                  }
+                />
+              )}
+              <Space wrap>
+                {(["register_ids", "domain_ids"] as const).flatMap((field) =>
+                  variant.metadata![field].map((id) => (
+                    <Tag key={id}>
+                      {catalog.data?.[
+                        field === "register_ids" ? "registers" : "domains"
+                      ].find((row) => row.id === id)?.name_zh ??
+                        (catalog.isPending
+                          ? "正在读取标签"
+                          : catalog.isError
+                            ? "标签目录不可用"
+                            : "配置不存在")}
+                    </Tag>
+                  ))
+                )}
+              </Space>
+              <SentenceSources rows={variant.metadata.sources} />
+            </>
+          )}
           {variant.translations
             .filter((v) => v.locale === medium && v.content.text.trim())
             .map((row) => (
-              <Space key={row.id}>
-                <Tag>{sentenceStyles[row.style]}</Tag>
-                <RichTextReadOnly value={row.content} />
-              </Space>
+              <div key={row.id}>
+                <Space>
+                  <Tag>
+                    {translationStyle(row)
+                      ? sentenceStyles[translationStyle(row)!]
+                      : "待评估"}
+                  </Tag>
+                  {row.metadata?.freedom != null && (
+                    <span>{row.metadata.freedom.toFixed(1)}%</span>
+                  )}
+                  <RichTextReadOnly value={row.content} />
+                </Space>
+                {row.metadata && (
+                  <SentenceSources rows={row.metadata.sources} />
+                )}
+              </div>
             ))}
         </>
       ) : (
@@ -105,16 +159,30 @@ function SentenceResource({
   );
 }
 export function SentenceExamplesPreview({
+  detailsAvailable = false,
+  senseLevel,
   ids,
   target,
   medium,
   requests
 }: {
+  detailsAvailable?: boolean;
+  senseLevel?: string;
   ids?: string[];
   target: string;
   medium: string;
   requests: LexiconNextRequests;
 }) {
+  if (detailsAvailable && ids?.length)
+    return (
+      <SentenceReadingPreview
+        ids={ids}
+        target={target}
+        medium={medium}
+        senseLevel={senseLevel}
+        requests={requests}
+      />
+    );
   return ids?.length ? (
     <EntryDialectContext.Provider
       value={target === "en-GB" ? "en-GB" : "en-US"}
@@ -243,6 +311,7 @@ function SentencePicker({
   );
 }
 export function SenseSentenceExamples({
+  detailsAvailable = false,
   ids = [],
   target,
   medium,
@@ -251,6 +320,7 @@ export function SenseSentenceExamples({
   onChange,
   registerLeaveGuard
 }: {
+  detailsAvailable?: boolean;
   ids?: string[];
   target: string;
   medium: string;
@@ -345,6 +415,7 @@ export function SenseSentenceExamples({
       {editing && validTarget && (
         <NextSentenceEditor
           source={editing.source}
+          detailsAvailable={detailsAvailable}
           target={target}
           medium={medium}
           requests={requests}

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/next-sense-examples-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-15T07:59:03.815Z",
+  "_source": "/Users/darwish/.codex/worktrees/sentence-manual-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-15T11:01:10.912Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -349,6 +349,30 @@
     "get /admin/lexicon-next/entries/{id}/view": [
       {
         "name": "x-tsz-next-definitions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/lexicon-next/sentences": [
+      {
+        "name": "x-tsz-next-sentence-details",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon-next/sentences/{id}": [
+      {
+        "name": "x-tsz-next-sentence-details",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "put /admin/lexicon-next/sentences/{id}": [
+      {
+        "name": "x-tsz-next-sentence-details",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -8883,6 +8907,47 @@
       },
       "additionalProperties": false
     },
+    "NextSentenceMetadata": {
+      "type": "object",
+      "required": ["register_ids", "domain_ids", "sources"],
+      "properties": {
+        "domain_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 1000
+        },
+        "register_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 1000
+        },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextSentenceSource" },
+          "maxItems": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceSource": {
+      "type": "object",
+      "description": "A manually recorded attribution, not proof that a source has been verified.",
+      "required": ["id", "source_type", "title", "url", "locator"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "locator": { "type": "string", "maxLength": 2000 },
+        "source_type": {
+          "$ref": "#/components/schemas/NextSentenceSourceType"
+        },
+        "title": { "type": "string", "maxLength": 500 },
+        "url": { "type": "string", "maxLength": 2000 }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceSourceType": {
+      "type": "string",
+      "enum": ["dictionary", "web", "adapted", "ai_composed", "human_composed"]
+    },
     "NextSentenceTranslation": {
       "type": "object",
       "required": ["id", "locale", "style", "content"],
@@ -8890,7 +8955,30 @@
         "content": { "$ref": "#/components/schemas/RichTextV3" },
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
+        "metadata": {
+          "$ref": "#/components/schemas/NextSentenceTranslationMetadata"
+        },
         "style": { "$ref": "#/components/schemas/NextSentenceTranslationStyle" }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceTranslationMetadata": {
+      "type": "object",
+      "required": ["sources"],
+      "properties": {
+        "freedom": {
+          "type": ["number", "null"],
+          "format": "double",
+          "description": "Unassessed is null. A score is translation freedom, never CEFR or accuracy.",
+          "multipleOf": 0.1,
+          "maximum": 100,
+          "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextSentenceSource" },
+          "maxItems": 20
+        }
       },
       "additionalProperties": false
     },
@@ -8911,6 +8999,7 @@
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string", "pattern": "^(A1|A2|B1|B2|C1|C2)$" },
         "locale": { "type": "string" },
+        "metadata": { "$ref": "#/components/schemas/NextSentenceMetadata" },
         "translations": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/NextSentenceTranslation" }
