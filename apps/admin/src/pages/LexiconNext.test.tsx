@@ -982,6 +982,14 @@ it("词典归一化仅用于匹配，创建保留输入；未知创建结果阻�
   expect(input).toBeDisabled();
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
 });
+async function chooseBasicPos(field = "选择基本词性") {
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: field }));
+  fireEvent.click(
+    await screen.findByText("名词", {
+      selector: ".ui-select-item-option-content"
+    })
+  );
+}
 async function edit(label: string, value: string) {
   fireEvent.click(
     stepButton(label.includes("词形") ? /词性与发音/ : /词义与译词/)
@@ -1085,6 +1093,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(stepButton(/词义与译词/));
     await edit("英式英语词形", "centre");
     fireEvent.click(stepButton(/词义与译词/));
+    await chooseBasicPos();
     fireEvent.click(button("添加词义"));
     await edit("英式英语释义", "the middle");
     await edit("简体中文解释", "中心位置");
@@ -1291,6 +1300,7 @@ describe("新版词库手工闭环", () => {
     await screen.findByDisplayValue("centre");
     fireEvent.click(stepButton(/词义与译词/));
     fireEvent.click(stepButton(/词义与译词/));
+    await chooseBasicPos();
     fireEvent.click(button("添加词义"));
     fireEvent.click(button("添加英式英语释义"));
     fireEvent.click(button("保存完整草稿"));
@@ -1878,6 +1888,7 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   await screen.findByDisplayValue("centre");
   fireEvent.click(stepButton(/词义与译词/));
   fireEvent.click(stepButton(/词义与译词/));
+  await chooseBasicPos("词义 1 词性");
   fireEvent.click(button("删除简体中文解释 1"));
   api.workspaceList.mockResolvedValue({
     items: [],

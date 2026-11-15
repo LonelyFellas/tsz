@@ -2,7 +2,13 @@ import { SenseSentenceExamples } from "./SenseSentenceExamples";
 import { EquivalentRows } from "./EquivalentRows";
 import { draftNodeCount, ensureMeaningTemplates, newSense } from "./model";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type Dispatch,
+  type SetStateAction
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
 import { Button, Alert, Flex, Space, Tabs } from "@tsz/ui/admin/display";
@@ -133,11 +139,13 @@ export function MeaningsStep({
     const label = group.name_zh.trim() || group.name_en.trim();
     return label ? [{ value: group.id, label }] : [];
   });
+  const fallbackPosId = useId();
   const [selectedPos, setSelectedPos] = useState<string>();
   const [expanded, setExpanded] = useState<Record<string, string | null>>({});
   const codes = [
     ...new Set([
       ...(value.form_editor?.pos.map((pos) => pos.pos) ?? []),
+      ...(!formEditorAvailable && selectedPos ? [selectedPos] : []),
       ...value.senses.map((sense) => sense.part_of_speech ?? ""),
       ...(value.grammar_structures?.map((grammar) => grammar.part_of_speech) ??
         [])
@@ -261,6 +269,7 @@ export function MeaningsStep({
         activeKey={activePos}
         onChange={setSelectedPos}
         items={codes.map((code, posIndex) => {
+          const contentDisabled = disabled || !code;
           const formPos = forms.pos.find((pos) => pos.pos === code);
           const senses = value.senses.filter(
             (sense) => (sense.part_of_speech ?? "") === code
@@ -299,6 +308,24 @@ export function MeaningsStep({
                   <span className="word-pos-tab-label">
                     <strong>{label(code)}</strong>
                   </span>
+                  {!formEditorAvailable && !code && (
+                    <span
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                    >
+                      <Select
+                        id={fallbackPosId}
+                        aria-label="选择基本词性"
+                        placeholder="选择基本词性"
+                        disabled={disabled}
+                        options={partOfSpeechCodes.map((value) => ({
+                          value,
+                          label: label(value)
+                        }))}
+                        onChange={setSelectedPos}
+                      />
+                    </span>
+                  )}
                   {formEditorAvailable && (
                     <span
                       className="word-pos-tab-actions"
@@ -362,6 +389,9 @@ export function MeaningsStep({
             ),
             children: (
               <Flex vertical gap={16}>
+                {!code && (
+                  <Alert type="info" title="请先指定基本词性，再录入内容。" />
+                )}
                 {grammarAvailable && (
                   <GrammarStructures
                     rows={value.grammar_structures ?? []}
@@ -674,7 +704,7 @@ export function MeaningsStep({
                                         locale={locale}
                                         grammarLocale={target}
                                         label={`${localeLabels[locale]}${locale === target ? "释义" : "解释"}`}
-                                        disabled={disabled}
+                                        disabled={contentDisabled}
                                         remaining={500 - draftNodeCount(value)}
                                         grammars={
                                           grammarAvailable
@@ -737,7 +767,7 @@ export function MeaningsStep({
                                       }
                                       grammarLocale={target}
                                       textClassName="tsz-words"
-                                      disabled={disabled}
+                                      disabled={contentDisabled}
                                       onChange={(definitions) =>
                                         updateSense(sense.id, {
                                           definitions:
@@ -768,7 +798,7 @@ export function MeaningsStep({
                                           : undefined
                                       }
                                       grammarLocale={target}
-                                      disabled={disabled}
+                                      disabled={contentDisabled}
                                       onChange={(definitions) =>
                                         updateSense(sense.id, {
                                           definitions:
@@ -783,7 +813,7 @@ export function MeaningsStep({
                                     ids={sense.sentence_ids}
                                     target={target}
                                     medium={medium}
-                                    disabled={disabled}
+                                    disabled={contentDisabled}
                                     requests={requests}
                                     registerLeaveGuard={registerLeaveGuard}
                                     onChange={(sentence_ids) =>
@@ -796,7 +826,7 @@ export function MeaningsStep({
                                     key={medium}
                                     sense={sense}
                                     locale={medium}
-                                    disabled={disabled}
+                                    disabled={contentDisabled}
                                     catalog={equivalentCatalog.data}
                                     loading={equivalentCatalog.isPending}
                                     catalogError={equivalentCatalog.isError}
@@ -814,7 +844,7 @@ export function MeaningsStep({
                                     rows={sense.equivalents}
                                     locale={medium}
                                     label={`${localeLabels[medium]}译词`}
-                                    disabled={disabled}
+                                    disabled={contentDisabled}
                                     onChange={(equivalents) =>
                                       updateSense(sense.id, { equivalents })
                                     }
@@ -833,7 +863,7 @@ export function MeaningsStep({
                     size="large"
                     type="dashed"
                     icon={<Plus aria-hidden />}
-                    disabled={disabled}
+                    disabled={contentDisabled}
                     onClick={() => {
                       const id = crypto.randomUUID();
                       const inheritedGroup =
