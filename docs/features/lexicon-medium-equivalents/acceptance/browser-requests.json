@@ -1,0 +1,18 @@
+[
+  {
+    "status": 200,
+    "url": "/api/v1/admin/lexicon-next/capabilities"
+  },
+  {
+    "status": 200,
+    "url": "/api/v1/admin/lexicon-next/entries/01a1dce7-ca62-7780-854f-d22817055332"
+  },
+  {
+    "status": 200,
+    "url": "/api/v1/admin/lexicon-next/workspace/entries/01a1dce7-ca62-7780-854f-d22817055332"
+  },
+  {
+    "status": 200,
+    "url": "/api/v1/admin/lexicon-next/equivalent-catalog"
+  }
+]

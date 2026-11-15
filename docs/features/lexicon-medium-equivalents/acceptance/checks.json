@@ -1,0 +1,86 @@
+{
+  "date": "2026-11-15",
+  "frontend": {
+    "checkout": "/Users/darwish/.codex/worktrees/cbce/tsz",
+    "head": "67badaf3b949b3470541ad4284af7b901486b43f",
+    "state": "HEAD plus task diff",
+    "mock_words": false,
+    "mock_part_of_speech": false,
+    "mock_tts": false,
+    "url": "http://127.0.0.1:57649",
+    "proxy": "http://127.0.0.1:57648/api/v1",
+    "checks": [
+      "whole-repository typecheck",
+      "whole-repository lint (2 existing web navigation warnings)",
+      "Admin production build",
+      "Admin UI scan and tighten",
+      "API package: 734 tests",
+      "Admin page/component/model: 77 tests across focused runs"
+    ]
+  },
+  "backend": {
+    "head": "a2cea083322b805ed587ce0466f2f457e5d3b355",
+    "source_sha256": "a610db4789131f2c6e90634b1b793f2968501c0e9b30eea0298fb103c5aa2ea7",
+    "binary_sha256": "bd4c8c1a122281803296df215d798be51e0576056327181e57764ca75f26bfff",
+    "pid": 9486,
+    "checkout": "/Users/darwish/.codex/worktrees/lexicon-medium-equivalents-api/tsz-rust",
+    "api_port": 57648,
+    "database_port": 57646,
+    "redis_port": 57647,
+    "mock_words": false,
+    "mock_catalog": false,
+    "mock_tts": false
+  },
+  "openapi_sha256": "bfdfc36c822ad67e7ea242ae953d20e66afde60d545f833b6ada899b4f863752",
+  "backend_checks": [
+    "lexicon_next: 27 real PostgreSQL/router tests",
+    "catalog_taxonomies: 4 real PostgreSQL/router tests",
+    "lexicon_next lib: 6 tests",
+    "final equivalent regression: 3 real PostgreSQL/router tests including 0.1 and 99.9",
+    "clippy --all-targets --all-features -D warnings",
+    "cargo fmt --all --check"
+  ],
+  "real_acceptance": {
+    "entry_id": "01a1dce7-ca62-7780-854f-d22817055332",
+    "revision_3_independent_get": true,
+    "dedup_count": 3,
+    "general_score": "90.0",
+    "industry_own_score": "80.0",
+    "register_count": 2,
+    "industry_tag_count": 1,
+    "sql_projection_verified": true,
+    "revision_5_get_verified": true,
+    "cleared_industry_score_not_materialized": true,
+    "explicit_none_persisted": true,
+    "language_view_verified": true
+  },
+  "browser": {
+    "surface": "Codex in-app browser",
+    "desktop_width": 1440,
+    "narrow_width": 900,
+    "page_overflow": false,
+    "words_access_only_account": true,
+    "catalog_fault_injection": "temporary exact-URL network block; removed; Retry restored controls",
+    "score_hint": "on hover/focus only; no permanent per-row text",
+    "saved_server_preview": true,
+    "console": "existing shared Modal wrapClassName deprecation; no page runtime exception"
+  },
+  "limits": [
+    "Isolated built-in dictionary unavailable (503); fixture created via real API before browser editing.",
+    "No AI generation, review, publication, PR, CI, merge, or deployment performed.",
+    "Browser origin storage removal unsupported; logout and tab closure verified."
+  ],
+  "cleanup": {
+    "api_stopped": true,
+    "vite_stopped": true,
+    "private_redis_stopped": true,
+    "private_postgres_stopped": true,
+    "ports_closed": [57646, 57647, 57648, 57649],
+    "private_cluster_removed": true,
+    "raw_logs_credentials_sessions_binary_and_local_fixtures_removed": true,
+    "oss_objects_created": false,
+    "shared_services_modified": false,
+    "browser": "logged out; temporary tab closed; viewport reset; injected network failure removed; origin storage removal unsupported",
+    "status": "complete_except_unverifiable_browser_origin_cache"
+  }
+}

@@ -134,6 +134,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               formEditorAvailable={capability.data?.form_editor === true}
               senseGroupsAvailable={capability.data?.sense_groups === true}
               senseMetadataAvailable={capability.data?.sense_metadata === true}
+              equivalentMetadataAvailable={
+                capability.data?.equivalent_metadata === true
+              }
               grammarAvailable={capability.data?.grammar_structures === true}
               grammarAudioAvailable={capability.data?.grammar_audio === true}
             />
@@ -156,12 +159,14 @@ function EntryLoader({
   formEditorAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
+  equivalentMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
   senseMetadataAvailable: boolean;
+  equivalentMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
   id: string;
@@ -240,6 +245,7 @@ function EntryLoader({
       formEditorAvailable={formEditorAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
       senseMetadataAvailable={senseMetadataAvailable}
+      equivalentMetadataAvailable={equivalentMetadataAvailable}
       grammarAvailable={grammarAvailable}
       grammarAudioAvailable={grammarAudioAvailable}
     />
@@ -253,12 +259,14 @@ function EntryEditor({
   formEditorAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
+  equivalentMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
   senseMetadataAvailable: boolean;
+  equivalentMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
   archived: boolean;
@@ -394,7 +402,7 @@ function EntryEditor({
         if (!(await wait())) throw new Error("发音处理尚未完成，请重试保存。");
       }
       const current = draftRef.current;
-      const problem = draftProblem(current);
+      const problem = draftProblem(current, equivalentMetadataAvailable);
       if (problem) throw new Error(problem);
       const result = await requests.save(saved.id, {
         expected_revision: saved.revision,
@@ -611,6 +619,7 @@ function EntryEditor({
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <MeaningsStep
             value={draft}
+            requests={requests}
             registerLeaveGuard={registerContentLeaveGuard}
             kind={saved.kind}
             formEditorAvailable={formEditorAvailable}
@@ -619,6 +628,7 @@ function EntryEditor({
             partOfSpeechCodes={language.part_of_speech_codes}
             senseGroupsAvailable={senseGroupsAvailable}
             senseMetadataAvailable={senseMetadataAvailable}
+            equivalentMetadataAvailable={equivalentMetadataAvailable}
             grammarAvailable={grammarAvailable}
             grammarAudioAvailable={grammarAudioAvailable}
             disabled={disabled}

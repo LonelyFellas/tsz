@@ -77,6 +77,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "NextEntry",
   "NextEntryList",
   "NextCapabilities",
+  "NextEquivalentCatalog",
   "NextEntryView",
   "CreateNextEntry",
   "NextDetection",

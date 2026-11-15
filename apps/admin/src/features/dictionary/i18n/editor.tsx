@@ -1,3 +1,4 @@
+import { equivalentMessages } from "./equivalent-messages";
 import { ClientResponseError } from "@tsz/api-client";
 import { localLexiconErrorMessages } from "./local-error-messages";
 import { creationResidualMessages } from "./creation-residual-messages";
@@ -8,6 +9,7 @@ import { lexiconEditorPanelMessages } from "./editor-panel-messages";
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconEditorMessages = {
+  ...equivalentMessages,
   ...lexiconEditorPanelMessages,
   ...publishingWorkspaceMessages,
   ...batchPublicationMessages,
