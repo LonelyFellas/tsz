@@ -6993,7 +6993,9 @@ it.each(["supersede", "unmount"] as const)(
       }
     });
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    onTestFinished(() => vi.useRealTimers());
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     await act(async () => {
       await actions!.navigateIssue(issue);
     });
