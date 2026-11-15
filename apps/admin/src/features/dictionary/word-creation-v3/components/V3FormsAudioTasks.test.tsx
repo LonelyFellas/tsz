@@ -610,11 +610,14 @@ it("Step 2 没有词性时不注册生成任务，指定词性后恢复且保留
     formsFixture()
   );
   if (!isSharedForms(assigned)) throw new Error("shared fixture required");
-  const target = primaryRegionalVariant(assigned.contents[0]!.regional_variants)
-    .pronunciations[0]!;
+  const target = primaryRegionalVariant(
+    assigned.contents[0]!.regional_variants,
+    "uk"
+  ).pronunciations[0]!;
   target.voice_profile = { voices };
   target.synthesis = primaryRegionalVariant(
-    fixture().contents[0]!.regional_variants
+    fixture().contents[0]!.regional_variants,
+    "uk"
   ).pronunciations[0]!.synthesis;
   const unassigned = { ...assigned, pos: [] };
   const original = structuredClone(unassigned);
