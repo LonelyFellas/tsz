@@ -12,7 +12,7 @@
 - 正式配音仅在明确保存后准备，覆盖所有改动过的英美变体，编辑/预览不生成。外部生成不属于数据库事务；保存失败保留输入及可复用资产，服务端最终校验 revision/归属/生成绑定。高级设置只是应用回本地草稿。
 - 验收：截图布局和同卡片六条译文连续录入、自由度/空行/来源、未保存预览；统一保存刷新回读；某条冲突或无权时其他资源和词条均不改变；跨目标/媒介语保护、取消/离开、键盘和宽窄屏。使用独占本地数据库/Redis，无 mock 的真实页面；不把语音效果或真实 Azure/OSS 生成作为交付门。
 
-当前阶段：两仓 `codex/sentence-inline-drafts` 实现与本地真实验收完成，按既有授权进入 PR、CI、合并与测试环境发布。后端基线 `32e7105`，前端基线以本分支 parent 为准；主记录仅在本文件。
+当前阶段：两仓 `codex/sentence-inline-drafts` 实现与本地真实验收完成，按既有授权进入 PR、CI、合并与测试环境发布。后端 [PR #428](https://github.com/LonelyFellas/tsz-rust/pull/428) 的精确候选为 `8a708b6a2ea770188f133ff0d76a1ca7d252cf90`，前端 CI 公开契约目标固定到该已审候选；前端保持 Draft，后端 main CI 及自动 CD accepted 前不合并。后端基线 `32e7105`、前端基线 `76e921b`；主记录仅在本文件。
 
 本轮验证：
 
@@ -21,7 +21,7 @@
 - 重新导出本轮 OpenAPI 并同步消费者；spec / runtime 来源哈希均为 `6e20d606c09f84e5d62a25623b144ba8f72aaed87bd3662f36db6608363255ec`。补齐协商 header 契约和未确认统一草稿能力时禁止请求的回归。
 - 内置浏览器：真实 Vite `53081` 代理本分支 Rust `53080`，独占批次 `20261115-inline-drafts-7a3b`，词库与持久化无 mock。六条译文、五个评分及未评估值、来源、语体通用全选及单行业录入统一保存，刷新及独立 GET 一致。未保存预览不写入；空白例句阻断保存，移除后不产生资源；真实并发资源更新返回 409，本地文字保留，比较服务器内容并经二次确认后重载。
 - 1440 / 390 视口检查完成，390px 页面 scrollWidth 为 390，卡片 clientWidth / scrollWidth 均为 305。修复等级下拉裁切、未评估标签换行及窄屏标题操作挤压；来源浮层可用。语音预览与上传关闭，不创建 OSS，不以本轮验收证明真实语音生成。
-- 证据：[桌面录入](acceptance/inline-editor-1440.jpg)、[窄屏录入](acceptance/inline-editor-390.jpg)、[已保存预览](acceptance/inline-preview.jpg)、[脱敏持久化记录](acceptance/inline-persistence.json)。测试账号已退出；本地容器、进程及临时凭据清理随交付收尾记录。
+- 证据：[桌面录入](acceptance/inline-editor-1440.jpg)、[窄屏录入](acceptance/inline-editor-390.jpg)、[已保存预览](acceptance/inline-preview.jpg)、[脱敏持久化记录](acceptance/inline-persistence.json)、[清理回执](acceptance/inline-cleanup.json)。测试账号已退出，两个独占容器及匿名卷（包含本批次全部数据库和 Redis 数据）已删除，任务服务已停止、凭据和完整 fixture 副本已删除；其余容器不变。浏览器站点偏好存储未验证清除。
 - 草稿预览使用独立资源副本：正文或配音设置改变时不播放旧正式录音，原始绑定保留供统一保存处理。旧前端严格 runtime 接受候选 API 的旧协商响应；新 runtime 接受无能力/无资源扩展表示；[兼容证据](acceptance/inline-compatibility.json)是受控表示验证，未冒充真实旧二进制联调。无新增迁移、持久化结构沿用现有例句格式，后端先发布后再固定前端 API 目标。
 
 后续章节保留前两轮已交付功能的历史记录，当前轮状态以上述记录及新 PR 为准。

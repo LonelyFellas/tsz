@@ -1,0 +1,12 @@
+{
+  "run_id": "20261115-inline-drafts-7a3b",
+  "task_containers_removed": 2,
+  "task_volumes_removed": 2,
+  "database_and_redis_fixture_remaining": 0,
+  "protected_containers_unchanged": 6,
+  "task_services_stopped": true,
+  "credentials_and_fixture_copies_removed": true,
+  "oss_created": false,
+  "browser_logged_out": true,
+  "browser_preference_storage_cleared": "not_verified"
+}
