@@ -3,6 +3,7 @@ import type {
   AudioAssetV3,
   VoiceProfileV3,
   RichTextV3,
+  WordRelationWritableV3,
   SharedFormsStepContentV3
 } from "./admin-word-v3";
 
@@ -51,6 +52,7 @@ export interface NextSenseGroup {
   name_en: string;
 }
 export interface NextSense {
+  relations?: WordRelationWritableV3[];
   sentence_ids?: string[];
   no_equivalents?: string[];
   level?: string;
@@ -179,6 +181,7 @@ export interface NextLanguageCapability {
 }
 export interface NextCapabilities {
   sentence_drafts?: boolean;
+  relations?: boolean;
   sentence_details?: boolean;
   definition_details?: boolean;
   sentences?: boolean;
@@ -201,6 +204,7 @@ export interface NextViewQuery {
   medium_locale: string;
 }
 export interface NextSenseView {
+  relations?: WordRelationWritableV3[];
   sentence_ids?: string[];
   no_equivalents?: boolean;
   level?: string;

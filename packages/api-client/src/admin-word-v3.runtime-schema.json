@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/.codex/worktrees/sentence-manual-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "6e20d606c09f84e5d62a25623b144ba8f72aaed87bd3662f36db6608363255ec",
+  "_source_sha256": "c9e584b684c9bd30a3330748531544ee46808819307b8f2dab235db86788c44f",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3619,6 +3619,7 @@
         "manual_drafts": { "type": "boolean" },
         "medium_ownership": { "type": "boolean" },
         "publishing": { "type": "boolean" },
+        "relations": { "type": "boolean" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
         "sense_groups": { "type": "boolean" },
         "sense_metadata": { "type": "boolean" },
@@ -4064,6 +4065,10 @@
         "level": { "type": "string" },
         "no_equivalents": { "type": "array", "items": { "type": "string" } },
         "part_of_speech": { "type": ["string", "null"] },
+        "relations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordRelationWritableV3" }
+        },
         "sense_group_id": { "type": "string", "format": "uuid" },
         "sentence_ids": {
           "type": "array",
@@ -4111,6 +4116,10 @@
         "missing_medium_definitions": { "type": "boolean" },
         "missing_target_definitions": { "type": "boolean" },
         "no_equivalents": { "type": "boolean" },
+        "relations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordRelationWritableV3" }
+        },
         "sense_group_id": { "type": "string", "format": "uuid" },
         "sentence_ids": {
           "type": "array",
@@ -7452,6 +7461,40 @@
             "target_headword": { "type": "string" },
             "target_sense_id": { "type": "string", "format": "uuid" },
             "target_status": { "$ref": "#/$defs/AdminWordStatus" },
+            "target_word_id": { "type": "string", "format": "uuid" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["id", "relation", "score", "pending_target_headword"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+            "pending_target_headword": { "type": "string" },
+            "relation": { "type": "string" },
+            "score": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WordRelationWritableV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "relation",
+            "score",
+            "target_word_id",
+            "target_sense_id"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "relation": { "type": "string" },
+            "score": { "type": "string" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
             "target_word_id": { "type": "string", "format": "uuid" }
           },
           "additionalProperties": false

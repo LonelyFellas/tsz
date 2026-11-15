@@ -1,3 +1,4 @@
+import { useAdminDisabled } from "@tsz/ui/admin/context";
 import {
   useLexiconEditorTranslation,
   defaultLexiconEditorTranslation,
@@ -30,6 +31,7 @@ import { useRef, useState } from "react";
 import {
   useRelatedSuggestions,
   useRelatedWordSenses,
+  type RelatedSuggestionsSource,
   type RelatedWordChoice
 } from "../../relatedSuggestions";
 import { validateEntryInput } from "../../word-creation/entryClassification";
@@ -93,7 +95,8 @@ export function V3RelationsGrid({
   change,
   idFactory,
   currentWordId,
-  relationDisplaySnapshots
+  relationDisplaySnapshots,
+  relatedSource
 }: {
   sense: WordSenseWritableV3;
   posIndex: number;
@@ -103,8 +106,10 @@ export function V3RelationsGrid({
   /** 当前词条自身；关联词不能指向自己，候选里要排除掉。新建词条时为 undefined。 */
   currentWordId?: string;
   relationDisplaySnapshots?: RelationDisplaySnapshots;
+  relatedSource?: RelatedSuggestionsSource;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const disabled = useAdminDisabled();
   const [collapsed, setCollapsed] = useState<Record<RelationType, boolean>>({
     synonym: false,
     antonym: false,
@@ -131,14 +136,16 @@ export function V3RelationsGrid({
   const relatedSearch = useRelatedSuggestions(
     preparedSearch.normalized,
     Boolean(searching?.query.trim()) && !preparedSearch.issue,
-    currentWordId
+    currentWordId,
+    relatedSource
   );
   const searchWords = relatedSearch.words.filter(
     (word) => word.word_id !== currentWordId
   );
   const relatedSenses = useRelatedWordSenses(
     senseSearch?.wordId,
-    senseSearch?.publicationId
+    senseSearch?.publicationId,
+    relatedSource
   );
   const activeSenses =
     relatedSenses.data && relatedSenses.data.entry_id === senseSearch?.wordId
@@ -274,7 +281,7 @@ export function V3RelationsGrid({
                   />
                 ) : (
                   <RelationSortScope
-                    items={relations}
+                    items={disabled ? [] : relations}
                     scopeId={`${sense.id}:${relationType}`}
                     onChange={(next) =>
                       change((draft) => {
@@ -712,7 +719,7 @@ export function V3RelationsGrid({
                                 gap={6}
                               >
                                 <RelationSortScope
-                                  items={group}
+                                  items={disabled ? [] : group}
                                   scopeId={`${sense.id}:${relation.id}:glosses`}
                                   onChange={(next) => {
                                     const key =
@@ -960,7 +967,9 @@ export function V3RelationsGrid({
                                     p0: relationLabel(relationType, t)
                                   })}
                                   className="word-relation-sense"
-                                  disabled={!relation.target_word_id}
+                                  disabled={
+                                    disabled || !relation.target_word_id
+                                  }
                                   mode={
                                     relationType === "derivative"
                                       ? "multiple"
@@ -1150,7 +1159,7 @@ export function V3RelationsGrid({
                                 {relationType === "derivative" &&
                                 group.some((item) => item.target_sense_id) ? (
                                   <RelationSortScope
-                                    items={group}
+                                    items={disabled ? [] : group}
                                     scopeId={`${sense.id}:${relation.id}:bound-glosses`}
                                     onChange={(next) => {
                                       const rowKey =

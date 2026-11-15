@@ -204,6 +204,9 @@ export function previewDraft(
         (row) => row.locale === medium
       );
       return {
+        ...(sense.relations !== undefined
+          ? { relations: sense.relations }
+          : {}),
         id: sense.id,
         ...(sense.level !== undefined ? { level: sense.level } : {}),
         ...(sense.frequency !== undefined
@@ -242,7 +245,10 @@ export function draftNodeCount(draft: NextDraft) {
     draft.senses.length +
     draft.senses.reduce(
       (count, sense) =>
-        count + sense.definitions.length + sense.equivalents.length,
+        count +
+        sense.definitions.length +
+        sense.equivalents.length +
+        (sense.relations?.length ?? 0),
       0
     )
   );

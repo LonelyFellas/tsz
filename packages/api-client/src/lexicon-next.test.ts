@@ -69,6 +69,56 @@ function client(reply: unknown, status = 200) {
 }
 
 describe("lexicon-next authoritative wire contract", () => {
+  it("拓展词协商后按 V1 wire 保存回读，旧服务不发送未知字段", async () => {
+    const next: NextEntry = structuredClone(entry);
+    next.draft.senses[0]!.relations = [
+      {
+        id: uuid(90),
+        relation: "derivative",
+        pending_target_headword: "worker",
+        pending_target_gloss: "工人",
+        score: "86.5"
+      }
+    ];
+    const { api, fetch } = client(next);
+    await expect(
+      api.save(entry.id, { expected_revision: 1, draft: next.draft })
+    ).rejects.toThrow("拓展词能力尚未确认");
+    expect(fetch).not.toHaveBeenCalled();
+    fetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          schema_version: 1,
+          language_rules_version: "lexicon-next-en-zh-1",
+          languages: [],
+          manual_drafts: true,
+          generation: false,
+          publishing: false,
+          relations: true
+        }),
+        { headers: { "content-type": "application/json" } }
+      )
+    );
+    await api.capabilities();
+    expect(
+      new Headers(fetch.mock.calls[0]![1].headers).get("x-tsz-next-relations")
+    ).toBe("v1");
+    expect(
+      await api.save(entry.id, { expected_revision: 1, draft: next.draft })
+    ).toEqual(next);
+    expect(
+      JSON.parse(fetch.mock.calls[1]![1].body).draft.senses[0].relations
+    ).toEqual(next.draft.senses[0]!.relations);
+    expect(await api.get(entry.id)).toEqual(next);
+    for (const relations of [
+      null,
+      [{ ...next.draft.senses[0]!.relations![0], target_headword: "readonly" }]
+    ]) {
+      const invalid = structuredClone(next);
+      Object.assign(invalid.draft.senses[0]!, { relations });
+      expect(() => decodeNextEntry(invalid)).toThrow("接口契约");
+    }
+  });
   it("按能力协商 V1 编辑器，完整保存新版草稿并拒绝畸形嵌套内容", async () => {
     const next = {
       ...entry,

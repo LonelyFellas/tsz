@@ -3378,7 +3378,8 @@ function unifiedSentenceRequests() {
     ...caps,
     sentences: true,
     sentence_details: true,
-    sentence_drafts: true
+    sentence_drafts: true,
+    relations: true
   });
   const saved: NextEntry = {
     ...entry,
@@ -3391,6 +3392,15 @@ function unifiedSentenceRequests() {
           part_of_speech: "noun",
           definitions: [],
           equivalents: [],
+          relations: [
+            {
+              id: "retained-relation",
+              relation: "synonym",
+              pending_target_headword: "middle",
+              pending_target_gloss: "中间",
+              score: "80"
+            }
+          ],
           sentence_ids: [source.id]
         }
       ]
@@ -3468,6 +3478,9 @@ it("内联录入和草稿预览零写入，统一保存提交英美两侧并忽�
   expect(api.sentence).not.toHaveBeenCalled();
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  expect(api.save.mock.calls[0]![1].draft.senses[0].relations).toEqual([
+    expect.objectContaining({ id: "retained-relation", score: "80" })
+  ]);
   const changes: NextSentenceDraftChange[] =
     api.save.mock.calls[0]![1].sentence_changes!;
   expect(
