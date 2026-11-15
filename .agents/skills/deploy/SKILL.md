@@ -48,6 +48,8 @@ Web 默认 `NEXT_PUBLIC_SITE_URL=https://test.tianshengzhi.com`。Admin 默认 t
 
 上传前和上传后、事务开始前复核 exact-main 与最新 CI run/attempt。查询与远端锁不是跨系统原子事务；上传后失败可能留下独立暂存，不能报告零远端写入。不删未完成事务记录继续发。
 
+自动发布启用 `DEPLOY_AUTO_SKIP_STALE=1`：checkout 后、环境安装/SSH 配置前检查候选，并在各组件入口、制品下载前和上传前复核。只有权威 main 已改变或同 SHA 出现更新 CI run/attempt 才以 `superseded` 记录退出，摘要说明候选、现场版本和远端写入为 0，不标记候选已验收。网络、元数据未知、原元组未成功仍失败；手动入口默认保持原严格拒绝行为。创建远端 stage 后不允许成功跳过，上传后继续原严格复核，失败保留并输出 stage 路径供恢复；不自动清除 stage/事务或重发。各次 GitHub 查询仍不是跨系统原子事务，检查间变化可能被后续严格门禁捕获为失败。
+
 ## 3. 验收
 
 Web 在 CI 先验证裁剪包启动与 Sharp，远端继续备用实例验活、HTTPS/版本/API 检查；Admin 继续原子切换及 HTTPS 验收。Node 本地/服务器版本仍按精确提交核对。当前与回退 release 始终保留，旧静态资源保留 30 天。

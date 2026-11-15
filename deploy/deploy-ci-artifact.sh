@@ -10,6 +10,7 @@ prepare_deploy_artifact() {
   id="$(node "$DEPLOY_BUILD_ROOT/deploy/release-artifact.mjs" select "$component" \
     "$destination/artifacts.json" "$destination/artifact-record.json")" || return 1
   [[ "$id" =~ ^[1-9][0-9]*$ ]] || return 1
+  deploy_candidate_checkpoint before-download
   deploy_phase artifact-download
   python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" 300 artifact-download gh api "repos/$DEPLOY_REPOSITORY/actions/artifacts/$id/zip" > "$destination/download.zip" || return 1
   deploy_phase unpack-and-verify
@@ -60,6 +61,7 @@ select_deploy_component() {
   DEPLOY_COMPONENT_ACTION="$(node -e 'const s=require(process.argv[1]); if(!["deploy","skip"].includes(s.action))process.exit(1);process.stdout.write(s.action)' "$destination/selection.json")"
   # A skip is a completed observation of the existing release, never acceptance
   # of the candidate. Bind it to the same fresh source/CI checks as publication.
+  deploy_candidate_checkpoint before-component-result
   recheck_deploy_source "$component"
 }
 
@@ -72,6 +74,7 @@ const receipt = JSON.parse(fs.readFileSync(process.argv[3]));
 console.log(`CI artifact ${artifact.id}; producer attempt ${receipt.identity.attempt}; latest successful CI attempt ${process.argv[4]}`);
 NODE
   deploy_phase source-recheck-upload
+  deploy_candidate_checkpoint before-upload
   recheck_deploy_source "$component"
   deploy_phase prepare-upload
   # rsync -a also copies this directory's mode to the remote mktemp stage.
@@ -91,6 +94,9 @@ NODE
   [[ "$remote_stage" =~ ^/opt/tsz-release-stage\.[a-zA-Z0-9]{6}$ ]] || {
     deploy_source_error "invalid remote staging path"; return 1;
   }
+  DEPLOY_REMOTE_STAGE_CREATED=1
+  DEPLOY_REMOTE_STAGE="$remote_stage"
+  echo "==> remote stage: $remote_stage"
   deploy_phase upload
   rsync -az --no-o --no-g --timeout=180 --stats -e "$DEPLOY_RSYNC_RSH" \
     "$upload/" "tshb-test:$remote_stage/"
@@ -106,4 +112,5 @@ NODE
     "$publish_command"
   deploy_phase remote-cleanup
   deploy_ssh tshb-test "rm -rf -- '$remote_stage'"
+  DEPLOY_REMOTE_STAGE=""
 }
