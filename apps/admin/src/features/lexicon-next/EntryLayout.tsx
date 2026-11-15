@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { NextDraft, NextForm, WordCreationStep } from "@tsz/types";
+import { groupRelations } from "@/features/dictionary/word-creation-v3/relationGroups";
 import { WordCreationLayout } from "@/features/dictionary/word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "@/features/dictionary/word-creation-v3/components/V3ProductProgressList";
 import { Tag } from "@tsz/ui/admin/display";
@@ -12,13 +13,15 @@ export function EntryLayout({
   onStepChange,
   children,
   languageSearch,
-  exists = true
+  exists = true,
+  relationsAvailable = false
 }: {
   draft?: NextDraft;
   step: WordCreationStep;
   onStepChange?: (step: WordCreationStep) => void;
   children: ReactNode;
   exists?: boolean;
+  relationsAvailable?: boolean;
   languageSearch?: string;
 }) {
   const senses = draft?.senses ?? [];
@@ -106,6 +109,36 @@ export function EntryLayout({
     });
     progress.forEach((row, index) => {
       row.index = index + 1;
+    });
+  }
+  if (relationsAvailable) {
+    const relations = senses.flatMap((sense) =>
+      groupRelations(sense.relations ?? [])
+    );
+    progress.push({
+      key: "relations",
+      index: progress.length + 1,
+      label: "拓展词",
+      completed:
+        senses.length > 0 &&
+        senses.every(
+          (sense) =>
+            (sense.relations?.length ?? 0) > 0 &&
+            sense.relations!.every((row) =>
+              Boolean(
+                (row.target_word_id && row.target_sense_id) ||
+                row.pending_target_headword?.trim()
+              )
+            )
+        ),
+      value: relations.length,
+      details: (["derivative", "synonym", "antonym"] as const).map((kind) => ({
+        key: kind,
+        label: { derivative: "派生词", synonym: "近义词", antonym: "反义词" }[
+          kind
+        ],
+        count: relations.filter((group) => group[0]!.relation === kind).length
+      }))
     });
   }
   return (
