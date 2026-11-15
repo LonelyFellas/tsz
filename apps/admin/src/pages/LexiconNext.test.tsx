@@ -3443,15 +3443,11 @@ it("内联录入和草稿预览零写入，统一保存提交英美两侧并忽�
   const { api } = unifiedSentenceRequests();
   await waitForEntryReady(1);
   fireEvent.click(stepButton(/^词义与译词/));
-  fireEvent.click(
-    await screen.findByRole("button", { name: "添加例句", exact: true })
-  );
+  fireEvent.click(await screen.findByRole("button", { name: "添加例句" }));
   fireEvent.click(button("保存完整草稿"));
   await screen.findAllByText("请填写例句原文，或移除空白例句。");
   expect(api.save).not.toHaveBeenCalled();
-  fireEvent.click(
-    screen.getAllByRole("button", { name: "移除引用", exact: true })[1]!
-  );
+  fireEvent.click(screen.getAllByRole("button", { name: "移除引用" })[1]!);
   await waitFor(() =>
     expect(screen.queryByText("请填写例句原文，或移除空白例句。")).toBeNull()
   );
