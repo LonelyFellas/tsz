@@ -179,3 +179,13 @@
 - 前端 `deploy/api-target.json` 将随后端 PR 合并更新至该精确 main SHA，避免新增能力与旧固定契约不一致；使用相同原生生成输入，不手改快照。后端无新迁移，正常 pre-commit 在本批专属本地 PostgreSQL/Redis 执行 SQLx/Clippy，完成后清理。
 - 每仓正常提交后固定 base/head，安排独立只读 pre-push 审查；结果、轮次、精确 CI 与制品身份放在两仓 PR 和最终交接，避免为记录状态反复改变被审 SHA。
 - 仍保留真实验收边界：内置浏览器不可用后按授权 fallback Chrome；上传控件 setFiles 未获权限，真实 HTTP 上传/确认/保存链通过；私有库无内置词典创建检测返回 503；浏览器精确 origin 持久化数据清理未知且禁止绕过。没有为本批重新创建 OSS、真实录音或浏览器环境。
+
+第 4 批本地资源回执：正常 hooks 在专属 PostgreSQL（174 项既有迁移）/Redis 上执行；SQLx prepare 没有改变缓存，Clippy 通过。完成后核实 cluster data_directory、数据库清单和 Redis PID，删除唯一专属数据库并独立确认零临时库、Redis 零键，再停止两进程、删除专属数据目录；独立复查两端口均已释放。本批没有新增 OSS、真实音频、业务账号/词条或浏览器数据。前端为更新 main 创建的自有保护 stash 已逐文件核验并删除，其他 stash 保留。
+
+后端交付：[PR #421](https://github.com/LonelyFellas/tsz-rust/pull/421)，精确 head `9d23430824d5f22f9444aa3f86b24a81a13f9be7`。独立只读 `backend_review` 审查：1 轮；确认缺陷 0；证据排除误报 0；关联回归/回退：未知。原生 SQLx prepare、Clippy 和 pre-push fmt 通过。前端初审对象 `145b06c499e711bce1f83d32a4e0a3ee425daaaa`，独立 `frontend_review` 未发现可确认缺陷；待 API 固定目标更新后增量复查。
+
+部署执行环境交接：本第 4 批聊天从前端项目启动，工具未加载后端项目角色。监督聊天已在后端任务 cwd 使用本机官方 codex-cli 0.169.0 的只读 `codex debug prompt-input` 核实，输出的原生 `spawn_agent.agent_type` schema 包含 `backend_deploy_runner`，与 `.codex/agents/backend-deploy-runner.toml` 一致；未修改配置/权限或执行部署。第 5 批从后端项目创建聊天后再次核实角色入口，必要时通过官方 CLI 在后端 cwd 正常加载，普通子任务不得冒充。此差异不阻断本批 PR/CI 交付。
+
+等待后端 CI 时前端 main 前进到 `e78e773d78a54be5aa2da0e7e7a52f714895c550`（#808）。只读核对为部署候选门禁/工具测试及配置改动，没有 schema、快照、lexicon 消费者或共享编辑器变化；本功能待合并范围不重做，GitHub PR merge 状态/CI 继续核实最新基线。
+
+后端 PR #421 已于 2026-11-15 合并；精确合并 SHA `16478dd6e8bc6de15cf71ea933198c697da763fd`，与已审 head tree 一致，spec 哈希不变。PR CI `43689110805` / attempt 1 completed/success。前端固定 API 预检目标已更新到该精确 main；实际发布仍检查服务器 API manifest，不能用固定目标代替在线版本。后端 main CI 与最终制品身份继续跟踪，交接以最终实际结果为准。
