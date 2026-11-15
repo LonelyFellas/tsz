@@ -16,7 +16,7 @@ const record = (
 ) =>
   `${id}\t${status}\t${conclusion}\thttps://github.com/LonelyFellas/tsz/actions/runs/${id}\t${attempt}\t${sha}\tmain`;
 
-async function checkpoint(t, overrides = {}) {
+async function checkpoint(t, overrides = {}, workflowShell = false) {
   const root = await mkdtemp(path.join(tmpdir(), "tsz-candidate-gate."));
   t.after(() => rm(root, { recursive: true, force: true }));
   const bin = path.join(root, "bin");
@@ -32,7 +32,8 @@ async function checkpoint(t, overrides = {}) {
     `case "$*" in
     'remote get-url origin') echo "\${TEST_ORIGIN:-https://github.com/LonelyFellas/tsz.git}" ;;
     'ls-remote --exit-code origin refs/heads/main')
-      if [[ -e "$TEST_QUERY_DONE" ]]; then echo "\${TEST_RECHECK_SHA:-$TEST_MAIN_SHA}"; else echo "$TEST_MAIN_SHA"; fi ;;
+      if [[ -e "$TEST_QUERY_DONE" ]]; then echo "\${TEST_RECHECK_SHA:-$TEST_MAIN_SHA}"; else echo "$TEST_MAIN_SHA"; fi
+      exit "\${TEST_GIT_STATUS:-0}" ;;
     *) exit 91 ;;
   esac`
   );
@@ -58,24 +59,56 @@ async function checkpoint(t, overrides = {}) {
     TEST_CALLS: path.join(root, "calls"),
     TEST_QUERY_DONE: path.join(root, "queried"),
     GITHUB_STEP_SUMMARY: path.join(root, "summary.md"),
+    GITHUB_OUTPUT: path.join(root, "output"),
     ...overrides
   });
-  const result = spawnSync(
-    "bash",
-    [
-      "-c",
-      'set -euo pipefail; source "$1"; deploy_candidate_checkpoint before-setup; echo current',
-      "--",
-      fileURLToPath(new URL("./deploy-source.sh", import.meta.url))
-    ],
-    { env, encoding: "utf8", timeout: 10000 }
-  );
+  let args = [
+    "-c",
+    'set -euo pipefail; source "$1"; deploy_candidate_checkpoint before-setup; echo current',
+    "--",
+    fileURLToPath(new URL("./deploy-source.sh", import.meta.url))
+  ];
+  if (workflowShell) {
+    const workflow = await readFile(
+      new URL("../.github/workflows/deploy-tshb-test.yml", import.meta.url),
+      "utf8"
+    );
+    const gate = workflow
+      .split("- name: Check deployment candidate\n")[1]
+      .split("\n      - name:")[0];
+    const source = gate
+      .split("        run: |\n")[1]
+      .split("\n")
+      .map((line) => line.replace(/^          /, ""))
+      .join("\n");
+    // GitHub's implicit Linux shell is bash -e. Execute the actual workflow
+    // block so its own strict flags, rather than the test harness, protect IO.
+    args = ["-e", "-c", source];
+  }
+  const result = spawnSync("bash", args, {
+    env,
+    cwd: fileURLToPath(new URL("../", import.meta.url)),
+    encoding: "utf8",
+    timeout: 10000
+  });
   return {
     ...result,
     calls: await readFile(env.TEST_CALLS, "utf8").catch(() => ""),
     summary: await readFile(env.GITHUB_STEP_SUMMARY, "utf8").catch(() => "")
   };
 }
+
+test("the actual workflow shell rejects a Git failure even after a valid different ref was printed", async (t) => {
+  const result = await checkpoint(
+    t,
+    { TEST_MAIN_SHA: other, TEST_GIT_STATUS: "128" },
+    true
+  );
+  assert.notEqual(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stderr, /cannot read origin\/main for candidate check/);
+  assert.doesNotMatch(result.stdout, /outcome=superseded/);
+  assert.doesNotMatch(result.calls, /^(ssh|rsync|node|pnpm) /m);
+});
 
 test("the exact latest successful candidate continues without setup or remote IO", async (t) => {
   const result = await checkpoint(t);

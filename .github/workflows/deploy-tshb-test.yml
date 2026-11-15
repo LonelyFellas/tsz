@@ -41,6 +41,7 @@ jobs:
           DEPLOY_EXPECTED_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           DEPLOY_AUTO_SKIP_STALE: "1"
         run: |
+          set -euo pipefail
           source deploy/deploy-source.sh
           deploy_candidate_checkpoint before-setup
           [[ "$(git rev-parse HEAD)" = "$DEPLOY_EXPECTED_SHA" ]]
