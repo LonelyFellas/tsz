@@ -12,7 +12,10 @@ import {
   validateModuleManifest,
   vitestProjectNames
 } from "./ci-test-modules.mjs";
-import { createInventoryDocument } from "./ci-test-inventory-reporter.mjs";
+import CiTestInventoryReporter, {
+  createInventoryDocument,
+  timingSummary
+} from "./ci-test-inventory-reporter.mjs";
 import {
   coverageCollectionConfig,
   fullCoverageConfig,
@@ -39,14 +42,18 @@ function inventoryFixture() {
     { projectName: "web", file: "/repo/apps/web/src/a.test.ts" },
     { projectName: "admin", file: "/repo/apps/admin/src/a.test.ts" },
     { projectName: "admin", file: "/repo/apps/admin/src/b.test.ts" },
-    { projectName: "admin", file: "/repo/apps/admin/src/c.test.ts" }
+    { projectName: "admin", file: "/repo/apps/admin/src/c.test.ts" },
+    { projectName: "admin", file: "/repo/apps/admin/src/d.test.ts" },
+    { projectName: "admin", file: "/repo/apps/admin/src/e.test.ts" }
   ];
   const byModule = {
     packages: files.slice(0, 4),
     web: files.slice(4, 5),
     "admin-1": files.slice(5, 6),
     "admin-2": files.slice(6, 7),
-    "admin-3": files.slice(7, 8)
+    "admin-3": files.slice(7, 8),
+    "admin-4": files.slice(8, 9),
+    "admin-5": files.slice(9, 10)
   };
   const documents = ciTestModules.map((module) => ({
     module: module.name,
@@ -69,12 +76,12 @@ test("M01: module manifest covers all six Vitest projects", () => {
     "web",
     "admin"
   ]);
-  assert.equal(ciTestModules.length, 5);
+  assert.equal(ciTestModules.length, 7);
 });
 
 test("M02: admin shards must form a complete 1/N..N/N range", () => {
   const modules = cloneModules();
-  modules.find((module) => module.name === "admin-3").shard = "2/3";
+  modules.find((module) => module.name === "admin-3").shard = "2/5";
   assert.throws(
     () => validateModuleManifest(modules),
     /complete range 1\/N\.\.N\/N/
@@ -126,7 +133,7 @@ test("M05: module arguments bound admin concurrency and retain path selection", 
   assert.ok(args.includes("--maxWorkers=1"));
   assert.ok(args.includes("/repo/apps/admin"));
   assert.ok(!args.some((argument) => argument.startsWith("--project=")));
-  assert.ok(args.includes("--shard=2/3"));
+  assert.ok(args.includes("--shard=2/5"));
   assert.ok(args.includes("--reporter=blob"));
   assert.ok(
     args.includes("--reporter=./scripts/ci-test-inventory-reporter.mjs")
@@ -194,7 +201,15 @@ test("M07: reporter inventory comes from actual TestModule values", () => {
     [
       {
         project: { name: "admin" },
-        moduleId: "/repo/apps/admin/src/example.test.ts"
+        moduleId: "/repo/apps/admin/src/example.test.ts",
+        diagnostic: () => ({
+          duration: 25,
+          collectDuration: 6,
+          setupDuration: 3,
+          prepareDuration: 2,
+          environmentSetupDuration: 4
+        }),
+        state: () => "passed"
       }
     ],
     "admin-1",
@@ -208,13 +223,85 @@ test("M07: reporter inventory comes from actual TestModule values", () => {
         projectName: "admin",
         filepath: "apps/admin/src/example.test.ts"
       }
+    ],
+    timings: [
+      {
+        projectName: "admin",
+        filepath: "apps/admin/src/example.test.ts",
+        duration_ms: 40,
+        test_duration_ms: 25,
+        status: "passed"
+      }
     ]
   });
 });
 
+test("missing timing diagnostics remain unknown without changing the executed inventory", () => {
+  const document = createInventoryDocument(
+    [
+      {
+        project: { name: "admin" },
+        moduleId: "/repo/apps/admin/src/new.test.ts"
+      }
+    ],
+    "admin-1",
+    "/repo"
+  );
+  assert.equal(document.tests.length, 1);
+  assert.equal(document.timings[0].duration_ms, null);
+  assert.equal(document.timings[0].test_duration_ms, null);
+  assert.match(timingSummary(document), /0 files recorded, 1 unknown/);
+  const invalid = createInventoryDocument(
+    [
+      {
+        project: { name: "admin" },
+        moduleId: "/repo/apps/admin/src/new.test.ts",
+        diagnostic: () => ({ duration: NaN })
+      }
+    ],
+    "admin-1",
+    "/repo"
+  );
+  assert.equal(invalid.timings[0].duration_ms, null);
+});
+
+test("an unwritable timing summary still preserves the required actual-run inventory", async () => {
+  const root = await mkdtemp(join(tmpdir(), "tsz-ci-timing-summary-"));
+  const keys = [
+    "CI_TEST_MODULE",
+    "CI_TEST_INVENTORY_FILE",
+    "GITHUB_STEP_SUMMARY"
+  ];
+  const previous = Object.fromEntries(
+    keys.map((key) => [key, process.env[key]])
+  );
+  try {
+    process.env.CI_TEST_MODULE = "admin-1";
+    process.env.CI_TEST_INVENTORY_FILE = join(root, "inventory.json");
+    process.env.GITHUB_STEP_SUMMARY = root;
+    await new CiTestInventoryReporter().onTestRunEnd([
+      {
+        project: { name: "admin" },
+        moduleId: join(process.cwd(), "apps/admin/src/new.test.ts")
+      }
+    ]);
+    const document = JSON.parse(
+      await readFile(process.env.CI_TEST_INVENTORY_FILE, "utf8")
+    );
+    assert.equal(document.tests.length, 1);
+    assert.equal(document.timings[0].duration_ms, null);
+  } finally {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("M08: full and module inventories must be an exact tuple partition", () => {
   const { files, documents } = inventoryFixture();
-  assert.equal(validateInventorySet(files, documents, "/repo").length, 8);
+  assert.equal(validateInventorySet(files, documents, "/repo").length, 10);
 
   const missing = structuredClone(documents);
   missing[0].tests.pop();
@@ -263,7 +350,7 @@ test("M09: inventory and blob files reject missing or extra artifacts", async ()
           "/repo"
         )
       ).length,
-      8
+      10
     );
     await writeFile(join(inventoryDirectory, "unexpected.json"), "{}");
     await assert.rejects(

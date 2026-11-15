@@ -209,6 +209,8 @@ jobs:
           - module: admin-1
           - module: admin-2
           - module: admin-3
+          - module: admin-4
+          - module: admin-5
     steps:
       - uses: actions/checkout@v7
 
