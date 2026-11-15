@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { NextSentence } from "@tsz/types";
+import type { NextDraft, NextSentence } from "@tsz/types";
 import {
   cleanSentenceVariant,
   draftSentenceError,
@@ -107,13 +107,14 @@ it("完全空白的译文不提交，0分和有来源的半填行不能当作空
   ).toContain("译文不能为空");
 });
 it("新引用的既有资源保留原版本，修改不能误认为新建或无变更", () => {
-  const word = {
+  const word: NextDraft = {
     schema_version: 1 as const,
     headword: "centre",
     forms: [],
     senses: [
       {
         id: "sense",
+        part_of_speech: "noun",
         definitions: [],
         equivalents: [],
         sentence_ids: [source.id]
@@ -153,13 +154,14 @@ it("未保存的正文和配音变更不预览旧录音，原草稿绑定保留�
       }
     ]
   };
-  const word = {
+  const word: NextDraft = {
     schema_version: 1 as const,
     headword: "centre",
     forms: [],
     senses: [
       {
         id: "sense",
+        part_of_speech: "noun",
         definitions: [],
         equivalents: [],
         sentence_ids: [source.id]

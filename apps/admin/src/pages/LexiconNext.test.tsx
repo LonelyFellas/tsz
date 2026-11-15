@@ -23,7 +23,8 @@ import type {
   NextEntryMatchInput,
   NextEntryMatches,
   NextWorkspaceEntry,
-  NextSentence
+  NextSentence,
+  NextSentenceDraftChange
 } from "@tsz/types";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { api as profileApi, tokens, useAuthStore } from "@/lib/auth";
@@ -3467,7 +3468,8 @@ it("内联录入和草稿预览零写入，统一保存提交英美两侧并忽�
   expect(api.sentence).not.toHaveBeenCalled();
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
-  const changes = api.save.mock.calls[0]![1].sentence_changes!;
+  const changes: NextSentenceDraftChange[] =
+    api.save.mock.calls[0]![1].sentence_changes!;
   expect(
     changes.map((c) => [
       c.expected_revision,
