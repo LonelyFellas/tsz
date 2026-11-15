@@ -111,7 +111,7 @@ export function createAdminAuthRuntime({
       }
     }
   });
-  const api = createAdminEndpoints(http);
+  const api = createAdminEndpoints(http, tokens.getSessionGeneration);
   const readProfile = api.profile;
   api.profile = async () => {
     const generation = tokens.getSessionGeneration();

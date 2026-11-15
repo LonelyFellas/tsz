@@ -263,7 +263,11 @@ function requireLifecycleBatchIdentity<
  * 这样这里的相对路径（/auth/login、/profile）才会命中后台独立路由，
  * 且 refresh cookie 的 path（/api/v1/admin）天然匹配。
  */
-export function createAdminEndpoints(http: HttpClient) {
+export function createAdminEndpoints(
+  http: HttpClient,
+  getSessionGeneration?: () => number
+) {
+  let audioGenerationQueue: Promise<unknown> = Promise.resolve();
   return {
     lexiconTaxonomies: createLexiconTaxonomyEndpoints(http),
     aiLedger: createAiLedgerEndpoints(http),
@@ -352,19 +356,29 @@ export function createAdminEndpoints(http: HttpClient) {
       generateAudio: (
         input: import("@tsz/types").GenerateVoiceAudioRequest,
         signal?: AbortSignal
-      ) =>
-        http.post<import("@tsz/types").GenerateVoiceAudioResponse>(
-          "/speech/audio",
-          input,
-          {
-            signal,
+      ) => {
+        const generation = getSessionGeneration?.();
+        const result = audioGenerationQueue.then(async () => {
+          signal?.throwIfAborted();
+          if (generation !== getSessionGeneration?.())
+            throw new Error("session changed");
+          // HTTP 取消不会停止后端生成。保留已发请求直到响应，再启动下一段，
+          // 避免正文变化、切换音色或多个编辑器撞上同一账号的生成锁。
+          const response = await http.post<
+            import("@tsz/types").GenerateVoiceAudioResponse
+          >("/speech/audio", input, {
             headers: {
               "X-TSZ-Voice-Versions": "v6",
               "X-TSZ-Voice-Locales": "v1",
               "X-TSZ-Voice-Models": "v1"
             }
-          }
-        ),
+          });
+          signal?.throwIfAborted();
+          return response;
+        });
+        audioGenerationQueue = result.catch(() => undefined);
+        return result;
+      },
       voices: (signal?: AbortSignal) =>
         http.get<AdminSpeechVoiceListResponse>("/speech/voices", {
           signal,
