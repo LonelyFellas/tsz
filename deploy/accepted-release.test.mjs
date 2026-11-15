@@ -72,6 +72,18 @@ for (const component of ["web", "admin"]) {
     assert.deepEqual(state.receipt, receipt);
     assert.equal(await readFile(manifestPath, "utf8"), before);
     assert.deepEqual(await readdir(manifestsRoot), [`${component}.json`]);
+    await writeFile(receiptPath, "null");
+    await assert.rejects(
+      readAcceptedRelease(options),
+      /existing release metadata must be a JSON object/
+    );
+    await writeFile(receiptPath, JSON.stringify(receipt));
+    await writeFile(manifestPath, "null");
+    await assert.rejects(
+      readAcceptedRelease(options),
+      /existing release metadata must be a JSON object/
+    );
+    await writeFile(manifestPath, before);
     await writeFile(
       receiptPath,
       JSON.stringify({ ...receipt, release_id: "wrong-id" })

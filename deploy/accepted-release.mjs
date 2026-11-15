@@ -6,7 +6,12 @@ import { verifyManifest } from "./provenance.mjs";
 
 async function optionalJson(file) {
   try {
-    return JSON.parse(await readFile(file, "utf8"));
+    const value = JSON.parse(await readFile(file, "utf8"));
+    assert.ok(
+      value !== null && typeof value === "object" && !Array.isArray(value),
+      "existing release metadata must be a JSON object"
+    );
+    return value;
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
