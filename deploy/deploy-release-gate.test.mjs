@@ -128,7 +128,9 @@ async function run(component, scenario, approved = true) {
       "ssh",
       `printf 'ssh %s\n' "$*" >> '${log}'
       case "$*" in
-        *'/usr/bin/node --version') [[ '${scenario}' != ssh-failure ]] || exit 255; echo '${process.version}' ;;
+        *'/usr/bin/node --version')
+          [[ '${scenario}' != ssh-failure ]] || exit 255
+          if [[ '${scenario}' = node-mismatch ]]; then echo v0.0.0; else echo '${process.version}'; fi ;;
         *'mktemp -d '*) echo /opt/tsz-release-stage.ABC123 ;;
         *publish-compatible.sh*) [[ '${scenario}' != publish-failure ]] || exit 42 ;;
         *'rm -rf '*) [[ '${scenario}' != cleanup-failure ]] || exit 37 ;;
@@ -353,6 +355,16 @@ test("a component reuses the CI socket without closing another component's conne
   assert.match(result.calls, /-S .*shared-control/);
   assert.doesNotMatch(result.calls, /-O exit/);
 });
+
+for (const component of ["web", "admin"]) {
+  test(`${component}: a mismatched server Node version stops before staging or uploading`, async () => {
+    const result = await run(component, "node-mismatch");
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, /server Node must be/);
+    assert.match(result.summary, /local \| node-check \| failure/);
+    assert.doesNotMatch(result.calls, /mktemp|rsync|publish-compatible.sh/);
+  });
+}
 
 test("admin: automatic deployment uses the verified package flags", async () => {
   const result = await run("admin", "auto-config");
