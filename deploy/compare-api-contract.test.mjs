@@ -39,7 +39,7 @@ test("deployed API may add endpoints but must retain required operations and sch
         structuredClone(expected),
         "openapi.snapshot.json"
       ),
-    /API contract differs/
+    /API contract differs: schemas Used at \/schemas\/Used\/type/
   );
 });
 
@@ -64,6 +64,22 @@ test("runtime schema comparison ignores source metadata but rejects structural d
   actual.$defs.A.type = "number";
   assert.throws(
     () => compareApiContract(actual, expected, "runtime.json"),
-    /differs/
+    /differs from selected API at \/\$defs\/A\/type/
+  );
+});
+
+test("diagnostics retain strict serialized ordering and identify escaped operation keys", () => {
+  const expected = {
+    paths: {},
+    operationHeaders: {},
+    operationQueryParameters: {},
+    operationSchemas: { "get /used": { required: ["id"], type: "object" } },
+    schemas: {}
+  };
+  const actual = structuredClone(expected);
+  actual.operationSchemas["get /used"] = { type: "object", required: ["id"] };
+  assert.throws(
+    () => compareApiContract(actual, expected, "openapi.snapshot.json"),
+    /operationSchemas\/get ~1used/
   );
 });

@@ -18,6 +18,8 @@ description: 将已合入 GitHub main 且精确 CI 成功的前端 Linux 发布�
 
 需要配套后端时先按 [配套发布清单](../contract-sync/references/paired-release.md)确认版本组合和顺序。单组件只发目标组件，成功且身份未变的组件不重复发布。
 
+CI 的 `pnpm ci:api-preflight` 只针对 [api-target.json](../../../deploy/api-target.json) 中固定的后端 SHA 做公开契约预检，不读取部署凭据、不修改前端快照。通过只证明该目标组合兼容；正式发布仍执行 `check-api-contract.mjs`，读取服务器实际 API manifest，并在共享锁内核对实际 SHA。不得用固定目标代替现场检查；目标版本升级按配套发布记录处理。
+
 fetch 后记录当前 main SHA，确认改动已合入。入口查询该 SHA 最新 `CI` 工作流；正在运行按 [CI 等待与续跑](references/ci-wait.md)处理，同范围授权沿用。每个组件执行前重新核对，main 前进不自动换包或追新版本。
 
 CI `quality` 在 Ubuntu 22.04 构建并验证 Web standalone/Sharp 与 Admin test-mode 制品。包名为 `tsz-<web|admin>-<sha>-attempt-<producer-attempt>`，必须唯一、未过期、来自精确 run。仅重跑失败测试时可复用该 run 中最近的成功构建包，生产 attempt 不得晚于最终 CI attempt；两者分别记录，包参数仍须匹配。包包含 `release.tar.gz`、原生 `candidate.json`、`release.json`；回执绑定 SHA/tree、run/attempt、构建参数、Node/平台、摘要与验证结果。
