@@ -40,5 +40,10 @@ started="$SECONDS"
 echo '==> download and verify web CI package'
 prepare_deploy_artifact web "$deploy_tmp"
 echo "==> package ready after $((SECONDS - started))s"
+select_deploy_component web "$deploy_tmp"
+if [[ "$DEPLOY_COMPONENT_ACTION" = skip ]]; then
+  echo '✓ web unchanged; existing accepted version verified; remote writes=0; local build=0'
+  exit 0
+fi
 publish_deploy_artifact web "$deploy_tmp"
 echo "✓ web accepted; total $((SECONDS - started))s; local build=0"

@@ -61,6 +61,7 @@ jobs:
           DEPLOY_EXPECTED_CI_RUN_ID: ${{ github.event.workflow_run.id }}
           DEPLOY_EXPECTED_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           DEPLOY_AUTO_CONFIG: "1"
+          DEPLOY_SELECT_COMPONENTS: "1"
         run: |
           DEPLOY_EXPECTED_API_SHA="$(node deploy/deploy-metrics.mjs run web local api-contract -- node deploy/check-api-contract.mjs)"
           export DEPLOY_EXPECTED_API_SHA
