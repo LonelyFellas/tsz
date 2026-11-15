@@ -755,7 +755,9 @@ function EntryEditor({
             requests={requests}
             sentenceDetailsAvailable={sentenceDetailsAvailable}
             sentenceResources={
-              sentenceDraftsAvailable ? sentenceWorkspace.resources : undefined
+              sentenceDraftsAvailable
+                ? sentenceWorkspace.previewResources
+                : undefined
             }
             view={previewDraft(draft, target, medium, grammarCatalog.data)}
           />
@@ -773,7 +775,7 @@ function EntryEditor({
                     sentenceDetailsAvailable={sentenceDetailsAvailable}
                     sentenceResources={
                       sentenceDraftsAvailable
-                        ? sentenceWorkspace.resources
+                        ? sentenceWorkspace.previewResources
                         : undefined
                     }
                     view={previewDraft(

@@ -1,0 +1,8 @@
+{
+  "legacy_consumer_candidate_api": true,
+  "candidate_consumer_legacy_representation": true,
+  "candidate_combination": true,
+  "no_schema_migration": true,
+  "missing_capability_uses_existing_editor": true,
+  "resource_count": 1
+}

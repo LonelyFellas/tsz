@@ -140,3 +140,68 @@ it("新引用的既有资源保留原版本，修改不能误认为新建或无�
     )!.translations[0]!.locale
   ).toBe("zh-Hant");
 });
+
+it("未保存的正文和配音变更不预览旧录音，原草稿绑定保留供保存复用", () => {
+  const audioSource = structuredClone(source);
+  audioSource.draft.variants[0]!.voice_profile = {
+    voices: [
+      {
+        voice_id: "voice",
+        enabled: true,
+        rate_percent: 0,
+        audio_asset_id: "old-audio"
+      }
+    ]
+  };
+  const word = {
+    schema_version: 1 as const,
+    headword: "centre",
+    forms: [],
+    senses: [
+      {
+        id: "sense",
+        definitions: [],
+        equivalents: [],
+        sentence_ids: [source.id]
+      }
+    ]
+  };
+  const { result } = renderHook(() =>
+    useSentenceDrafts([audioSource], word, "zh-Hans")
+  );
+  const variant = () =>
+    result.current.previewResources[source.id]!.draft.variants.find(
+      (v) => v.locale === "en-GB"
+    )!;
+  expect(variant().voice_profile?.voices[0]!.audio_asset_id).toBe("old-audio");
+  act(() =>
+    result.current.update(audioSource, {
+      ...audioSource.draft.variants[0]!,
+      content: { version: 2, text: "Changed text.", annotations: [] }
+    })
+  );
+  expect(variant().voice_profile).toBeUndefined();
+  expect(
+    result.current.resources[source.id]!.draft.variants.find(
+      (v) => v.locale === "en-GB"
+    )!.voice_profile?.voices[0]!.audio_asset_id
+  ).toBe("old-audio");
+  act(() =>
+    result.current.update(audioSource, {
+      ...audioSource.draft.variants[0]!,
+      voice_profile: {
+        voices: [
+          {
+            voice_id: "voice",
+            enabled: true,
+            rate_percent: 10,
+            audio_asset_id: "old-audio"
+          }
+        ]
+      }
+    })
+  );
+  expect(variant().voice_profile).toBeUndefined();
+  act(() => result.current.update(audioSource, audioSource.draft.variants[0]!));
+  expect(variant().voice_profile?.voices[0]!.audio_asset_id).toBe("old-audio");
+});

@@ -116,6 +116,38 @@ export function useSentenceDrafts(
     () => ({ ...Object.fromEntries(allBase.map((v) => [v.id, v])), ...drafts }),
     [allBase, drafts]
   );
+  const previewResources = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.values(resources).map((source) => [
+          source.id,
+          {
+            ...source,
+            draft: {
+              ...source.draft,
+              variants: source.draft.variants.map((variant) => {
+                const saved = allBase
+                  .find((row) => row.id === source.id)
+                  ?.draft.variants.find((row) => row.locale === variant.locale);
+                if (
+                  saved &&
+                  JSON.stringify([saved.content, saved.voice_profile]) ===
+                    JSON.stringify([variant.content, variant.voice_profile])
+                )
+                  return variant;
+                // Unsaved text/settings must not play the previous formal recording.
+                return {
+                  ...variant,
+                  voice_profile: undefined,
+                  audio_assets: undefined
+                };
+              })
+            }
+          }
+        ])
+      ),
+    [allBase, resources]
+  );
   const refs = word.senses.flatMap((v) => v.sentence_ids ?? []);
   const changes = sentenceChanges(allBase, drafts, refs, medium);
   const prepareTasks = useRef(new Map<string, () => Promise<boolean>>());
@@ -158,6 +190,7 @@ export function useSentenceDrafts(
     },
     base: allBase,
     resources,
+    previewResources,
     changes,
     dirty: changes.length > 0,
     update,

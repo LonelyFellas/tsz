@@ -17,11 +17,12 @@
 本轮验证：
 
 - 后端 `cargo test --locked --all-features --test lexicon_next`：独占 PostgreSQL/Redis 下 36 项通过，覆盖统一保存的非法输入、后一条冲突及无权时全部回滚、英美同资源只增一次修订、保留繁体译文与旧表示隐藏。
-- 前端内联草稿与页面回归 2 文件 73 项通过；api-client 整包 41 文件 747 项通过。Admin lint、UI 规则及 tighten 通过（基线无新增偏差）。原生提交/推送 hooks 承接最终 SQLx、Clippy、格式与全仓类型检查。
+- 前端内联草稿与页面回归 2 文件 74 项通过（含审查发现的旧录音失效回归）；api-client 整包 41 文件 747 项通过。Admin lint、UI 规则及 tighten 通过（基线无新增偏差）。原生提交/推送 hooks 承接最终 SQLx、Clippy、格式与全仓类型检查。
 - 重新导出本轮 OpenAPI 并同步消费者；spec / runtime 来源哈希均为 `6e20d606c09f84e5d62a25623b144ba8f72aaed87bd3662f36db6608363255ec`。补齐协商 header 契约和未确认统一草稿能力时禁止请求的回归。
 - 内置浏览器：真实 Vite `53081` 代理本分支 Rust `53080`，独占批次 `20261115-inline-drafts-7a3b`，词库与持久化无 mock。六条译文、五个评分及未评估值、来源、语体通用全选及单行业录入统一保存，刷新及独立 GET 一致。未保存预览不写入；空白例句阻断保存，移除后不产生资源；真实并发资源更新返回 409，本地文字保留，比较服务器内容并经二次确认后重载。
 - 1440 / 390 视口检查完成，390px 页面 scrollWidth 为 390，卡片 clientWidth / scrollWidth 均为 305。修复等级下拉裁切、未评估标签换行及窄屏标题操作挤压；来源浮层可用。语音预览与上传关闭，不创建 OSS，不以本轮验收证明真实语音生成。
 - 证据：[桌面录入](acceptance/inline-editor-1440.jpg)、[窄屏录入](acceptance/inline-editor-390.jpg)、[已保存预览](acceptance/inline-preview.jpg)、[脱敏持久化记录](acceptance/inline-persistence.json)。测试账号已退出；本地容器、进程及临时凭据清理随交付收尾记录。
+- 草稿预览使用独立资源副本：正文或配音设置改变时不播放旧正式录音，原始绑定保留供统一保存处理。旧前端严格 runtime 接受候选 API 的旧协商响应；新 runtime 接受无能力/无资源扩展表示；[兼容证据](acceptance/inline-compatibility.json)是受控表示验证，未冒充真实旧二进制联调。无新增迁移、持久化结构沿用现有例句格式，后端先发布后再固定前端 API 目标。
 
 后续章节保留前两轮已交付功能的历史记录，当前轮状态以上述记录及新 PR 为准。
 
