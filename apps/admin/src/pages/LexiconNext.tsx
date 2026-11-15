@@ -402,7 +402,7 @@ function EntryEditor({
         if (!(await wait())) throw new Error("发音处理尚未完成，请重试保存。");
       }
       const current = draftRef.current;
-      const problem = draftProblem(current);
+      const problem = draftProblem(current, equivalentMetadataAvailable);
       if (problem) throw new Error(problem);
       const result = await requests.save(saved.id, {
         expected_revision: saved.revision,

@@ -2774,3 +2774,54 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
     depends_on_context: false
   });
 });
+
+it.each([false, true])(
+  "译词新能力为 %s 时按协商结果校验旧草稿的重复译词",
+  async (available) => {
+    const api = requests();
+    api.capabilities.mockResolvedValue({
+      ...caps,
+      equivalent_metadata: available
+    });
+    const equivalents = [
+      { id: "legacy-one", locale: "zh-Hans", text: "ＪＯＢ" },
+      { id: "legacy-two", locale: "zh-Hans", text: "job" }
+    ];
+    api.get.mockResolvedValue({
+      ...entry,
+      draft: {
+        ...entry.draft,
+        senses: [
+          { id: "sense", part_of_speech: "noun", definitions: [], equivalents }
+        ]
+      }
+    });
+    mount(api);
+    await screen.findByDisplayValue("centre");
+    fireEvent.click(button(/^预览/));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "词头", exact: true }),
+      { target: { value: "center" } }
+    );
+    fireEvent.click(button("保存完整草稿"));
+    if (available) {
+      await waitFor(() =>
+        expect(
+          screen
+            .getAllByRole("alert")
+            .some(
+              (alert) =>
+                alert.textContent === "当前义项与媒介语言内已有该译词。"
+            )
+        ).toBe(true)
+      );
+      expect(api.save).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+      expect(api.save.mock.calls[0]![1].draft.senses[0].equivalents).toEqual(
+        equivalents
+      );
+      expect(api.save.mock.calls[0]![1].draft.headword).toBe("center");
+    }
+  }
+);

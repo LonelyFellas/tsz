@@ -177,23 +177,28 @@ export function draftNodeCount(draft: NextDraft) {
   );
 }
 
-export function draftProblem(draft: NextDraft): string | null {
+export function draftProblem(
+  draft: NextDraft,
+  equivalentMetadataAvailable = false
+): string | null {
   if (draftNodeCount(draft) > 500)
     return "草稿内容已超出数量限制，请减少本批译词。";
-  for (const sense of draft.senses) {
-    const keys = new Set<string>();
-    for (const row of sense.equivalents) {
-      const key = row.locale + ":" + equivalentKey(row.text);
-      if (keys.has(key)) return "当前义项与媒介语言内已有该译词。";
-      keys.add(key);
-      if (
-        row.metadata?.commonness.some(
-          (score) => commonnessUnits(score.score) === undefined
+  if (equivalentMetadataAvailable) {
+    for (const sense of draft.senses) {
+      const keys = new Set<string>();
+      for (const row of sense.equivalents) {
+        const key = row.locale + ":" + equivalentKey(row.text);
+        if (keys.has(key)) return "当前义项与媒介语言内已有该译词。";
+        keys.add(key);
+        if (
+          row.metadata?.commonness.some(
+            (score) => commonnessUnits(score.score) === undefined
+          )
         )
-      )
-        return "请输入 0.1–99.9，最多一位小数。";
-      if (sense.no_equivalents?.includes(row.locale))
-        return "无译词声明不能与已有译词并存。";
+          return "请输入 0.1–99.9，最多一位小数。";
+        if (sense.no_equivalents?.includes(row.locale))
+          return "无译词声明不能与已有译词并存。";
+      }
     }
   }
 

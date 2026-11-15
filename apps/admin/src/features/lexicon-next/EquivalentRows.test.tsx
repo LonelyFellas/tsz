@@ -221,7 +221,9 @@ describe("媒介语译词", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "工作的常见度" }), {
       target: { value: "100" }
     });
-    expect(draftProblem({ ...draft, senses: [saved()] })).toContain("0.1–99.9");
+    expect(draftProblem({ ...draft, senses: [saved()] }, true)).toContain(
+      "0.1–99.9"
+    );
     fireEvent.change(screen.getByRole("textbox", { name: "工作的常见度" }), {
       target: { value: "0.1" }
     });
@@ -231,7 +233,7 @@ describe("媒介语译词", () => {
     expect(
       within(screen.getByRole("table")).getAllByRole("alert").length
     ).toBeGreaterThan(0);
-    expect(draftProblem({ ...draft, senses: [saved()] })).toContain(
+    expect(draftProblem({ ...draft, senses: [saved()] }, true)).toContain(
       "已有该译词"
     );
   });
