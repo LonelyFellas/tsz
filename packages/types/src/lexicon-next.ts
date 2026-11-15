@@ -1,3 +1,4 @@
+import type { LexiconTaxonomy } from "./lexicon-taxonomies";
 import type {
   AudioAssetV3,
   VoiceProfileV3,
@@ -19,9 +20,24 @@ export interface NextDefinition {
   style: "definition" | "sentence";
 }
 export interface NextEquivalent {
+  metadata?: NextEquivalentMetadata;
   id: string;
   locale: string;
   text: string;
+}
+export interface NextEquivalentMetadata {
+  register_ids: string[];
+  domain_ids: string[];
+  commonness: NextEquivalentScore[];
+}
+export interface NextEquivalentScore {
+  domain_id?: string;
+  score: string;
+  assessed_at?: string;
+}
+export interface NextEquivalentCatalog {
+  registers: LexiconTaxonomy[];
+  domains: LexiconTaxonomy[];
 }
 export interface NextSenseGroup {
   id: string;
@@ -29,6 +45,7 @@ export interface NextSenseGroup {
   name_en: string;
 }
 export interface NextSense {
+  no_equivalents?: string[];
   level?: string;
   frequency?: string;
   depends_on_context?: boolean;
@@ -152,6 +169,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  equivalent_metadata?: boolean;
   sense_metadata?: boolean;
   grammar_audio?: boolean;
   grammar_structures?: boolean;
@@ -170,6 +188,7 @@ export interface NextViewQuery {
   medium_locale: string;
 }
 export interface NextSenseView {
+  no_equivalents?: boolean;
   level?: string;
   frequency?: string;
   depends_on_context?: boolean;

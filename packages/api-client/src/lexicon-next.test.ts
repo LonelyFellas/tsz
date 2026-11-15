@@ -669,3 +669,50 @@ it("词义总体数据协商新契约，兼容旧响应且拒绝 null 与错误 
     expect(() => decodeNextEntry(invalid)).toThrow();
   }
 });
+
+it("译词元数据与只读目录使用新版契约，保存不物化继承分", async () => {
+  const next = structuredClone(entry);
+  next.draft.senses[0]!.equivalents = [
+    {
+      id: uuid(20),
+      locale: "zh-Hans",
+      text: "中心",
+      metadata: {
+        register_ids: [uuid(21)],
+        domain_ids: [],
+        commonness: [{ score: "95.0", assessed_at: "2026-11-15T00:00:00Z" }]
+      }
+    }
+  ];
+  next.draft.senses[0]!.no_equivalents = ["zh-Hant"];
+  const { api, fetch } = client(next);
+  expect(
+    await api.save(next.id, { expected_revision: 1, draft: next.draft })
+  ).toEqual(next);
+  expect(
+    new Headers(fetch.mock.calls[0]![1].headers).get("x-tsz-next-equivalents")
+  ).toBe("v1");
+  const payload = JSON.parse(fetch.mock.calls[0]![1].body);
+  expect(
+    payload.draft.senses[0].equivalents[0].metadata.commonness
+  ).toHaveLength(1);
+  const { api: catalogApi, fetch: catalogFetch } = client({
+    registers: [],
+    domains: []
+  });
+  expect(await catalogApi.equivalentCatalog()).toEqual({
+    registers: [],
+    domains: []
+  });
+  expect(catalogFetch.mock.calls[0]![0]).toBe(
+    "https://test.invalid/api/v1/admin/lexicon-next/equivalent-catalog"
+  );
+  const invalid = structuredClone(next);
+  (
+    invalid.draft.senses[0]!.equivalents[0] as unknown as Record<
+      string,
+      unknown
+    >
+  ).metadata = null;
+  expect(() => decodeNextEntry(invalid)).toThrow();
+});

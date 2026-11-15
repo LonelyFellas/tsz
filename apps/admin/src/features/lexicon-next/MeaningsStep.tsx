@@ -1,3 +1,6 @@
+import { EquivalentRows } from "./EquivalentRows";
+import { draftNodeCount } from "./model";
+import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
@@ -56,6 +59,8 @@ export function MeaningsStep({
   disabled,
   senseGroupsAvailable = false,
   senseMetadataAvailable = false,
+  equivalentMetadataAvailable = false,
+  requests,
   grammarAvailable = false,
   grammarAudioAvailable = false,
   registerLeaveGuard,
@@ -70,6 +75,8 @@ export function MeaningsStep({
   disabled: boolean;
   senseGroupsAvailable?: boolean;
   senseMetadataAvailable?: boolean;
+  equivalentMetadataAvailable?: boolean;
+  requests?: LexiconNextRequests;
   grammarAvailable?: boolean;
   grammarAudioAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
@@ -82,6 +89,13 @@ export function MeaningsStep({
     queryFn: () => partOfSpeechDataSource.catalog(),
     enabled: formEditorAvailable || grammarAvailable || senseMetadataAvailable,
     staleTime: 5 * 60 * 1000
+  });
+  const equivalentCatalog = useQuery({
+    queryKey: ["admin-lexicon-next", "equivalent-catalog"],
+    queryFn: () => requests!.equivalentCatalog(),
+    enabled: equivalentMetadataAvailable && !!requests,
+    staleTime: 5 * 60 * 1000,
+    retry: false
   });
   const editor = value.form_editor ?? emptyFormEditor();
   const forms = expandFormContents(editor);
@@ -668,16 +682,35 @@ export function MeaningsStep({
                                   })
                                 }
                               />
-                              <ContentRows
-                                grouped
-                                rows={sense.equivalents}
-                                locale={medium}
-                                label={`${localeLabels[medium]}译词`}
-                                disabled={disabled}
-                                onChange={(equivalents) =>
-                                  updateSense(sense.id, { equivalents })
-                                }
-                              />
+                              {equivalentMetadataAvailable ? (
+                                <EquivalentRows
+                                  key={medium}
+                                  sense={sense}
+                                  locale={medium}
+                                  disabled={disabled}
+                                  catalog={equivalentCatalog.data}
+                                  loading={equivalentCatalog.isPending}
+                                  catalogError={equivalentCatalog.isError}
+                                  remaining={500 - draftNodeCount(value)}
+                                  onRetry={() => {
+                                    void equivalentCatalog.refetch();
+                                  }}
+                                  onChange={(patch) =>
+                                    updateSense(sense.id, patch)
+                                  }
+                                />
+                              ) : (
+                                <ContentRows
+                                  grouped
+                                  rows={sense.equivalents}
+                                  locale={medium}
+                                  label={`${localeLabels[medium]}译词`}
+                                  disabled={disabled}
+                                  onChange={(equivalents) =>
+                                    updateSense(sense.id, { equivalents })
+                                  }
+                                />
+                              )}
                             </Flex>
                           </SenseEditorShell>
                         </section>

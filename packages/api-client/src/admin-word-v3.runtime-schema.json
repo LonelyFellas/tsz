@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-sense-metadata/tsz-rust/docs/openapi.json",
-  "_source_sha256": "9694fe81b28e727eb440167899558065af63e08ae3248f340747bf5b974ec098",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-medium-equivalents-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "bfdfc36c822ad67e7ea242ae953d20e66afde60d545f833b6ada899b4f863752",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -17,6 +17,7 @@
     "NextEntry",
     "NextEntryList",
     "NextCapabilities",
+    "NextEquivalentCatalog",
     "NextEntryView",
     "CreateNextEntry",
     "NextDetection",
@@ -3582,6 +3583,7 @@
         "publishing"
       ],
       "properties": {
+        "equivalent_metadata": { "type": "boolean" },
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
         "grammar_audio": { "type": "boolean" },
@@ -3840,7 +3842,55 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/NextEquivalentMetadata" },
         "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextEquivalentCatalog": {
+      "type": "object",
+      "required": ["registers", "domains"],
+      "properties": {
+        "domains": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LexiconTaxonomy" }
+        },
+        "registers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LexiconTaxonomy" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextEquivalentMetadata": {
+      "type": "object",
+      "required": ["register_ids", "domain_ids", "commonness"],
+      "properties": {
+        "commonness": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextEquivalentScore" }
+        },
+        "domain_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "register_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextEquivalentScore": {
+      "type": "object",
+      "required": ["score"],
+      "properties": {
+        "assessed_at": { "type": "string", "format": "date-time" },
+        "domain_id": { "type": "string", "format": "uuid" },
+        "score": {
+          "type": "string",
+          "pattern": "^(?:[0-9]|[1-9][0-9])(?:\\.[0-9])?$"
+        }
       },
       "additionalProperties": false
     },
@@ -3969,6 +4019,7 @@
         "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },
+        "no_equivalents": { "type": "array", "items": { "type": "string" } },
         "part_of_speech": { "type": ["string", "null"] },
         "sense_group_id": { "type": "string", "format": "uuid" },
         "sub_pos": { "type": "string" }
@@ -4012,6 +4063,7 @@
         "missing_equivalents": { "type": "boolean" },
         "missing_medium_definitions": { "type": "boolean" },
         "missing_target_definitions": { "type": "boolean" },
+        "no_equivalents": { "type": "boolean" },
         "sense_group_id": { "type": "string", "format": "uuid" },
         "target_definitions": {
           "type": "array",

@@ -1,3 +1,4 @@
+import { commonnessUnits, equivalentKey } from "./equivalents";
 import type {
   NextDraft,
   NextGrammarStructure,
@@ -149,15 +150,53 @@ export function previewDraft(
         target_definitions,
         medium_definitions,
         equivalents,
+        no_equivalents: sense.no_equivalents?.includes(medium) ?? false,
         missing_target_definitions: !target_definitions.length,
         missing_medium_definitions: !medium_definitions.length,
-        missing_equivalents: !equivalents.length
+        missing_equivalents:
+          !equivalents.length && !sense.no_equivalents?.includes(medium)
       };
     })
   };
 }
 
+export function draftNodeCount(draft: NextDraft) {
+  return (
+    (draft.grammar_structures?.reduce(
+      (count, row) => count + 1 + row.variants.length,
+      0
+    ) ?? 0) +
+    (draft.sense_groups?.length ?? 0) +
+    draft.forms.length +
+    draft.senses.length +
+    draft.senses.reduce(
+      (count, sense) =>
+        count + sense.definitions.length + sense.equivalents.length,
+      0
+    )
+  );
+}
+
 export function draftProblem(draft: NextDraft): string | null {
+  if (draftNodeCount(draft) > 500)
+    return "草稿内容已超出数量限制，请减少本批译词。";
+  for (const sense of draft.senses) {
+    const keys = new Set<string>();
+    for (const row of sense.equivalents) {
+      const key = row.locale + ":" + equivalentKey(row.text);
+      if (keys.has(key)) return "当前义项与媒介语言内已有该译词。";
+      keys.add(key);
+      if (
+        row.metadata?.commonness.some(
+          (score) => commonnessUnits(score.score) === undefined
+        )
+      )
+        return "请输入 0.1–99.9，最多一位小数。";
+      if (sense.no_equivalents?.includes(row.locale))
+        return "无译词声明不能与已有译词并存。";
+    }
+  }
+
   for (const [index, sense] of draft.senses.entries()) {
     if (
       sense.level !== undefined &&

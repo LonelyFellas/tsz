@@ -79,6 +79,9 @@ const entry: NextEntry = {
 };
 function requests() {
   return {
+    equivalentCatalog: vi
+      .fn()
+      .mockResolvedValue({ registers: [], domains: [] }),
     list: vi.fn(),
     workspaceEntry: vi.fn().mockResolvedValue(listRow()),
     stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 }),

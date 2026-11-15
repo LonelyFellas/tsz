@@ -1,0 +1,81 @@
+.lexicon-next-equivalents {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  min-width: 0;
+}
+.lexicon-next-equivalent-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.lexicon-next-equivalent-tokens:empty {
+  display: none;
+}
+.lexicon-next-equivalent-domain label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.lexicon-next-equivalent-domain .ui-select {
+  min-width: 180px;
+}
+.lexicon-next-equivalent-scroll {
+  overflow-x: auto;
+}
+.lexicon-next-equivalent-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.lexicon-next-equivalent-table th,
+.lexicon-next-equivalent-table td {
+  padding: var(--ui-space-3) var(--ui-space-2);
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+}
+.lexicon-next-equivalent-table th {
+  background: var(--ui-color-fill-alter);
+  font-weight: var(--ui-font-weight-medium);
+}
+.equivalent-col-word {
+  width: 32%;
+}
+.equivalent-col-score {
+  width: 144px;
+}
+.equivalent-col-tags {
+  width: 22%;
+}
+.equivalent-col-action {
+  width: 40px;
+}
+.lexicon-next-commonness-input {
+  width: 112px;
+  flex: 0 0 112px;
+  text-align: right;
+}
+.lexicon-next-equivalent-table tbody tr:hover {
+  background: var(--ui-color-fill-alter);
+}
+.lexicon-next-equivalent-table td > span[role="alert"] {
+  display: block;
+  color: var(--ui-color-error);
+  font-size: var(--ui-font-size-sm);
+}
+.lexicon-next-taxonomy-trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+.lexicon-next-taxonomy-options {
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--ui-space-2);
+  max-height: min(360px, 60vh);
+  overflow-y: auto;
+}

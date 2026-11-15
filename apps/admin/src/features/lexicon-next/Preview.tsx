@@ -1,3 +1,4 @@
+import { EquivalentPreview } from "./EquivalentPreview";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { Alert } from "@tsz/ui/admin/display";
 import type { NextDraft, NextEntryView, NextSense } from "@tsz/types";
@@ -93,7 +94,10 @@ export function Preview({ view }: { view: NextEntryView }) {
           <SenseMetadataSummary sense={sense} />
           <Lines rows={sense.target_definitions} missing="英文释义" />
           <Lines rows={sense.medium_definitions} missing="中文解释" />
-          <Lines rows={sense.equivalents} missing="译词" />
+          <EquivalentPreview
+            rows={sense.equivalents}
+            noEquivalents={sense.no_equivalents}
+          />
           {[
             ...new Set(
               [...sense.target_definitions, ...sense.medium_definitions]
@@ -149,9 +153,33 @@ export function DraftSummary({ draft }: { draft: NextDraft }) {
           </h4>
           <SenseMetadataSummary sense={sense} />
           <Lines rows={sense.definitions} missing="释义" />
-          <Lines rows={sense.equivalents} missing="译词" />
+          <DraftEquivalentSummary sense={sense} />
         </section>
       ))}
     </div>
+  );
+}
+
+function DraftEquivalentSummary({ sense }: { sense: NextSense }) {
+  const locales = [
+    ...new Set([
+      ...sense.equivalents.map((row) => row.locale),
+      ...(sense.no_equivalents ?? [])
+    ])
+  ];
+  return locales.length ? (
+    locales.map((locale) => (
+      <div key={locale}>
+        <span className="lexicon-next-muted">
+          {localeLabels[locale] ?? locale}
+        </span>
+        <EquivalentPreview
+          rows={sense.equivalents.filter((row) => row.locale === locale)}
+          noEquivalents={sense.no_equivalents?.includes(locale)}
+        />
+      </div>
+    ))
+  ) : (
+    <EquivalentPreview rows={[]} />
   );
 }

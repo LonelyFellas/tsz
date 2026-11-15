@@ -1,4 +1,5 @@
 import type {
+  NextEquivalentCatalog,
   NextWorkspaceQuery,
   NextWorkspaceEntry,
   NextWorkspaceList,
@@ -55,6 +56,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   const editorOptions = {
     headers: {
       "x-tsz-next-forms": "v1",
+      "x-tsz-next-equivalents": "v1",
       "x-tsz-next-sense-metadata": "v1",
       "x-tsz-next-grammar": "v1",
       "x-tsz-next-grammar-audio": "v1",
@@ -79,6 +81,12 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     return params.size ? `?${params}` : "";
   };
   return {
+    equivalentCatalog: () =>
+      http
+        .get<unknown>(`${root}/equivalent-catalog`)
+        .then((value) =>
+          decode<NextEquivalentCatalog>("NextEquivalentCatalog", value)
+        ),
     workspaceList: (query: NextWorkspaceQuery = {}) =>
       http
         .get<unknown>(`${root}/workspace/entries${search(query)}`)

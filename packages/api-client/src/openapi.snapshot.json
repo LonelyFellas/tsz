@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-sense-metadata/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-14T14:27:11.212Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-medium-equivalents-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-15T01:42:54.678Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -37,6 +37,7 @@
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/view": ["get"],
     "/admin/lexicon-next/entry-matches": ["post"],
+    "/admin/lexicon-next/equivalent-catalog": ["get"],
     "/admin/lexicon-next/workspace/commands": ["post"],
     "/admin/lexicon-next/workspace/creators": ["get"],
     "/admin/lexicon-next/workspace/entries": ["get"],
@@ -2956,6 +2957,14 @@
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/equivalent-catalog": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextEquivalentCatalog" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon-next/workspace/commands": {
@@ -8597,7 +8606,47 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
+        "metadata": { "$ref": "#/components/schemas/NextEquivalentMetadata" },
         "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextEquivalentMetadata": {
+      "type": "object",
+      "required": ["register_ids", "domain_ids", "commonness"],
+      "properties": {
+        "commonness": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextEquivalentScore" },
+          "description": "Only independently assessed scores; inherited values are never stored."
+        },
+        "domain_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "register_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextEquivalentScore": {
+      "type": "object",
+      "required": ["score"],
+      "properties": {
+        "assessed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Set by the server; unchanged scores retain their original assessment time."
+        },
+        "domain_id": { "type": "string", "format": "uuid" },
+        "score": {
+          "type": "string",
+          "description": "Manual estimate, not a percentage. Exactly one decimal place on output.",
+          "example": "95.0",
+          "pattern": "^(?:[0-9]|[1-9][0-9])(?:\\.[0-9])?$"
+        }
       },
       "additionalProperties": false
     },
@@ -8691,6 +8740,11 @@
         "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },
+        "no_equivalents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Locales explicitly declared to have no suitable equivalents."
+        },
         "part_of_speech": {
           "type": ["string", "null"],
           "description": "Language-specific code; null is an incomplete draft, not an inferred POS."
