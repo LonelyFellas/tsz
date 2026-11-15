@@ -2808,3 +2808,50 @@ it.each([false, true])(
     }
   }
 );
+
+it("已保存预览读取服务器版本，关闭后保留本地未保存修改", async () => {
+  const api = requests();
+  api.view.mockResolvedValue({
+    entry_id: id,
+    revision: 1,
+    target_locale: "en-GB",
+    medium_locale: "zh-Hans",
+    forms: [],
+    missing_forms: true,
+    senses: [
+      {
+        id: "saved-sense",
+        target_definitions: [],
+        medium_definitions: [],
+        equivalents: [
+          { id: "saved-equivalent", locale: "zh-Hans", text: "已保存的译词" }
+        ],
+        missing_target_definitions: true,
+        missing_medium_definitions: true,
+        missing_equivalents: false
+      }
+    ]
+  });
+  mount(api);
+  await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local-unsaved" }
+  });
+  fireEvent.click(button("查看已保存预览"));
+  const dialog = await screen.findByRole("dialog", {
+    name: "已保存预览 · 版本 1"
+  });
+  expect(within(dialog).getByText("已保存的译词")).toBeVisible();
+  expect(api.view).toHaveBeenCalledExactlyOnceWith(id, {
+    target_locale: "en-GB",
+    medium_locale: "zh-Hans"
+  });
+  expect(api.save).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "关闭" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "local-unsaved"
+  );
+  expect(screen.getByRole("status")).toHaveTextContent("有未保存修改");
+});

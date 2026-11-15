@@ -298,3 +298,12 @@
 .lexicon-next-draft-preview {
   margin-top: var(--ui-space-6);
 }
+
+.lexicon-next-saved-preview .lexicon-next-equivalent-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+.lexicon-next-saved-preview .lexicon-next-equivalent-table th,
+.lexicon-next-saved-preview .lexicon-next-equivalent-table td {
+  overflow-wrap: anywhere;
+}
