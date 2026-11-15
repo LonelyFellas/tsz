@@ -1,0 +1,84 @@
+{
+  "bucket": "tshb-test-assets",
+  "run_id": "20261115-lexdef3-d82e71",
+  "prefix": "temporary-tests/20261115-lexdef3-d82e71/",
+  "started_at": "2026-11-15T06:58:26.860913+00:00",
+  "status": "clean",
+  "planned": [
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/01a1ddf9-de75-765c-97db-d53d6ae5f423.wav",
+      "version_id": "CAEQEhiBgMDw3_P3jhoiIDE3ZTAzOWEwYWIyZTQ3Mjk5MmM2NmVjZDdhNzNjNjZm",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf6-65c5-7792-bed6-761b3fb46b86.mp3",
+      "version_id": "CAEQEhiBgIDc6.z3jhoiIDE3NmEyOGQxY2YzNjQ4OTY4MDFkMDBjNDE2Njg4MTkz",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf6-aef8-732e-bc2f-16a095eea2ad.mp3",
+      "version_id": "CAEQEhiBgMDKsu33jhoiIGM5ZWYyZmVmNWMxYTQ3NjViZDZkM2I5NzU1YmUzZTNi",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf8-33d1-7429-bfe9-d9f2ea193326.mp3",
+      "version_id": "CAEQEhiBgMD9uPD3jhoiIDBmYzJjNmQzNDVlNDQ3ZGM4MDAyYWVhOTY4YjdlNzQ2",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf8-f85b-74f6-9d3c-5d3319fa3d80.mp3",
+      "version_id": "CAEQEhiBgMC1._H3jhoiIGQwMWIzMWQwM2UzMzQyYzU5YmEwYjMyOGU1ZjI4MTI5",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/uploads/59c6ab95-0cf2-413e-8b07-7c10e9615ef8/01a1ddf9-dd43-762a-992d-4e0c3dd1c5e3.wav",
+      "version_id": "CAEQEhiBgICD3_P3jhoiIGQ1ODc0NzAwMzc5MzQ0MTRhOTQ4YTNmNTE2YzQ5NTU5",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/uploads/59c6ab95-0cf2-413e-8b07-7c10e9615ef8/01a1ddf9-dd43-762a-992d-4e0c3dd1c5e3.wav",
+      "version_id": "CAEQEhiCgMCL4PP3jhoiIDlkNDhjMjU1ZWU3NDQ5MTM5ZGVjNzI1YWQ1NzFjZmIz",
+      "kind": "delete_marker"
+    }
+  ],
+  "deleted": [
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/01a1ddf9-de75-765c-97db-d53d6ae5f423.wav",
+      "version_id": "CAEQEhiBgMDw3_P3jhoiIDE3ZTAzOWEwYWIyZTQ3Mjk5MmM2NmVjZDdhNzNjNjZm",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf8-f85b-74f6-9d3c-5d3319fa3d80.mp3",
+      "version_id": "CAEQEhiBgMC1._H3jhoiIGQwMWIzMWQwM2UzMzQyYzU5YmEwYjMyOGU1ZjI4MTI5",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf8-33d1-7429-bfe9-d9f2ea193326.mp3",
+      "version_id": "CAEQEhiBgMD9uPD3jhoiIDBmYzJjNmQzNDVlNDQ3ZGM4MDAyYWVhOTY4YjdlNzQ2",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf6-aef8-732e-bc2f-16a095eea2ad.mp3",
+      "version_id": "CAEQEhiBgMDKsu33jhoiIGM5ZWYyZmVmNWMxYTQ3NjViZDZkM2I5NzU1YmUzZTNi",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/assets/generated/01a1ddf6-65c5-7792-bed6-761b3fb46b86.mp3",
+      "version_id": "CAEQEhiBgIDc6.z3jhoiIDE3NmEyOGQxY2YzNjQ4OTY4MDFkMDBjNDE2Njg4MTkz",
+      "kind": "version"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/uploads/59c6ab95-0cf2-413e-8b07-7c10e9615ef8/01a1ddf9-dd43-762a-992d-4e0c3dd1c5e3.wav",
+      "version_id": "CAEQEhiCgMCL4PP3jhoiIDlkNDhjMjU1ZWU3NDQ5MTM5ZGVjNzI1YWQ1NzFjZmIz",
+      "kind": "delete_marker"
+    },
+    {
+      "key": "temporary-tests/20261115-lexdef3-d82e71/audio/uploads/59c6ab95-0cf2-413e-8b07-7c10e9615ef8/01a1ddf9-dd43-762a-992d-4e0c3dd1c5e3.wav",
+      "version_id": "CAEQEhiBgICD3_P3jhoiIGQ1ODc0NzAwMzc5MzQ0MTRhOTQ4YTNmNTE2YzQ5NTU5",
+      "kind": "version"
+    }
+  ],
+  "errors": [],
+  "remaining": [],
+  "finished_at": "2026-11-15T06:58:27.366105+00:00"
+}

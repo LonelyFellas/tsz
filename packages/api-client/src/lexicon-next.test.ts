@@ -716,3 +716,85 @@ it("译词元数据与只读目录使用新版契约，保存不物化继承分"
   ).metadata = null;
   expect(() => decodeNextEntry(invalid)).toThrow();
 });
+
+it("逐条释义扩展保持独立等级、明确不绑定与英文正文，拒绝畸形 wire", () => {
+  const extended = structuredClone(entry);
+  extended.draft.senses[0]!.level = "C2";
+  Object.assign(extended.draft.senses[0]!.definitions[0]!, {
+    level: "A1",
+    grammar_unbound: true,
+    content: { version: 2, text: "the middle", annotations: [] },
+    voice_profile: { voices: [] }
+  });
+  expect(decodeNextEntry(extended)).toEqual(extended);
+  const invalidCases: [string, unknown][] = [
+    ["level", "A0"],
+    ["grammar_unbound", false],
+    [
+      "content",
+      { version: 2, text: "the middle", annotations: [{ type: "unknown" }] }
+    ],
+    ...[
+      "level",
+      "grammar_unbound",
+      "content",
+      "voice_profile",
+      "audio_assets"
+    ].map((field): [string, unknown] => [field, null])
+  ];
+  for (const [field, value] of invalidCases) {
+    const invalid = structuredClone(extended);
+    Object.assign(invalid.draft.senses[0]!.definitions[0]!, { [field]: value });
+    expect(() => decodeNextEntry(invalid), String(field)).toThrow();
+  }
+});
+
+it("协商释义能力后发送扩展；旧 API 或能力未确认时阻止扩展保存且不发送请求", async () => {
+  const capabilities = {
+    schema_version: 1,
+    language_rules_version: "lexicon-next-en-zh-1",
+    languages: [],
+    manual_drafts: true,
+    generation: false,
+    publishing: false
+  };
+  const extended = structuredClone(entry);
+  Object.assign(extended.draft.senses[0]!.definitions[0]!, {
+    level: "B2",
+    grammar_unbound: true,
+    content: { version: 2, text: "the middle", annotations: [] }
+  });
+  const old = client(capabilities);
+  await old.api.capabilities();
+  const request = { expected_revision: 2, draft: extended.draft };
+  await expect(old.api.save(entry.id, request)).rejects.toThrow(
+    "释义扩展能力尚未确认"
+  );
+  expect(old.fetch).toHaveBeenCalledTimes(1);
+  old.fetch.mockImplementation(
+    async () => new Response(JSON.stringify(entry), { status: 200 })
+  );
+  await old.api.save(entry.id, { expected_revision: 2, draft });
+  expect(JSON.parse(old.fetch.mock.calls[1]![1]!.body as string).draft).toEqual(
+    draft
+  );
+
+  const next = client({ ...capabilities, definition_details: true });
+  await expect(next.api.save(entry.id, request)).rejects.toThrow(
+    "释义扩展能力尚未确认"
+  );
+  expect(next.fetch).not.toHaveBeenCalled();
+  await next.api.capabilities();
+  expect(
+    new Headers(next.fetch.mock.calls[0]![1]?.headers).get(
+      "x-tsz-next-definitions"
+    )
+  ).toBe("v1");
+  next.fetch.mockImplementation(
+    async () => new Response(JSON.stringify(extended), { status: 200 })
+  );
+  await expect(next.api.save(entry.id, request)).resolves.toEqual(extended);
+  expect(JSON.parse(next.fetch.mock.calls[1]![1]!.body as string)).toEqual(
+    request
+  );
+});

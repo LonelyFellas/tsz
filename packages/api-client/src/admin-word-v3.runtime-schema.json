@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-medium-equivalents-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "bfdfc36c822ad67e7ea242ae953d20e66afde60d545f833b6ada899b4f863752",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-definitions-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "c43e21287a0effec536ded8de9d7305277f483e85d4888e48cbab369cb8b4f0e",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3583,6 +3583,7 @@
         "publishing"
       ],
       "properties": {
+        "definition_details": { "type": "boolean" },
         "equivalent_metadata": { "type": "boolean" },
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
@@ -3606,11 +3607,20 @@
       "type": "object",
       "required": ["id", "locale", "text", "style"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioAsset" },
+          "maxItems": 8
+        },
+        "content": { "$ref": "#/$defs/RichTextV3" },
         "grammar_structure_id": { "type": "string", "format": "uuid" },
+        "grammar_unbound": { "type": "boolean", "enum": [true] },
         "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string", "pattern": "^(A1|A2|B1|B2|C1|C2)$" },
         "locale": { "type": "string" },
         "style": { "$ref": "#/$defs/NextDefinitionStyle" },
-        "text": { "type": "string" }
+        "text": { "type": "string" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false
     },

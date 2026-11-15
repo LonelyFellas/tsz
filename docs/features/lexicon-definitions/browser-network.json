@@ -1,0 +1,1130 @@
+{
+  "truncated": true,
+  "hasMore": false,
+  "events": [
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1933",
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1933",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1935",
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1935",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1936",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/capabilities",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1936",
+      "path": "/api/v1/admin/lexicon-next/capabilities",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1937",
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1937",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1938",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1939",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/workspace/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1938",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1939",
+      "path": "/api/v1/admin/lexicon-next/workspace/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1940",
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1941",
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1942",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/equivalent-catalog",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1943",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1944",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1945",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1946",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1947",
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1948",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1949",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1950",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1951",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1942",
+      "path": "/api/v1/admin/lexicon-next/equivalent-catalog",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1940",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1943",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1941",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1944",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1945",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1946",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1948",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1949",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1947",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1952",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1953",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1950",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1951",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1952",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1953",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1979",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1980",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1981",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1979",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1982",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1983",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1984",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1985",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1986",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1987",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1980",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1981",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1983",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1985",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1982",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1984",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1986",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1987",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1988",
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "run": "20261115-lexdef3-d82e71",
+      "expected_revision": 7
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1988",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1989",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1990",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1991",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1992",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1993",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1991",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1989",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1990",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1992",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1993",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1994",
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "run": "20261115-lexdef3-d82e71",
+      "expected_revision": 8
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1994",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "status": 409
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1995",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1996",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1997",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1998",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.1999",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1998",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1997",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1995",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1996",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.1999",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2000",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2000",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2001",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2002",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2003",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2004",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2005",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2001",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2003",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2002",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2004",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2005",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2006",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2006",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2007",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2008",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2009",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2010",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2011",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2009",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2007",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2008",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2010",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2011",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2012",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2013",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2014",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2013",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2012",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2015",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2016",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2017",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2018",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2019",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2020",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2014",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2018",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2016",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2019",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2015",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2017",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2020",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2021",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-f85b-74f6-9d3c-5d3319fa3d80/url",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2021",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-f85b-74f6-9d3c-5d3319fa3d80/url",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2023",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-f85b-74f6-9d3c-5d3319fa3d80/content",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2023",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-f85b-74f6-9d3c-5d3319fa3d80/content",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2025",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2026",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2027",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2028",
+      "method": "PATCH",
+      "path": "/api/v1/admin/profile/preferences",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2025",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2028",
+      "path": "/api/v1/admin/profile/preferences",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2026",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2027",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2029",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2030",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2031",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2029",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2032",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2033",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2034",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2035",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "azure"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2036",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2031",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2030",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2033",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2035",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2034",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2032",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2036",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2037",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-33d1-7429-bfe9-d9f2ea193326/url",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2037",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-33d1-7429-bfe9-d9f2ea193326/url",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2039",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-33d1-7429-bfe9-d9f2ea193326/content",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2039",
+      "path": "/api/v1/admin/lexicon/audio-assets/01a1ddf8-33d1-7429-bfe9-d9f2ea193326/content",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2040",
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12/view",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2040",
+      "path": "/api/v1/admin/lexicon-next/entries/01a1ddf4-ac5b-75ff-8df6-c5af2342be12/view",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2041",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "grammar"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2042",
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "run": "20261115-lexdef3-d82e71",
+      "area": "meaning"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2043",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "id": "42351.2044",
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "run": "20261115-lexdef3-d82e71"
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2042",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2041",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2043",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "event": "Network.responseReceived",
+      "id": "42351.2044",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    }
+  ]
+}

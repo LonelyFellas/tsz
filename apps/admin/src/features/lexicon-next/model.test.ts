@@ -188,7 +188,7 @@ it("语义区间允许未填名称，限制 Unicode 名称长度，预览保留�
   expect(draftProblem(draft)).toContain("语义区间名称");
 });
 
-it("新语法预览只投影当前方言与有效引用，草稿中的失效引用和另一侧保留", () => {
+it("新语法预览按当前方言显示，失效引用保留 ID 并提示问题", () => {
   const draft: NextDraft = {
     schema_version: 1,
     headword: "job",
@@ -249,9 +249,9 @@ it("新语法预览只投影当前方言与有效引用，草稿中的失效引�
     partOfSpeechCatalogFixture
   );
   expect(invalid.grammar_issues).toHaveLength(1);
-  expect(
-    invalid.senses[0]!.target_definitions[0]!.grammar_structure_id
-  ).toBeUndefined();
+  expect(invalid.senses[0]!.target_definitions[0]!.grammar_structure_id).toBe(
+    "g"
+  );
   expect(draft).toEqual(before);
 });
 
@@ -296,9 +296,7 @@ it("当前目录改码后，同编码的结构与义项也不能作为有效语�
   const before = structuredClone(draft);
   const view = previewDraft(draft, "en-GB", "zh-Hans", catalog);
   expect(view.grammar_structures).toEqual([]);
-  expect(
-    view.senses[0]!.target_definitions[0]!.grammar_structure_id
-  ).toBeUndefined();
+  expect(view.senses[0]!.target_definitions[0]!.grammar_structure_id).toBe("g");
   expect(
     view
       .grammar_issues!.filter((issue) => issue.field === "sub_pos")
@@ -335,4 +333,60 @@ it("词义总体数据保留空白存量，预览共享元数据并按 V1 校验
     draft.senses[0]!.frequency = frequency;
     expect(draftProblem(draft)).toContain("词频");
   }
+});
+
+it("明确不绑定不产生缺少选择问题，未选与失效引用仍提示且保留身份", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [],
+    senses: [
+      {
+        id: "sense",
+        part_of_speech: "noun",
+        sub_pos: "N-COUNT",
+        definitions: [
+          {
+            id: "unbound",
+            locale: "en-GB",
+            text: "work",
+            style: "definition",
+            grammar_unbound: true,
+            level: "C1"
+          },
+          {
+            id: "unselected",
+            locale: "zh-Hans",
+            text: "工作",
+            style: "definition"
+          },
+          {
+            id: "invalid",
+            locale: "en-GB",
+            text: "a job",
+            style: "sentence",
+            grammar_structure_id: "gone"
+          }
+        ],
+        equivalents: []
+      }
+    ]
+  };
+  const before = structuredClone(draft);
+  const view = previewDraft(
+    draft,
+    "en-GB",
+    "zh-Hans",
+    partOfSpeechCatalogFixture
+  );
+  expect(view.grammar_issues?.map((issue) => issue.node_id)).toEqual([
+    "unselected",
+    "invalid"
+  ]);
+  expect(view.senses[0]!.target_definitions).toEqual([
+    draft.senses[0]!.definitions[0],
+    draft.senses[0]!.definitions[2]
+  ]);
+  expect(draft).toEqual(before);
 });

@@ -1,0 +1,1448 @@
+{
+  "frontend": {
+    "head": "2596d13343c9a567c0ccc702655b98a966f8a923",
+    "source_fingerprint": "74a0161c67c4a0523fd4021c75d24a224cd4004a1d845af73fb7917d90c72183",
+    "mode": "Vite development",
+    "url": "http://127.0.0.1:31593",
+    "backend_api_url": "http://127.0.0.1:18593/api/v1",
+    "mock_flags": {
+      "VITE_ADMIN_WORDS_MOCK": false,
+      "VITE_ADMIN_PART_OF_SPEECH_MOCK": false,
+      "VITE_ADMIN_TTS_MOCK": false,
+      "VITE_LOCAL_SPEECH_MOCK": false
+    }
+  },
+  "backend": {
+    "head": "c970d13280f5dd2b0b485cee141655f7b3216089",
+    "source_fingerprint": "2ceddd7415a13035e8788e64964093d50b5ec4cb64e6eb09718932dc95805c62",
+    "binary_sha256": "3a053382e1388f1bbf9dd3136ec9e88c308ee97b755990956b0fe89f3727e646",
+    "pid": 57490,
+    "cwd": "/Users/darwish/.codex/worktrees/lexicon-definitions-api/tsz-rust",
+    "postgres": "127.0.0.1:55593/lexdef3",
+    "redis": "127.0.0.1:56593/0",
+    "private_data_directory": "/tmp/tsz-lexdef3-d82e71/pg",
+    "test_resources_actor_whitelist": "only this batch admin",
+    "test_resources_spaces": ["speech", "audio"]
+  },
+  "entry_id": "01a1ddf4-ac5b-75ff-8df6-c5af2342be12",
+  "proxy_and_direct_get_sha256": "88e389cb1e9324d50f5710339adf799e4795d52021ab49c1dfeb0372dc004943",
+  "formal_audio_requests": [
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 501
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    }
+  ],
+  "api_responses": [
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/workspace/stats",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/workspace/entries",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/lexicon-next/detections",
+      "status": 503
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/lexicon-next/entry-matches",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "unmatched",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/lexicon-next/entries",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/profile/preferences",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/workspace/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/equivalent-catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 501
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/workspace/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/equivalent-catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/profile/preferences",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/profile/preferences",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/audio",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/url",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/url",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/lexicon/audio-assets/upload-url",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/url",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/url",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/lexicon/audio-assets/upload-url",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/lexicon/audio-assets",
+      "status": 201
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/workspace/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/equivalent-catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 409
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/url",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/content",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/profile/preferences",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/groups",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/url",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon/audio-assets/{id}/content",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/profile",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/workspace/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/equivalent-catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/parts-of-speech/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/speech/resolve",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/speech/voices",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/lexicon-next/entries/{id}",
+      "status": 200
+    }
+  ]
+}

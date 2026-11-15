@@ -1,0 +1,41 @@
+.lexicon-next-definition-scroll {
+  overflow-x: auto;
+}
+.lexicon-next-definition-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.lexicon-next-definition-table th,
+.lexicon-next-definition-table td {
+  padding: var(--ui-space-3) var(--ui-space-2);
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+}
+.lexicon-next-definition-table th {
+  background: var(--ui-color-fill-alter);
+  font-weight: var(--ui-font-weight-medium);
+}
+.lexicon-next-definition-table td:nth-child(2) {
+  min-width: 112px;
+}
+.lexicon-next-definition-table td:nth-child(3) {
+  min-width: 96px;
+}
+.lexicon-next-definition-table td:nth-child(4) {
+  width: 50%;
+  min-width: 280px;
+}
+.lexicon-next-definition-table td:nth-child(5) {
+  width: 25%;
+  min-width: 200px;
+}
+.lexicon-next-definition-table .ui-select {
+  width: 100%;
+}
+.lexicon-next-definition-table [role="alert"] {
+  color: var(--ui-color-error);
+  font-size: var(--ui-font-size-sm);
+}

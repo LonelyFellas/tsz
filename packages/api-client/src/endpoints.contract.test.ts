@@ -141,7 +141,7 @@ function collectCalls(
   };
 
   // 遍历端点树,用哨兵参数调用每个函数,触发其内部的 http.* 记录。
-  const walk = (node: unknown, name = "") => {
+  const walk = (node: unknown, name = "", parent = "") => {
     if (typeof node === "function") {
       (node as (...a: unknown[]) => unknown)(
         name === "previewContent"
@@ -151,14 +151,24 @@ function collectCalls(
               name === "tipStates"
             ? [SENTINEL]
             : SENTINEL,
-        name === "customAudio" || name === "myCustomAudio"
-          ? [SENTINEL]
-          : SENTINEL,
+        name === "save" && parent === "lexiconNext"
+          ? {
+              expected_revision: 1,
+              draft: {
+                schema_version: 1,
+                headword: SENTINEL,
+                forms: [],
+                senses: []
+              }
+            }
+          : name === "customAudio" || name === "myCustomAudio"
+            ? [SENTINEL]
+            : SENTINEL,
         name === "reviewCustomAudio" ? [SENTINEL] : SENTINEL,
         SENTINEL
       );
     } else if (node && typeof node === "object") {
-      Object.entries(node).forEach(([key, value]) => walk(value, key));
+      Object.entries(node).forEach(([key, value]) => walk(value, key, name));
     }
   };
   walk(factory(http as never));
@@ -833,7 +843,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "bfdfc36c822ad67e7ea242ae953d20e66afde60d545f833b6ada899b4f863752"
+      "c43e21287a0effec536ded8de9d7305277f483e85d4888e48cbab369cb8b4f0e"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1132,6 +1142,25 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "post"
     ]);
     expect(snapshot.operationHeaders).toEqual({
+      ...Object.fromEntries(
+        [
+          "get /admin/lexicon-next/capabilities",
+          "post /admin/lexicon-next/entries",
+          "get /admin/lexicon-next/entries/{id}",
+          "put /admin/lexicon-next/entries/{id}",
+          "get /admin/lexicon-next/entries/{id}/view"
+        ].map((operation) => [
+          operation,
+          [
+            {
+              name: "x-tsz-next-definitions",
+              in: "header",
+              required: false,
+              schema: { type: ["string", "null"] }
+            }
+          ]
+        ])
+      ),
       "get /admin/speech/groups": [
         {
           name: "X-TSZ-Dubbing-Groups",

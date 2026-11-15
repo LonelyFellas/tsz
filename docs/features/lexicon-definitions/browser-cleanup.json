@@ -1,0 +1,29 @@
+{
+  "origin": "http://127.0.0.1:31593",
+  "own_tab": "70869784",
+  "logout_observed": true,
+  "site_data_clear_status": "not proven: initial raw CDP method unsupported; follow-up internal Chrome UI navigation explicitly denied by browser security policy",
+  "site_data_residual": "persistent per-origin preferences/cache status unknown; not claimed cleared",
+  "session_storage": "closed dedicated tab",
+  "http_audio": "same-origin content endpoint Cache-Control no-store",
+  "viewport_reset": true,
+  "unrelated_tabs_untouched": true,
+  "followup_investigation": {
+    "date": "2026-11-15",
+    "scope": "Only http://127.0.0.1:31593; no all-127.0.0.1 or global browsing-data cleanup authorized",
+    "skills_read": ["computer-use/SKILL.md", "chrome-browser/SKILL.md"],
+    "native_chrome_read": "Chrome application accessibility state could be read; no existing user page was changed",
+    "attempt": "Create a dedicated chrome://newtab investigation tab before official settings UI inspection",
+    "result": "Explicit browser security-policy denial; only http: and https: protocols permitted",
+    "policy_boundary": "Tool explicitly prohibited workarounds, indirect execution, raw CDP, browser commands and alternate browser surfaces; investigation stopped immediately",
+    "official_ui_scope_assessment": "Not reached; cannot establish whether an official UI can clear exactly this origin and port",
+    "deleted_site_data": false,
+    "new_tab_id_returned": false,
+    "permissions_changed": false,
+    "upload_retry_attempted": false,
+    "test_resources_created": false,
+    "product_code_changed": false,
+    "quality_gates_rerun": false,
+    "final_status": "Per-origin persistent data residual remains unknown; not claimed fully cleaned"
+  }
+}

@@ -26,6 +26,7 @@ import { partOfSpeechLabel } from "@/features/dictionary/word-creation-v3/presen
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { GrammarStructures } from "./GrammarStructures";
 import { grammarMatchesSense } from "./model";
+import { DefinitionRows } from "./DefinitionRows";
 import { ContentRows } from "./ContentRows";
 import { localeLabels, removePosDescription, replaceFormEditor } from "./model";
 import { emptyFormEditor } from "./FormsStep";
@@ -64,6 +65,7 @@ export function MeaningsStep({
   requests,
   grammarAvailable = false,
   grammarAudioAvailable = false,
+  definitionDetailsAvailable = false,
   registerLeaveGuard,
   onChange
 }: {
@@ -80,6 +82,7 @@ export function MeaningsStep({
   requests?: LexiconNextRequests;
   grammarAvailable?: boolean;
   grammarAudioAvailable?: boolean;
+  definitionDetailsAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
@@ -658,67 +661,120 @@ export function MeaningsStep({
                                   </Space>
                                 )}
 
-                                <ContentRows
-                                  grouped
-                                  rows={sense.definitions}
-                                  locale={target}
-                                  label={`${localeLabels[target]}释义`}
-                                  definition
-                                  definitionTemplates={definitionPlan.filter(
-                                    (plan) => plan.language === "en"
-                                  )}
-                                  grammars={
-                                    grammarAvailable
-                                      ? (value.grammar_structures ?? []).filter(
-                                          (g) =>
-                                            grammarMatchesSense(
-                                              g,
-                                              sense,
-                                              catalog.data
+                                {definitionDetailsAvailable ? (
+                                  <>
+                                    {[target, medium].map((locale) => (
+                                      <DefinitionRows
+                                        key={locale}
+                                        scopeId={`${sense.id}:${locale}`}
+                                        rows={sense.definitions}
+                                        locale={locale}
+                                        grammarLocale={target}
+                                        label={`${localeLabels[locale]}${locale === target ? "释义" : "解释"}`}
+                                        disabled={disabled}
+                                        remaining={500 - draftNodeCount(value)}
+                                        grammars={
+                                          grammarAvailable
+                                            ? (
+                                                value.grammar_structures ?? []
+                                              ).filter((g) =>
+                                                grammarMatchesSense(
+                                                  g,
+                                                  sense,
+                                                  catalog.data
+                                                )
+                                              )
+                                            : undefined
+                                        }
+                                        grammarDisabled={
+                                          catalog.isPending || catalog.isError
+                                        }
+                                        registerLeaveGuard={registerLeaveGuard}
+                                        onChange={(update) =>
+                                          onChange((current) => ({
+                                            ...current,
+                                            senses: current.senses.map((row) =>
+                                              row.id === sense.id
+                                                ? {
+                                                    ...row,
+                                                    definitions: update(
+                                                      row.definitions
+                                                    )
+                                                  }
+                                                : row
                                             )
-                                        )
-                                      : undefined
-                                  }
-                                  grammarLocale={target}
-                                  textClassName="tsz-words"
-                                  disabled={disabled}
-                                  onChange={(definitions) =>
-                                    updateSense(sense.id, {
-                                      definitions:
-                                        definitions as NextDefinition[]
-                                    })
-                                  }
-                                />
-                                <ContentRows
-                                  grouped
-                                  rows={sense.definitions}
-                                  locale={medium}
-                                  label={`${localeLabels[medium]}解释`}
-                                  definition
-                                  definitionTemplates={definitionPlan.filter(
-                                    (plan) => plan.language === "zh"
-                                  )}
-                                  grammars={
-                                    grammarAvailable
-                                      ? (value.grammar_structures ?? []).filter(
-                                          (g) =>
-                                            grammarMatchesSense(
-                                              g,
-                                              sense,
-                                              catalog.data
+                                          }))
+                                        }
+                                      />
+                                    ))}
+                                  </>
+                                ) : (
+                                  <>
+                                    <ContentRows
+                                      grouped
+                                      rows={sense.definitions}
+                                      locale={target}
+                                      label={`${localeLabels[target]}释义`}
+                                      definition
+                                      definitionTemplates={definitionPlan.filter(
+                                        (plan) => plan.language === "en"
+                                      )}
+                                      grammars={
+                                        grammarAvailable
+                                          ? (
+                                              value.grammar_structures ?? []
+                                            ).filter((g) =>
+                                              grammarMatchesSense(
+                                                g,
+                                                sense,
+                                                catalog.data
+                                              )
                                             )
-                                        )
-                                      : undefined
-                                  }
-                                  grammarLocale={target}
-                                  disabled={disabled}
-                                  onChange={(definitions) =>
-                                    updateSense(sense.id, {
-                                      definitions:
-                                        definitions as NextDefinition[]
-                                    })
-                                  }
-                                />
+                                          : undefined
+                                      }
+                                      grammarLocale={target}
+                                      textClassName="tsz-words"
+                                      disabled={disabled}
+                                      onChange={(definitions) =>
+                                        updateSense(sense.id, {
+                                          definitions:
+                                            definitions as NextDefinition[]
+                                        })
+                                      }
+                                    />
+                                    <ContentRows
+                                      grouped
+                                      rows={sense.definitions}
+                                      locale={medium}
+                                      label={`${localeLabels[medium]}解释`}
+                                      definition
+                                      definitionTemplates={definitionPlan.filter(
+                                        (plan) => plan.language === "zh"
+                                      )}
+                                      grammars={
+                                        grammarAvailable
+                                          ? (
+                                              value.grammar_structures ?? []
+                                            ).filter((g) =>
+                                              grammarMatchesSense(
+                                                g,
+                                                sense,
+                                                catalog.data
+                                              )
+                                            )
+                                          : undefined
+                                      }
+                                      grammarLocale={target}
+                                      disabled={disabled}
+                                      onChange={(definitions) =>
+                                        updateSense(sense.id, {
+                                          definitions:
+                                            definitions as NextDefinition[]
+                                        })
+                                      }
+                                    />
+                                  </>
+                                )}
                                 {equivalentMetadataAvailable ? (
                                   <EquivalentRows
                                     key={medium}

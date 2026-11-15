@@ -196,28 +196,10 @@ export function previewDraft(
     forms,
     missing_forms: !forms.length,
     senses: draft.senses.map((sense) => {
-      const validReferences = (
-        definition: (typeof sense.definitions)[number]
-      ) => {
-        if (
-          !definition.grammar_structure_id ||
-          draft.grammar_structures?.some(
-            (g) =>
-              g.id === definition.grammar_structure_id &&
-              grammarMatchesSense(g, sense, catalog)
-          )
-        )
-          return definition;
-        const next = { ...definition };
-        delete next.grammar_structure_id;
-        return next;
-      };
-      const target_definitions = targetRows(sense.definitions).map(
-        validReferences
+      const target_definitions = targetRows(sense.definitions);
+      const medium_definitions = sense.definitions.filter(
+        (row) => row.locale === medium
       );
-      const medium_definitions = sense.definitions
-        .filter((row) => row.locale === medium)
-        .map(validReferences);
       const equivalents = sense.equivalents.filter(
         (row) => row.locale === medium
       );
@@ -420,6 +402,7 @@ export function grammarBindingIssues(
         message: "请选择词义的细分词性"
       });
     for (const definition of sense.definitions) {
+      if (definition.grammar_unbound) continue;
       const grammar = draft.grammar_structures.find(
         (row) => row.id === definition.grammar_structure_id
       );

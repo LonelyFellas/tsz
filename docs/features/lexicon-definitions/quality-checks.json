@@ -1,0 +1,62 @@
+{
+  "node": "v24.19.0",
+  "pnpm": "10.33.0",
+  "checks": [
+    {
+      "command": "pnpm typecheck",
+      "exit_code": 0,
+      "log": "typecheck.log",
+      "log_sha256": "176465c6dad110e0c1c0d0aec90684d724d0b51e0a0778e9fc50e46e6a4f731d"
+    },
+    {
+      "command": "pnpm lint",
+      "exit_code": 0,
+      "log": "lint.log",
+      "log_sha256": "f98abe7a7a05a1b2bacc36784284be7428939caaedf0f8c37d41559b4c5e7689"
+    },
+    {
+      "command": "pnpm --filter @tsz/admin build",
+      "exit_code": 0,
+      "log": "admin-build.log",
+      "log_sha256": "876f3028108444a96ab3882865a00bd5837215d745ec8c3c87112c81c351e7b5"
+    },
+    {
+      "command": "pnpm check:admin-ui",
+      "exit_code": 0,
+      "log": "admin-ui.log",
+      "log_sha256": "175fe80ba36cbdc04e06b2018acf12e26e83148b23a80343fa5c975107c13a6a"
+    },
+    {
+      "command": "pnpm check:admin-ui:tighten",
+      "exit_code": 0,
+      "log": "admin-ui-tighten.log",
+      "log_sha256": "6c576a51cd9e6a45f70e69eaff4d13a71ed3d41b65f1229120e132d12745a504"
+    },
+    {
+      "command": "SQLX_OFFLINE=true CARGO_TARGET_DIR=/Users/darwish/Dev/tsz-core/tsz-rust/target cargo clippy --locked --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log",
+      "log_sha256": "346da37bf4ae5328de9768d53b4d3be6927c3f305ac1153e19c994d2572d9828"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "reused": {
+    "api_client": "41 files / 740 tests (batch 1)",
+    "rust_lib": "8 tests (batch 1)",
+    "rust_postgres_redis_handlers": "30 tests (batch 1)",
+    "admin": "12 files / 110 tests (batch 2)"
+  },
+  "not_run": [
+    "full ordinary test suite",
+    "coverage",
+    "remote CI",
+    "PR",
+    "deployment"
+  ],
+  "warnings": ["two pre-existing web full-page-navigation lint warnings"]
+}

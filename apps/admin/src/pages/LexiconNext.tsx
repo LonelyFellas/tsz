@@ -139,6 +139,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               }
               grammarAvailable={capability.data?.grammar_structures === true}
               grammarAudioAvailable={capability.data?.grammar_audio === true}
+              definitionDetailsAvailable={
+                capability.data?.definition_details === true
+              }
             />
           ) : (
             <EntryList
@@ -161,7 +164,8 @@ function EntryLoader({
   senseMetadataAvailable,
   equivalentMetadataAvailable,
   grammarAvailable,
-  grammarAudioAvailable
+  grammarAudioAvailable,
+  definitionDetailsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -169,6 +173,7 @@ function EntryLoader({
   equivalentMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
+  definitionDetailsAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -248,6 +253,7 @@ function EntryLoader({
       equivalentMetadataAvailable={equivalentMetadataAvailable}
       grammarAvailable={grammarAvailable}
       grammarAudioAvailable={grammarAudioAvailable}
+      definitionDetailsAvailable={definitionDetailsAvailable}
     />
   );
 }
@@ -261,7 +267,8 @@ function EntryEditor({
   senseMetadataAvailable,
   equivalentMetadataAvailable,
   grammarAvailable,
-  grammarAudioAvailable
+  grammarAudioAvailable,
+  definitionDetailsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -269,6 +276,7 @@ function EntryEditor({
   equivalentMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
+  definitionDetailsAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -396,7 +404,7 @@ function EntryEditor({
     }
   }
   async function save() {
-    if (!writable || conflict) return false;
+    if (!writable || conflict || contentLeaveGuard.current) return false;
     return run(async () => {
       for (const wait of [...audioTasks.current.values()]) {
         if (!(await wait())) throw new Error("发音处理尚未完成，请重试保存。");
@@ -630,6 +638,7 @@ function EntryEditor({
             equivalentMetadataAvailable={equivalentMetadataAvailable}
             grammarAvailable={grammarAvailable}
             grammarAudioAvailable={grammarAudioAvailable}
+            definitionDetailsAvailable={definitionDetailsAvailable}
             disabled={disabled}
             onChange={setDraft}
           />
@@ -652,7 +661,7 @@ function EntryEditor({
               </Button>
               <Button
                 loading={busy}
-                disabled={!writable || !dirty || conflict}
+                disabled={!writable || !dirty || conflict || formContentOpen}
                 onClick={() => void save()}
               >
                 保存完整草稿

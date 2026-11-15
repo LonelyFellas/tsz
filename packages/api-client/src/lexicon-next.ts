@@ -53,8 +53,10 @@ export function decodeNextEntryView(value: unknown): NextEntryView {
 /** Uses the admin HttpClient (baseUrl=/api/v1/admin). Capability failure (including 404 on an old backend) must not fall back to V3. */
 export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
+  let definitionDetails = false;
   const editorOptions = {
     headers: {
+      "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
       "x-tsz-next-equivalents": "v1",
       "x-tsz-next-sense-metadata": "v1",
@@ -133,9 +135,11 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .get<unknown>(`${root}/entries${search(query)}`)
         .then(decodeNextEntryList),
     capabilities: () =>
-      http
-        .get<unknown>(`${root}/capabilities`, editorOptions)
-        .then(decodeNextCapabilities),
+      http.get<unknown>(`${root}/capabilities`, editorOptions).then((value) => {
+        const capabilities = decodeNextCapabilities(value);
+        definitionDetails = capabilities.definition_details === true;
+        return capabilities;
+      }),
     create: (input: CreateNextEntry) =>
       http
         .post<unknown>(`${root}/entries`, input, editorOptions)
@@ -150,8 +154,28 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .then((value) => decode<NextEntryMatches>("NextEntryMatches", value)),
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
-    save: (id: string, input: SaveNextDraft) =>
-      http.put<unknown>(entry(id), input, editorOptions).then(decodeNextEntry),
+    save: (id: string, input: SaveNextDraft) => {
+      if (
+        !definitionDetails &&
+        input.draft.senses.some((sense) =>
+          sense.definitions.some(
+            (row) =>
+              row.level !== undefined ||
+              row.grammar_unbound !== undefined ||
+              row.content !== undefined ||
+              row.voice_profile !== undefined ||
+              row.audio_assets !== undefined
+          )
+        )
+      ) {
+        return Promise.reject(
+          new ClientResponseError("释义扩展能力尚未确认，请重新打开词条")
+        );
+      }
+      return http
+        .put<unknown>(entry(id), input, editorOptions)
+        .then(decodeNextEntry);
+    },
     view: (id: string, selection: NextViewQuery) => {
       const params = new URLSearchParams({
         target_locale: selection.target_locale,
