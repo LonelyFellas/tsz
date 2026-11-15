@@ -39,6 +39,30 @@ assert.equal('v' + JSON.parse(fs.readFileSync(process.argv[2])).node, process.ar
 NODE
 }
 
+select_deploy_component() {
+  local component="$1" destination="$2"
+  DEPLOY_COMPONENT_ACTION=deploy
+  [[ "${DEPLOY_SELECT_COMPONENTS:-}" = 1 ]] || return 0
+  deploy_phase component-selection
+  node "$DEPLOY_BUILD_ROOT/deploy/select-component.mjs" remote-script "$component" "${DEPLOY_EXPECTED_API_SHA:-}" > "$destination/read-accepted.mjs"
+  # Shared locks are opened read-only: observing/skipping never creates remote
+  # state. Fresh installations without lock/history files require publication.
+  local command="if test ! -e /opt/tsz-frontend-deploy.lock || test ! -e /opt/tsz-cross-deploy.lock; then printf '%s\\n' '{\"schema_version\":1,\"manifest\":null,\"receipt\":null}'; else exec 8</opt/tsz-cross-deploy.lock && flock -s -n 8 && test ! -e /opt/tsz-rust/deploy.lock && exec 9</opt/tsz-frontend-deploy.lock && flock -s -n 9 && test ! -e /opt/tsz-frontend-transaction && timeout --kill-after=3s 45s /usr/bin/node --input-type=module -; fi"
+  python3 -I "$DEPLOY_BUILD_ROOT/deploy/run-with-progress.py" \
+    --log-file "$destination/accepted-state.json" 60 component-state \
+    ssh "${DEPLOY_SSH_OPTIONS[@]}" tshb-test "$command" < "$destination/read-accepted.mjs" > /dev/null || {
+      local status=$?
+      cat "$destination/accepted-state.json" >&2
+      return "$status"
+    }
+  node "$DEPLOY_BUILD_ROOT/deploy/select-component.mjs" select "$component" \
+    "$destination/bundle" "$destination/accepted-state.json" "$destination/selection.json"
+  DEPLOY_COMPONENT_ACTION="$(node -e 'const s=require(process.argv[1]); if(!["deploy","skip"].includes(s.action))process.exit(1);process.stdout.write(s.action)' "$destination/selection.json")"
+  # A skip is a completed observation of the existing release, never acceptance
+  # of the candidate. Bind it to the same fresh source/CI checks as publication.
+  recheck_deploy_source "$component"
+}
+
 publish_deploy_artifact() {
   local component="$1" destination="$2" remote_stage upload="$2/upload"
   node --input-type=module - "$destination/artifact-record.json" "$destination/bundle/release.json" "$DEPLOY_CI_RUN_ATTEMPT" <<'NODE'

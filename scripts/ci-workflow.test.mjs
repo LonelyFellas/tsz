@@ -46,6 +46,7 @@ test("automatic deployment is restricted to successful main push CI and binds it
     "github.event.workflow_run.head_sha",
     "DEPLOY_EXPECTED_CI_RUN_ID",
     "DEPLOY_EXPECTED_CI_RUN_ATTEMPT",
+    'DEPLOY_SELECT_COMPONENTS: "1"',
     "StrictHostKeyChecking yes",
     "./deploy/deploy-web.sh",
     "./deploy/deploy-admin.sh"

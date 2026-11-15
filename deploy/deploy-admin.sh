@@ -42,5 +42,10 @@ started="$SECONDS"
 echo '==> download and verify admin CI package'
 prepare_deploy_artifact admin "$deploy_tmp"
 echo "==> package ready after $((SECONDS - started))s"
+select_deploy_component admin "$deploy_tmp"
+if [[ "$DEPLOY_COMPONENT_ACTION" = skip ]]; then
+  echo '✓ admin unchanged; existing accepted version verified; remote writes=0; local build=0'
+  exit 0
+fi
 publish_deploy_artifact admin "$deploy_tmp"
 echo "✓ admin accepted; total $((SECONDS - started))s; local build=0"
