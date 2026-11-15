@@ -1,3 +1,5 @@
+import { SentenceExamplesPreview } from "./SenseSentenceExamples";
+import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { EquivalentPreview } from "./EquivalentPreview";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
@@ -148,7 +150,13 @@ function SenseMetadataSummary({
   ].filter(Boolean);
   return items.length ? <p>{items.join(" · ")}</p> : null;
 }
-export function Preview({ view }: { view: NextEntryView }) {
+export function Preview({
+  view,
+  requests
+}: {
+  view: NextEntryView;
+  requests?: LexiconNextRequests;
+}) {
   return (
     <EntryDialectContext.Provider
       value={view.target_locale === "en-US" ? "en-US" : "en-GB"}
@@ -182,6 +190,7 @@ export function Preview({ view }: { view: NextEntryView }) {
                 {senseGroupName(view.sense_groups, sense.sense_group_id)}
               </h4>
               <SenseMetadataSummary sense={sense} />
+
               <Definitions
                 rows={sense.target_definitions}
                 missing="英文释义"
@@ -196,6 +205,14 @@ export function Preview({ view }: { view: NextEntryView }) {
                 rows={sense.equivalents}
                 noEquivalents={sense.no_equivalents}
               />
+              {requests && (
+                <SentenceExamplesPreview
+                  ids={sense.sentence_ids}
+                  target={view.target_locale}
+                  medium={view.medium_locale}
+                  requests={requests}
+                />
+              )}
               {[
                 ...new Set(
                   [...sense.target_definitions, ...sense.medium_definitions]

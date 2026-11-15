@@ -798,3 +798,68 @@ it("协商释义能力后发送扩展；旧 API 或能力未确认时阻止扩�
     request
   );
 });
+
+it("新版例句使用独立身份和当前语言写入范围，严格拒绝畸形响应", async () => {
+  const variant = {
+    id: uuid(13),
+    locale: "en-GB",
+    level: "A2",
+    content: {
+      version: 2 as const,
+      text: "The centre is here.",
+      annotations: []
+    },
+    translations: []
+  };
+  const sentence = {
+    id: uuid(12),
+    target_language: "en",
+    owner_id: uuid(8),
+    revision: 1,
+    updated_at: "2026-11-15T00:00:00Z",
+    reference_count: 0,
+    draft: { schema_version: 1, variants: [variant] }
+  };
+  const scope = { target_locale: "en-GB", medium_locale: "zh-Hans", variant };
+  const { api, fetch } = client(sentence);
+  expect(
+    await api.createSentence({
+      id: sentence.id,
+      target_language: "en",
+      ...scope
+    })
+  ).toEqual(sentence);
+  expect(fetch.mock.calls[0]![0]).toBe(
+    "https://test.invalid/api/v1/admin/lexicon-next/sentences"
+  );
+  await api.saveSentence(sentence.id, { expected_revision: 1, ...scope });
+  expect(fetch.mock.calls[1]![1].method).toBe("PUT");
+  expect(JSON.parse(fetch.mock.calls[1]![1].body)).toEqual({
+    expected_revision: 1,
+    ...scope
+  });
+  const broken = client({
+    ...sentence,
+    draft: { schema_version: 1, variants: [{ ...variant, level: "Z9" }] }
+  });
+  await expect(broken.api.sentence(sentence.id)).rejects.toThrow();
+  const refs = {
+    ...entry,
+    draft: {
+      ...draft,
+      senses: draft.senses.map((s) => ({ ...s, sentence_ids: [sentence.id] }))
+    }
+  };
+  const connected = client(refs);
+  expect(
+    await connected.api.save(entry.id, {
+      expected_revision: 1,
+      draft: refs.draft
+    })
+  ).toEqual(refs);
+  expect(
+    new Headers(connected.fetch.mock.calls[0]![1].headers).get(
+      "x-tsz-next-sentences"
+    )
+  ).toBe("v1");
+});

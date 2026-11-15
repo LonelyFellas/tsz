@@ -80,6 +80,10 @@ const entry: NextEntry = {
 };
 function requests() {
   return {
+    sentences: vi.fn(),
+    sentence: vi.fn(),
+    createSentence: vi.fn(),
+    saveSentence: vi.fn(),
     equivalentCatalog: vi
       .fn()
       .mockResolvedValue({ registers: [], domains: [] }),

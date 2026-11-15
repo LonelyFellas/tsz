@@ -139,6 +139,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               }
               grammarAvailable={capability.data?.grammar_structures === true}
               grammarAudioAvailable={capability.data?.grammar_audio === true}
+              sentencesAvailable={capability.data?.sentences === true}
               definitionDetailsAvailable={
                 capability.data?.definition_details === true
               }
@@ -165,7 +166,8 @@ function EntryLoader({
   equivalentMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable,
-  definitionDetailsAvailable
+  definitionDetailsAvailable,
+  sentencesAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -174,6 +176,7 @@ function EntryLoader({
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
   definitionDetailsAvailable: boolean;
+  sentencesAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -254,6 +257,7 @@ function EntryLoader({
       grammarAvailable={grammarAvailable}
       grammarAudioAvailable={grammarAudioAvailable}
       definitionDetailsAvailable={definitionDetailsAvailable}
+      sentencesAvailable={sentencesAvailable}
     />
   );
 }
@@ -268,7 +272,8 @@ function EntryEditor({
   equivalentMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable,
-  definitionDetailsAvailable
+  definitionDetailsAvailable,
+  sentencesAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -277,6 +282,7 @@ function EntryEditor({
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
   definitionDetailsAvailable: boolean;
+  sentencesAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -639,6 +645,7 @@ function EntryEditor({
             grammarAvailable={grammarAvailable}
             grammarAudioAvailable={grammarAudioAvailable}
             definitionDetailsAvailable={definitionDetailsAvailable}
+            sentencesAvailable={sentencesAvailable}
             disabled={disabled}
             onChange={setDraft}
           />
@@ -711,7 +718,7 @@ function EntryEditor({
           footer={null}
           onCancel={() => setView(undefined)}
         >
-          {view && <Preview view={view} />}
+          {view && <Preview view={view} requests={requests} />}
         </Modal>
         <Modal
           open={!!remote}

@@ -51,6 +51,7 @@ export interface NextSenseGroup {
   name_en: string;
 }
 export interface NextSense {
+  sentence_ids?: string[];
   no_equivalents?: string[];
   level?: string;
   frequency?: string;
@@ -176,6 +177,7 @@ export interface NextLanguageCapability {
 }
 export interface NextCapabilities {
   definition_details?: boolean;
+  sentences?: boolean;
   equivalent_metadata?: boolean;
   sense_metadata?: boolean;
   grammar_audio?: boolean;
@@ -195,6 +197,7 @@ export interface NextViewQuery {
   medium_locale: string;
 }
 export interface NextSenseView {
+  sentence_ids?: string[];
   no_equivalents?: boolean;
   level?: string;
   frequency?: string;
@@ -276,4 +279,68 @@ export interface NextAnnotationResult {
   entry_id: string;
   annotation: string | null;
   annotation_revision: number;
+}
+
+export type NextSentenceTranslationStyle =
+  "word_for_word" | "balanced_fluency" | "adapted_creation";
+export interface NextSentenceTranslation {
+  id: string;
+  locale: string;
+  style: NextSentenceTranslationStyle;
+  content: RichTextV3;
+}
+export interface NextSentenceVariant {
+  id: string;
+  locale: string;
+  level: string;
+  content: RichTextV3;
+  translations: NextSentenceTranslation[];
+  voice_profile?: VoiceProfileV3;
+  audio_assets?: AudioAssetV3[];
+}
+export interface NextSentence {
+  id: string;
+  target_language: string;
+  owner_id: string;
+  revision: number;
+  updated_at: string;
+  reference_count: number;
+  draft: { schema_version: 1; variants: NextSentenceVariant[] };
+}
+export interface CreateNextSentence {
+  id: string;
+  target_language: string;
+  target_locale: string;
+  medium_locale: string;
+  variant: NextSentenceVariant;
+}
+export interface SaveNextSentence {
+  expected_revision: number;
+  target_locale: string;
+  medium_locale: string;
+  variant: NextSentenceVariant;
+}
+export interface NextSentenceQuery {
+  target_language: string;
+  target_locale: string;
+  medium_locale: string;
+  keyword?: string;
+  level?: string;
+  page?: number;
+  page_size?: number;
+}
+export interface NextSentenceListItem {
+  id: string;
+  owner_id: string;
+  revision: number;
+  updated_at: string;
+  reference_count: number;
+  locale: string;
+  level: string;
+  content: RichTextV3;
+  translation_count: number;
+}
+export interface NextSentenceList {
+  items: NextSentenceListItem[];
+  pagination: NextEntryList["pagination"];
 }

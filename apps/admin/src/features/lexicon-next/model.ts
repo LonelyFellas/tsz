@@ -215,6 +215,9 @@ export function previewDraft(
         ...(sense.sense_group_id
           ? { sense_group_id: sense.sense_group_id }
           : {}),
+        ...(sense.sentence_ids !== undefined
+          ? { sentence_ids: sense.sentence_ids }
+          : {}),
         target_definitions,
         medium_definitions,
         equivalents,

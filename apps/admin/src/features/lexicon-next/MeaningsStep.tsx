@@ -1,3 +1,4 @@
+import { SenseSentenceExamples } from "./SenseSentenceExamples";
 import { EquivalentRows } from "./EquivalentRows";
 import { draftNodeCount, ensureMeaningTemplates, newSense } from "./model";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
@@ -66,6 +67,7 @@ export function MeaningsStep({
   grammarAvailable = false,
   grammarAudioAvailable = false,
   definitionDetailsAvailable = false,
+  sentencesAvailable = false,
   registerLeaveGuard,
   onChange
 }: {
@@ -83,6 +85,7 @@ export function MeaningsStep({
   grammarAvailable?: boolean;
   grammarAudioAvailable?: boolean;
   definitionDetailsAvailable?: boolean;
+  sentencesAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
@@ -774,6 +777,19 @@ export function MeaningsStep({
                                       }
                                     />
                                   </>
+                                )}
+                                {sentencesAvailable && requests && (
+                                  <SenseSentenceExamples
+                                    ids={sense.sentence_ids}
+                                    target={target}
+                                    medium={medium}
+                                    disabled={disabled}
+                                    requests={requests}
+                                    registerLeaveGuard={registerLeaveGuard}
+                                    onChange={(sentence_ids) =>
+                                      updateSense(sense.id, { sentence_ids })
+                                    }
+                                  />
                                 )}
                                 {equivalentMetadataAvailable ? (
                                   <EquivalentRows

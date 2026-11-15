@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-definitions-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "c43e21287a0effec536ded8de9d7305277f483e85d4888e48cbab369cb8b4f0e",
+  "_source": "/Users/darwish/.codex/worktrees/next-sense-examples-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "cd8e797f64ac52c85c274972b49d4e361d4648d6bea338c076d258737ede1150",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -19,6 +19,10 @@
     "NextCapabilities",
     "NextEquivalentCatalog",
     "NextEntryView",
+    "NextSentence",
+    "NextSentenceList",
+    "CreateNextSentence",
+    "SaveNextSentence",
     "CreateNextEntry",
     "NextDetection",
     "NextDetectionInput",
@@ -1196,6 +1200,24 @@
         "kind": { "$ref": "#/$defs/NextEntryKind" },
         "medium_locale": { "type": "string" },
         "target_language": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "CreateNextSentence": {
+      "type": "object",
+      "required": [
+        "id",
+        "target_language",
+        "target_locale",
+        "medium_locale",
+        "variant"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "medium_locale": { "type": "string" },
+        "target_language": { "type": "string" },
+        "target_locale": { "type": "string" },
+        "variant": { "$ref": "#/$defs/NextSentenceVariant" }
       },
       "additionalProperties": false
     },
@@ -3599,7 +3621,8 @@
         "publishing": { "type": "boolean" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
         "sense_groups": { "type": "boolean" },
-        "sense_metadata": { "type": "boolean" }
+        "sense_metadata": { "type": "boolean" },
+        "sentences": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -4032,6 +4055,10 @@
         "no_equivalents": { "type": "array", "items": { "type": "string" } },
         "part_of_speech": { "type": ["string", "null"] },
         "sense_group_id": { "type": "string", "format": "uuid" },
+        "sentence_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
         "sub_pos": { "type": "string" }
       },
       "additionalProperties": false
@@ -4075,10 +4102,122 @@
         "missing_target_definitions": { "type": "boolean" },
         "no_equivalents": { "type": "boolean" },
         "sense_group_id": { "type": "string", "format": "uuid" },
+        "sentence_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
         "target_definitions": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextDefinition" }
         }
+      },
+      "additionalProperties": false
+    },
+    "NextSentence": {
+      "type": "object",
+      "required": [
+        "id",
+        "target_language",
+        "owner_id",
+        "revision",
+        "updated_at",
+        "reference_count",
+        "draft"
+      ],
+      "properties": {
+        "draft": { "$ref": "#/$defs/NextSentenceDraft" },
+        "id": { "type": "string", "format": "uuid" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "reference_count": { "type": "integer" },
+        "revision": { "type": "integer" },
+        "target_language": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceDraft": {
+      "type": "object",
+      "required": ["schema_version", "variants"],
+      "properties": {
+        "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceVariant" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceList": {
+      "type": "object",
+      "required": ["items", "pagination"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceListItem" }
+        },
+        "pagination": { "$ref": "#/$defs/PaginationMeta" }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceListItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "owner_id",
+        "revision",
+        "updated_at",
+        "reference_count",
+        "locale",
+        "level",
+        "content",
+        "translation_count"
+      ],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
+        "locale": { "type": "string" },
+        "owner_id": { "type": "string", "format": "uuid" },
+        "reference_count": { "type": "integer" },
+        "revision": { "type": "integer" },
+        "translation_count": { "type": "integer", "minimum": 0 },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceTranslation": {
+      "type": "object",
+      "required": ["id", "locale", "style", "content"],
+      "properties": {
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "type": "string" },
+        "style": { "$ref": "#/$defs/NextSentenceTranslationStyle" }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceTranslationStyle": {
+      "type": "string",
+      "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
+    },
+    "NextSentenceVariant": {
+      "type": "object",
+      "required": ["id", "locale", "level", "content", "translations"],
+      "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioAsset" },
+          "maxItems": 8
+        },
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string", "pattern": "^(A1|A2|B1|B2|C1|C2)$" },
+        "locale": { "type": "string" },
+        "translations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceTranslation" }
+        },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false
     },
@@ -5362,6 +5501,22 @@
       "properties": {
         "draft": { "$ref": "#/$defs/NextDraft" },
         "expected_revision": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "SaveNextSentence": {
+      "type": "object",
+      "required": [
+        "expected_revision",
+        "target_locale",
+        "medium_locale",
+        "variant"
+      ],
+      "properties": {
+        "expected_revision": { "type": "integer" },
+        "medium_locale": { "type": "string" },
+        "target_locale": { "type": "string" },
+        "variant": { "$ref": "#/$defs/NextSentenceVariant" }
       },
       "additionalProperties": false
     },
