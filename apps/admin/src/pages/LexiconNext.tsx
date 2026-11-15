@@ -686,6 +686,7 @@ function EntryEditor({
         <div hidden={step !== "preview"} inert={step !== "preview"}>
           <h2>预览</h2>
           <Preview
+            requests={requests}
             view={previewDraft(draft, target, medium, grammarCatalog.data)}
           />
         </div>
@@ -698,6 +699,7 @@ function EntryEditor({
                 label: "当前草稿预览（含未保存修改）",
                 children: (
                   <Preview
+                    requests={requests}
                     view={previewDraft(
                       draft,
                       target,
