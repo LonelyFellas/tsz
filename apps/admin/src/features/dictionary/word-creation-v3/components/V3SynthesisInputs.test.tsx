@@ -95,6 +95,13 @@ function sourceRadio(name: string, side = "美式") {
     )
   });
 }
+
+async function applyAudioTasks(tasks: Map<string, () => Promise<boolean>>) {
+  await waitFor(() => expect(tasks.size).toBeGreaterThan(0));
+  await act(async () => {
+    for (const wait of [...tasks.values()]) await wait();
+  });
+}
 beforeEach(() => {
   speech.canGenerate = true;
   speech.canUpload = true;
@@ -324,6 +331,53 @@ function Harness({
   );
 }
 
+it("音素设置弹窗不提前生成，点击完成才生成并应用最新配音", async () => {
+  speech.recommendations.mockResolvedValue([
+    {
+      id: "first",
+      name: "自然",
+      groupName: "发音",
+      locale: "en-GB",
+      setting: {
+        voice_id: "en-gb-sonia",
+        version_id: "11111111-1111-4111-8111-111111111111",
+        version_name: "自然",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: 0
+      }
+    }
+  ]);
+  renderWithUps(<Harness dialect="uk" audioTasks={new Map()} />);
+  fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+    target: { value: "fɑːɹ" }
+  });
+  fireEvent.click(sourceRadio("Azure IPA", "英式"));
+  const label = "第 1 条发音 英式 Azure IPA";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  await screen.findByLabelText("修改 自然");
+  await act(async () => {});
+  expect(speech.generateAudio).not.toHaveBeenCalled();
+  const complete = screen.getByLabelText(`完成${label}设置`);
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await waitFor(() =>
+    expect(screen.queryByLabelText(`完成${label}设置`)).not.toBeInTheDocument()
+  );
+  expect(speech.generateAudio).toHaveBeenCalledOnce();
+  expect(speech.generateAudio.mock.calls[0]![0].source).toMatchObject({
+    kind: "phoneme",
+    phoneme_locale: "en-GB",
+    phoneme: "fɑːɹ"
+  });
+  const saved = JSON.parse(
+    screen.getByTestId("pronunciation-wire").textContent!
+  );
+  expect(
+    saved.synthesis.uk.ipa_speech.voice_profile.voices[0].audio_asset_id
+  ).toBe("new-audio");
+});
+
 const renderWithUps = (ui: Parameters<typeof render>[0]) => {
   const view = render(ui);
   for (const toggle of screen.queryAllByRole("button", {
@@ -334,8 +388,9 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
 };
 
 it.each(["ipa", "ups"] as const)(
-  "活动 %s 自动生成回写后仍可撤销全部转换，旧资产不复活",
+  "活动 %s 保存补齐音频后仍可撤销全部转换，旧资产不复活",
   async (alphabet) => {
+    const tasks = new Map<string, () => Promise<boolean>>();
     function ConversionHarness() {
       const [pronunciation, setPronunciation] = useState<WordPronunciationV3>({
         id: "convert-active",
@@ -377,26 +432,28 @@ it.each(["ipa", "ups"] as const)(
         setPronunciation((current) => ({ ...current, ...patch }));
       return (
         <App>
-          <PronunciationPreviewProvider>
-            <V3PronunciationConvertAll
-              pronunciation={pronunciation}
-              spelling="far"
-              dialect="uk"
-              onChange={change}
-            />
-            <V3SynthesisInputs
-              pronunciation={pronunciation}
-              spelling="far"
-              dialect="uk"
-              index={0}
-              issues={[]}
-              synthesisEditable
-              onChange={change}
-            />
-            <output data-testid="conversion-wire">
-              {JSON.stringify(pronunciation)}
-            </output>
-          </PronunciationPreviewProvider>
+          <VoiceAudioTasksContext.Provider value={tasks}>
+            <PronunciationPreviewProvider>
+              <V3PronunciationConvertAll
+                pronunciation={pronunciation}
+                spelling="far"
+                dialect="uk"
+                onChange={change}
+              />
+              <V3SynthesisInputs
+                pronunciation={pronunciation}
+                spelling="far"
+                dialect="uk"
+                index={0}
+                issues={[]}
+                synthesisEditable
+                onChange={change}
+              />
+              <output data-testid="conversion-wire">
+                {JSON.stringify(pronunciation)}
+              </output>
+            </PronunciationPreviewProvider>
+          </VoiceAudioTasksContext.Provider>
         </App>
       );
     }
@@ -411,6 +468,8 @@ it.each(["ipa", "ups"] as const)(
         name: "应用转换结果"
       })
     );
+    expect(speech.generateAudio).not.toHaveBeenCalled();
+    await applyAudioTasks(tasks);
     await waitFor(() =>
       expect(
         wire().synthesis?.uk?.[`${alphabet}_speech`]?.voice_profile.voices[0]
@@ -503,14 +562,6 @@ it("UPS 缺少当前口音 IPA 时在 IPA 框内提示并聚焦，补齐后恢�
   );
 });
 
-async function dialogButton(dialog: HTMLElement, text: string) {
-  const button = within(dialog)
-    .getByText(text)
-    .closest<HTMLButtonElement>("button")!;
-  await waitFor(() => expect(button).toBeVisible());
-  return button;
-}
-
 async function phonemeDialog(label: string) {
   const input = await screen.findByLabelText(`${label}音标编辑`);
   const dialog = input.closest<HTMLElement>('[role="dialog"]')!;
@@ -531,26 +582,41 @@ describe("双口音真实试听控件", () => {
           finish = resolve;
         })
     );
-    renderWithUps(<Harness dialect="uk" profiled />);
+    const tasks = new Map<string, () => Promise<boolean>>();
+    renderWithUps(<Harness dialect="uk" profiled audioTasks={tasks} />);
     const label = "第 1 条发音 英式 Azure IPA";
     const open = screen.getByLabelText(`打开${label} TTS 设置器`);
+    expect(speech.generateAudio).not.toHaveBeenCalled();
+    await waitFor(() => expect(tasks.size).toBeGreaterThan(0));
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = Promise.all([...tasks.values()].map((wait) => wait()));
+    });
     await waitFor(() => expect(speech.generateAudio).toHaveBeenCalled());
     expect(open).toHaveAttribute("aria-busy", "true");
     expect(open).toBeEnabled();
     fireEvent.click(open);
     await phonemeDialog(label);
-    await act(async () => finish({ asset: { id: "completed-in-background" } }));
+    await act(async () => {
+      finish({ asset: { id: "completed-in-background" } });
+      await pending;
+    });
   });
-  it("可见音素入口的闭合生成和打开编辑都只采用当前原生地区的 fallback", async () => {
-    renderWithUps(<Harness dialect="common" profiled bothVoices />);
+  it("音素字段保存和弹窗完成都只采用当前原生地区的 fallback", async () => {
+    const tasks = new Map<string, () => Promise<boolean>>();
+    renderWithUps(
+      <Harness dialect="common" profiled bothVoices audioTasks={tasks} />
+    );
     const label = "第 1 条发音 英式 Azure IPA";
     const open = () => screen.getByLabelText(`打开${label} TTS 设置器`);
     await waitFor(() => expect(open()).toBeEnabled());
     fireEvent.click(open());
-    await phonemeDialog(label);
+    const dialog = await phonemeDialog(label);
     const complete = () => screen.getByLabelText(`完成${label}设置`);
     await waitFor(() => expect(complete()).toBeEnabled());
     fireEvent.click(complete());
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    await applyAudioTasks(tasks);
     await waitFor(() => {
       const saved = JSON.parse(
         screen.getByTestId("pronunciation-wire").textContent!
@@ -658,6 +724,7 @@ describe("双口音真实试听控件", () => {
       const complete = within(editor).getByLabelText(`完成${label}设置`);
       await waitFor(() => expect(complete).toBeEnabled());
       fireEvent.click(complete);
+      await waitFor(() => expect(editor).not.toBeInTheDocument());
       const saved = JSON.parse(
         screen.getByTestId("pronunciation-wire").textContent!
       );
@@ -1417,6 +1484,9 @@ it("未配置的音素设置器采用首位推荐，完成时保存参数", asyn
   const complete = screen.getByLabelText(`完成${label}设置`);
   await waitFor(() => expect(complete).toBeEnabled());
   fireEvent.click(complete);
+  await waitFor(() =>
+    expect(screen.queryByLabelText(`完成${label}设置`)).not.toBeInTheDocument()
+  );
   const saved = JSON.parse(
     screen.getByTestId("pronunciation-wire").textContent!
   );
@@ -1472,36 +1542,31 @@ it.each([
     fireEvent.mouseDown(
       dialog.querySelectorAll(".tsz-ve-gap")[alphabet === "UPS" ? 2 : 0]!
     );
-    await waitFor(() =>
-      expect(speech.generateAudio).toHaveBeenCalledWith(
-        expect.objectContaining({
-          setting: expect.objectContaining({ voice_id: voiceId }),
-          source: expect.objectContaining({
-            content: expect.objectContaining({
-              text: "far away",
-              annotations: expect.arrayContaining([
-                { type: "pause", at: 3, duration_ms: duration }
-              ])
-            })
-          })
-        }),
-        expect.any(AbortSignal)
-      )
-    );
+    expect(speech.generateAudio).not.toHaveBeenCalled();
     const poolPreview = () => within(dialog).getByLabelText(`试听 ${voice}`);
     await waitFor(() => expect(poolPreview()).toBeVisible());
     fireEvent.click(poolPreview());
-    await waitFor(() =>
-      expect(speech.resolveAudio).toHaveBeenCalledWith("new-audio", {
-        signal: expect.any(AbortSignal)
-      })
-    );
-    expect(speech.synthesize).not.toHaveBeenCalled();
+    await waitFor(() => expect(speech.synthesize).toHaveBeenCalled());
+    expect(speech.generateAudio).not.toHaveBeenCalled();
     expect(
       wire().synthesis[side][`${alphabet.toLowerCase()}_speech`]
     ).toBeUndefined();
     fireEvent.click(control(`完成${label}设置`));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(speech.generateAudio).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setting: expect.objectContaining({ voice_id: voiceId }),
+        source: expect.objectContaining({
+          content: expect.objectContaining({
+            text: "far away",
+            annotations: expect.arrayContaining([
+              { type: "pause", at: 3, duration_ms: duration }
+            ])
+          })
+        })
+      }),
+      expect.any(AbortSignal)
+    );
     expect(
       wire().synthesis[side][`${alphabet.toLowerCase()}_speech`].content
         .annotations
@@ -1609,16 +1674,11 @@ it("已显示的音素后端兼容诊断随语言更新，不重建设置器或�
     "第 1 条发音 英式 Azure IPA音标编辑"
   );
   expect(input).toHaveAttribute("readonly");
-  const editVoice = await screen.findByLabelText("修改 自然");
-  await waitFor(() => expect(editVoice).toBeEnabled());
-  fireEvent.click(editVoice);
-  const detail = (await screen.findByLabelText("当前音色语速")).closest(
-    '[role="dialog"]'
-  ) as HTMLElement;
-  const generate = await dialogButton(detail, "生成正式音频");
-  await waitFor(() => expect(generate).toBeEnabled());
-  fireEvent.click(generate);
-  await within(detail).findByText(/当前后端尚未支持精确地区音素生成/);
+  await screen.findByLabelText("修改 自然");
+  const complete = screen.getByLabelText("完成第 1 条发音 英式 Azure IPA设置");
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await screen.findByText(/当前后端尚未支持精确地区音素生成/);
   const before = screen.getByTestId("pronunciation-wire").textContent;
   const calls = [
     speech.generateAudio.mock.calls.length,
@@ -1626,7 +1686,7 @@ it("已显示的音素后端兼容诊断随语言更新，不重建设置器或�
     speech.recommendations.mock.calls.length
   ];
   view.rerender(content("en-GB"));
-  await within(detail).findByText(
+  await screen.findByText(
     /This backend does not support generation for the exact phoneme locale yet/
   );
   expect(screen.getByTestId("pronunciation-wire").textContent).toBe(before);
@@ -1861,55 +1921,60 @@ it("上传完成使用宿主当前回调，保留上传期间编辑的其他字�
 });
 
 it("明确选择IPA来源时，旧录音默认标记不阻止本侧生成", async () => {
+  const tasks = new Map<string, () => Promise<boolean>>();
   render(
-    <App>
-      <V3PhonemeSpeechSettings
-        active
-        spelling="far"
-        nodeId="explicit-source"
-        field="synthesis.uk.ipa_speech"
-        alphabet="ipa"
-        locale="en-GB"
-        label="明确IPA来源"
-        candidate={{
-          source: "ipa",
-          ipa: "fɑː",
-          ups: "F AA",
-          ipa_speech: {
-            content: { version: 2, text: "far", annotations: [] },
-            voice_profile: {
-              voices: [
-                {
-                  voice_id: "en-gb-sonia",
-                  locale: "en-GB",
-                  enabled: true,
-                  rate_percent: 0
+    <VoiceAudioTasksContext.Provider value={tasks}>
+      <App>
+        <V3PhonemeSpeechSettings
+          active
+          spelling="far"
+          nodeId="explicit-source"
+          field="synthesis.uk.ipa_speech"
+          alphabet="ipa"
+          locale="en-GB"
+          label="明确IPA来源"
+          candidate={{
+            source: "ipa",
+            ipa: "fɑː",
+            ups: "F AA",
+            ipa_speech: {
+              content: { version: 2, text: "far", annotations: [] },
+              voice_profile: {
+                voices: [
+                  {
+                    voice_id: "en-gb-sonia",
+                    locale: "en-GB",
+                    enabled: true,
+                    rate_percent: 0
+                  }
+                ],
+                dubbing: {
+                  area: "azure",
+                  uk: { mode: "local" },
+                  us: { mode: "local" }
                 }
-              ],
-              dubbing: {
-                area: "azure",
-                uk: { mode: "local" },
-                us: { mode: "local" }
               }
             }
-          }
-        }}
-        audioAssets={[
-          {
-            id: "retained-recording",
-            locale: "en-GB",
-            gender: "female",
-            content_type: "audio/mpeg",
-            size_bytes: 7,
-            original_name: "old.mp3",
-            created_at: "2026-11-12T00:00:00Z",
-            is_default: true
-          }
-        ]}
-        onChange={vi.fn()}
-      />
-    </App>
+          }}
+          audioAssets={[
+            {
+              id: "retained-recording",
+              locale: "en-GB",
+              gender: "female",
+              content_type: "audio/mpeg",
+              size_bytes: 7,
+              original_name: "old.mp3",
+              created_at: "2026-11-12T00:00:00Z",
+              is_default: true
+            }
+          ]}
+          onChange={vi.fn()}
+        />
+      </App>
+    </VoiceAudioTasksContext.Provider>
   );
+  expect(speech.generateAudio).not.toHaveBeenCalled();
+  await applyAudioTasks(tasks);
   await waitFor(() =>
     expect(speech.generateAudio).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -124,6 +124,180 @@ beforeEach(() => {
   state.resolveUrl.mockReset();
 });
 
+it.each([
+  { mode: "pronunciation", embedded: false },
+  { mode: "grammar", embedded: false },
+  { mode: "association", embedded: false },
+  { mode: "association", embedded: true }
+] as const)(
+  "$mode 弹窗编辑不生成，完成时才生成并一次应用正文和配音（内嵌=$embedded）",
+  async ({ mode, embedded }) => {
+    state.flags.VOICE_PREVIEW = true;
+    let finish!: (asset: import("@tsz/types").AudioAssetV3) => void;
+    const generateAudio = vi.fn<
+      NonNullable<
+        import("@tsz/voice-editor/types").VoicePreviewAdapter["generateAudio"]
+      >
+    >(() => new Promise((resolve) => (finish = resolve)));
+    const commit = vi.fn();
+    const persist = vi.fn(async () => true);
+    function Draft() {
+      const [value, setValue] = useState(VALUE);
+      const [profile, setProfile] = useState<VoiceProfileV3>({
+        voices: [
+          {
+            voice_id: "sonia",
+            version_id: "11111111-1111-4111-8111-111111111111",
+            version_name: "Sonia",
+            locale: "en-GB",
+            enabled: true,
+            rate_percent: 0,
+            audio_asset_id: "saved"
+          }
+        ]
+      });
+      return (
+        <V3VoiceTextField
+          mode={mode}
+          presentation={embedded ? "editor" : "field"}
+          showDone={!embedded}
+          onSave={embedded ? persist : undefined}
+          ariaLabel="延迟生成正文"
+          nodeId="deferred-field"
+          field="value"
+          dialect="uk"
+          value={value}
+          voiceProfile={profile}
+          previewAdapter={{
+            listVoices: state.listVoices,
+            synthesize: state.synthesize,
+            generateAudio
+          }}
+          onChange={setValue}
+          onVoiceProfileChange={setProfile}
+          onCommit={(result) => {
+            commit(result);
+            setValue(result.value);
+            setProfile(result.voiceProfile!);
+          }}
+        />
+      );
+    }
+    render(<Draft />);
+    if (!embedded)
+      fireEvent.click(screen.getByLabelText("打开延迟生成正文编辑器"));
+    const input = await screen.findByLabelText("延迟生成正文");
+    for (const text of ["hello", "hello new", "hello new text"]) {
+      fireEvent.change(input, { target: { value: text } });
+      await act(async () => {});
+    }
+    expect(generateAudio).not.toHaveBeenCalled();
+    const complete = screen.getByLabelText(
+      embedded ? "保存延迟生成正文修改" : "完成延迟生成正文编辑"
+    );
+    fireEvent.click(complete);
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledOnce());
+    expect(commit).not.toHaveBeenCalled();
+    expect(complete).toBeDisabled();
+    await act(async () =>
+      finish({
+        id: "final",
+        locale: "en-GB",
+        gender: "female",
+        content_type: "audio/mpeg",
+        size_bytes: 100,
+        original_name: "audio.mp3",
+        created_at: "2026-11-15T00:00:00Z"
+      })
+    );
+    await waitFor(() => expect(commit).toHaveBeenCalledOnce());
+    if (embedded) {
+      await waitFor(() => expect(persist).toHaveBeenCalledOnce());
+      expect(persist.mock.invocationCallOrder[0]).toBeGreaterThan(
+        commit.mock.invocationCallOrder[0]!
+      );
+    }
+    expect(commit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        value: expect.objectContaining({ text: "hello new text" }),
+        voiceProfile: expect.objectContaining({
+          voices: [expect.objectContaining({ audio_asset_id: "final" })]
+        })
+      })
+    );
+  }
+);
+
+it("语音弹窗取消不生成，完成失败保留输入并复用身份重试", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const generateAudio = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("Azure unavailable"))
+    .mockResolvedValueOnce({
+      id: "retried",
+      locale: "en-GB",
+      gender: "female",
+      content_type: "audio/mpeg",
+      size_bytes: 100,
+      original_name: "audio.mp3",
+      created_at: "2026-11-15T00:00:00Z"
+    });
+  const commit = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="association"
+      ariaLabel="失败草稿"
+      nodeId="retry-dialog"
+      field="value"
+      dialect="uk"
+      value={VALUE}
+      voiceProfile={{
+        voices: [
+          {
+            voice_id: "sonia",
+            version_id: "11111111-1111-4111-8111-111111111111",
+            version_name: "Sonia",
+            locale: "en-GB",
+            enabled: true,
+            rate_percent: 0,
+            audio_asset_id: "saved"
+          }
+        ]
+      }}
+      previewAdapter={{
+        listVoices: state.listVoices,
+        synthesize: state.synthesize,
+        generateAudio
+      }}
+      onChange={vi.fn()}
+      onCommit={commit}
+    />
+  );
+  fireEvent.click(screen.getByLabelText("打开失败草稿编辑器"));
+  fireEvent.change(await screen.findByLabelText("失败草稿"), {
+    target: { value: "cancelled" }
+  });
+  await act(async () => {});
+  fireEvent.click(screen.getByLabelText("取消失败草稿编辑"));
+  expect(generateAudio).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText("打开失败草稿编辑器"));
+  const input = await screen.findByLabelText("失败草稿");
+  expect(input).toHaveValue(VALUE.text);
+  fireEvent.change(input, { target: { value: "latest text" } });
+  fireEvent.click(screen.getByLabelText("完成失败草稿编辑"));
+  await screen.findByText("Azure unavailable");
+  expect(input).toHaveValue("latest text");
+  expect(commit).not.toHaveBeenCalled();
+  const request = generateAudio.mock.calls[0]![0].requestId;
+  fireEvent.click(screen.getByLabelText("完成失败草稿编辑"));
+  await waitFor(() => expect(commit).toHaveBeenCalledOnce());
+  expect(generateAudio.mock.calls[1]![0].requestId).toBe(request);
+  expect(commit.mock.calls[0]![0].voiceProfile.voices[0].audio_asset_id).toBe(
+    "retried"
+  );
+});
+
 it("配音校验只阻止保存，不将例句关联编辑标记为未完成", async () => {
   state.flags.VOICE_PREVIEW = true;
   const setting: VoiceSetting = {
@@ -427,6 +601,11 @@ it("折叠字段的默认勾选不依赖打开编辑器或试听，生成资产�
     );
   }
   render(<Host />);
+  expect(generateAudio).not.toHaveBeenCalled();
+  await act(async () => {
+    for (const wait of [...audioTasks.values()])
+      expect(await wait()).toBe(true);
+  });
   await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
   expect(generateAudio).toHaveBeenCalledWith(
     expect.objectContaining({ content: VALUE, setting }),
@@ -2220,21 +2399,12 @@ it("弹窗新增关联后生成使用当前草稿关联，不读取打开前的�
   });
   fireEvent.click(await screen.findByText("关联此词"));
   expect(onChange).not.toHaveBeenCalled();
-  const chosen = within(editor).getByRole("region", { name: "英式已获取音色" });
-  const editVoice = await within(chosen).findByLabelText("修改 自然");
-  await waitFor(() => expect(editVoice).toBeEnabled());
-  fireEvent.click(editVoice);
-  const voiceDetail = (await screen.findByLabelText("当前音色语速")).closest(
-    '[role="dialog"]'
-  ) as HTMLElement;
-  const generate = within(voiceDetail).getByRole("button", {
-    name: "生成正式音频"
-  });
-  await waitFor(() => expect(generate).toBeEnabled());
-  fireEvent.click(generate);
-  await waitFor(() => expect(generatedLinks).toHaveLength(2));
-  expect(generatedLinks[0]).toEqual([]);
-  expect(generatedLinks[1]).toEqual([
+  const complete = within(editor).getByLabelText("完成草稿关联编辑");
+  await waitFor(() => expect(complete).toBeEnabled());
+  expect(generatedLinks).toHaveLength(0);
+  fireEvent.click(complete);
+  await waitFor(() => expect(generatedLinks).toHaveLength(1));
+  expect(generatedLinks[0]).toEqual([
     expect.objectContaining({ target_word_id: "w" })
   ]);
 });
@@ -2811,6 +2981,11 @@ it("未启用的拼写设置可保存且不生成正式音频，启用后才补�
   expect(generateAudio).not.toHaveBeenCalled();
   expect(audioTasks.size).toBe(0);
   fireEvent.click(screen.getByText("启用拼写来源"));
+  expect(generateAudio).not.toHaveBeenCalled();
+  await act(async () => {
+    for (const wait of [...audioTasks.values()])
+      expect(await wait()).toBe(true);
+  });
   await waitFor(() => expect(generateAudio).toHaveBeenCalledOnce());
   expect(generateAudio).toHaveBeenCalledWith(
     expect.objectContaining({

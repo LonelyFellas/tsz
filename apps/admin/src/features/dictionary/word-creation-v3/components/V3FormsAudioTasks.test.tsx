@@ -97,6 +97,12 @@ function fixture(): SharedFormsStepContentV3 {
   };
 }
 const tasks = new Map<string, () => Promise<boolean>>();
+async function applyAudioTasks() {
+  await waitFor(() => expect(tasks.size).toBeGreaterThan(0));
+  await act(async () => {
+    for (const wait of [...tasks.values()]) await wait();
+  });
+}
 function Host({ initial = fixture(), paused = false }) {
   const [forms, setForms] = useState(initial);
   return (
@@ -254,8 +260,10 @@ it.each([false, true])(
   }
 );
 
-it("词典带入的已选音标在不打开弹窗、不试听时生成，英美资产同时回写共享内容", async () => {
+it("词典带入的已选音标等待保存，英美资产同时回写共享内容", async () => {
   render(<Host />);
+  expect(speech.generate).not.toHaveBeenCalled();
+  await applyAudioTasks();
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   await waitFor(() => {
     const row = JSON.parse(screen.getByTestId("saved-forms").textContent!)
@@ -286,10 +294,12 @@ it("词典带入的已选音标在不打开弹窗、不试听时生成，英美�
   expect(speech.synthesize).not.toHaveBeenCalled();
 });
 
-it("内容弹窗打开时暂停汇总表任务，关闭后自动继续缺失配音", async () => {
+it("内容弹窗打开时暂停汇总表任务，关闭后仍等待保存补齐配音", async () => {
   const view = render(<Host paused />);
   expect(speech.generate).not.toHaveBeenCalled();
   view.rerender(<Host paused={false} />);
+  expect(speech.generate).not.toHaveBeenCalled();
+  await applyAudioTasks();
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
 });
 
@@ -342,6 +352,7 @@ it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续�
   );
   for (const retry of screen.getAllByRole("button", { name: "重试生成音频" }))
     fireEvent.click(retry);
+  await applyAudioTasks();
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   expect(screen.getByTestId("saved-forms")).toHaveTextContent(
     "formal-phoneme-en-US"
@@ -360,6 +371,8 @@ it("词形拼写来源只补缺失的已选音频，不生成未启用的音标�
     }
   };
   render(<Host initial={forms} />);
+  expect(speech.generate).not.toHaveBeenCalled();
+  await applyAudioTasks();
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(3));
   expect(speech.generate).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -428,6 +441,7 @@ it("显式拼写来源的历史音色解析失败时不兜底生成未知口音"
   row.synthesis!.us!.source = "spelling";
   speech.resolve.mockRejectedValue(new Error("解析暂不可用"));
   render(<Host initial={forms} />);
+  await applyAudioTasks();
   expect(await screen.findAllByText("解析暂不可用")).not.toHaveLength(0);
   for (const wait of tasks.values()) expect(await wait()).toBe(false);
   expect(speech.generate).not.toHaveBeenCalled();
@@ -453,6 +467,7 @@ it("部分显式来源的拼写侧解析失败时保留配置并阻止保存", a
   row.synthesis!.us = { ipa: "", ups: "" };
   speech.resolve.mockRejectedValue(new Error("美式拼写解析失败"));
   render(<Host initial={forms} />);
+  await applyAudioTasks();
   expect(await screen.findByText("美式拼写解析失败")).toBeVisible();
   for (const wait of [...tasks.values()]) expect(await wait()).toBe(false);
   expect(speech.generate).not.toHaveBeenCalled();
@@ -497,6 +512,8 @@ it("旧行级配音和当前音标来源分别生成，未选拼写保持原配�
     voice_profile: { voices }
   };
   render(<Host initial={forms} />);
+  expect(speech.generate).not.toHaveBeenCalled();
+  await applyAudioTasks();
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   await waitFor(() => {
     const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
@@ -535,6 +552,8 @@ it.each(["none", "upload"] as const)(
     };
     const british = structuredClone(row.voice_profile!.voices[0]!);
     render(<Host initial={forms} />);
+    expect(speech.generate).not.toHaveBeenCalled();
+    await applyAudioTasks();
     await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(screen.getByTestId("saved-forms")).toHaveTextContent(
