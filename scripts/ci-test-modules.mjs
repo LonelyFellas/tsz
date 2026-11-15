@@ -25,19 +25,31 @@ export const ciTestModules = [
     name: "admin-1",
     projects: ["admin"],
     filters: ["apps/admin"],
-    shard: "1/3"
+    shard: "1/5"
   },
   {
     name: "admin-2",
     projects: ["admin"],
     filters: ["apps/admin"],
-    shard: "2/3"
+    shard: "2/5"
   },
   {
     name: "admin-3",
     projects: ["admin"],
     filters: ["apps/admin"],
-    shard: "3/3"
+    shard: "3/5"
+  },
+  {
+    name: "admin-4",
+    projects: ["admin"],
+    filters: ["apps/admin"],
+    shard: "4/5"
+  },
+  {
+    name: "admin-5",
+    projects: ["admin"],
+    filters: ["apps/admin"],
+    shard: "5/5"
   }
 ].map((module) => ({
   ...module,
