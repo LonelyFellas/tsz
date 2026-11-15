@@ -2799,10 +2799,9 @@ it.each([false, true])(
     mount(api);
     await screen.findByDisplayValue("centre");
     fireEvent.click(button(/^预览/));
-    fireEvent.change(
-      screen.getByRole("textbox", { name: "词头", exact: true }),
-      { target: { value: "center" } }
-    );
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "center" }
+    });
     fireEvent.click(button("保存完整草稿"));
     if (available) {
       await waitFor(() =>
