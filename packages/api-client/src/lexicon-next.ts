@@ -64,6 +64,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
       "x-tsz-next-sentences": "v1",
+      "x-tsz-next-sentence-details": "v1",
       "x-tsz-next-equivalents": "v1",
       "x-tsz-next-sense-metadata": "v1",
       "x-tsz-next-grammar": "v1",
@@ -95,15 +96,22 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .then((value) => decode<NextSentenceList>("NextSentenceList", value)),
     sentence: (id: string) =>
       http
-        .get<unknown>(`${root}/sentences/${encodeURIComponent(id)}`)
+        .get<unknown>(
+          `${root}/sentences/${encodeURIComponent(id)}`,
+          editorOptions
+        )
         .then((value) => decode<NextSentence>("NextSentence", value)),
     createSentence: (input: CreateNextSentence) =>
       http
-        .post<unknown>(`${root}/sentences`, input)
+        .post<unknown>(`${root}/sentences`, input, editorOptions)
         .then((value) => decode<NextSentence>("NextSentence", value)),
     saveSentence: (id: string, input: SaveNextSentence) =>
       http
-        .put<unknown>(`${root}/sentences/${encodeURIComponent(id)}`, input)
+        .put<unknown>(
+          `${root}/sentences/${encodeURIComponent(id)}`,
+          input,
+          editorOptions
+        )
         .then((value) => decode<NextSentence>("NextSentence", value)),
     equivalentCatalog: () =>
       http

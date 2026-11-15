@@ -596,11 +596,14 @@ function sanitizeRuntimeSchema(schema, path, referencedNames) {
         break;
       case "minimum":
       case "maximum":
+      case "multipleOf":
       case "minLength":
       case "maxLength":
       case "minItems":
       case "maxItems":
         assertFiniteNumber(value, `${path}.${keyword}`);
+        if (keyword === "multipleOf" && value <= 0)
+          throw new Error(`${path}.multipleOf 必须为正数`);
         if (
           ["minLength", "maxLength", "minItems", "maxItems"].includes(
             keyword

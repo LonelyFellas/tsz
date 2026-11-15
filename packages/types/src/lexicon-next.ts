@@ -176,6 +176,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  sentence_details?: boolean;
   definition_details?: boolean;
   sentences?: boolean;
   equivalent_metadata?: boolean;
@@ -283,11 +284,29 @@ export interface NextAnnotationResult {
 
 export type NextSentenceTranslationStyle =
   "word_for_word" | "balanced_fluency" | "adapted_creation";
+export interface NextSentenceSource {
+  id: string;
+  source_type:
+    "dictionary" | "web" | "adapted" | "ai_composed" | "human_composed";
+  title: string;
+  url: string;
+  locator: string;
+}
+export interface NextSentenceMetadata {
+  register_ids: string[];
+  domain_ids: string[];
+  sources: NextSentenceSource[];
+}
+export interface NextSentenceTranslationMetadata {
+  freedom?: number | null;
+  sources: NextSentenceSource[];
+}
 export interface NextSentenceTranslation {
   id: string;
   locale: string;
   style: NextSentenceTranslationStyle;
   content: RichTextV3;
+  metadata?: NextSentenceTranslationMetadata;
 }
 export interface NextSentenceVariant {
   id: string;
@@ -295,6 +314,7 @@ export interface NextSentenceVariant {
   level: string;
   content: RichTextV3;
   translations: NextSentenceTranslation[];
+  metadata?: NextSentenceMetadata;
   voice_profile?: VoiceProfileV3;
   audio_assets?: AudioAssetV3[];
 }

@@ -863,3 +863,65 @@ it("新版例句使用独立身份和当前语言写入范围，严格拒绝畸�
     )
   ).toBe("v1");
 });
+
+it("新版例句协商扩展字段，并拒绝超范围或非一位小数的自由度响应", async () => {
+  const sentence = {
+    id: uuid(12),
+    target_language: "en",
+    owner_id: uuid(8),
+    revision: 1,
+    updated_at: "2026-11-15T00:00:00Z",
+    reference_count: 0,
+    draft: {
+      schema_version: 1,
+      variants: [
+        {
+          id: uuid(13),
+          locale: "en-GB",
+          level: "A2",
+          content: { version: 2, text: "A job.", annotations: [] },
+          metadata: {
+            register_ids: [],
+            domain_ids: [],
+            sources: [
+              {
+                id: uuid(15),
+                source_type: "human_composed",
+                title: "人工",
+                url: "",
+                locator: ""
+              }
+            ]
+          },
+          translations: [
+            {
+              id: uuid(14),
+              locale: "zh-Hans",
+              style: "balanced_fluency",
+              content: { version: 2, text: "工作。", annotations: [] },
+              metadata: { freedom: 33.4, sources: [] }
+            }
+          ]
+        }
+      ]
+    }
+  };
+  const { api, fetch } = client(sentence);
+  expect(await api.sentence(sentence.id)).toEqual(sentence);
+  expect(
+    new Headers(fetch.mock.calls[0]![1].headers).get(
+      "x-tsz-next-sentence-details"
+    )
+  ).toBe("v1");
+  for (const freedom of [null, 0, 33.3, 66.7, 100]) {
+    const value = structuredClone(sentence);
+    value.draft.variants[0]!.translations[0]!.metadata.freedom =
+      freedom as number;
+    expect(await client(value).api.sentence(sentence.id)).toEqual(value);
+  }
+  for (const freedom of [33.33, -0.1, 100.1]) {
+    const value = structuredClone(sentence);
+    value.draft.variants[0]!.translations[0]!.metadata.freedom = freedom;
+    await expect(client(value).api.sentence(sentence.id)).rejects.toThrow();
+  }
+});

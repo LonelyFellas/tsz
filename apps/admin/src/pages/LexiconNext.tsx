@@ -140,6 +140,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               grammarAvailable={capability.data?.grammar_structures === true}
               grammarAudioAvailable={capability.data?.grammar_audio === true}
               sentencesAvailable={capability.data?.sentences === true}
+              sentenceDetailsAvailable={
+                capability.data?.sentence_details === true
+              }
               definitionDetailsAvailable={
                 capability.data?.definition_details === true
               }
@@ -167,7 +170,8 @@ function EntryLoader({
   grammarAvailable,
   grammarAudioAvailable,
   definitionDetailsAvailable,
-  sentencesAvailable
+  sentencesAvailable,
+  sentenceDetailsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -177,6 +181,7 @@ function EntryLoader({
   grammarAudioAvailable: boolean;
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
+  sentenceDetailsAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -257,6 +262,7 @@ function EntryLoader({
       grammarAvailable={grammarAvailable}
       grammarAudioAvailable={grammarAudioAvailable}
       definitionDetailsAvailable={definitionDetailsAvailable}
+      sentenceDetailsAvailable={sentenceDetailsAvailable}
       sentencesAvailable={sentencesAvailable}
     />
   );
@@ -273,7 +279,8 @@ function EntryEditor({
   grammarAvailable,
   grammarAudioAvailable,
   definitionDetailsAvailable,
-  sentencesAvailable
+  sentencesAvailable,
+  sentenceDetailsAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -283,6 +290,7 @@ function EntryEditor({
   grammarAudioAvailable: boolean;
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
+  sentenceDetailsAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -660,6 +668,7 @@ function EntryEditor({
             grammarAvailable={grammarAvailable}
             grammarAudioAvailable={grammarAudioAvailable}
             definitionDetailsAvailable={definitionDetailsAvailable}
+            sentenceDetailsAvailable={sentenceDetailsAvailable}
             sentencesAvailable={sentencesAvailable}
             disabled={disabled}
             onChange={setDraft}
@@ -702,6 +711,7 @@ function EntryEditor({
           <h2>预览</h2>
           <Preview
             requests={requests}
+            sentenceDetailsAvailable={sentenceDetailsAvailable}
             view={previewDraft(draft, target, medium, grammarCatalog.data)}
           />
         </div>
@@ -715,6 +725,7 @@ function EntryEditor({
                 children: (
                   <Preview
                     requests={requests}
+                    sentenceDetailsAvailable={sentenceDetailsAvailable}
                     view={previewDraft(
                       draft,
                       target,
@@ -735,7 +746,13 @@ function EntryEditor({
           footer={null}
           onCancel={() => setView(undefined)}
         >
-          {view && <Preview view={view} requests={requests} />}
+          {view && (
+            <Preview
+              view={view}
+              requests={requests}
+              sentenceDetailsAvailable={sentenceDetailsAvailable}
+            />
+          )}
         </Modal>
         <Modal
           open={!!remote}

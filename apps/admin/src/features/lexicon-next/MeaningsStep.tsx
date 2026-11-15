@@ -74,6 +74,7 @@ export function MeaningsStep({
   grammarAudioAvailable = false,
   definitionDetailsAvailable = false,
   sentencesAvailable = false,
+  sentenceDetailsAvailable = false,
   registerLeaveGuard,
   selectedPos: sharedSelectedPos,
   onSelectedPosChange,
@@ -94,6 +95,7 @@ export function MeaningsStep({
   grammarAudioAvailable?: boolean;
   definitionDetailsAvailable?: boolean;
   sentencesAvailable?: boolean;
+  sentenceDetailsAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   selectedPos?: string;
   onSelectedPosChange?: (code: string) => void;
@@ -819,6 +821,7 @@ export function MeaningsStep({
                                 )}
                                 {sentencesAvailable && requests && (
                                   <SenseSentenceExamples
+                                    detailsAvailable={sentenceDetailsAvailable}
                                     ids={sense.sentence_ids}
                                     target={target}
                                     medium={medium}

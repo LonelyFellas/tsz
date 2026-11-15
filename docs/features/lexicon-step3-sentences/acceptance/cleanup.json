@@ -1,0 +1,17 @@
+{
+  "local_database_and_redis": "removed_with_owned_containers_and_volumes",
+  "fixture_counts_removed": {
+    "entries": 2,
+    "sentences": 5,
+    "sentence_references": 6,
+    "taxonomy_references": 6,
+    "audio_references": 0
+  },
+  "all_test_databases_and_sessions": "removed_with_owned_postgres_volume",
+  "owned_ports_closed": [61480, 61481],
+  "protected_containers_unchanged": 6,
+  "oss_created": false,
+  "browser_session": "logged_out_and_tab_closed",
+  "browser_site_preferences": "cleanup_unverified_tools_do_not_support_storage_clear",
+  "temporary_credentials_and_raw_fixtures": "removed"
+}

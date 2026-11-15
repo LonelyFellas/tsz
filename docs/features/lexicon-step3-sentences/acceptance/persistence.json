@@ -1,0 +1,13 @@
+{
+  "real_api": "passed",
+  "sentence_revision": 5,
+  "reference_count": 2,
+  "four_language_scope": "passed",
+  "legacy_projection": "passed",
+  "legacy_write_status": 422,
+  "rejected_write_unchanged": true,
+  "oss_created": false,
+  "frontend_base": "a6525aaa",
+  "backend_base": "55579dc7",
+  "source_sha256": "0293921c167c4b2543a8702f0ff8512e55e8929d98b3f29987c92b2983c19748"
+}

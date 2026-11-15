@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
   fireEvent,
@@ -98,22 +99,31 @@ beforeEach(() => {
   speech.generate.mockReset();
   speech.preview.mockReset();
 });
-function setup() {
+function setup(detailsAvailable = false, input = source) {
   const saveSentence = vi.fn().mockResolvedValue(source);
   const sentence = vi.fn();
   const onSaved = vi.fn();
   const onClose = vi.fn();
   render(
-    <App>
-      <NextSentenceEditor
-        source={source}
-        target="en-GB"
-        medium="zh-Hans"
-        requests={{ saveSentence, sentence } as unknown as LexiconNextRequests}
-        onSaved={onSaved}
-        onClose={onClose}
-      />
-    </App>
+    <QueryClientProvider client={new QueryClient()}>
+      <App>
+        <NextSentenceEditor
+          source={input}
+          detailsAvailable={detailsAvailable}
+          target="en-GB"
+          medium="zh-Hans"
+          requests={
+            {
+              saveSentence,
+              sentence,
+              equivalentCatalog: async () => ({ registers: [], domains: [] })
+            } as unknown as LexiconNextRequests
+          }
+          onSaved={onSaved}
+          onClose={onClose}
+        />
+      </App>
+    </QueryClientProvider>
   );
   return { saveSentence, sentence, onSaved, onClose };
 }
@@ -203,4 +213,57 @@ it("保存冲突保留输入，显式重新加载后按最新 revision 保存", 
   fireEvent.click(complete);
   await waitFor(() => expect(saveSentence).toHaveBeenCalledTimes(2));
   expect(saveSentence.mock.calls[1]![1].expected_revision).toBe(4);
+});
+
+it("人工自由度及原文和译文来源一起保存，非法精度阻止生成和写入", async () => {
+  const input = structuredClone(source);
+  input.draft.variants[0]!.content.text = "A useful example.";
+  input.draft.variants[0]!.translations.push({
+    id: "simplified",
+    locale: "zh-Hans",
+    style: "balanced_fluency",
+    content: { version: 2, text: "一个例句。", annotations: [] }
+  });
+  speech.generate.mockResolvedValue(asset);
+  const { saveSentence } = setup(true, input);
+  const freedom = await screen.findByRole("spinbutton", {
+    name: "译文 1 自由度"
+  });
+  fireEvent.change(freedom, { target: { value: "33.33" } });
+  const complete = screen.getByRole("button", { name: "完成" });
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await screen.findByText("翻译自由度须为 0–100%，最多一位小数");
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(saveSentence).not.toHaveBeenCalled();
+  expect(screen.getByText("一个例句。")).toBeVisible();
+  fireEvent.change(freedom, { target: { value: "66.7" } });
+  fireEvent.click(screen.getByRole("button", { name: "添加原文来源" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "原文来源 1 名称" }), {
+    target: { value: "人工原句" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "添加译文 1 来源" }));
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "译文 1 来源 1 名称" }),
+    { target: { value: "人工翻译" } }
+  );
+  fireEvent.click(complete);
+  await waitFor(() => expect(saveSentence).toHaveBeenCalledOnce());
+  const variant = saveSentence.mock.calls[0]![1].variant;
+  expect(variant.metadata.sources).toEqual([
+    expect.objectContaining({
+      title: "人工原句",
+      source_type: "human_composed"
+    })
+  ]);
+  expect(variant.translations).toEqual([
+    expect.objectContaining({
+      id: "simplified",
+      style: "adapted_creation",
+      metadata: {
+        freedom: 66.7,
+        sources: [expect.objectContaining({ title: "人工翻译" })]
+      }
+    })
+  ]);
 });

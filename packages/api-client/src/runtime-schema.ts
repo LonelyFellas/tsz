@@ -155,6 +155,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
 export type RuntimeSchemaRoot = (typeof RUNTIME_SCHEMA_ROOTS)[number];
 
 export type RuntimeSchemaFailureReason =
+  | "invalid_multiple"
   | "above_maximum"
   | "ambiguous_union_match"
   | "below_minimum"
@@ -196,6 +197,7 @@ type RuntimeSchema = {
   format?: "date" | "date-time" | "uuid";
   minimum?: number;
   maximum?: number;
+  multipleOf?: number;
   pattern?: string;
   minLength?: number;
   maxLength?: number;
@@ -391,6 +393,13 @@ function validateSchema(
     }
     if (schema.maximum !== undefined && value > schema.maximum) {
       return failure(path, "above_maximum", value);
+    }
+    if (schema.multipleOf !== undefined) {
+      const units = value / schema.multipleOf;
+      if (!Number.isFinite(units) || schema.multipleOf <= 0)
+        return failure(path, "invalid_schema", value);
+      if (Math.abs(units - Math.round(units)) > 1e-8)
+        return failure(path, "invalid_multiple", value);
     }
   }
 
