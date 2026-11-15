@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import * as prettier from "prettier";
+import { ciTestModules } from "./ci-test-modules.mjs";
 
 const workflowUrl = new URL("../.github/workflows/ci.yml", import.meta.url);
 const deployWorkflowUrl = new URL(
@@ -114,6 +115,13 @@ test("W02: all test modules run in coverage mode and publish their results", asy
   const { jobs } = await workflowFixture();
   const block = jobs.get("unit-coverage");
   assert.ok(block);
+  const selected = [...block.matchAll(/^\s+- module: ([a-z0-9-]+)$/gm)].map(
+    (match) => match[1]
+  );
+  assert.deepEqual(
+    selected.sort(),
+    ciTestModules.map((module) => module.name).sort()
+  );
   assert.match(block, /fail-fast: false/);
   assert.match(block, /pnpm ci:test-module/);
   assert.match(block, /\.ci-artifacts\/\$\{\{ matrix\.module \}\}\s+coverage/);
