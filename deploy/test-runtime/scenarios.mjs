@@ -11,6 +11,7 @@ import {
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { createCandidateManifest, digestDirectory } from "../provenance.mjs";
+import { remoteMetrics } from "../deploy-metrics.mjs";
 const file = (p) => readFile(p, "utf8");
 async function stage(component, id, withImageRuntime = true) {
   const dir = `/opt/stage-${id}`;
@@ -21,6 +22,8 @@ async function stage(component, id, withImageRuntime = true) {
     "releases.mjs",
     "provenance.mjs",
     "install-nginx-local.sh",
+    "deploy-metrics.sh",
+    "deploy-metrics.mjs",
     "nginx",
     "systemd"
   ])
@@ -87,6 +90,14 @@ function publish(dir, component, success) {
     }
   );
   assert.equal(result.status === 0, success, result.stdout + result.stderr);
+  const metrics = remoteMetrics(result.stderr, component);
+  const total = metrics.find((record) => record.phase === "total");
+  assert.equal(total?.status, success ? "success" : "failure", result.stderr);
+  const available = metrics.find(
+    (record) => record.phase === "verified-available"
+  );
+  assert.equal(Boolean(available), success, result.stderr);
+  if (success) assert.ok(available.duration_ms <= total.duration_ms);
   return result;
 }
 const ipConfig = await file("/etc/nginx/conf.d/zentao-ip.conf");
@@ -152,7 +163,17 @@ await rm("/opt/tsz-frontend-transaction");
 
 await stage("admin", "B");
 await writeFile("/tmp/fail-api", "fail");
-publish("/opt/stage-B", "admin", false);
+const failedSmoke = publish("/opt/stage-B", "admin", false);
+assert.ok(
+  remoteMetrics(failedSmoke.stderr, "admin").some(
+    (record) => record.phase === "smoke" && record.status === "failure"
+  )
+);
+assert.ok(
+  remoteMetrics(failedSmoke.stderr, "admin").some(
+    (record) => record.phase === "rollback" && record.status === "success"
+  )
+);
 assert.match(await readlink("/opt/tsz-releases/admin/current"), /\/A$/);
 assert.equal(await file("/opt/tsz-deploy-manifests/admin.json"), accepted);
 await assert.rejects(access("/opt/tsz-frontend-transaction"));

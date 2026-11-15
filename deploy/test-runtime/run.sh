@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+bash /repo/deploy/test-runtime/transport.sh
 # 容器内真实 Nginx/HTTP/文件系统，systemd 命令适配为测试子进程。
 mkdir -p /opt/tsz-admin/dist/assets /opt/tsz-web/apps/web/.next/static /etc/letsencrypt/live/test.tianshengzhi.com /etc/nginx/conf.d
 rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
