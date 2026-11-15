@@ -299,6 +299,8 @@ function EntryEditor({
   const [step, setStep] = useState<WordCreationStep>("forms");
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
+  const [selectedPos, setSelectedPos] = useState<string>();
+  const activePos = selectedPos ?? draft.form_editor?.pos[0]?.pos;
   const draftRef = useRef(draft);
   useLayoutEffect(() => {
     draftRef.current = draft;
@@ -439,6 +441,15 @@ function EntryEditor({
   useEffect(() => {
     setView(undefined);
   }, [target, medium]);
+  function changeStep(next: WordCreationStep) {
+    if (
+      next === "forms" &&
+      !draft.form_editor?.pos.some((pos) => pos.pos === selectedPos)
+    ) {
+      setSelectedPos(draft.form_editor?.pos[0]?.pos);
+    }
+    setStep(next);
+  }
   return (
     <EntryLayout
       draft={draft}
@@ -454,7 +465,7 @@ function EntryEditor({
                   !(await contentLeaveGuard.current())
                 )
                   return;
-                setStep(next);
+                changeStep(next);
               })();
             }
       }
@@ -551,6 +562,8 @@ function EntryEditor({
                 >
                   <AdminControls componentDisabled={disabled}>
                     <FormsStep
+                      selectedPos={activePos}
+                      onSelectedPosChange={setSelectedPos}
                       value={draft.form_editor ?? emptyEditor}
                       saved={saved.draft.form_editor}
                       kind={saved.kind}
@@ -588,7 +601,7 @@ function EntryEditor({
                   <Button
                     type="primary"
                     disabled={busy || formContentOpen}
-                    onClick={() => setStep("meanings")}
+                    onClick={() => changeStep("meanings")}
                   >
                     下一步：词义与译词
                   </Button>
@@ -616,7 +629,7 @@ function EntryEditor({
                           textClassName="tsz-words"
                           locale={locale}
                           label={`${localeLabels[locale]}词形`}
-                          disabled={disabled}
+                          disabled={disabled || !draft.form_editor?.pos.length}
                           onChange={(forms) =>
                             setDraft((current) => ({ ...current, forms }))
                           }
@@ -631,6 +644,8 @@ function EntryEditor({
         </div>
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <MeaningsStep
+            selectedPos={activePos}
+            onSelectedPosChange={setSelectedPos}
             value={draft}
             requests={requests}
             registerLeaveGuard={registerContentLeaveGuard}
@@ -662,7 +677,7 @@ function EntryEditor({
               <Button
                 type="text"
                 disabled={busy}
-                onClick={() => setStep("forms")}
+                onClick={() => changeStep("forms")}
               >
                 上一步
               </Button>
@@ -676,7 +691,7 @@ function EntryEditor({
               <Button
                 type="primary"
                 disabled={busy}
-                onClick={() => setStep("preview")}
+                onClick={() => changeStep("preview")}
               >
                 下一步：预览
               </Button>

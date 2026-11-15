@@ -75,6 +75,8 @@ export function MeaningsStep({
   definitionDetailsAvailable = false,
   sentencesAvailable = false,
   registerLeaveGuard,
+  selectedPos: sharedSelectedPos,
+  onSelectedPosChange,
   onChange
 }: {
   value: NextDraft;
@@ -93,6 +95,8 @@ export function MeaningsStep({
   definitionDetailsAvailable?: boolean;
   sentencesAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
+  selectedPos?: string;
+  onSelectedPosChange?: (code: string) => void;
   onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
   const { modal } = App.useApp();
@@ -140,7 +144,12 @@ export function MeaningsStep({
     return label ? [{ value: group.id, label }] : [];
   });
   const fallbackPosId = useId();
-  const [selectedPos, setSelectedPos] = useState<string>();
+  const [localSelectedPos, setLocalSelectedPos] = useState<string>();
+  const selectedPos = sharedSelectedPos ?? localSelectedPos;
+  function setSelectedPos(code: string) {
+    setLocalSelectedPos(code);
+    onSelectedPosChange?.(code);
+  }
   const [expanded, setExpanded] = useState<Record<string, string | null>>({});
   const codes = [
     ...new Set([

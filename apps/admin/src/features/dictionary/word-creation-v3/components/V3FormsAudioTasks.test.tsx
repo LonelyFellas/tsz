@@ -14,6 +14,16 @@ import type {
   VoiceSettingV3
 } from "@tsz/types";
 import { V3FormsAudioTasks } from "./V3FormsAudioTasks";
+import { FormsStep } from "@/features/lexicon-next/FormsStep";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { App } from "@tsz/ui/admin/overlays";
+import { formsFixture } from "../fixtures";
+import { applyFormsStructure } from "../sharedFormsModel";
+import { isSharedForms, primaryRegionalVariant } from "@tsz/shared";
+import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
+vi.mock("../../dataSource", () => ({
+  partOfSpeechDataSource: { catalog: async () => partOfSpeechCatalogFixture }
+}));
 import { VoiceSaveContext } from "../voiceSaveContext";
 
 const speech = vi.hoisted(() => ({
@@ -22,10 +32,21 @@ const speech = vi.hoisted(() => ({
   synthesize: vi.fn(),
   catalog: vi.fn()
 }));
-vi.mock("@/lib/auth", () => ({
-  usePermission: () => true,
-  api: { speech: { generateAudio: speech.generate, resolve: speech.resolve } }
-}));
+vi.mock("@/lib/auth", async (original) => {
+  const actual = await original<typeof import("@/lib/auth")>();
+  return {
+    ...actual,
+    usePermission: () => true,
+    api: {
+      ...actual.api,
+      speech: {
+        ...actual.api.speech,
+        generateAudio: speech.generate,
+        resolve: speech.resolve
+      }
+    }
+  };
+});
 vi.mock("@/lib/env", () => ({ env: { VOICE_PREVIEW: true } }));
 vi.mock("../../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
@@ -121,7 +142,10 @@ beforeEach(() => {
   speech.catalog.mockReset().mockResolvedValue(
     voices.map((setting) => ({
       id: setting.voice_id,
-      locale: setting.locale
+      label: setting.voice_id,
+      locale: setting.locale,
+      gender: "female",
+      styles: []
     }))
   );
   speech.generate
@@ -579,3 +603,56 @@ it.each(["none", "upload"] as const)(
     expect(saved.synthesis.us.source).toBe("ups");
   }
 );
+
+it("Step 2 没有词性时不注册生成任务，指定词性后恢复且保留原内容", async () => {
+  const assigned = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    formsFixture()
+  );
+  if (!isSharedForms(assigned)) throw new Error("shared fixture required");
+  const target = primaryRegionalVariant(assigned.contents[0]!.regional_variants)
+    .pronunciations[0]!;
+  target.voice_profile = { voices };
+  target.synthesis = primaryRegionalVariant(
+    fixture().contents[0]!.regional_variants
+  ).pronunciations[0]!.synthesis;
+  const unassigned = { ...assigned, pos: [] };
+  const original = structuredClone(unassigned);
+  const changed = vi.fn();
+  function Step({ forms }: { forms: SharedFormsStepContentV3 }) {
+    return (
+      <QueryClientProvider client={client}>
+        <App>
+          <VoiceSaveContext.Provider
+            value={{ save: async () => true, audioTasks: tasks }}
+          >
+            <FormsStep
+              value={forms}
+              kind="word"
+              locale="en-GB"
+              issues={[]}
+              onChange={changed}
+              registerLeaveGuard={vi.fn()}
+            />
+          </VoiceSaveContext.Provider>
+        </App>
+      </QueryClientProvider>
+    );
+  }
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const view = render(<Step forms={unassigned} />);
+  await screen.findByRole("combobox", { name: "添加基本词性" });
+  expect(tasks.size).toBe(0);
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(changed).not.toHaveBeenCalled();
+  expect(unassigned).toEqual(original);
+  view.rerender(<Step forms={assigned} />);
+  await waitFor(() => expect(tasks.size).toBeGreaterThan(0));
+  expect(speech.generate).not.toHaveBeenCalled();
+  view.rerender(<Step forms={unassigned} />);
+  expect(tasks.size).toBe(0);
+  expect(unassigned).toEqual(original);
+  view.unmount();
+});
