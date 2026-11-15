@@ -265,6 +265,49 @@ test("missing timing diagnostics remain unknown without changing the executed in
   assert.equal(invalid.timings[0].duration_ms, null);
 });
 
+test("Vitest's zero-filled or unfinished diagnostics are unknown while measured failures remain recorded", () => {
+  const measured = {
+    duration: 25,
+    collectDuration: 6,
+    setupDuration: 3,
+    prepareDuration: 2,
+    environmentSetupDuration: 4
+  };
+  const empty = Object.fromEntries(
+    Object.keys(measured).map((key) => [key, 0])
+  );
+  const create = (status, diagnostic) =>
+    createInventoryDocument(
+      [
+        {
+          project: { name: "admin" },
+          moduleId: "/repo/apps/admin/src/example.test.ts",
+          diagnostic: () => diagnostic,
+          state: () => status
+        }
+      ],
+      "admin-1",
+      "/repo"
+    );
+  for (const [status, diagnostic] of [
+    ["queued", empty],
+    ["pending", empty],
+    ["passed", empty],
+    ["pending", measured]
+  ]) {
+    const document = create(status, diagnostic);
+    assert.equal(document.tests.length, 1);
+    assert.equal(document.timings[0].status, status);
+    assert.equal(document.timings[0].duration_ms, null);
+    assert.equal(document.timings[0].test_duration_ms, null);
+    assert.match(timingSummary(document), /0 files recorded, 1 unknown/);
+  }
+  const failed = create("failed", measured);
+  assert.equal(failed.timings[0].status, "failed");
+  assert.equal(failed.timings[0].duration_ms, 40);
+  assert.equal(failed.timings[0].test_duration_ms, 25);
+});
+
 test("an unwritable timing summary still preserves the required actual-run inventory", async () => {
   const root = await mkdtemp(join(tmpdir(), "tsz-ci-timing-summary-"));
   const keys = [

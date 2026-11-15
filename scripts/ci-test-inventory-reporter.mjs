@@ -28,6 +28,7 @@ export function createInventoryDocument(
       repositoryRoot
     );
     const diagnostic = testModule.diagnostic?.();
+    const status = testModule.state?.() ?? "unknown";
     const parts = diagnostic && [
       diagnostic.duration,
       diagnostic.collectDuration,
@@ -35,14 +36,19 @@ export function createInventoryDocument(
       diagnostic.prepareDuration,
       diagnostic.environmentSetupDuration
     ];
-    const known = parts?.every((value) => Number.isFinite(value) && value >= 0);
+    // Vitest substitutes zeroes for measurements that have not been produced.
+    // Only a finished module with some observed time supplies a usable total.
+    const known =
+      ["passed", "failed"].includes(status) &&
+      parts?.every((value) => Number.isFinite(value) && value >= 0) &&
+      parts.some((value) => value > 0);
     return {
       ...entry,
       duration_ms: known
         ? Math.ceil(parts.reduce((sum, value) => sum + value, 0))
         : null,
       test_duration_ms: known ? Math.ceil(diagnostic.duration) : null,
-      status: testModule.state?.() ?? "unknown"
+      status
     };
   });
   return { module: module.name, projects: module.projects, tests, timings };
