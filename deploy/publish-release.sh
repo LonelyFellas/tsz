@@ -4,10 +4,14 @@ set -euo pipefail
 stage="$1"
 component="$2"
 [[ "$component" = admin || "$component" = web ]]
+node_bin=/usr/bin/node
+source "$stage/deploy-metrics.sh"
+deploy_metrics_init "$component" remote
+trap 'deploy_metrics_finish "$?"' EXIT
+deploy_phase lock-check
 exec 9>/opt/tsz-frontend-deploy.lock
 flock -n 9 || { echo '已有前端发布正在运行，请稍后重试' >&2; exit 1; }
 cd "$stage"
-node_bin=/usr/bin/node
 root="/opt/tsz-releases/$component"
 id="$(cat release-id)"
 [[ "$id" =~ ^[a-zA-Z0-9-]+$ ]]
@@ -16,6 +20,7 @@ manifest="/opt/tsz-deploy-manifests/$component.json"
 mkdir -p /opt/tsz-deploy-manifests
 # 上次发布若被 SIGKILL/断电打断，保留现场，禁止下一次发布掩盖它。
 [[ ! -e /opt/tsz-frontend-transaction ]] || { echo '存在未完成发布，请先按事务记录恢复' >&2; exit 1; }
+deploy_phase verify-candidate
 "$node_bin" releases.mjs bootstrap /opt/tsz-releases/admin /opt/tsz-admin/dist admin
 "$node_bin" releases.mjs bootstrap /opt/tsz-releases/web /opt/tsz-web web
 "$node_bin" provenance.mjs verify-candidate --manifest candidate.json --artifact-root artifact
@@ -45,9 +50,11 @@ fi
 mkdir -p "$root/releases" backup
 [[ ! -e "$release" ]]
 old="$(readlink "$root/current")"
+deploy_phase verify-current
 if [[ -f "$manifest" ]]; then
   "$node_bin" provenance.mjs verify --manifest "$manifest" --artifact-root "$old"
 fi
+deploy_phase backup
 cp -a /etc/nginx/conf.d/tsz.conf backup/tsz.conf
 cp -a /etc/nginx/conf.d/tsz-test-domains.conf backup/tsz-test-domains.conf
 # 现有裸 IP 的禅道入口也转发 web；只迁移其前端上游，保留禅道配置。
@@ -70,7 +77,8 @@ accepted=false
 rollback() {
   local code=$?
   trap - EXIT INT TERM
-  if [[ "$accepted" = true ]]; then exit "$code"; fi
+  if [[ "$accepted" = true ]]; then deploy_metrics_finish "$code"; exit "$code"; fi
+  deploy_phase rollback failure
   local failed=0
   "$node_bin" releases.mjs point "$root" "$old" || failed=1
   cp -a backup/tsz.conf /etc/nginx/conf.d/tsz.conf || failed=1
@@ -88,17 +96,22 @@ rollback() {
   if [[ "$started" = true ]]; then systemctl disable --now "tsz-web@$new_port.service" || failed=1; fi
   if [[ "$failed" = 0 ]]; then rm -f /opt/tsz-frontend-transaction
   else echo "回滚失败，保留事务及备份：$stage" >&2; fi
+  if [[ "$failed" = 0 ]]; then deploy_phase_end success
+  else deploy_phase_end failure; fi
+  deploy_metrics_finish 1
   exit 1
 }
 printf '%s\n%s\n%s\n' "$stage" "$component" "$old" > /opt/tsz-frontend-transaction
 trap rollback EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+deploy_phase prepare-release
 # 按退役时间保留，而不是构建文件的 mtime。
 "$node_bin" releases.mjs archive "$root" "$old" "$component" "$(basename "$old")"
 "$node_bin" releases.mjs archive "$root" artifact "$component" "$id"
 mv artifact "$release"
 if [[ "$component" = web ]]; then
+  deploy_phase start-candidate
   mkdir -p "$root/slots"
   cp systemd/tsz-web@.service /etc/systemd/system/tsz-web@.service
   systemctl daemon-reload
@@ -115,6 +128,7 @@ if [[ "$component" = web ]]; then
   done
   [[ "$ready" = true ]]
 fi
+deploy_phase switch-traffic
 # 初次迁移时保留旧 web 上游，admin 部署不改变 web 运行版本。
 if [[ "$component" = web ]]; then target_port="$new_port"; else target_port="$old_port"; fi
 printf 'proxy_pass http://127.0.0.1:%s;\n' "$target_port" > /etc/nginx/tsz-web-upstream.inc.partial
@@ -130,6 +144,7 @@ cp nginx/tshb-test-domains.conf "$nginx_stage/tsz-test-domains.conf"
 bash install-nginx-local.sh "$nginx_stage" /etc/nginx/conf.d tsz.conf tsz-test-domains.conf
 if [[ "$component" = admin ]]; then host=admin-test.tianshengzhi.com; api_path=admin/profile
 else host=test.tianshengzhi.com; api_path=auth/me; fi
+deploy_phase smoke
 # reload 返回时旧 worker 可能仍在处理连接；以新版本探测成功为准。
 ready=false
 for attempt in {1..10}; do
@@ -156,6 +171,7 @@ for http_host in test.tianshengzhi.com admin-test.tianshengzhi.com; do
   result="$(curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code} %{redirect_url}' --resolve "$http_host:80:127.0.0.1" "http://$http_host/login")"
   [[ "$result" = "301 https://$http_host/login" ]]
 done
+deploy_phase accept
 "$node_bin" provenance.mjs accept --manifest candidate.json --artifact-root "$release" --output "$manifest"
 "$node_bin" provenance.mjs verify --manifest "$manifest" --artifact-root "$release"
 printf '%s\n' "$(basename "$old")" > "$root/previous"
@@ -170,10 +186,17 @@ if [[ -f ci-release.json ]]; then
 fi
 accepted=true
 rm /opt/tsz-frontend-transaction
-trap - EXIT INT TERM
+trap 'deploy_metrics_finish "$?"' EXIT
+trap - INT TERM
+deploy_metrics_mark verified-available
+deploy_phase prune
 # 清理不影响已成功接受的发布；失败返回明确维护告警。
-"$node_bin" releases.mjs prune "$root" || echo '历史资源清理失败，当前版本已发布' >&2
+"$node_bin" releases.mjs prune "$root" || {
+  deploy_phase_end failure
+  echo '历史资源清理失败，当前版本已发布' >&2
+}
 if [[ "$component" = web ]]; then
+  deploy_phase old-instance-drain
   # 给旧 nginx worker 的在途请求留出排空时间。
   sleep 30
   if [[ "$old_port" = 3000 ]]; then systemctl disable --now tsz-web.service

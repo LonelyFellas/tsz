@@ -55,6 +55,24 @@ test("automatic deployment is restricted to successful main push CI and binds it
     );
 });
 
+test("deployment shares one task-scoped SSH master and always closes it", async () => {
+  const source = await readFile(deployWorkflowUrl, "utf8");
+  for (const option of [
+    "ControlMaster auto",
+    "ControlPersist 60",
+    "BatchMode yes",
+    "ConnectTimeout 10"
+  ]) {
+    assert.ok(source.includes(option), `missing SSH option: ${option}`);
+  }
+  assert.match(source, /DEPLOY_SSH_CONTROL_PATH=.*tsz-deploy-control/);
+  assert.match(
+    source,
+    /name: Close deployment SSH connection\n\s+if: \$\{\{ always\(\) \}\}/
+  );
+  assert.match(source, /ssh -S "\$DEPLOY_SSH_CONTROL_PATH".*-O exit tshb-test/);
+});
+
 test("W01: workflow identity, triggers, permissions and concurrency stay stable", async () => {
   const { source } = await workflowFixture();
   assert.equal(await prettier.check(source, { parser: "yaml" }), true);

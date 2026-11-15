@@ -102,11 +102,11 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
   // 版本必须由 .node-version 推导出来（现在读的是目标 commit 里的那份），不许写死。
   assert.match(deployWeb, /required_node_version="v\$\(.*\.node-version.*\)"/);
   assert.doesNotMatch(deployWeb, /required_node_version="v24\./);
-  assert.match(deployWeb, /ssh tshb-test '\/usr\/bin\/node --version'/);
+  assert.match(deployWeb, /deploy_ssh tshb-test '\/usr\/bin\/node --version'/);
   const packagePreparation = deployWeb.indexOf("prepare_deploy_artifact web");
   assert.ok(packagePreparation >= 0, "deployment must consume the CI package");
   const serverVersionCheck = deployWeb.indexOf(
-    '[[ "$(ssh tshb-test \'/usr/bin/node --version\')" = "$required_node_version" ]]'
+    '[[ "$(deploy_ssh tshb-test \'/usr/bin/node --version\')" = "$required_node_version" ]]'
   );
   assert.ok(
     serverVersionCheck >= 0,
