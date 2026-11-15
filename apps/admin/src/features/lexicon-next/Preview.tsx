@@ -15,9 +15,11 @@ import type {
   NextDraft,
   NextEntryView,
   NextGrammarIssue,
-  NextSense
+  NextSense,
+  NextSentence
 } from "@tsz/types";
 import { draftForms, localeLabels } from "./model";
+import { SentenceSources } from "./SentenceDetails";
 
 function Lines({
   rows,
@@ -154,10 +156,12 @@ function SenseMetadataSummary({
 export function Preview({
   view,
   requests,
-  sentenceDetailsAvailable = false
+  sentenceDetailsAvailable = false,
+  sentenceResources
 }: {
   view: NextEntryView;
   sentenceDetailsAvailable?: boolean;
+  sentenceResources?: Record<string, NextSentence>;
   requests?: LexiconNextRequests;
 }) {
   return (
@@ -212,6 +216,14 @@ export function Preview({
                 <SentenceExamplesPreview
                   detailsAvailable={sentenceDetailsAvailable}
                   senseLevel={sense.level}
+                  resources={
+                    sentenceResources ??
+                    (view.sentence_resources
+                      ? Object.fromEntries(
+                          view.sentence_resources.map((v) => [v.id, v])
+                        )
+                      : undefined)
+                  }
                   ids={sense.sentence_ids}
                   target={view.target_locale}
                   medium={view.medium_locale}
@@ -258,11 +270,13 @@ export function Preview({
 }
 export function DraftSummary({
   draft,
+  sentenceResources,
   requests,
   target = "en-GB",
   medium = "zh-Hans"
 }: {
   draft: NextDraft;
+  sentenceResources?: Record<string, NextSentence>;
   requests?: LexiconNextRequests;
   target?: string;
   medium?: string;
@@ -300,6 +314,39 @@ export function DraftSummary({
             <SenseMetadataSummary sense={sense} />
             <Definitions rows={sense.definitions} missing="释义" />
             <DraftEquivalentSummary sense={sense} />
+            {sense.sentence_ids?.flatMap(
+              (id) =>
+                sentenceResources?.[id]?.draft.variants.map((variant) => (
+                  <div key={`${id}:${variant.locale}`}>
+                    <span>
+                      {localeLabels[variant.locale]} · {variant.level} ·
+                      例句版本 {sentenceResources![id]!.revision}
+                    </span>
+                    <RichTextReadOnly
+                      className="tsz-words"
+                      value={variant.content}
+                    />
+                    {!!variant.metadata?.sources.length && (
+                      <SentenceSources rows={variant.metadata.sources} />
+                    )}
+                    {variant.translations.map((row) => (
+                      <div key={row.id}>
+                        <span>
+                          {localeLabels[row.locale]} ·
+                          {row.metadata?.freedom == null
+                            ? "待评估"
+                            : `自由度 ${row.metadata.freedom}%`}
+                          ：
+                        </span>
+                        <RichTextReadOnly value={row.content} />
+                        {!!row.metadata?.sources.length && (
+                          <SentenceSources rows={row.metadata.sources} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )) ?? []
+            )}
             {requests && sense.relations && (
               <RelationsPreview
                 rows={sense.relations}

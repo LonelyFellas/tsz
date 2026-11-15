@@ -1,0 +1,29 @@
+{
+  "entry_revision": 4,
+  "sentence_revision": 3,
+  "translations": 6,
+  "freedom": [57.5, 8.8, 56.1, 79.6, 91.2, null],
+  "register_count": 2,
+  "domain_count": 1,
+  "empty_unsaved_sentence_excluded": true,
+  "preview_before_save_writes": 0,
+  "conflict_kept_local": true,
+  "conflict_explicit_reload": true,
+  "oss_created": false,
+  "backend": {
+    "head": "32e7105b235ecd05b15af007a98e542196cf1d8a",
+    "diff_sha256": "8ce7eaa6c3ca2d495b284c95e9d7057d61545a98a5e6b73d59113e17660932bd",
+    "sentence_drafts_sha256": "840b5a1b470383b16c5701b5fdb3b72cb8d75e4cc5e237dcb0c659db47a711ef",
+    "binary_sha256": "59f812fdc6eee6d32e654437d665548a63057c8f26d2cd12f6516cb496fb6e9b",
+    "pid": 38668
+  },
+  "frontend_runtime": {
+    "BACKEND_API_URL": "http://127.0.0.1:53080/api/v1",
+    "VITE_ADMIN_LEXICON_MOCK": "unset",
+    "VITE_ADMIN_POS_MOCK": "unset",
+    "VITE_ADMIN_TTS_MOCK": "false",
+    "VITE_VOICE_PREVIEW": "false",
+    "VITE_VOICE_EDITOR": "true",
+    "VITE_VOICE_AUDIO_UPLOAD": "false"
+  }
+}

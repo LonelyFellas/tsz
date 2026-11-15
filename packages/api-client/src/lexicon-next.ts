@@ -59,6 +59,7 @@ export function decodeNextEntryView(value: unknown): NextEntryView {
 export function createLexiconNextEndpoints(http: HttpClient) {
   const root = "/lexicon-next";
   let definitionDetails = false;
+  let sentenceDrafts = false;
   let relations = false;
   const editorOptions = {
     headers: {
@@ -67,6 +68,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-forms": "v1",
       "x-tsz-next-sentences": "v1",
       "x-tsz-next-sentence-details": "v1",
+      "x-tsz-next-sentence-drafts": "v1",
       "x-tsz-next-equivalents": "v1",
       "x-tsz-next-sense-metadata": "v1",
       "x-tsz-next-grammar": "v1",
@@ -170,6 +172,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       http.get<unknown>(`${root}/capabilities`, editorOptions).then((value) => {
         const capabilities = decodeNextCapabilities(value);
         definitionDetails = capabilities.definition_details === true;
+        sentenceDrafts = capabilities.sentence_drafts === true;
         relations = capabilities.relations === true;
         return capabilities;
       }),
@@ -188,6 +191,11 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) => {
+      if (input.sentence_changes?.length && !sentenceDrafts) {
+        return Promise.reject(
+          new ClientResponseError("例句统一草稿能力尚未确认，请重新打开词条")
+        );
+      }
       if (
         !relations &&
         input.draft.senses.some((sense) => sense.relations !== undefined)

@@ -1,3 +1,5 @@
+import { InlineSentenceExamples } from "./InlineSentenceExamples";
+import { useSentenceDraftWorkspace } from "./sentenceDrafts";
 import { SentenceSources } from "./SentenceDetails";
 import { sentenceStyles, translationStyle } from "./sentenceModel";
 import { SentenceReadingPreview } from "./SentenceReadingPreview";
@@ -161,6 +163,7 @@ function SentenceResource({
 export function SentenceExamplesPreview({
   detailsAvailable = false,
   senseLevel,
+  resources,
   ids,
   target,
   medium,
@@ -168,6 +171,7 @@ export function SentenceExamplesPreview({
 }: {
   detailsAvailable?: boolean;
   senseLevel?: string;
+  resources?: Record<string, NextSentence>;
   ids?: string[];
   target: string;
   medium: string;
@@ -177,6 +181,7 @@ export function SentenceExamplesPreview({
     return (
       <SentenceReadingPreview
         ids={ids}
+        resources={resources}
         target={target}
         medium={medium}
         senseLevel={senseLevel}
@@ -215,9 +220,11 @@ function SentencePicker({
   medium: string;
   ids: string[];
   requests: LexiconNextRequests;
-  onSelect: (id: string) => void;
+  onSelect: (id: string) => void | Promise<void>;
   onClose: () => void;
 }) {
+  const [selecting, setSelecting] = useState(false);
+  const [selectionError, setSelectionError] = useState<string>();
   const actor = useAuthStore((s) => s.profile);
   const [keyword, setKeyword] = useState("");
   const [selection, setSelection] = useState({ keyword: "", page: 1 });
@@ -246,7 +253,8 @@ function SentencePicker({
       title={`引用${localeLabels[target]}例句`}
       width={960}
       footer={null}
-      onCancel={onClose}
+      onCancel={selecting ? undefined : onClose}
+      closable={!selecting}
     >
       <Flex vertical gap={16}>
         <Space.Compact block>
@@ -260,6 +268,7 @@ function SentencePicker({
             搜索
           </Button>
         </Space.Compact>
+        {selectionError && <Alert type="error" title={selectionError} />}
         {query.isError && (
           <Alert
             type="error"
@@ -289,8 +298,20 @@ function SentencePicker({
                 key: "action",
                 render: (_, row) => (
                   <Button
-                    disabled={ids.includes(row.id)}
-                    onClick={() => onSelect(row.id)}
+                    disabled={selecting || ids.includes(row.id)}
+                    onClick={() => {
+                      setSelecting(true);
+                      setSelectionError(undefined);
+                      void Promise.resolve(onSelect(row.id))
+                        .catch((e: unknown) =>
+                          setSelectionError(
+                            e instanceof Error
+                              ? e.message
+                              : "无法读取例句，请重试"
+                          )
+                        )
+                        .finally(() => setSelecting(false));
+                    }}
                   >
                     {ids.includes(row.id) ? "已引用" : "引用"}
                   </Button>
@@ -329,6 +350,7 @@ export function SenseSentenceExamples({
   onChange: (ids: string[]) => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
+  const workspace = useSentenceDraftWorkspace();
   const actor = useAuthStore((s) => s.profile);
   const canRead = usePermission("sentences.access");
   const canCreate = usePermission("sentences.create");
@@ -337,6 +359,37 @@ export function SenseSentenceExamples({
   const [editing, setEditing] = useState<{ source: NextSentence | null }>();
   const [picking, setPicking] = useState(false);
   const validTarget = target === "en-GB" || target === "en-US";
+  if (workspace)
+    return (
+      <>
+        <InlineSentenceExamples
+          ids={ids}
+          target={target}
+          medium={medium}
+          requests={requests}
+          disabled={disabled || !validTarget}
+          onChange={onChange}
+          onPick={() => setPicking(true)}
+          registerLeaveGuard={registerLeaveGuard}
+        />
+        {picking && (
+          <SentencePicker
+            target={target}
+            medium={medium}
+            ids={ids}
+            requests={requests}
+            onSelect={(id) => {
+              return requests.sentence(id).then((source) => {
+                workspace.importResource(source);
+                if (!ids.includes(id)) onChange([...ids, id]);
+                setPicking(false);
+              });
+            }}
+            onClose={() => setPicking(false)}
+          />
+        )}
+      </>
+    );
   return (
     <>
       <SenseSectionTitle

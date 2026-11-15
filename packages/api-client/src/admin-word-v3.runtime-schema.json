@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/next-related-words-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "9b1062ddc6b4a6945b9f654a51b866f83c120131bfe606d05c458b9b38380bdc",
+  "_source": "/Users/darwish/.codex/worktrees/sentence-manual-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "c9e584b684c9bd30a3330748531544ee46808819307b8f2dab235db86788c44f",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3624,6 +3624,7 @@
         "sense_groups": { "type": "boolean" },
         "sense_metadata": { "type": "boolean" },
         "sentence_details": { "type": "boolean" },
+        "sentence_drafts": { "type": "boolean" },
         "sentences": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -3761,6 +3762,10 @@
         "medium_locale": { "type": "string" },
         "owner_id": { "type": "string", "format": "uuid" },
         "revision": { "type": "integer" },
+        "sentence_resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentence" }
+        },
         "target_language": { "type": "string" },
         "updated_at": { "type": "string", "format": "date-time" }
       },
@@ -3866,6 +3871,10 @@
         "senses": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextSenseView" }
+        },
+        "sentence_resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentence" }
         },
         "target_locale": { "type": "string" }
       },
@@ -4154,6 +4163,18 @@
           "type": "array",
           "items": { "$ref": "#/$defs/NextSentenceVariant" }
         }
+      },
+      "additionalProperties": false
+    },
+    "NextSentenceDraftChange": {
+      "type": "object",
+      "required": ["id", "target_locale", "medium_locale", "variant"],
+      "properties": {
+        "expected_revision": { "type": ["integer", "null"], "minimum": 1 },
+        "id": { "type": "string", "format": "uuid" },
+        "medium_locale": { "type": "string" },
+        "target_locale": { "type": "string" },
+        "variant": { "$ref": "#/$defs/NextSentenceVariant" }
       },
       "additionalProperties": false
     },
@@ -5568,7 +5589,12 @@
       "required": ["expected_revision", "draft"],
       "properties": {
         "draft": { "$ref": "#/$defs/NextDraft" },
-        "expected_revision": { "type": "integer", "minimum": 1 }
+        "expected_revision": { "type": "integer", "minimum": 1 },
+        "sentence_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceDraftChange" },
+          "maxItems": 1000
+        }
       },
       "additionalProperties": false
     },

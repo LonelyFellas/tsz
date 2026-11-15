@@ -22,7 +22,9 @@ import type {
   NextDetectionInput,
   NextEntryMatchInput,
   NextEntryMatches,
-  NextWorkspaceEntry
+  NextWorkspaceEntry,
+  NextSentence,
+  NextSentenceDraftChange
 } from "@tsz/types";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { api as profileApi, tokens, useAuthStore } from "@/lib/auth";
@@ -3315,4 +3317,225 @@ it("Step2 新增词性和双向切换时，Step3 选中同一词性", async () =
   fireEvent.click(stepButton(/^词义与译词/));
   expect(selectedTab(/动词/)).toHaveAttribute("aria-selected", "true");
   expect(api.save).not.toHaveBeenCalled();
+});
+
+function unifiedSentenceRequests() {
+  useAuthStore.setState({
+    profile: {
+      ...useAuthStore.getState().profile!,
+      permissions: [
+        "words.access",
+        "words.edit",
+        "sentences.access",
+        "sentences.edit",
+        "sentences.create"
+      ]
+    }
+  });
+  const source: NextSentence = {
+    id: "shared",
+    target_language: "en",
+    owner_id: "editor",
+    revision: 3,
+    updated_at: entry.updated_at,
+    reference_count: 2,
+    draft: {
+      schema_version: 1,
+      variants: [
+        {
+          id: "uk",
+          locale: "en-GB",
+          level: "A1",
+          content: { version: 2, text: "Stored British.", annotations: [] },
+          translations: [
+            {
+              id: "hans",
+              locale: "zh-Hans",
+              style: "balanced_fluency",
+              content: { version: 2, text: "已保存译文", annotations: [] },
+              metadata: { freedom: null, sources: [] }
+            },
+            {
+              id: "hant",
+              locale: "zh-Hant",
+              style: "balanced_fluency",
+              content: { version: 2, text: "保留繁體", annotations: [] }
+            }
+          ]
+        },
+        {
+          id: "us",
+          locale: "en-US",
+          level: "A1",
+          content: { version: 2, text: "Stored American.", annotations: [] },
+          translations: []
+        }
+      ]
+    }
+  };
+  const api = requests();
+  api.capabilities.mockResolvedValue({
+    ...caps,
+    sentences: true,
+    sentence_details: true,
+    sentence_drafts: true,
+    relations: true
+  });
+  const saved: NextEntry = {
+    ...entry,
+    sentence_resources: [source],
+    draft: {
+      ...entry.draft,
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: "noun",
+          definitions: [],
+          equivalents: [],
+          relations: [
+            {
+              id: "retained-relation",
+              relation: "synonym",
+              pending_target_headword: "middle",
+              pending_target_gloss: "中间",
+              score: "80"
+            }
+          ],
+          sentence_ids: [source.id]
+        }
+      ]
+    }
+  };
+  api.get.mockResolvedValue(saved);
+  api.save.mockImplementation(async (_id, input) => {
+    const current = structuredClone(source);
+    for (const change of input.sentence_changes ?? []) {
+      const previous = current.draft.variants.find(
+        (v) => v.locale === change.target_locale
+      );
+      current.draft.variants = [
+        ...current.draft.variants.filter(
+          (v) => v.locale !== change.target_locale
+        ),
+        {
+          ...change.variant,
+          translations: [
+            ...change.variant.translations,
+            ...(previous?.translations.filter(
+              (v) => v.locale !== change.medium_locale
+            ) ?? [])
+          ]
+        }
+      ];
+    }
+    current.revision++;
+    return {
+      ...saved,
+      revision: 2,
+      draft: input.draft,
+      sentence_resources: [current]
+    };
+  });
+  mount(api, `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`);
+  return { api, source, saved };
+}
+it("内联录入和草稿预览零写入，统一保存提交英美两侧并忽略空白译文占位", async () => {
+  const { api } = unifiedSentenceRequests();
+  await waitForEntryReady(1);
+  fireEvent.click(stepButton(/^词义与译词/));
+  fireEvent.click(await screen.findByRole("button", { name: "添加例句" }));
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findAllByText("请填写例句原文，或移除空白例句。");
+  expect(api.save).not.toHaveBeenCalled();
+  fireEvent.click(screen.getAllByRole("button", { name: "移除引用" })[1]!);
+  await waitFor(() =>
+    expect(screen.queryByText("请填写例句原文，或移除空白例句。")).toBeNull()
+  );
+  const english = await screen.findByRole("textbox", {
+    name: "英式英语例句原文"
+  });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(
+    screen.queryByRole("slider", { name: "译文 1 自由度滑块" })
+  ).toBeNull();
+  fireEvent.change(english, { target: { value: "Local British." } });
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "译文 1 简体中文正文" }),
+    { target: { value: "本地译文" } }
+  );
+  fireEvent.click(button("添加译文"));
+  expect(
+    screen.getByRole("textbox", { name: "译文 2 简体中文正文" })
+  ).toHaveValue("");
+  await chooseLanguage("美式英语");
+  fireEvent.change(
+    await screen.findByRole("textbox", { name: "美式英语例句原文" }),
+    { target: { value: "Local American." } }
+  );
+  await chooseLanguage("英式英语");
+  expect(
+    await screen.findByRole("textbox", { name: "英式英语例句原文" })
+  ).toHaveValue("Local British.");
+  fireEvent.click(button("下一步：预览"));
+  const preview = screen.getByLabelText("多维例句预览");
+  expect(within(preview).getByText("Local British.")).toBeVisible();
+  expect(within(preview).getByText("本地译文")).toBeVisible();
+  expect(api.save).not.toHaveBeenCalled();
+  expect(api.createSentence).not.toHaveBeenCalled();
+  expect(api.saveSentence).not.toHaveBeenCalled();
+  expect(api.sentence).not.toHaveBeenCalled();
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  expect(api.save.mock.calls[0]![1].draft.senses[0].relations).toEqual([
+    expect.objectContaining({ id: "retained-relation", score: "80" })
+  ]);
+  const changes: NextSentenceDraftChange[] =
+    api.save.mock.calls[0]![1].sentence_changes!;
+  expect(
+    changes.map((c) => [
+      c.expected_revision,
+      c.target_locale,
+      c.variant.content.text
+    ])
+  ).toEqual([
+    [3, "en-GB", "Local British."],
+    [3, "en-US", "Local American."]
+  ]);
+  expect(changes[0]!.variant.translations).toEqual([
+    expect.objectContaining({
+      id: "hans",
+      content: expect.objectContaining({ text: "本地译文" })
+    })
+  ]);
+  await screen.findByText("版本 2");
+});
+it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {
+  const { api, saved, source } = unifiedSentenceRequests();
+  api.save.mockRejectedValueOnce(
+    new HttpError(409, "conflict", [], "revision_conflict")
+  );
+  await waitForEntryReady(1);
+  fireEvent.click(stepButton(/^词义与译词/));
+  const english = await screen.findByRole("textbox", {
+    name: "英式英语例句原文"
+  });
+  fireEvent.change(english, { target: { value: "Keep local example." } });
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findByText("服务器版本已更新。本地草稿已保留，请先比较版本。");
+  expect(english).toHaveValue("Keep local example.");
+  const remote = structuredClone(source);
+  remote.revision = 4;
+  remote.draft.variants[0]!.content.text = "Server example.";
+  api.get.mockResolvedValue({ ...saved, sentence_resources: [remote] });
+  fireEvent.click(button("比较服务器版本"));
+  const compare = (
+    await screen.findByText("服务器 · 版本 1")
+  ).closest<HTMLElement>('[role="dialog"]')!;
+  expect(within(compare).getByText("Keep local example.")).toBeVisible();
+  expect(within(compare).getByText("Server example.")).toBeVisible();
+  fireEvent.click(
+    within(compare).getByRole("button", { name: "放弃本地修改并重载" })
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
+  await waitFor(() => expect(english).toHaveValue("Server example."));
 });
