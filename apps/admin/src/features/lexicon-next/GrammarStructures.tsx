@@ -4,20 +4,23 @@ import {
   useId,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
+import { flushSync } from "react-dom";
 import type {
   NextGrammarStructure,
   NextGrammarVariant,
   PartOfSpeechCatalogItem
 } from "@tsz/types";
-import { Button, Card, Space } from "@tsz/ui/admin/display";
+import { Alert, Button, Card, Space } from "@tsz/ui/admin/display";
 import { Select } from "@tsz/ui/admin/forms";
 import { App } from "@tsz/ui/admin/overlays";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
 import { VoiceEditorModal } from "@/features/dictionary/word-creation-v3/components/VoiceEditorModal";
+import { useSelectedVoiceAudio } from "@/features/dictionary/word-creation-v3/useSelectedVoiceAudio";
 import { usePermission } from "@/lib/auth";
 import { env } from "@/lib/env";
 import {
@@ -55,21 +58,52 @@ function GrammarText({
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
   const [draft, setDraft] = useState<NextGrammarVariant>();
+  const [applying, setApplying] = useState(false);
+  const applyingRef = useRef(false);
+  const [audioFailed, setAudioFailed] = useState(false);
   const canGenerate = usePermission("speech.generate");
   const canUpload = usePermission("speech.upload_audio");
+  // 与 Step 2 一致，正式音频由应用草稿动作统一生成；编辑器仅处理正文、设置和试听。
   const previewAdapter = useMemo(
-    () =>
-      canGenerate
-        ? adminVoicePreviewAdapter
-        : { ...adminVoicePreviewAdapter, generateAudio: undefined },
-    [canGenerate]
+    () => ({ ...adminVoicePreviewAdapter, generateAudio: undefined }),
+    []
   );
+  const current = draft ?? variant;
+  const profile = useMemo(
+    () => withDefaultVoiceProfile(current.voice_profile, "grammar"),
+    [current.voice_profile]
+  );
+  const content = useMemo(
+    () => toRichTextV2(current.content),
+    [current.content]
+  );
+  const generateAvailable =
+    audioAvailable && canGenerate && env.VOICE_PREVIEW && !voicePreviewIsMock;
+  const audio = useSelectedVoiceAudio({
+    target: `grammar:${variant.id}`,
+    content,
+    profile,
+    adapter: adminVoicePreviewAdapter,
+    locale:
+      variant.locale === "en-GB" || variant.locale === "en-US"
+        ? variant.locale
+        : undefined,
+    enabled: !!draft && !disabled && generateAvailable,
+    defer: true,
+    onChange: (voice_profile) =>
+      setDraft((value) => value && { ...value, voice_profile })
+  });
+  const latest = useRef({ draft, disabled, onChange, generate: audio.retry });
+  useLayoutEffect(() => {
+    latest.current = { draft, disabled, onChange, generate: audio.retry };
+  });
   const dirty =
     draft !== undefined && JSON.stringify(draft) !== JSON.stringify(variant);
   const { modal, message } = App.useApp();
   useLayoutEffect(() => {
     if (draft === undefined || !registerLeaveGuard) return;
     registerLeaveGuard(async () => {
+      if (applyingRef.current) return false;
       if (!dirty) {
         setDraft(undefined);
         return true;
@@ -119,7 +153,10 @@ function GrammarText({
           iconPlacement="end"
           aria-label={`编辑${label}`}
           disabled={disabled}
-          onClick={() => setDraft(structuredClone(variant))}
+          onClick={() => {
+            setAudioFailed(false);
+            setDraft(structuredClone(variant));
+          }}
         >
           <RichTextReadOnly
             className={
@@ -137,14 +174,28 @@ function GrammarText({
         open={draft !== undefined}
         title={label}
         footer={null}
-        keyboard={!dirty}
-        onCancel={() => setDraft(undefined)}
+        keyboard={!dirty && !applying}
+        closable={!applying}
+        onCancel={() => {
+          if (!applyingRef.current) setDraft(undefined);
+        }}
       >
+        {draft && audioFailed && Boolean(audio.error) && (
+          <Alert
+            type="error"
+            showIcon
+            title={
+              audio.error instanceof Error
+                ? audio.error.message
+                : "配音生成未完成，请重试"
+            }
+          />
+        )}
         {draft && (
           <Suspense fallback={<span role="status">正在加载编辑器</span>}>
             <VoiceEditor
               mode="grammar"
-              readOnly={disabled}
+              readOnly={disabled || applying}
               value={toRichTextV2(draft.content)}
               contextLabel={label}
               contextKey={variant.id}
@@ -162,11 +213,7 @@ function GrammarText({
               loadRecommendations={
                 audioAvailable ? loadAdminVoiceRecommendations : undefined
               }
-              voiceProfile={
-                audioAvailable
-                  ? withDefaultVoiceProfile(draft.voice_profile, "grammar")
-                  : undefined
-              }
+              voiceProfile={audioAvailable ? profile : undefined}
               onVoiceProfileChange={
                 audioAvailable
                   ? (voice_profile) =>
@@ -190,29 +237,48 @@ function GrammarText({
               }
               renderActions={(canComplete, prepareComplete, captureResult) => (
                 <Space>
-                  <Button onClick={() => setDraft(undefined)}>取消</Button>
+                  <Button
+                    disabled={applying}
+                    onClick={() => setDraft(undefined)}
+                  >
+                    取消
+                  </Button>
                   <Button
                     type="primary"
-                    disabled={disabled || !canComplete}
-                    onClick={() => {
+                    loading={applying}
+                    disabled={disabled || !canComplete || applying}
+                    onClick={async () => {
+                      if (applyingRef.current) return;
+                      applyingRef.current = true;
+                      setApplying(true);
+                      setAudioFailed(false);
                       try {
                         if (prepareComplete && !prepareComplete()) return;
                         const result = captureResult?.(true);
-                        onChange(
-                          result
-                            ? {
-                                ...draft,
-                                content: result.value,
-                                ...(audioAvailable
-                                  ? {
-                                      voice_profile:
-                                        result.voiceProfile ?? undefined,
-                                      audio_assets: result.audioAssets ?? []
-                                    }
-                                  : {})
-                              }
-                            : draft
-                        );
+                        const next = result
+                          ? {
+                              ...draft,
+                              content: result.value,
+                              ...(audioAvailable
+                                ? {
+                                    voice_profile:
+                                      result.voiceProfile ?? undefined,
+                                    audio_assets: result.audioAssets ?? []
+                                  }
+                                : {})
+                            }
+                          : draft;
+                        flushSync(() => setDraft(next));
+                        if (
+                          generateAvailable &&
+                          !(await latest.current.generate())
+                        ) {
+                          setAudioFailed(true);
+                          return;
+                        }
+                        if (!latest.current.draft || latest.current.disabled)
+                          return;
+                        latest.current.onChange(latest.current.draft);
                         setDraft(undefined);
                       } catch (error) {
                         message.error(
@@ -220,6 +286,9 @@ function GrammarText({
                             ? error.message
                             : "无法完成语法结构编辑，请检查配音设置"
                         );
+                      } finally {
+                        applyingRef.current = false;
+                        setApplying(false);
                       }
                     }}
                   >
