@@ -46,6 +46,63 @@ const targetEntry: NextEntry = {
   }
 };
 
+it("只读及编辑转保存中时禁用目标义项和排序，保留现有关系", async () => {
+  const rows = ["first", "second"].map((id) => ({
+    id,
+    relation: "synonym",
+    target_word_id: id,
+    target_sense_id: "target-sense",
+    score: "80"
+  }));
+  const before = structuredClone(rows);
+  const get = vi
+    .fn()
+    .mockImplementation(async (id: string) => ({ ...targetEntry, id }));
+  const onChange = vi.fn();
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+  const content = (disabled: boolean) => (
+    <QueryClientProvider client={client}>
+      <Relations
+        rows={rows}
+        entryId="source"
+        senseId="source-sense"
+        target="en-GB"
+        medium="zh-Hans"
+        requests={{ ...api.lexiconNext, get }}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    </QueryClientProvider>
+  );
+  const view = render(content(true));
+  await waitFor(() =>
+    expect(screen.getAllByLabelText("近义词目标词条")[0]).toHaveValue("work")
+  );
+  const handles = () => screen.getAllByRole("button", { name: /^拖动近义词/ });
+  const assertDisabled = () => {
+    for (const control of [
+      ...screen.getAllByLabelText("近义词目标词义"),
+      ...handles()
+    ])
+      expect(control).toBeDisabled();
+    for (const handle of handles())
+      expect(handle).toHaveAttribute("draggable", "false");
+    fireEvent.keyDown(handles()[0]!, { key: "ArrowDown" });
+    expect(onChange).not.toHaveBeenCalled();
+  };
+  assertDisabled();
+  view.rerender(content(false));
+  expect(screen.getAllByLabelText("近义词目标词义")[0]).toBeEnabled();
+  fireEvent.keyDown(handles()[0]!, { key: "ArrowDown" });
+  expect(onChange).toHaveBeenCalledTimes(1);
+  onChange.mockClear();
+  view.rerender(content(true));
+  assertDisabled();
+  expect(rows).toEqual(before);
+});
+
 it("已关联目标读取失败显示重试，恢复后回显且不改写草稿", async () => {
   const rows = [
     {

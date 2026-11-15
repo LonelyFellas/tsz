@@ -189,7 +189,8 @@ export function Relations({
             relatedSource={relatedSource}
             relationDisplaySnapshots={snapshots}
             idFactory={() => crypto.randomUUID()}
-            change={(mutation) =>
+            change={(mutation) => {
+              if (disabled) return;
               onChange((current) => {
                 const draft = {
                   sense_groups: [],
@@ -205,8 +206,8 @@ export function Relations({
                 };
                 mutation(draft);
                 return draft.pos[0]!.senses[0]!.relations;
-              })
-            }
+              });
+            }}
           />
         </AdminControls>
       </SenseSectionBody>

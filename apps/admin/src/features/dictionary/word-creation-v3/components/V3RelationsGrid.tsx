@@ -1,3 +1,4 @@
+import { useAdminDisabled } from "@tsz/ui/admin/context";
 import {
   useLexiconEditorTranslation,
   defaultLexiconEditorTranslation,
@@ -108,6 +109,7 @@ export function V3RelationsGrid({
   relatedSource?: RelatedSuggestionsSource;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const disabled = useAdminDisabled();
   const [collapsed, setCollapsed] = useState<Record<RelationType, boolean>>({
     synonym: false,
     antonym: false,
@@ -279,7 +281,7 @@ export function V3RelationsGrid({
                   />
                 ) : (
                   <RelationSortScope
-                    items={relations}
+                    items={disabled ? [] : relations}
                     scopeId={`${sense.id}:${relationType}`}
                     onChange={(next) =>
                       change((draft) => {
@@ -717,7 +719,7 @@ export function V3RelationsGrid({
                                 gap={6}
                               >
                                 <RelationSortScope
-                                  items={group}
+                                  items={disabled ? [] : group}
                                   scopeId={`${sense.id}:${relation.id}:glosses`}
                                   onChange={(next) => {
                                     const key =
@@ -965,7 +967,9 @@ export function V3RelationsGrid({
                                     p0: relationLabel(relationType, t)
                                   })}
                                   className="word-relation-sense"
-                                  disabled={!relation.target_word_id}
+                                  disabled={
+                                    disabled || !relation.target_word_id
+                                  }
                                   mode={
                                     relationType === "derivative"
                                       ? "multiple"
@@ -1155,7 +1159,7 @@ export function V3RelationsGrid({
                                 {relationType === "derivative" &&
                                 group.some((item) => item.target_sense_id) ? (
                                   <RelationSortScope
-                                    items={group}
+                                    items={disabled ? [] : group}
                                     scopeId={`${sense.id}:${relation.id}:bound-glosses`}
                                     onChange={(next) => {
                                       const rowKey =
