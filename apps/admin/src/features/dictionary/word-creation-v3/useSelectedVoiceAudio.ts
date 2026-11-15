@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -21,7 +22,7 @@ import {
   voiceEffectKey,
   voiceSettingKey
 } from "@tsz/voice-editor/core";
-import { useVoiceAudioTasks } from "./voiceSaveContext";
+import { VoiceAudioTasksContext, useVoiceAudioTasks } from "./voiceSaveContext";
 import { v3ContentFingerprint } from "./saveFlow";
 
 // 一页可能有多个折叠字段，正式生成按序请求，避免默认音色同时冲击供应商。
@@ -121,6 +122,7 @@ export function useSelectedVoiceAudio({
   onChange?: (profile: VoiceProfileV3) => void;
 }) {
   const audioTasks = useVoiceAudioTasks();
+  const inContentDialog = useContext(VoiceAudioTasksContext) !== null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const requests = useRef(new Map<string, { input: string; id: string }>());
@@ -424,10 +426,19 @@ export function useSelectedVoiceAudio({
       setBusy(false);
       return;
     }
-    if (defer || attempted.current === signature) return;
+    if (defer || inContentDialog || attempted.current === signature) return;
     attempted.current = signature;
     void ensure();
-  }, [defer, effects, enabled, ensure, signature, sourceKey, target]);
+  }, [
+    defer,
+    inContentDialog,
+    effects,
+    enabled,
+    ensure,
+    signature,
+    sourceKey,
+    target
+  ]);
   useEffect(
     () => () => {
       attempted.current = undefined;
