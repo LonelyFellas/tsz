@@ -116,7 +116,7 @@ async function run(component, scenario, approved = true) {
       'rev-parse HEAD') echo ${sha} ;;
       'remote get-url origin') echo https://github.com/LonelyFellas/tsz.git ;;
       'ls-remote --exit-code origin refs/heads/main')
-        if [[ '${scenario}' = main-* && -f '${phase}' ]]; then echo '${"c".repeat(40)} refs/heads/main'; else echo '${sha} refs/heads/main'; fi ;;
+        if [[ ( '${scenario}' = main-* || '${scenario}' = auto-main-* ) && -f '${phase}' ]]; then echo '${"c".repeat(40)} refs/heads/main'; else echo '${sha} refs/heads/main'; fi ;;
       'cat-file -e '*) ;;
       'rev-parse '*'^'{tree}) echo ${identity.tree} ;;
       'merge-base --is-ancestor '*) ;;
@@ -134,12 +134,14 @@ async function run(component, scenario, approved = true) {
     };
     await script(
       "gh",
-      `case "$*" in
+      `printf 'gh %s\\n' "$*" >> '${log}'
+      case "$*" in
       *'/artifacts/9/zip') cat '${zip}'; [[ '${scenario}' != *-download ]] || touch '${phase}' ;;
-      *'/artifacts?per_page=100') printf '%s' '${JSON.stringify([{ artifacts: scenario === "missing" ? [] : [record] }])}' ;;
+      *'/artifacts?per_page=100') printf '%s' '${JSON.stringify([{ artifacts: scenario === "missing" ? [] : [record] }])}'
+        [[ '${scenario}' != *-discovery ]] || touch '${phase}' ;;
       *) attempt=1; id=123; conclusion=success
         if [[ -f '${phase}' ]]; then
-          case '${scenario}' in attempt-*) attempt=2;; run-*) id=124;; failure-*) conclusion=failure;; skipped-*) conclusion=skipped;; unknown-*) exit 0;; esac
+          case '${scenario}' in attempt-* | auto-attempt-*) attempt=2;; run-* | auto-run-*) id=124;; failure-* | auto-failure-*) conclusion=failure;; skipped-*) conclusion=skipped;; unknown-* | auto-unknown-*) exit 0;; esac
         fi
         printf '%s\tcompleted\t%s\thttps://github.com/LonelyFellas/tsz/actions/runs/%s\t%s\t${sha}\tmain\n' "$id" "$conclusion" "$id" "$attempt" ;;
     esac`
@@ -183,11 +185,13 @@ async function run(component, scenario, approved = true) {
         DEPLOY_EXPECTED_CI_RUN_ATTEMPT: "1",
         DEPLOY_EXPECTED_API_SHA: "d".repeat(40)
       });
-    if (scenario === "stale") env.DEPLOY_EXPECTED_SHA = "c".repeat(40);
+    if (scenario === "stale" || scenario === "auto-stale")
+      env.DEPLOY_EXPECTED_SHA = "c".repeat(40);
     if (scenario === "auto-config") env.DEPLOY_AUTO_CONFIG = "1";
     if (scenario === "shared-ssh")
       env.DEPLOY_SSH_CONTROL_PATH = join(root, "shared-control");
     if (scenario.startsWith("select-")) env.DEPLOY_SELECT_COMPONENTS = "1";
+    if (scenario.startsWith("auto-")) env.DEPLOY_AUTO_SKIP_STALE = "1";
     env.GITHUB_STEP_SUMMARY = join(root, "summary.md");
     const result = spawnSync(
       "bash",
@@ -434,4 +438,57 @@ test("admin: identical source with changed build settings publishes", async () =
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /build-config-changed/);
   assert.match(result.calls, /publish-compatible.sh/);
+});
+
+for (const component of ["web", "admin"]) {
+  for (const scenario of [
+    "auto-stale",
+    "auto-main-discovery",
+    "auto-attempt-discovery",
+    "auto-run-discovery",
+    "auto-main-download"
+  ]) {
+    test(`${component}: ${scenario} records superseded before any remote staging`, async () => {
+      const result = await run(component, scenario);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /outcome=superseded/);
+      assert.doesNotMatch(result.stdout, /✓ .* accepted/);
+      assert.doesNotMatch(
+        result.calls,
+        /ssh .*mktemp -d|rsync|publish-compatible.sh/
+      );
+      assert.match(result.summary, /Outcome: \*\*superseded\*\*/);
+      if (scenario === "auto-stale")
+        assert.doesNotMatch(result.calls, /^ssh |\/artifacts/m);
+      if (scenario.endsWith("-discovery"))
+        assert.doesNotMatch(result.calls, /artifacts\/9\/zip/);
+    });
+  }
+  for (const scenario of [
+    "auto-main-upload",
+    "auto-attempt-upload",
+    "auto-failure-download",
+    "auto-unknown-download"
+  ]) {
+    test(`${component}: ${scenario} stays failed and cannot claim a harmless skip`, async () => {
+      const result = await run(component, scenario);
+      assert.notEqual(result.status, 0, result.stdout + result.stderr);
+      assert.doesNotMatch(result.stdout, /outcome=superseded/);
+      assert.doesNotMatch(result.calls, /ssh .*publish-compatible.sh/);
+      if (scenario.endsWith("-upload")) {
+        assert.match(
+          result.stderr,
+          /remote stage retained for recovery: \/opt\/tsz-release-stage.ABC123/
+        );
+        assert.doesNotMatch(result.calls, /ssh .*rm -rf/);
+      } else assert.doesNotMatch(result.calls, /ssh .*mktemp -d|rsync/);
+    });
+  }
+}
+
+test("automatic current candidate still publishes normally", async () => {
+  const result = await run("admin", "auto-stable");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.calls, /publish-compatible.sh/);
+  assert.doesNotMatch(result.stdout, /outcome=superseded/);
 });

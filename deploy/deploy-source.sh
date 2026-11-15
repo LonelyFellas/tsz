@@ -280,7 +280,7 @@ verify_standalone_boot() {
 }
 
 # 同一精确 SHA 的最新 run/attempt；重新查询只能比较，不能更新已绑定的证据。
-deploy_ci_record() {
+deploy_latest_ci_record() {
   local repository="$1" target_sha="$2" record
   record="$(gh api "repos/$repository/actions/runs?branch=main&head_sha=$target_sha&per_page=100" \
     --jq '[.workflow_runs[] | select(.name == "CI")] | sort_by([.created_at, .id]) | last | if . == null then empty else [.id, .status, (.conclusion // "-"), .html_url, .run_attempt, .head_sha, .head_branch] | @tsv end')" || {
@@ -294,13 +294,94 @@ deploy_ci_record() {
   [[ "$id" =~ ^[1-9][0-9]{0,14}$ && "$attempt" =~ ^[1-9][0-9]{0,14}$ ]] || {
     deploy_source_error "CI run ID or attempt is invalid"; return 1;
   }
-  [[ "$status" = completed && "$conclusion" = success ]] || {
-    deploy_source_error "exact main CI is not completed/success"; return 1;
-  }
   [[ "$url" = "https://github.com/$repository/actions/runs/$id" && "$sha" = "$target_sha" && "$branch" = main && -z "$extra" ]] || {
     deploy_source_error "CI run source does not match repository and exact main SHA"; return 1;
   }
   printf '%s\n' "$record"
+}
+
+deploy_ci_record() {
+  local record id status conclusion rest
+  record="$(deploy_latest_ci_record "$1" "$2")" || return 1
+  IFS=$'\t' read -r id status conclusion rest <<<"$record"
+  [[ "$status" = completed && "$conclusion" = success ]] || {
+    deploy_source_error "exact main CI is not completed/success"; return 1;
+  }
+  printf '%s\n' "$record"
+}
+
+# Return 75 only when fresh authoritative evidence proves this exact candidate
+# has been superseded. Query errors and unsuccessful/unknown CI remain failures.
+deploy_candidate_current() {
+  local sha="${DEPLOY_EXPECTED_SHA:-}" id="${DEPLOY_EXPECTED_CI_RUN_ID:-}" attempt="${DEPLOY_EXPECTED_CI_RUN_ATTEMPT:-}"
+  [[ "$sha" =~ ^[0-9a-f]{40}$ && "$id" =~ ^[1-9][0-9]{0,14}$ && "$attempt" =~ ^[1-9][0-9]{0,14}$ ]] || {
+    deploy_source_error 'automatic candidate requires an exact SHA and CI run/attempt'; return 1;
+  }
+  local remote_sha origin_url repository record latest_id status conclusion url latest_attempt record_sha branch extra
+  origin_url="$(git remote get-url origin)" || return 1
+  repository="$(deploy_github_repository "$origin_url")" || return 1
+  [[ "$repository" = LonelyFellas/tsz ]] || { deploy_source_error 'automatic candidate repository mismatch'; return 1; }
+  remote_sha="$(deploy_remote_main_sha)" || { deploy_source_error 'cannot read origin/main for candidate check'; return 1; }
+  [[ "$remote_sha" =~ ^[0-9a-f]{40}$ ]] || { deploy_source_error 'invalid origin/main for candidate check'; return 1; }
+  DEPLOY_CANDIDATE_MAIN_SHA="$remote_sha"
+  DEPLOY_CANDIDATE_LATEST_ID=""
+  DEPLOY_CANDIDATE_LATEST_ATTEMPT=""
+  if [[ "$remote_sha" != "$sha" ]]; then
+    DEPLOY_CANDIDATE_REASON=main-moved
+    return 75
+  fi
+  record="$(deploy_latest_ci_record "$repository" "$sha")" || return 1
+  IFS=$'\t' read -r latest_id status conclusion url latest_attempt record_sha branch extra <<<"$record"
+  case "$status" in
+    queued | in_progress | waiting | pending | requested) [[ "$conclusion" = - ]] || { deploy_source_error 'invalid pending candidate CI conclusion'; return 1; } ;;
+    completed)
+      case "$conclusion" in success | failure | neutral | cancelled | skipped | timed_out | action_required | startup_failure | stale) ;;
+        *) deploy_source_error 'unknown completed candidate CI conclusion'; return 1 ;;
+      esac ;;
+    *) deploy_source_error 'unknown candidate CI status'; return 1 ;;
+  esac
+  DEPLOY_CANDIDATE_LATEST_ID="$latest_id"
+  DEPLOY_CANDIDATE_LATEST_ATTEMPT="$latest_attempt"
+  remote_sha="$(deploy_remote_main_sha)" || { deploy_source_error 'cannot re-read origin/main for candidate check'; return 1; }
+  [[ "$remote_sha" =~ ^[0-9a-f]{40}$ ]] || { deploy_source_error 'invalid origin/main for candidate recheck'; return 1; }
+  DEPLOY_CANDIDATE_MAIN_SHA="$remote_sha"
+  if [[ "$remote_sha" != "$sha" ]]; then
+    DEPLOY_CANDIDATE_REASON=main-moved
+    return 75
+  fi
+  if ((latest_id > id || (latest_id == id && latest_attempt > attempt))); then
+    DEPLOY_CANDIDATE_REASON=ci-superseded
+    return 75
+  fi
+  [[ "$latest_id" = "$id" && "$latest_attempt" = "$attempt" ]] || {
+    deploy_source_error 'latest candidate CI is older than the expected identity'; return 1;
+  }
+  [[ "$status" = completed && "$conclusion" = success ]] || {
+    deploy_source_error 'exact candidate CI is not completed/success'; return 1;
+  }
+}
+
+# This helper must run directly in the entrypoint shell, before remote staging.
+# Exiting invokes its normal cleanup; no candidate is accepted or relabelled.
+deploy_candidate_checkpoint() {
+  local phase="$1" status=0
+  [[ "${DEPLOY_AUTO_SKIP_STALE:-}" = 1 ]] || return 0
+  [[ "${DEPLOY_REMOTE_STAGE_CREATED:-0}" = 0 ]] || {
+    deploy_source_error 'cannot skip a candidate after remote staging'; return 1;
+  }
+  [[ "$phase" =~ ^[a-z-]+$ ]] || return 1
+  deploy_candidate_current || status=$?
+  [[ "$status" != 0 ]] || return 0
+  [[ "$status" = 75 ]] || return "$status"
+  printf '[deploy-candidate] outcome=superseded phase=%s reason=%s candidate_sha=%s current_main=%s expected_ci=%s/%s latest_ci=%s/%s remote_writes=0\n' \
+    "$phase" "$DEPLOY_CANDIDATE_REASON" "$DEPLOY_EXPECTED_SHA" "$DEPLOY_CANDIDATE_MAIN_SHA" \
+    "$DEPLOY_EXPECTED_CI_RUN_ID" "$DEPLOY_EXPECTED_CI_RUN_ATTEMPT" "$DEPLOY_CANDIDATE_LATEST_ID" "$DEPLOY_CANDIDATE_LATEST_ATTEMPT"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    printf '\n### Superseded deployment candidate\n\nOutcome: **superseded** (%s, %s). Remote writes: **0**.\n\nCandidate: `%s`, CI `%s/%s`. Current main: `%s`; latest CI: `%s/%s`.\n' \
+      "$phase" "$DEPLOY_CANDIDATE_REASON" "$DEPLOY_EXPECTED_SHA" "$DEPLOY_EXPECTED_CI_RUN_ID" "$DEPLOY_EXPECTED_CI_RUN_ATTEMPT" \
+      "$DEPLOY_CANDIDATE_MAIN_SHA" "$DEPLOY_CANDIDATE_LATEST_ID" "$DEPLOY_CANDIDATE_LATEST_ATTEMPT" >> "$GITHUB_STEP_SUMMARY" || deploy_source_warn 'cannot append superseded candidate summary'
+  fi
+  exit 0
 }
 
 prepare_deploy_source() {
