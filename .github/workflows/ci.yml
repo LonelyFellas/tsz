@@ -161,6 +161,11 @@ jobs:
           node scripts/ci-metrics.mjs run install --
           pnpm install --frozen-lockfile
 
+      - name: Check pinned API compatibility
+        run: >-
+          node scripts/ci-metrics.mjs run api-preflight --
+          pnpm ci:api-preflight
+
       - name: Check Node runtime
         run: node scripts/ci-metrics.mjs run check-node -- pnpm check:node
 

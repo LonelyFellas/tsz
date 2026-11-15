@@ -173,6 +173,22 @@ test("W04: verify is a fail-closed stable summary", async () => {
   assert.match(block, /!= "success"/);
 });
 
+test("pinned API compatibility runs before other tooling checks without deployment credentials", async () => {
+  const { source, jobs } = await workflowFixture();
+  const tooling = jobs.get("tooling-tests");
+  const preflight = tooling.indexOf("- name: Check pinned API compatibility");
+  assert.ok(preflight > tooling.indexOf("- name: Install"));
+  assert.ok(preflight < tooling.indexOf("- name: Check Node runtime"));
+  assert.match(
+    tooling,
+    /ci-metrics\.mjs run api-preflight --\s+pnpm ci:api-preflight/
+  );
+  assert.doesNotMatch(source, /secrets\.TSHB_TEST_|pull_request_target/);
+  const deploy = await readFile(deployWorkflowUrl, "utf8");
+  assert.match(deploy, /node deploy\/check-api-contract\.mjs/);
+  assert.doesNotMatch(deploy, /preflight-api-contract/);
+});
+
 test("W06: commitlint remains pull-request only", async () => {
   const { jobs } = await workflowFixture();
   const block = jobs.get("commitlint");
@@ -256,6 +272,7 @@ test("W11: cache outcomes never skip quality or coverage gates", async () => {
   const { jobs } = await workflowFixture();
   const requiredSteps = [
     ["quality", ["Lint", "Typecheck", "Format check", "Build"]],
+    ["tooling-tests", ["Check pinned API compatibility"]],
     ["unit-coverage", ["Run test module"]],
     [
       "coverage-merge",
