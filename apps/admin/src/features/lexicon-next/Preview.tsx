@@ -84,11 +84,11 @@ export function Preview({ view }: { view: NextEntryView }) {
         />
       )}
       <Lines rows={view.forms} missing="词形" textClassName="tsz-words" />
-      {!view.senses.length && <p>尚无义项</p>}
+      {!view.senses.length && <p>尚无词义</p>}
       {view.senses.map((sense, index) => (
         <section key={sense.id}>
           <h4>
-            义项 {index + 1}
+            词义 {index + 1}
             {senseGroupName(view.sense_groups, sense.sense_group_id)}
           </h4>
           <SenseMetadataSummary sense={sense} />
@@ -148,7 +148,7 @@ export function DraftSummary({ draft }: { draft: NextDraft }) {
       {draft.senses.map((sense, index) => (
         <section key={sense.id}>
           <h4>
-            义项 {index + 1} · {sense.part_of_speech ?? "未指定词性"}
+            词义 {index + 1} · {sense.part_of_speech ?? "未指定词性"}
             {senseGroupName(draft.sense_groups, sense.sense_group_id)}
           </h4>
           <SenseMetadataSummary sense={sense} />

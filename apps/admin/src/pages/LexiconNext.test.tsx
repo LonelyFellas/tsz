@@ -483,7 +483,7 @@ it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词�
     languages.getByRole("combobox", { name: "媒介语言" }).closest(".ui-select")
   ).toHaveTextContent("繁体中文");
   fireEvent.click(button(/^词义与译词/));
-  expect(screen.getByRole("button", { name: "添加义项" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "添加词义" })).toBeVisible();
   fireEvent.click(button(/^预览/));
   expect(
     languages.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
@@ -503,12 +503,10 @@ it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词�
   expect(screen.queryByRole("group", { name: "智能词库语言" })).toBeNull();
 });
 
-it("预览请求进行中，浏览器返回不能绕过语言锁", async () => {
+it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
   const api = requests();
-  let finish!: (
-    value: Awaited<ReturnType<LexiconNextRequests["view"]>>
-  ) => void;
-  api.view.mockReturnValue(
+  let finish!: (value: NextEntry) => void;
+  api.save.mockReturnValue(
     new Promise((resolve) => {
       finish = resolve;
     })
@@ -517,13 +515,11 @@ it("预览请求进行中，浏览器返回不能绕过语言锁", async () => {
   await screen.findByText("版本 1");
   await chooseLanguage("美式英语");
   fireEvent.click(button(/^预览/));
-  fireEvent.click(button("查看已保存预览"));
-  await waitFor(() =>
-    expect(api.view).toHaveBeenCalledWith(id, {
-      target_locale: "en-US",
-      medium_locale: "zh-Hans"
-    })
-  );
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "center" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   await act(() => router.navigate(-1));
   expect(
     new URLSearchParams(router.state.location.search).get("target_locale")
@@ -531,16 +527,12 @@ it("预览请求进行中，浏览器返回不能绕过语言锁", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
   await act(async () =>
     finish({
-      entry_id: id,
-      revision: 1,
-      target_locale: "en-US",
-      medium_locale: "zh-Hans",
-      forms: [],
-      missing_forms: true,
-      senses: []
+      ...entry,
+      revision: 2,
+      draft: { ...entry.draft, headword: "center" }
     })
   );
-  await screen.findByText("已保存预览 · 版本 1");
+  await screen.findByText("版本 2");
   expect(
     screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
   ).toHaveTextContent("美式英语");
@@ -582,7 +574,7 @@ it("深链接归属不匹配时不挂载编辑器，可显式进入词条所属�
   api.get.mockResolvedValue({ ...entry, medium_locale: "zh-Hant" });
   const { router } = mount(api);
   await screen.findByText("该词条不属于当前媒介语言");
-  expect(screen.queryByRole("button", { name: "添加义项" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "添加词义" })).toBeNull();
   fireEvent.click(button("进入词条所属语言"));
   await screen.findByText("版本 1");
   expect(
@@ -955,7 +947,9 @@ async function edit(label: string, value: string) {
   if (label.includes("词形")) {
     if (!screen.queryByRole("textbox", { name: `${label} 1` }))
       fireEvent.click(button("已有词形"));
-  } else fireEvent.click(button(`添加${label}`));
+  } else if (!screen.queryByRole("textbox", { name: `${label} 1` })) {
+    fireEvent.click(button(`添加${label}`));
+  }
   fireEvent.change(await screen.findByRole("textbox", { name: `${label} 1` }), {
     target: { value }
   });
@@ -1049,7 +1043,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(button(/词义与译词/));
     await edit("英式英语词形", "centre");
     fireEvent.click(button(/词义与译词/));
-    fireEvent.click(button("添加义项"));
+    fireEvent.click(button("添加词义"));
     await edit("英式英语释义", "the middle");
     await edit("简体中文解释", "中心位置");
     await edit("简体中文译词", "中心");
@@ -1083,19 +1077,10 @@ describe("新版词库手工闭环", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local unsaved" }
     });
-    api.view.mockResolvedValue({
-      entry_id: id,
-      revision: 2,
-      target_locale: "en-GB",
-      medium_locale: "zh-Hans",
-      forms: [],
-      missing_forms: true,
-      senses: []
-    });
-    fireEvent.click(button("查看已保存预览"));
-    await screen.findByText("已保存预览 · 版本 2");
+    fireEvent.click(button("当前草稿预览（含未保存修改）"));
+    expect(screen.getAllByText("the middle").length).toBeGreaterThan(0);
+    expect(api.view).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("local unsaved")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.click(button("保存完整草稿"));
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
     expect(api.save.mock.calls[1]![1].draft.senses[0].id).toBe(senseId);
@@ -1152,7 +1137,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(button(/词义与译词/));
     expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
     fireEvent.click(button(/词义与译词/));
-    expect(button("添加义项")).toBeDisabled();
+    expect(button("添加词义")).toBeDisabled();
     act(() =>
       useAuthStore.setState({
         profile: {
@@ -1264,8 +1249,8 @@ describe("新版词库手工闭环", () => {
     await screen.findByDisplayValue("centre");
     fireEvent.click(button(/词义与译词/));
     fireEvent.click(button(/词义与译词/));
-    fireEvent.click(button("添加义项"));
-    await edit("英式英语释义", "");
+    fireEvent.click(button("添加词义"));
+    fireEvent.click(button("添加英式英语释义"));
     fireEvent.click(button("保存完整草稿"));
     await screen.findByText(/不能为空/);
     expect(api.save).not.toHaveBeenCalled();
@@ -2143,7 +2128,7 @@ it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容
     "the middle"
   );
   fireEvent.click(screen.getByRole("tab", { name: /动词/ }));
-  fireEvent.click(button("添加义项"));
+  fireEvent.click(button("添加词义"));
   fireEvent.click(button("添加简体中文译词"));
   fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
     target: { value: "集中于" }
@@ -2301,7 +2286,6 @@ it("Step3 从标签添加基本词性、排序，Step2 和保存请求沿用同�
     "true"
   );
   const meanings = within(screen.getByRole("tabpanel"));
-  fireEvent.click(meanings.getByRole("button", { name: "添加义项" }));
   fireEvent.click(meanings.getByRole("button", { name: "添加简体中文译词" }));
   fireEvent.change(meanings.getByRole("textbox", { name: "简体中文译词 1" }), {
     target: { value: "集中于" }
@@ -2724,7 +2708,7 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
   await screen.findByText("版本 1");
   fireEvent.click(button(/词义与译词/));
   fireEvent.mouseDown(
-    await screen.findByRole("combobox", { name: "义项 1 词性" })
+    await screen.findByRole("combobox", { name: "词义 1 词性" })
   );
   fireEvent.click(
     await screen.findByText("名词", {
@@ -2764,7 +2748,7 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
   });
   await screen.findByText("版本 2");
   expect(screen.getByRole("button", { name: "删除词义 1" })).toBeDisabled();
-  fireEvent.click(button("添加义项"));
+  fireEvent.click(button("添加词义"));
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
   expect(api.save.mock.calls[1]![1].draft.senses).toHaveLength(2);
@@ -2810,7 +2794,7 @@ it.each([false, true])(
             .getAllByRole("alert")
             .some(
               (alert) =>
-                alert.textContent === "当前义项与媒介语言内已有该译词。"
+                alert.textContent === "当前词义与媒介语言内已有该译词。"
             )
         ).toBe(true)
       );
@@ -2824,3 +2808,50 @@ it.each([false, true])(
     }
   }
 );
+
+it("已保存预览读取服务器版本，关闭后保留本地未保存修改", async () => {
+  const api = requests();
+  api.view.mockResolvedValue({
+    entry_id: id,
+    revision: 1,
+    target_locale: "en-GB",
+    medium_locale: "zh-Hans",
+    forms: [],
+    missing_forms: true,
+    senses: [
+      {
+        id: "saved-sense",
+        target_definitions: [],
+        medium_definitions: [],
+        equivalents: [
+          { id: "saved-equivalent", locale: "zh-Hans", text: "已保存的译词" }
+        ],
+        missing_target_definitions: true,
+        missing_medium_definitions: true,
+        missing_equivalents: false
+      }
+    ]
+  });
+  mount(api);
+  await screen.findByDisplayValue("centre");
+  fireEvent.click(button(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local-unsaved" }
+  });
+  fireEvent.click(button("查看已保存预览"));
+  const dialog = await screen.findByRole("dialog", {
+    name: "已保存预览 · 版本 1"
+  });
+  expect(within(dialog).getByText("已保存的译词")).toBeVisible();
+  expect(api.view).toHaveBeenCalledExactlyOnceWith(id, {
+    target_locale: "en-GB",
+    medium_locale: "zh-Hans"
+  });
+  expect(api.save).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "关闭" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "local-unsaved"
+  );
+  expect(screen.getByRole("status")).toHaveTextContent("有未保存修改");
+});

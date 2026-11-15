@@ -1,7 +1,64 @@
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import { describe, expect, it } from "vitest";
 import type { NextDraft } from "@tsz/types";
-import { previewDraft, draftProblem } from "./model";
+import { previewDraft, draftProblem, ensureMeaningTemplates } from "./model";
+
+it("只为缺失的已配置词性补模板，保留已有内容、共享区间和稳定身份", () => {
+  const initial: NextDraft = {
+    schema_version: 1,
+    headword: "centre",
+    forms: [],
+    form_editor: {
+      forms_format: "shared_v1",
+      contents: [],
+      pos: ["noun", "verb"].map((pos) => ({
+        pos_id: pos,
+        pos,
+        forms: [],
+        form_groups: []
+      }))
+    },
+    sense_groups: [{ id: "group", name_zh: "中心", name_en: "centre" }],
+    senses: [
+      { id: "sense", part_of_speech: "noun", definitions: [], equivalents: [] }
+    ],
+    grammar_structures: [
+      { id: "grammar", part_of_speech: "noun", variants: [] }
+    ]
+  };
+  const before = structuredClone(initial);
+  const capabilities = {
+    grammarAvailable: true,
+    senseGroupsAvailable: true,
+    senseMetadataAvailable: true
+  };
+  const next = ensureMeaningTemplates(initial, capabilities);
+  expect(initial).toEqual(before);
+  expect(next.senses).toHaveLength(2);
+  expect(next.senses[0]).toBe(initial.senses[0]);
+  expect(next.senses[1]).toMatchObject({
+    part_of_speech: "verb",
+    sense_group_id: "group",
+    level: "A1"
+  });
+  expect(next.grammar_structures).toHaveLength(2);
+  expect(next.grammar_structures![0]).toBe(initial.grammar_structures![0]);
+  expect(next.sense_groups).toBe(initial.sense_groups);
+  expect(ensureMeaningTemplates(next, capabilities)).toBe(next);
+  expect(draftProblem(next)).toBeNull();
+  const legacy = ensureMeaningTemplates(initial, {
+    grammarAvailable: false,
+    senseGroupsAvailable: false,
+    senseMetadataAvailable: false
+  });
+  expect(legacy.grammar_structures).toBe(initial.grammar_structures);
+  expect(legacy.senses[1]).toEqual({
+    id: expect.any(String),
+    part_of_speech: "verb",
+    definitions: [],
+    equivalents: []
+  });
+});
 describe("本地草稿预览", () => {
   it("预览按所选语言寻找通用内容，不拿通用英语补齐其他语言", () => {
     const draft: NextDraft = {

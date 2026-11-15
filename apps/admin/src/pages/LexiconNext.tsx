@@ -422,7 +422,6 @@ function EntryEditor({
       void message.success("草稿已保存");
     });
   }
-  // A successful save updates only this editor; background refetches never hydrate local edits.
   useEffect(() => {
     setView(undefined);
   }, [target, medium]);
@@ -676,6 +675,7 @@ function EntryEditor({
         </div>
         {step !== "forms" && (
           <Collapse
+            className="lexicon-next-draft-preview"
             items={[
               {
                 key: "preview",

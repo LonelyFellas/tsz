@@ -43,8 +43,8 @@ export const equivalentMessages = {
   ],
   eq_unassessed: ["未评分", "未評分", "Not assessed"],
   eq_no_suitable: [
-    "本义项无合适常见译词",
-    "本義項無合適常見譯詞",
+    "本词义无合适常见译词",
+    "本詞義無合適常見譯詞",
     "No suitable equivalents for this sense"
   ],
   eq_empty: ["尚未填写译词", "尚未填寫譯詞", "No equivalents entered"],
@@ -55,8 +55,8 @@ export const equivalentMessages = {
   ],
   eq_edit: ["译词 {{index}}", "譯詞 {{index}}", "Equivalent {{index}}"],
   eq_duplicate: [
-    "当前义项与媒介语言内已有该译词。",
-    "目前義項與媒介語言內已有該譯詞。",
+    "当前词义与媒介语言内已有该译词。",
+    "目前詞義與媒介語言內已有該譯詞。",
     "This equivalent already exists for this sense and language."
   ],
   eq_invalid_text: [
