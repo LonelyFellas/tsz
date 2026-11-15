@@ -20,6 +20,7 @@ export function ContentRows({
   locale,
   label,
   definition = false,
+  definitionTemplates,
   grouped = false,
   textClassName,
   disabled,
@@ -31,6 +32,7 @@ export function ContentRows({
   locale: string;
   label: string;
   definition?: boolean;
+  definitionTemplates?: readonly { style?: "definition" | "sentence" }[];
   grouped?: boolean;
   textClassName?: string;
   disabled: boolean;
@@ -38,7 +40,49 @@ export function ContentRows({
   grammarLocale?: string;
   onChange: (rows: Row[]) => void;
 }) {
-  const visible = rows.filter((row) => row.locale === locale);
+  const [templates, setTemplates] = useState<Record<string, NextDefinition[]>>(
+    {}
+  );
+  if (definition && definitionTemplates && !Object.hasOwn(templates, locale)) {
+    setTemplates({
+      ...templates,
+      [locale]: rows.some((row) => row.locale === locale)
+        ? []
+        : definitionTemplates.map((plan) => ({
+            id: crypto.randomUUID(),
+            locale,
+            text: "",
+            style: plan.style ?? "definition"
+          }))
+    });
+  }
+  const slots = templates[locale] ?? [];
+  const stored = rows.filter((row) => row.locale === locale);
+  const visible = [
+    ...slots.map((slot) => stored.find((row) => row.id === slot.id) ?? slot),
+    ...stored.filter((row) => !slots.some((slot) => slot.id === row.id))
+  ];
+  function updateRow(next: Row) {
+    const template = slots.some((slot) => slot.id === next.id);
+    const existing = rows.some((row) => row.id === next.id);
+    if (template) {
+      setTemplates((current) => ({
+        ...current,
+        [locale]: current[locale]!.map((row) =>
+          row.id === next.id ? (next as NextDefinition) : row
+        )
+      }));
+      if (!next.text.trim()) {
+        if (existing) onChange(rows.filter((row) => row.id !== next.id));
+        return;
+      }
+    }
+    onChange(
+      existing
+        ? rows.map((row) => (row.id === next.id ? next : row))
+        : [...rows, next]
+    );
+  }
   const [collapsed, setCollapsed] = useState(false);
   const content = (
     <>
@@ -55,15 +99,7 @@ export function ContentRows({
               value={row.text}
               disabled={disabled}
               autoSize={{ minRows: 2, maxRows: 8 }}
-              onChange={(e) =>
-                onChange(
-                  rows.map((item) =>
-                    item.id === row.id
-                      ? { ...item, text: e.target.value }
-                      : item
-                  )
-                )
-              }
+              onChange={(e) => updateRow({ ...row, text: e.target.value })}
             />
           ) : (
             <Input
@@ -71,15 +107,7 @@ export function ContentRows({
               aria-label={`${label} ${index + 1}`}
               value={row.text}
               disabled={disabled}
-              onChange={(e) =>
-                onChange(
-                  rows.map((item) =>
-                    item.id === row.id
-                      ? { ...item, text: e.target.value }
-                      : item
-                  )
-                )
-              }
+              onChange={(e) => updateRow({ ...row, text: e.target.value })}
             />
           )}
           <Space>
@@ -117,13 +145,7 @@ export function ContentRows({
                 ]}
                 notFoundContent="请先为当前细分词性添加语法结构"
                 onChange={(grammar_structure_id: string) =>
-                  onChange(
-                    rows.map((item) =>
-                      item.id === row.id
-                        ? { ...item, grammar_structure_id }
-                        : item
-                    )
-                  )
+                  updateRow({ ...row, grammar_structure_id })
                 }
               />
             )}
@@ -136,13 +158,7 @@ export function ContentRows({
                   { value: "definition", label: "定义" },
                   { value: "sentence", label: "整句释义" }
                 ]}
-                onChange={(style) =>
-                  onChange(
-                    rows.map((item) =>
-                      item.id === row.id ? { ...item, style } : item
-                    )
-                  )
-                }
+                onChange={(style) => updateRow({ ...row, style })}
               />
             )}
             <Button
@@ -151,9 +167,15 @@ export function ContentRows({
               danger={grouped}
               type={grouped ? "text" : "default"}
               disabled={disabled}
-              onClick={() =>
-                onChange(rows.filter((item) => item.id !== row.id))
-              }
+              onClick={() => {
+                setTemplates((current) => ({
+                  ...current,
+                  [locale]: (current[locale] ?? []).filter(
+                    (item) => item.id !== row.id
+                  )
+                }));
+                onChange(rows.filter((item) => item.id !== row.id));
+              }}
             />
           </Space>
         </div>

@@ -278,3 +278,23 @@
     grid-row: 1 / span 2;
   }
 }
+
+.lexicon-next .lexicon-next-section-title {
+  margin: 0;
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+}
+.lexicon-next-section-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--ui-space-2) var(--ui-space-4);
+}
+.lexicon-next-section-status {
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
+  font-weight: var(--ui-font-weight-regular);
+}
+.lexicon-next-draft-preview {
+  margin-top: var(--ui-space-6);
+}
