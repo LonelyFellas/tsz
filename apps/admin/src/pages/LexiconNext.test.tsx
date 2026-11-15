@@ -3505,9 +3505,9 @@ it("统一保存冲突保留本地例句，可比较服务器例句，明确确�
   remote.draft.variants[0]!.content.text = "Server example.";
   api.get.mockResolvedValue({ ...saved, sentence_resources: [remote] });
   fireEvent.click(button("比较服务器版本"));
-  const compare = (await screen.findByText("服务器 · 版本 1")).closest(
-    '[role="dialog"]'
-  )!;
+  const compare = (
+    await screen.findByText("服务器 · 版本 1")
+  ).closest<HTMLElement>('[role="dialog"]')!;
   expect(within(compare).getByText("Keep local example.")).toBeVisible();
   expect(within(compare).getByText("Server example.")).toBeVisible();
   fireEvent.click(
