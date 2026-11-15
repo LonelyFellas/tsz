@@ -267,11 +267,8 @@
 .dubbing-editor-drawer .ui-drawer-body {
   padding: var(--ui-space-5) var(--ui-space-6);
 }
-.dubbing-editor-drawer .ui-drawer-body > .ui-form {
-  width: 508px;
-}
 .dubbing-editor-drawer .voice-configuration-layout {
-  width: 508px;
+  width: 100%;
   grid-template-columns: minmax(0, 1fr);
 }
 .dubbing-editor-drawer .ui-drawer-footer {
