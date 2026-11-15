@@ -697,6 +697,8 @@ function EntryEditor({
         <Modal
           open={!!view}
           title={`已保存预览 · 版本 ${view?.revision ?? ""}`}
+          width={960}
+          className="lexicon-next-saved-preview"
           footer={null}
           onCancel={() => setView(undefined)}
         >
