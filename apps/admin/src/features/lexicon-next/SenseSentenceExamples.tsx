@@ -266,6 +266,7 @@ export function SenseSentenceExamples({
   const [collapsed, setCollapsed] = useState(false);
   const [editing, setEditing] = useState<{ source: NextSentence | null }>();
   const [picking, setPicking] = useState(false);
+  const [opening, setOpening] = useState<string>();
   const validTarget = target === "en-GB" || target === "en-US";
   return (
     <>
@@ -295,6 +296,7 @@ export function SenseSentenceExamples({
                         <Button
                           disabled={
                             disabled ||
+                            opening !== undefined ||
                             !validTarget ||
                             !canAdminResourceAction(
                               actor,
@@ -303,14 +305,30 @@ export function SenseSentenceExamples({
                               source.owner_id
                             )
                           }
-                          onClick={() => setEditing({ source })}
+                          loading={opening === source.id}
+                          onClick={async () => {
+                            setOpening(source.id);
+                            try {
+                              const fresh = await client.fetchQuery({
+                                queryKey: sentenceKey(actor?.id, source.id),
+                                queryFn: () => requests.sentence(source.id),
+                                staleTime: 0,
+                                retry: false
+                              });
+                              setEditing({ source: fresh });
+                            } catch {
+                              // The active resource query displays the read error and retry action.
+                            } finally {
+                              setOpening(undefined);
+                            }
+                          }}
                         >
                           编辑例句
                         </Button>
                         <Button
                           danger
                           icon={<Trash2 />}
-                          disabled={disabled}
+                          disabled={disabled || opening !== undefined}
                           onClick={() =>
                             onChange(ids.filter((value) => value !== id))
                           }
@@ -327,13 +345,21 @@ export function SenseSentenceExamples({
             <Space>
               <Button
                 icon={<Plus />}
-                disabled={disabled || !validTarget || !canCreate || !canRead}
+                disabled={
+                  disabled ||
+                  opening !== undefined ||
+                  !validTarget ||
+                  !canCreate ||
+                  !canRead
+                }
                 onClick={() => setEditing({ source: null })}
               >
                 添加例句
               </Button>
               <Button
-                disabled={disabled || !validTarget || !canRead}
+                disabled={
+                  disabled || opening !== undefined || !validTarget || !canRead
+                }
                 onClick={() => setPicking(true)}
               >
                 引用已有例句
