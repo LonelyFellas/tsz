@@ -3651,3 +3651,57 @@ it("统一保存冲突保留本地例句，可比较服务器例句，明确确�
   fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
   await waitFor(() => expect(english).toHaveTextContent("Server example."));
 });
+
+it("其他标签页只改变发布生命周期时，比较重载后使用新版本恢复预检", async () => {
+  useAuthStore.setState({
+    profile: {
+      ...useAuthStore.getState().profile!,
+      permissions: ["words.access", "words.edit", "words.publish"]
+    }
+  });
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, publishing: true });
+  api.publication.mockResolvedValueOnce({
+    entry_id: id,
+    status: "draft",
+    lifecycle_revision: 1,
+    has_unpublished_changes: true,
+    current: null
+  });
+  api.publication.mockResolvedValue({
+    entry_id: id,
+    status: "published",
+    lifecycle_revision: 2,
+    has_unpublished_changes: false,
+    current: null
+  });
+  api.publicationPreview.mockRejectedValueOnce(
+    new HttpError(409, "词条版本已变化", [], "revision_conflict")
+  );
+  api.publicationPreview.mockResolvedValue({
+    entry_id: id,
+    revision: 1,
+    lifecycle_revision: 2,
+    preview_token: "a".repeat(64),
+    can_publish: false,
+    issues: [],
+    warnings: []
+  });
+  mount(api);
+  await waitForEntryReady(1);
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.click(button("检查发布"));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "比较服务器版本" })
+  );
+  await screen.findByText("服务器 · 版本 1");
+  fireEvent.click(button("放弃本地修改并重载"));
+  fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
+  await waitFor(() => expect(button("检查发布")).toBeEnabled());
+  fireEvent.click(button("检查发布"));
+  await waitFor(() => expect(api.publicationPreview).toHaveBeenCalledTimes(2));
+  expect(api.publicationPreview).toHaveBeenLastCalledWith(id, {
+    base_revision: 1,
+    base_lifecycle_revision: 2
+  });
+});

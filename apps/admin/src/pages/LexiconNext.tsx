@@ -580,9 +580,25 @@ function EntryEditor({
                 <Button
                   disabled={busy || formContentOpen}
                   onClick={() =>
-                    void run(async () =>
-                      setRemote(await requests.get(saved.id))
-                    )
+                    void run(async () => {
+                      const [remote, state] = await Promise.all([
+                        requests.get(saved.id),
+                        publishingAvailable ? publication.refetch() : undefined,
+                        publishingAvailable
+                          ? queryClient.fetchQuery({
+                              queryKey: [
+                                "admin-lexicon-next",
+                                "workspace-entry",
+                                saved.id
+                              ],
+                              queryFn: () => requests.workspaceEntry(saved.id),
+                              staleTime: 0
+                            })
+                          : undefined
+                      ]);
+                      if (state?.error) throw state.error;
+                      setRemote(remote);
+                    })
                   }
                 >
                   比较服务器版本
