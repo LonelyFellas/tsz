@@ -418,6 +418,7 @@ export interface NextPublication {
       sense_id: string;
       publication_id: string;
       headword: string;
+      forms: NextForm[];
       gloss: string;
     }[];
   };

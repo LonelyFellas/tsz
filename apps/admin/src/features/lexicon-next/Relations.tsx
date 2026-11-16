@@ -256,7 +256,11 @@ export function RelationsPreview({
                 return (
                   <li key={row.id}>
                     <span className="tsz-words">
-                      {frozen?.headword ??
+                      {frozen?.forms.find((form) => form.locale === target)
+                        ?.text ??
+                        frozen?.forms.find((form) => form.locale === "en")
+                          ?.text ??
+                        frozen?.headword ??
                         word?.headword ??
                         row.pending_target_headword ??
                         "关联词读取中"}
