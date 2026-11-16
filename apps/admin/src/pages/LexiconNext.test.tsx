@@ -3705,3 +3705,36 @@ it("其他标签页只改变发布生命周期时，比较重载后使用新版�
     base_lifecycle_revision: 2
   });
 });
+
+it("比较发布冲突的状态读取失败时保留未保存草稿并允许重试", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, publishing: true });
+  api.publication.mockResolvedValue({
+    entry_id: id,
+    status: "draft",
+    lifecycle_revision: 1,
+    has_unpublished_changes: true,
+    current: null
+  });
+  api.save.mockRejectedValue(new HttpError(409, "服务器版本已变化"));
+  mount(api);
+  await waitForEntryReady(1);
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local-unsaved" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findByRole("button", { name: "比较服务器版本" });
+  api.workspaceEntry.mockRejectedValueOnce(new HttpError(503, "状态暂不可用"));
+  fireEvent.click(button("比较服务器版本"));
+  await screen.findByText("状态暂不可用");
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "local-unsaved"
+  );
+  expect(button("比较服务器版本")).toBeEnabled();
+  fireEvent.click(button("比较服务器版本"));
+  await screen.findByText("服务器 · 版本 1");
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "local-unsaved"
+  );
+});

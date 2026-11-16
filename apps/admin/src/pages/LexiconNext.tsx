@@ -581,22 +581,20 @@ function EntryEditor({
                   disabled={busy || formContentOpen}
                   onClick={() =>
                     void run(async () => {
-                      const [remote, state] = await Promise.all([
+                      const [remote, state, metadata] = await Promise.all([
                         requests.get(saved.id),
                         publishingAvailable ? publication.refetch() : undefined,
                         publishingAvailable
-                          ? queryClient.fetchQuery({
-                              queryKey: [
-                                "admin-lexicon-next",
-                                "workspace-entry",
-                                saved.id
-                              ],
-                              queryFn: () => requests.workspaceEntry(saved.id),
-                              staleTime: 0
-                            })
+                          ? requests.workspaceEntry(saved.id)
                           : undefined
                       ]);
                       if (state?.error) throw state.error;
+                      if (metadata) {
+                        queryClient.setQueryData(
+                          ["admin-lexicon-next", "workspace-entry", saved.id],
+                          metadata
+                        );
+                      }
                       setRemote(remote);
                     })
                   }
