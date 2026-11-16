@@ -1057,3 +1057,68 @@ it("新版例句协商扩展字段，并拒绝超范围或非一位小数的自�
     await expect(client(value).api.sentence(sentence.id)).rejects.toThrow();
   }
 });
+
+it("新版发布走独立契约，保留幂等身份和冻结内容；拒绝损坏的发布回包", async () => {
+  const base = { base_revision: 2, base_lifecycle_revision: 1 };
+  const preview = {
+    entry_id: entry.id,
+    revision: 2,
+    lifecycle_revision: 1,
+    preview_token: "a".repeat(64),
+    can_publish: true,
+    issues: [],
+    warnings: []
+  };
+  const checked = client(preview);
+  await expect(checked.api.publicationPreview(entry.id, base)).resolves.toEqual(
+    preview
+  );
+  expect(new URL(checked.fetch.mock.calls[0]![0]).pathname).toBe(
+    `/api/v1/admin/lexicon-next/entries/${entry.id}/publication-preview`
+  );
+  expect(JSON.parse(checked.fetch.mock.calls[0]![1].body as string)).toEqual(
+    base
+  );
+  const publication = {
+    id: uuid(100),
+    entry_id: entry.id,
+    revision: 2,
+    lifecycle_revision: 2,
+    published_by_admin_id: uuid(8),
+    published_at: entry.updated_at,
+    snapshot: { draft, sentence_resources: [], relation_targets: [] }
+  };
+  const published = client(publication);
+  const input = {
+    ...base,
+    request_id: uuid(101),
+    preview_token: preview.preview_token
+  };
+  await published.api.publish(entry.id, input);
+  await published.api.publish(entry.id, input);
+  expect(
+    published.fetch.mock.calls.map((call) => JSON.parse(call[1].body as string))
+  ).toEqual([input, input]);
+  const current = {
+    entry_id: entry.id,
+    status: "published",
+    lifecycle_revision: 2,
+    has_unpublished_changes: false,
+    current: publication
+  };
+  await expect(client(current).api.publication(entry.id)).resolves.toEqual(
+    current
+  );
+  for (const corrupt of [
+    { ...publication, snapshot: {} },
+    { ...publication, revision: "2" },
+    { ...publication, extra: true }
+  ]) {
+    await expect(client(corrupt).api.publish(entry.id, input)).rejects.toThrow(
+      /接口契约/
+    );
+  }
+  expect(
+    snapshot.paths[`/admin/lexicon-next/entries/{id}/publications`]
+  ).toEqual(["post"]);
+});

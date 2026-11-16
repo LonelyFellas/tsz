@@ -279,7 +279,11 @@ export function EntryList({
       action === "delete"
         ? actor?.role === "super_admin" && row.status === "archived"
         : allowed(row, action) &&
-          row.status === (action === "archive" ? "draft" : "archived")
+          (action === "archive"
+            ? row.status !== "archived"
+            : row.status === "archived") &&
+          (row.status !== "published" ||
+            canAdminResourceAction(actor, "words", "publish", row.owner_id))
     );
   async function submit() {
     if (
@@ -399,7 +403,7 @@ export function EntryList({
       wideOnly: true,
       defaultVisible: !trashMode,
       render: (row) => (
-        <Tag color={row.status === "archived" ? "warning" : "default"}>
+        <Tag color={row.status === "published" ? "success" : "default"}>
           {t(`status_${row.status}`)}
         </Tag>
       )
@@ -520,7 +524,9 @@ export function EntryList({
               {t(
                 row.status === "archived" || !allowed(row, "edit")
                   ? "action_view"
-                  : "action_create"
+                  : row.status === "published"
+                    ? "action_edit"
+                    : "action_create"
               )}
             </Button>
           </div>

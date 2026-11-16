@@ -14,6 +14,7 @@ export function EntryLayout({
   children,
   languageSearch,
   exists = true,
+  publicationStatus = "draft",
   relationsAvailable = false
 }: {
   draft?: NextDraft;
@@ -22,6 +23,7 @@ export function EntryLayout({
   children: ReactNode;
   exists?: boolean;
   relationsAvailable?: boolean;
+  publicationStatus?: "draft" | "published" | "archived";
   languageSearch?: string;
 }) {
   const senses = draft?.senses ?? [];
@@ -153,7 +155,7 @@ export function EntryLayout({
       stepLabels={{
         forms: { title: "词性与发音", subtitle: "基本词性｜词形变化｜多发音" },
         meanings: { title: "词义与译词", subtitle: "目标语言｜媒介语言" },
-        preview: { title: "预览", subtitle: "结构核对｜语言组合" }
+        preview: { title: "预览", subtitle: "结构核对｜发布" }
       }}
       presentation={{
         wordExists: exists,
@@ -164,7 +166,17 @@ export function EntryLayout({
             {draft?.headword || "新词条"}
           </strong>
         ),
-        status: <Tag>草稿</Tag>,
+        status: (
+          <Tag
+            color={publicationStatus === "published" ? "success" : "default"}
+          >
+            {publicationStatus === "published"
+              ? "已发布"
+              : publicationStatus === "archived"
+                ? "已归档"
+                : "草稿"}
+          </Tag>
+        ),
         progressBadge: `${progress.filter((row) => row.completed).length}/${progress.length}`,
         progress: <V3ProductProgressList currentKey={step} rows={progress} />
       }}

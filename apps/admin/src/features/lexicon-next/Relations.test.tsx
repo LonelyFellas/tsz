@@ -260,3 +260,61 @@ it("新版接入 V1 拓展词，候选按语言隔离，关联保存回读与预
   expect(await section.findByText("work")).toBeVisible();
   expect(section.getByText(/工作.*87.5%/)).toBeVisible();
 });
+
+it.each([
+  ["en-GB", "work"],
+  ["en-US", "works"]
+])(
+  "发布预览 %s 显示冻结拼写 %s，不请求后来变化的目标草稿",
+  (target, spelling) => {
+    const get = vi
+      .fn()
+      .mockRejectedValue(new Error("should not read live draft"));
+    const data: NextDraft = {
+      schema_version: 1,
+      headword: "job",
+      forms: [],
+      senses: [
+        {
+          id: "source",
+          part_of_speech: "noun",
+          definitions: [],
+          equivalents: [],
+          relations: [
+            {
+              id: "relation",
+              relation: "synonym",
+              target_word_id: "target",
+              target_sense_id: "target-sense",
+              score: "80"
+            }
+          ]
+        }
+      ]
+    };
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Preview
+          view={previewDraft(data, target!, "zh-Hans")}
+          requests={{ ...api.lexiconNext, get }}
+          relationTargets={[
+            {
+              entry_id: "target",
+              sense_id: "target-sense",
+              publication_id: "frozen",
+              headword: "old spelling",
+              forms: [
+                { id: "uk", locale: "en-GB", text: "work" },
+                { id: "us", locale: "en-US", text: "works" }
+              ],
+              gloss: "发布时的含义"
+            }
+          ]}
+        />
+      </QueryClientProvider>
+    );
+    expect(screen.getByText(spelling!)).toBeVisible();
+    expect(screen.getByText(/发布时的含义/)).toBeVisible();
+    expect(get).not.toHaveBeenCalled();
+  }
+);

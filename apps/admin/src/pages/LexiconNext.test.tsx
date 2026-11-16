@@ -85,6 +85,9 @@ const entry: NextEntry = {
 };
 function requests() {
   return {
+    publication: vi.fn(),
+    publicationPreview: vi.fn(),
+    publish: vi.fn(),
     sentences: vi.fn(),
     sentence: vi.fn(),
     createSentence: vi.fn(),
@@ -2744,7 +2747,7 @@ it("目录缓存更新后，停留在预览页也立即去除失效结构且不�
   );
   fireEvent.click(stepButton(/^预览/));
   const pane = screen.getByRole("heading", {
-    name: "预览"
+    name: "草稿预览"
   }).parentElement!;
   expect(within(pane).getByLabelText("语法结构")).toHaveTextContent("a job");
   const changed = structuredClone(partOfSpeechCatalogFixture);
@@ -3511,11 +3514,7 @@ it("英文例句点击进入编辑器，未应用时锁住宿主操作，取消�
   expect(api.saveSentence).not.toHaveBeenCalled();
 });
 async function editSentenceOriginal(locale: string, text: string) {
-  fireEvent.click(
-    await screen.findByRole("button", {
-      name: `编辑${locale}例句原文`
-    })
-  );
+  fireEvent.click(await screen.findByLabelText(`编辑${locale}例句原文`));
   const dialog = await screen.findByRole("dialog");
   expect(
     within(dialog).getByText(`编辑${locale}例句`, { exact: true })
@@ -3527,32 +3526,26 @@ async function editSentenceOriginal(locale: string, text: string) {
   const apply = within(dialog).getByRole("button", { name: "应用修改" });
   await waitFor(() => expect(apply).toBeEnabled());
   fireEvent.click(apply);
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
 }
 it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧并忽略空白译文占位", async () => {
   const { api, source } = unifiedSentenceRequests();
   await waitForEntryReady(1);
   fireEvent.click(stepButton(/^词义与译词/));
-  fireEvent.click(await screen.findByRole("button", { name: "添加例句" }));
-  fireEvent.click(button("保存完整草稿"));
+  fireEvent.click(textAction("添加例句"));
+  fireEvent.click(textAction("保存完整草稿"));
   await screen.findAllByText("请填写例句原文，或移除空白例句。");
   expect(api.save).not.toHaveBeenCalled();
-  fireEvent.click(screen.getAllByRole("button", { name: "移除引用" })[1]!);
+  fireEvent.click(screen.getAllByLabelText("移除引用")[1]!);
   await waitFor(() =>
     expect(screen.queryByText("请填写例句原文，或移除空白例句。")).toBeNull()
   );
-  expect(
-    screen.queryByRole("textbox", { name: "英式英语例句原文" })
-  ).toBeNull();
+  expect(screen.queryByLabelText("英式英语例句原文")).toBeNull();
   expect(screen.queryByRole("dialog")).toBeNull();
-  const freedomSlider = screen.getByRole("slider", {
-    name: "译文 1 自由度滑块"
-  });
+  const freedomSlider = screen.getByLabelText("译文 1 自由度滑块");
   expect(freedomSlider).toHaveAttribute("aria-disabled", "false");
   expect(freedomSlider).toHaveAttribute("aria-valuenow", "0");
-  const freedomInput = screen.getByRole("spinbutton", {
-    name: "译文 1 自由度"
-  });
+  const freedomInput = screen.getByLabelText("译文 1 自由度");
   expect(freedomInput).toHaveAttribute("aria-valuenow", "0");
   fireEvent.keyDown(freedomSlider, { key: "ArrowRight" });
   expect(freedomInput).toHaveAttribute("aria-valuenow", "0.1");
@@ -3564,21 +3557,18 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
   expect(freedomSlider).toHaveAttribute("aria-disabled", "false");
   expect(freedomSlider).toHaveAttribute("aria-valuenow", "0");
   await editSentenceOriginal("英式英语", "Local British.");
-  fireEvent.change(
-    screen.getByRole("textbox", { name: "译文 1 简体中文正文" }),
-    { target: { value: "本地译文" } }
-  );
-  fireEvent.click(button("添加译文"));
-  expect(
-    screen.getByRole("textbox", { name: "译文 2 简体中文正文" })
-  ).toHaveValue("");
+  fireEvent.change(screen.getByLabelText("译文 1 简体中文正文"), {
+    target: { value: "本地译文" }
+  });
+  fireEvent.click(textAction("添加译文"));
+  expect(screen.getByLabelText("译文 2 简体中文正文")).toHaveValue("");
   await chooseLanguage("美式英语");
   await editSentenceOriginal("美式英语", "Local American.");
   await chooseLanguage("英式英语");
   expect(
-    await screen.findByRole("button", { name: "编辑英式英语例句原文" })
+    await screen.findByLabelText("编辑英式英语例句原文")
   ).toHaveTextContent("Local British.");
-  fireEvent.click(button("下一步：预览"));
+  fireEvent.click(textAction("下一步：预览"));
   const preview = screen.getByLabelText("多维例句预览");
   expect(within(preview).getByText("Local British.")).toBeVisible();
   expect(within(preview).getByText("本地译文")).toBeVisible();
@@ -3586,7 +3576,7 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
   expect(api.createSentence).not.toHaveBeenCalled();
   expect(api.saveSentence).not.toHaveBeenCalled();
   expect(api.sentence).not.toHaveBeenCalled();
-  fireEvent.click(button("保存完整草稿"));
+  fireEvent.click(textAction("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
   expect(api.save.mock.calls[0]![1].draft.senses[0].relations).toEqual([
     expect.objectContaining({ id: "retained-relation", score: "80" })
@@ -3647,4 +3637,91 @@ it("统一保存冲突保留本地例句，可比较服务器例句，明确确�
   );
   fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
   await waitFor(() => expect(english).toHaveTextContent("Server example."));
+});
+
+it("其他标签页只改变发布生命周期时，比较重载后使用新版本恢复预检", async () => {
+  useAuthStore.setState({
+    profile: {
+      ...useAuthStore.getState().profile!,
+      permissions: ["words.access", "words.edit", "words.publish"]
+    }
+  });
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, publishing: true });
+  api.publication.mockResolvedValueOnce({
+    entry_id: id,
+    status: "draft",
+    lifecycle_revision: 1,
+    has_unpublished_changes: true,
+    current: null
+  });
+  api.publication.mockResolvedValue({
+    entry_id: id,
+    status: "published",
+    lifecycle_revision: 2,
+    has_unpublished_changes: false,
+    current: null
+  });
+  api.publicationPreview.mockRejectedValueOnce(
+    new HttpError(409, "词条版本已变化", [], "revision_conflict")
+  );
+  api.publicationPreview.mockResolvedValue({
+    entry_id: id,
+    revision: 1,
+    lifecycle_revision: 2,
+    preview_token: "a".repeat(64),
+    can_publish: false,
+    issues: [],
+    warnings: []
+  });
+  mount(api);
+  await waitForEntryReady(1);
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.click(button("检查发布"));
+  await screen.findByRole("button", { name: "比较服务器版本" });
+  await waitFor(() => expect(button("比较服务器版本")).toBeEnabled());
+  fireEvent.click(button("比较服务器版本"));
+  await screen.findByText("服务器 · 版本 1");
+  fireEvent.click(button("放弃本地修改并重载"));
+  fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
+  await waitFor(() => expect(button("检查发布")).toBeEnabled());
+  fireEvent.click(button("检查发布"));
+  await waitFor(() => expect(api.publicationPreview).toHaveBeenCalledTimes(2));
+  expect(api.publicationPreview).toHaveBeenLastCalledWith(id, {
+    base_revision: 1,
+    base_lifecycle_revision: 2
+  });
+});
+
+it("比较发布冲突的状态读取失败时保留未保存草稿并允许重试", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, publishing: true });
+  api.publication.mockResolvedValue({
+    entry_id: id,
+    status: "draft",
+    lifecycle_revision: 1,
+    has_unpublished_changes: true,
+    current: null
+  });
+  api.save.mockRejectedValue(new HttpError(409, "服务器版本已变化"));
+  mount(api);
+  await waitForEntryReady(1);
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "local-unsaved" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await screen.findByRole("button", { name: "比较服务器版本" });
+  api.workspaceEntry.mockRejectedValueOnce(new HttpError(503, "状态暂不可用"));
+  fireEvent.click(button("比较服务器版本"));
+  await screen.findByText("状态暂不可用");
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "local-unsaved"
+  );
+  expect(button("比较服务器版本")).toBeEnabled();
+  fireEvent.click(button("比较服务器版本"));
+  await screen.findByText("服务器 · 版本 1");
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "local-unsaved"
+  );
 });

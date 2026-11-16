@@ -244,7 +244,7 @@ export interface NextWorkspaceQuery extends NextListQuery {
   created_to?: string;
 }
 export interface NextWorkspaceEntry extends NextEntrySummary {
-  status: "draft" | "archived";
+  status: "draft" | "published" | "archived";
   lifecycle_revision: number;
   created_at: string;
   created_by_name: string;
@@ -379,4 +379,54 @@ export interface NextSentenceDraftChange {
   target_locale: string;
   medium_locale: string;
   variant: NextSentenceVariant;
+}
+
+export interface NextPublicationBase {
+  base_revision: number;
+  base_lifecycle_revision: number;
+}
+export interface NextPublishInput extends NextPublicationBase {
+  request_id: string;
+  preview_token: string;
+}
+export interface NextPublicationIssue {
+  node_id: string;
+  field: string;
+  message: string;
+}
+export interface NextPublicationPreview {
+  entry_id: string;
+  revision: number;
+  lifecycle_revision: number;
+  preview_token: string;
+  issues: NextPublicationIssue[];
+  warnings: NextPublicationIssue[];
+  can_publish: boolean;
+}
+export interface NextPublication {
+  id: string;
+  entry_id: string;
+  revision: number;
+  lifecycle_revision: number;
+  published_by_admin_id: string;
+  published_at: string;
+  snapshot: {
+    draft: NextDraft;
+    sentence_resources: NextSentence[];
+    relation_targets: {
+      entry_id: string;
+      sense_id: string;
+      publication_id: string;
+      headword: string;
+      forms: NextForm[];
+      gloss: string;
+    }[];
+  };
+}
+export interface NextPublicationState {
+  entry_id: string;
+  status: "draft" | "published" | "archived";
+  lifecycle_revision: number;
+  has_unpublished_changes: boolean;
+  current: NextPublication | null;
 }

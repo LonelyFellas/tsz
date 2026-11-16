@@ -22,9 +22,9 @@ export const lexiconListMessages = {
   ],
   publish: ["发布", "發布", "Publish"],
   next_publish_unavailable: [
-    "新版尚未接入语音审核、例句及发布系统，暂不能批量发布",
-    "新版尚未接入語音審核、例句及發布系統，暫不能批次發布",
-    "Batch publication requires the new audio review, sentence and publication systems"
+    "批量发布尚未开放，请打开词条逐条发布",
+    "批次發布尚未開放，請開啟詞條逐條發布",
+    "Batch publication is not available yet. Open an entry to publish it."
   ],
   next_references_unavailable: [
     "新版尚未接入引用系统，暂不能检查引用",
