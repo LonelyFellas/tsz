@@ -815,6 +815,17 @@ describe("V3PublicationHistory", () => {
       "pub-earlier"
     );
 
+    fireEvent.click(
+      within(detail).getByRole("button", { name: "查看更新版本" })
+    );
+    const newerDetail = await screen.findByTestId("publication-detail");
+    expect(
+      within(newerDetail).getByText("immutable-v3-detail")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "查看第 2 次发布" })
+    ).toHaveAttribute("aria-current", "true");
+
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
     fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const v3Detail = await screen.findByTestId("publication-detail");
