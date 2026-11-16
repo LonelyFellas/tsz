@@ -200,4 +200,32 @@ describe("新版发布确认", () => {
       screen.queryByRole("button", { name: "重试确认发布结果" })
     ).toBeNull();
   });
+
+  it("未知结果重试遇到版本冲突时先回读，已发布则确认原请求完成", async () => {
+    const p = props();
+    p.requests.publish.mockRejectedValueOnce(new Error("network"));
+    p.requests.publish.mockRejectedValueOnce(
+      new HttpError(409, "版本已变化", [], "revision_conflict")
+    );
+    p.onRefresh.mockResolvedValue({
+      data: {
+        ...state,
+        status: "published",
+        lifecycle_revision: 2,
+        has_unpublished_changes: false,
+        current: published
+      }
+    });
+    render(<PublicationPanel {...p} />);
+    await check();
+    fireEvent.click(screen.getByRole("button", { name: "确认发布" }));
+    await screen.findByText(/发布结果尚未确认/);
+    fireEvent.click(screen.getByRole("button", { name: "重试确认发布结果" }));
+    await waitFor(() => expect(p.onPublished).toHaveBeenCalledWith(published));
+    expect(p.onRefresh).toHaveBeenCalledTimes(1);
+    expect(p.onConflict).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "重试确认发布结果" })
+    ).toBeNull();
+  });
 });
