@@ -930,6 +930,7 @@ function EntryEditor({
             partOfSpeechCodes={language.part_of_speech_codes}
             senseGroupsAvailable={senseGroupsAvailable}
             senseMetadataAvailable={senseMetadataAvailable}
+            meaningLabels
             equivalentMetadataAvailable={equivalentMetadataAvailable}
             grammarAvailable={grammarAvailable}
             grammarAudioAvailable={grammarAudioAvailable}

@@ -74,6 +74,7 @@ export function MeaningsStep({
   senseGroupsAvailable = false,
   senseMetadataAvailable = false,
   equivalentMetadataAvailable = false,
+  meaningLabels = false,
   requests,
   grammarAvailable = false,
   grammarAudioAvailable = false,
@@ -99,6 +100,7 @@ export function MeaningsStep({
   senseGroupsAvailable?: boolean;
   senseMetadataAvailable?: boolean;
   equivalentMetadataAvailable?: boolean;
+  meaningLabels?: boolean;
   requests?: LexiconNextRequests;
   grammarAvailable?: boolean;
   grammarAudioAvailable?: boolean;
@@ -519,11 +521,12 @@ export function MeaningsStep({
                               row.text.trim()
                           )?.text ||
                           "未填写释义";
+                        const senseLabel = meaningLabels ? "义项" : "词义";
                         const isExpanded = expandedId === sense.id;
                         return (
                           <section
                             key={sense.id}
-                            aria-label={`词义 ${index + 1}`}
+                            aria-label={`${senseLabel} ${index + 1}`}
                           >
                             <SenseEditorShell
                               index={index}
@@ -580,7 +583,7 @@ export function MeaningsStep({
                                       <Space wrap>
                                         <span>词性</span>
                                         <Select
-                                          aria-label={`词义 ${index + 1} 词性`}
+                                          aria-label={`${senseLabel} ${index + 1} 词性`}
                                           placeholder="未指定词性"
                                           options={partOfSpeechCodes.map(
                                             (value) => ({
@@ -597,6 +600,7 @@ export function MeaningsStep({
                                     <V3SenseMetadataFields
                                       sense={sense}
                                       index={index}
+                                      meaningLabels={meaningLabels}
                                       catalogPos={catalog.data?.items.find(
                                         (part) =>
                                           part.code === sense.part_of_speech
@@ -613,7 +617,7 @@ export function MeaningsStep({
                                   <Space wrap>
                                     <span>词性</span>
                                     <Select
-                                      aria-label={`词义 ${index + 1} 词性`}
+                                      aria-label={`${senseLabel} ${index + 1} 词性`}
                                       placeholder="未指定词性"
                                       allowClear
                                       value={sense.part_of_speech ?? undefined}
@@ -632,7 +636,7 @@ export function MeaningsStep({
                                       <>
                                         <span>细分词性</span>
                                         <Select
-                                          aria-label={`词义 ${index + 1} 细分词性`}
+                                          aria-label={`${senseLabel} ${index + 1} 细分词性`}
                                           disabled={disabled}
                                           placeholder="请选择细分词性"
                                           value={sense.sub_pos || undefined}
@@ -686,9 +690,12 @@ export function MeaningsStep({
                                     )}
                                     {senseGroupsAvailable && (
                                       <Select
-                                        aria-label={t("sense_group_label", {
-                                          index: index + 1
-                                        })}
+                                        aria-label={t(
+                                          meaningLabels
+                                            ? "meaning_group_label"
+                                            : "sense_group_label",
+                                          { index: index + 1 }
+                                        )}
                                         disabled={disabled}
                                         placeholder={t("select_group")}
                                         value={

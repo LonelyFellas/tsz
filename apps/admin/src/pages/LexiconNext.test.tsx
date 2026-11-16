@@ -2224,7 +2224,7 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   await screen.findByDisplayValue("centre");
   fireEvent.click(stepButton(/词义与译词/));
   fireEvent.click(stepButton(/词义与译词/));
-  await chooseBasicPos("词义 1 词性");
+  await chooseBasicPos("义项 1 词性");
   fireEvent.click(button("删除简体中文解释 1"));
   api.workspaceList.mockResolvedValue({
     items: [],
@@ -2968,7 +2968,7 @@ it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐�
     "机构"
   );
   fireEvent.mouseDown(
-    screen.getByRole("combobox", { name: "释义 1 所属语义区间" })
+    screen.getByRole("combobox", { name: "义项 1 所属语义区间" })
   );
   fireEvent.click(
     screen
@@ -2977,7 +2977,7 @@ it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐�
   );
   expect(
     screen
-      .getByRole("combobox", { name: "释义 1 所属语义区间" })
+      .getByRole("combobox", { name: "义项 1 所属语义区间" })
       .closest(".ui-select")
   ).toHaveTextContent("机构");
   fireEvent.click(button("删除语义区间 2"));
@@ -3124,26 +3124,26 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
   await screen.findByText("版本 1");
   fireEvent.click(stepButton(/词义与译词/));
   fireEvent.mouseDown(
-    await screen.findByRole("combobox", { name: "词义 1 词性" })
+    await screen.findByRole("combobox", { name: "义项 1 词性" })
   );
   fireEvent.click(
     await screen.findByText("名词", {
       selector: ".ui-select-item-option-content"
     })
   );
-  const level = await screen.findByRole("combobox", { name: "释义 1 等级" });
+  const level = await screen.findByRole("combobox", { name: "义项 1 等级" });
   fireEvent.mouseDown(level);
   fireEvent.click(
     await screen.findByText("B2", {
       selector: ".ui-select-item-option-content"
     })
   );
-  fireEvent.change(screen.getByRole("spinbutton", { name: "释义 1 频率" }), {
+  fireEvent.change(screen.getByRole("spinbutton", { name: "义项 1 频率" }), {
     target: { value: "95.5" }
   });
-  fireEvent.click(screen.getByRole("switch", { name: "释义 1 是否依赖语境" }));
+  fireEvent.click(screen.getByRole("switch", { name: "义项 1 是否依赖语境" }));
   await chooseLanguage("美式英语");
-  expect(screen.getByRole("spinbutton", { name: "释义 1 频率" })).toHaveValue(
+  expect(screen.getByRole("spinbutton", { name: "义项 1 频率" })).toHaveValue(
     "95.50"
   );
   fireEvent.click(button("保存完整草稿"));
@@ -3299,7 +3299,7 @@ it("确认释义能力后开放双语表格，完整稿保存保留其他语言�
   expect(
     screen.queryByRole("button", { name: "编辑简体中文解释 1" })
   ).toBeNull();
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "释义 1 等级" }));
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "义项 1 等级" }));
   fireEvent.click(
     await screen.findByText("B1", {
       selector: ".ui-select-item-option-content"

@@ -23,6 +23,7 @@ export function V3SenseMetadataFields({
   index,
   catalogPos,
   groupOptions,
+  meaningLabels = false,
   subPosIssue,
   frequencyIssue,
   groupsAvailable = true,
@@ -34,6 +35,7 @@ export function V3SenseMetadataFields({
   index: number;
   catalogPos?: PartOfSpeechCatalogItem;
   groupOptions: { value: string; label: string }[];
+  meaningLabels?: boolean;
   subPosIssue?: V3DraftValidationIssue;
   frequencyIssue?: V3DraftValidationIssue;
   groupsAvailable?: boolean;
@@ -58,7 +60,10 @@ export function V3SenseMetadataFields({
       <label className="word-sense-field">
         <Typography.Text type="secondary">{t("sense_level")}</Typography.Text>
         <Select
-          aria-label={t("sense_level_label", { index: index + 1 })}
+          aria-label={t(
+            meaningLabels ? "meaning_level_label" : "sense_level_label",
+            { index: index + 1 }
+          )}
           data-v3-field="level"
           data-v3-node-id={sense.id}
           onChange={(level: string) => onChange({ level })}
@@ -72,7 +77,10 @@ export function V3SenseMetadataFields({
             {t("sense_groups")}
           </Typography.Text>
           <Select
-            aria-label={t("sense_group_label", { index: index + 1 })}
+            aria-label={t(
+              meaningLabels ? "meaning_group_label" : "sense_group_label",
+              { index: index + 1 }
+            )}
             data-v3-field="sense_group_id"
             data-v3-node-id={sense.id}
             onChange={(id: string) =>
@@ -105,7 +113,12 @@ export function V3SenseMetadataFields({
             <Typography.Text type="secondary">{t("sub_pos")}</Typography.Text>
             {extensible ? (
               <Select
-                aria-label={t("sense_sub_pos_label", { index: index + 1 })}
+                aria-label={t(
+                  meaningLabels
+                    ? "meaning_sub_pos_label"
+                    : "sense_sub_pos_label",
+                  { index: index + 1 }
+                )}
                 data-v3-field="sub_pos"
                 data-v3-node-id={sense.id}
                 onChange={(sub_pos: string) => onChange({ sub_pos })}
@@ -142,7 +155,10 @@ export function V3SenseMetadataFields({
       <label className="word-sense-field word-sense-field-frequency">
         <Typography.Text type="secondary">{t("frequency")}</Typography.Text>
         <InputNumber
-          aria-label={t("sense_frequency_label", { index: index + 1 })}
+          aria-label={t(
+            meaningLabels ? "meaning_frequency_label" : "sense_frequency_label",
+            { index: index + 1 }
+          )}
           data-v3-field="frequency"
           data-v3-node-id={sense.id}
           placeholder="0–100"
@@ -173,7 +189,10 @@ export function V3SenseMetadataFields({
           }}
         >
           <Switch
-            aria-label={t("sense_context_label", { index: index + 1 })}
+            aria-label={t(
+              meaningLabels ? "meaning_context_label" : "sense_context_label",
+              { index: index + 1 }
+            )}
             checked={sense.depends_on_context ?? false}
             onChange={(depends_on_context) => onChange({ depends_on_context })}
           />

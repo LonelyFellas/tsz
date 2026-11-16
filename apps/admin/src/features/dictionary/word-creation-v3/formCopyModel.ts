@@ -946,13 +946,13 @@ export function applyFormCopy(
       )
     )
       throw new FormCopyError("copy_shared_spelling_mapping_conflict");
+    const content = variant.spelling_speech?.content;
     variant.spelling_speech = {
       ...variant.spelling_speech,
-      content: variant.spelling_speech?.content ?? {
-        version: 2,
-        text: variant.spelling,
-        annotations: []
-      },
+      content:
+        content?.text === variant.spelling
+          ? content
+          : { version: 2, text: variant.spelling, annotations: [] },
       voice_profile: structuredClone(profile)
     };
   }
