@@ -16,6 +16,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useBeforeUnload,
   useBlocker,
+  useLocation,
   useNavigate,
   useSearchParams,
   useParams
@@ -76,6 +77,12 @@ import "./lexicon-next.css";
 export type LexiconNextRequests = typeof api.lexiconNext;
 function failure(error: unknown) {
   return error instanceof Error ? error.message : "请求失败，请重试。";
+}
+function editorStepFromSearch(
+  search: string
+): Exclude<WordCreationStep, "basics"> {
+  const value = new URLSearchParams(search).get("step");
+  return value === "meanings" || value === "preview" ? value : "forms";
 }
 
 export function LexiconNextPage({
@@ -212,6 +219,7 @@ function EntryLoader({
   language: NextLanguageCapability;
 }) {
   const { medium, search: languageSearch } = useLexiconLanguages();
+  const location = useLocation();
   const navigate = useNavigate();
   const query = useQuery({
     queryKey: ["admin-lexicon-next", "entry", id],
@@ -254,7 +262,8 @@ function EntryLoader({
     );
   if (query.data.target_language !== "en")
     return <Alert type="warning" title="当前编辑器尚未开放此目标语言" />;
-  if (query.data.medium_locale !== medium) {
+  const preserveEditor = location.state?.lexiconMediumSwitch === true;
+  if (query.data.medium_locale !== medium && !preserveEditor) {
     const selection = new URLSearchParams(languageSearch);
     if (query.data.medium_locale)
       selection.set("medium_locale", query.data.medium_locale);
@@ -276,7 +285,9 @@ function EntryLoader({
   }
   return (
     <EntryEditor
+      key={`${id}:${medium}`}
       initial={query.data}
+      entryMedium={query.data.medium_locale ?? medium}
       requests={requests}
       language={language}
       archived={metadata.data.status === "archived"}
@@ -297,6 +308,7 @@ function EntryLoader({
 }
 function EntryEditor({
   initial,
+  entryMedium,
   requests,
   language,
   archived,
@@ -327,6 +339,7 @@ function EntryEditor({
   publishingAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
+  entryMedium: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
 }) {
@@ -339,6 +352,7 @@ function EntryEditor({
     staleTime: 5 * 60 * 1000
   });
   const navigate = useNavigate();
+  const routeLocation = useLocation();
   const [params] = useSearchParams();
   const linked = params.get("sense");
   const linkedIssue = initial.draft.senses.some((s) => s.id === linked)
@@ -349,11 +363,12 @@ function EntryEditor({
       )
     : undefined;
   const publishedSense = params.get("published_sense");
+  const requestedStep = editorStepFromSearch(routeLocation.search);
   const [issueFocus, setIssueFocus] = useState<
     ReturnType<typeof publicationIssueLocation> | undefined
   >(linkedIssue);
   const [step, setStep] = useState<WordCreationStep>(
-    publishedSense ? "preview" : linkedIssue ? "meanings" : "forms"
+    publishedSense ? "preview" : linkedIssue ? "meanings" : requestedStep
   );
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
@@ -410,11 +425,12 @@ function EntryEditor({
   );
   const {
     target,
-    medium,
+    medium: selectedMedium,
     search: languageSearch,
     setLocked,
     cancelLanguageChange
   } = useLexiconLanguages();
+  const medium = entryMedium;
   const sentenceWorkspace = useSentenceDrafts(
     saved.sentence_resources ?? [],
     draft,
@@ -455,10 +471,20 @@ function EntryEditor({
     setLocked(busy || formContentOpen);
     return () => setLocked(false);
   }, [busy, formContentOpen, setLocked]);
-  const leaveState = useRef({ busy, formContentOpen, dirty, medium });
-  useLayoutEffect(() => {
-    leaveState.current = { busy, formContentOpen, dirty, medium };
+  const leaveState = useRef({
+    busy,
+    formContentOpen,
+    dirty,
+    medium: selectedMedium
   });
+  useLayoutEffect(() => {
+    leaveState.current = {
+      busy,
+      formContentOpen,
+      dirty,
+      medium: selectedMedium
+    };
+  }, [busy, formContentOpen, dirty, selectedMedium]);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     const current = leaveState.current;
     const requestedMedium = new URLSearchParams(nextLocation.search).get(
@@ -588,24 +614,36 @@ function EntryEditor({
     });
   }
   function changeStep(next: WordCreationStep) {
+    const nextStep = next === "basics" ? "forms" : next;
     if (
-      next === "forms" &&
+      nextStep === "forms" &&
       !draft.form_editor?.pos.some((pos) => pos.pos === selectedPos)
     ) {
       setSelectedPos(draft.form_editor?.pos[0]?.pos);
     }
-    setStep(next);
+    setStep(nextStep);
+    const query = new URLSearchParams(routeLocation.search);
+    query.set("step", nextStep);
+    navigate(`${routeLocation.pathname}?${query}`, {
+      replace: true,
+      state: routeLocation.state
+    });
   }
   function locateIssue(issue: NextPublicationIssue) {
-    const location = publicationIssueLocation(draft, issue, target);
-    changeStep(location.step);
-    setSelectedPos(location.pos);
-    setIssueFocus(location);
-    if (location.locale !== target) {
-      const query = new URLSearchParams(languageSearch);
-      query.set("target_locale", location.locale);
-      navigate(`?${query}`, { replace: true });
-    }
+    const issueLocation = publicationIssueLocation(draft, issue, target);
+    const nextStep =
+      issueLocation.step === "basics" ? "forms" : issueLocation.step;
+    setStep(nextStep);
+    setSelectedPos(issueLocation.pos);
+    setIssueFocus(issueLocation);
+    const query = new URLSearchParams(routeLocation.search);
+    query.set("step", nextStep);
+    if (issueLocation.locale !== target)
+      query.set("target_locale", issueLocation.locale);
+    navigate(`?${query}`, {
+      replace: true,
+      state: routeLocation.state
+    });
   }
   useEffect(() => {
     if (!issueFocus || step !== issueFocus.step || target !== issueFocus.locale)
@@ -664,6 +702,12 @@ function EntryEditor({
           <Alert
             type="info"
             title="此词条只读：需要编辑权限，编辑他人词条还需相应授权。"
+          />
+        )}
+        {entryMedium !== selectedMedium && (
+          <Alert
+            type="info"
+            title={`当前词条归属${localeLabels[entryMedium] ?? entryMedium}，仍按该媒介语编辑和保存。`}
           />
         )}
         {(error || conflict) && (
