@@ -1359,3 +1359,35 @@ it("共享标签只提供删除和新增，修改内容仍应用到全部共享�
       "shared edit"
     );
 });
+
+it("没有外层标签 Provider 时，短语内容标签仍使用传入的词性目录", () => {
+  const forms = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    formsFixture({
+      pos: "phrase_verbal_constituent",
+      forms: [commonFormFixture()]
+    })
+  ) as SharedFormsStepContentV3;
+  setup({
+    initialForms: forms,
+    baseOnly: true,
+    catalog: {
+      ...partOfSpeechCatalogFixture,
+      items: [
+        {
+          ...partOfSpeechCatalogFixture.items[0]!,
+          code: "phrase_verbal_constituent",
+          kind: "phrase",
+          name_zh: "动词性成分",
+          name_en: "Verbal constituent"
+        }
+      ]
+    }
+  });
+  expect(
+    screen.getByRole("button", { name: "移除动词性成分原形标签" })
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "移除其他词性原形标签" })
+  ).toBeNull();
+});

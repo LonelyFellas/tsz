@@ -148,7 +148,8 @@ function requests() {
 }
 async function chooseLanguage(label: string) {
   const field = label.includes("英语") ? "目标语言" : "媒介语言";
-  const select = screen.getByRole("combobox", { name: field });
+  const languages = within(screen.getByRole("group", { name: "智能词库语言" }));
+  const select = languages.getByRole("combobox", { name: field });
   await waitFor(() => expect(select).toBeEnabled());
   fireEvent.mouseDown(select);
   fireEvent.click(
@@ -3527,11 +3528,11 @@ async function editSentenceOriginal(locale: string, text: string) {
   expect(
     within(dialog).getByText(`编辑${locale}例句`, { exact: true })
   ).toBeVisible();
-  const editor = await within(dialog).findByRole("textbox", {
-    name: `${locale}例句原文`
-  });
+  const editor = await within(dialog).findByLabelText(`${locale}例句原文`);
   fireEvent.change(editor, { target: { value: text } });
-  const apply = within(dialog).getByRole("button", { name: "应用修改" });
+  const apply = within(dialog)
+    .getByText("应用修改", { selector: "button span", exact: true })
+    .closest("button")!;
   await waitFor(() => expect(apply).toBeEnabled());
   fireEvent.click(apply);
   await waitFor(() => expect(dialog).not.toBeInTheDocument());
