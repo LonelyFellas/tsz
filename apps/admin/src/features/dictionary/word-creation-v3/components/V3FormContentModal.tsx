@@ -17,6 +17,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useCallback,
   useRef,
   useState
 } from "react";
@@ -42,7 +43,10 @@ import type {
   WordConcreteFormV3
 } from "@tsz/types";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { createFormTypeComparator } from "../../part-of-speech/catalog";
+import {
+  createFormTypeComparator,
+  localizedCatalogName
+} from "../../part-of-speech/catalog";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
@@ -119,8 +123,17 @@ export function V3FormContentModal({
   onConfirm: (forms: SharedFormsStepContentV3) => void;
   onApply?: (forms: SharedFormsStepContentV3) => void;
 }) {
-  const partOfSpeechLabel = usePartOfSpeechLabel();
-  const { t } = useLexiconEditorTranslation();
+  const fallbackPartOfSpeechLabel = usePartOfSpeechLabel();
+  const { t, i18n } = useLexiconEditorTranslation();
+  const partOfSpeechLabel = useCallback(
+    (code: string) => {
+      const item = catalog?.items.find((item) => item.code === code);
+      return item
+        ? localizedCatalogName(item, i18n.language)
+        : fallbackPartOfSpeechLabel(code);
+    },
+    [catalog, fallbackPartOfSpeechLabel, i18n.language]
+  );
   const issueText = (issue: Exclude<FormContentIssue, null>) =>
     "message" in issue ? t(issue.message) : issue.detail;
   const outerSave = useVoiceSave();
