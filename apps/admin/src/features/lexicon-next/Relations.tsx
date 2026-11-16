@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type {
-  NextEntry,
   NextPublication,
   WordRelationWritableV3,
   WordSenseWritableV3
@@ -10,48 +9,13 @@ import { Alert, Button } from "@tsz/ui/admin/display";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { useAuthStore } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
-import type {
-  RelatedSuggestionsSource,
-  RelatedWordChoice
-} from "@/features/dictionary/relatedSuggestions";
+import type { RelatedSuggestionsSource } from "@/features/dictionary/relatedSuggestions";
 import { V3RelationsGrid } from "@/features/dictionary/word-creation-v3/components/V3RelationsGrid";
 import { groupRelations } from "@/features/dictionary/word-creation-v3/relationGroups";
 import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { relationLabel } from "@/features/dictionary/word-creation-v3/presentation";
-import { draftForms } from "./model";
-
-function choice(
-  entry: NextEntry,
-  target: string,
-  medium: string
-): RelatedWordChoice {
-  const forms = draftForms(entry.draft);
-  const headword =
-    forms.find((row) => row.locale === target)?.text ||
-    forms.find((row) => row.locale === "en")?.text ||
-    entry.draft.headword;
-  const senses = entry.draft.senses.map((sense) => ({
-    sense_id: sense.id,
-    gloss:
-      sense.definitions.find((row) => row.locale === medium)?.text ||
-      sense.equivalents.find((row) => row.locale === medium)?.text ||
-      "",
-    status: "draft" as const
-  }));
-  return {
-    word_id: entry.id,
-    headword,
-    matchedHeadword: headword,
-    status: "draft",
-    senses,
-    senseCount: senses.length,
-    preview: senses
-      .map((sense) => sense.gloss)
-      .filter(Boolean)
-      .join("；")
-  };
-}
+import { entrySenseChoice } from "./entrySenseChoice";
 
 function useTargets(
   rows: WordRelationWritableV3[],
@@ -118,13 +82,13 @@ export function Relations({
           .filter((entry) => entry.id !== exclude)
           .slice(0, 3)
           .map(async (entry) =>
-            choice(await requests.get(entry.id), target, medium)
+            entrySenseChoice(await requests.get(entry.id), target, medium)
           )
       );
     },
     senses: async (id) => ({
       entry_id: id,
-      senses: choice(await requests.get(id), target, medium).senses
+      senses: entrySenseChoice(await requests.get(id), target, medium).senses
     })
   };
   const snapshots = Object.fromEntries(
@@ -133,7 +97,7 @@ export function Relations({
         (entry) => entry.id === row.target_word_id
       );
       if (!entry) return [];
-      const word = choice(entry, target, medium);
+      const word = entrySenseChoice(entry, target, medium);
       return [
         [
           row.id,
@@ -241,7 +205,7 @@ export function RelationsPreview({
                 const entry = targets.entries.find(
                   (entry) => entry.id === row.target_word_id
                 );
-                const word = entry && choice(entry, target, medium);
+                const word = entry && entrySenseChoice(entry, target, medium);
                 const frozen = frozenTargets?.find(
                   (v) =>
                     v.entry_id === row.target_word_id &&

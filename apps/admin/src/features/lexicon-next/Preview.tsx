@@ -1,3 +1,6 @@
+import { DialectPreview } from "./DialectPairs";
+import type { NextDialectSense } from "@tsz/types";
+import { useEffect, useRef } from "react";
 import { RelationsPreview } from "./Relations";
 import { SentenceExamplesPreview } from "./SenseSentenceExamples";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
@@ -155,17 +158,32 @@ function SenseMetadataSummary({
 }
 export function Preview({
   relationTargets,
+  dialectSenses,
+  dialectDraft,
+  published = false,
+  focusSense,
   view,
   requests,
   sentenceDetailsAvailable = false,
   sentenceResources
 }: {
   view: NextEntryView;
+  dialectSenses?: NextDialectSense[];
+  dialectDraft?: NextDraft;
+  published?: boolean;
+  focusSense?: string | null;
   sentenceDetailsAvailable?: boolean;
   sentenceResources?: Record<string, NextSentence>;
   relationTargets?: NextPublication["snapshot"]["relation_targets"];
   requests?: LexiconNextRequests;
 }) {
+  const focus = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focusSense && focus.current) {
+      focus.current.scrollIntoView({ block: "center" });
+      focus.current.focus({ preventScroll: true });
+    }
+  }, [focusSense]);
   return (
     <EntryDialectContext.Provider
       value={view.target_locale === "en-US" ? "en-US" : "en-GB"}
@@ -193,12 +211,27 @@ export function Preview({
           <Lines rows={view.forms} missing="词形" textClassName="tsz-words" />
           {!view.senses.length && <p>尚无词义</p>}
           {view.senses.map((sense, index) => (
-            <section key={sense.id}>
+            <section
+              key={sense.id}
+              ref={sense.id === focusSense ? focus : undefined}
+              tabIndex={sense.id === focusSense ? -1 : undefined}
+            >
               <h4>
                 词义 {index + 1}
                 {senseGroupName(view.sense_groups, sense.sense_group_id)}
               </h4>
               <SenseMetadataSummary sense={sense} />
+              {dialectDraft && (
+                <DialectPreview
+                  row={(dialectSenses ?? view.dialect_senses)?.find(
+                    (v) => v.sense_id === sense.id
+                  )}
+                  locale={view.target_locale}
+                  medium={view.medium_locale}
+                  draft={dialectDraft}
+                  published={published}
+                />
+              )}
 
               <Definitions
                 rows={sense.target_definitions}
@@ -273,12 +306,14 @@ export function Preview({
 }
 export function DraftSummary({
   draft,
+  dialectSenses,
   sentenceResources,
   requests,
   target = "en-GB",
   medium = "zh-Hans"
 }: {
   draft: NextDraft;
+  dialectSenses?: NextDialectSense[];
   sentenceResources?: Record<string, NextSentence>;
   requests?: LexiconNextRequests;
   target?: string;
@@ -315,6 +350,12 @@ export function DraftSummary({
               {senseGroupName(draft.sense_groups, sense.sense_group_id)}
             </h4>
             <SenseMetadataSummary sense={sense} />
+            <DialectPreview
+              row={dialectSenses?.find((s) => s.sense_id === sense.id)}
+              draft={draft}
+              medium={medium}
+              locale={target}
+            />
             <Definitions rows={sense.definitions} missing="释义" />
             <DraftEquivalentSummary sense={sense} />
             {sense.sentence_ids?.flatMap(

@@ -66,9 +66,11 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   let definitionDetails = false;
   let sentenceDrafts = false;
   let relations = false;
+  let dialectPairs = false;
   const editorOptions = {
     headers: {
       "x-tsz-next-publications": "v1",
+      "x-tsz-next-dialect-pairs": "v1",
       "x-tsz-next-relations": "v1",
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
@@ -105,7 +107,9 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   return {
     publication: (id: string) =>
       http
-        .get<unknown>(`${entry(id)}/publication`)
+        .get<unknown>(`${entry(id)}/publication`, {
+          headers: { "x-tsz-next-dialect-pairs": "v1" }
+        })
         .then((value) =>
           decode<NextPublicationState>("NextPublicationState", value)
         ),
@@ -204,6 +208,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         const capabilities = decodeNextCapabilities(value);
         definitionDetails = capabilities.definition_details === true;
         sentenceDrafts = capabilities.sentence_drafts === true;
+        dialectPairs = capabilities.dialect_pairs === true;
         relations = capabilities.relations === true;
         return capabilities;
       }),
@@ -222,6 +227,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) => {
+      if (input.dialect_changes?.length && !dialectPairs)
+        return Promise.reject(
+          new ClientResponseError("当前服务未开放方言配对，请重新打开词条")
+        );
       if (input.sentence_changes?.length && !sentenceDrafts) {
         return Promise.reject(
           new ClientResponseError("例句统一草稿能力尚未确认，请重新打开词条")
