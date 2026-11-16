@@ -1864,6 +1864,79 @@ it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", asyn
     })
   );
 });
+
+it("标注同原型冲突展示服务器标注，并按最新修订再次确认", async () => {
+  grantListPermissions();
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow({ annotation_visible: true, annotation: "1" })],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  api.workspaceEntry.mockResolvedValue(
+    listRow({ annotation_visible: true, annotation: "1" })
+  );
+  api.annotation
+    .mockRejectedValueOnce(
+      new HttpError(
+        409,
+        "标注或原型分组已变化",
+        [],
+        "annotation_conflict",
+        [],
+        {
+          annotation_conflict: {
+            reason: "revision_conflict",
+            groups: [],
+            entries: [
+              {
+                entry_id: id,
+                annotation: "9",
+                annotation_revision: 4,
+                created_by: "editor",
+                created_by_name: "编辑",
+                presentation: {
+                  label: "centre",
+                  matched_surfaces: ["centre"],
+                  strategy_version: "surface_summary_v1"
+                },
+                pos_labels: ["noun"],
+                gloss_previews: ["中心"],
+                updated_at: entry.updated_at,
+                inbound_relations: {
+                  total: 0,
+                  by_type: { synonym: 0, antonym: 0, derivative: 0 },
+                  previews: [],
+                  truncated: false
+                }
+              }
+            ]
+          }
+        }
+      )
+    )
+    .mockResolvedValue({
+      entry_id: id,
+      annotation: "9",
+      annotation_revision: 4
+    });
+  mount(api, "/lexicon-next");
+  fireEvent.mouseEnter(
+    await screen.findByRole("button", { name: "更多操作：centre" })
+  );
+  fireEvent.click(await screen.findByText("标注"));
+  const field = await screen.findByDisplayValue("1");
+  fireEvent.change(field, { target: { value: "2" } });
+  fireEvent.click(button("保存标注"));
+  await screen.findByText("标注或原型分组已变化，请根据当前标注重新确认。");
+  expect(screen.getByDisplayValue("9")).toBeVisible();
+  fireEvent.click(button("保存标注"));
+  await waitFor(() =>
+    expect(api.annotation).toHaveBeenLastCalledWith(id, {
+      annotation: "9",
+      base_annotation_revision: 4
+    })
+  );
+});
 it("保存移除最后一项媒介内容后，返回列表立即刷新统计与创建人，不等待生产缓存过期", async () => {
   const api = requests();
   api.get.mockResolvedValue({
