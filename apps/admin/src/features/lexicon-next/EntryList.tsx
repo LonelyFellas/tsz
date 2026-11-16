@@ -23,6 +23,7 @@ import {
 import { Form } from "@tsz/ui/admin/forms";
 import { App, Dropdown, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
+  EntryAnnotationConflict,
   NextListCommand,
   NextWorkspaceEntry,
   NextWorkspaceQuery
@@ -34,6 +35,8 @@ import {
 } from "@/features/dictionary/WordListTable";
 import { WordListFilters } from "@/features/dictionary/WordListFilters";
 import { EntryAnnotationModal } from "@/features/dictionary/EntryAnnotationModal";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { annotationForbiddenMessage } from "@/features/dictionary/annotationPermission";
 import { useLexiconListTranslation } from "@/features/dictionary/i18n/list";
 import {
   parseWordListSearchParams,
@@ -73,6 +76,7 @@ export function EntryList({
   partOfSpeechCodes: string[];
 }) {
   const { t, i18n } = useLexiconListTranslation();
+  const { t: editorT } = useLexiconEditorTranslation();
   const {
     search: languageSearch,
     targetLanguage,
@@ -190,6 +194,9 @@ export function EntryList({
     rows: NextWorkspaceEntry[];
   }>();
   const [annotationEntry, setAnnotationEntry] = useState<NextWorkspaceEntry>();
+  const [annotationConflict, setAnnotationConflict] =
+    useState<EntryAnnotationConflict>();
+  const [annotationVersion, setAnnotationVersion] = useState(0);
   const [loadingAnnotationId, setLoadingAnnotationId] = useState<string>();
   const [openActionRow, setOpenActionRow] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -259,6 +266,8 @@ export function EntryList({
       }
       setError(undefined);
       setConflict(false);
+      setAnnotationConflict(undefined);
+      setAnnotationVersion(0);
       setAnnotationEntry(current);
     } catch (failure) {
       void message.error(
@@ -857,24 +866,47 @@ export function EntryList({
       )}
       {annotationEntry && (
         <EntryAnnotationModal
-          rows={[
-            {
-              key: annotationEntry.id,
-              label: annotationEntry.headword,
-              annotation: annotationEntry.annotation,
-              posLabels: annotationEntry.part_of_speech,
-              glossPreviews: annotationEntry.gloss
-                ? [annotationEntry.gloss]
-                : [],
-              readOnly: !allowed(annotationEntry, "edit")
-            }
-          ]}
-          groups={[]}
+          key={`${annotationEntry.id}:${annotationVersion}`}
+          rows={
+            annotationConflict
+              ? annotationConflict.entries.map((item) => ({
+                  key: item.entry_id,
+                  label: item.presentation.label,
+                  annotation: item.annotation,
+                  posLabels: item.pos_labels,
+                  glossPreviews: item.gloss_previews,
+                  createdByName: item.created_by_name,
+                  updatedAt: item.updated_at,
+                  referenceCount: item.inbound_relations.total,
+                  href: `/lexicon-next/${item.entry_id}?${languageSearch}`,
+                  readOnly: item.entry_id !== annotationEntry.id,
+                  readOnlyHint:
+                    item.entry_id === annotationEntry.id
+                      ? undefined
+                      : editorT("creation_for_comparison_only")
+                }))
+              : [
+                  {
+                    key: annotationEntry.id,
+                    label: annotationEntry.headword,
+                    annotation: annotationEntry.annotation,
+                    posLabels: annotationEntry.part_of_speech,
+                    glossPreviews: annotationEntry.gloss
+                      ? [annotationEntry.gloss]
+                      : [],
+                    readOnly: !allowed(annotationEntry, "edit")
+                  }
+                ]
+          }
+          groups={annotationConflict?.groups ?? []}
           busy={pending}
           saveDisabled={conflict}
           error={error}
           onClose={() => {
-            if (!lock.current) setAnnotationEntry(undefined);
+            if (!lock.current) {
+              setAnnotationEntry(undefined);
+              setAnnotationConflict(undefined);
+            }
           }}
           onSave={async (values) => {
             if (lock.current || conflict || !allowed(annotationEntry, "edit"))
@@ -885,19 +917,41 @@ export function EntryList({
             try {
               await requests.annotation(annotationEntry.id, {
                 annotation: values[annotationEntry.id] || null,
-                base_annotation_revision: annotationEntry.annotation_revision
+                base_annotation_revision:
+                  annotationConflict?.entries.find(
+                    (item) => item.entry_id === annotationEntry.id
+                  )?.annotation_revision ?? annotationEntry.annotation_revision
               });
               setAnnotationEntry(undefined);
+              setAnnotationConflict(undefined);
               await refresh();
             } catch (failure) {
-              setError(
-                failure instanceof Error ? failure.message : t("list_failed")
-              );
-              setConflict(
+              if (
                 failure instanceof HttpError &&
-                  failure.status === 409 &&
-                  failure.code !== "annotation_conflict"
-              );
+                failure.status === 409 &&
+                failure.code === "annotation_conflict" &&
+                failure.meta?.annotation_conflict
+              ) {
+                setAnnotationConflict(failure.meta.annotation_conflict);
+                setAnnotationVersion((version) => version + 1);
+                setError(
+                  editorT(
+                    "creation_annotations_or_base_form_groups_have_changed_confirm_again_using_the_current_annotations"
+                  )
+                );
+              } else if (
+                failure instanceof HttpError &&
+                failure.status === 403
+              ) {
+                setError(annotationForbiddenMessage(failure.code, editorT));
+              } else {
+                setError(
+                  failure instanceof Error ? failure.message : t("list_failed")
+                );
+                setConflict(
+                  failure instanceof HttpError && failure.status === 409
+                );
+              }
             } finally {
               lock.current = false;
               setPending(false);
