@@ -14,6 +14,7 @@ import { createStableVariantIdFactory } from "@/features/dictionary/word-creatio
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
 import { removePosDescription } from "./model";
+import { SpeechSettingsTextEditorProvider } from "@/features/dictionary/word-creation-v3/speechSettingsContext";
 
 export const emptyFormEditor = (): SharedFormsStepContentV3 => ({
   forms_format: "shared_v1",
@@ -65,42 +66,44 @@ export function FormsStep({
   return (
     <EntryDialectContext.Provider value={locale}>
       <DictionaryFormTypeLabels>
-        <V3FormsAndPronunciationStep
-          value={expandFormContents(value)}
-          issues={issues}
-          sharedForms={value}
-          onSharedFormsChange={applyForms}
-          onChange={(next) => {
-            const updated = applyFormsStructure(value, next);
-            if (isSharedForms(updated)) applyForms(updated);
-          }}
-          entryKind={kind}
-          deletePosDescription={removePosDescription}
-          activePosId={
-            value.pos.find((pos) => pos.pos === selectedPos)?.pos_id ??
-            (!onSelectedPosChange &&
-            value.pos.some((pos) => pos.pos_id === activePosId)
-              ? activePosId
-              : value.pos[0]?.pos_id)
-          }
-          onActivePosChange={(id) => {
-            if (!onSelectedPosChange) {
-              setActivePosId(id);
-              return;
+        <SpeechSettingsTextEditorProvider>
+          <V3FormsAndPronunciationStep
+            value={expandFormContents(value)}
+            issues={issues}
+            sharedForms={value}
+            onSharedFormsChange={applyForms}
+            onChange={(next) => {
+              const updated = applyFormsStructure(value, next);
+              if (isSharedForms(updated)) applyForms(updated);
+            }}
+            entryKind={kind}
+            deletePosDescription={removePosDescription}
+            activePosId={
+              value.pos.find((pos) => pos.pos === selectedPos)?.pos_id ??
+              (!onSelectedPosChange &&
+              value.pos.some((pos) => pos.pos_id === activePosId)
+                ? activePosId
+                : value.pos[0]?.pos_id)
             }
-            const pos = latestForms.current.pos.find(
-              (pos) => pos.pos_id === id
-            );
-            if (pos) onSelectedPosChange(pos.pos);
-          }}
-          stableVariantIds={stableVariantIds}
-          pronunciationReferenceIds={pronunciationIds}
-          multipleSpellingsAvailable
-          contentReassignmentAvailable
-          savedContentIds={new Set(saved?.contents.map((row) => row.id))}
-          bindingEditingAvailable={false}
-          registerLeaveGuard={registerLeaveGuard}
-        />
+            onActivePosChange={(id) => {
+              if (!onSelectedPosChange) {
+                setActivePosId(id);
+                return;
+              }
+              const pos = latestForms.current.pos.find(
+                (pos) => pos.pos_id === id
+              );
+              if (pos) onSelectedPosChange(pos.pos);
+            }}
+            stableVariantIds={stableVariantIds}
+            pronunciationReferenceIds={pronunciationIds}
+            multipleSpellingsAvailable
+            contentReassignmentAvailable
+            savedContentIds={new Set(saved?.contents.map((row) => row.id))}
+            bindingEditingAvailable={false}
+            registerLeaveGuard={registerLeaveGuard}
+          />
+        </SpeechSettingsTextEditorProvider>
       </DictionaryFormTypeLabels>
     </EntryDialectContext.Provider>
   );
