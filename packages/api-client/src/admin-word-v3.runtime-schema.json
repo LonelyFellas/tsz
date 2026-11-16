@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-authoring-fixes/tsz-rust/docs/openapi.json",
-  "_source_sha256": "03c8bafa1c79a1d971e688b3c6cc1f32642dbfec94657571c6c4f5d1dd4a311e",
+  "_source": "/Users/darwish/.codex/worktrees/sense-pairs-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "c9cb58bd08c3baca0ce84f47c3e22aad53253ce5d4defb04c91800952a11b3ea",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3611,6 +3611,7 @@
       ],
       "properties": {
         "definition_details": { "type": "boolean" },
+        "dialect_pairs": { "type": ["boolean", "null"] },
         "equivalent_metadata": { "type": "boolean" },
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
@@ -3680,6 +3681,61 @@
         "target_language": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "NextDialectChange": {
+      "type": "object",
+      "required": ["sense_id", "usage"],
+      "properties": {
+        "no_equivalent": { "type": "boolean" },
+        "note": { "type": "string" },
+        "previous_target_revision": { "type": ["integer", "null"] },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "target": {
+          "oneOf": [{ "$ref": "#/$defs/NextDialectTarget" }, { "type": "null" }]
+        },
+        "usage": { "$ref": "#/$defs/NextDialectUsage" }
+      },
+      "additionalProperties": false
+    },
+    "NextDialectPeer": {
+      "type": "object",
+      "required": ["entry_id", "sense_id", "revision", "headword", "gloss"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "gloss": { "type": "string" },
+        "headword": { "type": "string" },
+        "part_of_speech": { "type": ["string", "null"] },
+        "revision": { "type": "integer" },
+        "sense_id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "NextDialectSense": {
+      "type": "object",
+      "required": ["sense_id", "usage", "no_equivalent", "note", "paired"],
+      "properties": {
+        "no_equivalent": { "type": "boolean" },
+        "note": { "type": "string" },
+        "paired": { "type": "boolean" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "target": {
+          "oneOf": [{ "$ref": "#/$defs/NextDialectPeer" }, { "type": "null" }]
+        },
+        "usage": { "$ref": "#/$defs/NextDialectUsage" }
+      }
+    },
+    "NextDialectTarget": {
+      "type": "object",
+      "required": ["entry_id", "sense_id", "revision"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "revision": { "type": "integer" },
+        "sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextDialectUsage": {
+      "type": "string",
+      "enum": ["general", "en-GB", "en-US"]
     },
     "NextDictionaryForm": {
       "type": "object",
@@ -3761,6 +3817,10 @@
         "draft"
       ],
       "properties": {
+        "dialect_senses": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/NextDialectSense" }
+        },
         "draft": { "$ref": "#/$defs/NextDraft" },
         "id": { "type": "string", "format": "uuid" },
         "kind": { "$ref": "#/$defs/NextEntryKind" },
@@ -3856,6 +3916,10 @@
         "senses"
       ],
       "properties": {
+        "dialect_senses": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/NextDialectSense" }
+        },
         "entry_id": { "type": "string", "format": "uuid" },
         "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
         "grammar_issues": {
@@ -4169,6 +4233,10 @@
       "properties": {
         "current": {
           "oneOf": [{ "$ref": "#/$defs/NextPublication" }, { "type": "null" }]
+        },
+        "dialect_senses": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/NextDialectSense" }
         },
         "entry_id": { "type": "string", "format": "uuid" },
         "has_unpublished_changes": { "type": "boolean" },
@@ -5738,6 +5806,11 @@
       "type": "object",
       "required": ["expected_revision", "draft"],
       "properties": {
+        "dialect_changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDialectChange" },
+          "maxItems": 1000
+        },
         "draft": { "$ref": "#/$defs/NextDraft" },
         "expected_revision": { "type": "integer", "minimum": 1 },
         "sentence_changes": {

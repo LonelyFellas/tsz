@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-authoring-fixes/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-16T09:59:14.816Z",
+  "_source": "/Users/darwish/.codex/worktrees/sense-pairs-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-16T11:00:31.138Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -325,6 +325,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-relations",
         "in": "header",
         "required": false,
@@ -340,6 +346,12 @@
     "post /admin/lexicon-next/entries": [
       {
         "name": "x-tsz-next-definitions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-dialect-pairs",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -365,6 +377,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-relations",
         "in": "header",
         "required": false,
@@ -385,6 +403,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-relations",
         "in": "header",
         "required": false,
@@ -397,9 +421,23 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "get /admin/lexicon-next/entries/{id}/publication": [
+      {
+        "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "get /admin/lexicon-next/entries/{id}/view": [
       {
         "name": "x-tsz-next-definitions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-dialect-pairs",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -8819,6 +8857,41 @@
       },
       "additionalProperties": false
     },
+    "NextDialectChange": {
+      "type": "object",
+      "required": ["sense_id", "usage"],
+      "properties": {
+        "no_equivalent": { "type": "boolean" },
+        "note": { "type": "string" },
+        "previous_target_revision": {
+          "type": ["integer", "null"],
+          "format": "int64"
+        },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "target": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/NextDialectTarget" },
+            { "type": "null" }
+          ]
+        },
+        "usage": { "$ref": "#/components/schemas/NextDialectUsage" }
+      },
+      "additionalProperties": false
+    },
+    "NextDialectTarget": {
+      "type": "object",
+      "required": ["entry_id", "sense_id", "revision"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "revision": { "type": "integer", "format": "int64" },
+        "sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextDialectUsage": {
+      "type": "string",
+      "enum": ["general", "en-GB", "en-US"]
+    },
     "NextDraft": {
       "type": "object",
       "required": ["schema_version", "headword", "forms", "senses"],
@@ -9916,6 +9989,11 @@
       "type": "object",
       "required": ["expected_revision", "draft"],
       "properties": {
+        "dialect_changes": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextDialectChange" },
+          "maxItems": 1000
+        },
         "draft": {
           "$ref": "#/components/schemas/NextDraft",
           "description": "Complete draft, including every locale. Omitted nodes are removed from the current draft."

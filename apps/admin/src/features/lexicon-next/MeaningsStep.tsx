@@ -61,6 +61,7 @@ import "@/features/dictionary/word-creation-v3/posTabs.css";
 
 export function MeaningsStep({
   value,
+  renderDialect,
   focusIssue,
   entryId,
   relationsAvailable = false,
@@ -85,6 +86,7 @@ export function MeaningsStep({
   onChange
 }: {
   value: NextDraft;
+  renderDialect?: (id: string) => React.ReactNode;
   focusIssue?: { senseId?: string };
   entryId?: string;
   relationsAvailable?: boolean;
@@ -571,6 +573,7 @@ export function MeaningsStep({
                                 aria-hidden={!isExpanded}
                                 inert={!isExpanded}
                               >
+                                {renderDialect?.(sense.id)}
                                 {senseMetadataAvailable ? (
                                   <AdminControls componentDisabled={disabled}>
                                     {!sense.part_of_speech && (

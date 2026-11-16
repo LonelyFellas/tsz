@@ -1051,6 +1051,85 @@ beforeEach(() => {
   });
 });
 describe("新版词库手工闭环", () => {
+  it("解除配对留在本地，保存失败时保留修改并用原目标版本重试", async () => {
+    const scroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    onTestFinished(() => {
+      HTMLElement.prototype.scrollIntoView = scroll;
+    });
+    const api = requests(),
+      senseId = "00000000-0000-4000-8000-000000000007";
+    const original = {
+      ...entry,
+      dialect_senses: [
+        {
+          sense_id: senseId,
+          usage: "en-GB",
+          paired: true,
+          no_equivalent: false,
+          note: "",
+          target: {
+            entry_id: "other",
+            sense_id: "home",
+            revision: 8,
+            headword: "apartment",
+            gloss: "公寓",
+            part_of_speech: "noun"
+          }
+        }
+      ],
+      draft: {
+        ...entry.draft,
+        headword: "flat",
+        senses: [
+          {
+            id: senseId,
+            part_of_speech: "noun",
+            definitions: [],
+            equivalents: []
+          }
+        ]
+      }
+    };
+    api.get.mockResolvedValue(original);
+    api.capabilities.mockResolvedValue({ ...caps, dialect_pairs: true });
+    api.save
+      .mockRejectedValueOnce(new Error("保存暂时不可用"))
+      .mockResolvedValue({
+        ...original,
+        revision: 2,
+        dialect_senses: [
+          { ...original.dialect_senses[0], paired: false, target: null }
+        ]
+      });
+    mount(
+      api,
+      `/lexicon-next/${id}?sense=${senseId}&target_locale=en-GB&medium_locale=zh-Hans`
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "解除配对" }));
+    expect(api.save).not.toHaveBeenCalled();
+    const save = screen.getByRole("button", { name: "保存完整草稿" });
+    fireEvent.click(save);
+    await screen.findByText("保存暂时不可用");
+    expect(
+      screen.queryByRole("button", { name: "解除配对" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(save);
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+    const payload = api.save.mock.calls[0]![1];
+    expect(payload.dialect_changes).toEqual([
+      {
+        sense_id: senseId,
+        usage: "en-GB",
+        no_equivalent: false,
+        note: "",
+        target: null,
+        previous_target_revision: 8
+      }
+    ]);
+    expect(api.save.mock.calls[1]![1]).toEqual(payload);
+  });
+
   it.each(["uk", "us"] as const)(
     "账号偏好为 %s 时沿用全局语言组合，跨步骤切换不改账号偏好",
     async (dialect) => {
