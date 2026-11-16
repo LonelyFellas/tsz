@@ -3691,9 +3691,9 @@ it("其他标签页只改变发布生命周期时，比较重载后使用新版�
   await waitForEntryReady(1);
   fireEvent.click(stepButton(/^预览/));
   fireEvent.click(button("检查发布"));
-  fireEvent.click(
-    await screen.findByRole("button", { name: "比较服务器版本" })
-  );
+  await screen.findByRole("button", { name: "比较服务器版本" });
+  await waitFor(() => expect(button("比较服务器版本")).toBeEnabled());
+  fireEvent.click(button("比较服务器版本"));
   await screen.findByText("服务器 · 版本 1");
   fireEvent.click(button("放弃本地修改并重载"));
   fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
