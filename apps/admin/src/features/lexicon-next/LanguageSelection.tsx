@@ -9,7 +9,12 @@ import {
   type ReactNode
 } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams
+} from "react-router-dom";
 import { Select } from "@tsz/ui/admin/forms";
 import { Alert, Button, Spin } from "@tsz/ui/admin/display";
 import type { AdminLexiconLanguages, NextLanguageCapability } from "@tsz/types";
@@ -111,6 +116,7 @@ export function LexiconLanguages({
       : language.medium_locales[0]!;
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { entryId } = useParams();
   const [locked, setLocked] = useState(false);
   const [header, setHeader] = useState<HTMLElement | null>(null);
@@ -189,14 +195,14 @@ export function LexiconLanguages({
         }
       });
     if (
-      key === "medium_locale" &&
       entryId &&
       entryId !== "new" &&
-      entryId !== "trash"
+      entryId !== "trash" &&
+      (key === "medium_locale" || location.state?.lexiconMediumSwitch === true)
     ) {
-      const selection = new URLSearchParams(search);
-      selection.set(key, value);
-      navigate(`/lexicon-next?${selection}`);
+      navigate(`${location.pathname}?${next}`, {
+        state: { lexiconMediumSwitch: true }
+      });
     } else {
       setParams(next);
     }
