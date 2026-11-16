@@ -101,6 +101,7 @@ export function DefinitionRows({
                 return (
                   <tr
                     key={row.id}
+                    data-v3-node-id={row.id}
                     className={sortableRowClass(
                       "lexicon-next-definition-row",
                       sorting,
@@ -122,6 +123,7 @@ export function DefinitionRows({
                     <td>
                       <Select
                         aria-label={`${name} 等级`}
+                        data-v3-field="level"
                         value={row.level ?? ""}
                         disabled={disabled}
                         options={[
@@ -193,6 +195,7 @@ export function DefinitionRows({
                         <>
                           <Select
                             aria-label={`${name} 语法结构`}
+                            data-v3-field="grammar_structure_id"
                             value={
                               row.grammar_unbound
                                 ? "unbound"
@@ -262,6 +265,7 @@ export function DefinitionRows({
         block
         type="dashed"
         className="word-section-add-button"
+        data-v3-field="definitions"
         icon={<Plus aria-hidden />}
         disabled={disabled || remaining <= 0}
         onClick={() =>

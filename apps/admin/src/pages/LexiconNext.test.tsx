@@ -9,7 +9,15 @@ import {
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi
+} from "vitest";
 import { HttpError } from "@tsz/api-client";
 import { isSharedForms } from "@tsz/shared";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
@@ -37,7 +45,6 @@ import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/shar
 import { emptyFormEditor } from "@/features/lexicon-next/FormsStep";
 import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
 import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
-import { changeVoiceText } from "@/features/dictionary/word-creation-v3/components/V3VoiceTextField.test-helper";
 
 vi.mock("@/lib/env", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/env")>();
@@ -2013,9 +2020,10 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   const spelling = await screen.findByRole("textbox", {
     name: "词形英美通用拼写"
   });
+  expect(spelling).toHaveValue("centre");
   expect(screen.getByRole("combobox", { name: "目标语言" })).toBeDisabled();
   expect(screen.getByRole("combobox", { name: "媒介语言" })).toBeDisabled();
-  await changeVoiceText(spelling, { target: { value: "centre" } });
+  expect(spelling).toHaveValue("centre");
   fireEvent.click(textAction("确认，应用到草稿"));
   expect(await formProgress.findByText("1 项")).toBeVisible();
   expect(formProgress.getByText("通用英语：centre")).toBeVisible();
@@ -3723,5 +3731,114 @@ it("比较发布冲突的状态读取失败时保留未保存草稿并允许重�
   await screen.findByText("服务器 · 版本 1");
   expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
     "local-unsaved"
+  );
+});
+
+it("列表同时展示真实词头、词形和当前义项等级", async () => {
+  const matchMedia = window.matchMedia;
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    ...matchMedia(query),
+    matches: true
+  }));
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [
+      {
+        ...listRow(),
+        headword: "give up",
+        forms: [{ id: "form", locale: "en", text: "center" }],
+        levels: ["A1", "B2"]
+      }
+    ],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next");
+  const row = await screen.findByRole("row", { name: /give up.*center/ });
+  expect(within(row).getByText("give up")).toBeVisible();
+  expect(within(row).getByText("center")).toBeVisible();
+  expect(within(row).getByText("A1")).toBeVisible();
+  expect(within(row).getByText("B2")).toBeVisible();
+});
+
+it("发布缺项可切到缺失方言并聚焦对应语法编辑入口", async () => {
+  const scrollIntoView = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  onTestFinished(() => {
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  });
+  useAuthStore.setState({
+    profile: {
+      ...useAuthStore.getState().profile!,
+      permissions: ["words.access", "words.edit", "words.publish"]
+    }
+  });
+  const api = requests();
+  api.capabilities.mockResolvedValue({
+    ...caps,
+    publishing: true,
+    grammar_structures: true
+  });
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      grammar_structures: [
+        {
+          id: "grammar-focus",
+          part_of_speech: "noun",
+          variants: [
+            {
+              id: "gb-focus",
+              locale: "en-GB",
+              content: { version: 2, text: "a centre", annotations: [] }
+            },
+            {
+              id: "us-focus",
+              locale: "en-US",
+              content: { version: 2, text: "", annotations: [] }
+            }
+          ]
+        }
+      ]
+    }
+  });
+  api.publication.mockResolvedValue({
+    entry_id: id,
+    status: "draft",
+    lifecycle_revision: 1,
+    has_unpublished_changes: true,
+    current: null
+  });
+  api.publicationPreview.mockResolvedValue({
+    entry_id: id,
+    revision: 1,
+    lifecycle_revision: 1,
+    can_publish: false,
+    preview_token: "a".repeat(64),
+    issues: [
+      {
+        node_id: "grammar-focus",
+        field: "variants",
+        message: "请完整填写语法结构的英美内容"
+      }
+    ],
+    warnings: []
+  });
+  const { router } = mount(api);
+  await waitForEntryReady(1);
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.click(button("检查发布"));
+  const problem = await screen.findByRole("button", {
+    name: "请完整填写语法结构的英美内容"
+  });
+  await waitFor(() => expect(problem).toBeEnabled());
+  fireEvent.click(problem);
+  await waitFor(() =>
+    expect(router.state.location.search).toContain("target_locale=en-US")
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "编辑语法结构 1 美式英语内容" })
+    ).toHaveFocus()
   );
 });

@@ -197,10 +197,7 @@ export function EquivalentRows({
             id: crypto.randomUUID(),
             locale,
             text,
-            metadata: {
-              ...emptyEquivalentMetadata(),
-              register_ids: catalog?.registers.map((option) => option.id) ?? []
-            }
+            metadata: emptyEquivalentMetadata()
           }))
         ],
         no_equivalents: (sense.no_equivalents ?? []).filter(

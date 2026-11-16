@@ -1,3 +1,4 @@
+import { regionalVariants } from "@tsz/shared";
 import { commonnessUnits, equivalentKey } from "./equivalents";
 import type {
   NextDraft,
@@ -111,6 +112,31 @@ export function replaceFormEditor(
   draft: NextDraft,
   form_editor: SharedFormsStepContentV3
 ): NextDraft {
+  const newBaseContents = new Set(
+    form_editor.pos
+      .filter(
+        (pos) =>
+          !draft.form_editor?.pos.some((saved) => saved.pos_id === pos.pos_id)
+      )
+      .flatMap((pos) =>
+        pos.forms
+          .filter((form) => form.form_type === "base")
+          .map((form) => form.content_id)
+      )
+  );
+  if (draft.headword.trim() && newBaseContents.size) {
+    form_editor = {
+      ...form_editor,
+      contents: form_editor.contents.map((content) => {
+        if (!newBaseContents.has(content.id)) return content;
+        const next = structuredClone(content);
+        for (const variant of regionalVariants(next.regional_variants)) {
+          if (!variant.spelling.trim()) variant.spelling = draft.headword;
+        }
+        return next;
+      })
+    };
+  }
   const removed = new Set(
     draft.form_editor?.pos
       .filter((pos) => !form_editor.pos.some((next) => next.pos === pos.pos))

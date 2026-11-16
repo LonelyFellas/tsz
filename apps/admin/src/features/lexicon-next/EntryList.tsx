@@ -329,8 +329,10 @@ export function EntryList({
       fixed: "left",
       ellipsis: true,
       render: (row) => {
-        const names = [...new Set(row.forms.map((f) => f.text))];
-        if (!names.length) names.push(row.headword);
+        const names = [
+          ...new Set([row.headword, ...row.forms.map((f) => f.text)])
+        ];
+        if (!names.includes(row.headword)) names.unshift(row.headword);
         return (
           <div className="word-list-names">
             <div className="word-list-name-variants">
@@ -433,11 +435,16 @@ export function EntryList({
       title: t("level"),
       width: 80,
       wideOnly: true,
-      render: () => (
-        <Tooltip title={t("next_no_levels")}>
+      render: (row) =>
+        row.levels?.length ? (
+          <Space size={4} wrap>
+            {row.levels.map((level) => (
+              <Tag key={level}>{level}</Tag>
+            ))}
+          </Space>
+        ) : (
           <span>-</span>
-        </Tooltip>
-      )
+        )
     },
     {
       key: "updated_at",

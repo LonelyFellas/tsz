@@ -122,7 +122,7 @@ describe("媒介语译词", () => {
       "ＪＯＢ"
     ]);
     expect(saved().no_equivalents).toEqual([]);
-    expect(rows[1]!.metadata?.register_ids).toEqual(["spoken", "formal"]);
+    expect(rows[1]!.metadata?.register_ids).toEqual([]);
     expect(rows[1]!.metadata?.commonness).toEqual([]);
     const id = rows[1]!.id;
     fireEvent.change(screen.getByRole("textbox", { name: "译词 1" }), {
