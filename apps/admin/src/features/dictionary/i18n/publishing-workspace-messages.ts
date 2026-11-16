@@ -123,7 +123,15 @@ export const publishingWorkspaceMessages = {
     "Historical content rollback"
   ],
   publication_current_short: ["当前", "目前", "Current"],
+  publication_selected: ["已选", "已選", "Selected"],
+  publication_count: [
+    "共 {{count}} 个版本",
+    "共 {{count}} 個版本",
+    "{{count}} versions"
+  ],
   publication_view: ["查看详情", "檢視詳情", "View details"],
+  publication_previous: ["查看更早版本", "檢視更早版本", "View older version"],
+  publication_next: ["查看更新版本", "檢視更新版本", "View newer version"],
   publication_details: ["发布详情", "發布詳情", "Publication details"],
   publication_details_loading: [
     "加载发布详情",
@@ -427,6 +435,11 @@ export const publishingWorkspaceMessages = {
     "发布时间：{{time}}",
     "發布時間：{{time}}",
     "Published at: {{time}}"
+  ],
+  publication_source_revision: [
+    "基于草稿版本：{{revision}}",
+    "基於草稿版本：{{revision}}",
+    "Based on draft revision: {{revision}}"
   ],
   publication_status: [
     "当前状态：{{status}}",

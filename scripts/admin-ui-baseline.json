@@ -83,7 +83,7 @@
     "inline-visual-style": 1
   },
   "apps/admin/src/features/dictionary/word-creation-v3/V3PublicationHistory.tsx": {
-    "inline-visual-style": 2
+    "inline-visual-style": 1
   },
   "apps/admin/src/features/dictionary/word-creation-v3/V3ReviewContent.tsx": {
     "inline-visual-style": 3

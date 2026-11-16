@@ -34,6 +34,7 @@ import {
 } from "@tsz/ui/admin/display";
 import { Modal } from "@tsz/ui/admin/overlays";
 import dayjs from "dayjs";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LifecycleSurfaceConfirmation } from "../LifecycleSurfaceConfirmation";
 import {
@@ -59,6 +60,7 @@ import {
   relationLabel,
   sentenceLinkRoleLabel
 } from "./presentation";
+import "./v3-publication-history.css";
 
 type PublicationRequests = Pick<
   V3WordRequests,
@@ -532,6 +534,11 @@ function PublicationMetadata({
           })}
         </Typography.Text>
         <Typography.Text>
+          {t("publication_source_revision", {
+            revision: publication.source_revision
+          })}
+        </Typography.Text>
+        <Typography.Text>
           {t("publication_status", {
             status: publication.is_current
               ? t("publication_current")
@@ -817,6 +824,32 @@ export function V3PublicationHistory({
     [currentWord.id, requests, setActivationError]
   );
 
+  const selectedPublication = publications.find(
+    (publication) => publication.publication_id === selectedPublicationId
+  );
+  const olderPublication = selectedPublication
+    ? publications
+        .filter(
+          (publication) =>
+            publication.publication_number <
+            selectedPublication.publication_number
+        )
+        .sort(
+          (left, right) => right.publication_number - left.publication_number
+        )[0]
+    : undefined;
+  const newerPublication = selectedPublication
+    ? publications
+        .filter(
+          (publication) =>
+            publication.publication_number >
+            selectedPublication.publication_number
+        )
+        .sort(
+          (left, right) => left.publication_number - right.publication_number
+        )[0]
+    : undefined;
+
   const activate = useCallback(
     (confirmedSurfaceToken?: string) => {
       if (
@@ -977,54 +1010,76 @@ export function V3PublicationHistory({
           }
         />
       ) : null}
-      <Card className="v3-publication-history" title={t("history_title")}>
+      <Card
+        className="v3-publication-history"
+        title={t("history_title")}
+        extra={
+          <Typography.Text type="secondary">
+            {t("publication_count", { count: publications.length })}
+          </Typography.Text>
+        }
+      >
         {publications.length === 0 ? (
           <Typography.Text type="secondary">
             {t("publication_empty")}
           </Typography.Text>
         ) : (
-          <Flex vertical gap="small">
+          <div className="v3-publication-history-list">
             {publications.map((publication) => (
-              <Flex
+              <Button
                 key={publication.publication_id}
-                align="center"
-                justify="space-between"
-                gap="small"
-                wrap
+                block
+                type="text"
+                className="v3-publication-history-item"
+                aria-label={t("publication_view_number", {
+                  number: publication.publication_number
+                })}
+                aria-current={
+                  publication.publication_id === selectedPublicationId
+                    ? "true"
+                    : undefined
+                }
+                disabled={recovery !== undefined || activating}
+                onClick={() => openDetail(publication.publication_id)}
               >
-                <Flex vertical gap={2}>
-                  <Flex align="center" gap="small" wrap>
-                    <Typography.Text className="tsz-words" strong>
-                      {publicationLabel(publication)}
-                    </Typography.Text>
+                <Flex align="center" justify="space-between" gap="middle" wrap>
+                  <Flex vertical gap={2}>
+                    <Flex align="center" gap="small" wrap>
+                      <Typography.Text className="tsz-words" strong>
+                        {publicationLabel(publication)}
+                      </Typography.Text>
+                      <Typography.Text type="secondary">
+                        {t("publication_number", {
+                          number: publication.publication_number
+                        })}
+                      </Typography.Text>
+                      {publication.rollback_of_publication_id ? (
+                        <Tag>{t("publication_rollback")}</Tag>
+                      ) : null}
+                      {publication.is_current ? (
+                        <Tag color="success">
+                          {t("publication_current_short")}
+                        </Tag>
+                      ) : null}
+                      {publication.publication_id === selectedPublicationId ? (
+                        <Tag color="info">{t("publication_selected")}</Tag>
+                      ) : null}
+                    </Flex>
                     <Typography.Text type="secondary">
-                      {t("publication_number", {
-                        number: publication.publication_number
+                      {t("publication_time", {
+                        time: dayjs(publication.published_at).format(
+                          "YYYY-MM-DD HH:mm"
+                        )
                       })}
                     </Typography.Text>
-                    {publication.rollback_of_publication_id ? (
-                      <Tag>{t("publication_rollback")}</Tag>
-                    ) : null}
-                    {publication.is_current ? (
-                      <Tag color="green">{t("publication_current_short")}</Tag>
-                    ) : null}
                   </Flex>
-                  <Typography.Text type="secondary">
-                    {dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")}
+                  <Typography.Text className="v3-publication-history-item-action">
+                    {t("publication_view")}
                   </Typography.Text>
                 </Flex>
-                <Button
-                  aria-label={t("publication_view_number", {
-                    number: publication.publication_number
-                  })}
-                  disabled={recovery !== undefined || activating}
-                  onClick={() => openDetail(publication.publication_id)}
-                >
-                  {t("publication_view")}
-                </Button>
-              </Flex>
+              </Button>
             ))}
-          </Flex>
+          </div>
         )}
       </Card>
       <Modal
@@ -1051,19 +1106,50 @@ export function V3PublicationHistory({
           ) : null}
           {detail ? (
             <>
-              <Flex align="center" gap="small" wrap>
-                <Typography.Title
-                  className="tsz-words"
-                  level={5}
-                  style={{ margin: 0 }}
-                >
-                  {publicationLabel(detail)}
-                </Typography.Title>
-                <Typography.Text type="secondary">
-                  {t("publication_number", {
-                    number: detail.publication_number
-                  })}
-                </Typography.Text>
+              <Flex
+                className="v3-publication-modal-heading"
+                align="center"
+                justify="space-between"
+                gap="middle"
+                wrap
+              >
+                <Flex align="center" gap="small" wrap>
+                  <Typography.Title className="tsz-words" level={5}>
+                    {publicationLabel(detail)}
+                  </Typography.Title>
+                  <Typography.Text type="secondary">
+                    {t("publication_number", {
+                      number: detail.publication_number
+                    })}
+                  </Typography.Text>
+                  {detail.is_current ? (
+                    <Tag color="success">{t("publication_current_short")}</Tag>
+                  ) : null}
+                </Flex>
+                <Flex className="v3-publication-modal-nav" gap="small">
+                  <Button
+                    aria-label={t("publication_previous")}
+                    disabled={!olderPublication || activating}
+                    icon={<ChevronLeft aria-hidden="true" size={16} />}
+                    onClick={() =>
+                      olderPublication &&
+                      openDetail(olderPublication.publication_id)
+                    }
+                    size="small"
+                    type="text"
+                  />
+                  <Button
+                    aria-label={t("publication_next")}
+                    disabled={!newerPublication || activating}
+                    icon={<ChevronRight aria-hidden="true" size={16} />}
+                    onClick={() =>
+                      newerPublication &&
+                      openDetail(newerPublication.publication_id)
+                    }
+                    size="small"
+                    type="text"
+                  />
+                </Flex>
               </Flex>
               <Alert showIcon type="info" title={t("publication_readonly")} />
               <PublicationMetadata publication={detail} />
