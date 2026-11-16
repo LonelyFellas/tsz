@@ -60,6 +60,7 @@ import {
 } from "@/features/lexicon-next/LanguageSelection";
 import { EntryList } from "@/features/lexicon-next/EntryList";
 import { EntryLayout } from "@/features/lexicon-next/EntryLayout";
+import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
 import "./lexicon-next.css";
 
@@ -135,6 +136,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               id={entryId}
               requests={requests}
               language={language}
+              publishingAvailable={capability.data?.publishing === true}
               relationsAvailable={capability.data?.relations === true}
               formEditorAvailable={capability.data?.form_editor === true}
               senseGroupsAvailable={capability.data?.sense_groups === true}
@@ -181,7 +183,8 @@ function EntryLoader({
   sentencesAvailable,
   sentenceDetailsAvailable,
   sentenceDraftsAvailable,
-  relationsAvailable
+  relationsAvailable,
+  publishingAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -194,6 +197,7 @@ function EntryLoader({
   sentenceDetailsAvailable: boolean;
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
+  publishingAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -267,6 +271,7 @@ function EntryLoader({
       requests={requests}
       language={language}
       archived={metadata.data.status === "archived"}
+      publishingAvailable={publishingAvailable}
       relationsAvailable={relationsAvailable}
       formEditorAvailable={formEditorAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
@@ -296,7 +301,8 @@ function EntryEditor({
   sentencesAvailable,
   sentenceDetailsAvailable,
   sentenceDraftsAvailable,
-  relationsAvailable
+  relationsAvailable,
+  publishingAvailable
 }: {
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
@@ -309,6 +315,7 @@ function EntryEditor({
   sentenceDetailsAvailable: boolean;
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
+  publishingAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   requests: LexiconNextRequests;
@@ -357,13 +364,23 @@ function EntryEditor({
     medium
   );
   const [saving, setBusy] = useState(false);
-  const busy = saving;
+  const [publicationBusy, setPublicationBusy] = useState(false);
+  const busy = saving || publicationBusy;
+  const publication = useQuery({
+    queryKey: ["admin-lexicon-next", "publication", saved.id],
+    queryFn: () => requests.publication(saved.id),
+    enabled: publishingAvailable,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
+  });
   const lock = useRef(false);
   const [error, setError] = useState<string>();
   const [formIssues, setFormIssues] = useState<V3DraftValidationIssue[]>([]);
   const [conflict, setConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
   const profile = useAuthStore((state) => state.profile);
+  const canPublish = usePermission("words.publish");
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
   const writable =
@@ -488,6 +505,9 @@ function EntryEditor({
           })
         )
       );
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-lexicon-next", "publication", saved.id]
+      });
       void message.success("草稿已保存");
     });
   }
@@ -503,6 +523,7 @@ function EntryEditor({
   const editor = (
     <EntryLayout
       relationsAvailable={relationsAvailable}
+      publicationStatus={publication.data?.status}
       draft={draft}
       languageSearch={languageSearch}
       step={step}
@@ -532,7 +553,7 @@ function EntryEditor({
           </Space>
           <Space wrap>
             <Button
-              type="primary"
+              type={publishingAvailable ? "default" : "primary"}
               icon={<Save aria-hidden="true" />}
               hidden={step !== "preview"}
               loading={busy}
@@ -741,7 +762,94 @@ function EntryEditor({
           )}
         </div>
         <div hidden={step !== "preview"} inert={step !== "preview"}>
-          <h2>预览</h2>
+          {publishingAvailable ? (
+            <PublicationPanel
+              entryId={saved.id}
+              revision={saved.revision}
+              state={publication.data}
+              loading={publication.isPending}
+              stateError={publication.error}
+              dirty={dirty}
+              disabled={saving || conflict || archived || formContentOpen}
+              canPublish={
+                canPublish &&
+                (profile?.role === "super_admin" ||
+                  saved.owner_id === profile?.id)
+              }
+              requests={requests}
+              onBusyChange={setPublicationBusy}
+              onRefresh={publication.refetch}
+              onConflict={() => setConflict(true)}
+              onPublished={async (result) => {
+                const refreshed = await publication.refetch();
+                if (refreshed.error) throw refreshed.error;
+                if (!refreshed.data)
+                  throw new Error("无法读取发布状态，请重试。");
+                queryClient.setQueryData<NextWorkspaceEntry>(
+                  ["admin-lexicon-next", "workspace-entry", saved.id],
+                  (current) =>
+                    current
+                      ? {
+                          ...current,
+                          status: refreshed.data!.status,
+                          lifecycle_revision: refreshed.data!.lifecycle_revision
+                        }
+                      : current
+                );
+                await Promise.all(
+                  ["list", "stats"].map((key) =>
+                    queryClient.invalidateQueries({
+                      queryKey: ["admin-lexicon-next", key]
+                    })
+                  )
+                );
+                if (
+                  refreshed.data.current?.id === result.id &&
+                  refreshed.data.status === "published"
+                ) {
+                  void message.success("词条已发布");
+                } else {
+                  void message.info("发布请求已完成，词条当前状态已变化。");
+                }
+              }}
+            />
+          ) : (
+            <Alert
+              type="info"
+              title="当前服务尚未开放新版发布，请更新服务后重试。"
+            />
+          )}
+          {publication.data?.current && (
+            <Collapse
+              items={[
+                {
+                  key: "published",
+                  label: "已发布版本",
+                  children: (
+                    <Preview
+                      requests={requests}
+                      sentenceDetailsAvailable={sentenceDetailsAvailable}
+                      relationTargets={
+                        publication.data.current.snapshot.relation_targets
+                      }
+                      sentenceResources={Object.fromEntries(
+                        publication.data.current.snapshot.sentence_resources.map(
+                          (sentence) => [sentence.id, sentence]
+                        )
+                      )}
+                      view={previewDraft(
+                        publication.data.current.snapshot.draft,
+                        target,
+                        medium,
+                        grammarCatalog.data
+                      )}
+                    />
+                  )
+                }
+              ]}
+            />
+          )}
+          <h2>草稿预览</h2>
           <Preview
             requests={requests}
             sentenceDetailsAvailable={sentenceDetailsAvailable}

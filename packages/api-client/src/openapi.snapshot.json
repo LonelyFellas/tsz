@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/sentence-manual-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-15T14:40:29.126Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-next-publishing-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-16T07:38:54.388Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -35,6 +35,9 @@
     "/admin/lexicon-next/detections": ["post"],
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
+    "/admin/lexicon-next/entries/{id}/publication": ["get"],
+    "/admin/lexicon-next/entries/{id}/publication-preview": ["post"],
+    "/admin/lexicon-next/entries/{id}/publications": ["post"],
     "/admin/lexicon-next/entries/{id}/view": ["get"],
     "/admin/lexicon-next/entry-matches": ["post"],
     "/admin/lexicon-next/equivalent-catalog": ["get"],
@@ -414,6 +417,14 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "post /admin/lexicon-next/entry-matches": [
+      {
+        "name": "x-tsz-next-publications",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "post /admin/lexicon-next/sentences": [
       {
         "name": "x-tsz-next-sentence-details",
@@ -433,6 +444,22 @@
     "put /admin/lexicon-next/sentences/{id}": [
       {
         "name": "x-tsz-next-sentence-details",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon-next/workspace/entries": [
+      {
+        "name": "x-tsz-next-publications",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /admin/lexicon-next/workspace/entries/{id}": [
+      {
+        "name": "x-tsz-next-publications",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -3059,6 +3086,37 @@
       "request": { "$ref": "#/components/schemas/SaveNextDraft" },
       "responses": {
         "200": { "$ref": "#/components/schemas/NextEntry" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/entries/{id}/publication": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextPublicationState" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/entries/{id}/publication-preview": {
+      "request": { "$ref": "#/components/schemas/NextPublicationBase" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextPublicationPreview" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/entries/{id}/publications": {
+      "request": { "$ref": "#/components/schemas/NextPublishInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextPublication" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -8920,6 +8978,39 @@
         },
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextPublicationBase": {
+      "type": "object",
+      "required": ["base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "NextPublishInput": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "base_revision",
+        "base_lifecycle_revision",
+        "preview_token"
+      ],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "preview_token": { "type": "string" },
+        "request_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

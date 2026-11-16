@@ -85,6 +85,9 @@ const entry: NextEntry = {
 };
 function requests() {
   return {
+    publication: vi.fn(),
+    publicationPreview: vi.fn(),
+    publish: vi.fn(),
     sentences: vi.fn(),
     sentence: vi.fn(),
     createSentence: vi.fn(),
@@ -2744,7 +2747,7 @@ it("目录缓存更新后，停留在预览页也立即去除失效结构且不�
   );
   fireEvent.click(stepButton(/^预览/));
   const pane = screen.getByRole("heading", {
-    name: "预览"
+    name: "草稿预览"
   }).parentElement!;
   expect(within(pane).getByLabelText("语法结构")).toHaveTextContent("a job");
   const changed = structuredClone(partOfSpeechCatalogFixture);

@@ -1,4 +1,9 @@
 import type {
+  NextPublicationBase,
+  NextPublishInput,
+  NextPublicationPreview,
+  NextPublication,
+  NextPublicationState,
   NextEquivalentCatalog,
   NextSentence,
   NextSentenceList,
@@ -63,6 +68,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   let relations = false;
   const editorOptions = {
     headers: {
+      "x-tsz-next-publications": "v1",
       "x-tsz-next-relations": "v1",
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
@@ -93,7 +99,24 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     }
     return params.size ? `?${params}` : "";
   };
+  const publicationOptions = { headers: { "x-tsz-next-publications": "v1" } };
   return {
+    publication: (id: string) =>
+      http
+        .get<unknown>(`${entry(id)}/publication`)
+        .then((value) =>
+          decode<NextPublicationState>("NextPublicationState", value)
+        ),
+    publicationPreview: (id: string, input: NextPublicationBase) =>
+      http
+        .post<unknown>(`${entry(id)}/publication-preview`, input)
+        .then((value) =>
+          decode<NextPublicationPreview>("NextPublicationPreview", value)
+        ),
+    publish: (id: string, input: NextPublishInput) =>
+      http
+        .post<unknown>(`${entry(id)}/publications`, input)
+        .then((value) => decode<NextPublication>("NextPublication", value)),
     sentences: (query: NextSentenceQuery) =>
       http
         .get<unknown>(`${root}/sentences${search(query)}`)
@@ -125,11 +148,17 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         ),
     workspaceList: (query: NextWorkspaceQuery = {}) =>
       http
-        .get<unknown>(`${root}/workspace/entries${search(query)}`)
+        .get<unknown>(
+          `${root}/workspace/entries${search(query)}`,
+          publicationOptions
+        )
         .then((value) => decode<NextWorkspaceList>("NextWorkspaceList", value)),
     workspaceEntry: (id: string) =>
       http
-        .get<unknown>(`${root}/workspace/entries/${encodeURIComponent(id)}`)
+        .get<unknown>(
+          `${root}/workspace/entries/${encodeURIComponent(id)}`,
+          publicationOptions
+        )
         .then((value) =>
           decode<NextWorkspaceEntry>("NextWorkspaceEntry", value)
         ),

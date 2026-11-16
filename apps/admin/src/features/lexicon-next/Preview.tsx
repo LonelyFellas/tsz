@@ -16,6 +16,7 @@ import type {
   NextEntryView,
   NextGrammarIssue,
   NextSense,
+  NextPublication,
   NextSentence
 } from "@tsz/types";
 import { draftForms, localeLabels } from "./model";
@@ -153,6 +154,7 @@ function SenseMetadataSummary({
   return items.length ? <p>{items.join(" · ")}</p> : null;
 }
 export function Preview({
+  relationTargets,
   view,
   requests,
   sentenceDetailsAvailable = false,
@@ -161,6 +163,7 @@ export function Preview({
   view: NextEntryView;
   sentenceDetailsAvailable?: boolean;
   sentenceResources?: Record<string, NextSentence>;
+  relationTargets?: NextPublication["snapshot"]["relation_targets"];
   requests?: LexiconNextRequests;
 }) {
   return (
@@ -231,6 +234,7 @@ export function Preview({
               )}
               {requests && sense.relations && (
                 <RelationsPreview
+                  frozenTargets={relationTargets}
                   rows={sense.relations}
                   target={view.target_locale}
                   medium={view.medium_locale}

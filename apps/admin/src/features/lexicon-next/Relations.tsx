@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type {
   NextEntry,
+  NextPublication,
   WordRelationWritableV3,
   WordSenseWritableV3
 } from "@tsz/types";
@@ -205,18 +206,20 @@ export function Relations({
 }
 
 export function RelationsPreview({
+  frozenTargets,
   rows,
   target,
   medium,
   requests
 }: {
   rows: WordRelationWritableV3[];
+  frozenTargets?: NextPublication["snapshot"]["relation_targets"];
   target: string;
   medium: string;
   requests: LexiconNextRequests;
 }) {
   const { t } = useLexiconEditorTranslation();
-  const targets = useTargets(rows, requests);
+  const targets = useTargets(frozenTargets ? [] : rows, requests);
   if (!rows.length) return null;
   return (
     <section aria-label={t("related_words")}>
@@ -239,14 +242,22 @@ export function RelationsPreview({
                   (entry) => entry.id === row.target_word_id
                 );
                 const word = entry && choice(entry, target, medium);
+                const frozen = frozenTargets?.find(
+                  (v) =>
+                    v.entry_id === row.target_word_id &&
+                    v.sense_id === row.target_sense_id
+                );
                 const gloss =
+                  frozen?.gloss ??
                   word?.senses.find(
                     (sense) => sense.sense_id === row.target_sense_id
-                  )?.gloss ?? row.pending_target_gloss;
+                  )?.gloss ??
+                  row.pending_target_gloss;
                 return (
                   <li key={row.id}>
                     <span className="tsz-words">
-                      {word?.headword ??
+                      {frozen?.headword ??
+                        word?.headword ??
                         row.pending_target_headword ??
                         "关联词读取中"}
                     </span>
