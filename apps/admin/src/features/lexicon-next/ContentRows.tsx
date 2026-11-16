@@ -8,10 +8,7 @@ import type {
 } from "@tsz/types";
 import { grammarText } from "./model";
 import { useState } from "react";
-import {
-  SenseSectionBody,
-  SenseSectionTitle
-} from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
+import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
 import { V3RowIndex } from "@/features/dictionary/word-creation-v3/components/V3RowIndex";
 
 type Row = NextEquivalent | NextDefinition;
@@ -236,19 +233,15 @@ export function ContentRows({
     </>
   );
   return grouped ? (
-    <section
-      className={`word-sense-section${collapsed ? " is-collapsed" : ""}`}
-      aria-label={label}
+    <SenseSection
+      label={label}
+      count={visible.length}
+      unit="条"
+      collapsed={collapsed}
+      onToggle={() => setCollapsed(!collapsed)}
     >
-      <SenseSectionTitle
-        label={label}
-        count={visible.length}
-        unit="条"
-        collapsed={collapsed}
-        onToggle={() => setCollapsed(!collapsed)}
-      />
-      <SenseSectionBody collapsed={collapsed}>{content}</SenseSectionBody>
-    </section>
+      {content}
+    </SenseSection>
   ) : (
     <section className="lexicon-next-rows" aria-label={label}>
       <h4>{label}</h4>

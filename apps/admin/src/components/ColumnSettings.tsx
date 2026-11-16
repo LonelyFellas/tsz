@@ -61,7 +61,9 @@ export function ColumnSettings({
     ].find(
       (node) => node.getAttribute("data-column-key") === fixedFocusKey.current
     );
-    const input = control?.querySelector<HTMLInputElement>("input:checked");
+    const input = control?.querySelector<HTMLElement>(
+      '[role="radio"][aria-checked="true"]'
+    );
     if (input) {
       input.focus({ preventScroll: true });
       fixedFocusKey.current = undefined;

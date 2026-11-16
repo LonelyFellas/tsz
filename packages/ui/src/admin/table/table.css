@@ -73,9 +73,6 @@
   border: 0;
   font-weight: inherit;
 }
-.ui-table input[type="checkbox"] {
-  accent-color: var(--ui-color-primary);
-}
 .ui-table-placeholder td {
   text-align: center;
   color: var(--ui-color-text-secondary);

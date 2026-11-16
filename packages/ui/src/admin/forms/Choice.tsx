@@ -2,16 +2,16 @@ import {
   createContext,
   useContext,
   useId,
-  useLayoutEffect,
-  useRef,
   useState,
   type ComponentPropsWithoutRef,
   type CSSProperties,
   type HTMLAttributes,
-  type InputHTMLAttributes,
   type ReactNode
 } from "react";
 import { useFieldDisabled } from "./Form";
+import { Checkbox as ShadcnCheckbox } from "../../components/ui/checkbox";
+import { Switch as ShadcnSwitch } from "../../components/ui/switch";
+import { Slider as ShadcnSlider } from "../../components/ui/slider";
 import {
   RadioGroup as ShadcnRadioGroup,
   RadioGroupItem
@@ -28,48 +28,70 @@ const Checks = createContext<{
   disabled: boolean;
   toggle: (value: ChoiceValue, checked: boolean) => void;
 } | null>(null);
+type CheckChangeEvent = {
+  target: { checked: boolean; value: ChoiceValue; name: string };
+  nativeEvent: Event;
+  stopPropagation: () => void;
+  preventDefault: () => void;
+};
 type CheckProps = Omit<
-  InputHTMLAttributes<HTMLInputElement>,
-  "value" | "size"
-> & { value?: ChoiceValue; indeterminate?: boolean };
+  ComponentPropsWithoutRef<typeof ShadcnCheckbox>,
+  "value" | "checked" | "defaultChecked" | "onCheckedChange" | "onChange"
+> & {
+  value?: ChoiceValue;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  indeterminate?: boolean;
+  onChange?: (event: CheckChangeEvent) => void;
+};
 function Check({
   value,
   checked,
+  defaultChecked = false,
   disabled,
   indeterminate,
   className = "",
   style,
   title,
   children,
+  name,
   onChange,
+  onClick,
   ...props
 }: CheckProps) {
-  const group = useContext(Checks),
-    ref = useRef<HTMLInputElement>(null);
+  const group = useContext(Checks);
+  const [local, setLocal] = useState(defaultChecked);
   const off = useFieldDisabled(disabled ?? group?.disabled);
   const active =
-    group && value !== undefined ? group.value.includes(value) : checked;
-  useLayoutEffect(() => {
-    if (ref.current) ref.current.indeterminate = !!indeterminate;
-  }, [indeterminate]);
+    group && value !== undefined
+      ? group.value.includes(value)
+      : (checked ?? local);
   return (
     <label
       style={style}
       title={title}
       className={`ui-checkbox-wrapper ${active ? "ui-checkbox-wrapper-checked" : ""} ${off ? "ui-checkbox-wrapper-disabled" : ""} ${className}`}
     >
-      <span className={`ui-checkbox ${active ? "ui-checkbox-checked" : ""}`}>
-        <input
+      <span className="ui-checkbox">
+        <ShadcnCheckbox
           {...props}
-          ref={ref}
-          type="checkbox"
           className="ui-checkbox-input"
-          value={value === undefined ? undefined : String(value)}
-          checked={active}
+          name={name}
+          value={value === undefined ? "on" : String(value)}
+          checked={indeterminate ? "indeterminate" : active}
           disabled={off}
-          onChange={(event) => {
-            onChange?.(event);
-            if (value !== undefined) group?.toggle(value, event.target.checked);
+          onClick={(event) => {
+            onClick?.(event);
+            if (event.defaultPrevented || off) return;
+            const next = !active;
+            setLocal(next);
+            onChange?.({
+              target: { checked: next, value: value ?? "on", name: name ?? "" },
+              nativeEvent: event.nativeEvent,
+              stopPropagation: () => event.stopPropagation(),
+              preventDefault: () => event.preventDefault()
+            });
+            if (value !== undefined) group?.toggle(value, next);
           }}
         />
       </span>
@@ -330,13 +352,14 @@ export const Radio = Object.assign(RadioInput, {
 });
 type SegmentedProps<V extends string | number> = Omit<
   HTMLAttributes<HTMLDivElement>,
-  "onChange" | "defaultValue"
+  "onChange" | "defaultValue" | "dir"
 > & {
   options: ReadonlyArray<Option<V>>;
   value?: V;
   defaultValue?: V;
   disabled?: boolean;
   name?: string;
+  dir?: "ltr" | "rtl";
   size?: string;
   onChange?: (v: V) => void;
 };
@@ -358,39 +381,45 @@ export function Segmented<V extends string | number = string>({
   const id = useId();
   const off = useFieldDisabled(disabled);
   return (
-    <div
+    <ShadcnRadioGroup
       {...props}
-      role="radiogroup"
+      name={name ?? id}
+      value={String(value ?? local ?? "")}
+      disabled={off}
+      onValueChange={(next) => {
+        const selected = options
+          .map(unpack)
+          .find((option) => String(option.value) === next);
+        if (!selected || selected.disabled || off) return;
+        setLocal(selected.value);
+        onChange?.(selected.value);
+      }}
       className={`ui-segmented ui-segmented-${size ?? "middle"} ${className}`}
     >
       <div className="ui-segmented-group">
-        {options.map((i) => {
-          const o = unpack(i),
-            active = (value ?? local) === o.value;
+        {options.map((item) => {
+          const option = unpack(item);
+          const active = (value ?? local) === option.value;
           return (
-            <label
-              key={String(o.value)}
-              title={o.title}
+            <RadioGroupItem
+              key={String(option.value)}
+              value={String(option.value)}
+              disabled={off || option.disabled}
+              title={option.title}
+              onFocus={(event) => {
+                if (active || off || option.disabled) return;
+                // 分段选择跟随焦点，快速按键也应在 Radix 移焦后完成选中。
+                event.preventDefault();
+                event.currentTarget.click();
+              }}
               className={`ui-segmented-item ${active ? "ui-segmented-item-selected" : ""}`}
             >
-              <input
-                className="ui-segmented-item-input"
-                type="radio"
-                name={name ?? id}
-                checked={active}
-                disabled={off || o.disabled}
-                value={String(o.value)}
-                onChange={() => {
-                  setLocal(o.value);
-                  onChange?.(o.value);
-                }}
-              />
-              <span className="ui-segmented-item-label">{o.label}</span>
-            </label>
+              <span className="ui-segmented-item-label">{option.label}</span>
+            </RadioGroupItem>
           );
         })}
       </div>
-    </div>
+    </ShadcnRadioGroup>
   );
 }
 
@@ -420,22 +449,23 @@ export function Switch({
   const active = checked ?? local;
   const off = useFieldDisabled(disabled);
   return (
-    <button
+    <ShadcnSwitch
       {...props}
-      type="button"
-      role="switch"
-      aria-checked={active}
+      checked={active}
       aria-busy={loading}
       className={`ui-switch ${active ? "ui-switch-checked" : ""} ${className}`}
       disabled={off || loading}
-      onClick={() => {
-        setLocal(!active);
-        onChange?.(!active);
+      onCheckedChange={(next) => {
+        setLocal(next);
+        onChange?.(next);
       }}
     >
-      <span className="ui-switch-handle" />
-      {active ? checkedChildren : unCheckedChildren}
-    </button>
+      {(active ? checkedChildren : unCheckedChildren) != null && (
+        <span className="ui-switch-inner">
+          {active ? checkedChildren : unCheckedChildren}
+        </span>
+      )}
+    </ShadcnSwitch>
   );
 }
 type SliderProps = {
@@ -459,56 +489,15 @@ export function Slider({
 }: SliderProps) {
   const title = tooltip?.formatter?.(value);
   return (
-    <input
+    <ShadcnSlider
       {...props}
       className="ui-slider"
-      type="range"
       title={typeof title === "string" ? title : undefined}
       aria-label={ariaLabelForHandle}
-      aria-valuenow={value}
-      value={value ?? 0}
-      onChange={(e) => onChange?.(e.target.valueAsNumber)}
+      value={[value ?? 0]}
+      onValueChange={([next]) => onChange?.(next!)}
       disabled={useFieldDisabled(disabled)}
     />
   );
 }
-interface PickerColor {
-  toHexString(): string;
-}
-interface ColorProps {
-  value?: string;
-  disabled?: boolean;
-  format?: "hex";
-  disabledAlpha?: boolean;
-  disabledFormat?: boolean;
-  showText?: (color: PickerColor) => ReactNode;
-  onOpenChange?: (open: boolean) => void;
-  onChange?: (color: PickerColor) => void;
-  "aria-label"?: string;
-}
-export function ColorPicker({
-  value = "#000000",
-  disabled,
-  showText,
-  onOpenChange,
-  onChange,
-  "aria-label": label
-}: ColorProps) {
-  return (
-    <label className="ui-color-picker-trigger">
-      <input
-        type="color"
-        aria-label={label}
-        value={value}
-        disabled={useFieldDisabled(disabled)}
-        onClick={() => onOpenChange?.(true)}
-        onBlur={() => onOpenChange?.(false)}
-        onChange={(e) => {
-          const hex = e.target.value;
-          onChange?.({ toHexString: () => hex });
-        }}
-      />
-      {showText?.({ toHexString: () => value })}
-    </label>
-  );
-}
+export { ColorPicker } from "./ColorPicker";

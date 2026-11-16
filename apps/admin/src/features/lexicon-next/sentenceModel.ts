@@ -1,8 +1,4 @@
-import type {
-  NextSentenceSource,
-  NextSentenceTranslation,
-  NextSentenceVariant
-} from "@tsz/types";
+import type { NextSentenceTranslation, NextSentenceVariant } from "@tsz/types";
 
 export const sentenceLevels = ["A1", "A2", "B1", "B2", "C1", "C2"];
 export const sentenceStyles = {
@@ -25,51 +21,23 @@ export function freedomCategory(value: number) {
       : "adapted_creation";
 }
 export function translationStyle(row: NextSentenceTranslation) {
-  return row.metadata
-    ? row.metadata.freedom == null
-      ? undefined
-      : freedomCategory(row.metadata.freedom)
-    : row.style;
+  return row.metadata ? freedomCategory(row.metadata.freedom ?? 0) : row.style;
 }
-export function sourceError(rows: NextSentenceSource[]) {
-  if (rows.length > 20) return "每条内容最多登记 20 个来源";
-  for (const row of rows) {
-    if (
-      [row.title, row.url, row.locator].some((s) => /\p{Cc}/u.test(s)) ||
-      [...row.title].length > 500 ||
-      [...row.url].length > 2000 ||
-      [...row.locator].length > 2000
-    )
-      return "来源字段过长或包含控制字符";
-    if (row.url) {
-      try {
-        const url = new URL(row.url);
-        if (
-          !["http:", "https:"].includes(url.protocol) ||
-          url.username ||
-          url.password
-        )
-          return "来源链接须为不含凭据的 http/https 地址";
-      } catch {
-        return "来源链接须为有效的 http/https 地址";
-      }
-    }
-    if (
-      ["dictionary", "web", "adapted"].includes(row.source_type) &&
-      (!row.title.trim() || (!row.url && !row.locator.trim()))
-    )
-      return "引用或改写须登记来源名称及网页链接或具体定位";
-  }
+export function normalizeTranslationFreedom(
+  row: NextSentenceTranslation
+): NextSentenceTranslation {
+  const freedom = row.metadata?.freedom ?? 0;
+  return {
+    ...row,
+    style: freedomCategory(freedom) ?? row.style,
+    metadata: { ...row.metadata, freedom, sources: row.metadata?.sources ?? [] }
+  };
 }
 export function sentenceError(variant: NextSentenceVariant) {
-  const original = sourceError(variant.metadata?.sources ?? []);
-  if (original) return original;
   for (const row of variant.translations) {
     if (!row.content.text.trim()) return "译文不能为空；不需要的译文请移除";
     if (row.metadata?.freedom != null && !freedomCategory(row.metadata.freedom))
       return "翻译自由度须为 0–100%，最多一位小数";
-    const error = sourceError(row.metadata?.sources ?? []);
-    if (error) return error;
   }
 }
 export function exampleWordCount(text: string) {

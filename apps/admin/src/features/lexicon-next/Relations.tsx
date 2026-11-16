@@ -15,10 +15,7 @@ import type {
 } from "@/features/dictionary/relatedSuggestions";
 import { V3RelationsGrid } from "@/features/dictionary/word-creation-v3/components/V3RelationsGrid";
 import { groupRelations } from "@/features/dictionary/word-creation-v3/relationGroups";
-import {
-  SenseSectionBody,
-  SenseSectionTitle
-} from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
+import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { relationLabel } from "@/features/dictionary/word-creation-v3/presentation";
 import { draftForms } from "./model";
@@ -160,58 +157,50 @@ export function Relations({
     relations: rows
   };
   return (
-    <section
-      className={`word-sense-section${collapsed ? " is-collapsed" : ""}`}
-      aria-label={t("related_words")}
+    <SenseSection
+      label={t("related_words")}
+      count={groupRelations(rows).length}
+      unit="项"
+      collapsed={collapsed}
+      onToggle={() => setCollapsed(!collapsed)}
     >
-      <SenseSectionTitle
-        label={t("related_words")}
-        count={groupRelations(rows).length}
-        unit="项"
-        collapsed={collapsed}
-        onToggle={() => setCollapsed(!collapsed)}
-      />
-      <SenseSectionBody collapsed={collapsed}>
-        {targets.failed && (
-          <Alert
-            type="error"
-            title="关联词读取失败"
-            action={<Button onClick={targets.retry}>重试</Button>}
-          />
-        )}
-        <AdminControls componentDisabled={disabled}>
-          <V3RelationsGrid
-            key={`${target}:${medium}`}
-            sense={sense}
-            posIndex={0}
-            senseIndex={0}
-            currentWordId={entryId}
-            relatedSource={relatedSource}
-            relationDisplaySnapshots={snapshots}
-            idFactory={() => crypto.randomUUID()}
-            change={(mutation) => {
-              if (disabled) return;
-              onChange((current) => {
-                const draft = {
-                  sense_groups: [],
-                  pos: [
-                    {
-                      pos_id: "relations",
-                      grammar_structures: [],
-                      senses: [
-                        { ...sense, relations: structuredClone(current) }
-                      ]
-                    }
-                  ]
-                };
-                mutation(draft);
-                return draft.pos[0]!.senses[0]!.relations;
-              });
-            }}
-          />
-        </AdminControls>
-      </SenseSectionBody>
-    </section>
+      {targets.failed && (
+        <Alert
+          type="error"
+          title="关联词读取失败"
+          action={<Button onClick={targets.retry}>重试</Button>}
+        />
+      )}
+      <AdminControls componentDisabled={disabled}>
+        <V3RelationsGrid
+          key={`${target}:${medium}`}
+          sense={sense}
+          posIndex={0}
+          senseIndex={0}
+          currentWordId={entryId}
+          relatedSource={relatedSource}
+          relationDisplaySnapshots={snapshots}
+          idFactory={() => crypto.randomUUID()}
+          change={(mutation) => {
+            if (disabled) return;
+            onChange((current) => {
+              const draft = {
+                sense_groups: [],
+                pos: [
+                  {
+                    pos_id: "relations",
+                    grammar_structures: [],
+                    senses: [{ ...sense, relations: structuredClone(current) }]
+                  }
+                ]
+              };
+              mutation(draft);
+              return draft.pos[0]!.senses[0]!.relations;
+            });
+          }}
+        />
+      </AdminControls>
+    </SenseSection>
   );
 }
 

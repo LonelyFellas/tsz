@@ -115,7 +115,7 @@ function mount() {
 }
 function chooseRow(label: string) {
   const row = screen.getByText(label).closest("tr")!;
-  fireEvent.click(row.querySelector('input[type="checkbox"]')!);
+  fireEvent.click(row.querySelector('[role="checkbox"]')!);
   return row;
 }
 async function selectTag(label: string, name: string) {
@@ -132,7 +132,7 @@ async function selectTag(label: string, name: string) {
 function chooseTagRow(name: string) {
   const drawer = within(document.querySelector(".ui-drawer")!);
   const row = drawer.getByText(name).closest("tr")!;
-  fireEvent.click(row.querySelector('input[type="checkbox"]')!);
+  fireEvent.click(row.querySelector('[role="checkbox"]')!);
   return row;
 }
 function confirmTagChange(action: "添加" | "移除") {
@@ -165,14 +165,18 @@ describe("权限目录、标签和授权人员", () => {
     ).toHaveLength(1);
     expect(document.querySelector('tr[data-row-key="words.edit"]')).toBeNull();
     expect(
-      document.querySelector('tr[data-row-key="speech.upload_audio"] input')
+      document.querySelector(
+        'tr[data-row-key="speech.upload_audio"] [role="checkbox"]'
+      )
     ).toBeChecked();
     await selectTag("所属板块", "词库管理");
     expect(
       document.querySelectorAll('tr[data-row-key="speech.upload_audio"]')
     ).toHaveLength(1);
     expect(
-      document.querySelector('tr[data-row-key="speech.upload_audio"] input')
+      document.querySelector(
+        'tr[data-row-key="speech.upload_audio"] [role="checkbox"]'
+      )
     ).toBeChecked();
     expect(screen.getByText("已选 1 项")).toBeInTheDocument();
   });
@@ -192,7 +196,7 @@ describe("权限目录、标签和授权人员", () => {
       drawer
         .getByText("内容编辑")
         .closest("tr")!
-        .querySelector('input[type="checkbox"]')
+        .querySelector('[role="checkbox"]')
     ).toBeChecked();
     expect(drawer.getByText("勾选后确认")).toBeInTheDocument();
     expect(drawer.getByText("新建标签")).toBeVisible();
@@ -255,7 +259,7 @@ describe("权限目录、标签和授权人员", () => {
     await screen.findByText("编辑本人词条");
     fireEvent.click(
       document.querySelector(
-        'tr[data-row-key="words.access"] input[type="checkbox"]'
+        'tr[data-row-key="words.access"] [role="checkbox"]'
       )!
     );
     fireEvent.click(screen.getByText("标签管理"));
@@ -354,7 +358,7 @@ describe("权限目录、标签和授权人员", () => {
     expect(
       within(drawer.getByText("内容编辑").closest("tr")!).getByRole("checkbox")
     ).toBeChecked();
-    expect(selectedRow.querySelector('input[type="checkbox"]')).toBeChecked();
+    expect(selectedRow.querySelector('[role="checkbox"]')).toBeChecked();
     expect(api.permissionSystem.changeTags).not.toHaveBeenCalled();
   });
   it("关闭标签管理时不修改标签归属", async () => {
@@ -605,7 +609,7 @@ describe("权限目录、标签和授权人员", () => {
     await screen.findByText("编辑本人词条");
     fireEvent.click(
       document.querySelector(
-        'tr[data-row-key="words.access"] input[type="checkbox"]'
+        'tr[data-row-key="words.access"] [role="checkbox"]'
       )!
     );
     fireEvent.click(screen.getByText("标签管理"));
@@ -637,7 +641,7 @@ describe("权限目录、标签和授权人员", () => {
     mount();
     await screen.findByText("编辑本人词条");
     const row = chooseRow("编辑本人词条");
-    expect(row.querySelector('input[type="checkbox"]')).toBeChecked();
+    expect(row.querySelector('[role="checkbox"]')).toBeChecked();
     await selectTag("权限标签", "内容编辑");
     await selectTag("所属板块", "用户管理");
     fireEvent.change(screen.getByPlaceholderText("权限名称 / 说明"), {
@@ -659,7 +663,7 @@ describe("权限目录、标签和授权人员", () => {
       screen
         .getByText("编辑本人词条")
         .closest("tr")!
-        .querySelector('input[type="checkbox"]')
+        .querySelector('[role="checkbox"]')
     ).toBeChecked();
     expect(api.permissionSystem.commit).not.toHaveBeenCalled();
   });
@@ -737,7 +741,7 @@ describe("权限目录、标签和授权人员", () => {
     const first = await screen.findByText("管理员甲");
     expect(scroller.scrollTop).toBe(0);
     expect(
-      first.closest("tr")!.querySelector('input[type="checkbox"]')
+      first.closest("tr")!.querySelector('[role="checkbox"]')
     ).toBeChecked();
     fireEvent.click(screen.getByText("下一步：确认权限变更"));
     await waitFor(() =>
@@ -1048,9 +1052,7 @@ it("切换语言保留所选权限和标签草稿，显式保存保留原名及�
   );
   const view = render(content("zh-Hans"));
   const entryCell = await screen.findByText("查看词条", { selector: "td" });
-  fireEvent.click(
-    entryCell.closest("tr")!.querySelector('input[type="checkbox"]')!
-  );
+  fireEvent.click(entryCell.closest("tr")!.querySelector('[role="checkbox"]')!);
   fireEvent.click(screen.getByRole("button", { name: "标签管理" }));
   fireEvent.click(screen.getByRole("button", { name: "新建标签" }));
   const name = screen.getByRole("textbox", { name: "标签名称" });
@@ -1095,9 +1097,7 @@ it("目录名称检索跨语言保持相同结果与已选权限，不重新请�
   const row = screen
     .getByText("View entries", { selector: "td" })
     .closest("tr")!;
-  const checkbox = row.querySelector<HTMLInputElement>(
-    'input[type="checkbox"]'
-  )!;
+  const checkbox = row.querySelector<HTMLInputElement>('[role="checkbox"]')!;
   fireEvent.click(checkbox);
   const calls = vi.mocked(api.permissionSystem.catalog).mock.calls.length;
   for (const locale of ["zh-Hans", "zh-Hant", "en-US", "en-GB"] as const) {

@@ -1,0 +1,45 @@
+.tsz-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-border-radius-full);
+  background: var(--ui-color-border-hover);
+  color: var(--ui-color-text-light-solid);
+  cursor: pointer;
+  transition: background-color var(--ui-motion-duration) var(--ui-motion-easing);
+}
+
+.tsz-switch[data-state="checked"] {
+  background: var(--ui-color-primary);
+}
+
+.tsz-switch-thumb {
+  position: absolute;
+  inset-inline-start: 2px;
+  width: var(--ui-space-4);
+  height: var(--ui-space-4);
+  border-radius: 50%;
+  background: var(--ui-color-bg-container);
+  box-shadow: var(--ui-shadow-xs);
+  pointer-events: none;
+  transition: inset-inline-start var(--ui-motion-duration)
+    var(--ui-motion-easing);
+}
+
+.tsz-switch[data-state="checked"] .tsz-switch-thumb {
+  inset-inline-start: calc(100% - var(--ui-space-4) - 2px);
+}
+
+.tsz-switch:focus-visible {
+  outline: var(--ui-focus-ring);
+  outline-offset: var(--ui-focus-offset);
+}
+
+.tsz-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -1,127 +1,9 @@
-import type { NextSentenceSource, NextSentenceVariant } from "@tsz/types";
+import type { NextSentenceVariant } from "@tsz/types";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Card, Tag } from "@tsz/ui/admin/display";
-import { Input, Select } from "@tsz/ui/admin/forms";
-import { Plus, Trash2 } from "lucide-react";
+import { Alert, Button, Card } from "@tsz/ui/admin/display";
+import { Select } from "@tsz/ui/admin/forms";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 
-const sourceNames: Record<NextSentenceSource["source_type"], string> = {
-  dictionary: "词典引用",
-  web: "网页引用",
-  adapted: "改写",
-  ai_composed: "AI 原创",
-  human_composed: "人工原创"
-};
-export function SentenceSources({ rows }: { rows?: NextSentenceSource[] }) {
-  return rows?.length ? (
-    <ul className="next-sentence-sources">
-      {rows.map((row) => (
-        <li key={row.id}>
-          <Tag>{sourceNames[row.source_type]}</Tag>
-          {row.url ? (
-            <a href={row.url} target="_blank" rel="noopener noreferrer">
-              {row.title || row.url}
-            </a>
-          ) : (
-            row.title
-          )}
-          {row.locator && <span> · {row.locator}</span>}
-          {["dictionary", "web", "adapted"].includes(row.source_type) && (
-            <Tag color="warning">未核验</Tag>
-          )}
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <span className="lexicon-next-muted">未登记来源</span>
-  );
-}
-export function SentenceSourceFields({
-  rows,
-  label,
-  disabled,
-  onChange
-}: {
-  rows: NextSentenceSource[];
-  label: string;
-  disabled: boolean;
-  onChange: (rows: NextSentenceSource[]) => void;
-}) {
-  const update = (index: number, patch: Partial<NextSentenceSource>) =>
-    onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  return (
-    <div
-      className="next-sentence-source-fields"
-      role="group"
-      aria-label={label}
-    >
-      <strong>{label}</strong>
-      {rows.map((row, index) => (
-        <div className="next-sentence-source-row" key={row.id}>
-          <Select
-            aria-label={`${label} ${index + 1} 类型`}
-            disabled={disabled}
-            value={row.source_type}
-            options={Object.entries(sourceNames).map(([value, label]) => ({
-              value,
-              label
-            }))}
-            onChange={(source_type) => update(index, { source_type })}
-          />
-          <Input
-            aria-label={`${label} ${index + 1} 名称`}
-            placeholder="来源名称"
-            value={row.title}
-            maxLength={500}
-            disabled={disabled}
-            onChange={(e) => update(index, { title: e.target.value })}
-          />
-          <Input
-            aria-label={`${label} ${index + 1} 链接`}
-            placeholder="网页链接"
-            value={row.url}
-            maxLength={2000}
-            disabled={disabled}
-            onChange={(e) => update(index, { url: e.target.value })}
-          />
-          <Input
-            aria-label={`${label} ${index + 1} 定位`}
-            placeholder="页码、条目或段落"
-            value={row.locator}
-            maxLength={2000}
-            disabled={disabled}
-            onChange={(e) => update(index, { locator: e.target.value })}
-          />
-          <Button
-            aria-label={`移除${label} ${index + 1}`}
-            disabled={disabled}
-            icon={<Trash2 />}
-            danger
-            onClick={() => onChange(rows.filter((_, i) => i !== index))}
-          />
-        </div>
-      ))}
-      <Button
-        icon={<Plus />}
-        disabled={disabled || rows.length >= 20}
-        onClick={() =>
-          onChange([
-            ...rows,
-            {
-              id: crypto.randomUUID(),
-              source_type: "human_composed",
-              title: "",
-              url: "",
-              locator: ""
-            }
-          ])
-        }
-      >
-        添加{label}
-      </Button>
-    </div>
-  );
-}
 export function SentenceMetadataFields({
   value,
   requests,
@@ -209,14 +91,6 @@ export function SentenceMetadataFields({
           );
         })}
       </div>
-      <SentenceSourceFields
-        label="原文来源"
-        rows={metadata.sources}
-        disabled={disabled}
-        onChange={(sources) =>
-          onChange({ ...value, metadata: { ...metadata, sources } })
-        }
-      />
     </Card>
   );
 }

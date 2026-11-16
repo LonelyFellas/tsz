@@ -24,7 +24,6 @@ import {
   PronunciationPreviewProvider
 } from "@/features/dictionary/word-creation/PronunciationPreview";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
-import { SentenceSources } from "./SentenceDetails";
 import {
   exampleLevelContext,
   nextTranslation,
@@ -80,16 +79,14 @@ function TranslationChoice({
   if (!row)
     return <span className="lexicon-next-muted">当前媒介语译文待补充</span>;
   const style = translationStyle(row);
-  const freedom = row.metadata?.freedom;
+  const freedom = row.metadata?.freedom ?? 0;
   const stops = [
     ...new Set(
-      rows.flatMap((row) =>
-        row.metadata?.freedom == null ? [] : [row.metadata.freedom]
-      )
+      rows.flatMap((row) => (row.metadata ? [row.metadata.freedom ?? 0] : []))
     )
   ].sort((a, b) => a - b);
   const chooseFreedom = (requested: number) => {
-    const direction = Math.sign(requested - (freedom ?? requested));
+    const direction = Math.sign(requested - freedom);
     const value = [...stops].sort(
       (a, b) =>
         Math.abs(a - requested) - Math.abs(b - requested) ||
@@ -99,8 +96,9 @@ function TranslationChoice({
       rows.find(
         (candidate) =>
           candidate.id === state.current &&
-          candidate.metadata?.freedom === value
-      ) ?? rows.find((candidate) => candidate.metadata?.freedom === value);
+          (candidate.metadata?.freedom ?? 0) === value
+      ) ??
+      rows.find((candidate) => (candidate.metadata?.freedom ?? 0) === value);
     if (selected)
       select({
         ...state,
@@ -133,69 +131,68 @@ function TranslationChoice({
             });
           }}
         >
-          <Tag>{style ? sentenceStyles[style] : "待评估"}</Tag>
+          <Tag>{style ? sentenceStyles[style] : "自由度无效"}</Tag>
           <RichTextReadOnly value={row.content} />
         </Button>
-        <div
-          className="next-sentence-freedom"
-          onKeyDown={(event) => {
-            if (
-              !(event.target instanceof HTMLInputElement) ||
-              event.target.type !== "range" ||
-              !stops.length ||
-              ![
-                "ArrowRight",
-                "ArrowUp",
-                "ArrowLeft",
-                "ArrowDown",
-                "Home",
-                "End"
-              ].includes(event.key)
-            )
-              return;
-            event.preventDefault();
-            const current = Math.max(0, stops.indexOf(freedom ?? -1));
-            const at =
-              event.key === "Home"
-                ? 0
-                : event.key === "End"
-                  ? stops.length - 1
-                  : Math.max(
-                      0,
-                      Math.min(
-                        stops.length - 1,
-                        current +
-                          (["ArrowRight", "ArrowUp"].includes(event.key)
-                            ? 1
-                            : -1)
-                      )
-                    );
-            chooseFreedom(stops[at]!);
-          }}
-        >
-          <Slider
-            ariaLabelForHandle={`译文自由度：${freedom == null ? "待评估" : freedom + "%"}`}
-            min={0}
-            max={100}
-            step={0.1}
-            value={freedom ?? stops[0] ?? 0}
-            disabled={stops.length < 2}
-            onChange={chooseFreedom}
-            tooltip={{
-              formatter: () => (freedom == null ? "待评估" : `${freedom}%`)
+        {row.metadata && (
+          <div
+            className="next-sentence-freedom"
+            onKeyDownCapture={(event) => {
+              if (
+                !(event.target instanceof HTMLElement) ||
+                event.target.getAttribute("role") !== "slider" ||
+                !stops.length ||
+                ![
+                  "ArrowRight",
+                  "ArrowUp",
+                  "ArrowLeft",
+                  "ArrowDown",
+                  "Home",
+                  "End"
+                ].includes(event.key)
+              )
+                return;
+              event.preventDefault();
+              const current = Math.max(0, stops.indexOf(freedom));
+              const at =
+                event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                    ? stops.length - 1
+                    : Math.max(
+                        0,
+                        Math.min(
+                          stops.length - 1,
+                          current +
+                            (["ArrowRight", "ArrowUp"].includes(event.key)
+                              ? 1
+                              : -1)
+                        )
+                      );
+              chooseFreedom(stops[at]!);
             }}
-          />
-          <span>
-            {freedom == null ? "自由度待评估" : `${freedom.toFixed(1)}%`}
-          </span>
-        </div>
+          >
+            <Slider
+              ariaLabelForHandle={`译文自由度：${freedom}%`}
+              min={0}
+              max={100}
+              step={0.1}
+              value={freedom}
+              disabled={stops.length < 2}
+              onChange={chooseFreedom}
+              tooltip={{
+                formatter: () => `${freedom}%`
+              }}
+            />
+            <span>{`${freedom.toFixed(1)}%`}</span>
+          </div>
+        )}
       </div>
       {state.missing && (
         <p className="lexicon-next-muted">
           {sentenceStyles[state.missing]}待补，暂显示已有译文。
         </p>
       )}
-      <SentenceSources rows={row.metadata?.sources} />
     </div>
   );
 }
@@ -423,7 +420,6 @@ export function SentenceReadingPreview({
                     <Tag key={id}>{name}</Tag>
                   ))}
                 </Flex>
-                <SentenceSources rows={row.metadata?.sources} />
                 <TranslationChoice
                   key={scope}
                   scope={scope}

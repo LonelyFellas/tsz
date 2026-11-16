@@ -1,7 +1,34 @@
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import { Button, Tag, Typography } from "@tsz/ui/admin/display";
+import { Button, Card, Tag, Typography } from "@tsz/ui/admin/display";
 import type { ReactNode } from "react";
+import "./V3SenseSection.css";
+
+interface SenseSectionProps {
+  label: string;
+  count: number;
+  unit: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  extra?: ReactNode;
+  children: ReactNode;
+}
+
+export function SenseSection({ children, ...props }: SenseSectionProps) {
+  return (
+    <Card
+      size="small"
+      role="region"
+      aria-label={props.label}
+      className={`word-sense-section word-sense-section-card${props.collapsed ? " is-collapsed" : ""}`}
+      title={<SenseSectionTitle {...props} />}
+    >
+      <SenseSectionBody collapsed={props.collapsed}>
+        {children}
+      </SenseSectionBody>
+    </Card>
+  );
+}
 
 export function SenseSectionTitle({
   label,
@@ -10,14 +37,7 @@ export function SenseSectionTitle({
   collapsed,
   onToggle,
   extra
-}: {
-  label: string;
-  count: number;
-  unit: string;
-  collapsed: boolean;
-  onToggle: () => void;
-  extra?: ReactNode;
-}) {
+}: Omit<SenseSectionProps, "children">) {
   const { t } = useLexiconEditorTranslation();
   return (
     <div

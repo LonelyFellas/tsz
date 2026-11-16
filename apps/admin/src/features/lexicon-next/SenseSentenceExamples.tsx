@@ -1,6 +1,5 @@
 import { InlineSentenceExamples } from "./InlineSentenceExamples";
 import { useSentenceDraftWorkspace } from "./sentenceDrafts";
-import { SentenceSources } from "./SentenceDetails";
 import { sentenceStyles, translationStyle } from "./sentenceModel";
 import { SentenceReadingPreview } from "./SentenceReadingPreview";
 import { useState } from "react";
@@ -129,7 +128,6 @@ function SentenceResource({
                   ))
                 )}
               </Space>
-              <SentenceSources rows={variant.metadata.sources} />
             </>
           )}
           {variant.translations
@@ -140,16 +138,13 @@ function SentenceResource({
                   <Tag>
                     {translationStyle(row)
                       ? sentenceStyles[translationStyle(row)!]
-                      : "待评估"}
+                      : "自由度无效"}
                   </Tag>
-                  {row.metadata?.freedom != null && (
-                    <span>{row.metadata.freedom.toFixed(1)}%</span>
+                  {row.metadata != null && (
+                    <span>{(row.metadata.freedom ?? 0).toFixed(1)}%</span>
                   )}
                   <RichTextReadOnly value={row.content} />
                 </Space>
-                {row.metadata && (
-                  <SentenceSources rows={row.metadata.sources} />
-                )}
               </div>
             ))}
         </>

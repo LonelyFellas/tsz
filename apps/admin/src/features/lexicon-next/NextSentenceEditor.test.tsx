@@ -215,14 +215,39 @@ it("保存冲突保留输入，显式重新加载后按最新 revision 保存", 
   expect(saveSentence.mock.calls[1]![1].expected_revision).toBe(4);
 });
 
-it("人工自由度及原文和译文来源一起保存，非法精度阻止生成和写入", async () => {
+it("人工自由度保存保留历史元数据，非法精度阻止生成和写入", async () => {
   const input = structuredClone(source);
   input.draft.variants[0]!.content.text = "A useful example.";
+  input.draft.variants[0]!.metadata = {
+    register_ids: [],
+    domain_ids: [],
+    sources: [
+      {
+        id: "legacy-original",
+        source_type: "human_composed",
+        title: "历史原文",
+        url: "",
+        locator: ""
+      }
+    ]
+  };
   input.draft.variants[0]!.translations.push({
     id: "simplified",
     locale: "zh-Hans",
     style: "balanced_fluency",
-    content: { version: 2, text: "一个例句。", annotations: [] }
+    content: { version: 2, text: "一个例句。", annotations: [] },
+    metadata: {
+      freedom: null,
+      sources: [
+        {
+          id: "legacy-translation",
+          source_type: "human_composed",
+          title: "历史译文",
+          url: "",
+          locator: ""
+        }
+      ]
+    }
   });
   speech.generate.mockResolvedValue(asset);
   const { saveSentence } = setup(true, input);
@@ -238,31 +263,24 @@ it("人工自由度及原文和译文来源一起保存，非法精度阻止生�
   expect(saveSentence).not.toHaveBeenCalled();
   expect(screen.getByText("一个例句。")).toBeVisible();
   fireEvent.change(freedom, { target: { value: "66.7" } });
-  fireEvent.click(screen.getByRole("button", { name: "添加原文来源" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "原文来源 1 名称" }), {
-    target: { value: "人工原句" }
-  });
-  fireEvent.click(screen.getByRole("button", { name: "添加译文 1 来源" }));
-  fireEvent.change(
-    screen.getByRole("textbox", { name: "译文 1 来源 1 名称" }),
-    { target: { value: "人工翻译" } }
-  );
+  expect(screen.queryByRole("group", { name: /来源/ })).toBeNull();
+  expect(screen.queryByText("历史原文")).toBeNull();
+  expect(screen.queryByText("历史译文")).toBeNull();
   fireEvent.click(complete);
   await waitFor(() => expect(saveSentence).toHaveBeenCalledOnce());
   const variant = saveSentence.mock.calls[0]![1].variant;
-  expect(variant.metadata.sources).toEqual([
-    expect.objectContaining({
-      title: "人工原句",
-      source_type: "human_composed"
-    })
-  ]);
+  expect(variant.metadata.sources).toEqual(
+    input.draft.variants[0]!.metadata!.sources
+  );
   expect(variant.translations).toEqual([
     expect.objectContaining({
       id: "simplified",
       style: "adapted_creation",
       metadata: {
         freedom: 66.7,
-        sources: [expect.objectContaining({ title: "人工翻译" })]
+        sources: input.draft.variants[0]!.translations.find(
+          (v) => v.id === "simplified"
+        )!.metadata!.sources
       }
     })
   ]);

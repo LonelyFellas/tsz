@@ -75,7 +75,7 @@ it("只提交变更的语言，保留共同修订并排除其他媒介语与已�
     )
   ).toEqual([]);
 });
-it("完全空白的译文不提交，0分和有来源的半填行不能当作空行丢弃", () => {
+it("默认零分的空白译文不提交，非零评分的半填行须补齐正文", () => {
   const value = structuredClone(source.draft.variants[1]!);
   const empty = {
     id: "empty",
@@ -91,8 +91,14 @@ it("完全空白的译文不提交，0分和有来源的半填行不能当作空
     id: "zero",
     metadata: { freedom: 0, sources: [] }
   });
+  expect(cleanSentenceVariant(value).translations).toEqual([]);
+  value.translations.push({
+    ...empty,
+    id: "scored",
+    metadata: { freedom: 52, sources: [] }
+  });
   expect(cleanSentenceVariant(value).translations.map((v) => v.id)).toEqual([
-    "zero"
+    "scored"
   ]);
   expect(
     draftSentenceError([
@@ -105,6 +111,27 @@ it("完全空白的译文不提交，0分和有来源的半填行不能当作空
       }
     ])
   ).toContain("译文不能为空");
+});
+it("有正文的历史空值按零分提交，已有评分保留且不改输入", () => {
+  const value = structuredClone(source.draft.variants[1]!);
+  const legacy = {
+    id: "legacy",
+    locale: "zh-Hans",
+    style: "balanced_fluency" as const,
+    content: { version: 2 as const, text: "译文", annotations: [] },
+    metadata: { freedom: null as number | null, sources: [] }
+  };
+  value.translations = [
+    legacy,
+    { ...legacy, id: "scored", metadata: { freedom: 52, sources: [] } }
+  ];
+  const rows = cleanSentenceVariant(value).translations;
+  expect(rows[0]).toMatchObject({
+    style: "word_for_word",
+    metadata: { freedom: 0 }
+  });
+  expect(rows[1]).toEqual(value.translations[1]);
+  expect(value.translations[0]!.metadata!.freedom).toBeNull();
 });
 it("新引用的既有资源保留原版本，修改不能误认为新建或无变更", () => {
   const word: NextDraft = {

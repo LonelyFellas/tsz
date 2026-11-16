@@ -17,10 +17,7 @@ import { Checkbox, Input, Select } from "@tsz/ui/admin/forms";
 import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
-import {
-  SenseSectionBody,
-  SenseSectionTitle
-} from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
+import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
 import {
   commonnessUnits,
   emptyEquivalentMetadata,
@@ -218,309 +215,301 @@ export function EquivalentRows({
     setEditing(true);
   }
   return (
-    <section className="word-sense-section" aria-label={title}>
-      <SenseSectionTitle
-        label={title}
-        count={visible.length}
-        unit="条"
-        collapsed={collapsed}
-        onToggle={() => setCollapsed(!collapsed)}
-      />
-      <SenseSectionBody collapsed={collapsed}>
-        <div className="lexicon-next-equivalents">
-          {catalogError && (
-            <Alert
-              type="error"
-              title={t("eq_catalog_error")}
-              action={<Button onClick={onRetry}>{t("eq_retry")}</Button>}
-            />
-          )}
-          {loading && <Skeleton active paragraph={{ rows: 1 }} />}
-          {missing && (
-            <Alert
-              type="error"
-              title={t("eq_catalog_missing")}
-              action={<Button onClick={onRetry}>{t("eq_retry")}</Button>}
-            />
-          )}
-          {catalog && !catalog.registers.length && !catalog.domains.length && (
-            <Alert type="info" title={t("eq_catalog_empty")} />
-          )}
-          <div className="lexicon-next-equivalent-tokens">
-            {sorted.map((row) => (
-              <Tag key={row.id}>
-                {row.text}
-                <Button
-                  type="text"
-                  size="small"
-                  aria-label={t("eq_remove", { word: row.text })}
-                  disabled={disabled}
-                  icon={<X aria-hidden size={12} />}
-                  onClick={() => remove(row.id)}
-                />
-              </Tag>
-            ))}
-          </div>
-          <Space.Compact block>
-            <Input
-              aria-label={t("eq_input")}
-              placeholder={t("eq_input_hint")}
-              value={input}
-              disabled={disabled}
-              onChange={(event) => {
-                setInput(event.target.value);
-                setError(undefined);
-              }}
-              onCompositionStart={() => {
-                composing.current = true;
-              }}
-              onCompositionEnd={() => {
-                composing.current = false;
-              }}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  !composing.current &&
-                  !event.nativeEvent.isComposing &&
-                  event.keyCode !== 229
-                ) {
-                  event.preventDefault();
-                  add();
-                }
-              }}
-              onPaste={(event) => {
-                const text = event.clipboardData.getData("text");
-                if (/[,，、;；\n\r]/u.test(text) && !input) {
-                  event.preventDefault();
-                  add(text);
-                }
-              }}
-              onBlur={() => {
-                if (!composing.current && input.trim()) add();
-              }}
-            />
-            <Button
-              icon={<Plus aria-hidden size={14} />}
-              disabled={disabled || !input.trim()}
-              onClick={() => add()}
-            >
-              {t("eq_add")}
-            </Button>
-          </Space.Compact>
-          <span className="lexicon-next-muted">{t("eq_separators")}</span>
-          {error && (
-            <Alert
-              type="error"
-              title={t(error === "text" ? "eq_invalid_text" : "eq_too_many")}
-            />
-          )}
-          <div className="lexicon-next-equivalent-domain">
-            <label>
-              {t("eq_domain")}
-              <Select
-                aria-label={t("eq_domain")}
-                value={domain}
-                onChange={setDomain}
-                options={[
-                  { value: "", label: t("eq_general") },
-                  ...(catalog?.domains ?? []).map((option) => ({
-                    value: option.id,
-                    label: i18n.language.startsWith("en")
-                      ? option.name_en
-                      : option.name_zh
-                  }))
-                ]}
-              />
-            </label>
-          </div>
-          {!visible.length ? (
-            <>
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={t("eq_empty")}
-              />
-              <Checkbox
+    <SenseSection
+      label={title}
+      count={visible.length}
+      unit="条"
+      collapsed={collapsed}
+      onToggle={() => setCollapsed(!collapsed)}
+    >
+      <div className="lexicon-next-equivalents">
+        {catalogError && (
+          <Alert
+            type="error"
+            title={t("eq_catalog_error")}
+            action={<Button onClick={onRetry}>{t("eq_retry")}</Button>}
+          />
+        )}
+        {loading && <Skeleton active paragraph={{ rows: 1 }} />}
+        {missing && (
+          <Alert
+            type="error"
+            title={t("eq_catalog_missing")}
+            action={<Button onClick={onRetry}>{t("eq_retry")}</Button>}
+          />
+        )}
+        {catalog && !catalog.registers.length && !catalog.domains.length && (
+          <Alert type="info" title={t("eq_catalog_empty")} />
+        )}
+        <div className="lexicon-next-equivalent-tokens">
+          {sorted.map((row) => (
+            <Tag key={row.id}>
+              {row.text}
+              <Button
+                type="text"
+                size="small"
+                aria-label={t("eq_remove", { word: row.text })}
                 disabled={disabled}
-                checked={sense.no_equivalents?.includes(locale) ?? false}
-                onChange={(event) =>
-                  onChange({
-                    no_equivalents: [
-                      ...(sense.no_equivalents ?? []).filter(
-                        (item) => item !== locale
-                      ),
-                      ...(event.target.checked ? [locale] : [])
-                    ]
-                  })
-                }
-              >
-                {t("eq_no_suitable")}
-              </Checkbox>
-            </>
-          ) : (
-            <div className="lexicon-next-equivalent-scroll">
-              <table className="lexicon-next-equivalent-table">
-                <colgroup>
-                  <col className="equivalent-col-word" />
-                  <col className="equivalent-col-score" />
-                  <col className="equivalent-col-tags" />
-                  <col className="equivalent-col-tags" />
-                  <col className="equivalent-col-action" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th scope="col">{t("eq_word")}</th>
-                    <th scope="col">{t("eq_score")}</th>
-                    <th scope="col">{t("eq_registers")}</th>
-                    <th scope="col">{t("eq_domains")}</th>
-                    <th scope="col" aria-label={t("eq_actions")} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, index) => {
-                    const score = equivalentScore(row, domain || undefined);
-                    const duplicate = visible.some(
-                      (other) =>
-                        other.id !== row.id &&
-                        equivalentKey(other.text) === equivalentKey(row.text)
-                    );
-                    const textError = !row.text.trim()
-                      ? "eq_required_text"
-                      : [...row.text].length > 200 || /\p{Cc}/u.test(row.text)
-                        ? "eq_invalid_text"
-                        : duplicate
-                          ? "eq_duplicate"
-                          : undefined;
-                    const invalidScore =
-                      !!score.value &&
-                      commonnessUnits(score.value) === undefined;
-                    return (
-                      <tr key={row.id}>
-                        <td>
+                icon={<X aria-hidden size={12} />}
+                onClick={() => remove(row.id)}
+              />
+            </Tag>
+          ))}
+        </div>
+        <Space.Compact block>
+          <Input
+            aria-label={t("eq_input")}
+            placeholder={t("eq_input_hint")}
+            value={input}
+            disabled={disabled}
+            onChange={(event) => {
+              setInput(event.target.value);
+              setError(undefined);
+            }}
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            onCompositionEnd={() => {
+              composing.current = false;
+            }}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !composing.current &&
+                !event.nativeEvent.isComposing &&
+                event.keyCode !== 229
+              ) {
+                event.preventDefault();
+                add();
+              }
+            }}
+            onPaste={(event) => {
+              const text = event.clipboardData.getData("text");
+              if (/[,，、;；\n\r]/u.test(text) && !input) {
+                event.preventDefault();
+                add(text);
+              }
+            }}
+            onBlur={() => {
+              if (!composing.current && input.trim()) add();
+            }}
+          />
+          <Button
+            icon={<Plus aria-hidden size={14} />}
+            disabled={disabled || !input.trim()}
+            onClick={() => add()}
+          >
+            {t("eq_add")}
+          </Button>
+        </Space.Compact>
+        <span className="lexicon-next-muted">{t("eq_separators")}</span>
+        {error && (
+          <Alert
+            type="error"
+            title={t(error === "text" ? "eq_invalid_text" : "eq_too_many")}
+          />
+        )}
+        <div className="lexicon-next-equivalent-domain">
+          <label>
+            {t("eq_domain")}
+            <Select
+              aria-label={t("eq_domain")}
+              value={domain}
+              onChange={setDomain}
+              options={[
+                { value: "", label: t("eq_general") },
+                ...(catalog?.domains ?? []).map((option) => ({
+                  value: option.id,
+                  label: i18n.language.startsWith("en")
+                    ? option.name_en
+                    : option.name_zh
+                }))
+              ]}
+            />
+          </label>
+        </div>
+        {!visible.length ? (
+          <>
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t("eq_empty")}
+            />
+            <Checkbox
+              disabled={disabled}
+              checked={sense.no_equivalents?.includes(locale) ?? false}
+              onChange={(event) =>
+                onChange({
+                  no_equivalents: [
+                    ...(sense.no_equivalents ?? []).filter(
+                      (item) => item !== locale
+                    ),
+                    ...(event.target.checked ? [locale] : [])
+                  ]
+                })
+              }
+            >
+              {t("eq_no_suitable")}
+            </Checkbox>
+          </>
+        ) : (
+          <div className="lexicon-next-equivalent-scroll">
+            <table className="lexicon-next-equivalent-table">
+              <colgroup>
+                <col className="equivalent-col-word" />
+                <col className="equivalent-col-score" />
+                <col className="equivalent-col-tags" />
+                <col className="equivalent-col-tags" />
+                <col className="equivalent-col-action" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">{t("eq_word")}</th>
+                  <th scope="col">{t("eq_score")}</th>
+                  <th scope="col">{t("eq_registers")}</th>
+                  <th scope="col">{t("eq_domains")}</th>
+                  <th scope="col" aria-label={t("eq_actions")} />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => {
+                  const score = equivalentScore(row, domain || undefined);
+                  const duplicate = visible.some(
+                    (other) =>
+                      other.id !== row.id &&
+                      equivalentKey(other.text) === equivalentKey(row.text)
+                  );
+                  const textError = !row.text.trim()
+                    ? "eq_required_text"
+                    : [...row.text].length > 200 || /\p{Cc}/u.test(row.text)
+                      ? "eq_invalid_text"
+                      : duplicate
+                        ? "eq_duplicate"
+                        : undefined;
+                  const invalidScore =
+                    !!score.value && commonnessUnits(score.value) === undefined;
+                  return (
+                    <tr key={row.id}>
+                      <td>
+                        <Input
+                          aria-label={t("eq_edit", { index: index + 1 })}
+                          value={row.text}
+                          disabled={disabled}
+                          status={textError ? "error" : undefined}
+                          onFocus={focusRow}
+                          onBlur={() => setEditing(false)}
+                          onChange={(event) =>
+                            update({ ...row, text: event.target.value })
+                          }
+                        />
+                        {textError && <span role="alert">{t(textError)}</span>}
+                      </td>
+                      <td>
+                        <Tooltip
+                          trigger={["hover", "focus"]}
+                          title={
+                            score.inherited ? t("eq_inherited_hint") : undefined
+                          }
+                        >
                           <Input
-                            aria-label={t("eq_edit", { index: index + 1 })}
-                            value={row.text}
-                            disabled={disabled}
-                            status={textError ? "error" : undefined}
-                            onFocus={focusRow}
-                            onBlur={() => setEditing(false)}
-                            onChange={(event) =>
-                              update({ ...row, text: event.target.value })
-                            }
-                          />
-                          {textError && (
-                            <span role="alert">{t(textError)}</span>
-                          )}
-                        </td>
-                        <td>
-                          <Tooltip
-                            trigger={["hover", "focus"]}
-                            title={
+                            className="lexicon-next-commonness-input"
+                            aria-label={t("eq_score_label", {
+                              word: row.text
+                            })}
+                            aria-description={
                               score.inherited
                                 ? t("eq_inherited_hint")
                                 : undefined
                             }
-                          >
-                            <Input
-                              className="lexicon-next-commonness-input"
-                              aria-label={t("eq_score_label", {
-                                word: row.text
-                              })}
-                              aria-description={
-                                score.inherited
-                                  ? t("eq_inherited_hint")
-                                  : undefined
-                              }
-                              inputMode="decimal"
-                              value={score.value}
-                              placeholder={t("eq_unassessed")}
-                              disabled={disabled}
-                              status={invalidScore ? "error" : undefined}
-                              onFocus={focusRow}
-                              onChange={(event) =>
+                            inputMode="decimal"
+                            value={score.value}
+                            placeholder={t("eq_unassessed")}
+                            disabled={disabled}
+                            status={invalidScore ? "error" : undefined}
+                            onFocus={focusRow}
+                            onChange={(event) =>
+                              update(
+                                setEquivalentScore(
+                                  row,
+                                  domain || undefined,
+                                  event.target.value
+                                )
+                              )
+                            }
+                            onBlur={() => {
+                              const own = row.metadata?.commonness.find(
+                                (item) =>
+                                  item.domain_id === (domain || undefined)
+                              );
+                              const units = own && commonnessUnits(own.score);
+                              if (units !== undefined)
                                 update(
                                   setEquivalentScore(
                                     row,
                                     domain || undefined,
-                                    event.target.value
+                                    (units / 10).toFixed(1)
                                   )
-                                )
-                              }
-                              onBlur={() => {
-                                const own = row.metadata?.commonness.find(
-                                  (item) =>
-                                    item.domain_id === (domain || undefined)
                                 );
-                                const units = own && commonnessUnits(own.score);
-                                if (units !== undefined)
-                                  update(
-                                    setEquivalentScore(
-                                      row,
-                                      domain || undefined,
-                                      (units / 10).toFixed(1)
-                                    )
-                                  );
-                                setEditing(false);
-                              }}
-                            />
-                          </Tooltip>
-                          {invalidScore && (
-                            <span role="alert">{t("eq_invalid_score")}</span>
-                          )}
-                        </td>
-                        {(["register_ids", "domain_ids"] as const).map(
-                          (field) => (
-                            <td key={field}>
-                              <TaxonomyPicker
-                                values={row.metadata?.[field] ?? []}
-                                options={
-                                  catalog?.[
-                                    field === "register_ids"
-                                      ? "registers"
-                                      : "domains"
-                                  ] ?? []
-                                }
-                                label={t("eq_select", {
-                                  word: row.text,
-                                  kind: t(
-                                    field === "register_ids"
-                                      ? "eq_registers"
-                                      : "eq_domains"
-                                  )
-                                })}
-                                disabled={disabled || loading || catalogError}
-                                onChange={(ids) =>
-                                  update({
-                                    ...row,
-                                    metadata: {
-                                      ...(row.metadata ??
-                                        emptyEquivalentMetadata()),
-                                      [field]: ids
-                                    }
-                                  })
-                                }
-                              />
-                            </td>
-                          )
-                        )}
-                        <td>
-                          <Button
-                            type="text"
-                            danger
-                            disabled={disabled}
-                            aria-label={t("eq_remove", { word: row.text })}
-                            icon={<Trash2 aria-hidden size={14} />}
-                            onClick={() => remove(row.id)}
+                              setEditing(false);
+                            }}
                           />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </SenseSectionBody>
-    </section>
+                        </Tooltip>
+                        {invalidScore && (
+                          <span role="alert">{t("eq_invalid_score")}</span>
+                        )}
+                      </td>
+                      {(["register_ids", "domain_ids"] as const).map(
+                        (field) => (
+                          <td key={field}>
+                            <TaxonomyPicker
+                              values={row.metadata?.[field] ?? []}
+                              options={
+                                catalog?.[
+                                  field === "register_ids"
+                                    ? "registers"
+                                    : "domains"
+                                ] ?? []
+                              }
+                              label={t("eq_select", {
+                                word: row.text,
+                                kind: t(
+                                  field === "register_ids"
+                                    ? "eq_registers"
+                                    : "eq_domains"
+                                )
+                              })}
+                              disabled={disabled || loading || catalogError}
+                              onChange={(ids) =>
+                                update({
+                                  ...row,
+                                  metadata: {
+                                    ...(row.metadata ??
+                                      emptyEquivalentMetadata()),
+                                    [field]: ids
+                                  }
+                                })
+                              }
+                            />
+                          </td>
+                        )
+                      )}
+                      <td>
+                        <Button
+                          type="text"
+                          danger
+                          disabled={disabled}
+                          aria-label={t("eq_remove", { word: row.text })}
+                          icon={<Trash2 aria-hidden size={14} />}
+                          onClick={() => remove(row.id)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </SenseSection>
   );
 }
