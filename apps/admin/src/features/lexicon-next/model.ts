@@ -2,6 +2,7 @@ import { regionalVariants } from "@tsz/shared";
 import { commonnessUnits, equivalentKey } from "./equivalents";
 import type {
   NextDraft,
+  NextDialectSense,
   NextGrammarStructure,
   NextSense,
   NextGrammarIssue,
@@ -181,6 +182,38 @@ export function draftForms(draft: NextDraft): NextForm[] {
 }
 
 /** Local preview only; never replaces the complete editable draft. */
+export function dialectHeadword(
+  draft: NextDraft,
+  senseId: string,
+  locale: string
+) {
+  const editor = draft.form_editor;
+  if (!editor)
+    return (
+      draft.forms.find((f) => f.locale === locale)?.text ||
+      draft.forms.find((f) => f.locale === "en")?.text ||
+      draft.headword
+    );
+  const pos = draft.senses.find((s) => s.id === senseId)?.part_of_speech;
+  for (const form of editor.pos.find((p) => p.pos === pos)?.forms ?? []) {
+    if (form.form_type !== "base") continue;
+    const variants = editor.contents.find(
+      (v) => v.id === form.content_id
+    )?.regional_variants;
+    if (!variants) continue;
+    const side = locale === "en-US" ? "us" : "uk";
+    const rows =
+      variants.mode === "common"
+        ? [variants.common]
+        : variants.mode === "uk_us_many"
+          ? variants[side]
+          : [variants[side]];
+    const word = rows.find((r) => r.spelling.trim())?.spelling;
+    if (word) return word;
+  }
+  return draft.headword;
+}
+
 export function previewDraft(
   draft: NextDraft,
   target: string,
@@ -450,4 +483,15 @@ export function grammarBindingIssues(
     }
   }
   return issues;
+}
+
+export function generalSense(sense_id: string): NextDialectSense {
+  return {
+    sense_id,
+    usage: "general",
+    no_equivalent: false,
+    note: "",
+    paired: false,
+    target: null
+  };
 }
