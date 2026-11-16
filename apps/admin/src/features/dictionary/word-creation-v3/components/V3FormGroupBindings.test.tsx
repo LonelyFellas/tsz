@@ -140,7 +140,7 @@ describe("词形组的专用词义交互", () => {
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
     dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     for (const checkbox of within(dialog).getAllByLabelText(/本词性释义[12]/)) {
-      expect(checkbox).toHaveAttribute("type", "checkbox");
+      expect(checkbox).toHaveAttribute("role", "checkbox");
       fireEvent.click(checkbox);
     }
     fireEvent.click(within(dialog).getByText("确认选择").closest("button")!);
@@ -172,7 +172,7 @@ describe("词形组的专用词义交互", () => {
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
     dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     for (const checkbox of within(dialog).getAllByLabelText(/本词性释义[12]/)) {
-      expect(checkbox).toHaveAttribute("type", "checkbox");
+      expect(checkbox).toHaveAttribute("role", "checkbox");
       fireEvent.click(checkbox);
     }
     expect(

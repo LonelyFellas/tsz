@@ -11,6 +11,9 @@ export {
 } from "./card";
 export { Input } from "./input";
 export { RadioGroup, RadioGroupItem } from "./radio-group";
+export { Slider } from "./slider";
+export { Checkbox } from "./checkbox";
+export { Switch } from "./switch";
 export { Label } from "./label";
 export { FormField, type FormFieldProps } from "./form-field";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";

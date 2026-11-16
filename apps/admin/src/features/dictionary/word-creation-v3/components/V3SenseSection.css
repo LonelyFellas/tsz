@@ -1,0 +1,52 @@
+.word-sense-section-card.ui-card {
+  padding: 0;
+  border-color: var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  background: var(--ui-color-bg-container);
+}
+
+.word-sense-section-card > .ui-card-head {
+  padding: 0;
+  background: var(--ui-color-fill-alter);
+}
+
+.word-sense-section-card > .ui-card-head .ui-card-head-title {
+  flex: 1;
+}
+
+.word-sense-section-card .word-sense-section-title {
+  min-height: var(--ui-control-height-lg);
+  margin: 0;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-bottom: 0;
+  background: transparent;
+  transition:
+    color var(--ui-motion-duration) var(--ui-motion-easing),
+    background-color var(--ui-motion-duration) var(--ui-motion-easing);
+}
+
+.word-sense-section-card .word-sense-section-title.is-interactive:hover {
+  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-bg);
+}
+
+.word-sense-section-card .word-sense-section-title .ui-tag {
+  color: var(--ui-color-text-secondary);
+  background: var(--ui-color-bg-container);
+}
+
+.word-sense-section-card .word-sense-section-collapse {
+  color: var(--ui-color-text-secondary);
+}
+
+.word-sense-section-card > .ui-card-body {
+  padding: var(--ui-space-3);
+}
+
+.word-sense-section-card.is-collapsed > .ui-card-head {
+  border-bottom: 0;
+}
+
+.word-sense-section-card.is-collapsed > .ui-card-body {
+  padding-block: 0;
+}

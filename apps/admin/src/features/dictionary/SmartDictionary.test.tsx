@@ -1674,9 +1674,7 @@ describe("SmartDictionary", () => {
 
     expect(screen.getByText("first")).toBeInTheDocument();
     expect(screen.queryByText("发布所选")).not.toBeInTheDocument();
-    const firstRowCheckbox = container.querySelector(
-      "tbody input[type='checkbox']"
-    );
+    const firstRowCheckbox = container.querySelector("tbody [role='checkbox']");
     expect(firstRowCheckbox).not.toBeNull();
     fireEvent.click(firstRowCheckbox!);
     const batchButton = screen.getByText("移入垃圾桶(1)").closest("button");
@@ -1691,7 +1689,7 @@ describe("SmartDictionary", () => {
     });
     expect(batchButton).not.toBeDisabled();
     expect(screen.queryByText("发布所选")).not.toBeInTheDocument();
-    fireEvent.click(container.querySelector("tbody input[type='checkbox']")!);
+    fireEvent.click(container.querySelector("tbody [role='checkbox']")!);
     const batchReview = screen
       .getByText("批量审听与发布(2)")
       .closest("button")!;
@@ -1738,7 +1736,7 @@ describe("SmartDictionary", () => {
         </FeedbackApp>
       </MemoryRouter>
     );
-    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    fireEvent.click(container.querySelector("thead [role='checkbox']")!);
     expect(
       screen.getByRole("button", { name: "批量审听与发布(2)" })
     ).toBeDisabled();
@@ -1764,7 +1762,7 @@ describe("SmartDictionary", () => {
         </FeedbackApp>
       </MemoryRouter>
     );
-    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    fireEvent.click(container.querySelector("thead [role='checkbox']")!);
     expect(
       screen.getByRole("button", { name: "批量审听与发布(51)" })
     ).toBeDisabled();
@@ -2057,7 +2055,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
     fireEvent.click(
-      container.querySelector("tbody input[type='checkbox']") as Element
+      container.querySelector("tbody [role='checkbox']") as Element
     );
 
     fireEvent.click(screen.getByText("移入垃圾桶(1)"));
@@ -2510,7 +2508,7 @@ describe("SmartDictionary", () => {
     );
 
     // 表头全选：逐个点行内 checkbox 时，第二次点击拿到的仍是未 flush 的受控 selectedRowKeys。
-    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    fireEvent.click(container.querySelector("thead [role='checkbox']")!);
     fireEvent.click(screen.getByText("永久删除(2)").closest("button")!);
     await screen.findAllByText("永久删除选中的 2 个词条？");
     fireEvent.click(
@@ -2563,7 +2561,7 @@ describe("SmartDictionary", () => {
     );
 
     // 表头全选：逐个点行内 checkbox 时，第二次点击拿到的仍是未 flush 的受控 selectedRowKeys。
-    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    fireEvent.click(container.querySelector("thead [role='checkbox']")!);
     fireEvent.click(screen.getByText("永久删除(2)").closest("button")!);
 
     expect(screen.getByText("永久删除(2)").closest("button")).toBeDisabled();
@@ -2752,11 +2750,11 @@ describe("SmartDictionary", () => {
     const firstCheckbox = screen
       .getByText("first")
       .closest("tr")!
-      .querySelector("input[type='checkbox']")!;
+      .querySelector("[role='checkbox']")!;
     const secondCheckbox = screen
       .getByText("second")
       .closest("tr")!
-      .querySelector("input[type='checkbox']")!;
+      .querySelector("[role='checkbox']")!;
     fireEvent.click(firstCheckbox);
     await screen.findByText("恢 复(1)");
     fireEvent.click(secondCheckbox);
@@ -2807,7 +2805,7 @@ describe("SmartDictionary", () => {
         </FeedbackApp>
       </MemoryRouter>
     );
-    const checkbox = container.querySelector("tbody input[type='checkbox']")!;
+    const checkbox = container.querySelector("tbody [role='checkbox']")!;
     fireEvent.click(checkbox);
     fireEvent.click(screen.getByText("恢 复(1)"));
     fireEvent.click(

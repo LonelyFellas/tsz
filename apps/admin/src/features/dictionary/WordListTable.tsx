@@ -9,7 +9,7 @@ import {
 } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Button } from "@tsz/ui/components/button";
-import { Select } from "@tsz/ui/admin/forms";
+import { Checkbox, Select } from "@tsz/ui/admin/forms";
 import { AdminTableToolbar } from "@/components/AdminTable";
 import { ColumnSettings } from "@/components/ColumnSettings";
 import { useColumnSettings } from "@/components/useColumnSettings";
@@ -246,16 +246,11 @@ export function WordListTable<Row extends { id: string }>({
             <tr>
               {selection && (
                 <th scope="col" style={checkboxStyle}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     aria-label={t("select_page")}
                     checked={count > 0 && count === selectable.length}
                     disabled={!selectable.length}
-                    ref={(el) => {
-                      if (el)
-                        el.indeterminate =
-                          count > 0 && count < selectable.length;
-                    }}
+                    indeterminate={count > 0 && count < selectable.length}
                     onChange={(event) =>
                       toggle(selectable, event.target.checked)
                     }
@@ -282,8 +277,7 @@ export function WordListTable<Row extends { id: string }>({
               >
                 {selection && (
                   <td style={checkboxStyle}>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       aria-label={t("select_entry", {
                         label: rowLabel(row)
                       })}

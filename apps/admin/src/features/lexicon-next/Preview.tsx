@@ -19,7 +19,6 @@ import type {
   NextSentence
 } from "@tsz/types";
 import { draftForms, localeLabels } from "./model";
-import { SentenceSources } from "./SentenceDetails";
 
 function Lines({
   rows,
@@ -326,22 +325,13 @@ export function DraftSummary({
                       className="tsz-words"
                       value={variant.content}
                     />
-                    {!!variant.metadata?.sources.length && (
-                      <SentenceSources rows={variant.metadata.sources} />
-                    )}
                     {variant.translations.map((row) => (
                       <div key={row.id}>
                         <span>
                           {localeLabels[row.locale]} ·
-                          {row.metadata?.freedom == null
-                            ? "待评估"
-                            : `自由度 ${row.metadata.freedom}%`}
-                          ：
+                          {`自由度 ${row.metadata?.freedom ?? 0}%`}：
                         </span>
                         <RichTextReadOnly value={row.content} />
-                        {!!row.metadata?.sources.length && (
-                          <SentenceSources rows={row.metadata.sources} />
-                        )}
                       </div>
                     ))}
                   </div>

@@ -30,7 +30,7 @@ const example = (
   content: { version: 2, text, annotations: [] },
   translations: []
 });
-it("自由度按连续边界分类，未评估与非法精度不伪造类型", () => {
+it("自由度按连续边界分类，空值默认直译且非法精度不伪造类型", () => {
   expect([0, 33.3, 33.4, 66.6, 66.7, 100].map(freedomCategory)).toEqual([
     "word_for_word",
     "word_for_word",
@@ -41,7 +41,7 @@ it("自由度按连续边界分类，未评估与非法精度不伪造类型", (
   ]);
   for (const value of [-0.1, 100.1, 33.33, NaN, Infinity])
     expect(freedomCategory(value)).toBeUndefined();
-  expect(translationStyle(translation("pending", null))).toBeUndefined();
+  expect(translationStyle(translation("default", null))).toBe("word_for_word");
   const row = example("one", "A2", "A job.");
   row.translations = [translation("bad", 33.33)];
   expect(sentenceError(row)).toContain("一位小数");

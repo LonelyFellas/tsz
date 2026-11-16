@@ -4,6 +4,7 @@
 .lexicon-next-definition-table {
   width: 100%;
   min-width: 880px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
@@ -17,23 +18,39 @@
 .lexicon-next-definition-table th {
   background: var(--ui-color-fill-alter);
   font-weight: var(--ui-font-weight-medium);
+  white-space: nowrap;
 }
-.lexicon-next-definition-table td:nth-child(2) {
-  min-width: 112px;
+.lexicon-next-definition-table th:first-child,
+.lexicon-next-definition-table th:last-child {
+  width: 56px;
 }
-.lexicon-next-definition-table td:nth-child(3) {
-  min-width: 96px;
+.lexicon-next-definition-table th:nth-child(2) {
+  width: 112px;
 }
-.lexicon-next-definition-table td:nth-child(4) {
-  width: 50%;
-  min-width: 280px;
+.lexicon-next-definition-table th:nth-child(3) {
+  width: 96px;
 }
-.lexicon-next-definition-table td:nth-child(5) {
-  width: 25%;
-  min-width: 200px;
+.lexicon-next-definition-table th:nth-child(5) {
+  width: 240px;
+}
+.lexicon-next-definition-table :is(th, td):first-child,
+.lexicon-next-definition-table :is(th, td):last-child {
+  text-align: center;
 }
 .lexicon-next-definition-table .ui-select {
   width: 100%;
+}
+.lexicon-next-definition-table .lexicon-next-grammar-text,
+.lexicon-next-definition-table textarea.ui-input {
+  min-height: calc(var(--ui-control-height) + var(--ui-space-6));
+  padding: var(--ui-space-2) var(--ui-space-3);
+  line-height: var(--ui-line-height);
+}
+.lexicon-next-definition-table .lexicon-next-grammar-text {
+  align-items: flex-start;
+}
+.lexicon-next-definition-table .lexicon-next-grammar-text > .ui-btn-icon {
+  align-self: center;
 }
 .lexicon-next-definition-table [role="alert"] {
   color: var(--ui-color-error);

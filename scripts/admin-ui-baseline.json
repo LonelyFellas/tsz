@@ -297,9 +297,9 @@
     "raw-font-size": 2
   },
   "packages/ui/src/admin/forms/forms.css": {
-    "raw-radius": 9,
-    "raw-color": 6,
-    "raw-shadow": 2,
+    "raw-radius": 6,
+    "raw-color": 3,
+    "raw-shadow": 1,
     "raw-font-weight": 2
   },
   "packages/ui/src/admin/overlays/overlays.css": {

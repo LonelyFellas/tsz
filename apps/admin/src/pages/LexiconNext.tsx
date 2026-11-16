@@ -39,7 +39,6 @@ import { HttpError } from "@tsz/api-client";
 import type {
   NextDraft,
   NextEntry,
-  NextEntryView,
   NextWorkspaceEntry,
   NextLanguageCapability,
   V3DraftValidationIssue,
@@ -364,7 +363,6 @@ function EntryEditor({
   const [formIssues, setFormIssues] = useState<V3DraftValidationIssue[]>([]);
   const [conflict, setConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
-  const [view, setView] = useState<NextEntryView>();
   const profile = useAuthStore((state) => state.profile);
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
@@ -493,9 +491,6 @@ function EntryEditor({
       void message.success("草稿已保存");
     });
   }
-  useEffect(() => {
-    setView(undefined);
-  }, [target, medium]);
   function changeStep(next: WordCreationStep) {
     if (
       next === "forms" &&
@@ -536,22 +531,6 @@ function EntryEditor({
             <span role="status">{dirty ? "有未保存修改" : "已保存"}</span>
           </Space>
           <Space wrap>
-            <Button
-              hidden={step === "forms"}
-              disabled={busy}
-              onClick={() =>
-                void run(async () =>
-                  setView(
-                    await requests.view(saved.id, {
-                      target_locale: target,
-                      medium_locale: medium
-                    })
-                  )
-                )
-              }
-            >
-              查看已保存预览
-            </Button>
             <Button
               type="primary"
               icon={<Save aria-hidden="true" />}
@@ -802,22 +781,6 @@ function EntryEditor({
             ]}
           />
         )}
-        <Modal
-          open={!!view}
-          title={`已保存预览 · 版本 ${view?.revision ?? ""}`}
-          width={960}
-          className="lexicon-next-saved-preview"
-          footer={null}
-          onCancel={() => setView(undefined)}
-        >
-          {view && (
-            <Preview
-              view={view}
-              requests={requests}
-              sentenceDetailsAvailable={sentenceDetailsAvailable}
-            />
-          )}
-        </Modal>
         <Modal
           open={!!remote}
           title="比较草稿"

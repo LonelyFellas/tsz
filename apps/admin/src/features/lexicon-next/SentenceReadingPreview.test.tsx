@@ -32,7 +32,7 @@ const resource = (id: string, level: string): NextSentence => ({
           id: `${id}-${freedom}`,
           locale: "zh-Hans",
           style: "balanced_fluency",
-          metadata: { freedom, sources: [] },
+          metadata: { freedom: freedom === 0 ? null : freedom, sources: [] },
           content: { version: 2, text: `${id}译文${freedom}`, annotations: [] }
         }))
       }
@@ -76,7 +76,7 @@ it("等级切换保留译文选择；滑块和键盘只选择已有译文，不�
   expect(screen.getByText("high译文100")).toBeVisible();
   fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowLeft" });
   expect(screen.getByText("high译文50")).toBeVisible();
-  fireEvent.change(screen.getByRole("slider"), { target: { value: "8" } });
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "Home" });
   expect(screen.getByText("high译文0")).toBeVisible();
   expect(requests.sentence).toHaveBeenCalledTimes(2);
 });

@@ -34,12 +34,14 @@ const VoiceEditor = lazy(() =>
 export function DefinitionText({
   definition,
   label,
+  placeholder = "输入英文释义",
   disabled,
   onChange,
   registerLeaveGuard
 }: {
   definition: NextDefinition;
   label: string;
+  placeholder?: string;
   disabled: boolean;
   onChange: (value: NextDefinition) => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
@@ -165,7 +167,7 @@ export function DefinitionText({
                 annotations: []
               }
             }
-            emptyText="未填写英文释义"
+            emptyText={placeholder}
           />
         </Button>
       </Space.Compact>

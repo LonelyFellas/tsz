@@ -37,14 +37,12 @@ const VoiceEditor = lazy(() =>
 );
 import {
   sentenceError,
+  normalizeTranslationFreedom,
   sentenceStyles,
   freedomCategory,
   translationStyle
 } from "./sentenceModel";
-import {
-  SentenceMetadataFields,
-  SentenceSourceFields
-} from "./SentenceDetails";
+import { SentenceMetadataFields } from "./SentenceDetails";
 import "./sentences.css";
 const blank = () => ({ version: 2 as const, text: "", annotations: [] });
 function newVariant(locale: string): NextSentenceVariant {
@@ -166,8 +164,9 @@ export function NextSentenceEditor({
     );
     if (detailsAvailable) {
       variant.metadata ??= { register_ids: [], domain_ids: [], sources: [] };
-      for (const row of variant.translations)
-        row.metadata ??= { freedom: null, sources: [] };
+      variant.translations = variant.translations.map(
+        normalizeTranslationFreedom
+      );
     }
     return variant;
   };
@@ -427,7 +426,7 @@ export function NextSentenceEditor({
                     <Tag>
                       {translationStyle(row)
                         ? sentenceStyles[translationStyle(row)!]
-                        : "待评估"}
+                        : "自由度无效"}
                     </Tag>
                     <span>自由度</span>
                     <InputNumber
@@ -435,20 +434,17 @@ export function NextSentenceEditor({
                       min={0}
                       max={100}
                       step={0.1}
-                      value={row.metadata?.freedom ?? null}
+                      value={row.metadata?.freedom ?? 0}
                       disabled={applying}
                       onChange={(value) => {
-                        const freedom = value === null ? null : Number(value);
+                        const freedom = value === null ? 0 : Number(value);
                         setDraft((current) => ({
                           ...current,
                           translations: current.translations.map((v) =>
                             v.id === row.id
                               ? {
                                   ...v,
-                                  style:
-                                    freedom === null
-                                      ? v.style
-                                      : (freedomCategory(freedom) ?? v.style),
+                                  style: freedomCategory(freedom) ?? v.style,
                                   metadata: {
                                     sources: v.metadata?.sources ?? [],
                                     freedom
@@ -465,7 +461,7 @@ export function NextSentenceEditor({
                       min={0}
                       max={100}
                       step={0.1}
-                      value={row.metadata?.freedom ?? 50}
+                      value={row.metadata?.freedom ?? 0}
                       disabled={applying}
                       onChange={(freedom) =>
                         setDraft((current) => ({
@@ -518,29 +514,6 @@ export function NextSentenceEditor({
                   }))
                 }
               />
-              {detailsAvailable && (
-                <SentenceSourceFields
-                  label={`译文 ${index + 1} 来源`}
-                  rows={row.metadata?.sources ?? []}
-                  disabled={applying}
-                  onChange={(sources) =>
-                    setDraft((current) => ({
-                      ...current,
-                      translations: current.translations.map((v) =>
-                        v.id === row.id
-                          ? {
-                              ...v,
-                              metadata: {
-                                freedom: v.metadata?.freedom ?? null,
-                                sources
-                              }
-                            }
-                          : v
-                      )
-                    }))
-                  }
-                />
-              )}
               <Button
                 danger
                 disabled={applying}
@@ -567,10 +540,12 @@ export function NextSentenceEditor({
                   {
                     id: crypto.randomUUID(),
                     locale: medium,
-                    style: "balanced_fluency",
+                    style: detailsAvailable
+                      ? "word_for_word"
+                      : "balanced_fluency",
                     content: blank(),
                     ...(detailsAvailable
-                      ? { metadata: { freedom: null, sources: [] } }
+                      ? { metadata: { freedom: 0, sources: [] } }
                       : {})
                   }
                 ]

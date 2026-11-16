@@ -12,6 +12,8 @@ import {
 } from "react";
 
 import { copyText } from "../../lib/clipboard";
+import { Input } from "../forms/Input";
+import "../forms/forms.css";
 
 interface TextProps extends ComponentPropsWithoutRef<"span"> {
   ref?: Ref<HTMLElement>;
@@ -115,7 +117,7 @@ function TextBlock({
       }}
     >
       {editing ? (
-        <textarea
+        <Input.TextArea
           aria-label={(editable && editable.tooltip) || t("actions.edit")}
           autoFocus
           maxLength={editable ? editable.maxLength : undefined}

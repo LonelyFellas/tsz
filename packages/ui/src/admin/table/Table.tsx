@@ -9,11 +9,12 @@ import {
   useMemo,
   useRef,
   useState,
-  type InputHTMLAttributes,
+  type ComponentProps,
   type Key,
   type ReactNode,
   type Ref
 } from "react";
+import { Checkbox } from "../forms/Choice";
 import { Pagination, type PaginationProps } from "./Pagination";
 
 type Breakpoint = "xs" | "sm" | "md" | "lg" | "xl" | "xxl";
@@ -29,8 +30,8 @@ interface RowSelection<T> {
   selectedRowKeys?: Key[];
   preserveSelectedRowKeys?: boolean;
   fixed?: boolean;
-  getCheckboxProps?: (row: T) => InputHTMLAttributes<HTMLInputElement>;
-  getTitleCheckboxProps?: () => InputHTMLAttributes<HTMLInputElement>;
+  getCheckboxProps?: (row: T) => ComponentProps<typeof Checkbox>;
+  getTitleCheckboxProps?: () => ComponentProps<typeof Checkbox>;
   onChange?: (keys: Key[], rows: T[], info: { type: "all" | "single" }) => void;
 }
 
@@ -220,25 +221,19 @@ export function Table<T extends object>({
           viewColumns[0]?.fixed === "left" || viewColumns[0]?.fixed === "start"
         ),
       title: (
-        <input
+        <Checkbox
           aria-label={t("controls.selectPage")}
           {...titleProps}
-          type="checkbox"
           checked={checkedCount > 0 && checkedCount === selectable.length}
-          ref={(node) => {
-            if (node)
-              node.indeterminate =
-                checkedCount > 0 && checkedCount < selectable.length;
-          }}
+          indeterminate={checkedCount > 0 && checkedCount < selectable.length}
           disabled={titleProps?.disabled || !selectable.length}
           onChange={(e) => toggle(selectable, e.target.checked, "all")}
         />
       ),
       render: (_, row) => (
-        <input
+        <Checkbox
           aria-label={t("controls.selectRow", { id: keyOf(row) })}
           {...rowSelection.getCheckboxProps?.(row)}
-          type="checkbox"
           checked={selectedKeys.includes(keyOf(row))}
           onChange={(e) => toggle([row], e.target.checked, "single")}
         />

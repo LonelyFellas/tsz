@@ -549,9 +549,7 @@ it("切换语言保留角色草稿与勾选，显式保存提交原始权限 key
     expect(name).toHaveValue("保留 Role");
     expect(description).toHaveValue("业务正文 unchanged");
     expect(
-      within(dialog)
-        .getAllByRole("checkbox")
-        .filter((c) => (c as HTMLInputElement).checked)
+      within(dialog).getAllByRole("checkbox", { checked: true })
     ).toHaveLength(2);
     expect(mockPermissions).toHaveBeenCalledTimes(catalogCalls);
     expect(mockUpdate).not.toHaveBeenCalled();

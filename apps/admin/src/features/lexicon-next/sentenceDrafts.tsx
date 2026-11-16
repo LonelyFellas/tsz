@@ -14,7 +14,7 @@ import type {
   NextSentenceDraftChange,
   NextSentenceVariant
 } from "@tsz/types";
-import { sentenceError } from "./sentenceModel";
+import { normalizeTranslationFreedom, sentenceError } from "./sentenceModel";
 import { useSelectedVoiceAudio } from "@/features/dictionary/word-creation-v3/useSelectedVoiceAudio";
 import {
   adminVoicePreviewAdapter,
@@ -40,18 +40,22 @@ export function scopedSentenceVariant(
 ) {
   return {
     ...value,
-    translations: value.translations.filter((v) => v.locale === medium)
+    translations: value.translations
+      .filter((v) => v.locale === medium)
+      .map(normalizeTranslationFreedom)
   };
 }
 export function cleanSentenceVariant(value: NextSentenceVariant) {
   return {
     ...value,
-    translations: value.translations.filter(
-      (row) =>
-        row.content.text.trim() ||
-        row.metadata?.freedom != null ||
-        row.metadata?.sources.length
-    )
+    translations: value.translations
+      .filter(
+        (row) =>
+          row.content.text.trim() ||
+          (row.metadata?.freedom ?? 0) !== 0 ||
+          row.metadata?.sources.length
+      )
+      .map(normalizeTranslationFreedom)
   };
 }
 export function sentenceChanges(
