@@ -12,6 +12,7 @@ import { flushSync } from "react-dom";
 import { LoaderCircleIcon, SettingsIcon } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import { Alert, Button, Space, Typography } from "@tsz/ui/admin/display";
+import { Popover } from "@tsz/ui/admin/overlays";
 import {
   lazy,
   Suspense,
@@ -50,6 +51,7 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useContentEditPermissions } from "../../contentEditPermissions";
+import { useHideSpeechSettingsTextEditor } from "../speechSettingsContext";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 import "@tsz/voice-editor/styles.css";
 
@@ -121,6 +123,7 @@ export function V3PhonemeSpeechSettings({
     };
   }, [targetKey]);
   const { edit: canEdit } = useContentEditPermissions();
+  const hideTextEditor = useHideSpeechSettingsTextEditor();
   const canGenerateAudio = usePermission("speech.generate");
   const [open, setOpen] = useState(false);
   const audioTasks = useVoiceAudioTasks();
@@ -586,37 +589,63 @@ export function V3PhonemeSpeechSettings({
           }
         />
       )}
-      {!headless && (
-        <Button
-          type="text"
-          size="small"
-          icon={
-            automaticAudio.busy ? (
-              <LoaderCircleIcon className="ui-spinner" />
-            ) : (
-              <SettingsIcon />
-            )
-          }
-          aria-label={t("creation_open_tts_settings", { label })}
-          aria-busy={automaticAudio.busy || undefined}
-          title={
-            automaticAudio.busy ? t("panel_generating_final_audio") : undefined
-          }
-          data-v3-node-id={nodeId}
-          data-v3-field={field}
-          disabled={!canEdit || fallbackPending || fallbackError != null}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setDraft(capture());
-            setSaveError("");
-            setFormalAudioFailed(false);
-            setBusinessSaveFailed(false);
-            setSource(sourceKey);
-            setOpen(true);
-          }}
-        />
-      )}
+      {!headless &&
+        (() => {
+          const missingIpa =
+            hideTextEditor && alphabet === "ipa" && !candidate.ipa.trim();
+          const button = (
+            <Button
+              type="text"
+              size="small"
+              icon={
+                automaticAudio.busy ? (
+                  <LoaderCircleIcon className="ui-spinner" />
+                ) : (
+                  <SettingsIcon />
+                )
+              }
+              aria-label={t("creation_open_tts_settings", { label })}
+              aria-busy={automaticAudio.busy || undefined}
+              title={
+                automaticAudio.busy
+                  ? t("panel_generating_final_audio")
+                  : undefined
+              }
+              data-v3-node-id={nodeId}
+              data-v3-field={field}
+              style={missingIpa ? { pointerEvents: "none" } : undefined}
+              disabled={
+                !canEdit ||
+                fallbackPending ||
+                fallbackError != null ||
+                missingIpa
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setDraft(capture());
+                setSaveError("");
+                setFormalAudioFailed(false);
+                setBusinessSaveFailed(false);
+                setSource(sourceKey);
+                setOpen(true);
+              }}
+            />
+          );
+          return missingIpa && canEdit ? (
+            <Popover
+              trigger="click"
+              placement="top"
+              content={t(
+                "creation_phonetic_enter_azure_ipa_for_the_corresponding_accent_first"
+              )}
+            >
+              <span>{button}</span>
+            </Popover>
+          ) : (
+            button
+          );
+        })()}
       {!headless && automaticAudio.busy && (
         <span className="sr-only" role="status">
           {t("panel_generating_final_audio")}
@@ -674,6 +703,7 @@ export function V3PhonemeSpeechSettings({
               readOnly={!canEdit || saving || source !== sourceKey}
               mode="phoneme-settings"
               textReadOnly
+              hideTextEditor={hideTextEditor}
               autoRecommend={defaultProfile !== storedProfile}
               loadRecommendations={loadAdminVoiceRecommendations}
               recommendationArea="azure"

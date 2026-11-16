@@ -71,6 +71,7 @@ import {
   mergeSpellingSettings,
   type SpellingAudioScope
 } from "../spellingSpeech";
+import { useHideSpeechSettingsTextEditor } from "../speechSettingsContext";
 
 export type SpellingSettingsRequest = { dialect: "uk" | "us" };
 export type SpellingSettingsOpener = (request: SpellingSettingsRequest) => void;
@@ -270,6 +271,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const [editing, setEditing] = useState(false);
   const [spellingSettings, setSpellingSettings] =
     useState<SpellingSettingsRequest>();
+  const hideSpeechSettingsTextEditor = useHideSpeechSettingsTextEditor();
   const [settingsCommitting, setSettingsCommitting] = useState(false);
   const settingsInitial = useRef<ReturnType<typeof captureSession> | null>(
     null
@@ -1177,6 +1179,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             speechSettingsEnabled={!textOnly}
             onAssociationPendingChange={onAssociationPendingChange}
             textReadOnly={contentReadOnly || Boolean(spellingSettings)}
+            hideTextEditor={
+              hideSpeechSettingsTextEditor && Boolean(spellingSettings)
+            }
             contentReadOnly={contentReadOnly}
             associationsReadOnly={associationsReadOnly}
             mode={spellingSettings ? "spelling-settings" : mode}
