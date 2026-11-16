@@ -843,7 +843,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "03c8bafa1c79a1d971e688b3c6cc1f32642dbfec94657571c6c4f5d1dd4a311e"
+      "c9cb58bd08c3baca0ce84f47c3e22aad53253ce5d4defb04c91800952a11b3ea"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1141,7 +1141,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "head",
       "post"
     ]);
+    const dialectPairsHeader = {
+      name: "x-tsz-next-dialect-pairs",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
     expect(snapshot.operationHeaders).toEqual({
+      "get /admin/lexicon-next/entries/{id}/publication": [dialectPairsHeader],
       ...Object.fromEntries(
         [
           "get /admin/lexicon-next/workspace/entries",
@@ -1198,6 +1205,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               required: false,
               schema: { type: ["string", "null"] }
             },
+            dialectPairsHeader,
             {
               name: "x-tsz-next-relations",
               in: "header",

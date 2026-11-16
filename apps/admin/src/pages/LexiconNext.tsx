@@ -17,6 +17,7 @@ import {
   useBeforeUnload,
   useBlocker,
   useNavigate,
+  useSearchParams,
   useParams
 } from "react-router-dom";
 import {
@@ -47,10 +48,13 @@ import type {
 } from "@tsz/types";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { ContentRows } from "@/features/lexicon-next/ContentRows";
+import { DialectEditor } from "@/features/lexicon-next/DialectPairs";
+import type { NextDialectSense } from "@tsz/types";
 import { MeaningsStep } from "@/features/lexicon-next/MeaningsStep";
 import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
   draftProblem,
+  generalSense,
   localeLabels,
   previewDraft,
   replaceFormEditor
@@ -335,12 +339,57 @@ function EntryEditor({
     staleTime: 5 * 60 * 1000
   });
   const navigate = useNavigate();
-  const [issueFocus, setIssueFocus] =
-    useState<ReturnType<typeof publicationIssueLocation>>();
-  const [step, setStep] = useState<WordCreationStep>("forms");
+  const [params] = useSearchParams();
+  const linked = params.get("sense");
+  const linkedIssue = initial.draft.senses.some((s) => s.id === linked)
+    ? publicationIssueLocation(
+        initial.draft,
+        { node_id: linked!, field: "dialect_pairs", message: "" },
+        params.get("target_locale") ?? "en-GB"
+      )
+    : undefined;
+  const publishedSense = params.get("published_sense");
+  const [issueFocus, setIssueFocus] = useState<
+    ReturnType<typeof publicationIssueLocation> | undefined
+  >(linkedIssue);
+  const [step, setStep] = useState<WordCreationStep>(
+    publishedSense ? "preview" : linkedIssue ? "meanings" : "forms"
+  );
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
-  const [selectedPos, setSelectedPos] = useState<string>();
+  const [editedPairs, setEditedPairs] = useState<
+    Record<string, NextDialectSense>
+  >({});
+  const dialectSenses = draft.senses.flatMap((s) => {
+    const row =
+      editedPairs[s.id] ??
+      saved.dialect_senses?.find((v) => v.sense_id === s.id);
+    return row ? [row] : [];
+  });
+  const pairChanges = dialectSenses
+    .filter((row) => editedPairs[row.sense_id])
+    .map((row) => {
+      const peer = row.target;
+      return {
+        sense_id: row.sense_id,
+        usage: row.usage,
+        no_equivalent: row.no_equivalent,
+        note: row.note,
+        target: peer
+          ? {
+              entry_id: peer.entry_id,
+              sense_id: peer.sense_id,
+              revision: peer.revision
+            }
+          : null,
+        previous_target_revision:
+          saved.dialect_senses?.find((s) => s.sense_id === row.sense_id)?.target
+            ?.revision ?? null
+      };
+    });
+  const [selectedPos, setSelectedPos] = useState<string | undefined>(
+    linkedIssue?.pos
+  );
   const activePos = selectedPos ?? draft.form_editor?.pos[0]?.pos;
   const draftRef = useRef(draft);
   useLayoutEffect(() => {
@@ -379,13 +428,14 @@ function EntryEditor({
     queryFn: () => requests.publication(saved.id),
     enabled: publishingAvailable,
     retry: false,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: false
   });
   const lock = useRef(false);
   const [error, setError] = useState<string>();
   const [formIssues, setFormIssues] = useState<V3DraftValidationIssue[]>([]);
   const [conflict, setConflict] = useState(false);
+  const [peerConflict, setPeerConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
   const profile = useAuthStore((state) => state.profile);
   const canPublish = usePermission("words.publish");
@@ -395,6 +445,7 @@ function EntryEditor({
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
   const disabled = busy || !writable;
   const dirty =
+    pairChanges.length > 0 ||
     JSON.stringify(draft) !== JSON.stringify(saved.draft) ||
     (sentenceDraftsAvailable && sentenceWorkspace.dirty);
   useEffect(() => {
@@ -438,6 +489,7 @@ function EntryEditor({
     setFormIssues([]);
     try {
       await operation();
+      setPeerConflict(false);
       return true;
     } catch (error) {
       if (error instanceof HttpError) setFormIssues(error.field_issues);
@@ -461,6 +513,15 @@ function EntryEditor({
               refetchType: "all"
             })
           )
+        );
+      } else if (
+        error instanceof HttpError &&
+        error.status === 409 &&
+        error.problem?.field === "dialect_changes"
+      ) {
+        setPeerConflict(true);
+        setError(
+          "对方词义已变化。可重新选择，或只重载方言配对；其他草稿编辑会保留。"
         );
       } else if (error instanceof HttpError && error.status === 409) {
         setConflict(true);
@@ -503,9 +564,11 @@ function EntryEditor({
         : [];
       const result = await requests.save(saved.id, {
         expected_revision: saved.revision,
+        ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
         draft: draftRef.current,
         ...(changes.length ? { sentence_changes: changes } : {})
       });
+      setEditedPairs({});
       setSaved(result);
       setDraft(result.draft);
       sentenceWorkspace.reset();
@@ -609,31 +672,55 @@ function EntryEditor({
             showIcon
             title={error ?? "服务器版本已更新。本地草稿已保留，请先比较版本。"}
             action={
-              conflict && (
+              peerConflict && !conflict ? (
                 <Button
                   disabled={busy || formContentOpen}
                   onClick={() =>
                     void run(async () => {
-                      const [remote, state, metadata] = await Promise.all([
-                        requests.get(saved.id),
-                        publishingAvailable ? publication.refetch() : undefined,
-                        publishingAvailable
-                          ? requests.workspaceEntry(saved.id)
-                          : undefined
-                      ]);
-                      if (state?.error) throw state.error;
-                      if (metadata) {
-                        queryClient.setQueryData(
-                          ["admin-lexicon-next", "workspace-entry", saved.id],
-                          metadata
-                        );
+                      const current = await requests.get(saved.id);
+                      if (current.revision !== saved.revision) {
+                        setConflict(true);
+                        return;
                       }
-                      setRemote(remote);
+                      setSaved(current);
+                      setEditedPairs({});
+                      await queryClient.invalidateQueries({
+                        queryKey: ["admin-lexicon-next", "pair-candidate"]
+                      });
                     })
                   }
                 >
-                  比较服务器版本
+                  只重载方言配对
                 </Button>
+              ) : (
+                conflict && (
+                  <Button
+                    disabled={busy || formContentOpen}
+                    onClick={() =>
+                      void run(async () => {
+                        const [remote, state, metadata] = await Promise.all([
+                          requests.get(saved.id),
+                          publishingAvailable
+                            ? publication.refetch()
+                            : undefined,
+                          publishingAvailable
+                            ? requests.workspaceEntry(saved.id)
+                            : undefined
+                        ]);
+                        if (state?.error) throw state.error;
+                        if (metadata) {
+                          queryClient.setQueryData(
+                            ["admin-lexicon-next", "workspace-entry", saved.id],
+                            metadata
+                          );
+                        }
+                        setRemote(remote);
+                      })
+                    }
+                  >
+                    比较服务器版本
+                  </Button>
+                )
               )
             }
           />
@@ -751,6 +838,39 @@ function EntryEditor({
         </div>
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <MeaningsStep
+            renderDialect={
+              saved.dialect_senses === undefined
+                ? undefined
+                : (id) => {
+                    const baseline =
+                      saved.dialect_senses?.find((s) => s.sense_id === id) ??
+                      generalSense(id);
+                    return (
+                      <DialectEditor
+                        row={editedPairs[id] ?? baseline}
+                        draft={draft}
+                        localTargets={dialectSenses
+                          .filter((s) => s.sense_id !== id && s.target)
+                          .map((s) => s.target!.sense_id)}
+                        entryId={saved.id}
+                        requests={requests}
+                        medium={medium}
+                        disabled={disabled}
+                        onChange={(row) =>
+                          setEditedPairs((current) => {
+                            const next = { ...current };
+                            if (
+                              JSON.stringify(row) === JSON.stringify(baseline)
+                            )
+                              delete next[id];
+                            else next[id] = row;
+                            return next;
+                          })
+                        }
+                      />
+                    );
+                  }
+            }
             focusIssue={issueFocus}
             entryId={saved.id}
             relationsAvailable={relationsAvailable}
@@ -870,6 +990,7 @@ function EntryEditor({
           )}
           {publication.data?.current && (
             <Collapse
+              defaultActiveKey={publishedSense ? ["published"] : undefined}
               items={[
                 {
                   key: "published",
@@ -878,6 +999,10 @@ function EntryEditor({
                     <Preview
                       requests={requests}
                       sentenceDetailsAvailable={sentenceDetailsAvailable}
+                      dialectSenses={publication.data.dialect_senses}
+                      dialectDraft={publication.data.current.snapshot.draft}
+                      published
+                      focusSense={publishedSense}
                       relationTargets={
                         publication.data.current.snapshot.relation_targets
                       }
@@ -907,6 +1032,8 @@ function EntryEditor({
                 ? sentenceWorkspace.previewResources
                 : undefined
             }
+            dialectSenses={dialectSenses}
+            dialectDraft={draft}
             view={previewDraft(draft, target, medium, grammarCatalog.data)}
           />
         </div>
@@ -926,6 +1053,8 @@ function EntryEditor({
                         ? sentenceWorkspace.previewResources
                         : undefined
                     }
+                    dialectSenses={dialectSenses}
+                    dialectDraft={draft}
                     view={previewDraft(
                       draft,
                       target,
@@ -957,6 +1086,7 @@ function EntryEditor({
                     cancelText: "取消",
                     onOk: () => {
                       if (remote && !contentLeaveGuard.current) {
+                        setEditedPairs({});
                         setSaved(remote);
                         setDraft(remote.draft);
                         sentenceWorkspace.reset();
@@ -978,6 +1108,7 @@ function EntryEditor({
               <section>
                 <h3>本地草稿 · 基于版本 {saved.revision}</h3>
                 <DraftSummary
+                  dialectSenses={dialectSenses}
                   draft={draft}
                   sentenceResources={
                     sentenceDraftsAvailable
@@ -992,6 +1123,7 @@ function EntryEditor({
               <section>
                 <h3>服务器 · 版本 {remote.revision}</h3>
                 <DraftSummary
+                  dialectSenses={remote.dialect_senses}
                   draft={remote.draft}
                   sentenceResources={
                     remote.sentence_resources

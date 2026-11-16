@@ -69,6 +69,38 @@ function client(reply: unknown, status = 200) {
 }
 
 describe("lexicon-next authoritative wire contract", () => {
+  it("旧服务不发送配对命令，协商后同一保存请求携带原目标版本", async () => {
+    const { api, fetch } = client(entry);
+    const change = {
+      sense_id: uuid(7),
+      usage: "en-GB" as const,
+      no_equivalent: true,
+      note: "",
+      previous_target_revision: 8,
+      target: null
+    };
+    const input = { draft, expected_revision: 2, dialect_changes: [change] };
+    await expect(api.save(entry.id, input)).rejects.toThrow("未开放方言配对");
+    expect(fetch).not.toHaveBeenCalled();
+    fetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          schema_version: 1,
+          language_rules_version: "lexicon-next-en-zh-1",
+          languages: [],
+          manual_drafts: true,
+          generation: false,
+          publishing: true,
+          dialect_pairs: true
+        })
+      )
+    );
+    await api.capabilities();
+    await api.save(entry.id, input);
+    const req = fetch.mock.calls[1]![1];
+    expect(new Headers(req.headers).get("x-tsz-next-dialect-pairs")).toBe("v1");
+    expect(JSON.parse(req.body)).toEqual(input);
+  });
   it("拓展词协商后按 V1 wire 保存回读，旧服务不发送未知字段", async () => {
     const next: NextEntry = structuredClone(entry);
     next.draft.senses[0]!.relations = [

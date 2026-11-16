@@ -92,7 +92,35 @@ export interface NextDraft {
   senses: NextSense[];
   form_editor?: SharedFormsStepContentV3;
 }
+export type NextDialectUsage = "general" | "en-GB" | "en-US";
+export interface NextDialectTarget {
+  entry_id: string;
+  sense_id: string;
+  revision: number;
+}
+export interface NextDialectPeer extends NextDialectTarget {
+  headword: string;
+  part_of_speech: string | null;
+  gloss: string;
+}
+export interface NextDialectSense {
+  sense_id: string;
+  usage: NextDialectUsage;
+  no_equivalent: boolean;
+  note: string;
+  paired: boolean;
+  target: NextDialectPeer | null;
+}
+export interface NextDialectChange {
+  sense_id: string;
+  usage: NextDialectUsage;
+  no_equivalent: boolean;
+  note: string;
+  target: NextDialectTarget | null;
+  previous_target_revision: number | null;
+}
 export interface NextEntry {
+  dialect_senses?: NextDialectSense[];
   sentence_resources?: NextSentence[];
   id: string;
   medium_locale?: string;
@@ -167,6 +195,7 @@ export interface NextEntryList {
   };
 }
 export interface SaveNextDraft {
+  dialect_changes?: NextDialectChange[];
   sentence_changes?: NextSentenceDraftChange[];
   expected_revision: number;
   /** Complete draft across all locales; omission removes a current node. */
@@ -180,6 +209,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  dialect_pairs?: boolean;
   sentence_drafts?: boolean;
   relations?: boolean;
   sentence_details?: boolean;
@@ -220,6 +250,7 @@ export interface NextSenseView {
   missing_equivalents: boolean;
 }
 export interface NextEntryView {
+  dialect_senses?: NextDialectSense[];
   sentence_resources?: NextSentence[];
   grammar_structures?: NextGrammarStructure[];
   grammar_issues?: NextGrammarIssue[];
@@ -425,6 +456,7 @@ export interface NextPublication {
   };
 }
 export interface NextPublicationState {
+  dialect_senses?: NextDialectSense[];
   entry_id: string;
   status: "draft" | "published" | "archived";
   lifecycle_revision: number;

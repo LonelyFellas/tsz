@@ -9,6 +9,69 @@ import { lexiconEditorPanelMessages } from "./editor-panel-messages";
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconEditorMessages = {
+  dialect_pair_gb: ["英式专用", "英式專用", "British-specific"],
+  dialect_pair_us: ["美式专用", "美式專用", "American-specific"],
+  dialect_pair_open: ["打开对应词义", "開啟對應詞義", "Open equivalent sense"],
+  dialect_pair_inactive: [
+    "配对尚未生效",
+    "配對尚未生效",
+    "Pair not yet active"
+  ],
+  dialect_pair_none: [
+    "已确认无对应词义",
+    "已確認無對應詞義",
+    "No equivalent identified"
+  ],
+  dialect_pair_pending: ["待配对", "待配對", "Not yet paired"],
+  dialect_pair_missing: ["未填写释义", "未填寫釋義", "No definition"],
+  dialect_pair_occupied: ["已被配对", "已被配對", "Already paired"],
+  dialect_pair_search: [
+    "搜索配对词条",
+    "搜尋配對詞條",
+    "Search for an entry to pair"
+  ],
+  dialect_pair_spelling: ["输入词条拼写", "輸入詞條拼寫", "Enter a spelling"],
+  dialect_pair_entry: ["配对词条", "配對詞條", "Entry to pair"],
+  dialect_pair_choose_entry: ["选择词条", "選擇詞條", "Select entry"],
+  dialect_pair_previous: ["上一页", "上一頁", "Previous page"],
+  dialect_pair_next: ["下一页", "下一頁", "Next page"],
+  dialect_pair_sense: ["配对义项", "配對義項", "Sense to pair"],
+  dialect_pair_opposite: [
+    "选择相反方言的义项",
+    "選擇另一方言的義項",
+    "Select a sense in the other dialect"
+  ],
+  dialect_pair_mark: [
+    "请先在目标词条标注相反方言的义项。",
+    "請先在目標詞條標註另一方言的義項。",
+    "Mark a sense in the other dialect on the target entry first."
+  ],
+  dialect_pair_load_error: [
+    "无法读取配对候选",
+    "無法讀取配對候選",
+    "Could not load pairing candidates"
+  ],
+  dialect_pair_use: ["选用此义项", "選用此義項", "Use this sense"],
+  dialect_pair_usage: ["方言用法", "方言用法", "Dialect usage"],
+  dialect_pair_equivalent: [
+    "对应方言词义",
+    "對應方言詞義",
+    "Equivalent in the other dialect"
+  ],
+  dialect_pair_paired: ["已配对", "已配對", "Paired"],
+  dialect_pair_replace: ["更换配对", "更換配對", "Change pair"],
+  dialect_pair_choose: [
+    "选择配对词义",
+    "選擇配對詞義",
+    "Select equivalent sense"
+  ],
+  dialect_pair_unlink: ["解除配对", "解除配對", "Unlink pair"],
+  dialect_pair_reason: [
+    "无对应词义的说明",
+    "無對應詞義的說明",
+    "Reason for no equivalent"
+  ],
+  dialect_pair_optional: ["说明（选填）", "說明（選填）", "Optional note"],
   ...equivalentMessages,
   ...lexiconEditorPanelMessages,
   ...publishingWorkspaceMessages,
