@@ -692,25 +692,50 @@ export const lexiconEditorMessages = {
     "釋義 {{index}} 等級",
     "Meaning {{index}} level"
   ],
+  meaning_level_label: [
+    "义项 {{index}} 等级",
+    "義項 {{index}} 等級",
+    "Sense {{index}} level"
+  ],
   sense_group_label: [
     "释义 {{index}} 所属语义区间",
     "釋義 {{index}} 所屬語義區間",
     "Meaning {{index}} sense group"
+  ],
+  meaning_group_label: [
+    "义项 {{index}} 所属语义区间",
+    "義項 {{index}} 所屬語義區間",
+    "Sense {{index}} sense group"
   ],
   sense_sub_pos_label: [
     "释义 {{index}} 子词性",
     "釋義 {{index}} 子詞性",
     "Meaning {{index}} subcategory"
   ],
+  meaning_sub_pos_label: [
+    "义项 {{index}} 子词性",
+    "義項 {{index}} 子詞性",
+    "Sense {{index}} subcategory"
+  ],
   sense_frequency_label: [
     "释义 {{index}} 频率",
     "釋義 {{index}} 頻率",
     "Meaning {{index}} frequency"
   ],
+  meaning_frequency_label: [
+    "义项 {{index}} 频率",
+    "義項 {{index}} 頻率",
+    "Sense {{index}} frequency"
+  ],
   sense_context_label: [
     "释义 {{index}} 是否依赖语境",
     "釋義 {{index}} 是否依賴語境",
     "Meaning {{index}} context dependence"
+  ],
+  meaning_context_label: [
+    "义项 {{index}} 是否依赖语境",
+    "義項 {{index}} 是否依賴語境",
+    "Sense {{index}} context dependence"
   ],
   drag_definition: [
     "拖动定义 {{index}}",

@@ -11,6 +11,17 @@ import type {
 import { Alert, Button, Card, Space, Tag } from "@tsz/ui/admin/display";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 
+function publicationStateFromRefresh(
+  value: unknown
+): NextPublicationState | undefined {
+  if (!value || typeof value !== "object" || !("data" in value))
+    return undefined;
+  const data = value.data;
+  return data && typeof data === "object"
+    ? (data as NextPublicationState)
+    : undefined;
+}
+
 export function PublicationPanel({
   entryId,
   revision,
@@ -96,6 +107,27 @@ export function PublicationPanel({
       setCommand(undefined);
       setPreview(undefined);
     } catch (failure) {
+      if (failure instanceof HttpError && failure.status === 409 && command) {
+        const refreshed = await onRefresh().catch(() => undefined);
+        const refreshedState = publicationStateFromRefresh(refreshed);
+        const confirmed =
+          refreshedState &&
+          refreshedState.status === "published" &&
+          refreshedState.lifecycle_revision > input.base_lifecycle_revision &&
+          !refreshedState.has_unpublished_changes &&
+          refreshedState.current?.revision === input.base_revision;
+        if (confirmed && refreshedState.current) {
+          try {
+            await onPublished(refreshedState.current);
+            setCommand(undefined);
+            setPreview(undefined);
+            setError(undefined);
+            return;
+          } catch {
+            // Keep the original command when reconciliation itself is uncertain.
+          }
+        }
+      }
       const definitive = failure instanceof HttpError && failure.status < 500;
       if (definitive) {
         setCommand(undefined);

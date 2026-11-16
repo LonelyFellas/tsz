@@ -1425,6 +1425,57 @@ it("另一侧旧来源改变时不覆盖显式侧既有IPA音色缓存", () => {
   );
 });
 
+it("批量迁移到拼写来源时同步拼写试听正文，避免旧文本导致保存被拒绝", () => {
+  const { forms, sourceId, targetId } = setup(
+    commonFormFixture({ spelling: "old word" }),
+    commonFormFixture({ id: uuidFromInt(700), spelling: "longer spelling" })
+  );
+  const source = variant(forms.contents[0]!).pronunciations[0]!;
+  const sourceVariant = variant(forms.contents[0]!);
+  const targetVariant = variant(forms.contents[1]!);
+  const target = targetVariant.pronunciations[0]!;
+  source.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    use_spelling: false,
+    uk: {
+      source: "spelling",
+      ipa: "old",
+      ups: "",
+      ipa_speech: speech("old word", profile("source"))
+    },
+    us: {
+      source: "spelling",
+      ipa: "old",
+      ups: "",
+      ipa_speech: speech("old word", profile("source"))
+    }
+  };
+  sourceVariant.spelling_speech = speech(
+    "old word",
+    profile("source-spelling")
+  );
+  target.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    use_spelling: false,
+    uk: { source: "ipa", ipa: "new", ups: "" },
+    us: { source: "ipa", ipa: "new", ups: "" }
+  };
+  targetVariant.spelling_speech = speech("stale text", profile("stale"));
+
+  const next = applyFormCopy(
+    forms,
+    planFormCopy(forms, sourceId, targetId, "phonetics")
+  );
+
+  expect(variant(next.contents[1]!).spelling_speech?.content.text).toBe(
+    "longer spelling"
+  );
+});
+
 it("部分合并按保存的口音归属替换，而不是按原生locale保留旧英式声音", () => {
   const { forms, sourceId, targetId } = setup();
   const from = variant(forms.contents[0]!).pronunciations[0]!;
