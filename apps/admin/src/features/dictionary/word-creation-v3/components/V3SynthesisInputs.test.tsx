@@ -24,6 +24,7 @@ import { V3PronunciationConvertAll } from "./V3PronunciationConvertAll";
 import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
 import { VoiceSaveContext, VoiceAudioTasksContext } from "../voiceSaveContext";
 import { pronunciationPlaybackSource } from "@tsz/shared";
+import { SpeechSettingsTextEditorProvider } from "../speechSettingsContext";
 
 const speech = vi.hoisted(() => ({
   canGenerate: true,
@@ -560,6 +561,44 @@ it("UPS 缺少当前口音 IPA 时在 IPA 框内提示并聚焦，补齐后恢�
   expect(screen.getByLabelText("第 1 条发音的美式 Azure UPS")).toHaveValue(
     "F AA R"
   );
+});
+
+it("智能词库 IPA 为空时禁用齿轮并用 Popover 提示先填写", async () => {
+  renderWithUps(
+    <SpeechSettingsTextEditorProvider>
+      <Harness dialect="uk" empty />
+    </SpeechSettingsTextEditorProvider>
+  );
+  const open = screen.getByLabelText(
+    "打开第 1 条发音 英式 Azure IPA TTS 设置器"
+  );
+  expect(open).toBeDisabled();
+  fireEvent.click(open.parentElement!);
+  expect(await screen.findByText("请先填写对应口音的 Azure IPA")).toBeVisible();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("智能词库的 IPA 设置弹窗只保留配音设置，不挂载顶部编辑器", async () => {
+  renderWithUps(
+    <SpeechSettingsTextEditorProvider>
+      <Harness dialect="uk" />
+    </SpeechSettingsTextEditorProvider>
+  );
+  fireEvent.click(screen.getByLabelText("第 1 条发音的英式 Azure IPA"));
+  fireEvent.click(
+    screen.getByLabelText("打开第 1 条发音 英式 Azure IPA TTS 设置器")
+  );
+  const dialog = await screen.findByRole("dialog", {
+    name: "第 1 条发音 英式 Azure IPA · 音标、停顿与音色"
+  });
+  await waitFor(() =>
+    expect(dialog.querySelector(".tsz-ve-bottom-tools")).not.toBeNull()
+  );
+  expect(dialog.querySelector(".tsz-ve-editing-area")).toBeNull();
+  expect(dialog.querySelector(".tsz-ve-top-tools")).toBeNull();
+  expect(
+    within(dialog).getByLabelText("完成第 1 条发音 英式 Azure IPA设置")
+  ).toBeVisible();
 });
 
 async function phonemeDialog(label: string) {

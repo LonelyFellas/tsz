@@ -53,6 +53,7 @@ export interface MarkupPanelProps extends Pick<
   draft: LiaisonDraft;
   readOnly?: boolean;
   contentReadOnly?: boolean;
+  hideTextEditor?: boolean;
   onRoleRange: (start: number, end: number, mode: "click" | "drag") => void;
   roleAnchorStart?: number;
   onGapClick: (gapIndex: number) => void;
@@ -88,6 +89,7 @@ export function MarkupPanel({
   draft,
   readOnly,
   contentReadOnly,
+  hideTextEditor,
   textReadOnly,
   onRoleRange,
   onTextSelection,
@@ -268,164 +270,179 @@ export function MarkupPanel({
     );
   return (
     <div className="tsz-ve-markup">
-      <div
-        className={`tsz-ve-top-tools${selectionMode ? " is-selection" : ""}`}
+      {!hideTextEditor && (
+        <>
+          <div
+            className={`tsz-ve-top-tools${selectionMode ? " is-selection" : ""}`}
 
-        role="toolbar"
-        aria-label={t("annotation_toolbar")}
-      >
-        {headerTools.length > 0 && (
-          <div className="tsz-ve-primary-tools">
-            {headerTools.map(renderTool)}
-          </div>
-        )}
-        <div className="tsz-ve-toolbar-actions">
-          <Tooltip
-            title={
-              <>
-                <span>{t("undo")}</span>
-                <ShortcutHint shortcut="Z" />
-              </>
-            }
+            role="toolbar"
+            aria-label={t("annotation_toolbar")}
           >
-            <Button
-              size="small"
-              type="text"
-              className="tsz-ve-icon-button"
-              aria-label={t("previous_step")}
-              disabled={readOnly || !canUndo}
-              onClick={onUndo}
-              icon={<Undo2Icon />}
-            />
-          </Tooltip>
-          <Tooltip title={t("redo")}>
-            <Button
-              size="small"
-              type="text"
-              className="tsz-ve-icon-button"
-              aria-label={t("next_step")}
-              disabled={readOnly || !canRedo}
-              onClick={onRedo}
-              icon={<Redo2Icon />}
-            />
-          </Tooltip>
-          <Tooltip title={t("clear_annotations")}>
-            <Button
-              size="small"
-              type="text"
-              className="tsz-ve-icon-button"
-              aria-label={t("clear_annotations")}
-              disabled={readOnly || marked === 0}
-              onClick={onClearAll}
-              icon={<EraserIcon />}
-            />
-          </Tooltip>
-        </div>
-        {topTools.map((tool) => (
-          <div key={tool.key} className="tsz-ve-tool-row" data-tool={tool.key}>
-            {trigger(tool, true)}
-            <span className="tsz-ve-toolbar-divider" aria-hidden />
-            <div className="tsz-ve-tool-content">{tool.content}</div>
-          </div>
-        ))}
-        {eraseTool && (
-          <div className="tsz-ve-erase-action">
-            <Tooltip
-              title={
-                composedMode || mode === "spelling"
-                  ? t(
-                      "enable_to_remove_existing_liaison_marks_or_pauses_by_clicking_them_click_ag"
-                    )
-                  : t(
-                      "enable_to_remove_existing_liaison_marks_by_clicking_them_click_again_to_exi"
-                    )
-              }
-            >
-              {trigger(eraseTool, false)}
-            </Tooltip>
-          </div>
-        )}
-        {selectionMode &&
-          mode !== "spelling-settings" &&
-          (mode !== "voice-trial" ||
-            tools.some((tool) => !tool.disabledReason)) && (
-            <div className="tsz-ve-selection-status" role="status">
-              {contentReadOnly ? (
-                t(
-                  "text_is_read_only_select_words_or_phrases_to_edit_their_links"
-                )
-              ) : brush.kind === "erase" ? (
-                composedMode || mode === "spelling" ? (
-                  t(
-                    "clear_mode_click_existing_liaison_marks_or_pauses_to_remove_them"
-                  )
-                ) : (
-                  t("clear_mode_click_existing_liaison_marks_to_remove_them")
-                )
-              ) : mode === "voice-trial" ? (
-                selectionText ? (
+            {headerTools.length > 0 && (
+              <div className="tsz-ve-primary-tools">
+                {headerTools.map(renderTool)}
+              </div>
+            )}
+            <div className="tsz-ve-toolbar-actions">
+              <Tooltip
+                title={
                   <>
-                    {t("selected_2")} <strong>{selectionText}</strong>
+                    <span>{t("undo")}</span>
+                    <ShortcutHint shortcut="Z" />
                   </>
-                ) : (
-                  t("select_text_to_set_its_reading")
-                )
-              ) : selectionText ? (
-                <>
-                  {t("selected_3")} <strong>{selectionText}</strong>
-                  {t("selection_tools_suffix", { tools: selectionToolsLabel })}
-                </>
-              ) : (
-                t("select_text_to_configure", { p0: selectionToolsLabel })
-              )}
+                }
+              >
+                <Button
+                  size="small"
+                  type="text"
+                  className="tsz-ve-icon-button"
+                  aria-label={t("previous_step")}
+                  disabled={readOnly || !canUndo}
+                  onClick={onUndo}
+                  icon={<Undo2Icon />}
+                />
+              </Tooltip>
+              <Tooltip title={t("redo")}>
+                <Button
+                  size="small"
+                  type="text"
+                  className="tsz-ve-icon-button"
+                  aria-label={t("next_step")}
+                  disabled={readOnly || !canRedo}
+                  onClick={onRedo}
+                  icon={<Redo2Icon />}
+                />
+              </Tooltip>
+              <Tooltip title={t("clear_annotations")}>
+                <Button
+                  size="small"
+                  type="text"
+                  className="tsz-ve-icon-button"
+                  aria-label={t("clear_annotations")}
+                  disabled={readOnly || marked === 0}
+                  onClick={onClearAll}
+                  icon={<EraserIcon />}
+                />
+              </Tooltip>
             </div>
-          )}
-        {topTools.length === 0 &&
-          !contentReadOnly &&
-          mode !== "spelling-settings" &&
-          mode !== "voice-trial" && (
-            <div className="tsz-ve-top-hint">
-              {mode === "phoneme-settings"
-                ? t(
-                    "select_gaps_in_the_form_spelling_to_add_pauses_edit_phoneme_text_in_the_ext"
-                  )
-                : t(
-                    "edit_text_directly_place_the_cursor_between_words_to_insert_a_pause"
+            {topTools.map((tool) => (
+              <div
+                key={tool.key}
+                className="tsz-ve-tool-row"
+                data-tool={tool.key}
+              >
+                {trigger(tool, true)}
+                <span className="tsz-ve-toolbar-divider" aria-hidden />
+                <div className="tsz-ve-tool-content">{tool.content}</div>
+              </div>
+            ))}
+            {eraseTool && (
+              <div className="tsz-ve-erase-action">
+                <Tooltip
+                  title={
+                    composedMode || mode === "spelling"
+                      ? t(
+                          "enable_to_remove_existing_liaison_marks_or_pauses_by_clicking_them_click_ag"
+                        )
+                      : t(
+                          "enable_to_remove_existing_liaison_marks_by_clicking_them_click_again_to_exi"
+                        )
+                  }
+                >
+                  {trigger(eraseTool, false)}
+                </Tooltip>
+              </div>
+            )}
+            {selectionMode &&
+              mode !== "spelling-settings" &&
+              (mode !== "voice-trial" ||
+                tools.some((tool) => !tool.disabledReason)) && (
+                <div className="tsz-ve-selection-status" role="status">
+                  {contentReadOnly ? (
+                    t(
+                      "text_is_read_only_select_words_or_phrases_to_edit_their_links"
+                    )
+                  ) : brush.kind === "erase" ? (
+                    composedMode || mode === "spelling" ? (
+                      t(
+                        "clear_mode_click_existing_liaison_marks_or_pauses_to_remove_them"
+                      )
+                    ) : (
+                      t(
+                        "clear_mode_click_existing_liaison_marks_to_remove_them"
+                      )
+                    )
+                  ) : mode === "voice-trial" ? (
+                    selectionText ? (
+                      <>
+                        {t("selected_2")} <strong>{selectionText}</strong>
+                      </>
+                    ) : (
+                      t("select_text_to_set_its_reading")
+                    )
+                  ) : selectionText ? (
+                    <>
+                      {t("selected_3")} <strong>{selectionText}</strong>
+                      {t("selection_tools_suffix", {
+                        tools: selectionToolsLabel
+                      })}
+                    </>
+                  ) : (
+                    t("select_text_to_configure", { p0: selectionToolsLabel })
                   )}
-            </div>
-          )}
-      </div>
-      <div className="tsz-ve-editing-area">
-        <AnnotationStrip
-          showSpeechMarks={mode === "voice-trial"}
-          associationContent={associationContent}
-          associationAnchor={associationAnchor}
-          selectedLinkRanges={selectedLinkRanges}
-          linkedRanges={linkedRanges}
-          onWordRange={onWordRange}
-          inputLabel={inputLabel}
-          inputDataAttributes={inputDataAttributes}
-          inputPlaceholder={inputPlaceholder}
-          onTextChange={onTextChange}
-          text={text}
-          marks={marks}
-          brush={brush}
-          draft={draft}
-          readOnly={readOnly}
-          textReadOnly={textReadOnly}
-          onRoleRange={onRoleRange}
-          onTextSelection={onTextSelection}
-          onCaretChange={onCaretChange}
-          onInspectPause={onInspectPause}
-          pausePlacement={openTool === "pause" && brush.kind === "none"}
-          selectedPauseGap={selectedPauseGap}
-          roleAnchorStart={roleAnchorStart}
-          onGapClick={onGapClick}
-          onLetterClick={onLetterClick}
-          onLiaisonClick={onLiaisonClick}
-        />
-        {actions && <div className="tsz-ve-editor-actions">{actions}</div>}
-      </div>
+                </div>
+              )}
+            {topTools.length === 0 &&
+              !contentReadOnly &&
+              mode !== "spelling-settings" &&
+              mode !== "voice-trial" && (
+                <div className="tsz-ve-top-hint">
+                  {mode === "phoneme-settings"
+                    ? t(
+                        "select_gaps_in_the_form_spelling_to_add_pauses_edit_phoneme_text_in_the_ext"
+                      )
+                    : t(
+                        "edit_text_directly_place_the_cursor_between_words_to_insert_a_pause"
+                      )}
+                </div>
+              )}
+          </div>
+          <div className="tsz-ve-editing-area">
+            <AnnotationStrip
+              showSpeechMarks={mode === "voice-trial"}
+              associationContent={associationContent}
+              associationAnchor={associationAnchor}
+              selectedLinkRanges={selectedLinkRanges}
+              linkedRanges={linkedRanges}
+              onWordRange={onWordRange}
+              inputLabel={inputLabel}
+              inputDataAttributes={inputDataAttributes}
+              inputPlaceholder={inputPlaceholder}
+              onTextChange={onTextChange}
+              text={text}
+              marks={marks}
+              brush={brush}
+              draft={draft}
+              readOnly={readOnly}
+              textReadOnly={textReadOnly}
+              onRoleRange={onRoleRange}
+              onTextSelection={onTextSelection}
+              onCaretChange={onCaretChange}
+              onInspectPause={onInspectPause}
+              pausePlacement={openTool === "pause" && brush.kind === "none"}
+              selectedPauseGap={selectedPauseGap}
+              roleAnchorStart={roleAnchorStart}
+              onGapClick={onGapClick}
+              onLetterClick={onLetterClick}
+              onLiaisonClick={onLiaisonClick}
+            />
+            {actions && <div className="tsz-ve-editor-actions">{actions}</div>}
+          </div>
+        </>
+      )}
+      {hideTextEditor && actions && (
+        <div className="tsz-ve-editor-actions">{actions}</div>
+      )}
       {bottomTools.length > 0 && (
         <div className="tsz-ve-bottom-tools">
           {bottomTools.map((tool) => (

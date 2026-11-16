@@ -648,6 +648,101 @@ it("深链接归属不匹配时不挂载编辑器，可显式进入词条所属�
   ).toBe("zh-Hant");
 });
 
+it("编辑中切换媒介语言保留编辑页，并按词条原媒介语言编辑保存", async () => {
+  const api = requests();
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      senses: [
+        {
+          id: "sense",
+          part_of_speech: null,
+          definitions: [
+            {
+              id: "definition",
+              locale: "zh-Hans",
+              text: "简体内容",
+              style: "definition"
+            }
+          ],
+          equivalents: []
+        }
+      ]
+    }
+  });
+  const { router } = mount(
+    api,
+    `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
+  );
+
+  await screen.findByText("版本 1");
+  await chooseLanguage("繁体中文");
+
+  expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
+  expect(
+    new URLSearchParams(router.state.location.search).get("medium_locale")
+  ).toBe("zh-Hant");
+  expect(
+    screen.getByText("当前词条归属简体中文，仍按该媒介语编辑和保存。")
+  ).toBeVisible();
+
+  fireEvent.click(stepButton(/^词义与译词/));
+  const definition = await screen.findByRole("textbox", {
+    name: "简体中文解释 1"
+  });
+  fireEvent.change(definition, { target: { value: "保存后的简体内容" } });
+  fireEvent.click(button("保存完整草稿"));
+
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+  expect(api.save.mock.calls[0]![1].draft.senses[0].definitions).toEqual([
+    expect.objectContaining({
+      locale: "zh-Hans",
+      text: "保存后的简体内容"
+    })
+  ]);
+});
+
+it("刷新编辑页后保留当前步骤", async () => {
+  const api = requests();
+  const mounted = mount(
+    api,
+    `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
+  );
+  await screen.findByText("版本 1");
+  fireEvent.click(stepButton(/^预览/));
+  await waitFor(() =>
+    expect(
+      new URLSearchParams(mounted.router.state.location.search).get("step")
+    ).toBe("preview")
+  );
+  const refreshedPath =
+    mounted.router.state.location.pathname +
+    mounted.router.state.location.search;
+  mounted.unmount();
+
+  mount(api, refreshedPath);
+  await screen.findByText("版本 1");
+  expect(stepButton(/^预览/)).toHaveAttribute("aria-current", "step");
+});
+
+it("确认跨媒介切换时放弃修改会重载词条草稿", async () => {
+  const api = requests();
+  mount(api, `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`);
+  await screen.findByText("版本 1");
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "未保存内容" }
+  });
+
+  await chooseLanguage("繁体中文");
+  await screen.findByRole("dialog", { name: "有未保存修改" });
+  fireEvent.click(button("放弃修改并离开"));
+
+  await screen.findByText("当前词条归属简体中文，仍按该媒介语编辑和保存。");
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue("centre");
+});
+
 it("列表保留词条自身的非英语地区信息，不标成美式拼写", async () => {
   const api = requests();
   api.workspaceList.mockResolvedValue({

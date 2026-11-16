@@ -21,6 +21,7 @@ import {
 import { updatePronunciation, updateSpellingVoiceProfile } from "../operations";
 import { VoiceSaveContext } from "../voiceSaveContext";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
+import { SpeechSettingsTextEditorProvider } from "../speechSettingsContext";
 
 const save = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/env", () => ({
@@ -60,6 +61,7 @@ vi.mock("@tsz/voice-editor/editor", () => ({
         data-testid="settings-editor"
         data-locale={locale}
         data-text-readonly={String(props.textReadOnly)}
+        data-hide-text-editor={String(props.hideTextEditor)}
       >
         <output data-testid="settings-profile">
           {JSON.stringify(voiceProfile)}
@@ -220,6 +222,19 @@ function owners() {
   return regionalVariants(draft().pos[0]!.forms[0]!.regional_variants);
 }
 beforeEach(() => save.mockReset().mockResolvedValue(true));
+
+it("智能词库拼写设置弹窗隐藏顶部编辑器", async () => {
+  render(
+    <SpeechSettingsTextEditorProvider>
+      <Host form={setupForm("common")} />
+    </SpeechSettingsTextEditorProvider>
+  );
+  fireEvent.click(
+    screen.getAllByRole("button", { name: "英式词形拼写配音设置" })[0]!
+  );
+  const editor = await screen.findByTestId("settings-editor");
+  expect(editor).toHaveAttribute("data-hide-text-editor", "true");
+});
 
 it("非活动拼写入口不切来源，取消不写回；多个读法打开同一所有者并保留并发更新", async () => {
   render(<Host form={setupForm("common")} />);

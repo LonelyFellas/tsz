@@ -350,6 +350,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   readOnly?: boolean;
   /** 正文由宿主输入框编辑；隐藏文本工具并禁止改字，仍允许标注和发音配置。 */
   textReadOnly?: boolean;
+  /** 仅保留语音设置工具，隐藏顶部正文/标注编辑区。 */
+  hideTextEditor?: boolean;
   /** Allow association changes while keeping text, formatting and audio unchanged. */
   contentReadOnly?: boolean;
   associationsReadOnly?: boolean;

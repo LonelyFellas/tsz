@@ -206,6 +206,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   contentReadOnly = false,
   associationsReadOnly = false,
   textReadOnly,
+  hideTextEditor = false,
   inputDataAttributes,
   placeholder,
   voiceProfile,
@@ -4028,6 +4029,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       <MarkupPanel
         mode={mode}
         contentReadOnly={contentReadOnly}
+        hideTextEditor={hideTextEditor}
         selectionText={
           textSelection
             ? Array.from(text)
