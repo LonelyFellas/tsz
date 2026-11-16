@@ -435,6 +435,7 @@ function EntryEditor({
   const [error, setError] = useState<string>();
   const [formIssues, setFormIssues] = useState<V3DraftValidationIssue[]>([]);
   const [conflict, setConflict] = useState(false);
+  const [peerConflict, setPeerConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
   const profile = useAuthStore((state) => state.profile);
   const canPublish = usePermission("words.publish");
@@ -488,6 +489,7 @@ function EntryEditor({
     setFormIssues([]);
     try {
       await operation();
+      setPeerConflict(false);
       return true;
     } catch (error) {
       if (error instanceof HttpError) setFormIssues(error.field_issues);
@@ -511,6 +513,15 @@ function EntryEditor({
               refetchType: "all"
             })
           )
+        );
+      } else if (
+        error instanceof HttpError &&
+        error.status === 409 &&
+        error.problem?.field === "dialect_changes"
+      ) {
+        setPeerConflict(true);
+        setError(
+          "对方词义已变化。可重新选择，或只重载方言配对；其他草稿编辑会保留。"
         );
       } else if (error instanceof HttpError && error.status === 409) {
         setConflict(true);
@@ -661,31 +672,55 @@ function EntryEditor({
             showIcon
             title={error ?? "服务器版本已更新。本地草稿已保留，请先比较版本。"}
             action={
-              conflict && (
+              peerConflict && !conflict ? (
                 <Button
                   disabled={busy || formContentOpen}
                   onClick={() =>
                     void run(async () => {
-                      const [remote, state, metadata] = await Promise.all([
-                        requests.get(saved.id),
-                        publishingAvailable ? publication.refetch() : undefined,
-                        publishingAvailable
-                          ? requests.workspaceEntry(saved.id)
-                          : undefined
-                      ]);
-                      if (state?.error) throw state.error;
-                      if (metadata) {
-                        queryClient.setQueryData(
-                          ["admin-lexicon-next", "workspace-entry", saved.id],
-                          metadata
-                        );
+                      const current = await requests.get(saved.id);
+                      if (current.revision !== saved.revision) {
+                        setConflict(true);
+                        return;
                       }
-                      setRemote(remote);
+                      setSaved(current);
+                      setEditedPairs({});
+                      await queryClient.invalidateQueries({
+                        queryKey: ["admin-lexicon-next", "pair-candidate"]
+                      });
                     })
                   }
                 >
-                  比较服务器版本
+                  只重载方言配对
                 </Button>
+              ) : (
+                conflict && (
+                  <Button
+                    disabled={busy || formContentOpen}
+                    onClick={() =>
+                      void run(async () => {
+                        const [remote, state, metadata] = await Promise.all([
+                          requests.get(saved.id),
+                          publishingAvailable
+                            ? publication.refetch()
+                            : undefined,
+                          publishingAvailable
+                            ? requests.workspaceEntry(saved.id)
+                            : undefined
+                        ]);
+                        if (state?.error) throw state.error;
+                        if (metadata) {
+                          queryClient.setQueryData(
+                            ["admin-lexicon-next", "workspace-entry", saved.id],
+                            metadata
+                          );
+                        }
+                        setRemote(remote);
+                      })
+                    }
+                  >
+                    比较服务器版本
+                  </Button>
+                )
               )
             }
           />
@@ -814,6 +849,9 @@ function EntryEditor({
                       <DialectEditor
                         row={editedPairs[id] ?? baseline}
                         draft={draft}
+                        localTargets={dialectSenses
+                          .filter((s) => s.sense_id !== id && s.target)
+                          .map((s) => s.target!.sense_id)}
                         entryId={saved.id}
                         requests={requests}
                         medium={medium}

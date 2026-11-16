@@ -69,6 +69,7 @@ export function DialectPreview({
 }
 
 function PairPicker({
+  localTargets,
   entryId,
   medium,
   row,
@@ -76,6 +77,7 @@ function PairPicker({
   onPick,
   onClose
 }: {
+  localTargets: string[];
   entryId: string;
   medium: string;
   row: NextDialectSense;
@@ -119,9 +121,10 @@ function PairPicker({
         )
       )
       .map((s) => {
-        const occupied = candidate.data?.dialect_senses?.find(
-          (d) => d.sense_id === s.sense_id
-        )?.paired;
+        const occupied =
+          localTargets.includes(s.sense_id) ||
+          candidate.data?.dialect_senses?.find((d) => d.sense_id === s.sense_id)
+            ?.paired;
         const pos = candidate.data?.draft.senses.find(
           (v) => v.id === s.sense_id
         )?.part_of_speech;
@@ -241,6 +244,7 @@ function PairPicker({
   );
 }
 export function DialectEditor({
+  localTargets,
   row,
   entryId,
   medium,
@@ -250,6 +254,7 @@ export function DialectEditor({
   onChange
 }: {
   row: NextDialectSense;
+  localTargets: string[];
   entryId: string;
   medium: string;
   draft: NextDraft;
@@ -342,6 +347,7 @@ export function DialectEditor({
       )}
       {choosing && !disabled && row.usage !== "general" && (
         <PairPicker
+          localTargets={localTargets}
           requests={requests}
           entryId={entryId}
           medium={medium}
