@@ -152,6 +152,7 @@ function GrammarText({
           icon={<Pencil />}
           iconPlacement="end"
           aria-label={`编辑${label}`}
+          data-v3-field="variants"
           disabled={disabled}
           onClick={() => {
             setAudioFailed(false);
@@ -360,10 +361,15 @@ export function GrammarStructures({
             row.variants.find((v) => v.locale === "en");
           const subParts = catalog?.sub_parts ?? [];
           return (
-            <div key={row.id} className="lexicon-next-grammar-row">
+            <div
+              key={row.id}
+              data-v3-node-id={row.id}
+              className="lexicon-next-grammar-row"
+            >
               <span className="lexicon-next-grammar-index">{index + 1}</span>
               <Select
                 aria-label={`语法结构 ${index + 1} 细分词性`}
+                data-v3-field="sub_pos"
                 disabled={disabled}
                 placeholder="请选择细分词性"
                 value={row.sub_pos || undefined}

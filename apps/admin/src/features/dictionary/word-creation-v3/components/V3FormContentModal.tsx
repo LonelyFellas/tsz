@@ -58,7 +58,7 @@ import {
   spellingMarksEqual,
   type V3StableVariantIdFactory
 } from "../operations";
-import { partOfSpeechLabel } from "../presentation";
+import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
 import {
@@ -119,6 +119,7 @@ export function V3FormContentModal({
   onConfirm: (forms: SharedFormsStepContentV3) => void;
   onApply?: (forms: SharedFormsStepContentV3) => void;
 }) {
+  const partOfSpeechLabel = usePartOfSpeechLabel();
   const { t } = useLexiconEditorTranslation();
   const issueText = (issue: Exclude<FormContentIssue, null>) =>
     "message" in issue ? t(issue.message) : issue.detail;
@@ -297,7 +298,14 @@ export function V3FormContentModal({
           }
         ];
       }),
-    [assignedForms, assignmentCandidates, content.id, label, t]
+    [
+      assignedForms,
+      assignmentCandidates,
+      content.id,
+      label,
+      partOfSpeechLabel,
+      t
+    ]
   );
   const assignmentDirty = replacements.length > 0;
   const closeAssignment = () => {

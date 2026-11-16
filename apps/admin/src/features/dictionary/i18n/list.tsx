@@ -32,11 +32,7 @@ export const lexiconListMessages = {
     "Reference checking is not available in the new lexicon yet"
   ],
   next_check_references: ["检查引用", "檢查引用", "Check links"],
-  next_no_levels: [
-    "当前语言草稿尚无义项等级数据",
-    "目前語言草稿尚無義項等級資料",
-    "Language drafts do not have sense levels yet"
-  ],
+
   next_command_unknown: [
     "操作结果未确认，可重试同一请求；请勿重新创建操作",
     "操作結果未確認，可重試同一請求；請勿重新建立操作",

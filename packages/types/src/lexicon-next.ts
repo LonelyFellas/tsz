@@ -244,6 +244,7 @@ export interface NextWorkspaceQuery extends NextListQuery {
   created_to?: string;
 }
 export interface NextWorkspaceEntry extends NextEntrySummary {
+  levels?: string[];
   status: "draft" | "published" | "archived";
   lifecycle_revision: number;
   created_at: string;

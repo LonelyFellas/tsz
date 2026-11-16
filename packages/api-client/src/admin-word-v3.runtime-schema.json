@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-next-publishing-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "54684d4785d5d9ff52f3968a4a7882b3c480bedda0989f872136e2641169d791",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-authoring-fixes/tsz-rust/docs/openapi.json",
+  "_source_sha256": "03c8bafa1c79a1d971e688b3c6cc1f32642dbfec94657571c6c4f5d1dd4a311e",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -4498,6 +4498,7 @@
         "headword": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "levels": { "type": "array", "items": { "type": "string" } },
         "lifecycle_revision": { "type": "integer" },
         "owner_id": { "type": "string", "format": "uuid" },
         "part_of_speech": { "type": "array", "items": { "type": "string" } },

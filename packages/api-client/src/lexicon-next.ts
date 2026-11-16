@@ -99,7 +99,9 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     }
     return params.size ? `?${params}` : "";
   };
-  const publicationOptions = { headers: { "x-tsz-next-publications": "v1" } };
+  const publicationOptions = {
+    headers: { "x-tsz-next-publications": "v1", "x-tsz-next-levels": "v1" }
+  };
   return {
     publication: (id: string) =>
       http

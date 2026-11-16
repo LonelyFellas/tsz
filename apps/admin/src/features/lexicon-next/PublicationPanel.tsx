@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextPublication,
+  NextPublicationIssue,
   NextPublicationBase,
   NextPublicationPreview,
   NextPublicationState,
@@ -23,7 +24,8 @@ export function PublicationPanel({
   onBusyChange,
   onRefresh,
   onPublished,
-  onConflict
+  onConflict,
+  onLocateIssue
 }: {
   entryId: string;
   revision: number;
@@ -38,6 +40,7 @@ export function PublicationPanel({
   onRefresh: () => Promise<unknown>;
   onPublished: (result: NextPublication) => Promise<void>;
   onConflict: () => void;
+  onLocateIssue?: (issue: NextPublicationIssue) => void;
 }) {
   const [preview, setPreview] = useState<NextPublicationPreview>();
   const [command, setCommand] = useState<NextPublishInput>();
@@ -157,7 +160,16 @@ export function PublicationPanel({
                 <ul>
                   {preview.issues.map((issue, index) => (
                     <li key={`${issue.node_id}:${issue.field}:${index}`}>
-                      {issue.message}
+                      {onLocateIssue ? (
+                        <Button
+                          type="link"
+                          onClick={() => onLocateIssue(issue)}
+                        >
+                          {issue.message}
+                        </Button>
+                      ) : (
+                        issue.message
+                      )}
                     </li>
                   ))}
                 </ul>

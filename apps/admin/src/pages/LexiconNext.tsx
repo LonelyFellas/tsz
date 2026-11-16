@@ -38,6 +38,7 @@ import { Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextDraft,
+  NextPublicationIssue,
   NextEntry,
   NextWorkspaceEntry,
   NextLanguageCapability,
@@ -60,6 +61,10 @@ import {
 } from "@/features/lexicon-next/LanguageSelection";
 import { EntryList } from "@/features/lexicon-next/EntryList";
 import { EntryLayout } from "@/features/lexicon-next/EntryLayout";
+import {
+  publicationIssueLocation,
+  focusPublicationIssue
+} from "@/features/lexicon-next/publicationIssueFocus";
 import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
 import "./lexicon-next.css";
@@ -329,6 +334,9 @@ function EntryEditor({
     enabled: grammarAvailable,
     staleTime: 5 * 60 * 1000
   });
+  const navigate = useNavigate();
+  const [issueFocus, setIssueFocus] =
+    useState<ReturnType<typeof publicationIssueLocation>>();
   const [step, setStep] = useState<WordCreationStep>("forms");
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
@@ -396,7 +404,12 @@ function EntryEditor({
     setLocked(busy || formContentOpen);
     return () => setLocked(false);
   }, [busy, formContentOpen, setLocked]);
+  const leaveState = useRef({ busy, formContentOpen, dirty, medium });
+  useLayoutEffect(() => {
+    leaveState.current = { busy, formContentOpen, dirty, medium };
+  });
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    const current = leaveState.current;
     const requestedMedium = new URLSearchParams(nextLocation.search).get(
       "medium_locale"
     );
@@ -404,11 +417,11 @@ function EntryEditor({
       ? requestedMedium
       : undefined;
     return (
-      busy ||
-      formContentOpen ||
-      (dirty &&
+      current.busy ||
+      current.formContentOpen ||
+      (current.dirty &&
         (currentLocation.pathname !== nextLocation.pathname ||
-          nextMedium !== medium))
+          nextMedium !== current.medium))
     );
   });
   useBeforeUnload((event) => {
@@ -520,6 +533,26 @@ function EntryEditor({
     }
     setStep(next);
   }
+  function locateIssue(issue: NextPublicationIssue) {
+    const location = publicationIssueLocation(draft, issue, target);
+    changeStep(location.step);
+    setSelectedPos(location.pos);
+    setIssueFocus(location);
+    if (location.locale !== target) {
+      const query = new URLSearchParams(languageSearch);
+      query.set("target_locale", location.locale);
+      navigate(`?${query}`, { replace: true });
+    }
+  }
+  useEffect(() => {
+    if (!issueFocus || step !== issueFocus.step || target !== issueFocus.locale)
+      return;
+    const controller = new AbortController();
+    focusPublicationIssue(issueFocus, controller.signal, () =>
+      setIssueFocus(undefined)
+    );
+    return () => controller.abort();
+  }, [issueFocus, step, target]);
   const editor = (
     <EntryLayout
       relationsAvailable={relationsAvailable}
@@ -718,6 +751,7 @@ function EntryEditor({
         </div>
         <div hidden={step !== "meanings"} inert={step !== "meanings"}>
           <MeaningsStep
+            focusIssue={issueFocus}
             entryId={saved.id}
             relationsAvailable={relationsAvailable}
             selectedPos={activePos}
@@ -784,7 +818,7 @@ function EntryEditor({
               loading={publication.isPending}
               stateError={publication.error}
               dirty={dirty}
-              disabled={saving || conflict || archived || formContentOpen}
+              disabled={busy || conflict || archived || formContentOpen}
               canPublish={
                 canPublish &&
                 (profile?.role === "super_admin" ||
@@ -793,6 +827,7 @@ function EntryEditor({
               requests={requests}
               onBusyChange={setPublicationBusy}
               onRefresh={publication.refetch}
+              onLocateIssue={locateIssue}
               onConflict={() => setConflict(true)}
               onPublished={async (result) => {
                 const refreshed = await publication.refetch();

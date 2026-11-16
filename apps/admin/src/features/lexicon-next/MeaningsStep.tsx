@@ -61,6 +61,7 @@ import "@/features/dictionary/word-creation-v3/posTabs.css";
 
 export function MeaningsStep({
   value,
+  focusIssue,
   entryId,
   relationsAvailable = false,
   kind,
@@ -84,6 +85,7 @@ export function MeaningsStep({
   onChange
 }: {
   value: NextDraft;
+  focusIssue?: { senseId?: string };
   entryId?: string;
   relationsAvailable?: boolean;
   kind: "word" | "phrase";
@@ -158,6 +160,14 @@ export function MeaningsStep({
     onSelectedPosChange?.(code);
   }
   const [expanded, setExpanded] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    const sense = value.senses.find((row) => row.id === focusIssue?.senseId);
+    if (sense)
+      setExpanded((current) => ({
+        ...current,
+        [sense.part_of_speech ?? ""]: sense.id
+      }));
+  }, [focusIssue, value.senses]);
   const codes = [
     ...new Set([
       ...(value.form_editor?.pos.map((pos) => pos.pos) ?? []),
@@ -252,6 +262,9 @@ export function MeaningsStep({
     >
       {(formEditorAvailable || grammarAvailable) && catalog.isError && (
         <Alert type="error" title={t("catalog_unavailable")} />
+      )}
+      {grammarAvailable && (
+        <p>发布前需补齐英美释义；已添加的语法结构也需填写英美内容。</p>
       )}
       {senseGroupsAvailable && (
         <AdminControls componentDisabled={disabled}>
