@@ -7613,6 +7613,38 @@ it("词形保存等待默认配音回写，再提交包含新资产的当前草�
   ).toContain(`"audio_asset_id":"${UUIDS.pronunciation}"`);
 });
 
+it("实际发音局部保存跳过默认配音等待", async () => {
+  const source = requests();
+  let registered = false;
+  const pending = new Promise<boolean>(() => {});
+  function PendingAudio({ context }: { context: V3WizardSlotContext }) {
+    const save = useVoiceSave();
+    useEffect(() => {
+      save!.audioTasks!.set("default-audio", () => pending);
+      registered = true;
+      return () => {
+        save!.audioTasks!.delete("default-audio");
+      };
+    }, [save]);
+    return (
+      <>
+        <Slot context={context} />
+        <button
+          onClick={() => void save!.save(undefined, { skipAudioTasks: true })}
+        >
+          保存实际发音
+        </button>
+      </>
+    );
+  }
+  renderWizard(source, {
+    renderStep: (context) => <PendingAudio context={context} />
+  });
+  await waitFor(() => expect(registered).toBe(true));
+  fireEvent.click(screen.getByText("保存实际发音"));
+  await waitFor(() => expect(source.saveForms).toHaveBeenCalledOnce());
+});
+
 function formReferenceSlot(context: V3WizardSlotContext) {
   return (
     <>
