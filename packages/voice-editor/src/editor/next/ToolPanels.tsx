@@ -12,6 +12,7 @@ import {
 } from "@tsz/shared";
 import {
   CheckIcon,
+  DownloadIcon,
   FileAudioIcon,
   UploadIcon,
   Volume2Icon
@@ -643,9 +644,11 @@ export interface UploadPanelProps {
   onRetryUpload: (id: string) => void;
   onDismissUpload: (id: string) => void;
   onRemoveAsset: (asset: AudioAsset) => void;
+  onDownloadAsset?: (asset: AudioAsset) => void;
   onDefaultAssetChange?: (asset: AudioAsset) => void;
   onPlayAsset: (asset: AudioAsset) => void;
   playingAssetId?: string;
+  downloadingAssetId?: string;
   /** 试听失败的说明；只在这块面板里显示。 */
   playbackMessage?: string;
   genderUpdatePending?: boolean;
@@ -677,11 +680,13 @@ export function UploadPanel({
   onRetryUpload,
   onDismissUpload,
   onRemoveAsset,
+  onDownloadAsset,
   onDefaultAssetChange,
   onPlayAsset,
   playingAssetId,
   playbackMessage,
   genderUpdatePending,
+  downloadingAssetId,
   genderUpdateMessage
 }: UploadPanelProps) {
   const { t, i18n } = useVoiceEditorTranslation();
@@ -902,6 +907,18 @@ export function UploadPanel({
                   {localeBadge(asset.locale)} · {genderLabel(asset.gender, t)}
                 </span>
                 <span className="tsz-ve-upload-actions">
+                  {onDownloadAsset && (
+                    <Button
+                      size="small"
+                      type="text"
+                      aria-label={`${t("download_original_audio")} ${asset.original_name}`}
+                      title={t("download_original_audio")}
+                      loading={downloadingAssetId === asset.id}
+                      disabled={!available}
+                      icon={<DownloadIcon aria-hidden />}
+                      onClick={() => onDownloadAsset(asset)}
+                    />
+                  )}
                   {onDefaultAssetChange && (
                     <Button
                       size="small"
