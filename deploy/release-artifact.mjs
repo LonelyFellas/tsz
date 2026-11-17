@@ -260,13 +260,14 @@ async function main() {
     await main();
   } else if (action === "pack") {
     const [root, output] = args;
+    const remoteRef = process.env.GITHUB_REF;
     const identity = {
       repository: process.env.GITHUB_REPOSITORY,
       sha: process.env.GITHUB_SHA,
       tree: command("git", ["rev-parse", "HEAD^{tree}"]).trim(),
       runId: Number(process.env.GITHUB_RUN_ID),
       attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
-      remoteRef: process.env.GITHUB_REF ?? "refs/heads/main"
+      ...(remoteRef && remoteRef !== "refs/heads/main" ? { remoteRef } : {})
     };
     assert.match(identity.sha, /^[0-9a-f]{40}$/);
     assert.equal(command("git", ["rev-parse", "HEAD"]).trim(), identity.sha);
@@ -362,16 +363,17 @@ async function main() {
       runId: Number(process.env.DEPLOY_CI_RUN_ID),
       attempt: Number(process.env.DEPLOY_CI_RUN_ATTEMPT)
     });
+    const remoteRef =
+      selected.workflow_run?.head_branch === "main"
+        ? undefined
+        : `refs/tags/${selected.workflow_run?.head_branch}`;
     const identity = {
       repository: process.env.DEPLOY_REPOSITORY,
       sha: process.env.DEPLOY_GIT_SHA,
       tree: process.env.DEPLOY_GIT_TREE,
       runId: Number(process.env.DEPLOY_CI_RUN_ID),
       attempt: Number(selected.name.split("-attempt-")[1]),
-      remoteRef:
-        selected.workflow_run?.head_branch === "main"
-          ? "refs/heads/main"
-          : `refs/tags/${selected.workflow_run?.head_branch}`
+      ...(remoteRef ? { remoteRef } : {})
     };
     const result = await verifyRelease(
       bundle,
