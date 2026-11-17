@@ -55,7 +55,6 @@ import { useAdminTranslation } from "@/i18n";
 import { useAuthStore } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { useLexiconLanguages } from "./LanguageSelection";
-import { localeLabels } from "./model";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
 
@@ -103,9 +102,6 @@ export function EntryList({
   const { pageSize } = parsed;
   const page = parsed.page <= 4294967295 ? parsed.page : 1;
   const [form] = Form.useForm<WordFilterValues>();
-  const languageNames = new Intl.DisplayNames([i18n.language], {
-    type: "language"
-  });
   const [advancedExpanded, setAdvancedExpanded] = useState(
     Boolean(
       filters.kind ||
@@ -338,49 +334,19 @@ export function EntryList({
       fixed: "left",
       ellipsis: true,
       render: (row) => {
-        const names = [
-          ...new Set([row.headword, ...row.forms.map((f) => f.text)])
-        ];
-        if (!names.includes(row.headword)) names.unshift(row.headword);
         return (
           <div className="word-list-names">
             <div className="word-list-name-variants">
-              {names.map((name) => {
-                const locales = row.forms
-                  .filter((f) => f.text === name)
-                  .map((f) => f.locale);
-                return (
-                  <div className="word-list-name" key={name}>
-                    <span className="tsz-words word-list-name-text">
-                      {name}
-                    </span>
-                    {row.annotation_visible && row.annotation && (
-                      <sup className="word-list-name-annotation">
-                        {row.annotation}
-                      </sup>
-                    )}
-                    {!locales.includes(row.target_language) &&
-                      locales.map((locale) =>
-                        locale === "en-GB" || locale === "en-US" ? (
-                          <span
-                            key={locale}
-                            className={`word-list-dialect-dot word-list-dialect-dot-${locale === "en-GB" ? "uk" : "us"}`}
-                            role="img"
-                            aria-label={t(
-                              locale === "en-GB" ? "spelling_uk" : "spelling_us"
-                            )}
-                          />
-                        ) : (
-                          <Tag key={locale}>
-                            {localeLabels[locale] ??
-                              languageNames.of(locale) ??
-                              locale}
-                          </Tag>
-                        )
-                      )}
-                  </div>
-                );
-              })}
+              <div className="word-list-name">
+                <span className="tsz-words word-list-name-text">
+                  {row.headword}
+                </span>
+                {row.annotation_visible && row.annotation && (
+                  <sup className="word-list-name-annotation">
+                    {row.annotation}
+                  </sup>
+                )}
+              </div>
             </div>
             <span className="word-list-type-compact">
               {kindLabel(row.kind)}

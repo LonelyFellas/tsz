@@ -735,6 +735,8 @@ function InlineVoiceName({
   return (
     <span className="v3-voice-inline-name" title={secondary ?? displayName}>
       <strong>{english}</strong>
+      {chinese && chinese !== english && <small>{chinese}</small>}
+      {secondary && <small>{secondary}</small>}
       {gender === "female" ? (
         <span
           className="v3-voice-inline-gender is-female"
@@ -752,8 +754,6 @@ function InlineVoiceName({
           ♂
         </span>
       ) : null}
-      {chinese && chinese !== english && <small>{chinese}</small>}
-      {secondary && <small>{secondary}</small>}
     </span>
   );
 }
