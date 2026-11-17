@@ -9,6 +9,7 @@ import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import {
   VoiceAudioTasksContext,
   VoiceSaveContext,
+  type VoiceSaveOptions,
   useVoiceSave
 } from "../voiceSaveContext";
 import { flushSync } from "react-dom";
@@ -703,16 +704,22 @@ export function V3FormContentModal({
       ? {
           audioTasks: audioTasks.current,
           failure: outerSave.failure,
-          save: async (area) => {
+          save: async (area, options?: VoiceSaveOptions) => {
             if (savingRef.current) return false;
             savingRef.current = true;
             setSaving(true);
             try {
-              if (audioTasks.current.size > 0 && !(await waitForAudio()))
+              if (
+                !options?.skipAudioTasks &&
+                audioTasks.current.size > 0 &&
+                !(await waitForAudio())
+              )
                 return false;
               const next = completeForms();
               flushSync(() => onApply(next));
-              const accepted = await outerSaveRef.current!.save(area);
+              const accepted = options
+                ? await outerSaveRef.current!.save(area, options)
+                : await outerSaveRef.current!.save(area);
               if (accepted) {
                 original.current = next;
                 initialEditor.current = JSON.stringify(

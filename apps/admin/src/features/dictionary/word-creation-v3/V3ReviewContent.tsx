@@ -548,7 +548,9 @@ export function V3ReviewContent({
       </div>
       <div className="v3-review-reading-layout">
         <nav className="v3-review-index" aria-label={t("panel_entry_contents")}>
-          <div className="v3-review-index-title">{t("panel_this_entry")}</div>
+          <div className="v3-review-index-title">
+            {t("panel_sense_group_2")}
+          </div>
           <button
             type="button"
             aria-current={activeId === "review-forms" ? "location" : undefined}
