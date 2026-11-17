@@ -2095,7 +2095,7 @@ it.each([
     await waitFor(() => expect(complete).toBeEnabled());
     fireEvent.click(complete);
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(save).toHaveBeenCalledWith("azure");
+    expect(save).toHaveBeenCalledWith("azure", { skipAudioTasks: true });
     expect(wire().synthesis.uk.source).toBe(selectedSource);
     expect(sourceRadio(sourceLabel, "英式")).toBeChecked();
     if (selectedSource) expect(selectedSource).toBe(source);
