@@ -197,7 +197,9 @@ describe("V3WordCreationLayout", () => {
     });
 
     expect(screen.getByText("草稿未保存")).toBeVisible();
-    expect(screen.getByText("内容来源无法确认，请刷新后重试")).toBeVisible();
+    expect(
+      screen.getByText("尚未保存，修改已保留。内容来源无法确认，请刷新后重试")
+    ).toBeVisible();
     expect(screen.queryByText("spelling is invalid")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "去处理首项" }));
     expect(onIssueNavigate).toHaveBeenCalledWith(currentIssue);
@@ -230,7 +232,9 @@ describe("V3WordCreationLayout", () => {
       onDiscardLocalChanges
     });
     expect(
-      screen.getByText("词义内容暂时无法安全保存，请刷新后重试")
+      screen.getByText(
+        "尚未保存，修改已保留。词义内容暂时无法安全保存，请刷新后重试"
+      )
     ).toBeVisible();
     expect(screen.getByText("step body")).toBeVisible();
     expect(onRefreshConflict).not.toHaveBeenCalled();

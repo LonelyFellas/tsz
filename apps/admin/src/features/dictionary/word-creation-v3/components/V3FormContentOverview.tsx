@@ -26,6 +26,7 @@ import {
   PronunciationPreviewVoiceList
 } from "../../word-creation/PronunciationPreview";
 import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
+import { v3FormIssueMessages } from "../presentationErrors";
 
 export const formOverviewTableId = "form-content-overview";
 const DEFAULT_OVERVIEW_COLUMN_LABELS = {
@@ -309,6 +310,7 @@ export function V3FormContentOverview({
               const peers = rows.filter(
                 (item) => item.form.form_type === row.form.form_type
               );
+              const issueMessages = v3FormIssueMessages(issues, row.form.id, t);
               return (
                 <div
                   data-v3-node-id={row.membershipId}
@@ -372,13 +374,11 @@ export function V3FormContentOverview({
                         })}
                       </Typography.Text>
                     )}
-                    {issues.some(
-                      (issue) => issue.node_location.form_id === row.form.id
-                    ) && (
-                      <Typography.Text type="danger">
-                        {t("pending_fields")}
+                    {issueMessages.map((message) => (
+                      <Typography.Text type="danger" key={message}>
+                        {`${t("pending_fields")}：${message}`}
                       </Typography.Text>
-                    )}
+                    ))}
                   </Space>
                 </div>
               );

@@ -27,7 +27,7 @@ import { V3ReferenceList } from "./components/V3ReferenceList";
 import { useV3ReferenceGuard } from "./referenceGuardContext";
 import type { V3Problem } from "./problem";
 import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
-import { v3IssueMessages, v3SaveProblemMessage } from "./presentationErrors";
+import { v3SaveProblemMessage } from "./presentationErrors";
 import "./v3-layout.css";
 
 const STEP_TITLE: Record<WordCreationStep, WorkspaceMessage> = {
@@ -396,13 +396,7 @@ function V3WordCreationLayoutContent({
                     />
                   </Flex>
                 ) : operationValidationIssues.length > 0 ? (
-                  <Flex vertical gap={4}>
-                    {v3IssueMessages(operationValidationIssues, editorT)
-                      .slice(0, 1)
-                      .map((message) => (
-                        <span key={message}>{message}</span>
-                      ))}
-                  </Flex>
+                  v3SaveProblemMessage(problem, editorT)
                 ) : problem.kind === "request" &&
                   (problem.operation === "save_forms" ||
                     problem.operation === "save_meanings") ? (

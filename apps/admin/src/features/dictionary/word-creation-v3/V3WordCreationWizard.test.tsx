@@ -6950,7 +6950,13 @@ it.each([
         </FeedbackApp>
       )
     });
-    expect(screen.getByText("有待填写项")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        field === "spelling"
+          ? "有待填写项：请填写词形拼写"
+          : "有待填写项：请完整填写读法、字典音标和实际发音"
+      )
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByText("定位共享内容槽位"));
     const input = await screen.findByLabelText(label);
     await waitFor(() => expect(input).toHaveFocus());

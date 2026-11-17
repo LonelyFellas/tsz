@@ -32,7 +32,8 @@ import type {
   NextEntryMatches,
   NextWorkspaceEntry,
   NextSentence,
-  NextSentenceDraftChange
+  NextSentenceDraftChange,
+  V3DraftValidationIssue
 } from "@tsz/types";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { api as profileApi, tokens, useAuthStore } from "@/lib/auth";
@@ -1437,6 +1438,56 @@ describe("新版词库手工闭环", () => {
       }
     }
   );
+  it("422 校验失败时说明未保存但保留修改，并指出具体字段", async () => {
+    const api = requests();
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "forms",
+      node_id: "pronunciation-1",
+      field: "synthesis.ipa",
+      code: "pronunciation_required",
+      message: "selected phoneme is required",
+      node_location: {
+        node_role: "pronunciation",
+        ancestor_node_ids: [],
+        form_id: "form-1",
+        variant_id: "variant-1",
+        pronunciation_id: "pronunciation-1"
+      }
+    };
+    api.save.mockRejectedValue(
+      new HttpError(
+        422,
+        "v3 contract validation failed",
+        [],
+        "validation_failed",
+        [issue]
+      )
+    );
+    mount(api);
+    await screen.findByDisplayValue("centre");
+    fireEvent.click(stepButton(/^预览/));
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "local" }
+    });
+    fireEvent.click(button("保存完整草稿"));
+
+    await screen.findByText(
+      "草稿未保存，修改已保留。请填写有效的 Azure IPA 合成音素"
+    );
+    expect(screen.getByDisplayValue("local")).toBeVisible();
+    expect(screen.getByText("有未保存修改")).toBeVisible();
+  });
+  it("加载 422 不伪装成草稿保存失败", async () => {
+    const api = requests();
+    api.capabilities.mockRejectedValue(
+      new HttpError(422, "v3 contract validation failed")
+    );
+    mount(api);
+
+    await screen.findByText("智能词库手工编辑暂不可用");
+    expect(screen.queryByText(/草稿未保存/)).toBeNull();
+  });
   it("能力不可用时不请求条目，不回退旧库；无创建/编辑他人权限时禁止写入", async () => {
     const api = requests();
     api.capabilities.mockRejectedValue(new HttpError(404, "not found"));
