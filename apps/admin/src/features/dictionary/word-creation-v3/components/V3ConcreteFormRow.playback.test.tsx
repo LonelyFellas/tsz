@@ -30,8 +30,26 @@ vi.mock("../../voice-editor/dataSource", () => ({
   loadAdminVoiceRecommendations: vi.fn().mockResolvedValue([]),
   adminVoicePreviewAdapter: {
     listVoices: async () => [
-      { id: "british-voice", label: "British", locale: "en-GB" },
-      { id: "american-voice", label: "American", locale: "en-US" }
+      {
+        id: "british-voice",
+        label: "British",
+        displayName: "Sonia Test",
+        locale: "en-GB",
+        gender: "female"
+      },
+      {
+        id: "british-voice-2",
+        label: "British Alt",
+        displayName: "Andrew Test",
+        locale: "en-GB",
+        gender: "male"
+      },
+      {
+        id: "american-voice",
+        label: "American",
+        locale: "en-US",
+        gender: "female"
+      }
     ],
     synthesize: preview.synthesize,
     resolveVoices: preview.resolveVoices
@@ -206,6 +224,123 @@ it("总览明确显示停配侧且不借用旧读法音色，另一侧仍独立"
   expect(screen.getByLabelText("读法 1英式 播放语音")).toBeDisabled();
   expect(screen.queryByText("British")).not.toBeInTheDocument();
   expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("总览音色列按启用音色逐行展示，并让语速和音量保持同一行", async () => {
+  const form = commonFormFixture({
+    spelling: "dignity",
+    pronunciations: [
+      pronunciationFixture({
+        voice_profile: {
+          voices: [
+            {
+              voice_id: "british-voice",
+              enabled: true,
+              rate_percent: -10,
+              volume_percent: 93,
+              locale: "en-GB"
+            },
+            {
+              voice_id: "british-voice-2",
+              enabled: true,
+              rate_percent: -45,
+              volume_percent: 100,
+              locale: "en-GB"
+            }
+          ]
+        }
+      })
+    ]
+  });
+  const pos = formsFixture({ forms: [form] }).pos[0]!;
+  render(
+    <App>
+      <PronunciationPreviewProvider>
+        <V3FormContentOverview
+          rows={[
+            {
+              membershipId: pos.form_groups[0]!.members[0]!.id,
+              form,
+              formLabel: "原形",
+              formTypeAriaLabel: "词形类型",
+              formTypeDisabled: false,
+              formTypeOptions: ["base"],
+              membershipCount: 1
+            }
+          ]}
+          group={pos.form_groups[0]!}
+          sharedCounts={new Map()}
+          onEdit={() => undefined}
+          onFormTypeChange={() => undefined}
+          issues={[]}
+        />
+      </PronunciationPreviewProvider>
+    </App>
+  );
+  expect(await screen.findByText("Sonia Test")).toBeVisible();
+  expect(screen.getByText("Andrew Test")).toBeVisible();
+  expect(screen.getByText("0.90×")).toBeVisible();
+  expect(screen.getByText("0.55×")).toBeVisible();
+  expect(screen.getByText("93%")).toBeVisible();
+  expect(screen.getByText("100%")).toBeVisible();
+});
+
+it("总览上传音频行显示来源文件，语速和音量不伪造合成值", async () => {
+  const form = ukUsFormFixture({
+    uk: {
+      spelling: "dignity",
+      pronunciations: [
+        pronunciationFixture({
+          synthesis: {
+            alphabet: "ipa",
+            ipa: "",
+            ups: "",
+            uk: { source: "upload", ipa: "", ups: "" }
+          },
+          audio_assets: [
+            {
+              id: "recording-uk",
+              locale: "en-GB",
+              gender: "male",
+              content_type: "audio/mpeg",
+              size_bytes: 1024,
+              original_name: "dignity-andrew.mp3",
+              created_at: "2026-11-11T07:00:00Z",
+              is_default: true
+            }
+          ]
+        })
+      ]
+    }
+  });
+  const pos = formsFixture({ forms: [form] }).pos[0]!;
+  render(
+    <App>
+      <PronunciationPreviewProvider>
+        <V3FormContentOverview
+          rows={[
+            {
+              membershipId: pos.form_groups[0]!.members[0]!.id,
+              form,
+              formLabel: "原形",
+              formTypeAriaLabel: "词形类型",
+              formTypeDisabled: false,
+              formTypeOptions: ["base"],
+              membershipCount: 1
+            }
+          ]}
+          group={pos.form_groups[0]!}
+          sharedCounts={new Map()}
+          onEdit={() => undefined}
+          onFormTypeChange={() => undefined}
+          issues={[]}
+        />
+      </PronunciationPreviewProvider>
+    </App>
+  );
+  expect(await screen.findByText("上传音频")).toBeVisible();
+  expect(screen.getByText("dignity-andrew.mp3")).toBeVisible();
+  expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
 });
 
 it.each(["common", "uk_us"] as const)(
