@@ -229,6 +229,10 @@ export interface NextCapabilities {
   form_editor?: boolean;
   sense_groups?: boolean;
 }
+export interface NextDraftSchemaCompatibility {
+  draft_schema_version: number;
+  supported_draft_schema_versions: number[];
+}
 export interface NextViewQuery {
   target_locale: string;
   medium_locale: string;

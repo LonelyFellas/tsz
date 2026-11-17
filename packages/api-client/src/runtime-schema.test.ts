@@ -54,6 +54,7 @@ const ROOTS = [
   "NextEntry",
   "NextEntryList",
   "NextCapabilities",
+  "NextDraftSchemaCompatibility",
   "NextEquivalentCatalog",
   "NextEntryView",
   "NextSentence",

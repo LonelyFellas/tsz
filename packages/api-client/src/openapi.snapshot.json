@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/task-210-audio-per-accent/docs/openapi.json",
-  "_generatedAt": "2026-11-17T06:05:02.780Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-212-schema-compat/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-17T11:20:14.017Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -33,6 +33,7 @@
     "/admin/dashboard/overview": ["get"],
     "/admin/lexicon-next/capabilities": ["get"],
     "/admin/lexicon-next/detections": ["post"],
+    "/admin/lexicon-next/draft-schema": ["get"],
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/publication": ["get"],
@@ -3118,6 +3119,14 @@
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/draft-schema": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextDraftSchemaCompatibility" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/lexicon-next/entries": {

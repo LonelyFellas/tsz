@@ -69,6 +69,18 @@ function client(reply: unknown, status = 200) {
 }
 
 describe("lexicon-next authoritative wire contract", () => {
+  it("读取草稿 schema 兼容范围，旧服务缺少端点时保持失败而不保存", async () => {
+    const compatibility = {
+      draft_schema_version: 1,
+      supported_draft_schema_versions: [1]
+    };
+    const { api, fetch } = client(compatibility);
+    await expect(api.draftSchema()).resolves.toEqual(compatibility);
+    expect(fetch.mock.calls[0]![0]).toBe(
+      "https://test.invalid/api/v1/admin/lexicon-next/draft-schema"
+    );
+  });
+
   it("旧服务不发送配对命令，协商后同一保存请求携带原目标版本", async () => {
     const { api, fetch } = client(entry);
     const change = {

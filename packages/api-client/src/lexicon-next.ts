@@ -25,6 +25,7 @@ import type {
   NextEntryMatchInput,
   NextEntryMatches,
   NextCapabilities,
+  NextDraftSchemaCompatibility,
   NextEntry,
   NextEntryList,
   NextListQuery,
@@ -53,6 +54,13 @@ export function decodeNextCapabilities(value: unknown): NextCapabilities {
   )
     throw new ClientResponseError("新版词库能力目录不可用");
   return value as NextCapabilities;
+}
+export function decodeNextDraftSchemaCompatibility(
+  value: unknown
+): NextDraftSchemaCompatibility {
+  if (!validateRuntimeSchema("NextDraftSchemaCompatibility", value).valid)
+    throw new ClientResponseError("新版词库草稿版本兼容性不可用");
+  return value as NextDraftSchemaCompatibility;
 }
 export function decodeNextEntryView(value: unknown): NextEntryView {
   if (!validateRuntimeSchema("NextEntryView", value).valid)
@@ -212,6 +220,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         relations = capabilities.relations === true;
         return capabilities;
       }),
+    draftSchema: () =>
+      http
+        .get<unknown>(`${root}/draft-schema`)
+        .then(decodeNextDraftSchemaCompatibility),
     create: (input: CreateNextEntry) =>
       http
         .post<unknown>(`${root}/entries`, input, editorOptions)
