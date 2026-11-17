@@ -277,8 +277,15 @@ it("总览音色列按启用音色逐行展示，并让语速和音量保持同�
       </PronunciationPreviewProvider>
     </App>
   );
+  expect(screen.getAllByText("配音")[0]).toBeVisible();
   expect(await screen.findByText("Sonia Test")).toBeVisible();
   expect(screen.getByText("Andrew Test")).toBeVisible();
+  expect(
+    screen.getByText("Sonia Test").closest(".v3-voice-inline-name")
+  ).toHaveTextContent("Sonia Test♀");
+  expect(
+    screen.getByText("Andrew Test").closest(".v3-voice-inline-name")
+  ).toHaveTextContent("Andrew Test♂");
   expect(screen.getByText("0.90×")).toBeVisible();
   expect(screen.getByText("0.55×")).toBeVisible();
   expect(screen.getByText("93%")).toBeVisible();

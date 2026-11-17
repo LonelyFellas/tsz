@@ -400,7 +400,7 @@ describe("词形内容定向复制", () => {
     }
   );
 
-  it("复制音标保留目标身份、读法、拼写、继承音色与真人录音，并重建词界和清理全部正式音频", () => {
+  it("复制音标同步读法、保留目标身份、拼写、继承音色与真人录音，并重建词界和清理全部正式音频", () => {
     const { forms, sourceId, targetId } = setup();
     const from = variant(forms.contents[0]!);
     const to = variant(forms.contents[1]!);
@@ -484,7 +484,7 @@ describe("词形内容定向复制", () => {
     });
     expect(copied).toMatchObject({
       id: target.id,
-      style: "normal",
+      style: "weak",
       dict_phonetic: "/source/",
       dict_phonetic_rich: source.dict_phonetic_rich,
       actual_pron_rich: source.actual_pron_rich,
@@ -514,6 +514,25 @@ describe("词形内容定向复制", () => {
     ).toBe("target");
     expect(JSON.stringify(copied)).not.toContain("audio_asset_id");
     expect(forms).toEqual(before);
+  });
+
+  it("复制音标时来源缺少读法会清除目标读法", () => {
+    const { forms, sourceId, targetId } = setup();
+    const from = variant(forms.contents[0]!);
+    const to = variant(forms.contents[1]!);
+    const source = from.pronunciations[0]!;
+    const target = to.pronunciations[0]!;
+    source.style = undefined;
+    source.dict_phonetic = "/source/";
+    source.actual_pron = "source actual";
+    target.style = "strong";
+
+    const next = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "phonetics")
+    );
+
+    expect(variant(next.contents[1]!).pronunciations[0]!.style).toBeUndefined();
   });
 
   it("复制音色保留目标所有正文与发音源选择，复制禁用版本参数与顺序且不带来源音频", () => {

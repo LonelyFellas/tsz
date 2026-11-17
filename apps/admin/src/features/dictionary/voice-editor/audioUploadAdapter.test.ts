@@ -31,6 +31,9 @@ function source(overrides: Partial<AdminAudioAssetDataSource> = {}) {
       }
     }),
     confirm: vi.fn().mockResolvedValue({ asset: ASSET }),
+    update: vi.fn().mockResolvedValue({
+      asset: { ...ASSET, gender: "male" }
+    }),
     url: vi.fn().mockResolvedValue({
       url: "https://oss.example/get",
       expires_at: "2026-09-06T00:05:00Z",
@@ -41,6 +44,7 @@ function source(overrides: Partial<AdminAudioAssetDataSource> = {}) {
     createUpload: ReturnType<typeof vi.fn>;
     confirm: ReturnType<typeof vi.fn>;
     url: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -122,6 +126,20 @@ describe("admin audio upload adapter", () => {
     expect(dataSource.createUpload).toHaveBeenCalledWith(
       { content_type: "audio/mp4", size: 3 },
       undefined
+    );
+  });
+
+  it("updates gender metadata without re-uploading the asset", async () => {
+    const dataSource = source();
+    const adapter = createAdminAudioUploadAdapter(dataSource, vi.fn());
+    const controller = new AbortController();
+    await expect(
+      adapter.updateGender?.(ASSET.id, "male", { signal: controller.signal })
+    ).resolves.toMatchObject({ id: ASSET.id, gender: "male" });
+    expect(dataSource.update).toHaveBeenCalledWith(
+      ASSET.id,
+      { gender: "male" },
+      controller.signal
     );
   });
 

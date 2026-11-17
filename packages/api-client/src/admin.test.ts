@@ -301,6 +301,17 @@ describe("createAdminEndpoints — 音频资产 audioAssets", () => {
     });
   });
 
+  it("update → PATCH /lexicon/audio-assets/{id} 只更新性别元数据", () => {
+    const api = createAdminEndpoints(http);
+    const input = { gender: "male" as const };
+    api.audioAssets.update("a/b", input);
+    expect(http.patch).toHaveBeenCalledWith(
+      "/lexicon/audio-assets/a%2Fb",
+      input,
+      { signal: undefined }
+    );
+  });
+
   it("url → GET /lexicon/audio-assets/{id}/url,id 走 URL 编码", () => {
     const api = createAdminEndpoints(http);
     api.audioAssets.url("a/b");

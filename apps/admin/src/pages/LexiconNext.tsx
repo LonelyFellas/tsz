@@ -9,6 +9,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState
 } from "react";
@@ -75,10 +76,26 @@ import {
 } from "@/features/lexicon-next/publicationIssueFocus";
 import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
+import { v3IssueMessage } from "@/features/dictionary/word-creation-v3/presentationErrors";
+import {
+  clearNextLocalDraft,
+  NEXT_LOCAL_DRAFT_SCHEMA_VERSION,
+  readNextLocalDraft,
+  type NextLocalDraftKey,
+  type NextLocalDraftSnapshot,
+  writeNextLocalDraft
+} from "@/features/lexicon-next/localDraftStore";
 import "./lexicon-next.css";
 
 export type LexiconNextRequests = typeof api.lexiconNext;
-function failure(error: unknown) {
+const NEXT_DRAFT_SCHEMA_VERSION = NEXT_LOCAL_DRAFT_SCHEMA_VERSION;
+function failure(error: unknown, preserveDraft = false) {
+  if (preserveDraft && error instanceof HttpError && error.status === 422) {
+    const issue = error.field_issues[0];
+    return `草稿未保存，修改已保留。${
+      issue ? v3IssueMessage(issue) : "请处理待填写项后重试。"
+    }`;
+  }
   return error instanceof Error ? error.message : "请求失败，请重试。";
 }
 function editorStepFromSearch(
@@ -242,7 +259,16 @@ function EntryLoader({
     staleTime: Infinity,
     gcTime: 0
   });
-  if (query.isPending || metadata.isPending)
+  const draftSchema = useQuery({
+    queryKey: ["admin-lexicon-next", "draft-schema"],
+    queryFn: requests.draftSchema,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    staleTime: Infinity,
+    gcTime: 0
+  });
+  if (query.isPending || metadata.isPending || draftSchema.isPending)
     return <Spin aria-label="正在打开词条" />;
   if (metadata.isError)
     return (
@@ -261,6 +287,31 @@ function EntryLoader({
         title="无法打开智能词库词条"
         description={failure(query.error)}
         action={<Button onClick={() => void query.refetch()}>重试</Button>}
+      />
+    );
+  if (draftSchema.isError)
+    return (
+      <Alert
+        type="error"
+        showIcon
+        title="无法确认草稿版本兼容性"
+        description="为避免本地新增字段被服务器丢弃，当前服务暂不能安全编辑。请升级服务后重试。"
+        action={
+          <Button onClick={() => void draftSchema.refetch()}>重试</Button>
+        }
+      />
+    );
+  if (
+    !draftSchema.data.supported_draft_schema_versions.includes(
+      NEXT_DRAFT_SCHEMA_VERSION
+    )
+  )
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        title="当前服务不支持此草稿版本"
+        description="为避免新增字段被服务器丢弃，当前词条暂不能编辑。请升级服务后再试。"
       />
     );
   if (query.data.target_language !== "en")
@@ -457,19 +508,161 @@ function EntryEditor({
   const [peerConflict, setPeerConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
   const profile = useAuthStore((state) => state.profile);
+  const localDraftKey = useMemo<NextLocalDraftKey | undefined>(
+    () =>
+      profile?.id
+        ? {
+            account_id: profile.id,
+            entry_id: initial.id,
+            target_locale: target,
+            medium_locale: medium
+          }
+        : undefined,
+    [initial.id, medium, profile?.id, target]
+  );
+  const [localSnapshot, setLocalSnapshot] = useState<NextLocalDraftSnapshot>();
+  const [localSnapshotKey, setLocalSnapshotKey] = useState<string>();
+  const [localSnapshotLoadedKey, setLocalSnapshotLoadedKey] =
+    useState<string>();
+  const [localSnapshotChecked, setLocalSnapshotChecked] = useState(false);
+  const localKeyIdentity = localDraftKey
+    ? JSON.stringify(localDraftKey)
+    : undefined;
+  const currentLocalSnapshot =
+    localSnapshot && localSnapshotKey === localKeyIdentity
+      ? localSnapshot
+      : undefined;
   const canPublish = usePermission("words.publish");
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
   const writable =
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
-  const disabled = busy || !writable;
+  const disabled = busy || !writable || !!currentLocalSnapshot;
   const dirty =
     pairChanges.length > 0 ||
     JSON.stringify(draft) !== JSON.stringify(saved.draft) ||
     (sentenceDraftsAvailable && sentenceWorkspace.dirty);
   useEffect(() => {
+    let active = true;
+    setLocalSnapshot(undefined);
+    setLocalSnapshotKey(undefined);
+    setLocalSnapshotLoadedKey(undefined);
+    setLocalSnapshotChecked(false);
+    if (!localDraftKey) return;
+    void readNextLocalDraft(localDraftKey)
+      .then((snapshot) => {
+        if (
+          active &&
+          snapshot?.draft_schema_version === NEXT_DRAFT_SCHEMA_VERSION
+        ) {
+          setLocalSnapshot(snapshot);
+          setLocalSnapshotKey(localKeyIdentity);
+        }
+        if (active) {
+          setLocalSnapshotLoadedKey(localKeyIdentity);
+          setLocalSnapshotChecked(true);
+        }
+      })
+      .catch(() => {
+        if (active) setLocalSnapshotChecked(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [localDraftKey, localKeyIdentity]);
+  useEffect(() => {
+    if (
+      !localDraftKey ||
+      !localSnapshotChecked ||
+      localSnapshotLoadedKey !== localKeyIdentity ||
+      !dirty ||
+      conflict ||
+      currentLocalSnapshot
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      const snapshot: NextLocalDraftSnapshot = {
+        snapshot_version: 1,
+        account_id: localDraftKey.account_id,
+        entry_id: localDraftKey.entry_id,
+        target_locale: localDraftKey.target_locale,
+        medium_locale: localDraftKey.medium_locale,
+        base_revision: saved.revision,
+        draft_schema_version: NEXT_DRAFT_SCHEMA_VERSION,
+        draft: draftRef.current,
+        edited_pairs: editedPairs,
+        sentence_resources: Object.values(sentenceWorkspace.resources),
+        updated_at: new Date().toISOString()
+      };
+      void writeNextLocalDraft(localDraftKey, snapshot).catch(() => undefined);
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    dirty,
+    conflict,
+    editedPairs,
+    localDraftKey,
+    localSnapshotChecked,
+    localSnapshotLoadedKey,
+    localKeyIdentity,
+    currentLocalSnapshot,
+    saved.revision,
+    sentenceWorkspace.resources
+  ]);
+  function restoreLocalSnapshot(snapshot: NextLocalDraftSnapshot) {
+    setDraft(snapshot.draft);
+    setEditedPairs(snapshot.edited_pairs);
+    for (const resource of snapshot.sentence_resources) {
+      const base = sentenceWorkspace.base.find(
+        (item) => item.id === resource.id
+      );
+      if (base) {
+        for (const variant of resource.draft.variants)
+          sentenceWorkspace.update(base, variant);
+      } else {
+        sentenceWorkspace.importResource(resource);
+      }
+    }
+    setLocalSnapshot(undefined);
+    setLocalSnapshotKey(undefined);
+    if (snapshot.base_revision !== saved.revision) {
+      setConflict(true);
+      setError(
+        `本地草稿基于版本 ${snapshot.base_revision}，服务器当前为版本 ${saved.revision}，请先比较版本。`
+      );
+    } else {
+      setError(undefined);
+    }
+  }
+  function discardLocalSnapshot() {
+    setLocalSnapshot(undefined);
+    setLocalSnapshotKey(undefined);
+    if (localDraftKey)
+      void clearNextLocalDraft(localDraftKey).catch(() => undefined);
+  }
+  useEffect(() => {
     if (!dirty && !conflict) setError(undefined);
   }, [dirty, conflict]);
+  useEffect(() => {
+    if (
+      !localDraftKey ||
+      !localSnapshotChecked ||
+      localSnapshotLoadedKey !== localKeyIdentity ||
+      dirty ||
+      conflict ||
+      currentLocalSnapshot
+    )
+      return;
+    void clearNextLocalDraft(localDraftKey).catch(() => undefined);
+  }, [
+    conflict,
+    currentLocalSnapshot,
+    dirty,
+    localDraftKey,
+    localSnapshotChecked,
+    localSnapshotLoadedKey,
+    localKeyIdentity
+  ]);
   useEffect(() => {
     setLocked(busy || formContentOpen);
     return () => setLocked(false);
@@ -510,7 +703,10 @@ function EntryEditor({
       event.returnValue = "";
     }
   });
-  async function run(operation: () => Promise<void>) {
+  async function run(
+    operation: () => Promise<void>,
+    options: { preserveDraft?: boolean } = {}
+  ) {
     if (lock.current) return false;
     lock.current = true;
     setBusy(true);
@@ -558,7 +754,7 @@ function EntryEditor({
       } else if (error instanceof HttpError && error.status === 403) {
         setError("没有保存权限。本地草稿已保留，请联系管理员核实权限。");
       } else {
-        setError(failure(error));
+        setError(failure(error, options.preserveDraft));
       }
       return false;
     } finally {
@@ -570,59 +766,65 @@ function EntryEditor({
     if (
       !writable ||
       conflict ||
+      currentLocalSnapshot ||
       (contentLeaveGuard.current && !options?.skipAudioTasks)
     )
       return false;
-    return run(async () => {
-      const validation =
-        draftProblem(draftRef.current, equivalentMetadataAvailable) ||
-        (sentenceDraftsAvailable && sentenceWorkspace.validate());
-      if (validation) {
-        requestAnimationFrame(() =>
-          document
-            .querySelector<HTMLElement>(
-              '.next-sentence-inline-card [aria-invalid="true"]'
-            )
-            ?.focus()
-        );
-        throw new Error(validation);
-      }
-      if (!options?.skipAudioTasks) {
-        for (const wait of [...audioTasks.current.values()]) {
-          if (!(await wait()))
-            throw new Error("发音处理尚未完成，请重试保存。");
+    return run(
+      async () => {
+        const validation =
+          draftProblem(draftRef.current, equivalentMetadataAvailable) ||
+          (sentenceDraftsAvailable && sentenceWorkspace.validate());
+        if (validation) {
+          requestAnimationFrame(() =>
+            document
+              .querySelector<HTMLElement>(
+                '.next-sentence-inline-card [aria-invalid="true"]'
+              )
+              ?.focus()
+          );
+          throw new Error(validation);
         }
-      }
-      const current = draftRef.current;
-      const problem = draftProblem(current, equivalentMetadataAvailable);
-      if (problem) throw new Error(problem);
-      const changes = sentenceDraftsAvailable
-        ? await sentenceWorkspace.prepare()
-        : [];
-      const result = await requests.save(saved.id, {
-        expected_revision: saved.revision,
-        ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
-        draft: draftRef.current,
-        ...(changes.length ? { sentence_changes: changes } : {})
-      });
-      setEditedPairs({});
-      setSaved(result);
-      setDraft(result.draft);
-      sentenceWorkspace.reset();
-      setConflict(false);
-      setRemote(undefined);
-      void Promise.all(
-        ["list", "stats", "creators"].map((key) =>
-          queryClient.invalidateQueries({
-            queryKey: ["admin-lexicon-next", key]
-          })
-        )
-      );
-      void queryClient.invalidateQueries({
-        queryKey: ["admin-lexicon-next", "publication", saved.id]
-      });
-      void message.success("草稿已保存");
-    });
+        if (!options?.skipAudioTasks) {
+          for (const wait of [...audioTasks.current.values()]) {
+            if (!(await wait()))
+              throw new Error("发音处理尚未完成，请重试保存。");
+          }
+        }
+        const current = draftRef.current;
+        const problem = draftProblem(current, equivalentMetadataAvailable);
+        if (problem) throw new Error(problem);
+        const changes = sentenceDraftsAvailable
+          ? await sentenceWorkspace.prepare()
+          : [];
+        const result = await requests.save(saved.id, {
+          expected_revision: saved.revision,
+          ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
+          draft: draftRef.current,
+          ...(changes.length ? { sentence_changes: changes } : {})
+        });
+        setEditedPairs({});
+        setSaved(result);
+        setDraft(result.draft);
+        sentenceWorkspace.reset();
+        setConflict(false);
+        setRemote(undefined);
+        if (localDraftKey)
+          void clearNextLocalDraft(localDraftKey).catch(() => undefined);
+        void Promise.all(
+          ["list", "stats", "creators"].map((key) =>
+            queryClient.invalidateQueries({
+              queryKey: ["admin-lexicon-next", key]
+            })
+          )
+        );
+        void queryClient.invalidateQueries({
+          queryKey: ["admin-lexicon-next", "publication", saved.id]
+        });
+        void message.success("草稿已保存");
+      },
+      { preserveDraft: true }
+    );
   }
   function changeStep(next: WordCreationStep) {
     const nextStep = next === "basics" ? "forms" : next;
@@ -777,6 +979,35 @@ function EntryEditor({
                   </Button>
                 )
               )
+            }
+          />
+        )}
+        {currentLocalSnapshot && (
+          <Alert
+            type="warning"
+            showIcon
+            title={
+              currentLocalSnapshot.base_revision === saved.revision
+                ? "发现未提交的本地草稿"
+                : `发现基于版本 ${currentLocalSnapshot.base_revision} 的本地草稿`
+            }
+            description="本地草稿保存在当前浏览器中，请选择是否恢复。"
+            action={
+              <Space>
+                <Button
+                  onClick={() => restoreLocalSnapshot(currentLocalSnapshot)}
+                  disabled={busy || formContentOpen}
+                >
+                  恢复本地草稿
+                </Button>
+                <Button
+                  danger
+                  onClick={discardLocalSnapshot}
+                  disabled={busy || formContentOpen}
+                >
+                  放弃本地草稿
+                </Button>
+              </Space>
             }
           />
         )}
@@ -1130,7 +1361,28 @@ function EntryEditor({
           onCancel={() => setRemote(undefined)}
           footer={
             <Space>
-              <Button onClick={() => setRemote(undefined)}>保留本地草稿</Button>
+              <Button
+                type="primary"
+                disabled={busy || formContentOpen}
+                onClick={() => {
+                  if (!remote || contentLeaveGuard.current) return;
+                  modal.confirm({
+                    title: "保留本地草稿并覆盖服务器版本？",
+                    content: `确认后，本地草稿会以服务器版本 ${remote.revision} 为保存基线，下一次保存将覆盖服务器草稿。`,
+                    okText: "保留本地并继续",
+                    cancelText: "取消",
+                    onOk: () => {
+                      if (!remote || contentLeaveGuard.current) return;
+                      setSaved(remote);
+                      setRemote(undefined);
+                      setConflict(false);
+                      setError(undefined);
+                    }
+                  });
+                }}
+              >
+                保留本地草稿并继续保存
+              </Button>
               <Button
                 danger
                 disabled={busy || formContentOpen}
@@ -1149,6 +1401,10 @@ function EntryEditor({
                         setRemote(undefined);
                         setConflict(false);
                         setError(undefined);
+                        if (localDraftKey)
+                          void clearNextLocalDraft(localDraftKey).catch(
+                            () => undefined
+                          );
                       }
                     }
                   })

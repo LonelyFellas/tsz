@@ -12,6 +12,7 @@ import {
 } from "@tsz/shared";
 import {
   CheckIcon,
+  DownloadIcon,
   FileAudioIcon,
   UploadIcon,
   Volume2Icon
@@ -633,6 +634,7 @@ export interface UploadPanelProps {
   unavailableReason?: string;
   upload: UploadDraft;
   onUploadChange: (next: Partial<UploadDraft>) => void;
+  onGenderChange?: (gender: AudioAssetGender, locale: AudioAssetLocale) => void;
   /** 已落成资产的音频。 */
   assets: AudioAsset[];
   /** 还在路上或失败待重试的上传。 */
@@ -642,11 +644,15 @@ export interface UploadPanelProps {
   onRetryUpload: (id: string) => void;
   onDismissUpload: (id: string) => void;
   onRemoveAsset: (asset: AudioAsset) => void;
+  onDownloadAsset?: (asset: AudioAsset) => void;
   onDefaultAssetChange?: (asset: AudioAsset) => void;
   onPlayAsset: (asset: AudioAsset) => void;
   playingAssetId?: string;
+  downloadingAssetId?: string;
   /** 试听失败的说明；只在这块面板里显示。 */
   playbackMessage?: string;
+  genderUpdatePending?: boolean;
+  genderUpdateMessage?: string;
 }
 
 const localeBadge = (locale: string) =>
@@ -666,6 +672,7 @@ export function UploadPanel({
   unavailableReason,
   upload,
   onUploadChange,
+  onGenderChange,
   assets,
   pending,
   limit,
@@ -673,16 +680,32 @@ export function UploadPanel({
   onRetryUpload,
   onDismissUpload,
   onRemoveAsset,
+  onDownloadAsset,
   onDefaultAssetChange,
   onPlayAsset,
   playingAssetId,
-  playbackMessage
+  playbackMessage,
+  genderUpdatePending,
+  downloadingAssetId,
+  genderUpdateMessage
 }: UploadPanelProps) {
   const { t, i18n } = useVoiceEditorTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inFlight = pending.filter((item) => !item.error).length;
   const used = assets.length + inFlight;
-  const canAdd = available && uploadAllowed && !readOnly && used < limit;
+  const replacingAccent = assets.some(
+    (asset) =>
+      speechAccentGroup(asset.locale) === speechAccentGroup(upload.locale)
+  );
+  const selectedAssetGender = assets.find(
+    (asset) =>
+      speechAccentGroup(asset.locale) === speechAccentGroup(upload.locale)
+  )?.gender;
+  const canAdd =
+    available &&
+    uploadAllowed &&
+    !readOnly &&
+    (used < limit || replacingAccent);
   return (
     <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label={t("audio")}>
       <div className="tsz-ve-upload-header">
@@ -714,8 +737,7 @@ export function UploadPanel({
       />
 
       {/*
-       * 归属放在按钮之前：从上往下读即「先定归属 → 再选文件」，
-       * 顺序本身说明了它只作用于接下来添加的那批，不必再写一句解释。
+       * 归属放在按钮之前：没有录音时决定下一次上传，有录音时修改当前口音的元数据。
        */}
       <div className="tsz-ve-upload-fields">
         <span className="tsz-ve-upload-field-label">{t("upload_accent")}</span>
@@ -745,9 +767,15 @@ export function UploadPanel({
           size="middle"
           optionType="button"
           aria-label={t("upload_audio_gender")}
-          value={upload.gender}
-          disabled={readOnly || !available || !uploadAllowed}
-          onChange={(event) => onUploadChange({ gender: event.target.value })}
+          value={selectedAssetGender ?? upload.gender}
+          disabled={
+            readOnly || !available || !uploadAllowed || genderUpdatePending
+          }
+          onChange={(event) => {
+            const gender = event.target.value as AudioAssetGender;
+            onUploadChange({ gender });
+            onGenderChange?.(gender, upload.locale);
+          }}
           options={voiceGenderLabels(t).map(({ gender }) => ({
             value: gender,
             label: t(gender === "female" ? "female" : "male")
@@ -783,6 +811,15 @@ export function UploadPanel({
           role="alert"
         >
           {playbackMessage}
+        </Typography.Text>
+      )}
+      {genderUpdateMessage && (
+        <Typography.Text
+          type="danger"
+          className="tsz-ve-upload-hint"
+          role="alert"
+        >
+          {genderUpdateMessage}
         </Typography.Text>
       )}
 
@@ -870,6 +907,18 @@ export function UploadPanel({
                   {localeBadge(asset.locale)} · {genderLabel(asset.gender, t)}
                 </span>
                 <span className="tsz-ve-upload-actions">
+                  {onDownloadAsset && (
+                    <Button
+                      size="small"
+                      type="text"
+                      aria-label={`${t("download_original_audio")} ${asset.original_name}`}
+                      title={t("download_original_audio")}
+                      loading={downloadingAssetId === asset.id}
+                      disabled={!available}
+                      icon={<DownloadIcon aria-hidden />}
+                      onClick={() => onDownloadAsset(asset)}
+                    />
+                  )}
                   {onDefaultAssetChange && (
                     <Button
                       size="small"

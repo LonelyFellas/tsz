@@ -169,6 +169,7 @@ export const lexiconEditorMessages = {
   actions: ["操作", "操作", "Actions"],
   form_name: ["词形名称", "詞形名稱", "Form name"],
   voice: ["音色", "音色", "Voice"],
+  voice_source: ["配音", "配音", "Speech"],
   rate: ["语速", "語速", "Rate"],
   volume: ["音量", "音量", "Volume"],
   dialect_uk: ["英式", "英式", "British"],

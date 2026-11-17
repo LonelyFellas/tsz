@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/sense-pairs-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-16T11:00:31.138Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-212-schema-compat/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-17T11:20:14.017Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -33,6 +33,7 @@
     "/admin/dashboard/overview": ["get"],
     "/admin/lexicon-next/capabilities": ["get"],
     "/admin/lexicon-next/detections": ["post"],
+    "/admin/lexicon-next/draft-schema": ["get"],
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/publication": ["get"],
@@ -55,6 +56,7 @@
     "/admin/lexicon/assistant/stream": ["post"],
     "/admin/lexicon/audio-assets": ["post"],
     "/admin/lexicon/audio-assets/upload-url": ["post"],
+    "/admin/lexicon/audio-assets/{id}": ["patch"],
     "/admin/lexicon/audio-assets/{id}/content": ["get"],
     "/admin/lexicon/audio-assets/{id}/url": ["get"],
     "/admin/lexicon/detections": ["post"],
@@ -530,6 +532,14 @@
       }
     ],
     "post /admin/lexicon/audio-assets/upload-url": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "patch /admin/lexicon/audio-assets/{id}": [
       {
         "name": "X-TSZ-Test-Run",
         "in": "header",
@@ -3111,6 +3121,14 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/lexicon-next/draft-schema": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextDraftSchemaCompatibility" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/lexicon-next/entries": {
       "request": null,
       "responses": {
@@ -3378,6 +3396,17 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "501": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "patch /admin/lexicon/audio-assets/{id}": {
+      "request": { "$ref": "#/components/schemas/UpdateAudioAssetRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/ConfirmAudioAssetResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/lexicon/audio-assets/{id}/content": {
@@ -10378,6 +10407,14 @@
       "enum": ["zh"]
     },
     "UkDialectV3": { "type": "string", "enum": ["uk"] },
+    "UpdateAudioAssetRequest": {
+      "type": "object",
+      "required": ["gender"],
+      "properties": {
+        "gender": { "$ref": "#/components/schemas/AudioAssetGender" }
+      },
+      "additionalProperties": false
+    },
     "UpdateEntryAnnotationInput": {
       "type": "object",
       "required": ["base_annotation_revision"],

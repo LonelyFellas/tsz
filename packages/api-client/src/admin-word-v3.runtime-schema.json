@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/sense-pairs-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "c9cb58bd08c3baca0ce84f47c3e22aad53253ce5d4defb04c91800952a11b3ea",
+  "_source": "/Users/darwish/.codex/worktrees/task-212-schema-compat/tsz-rust/docs/openapi.json",
+  "_source_sha256": "e0dd0da59fed7e86dae015449c1e55958beaf85f85ed754a87d265fc026aa564",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -22,6 +22,7 @@
     "NextEntry",
     "NextEntryList",
     "NextCapabilities",
+    "NextDraftSchemaCompatibility",
     "NextEquivalentCatalog",
     "NextEntryView",
     "NextSentence",
@@ -3802,6 +3803,19 @@
           "items": { "$ref": "#/$defs/NextSenseGroup" }
         },
         "senses": { "type": "array", "items": { "$ref": "#/$defs/NextSense" } }
+      },
+      "additionalProperties": false
+    },
+    "NextDraftSchemaCompatibility": {
+      "type": "object",
+      "required": ["draft_schema_version", "supported_draft_schema_versions"],
+      "properties": {
+        "draft_schema_version": { "type": "integer", "minimum": 1 },
+        "supported_draft_schema_versions": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 1
+        }
       },
       "additionalProperties": false
     },

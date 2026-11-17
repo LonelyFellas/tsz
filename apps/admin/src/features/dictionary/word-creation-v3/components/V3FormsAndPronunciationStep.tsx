@@ -77,6 +77,7 @@ import {
   type createPronunciationReferenceIds
 } from "../sharedFormsModel";
 import { applyDefaultFormSharing } from "../defaultFormSharing";
+import { v3IssueMessages } from "../presentationErrors";
 
 /** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
 const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
@@ -199,6 +200,10 @@ export function V3FormsAndPronunciationStep({
         );
       })
     : issues;
+  const unscopedIssueMessages = v3IssueMessages(
+    formIssues.filter((issue) => !issue.node_location.form_id),
+    t
+  );
   const [bindingGroup, setBindingGroup] = useState<{
     posId: string;
     groupId: string;
@@ -581,6 +586,20 @@ export function V3FormsAndPronunciationStep({
           <V3VoiceNotice value={value} />
           {catalog.isError && (
             <Alert showIcon title={t("catalog_unavailable")} type="error" />
+          )}
+          {unscopedIssueMessages.length > 0 && (
+            <Alert
+              description={
+                <Space orientation="vertical" size={4}>
+                  {unscopedIssueMessages.map((message) => (
+                    <span key={message}>{message}</span>
+                  ))}
+                </Space>
+              }
+              showIcon
+              title={t("pending_fields")}
+              type="warning"
+            />
           )}
           <Tabs
             activeKey={value.pos.length === 0 ? "empty" : activePosId}

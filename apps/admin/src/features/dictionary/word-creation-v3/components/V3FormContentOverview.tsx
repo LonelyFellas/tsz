@@ -26,6 +26,7 @@ import {
   PronunciationPreviewVoiceList
 } from "../../word-creation/PronunciationPreview";
 import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
+import { v3FormIssueMessages } from "../presentationErrors";
 
 export const formOverviewTableId = "form-content-overview";
 const DEFAULT_OVERVIEW_COLUMN_LABELS = {
@@ -34,7 +35,7 @@ const DEFAULT_OVERVIEW_COLUMN_LABELS = {
   spelling: "词形拼写",
   style: "读法",
   pronunciation: "实际发音",
-  voice: "音色",
+  voice: "配音",
   rate: "语速",
   volume: "音量"
 };
@@ -44,7 +45,7 @@ export const formOverviewColumnMessages = {
   spelling: "spelling",
   style: "reading",
   pronunciation: "actual_pronunciation",
-  voice: "voice",
+  voice: "voice_source",
   rate: "rate",
   volume: "volume"
 } as const;
@@ -202,7 +203,7 @@ export function V3FormContentOverview({
     spelling: t("spelling"),
     style: t("reading"),
     pronunciation: t("actual_pronunciation"),
-    voice: t("voice"),
+    voice: t("voice_source"),
     rate: t("rate"),
     volume: t("volume")
   };
@@ -309,6 +310,7 @@ export function V3FormContentOverview({
               const peers = rows.filter(
                 (item) => item.form.form_type === row.form.form_type
               );
+              const issueMessages = v3FormIssueMessages(issues, row.form.id, t);
               return (
                 <div
                   data-v3-node-id={row.membershipId}
@@ -372,13 +374,11 @@ export function V3FormContentOverview({
                         })}
                       </Typography.Text>
                     )}
-                    {issues.some(
-                      (issue) => issue.node_location.form_id === row.form.id
-                    ) && (
-                      <Typography.Text type="danger">
-                        {t("pending_fields")}
+                    {issueMessages.map((message) => (
+                      <Typography.Text type="danger" key={message}>
+                        {`${t("pending_fields")}：${message}`}
                       </Typography.Text>
-                    )}
+                    ))}
                   </Space>
                 </div>
               );

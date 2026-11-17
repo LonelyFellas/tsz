@@ -525,6 +525,16 @@ export function createAdminEndpoints(
         http.post<ConfirmAudioAssetResponse>("/lexicon/audio-assets", input, {
           signal
         }),
+      update: (
+        id: string,
+        input: import("@tsz/types").UpdateAudioAssetInput,
+        signal?: AbortSignal
+      ) =>
+        http.patch<import("@tsz/types").UpdateAudioAssetResponse>(
+          `/lexicon/audio-assets/${encodeURIComponent(id)}`,
+          input,
+          { signal }
+        ),
       /** GET /admin/lexicon/audio-assets/{id}/url — 试听用短期签名 URL。 */
       url: (id: string, signal?: AbortSignal) =>
         http.get<AudioAssetUrlResponse>(

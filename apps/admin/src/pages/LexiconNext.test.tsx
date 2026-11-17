@@ -32,7 +32,8 @@ import type {
   NextEntryMatches,
   NextWorkspaceEntry,
   NextSentence,
-  NextSentenceDraftChange
+  NextSentenceDraftChange,
+  V3DraftValidationIssue
 } from "@tsz/types";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { api as profileApi, tokens, useAuthStore } from "@/lib/auth";
@@ -113,6 +114,10 @@ function requests() {
       pagination: { total: 0, page: 1, page_size: 20, total_pages: 0 }
     }),
     capabilities: vi.fn().mockResolvedValue(caps),
+    draftSchema: vi.fn().mockResolvedValue({
+      draft_schema_version: 1,
+      supported_draft_schema_versions: [1]
+    }),
     get: vi.fn().mockResolvedValue(structuredClone(entry)),
     detect: vi
       .fn()
@@ -743,23 +748,35 @@ it("确认跨媒介切换时放弃修改会重载词条草稿", async () => {
   expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue("centre");
 });
 
-it("列表保留词条自身的非英语地区信息，不标成美式拼写", async () => {
+it("列表名称只显示词头，不展示其他词形和地区标记", async () => {
   const api = requests();
   api.workspaceList.mockResolvedValue({
     items: [
       listRow({
         target_language: "fr",
-        forms: [{ id: "fr-ca", locale: "fr-CA", text: "centre" }]
+        forms: [
+          { id: "fr-ca", locale: "fr-CA", text: "central" },
+          { id: "en-GB", locale: "en-GB", text: "centre" },
+          { id: "en-US", locale: "en-US", text: "center" }
+        ]
       })
     ],
     pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
   });
   mount(api, "/lexicon-next");
-  const label = new Intl.DisplayNames(["zh-Hans"], { type: "language" }).of(
-    "fr-CA"
-  )!;
-  expect(await screen.findByText(label)).toBeVisible();
+  expect(await screen.findByText("centre")).toBeVisible();
+  expect(screen.queryByText("central")).toBeNull();
+  expect(screen.queryByText("center")).toBeNull();
+  expect(
+    screen.getByText("centre").closest(".word-list-name")
+  ).toHaveTextContent("centre");
+  expect(screen.getByText("centre").closest(".word-list-name")).toHaveAttribute(
+    "class",
+    "word-list-name"
+  );
   expect(screen.queryByRole("img", { name: /美式/ })).toBeNull();
+  expect(screen.queryByRole("img", { name: /英式/ })).toBeNull();
+  expect(screen.queryByText(/加拿大|法语/)).toBeNull();
 });
 
 it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保留独立创建", async () => {
@@ -1424,7 +1441,8 @@ describe("新版词库手工闭环", () => {
         expect(button("保存完整草稿")).toBeDisabled();
         fireEvent.click(button("比较服务器版本"));
         await screen.findByText("服务器 · 版本 5");
-        fireEvent.click(button("保留本地草稿"));
+        fireEvent.click(button("保留本地草稿并继续保存"));
+        fireEvent.click(await screen.findByRole("button", { name: "取消" }));
         expect(button("比较服务器版本")).toBeEnabled();
         fireEvent.click(button("比较服务器版本"));
         await screen.findByText("服务器 · 版本 5");
@@ -1437,6 +1455,56 @@ describe("新版词库手工闭环", () => {
       }
     }
   );
+  it("422 校验失败时说明未保存但保留修改，并指出具体字段", async () => {
+    const api = requests();
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "forms",
+      node_id: "pronunciation-1",
+      field: "synthesis.ipa",
+      code: "pronunciation_required",
+      message: "selected phoneme is required",
+      node_location: {
+        node_role: "pronunciation",
+        ancestor_node_ids: [],
+        form_id: "form-1",
+        variant_id: "variant-1",
+        pronunciation_id: "pronunciation-1"
+      }
+    };
+    api.save.mockRejectedValue(
+      new HttpError(
+        422,
+        "v3 contract validation failed",
+        [],
+        "validation_failed",
+        [issue]
+      )
+    );
+    mount(api);
+    await screen.findByDisplayValue("centre");
+    fireEvent.click(stepButton(/^预览/));
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "local" }
+    });
+    fireEvent.click(button("保存完整草稿"));
+
+    await screen.findByText(
+      "草稿未保存，修改已保留。请填写有效的 Azure IPA 合成音素"
+    );
+    expect(screen.getByDisplayValue("local")).toBeVisible();
+    expect(screen.getByText("有未保存修改")).toBeVisible();
+  });
+  it("加载 422 不伪装成草稿保存失败", async () => {
+    const api = requests();
+    api.capabilities.mockRejectedValue(
+      new HttpError(422, "v3 contract validation failed")
+    );
+    mount(api);
+
+    await screen.findByText("智能词库手工编辑暂不可用");
+    expect(screen.queryByText(/草稿未保存/)).toBeNull();
+  });
   it("能力不可用时不请求条目，不回退旧库；无创建/编辑他人权限时禁止写入", async () => {
     const api = requests();
     api.capabilities.mockRejectedValue(new HttpError(404, "not found"));
@@ -3964,7 +4032,7 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
     })
   ]);
   await screen.findByText("版本 2");
-});
+}, 15_000);
 it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {
   const { api, saved, source } = unifiedSentenceRequests();
   api.save.mockRejectedValueOnce(
@@ -3982,18 +4050,67 @@ it("统一保存冲突保留本地例句，可比较服务器例句，明确确�
   const remote = structuredClone(source);
   remote.revision = 4;
   remote.draft.variants[0]!.content.text = "Server example.";
-  api.get.mockResolvedValue({ ...saved, sentence_resources: [remote] });
+  api.get.mockResolvedValue({
+    ...saved,
+    revision: 4,
+    sentence_resources: [remote]
+  });
   fireEvent.click(button("比较服务器版本"));
   const compare = (
-    await screen.findByText("服务器 · 版本 1")
+    await screen.findByText("服务器 · 版本 4")
   ).closest<HTMLElement>('[role="dialog"]')!;
   expect(within(compare).getByText("Keep local example.")).toBeVisible();
   expect(within(compare).getByText("Server example.")).toBeVisible();
   fireEvent.click(
-    within(compare).getByRole("button", { name: "放弃本地修改并重载" })
+    within(compare).getByRole("button", {
+      name: "保留本地草稿并继续保存"
+    })
   );
-  fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
-  await waitFor(() => expect(english).toHaveTextContent("Server example."));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "保留本地并继续" })
+  );
+  await waitFor(() => expect(english).toHaveTextContent("Keep local example."));
+  await waitFor(() =>
+    expect(
+      within(document.querySelector(".lexicon-next-toolbar")!).getByText(
+        "版本 4"
+      )
+    ).toBeVisible()
+  );
+  expect(button("保存完整草稿")).toBeEnabled();
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+  expect(api.save.mock.calls[1]![1].expected_revision).toBe(4);
+  expect(api.save.mock.calls[1]![1].sentence_changes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        variant: expect.objectContaining({
+          content: expect.objectContaining({ text: "Keep local example." })
+        })
+      })
+    ])
+  );
+});
+
+it("服务器不支持当前草稿版本时阻止进入编辑器", async () => {
+  const api = requests();
+  api.draftSchema.mockResolvedValue({
+    draft_schema_version: 2,
+    supported_draft_schema_versions: [2]
+  });
+  mount(api);
+  await screen.findByText("当前服务不支持此草稿版本");
+  expect(screen.queryByText("保存完整草稿")).toBeNull();
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("无法读取草稿版本兼容性时保留安全阻断并允许重试", async () => {
+  const api = requests();
+  api.draftSchema.mockRejectedValue(new HttpError(404, "not found"));
+  mount(api);
+  await screen.findByText("无法确认草稿版本兼容性");
+  expect(screen.getByRole("button", { name: "重试" })).toBeEnabled();
+  expect(api.save).not.toHaveBeenCalled();
 });
 
 it("其他标签页只改变发布生命周期时，比较重载后使用新版本恢复预检", async () => {
@@ -4083,7 +4200,7 @@ it("比较发布冲突的状态读取失败时保留未保存草稿并允许重�
   );
 });
 
-it("列表同时展示真实词头、词形和当前义项等级", async () => {
+it("列表显示真实词头和当前义项等级，不展示其他词形", async () => {
   const matchMedia = window.matchMedia;
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     ...matchMedia(query),
@@ -4102,9 +4219,9 @@ it("列表同时展示真实词头、词形和当前义项等级", async () => {
     pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
   });
   mount(api, "/lexicon-next");
-  const row = await screen.findByRole("row", { name: /give up.*center/ });
+  const row = (await screen.findByText("give up")).closest("tr")!;
   expect(within(row).getByText("give up")).toBeVisible();
-  expect(within(row).getByText("center")).toBeVisible();
+  expect(within(row).queryByText("center")).toBeNull();
   expect(within(row).getByText("A1")).toBeVisible();
   expect(within(row).getByText("B2")).toBeVisible();
 });

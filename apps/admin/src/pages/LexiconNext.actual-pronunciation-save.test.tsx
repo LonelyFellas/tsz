@@ -77,6 +77,10 @@ const entry: NextEntry = {
 function requests() {
   return {
     capabilities: vi.fn().mockResolvedValue(capabilities),
+    draftSchema: vi.fn().mockResolvedValue({
+      draft_schema_version: 1,
+      supported_draft_schema_versions: [1]
+    }),
     get: vi.fn().mockResolvedValue({
       ...entry,
       draft: { ...entry.draft, form_editor: emptyFormEditor() }
