@@ -691,7 +691,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       const persist =
         saveRef.current.onSave ??
         (saveRef.current.businessSave
-          ? () => saveRef.current.businessSave!.save(area)
+          ? () =>
+              mode === "actual-pron"
+                ? saveRef.current.businessSave!.save(area, {
+                    skipAudioTasks: true
+                  })
+                : saveRef.current.businessSave!.save(area)
           : undefined);
       if (persist && !(await persist())) {
         if (activeTarget.current !== target) return false;

@@ -44,10 +44,12 @@ import {
 
 const backgroundAudio = vi.hoisted(() => ({
   enabled: false,
+  registered: false,
   finish: (() => {}) as (ready?: boolean) => void
 }));
 beforeEach(() => {
   backgroundAudio.enabled = false;
+  backgroundAudio.registered = false;
 });
 // 宿主测试只替换重型语音编辑器，嵌套弹窗和本地草稿使用真实实现。
 vi.mock("./V3ConcreteFormRow", () => ({
@@ -66,6 +68,7 @@ vi.mock("./V3ConcreteFormRow", () => ({
     latest.current = { content, onChange };
     useEffect(() => {
       if (!backgroundAudio.enabled || !audioTasks) return;
+      backgroundAudio.registered = true;
       const pending = new Promise<boolean>((resolve) => {
         backgroundAudio.finish = (ready = true) => {
           if (!ready) {
@@ -108,9 +111,18 @@ vi.mock("./V3ConcreteFormRow", () => ({
         {dialectActions?.uk}
         {dialectActions?.us}
         {localSave && (
-          <button onClick={() => void localSave.save("word")}>
-            保存当前正文
-          </button>
+          <>
+            <button onClick={() => void localSave.save("word")}>
+              保存当前正文
+            </button>
+            <button
+              onClick={() =>
+                void localSave.save(undefined, { skipAudioTasks: true })
+              }
+            >
+              保存实际发音
+            </button>
+          </>
         )}
         <input
           aria-label="内容拼写"
@@ -1262,6 +1274,15 @@ it("局部保存先交接完整抽屉结果再请求业务保存，失败不关�
   await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
   expect(persist.mock.calls[1]![0]).toEqual(persist.mock.calls[0]![0]);
   expect(onConfirm).not.toHaveBeenCalled();
+});
+
+it("实际发音局部保存不等待其他音频任务", async () => {
+  backgroundAudio.enabled = true;
+  const persist = vi.fn().mockResolvedValue(true);
+  setup({ persist });
+  await waitFor(() => expect(backgroundAudio.registered).toBe(true));
+  fireEvent.click(screen.getByText("保存实际发音"));
+  await waitFor(() => expect(persist).toHaveBeenCalledOnce());
 });
 
 it.each([true, false])(

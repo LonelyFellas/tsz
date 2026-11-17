@@ -2,7 +2,7 @@ import { regionalVariants } from "@tsz/shared";
 import { useLexiconEditorTranslation } from "../i18n/editor";
 import { assistantFieldTarget } from "../assistant/fieldNavigation";
 import { LexiconAssistant } from "../assistant/LexiconAssistant";
-import { VoiceSaveContext } from "./voiceSaveContext";
+import { VoiceSaveContext, type VoiceSaveOptions } from "./voiceSaveContext";
 import {
   canAcknowledgeSurfaceSnapshot,
   createEmptySurfaceSnapshotState,
@@ -1310,7 +1310,8 @@ function V3WordCreationSession({
       confirmationContext?: Omit<
         V3ConfirmationContext,
         "base_revision" | "impact_content"
-      >
+      >,
+      options?: VoiceSaveOptions
     ) => {
       const flow = flowRef.current;
       if (
@@ -1332,11 +1333,15 @@ function V3WordCreationSession({
       const done = markPending("save_forms");
       const useCurrentDraft = content === draftFormsRef.current;
       const retry = async () => {
-        await saveFormsContent(content, intent, confirmationContext);
+        await saveFormsContent(content, intent, confirmationContext, options);
       };
       savesInFlightRef.current += 1;
       try {
-        if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
+        if (
+          !options?.skipAudioTasks &&
+          audioTasks.current.size > 0 &&
+          !(await waitForSelectedAudio())
+        )
           return false;
         if (useCurrentDraft) {
           content = draftFormsRef.current;
@@ -2226,14 +2231,19 @@ function V3WordCreationSession({
         value={{
           audioTasks: audioTasks.current,
           failure: problem ? v3SaveProblemMessage(problem, t) : undefined,
-          save: async (area) => {
+          save: async (area, options?: VoiceSaveOptions) => {
             if (pending.size || sessionReadOnly || !word.id) return false;
             if (area === "meaning" || area === "grammar")
               return Boolean(
                 await saveMeanings(draftMeaningsRef.current, "save", false)
               );
             return Boolean(
-              await saveFormsContent(draftFormsRef.current, "save")
+              await saveFormsContent(
+                draftFormsRef.current,
+                "save",
+                undefined,
+                options
+              )
             );
           }
         }}

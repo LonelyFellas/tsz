@@ -2670,6 +2670,28 @@ it("业务保存以一次完整快照合并正文和参数，失败保留且连�
   expect(stored[1]).toEqual(stored[0]);
 });
 
+it("实际发音保存跳过无关音频任务等待", async () => {
+  const save = vi.fn().mockResolvedValue(true);
+  render(
+    <VoiceSaveContext.Provider value={{ save }}>
+      <V3VoiceTextField
+        mode="actual-pron"
+        ariaLabel="实际发音"
+        nodeId="actual-pron"
+        field="actual_pron"
+        value={VALUE}
+        onChange={vi.fn()}
+      />
+    </VoiceSaveContext.Provider>
+  );
+  fireEvent.click(screen.getByLabelText("打开实际发音编辑器"));
+  const input = await screen.findByLabelText("实际发音");
+  fireEvent.change(input, { target: { value: "hello changed" } });
+  fireEvent.click(screen.getByLabelText("保存实际发音修改"));
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  expect(save).toHaveBeenCalledWith(undefined, { skipAudioTasks: true });
+});
+
 it("新版无推荐空池整次拒绝保存，保留输入并定位当前编辑器", async () => {
   const persist = vi.fn().mockResolvedValue(true);
   const commit = vi.fn();
