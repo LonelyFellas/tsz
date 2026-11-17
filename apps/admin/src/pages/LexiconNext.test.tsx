@@ -744,23 +744,35 @@ it("确认跨媒介切换时放弃修改会重载词条草稿", async () => {
   expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue("centre");
 });
 
-it("列表保留词条自身的非英语地区信息，不标成美式拼写", async () => {
+it("列表名称只显示词头，不展示其他词形和地区标记", async () => {
   const api = requests();
   api.workspaceList.mockResolvedValue({
     items: [
       listRow({
         target_language: "fr",
-        forms: [{ id: "fr-ca", locale: "fr-CA", text: "centre" }]
+        forms: [
+          { id: "fr-ca", locale: "fr-CA", text: "central" },
+          { id: "en-GB", locale: "en-GB", text: "centre" },
+          { id: "en-US", locale: "en-US", text: "center" }
+        ]
       })
     ],
     pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
   });
   mount(api, "/lexicon-next");
-  const label = new Intl.DisplayNames(["zh-Hans"], { type: "language" }).of(
-    "fr-CA"
-  )!;
-  expect(await screen.findByText(label)).toBeVisible();
+  expect(await screen.findByText("centre")).toBeVisible();
+  expect(screen.queryByText("central")).toBeNull();
+  expect(screen.queryByText("center")).toBeNull();
+  expect(
+    screen.getByText("centre").closest(".word-list-name")
+  ).toHaveTextContent("centre");
+  expect(screen.getByText("centre").closest(".word-list-name")).toHaveAttribute(
+    "class",
+    "word-list-name"
+  );
   expect(screen.queryByRole("img", { name: /美式/ })).toBeNull();
+  expect(screen.queryByRole("img", { name: /英式/ })).toBeNull();
+  expect(screen.queryByText(/加拿大|法语/)).toBeNull();
 });
 
 it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保留独立创建", async () => {
@@ -4134,7 +4146,7 @@ it("比较发布冲突的状态读取失败时保留未保存草稿并允许重�
   );
 });
 
-it("列表同时展示真实词头、词形和当前义项等级", async () => {
+it("列表显示真实词头和当前义项等级，不展示其他词形", async () => {
   const matchMedia = window.matchMedia;
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     ...matchMedia(query),
@@ -4153,9 +4165,9 @@ it("列表同时展示真实词头、词形和当前义项等级", async () => {
     pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
   });
   mount(api, "/lexicon-next");
-  const row = await screen.findByRole("row", { name: /give up.*center/ });
+  const row = (await screen.findByText("give up")).closest("tr")!;
   expect(within(row).getByText("give up")).toBeVisible();
-  expect(within(row).getByText("center")).toBeVisible();
+  expect(within(row).queryByText("center")).toBeNull();
   expect(within(row).getByText("A1")).toBeVisible();
   expect(within(row).getByText("B2")).toBeVisible();
 });
