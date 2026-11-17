@@ -55,6 +55,12 @@ jobs:
         if: steps.candidate.outputs.current == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Verify API target tracks backend main
+        if: steps.candidate.outputs.current == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node deploy/verify-api-target-main.mjs
+
       - name: Configure SSH
         if: steps.candidate.outputs.current == 'true'
         env:
