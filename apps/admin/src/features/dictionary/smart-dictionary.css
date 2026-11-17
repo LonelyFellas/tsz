@@ -133,6 +133,29 @@
   border-radius: var(--ui-border-radius);
   font-size: var(--ui-font-size-compact);
 }
+.word-list-table-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.word-list-table-extra-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  min-height: var(--ui-control-height);
+  color: var(--list-muted);
+  font-size: var(--ui-font-size-compact);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.word-list-table-extra-action:hover {
+  color: var(--ui-color-primary);
+}
+.word-list-table-extra-action svg {
+  width: 15px;
+  height: 15px;
+}
 .word-list-heading .word-list-stats {
   flex-basis: 100%;
   gap: var(--ui-space-5) !important;

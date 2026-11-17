@@ -35,6 +35,7 @@ interface WordListTableProps<Row extends { id: string }> {
   rowLabel: (row: Row) => string;
   loading: boolean;
   toolbar: ReactNode;
+  toolbarExtra?: ReactNode;
   emptyText: ReactNode;
   page: number;
   pageSize: number;
@@ -56,6 +57,7 @@ export function WordListTable<Row extends { id: string }>({
   rows,
   rowLabel,
   toolbar,
+  toolbarExtra,
   loading,
   emptyText,
   page,
@@ -195,6 +197,7 @@ export function WordListTable<Row extends { id: string }>({
   return (
     <>
       <AdminTableToolbar
+        extra={toolbarExtra}
         columnSettings={
           <ColumnSettings
             columns={preferences.columns}
@@ -204,6 +207,7 @@ export function WordListTable<Row extends { id: string }>({
           />
         }
       >
+        {toolbar}
         <div className="word-list-result-summary">
           <span>
             {loading ? (
@@ -225,7 +229,6 @@ export function WordListTable<Row extends { id: string }>({
             </span>
           )}
         </div>
-        {toolbar}
       </AdminTableToolbar>
       <div className="word-table-scroll" ref={container} aria-busy={loading}>
         <table
