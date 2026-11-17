@@ -539,6 +539,9 @@ it("配音弹窗展示宿主保存失败原因并保留输入，重试成功后�
   fireEvent.click(button);
   await waitFor(() => expect(input).not.toBeInTheDocument());
   expect(save).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenNthCalledWith(1, "azure", {
+    skipAudioTasks: true
+  });
 });
 
 it("UPS 缺少当前口音 IPA 时在 IPA 框内提示并聚焦，补齐后恢复转换", () => {
