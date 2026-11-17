@@ -34,7 +34,10 @@ import { App, Modal } from "@tsz/ui/admin/overlays";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { ContentEditPermissions } from "@/features/dictionary/contentEditPermissions";
 import { FormsStep, emptyFormEditor } from "@/features/lexicon-next/FormsStep";
-import { VoiceSaveContext } from "@/features/dictionary/word-creation-v3/voiceSaveContext";
+import {
+  VoiceSaveContext,
+  type VoiceSaveOptions
+} from "@/features/dictionary/word-creation-v3/voiceSaveContext";
 import { V3StepActions } from "@/features/dictionary/word-creation-v3/components/V3StepActions";
 import { Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
@@ -573,7 +576,7 @@ function EntryEditor({
       setBusy(false);
     }
   }
-  async function save() {
+  async function save(options?: VoiceSaveOptions) {
     if (!writable || conflict || contentLeaveGuard.current) return false;
     return run(
       async () => {
@@ -590,9 +593,11 @@ function EntryEditor({
           );
           throw new Error(validation);
         }
-        for (const wait of [...audioTasks.current.values()]) {
-          if (!(await wait()))
-            throw new Error("发音处理尚未完成，请重试保存。");
+        if (!options?.skipAudioTasks) {
+          for (const wait of [...audioTasks.current.values()]) {
+            if (!(await wait()))
+              throw new Error("发音处理尚未完成，请重试保存。");
+          }
         }
         const current = draftRef.current;
         const problem = draftProblem(current, equivalentMetadataAvailable);
@@ -804,7 +809,7 @@ function EntryEditor({
             <>
               <VoiceSaveContext.Provider
                 value={{
-                  save,
+                  save: (_area, options) => save(options),
                   failure: error,
                   audioTasks: audioTasks.current
                 }}
