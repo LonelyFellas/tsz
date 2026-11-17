@@ -75,10 +75,17 @@ import {
 } from "@/features/lexicon-next/publicationIssueFocus";
 import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
+import { v3IssueMessage } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import "./lexicon-next.css";
 
 export type LexiconNextRequests = typeof api.lexiconNext;
-function failure(error: unknown) {
+function failure(error: unknown, preserveDraft = false) {
+  if (preserveDraft && error instanceof HttpError && error.status === 422) {
+    const issue = error.field_issues[0];
+    return `草稿未保存，修改已保留。${
+      issue ? v3IssueMessage(issue) : "请处理待填写项后重试。"
+    }`;
+  }
   return error instanceof Error ? error.message : "请求失败，请重试。";
 }
 function editorStepFromSearch(
@@ -510,7 +517,10 @@ function EntryEditor({
       event.returnValue = "";
     }
   });
-  async function run(operation: () => Promise<void>) {
+  async function run(
+    operation: () => Promise<void>,
+    options: { preserveDraft?: boolean } = {}
+  ) {
     if (lock.current) return false;
     lock.current = true;
     setBusy(true);
@@ -558,7 +568,7 @@ function EntryEditor({
       } else if (error instanceof HttpError && error.status === 403) {
         setError("没有保存权限。本地草稿已保留，请联系管理员核实权限。");
       } else {
-        setError(failure(error));
+        setError(failure(error, options.preserveDraft));
       }
       return false;
     } finally {
@@ -573,56 +583,59 @@ function EntryEditor({
       (contentLeaveGuard.current && !options?.skipAudioTasks)
     )
       return false;
-    return run(async () => {
-      const validation =
-        draftProblem(draftRef.current, equivalentMetadataAvailable) ||
-        (sentenceDraftsAvailable && sentenceWorkspace.validate());
-      if (validation) {
-        requestAnimationFrame(() =>
-          document
-            .querySelector<HTMLElement>(
-              '.next-sentence-inline-card [aria-invalid="true"]'
-            )
-            ?.focus()
-        );
-        throw new Error(validation);
-      }
-      if (!options?.skipAudioTasks) {
-        for (const wait of [...audioTasks.current.values()]) {
-          if (!(await wait()))
-            throw new Error("发音处理尚未完成，请重试保存。");
+    return run(
+      async () => {
+        const validation =
+          draftProblem(draftRef.current, equivalentMetadataAvailable) ||
+          (sentenceDraftsAvailable && sentenceWorkspace.validate());
+        if (validation) {
+          requestAnimationFrame(() =>
+            document
+              .querySelector<HTMLElement>(
+                '.next-sentence-inline-card [aria-invalid="true"]'
+              )
+              ?.focus()
+          );
+          throw new Error(validation);
         }
-      }
-      const current = draftRef.current;
-      const problem = draftProblem(current, equivalentMetadataAvailable);
-      if (problem) throw new Error(problem);
-      const changes = sentenceDraftsAvailable
-        ? await sentenceWorkspace.prepare()
-        : [];
-      const result = await requests.save(saved.id, {
-        expected_revision: saved.revision,
-        ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
-        draft: draftRef.current,
-        ...(changes.length ? { sentence_changes: changes } : {})
-      });
-      setEditedPairs({});
-      setSaved(result);
-      setDraft(result.draft);
-      sentenceWorkspace.reset();
-      setConflict(false);
-      setRemote(undefined);
-      void Promise.all(
-        ["list", "stats", "creators"].map((key) =>
-          queryClient.invalidateQueries({
-            queryKey: ["admin-lexicon-next", key]
-          })
-        )
-      );
-      void queryClient.invalidateQueries({
-        queryKey: ["admin-lexicon-next", "publication", saved.id]
-      });
-      void message.success("草稿已保存");
-    });
+        if (!options?.skipAudioTasks) {
+          for (const wait of [...audioTasks.current.values()]) {
+            if (!(await wait()))
+              throw new Error("发音处理尚未完成，请重试保存。");
+          }
+        }
+        const current = draftRef.current;
+        const problem = draftProblem(current, equivalentMetadataAvailable);
+        if (problem) throw new Error(problem);
+        const changes = sentenceDraftsAvailable
+          ? await sentenceWorkspace.prepare()
+          : [];
+        const result = await requests.save(saved.id, {
+          expected_revision: saved.revision,
+          ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
+          draft: draftRef.current,
+          ...(changes.length ? { sentence_changes: changes } : {})
+        });
+        setEditedPairs({});
+        setSaved(result);
+        setDraft(result.draft);
+        sentenceWorkspace.reset();
+        setConflict(false);
+        setRemote(undefined);
+        void Promise.all(
+          ["list", "stats", "creators"].map((key) =>
+            queryClient.invalidateQueries({
+              queryKey: ["admin-lexicon-next", key]
+            })
+          )
+        );
+        void queryClient.invalidateQueries({
+          queryKey: ["admin-lexicon-next", "publication", saved.id]
+        });
+        void message.success("草稿已保存");
+      },
+      { preserveDraft: true }
+    );
   }
   function changeStep(next: WordCreationStep) {
     const nextStep = next === "basics" ? "forms" : next;

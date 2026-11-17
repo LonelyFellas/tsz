@@ -1158,6 +1158,9 @@ describe("V3FormsAndPronunciationStep", () => {
     }
     const { container } = render(<GroupHarness />);
     expect(container.querySelector(".v3-form-overview .ui-select")).toBeNull();
+    expect(
+      screen.getByText("有待填写项：当前词性不支持该词形类型")
+    ).toBeVisible();
     const targetRow = container.querySelector<HTMLElement>(
       `tr[data-overview-form-id="${historical.id}"]`
     )!;
@@ -1934,6 +1937,7 @@ describe("V3FormsAndPronunciationStep", () => {
         "已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
       )
     ).toBeNull();
+    expect(screen.getByText("请至少添加一个词性")).toBeVisible();
 
     const incomplete = formsFixture({
       forms: [commonFormFixture({ spelling: "", pronunciations: [] })]
