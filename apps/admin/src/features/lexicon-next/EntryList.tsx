@@ -627,6 +627,25 @@ export function EntryList({
   const filtered = Object.entries(filters).some(
     ([key, value]) => value && !(trashMode && key === "status")
   );
+  const errorActions = result.isError ? (
+    <div className="word-list-page-actions">
+      <Link
+        to={`${trashMode ? "/lexicon-next" : "/lexicon-next/trash"}${languageSearch ? `?${languageSearch}` : ""}`}
+      >
+        {trashMode ? <Undo2Icon /> : <WastebasketIcon />}
+        {trashMode ? shell("nav_lexicon_next") : t("view_trash")}
+      </Link>
+      {!trashMode && canCreate && (
+        <Button
+          type="primary"
+          icon={<PlusIcon />}
+          onClick={() => navigate(`/lexicon-next/new?${languageSearch}`)}
+        >
+          {t("create")}
+        </Button>
+      )}
+    </div>
+  ) : undefined;
   return (
     <div
       className={`word-list-page ${trashMode ? "word-list-page--trash" : "word-list-page--library"}`}
@@ -634,25 +653,7 @@ export function EntryList({
       <PageHeader
         className="word-list-heading"
         title={trashMode ? t("status_archived") : shell("nav_lexicon_next")}
-        actions={
-          <div className="word-list-page-actions">
-            <Link
-              to={`${trashMode ? "/lexicon-next" : "/lexicon-next/trash"}${languageSearch ? `?${languageSearch}` : ""}`}
-            >
-              {trashMode ? <Undo2Icon /> : <WastebasketIcon />}
-              {trashMode ? shell("nav_lexicon_next") : t("view_trash")}
-            </Link>
-            {!trashMode && canCreate && (
-              <Button
-                type="primary"
-                icon={<PlusIcon />}
-                onClick={() => navigate(`/lexicon-next/new?${languageSearch}`)}
-              >
-                {t("create")}
-              </Button>
-            )}
-          </div>
-        }
+        actions={errorActions}
       >
         {!trashMode && (
           <Space size={16} wrap className="word-list-stats">
@@ -729,42 +730,69 @@ export function EntryList({
             rowLabel={(row) => row.headword}
             loading={result.isPending}
             toolbar={
-              <div hidden={!selectedRows.length}>
-                <Space wrap>
-                  {!trashMode && hasAdminPermission(actor, "words.publish") && (
-                    <Tooltip
-                      title={t("next_publish_unavailable")}
-                      trigger={["hover", "focus"]}
-                    >
-                      <span>
-                        <Button disabled>{t("batch_publish")}</Button>
-                      </span>
-                    </Tooltip>
-                  )}
+              <div className="word-list-table-actions">
+                {!trashMode && canCreate && (
                   <Button
-                    danger={batchAction === "archive"}
-                    icon={
-                      batchAction === "restore" ? <Undo2Icon /> : <Trash2Icon />
+                    type="primary"
+                    icon={<PlusIcon />}
+                    onClick={() =>
+                      navigate(`/lexicon-next/new?${languageSearch}`)
                     }
-                    disabled={!mayCommand(batchAction, selectedRows)}
-                    onClick={() => begin(batchAction, selectedRows)}
                   >
-                    {t(
-                      batchAction === "restore" ? "restore_spaced" : "archive"
-                    )}
-                    ({selectedRows.length})
+                    {t("create")}
                   </Button>
-                  {batchAction === "restore" && (
+                )}
+                <div hidden={!selectedRows.length}>
+                  <Space wrap>
+                    {!trashMode &&
+                      hasAdminPermission(actor, "words.publish") && (
+                        <Tooltip
+                          title={t("next_publish_unavailable")}
+                          trigger={["hover", "focus"]}
+                        >
+                          <span>
+                            <Button disabled>{t("batch_publish")}</Button>
+                          </span>
+                        </Tooltip>
+                      )}
                     <Button
-                      danger
-                      disabled={!mayCommand("delete", selectedRows)}
-                      onClick={() => begin("delete", selectedRows)}
+                      danger={batchAction === "archive"}
+                      icon={
+                        batchAction === "restore" ? (
+                          <Undo2Icon />
+                        ) : (
+                          <Trash2Icon />
+                        )
+                      }
+                      disabled={!mayCommand(batchAction, selectedRows)}
+                      onClick={() => begin(batchAction, selectedRows)}
                     >
-                      {t("delete")}({selectedRows.length})
+                      {t(
+                        batchAction === "restore" ? "restore_spaced" : "archive"
+                      )}
+                      ({selectedRows.length})
                     </Button>
-                  )}
-                </Space>
+                    {batchAction === "restore" && (
+                      <Button
+                        danger
+                        disabled={!mayCommand("delete", selectedRows)}
+                        onClick={() => begin("delete", selectedRows)}
+                      >
+                        {t("delete")}({selectedRows.length})
+                      </Button>
+                    )}
+                  </Space>
+                </div>
               </div>
+            }
+            toolbarExtra={
+              <Link
+                className="word-list-table-extra-action"
+                to={`${trashMode ? "/lexicon-next" : "/lexicon-next/trash"}${languageSearch ? `?${languageSearch}` : ""}`}
+              >
+                {trashMode ? <Undo2Icon /> : <WastebasketIcon />}
+                {trashMode ? shell("nav_lexicon_next") : t("view_trash")}
+              </Link>
             }
             selection={{
               keys: Object.keys(selected),
