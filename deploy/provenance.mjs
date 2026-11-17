@@ -42,6 +42,7 @@ const COMPONENTS = {
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const REMOTE_REF_PATTERN = /^refs\/(heads\/main|tags\/v[A-Za-z0-9._-]+)$/;
 
 export class ManifestError extends Error {}
 
@@ -106,8 +107,8 @@ export function validateManifest(manifest, { allowCandidate = false } = {}) {
     fail("source.git_sha is invalid");
   if (!SHA_PATTERN.test(manifest.source.git_tree))
     fail("source.git_tree is invalid");
-  if (manifest.source.remote_ref !== "refs/heads/main") {
-    fail("source.remote_ref must be refs/heads/main");
+  if (!REMOTE_REF_PATTERN.test(manifest.source.remote_ref)) {
+    fail("source.remote_ref must be refs/heads/main or refs/tags/v...");
   }
 
   assertExactKeys(
@@ -331,7 +332,8 @@ export async function createCandidateManifest({
   ciRunUrl,
   artifactRoot,
   artifactPath,
-  outputPath
+  outputPath,
+  remoteRef = "refs/heads/main"
 }) {
   if (!Number.isSafeInteger(ciRunId)) fail("ciRunId must be a safe integer");
   const componentConfig = COMPONENTS[component];
@@ -346,7 +348,7 @@ export async function createCandidateManifest({
       repository,
       git_sha: gitSha,
       git_tree: gitTree,
-      remote_ref: "refs/heads/main"
+      remote_ref: remoteRef
     },
     ci: {
       workflow: "CI",
