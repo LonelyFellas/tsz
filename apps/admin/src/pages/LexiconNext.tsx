@@ -9,6 +9,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState
 } from "react";
@@ -76,10 +77,18 @@ import {
 import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
 import { v3IssueMessage } from "@/features/dictionary/word-creation-v3/presentationErrors";
+import {
+  clearNextLocalDraft,
+  NEXT_LOCAL_DRAFT_SCHEMA_VERSION,
+  readNextLocalDraft,
+  type NextLocalDraftKey,
+  type NextLocalDraftSnapshot,
+  writeNextLocalDraft
+} from "@/features/lexicon-next/localDraftStore";
 import "./lexicon-next.css";
 
 export type LexiconNextRequests = typeof api.lexiconNext;
-const NEXT_DRAFT_SCHEMA_VERSION = 1;
+const NEXT_DRAFT_SCHEMA_VERSION = NEXT_LOCAL_DRAFT_SCHEMA_VERSION;
 function failure(error: unknown, preserveDraft = false) {
   if (preserveDraft && error instanceof HttpError && error.status === 422) {
     const issue = error.field_issues[0];
@@ -499,19 +508,161 @@ function EntryEditor({
   const [peerConflict, setPeerConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
   const profile = useAuthStore((state) => state.profile);
+  const localDraftKey = useMemo<NextLocalDraftKey | undefined>(
+    () =>
+      profile?.id
+        ? {
+            account_id: profile.id,
+            entry_id: initial.id,
+            target_locale: target,
+            medium_locale: medium
+          }
+        : undefined,
+    [initial.id, medium, profile?.id, target]
+  );
+  const [localSnapshot, setLocalSnapshot] = useState<NextLocalDraftSnapshot>();
+  const [localSnapshotKey, setLocalSnapshotKey] = useState<string>();
+  const [localSnapshotLoadedKey, setLocalSnapshotLoadedKey] =
+    useState<string>();
+  const [localSnapshotChecked, setLocalSnapshotChecked] = useState(false);
+  const localKeyIdentity = localDraftKey
+    ? JSON.stringify(localDraftKey)
+    : undefined;
+  const currentLocalSnapshot =
+    localSnapshot && localSnapshotKey === localKeyIdentity
+      ? localSnapshot
+      : undefined;
   const canPublish = usePermission("words.publish");
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
   const writable =
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
-  const disabled = busy || !writable;
+  const disabled = busy || !writable || !!currentLocalSnapshot;
   const dirty =
     pairChanges.length > 0 ||
     JSON.stringify(draft) !== JSON.stringify(saved.draft) ||
     (sentenceDraftsAvailable && sentenceWorkspace.dirty);
   useEffect(() => {
+    let active = true;
+    setLocalSnapshot(undefined);
+    setLocalSnapshotKey(undefined);
+    setLocalSnapshotLoadedKey(undefined);
+    setLocalSnapshotChecked(false);
+    if (!localDraftKey) return;
+    void readNextLocalDraft(localDraftKey)
+      .then((snapshot) => {
+        if (
+          active &&
+          snapshot?.draft_schema_version === NEXT_DRAFT_SCHEMA_VERSION
+        ) {
+          setLocalSnapshot(snapshot);
+          setLocalSnapshotKey(localKeyIdentity);
+        }
+        if (active) {
+          setLocalSnapshotLoadedKey(localKeyIdentity);
+          setLocalSnapshotChecked(true);
+        }
+      })
+      .catch(() => {
+        if (active) setLocalSnapshotChecked(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [localDraftKey, localKeyIdentity]);
+  useEffect(() => {
+    if (
+      !localDraftKey ||
+      !localSnapshotChecked ||
+      localSnapshotLoadedKey !== localKeyIdentity ||
+      !dirty ||
+      conflict ||
+      currentLocalSnapshot
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      const snapshot: NextLocalDraftSnapshot = {
+        snapshot_version: 1,
+        account_id: localDraftKey.account_id,
+        entry_id: localDraftKey.entry_id,
+        target_locale: localDraftKey.target_locale,
+        medium_locale: localDraftKey.medium_locale,
+        base_revision: saved.revision,
+        draft_schema_version: NEXT_DRAFT_SCHEMA_VERSION,
+        draft: draftRef.current,
+        edited_pairs: editedPairs,
+        sentence_resources: Object.values(sentenceWorkspace.resources),
+        updated_at: new Date().toISOString()
+      };
+      void writeNextLocalDraft(localDraftKey, snapshot).catch(() => undefined);
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    dirty,
+    conflict,
+    editedPairs,
+    localDraftKey,
+    localSnapshotChecked,
+    localSnapshotLoadedKey,
+    localKeyIdentity,
+    currentLocalSnapshot,
+    saved.revision,
+    sentenceWorkspace.resources
+  ]);
+  function restoreLocalSnapshot(snapshot: NextLocalDraftSnapshot) {
+    setDraft(snapshot.draft);
+    setEditedPairs(snapshot.edited_pairs);
+    for (const resource of snapshot.sentence_resources) {
+      const base = sentenceWorkspace.base.find(
+        (item) => item.id === resource.id
+      );
+      if (base) {
+        for (const variant of resource.draft.variants)
+          sentenceWorkspace.update(base, variant);
+      } else {
+        sentenceWorkspace.importResource(resource);
+      }
+    }
+    setLocalSnapshot(undefined);
+    setLocalSnapshotKey(undefined);
+    if (snapshot.base_revision !== saved.revision) {
+      setConflict(true);
+      setError(
+        `本地草稿基于版本 ${snapshot.base_revision}，服务器当前为版本 ${saved.revision}，请先比较版本。`
+      );
+    } else {
+      setError(undefined);
+    }
+  }
+  function discardLocalSnapshot() {
+    setLocalSnapshot(undefined);
+    setLocalSnapshotKey(undefined);
+    if (localDraftKey)
+      void clearNextLocalDraft(localDraftKey).catch(() => undefined);
+  }
+  useEffect(() => {
     if (!dirty && !conflict) setError(undefined);
   }, [dirty, conflict]);
+  useEffect(() => {
+    if (
+      !localDraftKey ||
+      !localSnapshotChecked ||
+      localSnapshotLoadedKey !== localKeyIdentity ||
+      dirty ||
+      conflict ||
+      currentLocalSnapshot
+    )
+      return;
+    void clearNextLocalDraft(localDraftKey).catch(() => undefined);
+  }, [
+    conflict,
+    currentLocalSnapshot,
+    dirty,
+    localDraftKey,
+    localSnapshotChecked,
+    localSnapshotLoadedKey,
+    localKeyIdentity
+  ]);
   useEffect(() => {
     setLocked(busy || formContentOpen);
     return () => setLocked(false);
@@ -615,6 +766,7 @@ function EntryEditor({
     if (
       !writable ||
       conflict ||
+      currentLocalSnapshot ||
       (contentLeaveGuard.current && !options?.skipAudioTasks)
     )
       return false;
@@ -657,6 +809,8 @@ function EntryEditor({
         sentenceWorkspace.reset();
         setConflict(false);
         setRemote(undefined);
+        if (localDraftKey)
+          void clearNextLocalDraft(localDraftKey).catch(() => undefined);
         void Promise.all(
           ["list", "stats", "creators"].map((key) =>
             queryClient.invalidateQueries({
@@ -825,6 +979,35 @@ function EntryEditor({
                   </Button>
                 )
               )
+            }
+          />
+        )}
+        {currentLocalSnapshot && (
+          <Alert
+            type="warning"
+            showIcon
+            title={
+              currentLocalSnapshot.base_revision === saved.revision
+                ? "发现未提交的本地草稿"
+                : `发现基于版本 ${currentLocalSnapshot.base_revision} 的本地草稿`
+            }
+            description="本地草稿保存在当前浏览器中，请选择是否恢复。"
+            action={
+              <Space>
+                <Button
+                  onClick={() => restoreLocalSnapshot(currentLocalSnapshot)}
+                  disabled={busy || formContentOpen}
+                >
+                  恢复本地草稿
+                </Button>
+                <Button
+                  danger
+                  onClick={discardLocalSnapshot}
+                  disabled={busy || formContentOpen}
+                >
+                  放弃本地草稿
+                </Button>
+              </Space>
             }
           />
         )}
@@ -1218,6 +1401,10 @@ function EntryEditor({
                         setRemote(undefined);
                         setConflict(false);
                         setError(undefined);
+                        if (localDraftKey)
+                          void clearNextLocalDraft(localDraftKey).catch(
+                            () => undefined
+                          );
                       }
                     }
                   })
