@@ -5,7 +5,9 @@ import type {
   ConfirmAudioAssetInput,
   ConfirmAudioAssetResponse,
   CreateAudioUploadInput,
-  CreateAudioUploadResponse
+  CreateAudioUploadResponse,
+  UpdateAudioAssetInput,
+  UpdateAudioAssetResponse
 } from "@tsz/types";
 import { AUDIO_ASSET_FORMAT_LABELS, audioAssetContentTypeOf } from "@tsz/types";
 import {
@@ -24,6 +26,11 @@ export interface AdminAudioAssetDataSource {
     input: ConfirmAudioAssetInput,
     signal?: AbortSignal
   ): Promise<ConfirmAudioAssetResponse>;
+  update(
+    id: string,
+    input: UpdateAudioAssetInput,
+    signal?: AbortSignal
+  ): Promise<UpdateAudioAssetResponse>;
   url(id: string, signal?: AbortSignal): Promise<AudioAssetUrlResponse>;
 }
 
@@ -93,13 +100,14 @@ const MESSAGES: Record<AudioUploadErrorCode, (locale?: string) => string> = {
   storage_unavailable: speechDiagnostic("upload_storage"),
   upload_failed: speechDiagnostic("upload_put"),
   confirm_failed: speechDiagnostic("upload_confirm"),
+  update_failed: speechDiagnostic("upload_update"),
   unavailable: speechDiagnostic("upload_unavailable"),
   unknown: speechDiagnostic("upload_unknown")
 };
 
 function fromHttpError(
   error: HttpError,
-  stage: "ticket" | "confirm"
+  stage: "ticket" | "confirm" | "update"
 ): AudioUploadError {
   const fail = (code: AudioUploadErrorCode, retryable: boolean) =>
     new AudioUploadError(code, MESSAGES[code], retryable);
@@ -114,6 +122,8 @@ function fromHttpError(
   }
   if (error.status === 429 || error.status === 503)
     return fail("unavailable", true);
+  if (stage === "update" && error.status >= 500)
+    return fail("update_failed", true);
   // confirm 阶段的 5xx：暂存对象还在，直接重试 confirm 即可，不必重新上传
   if (stage === "confirm" && error.status >= 500)
     return fail("confirm_failed", true);
@@ -121,6 +131,13 @@ function fromHttpError(
     return fail("upload_failed", true);
   }
   if (error.status >= 500) return fail("unavailable", true);
+  if (stage === "update") {
+    return new AudioUploadError(
+      "update_failed",
+      speechDiagnostic("upload_http", { status: error.status }),
+      true
+    );
+  }
   // 其余 4xx（端点未上线的 404、参数被拒的 400/422）：说清状态码，重试也放开——
   // 重来一遍申请许可没有副作用，比只能「移除再重选」强。
   return new AudioUploadError(
@@ -233,6 +250,29 @@ export function createAdminAudioUploadAdapter(
         throw new AudioUploadError(
           "confirm_failed",
           MESSAGES.confirm_failed,
+          true
+        );
+      }
+    },
+
+    async updateGender(assetId, gender, options) {
+      if (gender !== "female" && gender !== "male") {
+        throw new AudioUploadError(
+          "update_failed",
+          speechDiagnostic("upload_gender")
+        );
+      }
+      try {
+        return (await source.update(assetId, { gender }, options?.signal))
+          .asset;
+      } catch (error) {
+        if (isAbort(error)) throw error;
+        if (error instanceof HttpError) {
+          throw fromHttpError(error, "update");
+        }
+        throw new AudioUploadError(
+          "update_failed",
+          MESSAGES.update_failed,
           true
         );
       }

@@ -1,5 +1,6 @@
 import { canonicalVoiceHash } from "@tsz/voice-editor/core";
 import type {
+  AudioAsset,
   AudioUploadAdapter,
   VoiceOption,
   VoicePreviewAdapter
@@ -89,6 +90,7 @@ export function createMockVoicePreviewAdapter(): VoicePreviewAdapter {
  */
 export function createMockAudioUploadAdapter(): AudioUploadAdapter {
   let seq = 0;
+  const assets = new Map<string, AudioAsset>();
   return {
     isStorageUnavailable: () => false,
     async upload({ file, locale, gender, signal, onProgress }) {
@@ -98,7 +100,7 @@ export function createMockAudioUploadAdapter(): AudioUploadAdapter {
       if (signal?.aborted) throw abortError();
       onProgress?.(1);
       seq += 1;
-      return {
+      const asset = {
         id: `mock-audio-${seq}`,
         locale,
         gender,
@@ -108,6 +110,16 @@ export function createMockAudioUploadAdapter(): AudioUploadAdapter {
         original_name: file.name,
         created_at: new Date().toISOString()
       };
+      assets.set(asset.id, asset);
+      return asset;
+    },
+    async updateGender(assetId, gender, options) {
+      if (options?.signal?.aborted) throw abortError();
+      const asset = assets.get(assetId);
+      if (!asset) throw new Error("mock audio not found");
+      const updated = { ...asset, gender };
+      assets.set(assetId, updated);
+      return updated;
     },
     async resolveUrl(_assetId, options) {
       if (options?.signal?.aborted) throw abortError();

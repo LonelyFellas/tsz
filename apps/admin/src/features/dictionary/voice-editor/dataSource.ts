@@ -205,6 +205,25 @@ export const adminAudioUploadAdapter: AudioUploadAdapter = {
       throw new VoiceEditorDisplayError(speechDiagnostic("upload_forbidden"));
     return (await resolveAudioAdapter()).upload(input);
   },
+  async updateGender(assetId, gender, options) {
+    if (
+      !hasAdminPermission(
+        useAuthStore.getState().profile,
+        "speech.upload_audio"
+      ) ||
+      !hasAnyAdminPermission(useAuthStore.getState().profile, [
+        "words.create",
+        "words.edit",
+        "sentences.create",
+        "sentences.edit"
+      ])
+    )
+      throw new VoiceEditorDisplayError(speechDiagnostic("upload_forbidden"));
+    const adapter = await resolveAudioAdapter();
+    if (!adapter.updateGender)
+      throw new VoiceEditorDisplayError(speechDiagnostic("upload_update"));
+    return adapter.updateGender(assetId, gender, options);
+  },
   async resolveUrl(assetId, options) {
     return (await resolveAudioAdapter()).resolveUrl(assetId, options);
   }

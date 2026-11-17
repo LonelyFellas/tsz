@@ -100,6 +100,11 @@ export const speechDiagnosticMessages = {
     "上傳錄音請選擇男聲或女聲",
     "Select male or female for the uploaded recording."
   ],
+  upload_update: [
+    "修改录音性别失败，请重试",
+    "修改錄音性別失敗，請重試",
+    "Could not update the recording gender. Try again."
+  ],
   upload_locale: [
     "上传录音仅支持英式或美式归属",
     "上傳錄音僅支援英式或美式歸屬",
