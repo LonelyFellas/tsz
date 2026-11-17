@@ -5,7 +5,11 @@ import {
   useLexiconEditorMessageState,
   createLexiconEditorMessage
 } from "../i18n/editor";
-import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
+import {
+  speechAccentGroup,
+  savedVoiceAudioAsset,
+  splitVoiceDisplayName
+} from "@tsz/shared";
 import { ChevronDownIcon, Volume2Icon, RefreshCwIcon } from "lucide-react";
 import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { Button, Space, Tag } from "@tsz/ui/admin/display";
@@ -186,6 +190,27 @@ function localeForDialect(
   if (dialect === "uk") return "en-GB";
   if (dialect === "us") return "en-US";
   return undefined;
+}
+
+function voiceForSetting(
+  setting: VoiceSetting,
+  voices: VoiceOption[]
+): VoiceOption | undefined {
+  return voices.find((voice) => voice.id === setting.voice_id);
+}
+
+function settingMatchesDialect(
+  setting: VoiceSetting,
+  voices: VoiceOption[],
+  locale: PhonemeLocaleV3 | undefined
+) {
+  const voice = voiceForSetting(setting, voices);
+  const settingLocale = setting.locale ?? voice?.locale;
+  if (!settingLocale || !locale) return setting;
+  return speechAccentGroup(settingLocale, setting.accent) ===
+    speechAccentGroup(locale)
+    ? setting
+    : undefined;
 }
 
 function voiceForDialect(
@@ -514,6 +539,222 @@ export function PronunciationPreviewVoiceSummary({
         <ChevronDownIcon />
       </Button>
     </Popover>
+  );
+}
+
+/** 目录加载完成前仍按已保存的 locale 归属展示，不让已配置的声音暂时消失。 */
+export function pronunciationVoiceRows(
+  profile: VoiceProfileV3 | undefined,
+  voices: VoiceOption[],
+  dialect: Dialect,
+  preference: AdminDialectPreference
+): VoiceSetting[] {
+  const locale = localeForDialect(dialect, preference);
+  const rows =
+    profile?.voices.filter(
+      (setting) =>
+        setting.enabled && settingMatchesDialect(setting, voices, locale)
+    ) ?? [];
+  if (rows.length || !profile?.dubbing || !locale) return rows;
+
+  const matched = voiceForDialect(voices, dialect, preference);
+  if (!matched) return [];
+  const stored = profile.voices.find(
+    (setting) => setting.voice_id === matched.id
+  );
+  if (stored) return stored.enabled ? [stored] : [];
+  return [
+    {
+      voice_id: matched.id,
+      enabled: true,
+      rate_percent: matched.defaultSettings?.rate_percent ?? 0,
+      ...(matched.defaultSettings?.pitch_semitones !== undefined
+        ? { pitch_semitones: matched.defaultSettings.pitch_semitones }
+        : {}),
+      ...(matched.defaultSettings?.volume_percent !== undefined
+        ? { volume_percent: matched.defaultSettings.volume_percent }
+        : {}),
+      locale: matched.locale as PhonemeLocaleV3
+    }
+  ];
+}
+
+export function PronunciationPreviewVoiceList({
+  dialect,
+  voiceProfile,
+  recommendationArea,
+  source,
+  audioAssets,
+  audioAssetId,
+  column = "voice",
+  layout = "table"
+}: {
+  dialect: Dialect;
+  voiceProfile?: VoiceProfileV3;
+  recommendationArea?: VoiceRecommendationArea;
+  source?: string;
+  audioAssets?: readonly AudioAssetV3[] | null;
+  audioAssetId?: string;
+  column?: "voice" | "rate" | "volume";
+  layout?: "table" | "media";
+}) {
+  const { t } = useLexiconEditorTranslation();
+  const context = useContext(PreviewContext);
+  if (!context) throw new Error("PronunciationPreviewProvider is required");
+  const resolved = useResolvedPreviewProfile(
+    context,
+    voiceProfile,
+    { version: 2, text: "", annotations: [] },
+    dialect,
+    context.adapter,
+    recommendationArea
+  );
+  const rows = pronunciationVoiceRows(
+    resolved.profile,
+    context.voices,
+    dialect,
+    context.dialectPreference
+  );
+  const targetLocale = localeForDialect(dialect, context.dialectPreference);
+  if (source === "none")
+    return (
+      <span className="v3-voice-inline-status">
+        {column === "voice" ? t("creation_accent_not_configured") : "—"}
+      </span>
+    );
+  const uploaded =
+    source === "upload"
+      ? (audioAssets?.find((asset) => asset.id === audioAssetId) ??
+        audioAssets?.find(
+          (asset) =>
+            asset.is_default &&
+            speechAccentGroup(asset.locale) === speechAccentGroup(targetLocale)
+        ) ??
+        audioAssets?.find(
+          (asset) =>
+            speechAccentGroup(asset.locale) === speechAccentGroup(targetLocale)
+        ))
+      : undefined;
+  if (source === "upload") {
+    if (!uploaded)
+      return (
+        <span className="v3-voice-inline-status">
+          {t("creation_uploaded_source")}
+        </span>
+      );
+    return (
+      <ul
+        className={`v3-voice-inline-list${layout === "media" ? " is-media" : ""}`}
+        aria-label={t("creation_uploaded_source")}
+      >
+        <li className="v3-voice-inline-row" title={uploaded.original_name}>
+          {column === "voice" ? (
+            <InlineVoiceName
+              displayName={t("creation_uploaded_source")}
+              gender={uploaded.gender}
+              secondary={uploaded.original_name}
+            />
+          ) : (
+            <span className="v3-voice-inline-muted">—</span>
+          )}
+        </li>
+      </ul>
+    );
+  }
+  if (context.voicesLoading || resolved.pending)
+    return (
+      <span className="v3-voice-inline-status">
+        {t("panel_loading_voices")}
+      </span>
+    );
+  if (!rows.length)
+    return (
+      <span className="v3-voice-inline-status">
+        {resolved.error ||
+          context.voicesError ||
+          t("panel_no_voices_available_for_this_accent")}
+      </span>
+    );
+  return (
+    <ul
+      className={`v3-voice-inline-list${layout === "media" ? " is-media" : ""}`}
+      aria-label={t("panel_enabled_voices")}
+    >
+      {rows.map((setting) => {
+        const voice = voiceForSetting(setting, context.voices);
+        const displayName =
+          voice?.displayName ??
+          voice?.label ??
+          setting.version_name ??
+          setting.voice_id;
+        return (
+          <li
+            className="v3-voice-inline-row"
+            key={setting.version_id ?? setting.voice_id}
+          >
+            {column === "voice" ? (
+              <InlineVoiceName
+                displayName={
+                  voice
+                    ? displayName.replace(` · ${voice.locale}`, "")
+                    : displayName
+                }
+                gender={voice?.gender}
+              />
+            ) : column === "rate" ? (
+              <span className="v3-voice-inline-number" title={t("panel_rate")}>
+                {(1 + setting.rate_percent / 100).toFixed(2)}×
+              </span>
+            ) : (
+              <span
+                className="v3-voice-inline-number"
+                title={t("panel_volume")}
+              >
+                {setting.volume_percent ?? 100}%
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function InlineVoiceName({
+  displayName,
+  gender,
+  secondary
+}: {
+  displayName: string;
+  gender?: "female" | "male" | "neutral";
+  secondary?: string;
+}) {
+  const { english, chinese } = splitVoiceDisplayName(displayName);
+  const genderLabel =
+    gender === "female" ? "女声" : gender === "male" ? "男声" : undefined;
+  return (
+    <span className="v3-voice-inline-name" title={secondary ?? displayName}>
+      <strong>{english}</strong>
+      {gender === "female" ? (
+        <span
+          className="v3-voice-inline-gender is-female"
+          role="img"
+          aria-label={genderLabel}
+        >
+          ♀
+        </span>
+      ) : gender === "male" ? (
+        <span
+          className="v3-voice-inline-gender is-male"
+          role="img"
+          aria-label={genderLabel}
+        >
+          ♂
+        </span>
+      ) : null}
+      {chinese && chinese !== english && <small>{chinese}</small>}
+      {secondary && <small>{secondary}</small>}
+    </span>
   );
 }
 

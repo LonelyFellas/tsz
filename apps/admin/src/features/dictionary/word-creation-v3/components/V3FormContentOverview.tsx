@@ -23,7 +23,7 @@ import { pronunciationPlaybackSource, synthesisForLocale } from "@tsz/shared";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
   PronunciationPreviewControls,
-  PronunciationPreviewVoiceSummary
+  PronunciationPreviewVoiceList
 } from "../../word-creation/PronunciationPreview";
 import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
 
@@ -112,12 +112,6 @@ function PronunciationCell({
     source === "spelling" || (!source && row.synthesis?.use_spelling)
       ? "word"
       : "azure";
-  const sourceLabel =
-    source === "none"
-      ? t("creation_accent_not_configured")
-      : source === "upload"
-        ? t("creation_uploaded_source")
-        : undefined;
   const actualPron = row.actual_pron_rich ?? {
     version: 2 as const,
     text: row.actual_pron,
@@ -130,18 +124,15 @@ function PronunciationCell({
       className={`v3-overview-reading${settings ? " v3-overview-settings" : ""}`}
     >
       {settings ? (
-        sourceLabel ? (
-          <span>{settings === "voice" ? sourceLabel : "—"}</span>
-        ) : (
-          <PronunciationPreviewVoiceSummary
-            recommendationArea={recommendationArea}
-            dialect={dialect}
-            voiceProfile={profile}
-            pronunciationId={row.id}
-            content={content}
-            column={settings}
-          />
-        )
+        <PronunciationPreviewVoiceList
+          recommendationArea={recommendationArea}
+          dialect={dialect}
+          voiceProfile={profile}
+          source={source}
+          audioAssets={row.audio_assets}
+          audioAssetId={assetId}
+          column={settings}
+        />
       ) : (
         <div className="v3-overview-pronunciation">
           <PronunciationPreviewControls
