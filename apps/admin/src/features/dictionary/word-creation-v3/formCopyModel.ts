@@ -309,6 +309,7 @@ function rebindUpsWords(
 
 function phoneticFields(row: WordPronunciationV3) {
   return {
+    ...(row.style === undefined ? {} : { style: row.style }),
     dict_phonetic: row.dict_phonetic,
     ...(row.dict_phonetic_rich
       ? { dict_phonetic_rich: row.dict_phonetic_rich }
@@ -365,6 +366,7 @@ function copyPhonetics(
     )
   )
     throw new FormCopyError("copy_synthesis_sources_differ");
+  delete target.style;
   delete target.dict_phonetic_rich;
   delete target.actual_pron_rich;
   Object.assign(target, structuredClone(fields[0]));
