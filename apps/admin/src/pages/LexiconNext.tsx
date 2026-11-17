@@ -567,7 +567,12 @@ function EntryEditor({
     }
   }
   async function save(options?: VoiceSaveOptions) {
-    if (!writable || conflict || contentLeaveGuard.current) return false;
+    if (
+      !writable ||
+      conflict ||
+      (contentLeaveGuard.current && !options?.skipAudioTasks)
+    )
+      return false;
     return run(async () => {
       const validation =
         draftProblem(draftRef.current, equivalentMetadataAvailable) ||
