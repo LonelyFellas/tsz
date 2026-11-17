@@ -27,12 +27,14 @@ function Host({
   mode = "grammar",
   value = initial,
   onChange = vi.fn(),
-  readOnly = false
+  readOnly = false,
+  textReadOnly = false
 }: {
   mode?: VoiceEditorProps["mode"];
   value?: RichTextV2;
   onChange?: (value: RichTextV2) => void;
   readOnly?: boolean;
+  textReadOnly?: boolean;
 }) {
   const [data, setData] = useState(value);
   return (
@@ -41,6 +43,7 @@ function Host({
         mode={mode}
         value={data}
         readOnly={readOnly}
+        textReadOnly={textReadOnly}
         onChange={(next) => {
           const rich = next as RichTextV2;
           setData(rich);
@@ -69,6 +72,32 @@ function button(name: string) {
 }
 
 describe("停顿定位与显式编辑", () => {
+  it("设置模式显示只读正文但仍可编辑停顿", () => {
+    const changed = vi.fn();
+    const value = { version: 2 as const, text: "word gap", annotations: [] };
+    render(
+      <Host
+        mode="spelling-settings"
+        value={value}
+        textReadOnly
+        onChange={changed}
+      />
+    );
+    const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+    expect(input).toHaveValue(value.text);
+    expect(input).toHaveAttribute("readonly");
+    select(4);
+    fireEvent.click(button("停顿 0.5 秒"));
+    expect(data().annotations).toEqual([
+      { type: "pause", at: 4, duration_ms: 500 }
+    ]);
+    expect(changed).toHaveBeenCalledWith({
+      version: 2,
+      text: value.text,
+      annotations: [{ type: "pause", at: 4, duration_ms: 500 }]
+    });
+  });
+
   it.each(["grammar", "pronunciation", "association"] as const)(
     "%s 模式光标停在词间自动激活停顿，选择时长前不改内容",
     (mode) => {
