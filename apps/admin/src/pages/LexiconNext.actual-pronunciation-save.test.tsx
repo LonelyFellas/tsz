@@ -18,15 +18,21 @@ vi.mock("@/features/lexicon-next/FormsStep", async () => {
       contents: [],
       pos: []
     }),
-    FormsStep: () => {
+    FormsStep: ({
+      registerLeaveGuard
+    }: {
+      registerLeaveGuard: (guard?: () => Promise<boolean>) => void;
+    }) => {
       const save = useVoiceSave();
       useEffect(() => {
         if (!save?.audioTasks) return;
         save.audioTasks.set("blocked-audio", async () => false);
+        registerLeaveGuard(async () => false);
         return () => {
           save.audioTasks?.delete("blocked-audio");
+          registerLeaveGuard(undefined);
         };
-      }, [save]);
+      }, [registerLeaveGuard, save]);
       return (
         <button
           onClick={() => void save?.save(undefined, { skipAudioTasks: true })}
