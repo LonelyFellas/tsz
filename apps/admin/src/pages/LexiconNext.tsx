@@ -79,6 +79,7 @@ import { v3IssueMessage } from "@/features/dictionary/word-creation-v3/presentat
 import "./lexicon-next.css";
 
 export type LexiconNextRequests = typeof api.lexiconNext;
+const NEXT_DRAFT_SCHEMA_VERSION = 1;
 function failure(error: unknown, preserveDraft = false) {
   if (preserveDraft && error instanceof HttpError && error.status === 422) {
     const issue = error.field_issues[0];
@@ -249,7 +250,16 @@ function EntryLoader({
     staleTime: Infinity,
     gcTime: 0
   });
-  if (query.isPending || metadata.isPending)
+  const draftSchema = useQuery({
+    queryKey: ["admin-lexicon-next", "draft-schema"],
+    queryFn: requests.draftSchema,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    staleTime: Infinity,
+    gcTime: 0
+  });
+  if (query.isPending || metadata.isPending || draftSchema.isPending)
     return <Spin aria-label="正在打开词条" />;
   if (metadata.isError)
     return (
@@ -268,6 +278,31 @@ function EntryLoader({
         title="无法打开智能词库词条"
         description={failure(query.error)}
         action={<Button onClick={() => void query.refetch()}>重试</Button>}
+      />
+    );
+  if (draftSchema.isError)
+    return (
+      <Alert
+        type="error"
+        showIcon
+        title="无法确认草稿版本兼容性"
+        description="为避免本地新增字段被服务器丢弃，当前服务暂不能安全编辑。请升级服务后重试。"
+        action={
+          <Button onClick={() => void draftSchema.refetch()}>重试</Button>
+        }
+      />
+    );
+  if (
+    !draftSchema.data.supported_draft_schema_versions.includes(
+      NEXT_DRAFT_SCHEMA_VERSION
+    )
+  )
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        title="当前服务不支持此草稿版本"
+        description="为避免新增字段被服务器丢弃，当前词条暂不能编辑。请升级服务后再试。"
       />
     );
   if (query.data.target_language !== "en")
@@ -1143,7 +1178,28 @@ function EntryEditor({
           onCancel={() => setRemote(undefined)}
           footer={
             <Space>
-              <Button onClick={() => setRemote(undefined)}>保留本地草稿</Button>
+              <Button
+                type="primary"
+                disabled={busy || formContentOpen}
+                onClick={() => {
+                  if (!remote || contentLeaveGuard.current) return;
+                  modal.confirm({
+                    title: "保留本地草稿并覆盖服务器版本？",
+                    content: `确认后，本地草稿会以服务器版本 ${remote.revision} 为保存基线，下一次保存将覆盖服务器草稿。`,
+                    okText: "保留本地并继续",
+                    cancelText: "取消",
+                    onOk: () => {
+                      if (!remote || contentLeaveGuard.current) return;
+                      setSaved(remote);
+                      setRemote(undefined);
+                      setConflict(false);
+                      setError(undefined);
+                    }
+                  });
+                }}
+              >
+                保留本地草稿并继续保存
+              </Button>
               <Button
                 danger
                 disabled={busy || formContentOpen}

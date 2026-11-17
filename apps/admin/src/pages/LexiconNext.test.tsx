@@ -114,6 +114,10 @@ function requests() {
       pagination: { total: 0, page: 1, page_size: 20, total_pages: 0 }
     }),
     capabilities: vi.fn().mockResolvedValue(caps),
+    draftSchema: vi.fn().mockResolvedValue({
+      draft_schema_version: 1,
+      supported_draft_schema_versions: [1]
+    }),
     get: vi.fn().mockResolvedValue(structuredClone(entry)),
     detect: vi
       .fn()
@@ -1437,7 +1441,8 @@ describe("新版词库手工闭环", () => {
         expect(button("保存完整草稿")).toBeDisabled();
         fireEvent.click(button("比较服务器版本"));
         await screen.findByText("服务器 · 版本 5");
-        fireEvent.click(button("保留本地草稿"));
+        fireEvent.click(button("保留本地草稿并继续保存"));
+        fireEvent.click(await screen.findByRole("button", { name: "取消" }));
         expect(button("比较服务器版本")).toBeEnabled();
         fireEvent.click(button("比较服务器版本"));
         await screen.findByText("服务器 · 版本 5");
@@ -4045,18 +4050,67 @@ it("统一保存冲突保留本地例句，可比较服务器例句，明确确�
   const remote = structuredClone(source);
   remote.revision = 4;
   remote.draft.variants[0]!.content.text = "Server example.";
-  api.get.mockResolvedValue({ ...saved, sentence_resources: [remote] });
+  api.get.mockResolvedValue({
+    ...saved,
+    revision: 4,
+    sentence_resources: [remote]
+  });
   fireEvent.click(button("比较服务器版本"));
   const compare = (
-    await screen.findByText("服务器 · 版本 1")
+    await screen.findByText("服务器 · 版本 4")
   ).closest<HTMLElement>('[role="dialog"]')!;
   expect(within(compare).getByText("Keep local example.")).toBeVisible();
   expect(within(compare).getByText("Server example.")).toBeVisible();
   fireEvent.click(
-    within(compare).getByRole("button", { name: "放弃本地修改并重载" })
+    within(compare).getByRole("button", {
+      name: "保留本地草稿并继续保存"
+    })
   );
-  fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
-  await waitFor(() => expect(english).toHaveTextContent("Server example."));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "保留本地并继续" })
+  );
+  await waitFor(() => expect(english).toHaveTextContent("Keep local example."));
+  await waitFor(() =>
+    expect(
+      within(document.querySelector(".lexicon-next-toolbar")!).getByText(
+        "版本 4"
+      )
+    ).toBeVisible()
+  );
+  expect(button("保存完整草稿")).toBeEnabled();
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+  expect(api.save.mock.calls[1]![1].expected_revision).toBe(4);
+  expect(api.save.mock.calls[1]![1].sentence_changes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        variant: expect.objectContaining({
+          content: expect.objectContaining({ text: "Keep local example." })
+        })
+      })
+    ])
+  );
+});
+
+it("服务器不支持当前草稿版本时阻止进入编辑器", async () => {
+  const api = requests();
+  api.draftSchema.mockResolvedValue({
+    draft_schema_version: 2,
+    supported_draft_schema_versions: [2]
+  });
+  mount(api);
+  await screen.findByText("当前服务不支持此草稿版本");
+  expect(screen.queryByText("保存完整草稿")).toBeNull();
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("无法读取草稿版本兼容性时保留安全阻断并允许重试", async () => {
+  const api = requests();
+  api.draftSchema.mockRejectedValue(new HttpError(404, "not found"));
+  mount(api);
+  await screen.findByText("无法确认草稿版本兼容性");
+  expect(screen.getByRole("button", { name: "重试" })).toBeEnabled();
+  expect(api.save).not.toHaveBeenCalled();
 });
 
 it("其他标签页只改变发布生命周期时，比较重载后使用新版本恢复预检", async () => {
