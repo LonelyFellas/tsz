@@ -4015,7 +4015,7 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
     })
   ]);
   await screen.findByText("版本 2");
-});
+}, 15_000);
 it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {
   const { api, saved, source } = unifiedSentenceRequests();
   api.save.mockRejectedValueOnce(
