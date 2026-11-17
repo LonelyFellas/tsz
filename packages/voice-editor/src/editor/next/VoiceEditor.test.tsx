@@ -3728,6 +3728,33 @@ describe("VoiceEditor 发音区", () => {
     expect(screen.queryByLabelText(/^试听 /)).toBeNull();
   });
 
+  it("已上传录音可直接下载原文件", async () => {
+    const existing = asset({ original_name: "old.mp3" });
+    const blob = new Blob([new Uint8Array([1, 2, 3])], {
+      type: "audio/mpeg"
+    });
+    const loadAudio = vi.fn().mockResolvedValue(blob);
+    const adapter = audioAdapter({ loadAudio });
+    const createObjectURL = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:download");
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+
+    fireEvent.click(screen.getByLabelText("下载原音频 old.mp3"));
+
+    await waitFor(() => expect(loadAudio).toHaveBeenCalledWith(existing.id));
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(click).toHaveBeenCalledOnce();
+  });
+
   it("移除资产要确认：取消则保留，确认后从草稿去掉引用并抛出", async () => {
     const onAudioAssetsChange = vi.fn();
     const existing = asset({ original_name: "old.mp3" });

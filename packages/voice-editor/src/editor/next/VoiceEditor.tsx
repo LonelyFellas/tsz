@@ -81,7 +81,7 @@ import {
 import { MarkupPanel, type DropdownTool } from "./MarkupPanel";
 import { VoiceVersions } from "./VoiceVersions";
 import { LocalVoicePool } from "./LocalVoicePool";
-import { AudioReview, type ReviewAudio } from "./AudioReview";
+import { AudioReview, downloadBlob, type ReviewAudio } from "./AudioReview";
 import { SsmlReview } from "./SsmlReview";
 import { ReferenceAudio } from "./ReferenceAudio";
 import {
@@ -395,10 +395,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [playingAssetId, setPlayingAssetId] = useState<string>();
   const [assetReview, setAssetReview] = useState<ReviewAudio>();
-  /** 试听失败的说明；只在音频面板里显示，不走阻断性错误那条红色通道。 */
+  /** 试听或下载失败的说明；只在音频面板里显示，不走阻断性错误那条红色通道。 */
   const [playbackMessage, setPlaybackMessage] = useState<string>();
   const [genderUpdateAssetId, setGenderUpdateAssetId] = useState<string>();
   const [genderUpdateMessage, setGenderUpdateMessage] = useState<string>();
+  const [downloadingAssetId, setDownloadingAssetId] = useState<string>();
   const uploadSeqRef = useRef(0);
   const uploadAudioRef = useRef<HTMLAudioElement | null>(null);
   const stopReferenceRef = useRef<(() => void) | undefined>(undefined);
@@ -2764,6 +2765,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     });
   };
 
+  const downloadAsset = async (asset: AudioAsset) => {
+    if (!audioUploadAdapter?.loadAudio) return;
+    setDownloadingAssetId(asset.id);
+    try {
+      const blob = await audioUploadAdapter.loadAudio(asset.id);
+      downloadBlob(blob, asset.original_name);
+    } catch {
+      setPlaybackMessage(t("could_not_read_audio"));
+    } finally {
+      setDownloadingAssetId((current) =>
+        current === asset.id ? undefined : current
+      );
+    }
+  };
+
   const roleLevel = brush.kind === "role" ? brush.level : lastRoleRef.current;
   const roleLabel =
     Object.values(grammarRoleDefinitions(t)).find(
@@ -3609,11 +3625,17 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             onRetryUpload={retryUpload}
             onDismissUpload={dismissUpload}
             onRemoveAsset={removeAsset}
+            onDownloadAsset={
+              audioUploadAdapter?.loadAudio
+                ? (asset) => void downloadAsset(asset)
+                : undefined
+            }
             onDefaultAssetChange={
               onAudioAssetsChange ? changeDefaultAsset : undefined
             }
             onPlayAsset={(asset) => void playAsset(asset)}
             playingAssetId={playingAssetId}
+            downloadingAssetId={downloadingAssetId}
             playbackMessage={playbackMessage}
             genderUpdatePending={Boolean(genderUpdateAssetId)}
             genderUpdateMessage={genderUpdateMessage}
@@ -3819,6 +3841,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     onRetryUpload={retryUpload}
                     onDismissUpload={dismissUpload}
                     onRemoveAsset={removeAsset}
+                    onDownloadAsset={
+                      audioUploadAdapter?.loadAudio
+                        ? (asset) => void downloadAsset(asset)
+                        : undefined
+                    }
                     onDefaultAssetChange={
                       onAudioAssetsChange ? changeDefaultAsset : undefined
                     }
@@ -3827,6 +3854,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                       void playAsset(asset);
                     }}
                     playingAssetId={playingAssetId}
+                    downloadingAssetId={downloadingAssetId}
                     playbackMessage={playbackMessage}
                     genderUpdatePending={genderUpdateAssetId !== undefined}
                     genderUpdateMessage={genderUpdateMessage}
