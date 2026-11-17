@@ -35,7 +35,7 @@ const DEFAULT_OVERVIEW_COLUMN_LABELS = {
   spelling: "词形拼写",
   style: "读法",
   pronunciation: "实际发音",
-  voice: "音色",
+  voice: "配音",
   rate: "语速",
   volume: "音量"
 };
@@ -45,7 +45,7 @@ export const formOverviewColumnMessages = {
   spelling: "spelling",
   style: "reading",
   pronunciation: "actual_pronunciation",
-  voice: "voice",
+  voice: "voice_source",
   rate: "rate",
   volume: "volume"
 } as const;
@@ -203,7 +203,7 @@ export function V3FormContentOverview({
     spelling: t("spelling"),
     style: t("reading"),
     pronunciation: t("actual_pronunciation"),
-    voice: t("voice"),
+    voice: t("voice_source"),
     rate: t("rate"),
     volume: t("volume")
   };
