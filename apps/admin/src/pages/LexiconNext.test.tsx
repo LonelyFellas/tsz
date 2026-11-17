@@ -1813,6 +1813,32 @@ it("列表组合条件只在提交后生效，翻页保留，状态切换及移�
   );
   expect(api.list).not.toHaveBeenCalled();
 });
+it("列表入口位于结果工具栏", async () => {
+  grantListPermissions();
+  const api = requests();
+  mount(api, "/lexicon-next");
+
+  const create = await screen.findByRole("button", { name: "创建词条" });
+  expect(create.closest(".word-list-results-panel")).not.toBeNull();
+  expect(create.closest(".word-list-page-actions")).toBeNull();
+
+  const trash = screen.getByRole("link", { name: "查看垃圾桶" });
+  expect(trash.closest(".admin-table-toolbar-trailing")).not.toBeNull();
+  expect(screen.getByRole("button", { name: "列设置" })).toBeVisible();
+});
+
+it("列表请求失败仍保留创建和垃圾桶入口", async () => {
+  grantListPermissions();
+  const api = requests();
+  api.workspaceList.mockRejectedValue(new HttpError(500, "列表失败"));
+  mount(api, "/lexicon-next");
+
+  await screen.findByText("列表失败");
+  const create = screen.getByRole("button", { name: "创建词条" });
+  expect(create.closest(".word-list-page-actions")).not.toBeNull();
+  expect(screen.getByRole("link", { name: "查看垃圾桶" })).toBeVisible();
+});
+
 it("语言条件贯穿搜索、统计、分页、垃圾桶导航与重置", async () => {
   grantListPermissions();
   const api = requests();
