@@ -834,7 +834,9 @@ export function V3PhonemeSpeechSettings({
                         });
                         if (
                           businessSaveRef.current &&
-                          !(await businessSaveRef.current.save("azure"))
+                          !(await businessSaveRef.current.save("azure", {
+                            skipAudioTasks: true
+                          }))
                         ) {
                           if (activeTarget.current !== targetKey) return;
                           setBusinessSaveFailed(true);
