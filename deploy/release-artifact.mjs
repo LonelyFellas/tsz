@@ -17,12 +17,22 @@ const digest = async (file) =>
     .digest("hex");
 
 export function buildConfig(component, env = process.env) {
+  const target = env.DEPLOY_TARGET ?? "test";
+  assert.ok(
+    ["test", "production"].includes(target),
+    "DEPLOY_TARGET must be test or production"
+  );
+  const production = target === "production";
+
   if (component === "web")
     return {
       mode: "production",
       env: {
         NEXT_PUBLIC_SITE_URL:
-          env.NEXT_PUBLIC_SITE_URL ?? "https://test.tianshengzhi.com"
+          env.NEXT_PUBLIC_SITE_URL ??
+          (production
+            ? "https://www.tianshengzhi.com"
+            : "https://test.tianshengzhi.com")
       }
     };
   assert.equal(component, "admin", "component must be web or admin");
@@ -46,7 +56,16 @@ export function buildConfig(component, env = process.env) {
     );
     settings[`VITE_${flag}`] = value;
   }
-  return { mode: "test", env: settings };
+  return { mode: production ? "production" : "test", env: settings };
+}
+
+export function buildCommandArgs(component, config) {
+  return [
+    "--filter",
+    `@tsz/${component}`,
+    "build",
+    ...(component === "admin" ? ["--mode", config.mode] : [])
+  ];
 }
 
 export function selectArtifact(artifacts, component, identity) {
@@ -63,12 +82,13 @@ export function selectArtifact(artifacts, component, identity) {
   const matches = candidates.filter(
     (item) => Number(item.name.slice(prefix.length)) === producerAttempt
   );
+  const headBranch = matches[0]?.workflow_run?.head_branch;
   assert.ok(
     matches.length === 1 &&
       matches[0].expired === false &&
       matches[0].workflow_run?.id === identity.runId &&
       matches[0].workflow_run?.head_sha === identity.sha &&
-      matches[0].workflow_run?.head_branch === "main" &&
+      (headBranch === "main" || /^v[A-Za-z0-9._-]+$/.test(headBranch)) &&
       Number.isSafeInteger(matches[0].id),
     "a unique unexpired artifact from the exact CI run is required"
   );
@@ -109,7 +129,8 @@ export async function packRelease({
     ciRunUrl: `https://github.com/${identity.repository}/actions/runs/${identity.runId}`,
     artifactRoot: artifact,
     artifactPath: `/opt/tsz-releases/${component}/current`,
-    outputPath: path.join(output, "candidate.json")
+    outputPath: path.join(output, "candidate.json"),
+    remoteRef: identity.remoteRef
   });
   const archive = path.join(output, "release.tar.gz");
   command("tar", ["-czf", archive, "-C", artifact, "."]);
@@ -190,7 +211,7 @@ export async function verifyRelease(bundle, expected, output) {
     repository: expected.identity.repository,
     git_sha: expected.identity.sha,
     git_tree: expected.identity.tree,
-    remote_ref: "refs/heads/main"
+    remote_ref: expected.identity.remoteRef ?? "refs/heads/main"
   });
   assert.deepEqual(candidate.ci, {
     workflow: "CI",
@@ -220,16 +241,12 @@ async function main() {
       TSZ_RELEASE_ID: releaseId,
       NEXT_TELEMETRY_DISABLED: "1"
     };
-    const result = spawnSync(
-      "pnpm",
-      [
-        "--filter",
-        `@tsz/${component}`,
-        "build",
-        ...(component === "admin" ? ["--mode", "test"] : [])
-      ],
-      { cwd: root, env: environment, stdio: "inherit", timeout: 20 * 60 * 1000 }
-    );
+    const result = spawnSync("pnpm", buildCommandArgs(component, config), {
+      cwd: root,
+      env: environment,
+      stdio: "inherit",
+      timeout: 20 * 60 * 1000
+    });
     assert.equal(result.status, 0, `${component} build failed`);
     Object.assign(process.env, environment);
     process.argv = [
@@ -248,7 +265,8 @@ async function main() {
       sha: process.env.GITHUB_SHA,
       tree: command("git", ["rev-parse", "HEAD^{tree}"]).trim(),
       runId: Number(process.env.GITHUB_RUN_ID),
-      attempt: Number(process.env.GITHUB_RUN_ATTEMPT)
+      attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+      remoteRef: process.env.GITHUB_REF ?? "refs/heads/main"
     };
     assert.match(identity.sha, /^[0-9a-f]{40}$/);
     assert.equal(command("git", ["rev-parse", "HEAD"]).trim(), identity.sha);
@@ -349,7 +367,11 @@ async function main() {
       sha: process.env.DEPLOY_GIT_SHA,
       tree: process.env.DEPLOY_GIT_TREE,
       runId: Number(process.env.DEPLOY_CI_RUN_ID),
-      attempt: Number(selected.name.split("-attempt-")[1])
+      attempt: Number(selected.name.split("-attempt-")[1]),
+      remoteRef:
+        selected.workflow_run?.head_branch === "main"
+          ? "refs/heads/main"
+          : `refs/tags/${selected.workflow_run?.head_branch}`
     };
     const result = await verifyRelease(
       bundle,
