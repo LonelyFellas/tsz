@@ -16,6 +16,8 @@ export const useVoiceSave = () => useContext(VoiceSaveContext);
 export interface VoiceSaveOptions {
   /** 实际发音只改展示标注，不应被无关的正式音频任务阻断。 */
   skipAudioTasks?: boolean;
+  /** 内容弹窗内的局部保存可以绕过离开保护，但仍按 skipAudioTasks 决定是否等待音频。 */
+  allowContentSave?: boolean;
 }
 
 /** 内容弹窗有独立草稿，即使没有业务保存动作也需要等待其音频。 */
