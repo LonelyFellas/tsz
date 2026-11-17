@@ -3475,21 +3475,76 @@ describe("VoiceEditor 发音区", () => {
 
     await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(2));
     const emitted = onAudioAssetsChange.mock.calls.at(-1)![0] as AudioAsset[];
-    expect(emitted.map((item) => item.original_name)).toEqual([
-      "a.mp3",
-      "c.wav"
-    ]);
+    expect(emitted.map((item) => item.original_name)).toEqual(["c.wav"]);
     expect(emitted[0]).toMatchObject({ locale: "en-US", gender: "female" });
-    // 列表：两条资产 + 一条失败；资产行带归属标签
-    expect(screen.getByLabelText("试听 a.mp3")).toBeInTheDocument();
+    // 同一口音的新资产替换旧资产；失败项仍保留在队列。
+    expect(screen.queryByLabelText("试听 a.mp3")).not.toBeInTheDocument();
     expect(screen.getByLabelText("移除 b.txt")).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(
       expect.arrayContaining([expect.stringContaining("AmE")])
     );
-    // 工具栏计数只算落成的
+    // 工具栏计数只算当前保留的资产
     expect(
       document.querySelector('[aria-label="音频"]')!.textContent
-    ).toContain("2");
+    ).toContain("1");
+  });
+
+  it("每个口音只保留一条录音，替换一个口音不会影响另一个口音", async () => {
+    const adapter = audioAdapter();
+    const onAudioAssetsChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          audioUploadAdapter: adapter,
+          audioAssets: [
+            asset({ original_name: "uk.mp3" }),
+            asset({ original_name: "old-us.mp3", locale: "en-US" })
+          ],
+          onAudioAssetsChange
+        })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByRole("radio", { name: "AmE" }));
+    chooseFiles([mp3("new-us.mp3")]);
+    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalled());
+    expect(onAudioAssetsChange.mock.calls.at(-1)![0]).toEqual([
+      expect.objectContaining({ original_name: "uk.mp3", locale: "en-GB" }),
+      expect.objectContaining({ original_name: "new-us.mp3", locale: "en-US" })
+    ]);
+  });
+
+  it("上传后切换男女声会更新同一口音的资产元数据", async () => {
+    const existing = asset({ original_name: "voice.mp3", gender: "female" });
+    const updateGender = vi.fn(
+      async (id: string, gender: AudioAsset["gender"]) => ({
+        ...existing,
+        id,
+        gender
+      })
+    );
+    const onAudioAssetsChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          audioUploadAdapter: audioAdapter({ updateGender }),
+          audioAssets: [existing],
+          onAudioAssetsChange
+        })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByRole("radio", { name: "男声" }));
+    await waitFor(() =>
+      expect(updateGender).toHaveBeenCalledWith(
+        existing.id,
+        "male",
+        expect.any(Object)
+      )
+    );
+    expect(onAudioAssetsChange.mock.calls.at(-1)![0]).toEqual([
+      expect.objectContaining({ id: existing.id, gender: "male" })
+    ]);
   });
 
   it("已上传录音可设为默认播放，同口音互斥并随草稿重新打开保留", async () => {

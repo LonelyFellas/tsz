@@ -179,6 +179,7 @@ export type AudioUploadErrorCode =
   | "storage_unavailable"
   | "upload_failed"
   | "confirm_failed"
+  | "update_failed"
   | "unavailable"
   | "unknown";
 
@@ -215,6 +216,12 @@ export interface AudioUploadAdapter {
     assetId: string,
     options?: { signal?: AbortSignal }
   ): Promise<{ url: string; expiresAt: string }>;
+  /** 已上传资产的性别元数据修改；资产本身不变。 */
+  updateGender?(
+    assetId: string,
+    gender: AudioAssetGender,
+    options?: { signal?: AbortSignal }
+  ): Promise<AudioAsset>;
   /**
    * 本会话是否已探测到存储未开通（501）。由适配器记一次即可：同一页可能挂着几十个
    * 编辑器，各自记的话既重复又对不齐；编辑器每次渲染直接问。缺省视为可用。
@@ -381,7 +388,7 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** 挂在这段文本上的音频资产；与 voiceProfile 一样是受控通道，改动实时抛出。 */
   audioAssets?: AudioAsset[];
   onAudioAssetsChange?: (next: AudioAsset[]) => void;
-  /** 每段文本最多几条音频；缺省用 wire 的上限。 */
+  /** 每段文本最多几条音频；缺省按英式 / 美式两个口音各保留一条。 */
   audioAssetLimit?: number;
   onChange: (
     value: RichTextV2,

@@ -76,7 +76,7 @@ export function audioAssetContentTypeOf(file: {
 /** 单文件上限 10 MiB：真人录音一般不到 1 MiB，余量给 wav。 */
 export const AUDIO_ASSET_MAX_BYTES = 10 * 1024 * 1024;
 
-/** 每个文本变体最多挂几条音频。 */
+/** 兼容旧数据的总量上限；新上传流程按每个口音只保留一条处理。 */
 export const AUDIO_ASSETS_PER_VARIANT_MAX = 8;
 
 export interface CreateAudioUploadInput {
@@ -110,6 +110,14 @@ export interface ConfirmAudioAssetInput {
 }
 
 export interface ConfirmAudioAssetResponse {
+  asset: AudioAssetV3;
+}
+
+export interface UpdateAudioAssetInput {
+  gender: "female" | "male";
+}
+
+export interface UpdateAudioAssetResponse {
   asset: AudioAssetV3;
 }
 

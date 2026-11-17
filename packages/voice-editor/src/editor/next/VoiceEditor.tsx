@@ -31,7 +31,6 @@ import type {
   RichTextV2,
   TextLinkV3
 } from "@tsz/types";
-import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
 import {
   MAX_PAUSE_MS,
   MIN_PAUSE_MS,
@@ -98,6 +97,7 @@ import {
   grammarRoleDefinitions,
   PAUSE_PRESETS,
   formatPauseLabel,
+  VOICE_LOCALES,
   type Brush,
   type LiaisonEnd
 } from "./roles";
@@ -216,7 +216,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   showAudioUpload = true,
   audioAssets,
   onAudioAssetsChange,
-  audioAssetLimit = AUDIO_ASSETS_PER_VARIANT_MAX,
+  audioAssetLimit = VOICE_LOCALES.length,
   onChange
 }: VoiceEditorProps<TLink>) {
   const { t } = useVoiceEditorTranslation();
@@ -397,6 +397,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [assetReview, setAssetReview] = useState<ReviewAudio>();
   /** 试听失败的说明；只在音频面板里显示，不走阻断性错误那条红色通道。 */
   const [playbackMessage, setPlaybackMessage] = useState<string>();
+  const [genderUpdateAssetId, setGenderUpdateAssetId] = useState<string>();
+  const [genderUpdateMessage, setGenderUpdateMessage] = useState<string>();
   const uploadSeqRef = useRef(0);
   const uploadAudioRef = useRef<HTMLAudioElement | null>(null);
   const stopReferenceRef = useRef<(() => void) | undefined>(undefined);
@@ -418,6 +420,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const playRequestRef = useRef<AbortController | null>(null);
   const playingAssetIdRef = useRef<string | undefined>(undefined);
   const uploadControllersRef = useRef(new Map<string, AbortController>());
+  const genderUpdateControllersRef = useRef(new Map<string, AbortController>());
   /** 试听 URL 是短期签名，只放内存；过期重取。 */
   const assetUrlCacheRef = useRef(
     new Map<string, { url: string; expiresAt: string }>()
@@ -478,6 +481,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       stopAssetPlayback();
       uploadControllersRef.current.forEach((controller) => controller.abort());
       uploadControllersRef.current.clear();
+      genderUpdateControllersRef.current.forEach((controller) =>
+        controller.abort()
+      );
+      genderUpdateControllersRef.current.clear();
     },
     [stopAssetPlayback]
   );
@@ -2543,7 +2550,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           if (controller.signal.aborted) return;
           uploadControllersRef.current.delete(entry.id);
           dropPending(entry.id);
-          emitAssets([...assetsRef.current, asset]);
+          const accent = speechAccentGroup(asset.locale);
+          emitAssets([
+            ...assetsRef.current.filter(
+              (current) => speechAccentGroup(current.locale) !== accent
+            ),
+            asset
+          ]);
         },
         (error: unknown) => {
           if (controller.signal.aborted) return;
@@ -2557,7 +2570,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (!audioUploadAdapter || !audioUploadAllowed || readOnly) return;
     // 名额 = 上限 − 已落成 − 还在路上的；预检不过的那些不占名额。
     const inFlight = pendingUploads.filter((item) => !item.error).length;
-    let room = audioAssetLimit - assetsRef.current.length - inFlight;
+    const replacingAccent = assetsRef.current.some(
+      (asset) =>
+        speechAccentGroup(asset.locale) === speechAccentGroup(upload.locale)
+    );
+    let room =
+      audioAssetLimit -
+      assetsRef.current.length -
+      inFlight +
+      (replacingAccent ? 1 : 0);
     const entries: PendingUpload[] = [...files].map((file) => {
       // id 不用 crypto.randomUUID：测试服是裸 HTTP 的非安全上下文，该 API 缺失。
       uploadSeqRef.current += 1;
@@ -2590,6 +2611,62 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     uploadControllersRef.current.get(id)?.abort();
     uploadControllersRef.current.delete(id);
     dropPending(id);
+  };
+
+  const updateAssetGender = (
+    gender: AudioAsset["gender"],
+    locale: AudioAsset["locale"]
+  ) => {
+    if (readOnly || !audioUploadAdapter) return;
+    const asset = assetsRef.current.find(
+      (current) =>
+        speechAccentGroup(current.locale) === speechAccentGroup(locale)
+    );
+    if (!asset || asset.gender === gender) return;
+    genderUpdateControllersRef.current.get(asset.id)?.abort();
+    const controller = new AbortController();
+    genderUpdateControllersRef.current.set(asset.id, controller);
+    setGenderUpdateAssetId(asset.id);
+    setGenderUpdateMessage(undefined);
+    const update = audioUploadAdapter.updateGender;
+    if (!update) {
+      emitAssets(
+        assetsRef.current.map((current) =>
+          current.id === asset.id ? { ...current, gender } : current
+        )
+      );
+      genderUpdateControllersRef.current.delete(asset.id);
+      setGenderUpdateAssetId(undefined);
+      return;
+    }
+    update(asset.id, gender, { signal: controller.signal })
+      .then(
+        (updated) => {
+          if (controller.signal.aborted) return;
+          emitAssets(
+            assetsRef.current.map((current) =>
+              current.id === asset.id
+                ? { ...updated, is_default: current.is_default }
+                : current
+            )
+          );
+        },
+        (error: unknown) => {
+          if (controller.signal.aborted) return;
+          setUpload((current) =>
+            speechAccentGroup(current.locale) === speechAccentGroup(locale)
+              ? { ...current, gender: asset.gender }
+              : current
+          );
+          setGenderUpdateMessage(uploadFailure(error).message);
+        }
+      )
+      .finally(() => {
+        if (genderUpdateControllersRef.current.get(asset.id) !== controller)
+          return;
+        genderUpdateControllersRef.current.delete(asset.id);
+        setGenderUpdateAssetId(undefined);
+      });
   };
 
   /**
@@ -3524,6 +3601,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             onUploadChange={(next: Partial<UploadDraft>) =>
               setUpload((current) => ({ ...current, ...next }))
             }
+            onGenderChange={updateAssetGender}
             assets={assets}
             pending={pendingUploads}
             limit={audioAssetLimit}
@@ -3537,6 +3615,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             onPlayAsset={(asset) => void playAsset(asset)}
             playingAssetId={playingAssetId}
             playbackMessage={playbackMessage}
+            genderUpdatePending={Boolean(genderUpdateAssetId)}
+            genderUpdateMessage={genderUpdateMessage}
           />
           {assetReview && (
             <AudioReview
@@ -3729,6 +3809,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                         locale: dialect
                       }))
                     }
+                    onGenderChange={updateAssetGender}
                     assets={assets.filter((asset) => asset.locale === dialect)}
                     pending={pendingUploads.filter(
                       (item) => item.locale === dialect
@@ -3747,6 +3828,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     }}
                     playingAssetId={playingAssetId}
                     playbackMessage={playbackMessage}
+                    genderUpdatePending={genderUpdateAssetId !== undefined}
+                    genderUpdateMessage={genderUpdateMessage}
                   />
                   {assetReview && (
                     <AudioReview
