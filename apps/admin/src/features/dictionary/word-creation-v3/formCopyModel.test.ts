@@ -871,6 +871,63 @@ describe("词形内容定向复制", () => {
     );
   });
 
+  it("读法数量不同时按唯一读法标签自动匹配来源", () => {
+    const source = commonFormFixture({
+      pronunciations: [
+        pronunciationFixture({
+          id: uuidFromInt(801),
+          style: "citation",
+          actual_pron: "citation pronunciation"
+        }),
+        pronunciationFixture({
+          id: uuidFromInt(802),
+          style: "normal",
+          actual_pron: "normal pronunciation"
+        })
+      ]
+    });
+    const target = commonFormFixture({
+      id: uuidFromInt(803),
+      pronunciations: [
+        pronunciationFixture({ id: uuidFromInt(804), style: "normal" })
+      ]
+    });
+    const { forms, sourceId, targetId } = setup(source, target);
+
+    const plan = planFormCopy(forms, sourceId, targetId, "phonetics");
+
+    expect(plan.needsMapping).toBe(false);
+    const expectedSourceId = variant(forms.contents[0]!).pronunciations[1]!.id;
+    expect(
+      plan.matches.find((match) => match.side === "uk")?.source?.pronunciationId
+    ).toBe(expectedSourceId);
+    const next = applyFormCopy(forms, plan);
+    expect(variant(next.contents[1]!).pronunciations[0]!.actual_pron).toBe(
+      "normal pronunciation"
+    );
+  });
+
+  it("未选择读法标签时仍要求手动映射", () => {
+    const source = commonFormFixture({
+      pronunciations: [
+        pronunciationFixture({ style: undefined }),
+        pronunciationFixture({
+          id: uuidFromInt(805),
+          style: "citation"
+        })
+      ]
+    });
+    const target = commonFormFixture({
+      id: uuidFromInt(806),
+      pronunciations: [pronunciationFixture({ style: undefined })]
+    });
+    const { forms, sourceId, targetId } = setup(source, target);
+
+    expect(
+      planFormCopy(forms, sourceId, targetId, "phonetics").needsMapping
+    ).toBe(true);
+  });
+
   it("拒绝两套不同英美正文写入common，common双侧候选按侧写入uk_us并保留来源缺侧目标", () => {
     const conflict = setup(
       ukUsFormFixture({
