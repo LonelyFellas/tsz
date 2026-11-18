@@ -373,6 +373,16 @@ function copyPhonetics(
     fields.some((value) => JSON.stringify(value) !== JSON.stringify(fields[0]))
   )
     throw new FormCopyError("copy_transcriptions_differ");
+  delete target.style;
+  delete target.dict_phonetic_rich;
+  delete target.actual_pron_rich;
+  Object.assign(target, structuredClone(fields[0]));
+  if (target.voice_profile)
+    target.voice_profile = clearVoiceAudio(target.voice_profile);
+  if (!targetVariant.spelling.trim()) {
+    delete target.synthesis;
+    return;
+  }
   const candidates = matches.map((match, index) =>
     match.source
       ? candidateForSide(rows[index]!, match.source.region, match.side)
@@ -394,12 +404,6 @@ function copyPhonetics(
     )
   )
     throw new FormCopyError("copy_synthesis_sources_differ");
-  delete target.style;
-  delete target.dict_phonetic_rich;
-  delete target.actual_pron_rich;
-  Object.assign(target, structuredClone(fields[0]));
-  if (target.voice_profile)
-    target.voice_profile = clearVoiceAudio(target.voice_profile);
   if (before.synthesis && candidates.some(Boolean)) {
     target.synthesis = {
       alphabet: before.synthesis.alphabet,

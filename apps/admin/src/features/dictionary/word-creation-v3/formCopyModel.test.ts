@@ -928,6 +928,54 @@ describe("词形内容定向复制", () => {
     ).toBe(true);
   });
 
+  it("目标拼写为空时复制文本并清除无法绑定的合成配置", () => {
+    const source = commonFormFixture({
+      pronunciations: [
+        pronunciationFixture({
+          dict_phonetic: "source phonetic",
+          actual_pron: "source pronunciation",
+          synthesis: {
+            alphabet: "ups",
+            ipa: "",
+            ups: "S OW R S",
+            use_spelling: false,
+            uk: { ipa: "source", ups: "" }
+          }
+        })
+      ]
+    });
+    const target = commonFormFixture({
+      id: uuidFromInt(807),
+      spelling: "",
+      pronunciations: [
+        pronunciationFixture({
+          dict_phonetic: "old phonetic",
+          actual_pron: "old pronunciation",
+          synthesis: {
+            alphabet: "ipa",
+            ipa: "old",
+            ups: "",
+            use_spelling: false
+          }
+        })
+      ]
+    });
+    const { forms, sourceId, targetId } = setup(source, target);
+
+    const next = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "phonetics")
+    );
+    const copied = variant(next.contents[1]!).pronunciations[0]!;
+
+    expect(copied).toMatchObject({
+      dict_phonetic: "source phonetic",
+      actual_pron: "source pronunciation",
+      style: "normal"
+    });
+    expect(copied.synthesis).toBeUndefined();
+  });
+
   it("拒绝两套不同英美正文写入common，common双侧候选按侧写入uk_us并保留来源缺侧目标", () => {
     const conflict = setup(
       ukUsFormFixture({
