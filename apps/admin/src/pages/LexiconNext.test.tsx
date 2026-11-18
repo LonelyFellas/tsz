@@ -3674,6 +3674,7 @@ it("释义弹窗未应用时锁住语言切换和保存，取消不写宿主正�
     target: { value: "center" }
   });
   fireEvent.click(stepButton(/^词义与例句/));
+  await waitFor(() => expect(button("编辑英式英语释义 1")).toBeEnabled());
   fireEvent.click(button("编辑英式英语释义 1"));
   const editor = await screen.findByRole("textbox", { name: "英式英语释义 1" });
   fireEvent.change(editor, { target: { value: "unapplied body" } });
