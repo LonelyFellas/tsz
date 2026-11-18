@@ -8,7 +8,7 @@ import type { NextCapabilities, NextEntry } from "@tsz/types";
 import { adminShellResources } from "@/i18n";
 import { bindAdminAuthorizationCache } from "@/lib/adminAuthorization";
 import { api as profileApi, useAuthStore } from "@/lib/auth";
-import { readNextLocalDraft } from "@/features/lexicon-next/localDraftStore";
+import * as localDraftStore from "@/features/lexicon-next/localDraftStore";
 import { LexiconNextPage, type LexiconNextRequests } from "./LexiconNext";
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 
@@ -219,7 +219,7 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "解除配对" }));
     await waitFor(async () => {
-      const stored = await readNextLocalDraft({
+      const stored = await localDraftStore.readNextLocalDraft({
         account_id: accountId,
         entry_id: entryId,
         target_locale: "en-GB",
@@ -245,5 +245,37 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
       ).not.toBeInTheDocument();
     });
     second.unmount();
+  });
+
+  it("读取本地草稿失败时仍可继续编辑", async () => {
+    const read = vi
+      .spyOn(localDraftStore, "readNextLocalDraft")
+      .mockRejectedValue(new Error("indexedDB unavailable"));
+    const api = requests();
+    mount(api);
+
+    await expect(
+      screen.findByRole("button", { name: "解除配对" })
+    ).resolves.toBeTruthy();
+    await waitFor(() => expect(read).toHaveBeenCalledOnce());
+    expect(screen.queryByText("发现未提交的本地草稿")).not.toBeInTheDocument();
+  });
+
+  it("写入本地草稿失败时仍可继续编辑配对字段", async () => {
+    vi.spyOn(localDraftStore, "readNextLocalDraft").mockResolvedValue(
+      undefined
+    );
+    const write = vi
+      .spyOn(localDraftStore, "writeNextLocalDraft")
+      .mockRejectedValue(new Error("quota exceeded"));
+    const api = requests();
+    mount(api);
+
+    await screen.findByRole("button", { name: "解除配对" });
+    fireEvent.click(screen.getByRole("button", { name: "解除配对" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "选择配对词义" })).toBeEnabled()
+    );
+    await waitFor(() => expect(write).toHaveBeenCalledOnce());
   });
 });
