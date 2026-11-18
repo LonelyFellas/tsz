@@ -24,7 +24,7 @@ interface Props {
   currentStep: WordCreationStep;
   dictionary?: { path: string; label: string; back: string };
   stepLabels?: Partial<
-    Record<WordCreationStep, { title: string; subtitle: string }>
+    Record<WordCreationStep, { title: string; subtitle?: string }>
   >;
   reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
