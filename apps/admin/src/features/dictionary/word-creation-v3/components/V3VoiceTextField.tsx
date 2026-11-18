@@ -1020,7 +1020,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       )}
       {grammarPreview ? (
         <div
-          className={`v3-grammar-preview-content ${fontClass}${mode === "association" ? " v3-association-preview-content" : ""}`}
+          className={`v3-grammar-preview-content ${fontClass}${mode === "association" ? " v3-association-preview-content" : ""}${mode === "spelling" ? " v3-spelling-preview-content" : ""}`}
           aria-hidden
         >
           <RichTextReadOnly

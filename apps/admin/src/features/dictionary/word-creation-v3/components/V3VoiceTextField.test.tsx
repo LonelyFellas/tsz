@@ -916,7 +916,8 @@ it("词形拼写聚焦选中时隐藏富文本预览，避免输入文字重影"
     />
   );
   const input = screen.getByLabelText("英式拼写");
-  expect(document.querySelector(".v3-grammar-preview-content")).toBeTruthy();
+  const preview = document.querySelector(".v3-grammar-preview-content");
+  expect(preview).toHaveClass("v3-spelling-preview-content");
   fireEvent.focus(input);
   expect(document.querySelector(".v3-grammar-preview-content")).toBeNull();
 });
