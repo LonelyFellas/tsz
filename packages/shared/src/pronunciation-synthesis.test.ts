@@ -669,6 +669,27 @@ describe("IPA/UPS 来源与独立停顿", () => {
       });
     }
   );
+  it.each(["en-GB", "en-US"] as const)(
+    "%s 从 integrity 字典音标生成 Azure IPA 时保留词尾 i",
+    (locale) => {
+      expect(
+        convertDictionaryToAzureIpa("ɪnˈteɡrəti", "integrity", locale)
+      ).toMatchObject({
+        ok: true,
+        value: "ɪn.ˈtɛgɹəti"
+      });
+    }
+  );
+  it("Azure UPS 保留美式 Azure IPA 的 ɝ/ɚ", () => {
+    expect(convertAzureIpaToUps("bɝd", "bird", "en-US")).toMatchObject({
+      ok: true,
+      value: "B ER R D"
+    });
+    expect(convertAzureIpaToUps("sɚpɚ", "supper", "en-US")).toMatchObject({
+      ok: true,
+      value: "S AX R P AX R"
+    });
+  });
   it("字典括号不进入 IPA，UPS 直接保留人工 IPA 的音素", () => {
     expect(
       convertDictionaryToAzureIpa("/k(æ)t/", "cat", "en-US")

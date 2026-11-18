@@ -2,14 +2,14 @@
 
 2026-10-16 转换来源及独立设置后续变更见 [IPA / UPS 独立设置](../phoneme-speech-settings/README.md)。以下为原阶段记录。
 
-范围：管理端现有「字典音标 → 实际发音 → Azure IPA / UPS」按钮内置规则，无规则配置界面、无 API 或存储结构变更，不批量改写历史数据。
+范围：管理端现有「字典音标 → 实际发音」「字典音标 → Azure IPA」「Azure IPA → Azure UPS」按钮内置规则，无规则配置界面、无 API 或存储结构变更，不批量改写历史数据。
 
 依据：用户提供的[天生之统一音标规范](https://www.yuque.com/tianshengzhi/cowork/ymutpyfg2e1ykvt4)，于 2026-10-11 读取。目标音素依据 [Azure 英美音素表](https://learn.microsoft.com/azure/ai-services/speech-service/speech-ssml-phonetic-sets)、[Azure UPS 表](https://learn.microsoft.com/azure/ai-services/speech-service/customize-pronunciation)及 [SSML 文档](https://learn.microsoft.com/azure/ai-services/speech-service/speech-synthesis-markup-pronunciation)链接的微软 UPS 参考（长音 `lng`、复合音 `+`、重音 `S1/S2`）。这些资料说明格式，不代替音色的真实合成试听。
 
 ## 转换顺序与边界
 
 1. 字典音标按钮读取当前词形拼写、口音、常规／强读／弱读，生成统一音标。原字段不变，结果只进入实际发音字段。
-2. IPA / UPS 按钮读取实际发音，根据按钮的英美口音适配目标音素。UPS 共用 IPA 适配结果，再生成 UPS 音素、重音、音节边界与逐词元数据。
+2. IPA 按钮从字典音标单独生成对应口音的 Azure IPA，不读取实际发音字段。UPS 按钮读取当前 Azure IPA，根据口音生成 UPS 音素、重音、音节边界与逐词元数据。
 3. 有旧内容时预览确认，支持撤销。确认期间来源、词形、口音、读法或目标变化时旧结果失效。转换失败不写入部分结果，转换不改变语音来源选择。
 
 ### 字典音标到统一音标
@@ -31,6 +31,7 @@
 
 ### 统一音标到 Azure
 
+- 字典音标直接生成 Azure IPA 时不套用实际发音专属的 `i→ɪ`、`ɔːr→ɔr`、`ɝ/ɚ→ər`、清浊化或成音节补 `ə`；美式保留 Azure 支持的 `ɝ/ɚ`，英式不接受美式卷舌元音。
 - `r→ɹ`；英式滑音组合还原成 Azure 元音组合 `ɪə/ʊə`。美式 `ɪʲər/ʊʷər/ɛər/aɪʲər/aʊʷər` 映射为官方列出的 `ɪɹ/ʊɹ/ɛɹ/aɪɹ/aʊɹ`，不将上标滑音读成额外辅音。
 - 美式 `əʊ→oʊ`、`ɒ→ɑ`、`iː/uː/ɑː/ɔː→i/u/ɑ/ɔ`；英式保留其长音及元音。已录入的 `ər` 输出 `əɹ`，不凭丢失的重音信息猜 `ɚ/ɝ`。
 - UPS 英式长元音带 `lng`，双元音按 UPS 组合表示，英美口音不混用。例：英式 `wɜːld→W ER lng L D`，美式 `wərld→W AX R L D`。
