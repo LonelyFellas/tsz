@@ -889,9 +889,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
   const grammarPreview =
     (mode === "grammar" || mode === "spelling" || associationPreview) &&
-    (!focused ||
-      readOnly ||
-      (env.VOICE_EDITOR && editingEnabled && recorded)) &&
+    (mode === "spelling"
+      ? !focused
+      : !focused ||
+        readOnly ||
+        (env.VOICE_EDITOR && editingEnabled && recorded)) &&
     value.text !== "";
   const fallback = (
     <Input.TextArea
