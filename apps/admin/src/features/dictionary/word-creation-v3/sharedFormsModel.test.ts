@@ -16,6 +16,7 @@ import {
   contentFromEditor,
   createPronunciationReferenceIds,
   createSharedContentDialectNormalizer,
+  detachSharedFormContent,
   expandFormContents,
   replaceSharedContent
 } from "./sharedFormsModel";
@@ -182,6 +183,60 @@ describe("共享词形内容", () => {
     }
     expect(variants[0]).not.toEqual(variants[1]);
     expect(forms.contents[0]).not.toEqual(content);
+  });
+
+  it("解绑共享词形保留词形和组成员身份，并生成空的英美内容", () => {
+    const expanded = formsFixture({ forms: [ukUsFormFixture()] });
+    expanded.pos.push(
+      ...formsFixture({
+        pos_id: uuidFromInt(701),
+        pos: "verb",
+        forms: [commonFormFixture({ id: uuidFromInt(702) })],
+        groups: [
+          {
+            id: uuidFromInt(703),
+            is_regular: true,
+            members: [{ id: uuidFromInt(704), form_id: uuidFromInt(702) }]
+          }
+        ]
+      }).pos
+    );
+    let forms = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      expanded
+    ) as SharedFormsStepContentV3;
+    forms = assignSharedFormContent(
+      forms,
+      forms.pos[0]!.forms[0]!.content_id,
+      forms.pos[1]!.forms[0]!.id,
+      stableIds(forms)
+    );
+    const verb = forms.pos[1]!.forms[0]!;
+    const membership = forms.pos[1]!.form_groups[0]!.members[0]!;
+    const next = detachSharedFormContent(forms, verb.id);
+    const detached = next.pos[1]!.forms[0]!;
+    expect(detached.id).toBe(verb.id);
+    expect(next.pos[1]!.form_groups[0]!.members).toEqual([membership]);
+    expect(detached.content_id).not.toBe(forms.pos[0]!.forms[0]!.content_id);
+    const projected =
+      expandFormContents(next).pos[1]!.forms[0]!.regional_variants;
+    expect(projected).toMatchObject({
+      mode: "uk_us",
+      uk: {
+        spelling: "",
+        origin: "manual",
+        pronunciations: [
+          { dict_phonetic: "", actual_pron: "", style: "citation" }
+        ]
+      },
+      us: {
+        spelling: "",
+        origin: "manual",
+        pronunciations: [
+          { dict_phonetic: "", actual_pron: "", style: "citation" }
+        ]
+      }
+    });
   });
 
   it("结构操作不从展开副本覆盖共享正文，相同拼写新词形不自动合并", () => {
