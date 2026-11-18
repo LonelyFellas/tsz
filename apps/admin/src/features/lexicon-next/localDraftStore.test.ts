@@ -155,4 +155,25 @@ describe("localDraftStore", () => {
     await expect(readNextLocalDraft(draftKey)).resolves.toBeUndefined();
     await expect(readRaw(storageKey(draftKey))).resolves.toBeUndefined();
   });
+
+  it("reports unavailable IndexedDB instead of silently returning a draft", async () => {
+    const original = globalThis.indexedDB;
+    Object.defineProperty(globalThis, "indexedDB", {
+      configurable: true,
+      value: undefined
+    });
+    try {
+      await expect(readNextLocalDraft(key(editorId))).rejects.toThrow(
+        "indexedDB unavailable"
+      );
+      await expect(
+        writeNextLocalDraft(key(editorId), snapshot(editorId))
+      ).rejects.toThrow("indexedDB unavailable");
+    } finally {
+      Object.defineProperty(globalThis, "indexedDB", {
+        configurable: true,
+        value: original
+      });
+    }
+  });
 });
