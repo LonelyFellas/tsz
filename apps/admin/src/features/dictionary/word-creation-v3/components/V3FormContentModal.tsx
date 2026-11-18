@@ -56,6 +56,7 @@ import {
   contentFromEditor,
   createPronunciationReferenceIds,
   createSharedContentDialectNormalizer,
+  detachSharedFormContent,
   replaceSharedContent,
   sharedContentForForm
 } from "../sharedFormsModel";
@@ -503,6 +504,7 @@ export function V3FormContentModal({
     const projected = expanded.get(id)!;
     if (formReferenceCount(referenceGuard.index, projected) > 0)
       return "unlink_before_remove";
+    if (rows.length > 1) return undefined;
     if (pos.forms.length <= 1) return "one_form_required";
     const firstGroup = pos.form_groups[0];
     if (
@@ -529,6 +531,10 @@ export function V3FormContentModal({
     }
     const remove = () => {
       const next = structuredClone(labels);
+      if (rows.length > 1) {
+        setLabels(detachSharedFormContent(next, id));
+        return;
+      }
       for (const pos of next.pos) {
         pos.forms = pos.forms.filter((row) => row.id !== id);
         for (const group of pos.form_groups)
