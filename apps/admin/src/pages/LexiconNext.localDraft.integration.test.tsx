@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpError } from "@tsz/api-client";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
 import type { NextCapabilities, NextEntry } from "@tsz/types";
 import { adminShellResources } from "@/i18n";
@@ -144,7 +145,7 @@ function requests() {
     create: vi.fn(),
     save: vi.fn(),
     view: vi.fn()
-  } as unknown as LexiconNextRequests;
+  } satisfies LexiconNextRequests;
 }
 
 function mount(requests: LexiconNextRequests) {
@@ -277,5 +278,72 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
       expect(screen.getByRole("button", { name: "选择配对词义" })).toBeEnabled()
     );
     await waitFor(() => expect(write).toHaveBeenCalledOnce());
+  });
+
+  it("本地配对草稿遇到 409 后保留本地内容并用新版本继续保存", async () => {
+    const api = requests();
+    const remote = {
+      ...structuredClone(entry),
+      revision: 2,
+      draft: { ...entry.draft, headword: "remote-flat" }
+    };
+    api.get
+      .mockResolvedValueOnce(structuredClone(entry))
+      .mockResolvedValue(remote);
+    api.save
+      .mockRejectedValueOnce(
+        new HttpError(409, "revision conflict", [], "revision_conflict")
+      )
+      .mockResolvedValue({ ...remote, revision: 3 });
+    mount(api);
+
+    await screen.findByRole("button", { name: "解除配对" });
+    fireEvent.click(screen.getByRole("button", { name: "解除配对" }));
+    await waitFor(async () => {
+      const stored = await localDraftStore.readNextLocalDraft({
+        account_id: accountId,
+        entry_id: entryId,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans"
+      });
+      expect(stored?.edited_pairs[senseId]?.paired).toBe(false);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "保存完整草稿" }));
+    await screen.findByText("服务器版本已更新。本地草稿已保留，请先比较版本。");
+    fireEvent.click(screen.getByRole("button", { name: "比较服务器版本" }));
+    await screen.findByText("服务器 · 版本 2");
+    fireEvent.click(
+      screen.getByRole("button", { name: "保留本地草稿并继续保存" })
+    );
+    await screen.findByRole("button", { name: "保留本地并继续" });
+    fireEvent.click(screen.getByRole("button", { name: "保留本地并继续" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存完整草稿" }));
+
+    await waitFor(() => {
+      expect(api.save).toHaveBeenCalledTimes(2);
+      expect(api.save.mock.calls[1]![1].expected_revision).toBe(2);
+      expect(api.save.mock.calls[1]![1].draft.headword).toBe("flat");
+      expect(api.save.mock.calls[1]![1].dialect_changes).toEqual([
+        {
+          sense_id: senseId,
+          usage: "en-GB",
+          no_equivalent: false,
+          note: "",
+          target: null,
+          previous_target_revision: 1
+        }
+      ]);
+    });
+    await waitFor(async () => {
+      await expect(
+        localDraftStore.readNextLocalDraft({
+          account_id: accountId,
+          entry_id: entryId,
+          target_locale: "en-GB",
+          medium_locale: "zh-Hans"
+        })
+      ).resolves.toBeUndefined();
+    });
   });
 });
