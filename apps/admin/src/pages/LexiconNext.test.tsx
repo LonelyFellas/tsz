@@ -1247,6 +1247,127 @@ describe("新版词库手工闭环", () => {
     expect(screen.queryByText("apartment")).not.toBeInTheDocument();
   });
 
+  it("放弃方言配对本地草稿后清除快照并回到服务器配对目标", async () => {
+    const api = requests();
+    const senseId = "00000000-0000-4000-8000-000000000007";
+    const original = {
+      ...entry,
+      dialect_senses: [
+        {
+          sense_id: senseId,
+          usage: "en-GB" as const,
+          paired: true,
+          no_equivalent: false,
+          note: "",
+          target: {
+            entry_id: "peer-server",
+            sense_id: "peer-server-sense",
+            revision: 1,
+            headword: "apartment",
+            gloss: "公寓",
+            part_of_speech: "noun"
+          }
+        }
+      ],
+      draft: {
+        ...entry.draft,
+        senses: [
+          {
+            id: senseId,
+            part_of_speech: "noun",
+            definitions: [],
+            equivalents: []
+          }
+        ]
+      }
+    };
+    const snapshot: localDraftStore.NextLocalDraftSnapshot = {
+      snapshot_version: 1,
+      account_id: "editor",
+      entry_id: id,
+      target_locale: "en-GB",
+      medium_locale: "zh-Hans",
+      base_revision: 1,
+      draft_schema_version: 1,
+      draft: structuredClone(original.draft),
+      edited_pairs: {
+        [senseId]: {
+          sense_id: senseId,
+          usage: "en-GB",
+          paired: true,
+          no_equivalent: false,
+          note: "",
+          target: {
+            entry_id: "peer-edited",
+            sense_id: "peer-edited-sense",
+            revision: 4,
+            headword: "colour",
+            gloss: "颜色",
+            part_of_speech: "noun"
+          }
+        }
+      },
+      sentence_resources: [],
+      updated_at: "2026-11-18T00:00:00.000Z"
+    };
+    api.get.mockResolvedValue(original);
+    api.capabilities.mockResolvedValue({ ...caps, dialect_pairs: true });
+    vi.spyOn(localDraftStore, "readNextLocalDraft").mockResolvedValue(snapshot);
+    const clear = vi
+      .spyOn(localDraftStore, "clearNextLocalDraft")
+      .mockResolvedValue();
+
+    mount(
+      api,
+      `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans&step=meanings`
+    );
+
+    await screen.findByText("发现未提交的本地草稿");
+    fireEvent.click(button("放弃本地草稿"));
+    await waitFor(() =>
+      expect(screen.queryByText("发现未提交的本地草稿")).not.toBeInTheDocument()
+    );
+    expect(clear).toHaveBeenCalledWith({
+      account_id: "editor",
+      entry_id: id,
+      target_locale: "en-GB",
+      medium_locale: "zh-Hans"
+    });
+    expect(screen.getByRole("link", { name: "打开对应词义" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("peer-server")
+    );
+    expect(screen.queryByText("colour")).not.toBeInTheDocument();
+  });
+
+  it("不同账号不会读取其他账号的方言配对本地草稿", async () => {
+    const api = requests();
+    const read = vi
+      .spyOn(localDraftStore, "readNextLocalDraft")
+      .mockResolvedValue(undefined);
+    useAuthStore.setState({
+      profile: {
+        ...useAuthStore.getState().profile!,
+        id: "another-editor"
+      }
+    });
+    mount(
+      api,
+      `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans&step=meanings`
+    );
+
+    await screen.findByRole("combobox", { name: "目标语言" });
+    await waitFor(() =>
+      expect(read).toHaveBeenCalledWith({
+        account_id: "another-editor",
+        entry_id: id,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans"
+      })
+    );
+    expect(screen.queryByText("发现未提交的本地草稿")).not.toBeInTheDocument();
+  });
+
   it("解除配对留在本地，保存失败时保留修改并用原目标版本重试", async () => {
     const scroll = HTMLElement.prototype.scrollIntoView;
     HTMLElement.prototype.scrollIntoView = vi.fn();
