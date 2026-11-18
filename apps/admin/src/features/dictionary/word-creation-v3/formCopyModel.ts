@@ -154,6 +154,7 @@ export function planFormCopy(
       const styleKey = pronunciation.style ?? "__missing__";
       const autoMatch =
         needsChoice &&
+        pronunciation.style !== undefined &&
         sourceStyleCounts.get(styleKey) === 1 &&
         targetStyleCounts.get(styleKey) === 1
           ? from.findIndex((row) => row.style === pronunciation.style)

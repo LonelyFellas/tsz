@@ -897,6 +897,27 @@ describe("词形内容定向复制", () => {
     );
   });
 
+  it("未选择读法标签时仍要求手动映射", () => {
+    const source = commonFormFixture({
+      pronunciations: [
+        pronunciationFixture({ style: undefined }),
+        pronunciationFixture({
+          id: uuidFromInt(805),
+          style: "citation"
+        })
+      ]
+    });
+    const target = commonFormFixture({
+      id: uuidFromInt(806),
+      pronunciations: [pronunciationFixture({ style: undefined })]
+    });
+    const { forms, sourceId, targetId } = setup(source, target);
+
+    expect(
+      planFormCopy(forms, sourceId, targetId, "phonetics").needsMapping
+    ).toBe(true);
+  });
+
   it("拒绝两套不同英美正文写入common，common双侧候选按侧写入uk_us并保留来源缺侧目标", () => {
     const conflict = setup(
       ukUsFormFixture({
