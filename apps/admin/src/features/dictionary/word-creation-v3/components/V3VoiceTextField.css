@@ -120,7 +120,8 @@ textarea.v3-voice-text-large-preview.ui-input {
 }
 
 textarea.word-pronunciation-phonetic-input.tsz-words.ui-input,
-textarea.word-pronunciation-phonetic-input.tsz-actual-pronunciation.ui-input {
+textarea.word-pronunciation-phonetic-input.tsz-actual-pronunciation.ui-input,
+.v3-actual-pronunciation-preview-content {
   font-size: 14pt;
 }
 
@@ -161,6 +162,52 @@ textarea.word-pronunciation-phonetic-input.ui-input {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   pointer-events: none;
+}
+
+/* 实际发音完成后只展示富文本，输入层保留尺寸和错误定位但不再抢焦点。 */
+.v3-actual-pronunciation-preview > textarea.ui-input {
+  position: absolute;
+  inset: 0;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  color: transparent;
+  caret-color: transparent;
+  pointer-events: none;
+}
+
+.v3-actual-pronunciation-preview > textarea.ui-input:focus {
+  border-color: var(--ui-color-border);
+  outline: none;
+  box-shadow: none;
+}
+
+.v3-actual-pronunciation-preview
+  > textarea.ui-input.ui-input-status-error:focus {
+  border-color: var(--ui-color-error);
+  outline-color: var(--ui-color-error);
+}
+
+.v3-actual-pronunciation-preview-content {
+  position: relative;
+  z-index: 5;
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--ui-space-1) 11px;
+  border: 1px solid transparent;
+  line-height: var(--ui-line-height, 1.5714285714);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+
+.v3-actual-pronunciation-preview-content .tsz-ve-readonly {
+  display: block;
+  max-width: none;
+}
+
+.v3-actual-pronunciation-edit-button.is-preview-focused {
+  color: var(--ui-color-primary);
 }
 
 /* 释义收起态沿用正文输入框的字号和内边距，富文本负责撑高。 */

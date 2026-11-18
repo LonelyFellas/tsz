@@ -122,7 +122,7 @@ it("覆盖前显示所有新旧值，取消不写回，确认一次写入并整�
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByLabelText("实际发音 当前内容")).toHaveValue("old");
   expect(within(dialog).getByLabelText("英式 Azure IPA 转换结果")).toHaveValue(
-    "bɪp"
+    "bɪb"
   );
   expect(within(dialog).getByLabelText("美式 Azure UPS 转换结果")).toHaveValue(
     "B IH B"
@@ -137,7 +137,7 @@ it("覆盖前显示所有新旧值，取消不写回，确认一次写入并整�
     actual_pron: "bɪb",
     actual_pron_rich: { annotations: [] },
     synthesis: {
-      uk: { source: "upload", ipa: "bɪp", ups: "B IH P" },
+      uk: { source: "upload", ipa: "bɪb", ups: "B IH B" },
       us: { source: "none", ipa: "bɪb", ups: "B IH B" }
     }
   });
@@ -199,10 +199,10 @@ it("确认期间切换口音会拒绝旧结果，转换后再编辑会失去旧�
 
 it("转换失败保留全部原值并标明失败口音与字段", async () => {
   onChange.mockClear();
-  const value = { ...initial, dict_phonetic: "ˈbʌtən", style: "weak" as const };
+  const value = { ...initial, dict_phonetic: "ˈbʌʔən", style: "weak" as const };
   render(<Harness value={value} spelling="button" />);
   start();
-  expect(await screen.findByText(/美式 Azure IPA：.*ʔ/)).toBeVisible();
+  expect(await screen.findByText(/英式 Azure IPA：.*ʔ/)).toBeVisible();
   expect(current()).toEqual(value);
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.queryByRole("dialog")).toBeNull();

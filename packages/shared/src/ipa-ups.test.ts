@@ -72,6 +72,10 @@ test("unsupported and malformed notation is not guessed", () => {
     value: "W ER lng L D"
   });
   assert.deepEqual(ipaWordToUps("ɝ", "en-US"), { ok: true, value: "ER R" });
+  assert.deepEqual(ipaWordToUps("i", "en-GB"), { ok: true, value: "I" });
+  assert.isFalse(ipaWordToUps("oʊ", "en-GB").ok);
+  assert.isFalse(ipaWordToUps("ɝ", "en-GB").ok);
+  assert.isFalse(ipaWordToUps("ɚ", "en-GB").ok);
 });
 test("actual conversion marks the known syllable boundary before Azure IPA stress", () => {
   const result = convertActualPronunciation("gɪˈtɑɹ", "guitar", "ipa", "en-US");

@@ -23,9 +23,9 @@ it("通用读法分别转换英美音素，实际发音保持通用规则，输�
         actual_pron_rich: { version: 2, text: "bɪb", annotations: [] },
         synthesis: {
           uk: {
-            ipa: "bɪp",
-            ups: "B IH P",
-            ups_words: [{ text: "bib", phoneme: "B IH P" }]
+            ipa: "bɪb",
+            ups: "B IH B",
+            ups_words: [{ text: "bib", phoneme: "B IH B" }]
           },
           us: {
             ipa: "bɪb",
@@ -38,6 +38,36 @@ it("通用读法分别转换英美音素，实际发音保持通用规则，输�
     }
   });
   expect(input).toEqual(pronunciation);
+});
+
+it("批量转换分别应用实际发音与 Azure IPA 规则", () => {
+  const integrity = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ɪnˈteɡrəti" },
+    "integrity",
+    "common"
+  );
+  expect(integrity).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "ɪnˈtɛgrətɪ",
+        synthesis: {
+          uk: { ipa: "ɪn.ˈtɛgɹəti" },
+          us: { ipa: "ɪn.ˈtɛgɹəti" }
+        }
+      }
+    }
+  });
+
+  const moreLike = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ˈmɔːr laɪk" },
+    "more like",
+    "common"
+  );
+  expect(moreLike).toMatchObject({
+    ok: true,
+    plan: { patch: { actual_pron: "ˈmɔr laɪk" } }
+  });
 });
 
 const speech = (asset: string): SynthesisSpeechV3 => ({
@@ -91,8 +121,8 @@ it("转换与撤销只失效改动音素的旧音频引用，保留来源、参�
   expect(result.plan.patch.synthesis?.us).toEqual(input.synthesis?.us);
   expect(result.plan.patch.synthesis?.uk).toMatchObject({
     source: "upload",
-    ipa: "bɪp",
-    ups: "B IH P"
+    ipa: "bɪb",
+    ups: "B IH B"
   });
   for (const field of ["ipa_speech", "ups_speech"] as const) {
     expect(result.plan.patch.synthesis?.uk?.[field]).toEqual({
@@ -121,9 +151,9 @@ it("内容与词界没有改变时保留已有正式音频引用", () => {
       ups: "",
       uk: {
         source: "ipa",
-        ipa: "bɪp",
-        ups: "B IH P",
-        ups_words: [{ text: "bib", phoneme: "B IH P" }],
+        ipa: "bɪb",
+        ups: "B IH B",
+        ups_words: [{ text: "bib", phoneme: "B IH B" }],
         ipa_speech: speech("same-ipa"),
         ups_speech: speech("same-ups")
       }
@@ -139,11 +169,11 @@ it("内容与词界没有改变时保留已有正式音频引用", () => {
 it("美式转换失败时不返回已经算出的英式或实际发音补丁", () => {
   const input = {
     ...pronunciation,
-    dict_phonetic: "ˈbʌtən",
+    dict_phonetic: "ˈbʌʔən",
     style: "weak" as const
   };
   const before = structuredClone(input);
-  const result = planPronunciationConversion(input, "button", "common");
+  const result = planPronunciationConversion(input, "button", "us");
   expect(result).toMatchObject({
     ok: false,
     field: "us.ipa",
