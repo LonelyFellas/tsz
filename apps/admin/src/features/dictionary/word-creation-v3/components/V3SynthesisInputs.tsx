@@ -167,6 +167,26 @@ export function V3SynthesisInputs({
     });
     setDiagnostic("");
   };
+  const writeAudioAssets = (side: Side, audioAssets: AudioAssetV3[]) => {
+    const candidate = candidateForSide(synthesis, side, dialect);
+    const hasDefault = audioAssets.some(
+      (asset) =>
+        speechAccentGroup(asset.locale) === side && asset.is_default === true
+    );
+    const source = hasDefault
+      ? "upload"
+      : candidate.source === "upload"
+        ? undefined
+        : candidate.source;
+    writeCandidate(
+      side,
+      {
+        ...candidate,
+        source
+      },
+      audioAssets
+    );
+  };
   const change = (
     side: Side,
     alphabet: Alphabet,
@@ -714,7 +734,7 @@ export function V3SynthesisInputs({
                               })}
                               assets={pronunciation.audio_assets ?? []}
                               onChange={(audio_assets) =>
-                                onChange({ audio_assets })
+                                writeAudioAssets(side, audio_assets)
                               }
                             />
                           )}
