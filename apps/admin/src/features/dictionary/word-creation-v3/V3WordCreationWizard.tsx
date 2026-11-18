@@ -1620,16 +1620,25 @@ function V3WordCreationSession({
           return true;
         } catch (error) {
           if (mountedRef.current)
-            setProblem(classifyV3Problem(error, "save_forms"));
+            await handleError(error, "save_audio", async () => {
+              await saveAudioContent();
+            });
           return false;
         } finally {
-          savesInFlightRef.current -= 1;
+          finishSaveInFlight();
         }
       })
       .catch(() => false);
     audioSaveQueue.current = run;
     return run;
-  }, [applyCanonical, blockedByRemoteUpdate, requests, sessionReadOnly]);
+  }, [
+    applyCanonical,
+    blockedByRemoteUpdate,
+    finishSaveInFlight,
+    handleError,
+    requests,
+    sessionReadOnly
+  ]);
 
   const saveMeanings = useCallback(
     async (

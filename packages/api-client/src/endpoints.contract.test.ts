@@ -45,6 +45,7 @@ const SPELLING_MARKUP_OPERATIONS: readonly string[] = [
   "get /admin/lexicon/entries/{id}/publications/{publication_id}",
   "post /admin/lexicon/entries",
   "put /admin/lexicon/entries/{id}/steps/forms",
+  "put /admin/lexicon/entries/{id}/audio",
   "put /admin/lexicon/entries/{id}/steps/meanings",
   "post /admin/lexicon/entries/{id}/publications",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/restore-draft",
@@ -856,7 +857,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "cfa3aa6002a171ca66f3d4f5cc5f22bef47239e064e3d7253ee1e76148856d94"
+      "0be516fd74595aa97ccddece4dd3861100e4d993e1940aaa929023e786303363"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1427,7 +1428,17 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }
-                  }
+                  },
+                  ...(operation === "put /admin/lexicon/entries/{id}/audio"
+                    ? [
+                        {
+                          name: "X-TSZ-Voice-Locales",
+                          in: "header",
+                          required: false,
+                          schema: { type: ["string", "null"] }
+                        }
+                      ]
+                    : [])
                 ]
               : []),
             ...(operation === "get /me/wordlists/{id}/items"
