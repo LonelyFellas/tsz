@@ -300,11 +300,14 @@ it("总览音色列按启用音色逐行展示，并让语速和音量保持同�
 });
 
 it("总览继承音色时按当前读法解析推荐音色", async () => {
-  preview.resolveVoices.mockImplementation(async ({ accent }) => ({
+  preview.resolveVoices.mockImplementation(async ({ accent, content }) => ({
     source: { kind: "recommendation" },
     voices: [
       {
-        voice_id: accent === "gb" ? "british-voice" : "american-andrew",
+        voice_id:
+          accent === "gb" || content.text !== "center"
+            ? "british-voice"
+            : "american-andrew",
         version_id: `recommended-${accent}`,
         locale: accent === "gb" ? "en-GB" : "en-US",
         enabled: true,
@@ -367,6 +370,13 @@ it("总览继承音色时按当前读法解析推荐音色", async () => {
         />
       </PronunciationPreviewProvider>
     </App>
+  );
+  await waitFor(() =>
+    expect(
+      preview.resolveVoices.mock.calls.some(
+        ([input]) => input.accent === "us" && input.content?.text === "center"
+      )
+    ).toBe(true)
   );
   expect(await screen.findByText("Andrew Test")).toBeVisible();
   expect(
