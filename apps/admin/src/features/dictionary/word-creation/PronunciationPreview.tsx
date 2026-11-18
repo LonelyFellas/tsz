@@ -582,6 +582,7 @@ export function pronunciationVoiceRows(
 export function PronunciationPreviewVoiceList({
   dialect,
   voiceProfile,
+  content,
   recommendationArea,
   source,
   audioAssets,
@@ -591,6 +592,7 @@ export function PronunciationPreviewVoiceList({
 }: {
   dialect: Dialect;
   voiceProfile?: VoiceProfileV3;
+  content?: RichTextV2;
   recommendationArea?: VoiceRecommendationArea;
   source?: string;
   audioAssets?: readonly AudioAssetV3[] | null;
@@ -604,7 +606,7 @@ export function PronunciationPreviewVoiceList({
   const resolved = useResolvedPreviewProfile(
     context,
     voiceProfile,
-    { version: 2, text: "", annotations: [] },
+    content ?? { version: 2, text: "", annotations: [] },
     dialect,
     context.adapter,
     recommendationArea

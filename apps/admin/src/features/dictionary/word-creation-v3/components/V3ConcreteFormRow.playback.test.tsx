@@ -49,6 +49,13 @@ vi.mock("../../voice-editor/dataSource", () => ({
         label: "American",
         locale: "en-US",
         gender: "female"
+      },
+      {
+        id: "american-andrew",
+        label: "American Andrew",
+        displayName: "Andrew Test",
+        locale: "en-US",
+        gender: "male"
       }
     ],
     synthesize: preview.synthesize,
@@ -290,6 +297,81 @@ it("总览音色列按启用音色逐行展示，并让语速和音量保持同�
   expect(screen.getByText("0.55×")).toBeVisible();
   expect(screen.getByText("93%")).toBeVisible();
   expect(screen.getByText("100%")).toBeVisible();
+});
+
+it("总览继承音色时按当前读法解析推荐音色", async () => {
+  preview.resolveVoices.mockImplementation(async ({ accent }) => ({
+    source: { kind: "recommendation" },
+    voices: [
+      {
+        voice_id: accent === "gb" ? "british-voice" : "american-andrew",
+        version_id: `recommended-${accent}`,
+        locale: accent === "gb" ? "en-GB" : "en-US",
+        enabled: true,
+        rate_percent: 0
+      }
+    ]
+  }));
+  const inherited = {
+    voices: [],
+    dubbing: {
+      area: "azure" as const,
+      uk: { mode: "inherit" as const },
+      us: { mode: "inherit" as const }
+    }
+  };
+  const form = ukUsFormFixture({
+    us: {
+      spelling: "center",
+      pronunciations: [
+        pronunciationFixture({
+          synthesis: {
+            alphabet: "ipa",
+            ipa: "",
+            ups: "",
+            us: {
+              source: "ipa",
+              ipa: "ˈsɛntɚ",
+              ups: "S EH N T ER",
+              ipa_speech: {
+                content: { version: 2, text: "center", annotations: [] },
+                voice_profile: inherited
+              }
+            }
+          }
+        })
+      ]
+    }
+  });
+  const pos = formsFixture({ forms: [form] }).pos[0]!;
+  render(
+    <App>
+      <PronunciationPreviewProvider>
+        <V3FormContentOverview
+          rows={[
+            {
+              membershipId: pos.form_groups[0]!.members[0]!.id,
+              form,
+              formLabel: "原形",
+              formTypeAriaLabel: "词形类型",
+              formTypeDisabled: false,
+              formTypeOptions: ["base"],
+              membershipCount: 1
+            }
+          ]}
+          group={pos.form_groups[0]!}
+          sharedCounts={new Map()}
+          onEdit={() => undefined}
+          onFormTypeChange={() => undefined}
+          issues={[]}
+        />
+      </PronunciationPreviewProvider>
+    </App>
+  );
+  expect(await screen.findByText("Andrew Test")).toBeVisible();
+  expect(
+    screen.getByText("Andrew Test").closest(".v3-voice-inline-name")
+  ).toHaveTextContent("Andrew Test♂");
 });
 
 it("总览上传音频行显示来源文件，语速和音量不伪造合成值", async () => {

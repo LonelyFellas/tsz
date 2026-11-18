@@ -129,6 +129,7 @@ function PronunciationCell({
           recommendationArea={recommendationArea}
           dialect={dialect}
           voiceProfile={profile}
+          content={content}
           source={source}
           audioAssets={row.audio_assets}
           audioAssetId={assetId}
