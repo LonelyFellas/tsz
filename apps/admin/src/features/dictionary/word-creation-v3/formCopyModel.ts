@@ -7,12 +7,14 @@ export class FormCopyError extends Error {
 }
 import { regionalVariants } from "@tsz/shared";
 import type {
+  AudioAssetV3,
   FormContentV3,
   FormContentVariantV3,
   PronunciationSynthesisCandidateV3,
   PronunciationSynthesisV3,
   RichTextV2V3,
   SharedFormsStepContentV3,
+  SpellingSpeechV3,
   VoiceProfileV3,
   WordPronunciationV3
 } from "@tsz/types";
@@ -644,6 +646,51 @@ function profileSide(
   return group === "uk" || group === "us" ? group : undefined;
 }
 
+function audioAssetsForSide(
+  value: { audio_assets?: readonly AudioAssetV3[] } | undefined,
+  side: FormCopySide
+) {
+  return (
+    value?.audio_assets?.filter(
+      (asset) => speechAccentGroup(asset.locale) === side
+    ) ?? []
+  );
+}
+
+function replaceAudioAssetsForSide(
+  target: { audio_assets?: AudioAssetV3[] },
+  source: { audio_assets?: readonly AudioAssetV3[] } | undefined,
+  side: FormCopySide
+) {
+  const incoming = audioAssetsForSide(source, side);
+  if (!incoming.length) return false;
+  const current = target.audio_assets ?? [];
+  const firstIndex = current.findIndex(
+    (asset) => speechAccentGroup(asset.locale) === side
+  );
+  const next = current.flatMap((asset, index) => {
+    if (speechAccentGroup(asset.locale) !== side) return [asset];
+    return index === firstIndex ? structuredClone(incoming) : [];
+  });
+  if (firstIndex < 0) next.push(...structuredClone(incoming));
+  target.audio_assets = next;
+  return true;
+}
+
+function selectTargetSource(
+  target: WordPronunciationV3,
+  match: FormCopyPlan["matches"][number],
+  source: "upload" | "spelling"
+) {
+  target.synthesis ??= emptySynthesis();
+  const candidate = target.synthesis[match.side] ??
+    candidateForSide(target, match.target.region, match.side) ?? {
+      ipa: "",
+      ups: ""
+    };
+  target.synthesis[match.side] = { ...candidate, source };
+}
+
 function mergeFallbacks(
   target: VoiceProfileV3 | undefined,
   matches: FormCopyPlan["matches"],
@@ -743,11 +790,6 @@ function copyVoices(
         match.side === "uk" ? "en-GB" : "en-US",
         match.source.region
       );
-    if (
-      sourceSelection?.source === "none" ||
-      sourceSelection?.source === "upload"
-    )
-      continue;
     const targetSelection =
       before.synthesis &&
       synthesisForLocale(
@@ -755,6 +797,46 @@ function copyVoices(
         match.side === "uk" ? "en-GB" : "en-US",
         match.target.region
       );
+    const sourceAudio = audioAssetsForSide(from, match.side);
+    const sourceUsesUpload =
+      sourceSelection?.source === "upload" ||
+      (!sourceSelection?.source &&
+        !sourceSelection?.use_spelling &&
+        sourceAudio.length > 0);
+    if (sourceUsesUpload) {
+      if (replaceAudioAssetsForSide(target, from, match.side)) {
+        selectTargetSource(target, match, "upload");
+        copied = true;
+      }
+      continue;
+    }
+    const spellingAudio = sourceSelection?.use_spelling
+      ? audioAssetsForSide(fromVariant.spelling_speech, match.side)
+      : [];
+    if (spellingAudio.length) {
+      const spellingSpeech: SpellingSpeechV3 =
+        targetVariant.spelling_speech ?? {
+          content: {
+            version: 2,
+            text: targetVariant.spelling,
+            annotations: []
+          },
+          voice_profile: { voices: [] }
+        };
+      if (
+        replaceAudioAssetsForSide(
+          spellingSpeech,
+          fromVariant.spelling_speech,
+          match.side
+        )
+      ) {
+        targetVariant.spelling_speech = spellingSpeech;
+        if (!targetSelection?.use_spelling)
+          selectTargetSource(target, match, "spelling");
+        copied = true;
+      }
+    }
+    if (sourceSelection?.source === "none") continue;
     const fromSpelling = Boolean(sourceSelection?.use_spelling);
     const targetSpelling = Boolean(targetSelection?.use_spelling);
     const fallback = copiedProfile(

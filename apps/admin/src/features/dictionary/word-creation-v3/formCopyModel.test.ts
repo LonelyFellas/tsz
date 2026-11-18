@@ -69,6 +69,14 @@ function recording(id: string): AudioAssetV3 {
   };
 }
 
+function recordingFor(
+  id: string,
+  locale: "en-GB" | "en-US",
+  is_default = true
+): AudioAssetV3 {
+  return { ...recording(id), locale, ...(is_default ? { is_default } : {}) };
+}
+
 function setup(source?: WordConcreteFormV3, target?: WordConcreteFormV3) {
   const forms = applyFormsStructure(
     { forms_format: "shared_v1", contents: [], pos: [] },
@@ -274,7 +282,7 @@ describe("词形内容定向复制", () => {
   );
 
   it.each([false, true])(
-    "复制独立拼写音色而不使用残留profile（残留=%s）",
+    "复制独立拼写音色与上传音频而不使用残留profile（残留=%s）",
     (stale) => {
       const { forms, sourceId, targetId } = setup();
       const from = variant(forms.contents[0]!);
@@ -291,6 +299,7 @@ describe("词形内容定向复制", () => {
         ...speech(from.spelling, profile("spelling-source")),
         audio_assets: [recording("source")]
       };
+      source.audio_assets = [recording("stale-row-upload")];
       if (stale) {
         source.voice_profile = profile("stale-row");
         source.synthesis.uk = {
@@ -314,6 +323,7 @@ describe("词形内容定向复制", () => {
         },
         audio_assets: [recording("target")]
       };
+      target.audio_assets = [recording("target-row-upload")];
       const original = structuredClone(forms);
       const next = applyFormCopy(
         forms,
@@ -333,7 +343,7 @@ describe("词形内容定向复制", () => {
         to.spelling_speech.content
       );
       expect(copied.spelling_speech!.audio_assets).toEqual(
-        to.spelling_speech.audio_assets
+        from.spelling_speech.audio_assets
       );
       expect(copied.pronunciations[0]!.synthesis).toMatchObject({
         alphabet: "ups",
@@ -535,7 +545,7 @@ describe("词形内容定向复制", () => {
     expect(variant(next.contents[1]!).pronunciations[0]!.style).toBeUndefined();
   });
 
-  it("复制音色保留目标所有正文与发音源选择，复制禁用版本参数与顺序且不带来源音频", () => {
+  it("复制音色保留目标所有正文，复制禁用版本参数与顺序且不带生成音频", () => {
     const { forms, sourceId, targetId } = setup();
     const source = variant(forms.contents[0]!).pronunciations[0]!;
     const to = variant(forms.contents[1]!);
@@ -1215,6 +1225,165 @@ describe("词形内容定向复制", () => {
     forms.pos[0]!.forms[1]!.content_id = forms.contents[0]!.id;
     expect(() => applyFormCopy(forms, plan)).toThrow("已变化");
   });
+});
+
+it("复制音色时按英美口音复制上传音频，并切换目标活动来源", () => {
+  const { forms, sourceId, targetId } = setup();
+  const source = variant(forms.contents[0]!).pronunciations[0]!;
+  const target = variant(forms.contents[1]!).pronunciations[0]!;
+  source.audio_assets = [
+    recordingFor("source-uk", "en-GB"),
+    recordingFor("source-us", "en-US")
+  ];
+  source.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: { source: "upload", ipa: "", ups: "" },
+    us: { source: "upload", ipa: "", ups: "" }
+  };
+  target.audio_assets = [
+    recordingFor("target-uk", "en-GB"),
+    recordingFor("target-us", "en-US")
+  ];
+  target.synthesis = {
+    alphabet: "ipa",
+    ipa: "target",
+    ups: "",
+    uk: { source: "ipa", ipa: "target", ups: "" },
+    us: { source: "ipa", ipa: "target", ups: "" }
+  };
+
+  const before = structuredClone(forms);
+  const next = applyFormCopy(
+    forms,
+    planFormCopy(forms, sourceId, targetId, "voices")
+  );
+  const copied = variant(next.contents[1]!).pronunciations[0]!;
+
+  expect(copied.audio_assets).toEqual(source.audio_assets);
+  expect(copied.audio_assets).not.toBe(source.audio_assets);
+  expect(copied.synthesis?.uk?.source).toBe("upload");
+  expect(copied.synthesis?.us?.source).toBe("upload");
+  expect(forms).toEqual(before);
+});
+
+it("复制混合来源时只替换上传口音，保留另一侧目标音频与音色", () => {
+  const { forms, sourceId, targetId } = setup();
+  const source = variant(forms.contents[0]!).pronunciations[0]!;
+  const target = variant(forms.contents[1]!).pronunciations[0]!;
+  source.audio_assets = [recordingFor("source-uk", "en-GB")];
+  source.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: { source: "upload", ipa: "", ups: "" },
+    us: {
+      source: "ipa",
+      ipa: "source us",
+      ups: "",
+      ipa_speech: speech("old word", profile("source-us"))
+    }
+  };
+  target.audio_assets = [
+    recordingFor("target-uk", "en-GB"),
+    recordingFor("target-us", "en-US")
+  ];
+  target.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: { source: "ipa", ipa: "target uk", ups: "" },
+    us: {
+      source: "ipa",
+      ipa: "target us",
+      ups: "",
+      ipa_speech: speech("longer spelling", profile("target-us"))
+    }
+  };
+
+  const copied = variant(
+    applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
+      .contents[1]!
+  ).pronunciations[0]!;
+
+  expect(copied.audio_assets?.map((asset) => asset.id)).toEqual([
+    "source-uk",
+    "target-us"
+  ]);
+  expect(copied.synthesis?.uk?.source).toBe("upload");
+  expect(copied.synthesis?.us?.source).toBe("ipa");
+  expect(
+    copied.synthesis?.us?.ipa_speech?.voice_profile.voices[0]?.voice_id
+  ).toBe("source-us");
+});
+
+it("兼容没有显式 upload source 的旧上传资料", () => {
+  const { forms, sourceId, targetId } = setup();
+  const source = variant(forms.contents[0]!).pronunciations[0]!;
+  source.audio_assets = [recordingFor("legacy-upload", "en-GB")];
+  source.synthesis = {
+    alphabet: "ipa",
+    ipa: "legacy",
+    ups: "",
+    uk: { ipa: "legacy", ups: "" }
+  };
+  const target = variant(forms.contents[1]!).pronunciations[0]!;
+  target.synthesis = {
+    alphabet: "ipa",
+    ipa: "target",
+    ups: "",
+    uk: { source: "ipa", ipa: "target", ups: "" }
+  };
+
+  const copied = variant(
+    applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
+      .contents[1]!
+  ).pronunciations[0]!;
+
+  expect(copied.audio_assets?.map((asset) => asset.id)).toEqual([
+    "legacy-upload"
+  ]);
+  expect(copied.synthesis?.uk?.source).toBe("upload");
+});
+
+it("复制词形来源时同步拼写配音的上传音频", () => {
+  const { forms, sourceId, targetId } = setup();
+  const sourceVariant = variant(forms.contents[0]!);
+  const targetVariant = variant(forms.contents[1]!);
+  const source = sourceVariant.pronunciations[0]!;
+  const target = targetVariant.pronunciations[0]!;
+  source.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: { source: "spelling", ipa: "", ups: "" }
+  };
+  sourceVariant.spelling_speech = {
+    ...speech(sourceVariant.spelling, profile("source-spelling")),
+    audio_assets: [recordingFor("source-spelling-upload", "en-GB")]
+  };
+  target.synthesis = {
+    alphabet: "ipa",
+    ipa: "target",
+    ups: "",
+    uk: { source: "ipa", ipa: "target", ups: "" }
+  };
+  targetVariant.spelling_speech = {
+    ...speech(targetVariant.spelling, profile("target-spelling")),
+    audio_assets: [recordingFor("target-spelling-upload", "en-GB")]
+  };
+
+  const copiedVariant = variant(
+    applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
+      .contents[1]!
+  );
+  const copied = copiedVariant.pronunciations[0]!;
+
+  expect(
+    copiedVariant.spelling_speech?.audio_assets?.map((asset) => asset.id)
+  ).toEqual(["source-spelling-upload"]);
+  expect(copied.synthesis?.uk?.source).toBe("spelling");
 });
 
 it("复制音标保留逐侧UPS和停配，复制上传来源时保留目标选择与录音", () => {

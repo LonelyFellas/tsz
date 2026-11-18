@@ -157,6 +157,38 @@ function begin() {
     })
   );
 }
+function uploadVoiceFixture() {
+  const forms = fixture();
+  const source = forms.contents[0]!.regional_variants;
+  const target = forms.contents[1]!.regional_variants;
+  if (source.mode !== "common" || target.mode !== "common")
+    throw new Error("fixture");
+  source.common.pronunciations[0]!.audio_assets = [
+    {
+      id: "source-upload",
+      locale: "en-GB",
+      gender: "female",
+      content_type: "audio/mpeg",
+      size_bytes: 42,
+      original_name: "source-upload.mp3",
+      created_at: "2026-10-01T00:00:00Z",
+      is_default: true
+    }
+  ];
+  source.common.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: { source: "upload", ipa: "", ups: "" }
+  };
+  target.common.pronunciations[0]!.synthesis = {
+    alphabet: "ipa",
+    ipa: "target",
+    ups: "",
+    uk: { source: "ipa", ipa: "target", ups: "" }
+  };
+  return forms;
+}
 
 beforeEach(() => {
   resolveProfiles.mockReset().mockResolvedValue([]);
@@ -302,6 +334,42 @@ describe("词形复制交互", () => {
     begin();
     fireEvent.keyDown(sourceButton, { key: "Escape" });
     expect(sourceButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("指针拖动复制音色时包含上传音频并落到目标", async () => {
+    const initial = uploadVoiceFixture();
+    render(<Harness initial={initial} />);
+    const sourceButton = within(screen.getByTestId("form-0")).getByRole(
+      "button",
+      { name: "复制英美音色参数" }
+    );
+    const elementFromPoint = vi
+      .fn()
+      .mockReturnValue(screen.getByTestId("voices-1"));
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: elementFromPoint
+    });
+    const dispatch = (name: string, x: number, y: number) => {
+      const event = new MouseEvent(name, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientX: x,
+        clientY: y
+      });
+      Object.defineProperty(event, "pointerId", { value: 2 });
+      fireEvent(sourceButton, event);
+    };
+
+    dispatch("pointerdown", 10, 100);
+    dispatch("pointermove", 30, 120);
+    dispatch("pointerup", 50, 130);
+
+    await waitFor(() =>
+      expect(targetPronunciation().audio_assets?.[0]?.id).toBe("source-upload")
+    );
+    expect(targetPronunciation().synthesis?.uk?.source).toBe("upload");
   });
 
   it("版本数量不同需明确映射，取消保留所有目标内容", async () => {
