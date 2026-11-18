@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   # 手动补跑入口:main 的 push 事件偶发没触发 CI 时(#270 合并后遇到过),在 main 上手动跑一次;
   # 部署门禁按精确 SHA 认 CI 运行、不区分触发事件。缓存写入仍只认 push。
@@ -20,6 +21,13 @@ on:
       sentence_formatting:
         type: boolean
         default: true
+      deploy_target:
+        type: choice
+        description: Release target for deployable artifacts
+        options:
+          - test
+          - production
+        default: test
 
 # 默认只给只读权限,按需在单个 job 内提权(最小权限,降低 token 被滥用的风险)。
 permissions:
@@ -87,12 +95,17 @@ jobs:
         run: node scripts/ci-metrics.mjs run format -- pnpm format:check
 
       - name: Build
-        if: github.ref != 'refs/heads/main' || github.repository != 'LonelyFellas/tsz'
+        if: >-
+          (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')) ||
+          github.repository != 'LonelyFellas/tsz'
         run: node scripts/ci-metrics.mjs run build -- pnpm build
 
       - name: Build and verify deployable packages
-        if: github.ref == 'refs/heads/main' && github.repository == 'LonelyFellas/tsz'
+        if: >-
+          (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+          github.repository == 'LonelyFellas/tsz'
         env:
+          DEPLOY_TARGET: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'test' }}
           DEPLOY_VOICE_EDITOR: ${{ github.event_name == 'workflow_dispatch' && inputs.voice_editor || github.event_name != 'workflow_dispatch' }}
           DEPLOY_AZURE_PRONUNCIATION_INPUTS: ${{ github.event_name == 'workflow_dispatch' && inputs.azure_pronunciation_inputs || github.event_name != 'workflow_dispatch' }}
           DEPLOY_FORM_SPELLING_REGULARITY: ${{ github.event_name == 'workflow_dispatch' && inputs.form_spelling_regularity || github.event_name != 'workflow_dispatch' }}
@@ -103,7 +116,9 @@ jobs:
           node scripts/ci-metrics.mjs run build-admin -- node deploy/release-artifact.mjs build admin "$PWD" "$RUNNER_TEMP/releases/admin"
 
       - name: Upload Web release
-        if: github.ref == 'refs/heads/main' && github.repository == 'LonelyFellas/tsz'
+        if: >-
+          (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+          github.repository == 'LonelyFellas/tsz'
         uses: actions/upload-artifact@v7
         with:
           name: tsz-web-${{ github.sha }}-attempt-${{ github.run_attempt }}
@@ -112,7 +127,9 @@ jobs:
           retention-days: 30
 
       - name: Upload Admin release
-        if: github.ref == 'refs/heads/main' && github.repository == 'LonelyFellas/tsz'
+        if: >-
+          (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+          github.repository == 'LonelyFellas/tsz'
         uses: actions/upload-artifact@v7
         with:
           name: tsz-admin-${{ github.sha }}-attempt-${{ github.run_attempt }}

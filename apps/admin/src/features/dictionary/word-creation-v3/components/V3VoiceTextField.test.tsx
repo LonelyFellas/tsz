@@ -904,6 +904,24 @@ it("未录入词形拼写可直接输入，并提供编辑器入口", () => {
   expect(input).not.toHaveAttribute("readonly");
 });
 
+it("词形拼写聚焦选中时隐藏富文本预览，避免输入文字重影", () => {
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={{ version: 2, text: "finance", annotations: [] }}
+      onChange={vi.fn()}
+      ariaLabel="英式拼写"
+      nodeId="spelling-focused"
+      field="spelling"
+    />
+  );
+  const input = screen.getByLabelText("英式拼写");
+  const preview = document.querySelector(".v3-grammar-preview-content");
+  expect(preview).toHaveClass("v3-spelling-preview-content");
+  fireEvent.focus(input);
+  expect(document.querySelector(".v3-grammar-preview-content")).toBeNull();
+});
+
 describe("V3VoiceTextField 取消和收起态", () => {
   // rc-util 的 test-id 会让嵌套弹窗清除外层的 Esc 栈；使用开发环境的真实唯一 ID。
   beforeEach(() => vi.stubEnv("NODE_ENV", "development"));

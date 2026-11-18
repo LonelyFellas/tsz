@@ -71,7 +71,6 @@ import {
   mergeSpellingSettings,
   type SpellingAudioScope
 } from "../spellingSpeech";
-import { useHideSpeechSettingsTextEditor } from "../speechSettingsContext";
 
 export type SpellingSettingsRequest = { dialect: "uk" | "us" };
 export type SpellingSettingsOpener = (request: SpellingSettingsRequest) => void;
@@ -271,12 +270,15 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const [editing, setEditing] = useState(false);
   const [spellingSettings, setSpellingSettings] =
     useState<SpellingSettingsRequest>();
-  const hideSpeechSettingsTextEditor = useHideSpeechSettingsTextEditor();
   const [settingsCommitting, setSettingsCommitting] = useState(false);
   const settingsInitial = useRef<ReturnType<typeof captureSession> | null>(
     null
   );
   const [focused, setFocused] = useState(false);
+  const [
+    actualPronunciationPreviewFocused,
+    setActualPronunciationPreviewFocused
+  ] = useState(false);
   const [recorded, setRecorded] = useState(value.text.length > 0);
   const initialVoiceState = useRef({
     nodeId,
@@ -881,6 +883,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         : "tsz-entry-en";
   const largePreview =
     mode === "grammar" || mode === "association" || mode === "actual-pron";
+  const actualPronunciationPreview =
+    env.VOICE_EDITOR &&
+    mode === "actual-pron" &&
+    editingEnabled &&
+    recorded &&
+    value.text !== "";
   const associationPreview =
     mode === "association" &&
     toRichTextV2(value).annotations.some(
@@ -891,9 +899,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
   const grammarPreview =
     (mode === "grammar" || mode === "spelling" || associationPreview) &&
-    (!focused ||
-      readOnly ||
-      (env.VOICE_EDITOR && editingEnabled && recorded)) &&
+    (mode === "spelling"
+      ? !focused
+      : !focused ||
+        readOnly ||
+        (env.VOICE_EDITOR && editingEnabled && recorded)) &&
     value.text !== "";
   const fallback = (
     <Input.TextArea
@@ -942,6 +952,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           : undefined
       }
       className={`word-pronunciation-phonetic-input ${fontClass}${mode === "actual-pron" ? " tsz-actual-pronunciation" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
+      tabIndex={actualPronunciationPreview ? -1 : undefined}
       data-v3-field={expanded ? undefined : field}
       data-v3-node-id={expanded ? undefined : nodeId}
       data-v3-node-aliases={expanded ? undefined : nodeAliases}
@@ -1007,7 +1018,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     <RequiredFieldFeedback
       message={requiredError}
       messageId={requiredErrorId}
-      className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}`}
+      className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}${actualPronunciationPreview ? " v3-actual-pronunciation-preview" : ""}`}
     >
       {fallback}
       {defaultLoading && !requiredError && (
@@ -1020,7 +1031,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       )}
       {grammarPreview ? (
         <div
-          className={`v3-grammar-preview-content ${fontClass}${mode === "association" ? " v3-association-preview-content" : ""}`}
+          className={`v3-grammar-preview-content ${fontClass}${mode === "association" ? " v3-association-preview-content" : ""}${mode === "spelling" ? " v3-spelling-preview-content" : ""}`}
           aria-hidden
         >
           <RichTextReadOnly
@@ -1035,6 +1046,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                   }
                 : value
             }
+          />
+        </div>
+      ) : actualPronunciationPreview ? (
+        <div
+          className="v3-actual-pronunciation-preview-content tsz-phonetics tsz-actual-pronunciation"
+          aria-hidden
+          onClick={() => setActualPronunciationPreviewFocused(true)}
+        >
+          <RichTextReadOnly
+            textRole={textRole}
+            value={value.version === 2 ? value : toRichTextV2(value)}
           />
         </div>
       ) : mode !== "grammar" && liaisons ? (
@@ -1082,9 +1104,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {trailingAction}
         <Button
           aria-label={t("panel_open_editor", { p0: ariaLabel })}
+          className={`v3-actual-pronunciation-edit-button${actualPronunciationPreviewFocused ? " is-preview-focused" : ""}`}
           disabled={readOnly}
           icon={<PencilIcon />}
           onClick={() => {
+            setActualPronunciationPreviewFocused(false);
             setSpellingSettings(undefined);
             setDraftState(captureSession());
             setSaveError("");
@@ -1184,9 +1208,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             speechSettingsEnabled={!textOnly}
             onAssociationPendingChange={onAssociationPendingChange}
             textReadOnly={contentReadOnly || Boolean(spellingSettings)}
-            hideTextEditor={
-              hideSpeechSettingsTextEditor && Boolean(spellingSettings)
-            }
             contentReadOnly={contentReadOnly}
             associationsReadOnly={associationsReadOnly}
             mode={spellingSettings ? "spelling-settings" : mode}

@@ -14,7 +14,7 @@ import { createStableVariantIdFactory } from "@/features/dictionary/word-creatio
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
 import { removePosDescription } from "./model";
-import { SpeechSettingsTextEditorProvider } from "@/features/dictionary/word-creation-v3/speechSettingsContext";
+import { SpeechSettingsProvider } from "@/features/dictionary/word-creation-v3/speechSettingsContext";
 
 export const emptyFormEditor = (): SharedFormsStepContentV3 => ({
   forms_format: "shared_v1",
@@ -66,7 +66,7 @@ export function FormsStep({
   return (
     <EntryDialectContext.Provider value={locale}>
       <DictionaryFormTypeLabels>
-        <SpeechSettingsTextEditorProvider>
+        <SpeechSettingsProvider>
           <V3FormsAndPronunciationStep
             value={expandFormContents(value)}
             issues={issues}
@@ -103,7 +103,7 @@ export function FormsStep({
             bindingEditingAvailable={false}
             registerLeaveGuard={registerLeaveGuard}
           />
-        </SpeechSettingsTextEditorProvider>
+        </SpeechSettingsProvider>
       </DictionaryFormTypeLabels>
     </EntryDialectContext.Provider>
   );

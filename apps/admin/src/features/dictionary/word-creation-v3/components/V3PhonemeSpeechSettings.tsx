@@ -51,7 +51,7 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useContentEditPermissions } from "../../contentEditPermissions";
-import { useHideSpeechSettingsTextEditor } from "../speechSettingsContext";
+import { useGateEmptySpeechSettings } from "../speechSettingsContext";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 import "@tsz/voice-editor/styles.css";
 
@@ -123,7 +123,7 @@ export function V3PhonemeSpeechSettings({
     };
   }, [targetKey]);
   const { edit: canEdit } = useContentEditPermissions();
-  const hideTextEditor = useHideSpeechSettingsTextEditor();
+  const gateEmptySpeechSettings = useGateEmptySpeechSettings();
   const canGenerateAudio = usePermission("speech.generate");
   const [open, setOpen] = useState(false);
   const audioTasks = useVoiceAudioTasks();
@@ -592,7 +592,9 @@ export function V3PhonemeSpeechSettings({
       {!headless &&
         (() => {
           const missingIpa =
-            hideTextEditor && alphabet === "ipa" && !candidate.ipa.trim();
+            gateEmptySpeechSettings &&
+            alphabet === "ipa" &&
+            !candidate.ipa.trim();
           const button = (
             <Button
               type="text"
@@ -703,7 +705,6 @@ export function V3PhonemeSpeechSettings({
               readOnly={!canEdit || saving || source !== sourceKey}
               mode="phoneme-settings"
               textReadOnly
-              hideTextEditor={hideTextEditor}
               autoRecommend={defaultProfile !== storedProfile}
               loadRecommendations={loadAdminVoiceRecommendations}
               recommendationArea="azure"
@@ -834,7 +835,9 @@ export function V3PhonemeSpeechSettings({
                         });
                         if (
                           businessSaveRef.current &&
-                          !(await businessSaveRef.current.save("azure"))
+                          !(await businessSaveRef.current.save("azure", {
+                            skipAudioTasks: true
+                          }))
                         ) {
                           if (activeTarget.current !== targetKey) return;
                           setBusinessSaveFailed(true);

@@ -22,14 +22,7 @@ import {
   useSearchParams,
   useParams
 } from "react-router-dom";
-import {
-  Alert,
-  Button,
-  Collapse,
-  Space,
-  Spin,
-  Tag
-} from "@tsz/ui/admin/display";
+import { Alert, Button, Collapse, Space, Spin } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { AdminControls } from "@tsz/ui/admin/context";
@@ -767,7 +760,9 @@ function EntryEditor({
       !writable ||
       conflict ||
       currentLocalSnapshot ||
-      (contentLeaveGuard.current && !options?.skipAudioTasks)
+      (contentLeaveGuard.current &&
+        !options?.allowContentSave &&
+        !options?.skipAudioTasks)
     )
       return false;
     return run(
@@ -890,14 +885,15 @@ function EntryEditor({
       }
     >
       <div
+        data-testid="lexicon-next-editor"
         className={`lexicon-next lexicon-next-editor${step !== "preview" ? " lexicon-next-forms" : ""}`}
       >
         <div className="lexicon-next-toolbar">
-          <Space wrap>
-            <Tag>{saved.kind === "word" ? "单词" : "短语"} · 英语</Tag>
-            <span>版本 {saved.revision}</span>
-            <span role="status">{dirty ? "有未保存修改" : "已保存"}</span>
-          </Space>
+          {dirty && (
+            <Space wrap>
+              <span role="status">有未保存修改</span>
+            </Space>
+          )}
           <Space wrap>
             <Button
               type={publishingAvailable ? "default" : "primary"}
@@ -1062,11 +1058,7 @@ function EntryEditor({
               {step === "forms" && (
                 <V3StepActions
                   status={
-                    busy
-                      ? "正在保存草稿"
-                      : dirty
-                        ? "有未保存修改"
-                        : `草稿版本 ${saved.revision}`
+                    busy ? "正在保存草稿" : dirty ? "有未保存修改" : undefined
                   }
                 >
                   <Button
@@ -1185,11 +1177,7 @@ function EntryEditor({
           {step === "meanings" && (
             <V3StepActions
               status={
-                busy
-                  ? "正在保存草稿"
-                  : dirty
-                    ? "有未保存修改"
-                    : `草稿版本 ${saved.revision}`
+                busy ? "正在保存草稿" : dirty ? "有未保存修改" : undefined
               }
             >
               <Button

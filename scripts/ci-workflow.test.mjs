@@ -104,7 +104,10 @@ test("W01: workflow identity, triggers, permissions and concurrency stay stable"
   const { source } = await workflowFixture();
   assert.equal(await prettier.check(source, { parser: "yaml" }), true);
   assert.match(source, /^name: CI$/m);
-  assert.match(source, /^  push:\n    branches: \[main\]$/m);
+  assert.match(
+    source,
+    /^  push:\n    branches: \[main\]\n    tags: \["v\*"\]$/m
+  );
   assert.match(source, /^  pull_request:$/m);
   // main 的 push 事件偶发不触发 CI 时靠它补跑，否则部署门禁找不到精确 SHA 的运行。
   assert.match(source, /^  workflow_dispatch:$/m);
@@ -124,7 +127,7 @@ test("deploy packages are built once on matching Linux and published per attempt
   const { jobs } = await workflowFixture();
   const quality = jobs.get("quality");
   assert.match(quality, /runs-on: ubuntu-22\.04/);
-  assert.match(quality, /if: github\.ref != 'refs\/heads\/main'/);
+  assert.match(quality, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
   assert.match(quality, /release-artifact\.mjs build web/);
   assert.match(quality, /release-artifact\.mjs build admin/);
   assert.match(

@@ -170,7 +170,7 @@ it("实际发音保存跳过 LexiconNext 的音频任务等待", async () => {
       </QueryClientProvider>
     </InterfaceI18nProvider>
   );
-  await screen.findByText("版本 1");
+  await screen.findByTestId("lexicon-next-editor");
   fireEvent.click(screen.getByRole("button", { name: "保存实际发音" }));
   await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
 });

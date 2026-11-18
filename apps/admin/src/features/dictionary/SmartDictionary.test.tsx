@@ -1606,7 +1606,9 @@ describe("SmartDictionary", () => {
 
     let keyword = screen.getByLabelText("词条");
     fireEvent.change(keyword, { target: { value: "center" } });
-    fireEvent.submit(keyword.closest("form")!);
+    fireEvent.submit(
+      screen.getByRole("region", { name: "词条筛选" }).querySelector("form")!
+    );
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
         "/words?headword=center"
@@ -1619,7 +1621,9 @@ describe("SmartDictionary", () => {
 
     fireEvent.change(keyword, { target: { value: "harbour" } });
     expect(keyword).toHaveValue("harbour");
-    fireEvent.submit(keyword.closest("form")!);
+    fireEvent.submit(
+      screen.getByRole("region", { name: "词条筛选" }).querySelector("form")!
+    );
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
         "/words?headword=harbour"
