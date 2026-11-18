@@ -42,6 +42,7 @@ export interface FormCopyPronunciationReference {
   pronunciationId: string;
   index: number;
   spelling: string;
+  style?: WordPronunciationV3["style"];
 }
 
 export interface FormCopyPlan {
@@ -97,13 +98,26 @@ function reference(
   variant: FormContentVariantV3,
   index: number
 ): FormCopyPronunciationReference {
+  const pronunciation = variant.pronunciations[index]!;
   return {
     region,
     variantId: variant.id,
-    pronunciationId: variant.pronunciations[index]!.id,
+    pronunciationId: pronunciation.id,
     index,
-    spelling: variant.spelling
+    spelling: variant.spelling,
+    style: pronunciation.style
   };
+}
+
+function styleCounts(
+  references: readonly FormCopyPronunciationReference[]
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const reference of references) {
+    const key = reference.style ?? "__missing__";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
 }
 
 export function planFormCopy(
@@ -132,24 +146,35 @@ export function planFormCopy(
     const from = references(source);
     const to = references(target);
     sourceCount += from.length;
+    const sourceStyleCounts = styleCounts(from);
+    const targetStyleCounts = styleCounts(to);
     for (const [index, pronunciation] of to.entries()) {
       const explicit = mapping[side]?.[pronunciation.pronunciationId];
       const needsChoice = from.length > 0 && from.length !== to.length;
+      const styleKey = pronunciation.style ?? "__missing__";
+      const autoMatch =
+        needsChoice &&
+        sourceStyleCounts.get(styleKey) === 1 &&
+        targetStyleCounts.get(styleKey) === 1
+          ? from.findIndex((row) => row.style === pronunciation.style)
+          : -1;
       const sourceIndex =
         explicit === null
           ? -1
           : explicit !== undefined
             ? from.findIndex((row) => row.pronunciationId === explicit)
-            : needsChoice
-              ? -1
-              : index;
+            : autoMatch >= 0
+              ? autoMatch
+              : needsChoice
+                ? -1
+                : index;
       if (explicit != null && sourceIndex < 0)
         throw new FormCopyError("copy_source_pronunciation_missing");
       matches.push({
         side,
         source: from[sourceIndex] ?? null,
         target: pronunciation,
-        requiresMapping: needsChoice && explicit === undefined
+        requiresMapping: needsChoice && explicit === undefined && autoMatch < 0
       });
     }
   }
