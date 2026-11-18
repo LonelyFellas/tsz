@@ -120,6 +120,48 @@ function initialBinding(
   };
 }
 
+function emptyForm(form: WordConcreteFormV3): WordConcreteFormV3 {
+  const blank = <TDialect extends "common" | "uk" | "us">(variant: {
+    dialect: TDialect;
+    is_regular?: boolean;
+  }) => ({
+    id: newWordNodeId(),
+    dialect: variant.dialect,
+    spelling: "",
+    origin: "manual" as const,
+    ...(variant.is_regular === undefined
+      ? {}
+      : { is_regular: variant.is_regular }),
+    pronunciations: [
+      {
+        id: newWordNodeId(),
+        dict_phonetic: "",
+        actual_pron: "",
+        style: "citation" as const
+      }
+    ]
+  });
+  const source = form.regional_variants;
+  return {
+    id: form.id,
+    form_type: form.form_type,
+    regional_variants:
+      source.mode === "common"
+        ? { mode: "common", common: blank(source.common) }
+        : source.mode === "uk_us_many"
+          ? {
+              mode: "uk_us_many",
+              uk: source.uk.map(blank),
+              us: source.us.map(blank)
+            }
+          : {
+              mode: "uk_us",
+              uk: blank(source.uk),
+              us: blank(source.us)
+            }
+  };
+}
+
 /** Existing content is immutable here; group/label operations only change bindings. */
 export function applyFormsStructure(
   current: FormsStepRepresentationV3,
@@ -197,6 +239,41 @@ export function applyFormsStructure(
     pos,
     contents: [...contents.values()].filter((content) => used.has(content.id))
   };
+}
+
+/** Keep a concrete form and its group membership while giving it an empty content slot. */
+export function detachSharedFormContent(
+  forms: SharedFormsStepContentV3,
+  formId: string
+): SharedFormsStepContentV3 {
+  const next = structuredClone(forms);
+  const pos = next.pos.find((row) =>
+    row.forms.some((form) => form.id === formId)
+  );
+  if (!pos) throw new Error("Shared form not found");
+  const bindingIndex = pos.forms.findIndex((form) => form.id === formId);
+  const binding = pos.forms[bindingIndex]!;
+  const group = pos.form_groups.find((row) =>
+    row.members.some((member) => member.form_id === formId)
+  );
+  if (!group) throw new Error("Shared form group not found");
+  const sourceContent = next.contents.find(
+    (content) => content.id === binding.content_id
+  );
+  if (!sourceContent) throw new Error("Shared form content not found");
+  const expanded = expandFormContents(next);
+  const form = expanded.pos
+    .find((row) => row.pos_id === pos.pos_id)!
+    .forms.find((row) => row.id === formId)!;
+  const blankForm = emptyForm(form);
+  const groupDefaults = {
+    ...group,
+    dialect_rules: sourceContent.dialect_rules
+  };
+  const content = newContent(blankForm, groupDefaults);
+  pos.forms[bindingIndex] = initialBinding(blankForm, content, groupDefaults);
+  next.contents.push(content);
+  return next;
 }
 
 type FormContentEditor = DraftFormsStepContentV3 &

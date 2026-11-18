@@ -1257,6 +1257,70 @@ describe("词形内容弹窗的草稿边界", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
   });
+
+  it("移除共享标签保留原词形模板并清空其内容", async () => {
+    const noun = formsFixture({ forms: [commonFormFixture()] });
+    noun.pos.push(
+      ...formsFixture({
+        pos_id: uuidFromInt(910),
+        pos: "verb",
+        forms: [commonFormFixture({ id: uuidFromInt(911) })],
+        groups: [
+          {
+            id: uuidFromInt(912),
+            is_regular: true,
+            members: [{ id: uuidFromInt(913), form_id: uuidFromInt(911) }]
+          }
+        ]
+      }).pos
+    );
+    let shared = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      noun
+    ) as SharedFormsStepContentV3;
+    const nounBinding = shared.pos[0]!.forms[0]!;
+    const verbBinding = shared.pos[1]!.forms[0]!;
+    shared = assignSharedFormContent(
+      shared,
+      nounBinding.content_id,
+      verbBinding.id,
+      createStableVariantIdFactory(expandFormContents(shared), [])
+    );
+    const originalMembership = shared.pos[1]!.form_groups[0]!.members[0]!;
+    const originalContentId = nounBinding.content_id;
+    const { onConfirm } = setup({
+      initialForms: shared,
+      editFormId: nounBinding.id
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "移除动词原形标签" }));
+    const confirm = (await screen.findByText("移除这个标签？")).closest(
+      '[role="dialog"]'
+    ) as HTMLElement;
+    fireEvent.click(within(confirm).getByRole("button", { name: "移除标签" }));
+    expect(
+      screen.queryByRole("button", { name: "移除动词原形标签" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    const next = onConfirm.mock.calls[0]![0] as SharedFormsStepContentV3;
+    const detached = next.pos[1]!.forms[0]!;
+    expect(detached.id).toBe(verbBinding.id);
+    expect(next.pos[1]!.form_groups[0]!.members).toEqual([originalMembership]);
+    expect(detached.content_id).not.toBe(originalContentId);
+    expect(next.pos[0]!.forms[0]!.content_id).toBe(originalContentId);
+    const detachedForm = expandFormContents(next).pos[1]!.forms[0]!;
+    expect(detachedForm.regional_variants).toMatchObject({
+      mode: "common",
+      common: {
+        spelling: "",
+        origin: "manual",
+        pronunciations: [
+          { dict_phonetic: "", actual_pron: "", style: "citation" }
+        ]
+      }
+    });
+  });
 });
 
 it("局部保存先交接完整抽屉结果再请求业务保存，失败不关闭并保留其他词形", async () => {
