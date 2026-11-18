@@ -346,4 +346,130 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  it("恢复基于旧版本的本地草稿后要求比较并继续保存", async () => {
+    const api = requests();
+    const remote = {
+      ...structuredClone(entry),
+      revision: 2,
+      draft: { ...entry.draft, headword: "remote-flat" }
+    };
+    api.get.mockResolvedValue(remote);
+    api.save.mockResolvedValue({ ...remote, revision: 3 });
+    await localDraftStore.writeNextLocalDraft(
+      {
+        account_id: accountId,
+        entry_id: entryId,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans"
+      },
+      {
+        snapshot_version: 1,
+        account_id: accountId,
+        entry_id: entryId,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans",
+        base_revision: 1,
+        draft_schema_version: 1,
+        draft: { ...entry.draft, headword: "local-flat" },
+        edited_pairs: {
+          [senseId]: {
+            sense_id: senseId,
+            usage: "en-GB",
+            paired: false,
+            no_equivalent: false,
+            note: "",
+            target: null
+          }
+        },
+        sentence_resources: [],
+        updated_at: "2026-11-18T00:00:00.000Z"
+      } satisfies localDraftStore.NextLocalDraftSnapshot
+    );
+    mount(api);
+
+    await screen.findByText("发现基于版本 1 的本地草稿");
+    fireEvent.click(screen.getByRole("button", { name: "恢复本地草稿" }));
+    await screen.findByText(
+      "本地草稿基于版本 1，服务器当前为版本 2，请先比较版本。"
+    );
+    expect(screen.getByRole("button", { name: "保存完整草稿" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "比较服务器版本" }));
+    await screen.findByText("服务器 · 版本 2");
+    fireEvent.click(
+      screen.getByRole("button", { name: "保留本地草稿并继续保存" })
+    );
+    await screen.findByRole("button", { name: "保留本地并继续" });
+    fireEvent.click(screen.getByRole("button", { name: "保留本地并继续" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存完整草稿" }));
+    await waitFor(() => {
+      expect(api.save).toHaveBeenCalledWith(
+        entryId,
+        expect.objectContaining({
+          expected_revision: 2,
+          draft: expect.objectContaining({ headword: "local-flat" }),
+          dialect_changes: [
+            expect.objectContaining({ sense_id: senseId, target: null })
+          ]
+        })
+      );
+    });
+    await waitFor(async () => {
+      await expect(
+        localDraftStore.readNextLocalDraft({
+          account_id: accountId,
+          entry_id: entryId,
+          target_locale: "en-GB",
+          medium_locale: "zh-Hans"
+        })
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  it("放弃过期本地草稿后清除快照并退出比较状态", async () => {
+    const api = requests();
+    const remote = { ...structuredClone(entry), revision: 2 };
+    api.get.mockResolvedValue(remote);
+    await localDraftStore.writeNextLocalDraft(
+      {
+        account_id: accountId,
+        entry_id: entryId,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans"
+      },
+      {
+        snapshot_version: 1,
+        account_id: accountId,
+        entry_id: entryId,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans",
+        base_revision: 1,
+        draft_schema_version: 1,
+        draft: entry.draft,
+        edited_pairs: {},
+        sentence_resources: [],
+        updated_at: "2026-11-18T00:00:00.000Z"
+      } satisfies localDraftStore.NextLocalDraftSnapshot
+    );
+    mount(api);
+
+    await screen.findByText("发现基于版本 1 的本地草稿");
+    fireEvent.click(screen.getByRole("button", { name: "恢复本地草稿" }));
+    await screen.findByRole("button", { name: "比较服务器版本" });
+    fireEvent.click(screen.getByRole("button", { name: "比较服务器版本" }));
+    await screen.findByText("服务器 · 版本 2");
+    fireEvent.click(screen.getByRole("button", { name: "放弃本地修改并重载" }));
+    await screen.findByRole("button", { name: "放弃并重载" });
+    fireEvent.click(screen.getByRole("button", { name: "放弃并重载" }));
+    await waitFor(async () => {
+      await expect(
+        localDraftStore.readNextLocalDraft({
+          account_id: accountId,
+          entry_id: entryId,
+          target_locale: "en-GB",
+          medium_locale: "zh-Hans"
+        })
+      ).resolves.toBeUndefined();
+    });
+  });
 });
