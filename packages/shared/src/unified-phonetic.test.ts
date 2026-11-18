@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { convertDictionaryToUnified } from "./unified-phonetic";
 import {
   convertActualPronunciation,
+  convertDictionaryToAzureIpa,
   pronunciationSynthesisContent
 } from "./pronunciation-synthesis";
 
@@ -88,6 +89,60 @@ describe("语雀统一音标规则", () => {
     });
   });
 
+  it("实际发音转换处理词尾 i 和 ɔːr", () => {
+    expect(
+      convertDictionaryToUnified("ɪnˈteɡrəti", "integrity", "us")
+    ).toMatchObject({
+      ok: true,
+      value: "ɪnˈtɛgrətɪ"
+    });
+    for (const dialect of ["uk", "us"] as const)
+      expect(
+        convertDictionaryToUnified("ˈmɔːr laɪk", "more like", dialect)
+      ).toMatchObject({
+        ok: true,
+        value: "ˈmɔr laɪk"
+      });
+  });
+
+  it("Azure IPA 不套用实际发音的清浊化、补 ə 和卷舌元音降级", () => {
+    expect(convertDictionaryToUnified("stænd", "stand", "us")).toMatchObject({
+      value: "sdænd"
+    });
+    expect(
+      convertDictionaryToAzureIpa("stænd", "stand", "en-US")
+    ).toMatchObject({ ok: true, value: "stænd" });
+    expect(convertDictionaryToUnified("ˈbɒtl", "bottle", "uk")).toMatchObject({
+      value: "ˈbɒtəl"
+    });
+    expect(
+      convertDictionaryToAzureIpa("ˈbɒtl", "bottle", "en-GB")
+    ).toMatchObject({ ok: true, value: "ˈbɒtl" });
+    expect(convertDictionaryToAzureIpa("bɝd", "bird", "en-US")).toMatchObject({
+      ok: true,
+      value: "bɝd"
+    });
+    expect(
+      convertDictionaryToAzureIpa("sɚpɚ", "supper", "en-US")
+    ).toMatchObject({ ok: true, value: "sɚpɚ" });
+    expect(convertDictionaryToUnified("bɪb", "bib", "uk")).toMatchObject({
+      value: "bɪp"
+    });
+    expect(convertDictionaryToAzureIpa("bɪb", "bib", "en-GB")).toMatchObject({
+      ok: true,
+      value: "bɪb"
+    });
+    expect(
+      convertDictionaryToUnified("əv kɔːrs", "of course", "us")
+    ).toMatchObject({ value: "əf kɔrs" });
+    expect(
+      convertDictionaryToAzureIpa("əv kɔːrs", "of course", "en-US")
+    ).toMatchObject({ ok: true, value: "əv kɔɹs" });
+    expect(
+      convertDictionaryToAzureIpa("ˈbʌtn̩", "button", "en-US", "weak")
+    ).toMatchObject({ ok: true, value: "ˈbʌtən" });
+  });
+
   it("音变采用口音与文档示例，不把所有 t/d/b 都替换", () => {
     expect(convertDictionaryToUnified("ˈbʌtər", "butter", "us")).toMatchObject({
       value: "ˈbʌdər"
@@ -106,7 +161,7 @@ describe("语雀统一音标规则", () => {
     });
     expect(
       convertDictionaryToUnified("/əv kɔːrs/", "of course", "us")
-    ).toMatchObject({ value: "əf kɔːrs" });
+    ).toMatchObject({ value: "əf kɔrs" });
     expect(convertDictionaryToUnified("əv", "of", "us")).toMatchObject({
       value: "əv"
     });

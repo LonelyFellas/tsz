@@ -557,8 +557,8 @@ it("字典独立生成实际发音和英美 IPA，UPS 从各自 IPA 转换", () 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(field("实际发音")).toHaveValue("sguːl");
   for (const [accent, ipa, ups] of [
-    ["英式", "sguːl", "S G U lng L"],
-    ["美式", "sgul", "S G U L"]
+    ["英式", "skuːl", "S K U lng L"],
+    ["美式", "skul", "S K U L"]
   ]) {
     fireEvent.click(
       screen.getByLabelText(`第 1 条发音转换为${accent} Azure IPA`)
