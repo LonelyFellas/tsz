@@ -15,7 +15,7 @@ import { ipaWordToUps } from "./ipa-ups";
 import { speechAccentGroup } from "./speech-locale";
 import {
   stripPhoneticDelimiters,
-  convertDictionaryToUnified,
+  convertDictionaryToAzureIpaSource,
   unifiedWordToAzureIpa
 } from "./unified-phonetic";
 export const SYNTHESIS_LIMITS = { ipa: 200, ups: 1600 } as const;
@@ -431,14 +431,14 @@ export function convertDictionaryToAzureIpa(
   style?: WordPronunciationV3["style"]
 ) {
   const dictionary = input.replace(/[()[\]{}]/gu, "");
-  const unified = convertDictionaryToUnified(
+  const source = convertDictionaryToAzureIpaSource(
     dictionary,
     spelling,
     locale === "en-GB" ? "uk" : "us",
     style
   );
-  if (!unified.ok) return unified;
-  return convertActualPronunciation(unified.value, spelling, "ipa", locale);
+  if (!source.ok) return source;
+  return convertActualPronunciation(source.value, spelling, "ipa", locale);
 }
 
 /** Consume the current, possibly manually corrected IPA without reapplying dictionary rules. */

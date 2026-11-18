@@ -86,6 +86,10 @@ export function ipaWordToUps(input: string, locale: string = "en-US") {
   const source = input.replaceAll("ɡ", "g");
   if (!source || /\s|\p{Cc}/u.test(source))
     return fail("单词音标不能为空或含空白/控制字符。");
+  if (locale === "en-GB" && source.includes("oʊ"))
+    return fail("英式 Azure IPA 使用 əʊ，不使用美式 oʊ。");
+  if (locale === "en-GB" && /[ɚɝ]/u.test(source))
+    return fail("英式 Azure IPA 不使用美式卷舌元音 ɚ/ɝ。");
   const out: string[] = [];
   let hasPhone = false,
     hasVowel = false,

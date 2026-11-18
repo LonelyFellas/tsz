@@ -75,7 +75,13 @@ const STYLE_EXAMPLES: Record<
   }
 };
 
-function dictionaryWord(input: string): string {
+type DictionaryConversionTarget = "actual" | "azure-ipa";
+
+function dictionaryWord(
+  input: string,
+  dialect: Dialect,
+  target: DictionaryConversionTarget
+): string {
   const source = input
     .replaceAll("ɡ", "g")
     .replaceAll("ɹ", "r")
@@ -88,7 +94,7 @@ function dictionaryWord(input: string): string {
     .replace(/e(?!ɪ)/gu, "ɛ");
   // Match complete units once: ɑː and eɪ must survive short-vowel substitutions.
   let value = source.replace(
-    /ɑː|ɑr|iː|eɪ|ju(?!ː)|(?:ɪ(?:ʸ)?r|ʊ(?:ʷ|ʸ)?r|ɛr)(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuieɜɚɝ])|ɪə|ʊə|oʊ|[ɚɝɾɑ]/gu,
+    /ɑː|ɑr|iː|eɪ|ju(?!ː)|(?:ɪ(?:ʸ)?r|ʊ(?:ʷ|ʸ)?r|ɛr)(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuiɜɚɝ])|ɪə|ʊə|oʊ|[ɚɝɾɑ]/gu,
     (phone) =>
       ({
         ɑː: "ɑː",
@@ -105,35 +111,42 @@ function dictionaryWord(input: string): string {
         ɪə: "ɪʲə",
         ʊə: "ʊʷə",
         oʊ: "əʊ",
-        ɚ: "ər",
-        ɝ: "ər",
-        ɾ: "d",
+        ɚ: target === "azure-ipa" && dialect === "us" ? "ɚ" : "ər",
+        ɝ: target === "azure-ipa" && dialect === "us" ? "ɝ" : "ər",
+        ɾ: target === "actual" ? "d" : "ɾ",
         ɑ: "ɒ"
       })[phone]!
   );
-  // Happy vowel: bare i after an earlier vowel, without an immediately preceding
-  // stress marker. Do not reinterpret a sole/stressed i as the lax vowel.
-  value = value.replace(/i(?!ː)/gu, (phone, offset: number) => {
-    const prefix = value.slice(0, offset);
-    const stressedOnset = /[ˈˌ][^ɑæʌɔəɛɪɒʊuiɜ.ˈˌ]*$/u.test(prefix);
-    return /[ɑæʌɔəɛɪɒʊuiɜ]/u.test(prefix) && !stressedOnset ? "ɪ" : phone;
-  });
-  value = value.replace(/([lnm])̩/gu, "ə$1");
-  // Only syllable-final clusters from the document's onset inventory.
-  value = value.replace(/([tdszpbkgfvðʃʒmn])([lnm])(?=$|[.ˈˌ])/gu, "$1ə$2");
-  // Rule 7's s + unaspirated stop at a syllable onset; do not change ask/last.
-  return value.replace(
-    /(^|[.ˈˌ])s([ktp])(?=[ɑæʌɔəɛɪɒʊuieɜrjwl])/gu,
-    (_, boundary: string, stop: string) =>
-      `${boundary}s${{ k: "g", t: "d", p: "b" }[stop]}`
-  );
+  // Actual pronunciation applies lexical substitutions. Azure IPA keeps symbols
+  // whose Azure inventory has a distinct phoneme until locale adaptation.
+  if (target === "actual") {
+    // Happy vowel: bare i after an earlier vowel, without an immediately preceding
+    // stress marker. Do not reinterpret a sole/stressed i as the lax vowel.
+    value = value.replace(/i(?!ː)/gu, (phone, offset: number) => {
+      const prefix = value.slice(0, offset);
+      const stressedOnset = /[ˈˌ][^ɑæʌɔəɛɪɒʊuiɜ.ˈˌ]*$/u.test(prefix);
+      return /[ɑæʌɔəɛɪɒʊuiɜ]/u.test(prefix) && !stressedOnset ? "ɪ" : phone;
+    });
+    value = value.replace(/ɔːr/gu, "ɔr");
+    value = value.replace(/([lnm])̩/gu, "ə$1");
+    // Only syllable-final clusters from the document's onset inventory.
+    value = value.replace(/([tdszpbkgfvðʃʒmn])([lnm])(?=$|[.ˈˌ])/gu, "$1ə$2");
+    // Rule 7's s + unaspirated stop at a syllable onset; do not change ask/last.
+    return value.replace(
+      /(^|[.ˈˌ])s([ktp])(?=[ɑæʌɔəɛɪɒʊuieɜrjwl])/gu,
+      (_, boundary: string, stop: string) =>
+        `${boundary}s${{ k: "g", t: "d", p: "b" }[stop]}`
+    );
+  }
+  return value;
 }
 
-export function convertDictionaryToUnified(
+function convertDictionary(
   input: string,
   spelling: string,
   dialect: Dialect,
-  style: PronunciationStyle = "normal"
+  style: PronunciationStyle,
+  target: DictionaryConversionTarget
 ): Conversion {
   if (/\p{Cc}/u.test(input))
     return { ok: false, message: "字典音标不能包含控制字符" };
@@ -160,10 +173,10 @@ export function convertDictionaryToUnified(
         message: `第 ${index + 1} 个词包含未支持的音标，请每次只输入一个读音版本`
       };
     const word = words[index]!.toLowerCase();
-    let value = dictionaryWord(phone);
+    let value = dictionaryWord(phone, dialect, target);
     if (
-      !/[aɑæʌɔəɛɪɒʊuieɜ]/u.test(value) ||
-      /(^\.|\.$|\.\.|[ˈˌ](?:[.ˈˌ]|$)|[̩͡])/u.test(value) ||
+      !/[aɑæʌɔəɛɪɒʊuiɜɚɝ]/u.test(value) ||
+      /(^\.|\.$|\.\.|[ˈˌ](?:[.ˈˌ]|$)|͡|(?<![lnm])̩)/u.test(value) ||
       /(^|[^ɑɔɜiu])ː/u.test(value)
     )
       return {
@@ -184,24 +197,26 @@ export function convertDictionaryToUnified(
         styleApplied = true;
       }
     }
-    if (word === "hudson" && value === "ˈhʌdsən") value = "ˈhʌtsən";
-    if (word === "bib" && value === "bɪb" && dialect === "uk") value = "bɪp";
-    if (
-      word === "of" &&
-      words[index + 1]?.toLowerCase() === "course" &&
-      value === "əv"
-    )
-      value = "əf";
-    if (dialect === "us") {
-      if (word === "butter" && value === "ˈbʌtər") value = "ˈbʌdər";
-      if (word === "city" && value === "ˈsɪtɪ") value = "ˈsɪdɪ";
+    if (target === "actual") {
+      if (word === "hudson" && value === "ˈhʌdsən") value = "ˈhʌtsən";
+      if (word === "bib" && value === "bɪb" && dialect === "uk") value = "bɪp";
       if (
-        style === "weak" &&
-        ((word === "button" && value === "ˈbʌtən") ||
-          (word === "italy" && value === "ˈɪtəlɪ"))
-      ) {
-        value = value.replace("t", "ʔ");
-        styleApplied = true;
+        word === "of" &&
+        words[index + 1]?.toLowerCase() === "course" &&
+        value === "əv"
+      )
+        value = "əf";
+      if (dialect === "us") {
+        if (word === "butter" && value === "ˈbʌtər") value = "ˈbʌdər";
+        if (word === "city" && value === "ˈsɪtɪ") value = "ˈsɪdɪ";
+        if (
+          style === "weak" &&
+          ((word === "button" && value === "ˈbʌtən") ||
+            (word === "italy" && value === "ˈɪtəlɪ"))
+        ) {
+          value = value.replace("t", "ʔ");
+          styleApplied = true;
+        }
       }
     }
     if (style !== "normal" && !styleApplied)
@@ -223,6 +238,24 @@ export function convertDictionaryToUnified(
     values.push(value);
   }
   return { ok: true, value: values.join(" "), notices: [...notices] };
+}
+
+export function convertDictionaryToUnified(
+  input: string,
+  spelling: string,
+  dialect: Dialect,
+  style: PronunciationStyle = "normal"
+): Conversion {
+  return convertDictionary(input, spelling, dialect, style, "actual");
+}
+
+export function convertDictionaryToAzureIpaSource(
+  input: string,
+  spelling: string,
+  dialect: Dialect,
+  style: PronunciationStyle = "normal"
+): Conversion {
+  return convertDictionary(input, spelling, dialect, style, "azure-ipa");
 }
 
 /** Adapt product notation to the chosen Azure alphabet; never infer an accent
@@ -257,11 +290,18 @@ export function unifiedWordToAzureIpa(
         ɒ: "ɑ"
       }
     : {};
-  Object.assign(units, { ɪʲə: "ɪə", ʊʷə: "ʊə", r: "ɹ" });
+  Object.assign(units, {
+    ɪʲə: "ɪə",
+    ʊʷə: "ʊə",
+    r: "ɹ",
+    ɾ: "d"
+  });
   const pattern = Object.keys(units)
     .sort((a, b) => b.length - a.length)
     .join("|");
-  value = value.replace(new RegExp(pattern, "gu"), (unit) => units[unit]!);
+  value = value
+    .replace(/([lnm])̩/gu, "ə$1")
+    .replace(new RegExp(pattern, "gu"), (unit) => units[unit]!);
   if (/[ʲʷʸ]/u.test(value))
     return {
       ok: false,
