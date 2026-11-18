@@ -7,7 +7,7 @@
 //
 // 用法:pnpm --filter @tsz/api-client smoke
 //       SMOKE_API_URL=https://staging.example.com/api/v1 pnpm --filter @tsz/api-client smoke
-const BASE = process.env.SMOKE_API_URL ?? "http://localhost:8080/api/v1";
+const BASE = process.env.SMOKE_API_URL ?? "http://localhost:8383/api/v1";
 
 // 仅探测「非破坏性」的前端端点。method/path 与 endpoints.ts 对齐;
 // 破坏性(DELETE /auth/account)、已知未实现(apply-teacher、词表/任务 mock 域)不在此列。
