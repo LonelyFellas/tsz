@@ -1,5 +1,9 @@
 import { LocalLexiconError } from "../i18n/local-error-messages";
-import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
+import {
+  isSharedForms,
+  primaryRegionalVariant,
+  regionalVariants
+} from "@tsz/shared";
 import { env } from "../../../lib/env";
 import type {
   AudioAssetV3,
@@ -9,6 +13,7 @@ import type {
   RichTextV2V3,
   DialectRulesV3,
   DraftFormsStepContentV3,
+  FormsStepRepresentationV3,
   FormGroupScopeV3,
   PartOfSpeechCatalogItem,
   PhraseComponentUsageV3,
@@ -19,12 +24,14 @@ import type {
   WordFormTypeV3,
   WordPronunciationV3,
   WordUkFormVariantV3,
-  WordUsFormVariantV3
+  WordUsFormVariantV3,
+  RichTextV3
 } from "@tsz/types";
 import {
   clearVoiceAudio,
   editRichText,
-  spellingAnnotationsEqual
+  spellingAnnotationsEqual,
+  toRichTextV2
 } from "@tsz/voice-editor/core";
 import { spellingEditorValue, spellingSpeechEqual } from "./spellingSpeech";
 import { variantRegularity } from "./model";
@@ -108,6 +115,8 @@ const PRONUNCIATION_STYLES = new Set<PronunciationStyle>([
   "strong",
   "weak"
 ]);
+const SPELLING_RICH_TYPES = new Set(["italic", "liaison"]);
+const SPEECH_RICH_TYPES = new Set(["pause", "say_as", "sub"]);
 
 function defaultIdFactory() {
   return newWordNodeId();
@@ -127,6 +136,138 @@ function nextUuid(factory: V3IdFactory, allocated: Set<string>): string {
 
 function clone<T>(content: T): T {
   return structuredClone(content);
+}
+
+function normalizedRichText(value: RichTextV3) {
+  try {
+    return toRichTextV2(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function isAllowedRichText(
+  value: RichTextV3,
+  text: string,
+  allowedTypes?: ReadonlySet<string>
+) {
+  const normalized = normalizedRichText(value);
+  return Boolean(
+    normalized &&
+    normalized.text === text &&
+    (!allowedTypes ||
+      normalized.annotations.every((annotation) =>
+        allowedTypes.has(annotation.type)
+      ))
+  );
+}
+
+function isSpeechRichText(value: RichTextV3, text: string) {
+  const normalized = normalizedRichText(value);
+  return Boolean(
+    normalized &&
+    normalized.text === text &&
+    normalized.annotations.every((annotation) =>
+      SPEECH_RICH_TYPES.has(annotation.type)
+    )
+  );
+}
+
+function isSynthesisSpeechRichText(value: RichTextV3, text: string) {
+  const normalized = normalizedRichText(value);
+  if (!normalized || normalized.text !== text) return false;
+  const codepoints = [...text];
+  const isWhitespace = (character: string) => /\s/u.test(character);
+  return normalized.annotations.every(
+    (annotation) =>
+      SPEECH_RICH_TYPES.has(annotation.type) &&
+      (annotation.type !== "pause" ||
+        (annotation.at > 0 &&
+          annotation.at < codepoints.length &&
+          (isWhitespace(codepoints[annotation.at - 1]!) ||
+            isWhitespace(codepoints[annotation.at]!)) &&
+          codepoints
+            .slice(0, annotation.at)
+            .some((character) => !isWhitespace(character)) &&
+          codepoints
+            .slice(annotation.at)
+            .some((character) => !isWhitespace(character))))
+  );
+}
+
+function emptyRichText(text: string): RichTextV2V3 {
+  return { version: 2, text, annotations: [] };
+}
+
+type SpellingVariantState = {
+  spelling: string;
+  spelling_rich?: RichTextV2V3;
+  spelling_speech?: SpellingSpeechV3;
+};
+
+function sanitizeSpellingVariant(variant: SpellingVariantState) {
+  if (
+    variant.spelling_rich &&
+    !isAllowedRichText(
+      variant.spelling_rich,
+      variant.spelling,
+      SPELLING_RICH_TYPES
+    )
+  ) {
+    delete variant.spelling_rich;
+  }
+  const speech = variant.spelling_speech;
+  if (speech && !isSpeechRichText(speech.content, variant.spelling)) {
+    speech.content = emptyRichText(variant.spelling);
+    speech.voice_profile = clearVoiceAudio(speech.voice_profile);
+  }
+}
+
+function sanitizePronunciation(
+  variant: SpellingVariantState,
+  pronunciation: WordPronunciationV3
+) {
+  for (const [richField, plainField] of [
+    ["dict_phonetic_rich", "dict_phonetic"],
+    ["actual_pron_rich", "actual_pron"]
+  ] as const) {
+    const rich = pronunciation[richField];
+    if (rich && !isAllowedRichText(rich, pronunciation[plainField]))
+      delete pronunciation[richField];
+  }
+  for (const candidate of [
+    pronunciation.synthesis?.uk,
+    pronunciation.synthesis?.us
+  ]) {
+    if (!candidate) continue;
+    for (const speech of [candidate.ipa_speech, candidate.ups_speech]) {
+      if (
+        speech &&
+        !isSynthesisSpeechRichText(speech.content, variant.spelling)
+      ) {
+        speech.content = emptyRichText(variant.spelling);
+        speech.voice_profile = clearVoiceAudio(speech.voice_profile);
+      }
+    }
+  }
+}
+
+/** 保存前清理历史/恢复草稿里的失配扩展，纯文本、音色和录音资产仍保留。 */
+export function sanitizeFormsRichText(
+  content: FormsStepRepresentationV3
+): FormsStepRepresentationV3 {
+  const next = clone(content);
+  const variants = isSharedForms(next)
+    ? next.contents.flatMap((item) => regionalVariants(item.regional_variants))
+    : next.pos.flatMap((pos) =>
+        pos.forms.flatMap((form) => regionalVariants(form.regional_variants))
+      );
+  for (const variant of variants) {
+    sanitizeSpellingVariant(variant);
+    for (const pronunciation of variant.pronunciations)
+      sanitizePronunciation(variant, pronunciation);
+  }
+  return next;
 }
 
 function explicitMapping(value: unknown): value is VariantMapping {
@@ -691,8 +832,8 @@ export function applyVariantSpelling(
     }
   }
   variant.spelling = rich.text;
-  const annotations = rich.annotations.filter(
-    (annotation) => !["pause", "say_as", "sub"].includes(annotation.type)
+  const annotations = rich.annotations.filter((annotation) =>
+    SPELLING_RICH_TYPES.has(annotation.type)
   );
   if (variant.spelling_rich || annotations.length > 0)
     variant.spelling_rich = { ...rich, annotations };
@@ -712,6 +853,7 @@ export function applyVariantSpelling(
         : { voices: [] }
     };
   }
+  sanitizeSpellingVariant(variant);
 }
 
 /** 在草稿副本里定位变体并就地改写；找不到抛错，与其余写操作的约定一致。 */
@@ -788,6 +930,7 @@ export function updateSpellingVoiceProfile(
         },
         voice_profile: structuredClone(profile)
       };
+      sanitizeSpellingVariant(variant);
     });
   }
   return next;
@@ -807,6 +950,7 @@ export function updateSpellingAudioAssets(
         ...variant.spelling_speech,
         audio_assets: structuredClone(audioAssets)
       };
+      sanitizeSpellingVariant(variant);
     });
   }
   return next;
@@ -843,6 +987,8 @@ export function updatePronunciation(
         );
         if (pronunciation) {
           Object.assign(pronunciation, patch, { id: pronunciation.id });
+          // 音频更新也会触发整条发音保存，历史失配标注不能继续阻断保存。
+          sanitizePronunciation(variant, pronunciation);
           return next;
         }
       }

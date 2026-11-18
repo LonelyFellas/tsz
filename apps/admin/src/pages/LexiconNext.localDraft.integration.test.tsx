@@ -148,7 +148,10 @@ function requests() {
   } satisfies LexiconNextRequests;
 }
 
-function mount(requests: LexiconNextRequests) {
+function mount(
+  requests: LexiconNextRequests,
+  targetLocale: "en-GB" | "en-US" = "en-GB"
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: 0 },
@@ -165,7 +168,7 @@ function mount(requests: LexiconNextRequests) {
     ],
     {
       initialEntries: [
-        `/lexicon-next/${entryId}?target_locale=en-GB&medium_locale=zh-Hans&step=meanings`
+        `/lexicon-next/${entryId}?target_locale=${targetLocale}&medium_locale=zh-Hans&step=meanings`
       ]
     }
   );
@@ -471,5 +474,41 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
         })
       ).resolves.toBeUndefined();
     });
+  });
+
+  it("英式和美式页面使用不同的本地草稿范围", async () => {
+    const api = requests();
+    const first = mount(api);
+    await screen.findByRole("button", { name: "解除配对" });
+    fireEvent.click(screen.getByRole("button", { name: "解除配对" }));
+    await waitFor(async () => {
+      await expect(
+        localDraftStore.readNextLocalDraft({
+          account_id: accountId,
+          entry_id: entryId,
+          target_locale: "en-GB",
+          medium_locale: "zh-Hans"
+        })
+      ).resolves.toBeDefined();
+    });
+    first.unmount();
+
+    const american = mount(api, "en-US");
+    await screen.findByRole("combobox", { name: "目标语言" });
+    expect(screen.queryByText("发现未提交的本地草稿")).not.toBeInTheDocument();
+    await expect(
+      localDraftStore.readNextLocalDraft({
+        account_id: accountId,
+        entry_id: entryId,
+        target_locale: "en-US",
+        medium_locale: "zh-Hans"
+      })
+    ).resolves.toBeUndefined();
+    american.unmount();
+
+    const british = mount(api);
+    await screen.findByText("发现未提交的本地草稿");
+    expect(screen.getByRole("button", { name: "恢复本地草稿" })).toBeEnabled();
+    british.unmount();
   });
 });
