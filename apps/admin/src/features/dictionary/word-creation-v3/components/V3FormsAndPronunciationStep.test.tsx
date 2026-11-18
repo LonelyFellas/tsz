@@ -45,6 +45,7 @@ import {
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 import { V3FormGroupCard } from "./V3FormGroupCard";
 import { V3FormContentOverview } from "./V3FormContentOverview";
+import { V3FormCopyProvider } from "./V3FormCopyProvider";
 import {
   updateConcreteFormType,
   createStableVariantIdFactory
@@ -1101,6 +1102,64 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(updatedRows[0]).toHaveTextContent(/语流连读.*uk-one/);
     expect(updatedRows[1]).toHaveTextContent(/未填写.*uk-two/);
     expect(updatedRows[2]).toHaveTextContent(/—.*美式未填写/);
+  });
+
+  it("总览复制音标悬停时同时高亮读法和实际发音", () => {
+    const form = commonFormFixture({
+      spelling: "travel",
+      pronunciations: [
+        pronunciationFixture({
+          actual_pron: "ˈtrævəl",
+          style: "citation"
+        })
+      ]
+    });
+    const draftForms = formsFixture({ forms: [form] });
+    const forms = applyFormsStructure(
+      { forms_format: "shared_v1", contents: [], pos: [] },
+      draftForms
+    ) as SharedFormsStepContentV3;
+    const pos = draftForms.pos[0]!;
+    const { container } = render(
+      <FeedbackApp>
+        <PronunciationPreviewProvider>
+          <V3FormCopyProvider forms={forms} onChange={vi.fn()}>
+            <V3FormContentOverview
+              rows={[
+                {
+                  membershipId: pos.form_groups[0]!.members[0]!.id,
+                  form,
+                  formLabel: "原形",
+                  formTypeAriaLabel: "词形类型",
+                  formTypeDisabled: false,
+                  formTypeOptions: ["base"],
+                  membershipCount: 1
+                }
+              ]}
+              group={pos.form_groups[0]!}
+              sharedCounts={new Map()}
+              onEdit={() => undefined}
+              onFormTypeChange={() => undefined}
+              issues={[]}
+            />
+          </V3FormCopyProvider>
+        </PronunciationPreviewProvider>
+      </FeedbackApp>
+    );
+    const row = container.querySelector<HTMLElement>(
+      "tr[data-overview-dialect]"
+    )!;
+    const styleCell = within(row)
+      .getByText("逐字正音")
+      .closest<HTMLElement>("td")!;
+    const phoneticCell = row
+      .querySelector<HTMLElement>(".v3-overview-phonetic")!
+      .closest("td")!;
+
+    fireEvent.pointerEnter(phoneticCell);
+
+    expect(styleCell).toHaveClass("is-copy-hovered");
+    expect(phoneticCell).toHaveClass("is-copy-hovered");
   });
 
   it("总览词形名称保持文字，校验出错时可以调整类型并保留内容", async () => {

@@ -434,6 +434,7 @@ export function V3FormContentOverview({
             title: overviewColumnLabels.style,
             key: "style",
             width: 112,
+            onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
             render: (_, { pronunciation }) => (
               <div className="v3-overview-reading">
                 {pronunciation?.style ? (
