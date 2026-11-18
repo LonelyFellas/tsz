@@ -631,9 +631,9 @@ export const lexiconEditorPanelMessages = {
   ],
   panel_transcriptions_and_voice_parameters_are_copied_separately_including_both_br:
     [
-      "音标和音色参数分开复制，均包含英美两侧。拖动复制图标到目标区域，或点击图标后选择目标。复制会覆盖对应配置；可撤销，保存草稿后生效。音频文件不复制，复制后请重新试听。",
-      "音標和音色引數分開復制，均包含英美兩側。拖動複製圖示到目標區域，或點選圖示後選擇目標。複製會覆蓋對應配置；可撤銷，儲存草稿後生效。音訊檔案不復制，複製後請重新試聽。",
-      "Transcriptions and voice parameters are copied separately, including both British and American sides. Drag the copy icon to a target, or click it then select a target. Copying overwrites the relevant configuration and can be undone; save the draft to apply. Audio files are not copied. Audition again afterwards."
+      "音标和音色参数分开复制，均包含英美两侧。拖动复制图标到目标区域，或点击图标后选择目标。复制会覆盖对应配置；上传音频会按口音一并复制；可撤销，保存草稿后生效。",
+      "音標和音色引數分開複製，均包含英美兩側。拖動複製圖示到目標區域，或點選圖示後選擇目標。複製會覆蓋對應配置；上傳音訊會按口音一併複製；可撤銷，儲存草稿後生效。",
+      "Transcriptions and voice parameters are copied separately, including both British and American sides. Drag the copy icon to a target, or click it then select a target. Copying overwrites the relevant configuration; uploaded audio is copied for the corresponding accent; save the draft to apply."
     ],
   panel_form_copying_guidance: [
     "词形复制说明",
