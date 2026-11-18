@@ -11,6 +11,7 @@ import {
   contentFromEditor,
   replaceSharedContent
 } from "./sharedFormsModel";
+import { sanitizeFormsRichText } from "./operations";
 import { V3FormContentOverview } from "./components/V3FormContentOverview";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { V3FormContentModal } from "./components/V3FormContentModal";
@@ -6725,6 +6726,7 @@ it.each([commonFormFixture(), ukUsFormFixture()])(
       ...shared,
       contents: [structuredClone(editedContent!)]
     };
+    const expectedSaved = sanitizeFormsRichText(expected);
     expect(latest!.formContents).toEqual(expected);
     fireEvent.click(screen.getByText("保存共享词形配置"));
     await waitFor(() => expect(latest!.word.revision).toBe(2));
@@ -6732,10 +6734,10 @@ it.each([commonFormFixture(), ukUsFormFixture()])(
       schema_version: 3,
       base_revision: 1,
       intent: "save",
-      content: expected
+      content: expectedSaved
     });
-    expect(latest!.formContents).toEqual(expected);
-    expect(latest!.draftForms).toEqual(expandFormContents(expected));
+    expect(latest!.formContents).toEqual(expectedSaved);
+    expect(latest!.draftForms).toEqual(expandFormContents(expectedSaved));
     expect(latest!.hasUnsavedChanges).toBe(false);
     view.unmount();
     renderWizard(requests(), {
@@ -6746,8 +6748,8 @@ it.each([commonFormFixture(), ukUsFormFixture()])(
         return null;
       }
     });
-    expect(latest!.formContents).toEqual(expected);
-    expect(latest!.draftForms).toEqual(expandFormContents(expected));
+    expect(latest!.formContents).toEqual(expectedSaved);
+    expect(latest!.draftForms).toEqual(expandFormContents(expectedSaved));
     expect(latest!.hasUnsavedChanges).toBe(false);
   }
 );

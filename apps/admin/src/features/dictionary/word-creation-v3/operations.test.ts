@@ -24,6 +24,7 @@ import {
   reorderFormGroups,
   reorderPos,
   reorderPronunciations,
+  sanitizeFormsRichText,
   unifyUkUsSpelling,
   updateConcreteFormType,
   updateFormGroupScope,
@@ -72,6 +73,151 @@ describe("V3 forms operations", () => {
       actual_pron: "changed"
     });
     expect(commonVariant(original.pos[0]!.forms[0]!).spelling).toBe("centre");
+  });
+
+  it("替换音频时丢弃与正文失配的历史发音标注，避免阻断保存", () => {
+    const original = formsFixture();
+    const row = commonVariant(original.pos[0]!.forms[0]!).pronunciations[0]!;
+    row.dict_phonetic_rich = {
+      version: 2,
+      text: "stale transcription",
+      annotations: []
+    };
+    row.actual_pron_rich = {
+      version: 2,
+      text: row.actual_pron,
+      annotations: [{ type: "liaison", start: 0, end: 999 }]
+    };
+
+    const updated = updatePronunciation(original, row.id, {
+      audio_assets: []
+    });
+    const next = commonVariant(updated.pos[0]!.forms[0]!).pronunciations[0]!;
+
+    expect(next.dict_phonetic_rich).toBeUndefined();
+    expect(next.actual_pron_rich).toBeUndefined();
+  });
+
+  it("拼写和音素音频更新会修复失配正文并清除失效生成音频", () => {
+    const original = formsFixture();
+    const form = original.pos[0]!.forms[0]!;
+    const variant = commonVariant(form);
+    const row = variant.pronunciations[0]!;
+    variant.spelling_rich = {
+      version: 2,
+      text: "stale spelling",
+      annotations: []
+    };
+    variant.spelling_speech = {
+      content: { version: 2, text: "stale spelling", annotations: [] },
+      voice_profile: {
+        voices: [
+          {
+            voice_id: "sonia",
+            enabled: true,
+            rate_percent: 0,
+            audio_asset_id: "stale-audio"
+          }
+        ]
+      }
+    };
+    row.synthesis = {
+      alphabet: "ipa",
+      ipa: "kæt",
+      ups: "K AE T",
+      uk: {
+        ipa: "kæt",
+        ups: "K AE T",
+        ipa_speech: {
+          content: { version: 2, text: "stale spelling", annotations: [] },
+          voice_profile: {
+            voices: [
+              {
+                voice_id: "sonia",
+                enabled: true,
+                rate_percent: 0,
+                audio_asset_id: "stale-audio"
+              }
+            ]
+          }
+        }
+      }
+    };
+
+    const updated = updateSpellingAudioAssets(original, [variant.id], []);
+    const withPronunciationAudio = updatePronunciation(updated, row.id, {
+      audio_assets: []
+    });
+    const nextVariant = commonVariant(withPronunciationAudio.pos[0]!.forms[0]!);
+    const nextRow = nextVariant.pronunciations[0]!;
+
+    expect(nextVariant.spelling_rich).toBeUndefined();
+    expect(nextVariant.spelling_speech?.content).toEqual({
+      version: 2,
+      text: nextVariant.spelling,
+      annotations: []
+    });
+    expect(
+      nextVariant.spelling_speech?.voice_profile.voices[0]
+    ).not.toHaveProperty("audio_asset_id");
+    expect(nextRow.synthesis?.uk?.ipa_speech?.content).toEqual({
+      version: 2,
+      text: nextVariant.spelling,
+      annotations: []
+    });
+    expect(
+      nextRow.synthesis?.uk?.ipa_speech?.voice_profile.voices[0]
+    ).not.toHaveProperty("audio_asset_id");
+  });
+
+  it("保存前清理未发生编辑的历史失配富文本", () => {
+    const original = formsFixture();
+    const row = commonVariant(original.pos[0]!.forms[0]!).pronunciations[0]!;
+    row.dict_phonetic_rich = {
+      version: 2,
+      text: "stale transcription",
+      annotations: []
+    };
+
+    const sanitized = sanitizeFormsRichText(original);
+    const sanitizedDraft = sanitized as DraftFormsStepContentV3;
+
+    expect(
+      commonVariant(sanitizedDraft.pos[0]!.forms[0]!).pronunciations[0]!
+        .dict_phonetic_rich
+    ).toBeUndefined();
+    expect(row.dict_phonetic_rich).toBeDefined();
+  });
+
+  it("保存前清理音素正文中不在词界的历史停顿", () => {
+    const original = formsFixture();
+    const variant = commonVariant(original.pos[0]!.forms[0]!);
+    const row = variant.pronunciations[0]!;
+    row.synthesis = {
+      alphabet: "ipa",
+      ipa: "kæt",
+      ups: "K AE T",
+      uk: {
+        ipa: "kæt",
+        ups: "K AE T",
+        ipa_speech: {
+          content: {
+            version: 2,
+            text: variant.spelling,
+            annotations: [{ type: "pause", at: 1, duration_ms: 500 }]
+          },
+          voice_profile: { voices: [] }
+        }
+      }
+    };
+
+    const sanitized = sanitizeFormsRichText(
+      original
+    ) as DraftFormsStepContentV3;
+    const speech = commonVariant(sanitized.pos[0]!.forms[0]!).pronunciations[0]!
+      .synthesis?.uk?.ipa_speech;
+
+    expect(speech?.content.annotations).toEqual([]);
   });
 
   it("#110 就地修改 concrete form 类型且不改任何 V3 节点身份或引用", () => {

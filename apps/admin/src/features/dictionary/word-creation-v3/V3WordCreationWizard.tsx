@@ -44,9 +44,11 @@ import {
   useState
 } from "react";
 import { newWordNodeId } from "../word-model/primitives";
+import { Alert } from "@tsz/ui/admin/display";
 import {
   createStableVariantIdFactory,
   fillFormTypeTemplate,
+  sanitizeFormsRichText,
   type V3StableVariantIdFactory
 } from "./operations";
 import type { V3WordRequests } from "./api";
@@ -413,6 +415,7 @@ function V3WordCreationSession({
   const [impact, setImpact] = useState<FormsImpactResponseV3>();
   const [impactConfirmed, setImpactConfirmed] = useState(false);
   const [problem, setProblem] = useState<V3Problem>();
+  const [richTextRepairNotice, setRichTextRepairNotice] = useState(false);
   const [conflict, setConflict] = useState<V3ConflictComparison>();
   // 本地有未保存输入时收到的更新服务端版本。录入者决定保留还是放弃本地修改之前，保存
   // 基线停在旧版本、写请求一律不发，免得带着旧内容宣称基于新版本覆盖别处的改动。
@@ -1347,6 +1350,10 @@ function V3WordCreationSession({
           content = draftFormsRef.current;
           scope = scopeRef.current;
         }
+        const sanitizedContent = sanitizeFormsRichText(content);
+        if (JSON.stringify(sanitizedContent) !== JSON.stringify(content))
+          setRichTextRepairNotice(true);
+        content = sanitizedContent;
         if (
           scope !== scopeRef.current ||
           flow !== flowRef.current ||
@@ -2227,6 +2234,15 @@ function V3WordCreationSession({
         />
       )}
       {recovery.notice}
+      {richTextRepairNotice && (
+        <Alert
+          type="warning"
+          showIcon
+          closable
+          onClose={() => setRichTextRepairNotice(false)}
+          title={t("panel_legacy_rich_text_repaired")}
+        />
+      )}
       <VoiceSaveContext.Provider
         value={{
           audioTasks: audioTasks.current,
