@@ -1,19 +1,15 @@
 import { createContext, useContext, type ReactNode } from "react";
 
-const SpeechSettingsTextEditorContext = createContext(false);
+const SpeechSettingsContext = createContext(false);
 
-export function SpeechSettingsTextEditorProvider({
-  children
-}: {
-  children: ReactNode;
-}) {
+export function SpeechSettingsProvider({ children }: { children: ReactNode }) {
   return (
-    <SpeechSettingsTextEditorContext.Provider value>
+    <SpeechSettingsContext.Provider value>
       {children}
-    </SpeechSettingsTextEditorContext.Provider>
+    </SpeechSettingsContext.Provider>
   );
 }
 
-export function useHideSpeechSettingsTextEditor() {
-  return useContext(SpeechSettingsTextEditorContext);
+export function useGateEmptySpeechSettings() {
+  return useContext(SpeechSettingsContext);
 }

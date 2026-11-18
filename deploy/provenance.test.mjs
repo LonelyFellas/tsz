@@ -248,6 +248,23 @@ test("web route cache can grow without changing the accepted release digest", as
   );
 });
 
+test("candidate manifests preserve production tag refs", async (t) => {
+  const root = await fixture();
+  const outputPath = path.join(
+    await mkdtemp(path.join(tmpdir(), "tsz-provenance-tag-")),
+    "candidate.json"
+  );
+  t.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(root, { recursive: true });
+    await rm(path.dirname(outputPath), { recursive: true });
+  });
+  const candidate = await createCandidateManifest(
+    candidateInput(root, outputPath, { remoteRef: "refs/tags/v1.2.3" })
+  );
+  assert.equal(candidate.source.remote_ref, "refs/tags/v1.2.3");
+});
+
 test("legacy web manifests ignore only route-cache files added after acceptance", async (t) => {
   const root = await fixture();
   const outputDir = await mkdtemp(

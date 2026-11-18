@@ -178,7 +178,7 @@ export function EntryLayout({
           </Tag>
         ),
         progressBadge: `${progress.filter((row) => row.completed).length}/${progress.length}`,
-        progress: <V3ProductProgressList currentKey={step} rows={progress} />
+        progress: <V3ProductProgressList rows={progress} />
       }}
     >
       {children}

@@ -24,7 +24,7 @@ import { V3PronunciationConvertAll } from "./V3PronunciationConvertAll";
 import { V3PronunciationAudioUpload } from "./V3PronunciationAudioUpload";
 import { VoiceSaveContext, VoiceAudioTasksContext } from "../voiceSaveContext";
 import { pronunciationPlaybackSource } from "@tsz/shared";
-import { SpeechSettingsTextEditorProvider } from "../speechSettingsContext";
+import { SpeechSettingsProvider } from "../speechSettingsContext";
 
 const speech = vi.hoisted(() => ({
   canGenerate: true,
@@ -539,6 +539,9 @@ it("配音弹窗展示宿主保存失败原因并保留输入，重试成功后�
   fireEvent.click(button);
   await waitFor(() => expect(input).not.toBeInTheDocument());
   expect(save).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenNthCalledWith(1, "azure", {
+    skipAudioTasks: true
+  });
 });
 
 it("UPS 缺少当前口音 IPA 时在 IPA 框内提示并聚焦，补齐后恢复转换", () => {
@@ -565,9 +568,9 @@ it("UPS 缺少当前口音 IPA 时在 IPA 框内提示并聚焦，补齐后恢�
 
 it("智能词库 IPA 为空时禁用齿轮并用 Popover 提示先填写", async () => {
   renderWithUps(
-    <SpeechSettingsTextEditorProvider>
+    <SpeechSettingsProvider>
       <Harness dialect="uk" empty />
-    </SpeechSettingsTextEditorProvider>
+    </SpeechSettingsProvider>
   );
   const open = screen.getByLabelText(
     "打开第 1 条发音 英式 Azure IPA TTS 设置器"
@@ -578,11 +581,11 @@ it("智能词库 IPA 为空时禁用齿轮并用 Popover 提示先填写", async
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-it("智能词库的 IPA 设置弹窗只保留配音设置，不挂载顶部编辑器", async () => {
+it("智能词库的 IPA 设置弹窗显示只读文本并保留停顿工具", async () => {
   renderWithUps(
-    <SpeechSettingsTextEditorProvider>
+    <SpeechSettingsProvider>
       <Harness dialect="uk" />
-    </SpeechSettingsTextEditorProvider>
+    </SpeechSettingsProvider>
   );
   fireEvent.click(screen.getByLabelText("第 1 条发音的英式 Azure IPA"));
   fireEvent.click(
@@ -594,8 +597,11 @@ it("智能词库的 IPA 设置弹窗只保留配音设置，不挂载顶部编�
   await waitFor(() =>
     expect(dialog.querySelector(".tsz-ve-bottom-tools")).not.toBeNull()
   );
-  expect(dialog.querySelector(".tsz-ve-editing-area")).toBeNull();
-  expect(dialog.querySelector(".tsz-ve-top-tools")).toBeNull();
+  expect(dialog.querySelector(".tsz-ve-editing-area")).not.toBeNull();
+  expect(dialog.querySelector(".tsz-ve-top-tools")).not.toBeNull();
+  const textInput = dialog.querySelector(".tsz-ve-canvas-input");
+  expect(textInput).not.toBeNull();
+  expect(textInput).toHaveAttribute("readonly");
   expect(
     within(dialog).getByLabelText("完成第 1 条发音 英式 Azure IPA设置")
   ).toBeVisible();
@@ -2092,7 +2098,7 @@ it.each([
     await waitFor(() => expect(complete).toBeEnabled());
     fireEvent.click(complete);
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(save).toHaveBeenCalledWith("azure");
+    expect(save).toHaveBeenCalledWith("azure", { skipAudioTasks: true });
     expect(wire().synthesis.uk.source).toBe(selectedSource);
     expect(sourceRadio(sourceLabel, "英式")).toBeChecked();
     if (selectedSource) expect(selectedSource).toBe(source);

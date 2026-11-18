@@ -767,7 +767,9 @@ function EntryEditor({
       !writable ||
       conflict ||
       currentLocalSnapshot ||
-      (contentLeaveGuard.current && !options?.skipAudioTasks)
+      (contentLeaveGuard.current &&
+        !options?.allowContentSave &&
+        !options?.skipAudioTasks)
     )
       return false;
     return run(

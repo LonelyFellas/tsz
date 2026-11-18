@@ -717,9 +717,10 @@ export function V3FormContentModal({
                 return false;
               const next = completeForms();
               flushSync(() => onApply(next));
-              const accepted = options
-                ? await outerSaveRef.current!.save(area, options)
-                : await outerSaveRef.current!.save(area);
+              const accepted = await outerSaveRef.current!.save(area, {
+                ...(options ?? {}),
+                allowContentSave: true
+              });
               if (accepted) {
                 original.current = next;
                 initialEditor.current = JSON.stringify(

@@ -1,6 +1,7 @@
 import { primaryRegionalVariant } from "@tsz/shared";
 import {
   VoiceSaveContext,
+  type VoiceSaveOptions,
   useVoiceAudioTasks,
   useVoiceSave
 } from "../voiceSaveContext";
@@ -152,7 +153,10 @@ function setup({
   persist,
   catalog
 }: {
-  persist?: (value: SharedFormsStepContentV3) => Promise<boolean>;
+  persist?: (
+    value: SharedFormsStepContentV3,
+    options?: VoiceSaveOptions
+  ) => Promise<boolean>;
   catalog?: PartOfSpeechCatalogResponse;
   multipleGroups?: boolean;
   serverFieldOrder?: boolean;
@@ -219,7 +223,11 @@ function setup({
     return (
       <App>
         <VoiceSaveContext.Provider
-          value={persist ? { save: () => persist(applied) } : null}
+          value={
+            persist
+              ? { save: (_area, options) => persist(applied, options) }
+              : null
+          }
         >
           {open && (
             <V3FormContentModal
@@ -1274,6 +1282,20 @@ it("局部保存先交接完整抽屉结果再请求业务保存，失败不关�
   await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
   expect(persist.mock.calls[1]![0]).toEqual(persist.mock.calls[0]![0]);
   expect(onConfirm).not.toHaveBeenCalled();
+});
+
+it("局部保存绕过外层离开保护但不隐式跳过音频任务等待", async () => {
+  const persist = vi.fn(
+    async (_forms: SharedFormsStepContentV3, options?: VoiceSaveOptions) =>
+      options?.allowContentSave === true
+  );
+  setup({ persist });
+  fireEvent.change(screen.getByLabelText("内容拼写"), {
+    target: { value: "nested save" }
+  });
+  fireEvent.click(screen.getByText("保存当前正文"));
+  await waitFor(() => expect(persist).toHaveBeenCalledOnce());
+  expect(persist.mock.calls[0]![1]).toEqual({ allowContentSave: true });
 });
 
 it("实际发音局部保存不等待其他音频任务", async () => {

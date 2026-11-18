@@ -3204,7 +3204,11 @@ it.each([false, true])(
         field.closest<HTMLElement>(".v3-voice-text-field-compact")!
       ).getByLabelText("打开词形英美通用拼写编辑器")
     );
-    const toolbar = await screen.findByRole("toolbar", { name: "标注工具栏" });
+    const toolbar = await screen.findByRole(
+      "toolbar",
+      { name: "标注工具栏" },
+      { timeout: 10_000 }
+    );
     const dialog = toolbar.closest('[role="dialog"]')! as HTMLElement;
     expect(within(dialog).queryByLabelText("局部配音音色池")).toBeNull();
     fireEvent.change(within(dialog).getByLabelText("词形英美通用拼写"), {

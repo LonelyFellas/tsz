@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
   buildConfig,
+  buildCommandArgs,
   packRelease,
   verifyRelease,
   selectArtifact
@@ -29,7 +30,10 @@ const identity = {
 };
 
 test("build settings retain test mode, real APIs and explicit compatibility flags", () => {
-  const config = buildConfig("admin", { DEPLOY_VOICE_EDITOR: "false" });
+  const config = buildConfig("admin", {
+    DEPLOY_TARGET: "test",
+    DEPLOY_VOICE_EDITOR: "false"
+  });
   assert.equal(config.mode, "test");
   assert.equal(config.env.VITE_VOICE_EDITOR, "false");
   assert.equal(config.env.VITE_ADMIN_WORDS_MOCK, "false");
@@ -39,9 +43,37 @@ test("build settings retain test mode, real APIs and explicit compatibility flag
     /true or false/
   );
   assert.equal(
-    buildConfig("web", {}).env.NEXT_PUBLIC_SITE_URL,
+    buildConfig("web", { DEPLOY_TARGET: "test" }).env.NEXT_PUBLIC_SITE_URL,
     "https://test.tianshengzhi.com"
   );
+});
+
+test("production target uses production URL and mode", () => {
+  assert.deepEqual(buildConfig("web", { DEPLOY_TARGET: "production" }), {
+    mode: "production",
+    env: { NEXT_PUBLIC_SITE_URL: "https://www.tianshengzhi.com" }
+  });
+  assert.equal(
+    buildConfig("admin", { DEPLOY_TARGET: "production" }).mode,
+    "production"
+  );
+  assert.deepEqual(buildCommandArgs("admin", { mode: "production" }), [
+    "--filter",
+    "@tsz/admin",
+    "build",
+    "--mode",
+    "production"
+  ]);
+});
+
+test("test target keeps the test build mode", () => {
+  assert.deepEqual(buildCommandArgs("admin", { mode: "test" }), [
+    "--filter",
+    "@tsz/admin",
+    "build",
+    "--mode",
+    "test"
+  ]);
 });
 
 test("artifact discovery rejects missing, expired, ambiguous and wrong-run packages", () => {
@@ -52,6 +84,19 @@ test("artifact discovery rejects missing, expired, ambiguous and wrong-run packa
     workflow_run: { id: 123, head_sha: identity.sha, head_branch: "main" }
   };
   assert.equal(selectArtifact([item], "web", identity).id, 9);
+  assert.equal(
+    selectArtifact(
+      [
+        {
+          ...item,
+          workflow_run: { ...item.workflow_run, head_branch: "v1.2.3" }
+        }
+      ],
+      "web",
+      identity
+    ).id,
+    9
+  );
   assert.equal(
     selectArtifact([item], "web", { ...identity, attempt: 3 }).id,
     9
@@ -119,6 +164,32 @@ test("a published package binds bytes, source, attempt, config and verification"
       await readlink(path.join(verified.artifact, "dependencies/entry")),
       "../index.html"
     );
+    const tagIdentity = { ...identity, remoteRef: "refs/tags/v1.2.3" };
+    const tagBundle = path.join(root, "tag-bundle");
+    const tagReleaseId = `${identity.sha}-ci-123-2-admin-tag`;
+    await writeFile(
+      path.join(artifact, "version.json"),
+      JSON.stringify({ release_id: tagReleaseId })
+    );
+    await packRelease({
+      component: "admin",
+      artifact,
+      output: tagBundle,
+      identity: tagIdentity,
+      config: buildConfig("admin", { DEPLOY_TARGET: "production" }),
+      releaseId: tagReleaseId,
+      checks: { entry: "passed" }
+    });
+    const tagVerified = await verifyRelease(
+      tagBundle,
+      {
+        component: "admin",
+        identity: tagIdentity,
+        config: buildConfig("admin", { DEPLOY_TARGET: "production" })
+      },
+      path.join(root, "tag-extracted")
+    );
+    assert.equal(tagVerified.receipt.identity.remoteRef, "refs/tags/v1.2.3");
     await assert.rejects(
       verifyRelease(
         bundle,
