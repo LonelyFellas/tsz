@@ -37,6 +37,9 @@ it("概览统计通用英语一次，忽略空白，随草稿切换英美、删�
     screen.getByRole("region", { name: "英文释义摘要" })
   );
   const meanings = within(screen.getByRole("region", { name: "中文解释摘要" }));
+  expect(forms.getByRole("button", { name: /英语词形/ })).not.toHaveAttribute(
+    "aria-current"
+  );
   expect(forms.getByText("1 项")).toBeVisible();
   expect(forms.getByText("通用英语：centre")).toBeVisible();
   expect(definitions.getByText("1 项")).toBeVisible();
