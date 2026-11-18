@@ -1101,9 +1101,9 @@ export const lexiconEditorMessages = {
     "This is the last label. Confirming marks it for deletion; the drawer's confirm button applies it to the page draft. Saving the page checks link impact."
   ],
   remove_label_help: [
-    "其余标签继续使用同一份内容。页面保存时会检查这个标签的关联影响。",
-    "其他標籤繼續使用同一份內容。儲存頁面時會檢查此標籤的關聯影響。",
-    "Other labels keep using the same content. Saving the page checks this label's link impact."
+    "其余标签继续使用同一份内容。这个标签会保留为空模板，页面保存时会检查关联影响。",
+    "其他標籤繼續使用同一份內容。此標籤會保留為空白範本，儲存頁面時會檢查關聯影響。",
+    "Other labels keep using the same content. This label remains as an empty template, and saving the page checks link impact."
   ],
   delete_content: ["删除内容", "刪除內容", "Delete content"],
   remove_label: ["移除标签", "移除標籤", "Remove label"],
