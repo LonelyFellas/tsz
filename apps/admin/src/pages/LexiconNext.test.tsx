@@ -228,13 +228,21 @@ const textAction = (name: string) => {
   return target!;
 };
 
-async function waitForEntryReady(revision: number) {
-  await screen.findByText(`版本 ${revision}`);
+async function waitForEntryReady() {
+  await screen.findByTestId("lexicon-next-editor");
   const languages = within(screen.getByRole("group", { name: "智能词库语言" }));
   await waitFor(() =>
     expect(languages.getByRole("combobox", { name: "媒介语言" })).toBeEnabled()
   );
 }
+
+it("编辑器不展示词条类型和草稿版本状态", async () => {
+  mount(requests());
+  await waitForEntryReady();
+  expect(screen.queryByText("单词 · 英语")).toBeNull();
+  expect(screen.queryByText("版本 1")).toBeNull();
+  expect(screen.queryByText("草稿版本 1")).toBeNull();
+});
 
 const accountChoice = {
   target_language: "en",
@@ -315,7 +323,7 @@ it("账号模式下取消切换不保存，确认离页后才保存生效的组�
   const api = requests();
   api.get.mockResolvedValue({ ...entry, medium_locale: "zh-Hant" });
   mount(api, `/lexicon-next/${id}?target_locale=en-US&medium_locale=zh-Hant`);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local kept" }
@@ -451,7 +459,7 @@ it("取消跨媒介离页不会覆盖记忆，裸链接返回仍保护未保存�
     api,
     `/lexicon-next/${id}?target_locale=en-US&medium_locale=zh-Hant`
   );
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local kept" }
@@ -533,7 +541,7 @@ it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词�
   });
   fireEvent.click(button("词典检测"));
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
-  await screen.findByText("版本 1");
+  await screen.findByTestId("lexicon-next-editor");
   const languages = within(screen.getByRole("banner"));
   expect(
     languages.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
@@ -571,7 +579,7 @@ it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
     })
   );
   const { router } = mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   await chooseLanguage("美式英语");
   fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
@@ -591,7 +599,7 @@ it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
       draft: { ...entry.draft, headword: "center" }
     })
   );
-  await screen.findByText("版本 2");
+  await waitForEntryReady();
   expect(
     screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
   ).toHaveTextContent("美式英语");
@@ -635,7 +643,7 @@ it("深链接归属不匹配时不挂载编辑器，可显式进入词条所属�
   await screen.findByText("该词条不属于当前媒介语言");
   expect(screen.queryByRole("button", { name: "添加词义" })).toBeNull();
   fireEvent.click(button("进入词条所属语言"));
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   expect(
     new URLSearchParams(router.state.location.search).get("medium_locale")
   ).toBe("zh-Hant");
@@ -681,7 +689,7 @@ it("编辑中切换媒介语言保留编辑页，并按词条原媒介语言编�
     `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
   );
 
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   await chooseLanguage("繁体中文");
 
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
@@ -714,7 +722,7 @@ it("刷新编辑页后保留当前步骤", async () => {
     api,
     `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
   );
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^预览/));
   await waitFor(() =>
     expect(
@@ -727,14 +735,14 @@ it("刷新编辑页后保留当前步骤", async () => {
   mounted.unmount();
 
   mount(api, refreshedPath);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   expect(stepButton(/^预览/)).toHaveAttribute("aria-current", "step");
 });
 
 it("确认跨媒介切换时放弃修改会重载词条草稿", async () => {
   const api = requests();
   mount(api, `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "未保存内容" }
@@ -1403,7 +1411,7 @@ describe("新版词库手工闭环", () => {
       )
     ).toEqual(["en-GB", "zh-Hans", "en-US"]);
     const senseId = saved.draft.senses[0].id;
-    await waitForEntryReady(2);
+    await waitForEntryReady();
     fireEvent.click(stepButton(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local unsaved" }
@@ -1451,7 +1459,7 @@ describe("新版词库手工闭环", () => {
         await screen.findByRole("button", { name: "放弃并重载" });
         fireEvent.click(button("放弃并重载"));
         await screen.findByDisplayValue("remote");
-        expect(screen.getByText("版本 5")).toBeVisible();
+        expect(screen.getByDisplayValue("remote")).toBeVisible();
       }
     }
   );
@@ -1562,7 +1570,7 @@ describe("新版词库手工闭环", () => {
       new URLSearchParams(router.state.location.search).get("medium_locale")
     ).toBe("zh-Hans");
     await act(async () => finishCreate(structuredClone(entry)));
-    await screen.findByText("版本 1");
+    await waitForEntryReady();
     fireEvent.click(stepButton(/词义与译词/));
     fireEvent.click(stepButton(/^预览/));
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
@@ -1598,7 +1606,7 @@ describe("新版词库手工闭环", () => {
     });
     await act(() => router.navigate(`/lexicon-next/${id}`));
     await screen.findByDisplayValue("latest");
-    expect(screen.getByText("版本 3")).toBeVisible();
+    expect(screen.getByDisplayValue("latest")).toBeInTheDocument();
   });
   it("撤销编辑权限后的导航与语言切换不会因缓存清理丢失本地草稿", async () => {
     const api = requests();
@@ -2328,7 +2336,7 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   api.creators.mockResolvedValue([]);
   fireEvent.click(button("保存完整草稿"));
   // The revision renders before the save finally releases the navigation lock.
-  await waitForEntryReady(2);
+  await waitForEntryReady();
   expect(api.save.mock.calls[0]![1].draft.senses[0].definitions).toEqual([]);
   await act(() => router.navigate(-1));
   await screen.findByText("未找到符合条件的数据");
@@ -2362,7 +2370,7 @@ it("从列表创建后同步刷新缓存中的统计，不等待缓存过期", a
   fireEvent.click(button("词典检测"));
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   await act(() => router.navigate("/lexicon-next"));
   await waitFor(() =>
     expect(
@@ -2458,7 +2466,7 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
     )
   ).toBe(true);
   expect(draft.forms).toEqual([]);
-  await waitForEntryReady(2);
+  await waitForEntryReady();
   // Reopen from the server response rather than retaining editor component state.
   api.get.mockResolvedValue({ ...entry, revision: 2, draft });
   await act(() => mounted.router.navigate("/lexicon-next"));
@@ -2563,7 +2571,7 @@ it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳�
   await screen.findByText("服务器 · 版本 5");
   fireEvent.click(textAction("放弃本地修改并重载"));
   fireEvent.click(await screen.findByRole("button", { name: "放弃并重载" }));
-  await screen.findByText("版本 5");
+  await waitForEntryReady();
   expect(screen.getByText("暂无词性")).toBeVisible();
   expect(screen.queryByRole("button", { name: "编辑原形内容" })).toBeNull();
 });
@@ -2690,7 +2698,7 @@ it("Step3 释义跟随顶部语言选择，保留已有通用英语内容及完�
     }
   });
   mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   expect(
     screen.queryByRole("checkbox", { name: "编辑通用英语内容" })
@@ -2862,7 +2870,7 @@ it("Step3 保存后重新打开保留词性顺序和词义，只读时禁用标�
     }
   });
   const mounted = mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   fireEvent.change(screen.getByRole("textbox", { name: "简体中文译词 1" }), {
     target: { value: "集中于" }
@@ -2870,11 +2878,11 @@ it("Step3 保存后重新打开保留词性顺序和词义，只读时禁用标�
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   const saved: NextDraft = api.save.mock.calls[0]![1].draft;
-  await waitForEntryReady(2);
+  await waitForEntryReady();
   mounted.unmount();
   api.get.mockResolvedValue({ ...entry, revision: 2, draft: saved });
   mount(api);
-  await screen.findByText("版本 2");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   const tabs = within(screen.getByRole("tablist"));
   expect(
@@ -2908,7 +2916,7 @@ it("词性配置失效后，Step3 新增词性使用最新词形模板", async (
   const api = requests();
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
   const mounted = mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   await waitFor(() =>
     expect(screen.getByRole("combobox", { name: "添加基本词性" })).toBeEnabled()
@@ -3045,7 +3053,7 @@ it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐�
   };
   api.get.mockResolvedValue({ ...entry, draft: original });
   mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   expect(button("删除语义区间 1")).toBeDisabled();
   fireEvent.click(button("添加语义区间"));
@@ -3086,7 +3094,7 @@ it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐�
   const ungrouped = { ...original.senses[1]! };
   delete ungrouped.sense_group_id;
   expect(saved.senses[1]).toEqual(ungrouped);
-  await screen.findByText("版本 2");
+  await waitForEntryReady();
 });
 
 it("语义区间在只读词条中不能新增、修改、删除或排序", async () => {
@@ -3104,7 +3112,7 @@ it("语义区间在只读词条中不能新增、修改、删除或排序", asyn
     }
   });
   mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   expect(
     screen.getByRole("textbox", { name: "语义区间 1 中文" })
@@ -3164,7 +3172,7 @@ it("目录缓存更新后，停留在预览页也立即去除失效结构且不�
     api,
     `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
   );
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   await waitFor(() =>
     expect(
       mounted.client.getQueryData(partOfSpeechKeys.catalog())
@@ -3215,7 +3223,7 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
     draft: { ...entry.draft, senses: [sense] }
   });
   mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/词义与译词/));
   fireEvent.mouseDown(
     await screen.findByRole("combobox", { name: "义项 1 词性" })
@@ -3256,7 +3264,7 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
       ]
     }
   });
-  await waitForEntryReady(2);
+  await waitForEntryReady();
   expect(screen.getByRole("button", { name: "删除词义 1" })).toBeDisabled();
   fireEvent.click(button("添加词义"));
   fireEvent.click(button("保存完整草稿"));
@@ -3384,7 +3392,7 @@ it("确认释义能力后开放双语表格，完整稿保存保留其他语言�
   await act(async () =>
     ready({ ...caps, definition_details: true, sense_metadata: true })
   );
-  await screen.findByText("版本 7");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   expect(screen.getByRole("table", { name: "英式英语释义" })).toBeVisible();
   expect(
@@ -3515,7 +3523,7 @@ it("已归档词条的新版释义表格保持只读", async () => {
     }
   });
   mount(api);
-  await screen.findByText("版本 1");
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   expect(button("编辑英式英语释义 1")).toBeDisabled();
   expect(button("添加英式英语释义")).toBeDisabled();
@@ -3902,7 +3910,7 @@ function unifiedSentenceRequests() {
 }
 it("英文例句点击进入编辑器，未应用时锁住宿主操作，取消保留原文", async () => {
   const { api } = unifiedSentenceRequests();
-  await waitForEntryReady(1);
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   const trigger = await screen.findByRole("button", {
     name: "编辑英式英语例句原文"
@@ -3955,7 +3963,7 @@ async function editSentenceOriginal(locale: string, text: string) {
 }
 it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧并忽略空白译文占位", async () => {
   const { api, source } = unifiedSentenceRequests();
-  await waitForEntryReady(1);
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   fireEvent.click(textAction("添加例句"));
   fireEvent.click(textAction("保存完整草稿"));
@@ -4031,14 +4039,14 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
       content: expect.objectContaining({ text: "本地译文" })
     })
   ]);
-  await screen.findByText("版本 2");
+  await waitForEntryReady();
 }, 15_000);
 it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {
   const { api, saved, source } = unifiedSentenceRequests();
   api.save.mockRejectedValueOnce(
     new HttpError(409, "conflict", [], "revision_conflict")
   );
-  await waitForEntryReady(1);
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与译词/));
   const english = await screen.findByRole("button", {
     name: "编辑英式英语例句原文"
@@ -4070,13 +4078,6 @@ it("统一保存冲突保留本地例句，可比较服务器例句，明确确�
     await screen.findByRole("button", { name: "保留本地并继续" })
   );
   await waitFor(() => expect(english).toHaveTextContent("Keep local example."));
-  await waitFor(() =>
-    expect(
-      within(document.querySelector(".lexicon-next-toolbar")!).getByText(
-        "版本 4"
-      )
-    ).toBeVisible()
-  );
   expect(button("保存完整草稿")).toBeEnabled();
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
@@ -4149,7 +4150,7 @@ it("其他标签页只改变发布生命周期时，比较重载后使用新版�
     warnings: []
   });
   mount(api);
-  await waitForEntryReady(1);
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^预览/));
   fireEvent.click(button("检查发布"));
   await screen.findByRole("button", { name: "比较服务器版本" });
@@ -4179,7 +4180,7 @@ it("比较发布冲突的状态读取失败时保留未保存草稿并允许重�
   });
   api.save.mockRejectedValue(new HttpError(409, "服务器版本已变化"));
   mount(api);
-  await waitForEntryReady(1);
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^预览/));
   fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
     target: { value: "local-unsaved" }
@@ -4291,7 +4292,7 @@ it("发布缺项可切到缺失方言并聚焦对应语法编辑入口", async (
     warnings: []
   });
   const { router } = mount(api);
-  await waitForEntryReady(1);
+  await waitForEntryReady();
   fireEvent.click(stepButton(/^预览/));
   fireEvent.click(button("检查发布"));
   const problem = await screen.findByRole("button", {
