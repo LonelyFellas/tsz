@@ -27,6 +27,26 @@ export interface NextLocalDraftKey {
 const DB_NAME = "tsz-admin-drafts";
 const STORE_NAME = "lexicon-next";
 const DB_VERSION = 1;
+const OPERATION_TIMEOUT_MS = 2000;
+
+function withTimeout<T>(promise: Promise<T>, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(
+      () => reject(new Error(message)),
+      OPERATION_TIMEOUT_MS
+    );
+    promise.then(
+      (value) => {
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        globalThis.clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
 
 function isValidSnapshot(
   key: NextLocalDraftKey,
@@ -118,13 +138,36 @@ function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined")
     return Promise.reject(new Error("indexedDB unavailable"));
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = globalThis.setTimeout(() => {
+      settled = true;
+      reject(new Error("indexedDB open timed out"));
+    }, OPERATION_TIMEOUT_MS);
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () =>
+    request.onerror = () => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timeout);
       reject(request.error ?? new Error("indexedDB open failed"));
+    };
+    request.onblocked = () => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timeout);
+      reject(new Error("indexedDB open blocked"));
+    };
     request.onupgradeneeded = () => {
       request.result.createObjectStore(STORE_NAME);
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      globalThis.clearTimeout(timeout);
+      if (settled) {
+        request.result.close();
+        return;
+      }
+      settled = true;
+      resolve(request.result);
+    };
   });
 }
 
@@ -134,14 +177,17 @@ async function withStore<T>(
 ) {
   const database = await openDatabase();
   try {
-    return await new Promise<T>((resolve, reject) => {
-      const request = operation(
-        database.transaction(STORE_NAME, mode).objectStore(STORE_NAME)
-      );
-      request.onerror = () =>
-        reject(request.error ?? new Error("indexedDB request failed"));
-      request.onsuccess = () => resolve(request.result);
-    });
+    return await withTimeout(
+      new Promise<T>((resolve, reject) => {
+        const request = operation(
+          database.transaction(STORE_NAME, mode).objectStore(STORE_NAME)
+        );
+        request.onerror = () =>
+          reject(request.error ?? new Error("indexedDB request failed"));
+        request.onsuccess = () => resolve(request.result);
+      }),
+      "indexedDB operation timed out"
+    );
   } finally {
     database.close();
   }
@@ -161,9 +207,39 @@ export async function writeNextLocalDraft(
   key: NextLocalDraftKey,
   snapshot: NextLocalDraftSnapshot
 ) {
-  await withStore<IDBValidKey>("readwrite", (store) =>
-    store.put(snapshot, storageKey(key))
-  );
+  const database = await openDatabase();
+  try {
+    await withTimeout(
+      new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, "readwrite");
+        const store = transaction.objectStore(STORE_NAME);
+        const current = store.get(storageKey(key));
+        current.onerror = () =>
+          reject(current.error ?? new Error("indexedDB request failed"));
+        current.onsuccess = () => {
+          const existing = current.result;
+          if (
+            isValidSnapshot(key, existing) &&
+            existing.updated_at > snapshot.updated_at
+          ) {
+            resolve();
+            return;
+          }
+          const request = store.put(snapshot, storageKey(key));
+          request.onerror = () =>
+            reject(request.error ?? new Error("indexedDB request failed"));
+          request.onsuccess = () => resolve();
+        };
+        transaction.onabort = () =>
+          reject(
+            transaction.error ?? new Error("indexedDB transaction aborted")
+          );
+      }),
+      "indexedDB operation timed out"
+    );
+  } finally {
+    database.close();
+  }
 }
 
 export async function clearNextLocalDraft(key: NextLocalDraftKey) {
