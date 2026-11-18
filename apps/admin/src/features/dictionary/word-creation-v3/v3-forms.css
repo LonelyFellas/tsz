@@ -615,7 +615,10 @@
   }
 }
 
-:is(.v3-forms-step, .v3-content-modal) textarea.tsz-words.ui-input,
+:is(.v3-forms-step, .v3-content-modal) textarea.tsz-words.ui-input {
+  font-weight: var(--ui-font-weight-regular);
+}
+
 :is(.v3-forms-step, .v3-content-modal) .v3-grammar-preview-content.tsz-words {
   font-weight: 700;
 }
