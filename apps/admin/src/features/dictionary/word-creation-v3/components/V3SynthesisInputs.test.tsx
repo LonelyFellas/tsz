@@ -1903,6 +1903,34 @@ it("面板取消和移除默认录音均保留显式选择，不把本口音旧�
   ).toBeUndefined();
 });
 
+it("设为默认播放会同步上传来源，取消后清除上传来源", async () => {
+  render(<Harness dialect="uk" recording />);
+  const saved = () =>
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+
+  fireEvent.click(sourceRadio("Azure IPA", "英式"));
+  expect(saved().synthesis.uk.source).toBe("ipa");
+  fireEvent.click(
+    screen.getByRole("button", { name: "第 1 条发音 英式上传音频" })
+  );
+  fireEvent.click(await screen.findByLabelText("设为默认播放 recording.mp3"));
+
+  await waitFor(() => {
+    expect(sourceRadio("上传音频", "英式")).toBeChecked();
+  });
+  expect(saved().synthesis.uk.source).toBe("upload");
+  expect(saved().audio_assets).toEqual([
+    expect.objectContaining({ id: "old-recording", is_default: true })
+  ]);
+
+  fireEvent.click(await screen.findByLabelText("取消默认播放 recording.mp3"));
+  await waitFor(() => {
+    expect(sourceRadio("词形拼写", "英式")).toBeChecked();
+  });
+  expect(saved().synthesis.uk.source).toBeUndefined();
+  expect(saved().audio_assets[0].is_default).toBe(false);
+});
+
 it("上传完成使用宿主当前回调，保留上传期间编辑的其他字段", async () => {
   let finish!: (asset: unknown) => void;
   speech.upload.mockImplementation(
