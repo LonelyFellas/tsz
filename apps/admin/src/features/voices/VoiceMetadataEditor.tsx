@@ -77,7 +77,7 @@ export function VoiceMetadataEditor({
     );
     const value =
       field === "description"
-        ? (latest?.description_zh ?? "")
+        ? (latest?.description_zh ?? voice.metadata?.description ?? "")
         : accent === "uk"
           ? "gb"
           : accent === "us"
