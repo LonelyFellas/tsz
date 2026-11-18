@@ -4,6 +4,25 @@ import { expect, it } from "vitest";
 import type { NextDraft } from "@tsz/types";
 import { EntryLayout } from "./EntryLayout";
 
+it("步骤条显示正确标题且不显示副标题", () => {
+  render(
+    <MemoryRouter>
+      <EntryLayout step="basics" exists={false}>
+        正文
+      </EntryLayout>
+    </MemoryRouter>
+  );
+
+  const nav = screen.getByRole("navigation", { name: "词条编辑步骤" });
+  const steps = within(nav);
+  expect(steps.getByRole("button", { name: "创建新词条" })).toBeVisible();
+  expect(steps.getByRole("button", { name: "词形与发音" })).toBeVisible();
+  expect(steps.getByRole("button", { name: "词义与例句" })).toBeVisible();
+  expect(steps.getByRole("button", { name: "预览并发布" })).toBeVisible();
+  expect(nav.querySelectorAll("small")).toHaveLength(0);
+  expect(steps.queryByText(/基本词性|目标语言|结构核对/)).toBeNull();
+});
+
 it("概览统计通用英语一次，忽略空白，随草稿切换英美、删空内容更新", () => {
   const draft: NextDraft = {
     schema_version: 1,

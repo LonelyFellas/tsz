@@ -153,9 +153,10 @@ export function EntryLayout({
         back: "返回智能词库"
       }}
       stepLabels={{
-        forms: { title: "词性与发音", subtitle: "基本词性｜词形变化｜多发音" },
-        meanings: { title: "词义与译词", subtitle: "目标语言｜媒介语言" },
-        preview: { title: "预览", subtitle: "结构核对｜发布" }
+        basics: { title: "创建新词条" },
+        forms: { title: "词形与发音" },
+        meanings: { title: "词义与例句" },
+        preview: { title: "预览并发布" }
       }}
       presentation={{
         wordExists: exists,
