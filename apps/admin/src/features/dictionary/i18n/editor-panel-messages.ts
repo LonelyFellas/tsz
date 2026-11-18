@@ -1,4 +1,9 @@
 export const lexiconEditorPanelMessages = {
+  panel_legacy_rich_text_repaired: [
+    "检测到历史标注与正文不一致，已自动清理标注，文本和录音已保留。",
+    "偵測到歷史標註與正文不一致，已自動清理標註，文字與錄音已保留。",
+    "A historical annotation did not match its text and was removed. Text and recordings were kept."
+  ],
   panel_save_invalid_speech: [
     "尚未保存，修改已保留。配音内容或参数无效，请检查 IPA/UPS、停顿和音色设置后重试。",
     "尚未儲存，修改已保留。配音內容或參數無效，請檢查 IPA/UPS、停頓與音色設定後重試。",
