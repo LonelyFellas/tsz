@@ -23,7 +23,8 @@ import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { spellingAudioScope } from "../spellingSpeech";
 import type { VoiceOption } from "@tsz/voice-editor/types";
 import { flushSync } from "react-dom";
-import { useVoiceAudioTasks } from "../voiceSaveContext";
+import { useVoiceAudioTasks, useVoiceSave } from "../voiceSaveContext";
+import { useV3FormCopy } from "./V3FormCopyProvider";
 
 function variants(forms: SharedFormsStepContentV3) {
   return forms.contents
@@ -74,6 +75,8 @@ export function V3FormsAudioTasks({
   const [catalogError, setCatalogError] = useState<unknown>();
   const [catalogAttempt, retryCatalog] = useState(0);
   const audioTasks = useVoiceAudioTasks();
+  const voiceSave = useVoiceSave();
+  const copy = useV3FormCopy();
   const catalogReady = useRef<Promise<boolean>>(Promise.resolve(false));
   const needsCatalog =
     !rowOnly &&
@@ -125,7 +128,8 @@ export function V3FormsAudioTasks({
   });
   const patch = (
     id: string,
-    update: (variant: FormContentVariantV3) => void
+    update: (variant: FormContentVariantV3) => void,
+    background = false
   ) => {
     const next = structuredClone(latest.current.forms);
     const variant = variants(next).find(
@@ -133,7 +137,9 @@ export function V3FormsAudioTasks({
     )?.variant;
     if (!variant) return;
     update(variant);
-    latest.current.onChange(next);
+    if (background) flushSync(() => latest.current.onChange(next));
+    else latest.current.onChange(next);
+    if (background) void voiceSave?.saveAudio?.();
   };
   return (
     <>
@@ -193,18 +199,23 @@ export function V3FormsAudioTasks({
                         : "en-US"
                 }
                 enabled={ready}
+                background={copy?.backgroundContentIds.has(variant.id) ?? false}
                 onChange={(voice_profile) =>
-                  patch(variant.id, (current) => {
-                    current.spelling_speech = {
-                      content: {
-                        version: 2,
-                        text: current.spelling,
-                        annotations: []
-                      },
-                      ...current.spelling_speech,
-                      voice_profile
-                    };
-                  })
+                  patch(
+                    variant.id,
+                    (current) => {
+                      current.spelling_speech = {
+                        content: {
+                          version: 2,
+                          text: current.spelling,
+                          annotations: []
+                        },
+                        ...current.spelling_speech,
+                        voice_profile
+                      };
+                    },
+                    copy?.backgroundContentIds.has(variant.id) ?? false
+                  )
                 }
               />
             )}
@@ -249,14 +260,21 @@ export function V3FormsAudioTasks({
                         )}
                         profile={scoped}
                         enabled={ready}
+                        background={
+                          copy?.backgroundContentIds.has(variant.id) ?? false
+                        }
                         onChange={(voice_profile) =>
-                          patch(variant.id, (current) => {
-                            const row = current.pronunciations.find(
-                              (item) => item.id === pronunciation.id
-                            );
-                            if (!row?.voice_profile) return;
-                            row.voice_profile = voice_profile;
-                          })
+                          patch(
+                            variant.id,
+                            (current) => {
+                              const row = current.pronunciations.find(
+                                (item) => item.id === pronunciation.id
+                              );
+                              if (!row?.voice_profile) return;
+                              row.voice_profile = voice_profile;
+                            },
+                            copy?.backgroundContentIds.has(variant.id) ?? false
+                          )
                         }
                       />
                     );
@@ -293,6 +311,9 @@ export function V3FormsAudioTasks({
                     locale={locale}
                     label={variant.spelling}
                     spelling={variant.spelling}
+                    background={
+                      copy?.backgroundContentIds.has(variant.id) ?? false
+                    }
                     fallbackVoiceProfile={
                       pronunciation.voice_profile
                         ? {
@@ -315,13 +336,17 @@ export function V3FormsAudioTasks({
                         : undefined
                     }
                     onChange={(next) =>
-                      patch(variant.id, (current) => {
-                        const row = current.pronunciations.find(
-                          (item) => item.id === pronunciation.id
-                        );
-                        if (row?.synthesis)
-                          row.synthesis = { ...row.synthesis, [side]: next };
-                      })
+                      patch(
+                        variant.id,
+                        (current) => {
+                          const row = current.pronunciations.find(
+                            (item) => item.id === pronunciation.id
+                          );
+                          if (row?.synthesis)
+                            row.synthesis = { ...row.synthesis, [side]: next };
+                        },
+                        copy?.backgroundContentIds.has(variant.id) ?? false
+                      )
                     }
                   />
                 );
@@ -343,7 +368,8 @@ function TextAudioTask({
   recommendationArea,
   locale,
   activeLocales,
-  requiredLocales
+  requiredLocales,
+  background = false
 }: {
   target: string;
   content: RichTextV2;
@@ -352,6 +378,7 @@ function TextAudioTask({
   locale?: `en-${string}`;
   activeLocales?: readonly PhonemeLocaleV3[];
   requiredLocales?: readonly PhonemeLocaleV3[];
+  background?: boolean;
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
 }) {
@@ -368,7 +395,8 @@ function TextAudioTask({
     activeLocales,
     requiredLocales,
     enabled,
-    defer: true,
+    defer: !background,
+    waitForSave: !background,
     onChange
   });
   return task.error == null ? null : (

@@ -436,6 +436,7 @@ function V3WordCreationSession({
   draftMeaningsRef.current = draftMeanings;
   const [pending, setPending] = useState<Set<string>>(new Set());
   const audioTasks = useRef(new Map<string, () => Promise<boolean>>());
+  const audioSaveQueue = useRef(Promise.resolve(true));
   const waitForSelectedAudio = useCallback(async () => {
     for (const wait of [...audioTasks.current.values()]) {
       if (!(await wait())) return false;
@@ -608,11 +609,11 @@ function V3WordCreationSession({
   }, []);
 
   /** 服务端新版本待决时拦下写请求，并把录入者的注意力引回冲突提示。 */
-  const blockedByRemoteUpdate = () => {
+  const blockedByRemoteUpdate = useCallback(() => {
     if (!remoteUpdateRef.current) return false;
     setRemoteUpdateNotice((current) => current + 1);
     return true;
-  };
+  }, []);
 
   const resetReconciliationState = () => {
     publishAttemptRef.current = undefined;
@@ -1469,6 +1470,7 @@ function V3WordCreationSession({
     },
     [
       applyCanonical,
+      blockedByRemoteUpdate,
       finishSaveInFlight,
       handleEntryArchived,
       handleError,
@@ -1540,8 +1542,44 @@ function V3WordCreationSession({
         done();
       }
     },
-    [draftForms, handleEntryArchived, handleError, markPending, requests]
+    [
+      blockedByRemoteUpdate,
+      draftForms,
+      handleEntryArchived,
+      handleError,
+      markPending,
+      requests
+    ]
   );
+
+  const saveAudioContent = useCallback(() => {
+    const run = audioSaveQueue.current
+      .then(async () => {
+        if (!mountedRef.current || sessionReadOnly || blockedByRemoteUpdate())
+          return false;
+        const flow = flowRef.current;
+        const scope = scopeRef.current;
+        const result = await flow.runCanonical("save_forms", () =>
+          requests.saveAudio(flow.canonical().id, {
+            schema_version: 3,
+            base_revision: flow.canonical().revision,
+            forms: draftFormsRef.current,
+            meanings: draftMeaningsRef.current
+          })
+        );
+        if (
+          !result.accepted ||
+          scope !== scopeRef.current ||
+          flow !== flowRef.current
+        )
+          return false;
+        applyCanonical(result.value.word, "forms");
+        return true;
+      })
+      .catch(() => false);
+    audioSaveQueue.current = run;
+    return run;
+  }, [applyCanonical, blockedByRemoteUpdate, requests, sessionReadOnly]);
 
   const saveMeanings = useCallback(
     async (
@@ -1679,6 +1717,7 @@ function V3WordCreationSession({
     },
     [
       applyCanonical,
+      blockedByRemoteUpdate,
       allowPublishedEditing,
       finishSaveInFlight,
       handleEntryArchived,
@@ -1733,7 +1772,13 @@ function V3WordCreationSession({
     } finally {
       done();
     }
-  }, [handleEntryArchived, handleError, markPending, requests]);
+  }, [
+    blockedByRemoteUpdate,
+    handleEntryArchived,
+    handleError,
+    markPending,
+    requests
+  ]);
 
   const confirmImpactSurface = useCallback(
     (page: SurfaceMatchPageV3) => {
@@ -1982,7 +2027,7 @@ function V3WordCreationSession({
       publishAttemptRef.current = attempt;
       return publishWithAttempt(attempt);
     },
-    [idempotencyKeyFactory, publishWithAttempt]
+    [blockedByRemoteUpdate, idempotencyKeyFactory, publishWithAttempt]
   );
 
   const refreshConflict = useCallback(async () => {
@@ -2246,6 +2291,7 @@ function V3WordCreationSession({
       <VoiceSaveContext.Provider
         value={{
           audioTasks: audioTasks.current,
+          saveAudio: saveAudioContent,
           failure: problem ? v3SaveProblemMessage(problem, t) : undefined,
           save: async (area, options?: VoiceSaveOptions) => {
             if (pending.size || sessionReadOnly || !word.id) return false;

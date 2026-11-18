@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task-212-schema-compat/tsz-rust/docs/openapi.json",
-  "_source_sha256": "e0dd0da59fed7e86dae015449c1e55958beaf85f85ed754a87d265fc026aa564",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_source_sha256": "b370b2fbebe2f2f20cb2a269fa01f24eaf8f69378aeda3222eff3177bfc599d9",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",

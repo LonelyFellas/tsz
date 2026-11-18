@@ -73,6 +73,7 @@ export function V3PhonemeSpeechSettings({
   field,
   active: requestedActive,
   headless = false,
+  background = false,
   onChange
 }: {
   spelling: string;
@@ -86,6 +87,7 @@ export function V3PhonemeSpeechSettings({
   field: string;
   active: boolean;
   headless?: boolean;
+  background?: boolean;
   onChange: (
     candidate: PronunciationSynthesisCandidateV3,
     audioAssets: AudioAssetV3[]
@@ -468,7 +470,8 @@ export function V3PhonemeSpeechSettings({
     adapter: draftAdapter,
     locale,
     enabled: draftSpeechEnabled,
-    defer: true,
+    defer: !background,
+    waitForSave: !background,
     onChange: (voice_profile) =>
       setDraft((current) => ({ ...current, voice_profile }))
   });
@@ -553,7 +556,8 @@ export function V3PhonemeSpeechSettings({
       !voicePreviewIsMock &&
       !!spelling.trim() &&
       !synthesisInputIssue(alphabet, candidate[alphabet]),
-    defer: true,
+    defer: !background,
+    waitForSave: !background,
     onChange: (voice_profile) =>
       onChange(
         {

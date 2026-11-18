@@ -72,6 +72,14 @@ function EditProbe() {
     </>
   );
 }
+function BackgroundAudioProbe() {
+  const copy = useV3FormCopy()!;
+  return (
+    <output data-testid="background-content-ids">
+      {JSON.stringify([...copy.backgroundContentIds])}
+    </output>
+  );
+}
 function Cells({ forms }: { forms: SharedFormsStepContentV3 }) {
   const copy = useV3FormCopy()!;
   return (
@@ -123,6 +131,7 @@ function Harness({
         <V3FormCopyProvider forms={forms} onChange={setForms}>
           <Cells forms={forms} />
           <EditProbe />
+          <BackgroundAudioProbe />
           <button
             onClick={() => {
               const next = structuredClone(forms);
@@ -370,6 +379,10 @@ describe("词形复制交互", () => {
       expect(targetPronunciation().audio_assets?.[0]?.id).toBe("source-upload")
     );
     expect(targetPronunciation().synthesis?.uk?.source).toBe("upload");
+    expect(screen.queryByRole("button", { name: "撤销" })).toBeNull();
+    expect(
+      JSON.parse(screen.getByTestId("background-content-ids").textContent!)
+    ).toContain(initial.contents[1]!.id);
   });
 
   it("版本数量不同需明确映射，取消保留所有目标内容", async () => {

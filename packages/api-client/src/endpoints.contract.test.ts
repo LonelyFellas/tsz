@@ -564,6 +564,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "AdminWordV3Envelope"
       ],
       [
+        "put /admin/lexicon/entries/{id}/audio",
+        "UpdateEntryAudioInputV3",
+        "200",
+        "AdminWordV3Envelope"
+      ],
+      [
         "put /admin/lexicon/entries/{id}/steps/meanings",
         "SaveMeaningsStepInputV3",
         "200",
@@ -688,6 +694,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "413",
         "422",
         "503"
+      ],
+      "put /admin/lexicon/entries/{id}/audio": [
+        "401",
+        "403",
+        "404",
+        "409",
+        "422"
       ],
       "put /admin/lexicon/entries/{id}/steps/meanings": [
         "401",
@@ -843,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "e0dd0da59fed7e86dae015449c1e55958beaf85f85ed754a87d265fc026aa564"
+      "b370b2fbebe2f2f20cb2a269fa01f24eaf8f69378aeda3222eff3177bfc599d9"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1172,6 +1185,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ]
         ])
       ),
+      "post /admin/lexicon-next/test-fixtures/dialect-pair": [
+        {
+          name: "X-TSZ-Test-Run",
+          in: "header",
+          required: true,
+          schema: { type: "string" }
+        }
+      ],
       ...Object.fromEntries(
         [
           "get /admin/lexicon-next/sentences/{id}",
