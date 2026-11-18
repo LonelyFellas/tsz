@@ -934,7 +934,6 @@ export interface UpdateEntryAudioInputV3 {
   schema_version: 3;
   base_revision: number;
   forms: FormsStepRepresentationV3;
-  meanings: DraftMeaningsStepContentWritableV3;
 }
 
 export type SaveFormsStepInputAny = SaveFormsStepInput | SaveFormsStepInputV3;

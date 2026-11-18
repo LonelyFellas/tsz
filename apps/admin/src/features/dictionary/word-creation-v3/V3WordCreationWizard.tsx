@@ -91,6 +91,36 @@ type ExternalNavigationAdapter = Partial<
   Omit<V3IssueNavigationAdapter, "activateStep" | "activatePos">
 >;
 
+function enqueueCanonicalWrite<T>(
+  queue: { current: Promise<unknown>; busy: boolean },
+  request: () => Promise<T>
+): Promise<T> {
+  if (!queue.busy) {
+    queue.busy = true;
+    let immediate: Promise<T>;
+    try {
+      immediate = Promise.resolve(request());
+    } catch (error) {
+      immediate = Promise.reject(error);
+    }
+    const tracked: Promise<unknown> = immediate
+      .finally(() => {
+        if (queue.current === tracked) queue.busy = false;
+      })
+      .catch(() => undefined);
+    queue.current = tracked;
+    return immediate;
+  }
+  const run = queue.current.then(request, request);
+  const tracked: Promise<unknown> = run
+    .finally(() => {
+      if (queue.current === tracked) queue.busy = false;
+    })
+    .catch(() => undefined);
+  queue.current = tracked;
+  return run;
+}
+
 export interface V3WizardActions {
   saveForms(
     intent: StepSaveIntent,
@@ -437,6 +467,10 @@ function V3WordCreationSession({
   const [pending, setPending] = useState<Set<string>>(new Set());
   const audioTasks = useRef(new Map<string, () => Promise<boolean>>());
   const audioSaveQueue = useRef(Promise.resolve(true));
+  const canonicalWriteQueue = useRef({
+    current: Promise.resolve(),
+    busy: false
+  });
   const waitForSelectedAudio = useCallback(async () => {
     for (const wait of [...audioTasks.current.values()]) {
       if (!(await wait())) return false;
@@ -1332,7 +1366,7 @@ function V3WordCreationSession({
               flow.canonical().meanings
             )
           : [];
-      const baseRevision = flow.canonical().revision;
+      let baseRevision = flow.canonical().revision;
       let scope = scopeRef.current;
       const done = markPending("save_forms");
       const useCurrentDraft = content === draftFormsRef.current;
@@ -1347,6 +1381,8 @@ function V3WordCreationSession({
           !(await waitForSelectedAudio())
         )
           return false;
+        if (canonicalWriteQueue.current.busy)
+          await canonicalWriteQueue.current.current;
         if (useCurrentDraft) {
           content = draftFormsRef.current;
           scope = scopeRef.current;
@@ -1355,6 +1391,7 @@ function V3WordCreationSession({
         if (JSON.stringify(sanitizedContent) !== JSON.stringify(content))
           setRichTextRepairNotice(true);
         content = sanitizedContent;
+        baseRevision = flow.canonical().revision;
         if (
           scope !== scopeRef.current ||
           flow !== flowRef.current ||
@@ -1557,24 +1594,37 @@ function V3WordCreationSession({
       .then(async () => {
         if (!mountedRef.current || sessionReadOnly || blockedByRemoteUpdate())
           return false;
-        const flow = flowRef.current;
-        const scope = scopeRef.current;
-        const result = await flow.runCanonical("save_forms", () =>
-          requests.saveAudio(flow.canonical().id, {
-            schema_version: 3,
-            base_revision: flow.canonical().revision,
-            forms: draftFormsRef.current,
-            meanings: draftMeaningsRef.current
-          })
-        );
-        if (
-          !result.accepted ||
-          scope !== scopeRef.current ||
-          flow !== flowRef.current
-        )
+        savesInFlightRef.current += 1;
+        try {
+          const flow = flowRef.current;
+          const scope = scopeRef.current;
+          const result = await enqueueCanonicalWrite(
+            canonicalWriteQueue.current,
+            () =>
+              flow.runCanonical("save_audio", () =>
+                requests.saveAudio(flow.canonical().id, {
+                  schema_version: 3,
+                  base_revision: flow.canonical().revision,
+                  forms: draftFormsRef.current
+                })
+              )
+          );
+          if (
+            !result.accepted ||
+            scope !== scopeRef.current ||
+            flow !== flowRef.current
+          )
+            return false;
+          noteOwnRevision(result.value.word);
+          applyCanonical(result.value.word, "forms");
+          return true;
+        } catch (error) {
+          if (mountedRef.current)
+            setProblem(classifyV3Problem(error, "save_forms"));
           return false;
-        applyCanonical(result.value.word, "forms");
-        return true;
+        } finally {
+          savesInFlightRef.current -= 1;
+        }
       })
       .catch(() => false);
     audioSaveQueue.current = run;
@@ -1624,7 +1674,7 @@ function V3WordCreationSession({
         // 词形保存结束时可能处理了暂存的新版本（挂起提示或整体替换会话），不再按旧基线续发词义。
         if (blockedByRemoteUpdate() || flowRef.current !== flow) return;
       }
-      const baseRevision = flow.canonical().revision;
+      let baseRevision = flow.canonical().revision;
       // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
       // 都会经过的管线上，「确认影响并完成」那种旁路才不会漏掉清洗；保存失败或
       // 撞版本冲突时，回填用的本地编辑态也仍是未清洗的，录入位不会凭空少几行。
@@ -1642,6 +1692,8 @@ function V3WordCreationSession({
       try {
         if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
           return;
+        if (canonicalWriteQueue.current.busy)
+          await canonicalWriteQueue.current.current;
         if (useCurrentDraft) {
           content = draftMeaningsRef.current;
           scope = scopeRef.current;
@@ -1650,6 +1702,7 @@ function V3WordCreationSession({
               ? dropEmptySentenceTranslations(content)
               : content;
         }
+        baseRevision = flow.canonical().revision;
         if (
           scope !== scopeRef.current ||
           flow !== flowRef.current ||

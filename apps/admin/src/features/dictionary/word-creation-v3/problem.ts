@@ -32,6 +32,7 @@ export type V3ProblemOperation =
   | "get"
   | "impact"
   | "save_forms"
+  | "save_audio"
   | "save_meanings"
   | "validate"
   | "publish"

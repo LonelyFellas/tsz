@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-18T13:57:13.039Z",
+  "_generatedAt": "2026-11-18T15:57:18.151Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -10474,13 +10474,10 @@
     },
     "UpdateEntryAudioInputV3": {
       "type": "object",
-      "required": ["schema_version", "base_revision", "forms", "meanings"],
+      "required": ["schema_version", "base_revision", "forms"],
       "properties": {
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "forms": { "$ref": "#/components/schemas/FormsStepRepresentationV3" },
-        "meanings": {
-          "$ref": "#/components/schemas/DraftMeaningsStepContentWritableV3"
-        },
         "schema_version": { "type": "integer", "enum": [3] }
       },
       "additionalProperties": false

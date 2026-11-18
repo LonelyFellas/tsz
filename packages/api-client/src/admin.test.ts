@@ -470,8 +470,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         api.words.updateAudioV3("w-1", {
           schema_version: 3,
           base_revision: 1,
-          forms: { pos: [] },
-          meanings: { sense_groups: [], pos: [] }
+          forms: { pos: [] }
         })
     },
     {

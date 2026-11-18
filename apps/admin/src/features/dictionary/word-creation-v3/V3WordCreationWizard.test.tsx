@@ -7586,8 +7586,7 @@ it("后台音频完成后通过专用接口保存并推进 revision", async () =
     expect.objectContaining({
       schema_version: 3,
       base_revision: 1,
-      forms: expect.any(Object),
-      meanings: expect.any(Object)
+      forms: expect.any(Object)
     })
   );
   await waitFor(() =>
