@@ -920,6 +920,27 @@ describe("配音中心", () => {
     expect(router.state.location.pathname).toBe("/voices/library");
   });
 
+  it("未配置中文介绍时，编辑仍保留 Azure 原始介绍", async () => {
+    setPermissions(["words.access", "speech.global_dubbing"]);
+    vi.mocked(api.speech.voices).mockResolvedValue({
+      items: [
+        {
+          ...verifiedSonia,
+          metadata: {
+            ...verifiedSonia.metadata!,
+            description: "A gentle and soft voice."
+          }
+        }
+      ]
+    });
+    mount();
+    await screen.findByLabelText("调节 Sonia 声音");
+    editDescription();
+    expect(screen.getByLabelText("中文介绍")).toHaveValue(
+      "A gentle and soft voice."
+    );
+  });
+
   it("表格介绍保存期间不能放弃离开", async () => {
     setPermissions(["words.access", "speech.global_dubbing"]);
     const saved = {
