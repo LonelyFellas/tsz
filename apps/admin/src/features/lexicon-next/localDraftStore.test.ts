@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   NextLocalDraftKey,
   NextLocalDraftSnapshot
@@ -174,6 +174,35 @@ describe("localDraftStore", () => {
         configurable: true,
         value: original
       });
+    }
+  });
+
+  it("does not let a stale tab overwrite a newer snapshot", async () => {
+    const newer = snapshot(editorId);
+    newer.updated_at = "2026-11-18T00:00:02.000Z";
+    const stale = snapshot(editorId);
+    stale.updated_at = "2026-11-18T00:00:01.000Z";
+
+    await writeNextLocalDraft(key(editorId), newer);
+    await writeNextLocalDraft(key(editorId), stale);
+
+    await expect(readNextLocalDraft(key(editorId))).resolves.toEqual(newer);
+  });
+
+  it("fails fast when opening IndexedDB is blocked", async () => {
+    const open = vi.spyOn(indexedDB, "open").mockImplementation(() => {
+      const request = {} as IDBOpenDBRequest;
+      queueMicrotask(() =>
+        request.onblocked?.(new Event("blocked") as IDBVersionChangeEvent)
+      );
+      return request;
+    });
+    try {
+      await expect(readNextLocalDraft(key(editorId))).rejects.toThrow(
+        "indexedDB open blocked"
+      );
+    } finally {
+      open.mockRestore();
     }
   });
 });
