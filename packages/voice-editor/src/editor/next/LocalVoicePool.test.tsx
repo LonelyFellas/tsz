@@ -318,7 +318,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     ).toEqual(["b"]);
   });
 
-  it("目录每侧单选，切换英式保留美式、推荐和缓存参数", async () => {
+  it("目录每侧可多选，切换英式保留美式、推荐和缓存参数", async () => {
     const onProfile = vi.fn();
     render(
       <Harness
@@ -329,8 +329,8 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
     fireEvent.click(await screen.findByRole("checkbox", { name: "推荐" }));
     fireEvent.click(screen.getByText("完整音色目录"));
-    const beta = screen.getByRole("radio", { name: "选用 Beta" });
-    const american = screen.getByRole("radio", { name: "选用 American" });
+    const beta = screen.getByRole("checkbox", { name: "选用 Beta" });
+    const american = screen.getByRole("checkbox", { name: "选用 American" });
     fireEvent.click(beta);
     fireEvent.click(american);
     expect(beta).toBeChecked();
@@ -345,8 +345,10 @@ describe("新版局部主页和唯一声音草稿", () => {
       version_id: "b-version"
     });
     fireEvent.click(screen.getByRole("checkbox", { name: "推荐" }));
-    fireEvent.click(screen.getByRole("radio", { name: "选用 Alpha 阿尔法" }));
-    expect(beta).not.toBeChecked();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "选用 Alpha 阿尔法" })
+    );
+    expect(beta).toBeChecked();
     expect(american).toBeChecked();
     fireEvent.click(beta);
     expect(american).toBeChecked();
@@ -355,7 +357,7 @@ describe("新版局部主页和唯一声音草稿", () => {
         (item) => item.voice_id === "b"
       )
     ).toMatchObject({
-      enabled: true,
+      enabled: false,
       rate_percent: -27,
       version_id: "b-version"
     });
@@ -371,10 +373,10 @@ describe("新版局部主页和唯一声音草稿", () => {
       />
     );
     fireEvent.click(screen.getByText("完整音色目录"));
-    fireEvent.click(await screen.findByRole("radio", { name: "选用 Beta" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "选用 Beta" }));
     const recommended = screen.getByRole("checkbox", { name: "同声推荐" });
     fireEvent.click(recommended);
-    fireEvent.click(screen.getByRole("radio", { name: "选用 American" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选用 American" }));
     fireEvent.click(recommended);
     expect(
       onProfile.mock.calls
@@ -382,8 +384,10 @@ describe("新版局部主页和唯一声音草稿", () => {
         .voices.filter((item: VoiceSetting) => item.enabled)
         .map((item: VoiceSetting) => item.voice_id)
     ).toEqual(["b", "us"]);
-    expect(screen.getByRole("radio", { name: "选用 American" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "选用 Beta" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "选用 American" })
+    ).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "选用 Beta" })).toBeChecked();
   });
 
   it("恢复默认推荐后再选择目录，不恢复之前取消的推荐勾选", async () => {
@@ -408,7 +412,7 @@ describe("新版局部主页和唯一声音草稿", () => {
       ).not.toBeChecked();
     });
     fireEvent.click(screen.getByText("完整音色目录"));
-    fireEvent.click(screen.getByRole("radio", { name: "选用 American" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选用 American" }));
     expect(screen.getByRole("checkbox", { name: "第二套" })).not.toBeChecked();
     fireEvent.click(screen.getByRole("checkbox", { name: "第一套" }));
     expect(
@@ -441,7 +445,7 @@ describe("新版局部主页和唯一声音草稿", () => {
         />
       );
       fireEvent.click(screen.getByText("完整音色目录"));
-      const select = await screen.findByRole("radio", {
+      const select = await screen.findByRole("checkbox", {
         name: "选用 Jimmie HD Flash"
       });
       const audition = screen.getByRole("button", {
@@ -454,7 +458,9 @@ describe("新版局部主页和唯一声音草稿", () => {
         fireEvent.click(audition);
         expect(generateAudio).not.toHaveBeenCalled();
         expect(preview.synthesize).not.toHaveBeenCalled();
-        fireEvent.click(screen.getByRole("radio", { name: "选用 American" }));
+        fireEvent.click(
+          screen.getByRole("checkbox", { name: "选用 American" })
+        );
         await waitFor(() =>
           expect(generateAudio).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -521,18 +527,24 @@ describe("新版局部主页和唯一声音草稿", () => {
     fireEvent.click(dialogButton(dialog, "取消"));
     expect(onProfile).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("完整音色目录"));
-    const select = screen.getByRole("radio", {
+    const select = screen.getByRole("checkbox", {
       name: "选用 Jimmie HD Flash"
     });
     expect(select).toBeChecked();
     expect(select).toBeEnabled();
-    fireEvent.click(screen.getByRole("radio", { name: "选用 American" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选用 American" }));
     expect(onProfile.mock.calls.at(-1)![0].voices).toContainEqual({
       ...setting,
-      enabled: false
+      enabled: true
     });
-    expect(select).not.toBeChecked();
-    expect(select).toBeDisabled();
+    expect(select).toBeChecked();
+    expect(
+      onProfile.mock.calls
+        .at(-1)![0]
+        .voices.some(
+          (item: VoiceSetting) => item.voice_id === "us" && item.enabled
+        )
+    ).toBe(true);
   });
 
   it.each(["en-GB", "en-US", undefined] as const)(
@@ -792,7 +804,7 @@ describe("新版局部主页和唯一声音草稿", () => {
       />
     );
     fireEvent.click(screen.getByText("完整音色目录"));
-    const selected = await screen.findByRole("radio", { name: "选用 Beta" });
+    const selected = await screen.findByRole("checkbox", { name: "选用 Beta" });
     fireEvent.click(selected);
     await screen.findByText("存储暂不可用");
     expect(selected).toBeChecked();
@@ -811,7 +823,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
   });
 
-  it("生成中切换音色会中止请求，迟到结果不绑定，再选用可重试", async () => {
+  it("生成中新增音色会保留已有选择并分别生成", async () => {
     let finish!: (asset: AudioAsset) => void;
     const generateAudio = vi
       .fn<NonNullable<VoicePreviewAdapter["generateAudio"]>>()
@@ -832,26 +844,28 @@ describe("新版局部主页和唯一声音草稿", () => {
       />
     );
     fireEvent.click(screen.getByText("完整音色目录"));
-    const selected = await screen.findByRole("radio", { name: "选用 Beta" });
+    const selected = await screen.findByRole("checkbox", { name: "选用 Beta" });
     fireEvent.click(selected);
     await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
     const signal = generateAudio.mock.calls[0]![1]!.signal!;
-    fireEvent.click(screen.getByRole("radio", { name: "选用 Alpha 阿尔法" }));
-    expect(signal.aborted).toBe(true);
-    await act(async () => finish(generatedAsset("cancelled")));
-    expect(onProfile.mock.calls.at(-1)![0].voices[0]).toMatchObject({
-      enabled: false
-    });
-    expect(
-      onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id
-    ).toBeUndefined();
-    fireEvent.click(selected);
-    await waitFor(() =>
-      expect(onProfile.mock.calls.at(-1)![0].voices[0].audio_asset_id).toBe(
-        "reselected"
-      )
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "选用 Alpha 阿尔法" })
     );
-    expect(generateAudio).toHaveBeenCalledTimes(3);
+    expect(signal.aborted).toBe(false);
+    await act(async () => finish(generatedAsset("beta")));
+    await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(2));
+    await waitFor(() => {
+      const latest = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+      expect(
+        latest.voices
+          .filter((item) => item.enabled)
+          .map((item) => item.voice_id)
+      ).toEqual(["b", "a"]);
+    });
+    expect(screen.getByRole("checkbox", { name: "选用 Beta" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "选用 Alpha 阿尔法" })
+    ).toBeChecked();
   });
 
   it("生成期间改正文会重新生成，旧正文的迟到结果不会保存", async () => {
@@ -870,7 +884,7 @@ describe("新版局部主页和唯一声音草稿", () => {
       />
     );
     fireEvent.click(screen.getByText("完整音色目录"));
-    fireEvent.click(await screen.findByRole("radio", { name: "选用 Beta" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "选用 Beta" }));
     await waitFor(() => expect(generateAudio).toHaveBeenCalledTimes(1));
     const signal = generateAudio.mock.calls[0]![1]!.signal!;
     view.rerender(
@@ -957,7 +971,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     expect(catalog).not.toHaveAttribute("open");
     fireEvent.click(disclosure);
     expect(catalog).toHaveAttribute("open");
-    const voice = await screen.findByRole("radio", { name: "选用 Beta" });
+    const voice = await screen.findByRole("checkbox", { name: "选用 Beta" });
     fireEvent.click(voice);
     expect(voice).toBeChecked();
     fireEvent.click(disclosure);
@@ -986,7 +1000,9 @@ describe("新版局部主页和唯一声音草稿", () => {
     await waitFor(() => expect(audition).toBeEnabled());
     fireEvent.click(audition);
     await waitFor(() => expect(synthesize).toHaveBeenCalled());
-    expect(screen.getByRole("radio", { name: "选用 Beta" })).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "选用 Beta" })
+    ).not.toBeChecked();
     expect(onProfile).not.toHaveBeenCalled();
   });
   it("目录试听失败会显示原因，重新试听成功后可以停止", async () => {
@@ -1017,14 +1033,14 @@ describe("新版局部主页和唯一声音草稿", () => {
   it("目录搜索无结果时显示提示，清空后恢复音色", async () => {
     render(<Harness initial={pool([])} />);
     fireEvent.click(screen.getByText("完整音色目录"));
-    await screen.findByRole("radio", { name: "选用 Beta" });
+    await screen.findByRole("checkbox", { name: "选用 Beta" });
     const search = screen.getByRole("searchbox", { name: "英式女声目录搜索" });
     expect(screen.getAllByRole("searchbox")).toHaveLength(4);
     expect(screen.queryByRole("button", { name: /^搜索$/ })).toBeNull();
     fireEvent.change(search, { target: { value: "不存在的音色" } });
     expect(screen.getAllByText("没有匹配的音色")).toHaveLength(1);
     expect(
-      screen.getByRole("radio", { name: "选用 American" }).closest("label")
+      screen.getByRole("checkbox", { name: "选用 American" }).closest("label")
     ).toBeVisible();
     fireEvent.click(
       within(search.closest(".ui-input-affix-wrapper")!).getByRole("button", {
@@ -1033,7 +1049,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
     expect(search).toHaveValue("");
     expect(
-      screen.getByRole("radio", { name: "选用 Beta" }).closest("label")
+      screen.getByRole("checkbox", { name: "选用 Beta" }).closest("label")
     ).toBeVisible();
   });
   it("正文为空时目录试听使用示例文本，不修改正文和音色配置", async () => {
@@ -1070,7 +1086,9 @@ describe("新版局部主页和唯一声音草稿", () => {
         expect.anything()
       )
     );
-    expect(screen.getByRole("radio", { name: "选用 Beta" })).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "选用 Beta" })
+    ).not.toBeChecked();
     expect(onProfile).not.toHaveBeenCalled();
   });
   it.each([false, true])(
@@ -1102,7 +1120,7 @@ describe("新版局部主页和唯一声音草稿", () => {
         />
       );
       fireEvent.click(screen.getByText("完整音色目录"));
-      await screen.findByRole("radio", { name: "选用 Alpha 阿尔法" });
+      await screen.findByRole("checkbox", { name: "选用 Alpha 阿尔法" });
       if (fallbackOnly) {
         expect(
           (
@@ -1208,7 +1226,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     fireEvent.click(first);
     expect(
       screen
-        .getByRole("radio", { name: "选用 Alpha 阿尔法", hidden: true })
+        .getByRole("checkbox", { name: "选用 Alpha 阿尔法", hidden: true })
         .closest("[hidden]")
     ).not.toBeNull();
     fireEvent.click(within(ukGroup).getByRole("checkbox", { name: /第二套/ }));
@@ -1229,15 +1247,17 @@ describe("新版局部主页和唯一声音草稿", () => {
         .voices.filter((item: VoiceSetting) => item.enabled)
         .map((item: VoiceSetting) => item.voice_id)
     ).toEqual(["b"]);
-    const b = screen.getByRole("radio", { name: "选用 Beta" });
-    fireEvent.click(screen.getByRole("radio", { name: "选用 Alpha 阿尔法" }));
+    const b = screen.getByRole("checkbox", { name: "选用 Beta" });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "选用 Alpha 阿尔法" })
+    );
     fireEvent.click(b);
     expect(
       onProfile.mock.calls
         .at(-1)![0]
         .voices.find((item: VoiceSetting) => item.voice_id === "b")
     ).toMatchObject({
-      enabled: true,
+      enabled: false,
       rate_percent: -27,
       version_id: "b-version"
     });
@@ -1292,7 +1312,7 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
     await screen.findByLabelText("美式池 首推");
     fireEvent.click(screen.getByText("完整音色目录"));
-    fireEvent.click(screen.getByRole("radio", { name: "选用 Beta" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选用 Beta" }));
     let next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
     expect(next.dubbing!.uk.mode).toBe("local");
     expect(next.dubbing!.us).toEqual({ mode: "inherit" });
@@ -1310,8 +1330,8 @@ describe("新版局部主页和唯一声音草稿", () => {
     expect(await screen.findByLabelText("美式池 首推")).toBeVisible();
     fireEvent.click(
       within(
-        screen.getByRole("radiogroup", { name: "英式 完整音色目录" })
-      ).getByRole("radio", { name: "不使用目录音色" })
+        screen.getByRole("group", { name: "英式 完整音色目录" })
+      ).getByRole("checkbox", { name: "不使用目录音色" })
     );
     await waitFor(() => expect(screen.getByText("保存整段")).toBeEnabled());
     fireEvent.click(screen.getByText("保存整段"));
