@@ -287,7 +287,7 @@ describe("词形复制交互", () => {
     );
   });
 
-  it("点击和键盘复制到草稿，来源不变，允许撤销", async () => {
+  it("点击和键盘复制到草稿，来源不变且不显示完成通知", async () => {
     const initial = fixture();
     render(<Harness initial={initial} />);
     const sourceButton = within(screen.getByTestId("form-0")).getByRole(
@@ -302,8 +302,8 @@ describe("词形复制交互", () => {
       expect(targetPronunciation().actual_pron).toBe("source")
     );
     expect(current().contents[0]).toEqual(initial.contents[0]);
-    fireEvent.click(await screen.findByRole("button", { name: "撤销" }));
-    expect(current()).toEqual(initial);
+    expect(screen.queryByRole("button", { name: "撤销" })).toBeNull();
+    expect(current().contents[1]).not.toEqual(initial.contents[1]);
   });
 
   it("指针拖动只接受同类落点，松手复制且取消不修改", async () => {
@@ -417,7 +417,7 @@ describe("词形复制交互", () => {
     expect(current().pos).toEqual(initial.pos);
   });
 
-  it("同名目标用序号区分，通知精简展示目标和生效方式", async () => {
+  it("同名目标用序号区分并完成复制", async () => {
     const initial = fixture();
     initial.pos[0]!.forms[1]!.form_type = "base";
     const regions = initial.contents[1]!.regional_variants;
@@ -427,51 +427,10 @@ describe("词形复制交互", () => {
     begin();
     expect(screen.getByText(/正在复制“原形 1 · read”/)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("phonetics-1"));
-    expect(
-      await screen.findByText(
-        "目标：原形 2 · read。保存草稿后生效，请重新试听。"
-      )
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
-    expect(current()).toEqual(initial);
-  });
-
-  it("复制成功通知在 10 秒后关闭，复制结果保留", async () => {
-    render(<Harness />);
-    begin();
-    fireEvent.click(screen.getByTestId("phonetics-1"));
-    await screen.findByRole("button", { name: "撤销" });
-    expect(
-      screen.getByText("英美音标已复制").closest(".ui-notification-notice")
-    ).not.toBeNull();
-    await waitFor(
-      () =>
-        expect(
-          screen.queryByRole("button", { name: "撤销" })
-        ).not.toBeInTheDocument(),
-      { timeout: 12000 }
-    );
-    expect(targetPronunciation().actual_pron).toBe("source");
-  }, 15000);
-
-  it("通知出现后页面锁定时不可撤销，解锁后才允许改回草稿", async () => {
-    const initial = fixture();
-    const view = render(<Harness initial={initial} />);
-    begin();
-    fireEvent.click(screen.getByTestId("phonetics-1"));
-    await screen.findByRole("button", { name: "撤销" });
-    view.rerender(<Harness initial={initial} disabled />);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "撤销" })).toBeDisabled()
+      expect(targetPronunciation().actual_pron).toBe("source")
     );
-    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
-    expect(targetPronunciation().actual_pron).toBe("source");
-    view.rerender(<Harness initial={initial} />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "撤销" })).toBeEnabled()
-    );
-    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
-    expect(current()).toEqual(initial);
+    expect(screen.queryByRole("button", { name: "撤销" })).toBeNull();
   });
 
   it("选择复制目标后打开只读参考状态，键盘和点击都不能改写草稿", async () => {
@@ -489,19 +448,6 @@ describe("词形复制交互", () => {
     await waitFor(() =>
       expect(targetPronunciation().actual_pron).toBe("source")
     );
-  });
-
-  it("后续编辑阻止撤销覆盖新值", async () => {
-    render(<Harness />);
-    begin();
-    fireEvent.click(screen.getByTestId("phonetics-1"));
-    await screen.findByRole("button", { name: "撤销" });
-    fireEvent.click(screen.getByRole("button", { name: "随后编辑目标" }));
-    fireEvent.click(screen.getByRole("button", { name: "撤销" }));
-    expect(targetPronunciation().actual_pron).toBe("later-edit");
-    expect(
-      screen.getByText("目标在复制后又被修改，不能撤销覆盖这些修改")
-    ).toBeInTheDocument();
   });
 
   it("解析配音期间禁止打开旧草稿抽屉，完成后恢复编辑", async () => {
@@ -565,7 +511,7 @@ describe("词形复制交互", () => {
   });
 });
 
-it("复制请求中切换语言保留源目标和结果，完成后仍可撤销且不重发复制", async () => {
+it("复制请求中切换语言保留源目标和结果且不显示完成通知", async () => {
   let finish!: (value: []) => void;
   resolveProfiles.mockImplementationOnce(
     () =>
@@ -596,8 +542,7 @@ it("复制请求中切换语言保留源目标和结果，完成后仍可撤销�
   expect(current().pos).toEqual(before.pos);
   view.rerender(content("zh-Hant"));
   expect(targetPronunciation().actual_pron).toBe("source");
-  const undo = await screen.findByRole("button", { name: "撤銷" });
-  fireEvent.click(undo);
-  expect(current()).toEqual(before);
+  expect(screen.queryByRole("button", { name: "撤銷" })).toBeNull();
+  expect(current()).not.toEqual(before);
   expect(resolveProfiles).toHaveBeenCalledOnce();
 });
