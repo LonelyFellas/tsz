@@ -917,6 +917,11 @@ export const voiceEditorMessages = {
     "{{p0}}沒有實際可用的已選音色，請選擇後儲存",
     "No selected {{p0}} voice is usable. Select one before saving."
   ],
+  no_usable_recommendation_for_accent_check_voice_settings: [
+    "当前口音没有可用的推荐音色。请在下方勾选“自然发音”或其他音色；如果仍不可用，请检查音标、停顿和读法设置。",
+    "目前口音沒有可用的推薦音色。請在下方勾選「自然發音」或其他音色；如果仍不可用，請檢查音標、停頓和讀法設定。",
+    "No usable recommendation is available for this accent. Select natural reading or another voice below. If it remains unavailable, check the phonetics, pauses and reading settings."
+  ],
   spelling_normalised_and_affected_annotations_removed_check_before_completin: [
     "已规范化拼写并移除受影响的标注，请检查后完成；可撤销恢复",
     "已規範化拼寫並移除受影響的標註，請檢查後完成；可撤銷恢復",

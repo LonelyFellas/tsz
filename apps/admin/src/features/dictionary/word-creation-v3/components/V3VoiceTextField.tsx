@@ -462,7 +462,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const editorPreviewAdapter = useMemo(() => {
     const adapter = sessionPreviewAdapter ?? adminVoicePreviewAdapter;
-    // 编辑期间只试听，正式音频由完成/保存动作统一补齐。
+    // 编辑期间只试听；正式音频由完成/保存按钮显式等待补齐。
     return { ...adapter, generateAudio: undefined };
   }, [sessionPreviewAdapter]);
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
@@ -474,7 +474,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     !readOnly &&
     !contentReadOnly &&
     !textOnly &&
-    !spellingSettings &&
+    (!spellingSettings || (spellingAudioLocales?.length ?? 0) > 0) &&
     mode !== "actual-pron" &&
     Boolean((sessionPreviewAdapter ?? adminVoicePreviewAdapter).generateAudio);
   const draftSpeechContent = useMemo(
@@ -491,6 +491,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         : draftState.voiceProfile,
     [area, draftState.voiceProfile]
   );
+  const draftVoiceProfileRef = useRef(draftState.voiceProfile);
   const draftAudio = useSelectedVoiceAudio({
     target: JSON.stringify([nodeId, field, dialect, "dialog"]),
     content: draftSpeechContent,
@@ -499,8 +500,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     locale,
     enabled: draftSpeechEnabled,
     defer: true,
-    onChange: (voiceProfile) =>
-      setDraftState((current) => ({ ...current, voiceProfile }))
+    onChange: (voiceProfile) => {
+      draftVoiceProfileRef.current = voiceProfile;
+      setDraftState((current) => ({ ...current, voiceProfile }));
+    }
   });
   const draftAudioRef = useRef({
     generate: draftAudio.retry,
@@ -511,6 +514,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   useLayoutEffect(() => {
     draftAudioRef.current = { generate: draftAudio.retry, state: draftState };
+    draftVoiceProfileRef.current = draftState.voiceProfile;
   });
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   const reportEditorReady = useCallback(
@@ -590,7 +594,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         if (activeTarget.current !== target) return false;
         captured = {
           ...captured,
-          voiceProfile: draftAudioRef.current.state.voiceProfile
+          voiceProfile: draftVoiceProfileRef.current
         };
       }
       const settingsSnapshot = settingsInitial.current;
@@ -635,6 +639,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
               : captured;
       const next = { ...draftState, ...result, nodeId: target };
       const commitSourceAudio =
+        !draftSpeechEnabled &&
         (spellingSettings || textOnly) &&
         canGenerateAudio &&
         env.VOICE_PREVIEW &&

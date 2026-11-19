@@ -67,6 +67,18 @@ it("未知提供方错误保留原文，不进入本地诊断翻译", () => {
   );
 });
 
+it("已知的口音推荐解析错误改成可执行提示", () => {
+  const message = voiceEditorErrorMessage(
+    new Error(
+      "当前口音没有满足声音、参数和读法能力的已选推荐，请明确选择或修复配置"
+    ),
+    "generation_failed_try_again"
+  );
+  expect(message).toEqual({
+    key: "no_usable_recommendation_for_accent_check_voice_settings"
+  });
+});
+
 it("适配器已显示错误随界面语言更新，错误码与重试属性保留且不重复请求", async () => {
   const { render, screen, fireEvent, waitFor } =
     await import("@testing-library/react");

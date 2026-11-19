@@ -283,7 +283,11 @@
   white-space: normal;
 }
 .v3-overview-edit.ui-btn {
-  color: #b4b4b4;
+  color: var(--ui-color-primary);
+}
+.v3-overview-edit.ui-btn:hover:not(:disabled, [aria-disabled="true"]) {
+  color: var(--ui-color-primary-hover);
+  background: var(--ui-color-primary-bg);
 }
 .v3-overview-notes {
   font-size: var(--ui-font-size-sm);
