@@ -16,7 +16,7 @@ import {
   Volume2Icon
 } from "lucide-react";
 import { Alert, Button, Space, Spin, Typography } from "@tsz/ui/admin/display";
-import { Checkbox, Input, Radio } from "@tsz/ui/admin/forms";
+import { Checkbox, Input } from "@tsz/ui/admin/forms";
 import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { speechAccentGroup } from "@tsz/shared";
 import {
@@ -204,6 +204,21 @@ export function LocalVoicePool({
         providerVoiceKey(setting.voice_id, voices) ===
           providerVoiceKey(voice.id, voices)
     );
+  const isCatalogSelected = (voice: VoiceOption) => {
+    const side = speechAccentGroup(voice.locale, voice.accent);
+    return (
+      (side === "uk" || side === "us") &&
+      !inheritedFor(side) &&
+      (profile?.voices ?? current).some(
+        (setting) =>
+          setting.enabled &&
+          voiceSettingAccent(setting, voices) === side &&
+          !excluded.has(providerVoiceKey(setting.voice_id, voices)) &&
+          providerVoiceKey(setting.voice_id, voices) ===
+            providerVoiceKey(voice.id, voices)
+      )
+    );
+  };
   const sideOf = (setting: VoiceSetting) => {
     return voiceSettingAccent(setting, voices);
   };
@@ -234,15 +249,13 @@ export function LocalVoicePool({
       return ids.map((id) => providerVoiceKey(id, voices));
     })
   );
-  const catalogSelection = (side: "uk" | "us") =>
-    !inheritedFor(side)
-      ? current.find(
-          (item) =>
-            item.enabled &&
-            sideOf(item) === side &&
-            !excluded.has(providerVoiceKey(item.voice_id, voices))
-        )
-      : undefined;
+  const hasCatalogSelection = (side: "uk" | "us") =>
+    (profile?.voices ?? current).some(
+      (item) =>
+        item.enabled &&
+        sideOf(item) === side &&
+        !excluded.has(providerVoiceKey(item.voice_id, voices))
+    );
   const probabilities = voicePoolProbabilities(
     current.filter((item) => !unavailableVersions?.has(voiceSettingKey(item))),
     voices,
@@ -316,33 +329,7 @@ export function LocalVoicePool({
           )
         : ""
     );
-    const recommendedKeys = new Set(
-      result.profile.dubbing?.[side].recommendations?.map((item) =>
-        providerVoiceKey(item.voice_id, voices)
-      ) ?? []
-    );
-    const extras = result.profile.voices.filter(
-      (item) =>
-        item.enabled &&
-        sideOf(item) === side &&
-        !recommendedKeys.has(providerVoiceKey(item.voice_id, voices))
-    );
-    const previousCatalog = catalogSelection(side);
-    const retained =
-      extras.find(
-        (item) =>
-          previousCatalog &&
-          providerVoiceKey(item.voice_id, voices) ===
-            providerVoiceKey(previousCatalog.voice_id, voices)
-      ) ?? extras[0];
-    onChange({
-      ...result.profile,
-      voices: result.profile.voices.map((item) =>
-        extras.includes(item) && item !== retained
-          ? { ...item, enabled: false }
-          : item
-      )
-    });
+    onChange(result.profile);
   }
   function toggle(voice: VoiceOption) {
     if (readOnly) return;
@@ -361,24 +348,21 @@ export function LocalVoicePool({
     const local = materialize(side);
     if (local) {
       const next = togglePoolVoice(local, voice, voices);
+      const key = providerVoiceKey(voice.id, voices);
+      const enabled = !isCatalogSelected(voice);
       onChange({
         ...next,
         voices: next.voices.map((item) =>
-          providerVoiceKey(item.voice_id, voices) ===
-          providerVoiceKey(voice.id, voices)
-            ? { ...item, enabled: true }
-            : sideOf(item) === side &&
-                providerVoiceKey(item.voice_id, voices) !==
-                  providerVoiceKey(voice.id, voices) &&
-                !excluded.has(providerVoiceKey(item.voice_id, voices))
-              ? { ...item, enabled: false }
-              : item
+          providerVoiceKey(item.voice_id, voices) === key
+            ? { ...item, enabled }
+            : item
         )
       });
     }
   }
   function clearCatalog(side: "uk" | "us") {
     if (readOnly) return;
+    if (!hasCatalogSelection(side)) return;
     const local = materialize(side);
     if (local)
       onChange({
@@ -1015,27 +999,20 @@ export function LocalVoicePool({
           <div className="tsz-ve-pool-scroll">
             <div className="tsz-ve-pool-catalog-sides" data-single={!!locale}>
               {sides.map((side) => (
-                <Radio.Group
+                <div
                   key={side.key}
                   className="tsz-ve-pool-catalog"
-                  data-single="true"
+                  role="group"
                   aria-label={`${side.label} ${t("full_voice_catalogue")}`}
-                  value={catalogSelection(side.key)?.voice_id ?? ""}
-                  onChange={(event) => {
-                    const voice = voices.find(
-                      (item) => item.id === event.target.value
-                    );
-                    if (voice) toggle(voice);
-                    else clearCatalog(side.key);
-                  }}
                 >
-                  <Radio
-                    value=""
+                  <Checkbox
+                    checked={!hasCatalogSelection(side.key)}
                     disabled={readOnly}
                     className="tsz-ve-pool-catalog-clear"
+                    onChange={() => clearCatalog(side.key)}
                   >
                     {t("no_catalog_voice")}
-                  </Radio>
+                  </Checkbox>
                   {["female", "male"].map((gender) => {
                     const key = `${side.key}-${gender}`;
                     const columnVoices = voices.filter(
@@ -1122,8 +1099,8 @@ export function LocalVoicePool({
                           {columnVoices.map((voice) => (
                             <div key={voice.id} hidden={!isVisible(voice)}>
                               <div className="tsz-ve-pool-catalog-item-head">
-                                <Radio
-                                  value={voice.id}
+                                <Checkbox
+                                  checked={isCatalogSelected(voice)}
                                   aria-label={t("select", {
                                     p0: voice.displayName ?? voice.label
                                   })}
@@ -1132,12 +1109,13 @@ export function LocalVoicePool({
                                     (!!phonemeIssue(voice) &&
                                       !isSelected(voice))
                                   }
+                                  onChange={() => toggle(voice)}
                                 >
                                   <PoolVoiceName
                                     voice={voice}
                                     fallback={voice.id}
                                   />
-                                </Radio>
+                                </Checkbox>
                                 {preview(
                                   {
                                     voice_id: voice.id,
@@ -1172,7 +1150,7 @@ export function LocalVoicePool({
                       </section>
                     );
                   })}
-                </Radio.Group>
+                </div>
               ))}
             </div>
           </div>

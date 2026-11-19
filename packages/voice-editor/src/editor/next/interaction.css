@@ -692,12 +692,9 @@
 }
 .tsz-ve-pool-catalog {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   min-width: 0;
-}
-.tsz-ve-pool-catalog:where([data-single="true"]) {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .tsz-ve-pool-catalog-list {
   height: 280px;
@@ -791,12 +788,12 @@
   height: 28px;
   padding: 0;
 }
-.tsz-ve-pool-catalog-list .ui-radio-wrapper {
+.tsz-ve-pool-catalog-list .ui-checkbox-wrapper {
   align-items: center;
   flex: 1;
   min-width: 0;
 }
-.tsz-ve-pool-catalog-list .ui-radio-label {
+.tsz-ve-pool-catalog-list .ui-checkbox-label {
   min-width: 0;
 }
 .tsz-ve-pool-provider-id {

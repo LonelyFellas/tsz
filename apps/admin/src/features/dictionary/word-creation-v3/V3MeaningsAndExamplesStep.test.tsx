@@ -1619,9 +1619,13 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.click(
         within(detail).getByRole("button", { name: "保存配音设置" })
       );
-      fireEvent.click(within(editor).getByLabelText("选用 Sonia"));
+      const selectedVoice = within(editor).getByRole("checkbox", {
+        name: "选用 Sonia"
+      });
+      if (selectedVoice.getAttribute("aria-checked") !== "true")
+        fireEvent.click(selectedVoice);
       expect(
-        within(editor).getByRole("radio", { name: "选用 Sonia" })
+        within(editor).getByRole("checkbox", { name: "选用 Sonia" })
       ).toBeChecked();
       const complete = screen.getByLabelText("完成语法结构 1 英美通用内容编辑");
       await waitFor(() => expect(complete).toBeEnabled());
