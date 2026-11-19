@@ -237,7 +237,17 @@ export function V3PronunciationList({
                         draggable={fields.length > 1}
                         htmlType="button"
                         icon={<GripVerticalIcon />}
-                        onDragEnd={() => {
+                        onDragEnd={(event) => {
+                          const row = event.currentTarget.closest<HTMLElement>(
+                            ".word-pronunciation-editor"
+                          );
+                          row?.classList.remove("is-drag-preview");
+                          row?.style.removeProperty("background-color");
+                          row?.style.removeProperty("border");
+                          row?.style.removeProperty("border-radius");
+                          row?.style.removeProperty("box-shadow");
+                          row?.style.removeProperty("opacity");
+                          row?.style.removeProperty("transform");
                           setDraggingIndex(undefined);
                           setDragOverIndex(undefined);
                         }}
@@ -259,6 +269,21 @@ export function V3PronunciationList({
                             typeof event.dataTransfer.setDragImage ===
                               "function"
                           ) {
+                            row.classList.add("is-drag-preview");
+                            const surface = row.closest<HTMLElement>(
+                              ".word-shared-pronunciation"
+                            );
+                            if (surface) {
+                              row.style.backgroundColor =
+                                getComputedStyle(surface).backgroundColor;
+                            }
+                            row.style.border =
+                              "1px solid var(--ui-color-border-secondary)";
+                            row.style.borderRadius =
+                              "var(--ui-border-radius-lg)";
+                            row.style.boxShadow = "var(--ui-shadow-sm)";
+                            row.style.opacity = "1";
+                            row.style.transform = "none";
                             event.dataTransfer.setDragImage(row, 24, 24);
                           }
                           setDraggingIndex(index);

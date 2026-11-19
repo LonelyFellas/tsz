@@ -894,6 +894,30 @@
   transform: scale(0.997);
 }
 
+.word-pronunciation-editor.is-drag-preview {
+  opacity: 1;
+  transform: none;
+  border: 1px solid var(--word-drag-border, var(--ui-color-border));
+  border-radius: var(--ui-border-radius-lg);
+  background: var(--word-drag-surface, var(--ui-color-bg-container));
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.word-shared-pronunciation-uk .word-pronunciation-editor.is-drag-preview {
+  --word-drag-border: var(--ui-color-primary-border);
+  --word-drag-surface: var(--ui-color-primary-bg);
+}
+
+.word-shared-pronunciation-us .word-pronunciation-editor.is-drag-preview {
+  --word-drag-border: var(--ui-color-error-border);
+  --word-drag-surface: var(--ui-color-error-bg);
+}
+
+.word-shared-pronunciation-common .word-pronunciation-editor.is-drag-preview {
+  --word-drag-border: var(--ui-color-success-border);
+  --word-drag-surface: var(--ui-color-success-bg);
+}
+
 .word-pronunciation-editor.is-drag-over {
   background: rgba(22, 119, 255, 0.035);
 }
