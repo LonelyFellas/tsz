@@ -70,6 +70,42 @@ it("批量转换分别应用实际发音与 Azure IPA 规则", () => {
   });
 });
 
+it("美式卷舌字典音标在后台转换计划中生成实际发音和 Azure IPA", () => {
+  const result = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ˈbɜːrd" },
+    "bird",
+    "us"
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "ˈbərd",
+        synthesis: {
+          us: { ipa: "ˈbɝd", ups: "S1 B ER R D" }
+        }
+      }
+    }
+  });
+});
+
+it("后台计划在 Azure 路径中保留美式读法示例转换", () => {
+  const result = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ˈlɪtərətʃər" },
+    "literature",
+    "us"
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "ˈlɪtrətʃər",
+        synthesis: { us: { ipa: "ˈlɪtɹətʃɚ" } }
+      }
+    }
+  });
+});
+
 const speech = (asset: string): SynthesisSpeechV3 => ({
   content: { version: 2, text: "bib", annotations: [] },
   voice_profile: {

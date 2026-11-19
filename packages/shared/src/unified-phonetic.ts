@@ -92,11 +92,15 @@ function dictionaryWord(
     .replaceAll("ʤ", "dʒ")
     // Normalize equivalent short vowels before the rhotic/lexical rules.
     .replace(/e(?!ɪ)/gu, "ɛ");
-  // Match complete units once: ɑː and eɪ must survive short-vowel substitutions.
+  // Match complete units once: ɑː, rhotic ɜːr and eɪ must survive short-vowel substitutions.
+  // A following vowel keeps r as an onset, so it is not part of a rhotic vowel.
   let value = source.replace(
-    /ɑː|ɑr|iː|eɪ|ju(?!ː)|(?:ɪ(?:ʸ)?r|ʊ(?:ʷ|ʸ)?r|ɛr)(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuiɜɚɝ])|ɪə|ʊə|oʊ|[ɚɝɾɑ]/gu,
+    /(?:ɜːr|ɜr|ər)(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuiɜɚɝ])|ɑː|ɑr|iː|eɪ|ju(?!ː)|(?:ɪ(?:ʸ)?r|ʊ(?:ʷ|ʸ)?r|ɛr)(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuiɜɚɝ])|ɪə|ʊə|oʊ|[ɚɝɾɑ]/gu,
     (phone) =>
       ({
+        ɜːr: dialect === "us" ? (target === "azure-ipa" ? "ɝ" : "ər") : "ɜːr",
+        ɜr: dialect === "us" ? (target === "azure-ipa" ? "ɝ" : "ər") : "ɜr",
+        ər: target === "azure-ipa" && dialect === "us" ? "ɚ" : "ər",
         ɑː: "ɑː",
         ɑr: "ɑr",
         iː: "iː",
@@ -174,6 +178,7 @@ function convertDictionary(
       };
     const word = words[index]!.toLowerCase();
     let value = dictionaryWord(phone, dialect, target);
+    const styleValue = dictionaryWord(phone, dialect, "actual");
     if (
       !/[aɑæʌɔəɛɪɒʊuiɜɚɝ]/u.test(value) ||
       /(^\.|\.$|\.\.|[ˈˌ](?:[.ˈˌ]|$)|͡|(?<![lnm])̩)/u.test(value) ||
@@ -190,10 +195,13 @@ function convertDictionary(
         ? STYLE_EXAMPLES[word]
         : undefined;
     let styleApplied = false;
-    if (style !== "citation" && example?.source.includes(value)) {
+    if (style !== "citation" && example?.source.includes(styleValue)) {
       const selected = example[style];
       if (selected) {
-        value = selected;
+        value =
+          target === "actual"
+            ? selected
+            : dictionaryWord(selected, dialect, "azure-ipa");
         styleApplied = true;
       }
     }
