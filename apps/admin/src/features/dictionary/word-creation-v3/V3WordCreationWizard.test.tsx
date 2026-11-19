@@ -226,6 +226,7 @@ function requests(overrides: Partial<V3WordRequests> = {}): V3WordRequests {
       affected: []
     })),
     saveForms: vi.fn(async () => envelope(2, "centre")),
+    saveAudio: vi.fn(async () => envelope(2, "centre")),
     saveMeanings: vi.fn(async () => envelope(2, "centre")),
     validate: vi.fn(async () => validation),
     publish: vi.fn(async () => envelope(2, "centre")),
@@ -7558,6 +7559,39 @@ it("局部词义保存只发一次有 revision 的聚合请求，保留另一步
     intent: "save"
   });
   expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+});
+
+it("后台音频完成后通过专用接口保存并推进 revision", async () => {
+  const source = requests({
+    saveAudio: vi.fn(async () => envelope(2, "centre"))
+  });
+  function BackgroundAudioSave() {
+    const save = useVoiceSave();
+    return (
+      <button onClick={() => void save?.saveAudio?.()}>保存后台音频</button>
+    );
+  }
+  renderWizard(source, {
+    renderStep: (context) => (
+      <>
+        <Slot context={context} />
+        <BackgroundAudioSave />
+      </>
+    )
+  });
+  fireEvent.click(screen.getByText("保存后台音频"));
+  await waitFor(() => expect(source.saveAudio).toHaveBeenCalledOnce());
+  expect(source.saveAudio).toHaveBeenCalledWith(
+    "word-1",
+    expect.objectContaining({
+      schema_version: 3,
+      base_revision: 1,
+      forms: expect.any(Object)
+    })
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("revision")).toHaveTextContent("2")
+  );
 });
 
 it("词形保存等待默认配音回写，再提交包含新资产的当前草稿", async () => {

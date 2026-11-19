@@ -464,6 +464,16 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         })
     },
     {
+      name: "updateAudioV3",
+      httpMethod: "put",
+      invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
+        api.words.updateAudioV3("w-1", {
+          schema_version: 3,
+          base_revision: 1,
+          forms: { pos: [] }
+        })
+    },
+    {
       name: "saveMeaningsStepV3",
       httpMethod: "put",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>

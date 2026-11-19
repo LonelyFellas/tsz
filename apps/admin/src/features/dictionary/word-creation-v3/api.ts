@@ -19,6 +19,7 @@ export type V3WordsApi = Pick<
   | "inboundReferencesV3"
   | "previewFormsImpactV3"
   | "saveFormsStepV3"
+  | "updateAudioV3"
   | "saveMeaningsStepV3"
   | "searchComponentTargetsV3"
   | "validateV3"
@@ -147,6 +148,15 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
         .saveFormsStepV3(wordId, input)
         .then((response) =>
           requireWordIdentity(response, wordId, "save_forms.word.id")
+        ),
+    saveAudio: (
+      wordId: string,
+      input: Parameters<V3WordsApi["updateAudioV3"]>[1]
+    ) =>
+      source
+        .updateAudioV3(wordId, input)
+        .then((response) =>
+          requireWordIdentity(response, wordId, "save_audio.word.id")
         ),
     saveMeanings: (
       wordId: string,

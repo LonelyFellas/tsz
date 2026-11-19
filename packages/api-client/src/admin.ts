@@ -96,6 +96,7 @@ import type {
   RoleListResponse,
   SaveFormsStepInputV3,
   SaveMeaningsStepInputV3,
+  UpdateEntryAudioInputV3,
   SubPartOfSpeechConfig,
   SubPartOfSpeechListResponse,
   CreatePartOfSpeechInput,
@@ -628,6 +629,12 @@ export function createAdminEndpoints(
       saveFormsStepV3: (wordId: string, input: SaveFormsStepInputV3) =>
         http
           .put<unknown>(`/lexicon/entries/${wordId}/steps/forms`, input, {
+            headers: SPELLING_MARKUP_HEADERS
+          })
+          .then(decodeAdminWordV3Envelope),
+      updateAudioV3: (wordId: string, input: UpdateEntryAudioInputV3) =>
+        http
+          .put<unknown>(`/lexicon/entries/${wordId}/audio`, input, {
             headers: SPELLING_MARKUP_HEADERS
           })
           .then(decodeAdminWordV3Envelope),

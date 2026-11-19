@@ -7,6 +7,8 @@ export const VoiceSaveContext = createContext<{
     area?: VoiceRecommendationArea,
     options?: VoiceSaveOptions
   ) => Promise<boolean>;
+  /** 后台正式音频完成后的无影响持久化，仅提交音频相关字段。 */
+  saveAudio?: () => Promise<boolean>;
   failure?: string;
   /** 折叠字段的正式音频生成；业务保存先等待资产回写，再读取当前草稿。 */
   audioTasks?: Map<string, () => Promise<boolean>>;

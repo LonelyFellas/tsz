@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/task-212-schema-compat/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-17T11:20:14.017Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-18T16:31:46.173Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -44,6 +44,7 @@
     "/admin/lexicon-next/equivalent-catalog": ["get"],
     "/admin/lexicon-next/sentences": ["get", "post"],
     "/admin/lexicon-next/sentences/{id}": ["get", "put"],
+    "/admin/lexicon-next/test-fixtures/dialect-pair": ["post"],
     "/admin/lexicon-next/workspace/commands": ["post"],
     "/admin/lexicon-next/workspace/creators": ["get"],
     "/admin/lexicon-next/workspace/entries": ["get"],
@@ -77,6 +78,7 @@
     "/admin/lexicon/entries/{id}": ["delete", "get"],
     "/admin/lexicon/entries/{id}/annotation": ["patch"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
+    "/admin/lexicon/entries/{id}/audio": ["put"],
     "/admin/lexicon/entries/{id}/inbound-references": ["get"],
     "/admin/lexicon/entries/{id}/publication-audio/check": ["post"],
     "/admin/lexicon/entries/{id}/publication-audio/confirm": ["post"],
@@ -493,6 +495,14 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/lexicon-next/test-fixtures/dialect-pair": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
       }
     ],
     "get /admin/lexicon-next/workspace/entries": [
@@ -927,6 +937,68 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "put /admin/lexicon/entries/{id}/audio": [
+      {
+        "name": "X-TSZ-Form-Content-Reassignment",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Form-Contents",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Multiple-Spellings",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Phoneme-Speech",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Markup",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Speech",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Voice-Locales",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Voice-Models",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Voice-Versions",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
       }
     ],
     "get /admin/lexicon/entries/{id}/publications": [
@@ -3264,6 +3336,16 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /admin/lexicon-next/test-fixtures/dialect-pair": {
+      "request": { "$ref": "#/components/schemas/DialectPairFixtureRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/DialectPairFixtureResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon-next/workspace/commands": {
       "request": { "$ref": "#/components/schemas/NextListCommand" },
       "responses": {
@@ -3636,6 +3718,17 @@
       "responses": {
         "200": { "$ref": "#/components/schemas/AdminWordV3Envelope" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/lexicon/entries/{id}/audio": {
+      "request": { "$ref": "#/components/schemas/UpdateEntryAudioInputV3" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/AdminWordV3Envelope" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -8163,6 +8256,19 @@
     },
     "Dialect": { "type": "string", "enum": ["common", "uk", "us"] },
     "DialectModeV3": { "type": "string", "enum": ["unified", "distinguish"] },
+    "DialectPairFixtureRequest": {
+      "type": "object",
+      "required": ["headword_prefix"],
+      "properties": {
+        "headword_prefix": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 8,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$"
+        }
+      },
+      "additionalProperties": false
+    },
     "DialectRulesV3": {
       "type": "object",
       "required": ["spelling_mode", "phonetic_mode"],
@@ -10425,6 +10531,16 @@
           "format": "int64",
           "minimum": 1
         }
+      },
+      "additionalProperties": false
+    },
+    "UpdateEntryAudioInputV3": {
+      "type": "object",
+      "required": ["schema_version", "base_revision", "forms"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "forms": { "$ref": "#/components/schemas/FormsStepRepresentationV3" },
+        "schema_version": { "type": "integer", "enum": [3] }
       },
       "additionalProperties": false
     },

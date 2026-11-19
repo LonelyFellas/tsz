@@ -564,6 +564,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "AdminWordV3Envelope"
       ],
       [
+        "put /admin/lexicon/entries/{id}/audio",
+        "UpdateEntryAudioInputV3",
+        "200",
+        "AdminWordV3Envelope"
+      ],
+      [
         "put /admin/lexicon/entries/{id}/steps/meanings",
         "SaveMeaningsStepInputV3",
         "200",
@@ -688,6 +694,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "413",
         "422",
         "503"
+      ],
+      "put /admin/lexicon/entries/{id}/audio": [
+        "401",
+        "403",
+        "404",
+        "409",
+        "422"
       ],
       "put /admin/lexicon/entries/{id}/steps/meanings": [
         "401",
@@ -843,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "e0dd0da59fed7e86dae015449c1e55958beaf85f85ed754a87d265fc026aa564"
+      "ad0036fbcf38f6b1758cf71d61356d5ba24f4c90091ca4a6854eee48770d5038"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1172,6 +1185,33 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ]
         ])
       ),
+      "post /admin/lexicon-next/test-fixtures/dialect-pair": [
+        {
+          name: "X-TSZ-Test-Run",
+          in: "header",
+          required: true,
+          schema: { type: "string" }
+        }
+      ],
+      "put /admin/lexicon/entries/{id}/audio": [
+        ...[
+          "X-TSZ-Form-Content-Reassignment",
+          "X-TSZ-Form-Contents",
+          "X-TSZ-Multiple-Spellings",
+          "X-TSZ-Phoneme-Speech",
+          "X-TSZ-Sentence-Formatting",
+          "X-TSZ-Spelling-Markup",
+          "X-TSZ-Spelling-Speech",
+          "X-TSZ-Voice-Locales",
+          "X-TSZ-Voice-Models",
+          "X-TSZ-Voice-Versions"
+        ].map((name) => ({
+          name,
+          in: "header",
+          required: true,
+          schema: { type: "string" }
+        }))
+      ],
       ...Object.fromEntries(
         [
           "get /admin/lexicon-next/sentences/{id}",
@@ -1406,7 +1446,17 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
                     in: "header",
                     required: false,
                     schema: { type: ["string", "null"] }
-                  }
+                  },
+                  ...(operation === "put /admin/lexicon/entries/{id}/audio"
+                    ? [
+                        {
+                          name: "X-TSZ-Voice-Locales",
+                          in: "header",
+                          required: false,
+                          schema: { type: ["string", "null"] }
+                        }
+                      ]
+                    : [])
                 ]
               : []),
             ...(operation === "get /me/wordlists/{id}/items"

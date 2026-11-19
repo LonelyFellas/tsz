@@ -50,6 +50,7 @@ type Selection = {
 };
 type CopyContextValue = {
   source?: Selection;
+  backgroundContentIds: ReadonlySet<string>;
   busy: boolean;
   begin: (formId: string, kind: FormCopyKind, clicked: boolean) => void;
   pointerDown: (
@@ -149,6 +150,9 @@ export function V3FormCopyProvider({
   >(undefined);
   const suppressClick = useRef(false);
   const [source, setSource] = useState<Selection>();
+  const [backgroundContentIds, setBackgroundContentIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [hovered, setHovered] = useState<{
     formId: string;
     kind: FormCopyKind;
@@ -162,7 +166,7 @@ export function V3FormCopyProvider({
     kind: FormCopyKind;
     targetLabel: string;
     recordingsWarning: boolean;
-    undo: { formId: string; before: FormContentV3; after: FormContentV3 };
+    undo?: { formId: string; before: FormContentV3; after: FormContentV3 };
   }>();
   const disabled = busy || Boolean(componentDisabled);
   const latest = useRef({ forms, onChange, disabled, copyResult });
@@ -183,7 +187,6 @@ export function V3FormCopyProvider({
       notification.destroy(noticeKey);
       return;
     }
-    const { undo } = copyResult;
     notification.success({
       key: noticeKey,
       title: t("panel_copied", { p0: copyName(copyResult.kind, t) }),
@@ -199,45 +202,48 @@ export function V3FormCopyProvider({
         setCopyResult((current) =>
           current === copyResult ? undefined : current
         ),
-      actions: (
-        <Button
-          size="small"
-          aria-label={t("panel_undo")}
-          icon={<Undo2Icon />}
-          disabled={disabled}
-          onClick={() => {
-            if (
-              latest.current.disabled ||
-              latest.current.copyResult !== copyResult
-            )
-              return;
-            const current = latest.current.forms;
-            if (!same(contentFor(current, undo.formId), undo.after)) {
-              setError(
-                createLexiconEditorMessage(
-                  "panel_the_target_changed_after_copying_undo_cannot_overwrite_these_changes"
-                )
-              );
-              setCopyResult(undefined);
-              return;
-            }
-            latest.current.onChange({
-              ...current,
-              contents: current.contents.map((content) =>
-                content.id === undo.before.id
-                  ? structuredClone(undo.before)
-                  : content
+      actions:
+        copyResult.kind === "phonetics" && copyResult.undo ? (
+          <Button
+            size="small"
+            aria-label={t("panel_undo")}
+            icon={<Undo2Icon />}
+            disabled={disabled}
+            onClick={() => {
+              const undo = copyResult.undo;
+              if (!undo) return;
+              if (
+                latest.current.disabled ||
+                latest.current.copyResult !== copyResult
               )
-            });
-            setCopyResult(undefined);
-            void message.success(
-              t("panel_copy_undone_save_the_draft_to_keep_this_change")
-            );
-          }}
-        >
-          {t("panel_undo")}
-        </Button>
-      )
+                return;
+              const current = latest.current.forms;
+              if (!same(contentFor(current, undo.formId), undo.after)) {
+                setError(
+                  createLexiconEditorMessage(
+                    "panel_the_target_changed_after_copying_undo_cannot_overwrite_these_changes"
+                  )
+                );
+                setCopyResult(undefined);
+                return;
+              }
+              latest.current.onChange({
+                ...current,
+                contents: current.contents.map((content) =>
+                  content.id === undo.before.id
+                    ? structuredClone(undo.before)
+                    : content
+                )
+              });
+              setCopyResult(undefined);
+              void message.success(
+                t("panel_copy_undone_save_the_draft_to_keep_this_change")
+              );
+            }}
+          >
+            {t("panel_undo")}
+          </Button>
+        ) : undefined
     });
   }, [copyResult, disabled, notification, noticeKey, message, t, setError]);
   useEffect(() => () => request.current?.abort(), []);
@@ -319,6 +325,12 @@ export function V3FormCopyProvider({
         return;
       }
       latest.current.onChange(next);
+      if (plan.kind === "voices")
+        setBackgroundContentIds((current) => {
+          const nextIds = new Set(current);
+          nextIds.add(plan.target.contentId);
+          return nextIds;
+        });
       const undo = {
         formId: plan.target.formId,
         before: structuredClone(plan.target.contentSnapshot),
@@ -328,7 +340,7 @@ export function V3FormCopyProvider({
         kind: plan.kind,
         targetLabel: labelFor(plan.target.formId),
         recordingsWarning: plan.warnings.length > 0,
-        undo
+        undo: plan.kind === "phonetics" ? undo : undefined
       });
     } catch (cause) {
       if (!controller.signal.aborted)
@@ -396,6 +408,7 @@ export function V3FormCopyProvider({
     : [];
   const value: CopyContextValue = {
     source,
+    backgroundContentIds,
     busy,
     begin,
     pointerDown(event, formId, kind) {

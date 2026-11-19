@@ -56,6 +56,41 @@ it("内容弹窗的显式音色也等待应用动作，编辑期间不自动生�
   expect(generateAudio).toHaveBeenCalledOnce();
   expect(generateAudio.mock.calls[0]![0].content.text).toBe("latest");
 });
+
+it("后台音频立即生成但不注册为保存等待任务", async () => {
+  const tasks = new Map<string, () => Promise<boolean>>();
+  const generateAudio = vi.fn().mockResolvedValue(asset("background"));
+  const adapter: VoicePreviewAdapter = {
+    listVoices: vi.fn(),
+    synthesize: vi.fn(),
+    generateAudio
+  };
+  renderHook(
+    () =>
+      useSelectedVoiceAudio({
+        target: "background-field",
+        content,
+        profile: initial,
+        adapter,
+        enabled: true,
+        defer: false,
+        waitForSave: false,
+        onChange: vi.fn()
+      }),
+    {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <VoiceSaveContext.Provider
+          value={{ save: async () => true, audioTasks: tasks }}
+        >
+          {children}
+        </VoiceSaveContext.Provider>
+      )
+    }
+  );
+  await waitFor(() => expect(generateAudio).toHaveBeenCalledOnce());
+  expect(tasks.has("background-field")).toBe(false);
+  expect(tasks.size).toBe(0);
+});
 function setup(adapter: VoicePreviewAdapter, profile = initial) {
   const audioTasks = new Map<string, () => Promise<boolean>>();
   const changed = vi.fn();

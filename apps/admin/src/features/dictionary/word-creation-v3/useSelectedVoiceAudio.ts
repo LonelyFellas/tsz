@@ -108,6 +108,7 @@ export function useSelectedVoiceAudio({
   requiredLocales,
   enabled,
   defer,
+  waitForSave = true,
   onChange
 }: {
   target: string;
@@ -119,6 +120,7 @@ export function useSelectedVoiceAudio({
   requiredLocales?: readonly PhonemeLocaleV3[];
   enabled: boolean;
   defer: boolean;
+  waitForSave?: boolean;
   onChange?: (profile: VoiceProfileV3) => void;
 }) {
   const audioTasks = useVoiceAudioTasks();
@@ -412,12 +414,12 @@ export function useSelectedVoiceAudio({
   ]);
   useLayoutEffect(() => {
     ensureRef.current = ensure;
-    if (!enabled || !onChange) return;
+    if (!enabled || !onChange || !waitForSave) return;
     audioTasks?.set(target, () => ensureRef.current());
     return () => {
       audioTasks?.delete(target);
     };
-  }, [audioTasks, enabled, onChange, target, ensure]);
+  }, [audioTasks, enabled, onChange, target, ensure, waitForSave]);
   useEffect(() => {
     if (!enabled) {
       attempted.current = undefined;
