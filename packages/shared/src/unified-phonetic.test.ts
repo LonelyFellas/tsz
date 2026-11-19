@@ -143,6 +143,38 @@ describe("语雀统一音标规则", () => {
     ).toMatchObject({ ok: true, value: "ˈbʌtən" });
   });
 
+  it("美式字典卷舌元音按重读和非重读位置转换", () => {
+    expect(convertDictionaryToUnified("ˈbɜːrd", "bird", "us")).toMatchObject({
+      ok: true,
+      value: "ˈbərd"
+    });
+    expect(
+      convertDictionaryToAzureIpa("ˈbɜːrd", "bird", "en-US")
+    ).toMatchObject({ ok: true, value: "ˈbɝd" });
+    expect(
+      convertDictionaryToUnified("ˈtiːtʃər", "teacher", "us")
+    ).toMatchObject({ ok: true, value: "ˈtiːtʃər" });
+    expect(
+      convertDictionaryToAzureIpa("ˈtiːtʃər", "teacher", "en-US")
+    ).toMatchObject({ ok: true, value: "ˈtitʃɚ" });
+    expect(
+      convertDictionaryToAzureIpa("ˈsɛpərət", "separate", "en-US")
+    ).toMatchObject({ ok: true, value: "ˈsɛpəɹət" });
+  });
+
+  it("英式或通用口音不套用美式卷舌映射", () => {
+    expect(convertDictionaryToUnified("ˈwɜːd", "word", "uk")).toMatchObject({
+      ok: true,
+      value: "ˈwɜːd"
+    });
+    expect(convertDictionaryToAzureIpa("ˈwɜːd", "word", "en-GB")).toMatchObject(
+      { ok: true, value: "ˈwɜːd" }
+    );
+    expect(
+      convertDictionaryToUnified("ˈbɜːrd", "bird", "common")
+    ).toMatchObject({ ok: true, value: "ˈbɜːrd" });
+  });
+
   it("音变采用口音与文档示例，不把所有 t/d/b 都替换", () => {
     expect(convertDictionaryToUnified("ˈbʌtər", "butter", "us")).toMatchObject({
       value: "ˈbʌdər"
@@ -209,6 +241,9 @@ describe("语雀统一音标规则", () => {
     expect(convertDictionaryToUnified("kæt", "family", "us")).toMatchObject({
       value: "kæt"
     });
+    expect(
+      convertDictionaryToAzureIpa("ˈlɪtərətʃər", "literature", "en-US")
+    ).toMatchObject({ ok: true, value: "ˈlɪtɹətʃɚ" });
   });
 
   it("空值、控制符、混合读音和词界错误不返回部分转换", () => {
