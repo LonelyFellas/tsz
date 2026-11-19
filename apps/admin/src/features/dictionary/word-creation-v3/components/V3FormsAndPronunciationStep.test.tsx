@@ -1071,6 +1071,12 @@ describe("V3FormsAndPronunciationStep", () => {
         readingRows[0]!.querySelector<HTMLElement>(".v3-overview-action-cell")!
       ).getByRole("button", { name: "编辑原形内容" })
     );
+    const spellingCell = readingRows[0]!.querySelector<HTMLElement>(
+      ".v3-overview-spellings"
+    )!;
+    fireEvent.click(within(spellingCell).getByText("travel", { exact: true }));
+    fireEvent.keyDown(spellingCell, { key: "Enter" });
+    fireEvent.keyDown(spellingCell, { key: " " });
     expect(onEdit).toHaveBeenCalledWith(form.id);
     expect(form).toEqual(original);
 
@@ -4059,7 +4065,17 @@ it("词形浮窗打开和收起时背景只供参考，关闭后恢复编辑", a
       />
     </FeedbackApp>
   );
-  const edit = screen.getByRole("button", { name: "编辑原形内容" });
+  const edit = document.querySelector<HTMLButtonElement>(
+    "[data-v3-open-content]"
+  )!;
+  const spelling = document.querySelector<HTMLElement>(
+    ".v3-overview-spellings"
+  )!;
+  spelling.focus();
+  fireEvent.click(within(spelling).getByText("reference", { exact: true }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "关闭词形内容设置" }));
+  await waitFor(() => expect(spelling).toHaveFocus());
   edit.focus();
   fireEvent.click(edit);
   const dialog = screen.getByRole("dialog");
@@ -4188,7 +4204,7 @@ it.each(["words", "lexicon-next"])(
       </QueryClientProvider>
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "编辑原形内容" })
+      document.querySelector<HTMLButtonElement>("[data-v3-open-content]")!
     );
     const dialog = screen.getByRole("dialog");
     expect(

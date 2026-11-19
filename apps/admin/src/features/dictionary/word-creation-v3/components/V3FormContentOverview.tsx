@@ -390,7 +390,7 @@ export function V3FormContentOverview({
             key: "spelling",
             width: 160,
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
-            render: (_, { variant, spellingDialect }) => {
+            render: (_, { form, variant, spellingDialect }) => {
               const dialectLabel =
                 spellingDialect === "common"
                   ? t("common_spelling")
@@ -399,7 +399,18 @@ export function V3FormContentOverview({
                     : t("american_spelling");
               return (
                 <div
+                  aria-label={t("panel_open_editor", {
+                    p0: label(form.form_type)
+                  })}
                   className="v3-overview-spellings"
+                  onClick={() => onEdit(form.id)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    onEdit(form.id);
+                  }}
+                  role="button"
+                  tabIndex={0}
                   title={variant.spelling || undefined}
                 >
                   <Tooltip title={dialectLabel}>
