@@ -16,8 +16,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminText, useAdminTranslation } from "@/i18n";
 import { useAuthStore } from "@/lib/auth";
+import { adminReleaseId } from "@/lib/release";
 import { AdminAvatar } from "./adminAvatar";
 import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
+
+import "./admin-header.css";
 
 /**
  * 后台顶栏内容：把身份与账户操作收进头像 Popover——顶栏只留一个头像，
@@ -93,6 +96,14 @@ export function AdminHeader() {
           </Typography.Text>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {roleLabel}
+          </Typography.Text>
+          <Typography.Text
+            type="secondary"
+            ellipsis={{ tooltip: adminReleaseId }}
+            copyable={{ text: adminReleaseId }}
+            className="admin-header-version"
+          >
+            {t("account_version")}: {adminReleaseId}
           </Typography.Text>
         </div>
       </Flex>

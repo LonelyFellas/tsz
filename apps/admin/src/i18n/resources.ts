@@ -42,6 +42,7 @@ export const adminShellMessages = {
   account_standard_admin: ["普通管理员", "一般管理員", "Administrator"],
   account_super_admin: ["超级管理员", "超級管理員", "Super administrator"],
   account_menu: ["账户菜单", "帳戶選單", "Account menu"],
+  account_version: ["前端版本", "前端版本", "Frontend version"],
   account_settings: ["个人设置", "個人設定", "Personal settings"],
   account_change_password: ["修改密码", "修改密碼", "Change password"],
   account_sign_out: ["退出登录", "登出", "Sign out"],
