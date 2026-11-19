@@ -204,15 +204,21 @@ export function LocalVoicePool({
         providerVoiceKey(setting.voice_id, voices) ===
           providerVoiceKey(voice.id, voices)
     );
-  const isCatalogSelected = (voice: VoiceOption) =>
-    (profile?.voices ?? current).some(
-      (setting) =>
-        setting.enabled &&
-        voiceSettingAccent(setting, voices) ===
-          speechAccentGroup(voice.locale, voice.accent) &&
-        providerVoiceKey(setting.voice_id, voices) ===
-          providerVoiceKey(voice.id, voices)
+  const isCatalogSelected = (voice: VoiceOption) => {
+    const side = speechAccentGroup(voice.locale, voice.accent);
+    return (
+      (side === "uk" || side === "us") &&
+      !inheritedFor(side) &&
+      (profile?.voices ?? current).some(
+        (setting) =>
+          setting.enabled &&
+          voiceSettingAccent(setting, voices) === side &&
+          !excluded.has(providerVoiceKey(setting.voice_id, voices)) &&
+          providerVoiceKey(setting.voice_id, voices) ===
+            providerVoiceKey(voice.id, voices)
+      )
     );
+  };
   const sideOf = (setting: VoiceSetting) => {
     return voiceSettingAccent(setting, voices);
   };
