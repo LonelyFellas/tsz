@@ -4068,6 +4068,14 @@ it("词形浮窗打开和收起时背景只供参考，关闭后恢复编辑", a
   const edit = document.querySelector<HTMLButtonElement>(
     "[data-v3-open-content]"
   )!;
+  const spelling = document.querySelector<HTMLElement>(
+    ".v3-overview-spellings"
+  )!;
+  spelling.focus();
+  fireEvent.click(within(spelling).getByText("reference", { exact: true }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "关闭词形内容设置" }));
+  await waitFor(() => expect(spelling).toHaveFocus());
   edit.focus();
   fireEvent.click(edit);
   const dialog = screen.getByRole("dialog");

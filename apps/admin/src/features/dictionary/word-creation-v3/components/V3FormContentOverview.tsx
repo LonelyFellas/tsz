@@ -409,7 +409,6 @@ export function V3FormContentOverview({
                     event.preventDefault();
                     onEdit(form.id);
                   }}
-                  onMouseDown={(event) => event.preventDefault()}
                   role="button"
                   tabIndex={0}
                   title={variant.spelling || undefined}

@@ -110,6 +110,9 @@
   padding-top: 3px;
   user-select: none;
 }
+.v3-overview-spellings:focus {
+  outline: none;
+}
 .dialect-dot.v3-overview-dialect-dot {
   width: 6px;
   height: 6px;
