@@ -6,7 +6,7 @@ import {
   createLexiconEditorMessage
 } from "../../i18n/editor";
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
-import { CopyIcon, CircleHelpIcon, Undo2Icon } from "lucide-react";
+import { CopyIcon, CircleHelpIcon } from "lucide-react";
 import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
 import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { AdminControls, useAdminDisabled } from "@tsz/ui/admin/context";
@@ -16,7 +16,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useId,
   useRef,
   useState,
   type PointerEvent,
@@ -125,14 +124,7 @@ export function V3FormCopyProvider({
   children: ReactNode;
 }) {
   const { t } = useLexiconEditorTranslation();
-  const { message, notification } = App.useApp();
-  const noticeKey = useId();
-  useEffect(
-    () => () => {
-      notification.destroy(noticeKey);
-    },
-    [notification, noticeKey]
-  );
+  const { message } = App.useApp();
   const componentDisabled = useAdminDisabled();
   const formTypeLabel = useFormTypeLabel();
   const root = useRef<HTMLDivElement>(null);
@@ -162,90 +154,9 @@ export function V3FormCopyProvider({
   const [pending, setPending] = useState<FormCopyPlan>();
   const [mapping, setMapping] = useState<FormCopyMapping>({});
   const [error, setError] = useLexiconEditorMessageState();
-  const [copyResult, setCopyResult] = useState<{
-    kind: FormCopyKind;
-    targetLabel: string;
-    recordingsWarning: boolean;
-    undo?: { formId: string; before: FormContentV3; after: FormContentV3 };
-  }>();
   const disabled = busy || Boolean(componentDisabled);
-  const latest = useRef({ forms, onChange, disabled, copyResult });
-  latest.current = { forms, onChange, disabled, copyResult };
-  useEffect(() => {
-    if (!copyResult) return;
-    const timer = setTimeout(
-      () =>
-        setCopyResult((current) =>
-          current === copyResult ? undefined : current
-        ),
-      10000
-    );
-    return () => clearTimeout(timer);
-  }, [copyResult]);
-  useEffect(() => {
-    if (!copyResult) {
-      notification.destroy(noticeKey);
-      return;
-    }
-    notification.success({
-      key: noticeKey,
-      title: t("panel_copied", { p0: copyName(copyResult.kind, t) }),
-      description: t(
-        "panel_target_save_the_draft_to_apply_then_audition_again",
-        {
-          p0: copyResult.targetLabel,
-          p1: copyResult.recordingsWarning ? t("copy_recordings_retained") : ""
-        }
-      ),
-      duration: 0,
-      onClose: () =>
-        setCopyResult((current) =>
-          current === copyResult ? undefined : current
-        ),
-      actions:
-        copyResult.kind === "phonetics" && copyResult.undo ? (
-          <Button
-            size="small"
-            aria-label={t("panel_undo")}
-            icon={<Undo2Icon />}
-            disabled={disabled}
-            onClick={() => {
-              const undo = copyResult.undo;
-              if (!undo) return;
-              if (
-                latest.current.disabled ||
-                latest.current.copyResult !== copyResult
-              )
-                return;
-              const current = latest.current.forms;
-              if (!same(contentFor(current, undo.formId), undo.after)) {
-                setError(
-                  createLexiconEditorMessage(
-                    "panel_the_target_changed_after_copying_undo_cannot_overwrite_these_changes"
-                  )
-                );
-                setCopyResult(undefined);
-                return;
-              }
-              latest.current.onChange({
-                ...current,
-                contents: current.contents.map((content) =>
-                  content.id === undo.before.id
-                    ? structuredClone(undo.before)
-                    : content
-                )
-              });
-              setCopyResult(undefined);
-              void message.success(
-                t("panel_copy_undone_save_the_draft_to_keep_this_change")
-              );
-            }}
-          >
-            {t("panel_undo")}
-          </Button>
-        ) : undefined
-    });
-  }, [copyResult, disabled, notification, noticeKey, message, t, setError]);
+  const latest = useRef({ forms, onChange, disabled });
+  latest.current = { forms, onChange, disabled };
   useEffect(() => () => request.current?.abort(), []);
   const labelFor = (formId: string) => {
     const bindings = forms.pos.flatMap((pos) => pos.forms);
@@ -331,17 +242,6 @@ export function V3FormCopyProvider({
           nextIds.add(plan.target.contentId);
           return nextIds;
         });
-      const undo = {
-        formId: plan.target.formId,
-        before: structuredClone(plan.target.contentSnapshot),
-        after: structuredClone(after)
-      };
-      setCopyResult({
-        kind: plan.kind,
-        targetLabel: labelFor(plan.target.formId),
-        recordingsWarning: plan.warnings.length > 0,
-        undo: plan.kind === "phonetics" ? undo : undefined
-      });
     } catch (cause) {
       if (!controller.signal.aborted)
         setError(
