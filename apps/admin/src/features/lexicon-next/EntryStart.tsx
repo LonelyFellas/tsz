@@ -11,13 +11,22 @@ import {
 } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
 import { Search, Plus } from "lucide-react";
-import type { NextDetection, NextEntryMatches } from "@tsz/types";
+import type {
+  EntryAnnotationGroup,
+  NextDetection,
+  NextEntryMatches,
+  NextWorkspaceEntry
+} from "@tsz/types";
 import { Modal } from "@tsz/ui/admin/overlays";
 import { usePermission } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { validateEntryInput } from "@/features/dictionary/word-creation/entryClassification";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import {
+  EntryAnnotationModal,
+  type AnnotationRow
+} from "@/features/dictionary/EntryAnnotationModal";
 import { useLexiconLanguages } from "./LanguageSelection";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
@@ -32,6 +41,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   } = useLexiconLanguages();
   const queryClient = useQueryClient();
   const canCreate = usePermission("words.create");
+  const canEdit = usePermission("words.edit");
   const posLabel = usePartOfSpeechLabel();
   const { t } = useLexiconEditorTranslation();
   const [value, setValue] = useState("");
@@ -44,17 +54,25 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const [error, setError] = useState<string>();
   const [fieldError, setFieldError] = useState<string>();
   const [uncertain, setUncertain] = useState(false);
+  const [annotationEntries, setAnnotationEntries] = useState<
+    NextWorkspaceEntry[]
+  >([]);
+  const [annotationEntryId, setAnnotationEntryId] = useState<string>();
+  const [annotationRevision, setAnnotationRevision] = useState(1);
   const lock = useRef(false);
   const generation = useRef(0);
   const blocker = useBlocker(() => lock.current);
   useEffect(() => {
-    setLocked(Boolean(busy));
+    setLocked(Boolean(busy) || annotationEntries.length > 0);
     return () => setLocked(false);
-  }, [busy, setLocked]);
+  }, [annotationEntries.length, busy, setLocked]);
   useEffect(() => {
     generation.current += 1;
     setDetection(undefined);
     setEntryMatches(undefined);
+    setAnnotationEntries([]);
+    setAnnotationEntryId(undefined);
+    setAnnotationRevision(1);
     setExpandedGlosses(new Set());
     if (!uncertain) setError(undefined);
     setFieldError(undefined);
@@ -82,6 +100,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setDetection(undefined);
     setExpandedGlosses(new Set());
     setEntryMatches(undefined);
+    setAnnotationEntries([]);
+    setAnnotationEntryId(undefined);
+    setAnnotationRevision(1);
     try {
       const query = {
         target_language: targetLanguage,
@@ -148,7 +169,13 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     }
   }
 
-  async function create() {
+  function activeMatches() {
+    return (entryMatches?.items ?? []).filter(
+      (entry) => entry.status !== "archived"
+    );
+  }
+
+  async function create(annotation?: string) {
     if (lock.current || !canCreate || !detection || !entryMatches || uncertain)
       return;
     const current = generation.current;
@@ -156,12 +183,44 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setBusy("create");
     setError(undefined);
     try {
-      const entry = await requests.create({
-        target_language: targetLanguage,
-        medium_locale: medium,
-        kind: detection.kind,
-        headword: detection.surface
-      });
+      const entryId = annotationEntryId;
+      const entry = entryId
+        ? undefined
+        : await requests.create({
+            target_language: targetLanguage,
+            medium_locale: medium,
+            kind: detection.kind,
+            headword: detection.surface
+          });
+      const createdId = entry?.id ?? entryId;
+      if (!createdId) return;
+      if (annotation !== undefined) {
+        try {
+          await requests.annotation(createdId, {
+            annotation: annotation || null,
+            base_annotation_revision: annotationRevision
+          });
+        } catch (annotationError) {
+          try {
+            const latest = await requests.workspaceEntry(createdId);
+            if ((latest.annotation ?? null) !== (annotation || null)) {
+              setUncertain(true);
+              setError("词条标注已发生变化，请返回词库核实后再处理。");
+              return;
+            }
+            setAnnotationRevision(latest.annotation_revision);
+          } catch {
+            setUncertain(true);
+            setError("词条已创建，但无法确认标注状态，请返回词库核实。");
+            return;
+          }
+          setAnnotationEntryId(createdId);
+          setError(
+            `词条已创建，但标注保存失败：${annotationError instanceof Error ? annotationError.message : "请求失败，请重试。"}`
+          );
+          return;
+        }
+      }
       await Promise.all(
         ["list", "stats", "creators"].map((key) =>
           queryClient.invalidateQueries({
@@ -171,8 +230,10 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
         )
       );
       if (current !== generation.current) return;
+      setAnnotationEntries([]);
+      setAnnotationEntryId(undefined);
       lock.current = false;
-      navigate(`/lexicon-next/${entry.id}?${languageSearch}`);
+      navigate(`/lexicon-next/${createdId}?${languageSearch}`);
     } catch (error) {
       setUncertain(true);
       setError(
@@ -183,6 +244,50 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
       setBusy(undefined);
     }
   }
+
+  function requestCreate() {
+    const matches = activeMatches();
+    if (matches.length > 0) {
+      if (!canEdit) {
+        setError(
+          t("creation_this_account_cannot_change_this_entry_s_annotation")
+        );
+        return;
+      }
+      setAnnotationEntries(matches);
+      setAnnotationRevision(1);
+      return;
+    }
+    void create();
+  }
+
+  const annotationRows: AnnotationRow[] = annotationEntries.map((entry) => {
+    const labels = [
+      entry.headword,
+      ...entry.forms.map((form) => form.text)
+    ].filter(
+      (label, index, values) => label && values.indexOf(label) === index
+    );
+    return {
+      key: entry.id,
+      label: labels.join(" / "),
+      annotation: entry.annotation,
+      posLabels: entry.part_of_speech,
+      glossPreviews: entry.gloss ? [entry.gloss] : [],
+      createdByName: entry.created_by_name,
+      updatedAt: entry.updated_at,
+      href: `/lexicon-next/${entry.id}?${languageSearch}`,
+      readOnly: true
+    };
+  });
+
+  const annotationGroups: EntryAnnotationGroup[] = [
+    {
+      dialect_scope: "common",
+      normalized_surface: detection?.surface ?? value,
+      entry_ids: annotationEntries.map((entry) => entry.id)
+    }
+  ];
 
   return (
     <EntryLayout step="basics" exists={false} languageSearch={languageSearch}>
@@ -243,6 +348,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                   setValue(event.target.value);
                   setDetection(undefined);
                   setEntryMatches(undefined);
+                  setAnnotationEntries([]);
+                  setAnnotationEntryId(undefined);
+                  setAnnotationRevision(1);
                   setError(undefined);
                   setFieldError(undefined);
                 }}
@@ -368,7 +476,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                 icon={<Plus aria-hidden />}
                 loading={busy === "create"}
                 disabled={!canCreate || Boolean(busy) || uncertain}
-                onClick={() => void create()}
+                onClick={requestCreate}
               >
                 确认创建
               </Button>
@@ -376,6 +484,32 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
           </>
         )}
       </div>
+      {annotationEntries.length > 0 && (
+        <EntryAnnotationModal
+          creating
+          groups={annotationGroups}
+          rows={[
+            ...annotationRows,
+            {
+              key: "incoming",
+              incoming: true,
+              label: detection?.surface ?? value,
+              annotation: null
+            }
+          ]}
+          onClose={() => {
+            setAnnotationEntries([]);
+            setAnnotationEntryId(undefined);
+            setAnnotationRevision(1);
+            setError(undefined);
+          }}
+          onSave={(values) => {
+            void create(values.incoming?.trim());
+          }}
+          busy={busy === "create"}
+          error={error}
+        />
+      )}
     </EntryLayout>
   );
 }

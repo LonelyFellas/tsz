@@ -788,9 +788,11 @@ it("列表名称只显示词头，不展示其他词形和地区标记", async (
   expect(screen.queryByText(/加拿大|法语/)).toBeNull();
 });
 
-it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保留独立创建", async () => {
+it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并在创建前要求新标注", async () => {
   const api = requests();
+  const createdId = "00000000-0000-4000-8000-000000000003";
   const archivedId = "00000000-0000-4000-8000-000000000002";
+  api.create.mockResolvedValue({ ...entry, id: createdId });
   api.matchEntries.mockResolvedValue({
     surface: "center",
     items: [
@@ -843,6 +845,15 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保�
     page_size: 20
   });
   fireEvent.click(button("确认创建"));
+  const annotationDialog = await screen.findByRole("dialog");
+  expect(within(annotationDialog).getByText("已有词条 1")).toBeInTheDocument();
+  expect(
+    within(annotationDialog).getByLabelText("centre / center标注")
+  ).toHaveValue("2");
+  fireEvent.change(within(annotationDialog).getByLabelText("新建词条标注"), {
+    target: { value: "3" }
+  });
+  fireEvent.click(within(annotationDialog).getByText("保存标注并创建"));
   await waitFor(() =>
     expect(api.create).toHaveBeenCalledExactlyOnceWith({
       medium_locale: "zh-Hans",
@@ -851,7 +862,102 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并保�
       headword: "center"
     })
   );
+  expect(api.annotation).toHaveBeenCalledExactlyOnceWith(createdId, {
+    annotation: "3",
+    base_annotation_revision: 1
+  });
   expect(api.save).not.toHaveBeenCalled();
+});
+
+it("标注请求响应丢失后刷新修订号并只重试标注", async () => {
+  const api = requests();
+  const createdId = "00000000-0000-4000-8000-000000000003";
+  api.create.mockResolvedValue({ ...entry, id: createdId });
+  api.matchEntries.mockResolvedValue({
+    surface: "center",
+    items: [listRow({ annotation: "2", annotation_visible: true })],
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+  });
+  api.annotation.mockRejectedValueOnce(new Error("响应丢失"));
+  api.workspaceEntry.mockResolvedValue(
+    listRow({ annotation: "3", annotation_revision: 2 })
+  );
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "center" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
+    target: { value: "3" }
+  });
+  fireEvent.click(within(dialog).getByText("保存标注并创建"));
+  await within(dialog).findByText(/词条已创建，但标注保存失败/);
+  expect(api.create).toHaveBeenCalledOnce();
+  fireEvent.click(within(dialog).getByText("保存标注并创建"));
+  await waitFor(() => expect(api.annotation).toHaveBeenCalledTimes(2));
+  expect(api.annotation).toHaveBeenNthCalledWith(1, createdId, {
+    annotation: "3",
+    base_annotation_revision: 1
+  });
+  expect(api.annotation).toHaveBeenNthCalledWith(2, createdId, {
+    annotation: "3",
+    base_annotation_revision: 2
+  });
+  expect(api.create).toHaveBeenCalledOnce();
+});
+
+it("标注并发变化后停止重试，避免覆盖最新标注", async () => {
+  const api = requests();
+  const createdId = "00000000-0000-4000-8000-000000000003";
+  api.create.mockResolvedValue({ ...entry, id: createdId });
+  api.matchEntries.mockResolvedValue({
+    surface: "center",
+    items: [listRow({ annotation: "2", annotation_visible: true })],
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+  });
+  api.annotation.mockRejectedValueOnce(new Error("revision conflict"));
+  api.workspaceEntry.mockResolvedValue(
+    listRow({ annotation: "4", annotation_revision: 2 })
+  );
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "center" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
+    target: { value: "3" }
+  });
+  fireEvent.click(within(dialog).getByText("保存标注并创建"));
+  await screen.findByText("词条标注已发生变化，请返回词库核实后再处理。");
+  expect(api.create).toHaveBeenCalledOnce();
+  expect(api.annotation).toHaveBeenCalledOnce();
+});
+
+it("仅有创建权限时不创建无法保存标注的重名词条", async () => {
+  const api = requests();
+  useAuthStore.setState({
+    profile: {
+      ...useAuthStore.getState().profile!,
+      permissions: ["words.access", "words.create"]
+    }
+  });
+  api.matchEntries.mockResolvedValue({
+    surface: "center",
+    items: [listRow({ annotation: "2", annotation_visible: true })],
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "center" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  await screen.findByText("当前账号没有修改该词条标注的权限。");
+  expect(api.create).not.toHaveBeenCalled();
 });
 
 it("已有词条翻页只重查新版匹配，失败保留原结果并支持重试；改输入清空结果", async () => {
