@@ -119,3 +119,58 @@ it("语义区间摘要随名称修改更新完成状态，保留区间顺序和�
   expect(summary.getByText("位置 · position")).toBeVisible();
   expect(screen.getByText("1/5")).toBeVisible();
 });
+
+it("概览完成项仍显示数字序号，不显示完成图标", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "centre",
+    forms: [
+      { id: "uk", locale: "en-GB", text: "centre" },
+      { id: "us", locale: "en-US", text: "center" }
+    ],
+    senses: [
+      {
+        id: "sense",
+        part_of_speech: null,
+        definitions: [
+          {
+            id: "en-GB",
+            locale: "en-GB",
+            text: "middle",
+            style: "definition"
+          },
+          {
+            id: "en-US",
+            locale: "en-US",
+            text: "middle",
+            style: "definition"
+          }
+        ],
+        equivalents: [
+          { id: "zh-Hans", locale: "zh-Hans", text: "中心" },
+          { id: "zh-Hant", locale: "zh-Hant", text: "中心" }
+        ]
+      }
+    ]
+  };
+
+  render(
+    <MemoryRouter>
+      <EntryLayout draft={draft} step="forms">
+        正文
+      </EntryLayout>
+    </MemoryRouter>
+  );
+  fireEvent.click(screen.getByRole("button", { name: "展开词条概览" }));
+
+  const rows = Array.from(
+    document.querySelectorAll<HTMLElement>(".word-creation-progress-row")
+  );
+  expect(rows).toHaveLength(4);
+  expect(
+    rows.map((row) => row.querySelector(".word-progress-index")?.textContent)
+  ).toEqual(["1", "2", "3", "4"]);
+  expect(rows.every((row) => !row.querySelector(".word-progress-done"))).toBe(
+    true
+  );
+});
