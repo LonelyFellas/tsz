@@ -271,19 +271,12 @@ export function V3PronunciationList({
                           ) {
                             row.classList.add("is-drag-preview");
                             const surface = row.closest<HTMLElement>(
-                              ".word-shared-pronunciation"
+                              ".word-shared-pronunciation, .word-form-matrix-dialect-cell"
                             );
                             if (surface) {
                               row.style.backgroundColor =
                                 getComputedStyle(surface).backgroundColor;
                             }
-                            row.style.border =
-                              "1px solid var(--ui-color-border-secondary)";
-                            row.style.borderRadius =
-                              "var(--ui-border-radius-lg)";
-                            row.style.boxShadow = "var(--ui-shadow-sm)";
-                            row.style.opacity = "1";
-                            row.style.transform = "none";
                             event.dataTransfer.setDragImage(row, 24, 24);
                           }
                           setDraggingIndex(index);
