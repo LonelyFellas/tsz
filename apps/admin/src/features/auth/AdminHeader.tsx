@@ -20,6 +20,8 @@ import { adminReleaseId } from "@/lib/release";
 import { AdminAvatar } from "./adminAvatar";
 import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
 
+import "./admin-header.css";
+
 /**
  * 后台顶栏内容：把身份与账户操作收进头像 Popover——顶栏只留一个头像，
  * 点开展开「已登录为 X」+ 个人设置 + 退出登录，供 ConsoleLayout 的 Layout.Header 承载。
@@ -99,7 +101,7 @@ export function AdminHeader() {
             type="secondary"
             ellipsis={{ tooltip: adminReleaseId }}
             copyable={{ text: adminReleaseId }}
-            style={{ display: "block", maxWidth: 188, fontSize: 11 }}
+            className="admin-header-version"
           >
             {t("account_version")}: {adminReleaseId}
           </Typography.Text>
