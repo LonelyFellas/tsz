@@ -93,6 +93,7 @@ export function V3PronunciationAudioUpload({
       }
     >
       <Button
+        className="word-synthesis-source-settings"
         type="text"
         size="small"
         icon={<SettingsIcon />}

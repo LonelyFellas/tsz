@@ -601,6 +601,7 @@ export function V3PhonemeSpeechSettings({
             !candidate.ipa.trim();
           const button = (
             <Button
+              className="word-synthesis-source-settings"
               type="text"
               size="small"
               icon={

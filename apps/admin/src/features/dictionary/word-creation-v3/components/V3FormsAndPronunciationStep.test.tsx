@@ -1515,7 +1515,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(
       within(groupCard).getAllByLabelText(/最终读音 播放语音/)
-    ).toHaveLength(3);
+    ).toHaveLength(6);
     expect(within(groupCard).queryAllByLabelText(/获取语音/)).toHaveLength(0);
     expect(
       within(groupCard).getAllByLabelText("第 1 条发音的字典音标", {

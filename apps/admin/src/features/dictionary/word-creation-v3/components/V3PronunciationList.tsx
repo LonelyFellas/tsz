@@ -22,6 +22,7 @@ import type {
 } from "@tsz/types";
 import { useEffect, useId, useState, type DragEvent } from "react";
 import type { SpellingSettingsOpener } from "./V3VoiceTextField";
+import { spellingEditorValue } from "../spellingSpeech";
 import { issuesForPronunciation } from "../model";
 import {
   reorderPronunciations,
@@ -87,6 +88,7 @@ export function V3PronunciationList({
   const [missingDictionary, setMissingDictionary] = useState<
     ReadonlySet<string>
   >(new Set());
+  const [missingIpa, setMissingIpa] = useState<Record<string, "uk" | "us">>({});
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
   useEffect(() => {
@@ -138,6 +140,48 @@ export function V3PronunciationList({
                 );
                 const actualPronIssue = rowIssues.find(
                   (item) => item.field === "actual_pron"
+                );
+                const renderSynthesis = (
+                  view: "all" | "phonetics" | "source"
+                ) => (
+                  <V3SynthesisInputs
+                    key={`${pronunciation.id}-${view}`}
+                    view={view}
+                    synthesisEditable={env.AZURE_PRONUNCIATION_INPUTS}
+                    pronunciation={pronunciation}
+                    spelling={variant.spelling}
+                    spellingContent={spellingEditorValue(variant)}
+                    spellingSpeech={variant.spelling_speech}
+                    missingIpa={missingIpa[pronunciation.id]}
+                    onMissingIpa={(side) =>
+                      setMissingIpa((current) => ({
+                        ...current,
+                        [pronunciation.id]: side
+                      }))
+                    }
+                    onSpellingSettings={
+                      env.VOICE_EDITOR ? onSpellingSettings : undefined
+                    }
+                    dialect={variant.dialect}
+                    index={index}
+                    issues={rowIssues}
+                    onMissingSpelling={onMissingSpelling}
+                    onMissingDictionary={() => {
+                      setMissingDictionary(
+                        (current) => new Set([...current, pronunciation.id])
+                      );
+                      document
+                        .getElementById(
+                          `${inputPrefix}-${pronunciation.id}-dict`
+                        )
+                        ?.focus();
+                    }}
+                    onChange={(patch) =>
+                      onChange(
+                        updatePronunciation(content, pronunciation.id, patch)
+                      )
+                    }
+                  />
                 );
                 return (
                   <div
@@ -193,7 +237,17 @@ export function V3PronunciationList({
                         draggable={fields.length > 1}
                         htmlType="button"
                         icon={<GripVerticalIcon />}
-                        onDragEnd={() => {
+                        onDragEnd={(event) => {
+                          const row = event.currentTarget.closest<HTMLElement>(
+                            ".word-pronunciation-editor"
+                          );
+                          row?.classList.remove("is-drag-preview");
+                          row?.style.removeProperty("background-color");
+                          row?.style.removeProperty("border");
+                          row?.style.removeProperty("border-radius");
+                          row?.style.removeProperty("box-shadow");
+                          row?.style.removeProperty("opacity");
+                          row?.style.removeProperty("transform");
                           setDraggingIndex(undefined);
                           setDragOverIndex(undefined);
                         }}
@@ -215,6 +269,14 @@ export function V3PronunciationList({
                             typeof event.dataTransfer.setDragImage ===
                               "function"
                           ) {
+                            row.classList.add("is-drag-preview");
+                            const surface = row.closest<HTMLElement>(
+                              ".word-shared-pronunciation, .word-form-matrix-dialect-cell"
+                            );
+                            if (surface) {
+                              row.style.backgroundColor =
+                                getComputedStyle(surface).backgroundColor;
+                            }
                             event.dataTransfer.setDragImage(row, 24, 24);
                           }
                           setDraggingIndex(index);
@@ -293,78 +355,170 @@ export function V3PronunciationList({
                         type="text"
                       />
                     </div>
-                    <div className="word-pronunciation-fields word-pronunciation-floating-fields">
-                      <div className="word-pronunciation-row">
-                        <label
-                          className="word-pronunciation-label"
-                          htmlFor={`${inputPrefix}-${pronunciation.id}-style`}
-                        >
-                          {t("reading")}
-                        </label>
-                        <Form.Item noStyle>
-                          <Select
-                            id={`${inputPrefix}-${pronunciation.id}-style`}
-                            aria-label={t("reading_label", {
-                              index: index + 1
-                            })}
-                            className="word-pronunciation-style-select"
-                            data-v3-field="style"
-                            data-v3-node-id={pronunciation.id}
-                            onChange={(style) =>
-                              onChange(
-                                updatePronunciation(content, pronunciation.id, {
-                                  style
-                                })
-                              )
-                            }
-                            options={[
-                              {
-                                value: "citation",
-                                label: t("reading_citation")
-                              },
-                              {
-                                value: "normal",
-                                label: t("reading_normal")
-                              },
-                              {
-                                value: "strong",
-                                label: t("reading_strong")
-                              },
-                              {
-                                value: "weak",
-                                label: t("reading_weak")
-                              }
-                            ]}
-                            placeholder={t("style")}
-                            status={styleIssue ? "error" : undefined}
-                            value={pronunciation.style}
-                          />
-                        </Form.Item>
-                        {styleIssue ? (
-                          <Typography.Text
-                            className="word-field-help"
-                            type="danger"
+                    <div className="word-pronunciation-content">
+                      <div className="word-pronunciation-fields word-pronunciation-floating-fields">
+                        <div className="word-pronunciation-row">
+                          <label
+                            className="word-pronunciation-label"
+                            htmlFor={`${inputPrefix}-${pronunciation.id}-style`}
                           >
-                            {pronunciationFieldMessage(styleIssue, "style", t)}
-                          </Typography.Text>
-                        ) : null}
-                      </div>
-                      <div className="word-pronunciation-row">
-                        <label
-                          className="word-pronunciation-label"
-                          htmlFor={`${inputPrefix}-${pronunciation.id}-dict`}
-                        >
-                          {t("dictionary_phonetic")}
-                        </label>
-                        <div className="word-pronunciation-phonetic-control">
+                            {t("reading")}
+                          </label>
                           <Form.Item noStyle>
-                            <V3VoiceTextField
-                              id={`${inputPrefix}-${pronunciation.id}-dict`}
-                              mode="dict-phonetic"
-                              editingEnabled={false}
-                              trailingAction={
-                                env.AZURE_PRONUNCIATION_INPUTS && (
-                                  <V3PronunciationConvertAll
+                            <Select
+                              id={`${inputPrefix}-${pronunciation.id}-style`}
+                              aria-label={t("reading_label", {
+                                index: index + 1
+                              })}
+                              className="word-pronunciation-style-select"
+                              data-v3-field="style"
+                              data-v3-node-id={pronunciation.id}
+                              onChange={(style) =>
+                                onChange(
+                                  updatePronunciation(
+                                    content,
+                                    pronunciation.id,
+                                    { style }
+                                  )
+                                )
+                              }
+                              options={[
+                                {
+                                  value: "citation",
+                                  label: t("reading_citation")
+                                },
+                                {
+                                  value: "normal",
+                                  label: t("reading_normal")
+                                },
+                                {
+                                  value: "strong",
+                                  label: t("reading_strong")
+                                },
+                                {
+                                  value: "weak",
+                                  label: t("reading_weak")
+                                }
+                              ]}
+                              placeholder={t("style")}
+                              status={styleIssue ? "error" : undefined}
+                              value={pronunciation.style}
+                            />
+                          </Form.Item>
+                          {styleIssue ? (
+                            <Typography.Text
+                              className="word-field-help"
+                              type="danger"
+                            >
+                              {pronunciationFieldMessage(
+                                styleIssue,
+                                "style",
+                                t
+                              )}
+                            </Typography.Text>
+                          ) : null}
+                        </div>
+                        <div className="word-pronunciation-row">
+                          <label
+                            className="word-pronunciation-label"
+                            htmlFor={`${inputPrefix}-${pronunciation.id}-dict`}
+                          >
+                            {t("dictionary_phonetic")}
+                          </label>
+                          <div className="word-pronunciation-phonetic-control">
+                            <Form.Item noStyle>
+                              <V3VoiceTextField
+                                id={`${inputPrefix}-${pronunciation.id}-dict`}
+                                mode="dict-phonetic"
+                                editingEnabled={false}
+                                trailingAction={
+                                  env.AZURE_PRONUNCIATION_INPUTS && (
+                                    <V3PronunciationConvertAll
+                                      pronunciation={pronunciation}
+                                      spelling={variant.spelling}
+                                      dialect={variant.dialect}
+                                      onMissingSpelling={onMissingSpelling}
+                                      onChange={(patch) =>
+                                        onChange(
+                                          updatePronunciation(
+                                            content,
+                                            pronunciation.id,
+                                            patch
+                                          )
+                                        )
+                                      }
+                                    />
+                                  )
+                                }
+                                dialect={variant.dialect}
+                                ariaLabel={t("dictionary_phonetic_label", {
+                                  index: index + 1
+                                })}
+                                nodeId={pronunciation.id}
+                                field="dict_phonetic"
+                                invalid={Boolean(dictPhoneticIssue)}
+                                requiredError={
+                                  missingDictionary.has(pronunciation.id) &&
+                                  !pronunciation.dict_phonetic.trim()
+                                    ? t(
+                                        "panel_enter_the_dictionary_transcription_first"
+                                      )
+                                    : undefined
+                                }
+                                placeholder="Dictionary Pronunciation"
+                                value={
+                                  pronunciation.dict_phonetic_rich ?? {
+                                    version: 2,
+                                    text: pronunciation.dict_phonetic,
+                                    annotations: []
+                                  }
+                                }
+                                onChange={(dict_phonetic_rich) =>
+                                  onChange(
+                                    updatePronunciation(
+                                      content,
+                                      pronunciation.id,
+                                      {
+                                        dict_phonetic: dict_phonetic_rich.text,
+                                        ...(pronunciation.dict_phonetic_rich ||
+                                        dict_phonetic_rich.annotations.length >
+                                          0
+                                          ? { dict_phonetic_rich }
+                                          : {})
+                                      }
+                                    )
+                                  )
+                                }
+                              />
+                            </Form.Item>
+                            {dictPhoneticIssue ? (
+                              <Typography.Text
+                                className="word-field-help"
+                                type="danger"
+                              >
+                                {pronunciationFieldMessage(
+                                  dictPhoneticIssue,
+                                  "dict_phonetic",
+                                  t
+                                )}
+                              </Typography.Text>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="word-pronunciation-row">
+                          <label
+                            className="word-pronunciation-label"
+                            htmlFor={`${inputPrefix}-${pronunciation.id}-actual`}
+                          >
+                            {t("actual_pronunciation")}
+                          </label>
+                          <div className="word-actual-pronunciation-control">
+                            <Form.Item noStyle>
+                              <V3VoiceTextField
+                                id={`${inputPrefix}-${pronunciation.id}-actual`}
+                                mode="actual-pron"
+                                trailingAction={
+                                  <V3ActualPronunciationCopy
                                     pronunciation={pronunciation}
                                     spelling={variant.spelling}
                                     dialect={variant.dialect}
@@ -379,169 +533,60 @@ export function V3PronunciationList({
                                       )
                                     }
                                   />
-                                )
-                              }
-                              dialect={variant.dialect}
-                              ariaLabel={t("dictionary_phonetic_label", {
-                                index: index + 1
-                              })}
-                              nodeId={pronunciation.id}
-                              field="dict_phonetic"
-                              invalid={Boolean(dictPhoneticIssue)}
-                              requiredError={
-                                missingDictionary.has(pronunciation.id) &&
-                                !pronunciation.dict_phonetic.trim()
-                                  ? t(
-                                      "panel_enter_the_dictionary_transcription_first"
-                                    )
-                                  : undefined
-                              }
-                              placeholder="Dictionary Pronunciation"
-                              value={
-                                pronunciation.dict_phonetic_rich ?? {
-                                  version: 2,
-                                  text: pronunciation.dict_phonetic,
-                                  annotations: []
                                 }
-                              }
-                              onChange={(dict_phonetic_rich) =>
-                                onChange(
-                                  updatePronunciation(
-                                    content,
-                                    pronunciation.id,
-                                    {
-                                      dict_phonetic: dict_phonetic_rich.text,
-                                      ...(pronunciation.dict_phonetic_rich ||
-                                      dict_phonetic_rich.annotations.length > 0
-                                        ? { dict_phonetic_rich }
-                                        : {})
-                                    }
+                                dialect={variant.dialect}
+                                ariaLabel={t("actual_pronunciation_label", {
+                                  index: index + 1
+                                })}
+                                field="actual_pron"
+                                nodeId={pronunciation.id}
+                                placeholder="Connected Speech"
+                                invalid={Boolean(actualPronIssue)}
+                                value={
+                                  pronunciation.actual_pron_rich ?? {
+                                    version: 2,
+                                    text: pronunciation.actual_pron,
+                                    annotations: []
+                                  }
+                                }
+                                onChange={(actual_pron_rich) =>
+                                  onChange(
+                                    updatePronunciation(
+                                      content,
+                                      pronunciation.id,
+                                      {
+                                        actual_pron: actual_pron_rich.text,
+                                        ...(pronunciation.actual_pron_rich ||
+                                        actual_pron_rich.annotations.length > 0
+                                          ? { actual_pron_rich }
+                                          : {})
+                                      }
+                                    )
                                   )
-                                )
-                              }
-                            />
-                          </Form.Item>
-                          {dictPhoneticIssue ? (
+                                }
+                              />
+                            </Form.Item>
+                          </div>
+                          {actualPronIssue ? (
                             <Typography.Text
                               className="word-field-help"
                               type="danger"
                             >
                               {pronunciationFieldMessage(
-                                dictPhoneticIssue,
-                                "dict_phonetic",
+                                actualPronIssue,
+                                "actual_pron",
                                 t
                               )}
                             </Typography.Text>
                           ) : null}
                         </div>
+                        {renderSynthesis("phonetics")}
                       </div>
-                      <div className="word-pronunciation-row">
-                        <label
-                          className="word-pronunciation-label"
-                          htmlFor={`${inputPrefix}-${pronunciation.id}-actual`}
-                        >
-                          {t("actual_pronunciation")}
-                        </label>
-                        <div className="word-actual-pronunciation-control">
-                          <Form.Item noStyle>
-                            <V3VoiceTextField
-                              id={`${inputPrefix}-${pronunciation.id}-actual`}
-                              mode="actual-pron"
-                              trailingAction={
-                                <V3ActualPronunciationCopy
-                                  pronunciation={pronunciation}
-                                  spelling={variant.spelling}
-                                  dialect={variant.dialect}
-                                  onMissingSpelling={onMissingSpelling}
-                                  onChange={(patch) =>
-                                    onChange(
-                                      updatePronunciation(
-                                        content,
-                                        pronunciation.id,
-                                        patch
-                                      )
-                                    )
-                                  }
-                                />
-                              }
-                              dialect={variant.dialect}
-                              ariaLabel={t("actual_pronunciation_label", {
-                                index: index + 1
-                              })}
-                              field="actual_pron"
-                              nodeId={pronunciation.id}
-                              placeholder="Connected Speech"
-                              invalid={Boolean(actualPronIssue)}
-                              value={
-                                pronunciation.actual_pron_rich ?? {
-                                  version: 2,
-                                  text: pronunciation.actual_pron,
-                                  annotations: []
-                                }
-                              }
-                              onChange={(actual_pron_rich) =>
-                                onChange(
-                                  updatePronunciation(
-                                    content,
-                                    pronunciation.id,
-                                    {
-                                      actual_pron: actual_pron_rich.text,
-                                      ...(pronunciation.actual_pron_rich ||
-                                      actual_pron_rich.annotations.length > 0
-                                        ? { actual_pron_rich }
-                                        : {})
-                                    }
-                                  )
-                                )
-                              }
-                            />
-                          </Form.Item>
+                      {env.AZURE_PRONUNCIATION_INPUTS ? (
+                        <div className="word-pronunciation-source-host">
+                          {renderSynthesis("source")}
                         </div>
-                        {actualPronIssue ? (
-                          <Typography.Text
-                            className="word-field-help"
-                            type="danger"
-                          >
-                            {pronunciationFieldMessage(
-                              actualPronIssue,
-                              "actual_pron",
-                              t
-                            )}
-                          </Typography.Text>
-                        ) : null}
-                      </div>
-                      <V3SynthesisInputs
-                        key={pronunciation.id}
-                        synthesisEditable={env.AZURE_PRONUNCIATION_INPUTS}
-                        pronunciation={pronunciation}
-                        spelling={variant.spelling}
-                        onSpellingSettings={
-                          env.VOICE_EDITOR ? onSpellingSettings : undefined
-                        }
-                        dialect={variant.dialect}
-                        index={index}
-                        issues={rowIssues}
-                        onMissingSpelling={onMissingSpelling}
-                        onMissingDictionary={() => {
-                          setMissingDictionary(
-                            (current) => new Set([...current, pronunciation.id])
-                          );
-                          document
-                            .getElementById(
-                              `${inputPrefix}-${pronunciation.id}-dict`
-                            )
-                            ?.focus();
-                        }}
-                        onChange={(patch) =>
-                          onChange(
-                            updatePronunciation(
-                              content,
-                              pronunciation.id,
-                              patch
-                            )
-                          )
-                        }
-                      />
+                      ) : null}
                     </div>
                   </div>
                 );

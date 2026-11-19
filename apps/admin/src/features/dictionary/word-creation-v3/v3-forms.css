@@ -591,6 +591,12 @@
 .v3-content-form-row .word-pronunciation-synthesis {
   gap: var(--ui-space-4);
 }
+.v3-content-form-row .word-pronunciation-fields {
+  padding-left: 0;
+}
+.v3-content-form-row .word-pronunciation-fields::before {
+  display: none;
+}
 .v3-content-form-row .word-synthesis-source {
   gap: var(--ui-space-2);
 }
