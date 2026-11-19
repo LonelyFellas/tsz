@@ -16,7 +16,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminText, useAdminTranslation } from "@/i18n";
 import { useAuthStore } from "@/lib/auth";
-import { adminReleaseId } from "@/lib/release";
+import { adminReleaseId, adminVersion } from "@/lib/release";
 import { AdminAvatar } from "./adminAvatar";
 import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
 
@@ -99,11 +99,18 @@ export function AdminHeader() {
           </Typography.Text>
           <Typography.Text
             type="secondary"
+            className="admin-header-version"
+            copyable={{ text: adminVersion }}
+          >
+            {t("account_version")}：{adminVersion}
+          </Typography.Text>
+          <Typography.Text
+            type="secondary"
             ellipsis={{ tooltip: adminReleaseId }}
             copyable={{ text: adminReleaseId }}
-            className="admin-header-version"
+            className="admin-header-build"
           >
-            {t("account_version")}: {adminReleaseId}
+            {t("account_build")}：{adminReleaseId}
           </Typography.Text>
         </div>
       </Flex>
