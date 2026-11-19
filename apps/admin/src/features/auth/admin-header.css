@@ -1,5 +1,10 @@
 .admin-header-version {
   display: block;
+  font-size: var(--ui-font-size-sm);
+}
+
+.admin-header-build {
+  display: block;
   max-width: 188px;
   font-size: var(--ui-font-size-sm);
 }
