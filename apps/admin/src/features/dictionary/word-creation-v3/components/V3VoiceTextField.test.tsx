@@ -3209,6 +3209,10 @@ it("口音设置修改共享停顿后，宿主保存等待另一口音补齐音�
           field="spelling"
           ariaLabel="停顿拼写"
           spellingSettingsRef={opener}
+          spellingAudioScope={{
+            activeLocales: ["en-GB", "en-US"],
+            requiredLocales: []
+          }}
           voiceProfile={profile}
           onChange={setValue}
           onVoiceProfileChange={setProfile}

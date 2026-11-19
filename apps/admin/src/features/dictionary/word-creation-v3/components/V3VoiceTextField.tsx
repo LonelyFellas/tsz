@@ -33,6 +33,7 @@ import {
   remapTextLinks,
   toRichTextV2,
   recommendationVoiceSetting,
+  voiceSettingKey,
   withDefaultVoiceProfile
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
@@ -605,7 +606,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           settingsSnapshot.value.text !== value.text)
       )
         throw new Error(t("spelling_settings_target_changed"));
-      const result =
+      let result =
         spellingSettings && settingsSnapshot
           ? mergeSpellingSettings(
               { value: toRichTextV2(value), voiceProfile, audioAssets },
@@ -637,6 +638,33 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                   audioAssets: audioAssets ?? undefined
                 }
               : captured;
+      if (
+        draftSpeechEnabled &&
+        spellingSettings &&
+        result.voiceProfile &&
+        captured.voiceProfile
+      ) {
+        const generatedAudio = new Map(
+          captured.voiceProfile.voices
+            .filter((setting) => setting.audio_asset_id)
+            .map(
+              (setting) =>
+                [voiceSettingKey(setting), setting.audio_asset_id!] as const
+            )
+        );
+        result = {
+          ...result,
+          voiceProfile: {
+            ...result.voiceProfile,
+            voices: result.voiceProfile.voices.map((setting) => {
+              const audioAssetId = generatedAudio.get(voiceSettingKey(setting));
+              return audioAssetId
+                ? { ...setting, audio_asset_id: audioAssetId }
+                : setting;
+            })
+          }
+        };
+      }
       const next = { ...draftState, ...result, nodeId: target };
       const commitSourceAudio =
         !draftSpeechEnabled &&
