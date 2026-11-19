@@ -21,6 +21,7 @@ import type {
   DraftFormsStepContentV3,
   FormTypeCatalogItem,
   PartOfSpeechCatalogItem,
+  RichTextV2V3,
   V3DraftValidationIssue,
   WordFormGroupV3,
   WordPosFormsV3
@@ -43,6 +44,21 @@ import { useV3ReferenceGuard } from "../referenceGuardContext";
 import { V3DisabledReason } from "./V3DisabledReason";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
+import { spellingAnnotationsEqual } from "@tsz/voice-editor/core";
+import { spellingSpeechDialectEqual } from "../spellingSpeech";
+
+function spellingRichValue(variant: {
+  spelling: string;
+  spelling_rich?: RichTextV2V3;
+}): RichTextV2V3 {
+  return (
+    variant.spelling_rich ?? {
+      version: 2 as const,
+      text: variant.spelling,
+      annotations: []
+    }
+  );
+}
 
 function formMatchesDialectRules(
   form: WordPosFormsV3["forms"][number],
@@ -51,11 +67,24 @@ function formMatchesDialectRules(
   if (rules.spelling_mode === "unified" && rules.phonetic_mode === "unified") {
     return form.regional_variants.mode === "common";
   }
+  if (rules.spelling_mode === "distinguish") {
+    if (form.regional_variants.mode === "uk_us") return true;
+    return (
+      form.regional_variants.mode === "uk_us_many" &&
+      form.regional_variants.uk.length > 0 &&
+      form.regional_variants.us.length > 0 &&
+      form.regional_variants.uk.length <= 2000 &&
+      form.regional_variants.us.length <= 2000
+    );
+  }
   if (form.regional_variants.mode !== "uk_us") return false;
-  if (rules.spelling_mode === "distinguish") return true;
+  const uk = primaryRegionalVariant(form.regional_variants, "uk");
+  const us = primaryRegionalVariant(form.regional_variants, "us");
   return (
-    primaryRegionalVariant(form.regional_variants, "uk").spelling ===
-    primaryRegionalVariant(form.regional_variants, "us").spelling
+    uk.spelling === us.spelling &&
+    uk.is_regular === us.is_regular &&
+    spellingSpeechDialectEqual(uk.spelling_speech, us.spelling_speech) &&
+    spellingAnnotationsEqual(spellingRichValue(uk), spellingRichValue(us))
   );
 }
 

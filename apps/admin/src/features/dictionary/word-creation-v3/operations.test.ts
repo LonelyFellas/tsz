@@ -1,6 +1,9 @@
 import { regionalVariants, primaryRegionalVariant } from "@tsz/shared";
 import { env } from "../../../lib/env";
-import { spellingSpeechEqual } from "./spellingSpeech";
+import {
+  spellingSpeechDialectEqual,
+  spellingSpeechEqual
+} from "./spellingSpeech";
 import type {
   DraftFormsStepContentV3,
   RichTextV2V3,
@@ -2765,6 +2768,12 @@ it("拼写试听比较兼容缺省空配置、音色顺序与字段顺序，保�
       voice_profile: { voices: [{ ...sonia, pitch_semitones: 0 }, guy] }
     })
   ).toBe(true);
+  expect(
+    spellingSpeechDialectEqual(left, {
+      ...empty,
+      voice_profile: { voices: [{ ...sonia, pitch_semitones: 0 }, guy] }
+    })
+  ).toBe(false);
   expect(
     spellingSpeechEqual(left, { ...empty, voice_profile: { voices: [sonia] } })
   ).toBe(false);

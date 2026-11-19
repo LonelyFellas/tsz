@@ -247,3 +247,44 @@ export function spellingSpeechEqual(
       JSON.stringify(right?.voice_profile.dubbing)
   );
 }
+
+/** 与后端英美结构校验保持一致，保留语音字段缺省值与显式默认值的区别。 */
+export function spellingSpeechDialectEqual(
+  left?: SpellingSpeechV3,
+  right?: SpellingSpeechV3
+): boolean {
+  const voices = (speech?: SpellingSpeechV3) => {
+    const values = (speech?.voice_profile.voices ?? []).map((voice) => ({
+      voice_id: voice.voice_id,
+      version_id: voice.version_id,
+      audio_asset_id: voice.audio_asset_id,
+      version_name: voice.version_name,
+      locale: voice.locale,
+      accent: voice.accent,
+      enabled: voice.enabled,
+      rate_percent: voice.rate_percent,
+      pitch_semitones: voice.pitch_semitones,
+      volume_percent: voice.volume_percent,
+      style: voice.style,
+      style_degree: voice.style_degree,
+      role: voice.role,
+      output_format: voice.output_format
+    }));
+    if (!speech?.voice_profile.dubbing)
+      values.sort(
+        (a, b) =>
+          a.voice_id.localeCompare(b.voice_id) ||
+          (a.version_id ?? "").localeCompare(b.version_id ?? "")
+      );
+    return values;
+  };
+  const empty: RichTextV2 = { version: 2, text: "", annotations: [] };
+  return (
+    spellingAnnotationsEqual(left?.content ?? empty, right?.content ?? empty) &&
+    JSON.stringify(voices(left)) === JSON.stringify(voices(right)) &&
+    JSON.stringify(left?.voice_profile.dubbing) ===
+      JSON.stringify(right?.voice_profile.dubbing) &&
+    JSON.stringify(left?.audio_assets ?? []) ===
+      JSON.stringify(right?.audio_assets ?? [])
+  );
+}
