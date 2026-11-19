@@ -388,6 +388,38 @@ const renderWithUps = (ui: Parameters<typeof render>[0]) => {
   return view;
 };
 
+it("四种配音来源都在来源行提供试听按钮", () => {
+  renderWithUps(<Harness dialect="uk" recording />);
+
+  for (const source of ["词形拼写", "Azure IPA", "Azure UPS", "上传音频"]) {
+    const radio = sourceRadio(source, "英式");
+    const option = radio.closest(".word-synthesis-source-option");
+    expect(option).not.toBeNull();
+    expect(option).toContainElement(
+      screen.getByLabelText(`第 1 条发音 英式 ${source} 最终读音 播放语音`)
+    );
+  }
+  expect(
+    document.querySelectorAll(
+      ".word-synthesis-control .word-pronunciation-play-action"
+    )
+  ).toHaveLength(0);
+});
+
+it("上传音频来源试听当前口音的默认录音", async () => {
+  renderWithUps(<Harness dialect="uk" recording />);
+  const play = screen.getByLabelText(
+    "第 1 条发音 英式 上传音频 最终读音 播放语音"
+  );
+  await waitFor(() => expect(play).toBeEnabled());
+  fireEvent.click(play);
+  await waitFor(() =>
+    expect(speech.resolveAudio).toHaveBeenCalledWith("old-recording", {
+      signal: expect.any(AbortSignal)
+    })
+  );
+});
+
 it.each(["ipa", "ups"] as const)(
   "活动 %s 保存补齐音频后仍可撤销全部转换，旧资产不复活",
   async (alphabet) => {

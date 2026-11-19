@@ -321,9 +321,6 @@ describe("独立发音输入", () => {
       expect(group).toContainElement(
         screen.getByLabelText(`第 1 条发音转换为美式 Azure ${alphabet}`)
       );
-      expect(group).toContainElement(
-        screen.getByLabelText(`第 1 条发音 美式 Azure ${alphabet} 最终读音`)
-      );
       const convert = screen.getByLabelText(
         `第 1 条发音转换为美式 Azure ${alphabet}`
       );
@@ -332,12 +329,30 @@ describe("独立发音输入", () => {
         field(`Azure ${alphabet}`).compareDocumentPosition(convert) &
           Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
+      const sourceOption = screen
+        .getByLabelText(`第 1 条发音 美式 Azure ${alphabet} 最终读音`)
+        .closest(".word-synthesis-source-option");
+      expect(sourceOption).not.toBeNull();
+      expect(sourceOption).toContainElement(
+        screen.getByLabelText(`第 1 条发音 美式 Azure ${alphabet} 最终读音`)
+      );
+      const settings = screen.getByLabelText(
+        `打开第 1 条发音 美式 Azure ${alphabet} TTS 设置器`
+      );
+      const preview = screen.getByLabelText(
+        `第 1 条发音 美式 Azure ${alphabet} 最终读音`
+      );
+      const label = sourceOption!.querySelector(
+        ".word-synthesis-choice-content"
+      );
+      expect(sourceOption).toContainElement(settings);
       expect(
-        convert.compareDocumentPosition(
-          screen.getByLabelText(
-            `打开第 1 条发音 美式 Azure ${alphabet} TTS 设置器`
-          )
-        ) & Node.DOCUMENT_POSITION_FOLLOWING
+        settings.compareDocumentPosition(preview) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        preview.compareDocumentPosition(label!) &
+          Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
     }
   });
