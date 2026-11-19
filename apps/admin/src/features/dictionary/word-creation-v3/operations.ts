@@ -33,7 +33,10 @@ import {
   spellingAnnotationsEqual,
   toRichTextV2
 } from "@tsz/voice-editor/core";
-import { spellingEditorValue, spellingSpeechEqual } from "./spellingSpeech";
+import {
+  spellingEditorValue,
+  spellingSpeechDialectEqual
+} from "./spellingSpeech";
 import { variantRegularity } from "./model";
 import { newWordNodeId } from "../word-model/primitives";
 
@@ -635,7 +638,7 @@ export function spellingMarksEqual(
   us: Pick<VariantMapping, "spelling" | "spelling_rich" | "spelling_speech">
 ): boolean {
   return (
-    spellingSpeechEqual(uk.spelling_speech, us.spelling_speech) &&
+    spellingSpeechDialectEqual(uk.spelling_speech, us.spelling_speech) &&
     spellingAnnotationsEqual(
       uk.spelling_rich ?? { version: 2, text: uk.spelling, annotations: [] },
       us.spelling_rich ?? { version: 2, text: us.spelling, annotations: [] }

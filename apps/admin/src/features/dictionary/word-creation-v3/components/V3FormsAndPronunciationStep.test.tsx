@@ -1706,6 +1706,67 @@ describe("V3FormsAndPronunciationStep", () => {
     });
   });
 
+  it("英美拼写相同但规则元数据不一致时显示待统一", async () => {
+    const regional = ukUsFormFixture({
+      uk: { spelling: "purses'", is_regular: true },
+      us: { spelling: "purses'", is_regular: false }
+    });
+    render(
+      <Harness
+        initial={formsFixture({
+          forms: [regional],
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "distinguish"
+          }
+        })}
+      />
+    );
+
+    expect(await screen.findByText("本组的英美结构待统一")).toBeVisible();
+  });
+
+  it("英美拼写试听字段的缺省与显式默认值不一致时显示待统一", async () => {
+    const speech = {
+      content: { version: 2 as const, text: "purses'", annotations: [] },
+      voice_profile: {
+        voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+      }
+    };
+    const regional = ukUsFormFixture({
+      uk: { spelling: "purses'", spelling_speech: speech },
+      us: {
+        spelling: "purses'",
+        spelling_speech: {
+          ...speech,
+          voice_profile: {
+            voices: [
+              {
+                voice_id: "sonia",
+                enabled: true,
+                rate_percent: 0,
+                pitch_semitones: 0
+              }
+            ]
+          }
+        }
+      }
+    });
+    render(
+      <Harness
+        initial={formsFixture({
+          forms: [regional],
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "distinguish"
+          }
+        })}
+      />
+    );
+
+    expect(await screen.findByText("本组的英美结构待统一")).toBeVisible();
+  });
+
   it("I02 完整显示多 POS/多组/同类型多行，每个词形只在所属组出现", async () => {
     const content = multiPosFixture();
     const firstId = content.pos[0]!.forms[0]!.id;
