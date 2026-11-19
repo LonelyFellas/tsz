@@ -15,7 +15,7 @@ export interface V3ProductProgressListRow {
 }
 
 /**
- * 左栏「完成情况」列表：完成打勾、未完成显示序号，右侧计数不带底色。
+ * 左栏「完成情况」列表默认在完成项显示打勾，未完成项显示序号，右侧计数不带底色。
  * step1 与向导内各步共用本组件——两边各自渲染时样式会跟着 `v3-product-progress-list`
  * 挂没挂而分叉（右侧计数有无灰底就是这么来的）。
  *
@@ -23,9 +23,11 @@ export interface V3ProductProgressListRow {
  */
 export function V3ProductProgressList({
   currentKey,
+  showCompletionIcon = true,
   rows
 }: {
   currentKey?: string;
+  showCompletionIcon?: boolean;
   rows: readonly V3ProductProgressListRow[];
 }) {
   const { t } = useWorkspaceTranslation();
@@ -63,7 +65,7 @@ export function V3ProductProgressList({
             title={row.statusDescription}
             type="button"
           >
-            {row.completed ? (
+            {row.completed && showCompletionIcon ? (
               <CheckIcon
                 aria-label={t("progress_complete", { label: row.label })}
                 className="word-progress-done"
