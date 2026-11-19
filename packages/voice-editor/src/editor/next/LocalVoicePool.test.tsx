@@ -1312,6 +1312,12 @@ describe("新版局部主页和唯一声音草稿", () => {
     );
     await screen.findByLabelText("美式池 首推");
     fireEvent.click(screen.getByText("完整音色目录"));
+    fireEvent.click(
+      within(
+        screen.getByRole("group", { name: "美式 完整音色目录" })
+      ).getByRole("checkbox", { name: "不使用目录音色" })
+    );
+    expect(onProfile).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("checkbox", { name: "选用 Beta" }));
     let next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
     expect(next.dubbing!.uk.mode).toBe("local");

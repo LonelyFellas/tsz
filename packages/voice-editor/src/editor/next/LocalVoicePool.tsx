@@ -356,6 +356,7 @@ export function LocalVoicePool({
   }
   function clearCatalog(side: "uk" | "us") {
     if (readOnly) return;
+    if (!hasCatalogSelection(side)) return;
     const local = materialize(side);
     if (local)
       onChange({
