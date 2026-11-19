@@ -9,6 +9,7 @@ import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
 import { usePermission } from "@/lib/auth";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { useContentEditPermissions } from "../../contentEditPermissions";
+import { speechAccentGroup } from "@tsz/shared";
 import type {
   AudioAssetLocaleV3,
   AudioAssetV3,
@@ -644,9 +645,21 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         result.voiceProfile &&
         captured.voiceProfile
       ) {
+        const activeAccents = spellingAudioLocales
+          ? new Set(
+              spellingAudioLocales.map((locale) => speechAccentGroup(locale))
+            )
+          : undefined;
         const generatedAudio = new Map(
           captured.voiceProfile.voices
-            .filter((setting) => setting.audio_asset_id)
+            .filter(
+              (setting) =>
+                setting.audio_asset_id &&
+                (!activeAccents ||
+                  activeAccents.has(
+                    speechAccentGroup(setting.locale, setting.accent)
+                  ))
+            )
             .map(
               (setting) =>
                 [voiceSettingKey(setting), setting.audio_asset_id!] as const
