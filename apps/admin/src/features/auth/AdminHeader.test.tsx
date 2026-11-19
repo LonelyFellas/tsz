@@ -97,6 +97,7 @@ describe("AdminHeader", () => {
     await openAccountMenu();
     expect(screen.getByText("审核员小王")).toBeInTheDocument();
     expect(screen.getByText("普通管理员")).toBeInTheDocument();
+    expect(screen.getByText("版本：1.0.0")).toBeInTheDocument();
   });
 
   it("超级管理员展示超管角色文案", async () => {

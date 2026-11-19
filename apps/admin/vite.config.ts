@@ -1,5 +1,6 @@
 import { resourceRecoveryScript } from "../../packages/shared/src/recovery/bootstrap.ts";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
@@ -11,6 +12,10 @@ import {
   parseBooleanEnvFlag
 } from "./src/lib/env-flags.ts";
 import { buildAdminDevProxy } from "./src/lib/dev-proxy.ts";
+
+const { version: adminVersion } = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8")
+) as { version: string };
 
 // dev 代理配置：把 /api/v1/* 转发到后端，保证 refresh 的 HttpOnly cookie 与请求同源。
 // 复用 web 相同的 BACKEND_API_URL（默认已含 /api/v1 前缀），行为与旧 next.config
@@ -71,7 +76,8 @@ export default defineConfig(({ mode, command }) => {
   const releaseId = process.env.TSZ_RELEASE_ID ?? `local-${randomUUID()}`;
   return {
     define: {
-      __TSZ_RELEASE_ID__: JSON.stringify(releaseId)
+      __TSZ_RELEASE_ID__: JSON.stringify(releaseId),
+      __TSZ_APP_VERSION__: JSON.stringify(adminVersion)
     },
     plugins: [
       react(),
