@@ -390,7 +390,7 @@ export function V3FormContentOverview({
             key: "spelling",
             width: 160,
             onCell: (row) => ({ rowSpan: row.spellingRowSpan }),
-            render: (_, { variant, spellingDialect }) => {
+            render: (_, { form, variant, spellingDialect }) => {
               const dialectLabel =
                 spellingDialect === "common"
                   ? t("common_spelling")
@@ -400,6 +400,8 @@ export function V3FormContentOverview({
               return (
                 <div
                   className="v3-overview-spellings"
+                  onClick={() => onEdit(form.id)}
+                  onMouseDown={(event) => event.preventDefault()}
                   title={variant.spelling || undefined}
                 >
                   <Tooltip title={dialectLabel}>

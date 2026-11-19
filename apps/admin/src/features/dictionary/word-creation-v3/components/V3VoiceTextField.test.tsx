@@ -922,6 +922,21 @@ it("词形拼写聚焦选中时隐藏富文本预览，避免输入文字重影"
   expect(document.querySelector(".v3-grammar-preview-content")).toBeNull();
 });
 
+it("词形拼写预览不接收鼠标或 Tab 焦点", () => {
+  const { container } = render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={{ version: 2, text: "finance", annotations: [] }}
+      onChange={vi.fn()}
+      ariaLabel="英式拼写"
+      nodeId="spelling-preview"
+      field="spelling"
+    />
+  );
+  expect(container.querySelector(".v3-spelling-preview")).not.toBeNull();
+  expect(screen.getByLabelText("英式拼写")).toHaveAttribute("tabindex", "-1");
+});
+
 describe("V3VoiceTextField 取消和收起态", () => {
   // rc-util 的 test-id 会让嵌套弹窗清除外层的 Esc 栈；使用开发环境的真实唯一 ID。
   beforeEach(() => vi.stubEnv("NODE_ENV", "development"));
@@ -1957,6 +1972,9 @@ it("grammar 富文本位于紧凑组背景上方，透明输入框覆盖长预�
   );
   expect(fieldCss).toMatch(
     /\.v3-grammar-preview\s*>\s*textarea\.ui-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
+  );
+  expect(fieldCss).toMatch(
+    /\.v3-spelling-preview\s*>\s*textarea\.ui-input\s*\{[^}]*pointer-events:\s*none;/su
   );
 });
 

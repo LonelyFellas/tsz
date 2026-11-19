@@ -148,6 +148,17 @@ textarea.word-pronunciation-phonetic-input.ui-input {
   caret-color: transparent;
 }
 
+/* 词形拼写预览与实际发音一致，只通过右侧编辑按钮进入输入态。 */
+.v3-spelling-preview > textarea.ui-input {
+  pointer-events: none;
+}
+
+.v3-spelling-preview > textarea.ui-input:focus {
+  border-color: var(--ui-color-border);
+  outline: none;
+  box-shadow: none;
+}
+
 .v3-grammar-preview-content {
   position: relative;
   /* 正文保持在同一包装层内的透明输入框背景之上。 */

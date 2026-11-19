@@ -1071,6 +1071,10 @@ describe("V3FormsAndPronunciationStep", () => {
         readingRows[0]!.querySelector<HTMLElement>(".v3-overview-action-cell")!
       ).getByRole("button", { name: "编辑原形内容" })
     );
+    const spellingCell = readingRows[0]!.querySelector<HTMLElement>(
+      ".v3-overview-spellings"
+    )!;
+    fireEvent.click(within(spellingCell).getByText("travel", { exact: true }));
     expect(onEdit).toHaveBeenCalledWith(form.id);
     expect(form).toEqual(original);
 

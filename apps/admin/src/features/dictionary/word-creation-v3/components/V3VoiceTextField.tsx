@@ -905,6 +905,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         readOnly ||
         (env.VOICE_EDITOR && editingEnabled && recorded)) &&
     value.text !== "";
+  const spellingPreview = mode === "spelling" && grammarPreview;
   const fallback = (
     <Input.TextArea
       ref={inputRef}
@@ -952,7 +953,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           : undefined
       }
       className={`word-pronunciation-phonetic-input ${fontClass}${mode === "actual-pron" ? " tsz-actual-pronunciation" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
-      tabIndex={actualPronunciationPreview ? -1 : undefined}
+      tabIndex={actualPronunciationPreview || spellingPreview ? -1 : undefined}
       data-v3-field={expanded ? undefined : field}
       data-v3-node-id={expanded ? undefined : nodeId}
       data-v3-node-aliases={expanded ? undefined : nodeAliases}
@@ -1018,7 +1019,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     <RequiredFieldFeedback
       message={requiredError}
       messageId={requiredErrorId}
-      className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}${actualPronunciationPreview ? " v3-actual-pronunciation-preview" : ""}`}
+      className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}${actualPronunciationPreview ? " v3-actual-pronunciation-preview" : ""}${spellingPreview ? " v3-spelling-preview" : ""}`}
     >
       {fallback}
       {defaultLoading && !requiredError && (
