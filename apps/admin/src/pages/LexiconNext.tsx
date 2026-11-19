@@ -69,6 +69,7 @@ import {
 } from "@/features/lexicon-next/publicationIssueFocus";
 import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
 import { EntryStart } from "@/features/lexicon-next/EntryStart";
+import { sanitizeFormsRichText } from "@/features/dictionary/word-creation-v3/operations";
 import { v3IssueMessage } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import {
   clearNextLocalDraft,
@@ -90,6 +91,19 @@ function failure(error: unknown, preserveDraft = false) {
     }`;
   }
   return error instanceof Error ? error.message : "请求失败，请重试。";
+}
+
+function sanitizeNextDraft(draft: NextDraft) {
+  if (!draft.form_editor) return { draft, repaired: false };
+  const form_editor = sanitizeFormsRichText(draft.form_editor) as NonNullable<
+    NextDraft["form_editor"]
+  >;
+  const repaired =
+    JSON.stringify(form_editor) !== JSON.stringify(draft.form_editor);
+  return {
+    draft: repaired ? { ...draft, form_editor } : draft,
+    repaired
+  };
 }
 function editorStepFromSearch(
   search: string
@@ -496,6 +510,7 @@ function EntryEditor({
   });
   const lock = useRef(false);
   const [error, setError] = useState<string>();
+  const [richTextRepairNotice, setRichTextRepairNotice] = useState(false);
   const [formIssues, setFormIssues] = useState<V3DraftValidationIssue[]>([]);
   const [conflict, setConflict] = useState(false);
   const [peerConflict, setPeerConflict] = useState(false);
@@ -787,7 +802,16 @@ function EntryEditor({
           }
         }
         const current = draftRef.current;
-        const problem = draftProblem(current, equivalentMetadataAvailable);
+        const sanitized = sanitizeNextDraft(current);
+        if (sanitized.repaired) {
+          draftRef.current = sanitized.draft;
+          setDraft(sanitized.draft);
+          setRichTextRepairNotice(true);
+        }
+        const problem = draftProblem(
+          sanitized.draft,
+          equivalentMetadataAvailable
+        );
         if (problem) throw new Error(problem);
         const changes = sentenceDraftsAvailable
           ? await sentenceWorkspace.prepare()
@@ -795,7 +819,7 @@ function EntryEditor({
         const result = await requests.save(saved.id, {
           expected_revision: saved.revision,
           ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
-          draft: draftRef.current,
+          draft: sanitized.draft,
           ...(changes.length ? { sentence_changes: changes } : {})
         });
         setEditedPairs({});
@@ -976,6 +1000,15 @@ function EntryEditor({
                 )
               )
             }
+          />
+        )}
+        {richTextRepairNotice && (
+          <Alert
+            type="warning"
+            showIcon
+            closable
+            onClose={() => setRichTextRepairNotice(false)}
+            title="已清理历史失配标注，正文和录音已保留。"
           />
         )}
         {currentLocalSnapshot && (
