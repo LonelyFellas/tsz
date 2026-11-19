@@ -23,7 +23,7 @@ jobs:
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-22.04
-    timeout-minutes: 35
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
         with:
@@ -55,11 +55,11 @@ jobs:
         if: steps.candidate.outputs.current == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Verify API target tracks backend main
+      - name: Wait for paired backend deployment
         if: steps.candidate.outputs.current == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node deploy/verify-api-target-main.mjs
+        run: node deploy/wait-backend-deployment.mjs
 
       - name: Configure SSH
         if: steps.candidate.outputs.current == 'true'
@@ -91,10 +91,10 @@ jobs:
           DEPLOY_SELECT_COMPONENTS: "1"
           DEPLOY_AUTO_SKIP_STALE: "1"
         run: |
-          DEPLOY_EXPECTED_API_SHA="$(node deploy/deploy-metrics.mjs run web local api-contract -- node deploy/wait-api-contract.mjs)"
+          DEPLOY_EXPECTED_API_SHA="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync("deploy/api-target.json", "utf8")).sha)')"
           export DEPLOY_EXPECTED_API_SHA
           ./deploy/deploy-web.sh
-          DEPLOY_EXPECTED_API_SHA="$(node deploy/deploy-metrics.mjs run admin local api-contract -- node deploy/wait-api-contract.mjs)"
+          DEPLOY_EXPECTED_API_SHA="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync("deploy/api-target.json", "utf8")).sha)')"
           ./deploy/deploy-admin.sh
 
       - name: Close deployment SSH connection
