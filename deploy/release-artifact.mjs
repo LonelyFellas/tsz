@@ -16,6 +16,22 @@ const digest = async (file) =>
     .update(await readFile(file))
     .digest("hex");
 
+const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
+
+export function buildAppVersion(baseVersion, env = process.env) {
+  assert.match(baseVersion, SEMVER, "package version must be X.Y.Z");
+  const tag = env.GITHUB_REF?.match(/^refs\/tags\/v(\d+\.\d+\.\d+)$/)?.[1];
+  if (tag) return tag;
+  if (
+    env.GITHUB_REF === "refs/heads/main" &&
+    /^[1-9]\d*$/.test(env.GITHUB_RUN_NUMBER ?? "")
+  ) {
+    const [, major, minor] = baseVersion.match(SEMVER);
+    return `${major}.${minor}.${env.GITHUB_RUN_NUMBER}`;
+  }
+  return baseVersion;
+}
+
 export function buildConfig(component, env = process.env) {
   const target = env.DEPLOY_TARGET ?? "test";
   assert.ok(
@@ -120,6 +136,12 @@ export async function packRelease({
   await mkdir(output); // Packages are immutable; never replace an existing output.
   // Reject external links before tar can copy an invalid standalone dependency layout.
   await validateReleaseTree(artifact);
+  const version = JSON.parse(
+    await readFile(path.join(artifact, "version.json"), "utf8")
+  );
+  assert.equal(version.release_id, releaseId);
+  if (version.app_version !== undefined)
+    assert.match(version.app_version, SEMVER);
   const candidate = await createCandidateManifest({
     component,
     repository: identity.repository,
@@ -140,6 +162,7 @@ export async function packRelease({
     identity,
     config,
     release_id: releaseId,
+    ...(version.app_version ? { app_version: version.app_version } : {}),
     platform: "linux",
     arch: "x64",
     node: (
@@ -224,6 +247,13 @@ export async function verifyRelease(bundle, expected, output) {
     JSON.parse(await readFile(path.join(output, "version.json"))).release_id,
     receipt.release_id
   );
+  const version = JSON.parse(
+    await readFile(path.join(output, "version.json"), "utf8")
+  );
+  if (receipt.app_version !== undefined) {
+    assert.match(receipt.app_version, SEMVER);
+    assert.equal(version.app_version, receipt.app_version);
+  }
   assert.match(receipt.release_id, /^[a-zA-Z0-9-]+$/);
   return { artifact: output, receipt };
 }
@@ -234,11 +264,16 @@ async function main() {
     const [root, output] = args;
     const releaseId = `${process.env.GITHUB_SHA}-ci-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}-${component}`;
     const config = buildConfig(component);
+    const packageJson = JSON.parse(
+      await readFile(path.join(root, `apps/${component}/package.json`), "utf8")
+    );
+    const appVersion = buildAppVersion(packageJson.version);
     const environment = {
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR ?? "/tmp",
       ...config.env,
       TSZ_RELEASE_ID: releaseId,
+      TSZ_APP_VERSION: appVersion,
       NEXT_TELEMETRY_DISABLED: "1"
     };
     const result = spawnSync("pnpm", buildCommandArgs(component, config), {
@@ -296,7 +331,10 @@ async function main() {
       );
       await writeFile(
         path.join(artifact, "version.json"),
-        JSON.stringify({ release_id: releaseId })
+        JSON.stringify({
+          release_id: releaseId,
+          app_version: process.env.TSZ_APP_VERSION
+        })
       );
       command("bash", [
         "-c",
@@ -317,6 +355,13 @@ async function main() {
       });
       assert.ok((await readdir(artifact)).includes("index.html"));
     }
+    const appVersion = process.env.TSZ_APP_VERSION;
+    assert.match(appVersion, SEMVER);
+    const builtVersion = JSON.parse(
+      await readFile(path.join(artifact, "version.json"), "utf8")
+    );
+    assert.equal(builtVersion.app_version, appVersion);
+    assert.match(builtVersion.app_version, SEMVER);
     await packRelease({
       component,
       artifact,

@@ -48,6 +48,14 @@ export async function readAcceptedRelease({
       receipt.release_id,
       "accepted package version differs from its CI receipt"
     );
+    if (receipt.app_version !== undefined) {
+      assert.match(receipt.app_version, /^\d+\.\d+\.\d+$/);
+      assert.equal(
+        version.app_version,
+        receipt.app_version,
+        "accepted package app version differs from its CI receipt"
+      );
+    }
   }
   return { schema_version: 1, manifest, receipt };
 }
