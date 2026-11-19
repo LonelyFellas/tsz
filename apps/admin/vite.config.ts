@@ -70,6 +70,9 @@ export default defineConfig(({ mode, command }) => {
 
   const releaseId = process.env.TSZ_RELEASE_ID ?? `local-${randomUUID()}`;
   return {
+    define: {
+      __TSZ_RELEASE_ID__: JSON.stringify(releaseId)
+    },
     plugins: [
       react(),
       {
