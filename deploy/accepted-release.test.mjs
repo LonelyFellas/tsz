@@ -92,6 +92,15 @@ for (const component of ["web", "admin"]) {
       readAcceptedRelease(options),
       /accepted package version differs/
     );
+    await writeFile(
+      receiptPath,
+      JSON.stringify({ ...receipt, app_version: "1.0.123" })
+    );
+    await assert.rejects(
+      readAcceptedRelease(options),
+      /accepted package app version differs/
+    );
+    await writeFile(receiptPath, JSON.stringify(receipt));
     await writeFile(path.join(artifact, "index.html"), "corrupt bytes");
     await assert.rejects(
       readAcceptedRelease(options),

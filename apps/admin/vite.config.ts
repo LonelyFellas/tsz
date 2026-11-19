@@ -74,10 +74,11 @@ export default defineConfig(({ mode, command }) => {
       : undefined;
 
   const releaseId = process.env.TSZ_RELEASE_ID ?? `local-${randomUUID()}`;
+  const appVersion = process.env.TSZ_APP_VERSION ?? adminVersion;
   return {
     define: {
       __TSZ_RELEASE_ID__: JSON.stringify(releaseId),
-      __TSZ_APP_VERSION__: JSON.stringify(adminVersion)
+      __TSZ_APP_VERSION__: JSON.stringify(appVersion)
     },
     plugins: [
       react(),
@@ -94,7 +95,10 @@ export default defineConfig(({ mode, command }) => {
           this.emitFile({
             type: "asset",
             fileName: "version.json",
-            source: JSON.stringify({ release_id: releaseId })
+            source: JSON.stringify({
+              release_id: releaseId,
+              app_version: appVersion
+            })
           });
         }
       }

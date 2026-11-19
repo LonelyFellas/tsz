@@ -16,6 +16,7 @@ import { test } from "node:test";
 import {
   buildConfig,
   buildCommandArgs,
+  buildAppVersion,
   packRelease,
   verifyRelease,
   selectArtifact
@@ -28,6 +29,28 @@ const identity = {
   runId: 123,
   attempt: 2
 };
+
+test("build version uses the main CI run, tags, and local package fallback", () => {
+  assert.equal(
+    buildAppVersion("1.0.0", {
+      GITHUB_REF: "refs/heads/main",
+      GITHUB_RUN_NUMBER: "123"
+    }),
+    "1.0.123"
+  );
+  assert.equal(
+    buildAppVersion("1.0.0", {
+      GITHUB_REF: "refs/tags/v2.3.4",
+      GITHUB_RUN_NUMBER: "123"
+    }),
+    "2.3.4"
+  );
+  assert.equal(
+    buildAppVersion("1.0.0", { GITHUB_REF: "refs/pull/1/merge" }),
+    "1.0.0"
+  );
+  assert.throws(() => buildAppVersion("1.0"), /package version/);
+});
 
 test("build settings retain test mode, real APIs and explicit compatibility flags", () => {
   const config = buildConfig("admin", {
@@ -129,7 +152,7 @@ test("a published package binds bytes, source, attempt, config and verification"
     const releaseId = `${identity.sha}-ci-123-2-admin`;
     await writeFile(
       path.join(artifact, "version.json"),
-      JSON.stringify({ release_id: releaseId })
+      JSON.stringify({ release_id: releaseId, app_version: "1.0.123" })
     );
     const bundle = path.join(root, "bundle");
     await packRelease({
@@ -169,7 +192,7 @@ test("a published package binds bytes, source, attempt, config and verification"
     const tagReleaseId = `${identity.sha}-ci-123-2-admin-tag`;
     await writeFile(
       path.join(artifact, "version.json"),
-      JSON.stringify({ release_id: tagReleaseId })
+      JSON.stringify({ release_id: tagReleaseId, app_version: "1.2.3" })
     );
     await packRelease({
       component: "admin",
