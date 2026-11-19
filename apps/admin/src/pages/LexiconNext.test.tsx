@@ -2789,6 +2789,59 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   expect(api.get).toHaveBeenCalledTimes(2);
 });
 
+it("完整保存前清理其他词形中的历史失配富文本", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  const form_editor = applyFormsStructure(emptyFormEditor(), formsFixture());
+  if (!("forms_format" in form_editor))
+    throw new Error("Expected shared fixture");
+  const content = form_editor.contents[0]!;
+  if (content.regional_variants.mode !== "common")
+    throw new Error("Expected common variant fixture");
+  content.regional_variants.common.spelling_rich = {
+    version: 2,
+    text: "stale spelling",
+    annotations: []
+  };
+  const pronunciation = content.regional_variants.common.pronunciations[0]!;
+  pronunciation.dict_phonetic_rich = {
+    version: 2,
+    text: "stale phonetic",
+    annotations: []
+  };
+  pronunciation.actual_pron_rich = {
+    version: 2,
+    text: pronunciation.actual_pron,
+    annotations: [{ type: "liaison", start: 0, end: 999 }]
+  };
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: { ...entry.draft, form_editor }
+  });
+  mount(api);
+  await screen.findByLabelText("编辑原形内容", { selector: "button" });
+  fireEvent.click(stepButton(/^词义与例句/));
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "centre later" }
+  });
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+
+  const saved = api.save.mock.calls[0]![1].draft;
+  const savedContent = saved.form_editor!.contents[0]!;
+  if (savedContent.regional_variants.mode !== "common")
+    throw new Error("Expected common variant fixture");
+  expect(savedContent.regional_variants.common.spelling_rich).toBeUndefined();
+  const savedPronunciation =
+    savedContent.regional_variants.common.pronunciations[0]!;
+  expect(savedPronunciation.dict_phonetic_rich).toBeUndefined();
+  expect(savedPronunciation.actual_pron_rich).toBeUndefined();
+  expect(
+    screen.getByText("已清理历史失配标注，正文和录音已保留。")
+  ).toBeVisible();
+});
+
 it("词形底栏随步骤切换移除，切回词形仍保留编辑面板", async () => {
   const bounds = HTMLElement.prototype.getBoundingClientRect;
   const spy = vi
