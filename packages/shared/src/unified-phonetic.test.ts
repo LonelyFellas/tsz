@@ -133,6 +133,17 @@ describe("语雀统一音标规则", () => {
     });
   });
 
+  it("美式卷舌 r 后接元音时保留为音节起始", () => {
+    expect(convertDictionaryToUnified("ˈɔːri", "sorry", "us")).toMatchObject({
+      ok: true,
+      value: "ˈɔːrɪ"
+    });
+    expect(convertDictionaryToUnified("ˈɑːr.i", "starry", "us")).toMatchObject({
+      ok: true,
+      value: "ˈɑːr.ɪ"
+    });
+  });
+
   it("Azure IPA 不套用实际发音的清浊化、补 ə 和卷舌元音降级", () => {
     expect(convertDictionaryToUnified("stænd", "stand", "us")).toMatchObject({
       value: "sdænd"

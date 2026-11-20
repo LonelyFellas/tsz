@@ -134,7 +134,9 @@ function dictionaryWord(
       return /[ɑæʌɔəɛɪɒʊuiɜ]/u.test(prefix) && !stressedOnset ? "ɪ" : phone;
     });
     if (dialect === "us") {
-      value = value.replace(/ɑːr/gu, "ɑr").replace(/ɔːr/gu, "ɔr");
+      value = value
+        .replace(/ɑːr(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuiɜɚɝ])/gu, "ɑr")
+        .replace(/ɔːr(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuiɜɚɝ])/gu, "ɔr");
     }
     value = value.replace(/([lnm])̩/gu, "ə$1");
     // Only syllable-final clusters from the document's onset inventory.
