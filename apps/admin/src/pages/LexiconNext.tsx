@@ -1143,7 +1143,7 @@ function EntryEditor({
             <EntryBasicsSnapshot
               headword={draft.headword}
               kind={saved.kind}
-              detection={draft.creation_detection}
+              detection={saved.creation_detection}
             />
             <V3StepActions
               status={

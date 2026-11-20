@@ -87,7 +87,6 @@ export interface NextGrammarIssue {
   message: string;
 }
 export interface NextDraft {
-  creation_detection?: NextDetection;
   grammar_structures?: NextGrammarStructure[];
   sense_groups?: NextSenseGroup[];
   schema_version: 1;
@@ -124,6 +123,7 @@ export interface NextDialectChange {
   previous_target_revision: number | null;
 }
 export interface NextEntry {
+  creation_detection?: NextDetection;
   dialect_senses?: NextDialectSense[];
   sentence_resources?: NextSentence[];
   id: string;

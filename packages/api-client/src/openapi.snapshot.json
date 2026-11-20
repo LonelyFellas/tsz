@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/task-229-creation-snapshot-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-20T08:26:01.036Z",
+  "_generatedAt": "2026-11-20T09:41:35.993Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -9143,10 +9143,6 @@
       "type": "object",
       "required": ["schema_version", "headword", "forms", "senses"],
       "properties": {
-        "creation_detection": {
-          "$ref": "#/components/schemas/NextDetection",
-          "description": "Immutable snapshot of the create-step detection result."
-        },
         "form_editor": {
           "$ref": "#/components/schemas/SharedFormsStepContentV3",
           "description": "V1 editor content, with independent lexicon-next identities."

@@ -250,24 +250,24 @@ it("编辑词条可以回看创建时的检测快照", async () => {
   api.capabilities.mockResolvedValue({ ...caps, creation_snapshot: true });
   api.get.mockResolvedValue({
     ...entry,
+    creation_detection: {
+      surface: "Colour",
+      kind: "word",
+      matches: [
+        {
+          id: "dictionary:colour:noun",
+          term: "colour",
+          part_of_speech: "noun",
+          glosses: ["visible hue"],
+          forms: [{ text: "colours", tags: ["plural"] }],
+          phonetics: [{ ipa: "/ˈkʌlə/", tags: ["UK"] }],
+          source_name: "Test dictionary",
+          source_version: "v1"
+        }
+      ]
+    },
     draft: {
-      ...entry.draft,
-      creation_detection: {
-        surface: "Colour",
-        kind: "word",
-        matches: [
-          {
-            id: "dictionary:colour:noun",
-            term: "colour",
-            part_of_speech: "noun",
-            glosses: ["visible hue"],
-            forms: [{ text: "colours", tags: ["plural"] }],
-            phonetics: [{ ipa: "/ˈkʌlə/", tags: ["UK"] }],
-            source_name: "Test dictionary",
-            source_version: "v1"
-          }
-        ]
-      }
+      ...entry.draft
     }
   });
   mount(api);
