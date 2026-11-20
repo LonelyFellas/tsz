@@ -571,6 +571,39 @@ it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词�
   expect(screen.queryByRole("group", { name: "智能词库语言" })).toBeNull();
 });
 
+it("创建时把内置词典推荐词性带入词义步骤", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  api.detect.mockResolvedValue({
+    surface: "centre",
+    kind: "word",
+    matches: [
+      {
+        id: "dictionary:centre:noun",
+        term: "centre",
+        part_of_speech: "noun",
+        glosses: ["中心"],
+        forms: [],
+        phonetics: [],
+        source_name: "fixture-dictionary",
+        source_version: "1"
+      }
+    ]
+  });
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "centre" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  await screen.findByTestId("lexicon-next-editor");
+  fireEvent.click(stepButton(/^词义与例句/));
+
+  await waitFor(() =>
+    expect(screen.getByRole("tab", { name: "名词" })).toBeVisible()
+  );
+});
+
 it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
   const api = requests();
   let finish!: (value: NextEntry) => void;
