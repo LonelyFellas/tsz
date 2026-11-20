@@ -13,6 +13,8 @@ import {
   V3TargetCascader,
   type ResolvedTarget
 } from "../dictionary/word-creation-v3/components/V3TargetCascader";
+import type { LexiconNextRequests } from "@/pages/LexiconNext";
+import { NextTargetPicker } from "@/features/lexicon-next/NextTargetPicker";
 
 export interface SentenceTargetLabel {
   headword: string;
@@ -31,7 +33,10 @@ export function SharedSentenceAssociationPicker({
   sourceSenseId,
   sourcePosId,
   sourceForms,
-  onTargetLabel
+  onTargetLabel,
+  nextRequests,
+  nextTargetLocale,
+  nextMediumLocale
 }: AssociationPickerProps<SharedSentenceAnnotation> & {
   dialect: Dialect;
   labels: Record<string, SentenceTargetLabel>;
@@ -41,12 +46,77 @@ export function SharedSentenceAssociationPicker({
   sourcePosId?: string;
   sourceForms?: AdminWordV3["forms"];
   onTargetLabel: (id: string, label: SentenceTargetLabel) => void;
+  nextRequests?: LexiconNextRequests;
+  nextTargetLocale?: string;
+  nextMediumLocale?: string;
 }) {
   const { t } = useLexiconEditorTranslation();
   const literal = segments.map((segment) => segment.surface).join(" ");
   const [mode, setMode] = useState<"linked" | "pending">("linked");
   const [choice, setChoice] = useState<ResolvedTarget>();
   const [gloss, setGloss] = useState("");
+  const [source, setSource] = useState<"v3" | "lexicon_next">("v3");
+  if (nextRequests && source === "lexicon_next") {
+    return (
+      <Flex vertical gap="small">
+        <Button size="small" onClick={() => setSource("v3")}>
+          选择 V3 词条
+        </Button>
+        <NextTargetPicker
+          literal={literal}
+          targetLocale={
+            nextTargetLocale ?? (dialect === "uk" ? "en-GB" : "en-US")
+          }
+          mediumLocale={nextMediumLocale ?? "zh-Hans"}
+          requests={nextRequests}
+          onSelect={(next) =>
+            onSelect({
+              id: selected?.id ?? crypto.randomUUID(),
+              source_dialect: dialect,
+              source_segments: segments,
+              target: {
+                state: "linked",
+                target_source: "lexicon_next",
+                target_entry_id: next.target_word_id,
+                target_pos_id: next.target_pos_id,
+                target_base_form_id: next.target_base_form_id,
+                target_form_id: next.target_form_id,
+                target_variant_id: next.target_variant_id,
+                target_sense_id: next.target_sense_id,
+                target_dialect: next.target_dialect
+              }
+            })
+          }
+          onCancel={onCancel}
+        />
+      </Flex>
+    );
+  }
+  if (
+    selected?.target.state === "linked" &&
+    selected.target.target_source === "lexicon_next"
+  ) {
+    return (
+      <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
+        <Typography.Text className="tsz-words" strong>
+          {literal}
+        </Typography.Text>
+        <Typography.Text type="secondary">
+          已关联新版词条的具体词义和词形。
+        </Typography.Text>
+        <Flex justify="end" gap="small">
+          <Button size="small" onClick={() => onSelect(undefined)}>
+            清除关联
+          </Button>
+          {onCancel && (
+            <Button size="small" onClick={onCancel}>
+              关闭
+            </Button>
+          )}
+        </Flex>
+      </Flex>
+    );
+  }
   if (selected && selected.target.state !== "entry_only") {
     const target = selected.target;
     const label =
@@ -133,6 +203,11 @@ export function SharedSentenceAssociationPicker({
       <Typography.Text className="tsz-words" strong>
         {segments.map((segment) => segment.surface).join(" … ")}
       </Typography.Text>
+      {nextRequests && (
+        <Button size="small" onClick={() => setSource("lexicon_next")}>
+          选择新版词条
+        </Button>
+      )}
       {selected?.target.state === "entry_only" && (
         <Alert
           type="warning"

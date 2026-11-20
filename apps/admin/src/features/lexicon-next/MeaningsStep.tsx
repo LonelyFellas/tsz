@@ -78,8 +78,10 @@ export function MeaningsStep({
   requests,
   grammarAvailable = false,
   grammarAudioAvailable = false,
+  grammarFormLinksAvailable = false,
   definitionDetailsAvailable = false,
   sentencesAvailable = false,
+  sentenceAssociationsAvailable = false,
   sentenceDetailsAvailable = false,
   registerLeaveGuard,
   selectedPos: sharedSelectedPos,
@@ -104,8 +106,10 @@ export function MeaningsStep({
   requests?: LexiconNextRequests;
   grammarAvailable?: boolean;
   grammarAudioAvailable?: boolean;
+  grammarFormLinksAvailable?: boolean;
   definitionDetailsAvailable?: boolean;
   sentencesAvailable?: boolean;
+  sentenceAssociationsAvailable?: boolean;
   sentenceDetailsAvailable?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   selectedPos?: string;
@@ -434,7 +438,10 @@ export function MeaningsStep({
                       (item) => item.code === code
                     )}
                     audioAvailable={grammarAudioAvailable}
+                    formLinksAvailable={grammarFormLinksAvailable}
+                    requests={requests}
                     target={target}
+                    medium={medium}
                     disabled={disabled || catalog.isPending || catalog.isError}
                     referenceCount={(id) =>
                       value.senses.reduce(
@@ -850,6 +857,9 @@ export function MeaningsStep({
                                 {sentencesAvailable && requests && (
                                   <SenseSentenceExamples
                                     detailsAvailable={sentenceDetailsAvailable}
+                                    associationsAvailable={
+                                      sentenceAssociationsAvailable
+                                    }
                                     ids={sense.sentence_ids}
                                     target={target}
                                     medium={medium}

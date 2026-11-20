@@ -7,7 +7,13 @@ import {
   useRef,
   useState
 } from "react";
-import type { NextSentence, NextSentenceVariant, RichTextV2 } from "@tsz/types";
+import type { ComponentType } from "react";
+import type {
+  NextSentence,
+  NextSentenceVariant,
+  RichTextV2,
+  SharedSentenceAnnotation
+} from "@tsz/types";
 import { Alert, Button, Card, Empty, Space, Tag } from "@tsz/ui/admin/display";
 import {
   Checkbox,
@@ -31,6 +37,11 @@ import {
   PronunciationPreviewProvider
 } from "@/features/dictionary/word-creation/PronunciationPreview";
 import { VoiceEditorModal } from "@/features/dictionary/word-creation-v3/components/VoiceEditorModal";
+import {
+  SharedSentenceAssociationPicker,
+  type SentenceTargetLabel
+} from "@/features/sentences/SharedSentenceAssociationPicker";
+import type { VoiceEditorProps } from "@tsz/voice-editor/types";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
 import {
   adminAudioUploadAdapter,
@@ -60,6 +71,9 @@ import "./sentences.css";
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((m) => ({ default: m.VoiceEditor }))
 );
+const SentenceVoiceEditor = VoiceEditor as unknown as ComponentType<
+  VoiceEditorProps<SharedSentenceAnnotation>
+>;
 
 function Taxonomy({
   values,
@@ -144,6 +158,7 @@ function InlineSentenceCard({
   medium,
   requests,
   disabled,
+  associationsAvailable,
   onRemove,
   registerLeaveGuard
 }: {
@@ -152,6 +167,7 @@ function InlineSentenceCard({
   medium: string;
   requests: LexiconNextRequests;
   disabled: boolean;
+  associationsAvailable: boolean;
   onRemove: () => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
@@ -194,6 +210,9 @@ function InlineSentenceCard({
   const advancedInitial = useRef("");
   const { modal } = App.useApp();
   const [localError, setLocalError] = useState<string>();
+  const [targetLabels, setTargetLabels] = useState<
+    Record<string, SentenceTargetLabel>
+  >({});
   const canUpload = usePermission("speech.upload_audio");
   const previewAdapter = useMemo(
     () => ({ ...adminVoicePreviewAdapter, generateAudio: undefined }),
@@ -237,8 +256,12 @@ function InlineSentenceCard({
     : undefined;
   const changed =
     !original ||
-    JSON.stringify([original.content, original.voice_profile]) !==
-      JSON.stringify([value.content, value.voice_profile]);
+    JSON.stringify([
+      original.content,
+      original.voice_profile,
+      original.associations
+    ]) !==
+      JSON.stringify([value.content, value.voice_profile, value.associations]);
   const openOriginalEditor = () => {
     const next = structuredClone(value);
     advancedInitial.current = JSON.stringify(next);
@@ -506,17 +529,49 @@ function InlineSentenceCard({
       >
         {advanced && (
           <Suspense fallback={<span role="status">正在加载编辑器</span>}>
-            <VoiceEditor
+            <SentenceVoiceEditor
               mode="grammar"
               contextLabel={`${localeLabels[target]}例句原文`}
               locale={target as "en-GB" | "en-US"}
               recommendationArea="example"
               value={toRichTextV2(advanced.content)}
+              textLinks={
+                associationsAvailable
+                  ? (advanced.associations ?? [])
+                  : undefined
+              }
+              renderAssociationPicker={
+                associationsAvailable
+                  ? (pickerProps) => (
+                      <SharedSentenceAssociationPicker
+                        {...pickerProps}
+                        dialect={target === "en-GB" ? "uk" : "us"}
+                        nextRequests={requests}
+                        nextTargetLocale={target}
+                        nextMediumLocale={medium}
+                        labels={targetLabels}
+                        onTargetLabel={(key, label) =>
+                          setTargetLabels((current) => ({
+                            ...current,
+                            [key]: label
+                          }))
+                        }
+                      />
+                    )
+                  : undefined
+              }
               voiceProfile={withDefaultVoiceProfile(
                 advanced.voice_profile,
                 "example"
               )}
-              onChange={(content: RichTextV2) => setAdvancedValue({ content })}
+              onChange={(content: RichTextV2, associations) =>
+                setAdvancedValue({
+                  content,
+                  ...(associationsAvailable
+                    ? { associations: associations ?? [] }
+                    : {})
+                })
+              }
               onVoiceProfileChange={(voice_profile) =>
                 setAdvancedValue({ voice_profile })
               }
@@ -547,6 +602,12 @@ function InlineSentenceCard({
                         update({
                           ...advanced,
                           content: next?.value ?? advanced.content,
+                          ...(associationsAvailable
+                            ? {
+                                associations:
+                                  advanced.associations ?? next?.textLinks ?? []
+                              }
+                            : {}),
                           voice_profile:
                             next?.voiceProfile ?? advanced.voice_profile,
                           audio_assets:
@@ -577,6 +638,7 @@ export function InlineSentenceExamples({
   medium,
   requests,
   disabled,
+  associationsAvailable = false,
   onChange,
   onPick,
   registerLeaveGuard
@@ -586,6 +648,7 @@ export function InlineSentenceExamples({
   medium: string;
   requests: LexiconNextRequests;
   disabled: boolean;
+  associationsAvailable?: boolean;
   onChange: (ids: string[]) => void;
   onPick: () => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
@@ -626,6 +689,7 @@ export function InlineSentenceExamples({
                     medium={medium}
                     requests={requests}
                     disabled={disabled}
+                    associationsAvailable={associationsAvailable}
                     onRemove={() => onChange(ids.filter((v) => v !== id))}
                     registerLeaveGuard={registerLeaveGuard}
                   />

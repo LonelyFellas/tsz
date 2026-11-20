@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "ad0036fbcf38f6b1758cf71d61356d5ba24f4c90091ca4a6854eee48770d5038",
+  "_source": "/Users/darwish/.codex/worktrees/111d/tsz-rust/docs/openapi.json",
+  "_source_sha256": "bb05e93be2755a9f41a0a0f29f2988e3326eec878c32032ac83f45a7aa94bd36",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -808,6 +808,10 @@
     "AssistantSourceKind": {
       "type": "string",
       "enum": ["smart_lexicon", "builtin_dictionary", "filling_rules"]
+    },
+    "AssociationTargetSource": {
+      "type": "string",
+      "enum": ["v3", "lexicon_next"]
     },
     "AudioAsset": {
       "type": "object",
@@ -2236,6 +2240,7 @@
         "target_form_id": { "type": "string", "format": "uuid" },
         "target_pos_id": { "type": "string", "format": "uuid" },
         "target_publication_id": { "type": "string", "format": "uuid" },
+        "target_source": { "$ref": "#/$defs/AssociationTargetSource" },
         "target_variant_id": { "type": "string", "format": "uuid" },
         "target_word_id": { "type": "string", "format": "uuid" }
       },
@@ -3617,6 +3622,7 @@
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
         "grammar_audio": { "type": "boolean" },
+        "grammar_form_links": { "type": "boolean" },
         "grammar_structures": { "type": "boolean" },
         "language_rules_version": { "type": "string" },
         "languages": {
@@ -3630,6 +3636,7 @@
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
         "sense_groups": { "type": "boolean" },
         "sense_metadata": { "type": "boolean" },
+        "sentence_associations": { "type": "boolean" },
         "sentence_details": { "type": "boolean" },
         "sentence_drafts": { "type": "boolean" },
         "sentences": { "type": "boolean" }
@@ -4065,6 +4072,11 @@
           "maxItems": 8
         },
         "content": { "$ref": "#/$defs/RichTextV3" },
+        "form_links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/GrammarFormLinkV3" },
+          "maxItems": 100
+        },
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
@@ -4382,6 +4394,22 @@
       },
       "additionalProperties": false
     },
+    "NextSentenceAnnotation": {
+      "type": "object",
+      "required": ["id", "source_dialect", "source_segments", "target"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "source_dialect": { "type": "string" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+          "maxItems": 20,
+          "minItems": 1
+        },
+        "target": { "$ref": "#/$defs/NextSentenceTarget" }
+      },
+      "additionalProperties": false
+    },
     "NextSentenceDraft": {
       "type": "object",
       "required": ["schema_version", "variants"],
@@ -4482,6 +4510,68 @@
       "type": "string",
       "enum": ["dictionary", "web", "adapted", "ai_composed", "human_composed"]
     },
+    "NextSentenceTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "target_entry_id",
+            "target_pos_id",
+            "target_base_form_id",
+            "target_form_id",
+            "target_variant_id",
+            "target_sense_id",
+            "state"
+          ],
+          "properties": {
+            "state": { "type": "string", "enum": ["linked"] },
+            "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_dialect": {
+              "oneOf": [{ "$ref": "#/$defs/Dialect" }, { "type": "null" }]
+            },
+            "target_entry_id": { "type": "string", "format": "uuid" },
+            "target_form_id": { "type": "string", "format": "uuid" },
+            "target_pos_id": { "type": "string", "format": "uuid" },
+            "target_publication_id": {
+              "type": ["string", "null"],
+              "format": "uuid"
+            },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_source": {
+              "oneOf": [
+                { "$ref": "#/$defs/AssociationTargetSource" },
+                { "type": "null" }
+              ]
+            },
+            "target_variant_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["target_entry_id", "state"],
+          "properties": {
+            "state": { "type": "string", "enum": ["entry_only"] },
+            "target_entry_id": { "type": "string", "format": "uuid" },
+            "target_source": {
+              "oneOf": [
+                { "$ref": "#/$defs/AssociationTargetSource" },
+                { "type": "null" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "headword", "state"],
+          "properties": {
+            "gloss": { "type": ["string", "null"] },
+            "headword": { "type": "string" },
+            "kind": { "type": "string" },
+            "state": { "type": "string", "enum": ["pending"] }
+          }
+        }
+      ]
+    },
     "NextSentenceTranslation": {
       "type": "object",
       "required": ["id", "locale", "style", "content"],
@@ -4520,6 +4610,11 @@
       "type": "object",
       "required": ["id", "locale", "level", "content", "translations"],
       "properties": {
+        "associations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextSentenceAnnotation" },
+          "maxItems": 100
+        },
         "audio_assets": {
           "type": "array",
           "items": { "$ref": "#/$defs/AudioAsset" },

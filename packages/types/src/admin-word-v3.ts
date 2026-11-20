@@ -489,6 +489,7 @@ export interface AudioAssetV3 {
 export interface GrammarFormLinkV3 {
   id: string;
   source_segments: SentenceSourceRangeV3[];
+  target_source?: "v3" | "lexicon_next";
   target_word_id: string;
   target_publication_id?: string;
   target_pos_id: string;

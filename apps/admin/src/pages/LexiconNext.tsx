@@ -189,7 +189,13 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               }
               grammarAvailable={capability.data?.grammar_structures === true}
               grammarAudioAvailable={capability.data?.grammar_audio === true}
+              grammarFormLinksAvailable={
+                capability.data?.grammar_form_links === true
+              }
               sentencesAvailable={capability.data?.sentences === true}
+              sentenceAssociationsAvailable={
+                capability.data?.sentence_associations === true
+              }
               sentenceDraftsAvailable={
                 capability.data?.sentence_drafts === true
               }
@@ -222,8 +228,10 @@ function EntryLoader({
   equivalentMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable,
+  grammarFormLinksAvailable,
   definitionDetailsAvailable,
   sentencesAvailable,
+  sentenceAssociationsAvailable,
   sentenceDetailsAvailable,
   sentenceDraftsAvailable,
   relationsAvailable,
@@ -235,8 +243,10 @@ function EntryLoader({
   equivalentMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
+  grammarFormLinksAvailable: boolean;
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
+  sentenceAssociationsAvailable: boolean;
   sentenceDetailsAvailable: boolean;
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
@@ -360,10 +370,12 @@ function EntryLoader({
       equivalentMetadataAvailable={equivalentMetadataAvailable}
       grammarAvailable={grammarAvailable}
       grammarAudioAvailable={grammarAudioAvailable}
+      grammarFormLinksAvailable={grammarFormLinksAvailable}
       definitionDetailsAvailable={definitionDetailsAvailable}
       sentenceDraftsAvailable={sentenceDraftsAvailable}
       sentenceDetailsAvailable={sentenceDetailsAvailable}
       sentencesAvailable={sentencesAvailable}
+      sentenceAssociationsAvailable={sentenceAssociationsAvailable}
     />
   );
 }
@@ -379,8 +391,10 @@ function EntryEditor({
   equivalentMetadataAvailable,
   grammarAvailable,
   grammarAudioAvailable,
+  grammarFormLinksAvailable,
   definitionDetailsAvailable,
   sentencesAvailable,
+  sentenceAssociationsAvailable,
   sentenceDetailsAvailable,
   sentenceDraftsAvailable,
   relationsAvailable,
@@ -392,8 +406,10 @@ function EntryEditor({
   equivalentMetadataAvailable: boolean;
   grammarAvailable: boolean;
   grammarAudioAvailable: boolean;
+  grammarFormLinksAvailable: boolean;
   definitionDetailsAvailable: boolean;
   sentencesAvailable: boolean;
+  sentenceAssociationsAvailable: boolean;
   sentenceDetailsAvailable: boolean;
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
@@ -1201,9 +1217,11 @@ function EntryEditor({
             equivalentMetadataAvailable={equivalentMetadataAvailable}
             grammarAvailable={grammarAvailable}
             grammarAudioAvailable={grammarAudioAvailable}
+            grammarFormLinksAvailable={grammarFormLinksAvailable}
             definitionDetailsAvailable={definitionDetailsAvailable}
             sentenceDetailsAvailable={sentenceDetailsAvailable}
             sentencesAvailable={sentencesAvailable}
+            sentenceAssociationsAvailable={sentenceAssociationsAvailable}
             disabled={disabled}
             onChange={setDraft}
           />
