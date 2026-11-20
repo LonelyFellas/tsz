@@ -15,8 +15,10 @@ write_state() {
 }
 
 run_component() {
-  local component="$1" marker="$state_file.$component-superseded" result_marker="$state_file.$component-result"
+  local component="$1"
   shift
+  local marker="$state_file.$component-superseded"
+  local result_marker="$state_file.$component-result"
   rm -f "$marker"
   rm -f "$result_marker"
   DEPLOY_SUPERSEDED_MARKER="$marker" DEPLOY_COMPONENT_RESULT_MARKER="$result_marker" "$@"
