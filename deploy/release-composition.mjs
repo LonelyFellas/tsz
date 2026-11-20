@@ -196,24 +196,32 @@ export function writeRemoteComposition({
   return composition;
 }
 
-if (
-  process.argv[1] === "-" &&
-  !["validate", "recover"].includes(process.argv[2])
-) {
-  const [state, candidateSha, runId, attempt, apiSha, root] =
-    process.argv.slice(2);
-  console.log(
-    JSON.stringify(
-      writeRemoteComposition({
-        root,
-        state,
-        candidateSha,
-        runId: Number(runId),
-        attempt: Number(attempt),
-        apiSha
-      })
-    )
-  );
+if (process.argv[1] === "-") {
+  const [command, ...args] = process.argv.slice(2);
+  if (command === "validate" || command === "recover") {
+    const value = JSON.parse(readFileSync(args[0], "utf8"));
+    console.log(
+      JSON.stringify(
+        command === "validate"
+          ? validateReleaseComposition(value)
+          : recoveryPlan(value)
+      )
+    );
+  } else {
+    const [candidateSha, runId, attempt, apiSha, root] = args;
+    console.log(
+      JSON.stringify(
+        writeRemoteComposition({
+          root,
+          state: command,
+          candidateSha,
+          runId: Number(runId),
+          attempt: Number(attempt),
+          apiSha
+        })
+      )
+    );
+  }
 } else if (process.argv[1]?.endsWith("release-composition.mjs")) {
   const [command, file] = process.argv.slice(2);
   assert.ok(command === "validate" || command === "recover");
