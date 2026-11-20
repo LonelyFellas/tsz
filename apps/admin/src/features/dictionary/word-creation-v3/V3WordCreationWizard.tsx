@@ -92,33 +92,45 @@ type ExternalNavigationAdapter = Partial<
 >;
 
 function enqueueCanonicalWrite<T>(
-  queue: { current: Promise<unknown>; busy: boolean },
-  request: () => Promise<T>
+  queue: {
+    current: Promise<unknown>;
+    busy: boolean;
+    activeCommands: Map<string, Promise<unknown>>;
+  },
+  request: () => Promise<T>,
+  command?: string
 ): Promise<T> {
-  if (!queue.busy) {
-    queue.busy = true;
-    let immediate: Promise<T>;
-    try {
-      immediate = Promise.resolve(request());
-    } catch (error) {
-      immediate = Promise.reject(error);
-    }
-    const tracked: Promise<unknown> = immediate
-      .finally(() => {
-        if (queue.current === tracked) queue.busy = false;
-      })
-      .catch(() => undefined);
-    queue.current = tracked;
-    return immediate;
+  const existing = command && queue.activeCommands.get(command);
+  if (existing) {
+    return existing as Promise<T>;
   }
-  const run = queue.current.then(request, request);
-  const tracked: Promise<unknown> = run
-    .finally(() => {
-      if (queue.current === tracked) queue.busy = false;
-    })
-    .catch(() => undefined);
-  queue.current = tracked;
-  return run;
+  const wasBusy = queue.busy;
+  const previous = queue.current.catch(() => undefined);
+  let release!: () => void;
+  const slot = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.then(() => slot);
+  queue.current = tail;
+  queue.busy = true;
+  const invoke = () => {
+    try {
+      return Promise.resolve(request());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
+  const operation = wasBusy ? previous.then(invoke) : invoke();
+  const result = operation.finally(() => {
+    release();
+    if (command && queue.activeCommands.get(command) === result)
+      queue.activeCommands.delete(command);
+    if (queue.current === tail) queue.busy = false;
+  });
+  if (command) {
+    queue.activeCommands.set(command, result);
+  }
+  return result;
 }
 
 export interface V3WizardActions {
@@ -469,7 +481,8 @@ function V3WordCreationSession({
   const audioSaveQueue = useRef(Promise.resolve(true));
   const canonicalWriteQueue = useRef({
     current: Promise.resolve(),
-    busy: false
+    busy: false,
+    activeCommands: new Map<string, Promise<unknown>>()
   });
   const waitForSelectedAudio = useCallback(async () => {
     for (const wait of [...audioTasks.current.values()]) {
@@ -596,6 +609,7 @@ function V3WordCreationSession({
   const supersede = useCallback(() => {
     scopeRef.current += 1;
     flowRef.current.supersede();
+    canonicalWriteQueue.current.activeCommands.clear();
     pendingTokens.current.clear();
     if (mountedRef.current) setPending(new Set());
   }, []);
@@ -1351,159 +1365,181 @@ function V3WordCreationSession({
       >,
       options?: VoiceSaveOptions
     ) => {
-      const flow = flowRef.current;
+      const initialFlow = flowRef.current;
       if (
         archivedReconciliationRequiredRef.current ||
-        flow.canonical().status === "archived"
+        initialFlow.canonical().status === "archived"
       ) {
         return false;
       }
       if (blockedByRemoteUpdate()) return false;
-      const senseBindings =
-        flow.canonical().capabilities.atomic_form_sense_bindings === true
-          ? formGroupBindingPatches(
-              draftMeaningsRef.current,
-              flow.canonical().meanings
-            )
-          : [];
-      let baseRevision = flow.canonical().revision;
-      let scope = scopeRef.current;
-      const done = markPending("save_forms");
       const useCurrentDraft = content === draftFormsRef.current;
-      const retry = async () => {
-        await saveFormsContent(content, intent, confirmationContext, options);
-      };
-      savesInFlightRef.current += 1;
-      try {
-        if (
-          !options?.skipAudioTasks &&
-          audioTasks.current.size > 0 &&
-          !(await waitForSelectedAudio())
-        )
-          return false;
-        if (canonicalWriteQueue.current.busy)
-          await canonicalWriteQueue.current.current;
-        if (useCurrentDraft) {
-          content = draftFormsRef.current;
-          scope = scopeRef.current;
-        }
-        const sanitizedContent = sanitizeFormsRichText(content);
-        if (JSON.stringify(sanitizedContent) !== JSON.stringify(content))
-          setRichTextRepairNotice(true);
-        content = sanitizedContent;
-        baseRevision = flow.canonical().revision;
-        if (
-          scope !== scopeRef.current ||
-          flow !== flowRef.current ||
-          baseRevision !== flow.canonical().revision ||
-          blockedByRemoteUpdate()
-        )
-          return false;
-        let saveConfirmationContext = confirmationContext;
-        // 草稿保存自动核对影响；发布仍由预览页显式确认。
-        if (intent === "save" && !confirmationContext) {
-          const preview = await flow.runRequest("impact", () =>
-            requests.impact(flow.canonical().id, {
-              schema_version: 3,
-              base_revision: baseRevision,
+      return enqueueCanonicalWrite(
+        canonicalWriteQueue.current,
+        async () => {
+          const flow = flowRef.current;
+          if (
+            archivedReconciliationRequiredRef.current ||
+            flow.canonical().status === "archived"
+          ) {
+            return false;
+          }
+          const senseBindings =
+            flow.canonical().capabilities.atomic_form_sense_bindings === true
+              ? formGroupBindingPatches(
+                  draftMeaningsRef.current,
+                  flow.canonical().meanings
+                )
+              : [];
+          let baseRevision = flow.canonical().revision;
+          let scope = scopeRef.current;
+          const done = markPending("save_forms");
+          const retry = async () => {
+            await saveFormsContent(
               content,
-              ...(senseBindings.length ? { sense_bindings: senseBindings } : {})
-            })
-          );
-          if (!preview.accepted || scope !== scopeRef.current) return false;
-          const impact = preview.value;
-          flow.bindImpactConfirmation(impact, content, senseBindings);
-          setImpact(impact);
-          setImpactConfirmed(false);
-          let page = impact.surface_match_page;
-          if (page) {
-            let snapshot = surfaceSnapshotReducer(
-              createEmptySurfaceSnapshotState(),
-              { type: "start", generation: 0, page }
+              intent,
+              confirmationContext,
+              options
             );
-            while (snapshot.phase === "loading" && snapshot.next_cursor) {
-              const cursor = snapshot.next_cursor;
-              page = await requests.surfacePage(
-                page.snapshot_id,
-                cursor,
-                new AbortController().signal
-              );
-              if (scope !== scopeRef.current) return false;
-              snapshot = surfaceSnapshotReducer(snapshot, {
-                type: "page_loaded",
-                generation: 0,
-                requested_cursor: cursor,
-                page
-              });
-            }
+          };
+          savesInFlightRef.current += 1;
+          try {
             if (
-              !canAcknowledgeSurfaceSnapshot(snapshot) ||
-              !flow.bindImpactSurfaceConfirmation(page)
-            ) {
-              throw new Error("无法完成同形匹配核对");
+              !options?.skipAudioTasks &&
+              audioTasks.current.size > 0 &&
+              !(await waitForSelectedAudio())
+            )
+              return false;
+            if (useCurrentDraft) {
+              content = draftFormsRef.current;
+              scope = scopeRef.current;
             }
-            saveConfirmationContext = {
-              snapshot_id: page.snapshot_id,
-              policy_name: page.policy_name,
-              policy_epoch: page.policy_epoch
-            };
-          }
-        }
-        const tokens = flow.confirmations({
-          base_revision: baseRevision,
-          impact_content: content,
-          sense_bindings: senseBindings,
-          ...saveConfirmationContext
-        });
-        const result = await flow.runCanonical("save_forms", () =>
-          requests.saveForms(flow.canonical().id, {
-            schema_version: 3,
-            base_revision: baseRevision,
-            intent,
-            content,
-            ...(senseBindings.length ? { sense_bindings: senseBindings } : {}),
-            ...tokens
-          })
-        );
-        noteOwnRevision(result.value.word);
-        if (result.accepted && scope === scopeRef.current) {
-          if (intent === "complete") replaceStepIssues(["forms"], []);
-          if (senseBindings.length) {
-            cleanMeaningsRef.current = syncFormGroupBindings(
-              cleanMeaningsRef.current,
-              result.value.word.meanings
+            const sanitizedContent = sanitizeFormsRichText(content);
+            if (JSON.stringify(sanitizedContent) !== JSON.stringify(content))
+              setRichTextRepairNotice(true);
+            content = sanitizedContent;
+            baseRevision = flow.canonical().revision;
+            if (
+              scope !== scopeRef.current ||
+              flow !== flowRef.current ||
+              baseRevision !== flow.canonical().revision ||
+              blockedByRemoteUpdate()
+            )
+              return false;
+            let saveConfirmationContext = confirmationContext;
+            // 草稿保存自动核对影响；发布仍由预览页显式确认。
+            if (intent === "save" && !confirmationContext) {
+              const preview = await flow.runRequest("impact", () =>
+                requests.impact(flow.canonical().id, {
+                  schema_version: 3,
+                  base_revision: baseRevision,
+                  content,
+                  ...(senseBindings.length
+                    ? { sense_bindings: senseBindings }
+                    : {})
+                })
+              );
+              if (!preview.accepted || scope !== scopeRef.current) return false;
+              const impact = preview.value;
+              flow.bindImpactConfirmation(impact, content, senseBindings);
+              setImpact(impact);
+              setImpactConfirmed(false);
+              let page = impact.surface_match_page;
+              if (page) {
+                let snapshot = surfaceSnapshotReducer(
+                  createEmptySurfaceSnapshotState(),
+                  { type: "start", generation: 0, page }
+                );
+                while (snapshot.phase === "loading" && snapshot.next_cursor) {
+                  const cursor = snapshot.next_cursor;
+                  page = await requests.surfacePage(
+                    page.snapshot_id,
+                    cursor,
+                    new AbortController().signal
+                  );
+                  if (scope !== scopeRef.current) return false;
+                  snapshot = surfaceSnapshotReducer(snapshot, {
+                    type: "page_loaded",
+                    generation: 0,
+                    requested_cursor: cursor,
+                    page
+                  });
+                }
+                if (
+                  !canAcknowledgeSurfaceSnapshot(snapshot) ||
+                  !flow.bindImpactSurfaceConfirmation(page)
+                ) {
+                  throw new Error("无法完成同形匹配核对");
+                }
+                saveConfirmationContext = {
+                  snapshot_id: page.snapshot_id,
+                  policy_name: page.policy_name,
+                  policy_epoch: page.policy_epoch
+                };
+              }
+            }
+            const tokens = flow.confirmations({
+              base_revision: baseRevision,
+              impact_content: content,
+              sense_bindings: senseBindings,
+              ...saveConfirmationContext
+            });
+            const result = await flow.runCanonical("save_forms", () =>
+              requests.saveForms(flow.canonical().id, {
+                schema_version: 3,
+                base_revision: baseRevision,
+                intent,
+                content,
+                ...(senseBindings.length
+                  ? { sense_bindings: senseBindings }
+                  : {}),
+                ...tokens
+              })
             );
-            updateDirty(
-              "meanings",
-              v3MeaningsContentFingerprint(draftMeaningsRef.current) !==
-                v3MeaningsContentFingerprint(cleanMeaningsRef.current)
-            );
+            noteOwnRevision(result.value.word);
+            if (result.accepted && scope === scopeRef.current) {
+              if (intent === "complete") replaceStepIssues(["forms"], []);
+              if (senseBindings.length) {
+                cleanMeaningsRef.current = syncFormGroupBindings(
+                  cleanMeaningsRef.current,
+                  result.value.word.meanings
+                );
+                updateDirty(
+                  "meanings",
+                  v3MeaningsContentFingerprint(draftMeaningsRef.current) !==
+                    v3MeaningsContentFingerprint(cleanMeaningsRef.current)
+                );
+              }
+              applyCanonical(result.value.word, "forms");
+              return true;
+            }
+            return false;
+          } catch (error) {
+            if (
+              classifyV3Problem(error, "save_forms").kind === "entry_archived"
+            ) {
+              await handleEntryArchived(error);
+            } else if (scope === scopeRef.current) {
+              await handleError(
+                error,
+                "save_forms",
+                retry,
+                {
+                  step: "forms",
+                  baseRevision,
+                  localForms: content
+                },
+                intent === "complete"
+              );
+            }
+            return false;
+          } finally {
+            done();
+            finishSaveInFlight();
           }
-          applyCanonical(result.value.word, "forms");
-          return true;
-        }
-        return false;
-      } catch (error) {
-        if (classifyV3Problem(error, "save_forms").kind === "entry_archived") {
-          await handleEntryArchived(error);
-        } else if (scope === scopeRef.current) {
-          await handleError(
-            error,
-            "save_forms",
-            retry,
-            {
-              step: "forms",
-              baseRevision,
-              localForms: content
-            },
-            intent === "complete"
-          );
-        }
-        return false;
-      } finally {
-        done();
-        finishSaveInFlight();
-      }
+        },
+        "save_forms"
+      );
     },
     [
       applyCanonical,
@@ -1607,7 +1643,8 @@ function V3WordCreationSession({
                   base_revision: flow.canonical().revision,
                   forms: draftFormsRef.current
                 })
-              )
+              ),
+            "save_audio"
           );
           if (
             !result.accepted ||
@@ -1683,99 +1720,105 @@ function V3WordCreationSession({
         // 词形保存结束时可能处理了暂存的新版本（挂起提示或整体替换会话），不再按旧基线续发词义。
         if (blockedByRemoteUpdate() || flowRef.current !== flow) return;
       }
-      let baseRevision = flow.canonical().revision;
-      // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
-      // 都会经过的管线上，「确认影响并完成」那种旁路才不会漏掉清洗；保存失败或
-      // 撞版本冲突时，回填用的本地编辑态也仍是未清洗的，录入位不会凭空少几行。
-      let meaningsPayload =
-        intent === "complete"
-          ? dropEmptySentenceTranslations(content)
-          : content;
-      let scope = scopeRef.current;
-      const done = markPending("save_meanings");
-      const useCurrentDraft = content === draftMeaningsRef.current;
-      const retry = async () => {
-        await saveMeanings(content, intent, saveFormsFirst);
-      };
-      savesInFlightRef.current += 1;
-      try {
-        if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
-          return;
-        if (canonicalWriteQueue.current.busy)
-          await canonicalWriteQueue.current.current;
-        if (useCurrentDraft) {
-          content = draftMeaningsRef.current;
-          scope = scopeRef.current;
-          meaningsPayload =
+      return enqueueCanonicalWrite(
+        canonicalWriteQueue.current,
+        async () => {
+          let baseRevision = flow.canonical().revision;
+          // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
+          // 都会经过的管线上，「确认影响并完成」那种旁路才不会漏掉清洗；保存失败或
+          // 撞版本冲突时，回填用的本地编辑态也仍是未清洗的，录入位不会凭空少几行。
+          let meaningsPayload =
             intent === "complete"
               ? dropEmptySentenceTranslations(content)
               : content;
-        }
-        baseRevision = flow.canonical().revision;
-        if (
-          scope !== scopeRef.current ||
-          flow !== flowRef.current ||
-          baseRevision !== flow.canonical().revision ||
-          blockedByRemoteUpdate()
-        )
-          return;
-        const result = await flow.runCanonical("save_meanings", () =>
-          requests.saveMeanings(flow.canonical().id, {
-            schema_version: 3,
-            base_revision: baseRevision,
-            intent,
-            // 释义级成分用词只在后端声明支持时发送（无 dev 放宽）：旧后端会 400。
-            content: prepareTextLinksForSave(
-              stripBlankRelations(
-                flow.canonical().capabilities.sense_component_usages === true
-                  ? meaningsPayload
-                  : stripSenseComponentUsages(meaningsPayload)
-              ),
-              flow.canonical().capabilities.text_links === true
+          let scope = scopeRef.current;
+          const done = markPending("save_meanings");
+          const useCurrentDraft = content === draftMeaningsRef.current;
+          const retry = async () => {
+            await saveMeanings(content, intent, saveFormsFirst);
+          };
+          savesInFlightRef.current += 1;
+          try {
+            if (audioTasks.current.size > 0 && !(await waitForSelectedAudio()))
+              return;
+            if (useCurrentDraft) {
+              content = draftMeaningsRef.current;
+              scope = scopeRef.current;
+              meaningsPayload =
+                intent === "complete"
+                  ? dropEmptySentenceTranslations(content)
+                  : content;
+            }
+            baseRevision = flow.canonical().revision;
+            if (
+              scope !== scopeRef.current ||
+              flow !== flowRef.current ||
+              baseRevision !== flow.canonical().revision ||
+              blockedByRemoteUpdate()
             )
-          })
-        );
-        noteOwnRevision(result.value.word);
-        if (result.accepted && scope === scopeRef.current) {
-          if (intent === "complete") {
-            // meanings 完成成功隐含服务端已认可 forms 完成态（后端仅在内容
-            // 通过完成校验时保留 completed_steps），两步的滞留 issues 一并失效
-            replaceStepIssues(["forms", "meanings"], []);
-          }
-          applyCanonical(result.value.word, "meanings");
-          if (intent === "complete") {
-            setActiveStepState(
-              resolveV3StepAccess(
-                result.value.word,
-                "preview",
-                allowPublishedEditing
-              ).effective
+              return;
+            const result = await flow.runCanonical("save_meanings", () =>
+              requests.saveMeanings(flow.canonical().id, {
+                schema_version: 3,
+                base_revision: baseRevision,
+                intent,
+                // 释义级成分用词只在后端声明支持时发送（无 dev 放宽）：旧后端会 400。
+                content: prepareTextLinksForSave(
+                  stripBlankRelations(
+                    flow.canonical().capabilities.sense_component_usages ===
+                      true
+                      ? meaningsPayload
+                      : stripSenseComponentUsages(meaningsPayload)
+                  ),
+                  flow.canonical().capabilities.text_links === true
+                )
+              })
             );
+            noteOwnRevision(result.value.word);
+            if (result.accepted && scope === scopeRef.current) {
+              if (intent === "complete") {
+                // meanings 完成成功隐含服务端已认可 forms 完成态（后端仅在内容
+                // 通过完成校验时保留 completed_steps），两步的滞留 issues 一并失效
+                replaceStepIssues(["forms", "meanings"], []);
+              }
+              applyCanonical(result.value.word, "meanings");
+              if (intent === "complete") {
+                setActiveStepState(
+                  resolveV3StepAccess(
+                    result.value.word,
+                    "preview",
+                    allowPublishedEditing
+                  ).effective
+                );
+              }
+              return result.value.word;
+            }
+          } catch (error) {
+            if (
+              classifyV3Problem(error, "save_meanings").kind ===
+              "entry_archived"
+            ) {
+              await handleEntryArchived(error);
+            } else if (scope === scopeRef.current) {
+              await handleError(
+                error,
+                "save_meanings",
+                retry,
+                {
+                  step: "meanings",
+                  baseRevision,
+                  localMeanings: content
+                },
+                intent === "complete"
+              );
+            }
+          } finally {
+            done();
+            finishSaveInFlight();
           }
-          return result.value.word;
-        }
-      } catch (error) {
-        if (
-          classifyV3Problem(error, "save_meanings").kind === "entry_archived"
-        ) {
-          await handleEntryArchived(error);
-        } else if (scope === scopeRef.current) {
-          await handleError(
-            error,
-            "save_meanings",
-            retry,
-            {
-              step: "meanings",
-              baseRevision,
-              localMeanings: content
-            },
-            intent === "complete"
-          );
-        }
-      } finally {
-        done();
-        finishSaveInFlight();
-      }
+        },
+        "save_meanings"
+      );
     },
     [
       applyCanonical,
