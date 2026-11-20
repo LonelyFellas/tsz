@@ -762,6 +762,7 @@ function EntryEditor({
     busy,
     formContentOpen,
     dirty,
+    target,
     medium: selectedMedium
   });
   useLayoutEffect(() => {
@@ -769,14 +770,18 @@ function EntryEditor({
       busy,
       formContentOpen,
       dirty,
+      target,
       medium: selectedMedium
     };
-  }, [busy, formContentOpen, dirty, selectedMedium]);
+  }, [busy, formContentOpen, dirty, selectedMedium, target]);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     const current = leaveState.current;
-    const requestedMedium = new URLSearchParams(nextLocation.search).get(
-      "medium_locale"
-    );
+    const nextSearch = new URLSearchParams(nextLocation.search);
+    const requestedTarget = nextSearch.get("target_locale");
+    const nextTarget = language.target_locales.includes(requestedTarget ?? "")
+      ? requestedTarget
+      : undefined;
+    const requestedMedium = nextSearch.get("medium_locale");
     const nextMedium = language.medium_locales.includes(requestedMedium ?? "")
       ? requestedMedium
       : undefined;
@@ -785,6 +790,7 @@ function EntryEditor({
       current.formContentOpen ||
       (current.dirty &&
         (currentLocation.pathname !== nextLocation.pathname ||
+          nextTarget !== current.target ||
           nextMedium !== current.medium))
     );
   });
