@@ -1630,7 +1630,7 @@ function EntryEditor({
             </Space>
           }
         >
-          离开此页会丢失未保存的草稿。
+          当前有未保存修改。选择“继续编辑”保留草稿，或选择“放弃修改并离开”。
         </Modal>
       </div>
     </EntryLayout>
