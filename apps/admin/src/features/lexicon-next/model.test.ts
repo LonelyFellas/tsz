@@ -1,7 +1,12 @@
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import { describe, expect, it } from "vitest";
 import type { NextDraft } from "@tsz/types";
-import { previewDraft, draftProblem, ensureMeaningTemplates } from "./model";
+import {
+  previewDraft,
+  draftProblem,
+  ensureMeaningTemplates,
+  grammarBindingIssues
+} from "./model";
 
 it("只为缺失的已配置词性补模板，保留已有内容、共享区间和稳定身份", () => {
   const initial: NextDraft = {
@@ -389,4 +394,36 @@ it("明确不绑定不产生缺少选择问题，未选与失效引用仍提示�
     draft.senses[0]!.definitions[2]
   ]);
   expect(draft).toEqual(before);
+});
+
+it("混用通用英语和单一地区变体时报告缺失的英美结构", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [
+      {
+        id: "grammar",
+        part_of_speech: "noun",
+        variants: [
+          {
+            id: "common",
+            locale: "en",
+            content: { version: 2, text: "a job", annotations: [] }
+          },
+          {
+            id: "uk",
+            locale: "en-GB",
+            content: { version: 2, text: "a job", annotations: [] }
+          }
+        ]
+      }
+    ],
+    senses: []
+  };
+  expect(grammarBindingIssues(draft, partOfSpeechCatalogFixture)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ node_id: "grammar", field: "variants" })
+    ])
+  );
 });

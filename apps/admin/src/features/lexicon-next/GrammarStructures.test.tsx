@@ -210,3 +210,58 @@ it("缺少当前目标语言内容时仍提供稳定的编辑入口", async () =
     ).toHaveLength(2)
   );
 });
+
+it("通用英语不能吞掉缺失的美式语法变体", async () => {
+  const initial: NextGrammarStructure[] = [
+    {
+      id: "grammar",
+      part_of_speech: "noun",
+      variants: [
+        {
+          id: "common",
+          locale: "en",
+          content: { version: 2, text: "a job", annotations: [] }
+        },
+        {
+          id: "uk",
+          locale: "en-GB",
+          content: { version: 2, text: "a job", annotations: [] }
+        }
+      ]
+    }
+  ];
+  function Harness() {
+    const [rows, setRows] = useState(initial);
+    return (
+      <>
+        <GrammarStructures
+          rows={rows}
+          pos="noun"
+          target="en-US"
+          audioAvailable
+          disabled={false}
+          referenceCount={() => 0}
+          onChange={setRows}
+        />
+        <output aria-label="语法草稿">{JSON.stringify(rows)}</output>
+      </>
+    );
+  }
+  render(
+    <App>
+      <Harness />
+    </App>
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "编辑语法结构 1 美式英语内容" })
+  );
+  const rows = JSON.parse(screen.getByLabelText("语法草稿").textContent!)[0]
+    .variants;
+  expect(rows).toHaveLength(3);
+  expect(rows.map((row: { locale: string }) => row.locale)).toEqual([
+    "en",
+    "en-GB",
+    "en-US"
+  ]);
+  expect(rows[0].content.text).toBe("a job");
+});

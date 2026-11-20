@@ -450,11 +450,15 @@ export function grammarBindingIssues(
         field: "sub_pos",
         message: "语法结构需要绑定当前基本词性下有效的细分词性"
       });
+    const locales = new Set(grammar.variants.map((variant) => variant.locale));
+    const hasRegionalVariants = locales.has("en-GB") || locales.has("en-US");
+    const invalidLocaleShape = hasRegionalVariants
+      ? locales.size !== 2 || !locales.has("en-GB") || !locales.has("en-US")
+      : locales.size !== 1 || !locales.has("en");
     if (
       !grammar.variants.length ||
       grammar.variants.some((v) => !v.content.text.trim()) ||
-      (grammar.variants.some((v) => v.locale !== "en") &&
-        grammar.variants.length !== 2)
+      invalidLocaleShape
     )
       issues.push({
         node_id: grammar.id,

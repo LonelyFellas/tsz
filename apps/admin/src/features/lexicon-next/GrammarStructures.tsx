@@ -490,9 +490,7 @@ export function GrammarStructures({
       {rows
         .filter((row) => row.part_of_speech === pos)
         .map((row, index) => {
-          const variant =
-            row.variants.find((v) => v.locale === target) ??
-            row.variants.find((v) => v.locale === "en");
+          const variant = row.variants.find((v) => v.locale === target);
           const subParts = catalog?.sub_parts ?? [];
           return (
             <div
