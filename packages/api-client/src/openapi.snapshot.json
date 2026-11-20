@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/111d/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-20T00:23:38.282Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-229-creation-snapshot-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-20T08:26:01.036Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -323,6 +323,12 @@
     ],
     "get /admin/lexicon-next/capabilities": [
       {
+        "name": "x-tsz-next-creation-snapshot",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-definitions",
         "in": "header",
         "required": false,
@@ -361,6 +367,12 @@
     ],
     "post /admin/lexicon-next/entries": [
       {
+        "name": "x-tsz-next-creation-snapshot",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-definitions",
         "in": "header",
         "required": false,
@@ -387,6 +399,12 @@
     ],
     "get /admin/lexicon-next/entries/{id}": [
       {
+        "name": "x-tsz-next-creation-snapshot",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-definitions",
         "in": "header",
         "required": false,
@@ -412,6 +430,12 @@
       }
     ],
     "put /admin/lexicon-next/entries/{id}": [
+      {
+        "name": "x-tsz-next-creation-snapshot",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "x-tsz-next-definitions",
         "in": "header",
@@ -8189,6 +8213,10 @@
       "type": "object",
       "required": ["target_language", "kind", "headword"],
       "properties": {
+        "creation_detection": {
+          "$ref": "#/components/schemas/NextDetection",
+          "description": "Optional create-step snapshot, accepted only with the v1 capability header."
+        },
         "headword": { "type": "string" },
         "kind": { "$ref": "#/components/schemas/NextEntryKind" },
         "medium_locale": {
@@ -9002,6 +9030,23 @@
       "type": "string",
       "enum": ["definition", "sentence"]
     },
+    "NextDetection": {
+      "type": "object",
+      "required": ["surface", "kind", "matches"],
+      "properties": {
+        "kind": { "$ref": "#/components/schemas/NextEntryKind" },
+        "matches": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextDictionaryMatch" },
+          "description": "Independent source records; no primary record or automatic draft prefill."
+        },
+        "surface": {
+          "type": "string",
+          "description": "Display input, never replaced with a dictionary record's term."
+        }
+      },
+      "additionalProperties": false
+    },
     "NextDetectionInput": {
       "type": "object",
       "required": ["target_language", "surface"],
@@ -9046,10 +9091,62 @@
       "type": "string",
       "enum": ["general", "en-GB", "en-US"]
     },
+    "NextDictionaryForm": {
+      "type": "object",
+      "required": ["text", "tags"],
+      "properties": {
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionaryMatch": {
+      "type": "object",
+      "required": [
+        "id",
+        "term",
+        "part_of_speech",
+        "glosses",
+        "forms",
+        "phonetics",
+        "source_name",
+        "source_version"
+      ],
+      "properties": {
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextDictionaryForm" }
+        },
+        "glosses": { "type": "array", "items": { "type": "string" } },
+        "id": { "type": "string" },
+        "part_of_speech": { "type": "string" },
+        "phonetics": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextDictionaryPhonetic" }
+        },
+        "source_name": { "type": "string" },
+        "source_version": { "type": "string" },
+        "term": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionaryPhonetic": {
+      "type": "object",
+      "required": ["ipa", "tags"],
+      "properties": {
+        "ipa": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
     "NextDraft": {
       "type": "object",
       "required": ["schema_version", "headword", "forms", "senses"],
       "properties": {
+        "creation_detection": {
+          "$ref": "#/components/schemas/NextDetection",
+          "description": "Immutable snapshot of the create-step detection result."
+        },
         "form_editor": {
           "$ref": "#/components/schemas/SharedFormsStepContentV3",
           "description": "V1 editor content, with independent lexicon-next identities."

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/111d/tsz-rust/docs/openapi.json",
-  "_source_sha256": "bb05e93be2755a9f41a0a0f29f2988e3326eec878c32032ac83f45a7aa94bd36",
+  "_source": "/Users/darwish/.codex/worktrees/task-229-creation-snapshot-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "517524e767d307646c8eb429490a0b150025cd31fa4f74aa2097421c41b11ffc",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -1206,6 +1206,7 @@
       "type": "object",
       "required": ["target_language", "kind", "headword"],
       "properties": {
+        "creation_detection": { "$ref": "#/$defs/NextDetection" },
         "headword": { "type": "string" },
         "kind": { "$ref": "#/$defs/NextEntryKind" },
         "medium_locale": { "type": "string" },
@@ -3616,6 +3617,7 @@
         "publishing"
       ],
       "properties": {
+        "creation_snapshot": { "type": "boolean" },
         "definition_details": { "type": "boolean" },
         "dialect_pairs": { "type": ["boolean", "null"] },
         "equivalent_metadata": { "type": "boolean" },
@@ -3797,6 +3799,7 @@
       "type": "object",
       "required": ["schema_version", "headword", "forms", "senses"],
       "properties": {
+        "creation_detection": { "$ref": "#/$defs/NextDetection" },
         "form_editor": { "$ref": "#/$defs/SharedFormsStepContentV3" },
         "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
         "grammar_structures": {

@@ -245,6 +245,46 @@ it("编辑器不展示词条类型和草稿版本状态", async () => {
   expect(screen.queryByText("草稿版本 1")).toBeNull();
 });
 
+it("编辑词条可以回看创建时的检测快照", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, creation_snapshot: true });
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      creation_detection: {
+        surface: "Colour",
+        kind: "word",
+        matches: [
+          {
+            id: "dictionary:colour:noun",
+            term: "colour",
+            part_of_speech: "noun",
+            glosses: ["visible hue"],
+            forms: [{ text: "colours", tags: ["plural"] }],
+            phonetics: [{ ipa: "/ˈkʌlə/", tags: ["UK"] }],
+            source_name: "Test dictionary",
+            source_version: "v1"
+          }
+        ]
+      }
+    }
+  });
+  mount(api);
+  await waitForEntryReady();
+
+  const basics = stepButton("创建新词条");
+  expect(basics).toBeEnabled();
+  fireEvent.click(basics);
+
+  expect(screen.getByRole("textbox", { name: "词条文本" })).toHaveValue(
+    "Colour"
+  );
+  expect(screen.getByText("visible hue")).toBeVisible();
+  expect(screen.getByText("colours")).toBeVisible();
+  expect(button("下一步：词形与发音")).toBeVisible();
+});
+
 const accountChoice = {
   target_language: "en",
   target_locale: "en-US",

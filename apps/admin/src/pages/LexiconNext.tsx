@@ -63,6 +63,7 @@ import {
 } from "@/features/lexicon-next/LanguageSelection";
 import { EntryList } from "@/features/lexicon-next/EntryList";
 import { EntryLayout } from "@/features/lexicon-next/EntryLayout";
+import { EntryBasicsSnapshot } from "@/features/lexicon-next/EntryBasicsSnapshot";
 import {
   publicationIssueLocation,
   focusPublicationIssue
@@ -109,11 +110,11 @@ function sanitizeNextDraft(draft: NextDraft) {
     repaired
   };
 }
-function editorStepFromSearch(
-  search: string
-): Exclude<WordCreationStep, "basics"> {
+function editorStepFromSearch(search: string): WordCreationStep {
   const value = new URLSearchParams(search).get("step");
-  return value === "meanings" || value === "preview" ? value : "forms";
+  return value === "basics" || value === "meanings" || value === "preview"
+    ? value
+    : "forms";
 }
 
 export function LexiconNextPage({
@@ -176,7 +177,12 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               partOfSpeechCodes={language.part_of_speech_codes}
             />
           ) : entryId === "new" ? (
-            <EntryStart requests={requests} />
+            <EntryStart
+              requests={requests}
+              creationSnapshotAvailable={
+                capability.data?.creation_snapshot === true
+              }
+            />
           ) : entryId ? (
             <EntryLoader
               key={entryId}
@@ -922,7 +928,7 @@ function EntryEditor({
     );
   }
   function changeStep(next: WordCreationStep) {
-    const nextStep = next === "basics" ? "forms" : next;
+    const nextStep = next;
     if (
       nextStep === "forms" &&
       !draft.form_editor?.pos.some((pos) => pos.pos === selectedPos)
@@ -1132,6 +1138,28 @@ function EntryEditor({
             />
           </Form.Item>
         </Form>
+        {step === "basics" && (
+          <div>
+            <EntryBasicsSnapshot
+              headword={draft.headword}
+              kind={saved.kind}
+              detection={draft.creation_detection}
+            />
+            <V3StepActions
+              status={
+                busy ? "正在保存草稿" : dirty ? "有未保存修改" : undefined
+              }
+            >
+              <Button
+                type="primary"
+                disabled={busy || formContentOpen}
+                onClick={() => changeStep("forms")}
+              >
+                下一步：词形与发音
+              </Button>
+            </V3StepActions>
+          </div>
+        )}
         <div hidden={step !== "forms"} inert={step !== "forms"}>
           {formEditorAvailable ? (
             <>

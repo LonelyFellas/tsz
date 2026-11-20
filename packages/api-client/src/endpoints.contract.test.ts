@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "bb05e93be2755a9f41a0a0f29f2988e3326eec878c32032ac83f45a7aa94bd36"
+      "517524e767d307646c8eb429490a0b150025cd31fa4f74aa2097421c41b11ffc"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1160,6 +1160,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"] }
     };
+    const creationSnapshotHeader = {
+      name: "x-tsz-next-creation-snapshot",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
     expect(snapshot.operationHeaders).toEqual({
       "get /admin/lexicon-next/entries/{id}/publication": [dialectPairsHeader],
       ...Object.fromEntries(
@@ -1233,11 +1239,11 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         [
           "post /admin/lexicon-next/entries",
           "get /admin/lexicon-next/entries/{id}",
-          "put /admin/lexicon-next/entries/{id}",
-          "get /admin/lexicon-next/entries/{id}/view"
+          "put /admin/lexicon-next/entries/{id}"
         ].map((operation) => [
           operation,
           [
+            creationSnapshotHeader,
             {
               name: "x-tsz-next-definitions",
               in: "header",
@@ -1260,7 +1266,29 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ]
         ])
       ),
+      "get /admin/lexicon-next/entries/{id}/view": [
+        {
+          name: "x-tsz-next-definitions",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        },
+        dialectPairsHeader,
+        {
+          name: "x-tsz-next-relations",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        },
+        {
+          name: "x-tsz-next-sentence-drafts",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        }
+      ],
       "get /admin/lexicon-next/capabilities": [
+        creationSnapshotHeader,
         {
           name: "x-tsz-next-definitions",
           in: "header",

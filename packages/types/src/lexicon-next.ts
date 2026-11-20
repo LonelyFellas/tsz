@@ -87,6 +87,7 @@ export interface NextGrammarIssue {
   message: string;
 }
 export interface NextDraft {
+  creation_detection?: NextDetection;
   grammar_structures?: NextGrammarStructure[];
   sense_groups?: NextSenseGroup[];
   schema_version: 1;
@@ -139,6 +140,7 @@ export interface CreateNextEntry {
   medium_locale: string;
   kind: "word" | "phrase";
   headword: string;
+  creation_detection?: NextDetection;
 }
 export interface NextDetectionInput {
   target_language: string;
@@ -212,6 +214,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  creation_snapshot?: boolean;
   dialect_pairs?: boolean;
   sentence_drafts?: boolean;
   relations?: boolean;
