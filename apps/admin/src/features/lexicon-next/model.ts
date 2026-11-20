@@ -38,6 +38,32 @@ export function newGrammarStructure(
   };
 }
 
+export function normalizeGrammarVariants(draft: NextDraft): NextDraft {
+  if (!draft.grammar_structures?.length) return draft;
+  let changed = false;
+  const grammar_structures = draft.grammar_structures.map((grammar) => {
+    const common = grammar.variants.find((variant) => variant.locale === "en");
+    if (!common) return grammar;
+    changed = true;
+    const variants = grammar.variants.filter(
+      (variant) => variant.locale !== "en"
+    );
+    for (const locale of ["en-GB", "en-US"] as const) {
+      if (variants.some((variant) => variant.locale === locale)) continue;
+      variants.push({
+        id: crypto.randomUUID(),
+        locale,
+        content: structuredClone(common!.content)
+      });
+    }
+    return {
+      ...grammar,
+      variants
+    };
+  });
+  return changed ? { ...draft, grammar_structures } : draft;
+}
+
 export function newSense(
   pos: string,
   groupId: string | undefined,
@@ -450,11 +476,15 @@ export function grammarBindingIssues(
         field: "sub_pos",
         message: "语法结构需要绑定当前基本词性下有效的细分词性"
       });
+    const locales = new Set(grammar.variants.map((variant) => variant.locale));
+    const hasRegionalVariants = locales.has("en-GB") || locales.has("en-US");
+    const invalidLocaleShape = hasRegionalVariants
+      ? locales.size !== 2 || !locales.has("en-GB") || !locales.has("en-US")
+      : locales.size !== 1 || !locales.has("en");
     if (
       !grammar.variants.length ||
       grammar.variants.some((v) => !v.content.text.trim()) ||
-      (grammar.variants.some((v) => v.locale !== "en") &&
-        grammar.variants.length !== 2)
+      invalidLocaleShape
     )
       issues.push({
         node_id: grammar.id,

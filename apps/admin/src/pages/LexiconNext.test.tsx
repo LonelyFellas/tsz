@@ -663,6 +663,8 @@ it("创建完成后不等待列表统计刷新再进入编辑器", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await waitForEntryReady();
   expect(api.create).toHaveBeenCalledOnce();
+  expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
+  expect(stepButton(/^词形与发音/)).toBeVisible();
 });
 
 it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
@@ -2011,6 +2013,82 @@ describe("新版词库手工闭环", () => {
     await act(() => router.navigate(`/lexicon-next/${id}`));
     await screen.findByDisplayValue("latest");
     expect(screen.getByDisplayValue("latest")).toBeInTheDocument();
+  });
+
+  it("保存完成后自动放行已发起的面包屑导航", async () => {
+    const api = requests();
+    let finishSave!: (entry: NextEntry) => void;
+    api.save.mockReturnValue(
+      new Promise((resolve) => {
+        finishSave = resolve;
+      })
+    );
+    const { router } = mount(api);
+    await waitForEntryReady();
+    fireEvent.click(stepButton(/^预览/));
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "saved before leaving" }
+    });
+    fireEvent.click(button("保存完整草稿"));
+    await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+
+    act(() => {
+      void router.navigate("/lexicon-next");
+    });
+    await screen.findByRole("dialog", { name: "请求尚未完成" });
+    await act(async () =>
+      finishSave({
+        ...entry,
+        revision: 2,
+        draft: { ...entry.draft, headword: "saved before leaving" }
+      })
+    );
+
+    await screen.findByRole("button", { name: "创建词条" });
+    expect(router.state.location.pathname).toBe("/lexicon-next");
+  });
+  it("完整草稿保存后先刷新发布状态，再按最新修订执行检查", async () => {
+    useAuthStore.setState({
+      profile: {
+        ...useAuthStore.getState().profile!,
+        permissions: ["words.access", "words.edit", "words.publish"]
+      }
+    });
+    const api = requests();
+    api.capabilities.mockResolvedValue({ ...caps, publishing: true });
+    api.publication.mockResolvedValue({
+      entry_id: id,
+      status: "draft",
+      lifecycle_revision: 1,
+      has_unpublished_changes: true,
+      current: null
+    });
+    api.publicationPreview.mockResolvedValue({
+      entry_id: id,
+      revision: 2,
+      lifecycle_revision: 1,
+      preview_token: "a".repeat(64),
+      issues: [],
+      warnings: [],
+      can_publish: true
+    });
+    mount(api);
+    await waitForEntryReady();
+    fireEvent.click(stepButton(/^预览/));
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "saved revision" }
+    });
+    fireEvent.click(button("保存完整草稿"));
+    await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(api.publication.mock.calls.length).toBeGreaterThanOrEqual(2)
+    );
+    fireEvent.click(button("检查发布"));
+    await waitFor(() => expect(api.publicationPreview).toHaveBeenCalledOnce());
+    expect(api.publicationPreview).toHaveBeenCalledWith(id, {
+      base_revision: 2,
+      base_lifecycle_revision: 1
+    });
   });
   it("撤销编辑权限后的导航与语言切换不会因缓存清理丢失本地草稿", async () => {
     const api = requests();

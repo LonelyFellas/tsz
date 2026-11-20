@@ -221,14 +221,6 @@ export function EntryStart({
           return;
         }
       }
-      void Promise.all(
-        ["list", "stats", "creators"].map((key) =>
-          queryClient.invalidateQueries({
-            queryKey: ["admin-lexicon-next", key],
-            refetchType: "all"
-          })
-        )
-      ).catch(() => undefined);
       if (current !== generation.current) return;
       setAnnotationEntries([]);
       setAnnotationEntryId(undefined);
@@ -241,6 +233,14 @@ export function EntryStart({
           lexiconNextSuggestedPartOfSpeech: suggestedPartOfSpeech
         } satisfies LexiconNextCreationNavigationState
       });
+      void Promise.all(
+        ["list", "stats", "creators"].map((key) =>
+          queryClient.invalidateQueries({
+            queryKey: ["admin-lexicon-next", key],
+            refetchType: "all"
+          })
+        )
+      ).catch(() => undefined);
     } catch (error) {
       setUncertain(true);
       setError(

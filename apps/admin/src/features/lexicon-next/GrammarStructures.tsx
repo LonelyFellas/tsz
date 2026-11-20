@@ -490,9 +490,7 @@ export function GrammarStructures({
       {rows
         .filter((row) => row.part_of_speech === pos)
         .map((row, index) => {
-          const variant =
-            row.variants.find((v) => v.locale === target) ??
-            row.variants.find((v) => v.locale === "en");
+          const variant = row.variants.find((v) => v.locale === target);
           const subParts = catalog?.sub_parts ?? [];
           return (
             <div
@@ -562,7 +560,7 @@ export function GrammarStructures({
                 />
               ) : (
                 <Button
-                  aria-label={`添加或编辑语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
+                  aria-label={`编辑语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
                   disabled={disabled}
                   onClick={() =>
                     onChange((rows) =>
@@ -571,11 +569,21 @@ export function GrammarStructures({
                           ? {
                               ...item,
                               variants: [
-                                ...item.variants,
+                                ...(item.variants.some(
+                                  (variant) =>
+                                    variant.locale === "en-GB" ||
+                                    variant.locale === "en-US"
+                                )
+                                  ? item.variants.filter(
+                                      (variant) => variant.locale !== "en"
+                                    )
+                                  : item.variants),
                                 {
                                   id: crypto.randomUUID(),
                                   locale: target,
-                                  content: {
+                                  content: item.variants.find(
+                                    (variant) => variant.locale === "en"
+                                  )?.content ?? {
                                     version: 2,
                                     text: "",
                                     annotations: []
