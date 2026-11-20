@@ -740,6 +740,46 @@ export function V3SynthesisInputs({
                                 }
                                 className="word-synthesis-choice"
                               />
+                              <PronunciationPreviewControls
+                                recommendationArea={
+                                  option.value === "spelling" ? "word" : "azure"
+                                }
+                                playbackOnly
+                                assetOnly={option.value === "upload"}
+                                audioAssetId={
+                                  option.value === "upload"
+                                    ? (recording ?? recordings[0])?.id
+                                    : undefined
+                                }
+                                audioAssets={
+                                  option.value === "upload"
+                                    ? recordings
+                                    : option.value === "spelling"
+                                      ? spellingSpeech?.audio_assets
+                                      : undefined
+                                }
+                                pronunciationId={pronunciation.id}
+                                dialect={side}
+                                ariaLabelPrefix={t(
+                                  "creation_final_reading_label",
+                                  {
+                                    label,
+                                    side: sideLabel,
+                                    name: option.name
+                                  }
+                                )}
+                                disabled={previewDisabled}
+                                disabledReason={previewDisabledReason}
+                                content={previewContent}
+                                voiceProfile={
+                                  option.value === "spelling"
+                                    ? spellingSpeech?.voice_profile
+                                    : isPhoneme
+                                      ? (phonemeSpeech?.voice_profile ??
+                                        pronunciation.voice_profile)
+                                      : undefined
+                                }
+                              />
                               {option.value === "spelling" &&
                                 onSpellingSettings && (
                                   <Button
@@ -796,46 +836,6 @@ export function V3SynthesisInputs({
                                   }
                                 />
                               )}
-                              <PronunciationPreviewControls
-                                recommendationArea={
-                                  option.value === "spelling" ? "word" : "azure"
-                                }
-                                playbackOnly
-                                assetOnly={option.value === "upload"}
-                                audioAssetId={
-                                  option.value === "upload"
-                                    ? (recording ?? recordings[0])?.id
-                                    : undefined
-                                }
-                                audioAssets={
-                                  option.value === "upload"
-                                    ? recordings
-                                    : option.value === "spelling"
-                                      ? spellingSpeech?.audio_assets
-                                      : undefined
-                                }
-                                pronunciationId={pronunciation.id}
-                                dialect={side}
-                                ariaLabelPrefix={t(
-                                  "creation_final_reading_label",
-                                  {
-                                    label,
-                                    side: sideLabel,
-                                    name: option.name
-                                  }
-                                )}
-                                disabled={previewDisabled}
-                                disabledReason={previewDisabledReason}
-                                content={previewContent}
-                                voiceProfile={
-                                  option.value === "spelling"
-                                    ? spellingSpeech?.voice_profile
-                                    : isPhoneme
-                                      ? (phonemeSpeech?.voice_profile ??
-                                        pronunciation.voice_profile)
-                                      : undefined
-                                }
-                              />
                               <label
                                 htmlFor={`${inputPrefix}-${side}-source-${option.value}`}
                                 className="word-synthesis-choice-content"
