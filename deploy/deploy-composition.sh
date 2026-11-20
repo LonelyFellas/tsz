@@ -42,7 +42,11 @@ cleanup_status=0
 on_exit() {
   local status=$?
   if [[ "$status" != 0 ]]; then
-    node deploy/release-state.mjs transition "$state_file" failed "" "${DEPLOY_ACTIVE_COMPONENT:-web}" "" >/dev/null 2>&1 || true
+    if [[ -n "${DEPLOY_ACTIVE_COMPONENT:-}" ]]; then
+      node deploy/release-state.mjs transition "$state_file" failed "" "$DEPLOY_ACTIVE_COMPONENT" "" >/dev/null 2>&1 || true
+    else
+      node deploy/release-state.mjs transition "$state_file" failed >/dev/null 2>&1 || true
+    fi
   fi
   deploy_transport_cleanup || cleanup_status=1
   if [[ "$cleanup_status" != 0 ]]; then status=1; fi
