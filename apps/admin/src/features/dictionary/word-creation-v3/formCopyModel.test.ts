@@ -1253,7 +1253,7 @@ describe("词形内容定向复制", () => {
     expect(applyFormCopy(forms, skipped)).toBe(forms);
   });
 
-  it("标注或UPS无法对应时原子拒绝，不静默丢失字段", () => {
+  it("标注无法对应时原子拒绝，UPS不因词形差异阻断复制", () => {
     const { forms, sourceId, targetId } = setup();
     const source = variant(forms.contents[0]!).pronunciations[0]!;
     source.synthesis = {
@@ -1287,9 +1287,67 @@ describe("词形内容定向复制", () => {
       ]
     };
     variant(forms.contents[1]!).spelling = "single";
-    expect(() =>
-      applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "phonetics"))
-    ).toThrow("UPS");
+    const next = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "phonetics")
+    );
+    expect(
+      variant(next.contents[1]!).pronunciations[0]!.synthesis!.uk
+    ).toMatchObject({
+      ipa: "",
+      ups: "A B",
+      source: "spelling",
+      ups_words: [
+        { text: "old", phoneme: "A" },
+        { text: "word", phoneme: "B" }
+      ]
+    });
+  });
+
+  it("复制单词到短语时保留来源 Azure UPS", () => {
+    const source = commonFormFixture({
+      spelling: "absurd",
+      pronunciations: [
+        pronunciationFixture({
+          dict_phonetic: "əbˈsɜːd",
+          actual_pron: "əbˈsɜːd",
+          synthesis: {
+            alphabet: "ups",
+            ipa: "",
+            ups: "AH B S ER D",
+            use_spelling: false,
+            uk: {
+              ipa: "",
+              ups: "AH B S ER D",
+              ups_words: [{ text: "absurd", phoneme: "AH B S ER D" }]
+            },
+            us: {
+              ipa: "",
+              ups: "AH B S ER D",
+              ups_words: [{ text: "absurd", phoneme: "AH B S ER D" }]
+            }
+          }
+        })
+      ]
+    });
+    const target = commonFormFixture({
+      id: uuidFromInt(910),
+      spelling: "more absurd"
+    });
+    const { forms, sourceId, targetId } = setup(source, target);
+
+    const next = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "phonetics")
+    );
+    const copied = variant(next.contents[1]!).pronunciations[0]!;
+
+    expect(copied.actual_pron).toBe("əbˈsɜːd");
+    expect(copied.synthesis!.uk).toMatchObject({
+      source: "spelling",
+      ups: "AH B S ER D",
+      ups_words: [{ text: "absurd", phoneme: "AH B S ER D" }]
+    });
   });
 
   it("保持共享引用，仅替换target content，并拦截source/target快照及改绑变化", () => {
