@@ -48,8 +48,7 @@ test("automatic deployment is restricted to successful main push CI and binds it
     "DEPLOY_EXPECTED_CI_RUN_ATTEMPT",
     'DEPLOY_SELECT_COMPONENTS: "1"',
     "StrictHostKeyChecking yes",
-    "./deploy/deploy-web.sh",
-    "./deploy/deploy-admin.sh"
+    "./deploy/deploy-composition.sh"
   ])
     assert.ok(
       source.includes(required),
@@ -214,7 +213,19 @@ test("pinned API compatibility runs before other tooling checks without deployme
   );
   assert.doesNotMatch(source, /secrets\.TSHB_TEST_|pull_request_target/);
   const deploy = await readFile(deployWorkflowUrl, "utf8");
-  assert.match(deploy, /node deploy\/wait-api-contract\.mjs --compatible/);
+  const composition = await readFile(
+    new URL("../deploy/deploy-composition.sh", import.meta.url),
+    "utf8"
+  );
+  const compositionManifest = await readFile(
+    new URL("../deploy/release-composition.mjs", import.meta.url),
+    "utf8"
+  );
+  assert.match(deploy, /\.\/deploy\/deploy-composition\.sh/);
+  assert.match(deploy, /frontend-release-composition-/);
+  assert.match(composition, /release-state\.mjs/);
+  assert.match(composition, /release-composition\.mjs/);
+  assert.match(compositionManifest, /buildReleaseComposition/);
   assert.doesNotMatch(deploy, /preflight-api-contract/);
 });
 

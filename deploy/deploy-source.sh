@@ -381,6 +381,9 @@ deploy_candidate_checkpoint() {
       "$phase" "$DEPLOY_CANDIDATE_REASON" "$DEPLOY_EXPECTED_SHA" "$DEPLOY_EXPECTED_CI_RUN_ID" "$DEPLOY_EXPECTED_CI_RUN_ATTEMPT" \
       "$DEPLOY_CANDIDATE_MAIN_SHA" "$DEPLOY_CANDIDATE_LATEST_ID" "$DEPLOY_CANDIDATE_LATEST_ATTEMPT" >> "$GITHUB_STEP_SUMMARY" || deploy_source_warn 'cannot append superseded candidate summary'
   fi
+  if [[ -n "${DEPLOY_SUPERSEDED_MARKER:-}" ]]; then
+    printf '%s\n' "$DEPLOY_CANDIDATE_REASON" > "$DEPLOY_SUPERSEDED_MARKER" || deploy_source_warn 'cannot write superseded candidate marker'
+  fi
   exit 0
 }
 
