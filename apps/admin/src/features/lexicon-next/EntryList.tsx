@@ -319,7 +319,17 @@ export function EntryList({
       const deterministic =
         failure instanceof HttpError && failure.status < 500;
       setConflict(deterministic);
-      setError(deterministic ? failure.message : t("next_command_unknown"));
+      const historyBlocked =
+        confirmation.request.action === "delete" &&
+        failure instanceof HttpError &&
+        failure.message.includes("有发布历史");
+      setError(
+        historyBlocked
+          ? t("next_delete_history_help")
+          : deterministic
+            ? failure.message
+            : t("next_command_unknown")
+      );
     } finally {
       lock.current = false;
       setPending(false);
@@ -839,7 +849,10 @@ export function EntryList({
             {confirmation.rows.map((row) => row.headword).join("、")}
           </p>
           {confirmation.request.action === "delete" && (
-            <p>{t("delete_help")}</p>
+            <>
+              <p>{t("delete_help")}</p>
+              <p>{t("next_delete_history_help")}</p>
+            </>
           )}
           {confirmation.request.action === "restore" && (
             <p>{t("next_restore_help")}</p>

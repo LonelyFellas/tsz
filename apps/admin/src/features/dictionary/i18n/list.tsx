@@ -197,6 +197,11 @@ export const lexiconListMessages = {
     "此操作無法復原：詞條及其草稿內容將徹底清除，佔用的詞頭也會釋出（之後可用相同名稱重新建立）。",
     "This cannot be undone. The entry and its drafts will be removed, releasing the headword so it can be used again."
   ],
+  next_delete_history_help: [
+    "带发布历史的词条不能永久删除，归档后需保留在垃圾桶中。",
+    "帶發布歷史的詞條不能永久刪除，封存後需保留在垃圾桶中。",
+    "Entries with publication history cannot be permanently deleted and must remain in the recycle bin."
+  ],
   delete: ["永久删除", "永久刪除", "Permanently delete"],
   cancel: ["取消", "取消", "Cancel"],
   deleted: ["词条已永久删除", "詞條已永久刪除", "Entry permanently deleted"],
