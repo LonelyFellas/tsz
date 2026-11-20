@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task-229-creation-snapshot-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "48ca6a776f9bbaa76cd321ad215b854415db7499c8841be1e834282fe711a5d3",
+  "_source": "/Users/darwish/.codex/worktrees/06f8/tsz-rust/docs/openapi.json",
+  "_source_sha256": "bcd24c3ceb087a566fcf81819c6489bedb5f50aea56387a55414e16ad4639710",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",

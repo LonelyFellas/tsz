@@ -34,6 +34,9 @@ export function WordListFilters({
   partOfSpeechCatalog,
   creators,
   creatorOptions,
+  updaters,
+  updaterOptions = [],
+  showLevel = true,
   kindLabel,
   posDisplayName,
   languages
@@ -50,6 +53,9 @@ export function WordListFilters({
   partOfSpeechCatalog: QueryState;
   creators: QueryState;
   creatorOptions: Options[];
+  updaters?: QueryState;
+  updaterOptions?: Options[];
+  showLevel?: boolean;
   kindLabel: (kind: AdminWordKind) => string;
   posDisplayName: (code: string) => string;
   languages?: {
@@ -140,6 +146,19 @@ export function WordListFilters({
                   creatorOptions.find(
                     (item) => item.value === filters.createdBy
                   )?.label ?? filters.createdBy.slice(-8)
+              })
+            }
+          ]
+        : []),
+      ...(filters.updatedBy
+        ? [
+            {
+              key: "updatedBy" as const,
+              label: t("filter_updated_by", {
+                value:
+                  updaterOptions.find(
+                    (item) => item.value === filters.updatedBy
+                  )?.label ?? filters.updatedBy.slice(-8)
               })
             }
           ]
@@ -273,15 +292,25 @@ export function WordListFilters({
         </div>
         <div
           id={advancedPanelId}
-          className="word-search-advanced"
+          className={`word-search-advanced${updaters ? " word-search-advanced--v2" : ""}`}
           hidden={!advancedExpanded}
           aria-hidden={!advancedExpanded}
           inert={!advancedExpanded}
         >
-          <Form.Item name="kind" label={t("entry_kind")}>
-            <Select placeholder={t("all")} options={kindOptions} allowClear />
-          </Form.Item>
-          <Form.Item name="pos" label={t("pos")}>
+          {!updaters ? (
+            <Form.Item
+              name="kind"
+              label={t("entry_kind")}
+              className="word-search-kind-filter"
+            >
+              <Select placeholder={t("all")} options={kindOptions} allowClear />
+            </Form.Item>
+          ) : null}
+          <Form.Item
+            name="pos"
+            label={t("pos")}
+            className="word-search-pos-filter"
+          >
             <Select
               placeholder={t("all")}
               options={partOfSpeechOptions}
@@ -290,9 +319,54 @@ export function WordListFilters({
               allowClear
             />
           </Form.Item>
-          <Form.Item name="level" label={t("meaning_level")}>
-            <Select placeholder={t("all")} options={CEFR_OPTIONS} allowClear />
-          </Form.Item>
+          {updaters ? (
+            <Form.Item
+              name="updatedBy"
+              label={t("updated_by")}
+              className="word-search-updated-by-filter"
+              help={
+                updaters.isError ? (
+                  <span>
+                    {t("updaters_failed")}
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => void updaters.refetch()}
+                    >
+                      {t("reload_updaters")}
+                    </Button>
+                  </span>
+                ) : undefined
+              }
+            >
+              <Select
+                placeholder={t("unlimited")}
+                options={updaterOptions}
+                allowClear
+                showSearch={{ optionFilterProp: "label" }}
+                loading={updaters.isPending}
+                disabled={updaters.isError}
+              />
+            </Form.Item>
+          ) : null}
+          {updaters ? (
+            <Form.Item
+              name="kind"
+              label={t("entry_kind")}
+              className="word-search-kind-filter"
+            >
+              <Select placeholder={t("all")} options={kindOptions} allowClear />
+            </Form.Item>
+          ) : null}
+          {showLevel ? (
+            <Form.Item name="level" label={t("meaning_level")}>
+              <Select
+                placeholder={t("all")}
+                options={CEFR_OPTIONS}
+                allowClear
+              />
+            </Form.Item>
+          ) : null}
           {!trashMode && (
             <Form.Item name="status" hidden>
               <input type="hidden" />
@@ -301,6 +375,7 @@ export function WordListFilters({
           <Form.Item
             name="createdBy"
             label={t("creator")}
+            className="word-search-creator-filter"
             help={
               creators.isError ? (
                 <span>

@@ -43,6 +43,7 @@ export function parseWordFilterSearchParams(
   const keyword = trimmed(params.get("keyword"));
   const headword = trimmed(params.get("headword"));
   const createdBy = params.get("created_by");
+  const updatedBy = params.get("updated_by");
   const gloss = trimmed(params.get("gloss"));
   const kind = params.get("kind");
   const pos = params.get("pos");
@@ -60,6 +61,7 @@ export function parseWordFilterSearchParams(
     ...(keyword ? { keyword } : {}),
     ...(headword ? { headword } : {}),
     ...(createdBy && ADMIN_ID.test(createdBy) ? { createdBy } : {}),
+    ...(updatedBy && ADMIN_ID.test(updatedBy) ? { updatedBy } : {}),
     ...(gloss ? { gloss } : {}),
     ...(kind && KINDS.has(kind as AdminWordKind)
       ? { kind: kind as AdminWordKind }
@@ -95,6 +97,7 @@ export function serializeWordFilterSearchParams(
   const headword = values.headword?.trim();
   if (headword) params.set("headword", headword);
   if (values.createdBy) params.set("created_by", values.createdBy);
+  if (values.updatedBy) params.set("updated_by", values.updatedBy);
   if (gloss) params.set("gloss", gloss);
   if (values.kind) params.set("kind", values.kind);
   if (values.pos) params.set("pos", values.pos);

@@ -505,9 +505,15 @@ it("语言筛选作为真实 query 发送，列表、统计和创建人参数与
   const query = {
     target_language: "en",
     medium_locale: "zh-Hant",
-    gloss: "a & b"
+    gloss: "a & b",
+    updated_by: uuid(9)
   };
-  for (const endpoint of ["workspaceList", "stats", "creators"] as const) {
+  for (const endpoint of [
+    "workspaceList",
+    "stats",
+    "creators",
+    "updaters"
+  ] as const) {
     const reply =
       endpoint === "workspaceList"
         ? {
