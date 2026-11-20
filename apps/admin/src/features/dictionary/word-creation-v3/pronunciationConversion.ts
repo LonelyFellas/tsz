@@ -2,6 +2,7 @@ import {
   convertAzureIpaToUps,
   convertDictionaryToAzureIpa,
   convertDictionaryToUnified,
+  DEFAULT_SPELLING_SYNTHESIS,
   EMPTY_SYNTHESIS,
   pronunciationLocale
 } from "@tsz/shared";
@@ -38,7 +39,11 @@ export function planPronunciationConversion(
     pronunciation.style
   );
   if (!actual.ok) return { ...actual, field: "actual_pron" };
-  let synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
+  let synthesis =
+    pronunciation.synthesis ??
+    (pronunciation.voice_profile || pronunciation.audio_assets?.length
+      ? EMPTY_SYNTHESIS
+      : DEFAULT_SPELLING_SYNTHESIS);
   const rows: PronunciationConversionPlan["rows"] = [
     {
       field: "actual_pron",

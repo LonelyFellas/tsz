@@ -406,6 +406,36 @@ it("四种配音来源都在来源行提供试听按钮", () => {
   ).toHaveLength(0);
 });
 
+it("没有既有音标配置时默认使用词形拼写配音", () => {
+  render(
+    <App>
+      <VoiceAudioTasksContext.Provider value={null}>
+        <PronunciationPreviewProvider>
+          <V3SynthesisInputs
+            pronunciation={{
+              id: "p",
+              dict_phonetic: "fɑː",
+              actual_pron: "fɑː",
+              style: "normal"
+            }}
+            synthesisEditable
+            spelling="far"
+            dialect="common"
+            index={0}
+            issues={[]}
+            onChange={vi.fn()}
+          />
+        </PronunciationPreviewProvider>
+      </VoiceAudioTasksContext.Provider>
+    </App>
+  );
+
+  expect(sourceRadio("词形拼写", "英式")).toBeChecked();
+  expect(sourceRadio("词形拼写", "美式")).toBeChecked();
+  expect(sourceRadio("Azure IPA", "英式")).not.toBeChecked();
+  expect(sourceRadio("Azure IPA", "美式")).not.toBeChecked();
+});
+
 it("上传音频来源试听当前口音的默认录音", async () => {
   renderWithUps(<Harness dialect="uk" recording />);
   const play = screen.getByLabelText(

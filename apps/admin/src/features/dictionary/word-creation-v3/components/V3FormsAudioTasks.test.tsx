@@ -409,6 +409,55 @@ it("词形拼写来源只补缺失的已选音频，不生成未启用的音标�
   );
 });
 
+it("缺少音标配置时按默认词形拼写来源生成音频", async () => {
+  const forms = fixture();
+  const variant = forms.contents[0]!.regional_variants;
+  if (variant.mode !== "common") throw new Error("expected common fixture");
+  const row = variant.common.pronunciations[0]!;
+  delete row.synthesis;
+  delete row.voice_profile;
+  variant.common.spelling_speech = {
+    content: { version: 2, text: "hello", annotations: [] },
+    voice_profile: { voices }
+  };
+  render(<Host initial={forms} />);
+
+  expect(speech.generate).not.toHaveBeenCalled();
+  await applyAudioTasks();
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+  expect(speech.generate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      source: {
+        kind: "text",
+        content: { version: 2, text: "hello", annotations: [] }
+      }
+    })
+  );
+});
+
+it("缺少音标但已有行级音色时保留旧行级音频来源", async () => {
+  const forms = fixture();
+  const variant = forms.contents[0]!.regional_variants;
+  if (variant.mode !== "common") throw new Error("expected common fixture");
+  delete variant.common.pronunciations[0]!.synthesis;
+  render(<Host initial={forms} />);
+
+  await applyAudioTasks();
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(2));
+  expect(speech.generate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      source: {
+        kind: "text",
+        content: { version: 2, text: "heˈləʊ", annotations: [] }
+      }
+    })
+  );
+  expect(
+    JSON.parse(screen.getByTestId("saved-forms").textContent!).contents[0]
+      .regional_variants.common.spelling_speech
+  ).toBeUndefined();
+});
+
 it.each([false, true])(
   "显式来源下未启用的拼写口音不生成，活动美式=%s",
   async (activeUs) => {

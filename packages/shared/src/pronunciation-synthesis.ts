@@ -25,6 +25,10 @@ export const EMPTY_SYNTHESIS: PronunciationSynthesisV3 = {
   ups: "",
   use_spelling: false
 };
+export const DEFAULT_SPELLING_SYNTHESIS: PronunciationSynthesisV3 = {
+  ...EMPTY_SYNTHESIS,
+  use_spelling: true
+};
 
 /** Candidates may be unfinished in a draft; only the selected side is required to synthesize. */
 export function synthesisInputIssue(
@@ -821,9 +825,14 @@ export function pronunciationPlaybackSource(
   legacyDialect: Dialect,
   requireLocaleConfirmation = false
 ): { content?: RichTextV2; profile?: VoiceProfileV3; assetId?: string } {
+  const hasLegacyAudio =
+    !pronunciation.synthesis &&
+    Boolean(pronunciation.voice_profile || pronunciation.audio_assets?.length);
   const synthesis = pronunciation.synthesis
     ? synthesisForLocale(pronunciation.synthesis, locale, legacyDialect)
-    : undefined;
+    : hasLegacyAudio
+      ? undefined
+      : synthesisForLocale(DEFAULT_SPELLING_SYNTHESIS, locale, legacyDialect);
   if (synthesis?.source === "none") return {};
   if (synthesis?.source === "upload") {
     const assets =

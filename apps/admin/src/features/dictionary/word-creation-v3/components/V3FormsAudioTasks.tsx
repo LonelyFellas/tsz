@@ -175,7 +175,8 @@ export function V3FormsAudioTasks({
                   row.synthesis?.use_spelling ||
                   row.synthesis?.uk?.source === "spelling" ||
                   row.synthesis?.us?.source === "spelling"
-              )) && (
+              ) ||
+              (spellingScope.activeLocales?.length ?? 0) > 0) && (
               <TextAudioTask
                 target={JSON.stringify([variant.id, "spelling_speech"])}
                 content={
@@ -221,11 +222,19 @@ export function V3FormsAudioTasks({
             )}
           {variant.pronunciations.flatMap((pronunciation) => {
             const synthesis = pronunciation.synthesis;
+            const hasLegacyAudio =
+              !synthesis &&
+              Boolean(
+                pronunciation.voice_profile ||
+                pronunciation.audio_assets?.length
+              );
             const explicitSources = !!(
               synthesis?.uk?.source || synthesis?.us?.source
             );
             const rowAudio =
-              pronunciation.voice_profile && !explicitSources
+              pronunciation.voice_profile &&
+              (Boolean(synthesis) || hasLegacyAudio) &&
+              !explicitSources
                 ? [undefined].map((locale) => {
                     const profile = pronunciation.voice_profile!;
                     const scoped = {
@@ -280,7 +289,8 @@ export function V3FormsAudioTasks({
                     );
                   })
                 : [];
-            if (rowOnly || !synthesis) return rowAudio;
+            if (rowOnly || hasLegacyAudio) return rowAudio;
+            if (!synthesis) return [];
             const phonemes = (["uk", "us"] as const)
               .filter((side) => dialect === "common" || dialect === side)
               .map((side) => {
