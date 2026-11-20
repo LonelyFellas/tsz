@@ -19,6 +19,8 @@ import type {
   WordPronunciationV3
 } from "@tsz/types";
 import {
+  DEFAULT_SPELLING_SYNTHESIS,
+  EMPTY_SYNTHESIS,
   pronunciationLocale,
   speechAccentGroup,
   synthesisForLocale
@@ -347,8 +349,12 @@ function phoneticFields(row: WordPronunciationV3) {
   };
 }
 
-function emptySynthesis(): PronunciationSynthesisV3 {
-  return { alphabet: "ipa", ipa: "", ups: "", use_spelling: false };
+function emptySynthesis(
+  target?: WordPronunciationV3
+): PronunciationSynthesisV3 {
+  return target?.voice_profile || target?.audio_assets?.length
+    ? { ...EMPTY_SYNTHESIS }
+    : { ...DEFAULT_SPELLING_SYNTHESIS };
 }
 
 function copyPhonetics(
@@ -478,7 +484,7 @@ function copyPhonetics(
         };
       }
     }
-    target.synthesis ??= emptySynthesis();
+    target.synthesis ??= emptySynthesis(target);
     target.synthesis[match.side] = next;
   }
   if (target.synthesis && candidates.some(Boolean)) {
@@ -712,7 +718,7 @@ function selectTargetSource(
   match: FormCopyPlan["matches"][number],
   source: "upload" | "spelling"
 ) {
-  target.synthesis ??= emptySynthesis();
+  target.synthesis ??= emptySynthesis(target);
   const candidate = target.synthesis[match.side] ??
     candidateForSide(target, match.target.region, match.side) ?? {
       ipa: "",
@@ -932,7 +938,7 @@ function copyVoices(
       };
       if (content.text !== match.target.spelling)
         throw new FormCopyError("copy_target_text_mismatch");
-      target.synthesis ??= emptySynthesis();
+      target.synthesis ??= emptySynthesis(target);
       // 写入首个分侧候选前，保留旧格式在两侧实际可用的内容。
       if (!target.synthesis.uk && !target.synthesis.us) {
         for (const side of SIDES) {
