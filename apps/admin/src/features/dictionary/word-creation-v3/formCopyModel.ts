@@ -320,11 +320,11 @@ function rebindUpsWords(
   const from = source.match(/\S+/gu) ?? [];
   const to = target.match(/\S+/gu) ?? [];
   const words = candidate.ups_words;
-  if (words == null) {
-    if (candidate.ups.trim() && (from.length > 1 || to.length > 1))
-      throw new FormCopyError("copy_ups_boundaries_missing");
-    return words;
-  }
+  if (words == null)
+    return {
+      words,
+      compatible: !candidate.ups.trim() || (from.length <= 1 && to.length <= 1)
+    };
   if (
     words.length !== from.length ||
     words.length !== to.length ||
@@ -333,8 +333,11 @@ function rebindUpsWords(
     ) ||
     words.map((word) => word.phoneme).join(" ") !== candidate.ups.trim()
   )
-    throw new FormCopyError("copy_ups_target_mismatch");
-  return words.map((word, index) => ({ ...word, text: to[index]! }));
+    return { words: structuredClone(words), compatible: false };
+  return {
+    words: words.map((word, index) => ({ ...word, text: to[index]! })),
+    compatible: true
+  };
 }
 
 function phoneticFields(row: WordPronunciationV3) {
@@ -450,23 +453,20 @@ function copyPhonetics(
             ? "spelling"
             : previousSelection?.alphabet))
         : candidate.source;
+    const upsWords = rebindUpsWords(
+      candidate,
+      match.source.spelling,
+      match.target.spelling
+    );
     const next: PronunciationSynthesisCandidateV3 = {
       ...(copiedSource ? { source: copiedSource } : {}),
       ipa: candidate.ipa,
       ups: candidate.ups,
       ...(candidate.ups_words !== undefined
-        ? {
-            ups_words: rebindUpsWords(
-              candidate,
-              match.source.spelling,
-              match.target.spelling
-            )
-          }
+        ? { ups_words: upsWords.words }
         : {})
     };
-    // A multiword UPS without boundaries cannot be silently moved to another body.
-    if (candidate.ups_words === undefined)
-      rebindUpsWords(candidate, match.source.spelling, match.target.spelling);
+    if (!upsWords.compatible) next.source = "spelling";
     for (const alphabet of ALPHABETS) {
       const key = `${alphabet}_speech` as const;
       const voice = previous?.[key]?.voice_profile ?? target.voice_profile;
