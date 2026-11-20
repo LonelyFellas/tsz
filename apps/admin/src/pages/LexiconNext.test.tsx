@@ -597,6 +597,11 @@ it("创建时把内置词典推荐词性带入词义步骤", async () => {
   fireEvent.click(button("词典检测"));
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await screen.findByTestId("lexicon-next-editor");
+  await waitFor(() =>
+    expect(
+      document.querySelector(".word-forms-tabs .word-pos-tab-label")
+    ).toHaveTextContent("名词")
+  );
   fireEvent.click(stepButton(/^词义与例句/));
 
   await waitFor(() =>

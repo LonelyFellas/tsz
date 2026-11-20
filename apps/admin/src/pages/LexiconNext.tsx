@@ -434,7 +434,7 @@ function EntryEditor({
   const grammarCatalog = useQuery({
     queryKey: partOfSpeechKeys.catalog(),
     queryFn: () => partOfSpeechDataSource.catalog(),
-    enabled: grammarAvailable,
+    enabled: formEditorAvailable || grammarAvailable || senseMetadataAvailable,
     staleTime: 5 * 60 * 1000
   });
   const navigate = useNavigate();
