@@ -13,7 +13,17 @@ LATIN = list(range(0x100))
 # Other IPA and extended Latin continue to use the original complete font.
 ENGLISH_IPA = [ord(char) for char in "ŋθɑʒɡʃʌɔəɛɪɒʊɜɹɻɚɝɾʔːˈˌʲʷʸ̩͡ʧʤ"]
 LATIN_MARKS = [0x0300, 0x0301, 0x0302, 0x0303, 0x0308, 0x030A, 0x0327]
-WORD_FEATURES = ["cv01", "cv04", "cv06", "cv09", "cv31", "cv39", "cv52", "ss05"]
+WORD_FEATURES = [
+    "cv01",
+    "cv04",
+    "cv06",
+    "cv09",
+    "cv31",
+    "cv39",
+    "cv52",
+    "ss05",
+    "ss13",
+]
 
 family = "TSZ Common Words"
 for style, characters in (
