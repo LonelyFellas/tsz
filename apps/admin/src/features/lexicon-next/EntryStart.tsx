@@ -221,14 +221,14 @@ export function EntryStart({
           return;
         }
       }
-      await Promise.all(
+      void Promise.all(
         ["list", "stats", "creators"].map((key) =>
           queryClient.invalidateQueries({
             queryKey: ["admin-lexicon-next", key],
             refetchType: "all"
           })
         )
-      );
+      ).catch(() => undefined);
       if (current !== generation.current) return;
       setAnnotationEntries([]);
       setAnnotationEntryId(undefined);
