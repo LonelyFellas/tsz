@@ -7594,6 +7594,81 @@ it("后台音频完成后通过专用接口保存并推进 revision", async () =
   );
 });
 
+it("完整词形保存进行中时串行等待后台音频保存", async () => {
+  let resolveForms!: (value: AdminWordV3Envelope) => void;
+  const saveForms = vi.fn<V3WordRequests["saveForms"]>(
+    () =>
+      new Promise<AdminWordV3Envelope>((resolve) => {
+        resolveForms = resolve;
+      })
+  );
+  const saveAudio = vi.fn<V3WordRequests["saveAudio"]>(async () =>
+    envelope(3, "centre")
+  );
+  const source = requests({ saveForms, saveAudio });
+  function ConcurrentSaves({ context }: { context: V3WizardSlotContext }) {
+    const save = useVoiceSave();
+    return (
+      <>
+        <button onClick={() => void context.actions.saveForms("save")}>
+          保存完整草稿
+        </button>
+        <button onClick={() => void save?.saveAudio?.()}>保存后台音频</button>
+      </>
+    );
+  }
+
+  renderWizard(source, {
+    renderStep: (context) => (
+      <>
+        <Slot context={context} />
+        <ConcurrentSaves context={context} />
+      </>
+    )
+  });
+
+  fireEvent.click(screen.getByText("保存完整草稿"));
+  await waitFor(() => expect(saveForms).toHaveBeenCalledOnce());
+
+  fireEvent.click(screen.getByText("保存后台音频"));
+  await act(async () => {});
+  expect(saveAudio).not.toHaveBeenCalled();
+
+  await act(async () => resolveForms(envelope(2, "centre")));
+  await waitFor(() => expect(saveAudio).toHaveBeenCalledOnce());
+  expect(saveForms.mock.calls[0]![1].base_revision).toBe(1);
+  expect(saveAudio.mock.calls[0]![1].base_revision).toBe(2);
+});
+
+it("作废在途保存后允许同命令的新草稿再次保存", async () => {
+  const deferred: Array<(value: AdminWordV3Envelope) => void> = [];
+  const saveForms = vi.fn<V3WordRequests["saveForms"]>(
+    () =>
+      new Promise<AdminWordV3Envelope>((resolve) => {
+        deferred.push(resolve);
+      })
+  );
+  const source = requests({ saveForms });
+  renderWizard(source, {
+    renderStep: (context) => (
+      <>
+        <Slot context={context} />
+        <button onClick={() => context.setActivePosId("pos-2")}>
+          作废在途保存
+        </button>
+      </>
+    )
+  });
+
+  fireEvent.click(screen.getByText("保存"));
+  await waitFor(() => expect(saveForms).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByText("作废在途保存"));
+  fireEvent.click(screen.getByText("保存"));
+  await act(async () => deferred[0]!(envelope(2, "stale")));
+
+  await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(2));
+});
+
 it("词形保存等待默认配音回写，再提交包含新资产的当前草稿", async () => {
   const source = requests();
   let finish!: (ready: boolean) => void;
