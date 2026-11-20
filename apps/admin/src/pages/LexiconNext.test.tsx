@@ -668,6 +668,55 @@ it("创建完成后不等待列表统计刷新再进入编辑器", async () => {
   expect(stepButton(/^词形与发音/)).toBeVisible();
 });
 
+it("创建后词形步骤的自动词性草稿保护面包屑离开", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  api.detect.mockResolvedValue({
+    surface: "watershed",
+    kind: "word",
+    matches: [
+      {
+        id: "dictionary:watershed:noun",
+        term: "watershed",
+        part_of_speech: "noun",
+        glosses: [],
+        forms: [],
+        phonetics: [],
+        source_name: "test",
+        source_version: "1"
+      }
+    ]
+  });
+  const { router } = mount(
+    api,
+    "/lexicon-next?target_language=en&target_locale=en-GB&medium_locale=zh-Hans"
+  );
+  await screen.findByRole("button", { name: "创建词条" });
+  fireEvent.click(button("创建词条"));
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "watershed" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  await screen.findByTestId("lexicon-next-editor");
+  await waitFor(() =>
+    expect(screen.getAllByText("有未保存修改")).not.toHaveLength(0)
+  );
+  fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
+  await screen.findByText(
+    "当前有未保存修改。选择“继续编辑”保留草稿，或选择“放弃修改并离开”。"
+  );
+  expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
+  fireEvent.click(button("继续编辑"));
+  expect(screen.getByTestId("lexicon-next-editor")).toBeVisible();
+  fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
+  await screen.findByRole("button", { name: "创建词条" });
+  expect(router.state.location.pathname).toBe("/lexicon-next");
+});
+
 it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
   const api = requests();
   let finish!: (value: NextEntry) => void;
