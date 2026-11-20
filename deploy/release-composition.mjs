@@ -25,6 +25,97 @@ function validateComponentManifest(manifest, component) {
   return manifest;
 }
 
+function exactKeys(value, keys, label) {
+  assert.deepEqual(
+    Object.keys(value).sort(),
+    [...keys].sort(),
+    `${label} fields are invalid`
+  );
+}
+
+function validateComponentSummary(value, component) {
+  if (value === null) return null;
+  exactKeys(
+    value,
+    ["git_sha", "ci_run_id", "artifact_sha256", "accepted_at"],
+    `${component} component`
+  );
+  assertSha(value.git_sha, `${component}.git_sha`);
+  assert.ok(Number.isSafeInteger(value.ci_run_id) && value.ci_run_id > 0);
+  assert.match(value.artifact_sha256, /^[0-9a-f]{64}$/);
+  assert.equal(typeof value.accepted_at, "string");
+  assert.ok(!Number.isNaN(Date.parse(value.accepted_at)));
+  return value;
+}
+
+export function validateReleaseComposition(value) {
+  exactKeys(
+    value,
+    [
+      "schema_version",
+      "environment",
+      "state",
+      "candidate",
+      "api",
+      "components",
+      "updated_at"
+    ],
+    "release composition"
+  );
+  assert.equal(value.schema_version, 1);
+  assert.equal(value.environment, "tshb-test");
+  assert.ok(STATES.has(value.state));
+  exactKeys(
+    value.candidate,
+    ["repository", "git_sha", "ci_run_id", "ci_run_attempt"],
+    "candidate"
+  );
+  assert.equal(value.candidate.repository, "LonelyFellas/tsz");
+  assertSha(value.candidate.git_sha, "candidate.git_sha");
+  assert.ok(
+    Number.isSafeInteger(value.candidate.ci_run_id) &&
+      value.candidate.ci_run_id > 0
+  );
+  assert.ok(
+    Number.isSafeInteger(value.candidate.ci_run_attempt) &&
+      value.candidate.ci_run_attempt > 0
+  );
+  exactKeys(value.api, ["repository", "git_sha", "contract_status"], "api");
+  assert.equal(value.api.repository, "LonelyFellas/tsz-rust");
+  assertSha(value.api.git_sha, "api.git_sha");
+  assert.equal(value.api.contract_status, "verified");
+  exactKeys(value.components, ["web", "admin"], "components");
+  validateComponentSummary(value.components.web, "web");
+  validateComponentSummary(value.components.admin, "admin");
+  assert.equal(typeof value.updated_at, "string");
+  assert.ok(!Number.isNaN(Date.parse(value.updated_at)));
+  if (value.state === "web-accepted") assert.ok(value.components.web !== null);
+  if (value.state === "accepted") {
+    assert.ok(value.components.web !== null && value.components.admin !== null);
+  }
+  return value;
+}
+
+export function recoveryPlan(value) {
+  validateReleaseComposition(value);
+  if (value.state === "accepted") {
+    return {
+      action: "complete",
+      resume_from: "accepted",
+      skip_components: ["web", "admin"],
+      publish_components: [],
+      api_sha: value.api.git_sha
+    };
+  }
+  return {
+    action: "resume",
+    resume_from: "web-accepted",
+    skip_components: ["web"],
+    publish_components: ["admin"],
+    api_sha: value.api.git_sha
+  };
+}
+
 export function buildReleaseComposition({
   state,
   candidateSha,
@@ -43,7 +134,7 @@ export function buildReleaseComposition({
   web = validateComponentManifest(web, "web");
   admin = validateComponentManifest(admin, "admin");
   if (state === "accepted") assert.ok(web !== null && admin !== null);
-  return {
+  return validateReleaseComposition({
     schema_version: 1,
     environment: "tshb-test",
     state,
@@ -63,7 +154,7 @@ export function buildReleaseComposition({
       admin: admin === null ? null : componentSummary(admin)
     },
     updated_at: updatedAt
-  };
+  });
 }
 
 function componentSummary(manifest) {
@@ -106,18 +197,40 @@ export function writeRemoteComposition({
 }
 
 if (process.argv[1] === "-") {
-  const [state, candidateSha, runId, attempt, apiSha, root] =
-    process.argv.slice(2);
+  const [command, ...args] = process.argv.slice(2);
+  if (command === "validate" || command === "recover") {
+    const value = JSON.parse(readFileSync(args[0], "utf8"));
+    console.log(
+      JSON.stringify(
+        command === "validate"
+          ? validateReleaseComposition(value)
+          : recoveryPlan(value)
+      )
+    );
+  } else {
+    const [candidateSha, runId, attempt, apiSha, root] = args;
+    console.log(
+      JSON.stringify(
+        writeRemoteComposition({
+          root,
+          state: command,
+          candidateSha,
+          runId: Number(runId),
+          attempt: Number(attempt),
+          apiSha
+        })
+      )
+    );
+  }
+} else if (process.argv[1]?.endsWith("release-composition.mjs")) {
+  const [command, file] = process.argv.slice(2);
+  assert.ok(command === "validate" || command === "recover");
+  const value = JSON.parse(readFileSync(file, "utf8"));
   console.log(
     JSON.stringify(
-      writeRemoteComposition({
-        root,
-        state,
-        candidateSha,
-        runId: Number(runId),
-        attempt: Number(attempt),
-        apiSha
-      })
+      command === "validate"
+        ? validateReleaseComposition(value)
+        : recoveryPlan(value)
     )
   );
 }

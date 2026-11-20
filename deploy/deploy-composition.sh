@@ -40,6 +40,10 @@ write_remote_composition() {
   deploy_ssh tshb-test "exec 8>/opt/tsz-cross-deploy.lock && flock -n 8 && /usr/bin/node --input-type=module - '$state' '$DEPLOY_EXPECTED_SHA' '$DEPLOY_EXPECTED_CI_RUN_ID' '$DEPLOY_EXPECTED_CI_RUN_ATTEMPT' '$api_sha' /opt/tsz-deploy-manifests" < deploy/release-composition.mjs
 }
 
+verify_remote_composition() {
+  deploy_ssh tshb-test "exec 8>/opt/tsz-cross-deploy.lock && flock -s 8 && /usr/bin/node --input-type=module - validate /opt/tsz-deploy-manifests/release-composition.json" < deploy/release-composition.mjs >/dev/null
+}
+
 cleanup_status=0
 on_exit() {
   local status=$?
@@ -72,6 +76,7 @@ run_component web env DEPLOY_EXPECTED_API_SHA="$web_api_sha" ./deploy/deploy-web
 DEPLOY_ACTIVE_COMPONENT=""
 write_state transition "$state_file" web-accepted "" web "$DEPLOY_COMPONENT_ACCEPTED_SHA"
 write_remote_composition web-accepted "$web_api_sha"
+verify_remote_composition
 
 DEPLOY_ACTIVE_COMPONENT=admin
 admin_api_sha="$(node deploy/deploy-metrics.mjs run admin local api-contract -- node deploy/wait-api-contract.mjs --compatible)"
@@ -85,5 +90,6 @@ write_state transition "$state_file" admin-deploying "$admin_api_sha" admin
 run_component admin env DEPLOY_EXPECTED_API_SHA="$admin_api_sha" ./deploy/deploy-admin.sh
 DEPLOY_ACTIVE_COMPONENT=""
 write_remote_composition accepted "$admin_api_sha"
+verify_remote_composition
 write_state transition "$state_file" accepted "$admin_api_sha" admin "$DEPLOY_COMPONENT_ACCEPTED_SHA"
 echo "release composition accepted: $release_id"
