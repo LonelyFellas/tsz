@@ -31,6 +31,10 @@ import { useLexiconLanguages } from "./LanguageSelection";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
 
+export interface LexiconNextCreationNavigationState {
+  lexiconNextSuggestedPartOfSpeech?: string[];
+}
+
 export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const navigate = useNavigate();
   const {
@@ -233,7 +237,14 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
       setAnnotationEntries([]);
       setAnnotationEntryId(undefined);
       lock.current = false;
-      navigate(`/lexicon-next/${createdId}?${languageSearch}`);
+      const suggestedPartOfSpeech = [
+        ...new Set(detection.matches.map((match) => match.part_of_speech))
+      ];
+      navigate(`/lexicon-next/${createdId}?${languageSearch}`, {
+        state: {
+          lexiconNextSuggestedPartOfSpeech: suggestedPartOfSpeech
+        } satisfies LexiconNextCreationNavigationState
+      });
     } catch (error) {
       setUncertain(true);
       setError(
