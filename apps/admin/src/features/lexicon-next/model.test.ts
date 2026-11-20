@@ -464,3 +464,37 @@ it("保存前清理已存在目标地区的通用英语混合变体", () => {
     normalized.grammar_structures![0]!.variants.map((v) => v.locale)
   ).toEqual(["en-GB", "en-US"]);
 });
+
+it("保存旧的通用加单地区草稿时复制缺失地区内容", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [
+      {
+        id: "grammar",
+        part_of_speech: "noun",
+        variants: [
+          {
+            id: "common",
+            locale: "en",
+            content: { version: 2, text: "a job", annotations: [] }
+          },
+          {
+            id: "uk",
+            locale: "en-GB",
+            content: { version: 2, text: "a job", annotations: [] }
+          }
+        ]
+      }
+    ],
+    senses: []
+  };
+  const normalized =
+    normalizeGrammarVariants(draft).grammar_structures![0]!.variants;
+  expect(normalized.map((variant) => variant.locale)).toEqual([
+    "en-GB",
+    "en-US"
+  ]);
+  expect(normalized[1]!.content.text).toBe("a job");
+});

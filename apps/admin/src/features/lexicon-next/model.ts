@@ -51,9 +51,21 @@ export function normalizeGrammarVariants(draft: NextDraft): NextDraft {
     )
       return grammar;
     changed = true;
+    const common = grammar.variants.find((variant) => variant.locale === "en");
+    const variants = grammar.variants.filter(
+      (variant) => variant.locale !== "en"
+    );
+    for (const locale of ["en-GB", "en-US"] as const) {
+      if (variants.some((variant) => variant.locale === locale)) continue;
+      variants.push({
+        id: crypto.randomUUID(),
+        locale,
+        content: structuredClone(common!.content)
+      });
+    }
     return {
       ...grammar,
-      variants: grammar.variants.filter((variant) => variant.locale !== "en")
+      variants
     };
   });
   return changed ? { ...draft, grammar_structures } : draft;
