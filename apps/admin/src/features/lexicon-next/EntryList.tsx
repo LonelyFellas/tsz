@@ -319,17 +319,7 @@ export function EntryList({
       const deterministic =
         failure instanceof HttpError && failure.status < 500;
       setConflict(deterministic);
-      const historyBlocked =
-        confirmation.request.action === "delete" &&
-        failure instanceof HttpError &&
-        failure.message.includes("有发布历史");
-      setError(
-        historyBlocked
-          ? t("next_delete_history_help")
-          : deterministic
-            ? failure.message
-            : t("next_command_unknown")
-      );
+      setError(deterministic ? failure.message : t("next_command_unknown"));
     } finally {
       lock.current = false;
       setPending(false);
