@@ -214,7 +214,7 @@ test("pinned API compatibility runs before other tooling checks without deployme
   );
   assert.doesNotMatch(source, /secrets\.TSHB_TEST_|pull_request_target/);
   const deploy = await readFile(deployWorkflowUrl, "utf8");
-  assert.match(deploy, /node deploy\/wait-backend-deployment\.mjs/);
+  assert.match(deploy, /node deploy\/wait-api-contract\.mjs --compatible/);
   assert.doesNotMatch(deploy, /preflight-api-contract/);
 });
 

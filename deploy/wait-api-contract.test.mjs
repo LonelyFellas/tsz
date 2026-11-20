@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { waitForApiContract } from "./wait-api-contract.mjs";
+import {
+  waitForApiContract,
+  waitForCompatibleApiContract
+} from "./wait-api-contract.mjs";
 
 const SHA = "a".repeat(40);
 
@@ -40,4 +43,25 @@ test("does not accept a different deployed API SHA", async () => {
     }),
     /did not reach/
   );
+});
+
+test("returns the current deployed API SHA after compatibility verification", async () => {
+  const currentSha = "b".repeat(40);
+  const calls = [];
+  let now = 0;
+  const result = await waitForCompatibleApiContract({
+    check: async () => {
+      calls.push(calls.length);
+      if (calls.length === 1) throw new Error("deployment_in_progress");
+      return currentSha;
+    },
+    sleep: async () => {
+      now += 20;
+    },
+    timeoutMs: 100,
+    intervalMs: 20,
+    now: () => now
+  });
+  assert.equal(result, currentSha);
+  assert.equal(calls.length, 2);
 });
