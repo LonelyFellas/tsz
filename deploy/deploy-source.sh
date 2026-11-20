@@ -387,6 +387,16 @@ deploy_candidate_checkpoint() {
   exit 0
 }
 
+deploy_component_result() {
+  local component_sha="$1"
+  [[ "$component_sha" =~ ^[0-9a-f]{40}$ ]] || {
+    deploy_source_error "component result SHA is invalid"
+    return 1
+  }
+  [[ -z "${DEPLOY_COMPONENT_RESULT_MARKER:-}" ]] ||
+    printf '%s\n' "$component_sha" > "$DEPLOY_COMPONENT_RESULT_MARKER"
+}
+
 prepare_deploy_source() {
   local component="$1"
   case "$component" in
