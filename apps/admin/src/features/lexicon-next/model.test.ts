@@ -498,3 +498,34 @@ it("保存旧的通用加单地区草稿时复制缺失地区内容", () => {
   ]);
   expect(normalized[1]!.content.text).toBe("a job");
 });
+
+it("保存只有通用英语的旧草稿时复制英美两侧内容", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [
+      {
+        id: "grammar",
+        part_of_speech: "noun",
+        variants: [
+          {
+            id: "common",
+            locale: "en",
+            content: { version: 2, text: "a job", annotations: [] }
+          }
+        ]
+      }
+    ],
+    senses: []
+  };
+  const normalized =
+    normalizeGrammarVariants(draft).grammar_structures![0]!.variants;
+  expect(normalized.map((variant) => variant.locale)).toEqual([
+    "en-GB",
+    "en-US"
+  ]);
+  expect(normalized.every((variant) => variant.content.text === "a job")).toBe(
+    true
+  );
+});

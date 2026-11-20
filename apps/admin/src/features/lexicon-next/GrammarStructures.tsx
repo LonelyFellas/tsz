@@ -570,7 +570,9 @@ export function GrammarStructures({
                               ...item,
                               variants: [
                                 ...(item.variants.some(
-                                  (variant) => variant.locale === "en"
+                                  (variant) =>
+                                    variant.locale === "en-GB" ||
+                                    variant.locale === "en-US"
                                 )
                                   ? item.variants.filter(
                                       (variant) => variant.locale !== "en"
