@@ -147,6 +147,7 @@ export function EntryLayout({
     <WordCreationLayout
       currentStep={step}
       onStepChange={onStepChange}
+      allowBasicsStep={exists}
       dictionary={{
         path: `/lexicon-next${languageSearch ? `?${languageSearch}` : ""}`,
         label: "智能词库",

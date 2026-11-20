@@ -27,6 +27,7 @@ interface Props {
     Record<WordCreationStep, { title: string; subtitle?: string }>
   >;
   reachableSteps?: ReadonlySet<WordCreationStep>;
+  allowBasicsStep?: boolean;
   readOnly?: boolean;
   onStepChange?: (step: WordCreationStep) => void;
   presentation: {
@@ -48,6 +49,7 @@ export function WordCreationLayout({
   dictionary,
   stepLabels,
   reachableSteps,
+  allowBasicsStep = false,
   readOnly,
   onStepChange,
   presentation,
@@ -85,7 +87,7 @@ export function WordCreationLayout({
           const disabled =
             componentDisabled ||
             !presentation.wordExists ||
-            step === "basics" ||
+            (step === "basics" && !allowBasicsStep) ||
             readOnly ||
             (reachableSteps && !reachableSteps.has(step)) ||
             !onStepChange;
