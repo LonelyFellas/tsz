@@ -9,7 +9,7 @@ description: 将已合入 GitHub main 且精确 CI 成功的前端 Linux 发布�
 
 ## 必须保留的约束
 
-- 唯一入口为 [deploy-web.sh](../../../deploy/deploy-web.sh) 与 [deploy-admin.sh](../../../deploy/deploy-admin.sh)。只发布当前 GitHub main 的精确 SHA，最新 `CI` run/attempt 必须 completed/success。失败、无记录、来源未知或变化均停止。
+- 自动发布唯一入口为 [deploy-composition.sh](../../../deploy/deploy-composition.sh)，它编排 [deploy-web.sh](../../../deploy/deploy-web.sh) 与 [deploy-admin.sh](../../../deploy/deploy-admin.sh)。手动单组件操作仍使用组件入口。只发布当前 GitHub main 的精确 SHA，最新 `CI` run/attempt 必须 completed/success。失败、无记录、来源未知或变化均停止。
 - 发布消费 CI 的 Linux/amd64 制品，不运行本地 pnpm install/build。服务器不拉源码、不编译，不运行旧根 deploy.sh 或旧 Docker Compose。
 - 入口从精确 Git 对象导出受信工具；下载包只作为数据安全解包，不导入其中的脚本。工作区脏文件和本地环境文件不进入发布包。
 - 原生 candidate manifest、共享远端锁、事务记录、原子切换、静态资源保留、smoke 和来源验证继续生效。不修改后端或数据库。
@@ -28,7 +28,7 @@ CI `quality` 在 Ubuntu 22.04 构建并验证 Web standalone/Sharp 与 Admin tes
 
 ## 2. 参数与顺序
 
-先执行 `./deploy/deploy-web.sh`，成功后执行 `./deploy/deploy-admin.sh`；用户只选一个组件则只运行该入口。共享 nginx 和远端发布锁继续串行。
+自动发布由组合状态机推进 `candidate -> dependencies-ready -> contract-compatible -> web-deploying -> web-accepted -> admin-deploying -> accepted`。组件脚本仍负责各自的制品校验、原子切换、smoke 和回滚。共享 nginx 和远端发布锁继续串行。
 
 自动发布设置 `DEPLOY_SELECT_COMPONENTS=1`；手动入口可设置同值启用组件选择。候选包仍完整验证，再在只读共享锁内复算在线制品、绑定已验收 CI 回执并核对 HTTPS 版本、页面和未登录 API。仅当构建参数、Node 及各组件最后验收 SHA 到候选 SHA 的输入均未变时跳过上传；另一端应用和文档可忽略，共享包、发布工具、根配置与未知路径保守触发发布。缺少历史回执或 Git 对象时发布，校验失败则停止。跳过保留该端原 SHA、CI、摘要和验收时间，不把候选写成已上线。
 
@@ -60,4 +60,4 @@ Web 在 CI 先验证裁剪包启动与 Sharp，远端继续备用实例验活、
 
 汇报组件实际 SHA、CI run/attempt、制品 ID/摘要、构建参数、HTTP/服务及 manifest 结果、阶段耗时和 `local build=0`。失败说明已完成组件、暂存及回退状态。不得强制 nginx reload、重启后端、补造 manifest 或绕过门禁。
 
-日志中的 `[deploy-metrics]` 和 GitHub Actions 摘要按 local/remote 记录阶段、结果及毫秒耗时，失败和回滚也记录，计时输出不覆盖原退出码。自动发布在组件入口前单列 `api-contract`，工作流环境准备和整体耗时沿用 Actions 步骤计时。`verified-available` 表示切流、冒烟及 accepted manifest 均通过时的远端累计时间；远端 total 还包含清理和 Web 的 30 秒旧实例排空，本地 total 还包含来源检查、传输及本地清理，不含前置契约检查。嵌套阶段和累计值不能相加；SSH 断线时缺失的远端计时保持未知，不自动重试发布。
+日志中的 `[deploy-metrics]` 和 GitHub Actions 摘要按 local/remote 记录阶段、结果及毫秒耗时，失败和回滚也记录，计时输出不覆盖原退出码。自动发布在组合状态机的依赖阶段执行 Web/Admin 各自的 `api-contract` 检查，状态文件作为 Actions 制品保留，远端 `/opt/tsz-deploy-manifests/release-composition.json` 保存当前组合。`verified-available` 表示切流、冒烟及 accepted manifest 均通过时的远端累计时间；远端 total 还包含清理和 Web 的 30 秒旧实例排空，本地 total 还包含来源检查、传输及本地清理，不含前置契约检查。嵌套阶段和累计值不能相加；SSH 断线时缺失的远端计时保持未知，不自动重试发布。

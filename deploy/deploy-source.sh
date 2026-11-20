@@ -381,7 +381,20 @@ deploy_candidate_checkpoint() {
       "$phase" "$DEPLOY_CANDIDATE_REASON" "$DEPLOY_EXPECTED_SHA" "$DEPLOY_EXPECTED_CI_RUN_ID" "$DEPLOY_EXPECTED_CI_RUN_ATTEMPT" \
       "$DEPLOY_CANDIDATE_MAIN_SHA" "$DEPLOY_CANDIDATE_LATEST_ID" "$DEPLOY_CANDIDATE_LATEST_ATTEMPT" >> "$GITHUB_STEP_SUMMARY" || deploy_source_warn 'cannot append superseded candidate summary'
   fi
+  if [[ -n "${DEPLOY_SUPERSEDED_MARKER:-}" ]]; then
+    printf '%s\n' "$DEPLOY_CANDIDATE_REASON" > "$DEPLOY_SUPERSEDED_MARKER" || deploy_source_warn 'cannot write superseded candidate marker'
+  fi
   exit 0
+}
+
+deploy_component_result() {
+  local component_sha="$1"
+  [[ "$component_sha" =~ ^[0-9a-f]{40}$ ]] || {
+    deploy_source_error "component result SHA is invalid"
+    return 1
+  }
+  [[ -z "${DEPLOY_COMPONENT_RESULT_MARKER:-}" ]] ||
+    printf '%s\n' "$component_sha" > "$DEPLOY_COMPONENT_RESULT_MARKER"
 }
 
 prepare_deploy_source() {

@@ -46,8 +46,11 @@ prepare_deploy_artifact web "$deploy_tmp"
 echo "==> package ready after $((SECONDS - started))s"
 select_deploy_component web "$deploy_tmp"
 if [[ "$DEPLOY_COMPONENT_ACTION" = skip ]]; then
+  accepted_sha="$(node -e 'const s=require(process.argv[1]); if(s.action!=="skip" || !s.accepted_sha) process.exit(1); process.stdout.write(s.accepted_sha)' "$deploy_tmp/selection.json")"
+  deploy_component_result "$accepted_sha"
   echo '✓ web unchanged; existing accepted version verified; remote writes=0; local build=0'
   exit 0
 fi
 publish_deploy_artifact web "$deploy_tmp"
+deploy_component_result "$DEPLOY_GIT_SHA"
 echo "✓ web accepted; total $((SECONDS - started))s; local build=0"
