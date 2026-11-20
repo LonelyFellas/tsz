@@ -38,6 +38,27 @@ export function newGrammarStructure(
   };
 }
 
+export function normalizeGrammarVariants(draft: NextDraft): NextDraft {
+  if (!draft.grammar_structures?.length) return draft;
+  let changed = false;
+  const grammar_structures = draft.grammar_structures.map((grammar) => {
+    const hasRegionalVariant = grammar.variants.some(
+      (variant) => variant.locale === "en-GB" || variant.locale === "en-US"
+    );
+    if (
+      !hasRegionalVariant ||
+      !grammar.variants.some((variant) => variant.locale === "en")
+    )
+      return grammar;
+    changed = true;
+    return {
+      ...grammar,
+      variants: grammar.variants.filter((variant) => variant.locale !== "en")
+    };
+  });
+  return changed ? { ...draft, grammar_structures } : draft;
+}
+
 export function newSense(
   pos: string,
   groupId: string | undefined,

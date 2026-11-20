@@ -5,7 +5,8 @@ import {
   previewDraft,
   draftProblem,
   ensureMeaningTemplates,
-  grammarBindingIssues
+  grammarBindingIssues,
+  normalizeGrammarVariants
 } from "./model";
 
 it("只为缺失的已配置词性补模板，保留已有内容、共享区间和稳定身份", () => {
@@ -426,4 +427,40 @@ it("混用通用英语和单一地区变体时报告缺失的英美结构", () =
       expect.objectContaining({ node_id: "grammar", field: "variants" })
     ])
   );
+});
+
+it("保存前清理已存在目标地区的通用英语混合变体", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "job",
+    forms: [],
+    grammar_structures: [
+      {
+        id: "grammar",
+        part_of_speech: "noun",
+        variants: [
+          {
+            id: "common",
+            locale: "en",
+            content: { version: 2, text: "a job", annotations: [] }
+          },
+          {
+            id: "uk",
+            locale: "en-GB",
+            content: { version: 2, text: "a job", annotations: [] }
+          },
+          {
+            id: "us",
+            locale: "en-US",
+            content: { version: 2, text: "a job", annotations: [] }
+          }
+        ]
+      }
+    ],
+    senses: []
+  };
+  const normalized = normalizeGrammarVariants(draft);
+  expect(
+    normalized.grammar_structures![0]!.variants.map((v) => v.locale)
+  ).toEqual(["en-GB", "en-US"]);
 });

@@ -54,6 +54,7 @@ import {
   draftProblem,
   generalSense,
   localeLabels,
+  normalizeGrammarVariants,
   previewDraft,
   replaceFormEditor
 } from "@/features/lexicon-next/model";
@@ -890,15 +891,16 @@ function EntryEditor({
         }
         const current = draftRef.current;
         const sanitized = sanitizeNextDraft(current);
+        const normalized = normalizeGrammarVariants(sanitized.draft);
         if (sanitized.repaired) {
-          draftRef.current = sanitized.draft;
-          setDraft(sanitized.draft);
+          draftRef.current = normalized;
+          setDraft(normalized);
           setRichTextRepairNotice(true);
+        } else if (normalized !== sanitized.draft) {
+          draftRef.current = normalized;
+          setDraft(normalized);
         }
-        const problem = draftProblem(
-          sanitized.draft,
-          equivalentMetadataAvailable
-        );
+        const problem = draftProblem(normalized, equivalentMetadataAvailable);
         if (problem) throw new Error(problem);
         const changes = sentenceDraftsAvailable
           ? await sentenceWorkspace.prepare()
@@ -906,7 +908,7 @@ function EntryEditor({
         const result = await requests.save(saved.id, {
           expected_revision: saved.revision,
           ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
-          draft: sanitized.draft,
+          draft: normalized,
           ...(changes.length ? { sentence_changes: changes } : {})
         });
         setEditedPairs({});
