@@ -51,7 +51,6 @@ import { spellingConflictReferences } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
 import { V3DisabledReason } from "./V3DisabledReason";
 import { V3PronunciationList } from "./V3PronunciationList";
-import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 
 /** 拼写与多维例句标注片段对不上时即时标红（Q2）：输入框照常可编辑，保存由确认条与后端拦。 */
 function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
@@ -463,22 +462,6 @@ function V3DialectFormCell({
               : undefined
           }
           dialect={dialect}
-          leadingAction={
-            <PronunciationPreviewControls
-              recommendationArea="word"
-              playbackOnly
-              pronunciationId={variant.id}
-              spelling={variant.spelling}
-              content={spellingEditorValue(variant)}
-              voiceProfile={variant.spelling_speech?.voice_profile}
-              audioAssets={variant.spelling_speech?.audio_assets}
-              dialect={dialect}
-              ariaLabelPrefix={t("dialect_spelling_label", {
-                label: formLabel,
-                dialect: dialectLabel(dialect)
-              })}
-            />
-          }
           onCommit={(result) => {
             let next = content;
             if (dialectRules.spelling_mode === "unified") {
@@ -960,21 +943,6 @@ export function V3ConcreteFormRow({
                     ? t("panel_enter_the_form_spelling_first")
                     : undefined
                 }
-                leadingAction={
-                  <PronunciationPreviewControls
-                    recommendationArea="word"
-                    playbackOnly
-                    pronunciationId={commonVariant.id}
-                    spelling={commonVariant.spelling}
-                    content={spellingEditorValue(commonVariant)}
-                    voiceProfile={commonVariant.spelling_speech?.voice_profile}
-                    audioAssets={commonVariant.spelling_speech?.audio_assets}
-                    dialect="common"
-                    ariaLabelPrefix={t("common_spelling_label", {
-                      label: formLabel
-                    })}
-                  />
-                }
                 invalid={
                   commonConflictLiterals.length > 0 ||
                   issues.some(
@@ -1089,25 +1057,6 @@ export function V3ConcreteFormRow({
                   !unifiedSpellingVariants.uk.spelling.trim()
                     ? t("panel_enter_the_form_spelling_first")
                     : undefined
-                }
-                leadingAction={
-                  <PronunciationPreviewControls
-                    recommendationArea="word"
-                    playbackOnly
-                    pronunciationId={form.id}
-                    spelling={unifiedSpellingVariants.uk.spelling}
-                    content={spellingEditorValue(unifiedSpellingVariants.uk)}
-                    voiceProfile={
-                      unifiedSpellingVariants.uk.spelling_speech?.voice_profile
-                    }
-                    audioAssets={
-                      unifiedSpellingVariants.uk.spelling_speech?.audio_assets
-                    }
-                    dialect="common"
-                    ariaLabelPrefix={t("common_spelling_label", {
-                      label: formLabel
-                    })}
-                  />
                 }
                 invalid={unifiedSpellingInvalid}
                 ariaLabel={t("common_spelling_label", { label: formLabel })}

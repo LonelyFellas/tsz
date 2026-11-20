@@ -21,7 +21,7 @@ import type {
   WordFormGroupV3,
   WordPosFormsV3
 } from "@tsz/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   addConcreteForm,
@@ -76,6 +76,80 @@ export interface V3FormGroupCardProps {
   boundSenseCount?: number;
 }
 
+interface V3DeleteFormButtonProps {
+  content: DraftFormsStepContentV3;
+  posId: string;
+  formId: string;
+  groupIndex: number;
+  formIndex: number;
+  sharedCount: number;
+  deleteLocked: boolean;
+  deleteReason?: string;
+  referenceHint?: string;
+  onChange: (next: DraftFormsStepContentV3) => void;
+}
+
+function V3DeleteFormButton({
+  content,
+  posId,
+  formId,
+  groupIndex,
+  formIndex,
+  sharedCount,
+  deleteLocked,
+  deleteReason,
+  referenceHint,
+  onChange
+}: V3DeleteFormButtonProps) {
+  const { t, i18n } = useLexiconEditorTranslation();
+  const [open, setOpen] = useState(false);
+
+  // 引用索引可能在确认框打开后才返回。锁定后立即关闭，避免确认按钮继续操作陈旧草稿。
+  useEffect(() => {
+    if (deleteLocked) setOpen(false);
+  }, [deleteLocked]);
+
+  return (
+    <V3DisabledReason reason={deleteReason}>
+      <Popconfirm
+        cancelButtonProps={{ "aria-label": t("cancel_delete_form") }}
+        cancelText={t("cancel")}
+        description={[
+          sharedCount > 1 ? t("remove_shared_label") : t("remove_last_label"),
+          referenceHint
+        ]
+          .filter(Boolean)
+          .join(i18n.language.startsWith("en") ? " " : "")}
+        disabled={deleteLocked}
+        okButtonProps={{
+          "aria-label": t("delete_form_audio"),
+          danger: true
+        }}
+        okText={t("delete_form")}
+        onConfirm={() => {
+          const result = deleteConcreteForm(content, posId, formId);
+          if (result.ok) onChange(result.value);
+        }}
+        onOpenChange={setOpen}
+        open={open}
+        title={t("delete_form_title")}
+      >
+        <Button
+          aria-label={t("delete_group_form_label", {
+            group: groupIndex + 1,
+            index: formIndex + 1
+          })}
+          danger
+          disabled={deleteLocked}
+          icon={<CircleMinusIcon />}
+          size="small"
+          type="text"
+        />
+      </Popconfirm>
+    </V3DisabledReason>
+  );
+}
+
 export function V3FormGroupCard({
   sharedCounts,
   onEditContent,
@@ -101,11 +175,10 @@ export function V3FormGroupCard({
   onCloseSenses,
   boundSenseCount = 0
 }: V3FormGroupCardProps) {
-  const { t, i18n } = useLexiconEditorTranslation();
+  const { t } = useLexiconEditorTranslation();
   const BASE_REQUIRED_HINT = t("first_base_required");
   // 模板仅在新建或显式新增词性时初始化；展示以草稿成员为准。
   const formTypeLabel = useFormTypeLabel();
-  const [blockedFormId, setBlockedFormId] = useState<string>();
   const [collapsed, setCollapsed] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnsOverflow, setColumnsOverflow] = useState(false);
@@ -170,19 +243,6 @@ export function V3FormGroupCard({
     const baseMembers = baseMembersOf(group);
     return baseMembers.length === 1 ? baseMembers[0]!.id : undefined;
   })();
-  // 确认框开着时本组另一个原形可能被改成派生类型，待删词形就成了唯一原形，不能再删，直接收起；
-  // 引用数据晚到、发现待删词形被引用时同理（受控的 open 不受 Popconfirm disabled 约束）。
-  const blockedForm =
-    blockedFormId === undefined
-      ? undefined
-      : pos.forms.find((item) => item.id === blockedFormId);
-  if (
-    blockedForm &&
-    (referenceStatusHint !== undefined ||
-      lockedBaseFormIds.has(blockedForm.id) ||
-      formReferenceCount(referenceGuard.index, blockedForm) > 0)
-  )
-    setBlockedFormId(undefined);
   const formRow = (
     member: WordFormGroupV3["members"][number],
     index: number,
@@ -254,47 +314,18 @@ export function V3FormGroupCard({
       actions: (
         <div className="v3-membership-actions">
           {/* 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认。 */}
-          <V3DisabledReason reason={deleteReason}>
-            <Popconfirm
-              cancelButtonProps={{ "aria-label": t("cancel_delete_form") }}
-              cancelText={t("cancel")}
-              description={[
-                (sharedCounts?.get(form.id) ?? 1) > 1
-                  ? t("remove_shared_label")
-                  : t("remove_last_label"),
-                referenceHint
-              ]
-                .filter(Boolean)
-                .join(i18n.language.startsWith("en") ? " " : "")}
-              disabled={deleteLocked}
-              okButtonProps={{
-                "aria-label": t("delete_form_audio"),
-                danger: true
-              }}
-              okText={t("delete_form")}
-              onConfirm={() => {
-                const result = deleteConcreteForm(content, pos.pos_id, form.id);
-                if (result.ok) onChange(result.value);
-              }}
-              onOpenChange={(open) =>
-                setBlockedFormId(open ? form.id : undefined)
-              }
-              open={blockedFormId === form.id}
-              title={t("delete_form_title")}
-            >
-              <Button
-                aria-label={t("delete_group_form_label", {
-                  group: groupIndex + 1,
-                  index: index + 1
-                })}
-                danger
-                disabled={deleteLocked}
-                icon={<CircleMinusIcon />}
-                size="small"
-                type="text"
-              />
-            </Popconfirm>
-          </V3DisabledReason>
+          <V3DeleteFormButton
+            content={content}
+            deleteLocked={deleteLocked}
+            deleteReason={deleteReason}
+            formId={form.id}
+            formIndex={index}
+            groupIndex={groupIndex}
+            onChange={onChange}
+            posId={pos.pos_id}
+            referenceHint={referenceHint}
+            sharedCount={sharedCounts?.get(form.id) ?? 1}
+          />
         </div>
       )
     };

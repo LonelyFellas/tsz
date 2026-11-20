@@ -3148,9 +3148,10 @@ it("口音设置修改共享停顿后，宿主保存等待另一口音补齐音�
   ]);
   const generateAudio = vi
     .fn()
-    .mockImplementation(async ({ setting }: { setting: VoiceSetting }) => ({
-      id: `fresh-${setting.locale}`
-    }));
+    .mockImplementation(async ({ setting }: { setting: VoiceSetting }) => {
+      expect(screen.queryByRole("dialog")).toBeInTheDocument();
+      return { id: `fresh-${setting.locale}` };
+    });
   const audioTasks = new Map<string, () => Promise<boolean>>();
   const persisted = vi.fn();
   function Host() {
@@ -3208,6 +3209,10 @@ it("口音设置修改共享停顿后，宿主保存等待另一口音补齐音�
           field="spelling"
           ariaLabel="停顿拼写"
           spellingSettingsRef={opener}
+          spellingAudioScope={{
+            activeLocales: ["en-GB", "en-US"],
+            requiredLocales: []
+          }}
           voiceProfile={profile}
           onChange={setValue}
           onVoiceProfileChange={setProfile}

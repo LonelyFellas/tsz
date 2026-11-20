@@ -15,8 +15,13 @@
   flex-direction: column;
   gap: var(--ui-space-4);
   min-width: 0;
-  width: 1200px;
+  width: 100%;
+  max-width: 1440px;
   margin-inline: auto;
+}
+
+.voice-library-catalog {
+  max-width: none;
 }
 
 .voice-library-controls > .ui-card-body {

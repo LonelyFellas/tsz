@@ -46,12 +46,15 @@ export function useVoiceEditorTranslation() {
   const instance = useInterfaceInstance();
   useMemo(() => {
     for (const [language, namespaces] of Object.entries(voiceEditorResources)) {
-      if (!instance.hasResourceBundle(language, "voiceEditor"))
-        instance.addResourceBundle(
-          language,
-          "voiceEditor",
-          namespaces.voiceEditor
-        );
+      // 合并而不是只在 namespace 不存在时注册，确保宿主热更新或长期实例中
+      // 已有旧资源时也能拿到新增文案，同时保留宿主已经覆盖的译文。
+      instance.addResourceBundle(
+        language,
+        "voiceEditor",
+        namespaces.voiceEditor,
+        true,
+        false
+      );
     }
   }, [instance]);
   return useTranslation("voiceEditor", { i18n: instance });
@@ -91,7 +94,12 @@ export function voiceEditorErrorMessage(
   return error instanceof VoiceEditorDisplayError
     ? error
     : error instanceof Error
-      ? error.message
+      ? error.message ===
+        "当前口音没有满足声音、参数和读法能力的已选推荐，请明确选择或修复配置"
+        ? createVoiceEditorMessage(
+            "no_usable_recommendation_for_accent_check_voice_settings"
+          )
+        : error.message
       : createVoiceEditorMessage(fallback);
 }
 

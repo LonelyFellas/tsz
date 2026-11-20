@@ -9,6 +9,7 @@ import { useSelectedVoiceAudio } from "../useSelectedVoiceAudio";
 import { usePermission } from "@/lib/auth";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { useContentEditPermissions } from "../../contentEditPermissions";
+import { speechAccentGroup } from "@tsz/shared";
 import type {
   AudioAssetLocaleV3,
   AudioAssetV3,
@@ -33,6 +34,7 @@ import {
   remapTextLinks,
   toRichTextV2,
   recommendationVoiceSetting,
+  voiceSettingKey,
   withDefaultVoiceProfile
 } from "@tsz/voice-editor/core";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
@@ -462,7 +464,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const editorPreviewAdapter = useMemo(() => {
     const adapter = sessionPreviewAdapter ?? adminVoicePreviewAdapter;
-    // 编辑期间只试听，正式音频由完成/保存动作统一补齐。
+    // 编辑期间只试听；正式音频由完成/保存按钮显式等待补齐。
     return { ...adapter, generateAudio: undefined };
   }, [sessionPreviewAdapter]);
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
@@ -474,7 +476,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     !readOnly &&
     !contentReadOnly &&
     !textOnly &&
-    !spellingSettings &&
+    (!spellingSettings || (spellingAudioLocales?.length ?? 0) > 0) &&
     mode !== "actual-pron" &&
     Boolean((sessionPreviewAdapter ?? adminVoicePreviewAdapter).generateAudio);
   const draftSpeechContent = useMemo(
@@ -491,6 +493,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         : draftState.voiceProfile,
     [area, draftState.voiceProfile]
   );
+  const draftVoiceProfileRef = useRef(draftState.voiceProfile);
   const draftAudio = useSelectedVoiceAudio({
     target: JSON.stringify([nodeId, field, dialect, "dialog"]),
     content: draftSpeechContent,
@@ -499,8 +502,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     locale,
     enabled: draftSpeechEnabled,
     defer: true,
-    onChange: (voiceProfile) =>
-      setDraftState((current) => ({ ...current, voiceProfile }))
+    onChange: (voiceProfile) => {
+      draftVoiceProfileRef.current = voiceProfile;
+      setDraftState((current) => ({ ...current, voiceProfile }));
+    }
   });
   const draftAudioRef = useRef({
     generate: draftAudio.retry,
@@ -511,6 +516,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   useLayoutEffect(() => {
     draftAudioRef.current = { generate: draftAudio.retry, state: draftState };
+    draftVoiceProfileRef.current = draftState.voiceProfile;
   });
   const draftPending = JSON.stringify(draftState) !== incomingKey;
   const reportEditorReady = useCallback(
@@ -590,7 +596,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         if (activeTarget.current !== target) return false;
         captured = {
           ...captured,
-          voiceProfile: draftAudioRef.current.state.voiceProfile
+          voiceProfile: draftVoiceProfileRef.current
         };
       }
       const settingsSnapshot = settingsInitial.current;
@@ -601,7 +607,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           settingsSnapshot.value.text !== value.text)
       )
         throw new Error(t("spelling_settings_target_changed"));
-      const result =
+      let result =
         spellingSettings && settingsSnapshot
           ? mergeSpellingSettings(
               { value: toRichTextV2(value), voiceProfile, audioAssets },
@@ -633,8 +639,48 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                   audioAssets: audioAssets ?? undefined
                 }
               : captured;
+      if (
+        draftSpeechEnabled &&
+        spellingSettings &&
+        result.voiceProfile &&
+        captured.voiceProfile
+      ) {
+        const activeAccents = spellingAudioLocales
+          ? new Set(
+              spellingAudioLocales.map((locale) => speechAccentGroup(locale))
+            )
+          : undefined;
+        const generatedAudio = new Map(
+          captured.voiceProfile.voices
+            .filter(
+              (setting) =>
+                setting.audio_asset_id &&
+                (!activeAccents ||
+                  activeAccents.has(
+                    speechAccentGroup(setting.locale, setting.accent)
+                  ))
+            )
+            .map(
+              (setting) =>
+                [voiceSettingKey(setting), setting.audio_asset_id!] as const
+            )
+        );
+        result = {
+          ...result,
+          voiceProfile: {
+            ...result.voiceProfile,
+            voices: result.voiceProfile.voices.map((setting) => {
+              const audioAssetId = generatedAudio.get(voiceSettingKey(setting));
+              return audioAssetId
+                ? { ...setting, audio_asset_id: audioAssetId }
+                : setting;
+            })
+          }
+        };
+      }
       const next = { ...draftState, ...result, nodeId: target };
       const commitSourceAudio =
+        !draftSpeechEnabled &&
         (spellingSettings || textOnly) &&
         canGenerateAudio &&
         env.VOICE_PREVIEW &&

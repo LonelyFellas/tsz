@@ -20,7 +20,7 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
-import { useEffect, useId, useState, type DragEvent } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent } from "react";
 import type { SpellingSettingsOpener } from "./V3VoiceTextField";
 import { spellingEditorValue } from "../spellingSpeech";
 import { issuesForPronunciation } from "../model";
@@ -91,6 +91,11 @@ export function V3PronunciationList({
   const [missingIpa, setMissingIpa] = useState<Record<string, "uk" | "us">>({});
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
+  const dragPreviewRef = useRef<HTMLElement | null>(null);
+  const clearDragPreview = () => {
+    dragPreviewRef.current?.remove();
+    dragPreviewRef.current = null;
+  };
   useEffect(() => {
     form.setFieldsValue({ items: variant.pronunciations });
   }, [form, variant.pronunciations]);
@@ -237,17 +242,8 @@ export function V3PronunciationList({
                         draggable={fields.length > 1}
                         htmlType="button"
                         icon={<GripVerticalIcon />}
-                        onDragEnd={(event) => {
-                          const row = event.currentTarget.closest<HTMLElement>(
-                            ".word-pronunciation-editor"
-                          );
-                          row?.classList.remove("is-drag-preview");
-                          row?.style.removeProperty("background-color");
-                          row?.style.removeProperty("border");
-                          row?.style.removeProperty("border-radius");
-                          row?.style.removeProperty("box-shadow");
-                          row?.style.removeProperty("opacity");
-                          row?.style.removeProperty("transform");
+                        onDragEnd={() => {
+                          clearDragPreview();
                           setDraggingIndex(undefined);
                           setDragOverIndex(undefined);
                         }}
@@ -269,15 +265,58 @@ export function V3PronunciationList({
                             typeof event.dataTransfer.setDragImage ===
                               "function"
                           ) {
-                            row.classList.add("is-drag-preview");
                             const surface = row.closest<HTMLElement>(
                               ".word-shared-pronunciation, .word-form-matrix-dialect-cell"
                             );
-                            if (surface) {
-                              row.style.backgroundColor =
-                                getComputedStyle(surface).backgroundColor;
-                            }
-                            event.dataTransfer.setDragImage(row, 24, 24);
+                            clearDragPreview();
+                            const preview = row.cloneNode(true) as HTMLElement;
+                            const rect = row.getBoundingClientRect();
+                            const surfaceColor = surface
+                              ? getComputedStyle(surface).backgroundColor
+                              : "transparent";
+                            preview.setAttribute("aria-hidden", "true");
+                            preview.setAttribute("inert", "");
+                            preview
+                              .querySelectorAll<HTMLElement>("[id]")
+                              .forEach((element) =>
+                                element.removeAttribute("id")
+                              );
+                            preview.classList.remove("is-dragging");
+                            preview.classList.add("is-drag-preview");
+                            preview.style.position = "fixed";
+                            preview.style.left = "-10000px";
+                            preview.style.top = "-10000px";
+                            preview.style.width = `${Math.ceil(rect.width)}px`;
+                            preview.style.height = `${Math.ceil(rect.height)}px`;
+                            preview.style.margin = "0";
+                            preview.style.boxSizing = "border-box";
+                            preview.style.overflow = "hidden";
+                            preview.style.opacity = "1";
+                            preview.style.transform = "none";
+                            preview.style.backgroundColor = surfaceColor;
+                            preview.style.border =
+                              "1px solid var(--ui-color-border-secondary)";
+                            preview.style.borderRadius =
+                              "var(--ui-border-radius-lg)";
+                            preview.style.boxShadow = "var(--ui-shadow-sm)";
+                            preview.style.pointerEvents = "none";
+                            const sourceFields = row.querySelectorAll<
+                              | HTMLInputElement
+                              | HTMLTextAreaElement
+                              | HTMLSelectElement
+                            >("input, textarea, select");
+                            const previewFields = preview.querySelectorAll<
+                              | HTMLInputElement
+                              | HTMLTextAreaElement
+                              | HTMLSelectElement
+                            >("input, textarea, select");
+                            sourceFields.forEach((field, fieldIndex) => {
+                              const target = previewFields[fieldIndex];
+                              if (target) target.value = field.value;
+                            });
+                            document.body.appendChild(preview);
+                            dragPreviewRef.current = preview;
+                            event.dataTransfer.setDragImage(preview, 24, 24);
                           }
                           setDraggingIndex(index);
                         }}
