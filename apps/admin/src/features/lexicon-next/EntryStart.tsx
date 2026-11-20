@@ -30,6 +30,8 @@ import {
 import { useLexiconLanguages } from "./LanguageSelection";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
+import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
+import { dictionaryMatchPosLabel } from "./dictionaryPosLabel";
 
 export interface LexiconNextCreationNavigationState {
   lexiconNextSuggestedPartOfSpeech?: string[];
@@ -47,7 +49,8 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const canCreate = usePermission("words.create");
   const canEdit = usePermission("words.edit");
   const posLabel = usePartOfSpeechLabel();
-  const { t } = useLexiconEditorTranslation();
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
+  const { t, i18n } = useLexiconEditorTranslation();
   const [value, setValue] = useState("");
   const [detection, setDetection] = useState<NextDetection>();
   const [expandedGlosses, setExpandedGlosses] = useState<Set<string>>(
@@ -400,7 +403,14 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                     <article key={match.id} className="lexicon-next-match">
                       <Space wrap>
                         <strong className="tsz-words">{match.term}</strong>
-                        <Tag>{posLabel(match.part_of_speech)}</Tag>
+                        <Tag>
+                          {dictionaryMatchPosLabel(
+                            match.part_of_speech,
+                            partOfSpeechCatalog.data?.items,
+                            posLabel,
+                            i18n.language
+                          )}
+                        </Tag>
                       </Space>
                       {match.phonetics.length > 0 && (
                         <ul className="lexicon-next-phonetics">
