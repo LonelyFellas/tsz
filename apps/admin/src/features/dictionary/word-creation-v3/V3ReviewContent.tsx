@@ -5,6 +5,7 @@ import { useColumnSettings } from "@/components/useColumnSettings";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   expandFormContents,
+  DEFAULT_SPELLING_SYNTHESIS,
   EMPTY_SYNTHESIS,
   pronunciationPlaybackSource,
   synthesisInputIssue,
@@ -76,7 +77,10 @@ function ReviewPronunciationPlayback({
   const { preference } = useDialectPreference();
   const locale = pronunciationLocale(dialect, preference);
   const synthesis = synthesisForLocale(
-    pronunciation.synthesis ?? EMPTY_SYNTHESIS,
+    pronunciation.synthesis ??
+      (pronunciation.voice_profile || pronunciation.audio_assets?.length
+        ? EMPTY_SYNTHESIS
+        : DEFAULT_SPELLING_SYNTHESIS),
     locale,
     legacyDialect
   );

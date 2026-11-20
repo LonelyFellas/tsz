@@ -1974,3 +1974,29 @@ it("原无合成来源的目标从显式IPA资料复制后仍使用自己的逐�
   ).toEqual(["own-us"]);
   expect(JSON.stringify(copied.synthesis)).not.toContain("audio_asset_id");
 });
+
+it("复制音色到旧行级音频目标时保留 Azure 默认来源", () => {
+  const { forms, sourceId, targetId } = setup();
+  const source = variant(forms.contents[0]!).pronunciations[0]!;
+  const target = variant(forms.contents[1]!).pronunciations[0]!;
+  source.synthesis = {
+    alphabet: "ipa",
+    ipa: "",
+    ups: "",
+    uk: {
+      source: "ipa",
+      ipa: "kæt",
+      ups: "",
+      ipa_speech: speech("cat", profile("source-ipa"))
+    }
+  };
+  delete target.synthesis;
+  target.voice_profile = profile("legacy-target");
+
+  const copied = variant(
+    applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
+      .contents[1]!
+  ).pronunciations[0]!;
+
+  expect(copied.synthesis?.use_spelling).toBe(false);
+});

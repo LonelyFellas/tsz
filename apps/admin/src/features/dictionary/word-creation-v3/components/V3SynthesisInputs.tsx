@@ -33,6 +33,7 @@ import type {
 import {
   convertDictionaryToAzureIpa,
   convertAzureIpaToUps,
+  DEFAULT_SPELLING_SYNTHESIS,
   editSynthesisUpsWords,
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
@@ -87,7 +88,11 @@ export function V3SynthesisInputs({
 }) {
   const { t } = useLexiconEditorTranslation();
   const { edit: canEdit } = useContentEditPermissions();
-  const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
+  const synthesis =
+    pronunciation.synthesis ??
+    (pronunciation.voice_profile || pronunciation.audio_assets?.length
+      ? EMPTY_SYNTHESIS
+      : DEFAULT_SPELLING_SYNTHESIS);
   const inputPrefix = useId();
   const [localMissingIpa, setLocalMissingIpa] = useState<Side>();
   const activeMissingIpa = missingIpa ?? localMissingIpa;

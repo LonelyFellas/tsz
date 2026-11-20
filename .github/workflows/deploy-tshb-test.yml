@@ -85,12 +85,19 @@ jobs:
           DEPLOY_SELECT_COMPONENTS: "1"
           DEPLOY_AUTO_SKIP_STALE: "1"
         run: |
-          DEPLOY_EXPECTED_API_SHA="$(node deploy/deploy-metrics.mjs run web local api-contract -- node deploy/wait-api-contract.mjs --compatible)"
-          export DEPLOY_EXPECTED_API_SHA
-          ./deploy/deploy-web.sh
-          DEPLOY_EXPECTED_API_SHA="$(node deploy/deploy-metrics.mjs run admin local api-contract -- node deploy/wait-api-contract.mjs --compatible)"
-          export DEPLOY_EXPECTED_API_SHA
-          ./deploy/deploy-admin.sh
+          mkdir -p "$RUNNER_TEMP/deploy-composition"
+          DEPLOY_COMPOSITION_STATE="$RUNNER_TEMP/deploy-composition/release-state.json" \
+            ./deploy/deploy-composition.sh
+
+      - name: Preserve release composition state
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-release-composition-${{ github.event.workflow_run.head_sha }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deploy-composition/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Close deployment SSH connection
         if: ${{ always() }}

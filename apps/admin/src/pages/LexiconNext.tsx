@@ -68,7 +68,11 @@ import {
   focusPublicationIssue
 } from "@/features/lexicon-next/publicationIssueFocus";
 import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
-import { EntryStart } from "@/features/lexicon-next/EntryStart";
+import {
+  EntryStart,
+  type LexiconNextCreationNavigationState
+} from "@/features/lexicon-next/EntryStart";
+import { seedRecommendedPartOfSpeech } from "@/features/lexicon-next/recommendedPosPrefill";
 import { sanitizeFormsRichText } from "@/features/dictionary/word-creation-v3/operations";
 import { v3IssueMessage } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import {
@@ -334,6 +338,8 @@ function EntryLoader({
   if (query.data.target_language !== "en")
     return <Alert type="warning" title="当前编辑器尚未开放此目标语言" />;
   const preserveEditor = location.state?.lexiconMediumSwitch === true;
+  const creationState =
+    location.state as LexiconNextCreationNavigationState | null;
   if (query.data.medium_locale !== medium && !preserveEditor) {
     const selection = new URLSearchParams(languageSearch);
     if (query.data.medium_locale)
@@ -358,6 +364,7 @@ function EntryLoader({
     <EntryEditor
       key={`${id}:${medium}`}
       initial={query.data}
+      suggestedPartOfSpeech={creationState?.lexiconNextSuggestedPartOfSpeech}
       entryMedium={query.data.medium_locale ?? medium}
       requests={requests}
       language={language}
@@ -381,6 +388,7 @@ function EntryLoader({
 }
 function EntryEditor({
   initial,
+  suggestedPartOfSpeech,
   entryMedium,
   requests,
   language,
@@ -416,6 +424,7 @@ function EntryEditor({
   publishingAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
+  suggestedPartOfSpeech?: readonly string[];
   entryMedium: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -425,7 +434,7 @@ function EntryEditor({
   const grammarCatalog = useQuery({
     queryKey: partOfSpeechKeys.catalog(),
     queryFn: () => partOfSpeechDataSource.catalog(),
-    enabled: grammarAvailable,
+    enabled: formEditorAvailable || grammarAvailable || senseMetadataAvailable,
     staleTime: 5 * 60 * 1000
   });
   const navigate = useNavigate();
@@ -556,6 +565,57 @@ function EntryEditor({
     localSnapshot && localSnapshotKey === localKeyIdentity
       ? localSnapshot
       : undefined;
+  const recommendedPosPrefilledRef = useRef(false);
+  useEffect(() => {
+    if (
+      recommendedPosPrefilledRef.current ||
+      !suggestedPartOfSpeech?.length ||
+      !formEditorAvailable ||
+      !grammarCatalog.data ||
+      !localSnapshotChecked ||
+      currentLocalSnapshot
+    )
+      return;
+    const emptyNewDraft =
+      initial.revision === 1 &&
+      !initial.draft.form_editor?.pos.length &&
+      initial.draft.forms.length === 0 &&
+      initial.draft.senses.length === 0;
+    recommendedPosPrefilledRef.current = true;
+    if (!emptyNewDraft) return;
+    const seeded = seedRecommendedPartOfSpeech(
+      draft,
+      initial.kind,
+      suggestedPartOfSpeech,
+      grammarCatalog.data
+    );
+    if (seeded === draft) return;
+    setDraft(seeded);
+    setSelectedPos(seeded.form_editor?.pos[0]?.pos);
+    const state = (routeLocation.state ?? {}) as Record<string, unknown>;
+    const restState = { ...state };
+    delete restState.lexiconNextSuggestedPartOfSpeech;
+    navigate(`${routeLocation.pathname}${routeLocation.search}`, {
+      replace: true,
+      state: Object.keys(restState).length > 0 ? restState : null
+    });
+  }, [
+    currentLocalSnapshot,
+    draft,
+    formEditorAvailable,
+    grammarCatalog.data,
+    initial.draft.form_editor?.pos.length,
+    initial.draft.forms.length,
+    initial.draft.senses.length,
+    initial.kind,
+    initial.revision,
+    localSnapshotChecked,
+    navigate,
+    routeLocation.pathname,
+    routeLocation.search,
+    routeLocation.state,
+    suggestedPartOfSpeech
+  ]);
   const canPublish = usePermission("words.publish");
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
