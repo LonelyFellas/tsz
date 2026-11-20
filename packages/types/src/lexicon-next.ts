@@ -3,9 +3,11 @@ import type {
   AudioAssetV3,
   VoiceProfileV3,
   RichTextV3,
+  GrammarFormLinkV3,
   WordRelationWritableV3,
   SharedFormsStepContentV3
 } from "./admin-word-v3";
+import type { SharedSentenceAnnotation } from "./shared-sentences";
 
 /** Independent lexicon-next identities; the forms editor shares the V1 content contract. */
 export interface NextForm {
@@ -68,6 +70,7 @@ export interface NextSense {
 export interface NextGrammarVariant {
   voice_profile?: VoiceProfileV3;
   audio_assets?: AudioAssetV3[];
+  form_links?: GrammarFormLinkV3[];
   id: string;
   locale: string;
   content: RichTextV3;
@@ -218,6 +221,8 @@ export interface NextCapabilities {
   equivalent_metadata?: boolean;
   sense_metadata?: boolean;
   grammar_audio?: boolean;
+  grammar_form_links?: boolean;
+  sentence_associations?: boolean;
   grammar_structures?: boolean;
   medium_ownership?: boolean;
   schema_version: 1;
@@ -358,6 +363,7 @@ export interface NextSentenceVariant {
   level: string;
   content: RichTextV3;
   translations: NextSentenceTranslation[];
+  associations?: SharedSentenceAnnotation[];
   metadata?: NextSentenceMetadata;
   voice_profile?: VoiceProfileV3;
   audio_assets?: AudioAssetV3[];

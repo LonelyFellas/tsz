@@ -6,11 +6,13 @@ import {
   useRef,
   useState
 } from "react";
+import type { ComponentType } from "react";
 import { flushSync } from "react-dom";
 import type {
   NextSentence,
   NextSentenceTranslation,
-  NextSentenceVariant
+  NextSentenceVariant,
+  SharedSentenceAnnotation
 } from "@tsz/types";
 import { Alert, Button, Card, Flex, Space, Tag } from "@tsz/ui/admin/display";
 import { InputNumber, Select, Slider } from "@tsz/ui/admin/forms";
@@ -35,6 +37,9 @@ const VoiceEditor = lazy(() =>
     default: module.VoiceEditor
   }))
 );
+const SentenceVoiceEditor = VoiceEditor as unknown as ComponentType<
+  VoiceEditorProps<SharedSentenceAnnotation>
+>;
 import {
   sentenceError,
   normalizeTranslationFreedom,
@@ -43,6 +48,11 @@ import {
   translationStyle
 } from "./sentenceModel";
 import { SentenceMetadataFields } from "./SentenceDetails";
+import {
+  SharedSentenceAssociationPicker,
+  type SentenceTargetLabel
+} from "@/features/sentences/SharedSentenceAssociationPicker";
+import type { VoiceEditorProps } from "@tsz/voice-editor/types";
 import "./sentences.css";
 const blank = () => ({ version: 2 as const, text: "", annotations: [] });
 function newVariant(locale: string): NextSentenceVariant {
@@ -140,6 +150,7 @@ function TranslationField({
 export function NextSentenceEditor({
   source,
   detailsAvailable = false,
+  associationsAvailable = false,
   target,
   medium,
   requests,
@@ -149,6 +160,7 @@ export function NextSentenceEditor({
 }: {
   source: NextSentence | null;
   detailsAvailable?: boolean;
+  associationsAvailable?: boolean;
   target: "en-GB" | "en-US";
   medium: string;
   requests: LexiconNextRequests;
@@ -180,6 +192,9 @@ export function NextSentenceEditor({
   const [applying, setApplying] = useState(false);
   const applyingRef = useRef(false);
   const [error, setError] = useState<string>();
+  const [targetLabels, setTargetLabels] = useState<
+    Record<string, SentenceTargetLabel>
+  >({});
   const canGenerate = usePermission("speech.generate");
   const canUpload = usePermission("speech.upload_audio");
   const generationAvailable =
@@ -314,7 +329,7 @@ export function NextSentenceEditor({
           />
         </Space>
         <Suspense fallback={<span role="status">正在加载编辑器</span>}>
-          <VoiceEditor
+          <SentenceVoiceEditor
             mode="grammar"
             readOnly={applying}
             value={content}
@@ -332,6 +347,29 @@ export function NextSentenceEditor({
               setDraft((current) => ({ ...current, voice_profile }))
             }
             audioAssets={draft.audio_assets}
+            textLinks={
+              associationsAvailable ? (draft.associations ?? []) : undefined
+            }
+            renderAssociationPicker={
+              associationsAvailable
+                ? (pickerProps) => (
+                    <SharedSentenceAssociationPicker
+                      {...pickerProps}
+                      dialect={target === "en-GB" ? "uk" : "us"}
+                      nextRequests={requests}
+                      nextTargetLocale={target}
+                      nextMediumLocale={medium}
+                      labels={targetLabels}
+                      onTargetLabel={(key, label) =>
+                        setTargetLabels((current) => ({
+                          ...current,
+                          [key]: label
+                        }))
+                      }
+                    />
+                  )
+                : undefined
+            }
             showAudioUpload
             audioUploadAllowed={canUpload}
             audioUploadAdapter={
@@ -340,8 +378,14 @@ export function NextSentenceEditor({
             onAudioAssetsChange={(audio_assets) =>
               setDraft((current) => ({ ...current, audio_assets }))
             }
-            onChange={(content) =>
-              setDraft((current) => ({ ...current, content }))
+            onChange={(content, associations) =>
+              setDraft((current) => ({
+                ...current,
+                content,
+                ...(associationsAvailable
+                  ? { associations: associations ?? [] }
+                  : {})
+              }))
             }
             renderActions={(canComplete, prepare, capture) => (
               <Space>
@@ -367,6 +411,12 @@ export function NextSentenceEditor({
                           setDraft((current) => ({
                             ...current,
                             content: result.value,
+                            ...(associationsAvailable
+                              ? {
+                                  associations:
+                                    draft.associations ?? result.textLinks ?? []
+                                }
+                              : {}),
                             voice_profile: result.voiceProfile ?? undefined,
                             audio_assets: result.audioAssets ?? []
                           }))

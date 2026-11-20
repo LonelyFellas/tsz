@@ -24,7 +24,8 @@ vi.mock("@tsz/voice-editor/editor", () => ({
           {JSON.stringify({
             locale: props.locale,
             area: props.recommendationArea,
-            speech: props.speechSettingsEnabled
+            speech: props.speechSettingsEnabled,
+            links: Boolean(props.renderAssociationPicker)
           })}
         </output>
         <button onClick={() => props.onVoiceProfileChange?.(profile)}>
@@ -87,6 +88,7 @@ it("配音和正文只在完成时一起写回，取消及切换方言保留另�
           pos="noun"
           target={target}
           audioAvailable
+          formLinksAvailable
           disabled={disabled}
           referenceCount={() => 0}
           onChange={setRows}
@@ -107,7 +109,7 @@ it("配音和正文只在完成时一起写回，取消及切换方言保留另�
   );
   expect(
     JSON.parse((await screen.findByLabelText("配音入口")).textContent!)
-  ).toEqual({ locale: "en-GB", area: "grammar", speech: true });
+  ).toEqual({ locale: "en-GB", area: "grammar", speech: true, links: true });
   fireEvent.click(screen.getByRole("button", { name: "修改配音" }));
   fireEvent.click(screen.getByRole("button", { name: "修改正文" }));
   expect(draft()).toEqual(initial);
@@ -142,7 +144,7 @@ it("配音和正文只在完成时一起写回，取消及切换方言保留另�
   );
   expect(
     JSON.parse((await screen.findByLabelText("配音入口")).textContent!)
-  ).toEqual({ locale: "en-US", area: "grammar", speech: true });
+  ).toEqual({ locale: "en-US", area: "grammar", speech: true, links: true });
   fireEvent.click(screen.getByRole("button", { name: "撤销编辑权限" }));
   expect(
     within(screen.getByRole("dialog")).getByRole("button", { name: "完成" })

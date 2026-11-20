@@ -332,6 +332,7 @@ export function SenseSentenceExamples({
   target,
   medium,
   disabled,
+  associationsAvailable = false,
   requests,
   onChange,
   registerLeaveGuard
@@ -341,6 +342,7 @@ export function SenseSentenceExamples({
   target: string;
   medium: string;
   disabled: boolean;
+  associationsAvailable?: boolean;
   requests: LexiconNextRequests;
   onChange: (ids: string[]) => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
@@ -363,6 +365,7 @@ export function SenseSentenceExamples({
           medium={medium}
           requests={requests}
           disabled={disabled || !validTarget}
+          associationsAvailable={associationsAvailable}
           onChange={onChange}
           onPick={() => setPicking(true)}
           registerLeaveGuard={registerLeaveGuard}
@@ -464,6 +467,7 @@ export function SenseSentenceExamples({
         <NextSentenceEditor
           source={editing.source}
           detailsAvailable={detailsAvailable}
+          associationsAvailable={associationsAvailable}
           target={target}
           medium={medium}
           requests={requests}

@@ -7,19 +7,33 @@ import {
   useRef,
   useState
 } from "react";
+import type { ComponentType } from "react";
 import { flushSync } from "react-dom";
 import type {
+  GrammarFormLinkV3,
   NextGrammarStructure,
   NextGrammarVariant,
   PartOfSpeechCatalogItem
 } from "@tsz/types";
-import { Alert, Button, Card, Space } from "@tsz/ui/admin/display";
+import {
+  Alert,
+  Button,
+  Card,
+  Flex,
+  Space,
+  Typography
+} from "@tsz/ui/admin/display";
 import { Select } from "@tsz/ui/admin/forms";
 import { App } from "@tsz/ui/admin/overlays";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
 import { VoiceEditorModal } from "@/features/dictionary/word-creation-v3/components/VoiceEditorModal";
+import { V3GrammarFormPicker } from "@/features/dictionary/word-creation-v3/components/V3GrammarFormPicker";
+import type { AssociationPickerProps } from "@tsz/voice-editor/types";
+import type { VoiceEditorProps } from "@tsz/voice-editor/types";
+import type { LexiconNextRequests } from "@/pages/LexiconNext";
+import { NextTargetPicker } from "./NextTargetPicker";
 import { useSelectedVoiceAudio } from "@/features/dictionary/word-creation-v3/useSelectedVoiceAudio";
 import { usePermission } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -41,12 +55,90 @@ const VoiceEditor = lazy(() =>
     default: module.VoiceEditor
   }))
 );
+const GrammarVoiceEditor = VoiceEditor as unknown as ComponentType<
+  VoiceEditorProps<GrammarFormLinkV3>
+>;
+
+function CombinedGrammarFormPicker({
+  pickerProps,
+  requests,
+  target,
+  medium
+}: {
+  pickerProps: AssociationPickerProps<GrammarFormLinkV3>;
+  requests?: LexiconNextRequests;
+  target: string;
+  medium?: string;
+}) {
+  const [source, setSource] = useState<"v3" | "lexicon_next">("v3");
+  if (pickerProps.selected?.target_source === "lexicon_next") {
+    return (
+      <Flex vertical gap="small">
+        <Typography.Text type="secondary">
+          已关联新版词条的具体词形。
+        </Typography.Text>
+        <Button size="small" onClick={() => pickerProps.onSelect(undefined)}>
+          清除关联
+        </Button>
+        {pickerProps.onCancel && (
+          <Button size="small" onClick={pickerProps.onCancel}>
+            关闭
+          </Button>
+        )}
+      </Flex>
+    );
+  }
+  if (source === "lexicon_next" && requests) {
+    return (
+      <Flex vertical gap="small">
+        <Button size="small" onClick={() => setSource("v3")}>
+          选择 V3 词条
+        </Button>
+        <NextTargetPicker
+          literal={pickerProps.segments
+            .map((segment) => segment.surface)
+            .join(" ")}
+          targetLocale={target}
+          mediumLocale={medium ?? "zh-Hans"}
+          requests={requests}
+          onSelect={(choice) => {
+            pickerProps.onSelect({
+              id: pickerProps.selected?.id ?? crypto.randomUUID(),
+              source_segments: pickerProps.segments,
+              target_source: "lexicon_next",
+              target_word_id: choice.target_word_id,
+              target_pos_id: choice.target_pos_id,
+              target_form_id: choice.target_form_id,
+              target_variant_id: choice.target_variant_id,
+              target_dialect: choice.target_dialect
+            });
+          }}
+          onCancel={pickerProps.onCancel}
+        />
+      </Flex>
+    );
+  }
+  return (
+    <Flex vertical gap="small">
+      {requests && (
+        <Button size="small" onClick={() => setSource("lexicon_next")}>
+          选择新版词条
+        </Button>
+      )}
+      <V3GrammarFormPicker {...pickerProps} />
+    </Flex>
+  );
+}
 
 function GrammarText({
   variant,
   label,
   disabled,
   audioAvailable,
+  formLinksAvailable,
+  requests,
+  target,
+  medium,
   onChange,
   registerLeaveGuard
 }: {
@@ -54,6 +146,10 @@ function GrammarText({
   label: string;
   disabled: boolean;
   audioAvailable: boolean;
+  formLinksAvailable: boolean;
+  requests?: LexiconNextRequests;
+  target: string;
+  medium?: string;
   onChange: (value: NextGrammarVariant) => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
@@ -194,7 +290,7 @@ function GrammarText({
         )}
         {draft && (
           <Suspense fallback={<span role="status">正在加载编辑器</span>}>
-            <VoiceEditor
+            <GrammarVoiceEditor
               mode="grammar"
               readOnly={disabled || applying}
               value={toRichTextV2(draft.content)}
@@ -224,6 +320,23 @@ function GrammarText({
                   : undefined
               }
               audioAssets={draft.audio_assets}
+              textLinks={
+                formLinksAvailable ? (draft.form_links ?? []) : undefined
+              }
+              renderAssociationPicker={
+                formLinksAvailable
+                  ? (
+                      pickerProps: AssociationPickerProps<GrammarFormLinkV3>
+                    ) => (
+                      <CombinedGrammarFormPicker
+                        pickerProps={pickerProps}
+                        requests={requests}
+                        target={target}
+                        medium={medium}
+                      />
+                    )
+                  : undefined
+              }
               audioUploadAllowed={canUpload}
               audioUploadAdapter={
                 audioAvailable && env.VOICE_AUDIO_UPLOAD
@@ -233,8 +346,17 @@ function GrammarText({
               onAudioAssetsChange={(audio_assets) =>
                 setDraft((current) => current && { ...current, audio_assets })
               }
-              onChange={(content) =>
-                setDraft((current) => current && { ...current, content })
+              onChange={(content, form_links) =>
+                setDraft(
+                  (current) =>
+                    current && {
+                      ...current,
+                      content,
+                      ...(formLinksAvailable
+                        ? { form_links: form_links ?? [] }
+                        : {})
+                    }
+                )
               }
               renderActions={(canComplete, prepareComplete, captureResult) => (
                 <Space>
@@ -260,6 +382,12 @@ function GrammarText({
                           ? {
                               ...draft,
                               content: result.value,
+                              ...(formLinksAvailable
+                                ? {
+                                    form_links:
+                                      draft.form_links ?? result.textLinks ?? []
+                                  }
+                                : {}),
                               ...(audioAvailable
                                 ? {
                                     voice_profile:
@@ -313,6 +441,9 @@ export function GrammarStructures({
   disabled,
   referenceCount,
   audioAvailable = false,
+  formLinksAvailable = false,
+  requests,
+  medium = "zh-Hans",
   registerLeaveGuard,
   onChange
 }: {
@@ -323,6 +454,9 @@ export function GrammarStructures({
   disabled: boolean;
   referenceCount: (id: string) => number;
   audioAvailable?: boolean;
+  formLinksAvailable?: boolean;
+  requests?: LexiconNextRequests;
+  medium?: string;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   onChange: (
     update: (rows: NextGrammarStructure[]) => NextGrammarStructure[]
@@ -404,6 +538,10 @@ export function GrammarStructures({
                 <GrammarText
                   variant={variant}
                   audioAvailable={audioAvailable}
+                  formLinksAvailable={formLinksAvailable}
+                  requests={requests}
+                  target={target}
+                  medium={medium}
                   registerLeaveGuard={registerLeaveGuard}
                   label={`语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
                   disabled={disabled}

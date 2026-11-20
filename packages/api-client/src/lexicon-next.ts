@@ -75,6 +75,8 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   let sentenceDrafts = false;
   let relations = false;
   let dialectPairs = false;
+  let grammarFormLinks = false;
+  let sentenceAssociations = false;
   const editorOptions = {
     headers: {
       "x-tsz-next-publications": "v1",
@@ -89,6 +91,8 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-sense-metadata": "v1",
       "x-tsz-next-grammar": "v1",
       "x-tsz-next-grammar-audio": "v1",
+      "x-tsz-next-grammar-form-links": "v1",
+      "x-tsz-next-sentence-associations": "v1",
       "x-tsz-next-sense-groups": "v1",
       "x-tsz-next-medium-ownership": "v1"
     }
@@ -143,17 +147,25 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         )
         .then((value) => decode<NextSentence>("NextSentence", value)),
     createSentence: (input: CreateNextSentence) =>
-      http
-        .post<unknown>(`${root}/sentences`, input, editorOptions)
-        .then((value) => decode<NextSentence>("NextSentence", value)),
+      !sentenceAssociations && input.variant?.associations !== undefined
+        ? Promise.reject(
+            new ClientResponseError("例句关联能力尚未确认，请重新打开词条")
+          )
+        : http
+            .post<unknown>(`${root}/sentences`, input, editorOptions)
+            .then((value) => decode<NextSentence>("NextSentence", value)),
     saveSentence: (id: string, input: SaveNextSentence) =>
-      http
-        .put<unknown>(
-          `${root}/sentences/${encodeURIComponent(id)}`,
-          input,
-          editorOptions
-        )
-        .then((value) => decode<NextSentence>("NextSentence", value)),
+      !sentenceAssociations && input.variant?.associations !== undefined
+        ? Promise.reject(
+            new ClientResponseError("例句关联能力尚未确认，请重新打开词条")
+          )
+        : http
+            .put<unknown>(
+              `${root}/sentences/${encodeURIComponent(id)}`,
+              input,
+              editorOptions
+            )
+            .then((value) => decode<NextSentence>("NextSentence", value)),
     equivalentCatalog: () =>
       http
         .get<unknown>(`${root}/equivalent-catalog`)
@@ -218,6 +230,8 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         sentenceDrafts = capabilities.sentence_drafts === true;
         dialectPairs = capabilities.dialect_pairs === true;
         relations = capabilities.relations === true;
+        grammarFormLinks = capabilities.grammar_form_links === true;
+        sentenceAssociations = capabilities.sentence_associations === true;
         return capabilities;
       }),
     draftSchema: () =>
@@ -254,6 +268,26 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       ) {
         return Promise.reject(
           new ClientResponseError("拓展词能力尚未确认，请重新打开词条")
+        );
+      }
+      if (
+        !grammarFormLinks &&
+        input.draft.grammar_structures?.some((grammar) =>
+          grammar.variants.some((variant) => variant.form_links !== undefined)
+        )
+      ) {
+        return Promise.reject(
+          new ClientResponseError("语法词形关联能力尚未确认，请重新打开词条")
+        );
+      }
+      if (
+        !sentenceAssociations &&
+        input.sentence_changes?.some(
+          (change) => change.variant.associations !== undefined
+        )
+      ) {
+        return Promise.reject(
+          new ClientResponseError("例句关联能力尚未确认，请重新打开词条")
         );
       }
       if (
