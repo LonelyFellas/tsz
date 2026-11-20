@@ -22,9 +22,13 @@ candidate
 
 远端 `/opt/tsz-deploy-manifests/release-composition.json` 保存当前组合，包含候选前端 SHA、CI 身份、实际 API SHA、Web/Admin 已接受版本和组合状态。文件使用临时文件加原子 rename 写入，并在跨仓锁内生成。
 
+组合写入后由独立的 `release-composition.mjs validate` 读取并校验字段、SHA、CI 身份、组件状态和 API 合约状态。校验失败会让发布失败，保留状态制品和远端现场。
+
 ## 恢复
 
 组件脚本仍按现有接受 manifest 判断是否需要发布。控制器重跑时，已接受组件可以被识别为 unchanged，后续组件继续推进。状态文件作为 GitHub Actions 制品保留，远端组合 manifest 作为服务器事实记录。
+
+恢复演练从 `web-accepted` 组合开始，恢复计划跳过已接受 Web，只发布 Admin。Admin 失败不会生成 `accepted` 组合，重跑后两个组件和 API 状态都通过才进入 `accepted`。
 
 ## 验收
 
