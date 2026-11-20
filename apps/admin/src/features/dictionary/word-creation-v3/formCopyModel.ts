@@ -19,6 +19,8 @@ import type {
   WordPronunciationV3
 } from "@tsz/types";
 import {
+  DEFAULT_SPELLING_SYNTHESIS,
+  EMPTY_SYNTHESIS,
   pronunciationLocale,
   speechAccentGroup,
   synthesisForLocale
@@ -318,11 +320,11 @@ function rebindUpsWords(
   const from = source.match(/\S+/gu) ?? [];
   const to = target.match(/\S+/gu) ?? [];
   const words = candidate.ups_words;
-  if (words == null) {
-    if (candidate.ups.trim() && (from.length > 1 || to.length > 1))
-      throw new FormCopyError("copy_ups_boundaries_missing");
-    return words;
-  }
+  if (words == null)
+    return {
+      words,
+      compatible: !candidate.ups.trim() || (from.length <= 1 && to.length <= 1)
+    };
   if (
     words.length !== from.length ||
     words.length !== to.length ||
@@ -331,8 +333,11 @@ function rebindUpsWords(
     ) ||
     words.map((word) => word.phoneme).join(" ") !== candidate.ups.trim()
   )
-    throw new FormCopyError("copy_ups_target_mismatch");
-  return words.map((word, index) => ({ ...word, text: to[index]! }));
+    return { words: structuredClone(words), compatible: false };
+  return {
+    words: words.map((word, index) => ({ ...word, text: to[index]! })),
+    compatible: true
+  };
 }
 
 function phoneticFields(row: WordPronunciationV3) {
@@ -347,8 +352,12 @@ function phoneticFields(row: WordPronunciationV3) {
   };
 }
 
-function emptySynthesis(): PronunciationSynthesisV3 {
-  return { alphabet: "ipa", ipa: "", ups: "", use_spelling: false };
+function emptySynthesis(
+  target?: WordPronunciationV3
+): PronunciationSynthesisV3 {
+  return target?.voice_profile || target?.audio_assets?.length
+    ? { ...EMPTY_SYNTHESIS }
+    : { ...DEFAULT_SPELLING_SYNTHESIS };
 }
 
 function copyPhonetics(
@@ -444,23 +453,20 @@ function copyPhonetics(
             ? "spelling"
             : previousSelection?.alphabet))
         : candidate.source;
+    const upsWords = rebindUpsWords(
+      candidate,
+      match.source.spelling,
+      match.target.spelling
+    );
     const next: PronunciationSynthesisCandidateV3 = {
       ...(copiedSource ? { source: copiedSource } : {}),
       ipa: candidate.ipa,
       ups: candidate.ups,
       ...(candidate.ups_words !== undefined
-        ? {
-            ups_words: rebindUpsWords(
-              candidate,
-              match.source.spelling,
-              match.target.spelling
-            )
-          }
+        ? { ups_words: upsWords.words }
         : {})
     };
-    // A multiword UPS without boundaries cannot be silently moved to another body.
-    if (candidate.ups_words === undefined)
-      rebindUpsWords(candidate, match.source.spelling, match.target.spelling);
+    if (!upsWords.compatible) next.source = "spelling";
     for (const alphabet of ALPHABETS) {
       const key = `${alphabet}_speech` as const;
       const voice = previous?.[key]?.voice_profile ?? target.voice_profile;
@@ -478,7 +484,7 @@ function copyPhonetics(
         };
       }
     }
-    target.synthesis ??= emptySynthesis();
+    target.synthesis ??= emptySynthesis(target);
     target.synthesis[match.side] = next;
   }
   if (target.synthesis && candidates.some(Boolean)) {
@@ -712,7 +718,7 @@ function selectTargetSource(
   match: FormCopyPlan["matches"][number],
   source: "upload" | "spelling"
 ) {
-  target.synthesis ??= emptySynthesis();
+  target.synthesis ??= emptySynthesis(target);
   const candidate = target.synthesis[match.side] ??
     candidateForSide(target, match.target.region, match.side) ?? {
       ipa: "",
@@ -932,7 +938,7 @@ function copyVoices(
       };
       if (content.text !== match.target.spelling)
         throw new FormCopyError("copy_target_text_mismatch");
-      target.synthesis ??= emptySynthesis();
+      target.synthesis ??= emptySynthesis(target);
       // 写入首个分侧候选前，保留旧格式在两侧实际可用的内容。
       if (!target.synthesis.uk && !target.synthesis.us) {
         for (const side of SIDES) {

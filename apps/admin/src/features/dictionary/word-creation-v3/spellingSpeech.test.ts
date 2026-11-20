@@ -41,7 +41,7 @@ it("拼写任务聚合所有共享读法的活动口音并保留旧协议资产�
     spellingAudioScope([
       { dialect: "common", pronunciations: [pronunciationFixture()] }
     ])
-  ).toEqual({ activeLocales: [], requiredLocales: [] });
+  ).toEqual({ activeLocales: ["en-GB", "en-US"], requiredLocales: [] });
 });
 
 it("隐式 IPA/UPS 不启用拼写，旧拼写配置和单侧来源仍按当前口音聚合", () => {

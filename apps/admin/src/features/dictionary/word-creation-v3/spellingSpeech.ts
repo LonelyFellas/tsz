@@ -7,6 +7,7 @@ import {
   withDefaultVoiceProfile
 } from "@tsz/voice-editor/core";
 import {
+  DEFAULT_SPELLING_SYNTHESIS,
   EMPTY_SYNTHESIS,
   speechAccentGroup,
   synthesisForLocale
@@ -50,7 +51,10 @@ export function spellingAudioScope(
         if (variant.dialect !== "common" && variant.dialect !== side) continue;
         const locale = side === "uk" ? "en-GB" : "en-US";
         const current = synthesisForLocale(
-          row.synthesis ?? EMPTY_SYNTHESIS,
+          row.synthesis ??
+            (row.voice_profile || row.audio_assets?.length
+              ? EMPTY_SYNTHESIS
+              : DEFAULT_SPELLING_SYNTHESIS),
           locale,
           variant.dialect
         );
