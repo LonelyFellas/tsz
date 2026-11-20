@@ -562,6 +562,7 @@ export function GrammarStructures({
                 />
               ) : (
                 <Button
+                  aria-label={`添加或编辑语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
                   disabled={disabled}
                   onClick={() =>
                     onChange((rows) =>

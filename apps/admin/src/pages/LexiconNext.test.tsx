@@ -649,6 +649,22 @@ it("创建时把内置词典推荐词性带入词义步骤", async () => {
   );
 });
 
+it("创建完成后不等待列表统计刷新再进入编辑器", async () => {
+  const api = requests();
+  api.stats.mockReturnValue(new Promise(() => undefined));
+  api.creators.mockReturnValue(new Promise(() => undefined));
+  const { router } = mount(api, "/lexicon-next");
+  await screen.findByRole("button", { name: "创建词条" });
+  await act(() => router.navigate("/lexicon-next/new"));
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "centre" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  await waitForEntryReady();
+  expect(api.create).toHaveBeenCalledOnce();
+});
+
 it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
   const api = requests();
   let finish!: (value: NextEntry) => void;

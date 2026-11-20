@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { NextGrammarStructure, VoiceProfileV3 } from "@tsz/types";
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
@@ -153,4 +159,54 @@ it("配音和正文只在完成时一起写回，取消及切换方言保留另�
     within(screen.getByRole("dialog")).getByRole("button", { name: "取消" })
   );
   expect(draft()[0].variants[1]).toEqual(initial[0]!.variants[1]);
+});
+
+it("缺少当前目标语言内容时仍提供稳定的编辑入口", async () => {
+  const initial: NextGrammarStructure[] = [
+    {
+      id: "grammar",
+      part_of_speech: "noun",
+      variants: [
+        {
+          id: "uk",
+          locale: "en-GB",
+          content: { version: 2, text: "a job", annotations: [] }
+        }
+      ]
+    }
+  ];
+  function Harness() {
+    const [target, setTarget] = useState("en-US");
+    const [rows, setRows] = useState(initial);
+    return (
+      <>
+        <button onClick={() => setTarget("en-US")}>切换美式</button>
+        <GrammarStructures
+          rows={rows}
+          pos="noun"
+          target={target}
+          audioAvailable
+          disabled={false}
+          referenceCount={() => 0}
+          onChange={setRows}
+        />
+        <output aria-label="语法草稿">{JSON.stringify(rows)}</output>
+      </>
+    );
+  }
+  render(
+    <App>
+      <Harness />
+    </App>
+  );
+  const button = screen.getByRole("button", {
+    name: "添加或编辑语法结构 1 美式英语内容"
+  });
+  expect(button).toBeVisible();
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(
+      JSON.parse(screen.getByLabelText("语法草稿").textContent!)[0].variants
+    ).toHaveLength(2)
+  );
 });
