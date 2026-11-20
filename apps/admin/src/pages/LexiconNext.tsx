@@ -787,6 +787,11 @@ function EntryEditor({
           nextMedium !== current.medium))
     );
   });
+  useEffect(() => {
+    if (blocker.state === "blocked" && !dirty && !busy && !formContentOpen) {
+      blocker.proceed();
+    }
+  }, [blocker, busy, dirty, formContentOpen]);
   useBeforeUnload((event) => {
     if (dirty || busy || formContentOpen) {
       event.preventDefault();
@@ -912,6 +917,8 @@ function EntryEditor({
         setRemote(undefined);
         if (localDraftKey)
           void clearNextLocalDraft(localDraftKey).catch(() => undefined);
+        if (publishingAvailable)
+          await publication.refetch().catch(() => undefined);
         void Promise.all(
           ["list", "stats", "creators"].map((key) =>
             queryClient.invalidateQueries({

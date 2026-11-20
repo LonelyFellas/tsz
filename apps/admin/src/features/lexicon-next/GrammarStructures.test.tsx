@@ -200,7 +200,7 @@ it("缺少当前目标语言内容时仍提供稳定的编辑入口", async () =
     </App>
   );
   const button = screen.getByRole("button", {
-    name: "添加或编辑语法结构 1 美式英语内容"
+    name: "编辑语法结构 1 美式英语内容"
   });
   expect(button).toBeVisible();
   fireEvent.click(button);
