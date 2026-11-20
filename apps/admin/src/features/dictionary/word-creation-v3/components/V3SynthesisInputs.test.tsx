@@ -319,6 +319,7 @@ function Harness({
             dialect={dialect}
             index={0}
             issues={issues}
+            onSpellingSettings={() => {}}
             onChange={(patch) =>
               setPronunciation((value) => ({ ...value, ...patch }))
             }
@@ -404,6 +405,39 @@ it("四种配音来源都在来源行提供试听按钮", () => {
       ".word-synthesis-control .word-pronunciation-play-action"
     )
   ).toHaveLength(0);
+});
+
+it("来源行按选择、试听、设置、名称排序", () => {
+  renderWithUps(<Harness dialect="uk" recording />);
+
+  for (const source of ["词形拼写", "Azure IPA", "Azure UPS", "上传音频"]) {
+    const radio = sourceRadio(source, "英式");
+    const option = radio.closest<HTMLElement>(".word-synthesis-source-option");
+    expect(option).not.toBeNull();
+    const play = option?.querySelector<HTMLElement>(
+      ".word-pronunciation-play-action"
+    );
+    const settings = option?.querySelector<HTMLElement>(
+      ".word-synthesis-source-settings"
+    );
+    const label = option?.querySelector<HTMLElement>(
+      ".word-synthesis-choice-content"
+    );
+    expect(play).not.toBeNull();
+    expect(settings).not.toBeNull();
+    expect(label).not.toBeNull();
+    expect(
+      radio.compareDocumentPosition(play!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      play!.compareDocumentPosition(settings!) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      settings!.compareDocumentPosition(label!) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  }
 });
 
 it("没有既有音标配置时默认使用词形拼写配音", () => {
