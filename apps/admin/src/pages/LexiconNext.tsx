@@ -1013,6 +1013,13 @@ function EntryEditor({
             </Button>
           </Space>
         </div>
+        {step !== "preview" && (
+          <Alert
+            type="info"
+            title={`当前目标语言：${localeLabels[target] ?? target}`}
+            description="词形、IPA、语法结构和英文释义需分别补齐英式英语与美式英语。使用顶部目标语言切换当前编辑侧。"
+          />
+        )}
         {!writable && (
           <Alert
             type="info"

@@ -83,6 +83,7 @@ describe("新版发布确认", () => {
       base_revision: 2,
       base_lifecycle_revision: 1
     });
+    expect(screen.getByText("音频未就绪，将按文本发布")).toBeVisible();
     expect(screen.getByText("缺少音频，本次仅发布文本内容")).toBeVisible();
     expect(p.requests.publish).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "确认发布" }));

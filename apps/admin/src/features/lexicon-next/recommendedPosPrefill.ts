@@ -4,10 +4,7 @@ import type {
   SharedFormsStepContentV3
 } from "@tsz/types";
 import { isSharedForms, expandFormContents } from "@tsz/shared";
-import {
-  addPartOfSpeech,
-  fillFormTypeTemplate
-} from "@/features/dictionary/word-creation-v3/operations";
+import { addPartOfSpeech } from "@/features/dictionary/word-creation-v3/operations";
 import { applyDefaultFormSharing } from "@/features/dictionary/word-creation-v3/defaultFormSharing";
 import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { newWordNodeId } from "@/features/dictionary/word-model/primitives";
@@ -45,7 +42,8 @@ export function seedRecommendedPartOfSpeech(
     const result = addPartOfSpeech(forms, item, newWordNodeId);
     if (result.ok) forms = result.value;
   }
-  forms = fillFormTypeTemplate(forms, catalog.items, newWordNodeId);
+  // Dictionary suggestions provide the basic POS anchor only. Derived forms are
+  // explicit authoring choices and must not arrive as empty draft rows.
   const structured = applyFormsStructure(emptyForms, forms);
   if (!isSharedForms(structured)) return draft;
   const formIds = new Set(

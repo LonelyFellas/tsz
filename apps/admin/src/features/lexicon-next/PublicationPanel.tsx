@@ -211,7 +211,15 @@ export function PublicationPanel({
           {preview.warnings.length > 0 && (
             <Alert
               type="warning"
-              title="发布提醒"
+              title={
+                preview.warnings.some(
+                  (issue) =>
+                    issue.field === "audio_assets" ||
+                    issue.message.includes("音频")
+                )
+                  ? "音频未就绪，将按文本发布"
+                  : "发布提醒"
+              }
               description={
                 <ul>
                   {[

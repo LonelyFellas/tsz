@@ -839,7 +839,10 @@ export function EntryList({
             {confirmation.rows.map((row) => row.headword).join("、")}
           </p>
           {confirmation.request.action === "delete" && (
-            <p>{t("delete_help")}</p>
+            <>
+              <p>{t("delete_help")}</p>
+              <p>{t("next_delete_history_help")}</p>
+            </>
           )}
           {confirmation.request.action === "restore" && (
             <p>{t("next_restore_help")}</p>
