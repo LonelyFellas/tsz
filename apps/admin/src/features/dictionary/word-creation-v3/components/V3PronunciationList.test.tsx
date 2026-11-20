@@ -355,7 +355,7 @@ describe("独立发音输入", () => {
       );
       expect(sourceOption).toContainElement(settings);
       expect(
-        settings.compareDocumentPosition(preview) &
+        preview.compareDocumentPosition(settings) &
           Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
       expect(
