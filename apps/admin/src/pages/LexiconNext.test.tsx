@@ -752,6 +752,34 @@ it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
   ).toHaveTextContent("美式英语");
 });
 
+it("有未保存修改时切换目标语言需要确认离开", async () => {
+  const api = requests();
+  const { router } = mount(api, `/lexicon-next/${id}?target_locale=en-GB`);
+  await waitForEntryReady();
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "unsaved target locale" }
+  });
+
+  await chooseLanguage("美式英语");
+
+  expect(screen.getByRole("dialog", { name: "有未保存修改" })).toBeVisible();
+  expect(router.state.location.search).toContain("target_locale=en-GB");
+
+  fireEvent.click(button("继续编辑"));
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "unsaved target locale"
+  );
+
+  await chooseLanguage("美式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
+  await waitFor(() =>
+    expect(router.state.location.search).toContain("target_locale=en-US")
+  );
+});
+
 it("新建中切换媒介语言清除旧范围匹配，保留输入并重新检测", async () => {
   const api = requests();
   mount(api, "/lexicon-next/new");
@@ -1843,9 +1871,15 @@ describe("新版词库手工闭环", () => {
     await edit("简体中文解释", "中心位置");
     await edit("简体中文译词", "中心");
     await chooseLanguage("美式英语");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "放弃修改并离开" })
+    );
     await edit("美式英语词形", "center");
     await edit("美式英语释义", "the center");
     await chooseLanguage("英式英语");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "放弃修改并离开" })
+    );
     fireEvent.click(stepButton(/词形与发音/));
     expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
       "centre"
@@ -3390,10 +3424,16 @@ it("Step3 释义跟随顶部语言选择，保留已有通用英语内容及完�
     target: { value: "the center" }
   });
   await chooseLanguage("英式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
     "a centre"
   );
   await chooseLanguage("美式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   await chooseLanguage("繁体中文");
   fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
   expect(
@@ -4663,8 +4703,14 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
   fireEvent.click(textAction("添加译文"));
   expect(screen.getByLabelText("译文 2 简体中文正文")).toHaveValue("");
   await chooseLanguage("美式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   await editSentenceOriginal("美式英语", "Local American.");
   await chooseLanguage("英式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   expect(
     await screen.findByLabelText("编辑英式英语例句原文")
   ).toHaveTextContent("Local British.");
