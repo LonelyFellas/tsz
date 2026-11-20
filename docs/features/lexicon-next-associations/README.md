@@ -40,6 +40,7 @@
 - 后端 `next_sentence_association_roundtrips_to_a_next_entry_target` 集成测试通过。
 - 隔离数据库完成迁移 up/down/up 验证，最终版本为 `20261119120000`。
 - 真实页面使用隔离 Postgres、Redis 和 `tsz-rust` API 验证了新版词条选择、保存、刷新、重新打开和回读。数据库中的 `lexicon_next.grammar_form_links` 与草稿 `form_links` 均回读出 `target_source=lexicon_next` 的关联。
+- `deploy/api-target.json` 已固定到配套后端提交 `9e014ea2061672637c08c602e348ed8f12a64855`，用于 PR API 契约预检。
 
 ## 当前状态
 
