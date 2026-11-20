@@ -16,9 +16,7 @@ export function EntryBasicsSnapshot({
     <div className="lexicon-next word-basics-workflow is-detected">
       <div className="word-step-heading">
         <span className="word-step-number">STEP 01</span>
-        <Typography.Title level={2} style={{ margin: 0 }}>
-          创建词条
-        </Typography.Title>
+        <Typography.Title level={2}>创建词条</Typography.Title>
       </div>
       <Card
         className="word-basics-input-card"
