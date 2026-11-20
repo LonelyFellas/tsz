@@ -105,7 +105,9 @@ function dictionaryWord(
         ɑr: "ɑr",
         iː: "iː",
         eɪ: "eɪ",
-        ju: "jʊ",
+        // The product's `ju` → `jʊ` display rule belongs to actual pronunciation.
+        // Azure IPA must retain the dictionary source and adapt it by locale later.
+        ju: target === "actual" ? "jʊ" : "ju",
         ɪr: "ɪʲər",
         ɪʸr: "ɪʲər",
         ʊr: "ʊʷər",
@@ -131,7 +133,9 @@ function dictionaryWord(
       const stressedOnset = /[ˈˌ][^ɑæʌɔəɛɪɒʊuiɜ.ˈˌ]*$/u.test(prefix);
       return /[ɑæʌɔəɛɪɒʊuiɜ]/u.test(prefix) && !stressedOnset ? "ɪ" : phone;
     });
-    value = value.replace(/ɔːr/gu, "ɔr");
+    if (dialect === "us") {
+      value = value.replace(/ɑːr/gu, "ɑr").replace(/ɔːr/gu, "ɔr");
+    }
     value = value.replace(/([lnm])̩/gu, "ə$1");
     // Only syllable-final clusters from the document's onset inventory.
     value = value.replace(/([tdszpbkgfvðʃʒmn])([lnm])(?=$|[.ˈˌ])/gu, "$1ə$2");

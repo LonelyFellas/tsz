@@ -59,14 +59,24 @@ it("批量转换分别应用实际发音与 Azure IPA 规则", () => {
     }
   });
 
-  const moreLike = planPronunciationConversion(
+  const moreLikeUs = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ˈmɔːr laɪk" },
+    "more like",
+    "us"
+  );
+  expect(moreLikeUs).toMatchObject({
+    ok: true,
+    plan: { patch: { actual_pron: "ˈmɔr laɪk" } }
+  });
+
+  const moreLikeCommon = planPronunciationConversion(
     { ...pronunciation, dict_phonetic: "ˈmɔːr laɪk" },
     "more like",
     "common"
   );
-  expect(moreLike).toMatchObject({
+  expect(moreLikeCommon).toMatchObject({
     ok: true,
-    plan: { patch: { actual_pron: "ˈmɔr laɪk" } }
+    plan: { patch: { actual_pron: "ˈmɔːr laɪk" } }
   });
 });
 
@@ -84,6 +94,55 @@ it("美式卷舌字典音标在后台转换计划中生成实际发音和 Azure 
         synthesis: {
           us: { ipa: "ˈbɝd", ups: "S1 B ER R D" }
         }
+      }
+    }
+  });
+});
+
+it("后台计划按口音分开处理卷舌音和 Azure IPA", () => {
+  const us = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ˈɔːr" },
+    "or",
+    "us"
+  );
+  expect(us).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "ˈɔr",
+        synthesis: { us: { ipa: "ˈɔɹ" } }
+      }
+    }
+  });
+
+  const uk = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ˈɔːr" },
+    "or",
+    "uk"
+  );
+  expect(uk).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "ˈɔːr",
+        synthesis: { uk: { ipa: "ˈɔːɹ" } }
+      }
+    }
+  });
+});
+
+it("后台计划只在实际发音层应用 ju→jʊ，Azure IPA 保留 ju", () => {
+  const result = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ju" },
+    "you",
+    "us"
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "jʊ",
+        synthesis: { us: { ipa: "ju" } }
       }
     }
   });

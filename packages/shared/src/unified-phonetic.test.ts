@@ -69,6 +69,8 @@ describe("语雀统一音标规则", () => {
     ["teacher", "ˈtiːtʃɚ", "ˈtiːtʃər"],
     ["tune", "tjuːn", "tjuːn"],
     ["you", "ju", "jʊ"],
+    ["to", "tu", "tu"],
+    ["to", "tuː", "tuː"],
     ["tune", "tuːn", "tuːn"],
     ["school", "skuːl", "sguːl"],
     ["stand", "stænd", "sdænd"],
@@ -76,6 +78,8 @@ describe("语雀统一音标规则", () => {
     ["last", "lɑːst", "lɑːst"],
     ["butter", "ˈbʌɾər", "ˈbʌdər"],
     ["bottle", "ˈbɒtl", "ˈbɒtəl"],
+    ["council", "ˈkaʊnsl", "ˈkaʊnsəl"],
+    ["conclusion", "kənˈkluːʒn", "kənˈkluːʒən"],
     ["travel", "ˈtrævl", "ˈtrævəl"],
     ["seven", "ˈsevn", "ˈsɛvən"],
     ["vision", "ˈvɪʒn", "ˈvɪʒən"],
@@ -89,20 +93,44 @@ describe("语雀统一音标规则", () => {
     });
   });
 
-  it("实际发音转换处理词尾 i 和 ɔːr", () => {
+  it("词中辅音丛没有成音节边界时不擅自补 ə", () => {
+    expect(
+      convertDictionaryToUnified("ˈbɒtlɪŋ", "bottling", "uk")
+    ).toMatchObject({ ok: true, value: "ˈbɒtlɪŋ" });
+  });
+
+  it("不把美式实际发音中的裸 u 全局降为 ʊ", () => {
+    expect(convertDictionaryToUnified("tu", "to", "us")).toMatchObject({
+      ok: true,
+      value: "tu"
+    });
+    expect(convertDictionaryToUnified("tuː", "to", "us")).toMatchObject({
+      ok: true,
+      value: "tuː"
+    });
+  });
+
+  it("实际发音转换处理词尾 i 和美式 ɔːr", () => {
     expect(
       convertDictionaryToUnified("ɪnˈteɡrəti", "integrity", "us")
     ).toMatchObject({
       ok: true,
       value: "ɪnˈtɛgrətɪ"
     });
-    for (const dialect of ["uk", "us"] as const)
-      expect(
-        convertDictionaryToUnified("ˈmɔːr laɪk", "more like", dialect)
-      ).toMatchObject({
-        ok: true,
-        value: "ˈmɔr laɪk"
-      });
+    expect(
+      convertDictionaryToUnified("ˈmɔːr laɪk", "more like", "us")
+    ).toMatchObject({ ok: true, value: "ˈmɔr laɪk" });
+    expect(
+      convertDictionaryToUnified("ˈmɔːr laɪk", "more like", "uk")
+    ).toMatchObject({ ok: true, value: "ˈmɔːr laɪk" });
+    expect(convertDictionaryToUnified("ˈɑːr", "are", "us")).toMatchObject({
+      ok: true,
+      value: "ˈɑr"
+    });
+    expect(convertDictionaryToUnified("ˈɑːr", "are", "uk")).toMatchObject({
+      ok: true,
+      value: "ˈɑːr"
+    });
   });
 
   it("Azure IPA 不套用实际发音的清浊化、补 ə 和卷舌元音降级", () => {
@@ -141,6 +169,33 @@ describe("语雀统一音标规则", () => {
     expect(
       convertDictionaryToAzureIpa("ˈbʌtn̩", "button", "en-US", "weak")
     ).toMatchObject({ ok: true, value: "ˈbʌtən" });
+    expect(convertDictionaryToAzureIpa("ju", "you", "en-US")).toMatchObject({
+      ok: true,
+      value: "ju"
+    });
+    expect(convertDictionaryToAzureIpa("tu", "to", "en-US")).toMatchObject({
+      ok: true,
+      value: "tu"
+    });
+    expect(convertDictionaryToAzureIpa("tuː", "to", "en-US")).toMatchObject({
+      ok: true,
+      value: "tu"
+    });
+  });
+
+  it("Azure IPA 按 locale 生成美式卷舌音，不把英式长音压缩为美式读法", () => {
+    expect(convertDictionaryToAzureIpa("ˈɑːr", "are", "en-US")).toMatchObject({
+      ok: true,
+      value: "ˈɑɹ"
+    });
+    expect(convertDictionaryToAzureIpa("ˈɔːr", "or", "en-US")).toMatchObject({
+      ok: true,
+      value: "ˈɔɹ"
+    });
+    expect(convertDictionaryToAzureIpa("ˈɔːr", "or", "en-GB")).toMatchObject({
+      ok: true,
+      value: "ˈɔːɹ"
+    });
   });
 
   it("美式字典卷舌元音按重读和非重读位置转换", () => {
