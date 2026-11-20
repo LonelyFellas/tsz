@@ -108,6 +108,7 @@ export function EntryList({
       filters.pos ||
       filters.level ||
       filters.createdBy ||
+      filters.updatedBy ||
       filters.range?.some(Boolean)
     )
   );
@@ -136,7 +137,11 @@ export function EntryList({
     );
     return params;
   };
-  const query: NextWorkspaceQuery = { ...mapped, ...languageQuery };
+  const query: NextWorkspaceQuery = {
+    ...mapped,
+    ...languageQuery,
+    ...(filters.updatedBy ? { updated_by: filters.updatedBy } : {})
+  };
   const statsQuery = { ...query };
   delete statsQuery.page;
   delete statsQuery.page_size;
@@ -155,6 +160,16 @@ export function EntryList({
     queryKey: ["admin-lexicon-next", "creators", languageQuery, trashMode],
     queryFn: () =>
       requests.creators({
+        ...languageQuery,
+        ...(trashMode ? { status: "archived" } : {})
+      }),
+    enabled: advancedExpanded,
+    retry: false
+  });
+  const updaters = useQuery({
+    queryKey: ["admin-lexicon-next", "updaters", languageQuery, trashMode],
+    queryFn: () =>
+      requests.updaters({
         ...languageQuery,
         ...(trashMode ? { status: "archived" } : {})
       }),
@@ -180,6 +195,15 @@ export function EntryList({
     )
       ? `${creator.display_name}（${creator.id.slice(-8)}）`
       : creator.display_name
+  }));
+  const updaterOptions = (updaters.data ?? []).map((updater) => ({
+    value: updater.id,
+    label: (updaters.data ?? []).some(
+      (other) =>
+        other.id !== updater.id && other.display_name === updater.display_name
+    )
+      ? `${updater.display_name}（${updater.id.slice(-8)}）`
+      : updater.display_name
   }));
   const [selected, setSelected] = useState<Record<string, NextWorkspaceEntry>>(
     {}
@@ -328,6 +352,19 @@ export function EntryList({
   const rows = result.data?.items ?? [];
   const columns: WordColumn<NextWorkspaceEntry>[] = [
     {
+      key: "status",
+      title: t("column_entry_status"),
+      width: 84,
+      fixed: "left",
+      wideOnly: true,
+      defaultVisible: !trashMode,
+      render: (row) => (
+        <Tag color={row.status === "published" ? "success" : "default"}>
+          {t(`status_${row.status}`)}
+        </Tag>
+      )
+    },
+    {
       key: "label",
       title: t("entry_name"),
       width: 180,
@@ -357,7 +394,7 @@ export function EntryList({
     },
     {
       key: "kind",
-      title: t("kind"),
+      title: t("column_entry_kind"),
       width: 76,
       wideOnly: true,
       render: (row) => (
@@ -366,24 +403,12 @@ export function EntryList({
     },
     {
       key: "gloss",
-      title: t("gloss"),
+      title: t("column_common_meaning"),
       width: 180,
       wideOnly: true,
       ellipsis: true,
       render: (row) =>
         row.gloss || <span className="word-list-empty-value">—</span>
-    },
-    {
-      key: "status",
-      title: t("status"),
-      width: 156,
-      wideOnly: true,
-      defaultVisible: !trashMode,
-      render: (row) => (
-        <Tag color={row.status === "published" ? "success" : "default"}>
-          {t(`status_${row.status}`)}
-        </Tag>
-      )
     },
     {
       key: "pos_list",
@@ -407,7 +432,7 @@ export function EntryList({
     },
     {
       key: "levels",
-      title: t("level"),
+      title: t("column_meaning_level"),
       width: 80,
       wideOnly: true,
       render: (row) =>
@@ -456,7 +481,7 @@ export function EntryList({
     },
     {
       key: "references",
-      title: t("references"),
+      title: t("column_related_items"),
       width: 80,
       wideOnly: true,
       defaultVisible: false,
@@ -657,6 +682,9 @@ export function EntryList({
         }}
         creators={creators}
         creatorOptions={creatorOptions}
+        updaters={updaters}
+        updaterOptions={updaterOptions}
+        showLevel={false}
         kindLabel={kindLabel}
         posDisplayName={posDisplayName}
       />

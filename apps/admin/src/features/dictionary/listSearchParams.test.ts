@@ -51,6 +51,16 @@ describe("word list search params", () => {
     ).toEqual({});
   });
 
+  it("最后更新人条件可在 URL 中往返", () => {
+    const id = "01991111-2222-7333-8444-555566667778";
+    const params = serializeWordFilterSearchParams({ updatedBy: id });
+    expect(params.toString()).toBe(`updated_by=${id}`);
+    expect(parseWordFilterSearchParams(params)).toEqual({ updatedBy: id });
+    expect(
+      parseWordFilterSearchParams(new URLSearchParams("updated_by=invalid"))
+    ).toEqual({});
+  });
+
   it("round-trips every product filter with day-granularity dates", () => {
     const params = serializeWordFilterSearchParams({
       keyword: "  creator  ",

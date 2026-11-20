@@ -375,6 +375,11 @@ export const lexiconListMessages = {
   unpublished_changes: ["有未发布修改", "有未發布修改", "Unpublished changes"],
   updated_at: ["更新时间", "更新時間", "Updated"],
   updated_by: ["最后更新人", "最後更新者", "Last updated by"],
+  column_entry_kind: ["词条类型", "詞條類型", "Entry type"],
+  column_common_meaning: ["常见词义", "常見詞義", "Common meaning"],
+  column_entry_status: ["词条状态", "詞條狀態", "Entry status"],
+  column_meaning_level: ["词义难度", "詞義難度", "Meaning level"],
+  column_related_items: ["关联项", "關聯項", "Related items"],
   actions: ["操作", "操作", "Actions"],
   lifecycle_permission: [
     "需要相应的归档或恢复权限；普通管理员仅可操作本人词条",
@@ -423,6 +428,11 @@ export const lexiconListMessages = {
     "建立者：{{value}}",
     "Created by: {{value}}"
   ],
+  filter_updated_by: [
+    "最后更新人：{{value}}",
+    "最後更新者：{{value}}",
+    "Last updated by: {{value}}"
+  ],
   filter_date: [
     "创建时间{{zone}}：{{start}} 至 {{end}}",
     "建立時間{{zone}}：{{start}} 至 {{end}}",
@@ -465,6 +475,16 @@ export const lexiconListMessages = {
     "Could not load creators"
   ],
   reload_creators: ["重新加载创建人", "重新載入建立者", "Reload creators"],
+  updaters_failed: [
+    "最后更新人加载失败",
+    "最後更新者載入失敗",
+    "Could not load last updated by"
+  ],
+  reload_updaters: [
+    "重新加载最后更新人",
+    "重新載入最後更新者",
+    "Reload last updated by"
+  ],
   beijing_time: [
     "北京时间（UTC+8）",
     "北京時間（UTC+8）",

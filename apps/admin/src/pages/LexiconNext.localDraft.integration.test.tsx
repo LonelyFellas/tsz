@@ -128,6 +128,7 @@ function requests() {
     }),
     stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 }),
     creators: vi.fn().mockResolvedValue([]),
+    updaters: vi.fn().mockResolvedValue([]),
     command: vi.fn(),
     annotation: vi.fn(),
     workspaceList: vi.fn().mockResolvedValue({

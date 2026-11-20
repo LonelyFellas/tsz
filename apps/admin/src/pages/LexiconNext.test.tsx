@@ -108,6 +108,7 @@ function requests() {
     workspaceEntry: vi.fn().mockResolvedValue(listRow()),
     stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 }),
     creators: vi.fn().mockResolvedValue([]),
+    updaters: vi.fn().mockResolvedValue([]),
     command: vi.fn(),
     annotation: vi.fn(),
     workspaceList: vi.fn().mockResolvedValue({
@@ -2283,6 +2284,87 @@ it("列表查询筛选与分页走新版接口，列表入口和创建入口使�
   await screen.findByDisplayValue("centre");
   fireEvent.click(stepButton(/词义与例句/));
   expect(router.state.location.pathname).toBe(`/lexicon-next/${id}`);
+});
+
+it("新版列表按任务布局显示高级筛选并提交最后更新人", async () => {
+  const api = requests();
+  const updaterId = "00000000-0000-4000-8000-000000000009";
+  api.updaters.mockResolvedValue([{ id: updaterId, display_name: "更新者" }]);
+  api.workspaceList.mockResolvedValue({
+    items: [listRow()],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next");
+  await screen.findByText("centre");
+  fireEvent.click(button("更多筛选"));
+  const toggle = button("收起筛选");
+  const panel = document.getElementById(toggle.getAttribute("aria-controls")!);
+  expect(
+    [...panel!.querySelectorAll("label")].map((label) => label.textContent)
+  ).toEqual(["基本词性", "最后更新人", "词条类型", "创建人", "创建时间"]);
+  const updater = screen.getByLabelText("最后更新人");
+  fireEvent.mouseDown(updater.closest(".ui-select")!);
+  fireEvent.click(await screen.findByText("更新者"));
+  fireEvent.click(button("搜索"));
+  await waitFor(() =>
+    expect(api.workspaceList).toHaveBeenLastCalledWith(
+      expect.objectContaining({ updated_by: updaterId, page: 1 })
+    )
+  );
+});
+
+it("新版列表将词条状态和词条名称按顺序固定在左侧", async () => {
+  const matchMedia = window.matchMedia;
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    ...matchMedia(query),
+    matches: true
+  }));
+  const columnKey = "tsz:admin:table-columns:v1:lexicon-next";
+  localStorage.setItem(
+    columnKey,
+    JSON.stringify(
+      [
+        ["status", "left"],
+        ["label", "left"],
+        ["kind", false],
+        ["gloss", false],
+        ["pos_list", false],
+        ["levels", false],
+        ["updated_at", false],
+        ["updated_by_name", false],
+        ["created_at", false],
+        ["created_by_name", false],
+        ["references", false],
+        ["action", "right"]
+      ].map(([key, fixed]) => ({ key, visible: true, fixed }))
+    )
+  );
+  onTestFinished(() => localStorage.removeItem(columnKey));
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [listRow({ status: "published" })],
+    pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next");
+  await screen.findByText("centre");
+  const headers = screen.getAllByRole("columnheader");
+  expect(headers.map((header) => header.textContent)).toEqual([
+    "",
+    "词条状态",
+    "词条名称",
+    "词条类型",
+    "常见词义",
+    "基本词性",
+    "词义难度",
+    "更新时间",
+    "最后更新人",
+    "创建时间",
+    "创建人",
+    "关联项",
+    "操作"
+  ]);
+  expect(headers[1]).toHaveStyle({ position: "sticky", left: "44px" });
+  expect(headers[2]).toHaveStyle({ position: "sticky", left: "128px" });
 });
 
 function listRow(

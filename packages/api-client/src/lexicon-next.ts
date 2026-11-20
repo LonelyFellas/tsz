@@ -206,6 +206,18 @@ export function createLexiconNextEndpoints(http: HttpClient) {
             decode<NextWorkspaceCreator>("NextWorkspaceCreator", row)
           );
         }),
+    updaters: (query: NextWorkspaceQuery = {}) =>
+      http
+        .get<unknown>(`${root}/workspace/updaters${search(query)}`)
+        .then((value) => {
+          if (!Array.isArray(value))
+            throw new ClientResponseError(
+              "智能词库最后更新人响应不符合接口契约"
+            );
+          return value.map((row) =>
+            decode<NextWorkspaceCreator>("NextWorkspaceCreator", row)
+          );
+        }),
     command: (input: NextListCommand) =>
       http
         .post<unknown>(`${root}/workspace/commands`, input)

@@ -16,6 +16,7 @@ export interface WordFilterValues {
   keyword?: string;
   headword?: string;
   createdBy?: string;
+  updatedBy?: string;
   gloss?: string;
   kind?: AdminWordKind;
   pos?: WordPosTag;

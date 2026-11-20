@@ -268,7 +268,7 @@
 }
 .word-search-advanced {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ui-space-4);
   margin-top: var(--ui-space-5);
   padding-top: var(--ui-space-5);
@@ -299,13 +299,30 @@
   min-height: var(--ui-control-height-comfortable);
 }
 .word-search-advanced .word-search-date {
-  grid-column: span 2;
+  grid-column: 3;
+  grid-row: span 2;
 }
 .word-search-advanced-actions {
-  grid-column: span 2;
+  grid-column: 1 / -1;
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
+}
+.word-search-advanced--v2 .word-search-pos-filter {
+  grid-column: 1;
+  grid-row: 1;
+}
+.word-search-advanced--v2 .word-search-updated-by-filter {
+  grid-column: 2;
+  grid-row: 1;
+}
+.word-search-advanced--v2 .word-search-kind-filter {
+  grid-column: 1;
+  grid-row: 2;
+}
+.word-search-advanced--v2 .word-search-creator-filter {
+  grid-column: 2;
+  grid-row: 2;
 }
 .word-active-filters {
   display: flex;
@@ -536,6 +553,23 @@
   .word-search-advanced {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .word-search-advanced .word-search-date {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  .word-search-advanced--v2
+    :is(
+      .word-search-pos-filter,
+      .word-search-updated-by-filter,
+      .word-search-kind-filter,
+      .word-search-creator-filter
+    ) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .word-search-advanced-actions {
+    grid-column: 1 / -1;
+  }
 }
 @container (max-width:500px) {
   .word-search-languages,
@@ -549,6 +583,7 @@
   }
   .word-search-advanced .word-search-date {
     grid-column: 1 / -1;
+    grid-row: auto;
   }
   .word-search-advanced-actions {
     grid-column: 1 / -1;

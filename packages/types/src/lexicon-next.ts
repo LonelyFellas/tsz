@@ -283,6 +283,7 @@ export interface NextWorkspaceQuery extends NextListQuery {
   level?: string;
   status?: "draft" | "published" | "archived";
   created_by?: string;
+  updated_by?: string;
   created_from?: string;
   created_to?: string;
 }
