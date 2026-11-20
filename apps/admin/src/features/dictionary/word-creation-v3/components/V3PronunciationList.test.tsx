@@ -121,12 +121,20 @@ function Harness({
     if (configured)
       row.synthesis = { alphabet: "ups", ipa: "kæt", ups: "K AE T" };
     if (initialSynthesis) row.synthesis = initialSynthesis;
+    if (!configured && !initialSynthesis)
+      row.synthesis = {
+        alphabet: "ipa",
+        ipa: "",
+        ups: "",
+        use_spelling: false
+      };
     if (multipleReadings)
       form.regional_variants.common.pronunciations.push({
         ...row,
         id: "other-reading",
         dict_phonetic: "dɒg",
-        actual_pron: "manual-other"
+        actual_pron: "manual-other",
+        synthesis: undefined
       });
     return formsFixture({ forms: [form] });
   });
@@ -364,7 +372,10 @@ describe("独立发音输入", () => {
     fireEvent.click(screen.getByLabelText("在第 1 条后新增发音"));
     change("Azure IPA", "kæt");
     change("Azure UPS", "K AE T");
-    for (const radio of screen.getAllByRole("radio", {
+    const firstRow = field("字典音标").closest(
+      "[data-pronunciation-id]"
+    ) as HTMLElement;
+    for (const radio of within(firstRow).getAllByRole("radio", {
       name: /^(?:(?:英式|美式) )?Azure IPA$/
     })) {
       expect(radio).toBeChecked();
