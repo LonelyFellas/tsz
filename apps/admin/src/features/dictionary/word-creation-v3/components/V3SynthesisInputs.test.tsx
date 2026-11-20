@@ -1820,6 +1820,7 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
   fireEvent.click(
     screen.getByRole("button", { name: "第 1 条发音 美式上传音频" })
   );
+  expect(screen.queryByLabelText("试听 recording.mp3")).not.toBeInTheDocument();
   const fileInput = await screen.findByLabelText("上传音频", {
     selector: "input"
   });
