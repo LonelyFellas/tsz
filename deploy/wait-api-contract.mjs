@@ -54,7 +54,7 @@ export async function waitForCompatibleApiContract({
   timeoutMs = DEFAULT_COMPATIBLE_TIMEOUT_MS,
   intervalMs = DEFAULT_INTERVAL_MS,
   now = () => Date.now()
-}) {
+} = {}) {
   const deadline = timeoutMs == null ? null : now() + timeoutMs;
   let lastError;
   while (true) {
