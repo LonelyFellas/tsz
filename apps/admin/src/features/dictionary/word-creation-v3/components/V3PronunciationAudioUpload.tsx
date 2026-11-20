@@ -37,6 +37,10 @@ export function V3PronunciationAudioUpload({
   const [open, setOpen] = useState(false);
   const ready = useRef(true);
   const tasks = useVoiceAudioTasks();
+  const accent = speechAccentGroup(locale);
+  const scopedAssets = accent
+    ? assets.filter((asset) => speechAccentGroup(asset.locale) === accent)
+    : assets;
   useLayoutEffect(() => {
     if (!tasks) return;
     const key = `${nodeId}:${locale ?? "common"}:upload`;
@@ -67,21 +71,29 @@ export function V3PronunciationAudioUpload({
                 env.VOICE_AUDIO_UPLOAD ? adminAudioUploadAdapter : undefined
               }
               audioUploadAllowed={allowed}
-              audioAssets={assets}
+              audioAssets={scopedAssets}
               onAudioAssetsChange={(next) => {
                 const explicitAccents = new Set(
-                  assets
+                  scopedAssets
                     .filter((asset) => asset.is_default !== undefined)
                     .map((asset) => speechAccentGroup(asset.locale))
                 );
+                const normalized = next.map((asset) =>
+                  asset.is_default === undefined &&
+                  (!scopedAssets.some((current) => current.id === asset.id) ||
+                    explicitAccents.has(speechAccentGroup(asset.locale)))
+                    ? { ...asset, is_default: false }
+                    : asset
+                );
                 onChange(
-                  next.map((asset) =>
-                    asset.is_default === undefined &&
-                    (!assets.some((current) => current.id === asset.id) ||
-                      explicitAccents.has(speechAccentGroup(asset.locale)))
-                      ? { ...asset, is_default: false }
-                      : asset
-                  )
+                  accent
+                    ? [
+                        ...assets.filter(
+                          (asset) => speechAccentGroup(asset.locale) !== accent
+                        ),
+                        ...normalized
+                      ]
+                    : normalized
                 );
               }}
               onValidationChange={(valid) => {
