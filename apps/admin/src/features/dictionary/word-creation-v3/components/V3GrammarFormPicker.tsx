@@ -38,11 +38,23 @@ import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
 import { dialectLabel } from "../presentation";
 import { normalizeSentenceSurface } from "@/features/sentences/associationModel";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
+import type { LexiconNextRequests } from "@/pages/LexiconNext";
+import { NextTargetPicker } from "@/features/lexicon-next/NextTargetPicker";
 
 type CandidateForm = Pick<
   SentenceTargetCandidateFormV3,
   "form_id" | "variant_id" | "form_type" | "spelling" | "dialect"
 >;
+
+type V3GrammarFormPickerProps = AssociationPickerProps<GrammarFormLinkV3> & {
+  wordId?: string;
+  locale?: "en-GB" | "en-US";
+  forms?: DraftFormsStepContentV3;
+  meanings?: DraftMeaningsStepContentWritableV3 | DraftMeaningsStepContentV3;
+  nextRequests?: LexiconNextRequests;
+  nextTargetLocale?: string;
+  nextMediumLocale?: string;
+};
 
 function sameTarget(left?: GrammarFormLinkV3, right?: GrammarFormLinkV3) {
   return (
@@ -56,7 +68,34 @@ function sameTarget(left?: GrammarFormLinkV3, right?: GrammarFormLinkV3) {
   );
 }
 
-export function V3GrammarFormPicker({
+export function V3GrammarFormPicker(props: V3GrammarFormPickerProps) {
+  if (props.nextRequests) {
+    return (
+      <NextTargetPicker
+        literal={props.segments.map((segment) => segment.surface).join(" ")}
+        targetLocale={props.nextTargetLocale ?? props.locale ?? "en-GB"}
+        mediumLocale={props.nextMediumLocale ?? "zh-Hans"}
+        requests={props.nextRequests}
+        onSelect={(choice) =>
+          props.onSelect({
+            id: props.selected?.id ?? crypto.randomUUID(),
+            source_segments: props.segments,
+            target_source: "lexicon_next",
+            target_word_id: choice.target_word_id,
+            target_pos_id: choice.target_pos_id,
+            target_form_id: choice.target_form_id,
+            target_variant_id: choice.target_variant_id,
+            target_dialect: choice.target_dialect
+          })
+        }
+        onCancel={props.onCancel}
+      />
+    );
+  }
+  return <V3GrammarFormPickerLegacy {...props} />;
+}
+
+function V3GrammarFormPickerLegacy({
   segments,
   selected: initialSelected,
   onSelect,
@@ -66,12 +105,7 @@ export function V3GrammarFormPicker({
   forms,
   meanings,
   locale
-}: AssociationPickerProps<GrammarFormLinkV3> & {
-  wordId?: string;
-  locale?: "en-GB" | "en-US";
-  forms?: DraftFormsStepContentV3;
-  meanings?: DraftMeaningsStepContentWritableV3 | DraftMeaningsStepContentV3;
-}) {
+}: V3GrammarFormPickerProps) {
   const { t } = useLexiconEditorTranslation();
   const [selected, setSelected] = useState(initialSelected);
   const segmentsKey = JSON.stringify(segments);

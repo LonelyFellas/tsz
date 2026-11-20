@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "ad0036fbcf38f6b1758cf71d61356d5ba24f4c90091ca4a6854eee48770d5038"
+      "bb05e93be2755a9f41a0a0f29f2988e3326eec878c32032ac83f45a7aa94bd36"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1231,7 +1231,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       ),
       ...Object.fromEntries(
         [
-          "get /admin/lexicon-next/capabilities",
           "post /admin/lexicon-next/entries",
           "get /admin/lexicon-next/entries/{id}",
           "put /admin/lexicon-next/entries/{id}",
@@ -1261,6 +1260,39 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ]
         ])
       ),
+      "get /admin/lexicon-next/capabilities": [
+        {
+          name: "x-tsz-next-definitions",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        },
+        dialectPairsHeader,
+        {
+          name: "x-tsz-next-grammar-form-links",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        },
+        {
+          name: "x-tsz-next-relations",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        },
+        {
+          name: "x-tsz-next-sentence-associations",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        },
+        {
+          name: "x-tsz-next-sentence-drafts",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        }
+      ],
       "get /admin/speech/groups": [
         {
           name: "X-TSZ-Dubbing-Groups",

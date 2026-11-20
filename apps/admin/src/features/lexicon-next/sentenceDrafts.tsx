@@ -135,8 +135,16 @@ export function useSentenceDrafts(
                   ?.draft.variants.find((row) => row.locale === variant.locale);
                 if (
                   saved &&
-                  JSON.stringify([saved.content, saved.voice_profile]) ===
-                    JSON.stringify([variant.content, variant.voice_profile])
+                  JSON.stringify([
+                    saved.content,
+                    saved.voice_profile,
+                    saved.associations
+                  ]) ===
+                    JSON.stringify([
+                      variant.content,
+                      variant.voice_profile,
+                      variant.associations
+                    ])
                 )
                   return variant;
                 // Unsaved text/settings must not play the previous formal recording.

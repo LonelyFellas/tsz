@@ -7,6 +7,7 @@ import type { Dialect } from "./admin-word";
 export type SentenceTarget =
   | {
       state: "linked";
+      target_source?: "v3" | "lexicon_next";
       target_entry_id: string;
       target_pos_id: string;
       target_base_form_id: string;
@@ -17,7 +18,11 @@ export type SentenceTarget =
       target_dialect?: Dialect;
       target_publication_id?: string;
     }
-  | { state: "entry_only"; target_entry_id: string }
+  | {
+      state: "entry_only";
+      target_source?: "v3" | "lexicon_next";
+      target_entry_id: string;
+    }
   | { state: "pending"; kind: string; headword: string; gloss?: string | null };
 export interface SharedSentenceAnnotation {
   id: string;
