@@ -123,6 +123,7 @@ export interface NextDialectChange {
   previous_target_revision: number | null;
 }
 export interface NextEntry {
+  creation_detection?: NextDetection;
   dialect_senses?: NextDialectSense[];
   sentence_resources?: NextSentence[];
   id: string;
@@ -139,6 +140,7 @@ export interface CreateNextEntry {
   medium_locale: string;
   kind: "word" | "phrase";
   headword: string;
+  creation_detection?: NextDetection;
 }
 export interface NextDetectionInput {
   target_language: string;
@@ -212,6 +214,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  creation_snapshot?: boolean;
   dialect_pairs?: boolean;
   sentence_drafts?: boolean;
   relations?: boolean;

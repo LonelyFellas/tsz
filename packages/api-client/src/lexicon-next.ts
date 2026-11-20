@@ -77,8 +77,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   let dialectPairs = false;
   let grammarFormLinks = false;
   let sentenceAssociations = false;
+  let creationSnapshot = false;
   const editorOptions = {
     headers: {
+      "x-tsz-next-creation-snapshot": "v1",
       "x-tsz-next-publications": "v1",
       "x-tsz-next-dialect-pairs": "v1",
       "x-tsz-next-relations": "v1",
@@ -226,6 +228,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     capabilities: () =>
       http.get<unknown>(`${root}/capabilities`, editorOptions).then((value) => {
         const capabilities = decodeNextCapabilities(value);
+        creationSnapshot = capabilities.creation_snapshot === true;
         definitionDetails = capabilities.definition_details === true;
         sentenceDrafts = capabilities.sentence_drafts === true;
         dialectPairs = capabilities.dialect_pairs === true;
@@ -238,10 +241,16 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       http
         .get<unknown>(`${root}/draft-schema`)
         .then(decodeNextDraftSchemaCompatibility),
-    create: (input: CreateNextEntry) =>
-      http
-        .post<unknown>(`${root}/entries`, input, editorOptions)
-        .then(decodeNextEntry),
+    create: (input: CreateNextEntry) => {
+      const payload = creationSnapshot
+        ? input
+        : (({ creation_detection: _creationDetection, ...legacy }) => legacy)(
+            input
+          );
+      return http
+        .post<unknown>(`${root}/entries`, payload, editorOptions)
+        .then(decodeNextEntry);
+    },
     detect: (input: NextDetectionInput) =>
       http
         .post<unknown>(`${root}/detections`, input)

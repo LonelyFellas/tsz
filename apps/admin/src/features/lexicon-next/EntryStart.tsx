@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "react-router-dom";
-import {
-  Alert,
-  Button,
-  Card,
-  Space,
-  Tag,
-  Typography
-} from "@tsz/ui/admin/display";
+import { Alert, Button, Card, Space, Typography } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
 import { Search, Plus } from "lucide-react";
 import type {
@@ -21,7 +14,6 @@ import { Modal } from "@tsz/ui/admin/overlays";
 import { usePermission } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { validateEntryInput } from "@/features/dictionary/word-creation/entryClassification";
-import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import {
   EntryAnnotationModal,
@@ -30,14 +22,19 @@ import {
 import { useLexiconLanguages } from "./LanguageSelection";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
-import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
-import { dictionaryMatchPosLabel } from "./dictionaryPosLabel";
+import { DictionaryDetectionCard } from "./DictionaryDetectionCard";
 
 export interface LexiconNextCreationNavigationState {
   lexiconNextSuggestedPartOfSpeech?: string[];
 }
 
-export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
+export function EntryStart({
+  requests,
+  creationSnapshotAvailable = false
+}: {
+  requests: LexiconNextRequests;
+  creationSnapshotAvailable?: boolean;
+}) {
   const navigate = useNavigate();
   const {
     search: languageSearch,
@@ -48,14 +45,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const queryClient = useQueryClient();
   const canCreate = usePermission("words.create");
   const canEdit = usePermission("words.edit");
-  const posLabel = usePartOfSpeechLabel();
-  const partOfSpeechCatalog = usePartOfSpeechCatalog();
-  const { t, i18n } = useLexiconEditorTranslation();
+  const { t } = useLexiconEditorTranslation();
   const [value, setValue] = useState("");
   const [detection, setDetection] = useState<NextDetection>();
-  const [expandedGlosses, setExpandedGlosses] = useState<Set<string>>(
-    new Set()
-  );
   const [entryMatches, setEntryMatches] = useState<NextEntryMatches>();
   const [busy, setBusy] = useState<"detect" | "create" | "matches">();
   const [error, setError] = useState<string>();
@@ -80,7 +72,6 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setAnnotationEntries([]);
     setAnnotationEntryId(undefined);
     setAnnotationRevision(1);
-    setExpandedGlosses(new Set());
     if (!uncertain) setError(undefined);
     setFieldError(undefined);
   }, [targetLanguage, medium, uncertain]);
@@ -105,7 +96,6 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setError(undefined);
     setFieldError(undefined);
     setDetection(undefined);
-    setExpandedGlosses(new Set());
     setEntryMatches(undefined);
     setAnnotationEntries([]);
     setAnnotationEntryId(undefined);
@@ -197,7 +187,10 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
             target_language: targetLanguage,
             medium_locale: medium,
             kind: detection.kind,
-            headword: detection.surface
+            headword: detection.surface,
+            ...(creationSnapshotAvailable
+              ? { creation_detection: detection }
+              : {})
           });
       const createdId = entry?.id ?? entryId;
       if (!createdId) return;
@@ -388,105 +381,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
                 onPageChange={(page) => void matchPage(page)}
               />
             )}
-            <Card
-              title="内置词典"
-              extra={
-                <Space>
-                  <Tag>{detection.kind === "word" ? "单词" : "短语"}</Tag>
-                  <span>{detection.matches.length} 条匹配</span>
-                </Space>
-              }
-            >
-              {detection.matches.length ? (
-                <div className="lexicon-next-matches">
-                  {detection.matches.map((match) => (
-                    <article key={match.id} className="lexicon-next-match">
-                      <Space wrap>
-                        <strong className="tsz-words">{match.term}</strong>
-                        <Tag>
-                          {dictionaryMatchPosLabel(
-                            match.part_of_speech,
-                            partOfSpeechCatalog.data?.items,
-                            posLabel,
-                            i18n.language
-                          )}
-                        </Tag>
-                      </Space>
-                      {match.phonetics.length > 0 && (
-                        <ul className="lexicon-next-phonetics">
-                          {match.phonetics.map((phonetic, index) => (
-                            <li key={index}>
-                              <span className="tsz-phonetics">
-                                {phonetic.ipa}
-                              </span>
-                              {phonetic.tags.length > 0 &&
-                                ` · ${phonetic.tags.join("、")}`}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {match.glosses.length > 0 && (
-                        <ul>
-                          {match.glosses
-                            .slice(
-                              0,
-                              expandedGlosses.has(match.id) ? undefined : 3
-                            )
-                            .map((gloss, index) => (
-                              <li key={index}>{gloss}</li>
-                            ))}
-                        </ul>
-                      )}
-                      {match.glosses.length > 3 && (
-                        <Button
-                          type="link"
-                          size="small"
-                          aria-expanded={expandedGlosses.has(match.id)}
-                          onClick={() => {
-                            setExpandedGlosses((previous) => {
-                              const next = new Set(previous);
-                              if (next.has(match.id)) next.delete(match.id);
-                              else next.add(match.id);
-                              return next;
-                            });
-                          }}
-                        >
-                          {expandedGlosses.has(match.id)
-                            ? "收起"
-                            : `展开全部（共 ${match.glosses.length} 条）`}
-                        </Button>
-                      )}
-                      {match.forms.length > 0 && (
-                        <dl>
-                          <dt>词形</dt>
-                          <dd>
-                            {match.forms.map((form, index) => (
-                              <span
-                                key={index}
-                                className="lexicon-next-dictionary-form"
-                              >
-                                <span className="tsz-words">{form.text}</span>
-                                {form.tags.length > 0 &&
-                                  `（${form.tags.join("、")}）`}
-                              </span>
-                            ))}
-                          </dd>
-                        </dl>
-                      )}
-                      <p className="lexicon-next-muted">
-                        {match.source_name} · {match.source_version}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <Alert
-                  type="info"
-                  showIcon
-                  title="未找到内置词典匹配，可继续创建空白草稿。"
-                />
-              )}
-            </Card>
+            <DictionaryDetectionCard detection={detection} />
             <div className="lexicon-next-create-actions">
               <span>
                 按输入“<span className="tsz-words">{detection.surface}</span>
