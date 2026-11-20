@@ -700,6 +700,7 @@ textarea.ui-input {
   width: auto;
   height: auto;
   min-height: var(--ui-control-height-sm);
+  padding: var(--ui-space-1) 9px;
   border: 0;
   font: inherit;
   color: inherit;
