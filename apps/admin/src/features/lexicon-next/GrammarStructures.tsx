@@ -569,11 +569,19 @@ export function GrammarStructures({
                           ? {
                               ...item,
                               variants: [
-                                ...item.variants,
+                                ...(item.variants.some(
+                                  (variant) => variant.locale === "en"
+                                )
+                                  ? item.variants.filter(
+                                      (variant) => variant.locale !== "en"
+                                    )
+                                  : item.variants),
                                 {
                                   id: crypto.randomUUID(),
                                   locale: target,
-                                  content: {
+                                  content: item.variants.find(
+                                    (variant) => variant.locale === "en"
+                                  )?.content ?? {
                                     version: 2,
                                     text: "",
                                     annotations: []

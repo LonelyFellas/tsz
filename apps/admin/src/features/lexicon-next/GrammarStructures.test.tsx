@@ -10,6 +10,8 @@ import { expect, it, vi } from "vitest";
 import type { NextGrammarStructure, VoiceProfileV3 } from "@tsz/types";
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
 import { App } from "@tsz/ui/admin/overlays";
+import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
+import { grammarBindingIssues } from "./model";
 import { GrammarStructures } from "./GrammarStructures";
 
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
@@ -257,11 +259,24 @@ it("通用英语不能吞掉缺失的美式语法变体", async () => {
   );
   const rows = JSON.parse(screen.getByLabelText("语法草稿").textContent!)[0]
     .variants;
-  expect(rows).toHaveLength(3);
+  expect(rows).toHaveLength(2);
   expect(rows.map((row: { locale: string }) => row.locale)).toEqual([
-    "en",
     "en-GB",
     "en-US"
   ]);
-  expect(rows[0].content.text).toBe("a job");
+  expect(rows[1].content.text).toBe("a job");
+  expect(
+    grammarBindingIssues(
+      {
+        schema_version: 1,
+        headword: "job",
+        forms: [],
+        grammar_structures: [
+          { id: "grammar", part_of_speech: "noun", variants: rows }
+        ],
+        senses: []
+      },
+      partOfSpeechCatalogFixture
+    ).some((issue) => issue.field === "variants")
+  ).toBe(false);
 });
