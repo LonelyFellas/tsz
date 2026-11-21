@@ -7254,7 +7254,7 @@ describe("新草稿默认录入位", () => {
     );
     const deleted = seen.context!.draftForms.pos[0]!.forms[1]!;
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
-    fireEvent.click(await screen.findByLabelText("删除词形及相关发音"));
+    expect(screen.queryByLabelText("删除词形及相关发音")).toBeNull();
     await waitFor(() =>
       expect(seen.context!.draftForms.pos[0]!.forms).not.toContainEqual(deleted)
     );
