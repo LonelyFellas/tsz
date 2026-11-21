@@ -49,8 +49,12 @@ cleanup_status=0
 on_exit() {
   local status=$?
   if [[ "$status" = 0 && -f "$composition_superseded_marker" ]]; then
-    write_state transition "$state_file" superseded >/dev/null 2>&1 || true
-    echo "release composition superseded before component deployment"
+    if write_state transition "$state_file" superseded >/dev/null 2>&1; then
+      echo "release composition superseded before component deployment"
+    else
+      echo "failed to persist superseded release composition state" >&2
+      status=1
+    fi
   elif [[ "$status" != 0 ]]; then
     if [[ -n "${DEPLOY_ACTIVE_COMPONENT:-}" ]]; then
       node deploy/release-state.mjs transition "$state_file" failed "" "$DEPLOY_ACTIVE_COMPONENT" "" >/dev/null 2>&1 || true

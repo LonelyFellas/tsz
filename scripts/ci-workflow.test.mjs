@@ -68,6 +68,16 @@ test("frontend composition rechecks stale candidates around backend API recovery
   assert.ok(waitIndex > source.indexOf("before-api-contract"));
   assert.ok(source.indexOf("after-api-contract") > waitIndex);
   assert.match(source, /composition_superseded_marker=/);
+  assert.match(
+    source,
+    /failed to persist superseded release composition state/
+  );
+
+  const sourceHelpers = await readFile(
+    new URL("../deploy/deploy-source.sh", import.meta.url),
+    "utf8"
+  );
+  assert.match(sourceHelpers, /cannot write superseded candidate marker/);
 });
 
 test("deployment shares one task-scoped SSH master and always closes it", async () => {
