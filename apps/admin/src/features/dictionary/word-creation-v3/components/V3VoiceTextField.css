@@ -131,6 +131,19 @@ textarea.v3-grammar-input.ui-input {
   padding: var(--ui-space-1) var(--ui-space-3);
 }
 
+/* 词形拼写预览只保留富文本层可见，输入框继续承接焦点和错误定位。 */
+.v3-spelling-preview > textarea.ui-input {
+  pointer-events: none;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.v3-spelling-preview > textarea.ui-input:focus {
+  border-color: var(--ui-color-border);
+  outline: none;
+  box-shadow: none;
+}
+
 /* antd 默认 transition: all 会让 autoSize 测到连读留白的动画中间值；仅保留颜色和焦点过渡。 */
 textarea.word-pronunciation-phonetic-input.ui-input {
   transition-property: color, background-color, border-color, box-shadow;
@@ -146,17 +159,6 @@ textarea.word-pronunciation-phonetic-input.ui-input {
   max-height: none !important;
   color: transparent;
   caret-color: transparent;
-}
-
-/* 词形拼写预览与实际发音一致，只通过右侧编辑按钮进入输入态。 */
-.v3-spelling-preview > textarea.ui-input {
-  pointer-events: none;
-}
-
-.v3-spelling-preview > textarea.ui-input:focus {
-  border-color: var(--ui-color-border);
-  outline: none;
-  box-shadow: none;
 }
 
 .v3-grammar-preview-content {

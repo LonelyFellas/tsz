@@ -1971,10 +1971,10 @@ it("grammar 富文本位于紧凑组背景上方，透明输入框覆盖长预�
     /\.v3-grammar-preview-content\s*\{[^}]*z-index:\s*5;/su
   );
   expect(fieldCss).toMatch(
-    /\.v3-grammar-preview\s*>\s*textarea\.ui-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
+    /\.v3-spelling-preview\s*>\s*textarea\.ui-input\s*\{[^}]*pointer-events:\s*none;[^}]*color:\s*transparent;[^}]*caret-color:\s*transparent;/su
   );
   expect(fieldCss).toMatch(
-    /\.v3-spelling-preview\s*>\s*textarea\.ui-input\s*\{[^}]*pointer-events:\s*none;/su
+    /\.v3-grammar-preview\s*>\s*textarea\.ui-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
   );
 });
 
