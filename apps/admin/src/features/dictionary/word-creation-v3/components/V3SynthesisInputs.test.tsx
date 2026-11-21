@@ -158,7 +158,8 @@ function Harness({
   recording = false,
   extraRecording = false,
   issues = [],
-  audioTasks = null
+  audioTasks = null,
+  onLatestChange
 }: {
   dialect: Dialect;
   legacy?: boolean;
@@ -172,6 +173,7 @@ function Harness({
   extraRecording?: boolean;
   issues?: readonly V3DraftValidationIssue[];
   audioTasks?: Map<string, () => Promise<boolean>> | null;
+  onLatestChange?: (next: WordPronunciationV3) => void;
 }) {
   const generatedSpeech = {
     content: { version: 2 as const, text: "far", annotations: [] },
@@ -321,7 +323,11 @@ function Harness({
             issues={issues}
             onSpellingSettings={() => {}}
             onChange={(patch) =>
-              setPronunciation((value) => ({ ...value, ...patch }))
+              setPronunciation((value) => {
+                const next = { ...value, ...patch };
+                onLatestChange?.(next);
+                return next;
+              })
             }
           />
           <output data-testid="pronunciation-wire">
@@ -332,6 +338,59 @@ function Harness({
     </App>
   );
 }
+
+it("真实音素设置保存先回写最新配音资产再触发业务保存", async () => {
+  let latest: WordPronunciationV3 | undefined;
+  const save = vi.fn().mockImplementation(async () => {
+    expect(
+      latest?.synthesis?.uk?.ipa_speech?.voice_profile?.voices[0]
+    ).toMatchObject({
+      audio_asset_id: "new-audio"
+    });
+    return true;
+  });
+  speech.recommendations.mockResolvedValue([
+    {
+      id: "first",
+      name: "自然",
+      groupName: "发音",
+      locale: "en-GB",
+      setting: {
+        voice_id: "en-gb-sonia",
+        version_id: "11111111-1111-4111-8111-111111111111",
+        version_name: "自然",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: 0
+      }
+    }
+  ]);
+  renderWithUps(
+    <VoiceSaveContext.Provider value={{ save }}>
+      <Harness
+        dialect="uk"
+        onLatestChange={(next) => {
+          latest = next;
+        }}
+      />
+    </VoiceSaveContext.Provider>
+  );
+  fireEvent.change(screen.getByLabelText("第 1 条发音的英式 Azure IPA"), {
+    target: { value: "fɑːɹ" }
+  });
+  fireEvent.click(sourceRadio("Azure IPA", "英式"));
+  const label = "第 1 条发音 英式 Azure IPA";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  await screen.findByLabelText(`${label}音标编辑`);
+  const complete = screen.getByLabelText(`保存${label}修改`);
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith("azure", {
+      skipAudioTasks: true
+    })
+  );
+});
 
 it("音素设置弹窗不提前生成，点击完成才生成并应用最新配音", async () => {
   speech.recommendations.mockResolvedValue([
