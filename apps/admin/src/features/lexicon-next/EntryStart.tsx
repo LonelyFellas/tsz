@@ -28,13 +28,7 @@ export interface LexiconNextCreationNavigationState {
   lexiconNextSuggestedPartOfSpeech?: string[];
 }
 
-export function EntryStart({
-  requests,
-  creationSnapshotAvailable = false
-}: {
-  requests: LexiconNextRequests;
-  creationSnapshotAvailable?: boolean;
-}) {
+export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const navigate = useNavigate();
   const {
     search: languageSearch,
@@ -187,10 +181,7 @@ export function EntryStart({
             target_language: targetLanguage,
             medium_locale: medium,
             kind: detection.kind,
-            headword: detection.surface,
-            ...(creationSnapshotAvailable
-              ? { creation_detection: detection }
-              : {})
+            headword: detection.surface
           });
       const createdId = entry?.id ?? entryId;
       if (!createdId) return;
