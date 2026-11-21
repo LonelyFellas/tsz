@@ -946,6 +946,11 @@ function EntryEditor({
       { preserveDraft: true }
     );
   }
+  function goToPreview() {
+    if (dirty) setError("当前预览包含未保存修改，发布前请先保存完整草稿。");
+    changeStep("preview");
+  }
+
   function changeStep(next: WordCreationStep) {
     const nextStep = next;
     if (nextStep === "basics") {
@@ -1386,8 +1391,9 @@ function EntryEditor({
               </Button>
               <Button
                 type="primary"
+                loading={busy}
                 disabled={busy}
-                onClick={() => changeStep("preview")}
+                onClick={() => void goToPreview()}
               >
                 下一步：预览
               </Button>

@@ -8,7 +8,7 @@ export const adminShellMessages = {
   nav_classes: ["班级管理", "班級管理", "Classes"],
   nav_dictionary: ["词库管理", "詞庫管理", "Lexicon"],
   nav_lexicon_next: ["智能词库", "智慧詞庫", "Entries"],
-  nav_words: ["智能词库V1", "智慧詞庫V1", "Entries V1"],
+  nav_words: ["旧版智能词库", "舊版智慧詞庫", "Legacy entries"],
   nav_trash: ["垃圾桶", "垃圾桶", "Trash"],
   nav_registers: ["语体色彩", "語體色彩", "Registers"],
   nav_domains: ["行业领域", "行業領域", "Industry domains"],

@@ -391,9 +391,11 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
               </span>
               <Button
                 type="primary"
+                htmlType="button"
                 icon={<Plus aria-hidden />}
                 loading={busy === "create"}
                 disabled={!canCreate || Boolean(busy) || uncertain}
+                aria-busy={busy === "create"}
                 onClick={requestCreate}
               >
                 确认创建
