@@ -816,7 +816,6 @@ export const lexiconEditorPanelMessages = {
   ],
   panel_save_changes_2: ["保存修改", "儲存修改", "Save changes"],
   panel_done: ["完成", "完成", "Done"],
-  panel_saving_changes: ["正在保存修改…", "正在儲存修改…", "Saving changes…"],
   panel_loading_default_voices: [
     "正在加载默认配音…",
     "正在載入預設配音…",
