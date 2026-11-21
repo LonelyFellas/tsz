@@ -1066,6 +1066,15 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       message={requiredError}
       messageId={requiredErrorId}
       className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}${actualPronunciationPreview ? " v3-actual-pronunciation-preview" : ""}${spellingPreview ? " v3-spelling-preview" : ""}`}
+      onMouseDown={
+        spellingPreview
+          ? (event) => {
+              event.currentTarget
+                .querySelector<HTMLTextAreaElement>("textarea")
+                ?.focus();
+            }
+          : undefined
+      }
     >
       {fallback}
       {defaultLoading && !requiredError && (

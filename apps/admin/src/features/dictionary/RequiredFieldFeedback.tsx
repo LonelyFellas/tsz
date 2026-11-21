@@ -1,16 +1,23 @@
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  type MouseEventHandler,
+  type ReactNode
+} from "react";
 import "./required-field-feedback.css";
 
 export function RequiredFieldFeedback({
   message,
   messageId,
   className = "",
-  children
+  children,
+  onMouseDown
 }: {
   message?: string;
   messageId: string;
   className?: string;
   children: ReactNode;
+  onMouseDown?: MouseEventHandler<HTMLDivElement>;
 }) {
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -26,6 +33,7 @@ export function RequiredFieldFeedback({
       ref={root}
       data-ui-compact-item
       className={`required-field-feedback${message ? " required-field-feedback-error" : ""} ${className}`}
+      onMouseDown={onMouseDown}
     >
       {children}
       {message && (
