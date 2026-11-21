@@ -4,7 +4,8 @@ import { resolve } from "node:path";
 import { checkDeployedApiContract } from "./check-api-contract.mjs";
 
 const DEFAULT_INTERVAL_MS = 20 * 1000;
-const DEFAULT_COMPATIBLE_TIMEOUT_MS = 15 * 60 * 1000;
+// Backend deployment recovery may take longer than the old 15-minute wait.
+const DEFAULT_COMPATIBLE_TIMEOUT_MS = 120 * 60 * 1000;
 
 function nextDelay({ deadline, now, intervalMs }) {
   return deadline == null
