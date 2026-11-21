@@ -1242,7 +1242,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             }
           />
         )}
-        {saving && <span role="status">{t("panel_saving_changes")}</span>}
         <Suspense
           fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}
         >
@@ -1360,7 +1359,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     <>
       {fieldView}
       {automaticAudio.busy && (
-        <span role="status">{t("panel_generating_final_audio")}</span>
+        <span className="sr-only" role="status">
+          {t("panel_generating_final_audio")}
+        </span>
       )}
       {!expanded && automaticAudio.error != null && (
         <Alert

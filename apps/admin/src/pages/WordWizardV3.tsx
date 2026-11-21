@@ -301,11 +301,9 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
       </AdminControls>
       <V3StepActions
         status={
-          busy
-            ? t("processing_draft")
-            : context.hasUnsavedChanges || bindingsDirty
-              ? t("unsaved_draft_status")
-              : t("draft_revision", { revision: context.word.revision })
+          context.hasUnsavedChanges || bindingsDirty
+            ? t("unsaved_draft_status")
+            : t("draft_revision", { revision: context.word.revision })
         }
       >
         <Button

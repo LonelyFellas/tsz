@@ -1261,7 +1261,7 @@ function EntryEditor({
                 </ContentEditPermissions.Provider>
               </VoiceSaveContext.Provider>
               {step === "forms" && (
-                <V3StepActions status={busy ? "正在保存草稿" : undefined}>
+                <V3StepActions>
                   <Button
                     loading={busy}
                     disabled={
@@ -1378,7 +1378,7 @@ function EntryEditor({
             onChange={setDraft}
           />
           {step === "meanings" && (
-            <V3StepActions status={busy ? "正在保存草稿" : undefined}>
+            <V3StepActions>
               <Button
                 type="text"
                 disabled={busy}

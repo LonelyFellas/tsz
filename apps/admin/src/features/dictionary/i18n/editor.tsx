@@ -629,7 +629,6 @@ export const lexiconEditorMessages = {
   component_words: ["成分用词", "成分用詞", "Component words"],
   related_words: ["拓展词", "拓展詞", "Related entries"],
   add_sense: ["添加词义", "新增詞義", "Add meaning"],
-  processing_draft: ["正在处理草稿…", "正在處理草稿…", "Processing draft…"],
   previous: ["上一步", "上一步", "Previous step"],
   save_draft: ["保存草稿", "儲存草稿", "Save draft"],
   complete_preview: [

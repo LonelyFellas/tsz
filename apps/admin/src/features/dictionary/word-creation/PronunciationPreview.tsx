@@ -430,6 +430,12 @@ export function PronunciationPreviewVoiceSummary({
     <span
       className="word-pronunciation-voice-label"
       data-has-voice={Boolean(voice)}
+      role={context.voicesLoading || resolved.pending ? "status" : undefined}
+      aria-label={
+        context.voicesLoading || resolved.pending
+          ? t("panel_loading_voices")
+          : undefined
+      }
       title={
         voice
           ? t("panel_label_7", {
@@ -440,7 +446,7 @@ export function PronunciationPreviewVoiceSummary({
       }
     >
       {context.voicesLoading || resolved.pending
-        ? t("panel_loading_voices")
+        ? "—"
         : voice
           ? voice.label.replace(` · ${voice.locale}`, "")
           : resolved.error ||
@@ -665,8 +671,12 @@ export function PronunciationPreviewVoiceList({
   }
   if (context.voicesLoading || resolved.pending)
     return (
-      <span className="v3-voice-inline-status">
-        {t("panel_loading_voices")}
+      <span
+        className="v3-voice-inline-status"
+        role="status"
+        aria-label={t("panel_loading_voices")}
+      >
+        —
       </span>
     );
   if (!rows.length)
