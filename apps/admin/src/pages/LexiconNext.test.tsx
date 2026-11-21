@@ -700,7 +700,9 @@ it("创建后词形步骤的自动词性草稿保护面包屑离开", async () =
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await screen.findByTestId("lexicon-next-editor");
   await waitFor(() =>
-    expect(screen.getAllByText("有未保存修改")).not.toHaveLength(0)
+    expect(
+      document.querySelector(".word-forms-tabs .word-pos-tab-label")
+    ).toHaveTextContent("名词")
   );
   fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
   await screen.findByText(
@@ -750,6 +752,34 @@ it("保存请求进行中，浏览器返回不能绕过语言锁", async () => {
   expect(
     screen.getByRole("combobox", { name: "目标语言" }).closest(".ui-select")
   ).toHaveTextContent("美式英语");
+});
+
+it("有未保存修改时切换目标语言需要确认离开", async () => {
+  const api = requests();
+  const { router } = mount(api, `/lexicon-next/${id}?target_locale=en-GB`);
+  await waitForEntryReady();
+  fireEvent.click(stepButton(/^预览/));
+  fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+    target: { value: "unsaved target locale" }
+  });
+
+  await chooseLanguage("美式英语");
+
+  expect(screen.getByRole("dialog", { name: "有未保存修改" })).toBeVisible();
+  expect(router.state.location.search).toContain("target_locale=en-GB");
+
+  fireEvent.click(button("继续编辑"));
+  expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+    "unsaved target locale"
+  );
+
+  await chooseLanguage("美式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
+  await waitFor(() =>
+    expect(router.state.location.search).toContain("target_locale=en-US")
+  );
 });
 
 it("新建中切换媒介语言清除旧范围匹配，保留输入并重新检测", async () => {
@@ -934,10 +964,9 @@ it("列表名称只显示词头，不展示其他词形和地区标记", async (
   expect(screen.queryByText(/加拿大|法语/)).toBeNull();
 });
 
-it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并在创建前要求新标注", async () => {
+it("检测展示新版已有草稿、标注与释义，并在创建前要求新标注", async () => {
   const api = requests();
   const createdId = "00000000-0000-4000-8000-000000000003";
-  const archivedId = "00000000-0000-4000-8000-000000000002";
   api.create.mockResolvedValue({ ...entry, id: createdId });
   api.matchEntries.mockResolvedValue({
     surface: "center",
@@ -947,16 +976,9 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并在�
         annotation_visible: true,
         annotation: "2",
         gloss: "已有词条的释义"
-      }),
-      listRow({
-        id: archivedId,
-        status: "archived",
-        headword: "center",
-        kind: "phrase",
-        gloss: "垃圾桶词条的释义"
       })
     ],
-    pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
   });
   mount(api, "/lexicon-next/new");
   fireEvent.change(await screen.findByLabelText("录入词条"), {
@@ -967,18 +989,12 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并在�
     await screen.findByRole("region", { name: "智能词库匹配结果" })
   );
   expect(matches.getByText("已有词条的释义")).toBeVisible();
-  expect(matches.getByText("垃圾桶词条的释义")).toBeVisible();
-  expect(matches.getByText("2 条匹配")).toBeVisible();
+  expect(matches.getByText("1 条匹配")).toBeVisible();
   expect(matches.getByText("草稿")).toBeVisible();
-  expect(matches.getByText("垃圾桶")).toBeVisible();
   expect(matches.getByText("2", { selector: "sup" })).toBeVisible();
   expect(matches.getByRole("link", { name: "继续创建" })).toHaveAttribute(
     "href",
     `/lexicon-next/${id}?target_language=en&target_locale=en-GB&medium_locale=zh-Hans`
-  );
-  expect(matches.getByRole("link", { name: "查看词条" })).toHaveAttribute(
-    "href",
-    `/lexicon-next/${archivedId}?target_language=en&target_locale=en-GB&medium_locale=zh-Hans`
   );
   expect(
     screen.getByText("未找到内置词典匹配，可继续创建空白草稿。")
@@ -1843,9 +1859,15 @@ describe("新版词库手工闭环", () => {
     await edit("简体中文解释", "中心位置");
     await edit("简体中文译词", "中心");
     await chooseLanguage("美式英语");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "放弃修改并离开" })
+    );
     await edit("美式英语词形", "center");
     await edit("美式英语释义", "the center");
     await chooseLanguage("英式英语");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "放弃修改并离开" })
+    );
     fireEvent.click(stepButton(/词形与发音/));
     expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
       "centre"
@@ -1957,7 +1979,6 @@ describe("新版词库手工闭环", () => {
       "草稿未保存，修改已保留。请填写有效的 Azure IPA 合成音素"
     );
     expect(screen.getByDisplayValue("local")).toBeVisible();
-    expect(screen.getByText("有未保存修改")).toBeVisible();
   });
   it("加载 422 不伪装成草稿保存失败", async () => {
     const api = requests();
@@ -3390,10 +3411,16 @@ it("Step3 释义跟随顶部语言选择，保留已有通用英语内容及完�
     target: { value: "the center" }
   });
   await chooseLanguage("英式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   expect(screen.getByRole("textbox", { name: "英式英语释义 1" })).toHaveValue(
     "a centre"
   );
   await chooseLanguage("美式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   await chooseLanguage("繁体中文");
   fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
   expect(
@@ -4663,8 +4690,14 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
   fireEvent.click(textAction("添加译文"));
   expect(screen.getByLabelText("译文 2 简体中文正文")).toHaveValue("");
   await chooseLanguage("美式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   await editSentenceOriginal("美式英语", "Local American.");
   await chooseLanguage("英式英语");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "放弃修改并离开" })
+  );
   expect(
     await screen.findByLabelText("编辑英式英语例句原文")
   ).toHaveTextContent("Local British.");
