@@ -999,7 +999,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           : undefined
       }
       className={`word-pronunciation-phonetic-input ${fontClass}${mode === "actual-pron" ? " tsz-actual-pronunciation" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
-      tabIndex={actualPronunciationPreview || spellingPreview ? -1 : undefined}
+      tabIndex={actualPronunciationPreview ? -1 : undefined}
       data-v3-field={expanded ? undefined : field}
       data-v3-node-id={expanded ? undefined : nodeId}
       data-v3-node-aliases={expanded ? undefined : nodeAliases}
