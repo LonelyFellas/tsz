@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { NextDraft, NextEntry } from "@tsz/types";
+import type { NextDraft, NextEntry, NextEntryMatchInput } from "@tsz/types";
 import { createAdminEndpoints } from "./admin";
 import { createHttpClient, HttpError } from "./http";
 import { decodeNextEntry, decodeNextEntryView } from "./lexicon-next";
@@ -218,21 +218,32 @@ describe("lexicon-next authoritative wire contract", () => {
     const page = {
       surface: "café",
       items: [],
-      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 },
+      annotation_required: false
     };
     const { api, fetch } = client(page);
-    const input = {
+    const input: NextEntryMatchInput = {
       target_language: "en",
       surface: "café",
       page: 2,
       page_size: 20
     };
-    expect(await api.matchEntries(input)).toEqual(page);
+    expect(await api.matchEntries(input, "word")).toEqual(page);
     expect(fetch.mock.calls[0]![0]).toBe(
       "https://test.invalid/api/v1/admin/lexicon-next/entry-matches"
     );
     expect(fetch.mock.calls[0]![1].method).toBe("POST");
     expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual(input);
+    expect(
+      new Headers(fetch.mock.calls[0]![1].headers).get(
+        "x-tsz-next-annotation-rule"
+      )
+    ).toBe("v1");
+    expect(
+      new Headers(fetch.mock.calls[0]![1].headers).get(
+        "x-tsz-next-annotation-kind"
+      )
+    ).toBe("word");
     expect(
       validateRuntimeSchema("NextEntryMatchInput", {
         target_language: "en",
@@ -249,11 +260,13 @@ describe("lexicon-next authoritative wire contract", () => {
       );
     }
     const malformed = client({ ...page, items: [entry] });
-    await expect(malformed.api.matchEntries(input)).rejects.toThrow("接口契约");
-    const missing = client({}, 404);
-    await expect(missing.api.matchEntries(input)).rejects.toBeInstanceOf(
-      HttpError
+    await expect(malformed.api.matchEntries(input, "word")).rejects.toThrow(
+      "接口契约"
     );
+    const missing = client({}, 404);
+    await expect(
+      missing.api.matchEntries(input, "word")
+    ).rejects.toBeInstanceOf(HttpError);
     expect(missing.fetch).toHaveBeenCalledTimes(1);
   });
   it("detects through the independent read-only endpoint and rejects incomplete reference records", async () => {

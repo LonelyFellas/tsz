@@ -816,13 +816,16 @@ it("新建中切换媒介语言清除旧范围匹配，保留输入并重新检�
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
   fireEvent.click(button("词典检测"));
   await screen.findByRole("button", { name: "确认创建" });
-  expect(api.matchEntries).toHaveBeenLastCalledWith({
-    target_language: "en",
-    medium_locale: "zh-Hant",
-    surface: "centre",
-    page: 1,
-    page_size: 20
-  });
+  expect(api.matchEntries).toHaveBeenLastCalledWith(
+    {
+      target_language: "en",
+      medium_locale: "zh-Hant",
+      surface: "centre",
+      page: 1,
+      page_size: 20
+    },
+    "word"
+  );
 });
 
 it("旧API未开放归属能力时不发起词条读写", async () => {
@@ -991,6 +994,7 @@ it("检测展示新版已有草稿、标注与释义，并在创建前要求新�
   api.create.mockResolvedValue({ ...entry, id: createdId });
   api.matchEntries.mockResolvedValue({
     surface: "center",
+    annotation_required: true,
     items: [
       listRow({
         forms: [{ id: "form", locale: "en-US", text: "center" }],
@@ -1020,13 +1024,16 @@ it("检测展示新版已有草稿、标注与释义，并在创建前要求新�
   expect(
     screen.getByText("未找到内置词典匹配，可继续创建空白草稿。")
   ).toBeVisible();
-  expect(api.matchEntries).toHaveBeenCalledExactlyOnceWith({
-    medium_locale: "zh-Hans",
-    target_language: "en",
-    surface: "center",
-    page: 1,
-    page_size: 20
-  });
+  expect(api.matchEntries).toHaveBeenCalledExactlyOnceWith(
+    {
+      medium_locale: "zh-Hans",
+      target_language: "en",
+      surface: "center",
+      page: 1,
+      page_size: 20
+    },
+    "word"
+  );
   fireEvent.click(button("确认创建"));
   const annotationDialog = await screen.findByRole("dialog");
   expect(within(annotationDialog).getByText("已有词条 1")).toBeInTheDocument();
@@ -1050,6 +1057,67 @@ it("检测展示新版已有草稿、标注与释义，并在创建前要求新�
     base_annotation_revision: 1
   });
   expect(api.save).not.toHaveBeenCalled();
+});
+
+it("仅词形重复不要求数字标注", async () => {
+  const api = requests();
+  const createdId = "00000000-0000-4000-8000-000000000004";
+  api.create.mockResolvedValue({ ...entry, id: createdId });
+  api.matchEntries.mockResolvedValue({
+    surface: "flipper",
+    annotation_required: false,
+    items: [
+      listRow({
+        headword: "flip",
+        forms: [{ id: "form", locale: "en-GB", text: "flipper" }]
+      })
+    ],
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "flipper" }
+  });
+  fireEvent.click(button("词典检测"));
+  await screen.findByRole("button", { name: "确认创建" });
+  fireEvent.click(button("确认创建"));
+  await waitFor(() =>
+    expect(api.create).toHaveBeenCalledExactlyOnceWith({
+      medium_locale: "zh-Hans",
+      target_language: "en",
+      kind: "word",
+      headword: "flipper"
+    })
+  );
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(api.annotation).not.toHaveBeenCalled();
+});
+
+it("标注弹窗只展示后端返回的精确词头冲突", async () => {
+  const api = requests();
+  api.matchEntries.mockResolvedValue({
+    surface: "flipper",
+    annotation_required: true,
+    annotation_items: [listRow({ headword: "flipper", annotation: "2" })],
+    items: [
+      listRow({ headword: "flipper", annotation: "2" }),
+      listRow({
+        id: "form-only",
+        headword: "flip",
+        forms: [{ id: "form", locale: "en-GB", text: "flipper" }]
+      })
+    ],
+    pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
+  });
+  mount(api, "/lexicon-next/new");
+  fireEvent.change(await screen.findByLabelText("录入词条"), {
+    target: { value: "flipper" }
+  });
+  fireEvent.click(button("词典检测"));
+  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText("已有词条 1")).toBeVisible();
+  expect(within(dialog).queryByText("已有词条 2")).toBeNull();
 });
 
 it("标注请求响应丢失后刷新修订号并只重试标注", async () => {
@@ -1176,13 +1244,16 @@ it("已有词条翻页只重查新版匹配，失败保留原结果并支持重�
   await screen.findByText("第二页已有释义");
   await waitFor(() => expect(region).toHaveFocus());
   expect(api.detect).toHaveBeenCalledTimes(1);
-  expect(api.matchEntries).toHaveBeenLastCalledWith({
-    medium_locale: "zh-Hans",
-    target_language: "en",
-    surface: "center",
-    page: 2,
-    page_size: 20
-  });
+  expect(api.matchEntries).toHaveBeenLastCalledWith(
+    {
+      medium_locale: "zh-Hans",
+      target_language: "en",
+      surface: "center",
+      page: 2,
+      page_size: 20
+    },
+    "word"
+  );
   fireEvent.change(input, { target: { value: "another" } });
   expect(screen.queryByRole("region", { name: "智能词库匹配结果" })).toBeNull();
   expect(screen.queryByRole("button", { name: "确认创建" })).toBeNull();
