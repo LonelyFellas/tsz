@@ -13,7 +13,8 @@ import {
   PencilIcon,
   CircleHelpIcon,
   SearchIcon,
-  Volume2Icon
+  Volume2Icon,
+  Trash2Icon
 } from "lucide-react";
 import { Alert, Button, Space, Spin, Typography } from "@tsz/ui/admin/display";
 import { Checkbox, Input } from "@tsz/ui/admin/forms";
@@ -400,6 +401,18 @@ export function LocalVoicePool({
       dialect
     });
   }
+  function removeSelectedVoice(setting: VoiceSetting, side: "uk" | "us") {
+    if (readOnly) return;
+    const local = materialize(side);
+    if (!local) return;
+    const key = voiceSettingKey(setting);
+    onChange({
+      ...local,
+      voices: local.voices.map((item) =>
+        voiceSettingKey(item) === key ? { ...item, enabled: false } : item
+      )
+    });
+  }
   function preview(
     item: VoiceSetting,
     accent?: AudioAssetLocale,
@@ -715,20 +728,35 @@ export function LocalVoicePool({
                             ))}
                           </Space>
                           {renderIdentity(setting, side.locale)}
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<PencilIcon />}
-                            aria-label={t("edit_2", {
-                              p0: setting.version_name ?? setting.voice_id
-                            })}
-                            disabled={
-                              readOnly ||
-                              !!generatingVersion ||
-                              !voices.some((v) => v.id === setting.voice_id)
-                            }
-                            onClick={() => edit(setting)}
-                          />
+                          <Space size={0}>
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<PencilIcon />}
+                              aria-label={t("edit_2", {
+                                p0: setting.version_name ?? setting.voice_id
+                              })}
+                              disabled={
+                                readOnly ||
+                                !!generatingVersion ||
+                                !voices.some((v) => v.id === setting.voice_id)
+                              }
+                              onClick={() => edit(setting)}
+                            />
+                            <Button
+                              type="text"
+                              size="small"
+                              danger
+                              icon={<Trash2Icon />}
+                              aria-label={t("remove", {
+                                p0: setting.version_name ?? setting.voice_id
+                              })}
+                              disabled={readOnly || !!generatingVersion}
+                              onClick={() =>
+                                removeSelectedVoice(setting, side.key)
+                              }
+                            />
+                          </Space>
                         </div>
                         {adapter?.generateAudio && !setting.audio_asset_id && (
                           <Typography.Text type="secondary">
