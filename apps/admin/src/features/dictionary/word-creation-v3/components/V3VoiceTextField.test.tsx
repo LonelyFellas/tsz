@@ -937,6 +937,22 @@ it("词形拼写预览保留输入框鼠标和 Tab 焦点", () => {
   expect(screen.getByLabelText("英式拼写")).not.toHaveAttribute("tabindex");
 });
 
+it("词形拼写预览点击容器时把焦点交给输入框", () => {
+  const { container } = render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={{ version: 2, text: "finance", annotations: [] }}
+      onChange={vi.fn()}
+      ariaLabel="英式拼写"
+      nodeId="spelling-container-focus"
+      field="spelling"
+    />
+  );
+  const input = screen.getByLabelText("英式拼写");
+  fireEvent.mouseDown(container.querySelector(".v3-spelling-preview")!);
+  expect(input).toHaveFocus();
+});
+
 describe("V3VoiceTextField 取消和收起态", () => {
   // rc-util 的 test-id 会让嵌套弹窗清除外层的 Esc 栈；使用开发环境的真实唯一 ID。
   beforeEach(() => vi.stubEnv("NODE_ENV", "development"));
