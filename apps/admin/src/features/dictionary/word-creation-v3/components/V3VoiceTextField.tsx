@@ -943,8 +943,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         annotation.type === "italic" ||
         annotation.type === "underline"
     );
+  const spellingMarkupPreview =
+    mode === "spelling" && toRichTextV2(value).annotations.length > 0;
   const grammarPreview =
-    (mode === "grammar" || mode === "spelling" || associationPreview) &&
+    (mode === "grammar" || associationPreview || spellingMarkupPreview) &&
     (mode === "spelling"
       ? !focused
       : !focused ||
