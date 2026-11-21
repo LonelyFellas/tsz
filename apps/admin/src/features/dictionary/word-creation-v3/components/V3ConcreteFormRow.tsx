@@ -115,8 +115,8 @@ function conflictLiterals(
   ];
 }
 
-function spellingInputId(variantId: string) {
-  return `v3-spelling-${variantId}`;
+function spellingInputId(instanceId: string) {
+  return `v3-spelling-${instanceId.replaceAll(":", "")}`;
 }
 
 function SpellingLabel({
@@ -133,8 +133,11 @@ function SpellingLabel({
       className="ui-typography"
       htmlFor={htmlFor}
       onMouseDown={(event) => {
+        const input = inputRef.current?.resizableTextArea.textArea;
+        if (!input || input.id !== htmlFor || input.readOnly || input.disabled)
+          return;
         event.preventDefault();
-        inputRef.current?.focus();
+        input.focus();
       }}
     >
       <strong>{children}</strong>
@@ -409,6 +412,7 @@ function V3DialectFormCell({
   spellingLabel
 }: V3DialectFormCellProps) {
   const { t } = useLexiconEditorTranslation();
+  const spellingInstanceId = useId();
   const spellingRef = useRef<TextAreaRef>(null);
   const spellingSettingsRef = useRef<SpellingSettingsOpener | null>(null);
   const [spellingRequired, setSpellingRequired] = useState(false);
@@ -418,7 +422,7 @@ function V3DialectFormCell({
     (row) => !variantId || row.id === variantId
   );
   if (!variant) return null;
-  const inputId = spellingInputId(variant.id);
+  const inputId = spellingInputId(spellingInstanceId);
   const conflictLiteralList = conflictLiterals(
     spellingReferences(
       referenceGuard.index,
@@ -797,6 +801,8 @@ export function V3ConcreteFormRow({
   referenceBadge
 }: V3ConcreteFormRowProps) {
   const { t } = useLexiconEditorTranslation();
+  const spellingInstanceId = useId();
+  const spellingInput = spellingInputId(spellingInstanceId);
   const spellingRef = useRef<TextAreaRef>(null);
   const spellingSettingsRef = useRef<SpellingSettingsOpener | null>(null);
   const [spellingRequired, setSpellingRequired] = useState(false);
@@ -944,10 +950,7 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <SpellingLabel
-                  htmlFor={spellingInputId(commonVariant.id)}
-                  inputRef={spellingRef}
-                >
+                <SpellingLabel htmlFor={spellingInput} inputRef={spellingRef}>
                   {t("spelling")}
                 </SpellingLabel>
                 <SpellingRegularity
@@ -961,7 +964,7 @@ export function V3ConcreteFormRow({
                 />
               </Flex>
               <V3VoiceTextField
-                id={spellingInputId(commonVariant.id)}
+                id={spellingInput}
                 mode="spelling"
                 spellingTextOnly
                 spellingAudioScope={spellingAudioScope(variants)}
@@ -1064,10 +1067,7 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <SpellingLabel
-                  htmlFor={spellingInputId(unifiedSpellingVariants.uk.id)}
-                  inputRef={spellingRef}
-                >
+                <SpellingLabel htmlFor={spellingInput} inputRef={spellingRef}>
                   {t("spelling")}
                 </SpellingLabel>
                 <SpellingRegularity
@@ -1081,7 +1081,7 @@ export function V3ConcreteFormRow({
                 />
               </Flex>
               <V3VoiceTextField
-                id={spellingInputId(unifiedSpellingVariants.uk.id)}
+                id={spellingInput}
                 mode="spelling"
                 spellingTextOnly
                 spellingAudioScope={spellingAudioScope(variants)}
