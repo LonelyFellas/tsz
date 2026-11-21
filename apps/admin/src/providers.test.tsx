@@ -141,6 +141,40 @@ function showLogin(path = "/login") {
   );
 }
 
+describe("后台初次连接状态", () => {
+  it("初次恢复会话时只显示一张连接状态卡片", () => {
+    useAuthStore.setState({
+      profile: null,
+      role: null,
+      hydrated: false,
+      connectionError: false
+    });
+    render(
+      <MemoryRouter initialEntries={["/words"]}>
+        <Routes>
+          <Route
+            path="/words"
+            element={
+              <RootProviders>
+                <div>后台内容</div>
+              </RootProviders>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "正在连接…" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("正在恢复后台会话，连接成功后会自动打开页面。")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("加载中...")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
 describe("登录页连接提示", () => {
   it.each(["/login", "/login/", "/LOGIN"])(
     "%s 在登录区域内重试，恢复后移除提示且保留已填写内容",

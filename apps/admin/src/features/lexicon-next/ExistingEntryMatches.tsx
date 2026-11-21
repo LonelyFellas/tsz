@@ -27,7 +27,12 @@ export function ExistingEntryMatches({
     }
   }, [result]);
   return (
-    <section ref={region} tabIndex={-1} aria-label="智能词库匹配结果">
+    <section
+      ref={region}
+      tabIndex={-1}
+      className="lexicon-next-existing-matches"
+      aria-label="智能词库匹配结果"
+    >
       <Card
         title="智能词库"
         extra={
@@ -78,7 +83,11 @@ export function ExistingEntryMatches({
             })}
           </div>
         ) : (
-          <Alert type="info" showIcon title="未找到智能词库中的匹配词条。" />
+          <Alert
+            className="lexicon-next-empty-state"
+            type="info"
+            title="未找到智能词库中的匹配词条。"
+          />
         )}
         {result.pagination.total_pages > 1 && (
           <Pagination

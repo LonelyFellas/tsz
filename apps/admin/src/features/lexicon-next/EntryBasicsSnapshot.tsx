@@ -54,19 +54,27 @@ export function EntryBasicsSnapshot({
           <Spin aria-label="正在读取内置词典" />
         </Card>
       ) : error ? (
-        <Alert
-          type="error"
-          showIcon
-          title="无法读取内置词典"
-          description={
-            error instanceof Error ? error.message : "请求失败，请重试。"
-          }
-          action={onRetry && <Button onClick={onRetry}>重试</Button>}
-        />
+        <Card className="word-detection-result-card" title="内置词典">
+          <Alert
+            type="error"
+            showIcon
+            title="无法读取内置词典"
+            description={
+              error instanceof Error ? error.message : "请求失败，请重试。"
+            }
+            action={onRetry && <Button onClick={onRetry}>重试</Button>}
+          />
+        </Card>
       ) : detection ? (
         <DictionaryDetectionCard detection={detection} />
       ) : (
-        <Alert type="info" showIcon title="未找到内置词典匹配" />
+        <Card className="word-detection-result-card" title="内置词典">
+          <Alert
+            className="lexicon-next-empty-state"
+            type="info"
+            title="未找到内置词典匹配"
+          />
+        </Card>
       )}
     </div>
   );

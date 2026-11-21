@@ -133,6 +133,122 @@
   margin: 0;
 }
 
+/* 创建入口：把检测过程做成连续工作区，避免初始空状态被壳体撑满。 */
+.word-creation-shell:has(.lexicon-next-create) {
+  min-height: auto;
+}
+
+.lexicon-next-create {
+  gap: var(--ui-space-5);
+}
+
+.lexicon-next-create .word-step-number {
+  display: none;
+}
+
+.lexicon-next-create .word-step-heading {
+  margin-bottom: var(--ui-space-4);
+}
+
+.lexicon-next-create .word-step-heading .ui-typography-h2 {
+  font-size: var(--ui-font-size-heading);
+  line-height: var(--ui-line-height-tight);
+}
+
+.lexicon-next-create
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .lexicon-next-existing-matches > .ui-card
+  ) {
+  overflow: hidden;
+  border-color: var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  box-shadow: none;
+}
+
+.lexicon-next-create
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .lexicon-next-existing-matches > .ui-card
+  )
+  > .ui-card-head {
+  min-height: var(--ui-control-height-comfortable);
+  padding-inline: var(--ui-space-5);
+  background: var(--ui-color-fill-alter);
+  border-bottom-color: var(--ui-color-border-secondary);
+}
+
+.lexicon-next-create
+  :is(
+    .word-basics-input-card,
+    .word-detection-result-card,
+    .lexicon-next-existing-matches > .ui-card
+  )
+  > .ui-card-body {
+  padding: var(--ui-space-5);
+}
+
+.lexicon-next-create .word-basics-input-card .ui-form-item {
+  margin-bottom: var(--ui-space-3);
+}
+
+.lexicon-next-create .word-basics-input-card .word-field-help {
+  margin-top: var(--ui-space-2);
+}
+
+.lexicon-next-create .lexicon-next-existing-matches {
+  margin-top: var(--ui-space-4);
+}
+
+.lexicon-next-create .lexicon-next-match {
+  padding-block: var(--ui-space-3);
+}
+
+.lexicon-next-create .lexicon-next-match + .lexicon-next-match {
+  margin-top: var(--ui-space-3);
+  padding-top: var(--ui-space-3);
+}
+
+.lexicon-next-create .lexicon-next-existing-heading {
+  gap: var(--ui-space-3);
+}
+
+.lexicon-next-create .lexicon-next-preview {
+  margin-block: var(--ui-space-2) 0;
+}
+
+.lexicon-next-create .word-detection-result-card .lexicon-next-match > ul {
+  margin-block: var(--ui-space-2);
+}
+
+.lexicon-next-create .word-detection-result-card .lexicon-next-match > dl {
+  margin-block: var(--ui-space-3);
+}
+
+.lexicon-next-create .word-detection-result-card .lexicon-next-match > p {
+  margin: var(--ui-space-3) 0 0;
+}
+
+.lexicon-next-create
+  .word-detection-result-card
+  .lexicon-next-match
+  > .ui-space {
+  gap: var(--ui-space-2);
+}
+
+.lexicon-next-create .lexicon-next-create-actions {
+  margin-top: var(--ui-space-5);
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-color-border-secondary);
+}
+
+.lexicon-next-create .lexicon-next-create-actions .ui-btn {
+  min-height: var(--ui-control-height-comfortable);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
 .lexicon-next [hidden],
 .lexicon-next[hidden] {
   display: none;
@@ -141,6 +257,79 @@
   max-width: 1200px;
   margin-inline: 0;
   border-radius: var(--ui-border-radius-lg);
+}
+
+/* 编辑页基础步骤与创建入口共用视觉层级，但不影响词形/词义编辑步骤。 */
+.lexicon-next-editor {
+  background: transparent;
+}
+
+.word-creation-shell:has(
+  .word-creation-content--basics > .lexicon-next-editor
+) {
+  min-height: auto;
+  background: transparent;
+  border-color: var(--ui-color-border-secondary);
+  box-shadow: none;
+}
+
+.word-creation-content--basics:has(> .lexicon-next-editor) {
+  padding-top: var(--ui-space-8);
+  background: transparent;
+}
+
+.lexicon-next-editor .word-basics-workflow,
+.lexicon-next-editor .lexicon-next-draft-preview {
+  box-sizing: border-box;
+  width: min(100%, 1120px);
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.lexicon-next-editor .word-basics-workflow {
+  padding: 0;
+  background: transparent;
+}
+
+.lexicon-next-editor .word-basics-workflow .word-step-number {
+  display: none;
+}
+
+.lexicon-next-editor .word-basics-workflow .word-step-heading {
+  margin-bottom: var(--ui-space-4);
+}
+
+.lexicon-next-editor
+  .word-basics-workflow
+  :is(.word-basics-input-card, .word-detection-result-card) {
+  overflow: hidden;
+  border-color: var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  box-shadow: none;
+}
+
+.lexicon-next-editor
+  .word-basics-workflow
+  :is(.word-basics-input-card, .word-detection-result-card)
+  > .ui-card-head {
+  min-height: var(--ui-control-height-comfortable);
+  padding-inline: var(--ui-space-5);
+  background: var(--ui-color-fill-alter);
+  border-bottom-color: var(--ui-color-border-secondary);
+}
+
+.lexicon-next-editor
+  .word-basics-workflow
+  :is(.word-basics-input-card, .word-detection-result-card)
+  > .ui-card-body {
+  padding: var(--ui-space-5);
+}
+
+.lexicon-next-editor
+  .word-basics-workflow
+  .word-basics-input-card
+  .ui-form-item {
+  margin-bottom: var(--ui-space-3);
 }
 .lexicon-next-forms {
   max-width: none;
@@ -297,4 +486,132 @@
 }
 .lexicon-next-draft-preview {
   margin-top: var(--ui-space-6);
+}
+
+/* 基础步骤操作条在内容流末尾，不再需要固定底部的额外安全区。 */
+.word-creation-content--basics:has(.v3-step-actions-inline) {
+  padding-bottom: var(--ui-space-6);
+}
+
+.lexicon-next-editor .lexicon-next-draft-preview {
+  overflow: hidden;
+  border: 1px solid var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  background: var(--ui-color-bg-container);
+  box-shadow: var(--ui-shadow-xs);
+}
+
+.lexicon-next-editor .lexicon-next-draft-preview .ui-collapse-header {
+  padding: var(--ui-space-4) var(--ui-space-5);
+  background: var(--ui-color-fill-alter);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.lexicon-next-editor .lexicon-next-draft-preview .ui-collapse-body {
+  padding: 0;
+}
+
+.lexicon-next-editor
+  .lexicon-next-draft-preview
+  .ui-collapse-body
+  > .lexicon-next-preview {
+  padding: var(--ui-space-6);
+}
+
+.lexicon-next-editor .lexicon-next-draft-preview .lexicon-next-preview h4 {
+  margin: 0 0 var(--ui-space-3);
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.lexicon-next-editor .lexicon-next-draft-preview .lexicon-next-preview ul {
+  margin-block: var(--ui-space-3);
+  padding-inline-start: var(--ui-space-6);
+}
+
+.lexicon-next-editor
+  .lexicon-next-draft-preview
+  .lexicon-next-preview
+  section
+  + section {
+  margin-top: var(--ui-space-6);
+  padding-top: var(--ui-space-5);
+  border-top: 1px solid var(--ui-color-border-secondary);
+}
+
+:is(.lexicon-next-create, .lexicon-next-editor)
+  .word-detection-result-card
+  > .ui-card-body
+  > .ui-alert {
+  margin: 0;
+}
+
+:is(.lexicon-next-create, .lexicon-next-editor)
+  .word-detection-result-card
+  > .ui-card-body
+  > [aria-label="正在读取内置词典"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ui-control-height-lg);
+}
+
+:is(.lexicon-next-create, .lexicon-next-editor)
+  :is(.word-basics-input-card, .word-detection-result-card)
+  > .ui-card-head-title {
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+:is(.lexicon-next-create, .lexicon-next-editor)
+  :is(.word-basics-input-card, .word-detection-result-card)
+  > .ui-card-extra {
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
+}
+
+:is(.lexicon-next-create, .lexicon-next-editor)
+  .lexicon-next-empty-state.ui-alert {
+  border-color: var(--ui-color-border-secondary);
+  background: var(--ui-color-fill-alter);
+  color: var(--ui-color-text-secondary);
+}
+
+.v3-step-actions.lexicon-next-basics-actions > .word-step-actions {
+  min-height: calc(var(--ui-control-height-lg) + var(--ui-space-2));
+  padding-block: var(--ui-space-2);
+}
+
+.v3-step-actions.lexicon-next-basics-actions .ui-btn-primary {
+  min-width: 128px;
+}
+
+.v3-step-actions.lexicon-next-basics-actions {
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  background: var(--ui-color-bg-container);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.v3-step-actions.lexicon-next-basics-actions[data-at-end="true"] {
+  border: 0;
+  border-radius: 0 0 var(--ui-border-radius-lg) var(--ui-border-radius-lg);
+  box-shadow: none;
+}
+
+.v3-step-actions.lexicon-next-basics-actions > .word-step-actions {
+  padding-inline: var(--ui-space-5);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+.v3-step-actions.lexicon-next-basics-actions[data-at-end="true"]
+  > .word-step-actions {
+  border-top: 1px solid var(--ui-color-border-secondary);
+  border-radius: 0 0 var(--ui-border-radius-lg) var(--ui-border-radius-lg);
 }

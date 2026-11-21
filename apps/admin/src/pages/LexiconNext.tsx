@@ -1217,15 +1217,6 @@ function EntryEditor({
                   : undefined
               }
             />
-            <V3StepActions status={busy ? "正在保存草稿" : undefined}>
-              <Button
-                type="primary"
-                disabled={busy || formContentOpen}
-                onClick={() => changeStep("forms")}
-              >
-                下一步：词形与发音
-              </Button>
-            </V3StepActions>
           </div>
         )}
         <div hidden={step !== "forms"} inert={step !== "forms"}>
@@ -1540,6 +1531,21 @@ function EntryEditor({
               }
             ]}
           />
+        )}
+        {step === "basics" && (
+          <V3StepActions
+            inline
+            className="lexicon-next-basics-actions"
+            status={busy ? "正在保存草稿" : undefined}
+          >
+            <Button
+              type="primary"
+              disabled={busy || formContentOpen}
+              onClick={() => changeStep("forms")}
+            >
+              下一步：词形与发音
+            </Button>
+          </V3StepActions>
         )}
         <Modal
           open={!!remote}
