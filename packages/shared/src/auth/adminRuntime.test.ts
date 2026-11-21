@@ -196,23 +196,32 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
     expect(rt.tokens.getToken()).toBeUndefined();
   });
 
-  it("会话恢复探针 401 时整页回到后台登录页", async () => {
-    fetchMock.mockResolvedValueOnce(
-      resp(401, problem(401, "invalid_token", "Invalid token", "invalid token"))
-    );
-    const location = { href: "", pathname: "/lexicon-next" };
-    vi.stubGlobal("window", { location, addEventListener: vi.fn() });
-    vi.stubGlobal("document", { addEventListener: () => undefined });
+  it.each([
+    ["/lexicon-next", "/login"],
+    ["/login", ""]
+  ])(
+    "会话恢复探针 401 在 %s 的跳转行为稳定",
+    async (pathname, expectedHref) => {
+      fetchMock.mockResolvedValueOnce(
+        resp(
+          401,
+          problem(401, "invalid_token", "Invalid token", "invalid token")
+        )
+      );
+      const location = { href: "", pathname };
+      vi.stubGlobal("window", { location, addEventListener: vi.fn() });
+      vi.stubGlobal("document", { addEventListener: () => undefined });
 
-    const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
-    await rt.restoreSession();
+      const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
+      await rt.restoreSession();
 
-    expect(location.href).toBe("/login");
-    expect(rt.store.getState()).toMatchObject({
-      profile: null,
-      hydrated: true
-    });
-  });
+      expect(location.href).toBe(expectedHref);
+      expect(rt.store.getState()).toMatchObject({
+        profile: null,
+        hydrated: true
+      });
+    }
+  );
 
   it("login 走 skipAuth：401 直接抛凭证错误，不误触发 refresh", async () => {
     fetchMock.mockResolvedValueOnce(
