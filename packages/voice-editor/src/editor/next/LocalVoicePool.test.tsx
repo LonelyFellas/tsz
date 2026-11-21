@@ -363,6 +363,45 @@ describe("新版局部主页和唯一声音草稿", () => {
     });
   });
 
+  it("已获取的配音可以逐条移除并保留其他音色的参数与音频", async () => {
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={pool([
+          {
+            ...version("a", -27),
+            volume_percent: 64,
+            audio_asset_id: "alpha-audio"
+          },
+          version("b"),
+          version("us")
+        ])}
+        onProfile={onProfile}
+      />
+    );
+
+    const removeAlpha = await screen.findByRole("button", {
+      name: "移除 a"
+    });
+    fireEvent.click(removeAlpha);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("英式池 a")).toBeNull();
+      expect(screen.getByLabelText("英式池 b")).toBeVisible();
+      expect(screen.getByLabelText("美式池 us")).toBeVisible();
+    });
+    const saved = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+    expect(saved.voices.find((item) => item.voice_id === "a")).toMatchObject({
+      enabled: false,
+      rate_percent: -27,
+      volume_percent: 64,
+      audio_asset_id: "alpha-audio"
+    });
+    expect(
+      saved.voices.filter((item) => item.enabled).map((item) => item.voice_id)
+    ).toEqual(["b", "us"]);
+  });
+
   it("目录音色被同声推荐采用后，取消推荐保留原目录参数且另一侧选择不受影响", async () => {
     const onProfile = vi.fn();
     render(
