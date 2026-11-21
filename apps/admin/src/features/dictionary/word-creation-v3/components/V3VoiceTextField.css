@@ -133,7 +133,6 @@ textarea.v3-grammar-input.ui-input {
 
 /* 词形拼写预览只保留富文本层可见，输入框继续承接焦点和错误定位。 */
 .v3-spelling-preview > textarea.ui-input {
-  pointer-events: none;
   color: transparent;
   caret-color: transparent;
 }

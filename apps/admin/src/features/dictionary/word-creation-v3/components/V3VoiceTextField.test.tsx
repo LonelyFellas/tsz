@@ -922,7 +922,7 @@ it("词形拼写聚焦选中时隐藏富文本预览，避免输入文字重影"
   expect(document.querySelector(".v3-grammar-preview-content")).toBeNull();
 });
 
-it("词形拼写预览不接收鼠标或 Tab 焦点", () => {
+it("词形拼写预览保留输入框鼠标和 Tab 焦点", () => {
   const { container } = render(
     <V3VoiceTextField
       mode="spelling"
@@ -934,7 +934,7 @@ it("词形拼写预览不接收鼠标或 Tab 焦点", () => {
     />
   );
   expect(container.querySelector(".v3-spelling-preview")).not.toBeNull();
-  expect(screen.getByLabelText("英式拼写")).toHaveAttribute("tabindex", "-1");
+  expect(screen.getByLabelText("英式拼写")).not.toHaveAttribute("tabindex");
 });
 
 describe("V3VoiceTextField 取消和收起态", () => {
@@ -1971,7 +1971,7 @@ it("grammar 富文本位于紧凑组背景上方，透明输入框覆盖长预�
     /\.v3-grammar-preview-content\s*\{[^}]*z-index:\s*5;/su
   );
   expect(fieldCss).toMatch(
-    /\.v3-spelling-preview\s*>\s*textarea\.ui-input\s*\{[^}]*pointer-events:\s*none;[^}]*color:\s*transparent;[^}]*caret-color:\s*transparent;/su
+    /\.v3-spelling-preview\s*>\s*textarea\.ui-input\s*\{[^}]*color:\s*transparent;[^}]*caret-color:\s*transparent;/su
   );
   expect(fieldCss).toMatch(
     /\.v3-grammar-preview\s*>\s*textarea\.ui-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
