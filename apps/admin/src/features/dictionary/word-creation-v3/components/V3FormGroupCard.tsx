@@ -17,6 +17,7 @@ import type {
   FormTypeCatalogItem,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
+  WordConcreteFormV3,
   WordFormTypeV3,
   WordFormGroupV3,
   WordPosFormsV3
@@ -85,8 +86,25 @@ interface V3DeleteFormButtonProps {
   sharedCount: number;
   deleteLocked: boolean;
   deleteReason?: string;
+  skipConfirmation: boolean;
   referenceHint?: string;
   onChange: (next: DraftFormsStepContentV3) => void;
+}
+
+function formSpellings(form: WordConcreteFormV3): string[] {
+  const variants = form.regional_variants;
+  if (variants.mode === "common") return [variants.common.spelling];
+  if (variants.mode === "uk_us") {
+    return [variants.uk.spelling, variants.us.spelling];
+  }
+  return [
+    ...variants.uk.map((variant) => variant.spelling),
+    ...variants.us.map((variant) => variant.spelling)
+  ];
+}
+
+function isEmptyForm(form: WordConcreteFormV3): boolean {
+  return formSpellings(form).every((spelling) => !spelling.trim());
 }
 
 function V3DeleteFormButton({
@@ -98,6 +116,7 @@ function V3DeleteFormButton({
   sharedCount,
   deleteLocked,
   deleteReason,
+  skipConfirmation,
   referenceHint,
   onChange
 }: V3DeleteFormButtonProps) {
@@ -109,43 +128,53 @@ function V3DeleteFormButton({
     if (deleteLocked) setOpen(false);
   }, [deleteLocked]);
 
+  const handleDelete = () => {
+    const result = deleteConcreteForm(content, posId, formId);
+    if (result.ok) onChange(result.value);
+  };
+  const button = (
+    <Button
+      aria-label={t("delete_group_form_label", {
+        group: groupIndex + 1,
+        index: formIndex + 1
+      })}
+      danger
+      disabled={deleteLocked}
+      icon={<CircleMinusIcon />}
+      onClick={skipConfirmation ? handleDelete : undefined}
+      size="small"
+      type="text"
+    />
+  );
+
   return (
     <V3DisabledReason reason={deleteReason}>
-      <Popconfirm
-        cancelButtonProps={{ "aria-label": t("cancel_delete_form") }}
-        cancelText={t("cancel")}
-        description={[
-          sharedCount > 1 ? t("remove_shared_label") : t("remove_last_label"),
-          referenceHint
-        ]
-          .filter(Boolean)
-          .join(i18n.language.startsWith("en") ? " " : "")}
-        disabled={deleteLocked}
-        okButtonProps={{
-          "aria-label": t("delete_form_audio"),
-          danger: true
-        }}
-        okText={t("delete_form")}
-        onConfirm={() => {
-          const result = deleteConcreteForm(content, posId, formId);
-          if (result.ok) onChange(result.value);
-        }}
-        onOpenChange={setOpen}
-        open={open}
-        title={t("delete_form_title")}
-      >
-        <Button
-          aria-label={t("delete_group_form_label", {
-            group: groupIndex + 1,
-            index: formIndex + 1
-          })}
-          danger
+      {skipConfirmation ? (
+        button
+      ) : (
+        <Popconfirm
+          cancelButtonProps={{ "aria-label": t("cancel_delete_form") }}
+          cancelText={t("cancel")}
+          description={[
+            sharedCount > 1 ? t("remove_shared_label") : t("remove_last_label"),
+            referenceHint
+          ]
+            .filter(Boolean)
+            .join(i18n.language.startsWith("en") ? " " : "")}
           disabled={deleteLocked}
-          icon={<CircleMinusIcon />}
-          size="small"
-          type="text"
-        />
-      </Popconfirm>
+          okButtonProps={{
+            "aria-label": t("delete_form_audio"),
+            danger: true
+          }}
+          okText={t("delete_form")}
+          onConfirm={handleDelete}
+          onOpenChange={setOpen}
+          open={open}
+          title={t("delete_form_title")}
+        >
+          {button}
+        </Popconfirm>
+      )}
     </V3DisabledReason>
   );
 }
@@ -313,7 +342,7 @@ export function V3FormGroupCard({
       ),
       actions: (
         <div className="v3-membership-actions">
-          {/* 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认。 */}
+          {/* 一个词形只属于一个组，「从本组移除」就是删除词形；空词形直接删除。 */}
           <V3DeleteFormButton
             content={content}
             deleteLocked={deleteLocked}
@@ -325,6 +354,7 @@ export function V3FormGroupCard({
             posId={pos.pos_id}
             referenceHint={referenceHint}
             sharedCount={sharedCounts?.get(form.id) ?? 1}
+            skipConfirmation={isEmptyForm(form)}
           />
         </div>
       )

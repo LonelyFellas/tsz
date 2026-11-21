@@ -675,7 +675,12 @@ describe("V3FormsAndPronunciationStep", () => {
       const view = render(<Harness initial={initial} />);
       await screen.findByLabelText("复数英美通用拼写");
       fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
-      fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
+      if (spelling === "") {
+        expect(openDeleteConfirm()).toBeNull();
+      } else {
+        expect(openDeleteConfirm()).not.toBeNull();
+        fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
+      }
       const persisted = canonicalValue();
       expect(persisted.pos[0]!.forms).toEqual([initial.pos[0]!.forms[0]]);
       expect(persisted.pos[0]!.form_groups[0]!.members).toEqual([
