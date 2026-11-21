@@ -141,6 +141,24 @@ function showLogin(path = "/login") {
   );
 }
 
+function showBoot(path = "/words") {
+  useAuthStore.setState({ profile: null, role: null, hydrated: false });
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route
+          path="*"
+          element={
+            <RootProviders>
+              <div>后台内容</div>
+            </RootProviders>
+          }
+        />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe("后台初次连接状态", () => {
   it("初次恢复会话时只显示一张连接状态卡片", () => {
     useAuthStore.setState({
@@ -172,6 +190,28 @@ describe("后台初次连接状态", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("加载中...")).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("初次恢复失败显示重试入口并调用恢复逻辑", () => {
+    useAuthStore.setState({ connectionError: true });
+    showBoot();
+    expect(
+      screen.getByRole("heading", { name: "暂时无法连接" })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试连接" }));
+    expect(sessionRestore.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("初始会话未确认时在改密路由也显示重新登录入口", () => {
+    useAuthStore.setState({ refreshUnconfirmed: true });
+    showBoot("/change-password");
+    expect(
+      screen.getByRole("heading", { name: "需要重新登录" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "重新登录" })
+    ).toBeInTheDocument();
+    expect(screen.queryByText("后台内容")).toBeNull();
   });
 });
 
