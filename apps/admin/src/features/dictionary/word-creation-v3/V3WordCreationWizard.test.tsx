@@ -7022,6 +7022,61 @@ it.each(["supersede", "unmount"] as const)(
   }
 );
 
+it("共享内容定位等待异步挂载的内容编辑按钮", async () => {
+  const initialWord: AdminWordV3 = word();
+  const shared = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    word().forms
+  );
+  if (!("forms_format" in shared)) throw new Error("fixture");
+  initialWord.forms = shared;
+  const binding = shared.pos[0]!.forms[0]!;
+  const issue: V3DraftValidationIssue = {
+    ...validationIssue(),
+    node_id: binding.content_id,
+    field: "spelling",
+    node_location: {
+      node_role: "forms.content",
+      ancestor_node_ids: [],
+      content_id: binding.content_id
+    }
+  };
+  const open = vi.fn();
+  let actions: V3WizardSlotContext["actions"];
+  let mountButton!: () => void;
+  let mountedButton: HTMLButtonElement | undefined;
+  onTestFinished(() => mountedButton?.remove());
+  renderWizard(requests(), {
+    initialWord,
+    renderStep: (context) => {
+      actions = context.actions;
+      mountButton = () => {
+        const button = document.createElement("button");
+        button.dataset.v3OpenContent = binding.id;
+        button.addEventListener("click", open);
+        mountedButton = button;
+        document.body.append(button);
+      };
+      return (
+        <>
+          <input
+            data-v3-node-id={binding.id}
+            data-v3-field="form_id"
+            aria-label="词形定位"
+          />
+        </>
+      );
+    }
+  });
+
+  const navigation = actions!.navigateIssue(issue);
+  mountButton();
+  await act(async () => {
+    await navigation;
+  });
+  expect(open).toHaveBeenCalledTimes(1);
+});
+
 it("正文关联校验失败定位到所属英文正文输入框", async () => {
   const initialWord = word();
   const en = initialWord.meanings.pos[0]!.senses[0]!.sentences[0]!.en_text;

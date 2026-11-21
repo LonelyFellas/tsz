@@ -8,12 +8,14 @@ export function WordNavigationGuard({
   dirty,
   busy,
   wordId,
-  requestSentenceLeave
+  requestSentenceLeave,
+  requestLeave
 }: {
   dirty: boolean;
   busy: boolean;
   wordId: string;
   requestSentenceLeave?: () => Promise<boolean>;
+  requestLeave?: () => Promise<boolean>;
 }) {
   const { t } = useWorkspaceTranslation();
   const [leaving, setLeaving] = useState(false);
@@ -46,8 +48,10 @@ export function WordNavigationGuard({
             onClick={async () => {
               setLeaving(true);
               try {
-                if (!requestSentenceLeave || (await requestSentenceLeave()))
-                  blocker.proceed();
+                const allowed = requestLeave
+                  ? await requestLeave()
+                  : !requestSentenceLeave || (await requestSentenceLeave());
+                if (allowed) blocker.proceed();
               } finally {
                 setLeaving(false);
               }

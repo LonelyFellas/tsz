@@ -5,7 +5,7 @@ import {
   Outlet,
   RouterProvider
 } from "react-router-dom";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { WordNavigationGuard } from "./WordNavigationGuard";
 
 it("keeps unsaved word edits on external navigation while allowing its own step links", async () => {
@@ -75,5 +75,42 @@ it("does not leave until the embedded sentence guard permits it", async () => {
   expect(router.state.location.pathname).toBe("/words/a/v3/wizard/forms");
   allowed = true;
   fireEvent.click(screen.getByText("离开页面"));
+  expect(await screen.findByText("其他页面")).toBeVisible();
+});
+
+it("waits for the editor leave callback before completing navigation", async () => {
+  let resolveLeave!: (allowed: boolean) => void;
+  const requestLeave = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        resolveLeave = resolve;
+      })
+  );
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/words/:id/v3/wizard/forms",
+        element: (
+          <>
+            <WordNavigationGuard
+              wordId="a"
+              dirty
+              busy={false}
+              requestLeave={requestLeave}
+            />
+            <Link to="/elsewhere">离开词条</Link>
+          </>
+        )
+      },
+      { path: "/elsewhere", element: <p>其他页面</p> }
+    ],
+    { initialEntries: ["/words/a/v3/wizard/forms"] }
+  );
+  render(<RouterProvider router={router} />);
+  fireEvent.click(screen.getByText("离开词条"));
+  fireEvent.click(await screen.findByText("离开页面"));
+  expect(requestLeave).toHaveBeenCalledTimes(1);
+  expect(router.state.location.pathname).toBe("/words/a/v3/wizard/forms");
+  resolveLeave(true);
   expect(await screen.findByText("其他页面")).toBeVisible();
 });

@@ -902,7 +902,7 @@ export function WordWizardV3Page({
     [wordId]
   );
   const replaceCanonical = useCallback(
-    (word: AdminWordV3) => {
+    async (word: AdminWordV3) => {
       queryClient.setQueryData<AdminWordDraftV3Envelope>(queryKey, (current) =>
         current ? { ...current, word } : current
       );
@@ -923,14 +923,16 @@ export function WordWizardV3Page({
           );
         })
         .catch(() => {});
-      void queryClient.invalidateQueries({ queryKey: wordKeys.lists() });
-      void queryClient.invalidateQueries({ queryKey: wordKeys.stats() });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: wordKeys.lists() }),
+        queryClient.invalidateQueries({ queryKey: wordKeys.stats() })
+      ]);
     },
     [queryClient, queryKey, requests]
   );
   const replaceActivatedCanonical = useCallback(
-    (word: AdminWordV3) => {
-      replaceCanonical(word);
+    async (word: AdminWordV3) => {
+      await replaceCanonical(word);
       setActivationGeneration((generation) => generation + 1);
     },
     [replaceCanonical]
