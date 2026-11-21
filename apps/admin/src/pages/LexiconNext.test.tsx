@@ -246,9 +246,8 @@ it("编辑器不展示词条类型和草稿版本状态", async () => {
   expect(screen.queryByText("草稿版本 1")).toBeNull();
 });
 
-it("编辑词条可以回看创建时的检测快照", async () => {
+it("进入基础步骤时重新读取内置词典", async () => {
   const api = requests();
-  api.capabilities.mockResolvedValue({ ...caps, creation_snapshot: true });
   api.get.mockResolvedValue({
     ...entry,
     creation_detection: {
@@ -259,7 +258,7 @@ it("编辑词条可以回看创建时的检测快照", async () => {
           id: "dictionary:colour:noun",
           term: "colour",
           part_of_speech: "noun",
-          glosses: ["visible hue"],
+          glosses: ["stale snapshot"],
           forms: [{ text: "colours", tags: ["plural"] }],
           phonetics: [{ ipa: "/ˈkʌlə/", tags: ["UK"] }],
           source_name: "Test dictionary",
@@ -268,8 +267,25 @@ it("编辑词条可以回看创建时的检测快照", async () => {
       ]
     },
     draft: {
-      ...entry.draft
+      ...entry.draft,
+      headword: "Colour"
     }
+  });
+  api.detect.mockResolvedValue({
+    surface: "Colour",
+    kind: "word",
+    matches: [
+      {
+        id: "dictionary:colour:noun-current",
+        term: "colour",
+        part_of_speech: "noun",
+        glosses: ["visible hue"],
+        forms: [{ text: "colours", tags: ["plural"] }],
+        phonetics: [{ ipa: "/ˈkʌlə/", tags: ["UK"] }],
+        source_name: "Current dictionary",
+        source_version: "v2"
+      }
+    ]
   });
   mount(api);
   await waitForEntryReady();
@@ -281,7 +297,12 @@ it("编辑词条可以回看创建时的检测快照", async () => {
   expect(screen.getByRole("textbox", { name: "词条文本" })).toHaveValue(
     "Colour"
   );
-  expect(screen.getByText("visible hue")).toBeVisible();
+  expect(await screen.findByText("visible hue")).toBeVisible();
+  expect(screen.queryByText("stale snapshot")).toBeNull();
+  expect(api.detect).toHaveBeenCalledWith({
+    target_language: "en",
+    surface: "Colour"
+  });
   expect(screen.getByText("colours")).toBeVisible();
   expect(button("下一步：词形与发音")).toBeVisible();
 });

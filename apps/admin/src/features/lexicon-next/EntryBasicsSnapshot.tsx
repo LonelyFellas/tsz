@@ -1,4 +1,11 @@
-import { Alert, Card, Tag, Typography } from "@tsz/ui/admin/display";
+import {
+  Alert,
+  Button,
+  Card,
+  Spin,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
 import type { NextDetection } from "@tsz/types";
 import { DictionaryDetectionCard } from "./DictionaryDetectionCard";
@@ -6,11 +13,17 @@ import { DictionaryDetectionCard } from "./DictionaryDetectionCard";
 export function EntryBasicsSnapshot({
   headword,
   kind,
-  detection
+  detection,
+  loading = false,
+  error,
+  onRetry
 }: {
   headword: string;
   kind: "word" | "phrase";
   detection?: NextDetection;
+  loading?: boolean;
+  error?: unknown;
+  onRetry?: () => void;
 }) {
   return (
     <div className="lexicon-next word-basics-workflow is-detected">
@@ -36,15 +49,24 @@ export function EntryBasicsSnapshot({
           </Form.Item>
         </Form>
       </Card>
-      {detection ? (
+      {loading ? (
+        <Card className="word-detection-result-card" title="内置词典">
+          <Spin aria-label="正在读取内置词典" />
+        </Card>
+      ) : error ? (
+        <Alert
+          type="error"
+          showIcon
+          title="无法读取内置词典"
+          description={
+            error instanceof Error ? error.message : "请求失败，请重试。"
+          }
+          action={onRetry && <Button onClick={onRetry}>重试</Button>}
+        />
+      ) : detection ? (
         <DictionaryDetectionCard detection={detection} />
       ) : (
-        <Alert
-          type="info"
-          showIcon
-          title="该词条没有保存创建时的内置词典快照。"
-          description="当前版本只能展示词条原始文本，无法还原创建时的词典结果。"
-        />
+        <Alert type="info" showIcon title="未找到内置词典匹配" />
       )}
     </div>
   );

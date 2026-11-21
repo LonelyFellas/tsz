@@ -37,6 +37,7 @@ import { Save } from "lucide-react";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextDraft,
+  NextDetection,
   NextPublicationIssue,
   NextEntry,
   NextWorkspaceEntry,
@@ -178,12 +179,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               partOfSpeechCodes={language.part_of_speech_codes}
             />
           ) : entryId === "new" ? (
-            <EntryStart
-              requests={requests}
-              creationSnapshotAvailable={
-                capability.data?.creation_snapshot === true
-              }
-            />
+            <EntryStart requests={requests} />
           ) : entryId ? (
             <EntryLoader
               key={entryId}
@@ -465,6 +461,13 @@ function EntryEditor({
   );
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
+  const [basicsDetection, setBasicsDetection] = useState<NextDetection>();
+  const [basicsDetectionLoading, setBasicsDetectionLoading] = useState(
+    () => step === "basics"
+  );
+  const [basicsDetectionError, setBasicsDetectionError] = useState<unknown>();
+  const [basicsDetectionAttempt, setBasicsDetectionAttempt] = useState(0);
+  const basicsDetectionRequest = useRef(0);
   const [editedPairs, setEditedPairs] = useState<
     Record<string, NextDialectSense>
   >({});
@@ -624,6 +627,7 @@ function EntryEditor({
     suggestedPartOfSpeech
   ]);
   const canPublish = usePermission("words.publish");
+  const canCreate = usePermission("words.create");
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
   const writable =
@@ -944,6 +948,10 @@ function EntryEditor({
   }
   function changeStep(next: WordCreationStep) {
     const nextStep = next;
+    if (nextStep === "basics") {
+      setBasicsDetectionLoading(true);
+      setBasicsDetectionError(undefined);
+    }
     if (
       nextStep === "forms" &&
       !draft.form_editor?.pos.some((pos) => pos.pos === selectedPos)
@@ -983,6 +991,53 @@ function EntryEditor({
     );
     return () => controller.abort();
   }, [issueFocus, step, target]);
+  useEffect(() => {
+    if (step !== "basics") return;
+    const requestId = ++basicsDetectionRequest.current;
+    setBasicsDetection(undefined);
+    setBasicsDetectionError(undefined);
+    setBasicsDetectionLoading(true);
+    if (!canCreate) {
+      setBasicsDetection(saved.creation_detection);
+      setBasicsDetectionError(
+        saved.creation_detection
+          ? undefined
+          : new Error("当前账号没有内置词典检测权限。")
+      );
+      setBasicsDetectionLoading(false);
+      return () => {
+        basicsDetectionRequest.current += 1;
+      };
+    }
+    void requests
+      .detect({
+        target_language: language.target_language,
+        surface: draft.headword
+      })
+      .then((result) => {
+        if (requestId !== basicsDetectionRequest.current) return;
+        setBasicsDetection(result);
+      })
+      .catch((error: unknown) => {
+        if (requestId !== basicsDetectionRequest.current) return;
+        setBasicsDetectionError(error);
+      })
+      .finally(() => {
+        if (requestId === basicsDetectionRequest.current)
+          setBasicsDetectionLoading(false);
+      });
+    return () => {
+      basicsDetectionRequest.current += 1;
+    };
+  }, [
+    basicsDetectionAttempt,
+    draft.headword,
+    language.target_language,
+    canCreate,
+    requests,
+    saved.creation_detection,
+    step
+  ]);
   const editor = (
     <EntryLayout
       relationsAvailable={relationsAvailable}
@@ -1153,7 +1208,14 @@ function EntryEditor({
             <EntryBasicsSnapshot
               headword={draft.headword}
               kind={saved.kind}
-              detection={saved.creation_detection}
+              detection={basicsDetection}
+              loading={basicsDetectionLoading}
+              error={basicsDetectionError}
+              onRetry={
+                canCreate
+                  ? () => setBasicsDetectionAttempt((value) => value + 1)
+                  : undefined
+              }
             />
             <V3StepActions status={busy ? "正在保存草稿" : undefined}>
               <Button
