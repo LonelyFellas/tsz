@@ -700,7 +700,9 @@ it("创建后词形步骤的自动词性草稿保护面包屑离开", async () =
   fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
   await screen.findByTestId("lexicon-next-editor");
   await waitFor(() =>
-    expect(screen.getAllByText("有未保存修改")).not.toHaveLength(0)
+    expect(
+      document.querySelector(".word-forms-tabs .word-pos-tab-label")
+    ).toHaveTextContent("名词")
   );
   fireEvent.click(screen.getByRole("link", { name: "智能词库" }));
   await screen.findByText(
@@ -1977,7 +1979,6 @@ describe("新版词库手工闭环", () => {
       "草稿未保存，修改已保留。请填写有效的 Azure IPA 合成音素"
     );
     expect(screen.getByDisplayValue("local")).toBeVisible();
-    expect(screen.getByText("有未保存修改")).toBeVisible();
   });
   it("加载 422 不伪装成草稿保存失败", async () => {
     const api = requests();

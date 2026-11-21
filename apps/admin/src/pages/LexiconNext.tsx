@@ -1010,11 +1010,6 @@ function EntryEditor({
         className={`lexicon-next lexicon-next-editor${step !== "preview" ? " lexicon-next-forms" : ""}`}
       >
         <div className="lexicon-next-toolbar">
-          {dirty && (
-            <Space wrap>
-              <span role="status">有未保存修改</span>
-            </Space>
-          )}
           <Space wrap>
             <Button
               type={publishingAvailable ? "default" : "primary"}
@@ -1028,13 +1023,6 @@ function EntryEditor({
             </Button>
           </Space>
         </div>
-        {step !== "preview" && (
-          <Alert
-            type="info"
-            title={`当前目标语言：${localeLabels[target] ?? target}`}
-            description="词形、IPA、语法结构和英文释义需分别补齐英式英语与美式英语。使用顶部目标语言切换当前编辑侧。"
-          />
-        )}
         {!writable && (
           <Alert
             type="info"
@@ -1167,11 +1155,7 @@ function EntryEditor({
               kind={saved.kind}
               detection={saved.creation_detection}
             />
-            <V3StepActions
-              status={
-                busy ? "正在保存草稿" : dirty ? "有未保存修改" : undefined
-              }
-            >
+            <V3StepActions status={busy ? "正在保存草稿" : undefined}>
               <Button
                 type="primary"
                 disabled={busy || formContentOpen}
@@ -1215,11 +1199,7 @@ function EntryEditor({
                 </ContentEditPermissions.Provider>
               </VoiceSaveContext.Provider>
               {step === "forms" && (
-                <V3StepActions
-                  status={
-                    busy ? "正在保存草稿" : dirty ? "有未保存修改" : undefined
-                  }
-                >
+                <V3StepActions status={busy ? "正在保存草稿" : undefined}>
                   <Button
                     loading={busy}
                     disabled={
@@ -1336,11 +1316,7 @@ function EntryEditor({
             onChange={setDraft}
           />
           {step === "meanings" && (
-            <V3StepActions
-              status={
-                busy ? "正在保存草稿" : dirty ? "有未保存修改" : undefined
-              }
-            >
+            <V3StepActions status={busy ? "正在保存草稿" : undefined}>
               <Button
                 type="text"
                 disabled={busy}
