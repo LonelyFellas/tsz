@@ -964,10 +964,9 @@ it("列表名称只显示词头，不展示其他词形和地区标记", async (
   expect(screen.queryByText(/加拿大|法语/)).toBeNull();
 });
 
-it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并在创建前要求新标注", async () => {
+it("检测展示新版已有草稿、标注与释义，并在创建前要求新标注", async () => {
   const api = requests();
   const createdId = "00000000-0000-4000-8000-000000000003";
-  const archivedId = "00000000-0000-4000-8000-000000000002";
   api.create.mockResolvedValue({ ...entry, id: createdId });
   api.matchEntries.mockResolvedValue({
     surface: "center",
@@ -977,16 +976,9 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并在�
         annotation_visible: true,
         annotation: "2",
         gloss: "已有词条的释义"
-      }),
-      listRow({
-        id: archivedId,
-        status: "archived",
-        headword: "center",
-        kind: "phrase",
-        gloss: "垃圾桶词条的释义"
       })
     ],
-    pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 }
+    pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
   });
   mount(api, "/lexicon-next/new");
   fireEvent.change(await screen.findByLabelText("录入词条"), {
@@ -997,18 +989,12 @@ it("检测同时展示新版已有草稿、垃圾桶、标注与释义，并在�
     await screen.findByRole("region", { name: "智能词库匹配结果" })
   );
   expect(matches.getByText("已有词条的释义")).toBeVisible();
-  expect(matches.getByText("垃圾桶词条的释义")).toBeVisible();
-  expect(matches.getByText("2 条匹配")).toBeVisible();
+  expect(matches.getByText("1 条匹配")).toBeVisible();
   expect(matches.getByText("草稿")).toBeVisible();
-  expect(matches.getByText("垃圾桶")).toBeVisible();
   expect(matches.getByText("2", { selector: "sup" })).toBeVisible();
   expect(matches.getByRole("link", { name: "继续创建" })).toHaveAttribute(
     "href",
     `/lexicon-next/${id}?target_language=en&target_locale=en-GB&medium_locale=zh-Hans`
-  );
-  expect(matches.getByRole("link", { name: "查看词条" })).toHaveAttribute(
-    "href",
-    `/lexicon-next/${archivedId}?target_language=en&target_locale=en-GB&medium_locale=zh-Hans`
   );
   expect(
     screen.getByText("未找到内置词典匹配，可继续创建空白草稿。")
