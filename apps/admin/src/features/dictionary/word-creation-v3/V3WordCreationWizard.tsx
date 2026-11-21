@@ -146,7 +146,7 @@ export interface V3WizardActions {
       V3ConfirmationContext,
       "base_revision" | "impact_content"
     >
-  ): Promise<void>;
+  ): Promise<boolean>;
   previewFormsImpact(): Promise<FormsImpactResponseV3 | undefined>;
   previewFormsSaveImpact(): Promise<FormsImpactResponseV3 | undefined>;
   saveMeanings(
@@ -221,7 +221,7 @@ export interface V3WordCreationWizardProps {
   renderStep: (context: V3WizardSlotContext) => ReactNode;
   navigationAdapter?: ExternalNavigationAdapter;
   idempotencyKeyFactory?: () => string;
-  onWordChange?: (word: AdminWordV3) => void;
+  onWordChange?: (word: AdminWordV3) => void | Promise<void>;
   retiredStableNodes?: readonly RetiredStableNodeV3[];
   retiredContentSlots?: readonly RetiredContentSlotV3[];
 }
@@ -257,21 +257,58 @@ async function focusRenderedTarget(
   target: V3IssueNavigationTarget,
   signal: AbortSignal
 ) {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    if (signal.aborted) return;
+  const waitForDom = () =>
+    new Promise<boolean>((resolve) => {
+      if (signal.aborted) {
+        resolve(false);
+        return;
+      }
+      let settled = false;
+      const observer = new MutationObserver(() => {
+        if (settled) return;
+        settled = true;
+        observer.disconnect();
+        window.clearTimeout(timeout);
+        signal.removeEventListener("abort", abort);
+        resolve(true);
+      });
+      const timeout = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        observer.disconnect();
+        signal.removeEventListener("abort", abort);
+        resolve(false);
+      }, 5000);
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        observer.disconnect();
+        window.clearTimeout(timeout);
+        signal.removeEventListener("abort", abort);
+        resolve(false);
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true
+      });
+    });
+
+  const targetNodeIds = new Set([
+    target.node_id,
+    ...(target.ancestor_node_ids ?? []),
+    target.form_group_id,
+    target.form_id,
+    target.membership_id
+  ]);
+  const findTarget = () => {
     const nodes = [
       ...document.querySelectorAll<HTMLElement>("[data-v3-node-id]")
     ];
     const groupCards = [
       ...document.querySelectorAll<HTMLElement>("[data-group-id]")
     ];
-    const targetNodeIds = new Set([
-      target.node_id,
-      ...(target.ancestor_node_ids ?? []),
-      target.form_group_id,
-      target.form_id,
-      target.membership_id
-    ]);
     const collapsedToggles = new Set<HTMLElement>();
     for (const node of [...nodes, ...groupCards]) {
       if (!targetNodeIds.has(node.dataset.v3NodeId ?? node.dataset.groupId)) {
@@ -330,7 +367,15 @@ async function focusRenderedTarget(
       globalMatches.length === 1 && collapsedToggles.size === 0
         ? globalMatches[0]
         : undefined;
-    const element = scopedElement ?? uniqueGlobalFallback;
+    return {
+      element: scopedElement ?? uniqueGlobalFallback,
+      collapsedToggles
+    };
+  };
+
+  for (;;) {
+    if (signal.aborted) return;
+    const { element } = findTarget();
     if (element) {
       scrollV3TargetIntoView(element);
       const control = element.matches("input, textarea, button, [tabindex]")
@@ -341,8 +386,43 @@ async function focusRenderedTarget(
       control.focus();
       if (document.activeElement === control) return;
     }
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (!(await waitForDom())) return;
   }
+}
+
+function waitForRenderedContentButton(
+  formId: string,
+  signal: AbortSignal
+): Promise<HTMLElement | undefined> {
+  const find = () =>
+    [...document.querySelectorAll<HTMLElement>("[data-v3-open-content]")].find(
+      (row) => row.dataset.v3OpenContent === formId
+    );
+  const existing = find();
+  if (existing) return Promise.resolve(existing);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (button?: HTMLElement) => {
+      if (settled) return;
+      settled = true;
+      observer.disconnect();
+      window.clearTimeout(timeout);
+      signal.removeEventListener("abort", abort);
+      resolve(button);
+    };
+    const observer = new MutationObserver(() => {
+      const button = find();
+      if (button) finish(button);
+    });
+    const timeout = window.setTimeout(() => finish(), 5000);
+    const abort = () => finish();
+    signal.addEventListener("abort", abort, { once: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    });
+  });
 }
 
 function V3WordCreationSession({
@@ -565,9 +645,10 @@ function V3WordCreationSession({
           controller.signal
         );
         if (controller.signal.aborted) return;
-        const button = [
-          ...document.querySelectorAll<HTMLElement>("[data-v3-open-content]")
-        ].find((row) => row.dataset.v3OpenContent === binding.id);
+        const button = await waitForRenderedContentButton(
+          binding.id,
+          controller.signal
+        );
         if (!button) return;
         button.click();
         await focusRenderedTarget(
@@ -1151,7 +1232,10 @@ function V3WordCreationSession({
   }, [initialWord, receiveNewerRevision, replaceSession]);
 
   const applyCanonical = useCallback(
-    (canonical: AdminWordV3, replacement: "forms" | "meanings" | "all") => {
+    async (
+      canonical: AdminWordV3,
+      replacement: "forms" | "meanings" | "all"
+    ) => {
       if (!mountedRef.current) return;
       const syncForms =
         replacement === "all" ||
@@ -1189,7 +1273,7 @@ function V3WordCreationSession({
       setProblem(undefined);
       setConflict(undefined);
       clearPreviewState();
-      onWordChange?.(canonical);
+      await onWordChange?.(canonical);
     },
     [
       contentEditing,
@@ -1510,7 +1594,7 @@ function V3WordCreationSession({
                     v3MeaningsContentFingerprint(cleanMeaningsRef.current)
                 );
               }
-              applyCanonical(result.value.word, "forms");
+              await applyCanonical(result.value.word, "forms");
               return true;
             }
             return false;
@@ -1653,7 +1737,7 @@ function V3WordCreationSession({
           )
             return false;
           noteOwnRevision(result.value.word);
-          applyCanonical(result.value.word, "forms");
+          await applyCanonical(result.value.word, "forms");
           return true;
         } catch (error) {
           if (mountedRef.current)
@@ -1781,7 +1865,7 @@ function V3WordCreationSession({
                 // 通过完成校验时保留 completed_steps），两步的滞留 issues 一并失效
                 replaceStepIssues(["forms", "meanings"], []);
               }
-              applyCanonical(result.value.word, "meanings");
+              await applyCanonical(result.value.word, "meanings");
               if (intent === "complete") {
                 setActiveStepState(
                   resolveV3StepAccess(
@@ -2068,7 +2152,7 @@ function V3WordCreationSession({
         finishAttempt();
         if (result.accepted && scope === scopeRef.current) {
           setPublicationIssues([]);
-          applyCanonical(result.value.word, "all");
+          await applyCanonical(result.value.word, "all");
         }
       } catch (error) {
         const nextProblem = classifyV3Problem(error, "publish");
@@ -2234,11 +2318,13 @@ function V3WordCreationSession({
             confirmationContext
           );
           if (!saved || scope !== scopeRef.current || flowRef.current !== flow)
-            return;
+            return false;
         }
         if (dirtyRef.current.meanings) {
-          await saveMeanings(draftMeaningsRef.current, "save");
+          const saved = await saveMeanings(draftMeaningsRef.current, "save");
+          if (!saved) return false;
         }
+        return !hasLiveDirtyDraft();
       },
       previewFormsImpact: () => previewFormsImpact("publish"),
       previewFormsSaveImpact: () => previewFormsImpact("save"),
@@ -2271,6 +2357,12 @@ function V3WordCreationSession({
       validate
     ]
   );
+
+  const requestNavigationLeave = useCallback(async () => {
+    if (!(await requestSentenceLeave())) return false;
+    if (!hasLiveDirtyDraft()) return true;
+    return actions.saveDraft();
+  }, [actions, requestSentenceLeave]);
 
   const reachableSteps = useMemo(
     () =>
@@ -2381,6 +2473,7 @@ function V3WordCreationSession({
           dirty={context.hasUnsavedChanges || hasSentenceGuard}
           busy={pending.size > 0}
           requestSentenceLeave={requestSentenceLeave}
+          requestLeave={requestNavigationLeave}
         />
       )}
       {recovery.notice}

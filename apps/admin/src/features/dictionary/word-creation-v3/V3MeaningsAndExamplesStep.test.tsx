@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import { api, useAuthStore } from "@/lib/auth";
 import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -4154,6 +4155,19 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(
       definitions.map((definition) => definition.grammar_structure_id)
     ).toEqual(["grammar-1", "grammar-1"]);
+  });
+
+  it("连续新增释义时保留同一批快速点击的每次变更", () => {
+    render(<Harness />);
+    const addDefinition = () =>
+      screen.getByRole("button", { name: "添加释义" });
+
+    act(() => {
+      fireEvent.click(addDefinition());
+      fireEvent.click(addDefinition());
+    });
+
+    expect(value().pos[0]!.senses[0]!.definitions).toHaveLength(3);
   });
 
   it("使用后端 node/field 规范暴露 rich-text 与 grammar locators", () => {

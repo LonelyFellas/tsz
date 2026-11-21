@@ -808,6 +808,14 @@ function V3MeaningsAndExamplesStepContent({
   // 那颗按钮平时被 CSS 藏起来，隐形时收不到 mouseleave，交给 antd 自己管 hover
   // 会留下关不掉的气泡。改成受控：只认当前这一个键，换一个就把上一个顶掉。
   const [hoveredCopyKey, setHoveredCopyKey] = useState<string | null>(null);
+  // 连续点击新增释义、切换语言或方言时，父层的受控值可能还没完成一次渲染。
+  // 以最后一次已发出的草稿为基准，避免第二个事件覆盖前一个事件。
+  const valueRef = useRef(value);
+  const lastPropValueRef = useRef(value);
+  if (value !== lastPropValueRef.current) {
+    valueRef.current = value;
+    lastPropValueRef.current = value;
+  }
   // 取反用的是当前**生效**的折叠态而不是 `current[key]`：成分区块在能力关闭时默认
   // 折叠，键尚未写入时 `!current[key]` 恒为 true，第一次点击会是无反馈的空操作。
   const toggleSenseSection = (
@@ -821,8 +829,9 @@ function V3MeaningsAndExamplesStepContent({
     }));
   };
   const change = (mutation: DraftMutation) => {
-    const next = structuredClone(value);
+    const next = structuredClone(valueRef.current);
     mutation(next);
+    valueRef.current = next;
     onChange(next);
   };
 
