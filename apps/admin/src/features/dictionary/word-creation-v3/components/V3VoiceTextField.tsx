@@ -947,9 +947,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     mode === "spelling" && toRichTextV2(value).annotations.length > 0;
   const grammarPreview =
     (mode === "grammar" || associationPreview || spellingMarkupPreview) &&
-    (!focused ||
-      readOnly ||
-      (env.VOICE_EDITOR && editingEnabled && recorded)) &&
+    (mode === "spelling"
+      ? !focused
+      : !focused ||
+        readOnly ||
+        (env.VOICE_EDITOR && editingEnabled && recorded)) &&
     value.text !== "";
   const spellingPreview = mode === "spelling" && grammarPreview;
   const fallback = (

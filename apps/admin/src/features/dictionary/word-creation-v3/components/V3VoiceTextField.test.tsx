@@ -935,6 +935,29 @@ it("词形拼写收起态不挂载预览层", () => {
   expect(screen.getByLabelText("英式拼写")).not.toHaveAttribute("tabindex");
 });
 
+it("带拼写标注时聚焦输入框会卸载预览层", () => {
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={{
+        version: 2,
+        text: "finance",
+        annotations: [{ type: "italic", start: 0, end: 7 }]
+      }}
+      onChange={vi.fn()}
+      ariaLabel="带标注拼写"
+      nodeId="spelling-markup-focus"
+      field="spelling"
+    />
+  );
+  const input = screen.getByLabelText("带标注拼写");
+  expect(document.querySelector(".v3-grammar-preview-content")).toHaveClass(
+    "v3-spelling-preview-content"
+  );
+  fireEvent.focus(input);
+  expect(document.querySelector(".v3-grammar-preview-content")).toBeNull();
+});
+
 describe("V3VoiceTextField 取消和收起态", () => {
   // rc-util 的 test-id 会让嵌套弹窗清除外层的 Esc 栈；使用开发环境的真实唯一 ID。
   beforeEach(() => vi.stubEnv("NODE_ENV", "development"));
