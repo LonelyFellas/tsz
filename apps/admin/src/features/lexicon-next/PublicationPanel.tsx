@@ -251,7 +251,7 @@ export function PublicationPanel({
             disabled={pending || (!command && (!ready || !canPublish))}
             onClick={() => void publish()}
           >
-            {pending ? "正在发布" : command ? "重试确认发布结果" : "确认发布"}
+            {command ? "重试确认发布结果" : "确认发布"}
           </Button>
         )}
       </Space>

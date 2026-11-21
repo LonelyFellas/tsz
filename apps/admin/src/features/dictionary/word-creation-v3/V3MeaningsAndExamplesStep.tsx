@@ -2114,13 +2114,14 @@ function V3MeaningsAndExamplesStepContent({
       )}
 
       {onSave && (
-        <V3StepActions status={saving ? t("processing_draft") : draftStatus}>
+        <V3StepActions status={draftStatus}>
           {onPrevious ? (
             <Button type="text" disabled={saving} onClick={onPrevious}>
               {t("previous")}
             </Button>
           ) : null}
           <Button
+            loading={saving}
             disabled={saving || !canSave}
             onClick={() => void save("save")}
           >

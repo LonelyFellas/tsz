@@ -64,10 +64,10 @@ export function VoicePreviewResult({
     <div className="voice-library-preview" aria-live="polite">
       {pending && (
         <Space>
-          <Volume2Icon />
-          <Typography.Text type="secondary">
+          <Volume2Icon aria-hidden="true" />
+          <span className="sr-only" role="status">
             {t("generating_preview")}
-          </Typography.Text>
+          </span>
           <Button type="link" size="small" onClick={onCancel}>
             {t("cancel")}
           </Button>
