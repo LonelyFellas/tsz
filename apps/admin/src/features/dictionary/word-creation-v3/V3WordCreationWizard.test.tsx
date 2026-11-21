@@ -7616,10 +7616,20 @@ it("局部词义保存只发一次有 revision 的聚合请求，保留另一步
   expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
 });
 
-it("后台音频完成后通过专用接口保存并推进 revision", async () => {
-  const source = requests({
-    saveAudio: vi.fn(async () => envelope(2, "centre"))
-  });
+it("后台音频保存保留非音频字段并推进 revision", async () => {
+  const initialWord = word();
+  const variant = regionalVariants(
+    initialWord.forms.pos[0]!.forms[0]!.regional_variants
+  )[0]!;
+  variant.pronunciations[0]!.dict_phonetic_rich = {
+    version: 2,
+    text: "stale phonetic",
+    annotations: []
+  };
+  const saveAudio = vi.fn<V3WordRequests["saveAudio"]>(async () =>
+    envelope(2, "centre")
+  );
+  const source = requests({ saveAudio });
   function BackgroundAudioSave() {
     const save = useVoiceSave();
     return (
@@ -7627,6 +7637,7 @@ it("后台音频完成后通过专用接口保存并推进 revision", async () =
     );
   }
   renderWizard(source, {
+    initialWord,
     renderStep: (context) => (
       <>
         <Slot context={context} />
@@ -7635,15 +7646,16 @@ it("后台音频完成后通过专用接口保存并推进 revision", async () =
     )
   });
   fireEvent.click(screen.getByText("保存后台音频"));
-  await waitFor(() => expect(source.saveAudio).toHaveBeenCalledOnce());
-  expect(source.saveAudio).toHaveBeenCalledWith(
-    "word-1",
-    expect.objectContaining({
-      schema_version: 3,
-      base_revision: 1,
-      forms: expect.any(Object)
-    })
-  );
+  await waitFor(() => expect(saveAudio).toHaveBeenCalledOnce());
+  const submitted = expandFormContents(saveAudio.mock.calls[0]![1].forms);
+  const submittedVariant = regionalVariants(
+    submitted.pos[0]!.forms[0]!.regional_variants
+  )[0]!;
+  expect(submittedVariant.pronunciations[0]!.dict_phonetic_rich).toEqual({
+    version: 2,
+    text: "stale phonetic",
+    annotations: []
+  });
   await waitFor(() =>
     expect(screen.getByTestId("revision")).toHaveTextContent("2")
   );
