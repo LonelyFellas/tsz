@@ -943,8 +943,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         annotation.type === "italic" ||
         annotation.type === "underline"
     );
+  const spellingMarkupPreview =
+    mode === "spelling" && toRichTextV2(value).annotations.length > 0;
   const grammarPreview =
-    (mode === "grammar" || mode === "spelling" || associationPreview) &&
+    (mode === "grammar" || associationPreview || spellingMarkupPreview) &&
     (mode === "spelling"
       ? !focused
       : !focused ||
@@ -999,7 +1001,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           : undefined
       }
       className={`word-pronunciation-phonetic-input ${fontClass}${mode === "actual-pron" ? " tsz-actual-pronunciation" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
-      tabIndex={actualPronunciationPreview || spellingPreview ? -1 : undefined}
+      tabIndex={actualPronunciationPreview ? -1 : undefined}
       data-v3-field={expanded ? undefined : field}
       data-v3-node-id={expanded ? undefined : nodeId}
       data-v3-node-aliases={expanded ? undefined : nodeAliases}
@@ -1066,6 +1068,15 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       message={requiredError}
       messageId={requiredErrorId}
       className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}${actualPronunciationPreview ? " v3-actual-pronunciation-preview" : ""}${spellingPreview ? " v3-spelling-preview" : ""}`}
+      onMouseDown={
+        spellingPreview
+          ? (event) => {
+              event.currentTarget
+                .querySelector<HTMLTextAreaElement>("textarea")
+                ?.focus();
+            }
+          : undefined
+      }
     >
       {fallback}
       {defaultLoading && !requiredError && (

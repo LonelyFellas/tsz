@@ -170,6 +170,8 @@ export interface NextEntryMatches {
   surface: string;
   items: NextWorkspaceEntry[];
   pagination: NextEntryList["pagination"];
+  annotation_required?: boolean;
+  annotation_items?: NextWorkspaceEntry[];
 }
 export interface NextListQuery {
   target_language?: string;

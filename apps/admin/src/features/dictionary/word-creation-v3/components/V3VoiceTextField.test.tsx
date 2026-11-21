@@ -904,7 +904,7 @@ it("未录入词形拼写可直接输入，并提供编辑器入口", () => {
   expect(input).not.toHaveAttribute("readonly");
 });
 
-it("词形拼写聚焦选中时隐藏富文本预览，避免输入文字重影", () => {
+it("词形拼写收起态只渲染单层输入框", () => {
   render(
     <V3VoiceTextField
       mode="spelling"
@@ -916,13 +916,11 @@ it("词形拼写聚焦选中时隐藏富文本预览，避免输入文字重影"
     />
   );
   const input = screen.getByLabelText("英式拼写");
-  const preview = document.querySelector(".v3-grammar-preview-content");
-  expect(preview).toHaveClass("v3-spelling-preview-content");
-  fireEvent.focus(input);
   expect(document.querySelector(".v3-grammar-preview-content")).toBeNull();
+  expect(input).toHaveValue("finance");
 });
 
-it("词形拼写预览不接收鼠标或 Tab 焦点", () => {
+it("词形拼写收起态不挂载预览层", () => {
   const { container } = render(
     <V3VoiceTextField
       mode="spelling"
@@ -933,8 +931,31 @@ it("词形拼写预览不接收鼠标或 Tab 焦点", () => {
       field="spelling"
     />
   );
-  expect(container.querySelector(".v3-spelling-preview")).not.toBeNull();
-  expect(screen.getByLabelText("英式拼写")).toHaveAttribute("tabindex", "-1");
+  expect(container.querySelector(".v3-spelling-preview")).toBeNull();
+  expect(screen.getByLabelText("英式拼写")).not.toHaveAttribute("tabindex");
+});
+
+it("带拼写标注时聚焦输入框会卸载预览层", () => {
+  render(
+    <V3VoiceTextField
+      mode="spelling"
+      value={{
+        version: 2,
+        text: "finance",
+        annotations: [{ type: "italic", start: 0, end: 7 }]
+      }}
+      onChange={vi.fn()}
+      ariaLabel="带标注拼写"
+      nodeId="spelling-markup-focus"
+      field="spelling"
+    />
+  );
+  const input = screen.getByLabelText("带标注拼写");
+  expect(document.querySelector(".v3-grammar-preview-content")).toHaveClass(
+    "v3-spelling-preview-content"
+  );
+  fireEvent.focus(input);
+  expect(document.querySelector(".v3-grammar-preview-content")).toBeNull();
 });
 
 describe("V3VoiceTextField 取消和收起态", () => {
@@ -1969,9 +1990,6 @@ it("grammar 富文本位于紧凑组背景上方，透明输入框覆盖长预�
   // jsdom 不做布局；对应的长文本尾行点击和可见性另用 Chromium 验证。
   expect(fieldCss).toMatch(
     /\.v3-grammar-preview-content\s*\{[^}]*z-index:\s*5;/su
-  );
-  expect(fieldCss).toMatch(
-    /\.v3-spelling-preview\s*>\s*textarea\.ui-input\s*\{[^}]*pointer-events:\s*none;[^}]*color:\s*transparent;[^}]*caret-color:\s*transparent;/su
   );
   expect(fieldCss).toMatch(
     /\.v3-grammar-preview\s*>\s*textarea\.ui-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
