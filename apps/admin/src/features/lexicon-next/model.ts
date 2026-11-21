@@ -452,6 +452,17 @@ export function grammarMatchesSense(
     grammarSubPosValid(grammar.part_of_speech, grammar.sub_pos, catalog)
   );
 }
+
+/** 编辑态下拉按草稿词性精确匹配；目录合法性留给发布校验。 */
+export function grammarSelectMatchesSense(
+  grammar: NextGrammarStructure,
+  sense: NextSense
+): boolean {
+  return (
+    grammar.part_of_speech === sense.part_of_speech &&
+    (grammar.sub_pos ?? "") === (sense.sub_pos ?? "")
+  );
+}
 export function grammarText(
   grammar: NextGrammarStructure,
   locale: string

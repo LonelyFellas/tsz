@@ -6,6 +6,8 @@ import {
   draftProblem,
   ensureMeaningTemplates,
   grammarBindingIssues,
+  grammarMatchesSense,
+  grammarSelectMatchesSense,
   normalizeGrammarVariants
 } from "./model";
 
@@ -309,6 +311,38 @@ it("当前目录改码后，同编码的结构与义项也不能作为有效语�
       .map((issue) => issue.node_id)
   ).toEqual(["g", "s"]);
   expect(draft).toEqual(before);
+});
+
+it("编辑态按草稿词性匹配语法结构，不因目录暂未同步而隐藏下拉选项", () => {
+  const grammar = {
+    id: "g",
+    part_of_speech: "noun",
+    sub_pos: "N-UNCOUNT-ABSTRACT",
+    variants: []
+  };
+  const sense = {
+    id: "s",
+    part_of_speech: "noun",
+    sub_pos: "N-UNCOUNT-ABSTRACT",
+    definitions: [],
+    equivalents: []
+  };
+  expect(grammarSelectMatchesSense(grammar, sense)).toBe(true);
+  expect(
+    grammarMatchesSense(grammar, sense, {
+      ...partOfSpeechCatalogFixture,
+      items: partOfSpeechCatalogFixture.items.map((item) =>
+        item.code === "noun"
+          ? {
+              ...item,
+              sub_parts: item.sub_parts.filter(
+                (part) => part.code !== "N-UNCOUNT-ABSTRACT"
+              )
+            }
+          : item
+      )
+    })
+  ).toBe(false);
 });
 
 it("词义总体数据保留空白存量，预览共享元数据并按 V1 校验词频", () => {
