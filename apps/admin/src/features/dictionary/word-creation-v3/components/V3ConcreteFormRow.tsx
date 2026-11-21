@@ -32,7 +32,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type RefObject,
   type ReactNode
 } from "react";
 import {
@@ -98,26 +97,6 @@ function SpellingSettingsHint({
         </Typography.Paragraph>
       )}
     </>
-  );
-}
-
-function SpellingLabel({
-  children,
-  inputRef
-}: {
-  children: ReactNode;
-  inputRef: RefObject<TextAreaRef | null>;
-}) {
-  return (
-    <Typography.Text
-      strong
-      onMouseDown={(event) => {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }}
-    >
-      {children}
-    </Typography.Text>
   );
 }
 
@@ -443,10 +422,10 @@ function V3DialectFormCell({
       <Flex vertical gap="small">
         <Flex align="center" justify="space-between" gap="small" wrap>
           <Flex align="center" gap="small">
-            <SpellingLabel inputRef={spellingRef}>
+            <Typography.Text strong>
               {spellingLabel ??
                 t("spelling_label", { label: dialectLabel(dialect) })}
-            </SpellingLabel>
+            </Typography.Text>
             {spellingActions}
           </Flex>
           <SpellingRegularity
@@ -935,9 +914,7 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <SpellingLabel inputRef={spellingRef}>
-                  {t("spelling")}
-                </SpellingLabel>
+                <Typography.Text strong>{t("spelling")}</Typography.Text>
                 <SpellingRegularity
                   visible={showRegularity}
                   content={content}
@@ -1051,9 +1028,7 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <SpellingLabel inputRef={spellingRef}>
-                  {t("spelling")}
-                </SpellingLabel>
+                <Typography.Text strong>{t("spelling")}</Typography.Text>
                 <SpellingRegularity
                   visible={showRegularity}
                   content={content}

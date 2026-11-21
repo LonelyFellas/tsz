@@ -131,7 +131,7 @@ textarea.v3-grammar-input.ui-input {
   padding: var(--ui-space-1) var(--ui-space-3);
 }
 
-/* 词形拼写预览只保留富文本层可见，输入框继续承接焦点和错误定位。 */
+/* 有拼写标注时只保留富文本层可见，输入框继续承接焦点和错误定位。 */
 .v3-spelling-preview > textarea.ui-input {
   color: transparent;
   caret-color: transparent;
