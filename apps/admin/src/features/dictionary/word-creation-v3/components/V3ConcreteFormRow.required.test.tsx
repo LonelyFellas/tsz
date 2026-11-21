@@ -97,3 +97,17 @@ it.each(["common", "unified", "distinguish"] as const)(
     ).toHaveValue("bɪb");
   }
 );
+
+it("点击词形拼写标题时聚焦对应输入框", () => {
+  const form = commonFormFixture({ spelling: "web" });
+  const rules: DialectRulesV3 = {
+    spelling_mode: "unified",
+    phonetic_mode: "unified"
+  };
+  render(<Harness form={form} rules={rules} />);
+
+  const spelling = screen.getByLabelText("原形英美通用拼写");
+  fireEvent.mouseDown(screen.getByText("词形拼写", { exact: true }));
+
+  expect(spelling).toHaveFocus();
+});
