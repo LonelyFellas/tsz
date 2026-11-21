@@ -31,7 +31,7 @@ it("切换语言保留表格模式与选中周，链接继续使用北京时间�
     screen.getByRole("link", { name: "View entries for this week →" })
   ).toHaveAttribute(
     "href",
-    "/words?created_from=2026-10-26&created_to=2026-11-01&created_timezone=Asia%2FShanghai"
+    "/lexicon-next?created_from=2026-10-26&created_to=2026-11-01&created_timezone=Asia%2FShanghai"
   );
 });
 it("按北京时间标记本周，选择历史周同步数量与词库筛选入口", () => {
@@ -43,14 +43,14 @@ it("按北京时间标记本周，选择历史周同步数量与词库筛选入�
   expect(screen.getByText("本周 · 进行中")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "查看该周词条 →" })).toHaveAttribute(
     "href",
-    "/words?created_from=2026-11-02&created_to=2026-11-08&created_timezone=Asia%2FShanghai"
+    "/lexicon-next?created_from=2026-11-02&created_to=2026-11-08&created_timezone=Asia%2FShanghai"
   );
   fireEvent.click(screen.getByRole("button", { name: "查看 2026-10-26 当周" }));
   expect(screen.getByText("133")).toBeInTheDocument();
   expect(screen.queryByText("本周 · 进行中")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "查看该周词条 →" })).toHaveAttribute(
     "href",
-    "/words?created_from=2026-10-26&created_to=2026-11-01&created_timezone=Asia%2FShanghai"
+    "/lexicon-next?created_from=2026-10-26&created_to=2026-11-01&created_timezone=Asia%2FShanghai"
   );
   fireEvent.click(screen.getByRole("button", { name: "数据" }));
   expect(screen.getByRole("table")).toHaveTextContent("2026-10-26");

@@ -251,6 +251,7 @@ export function WordListTable<Row extends { id: string }>({
                 <th scope="col" style={checkboxStyle}>
                   <Checkbox
                     aria-label={t("select_page")}
+                    style={{ width: "100%", justifyContent: "center" }}
                     checked={count > 0 && count === selectable.length}
                     disabled={!selectable.length}
                     indeterminate={count > 0 && count < selectable.length}
@@ -284,6 +285,7 @@ export function WordListTable<Row extends { id: string }>({
                       aria-label={t("select_entry", {
                         label: rowLabel(row)
                       })}
+                      style={{ width: "100%", justifyContent: "center" }}
                       checked={selection.keys.includes(row.id)}
                       disabled={selection.disabled(row)}
                       onChange={(event) => toggle([row], event.target.checked)}

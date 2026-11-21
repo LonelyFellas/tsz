@@ -78,8 +78,8 @@ export function HomePage() {
             >
               {t("refresh")}
             </Button>
-            {canVisitAdminRoute(profile, "/words/new") && (
-              <Link className="ui-btn ui-btn-primary" to="/words/new">
+            {canVisitAdminRoute(profile, "/lexicon-next/new") && (
+              <Link className="ui-btn ui-btn-primary" to="/lexicon-next/new">
                 <PlusIcon aria-hidden="true" />
                 {t("create_entry")}
               </Link>
@@ -309,7 +309,7 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
             <div className="dashboard-links">
               {[
                 {
-                  path: "/words",
+                  path: "/lexicon-next",
                   label: t("entries"),
                   hint: t("entries_help"),
                   icon: LibraryBigIcon
