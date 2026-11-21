@@ -458,6 +458,40 @@ it("缺少音标但已有行级音色时保留旧行级音频来源", async () =
   ).toBeUndefined();
 });
 
+it("旧行级空配音配置按词形继承推荐并完成正式音频", async () => {
+  const forms = fixture();
+  const variant = forms.contents[0]!.regional_variants;
+  if (variant.mode !== "common") throw new Error("expected common fixture");
+  variant.common.pronunciations[0]!.voice_profile = { voices: [] };
+  speech.resolve.mockImplementation(async ({ accent }) => ({
+    voices: [voices[accent === "gb" ? 0 : 1]!]
+  }));
+  render(<Host initial={forms} />);
+
+  await applyAudioTasks();
+
+  expect(speech.resolve).toHaveBeenCalledWith(
+    expect.objectContaining({
+      accent: "gb",
+      profile: expect.objectContaining({
+        dubbing: {
+          area: "word",
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
+      })
+    })
+  );
+  expect(speech.generate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      source: {
+        kind: "text",
+        content: { version: 2, text: "heˈləʊ", annotations: [] }
+      }
+    })
+  );
+});
+
 it.each([false, true])(
   "显式来源下未启用的拼写口音不生成，活动美式=%s",
   async (activeUs) => {
