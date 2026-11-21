@@ -96,8 +96,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-grammar-form-links": "v1",
       "x-tsz-next-sentence-associations": "v1",
       "x-tsz-next-sense-groups": "v1",
-      "x-tsz-next-medium-ownership": "v1",
-      "x-tsz-next-annotation-rule": "v1"
+      "x-tsz-next-medium-ownership": "v1"
     }
   };
   const entry = (id: string) => `${root}/entries/${encodeURIComponent(id)}`;
@@ -268,9 +267,20 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       http
         .post<unknown>(`${root}/detections`, input)
         .then((value) => decode<NextDetection>("NextDetection", value)),
-    matchEntries: (input: NextEntryMatchInput) =>
+    matchEntries: (
+      input: NextEntryMatchInput,
+      annotationKind?: "word" | "phrase"
+    ) =>
       http
-        .post<unknown>(`${root}/entry-matches`, input, editorOptions)
+        .post<unknown>(`${root}/entry-matches`, input, {
+          headers: {
+            ...editorOptions.headers,
+            "x-tsz-next-annotation-rule": "v1",
+            ...(annotationKind
+              ? { "x-tsz-next-annotation-kind": annotationKind }
+              : {})
+          }
+        })
         .then((value) => decode<NextEntryMatches>("NextEntryMatches", value)),
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
