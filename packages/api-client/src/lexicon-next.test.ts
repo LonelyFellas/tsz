@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { NextDraft, NextEntry } from "@tsz/types";
+import type { NextDraft, NextEntry, NextEntryMatchInput } from "@tsz/types";
 import { createAdminEndpoints } from "./admin";
 import { createHttpClient, HttpError } from "./http";
 import { decodeNextEntry, decodeNextEntryView } from "./lexicon-next";
@@ -218,12 +218,14 @@ describe("lexicon-next authoritative wire contract", () => {
     const page = {
       surface: "café",
       items: [],
-      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 },
+      annotation_required: false
     };
     const { api, fetch } = client(page);
-    const input = {
+    const input: NextEntryMatchInput = {
       target_language: "en",
       surface: "café",
+      kind: "word",
       page: 2,
       page_size: 20
     };
@@ -233,6 +235,11 @@ describe("lexicon-next authoritative wire contract", () => {
     );
     expect(fetch.mock.calls[0]![1].method).toBe("POST");
     expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual(input);
+    expect(
+      new Headers(fetch.mock.calls[0]![1].headers).get(
+        "x-tsz-next-annotation-rule"
+      )
+    ).toBe("v1");
     expect(
       validateRuntimeSchema("NextEntryMatchInput", {
         target_language: "en",

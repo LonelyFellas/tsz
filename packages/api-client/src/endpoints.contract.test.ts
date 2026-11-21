@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "bcd24c3ceb087a566fcf81819c6489bedb5f50aea56387a55414e16ad4639710"
+      "d10c29338270003b161f09923a5ef8327bfa564b7bccfbca57198b9b976d527f"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1166,6 +1166,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"] }
     };
+    const annotationRuleHeader = {
+      name: "x-tsz-next-annotation-rule",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
     expect(snapshot.operationHeaders).toEqual({
       "get /admin/lexicon-next/entries/{id}/publication": [dialectPairsHeader],
       ...Object.fromEntries(
@@ -1176,6 +1182,9 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         ].map((operation) => [
           operation,
           [
+            ...(operation === "post /admin/lexicon-next/entry-matches"
+              ? [annotationRuleHeader]
+              : []),
             {
               name: "x-tsz-next-levels",
               in: "header",

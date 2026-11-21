@@ -163,6 +163,7 @@ export interface NextDetection {
 }
 export interface NextEntryMatchInput extends NextDetectionInput {
   medium_locale?: string;
+  kind?: "word" | "phrase";
   page?: number | null;
   page_size?: number | null;
 }
@@ -170,6 +171,7 @@ export interface NextEntryMatches {
   surface: string;
   items: NextWorkspaceEntry[];
   pagination: NextEntryList["pagination"];
+  annotation_required?: boolean;
 }
 export interface NextListQuery {
   target_language?: string;

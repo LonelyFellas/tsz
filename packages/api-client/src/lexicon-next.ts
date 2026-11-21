@@ -96,7 +96,8 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-grammar-form-links": "v1",
       "x-tsz-next-sentence-associations": "v1",
       "x-tsz-next-sense-groups": "v1",
-      "x-tsz-next-medium-ownership": "v1"
+      "x-tsz-next-medium-ownership": "v1",
+      "x-tsz-next-annotation-rule": "v1"
     }
   };
   const entry = (id: string) => `${root}/entries/${encodeURIComponent(id)}`;

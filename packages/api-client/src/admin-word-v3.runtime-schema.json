@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/06f8/tsz-rust/docs/openapi.json",
-  "_source_sha256": "bcd24c3ceb087a566fcf81819c6489bedb5f50aea56387a55414e16ad4639710",
+  "_source": "/Users/darwish/.codex/worktrees/810c/tsz-rust/docs/openapi.json",
+  "_source_sha256": "d10c29338270003b161f09923a5ef8327bfa564b7bccfbca57198b9b976d527f",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3877,6 +3877,7 @@
       "type": "object",
       "required": ["surface", "items", "pagination"],
       "properties": {
+        "annotation_required": { "type": ["boolean", "null"] },
         "items": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextWorkspaceEntry" }
@@ -3890,6 +3891,9 @@
       "type": "object",
       "required": ["target_language", "surface"],
       "properties": {
+        "kind": {
+          "oneOf": [{ "$ref": "#/$defs/NextEntryKind" }, { "type": "null" }]
+        },
         "medium_locale": { "type": ["string", "null"] },
         "page": { "type": ["integer", "null"], "minimum": 1 },
         "page_size": {

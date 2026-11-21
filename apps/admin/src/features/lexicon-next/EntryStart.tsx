@@ -99,14 +99,16 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
         target_language: targetLanguage,
         surface: input.normalized
       };
+      const matchQuery = {
+        ...query,
+        kind: input.kind,
+        medium_locale: medium,
+        page: 1,
+        page_size: 20
+      };
       const [result, entries] = await Promise.all([
         requests.detect(query),
-        requests.matchEntries({
-          ...query,
-          medium_locale: medium,
-          page: 1,
-          page_size: 20
-        })
+        requests.matchEntries(matchQuery)
       ]);
       if (current !== generation.current) return;
       if (
@@ -139,6 +141,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
       const result = await requests.matchEntries({
         target_language: targetLanguage,
         medium_locale: medium,
+        kind: detection.kind,
         surface: detection.surface,
         page,
         page_size: entryMatches.pagination.page_size
@@ -245,7 +248,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
 
   function requestCreate() {
     const matches = activeMatches();
-    if (matches.length > 0) {
+    const annotationRequired =
+      entryMatches?.annotation_required ?? matches.length > 0;
+    if (annotationRequired) {
       if (!canEdit) {
         setError(
           t("creation_this_account_cannot_change_this_entry_s_annotation")

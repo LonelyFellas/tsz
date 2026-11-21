@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/06f8/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-20T13:41:55.422Z",
+  "_source": "/Users/darwish/.codex/worktrees/810c/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-21T02:49:17.382Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -497,6 +497,12 @@
       }
     ],
     "post /admin/lexicon-next/entry-matches": [
+      {
+        "name": "x-tsz-next-annotation-rule",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
       {
         "name": "x-tsz-next-levels",
         "in": "header",
@@ -9295,6 +9301,12 @@
       "type": "object",
       "required": ["target_language", "surface"],
       "properties": {
+        "kind": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/NextEntryKind" },
+            { "type": "null" }
+          ]
+        },
         "medium_locale": { "type": ["string", "null"] },
         "page": {
           "type": ["integer", "null"],
