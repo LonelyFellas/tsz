@@ -538,7 +538,7 @@ export function EntryList({
             </Button>
           </div>
           <Dropdown
-            trigger={["hover"]}
+            trigger={["hover", "click"]}
             placement="bottomRight"
             open={openActionRow === row.id}
             onOpenChange={(open) =>

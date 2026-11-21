@@ -13,6 +13,10 @@ export const ADMIN_PAGE_ROUTES = {
   reviews: { path: "reviews", handle: { permission: "wordlists.access" } },
   coins: { path: "coins", handle: { permission: "coins.access" } },
   myCoins: { path: "account/coins", handle: {} },
+  lexiconNextNew: {
+    path: "lexicon-next/new",
+    handle: { permission: "words.create" }
+  },
   lexiconNext: {
     path: "lexicon-next/:entryId?",
     handle: { permission: "words.access" }

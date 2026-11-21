@@ -164,7 +164,8 @@ export function createAdminAuthRuntime({
     () =>
       store.setState({
         connectionError: !store.getState().permissionModelIncompatible
-      })
+      }),
+    () => tokens.redirectToLogin()
   );
 
   let pendingProfile:

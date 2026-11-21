@@ -6,7 +6,8 @@ export function createSessionRestore<T>(
   load: () => Promise<T>,
   apply: (session: T) => void,
   absent: () => void,
-  failed: () => void
+  failed: () => void,
+  expired?: () => void
 ): () => Promise<void> {
   let pending: { generation: number; promise: Promise<void> } | undefined;
   return () => {
@@ -32,6 +33,7 @@ export function createSessionRestore<T>(
         if (error instanceof HttpError && error.status === 401) {
           tokens.setAccessToken(null);
           absent();
+          expired?.();
           return;
         }
         failed();

@@ -54,8 +54,8 @@ export function ContentTrend({
     selected.week_start <= date &&
     weekEnd(selected.week_start) >= date;
   const detailLink = selected
-    ? `/words?created_from=${selected.week_start}&created_to=${weekEnd(selected.week_start)}&created_timezone=Asia%2FShanghai`
-    : "/words";
+    ? `/lexicon-next?created_from=${selected.week_start}&created_to=${weekEnd(selected.week_start)}&created_timezone=Asia%2FShanghai`
+    : "/lexicon-next";
   return (
     <div className="dashboard-trend">
       <div className="dashboard-chart-heading">
@@ -228,7 +228,7 @@ export function ContentTrend({
         ))}
       </div>
       <div className="dashboard-chart-footer">
-        {selected && canVisitAdminRoute(profile, "/words") && (
+        {selected && canVisitAdminRoute(profile, "/lexicon-next") && (
           <Link to={detailLink}>{t("week_entries")}</Link>
         )}
       </div>
