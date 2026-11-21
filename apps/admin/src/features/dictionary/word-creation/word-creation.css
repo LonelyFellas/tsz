@@ -641,6 +641,10 @@
   margin-bottom: var(--ui-space-2);
 }
 
+.lexicon-next .word-detection-result-card {
+  margin-top: var(--ui-space-4);
+}
+
 .word-basics-workflow .word-basics-result-grid {
   gap: var(--ui-space-4);
   margin-top: var(--ui-space-6);

@@ -20,6 +20,7 @@ export function DictionaryDetectionCard({
 
   return (
     <Card
+      className="word-detection-result-card"
       title="内置词典"
       extra={
         <Space>
