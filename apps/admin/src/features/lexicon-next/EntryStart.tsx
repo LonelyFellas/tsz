@@ -99,14 +99,15 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
         target_language: targetLanguage,
         surface: input.normalized
       };
+      const matchQuery = {
+        ...query,
+        medium_locale: medium,
+        page: 1,
+        page_size: 20
+      };
       const [result, entries] = await Promise.all([
         requests.detect(query),
-        requests.matchEntries({
-          ...query,
-          medium_locale: medium,
-          page: 1,
-          page_size: 20
-        })
+        requests.matchEntries(matchQuery, input.kind)
       ]);
       if (current !== generation.current) return;
       if (
@@ -136,13 +137,16 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
     setBusy("matches");
     setError(undefined);
     try {
-      const result = await requests.matchEntries({
-        target_language: targetLanguage,
-        medium_locale: medium,
-        surface: detection.surface,
-        page,
-        page_size: entryMatches.pagination.page_size
-      });
+      const result = await requests.matchEntries(
+        {
+          target_language: targetLanguage,
+          medium_locale: medium,
+          surface: detection.surface,
+          page,
+          page_size: entryMatches.pagination.page_size
+        },
+        detection.kind
+      );
       if (current !== generation.current) return;
       if (
         result.surface.normalize("NFKC") !== detection.surface.normalize("NFKC")
@@ -245,14 +249,21 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
 
   function requestCreate() {
     const matches = activeMatches();
-    if (matches.length > 0) {
+    const annotationMatches = entryMatches?.annotation_items ?? matches;
+    const annotationRequired =
+      entryMatches?.annotation_required ?? annotationMatches.length > 0;
+    if (annotationRequired) {
       if (!canEdit) {
         setError(
           t("creation_this_account_cannot_change_this_entry_s_annotation")
         );
         return;
       }
-      setAnnotationEntries(matches);
+      if (!annotationMatches.length) {
+        setError("已有词头冲突暂不可用，请重新检测。");
+        return;
+      }
+      setAnnotationEntries(annotationMatches);
       setAnnotationRevision(1);
       return;
     }
