@@ -33,7 +33,7 @@ import type {
 import { partOfSpeechLabel } from "@/features/dictionary/word-creation-v3/presentation";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { GrammarStructures } from "./GrammarStructures";
-import { grammarMatchesSense } from "./model";
+import { grammarSelectMatchesSense } from "./model";
 import { DefinitionRows } from "./DefinitionRows";
 import { ContentRows } from "./ContentRows";
 import { localeLabels, removePosDescription, replaceFormEditor } from "./model";
@@ -757,10 +757,9 @@ export function MeaningsStep({
                                             ? (
                                                 value.grammar_structures ?? []
                                               ).filter((g) =>
-                                                grammarMatchesSense(
+                                                grammarSelectMatchesSense(
                                                   g,
-                                                  sense,
-                                                  catalog.data
+                                                  sense
                                                 )
                                               )
                                             : undefined
@@ -803,10 +802,9 @@ export function MeaningsStep({
                                           ? (
                                               value.grammar_structures ?? []
                                             ).filter((g) =>
-                                              grammarMatchesSense(
+                                              grammarSelectMatchesSense(
                                                 g,
-                                                sense,
-                                                catalog.data
+                                                sense
                                               )
                                             )
                                           : undefined
@@ -835,10 +833,9 @@ export function MeaningsStep({
                                           ? (
                                               value.grammar_structures ?? []
                                             ).filter((g) =>
-                                              grammarMatchesSense(
+                                              grammarSelectMatchesSense(
                                                 g,
-                                                sense,
-                                                catalog.data
+                                                sense
                                               )
                                             )
                                           : undefined
