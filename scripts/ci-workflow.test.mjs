@@ -9,6 +9,10 @@ const deployWorkflowUrl = new URL(
   "../.github/workflows/deploy-tshb-test.yml",
   import.meta.url
 );
+const deployCompositionUrl = new URL(
+  "../deploy/deploy-composition.sh",
+  import.meta.url
+);
 const setupActionUrl = new URL(
   "../.github/actions/setup-node-pnpm/action.yml",
   import.meta.url
@@ -54,6 +58,16 @@ test("automatic deployment is restricted to successful main push CI and binds it
       source.includes(required),
       `missing deployment safeguard: ${required}`
     );
+});
+
+test("frontend composition rechecks stale candidates around backend API recovery", async () => {
+  const source = await readFile(deployCompositionUrl, "utf8");
+  assert.match(source, /deploy_candidate_checkpoint before-api-contract/);
+  assert.match(source, /deploy_candidate_checkpoint after-api-contract/);
+  const waitIndex = source.indexOf("wait-api-contract.mjs --compatible");
+  assert.ok(waitIndex > source.indexOf("before-api-contract"));
+  assert.ok(source.indexOf("after-api-contract") > waitIndex);
+  assert.match(source, /composition_superseded_marker=/);
 });
 
 test("deployment shares one task-scoped SSH master and always closes it", async () => {

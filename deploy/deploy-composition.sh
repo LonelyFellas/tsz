@@ -44,10 +44,14 @@ verify_remote_composition() {
   deploy_ssh tshb-test "exec 8>/opt/tsz-cross-deploy.lock && flock -s 8 && /usr/bin/node --input-type=module - validate /opt/tsz-deploy-manifests/release-composition.json" < deploy/release-composition.mjs >/dev/null
 }
 
+composition_superseded_marker="$state_file-api-superseded"
 cleanup_status=0
 on_exit() {
   local status=$?
-  if [[ "$status" != 0 ]]; then
+  if [[ "$status" = 0 && -f "$composition_superseded_marker" ]]; then
+    write_state transition "$state_file" superseded >/dev/null 2>&1 || true
+    echo "release composition superseded before component deployment"
+  elif [[ "$status" != 0 ]]; then
     if [[ -n "${DEPLOY_ACTIVE_COMPONENT:-}" ]]; then
       node deploy/release-state.mjs transition "$state_file" failed "" "$DEPLOY_ACTIVE_COMPONENT" "" >/dev/null 2>&1 || true
     else
@@ -65,8 +69,11 @@ trap 'exit 143' TERM
 node deploy/release-state.mjs init "$state_file" "$release_id" "$DEPLOY_EXPECTED_SHA" "$DEPLOY_EXPECTED_CI_RUN_ID" "$DEPLOY_EXPECTED_CI_RUN_ATTEMPT" >/dev/null
 deploy_transport_init "$(dirname "$state_file")"
 DEPLOY_ACTIVE_COMPONENT=""
+rm -f "$composition_superseded_marker"
 
+DEPLOY_SUPERSEDED_MARKER="$composition_superseded_marker" deploy_candidate_checkpoint before-api-contract
 web_api_sha="$(node deploy/deploy-metrics.mjs run web local api-contract -- node deploy/wait-api-contract.mjs --compatible)"
+DEPLOY_SUPERSEDED_MARKER="$composition_superseded_marker" deploy_candidate_checkpoint after-api-contract
 write_state transition "$state_file" dependencies-ready
 write_state transition "$state_file" contract-compatible "$web_api_sha"
 
