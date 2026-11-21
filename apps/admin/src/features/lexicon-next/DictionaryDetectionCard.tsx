@@ -107,8 +107,8 @@ export function DictionaryDetectionCard({
         </div>
       ) : (
         <Alert
+          className="lexicon-next-empty-state"
           type="info"
-          showIcon
           title="未找到内置词典匹配，可继续创建空白草稿。"
         />
       )}

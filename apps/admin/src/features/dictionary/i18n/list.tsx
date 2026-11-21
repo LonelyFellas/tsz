@@ -490,7 +490,6 @@ export const lexiconListMessages = {
     "北京時間（UTC+8）",
     "Beijing time (UTC+8)"
   ],
-  apply_filters: ["应用筛选", "套用篩選", "Apply filters"],
   active_filters: ["已应用筛选", "已套用篩選", "Applied filters"],
   filtered: ["已筛选", "已篩選", "Filtered"],
   remove_filter: ["移除{{label}}", "移除{{label}}", "Remove {{label}}"],

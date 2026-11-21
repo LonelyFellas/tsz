@@ -15,6 +15,7 @@ import { useEffect, type ReactNode } from "react";
 import { Outlet, useMatch } from "react-router-dom";
 import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
 import { AdminConnectionStatus } from "@/features/auth/AdminConnectionStatus";
+import { AdminBootConnection } from "@/features/auth/AdminBootConnection";
 
 export type RootOutletContext = {
   connectionNotice: ReactNode;
@@ -68,7 +69,10 @@ export function RootProviders({ children }: { children?: ReactNode }) {
   const hydrated = useAuthStore((s) => s.hydrated);
   const hasProfile = useAuthStore((s) => !!s.profile);
   const localeReady = useAdminLocaleReady();
+  const bootConnection =
+    !isLoginPage && !permissionModelIncompatible && !hydrated && !hasProfile;
   const connectionNotice = !permissionModelIncompatible &&
+    !bootConnection &&
     (connectionError || refreshUnconfirmed) && (
       <Alert
         className={isLoginPage ? "admin-login__connection" : undefined}
@@ -115,28 +119,42 @@ export function RootProviders({ children }: { children?: ReactNode }) {
       <>
         <RecoverySession />
         <FeedbackApp key={identity}>
-          {permissionModelIncompatible && !isLoginPage && (
-            <Alert type="error" showIcon title={t("auth_upgrade")} />
-          )}
-          {!isLoginPage &&
-            (isChangePasswordPage || !hydrated || !hasProfile || children) &&
-            connectionNotice}
-          {children ?? (
-            <Outlet
-              context={
-                {
-                  connectionNotice,
-                  connectionStatus: !permissionModelIncompatible && (
-                    <AdminConnectionStatus
-                      connectionError={connectionError}
-                      refreshUnconfirmed={refreshUnconfirmed}
-                      retrying={retrying}
-                      onRetry={() => void retry()}
-                    />
-                  )
-                } satisfies RootOutletContext
-              }
+          {bootConnection ? (
+            <AdminBootConnection
+              connectionError={connectionError}
+              refreshUnconfirmed={refreshUnconfirmed}
+              retrying={retrying}
+              onRetry={() => void retry()}
             />
+          ) : (
+            <>
+              {permissionModelIncompatible && !isLoginPage && (
+                <Alert type="error" showIcon title={t("auth_upgrade")} />
+              )}
+              {!isLoginPage &&
+                (isChangePasswordPage ||
+                  !hydrated ||
+                  !hasProfile ||
+                  children) &&
+                connectionNotice}
+              {children ?? (
+                <Outlet
+                  context={
+                    {
+                      connectionNotice,
+                      connectionStatus: !permissionModelIncompatible && (
+                        <AdminConnectionStatus
+                          connectionError={connectionError}
+                          refreshUnconfirmed={refreshUnconfirmed}
+                          retrying={retrying}
+                          onRetry={() => void retry()}
+                        />
+                      )
+                    } satisfies RootOutletContext
+                  }
+                />
+              )}
+            </>
           )}
         </FeedbackApp>
       </>

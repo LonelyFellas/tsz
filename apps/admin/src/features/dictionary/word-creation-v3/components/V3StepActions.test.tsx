@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { V3StepActions } from "./V3StepActions";
 
@@ -35,6 +35,27 @@ it("窄窗口侧栏移到抽屉后，底栏仍贴住编辑区域底边并跟随�
   act(() => window.dispatchEvent(new Event("scroll")));
   expect(bar).toHaveStyle({ bottom: "0px" });
   expect(bar).toHaveAttribute("data-at-end", "false");
+  unmount();
+  expect(document.querySelector(".v3-step-actions")).toBeNull();
+});
+
+it("inline模式把操作条留在内容流中并保留按钮交互", () => {
+  const onClick = vi.fn();
+  const { unmount } = render(
+    <div className="word-creation-shell">
+      <V3StepActions inline className="lexicon-next-basics-actions">
+        <button onClick={onClick}>下一步</button>
+      </V3StepActions>
+    </div>
+  );
+
+  const button = screen.getByRole("button", { name: "下一步" });
+  const bar = button.closest(".v3-step-actions");
+  expect(bar).toHaveClass("v3-step-actions-inline");
+  expect(bar).not.toHaveAttribute("data-at-end");
+  expect(bar?.parentElement).toHaveClass("word-creation-shell");
+  fireEvent.click(button);
+  expect(onClick).toHaveBeenCalledTimes(1);
   unmount();
   expect(document.querySelector(".v3-step-actions")).toBeNull();
 });

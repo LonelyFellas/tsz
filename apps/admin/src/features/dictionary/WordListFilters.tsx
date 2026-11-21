@@ -410,11 +410,6 @@ export function WordListFilters({
           >
             <RangePicker style={{ width: "100%" }} />
           </Form.Item>
-          <div className="word-search-advanced-actions">
-            <Button htmlType="submit" type="primary" size="small">
-              {t("apply_filters")}
-            </Button>
-          </div>
         </div>
       </Form>
       {filterSummaries.length > 0 && (

@@ -6,6 +6,19 @@
   container: word-creation-actions / inline-size;
 }
 
+.v3-step-actions-inline {
+  position: static;
+  width: 100%;
+  margin-top: var(--ui-space-6);
+}
+
+.v3-step-actions-inline.lexicon-next-basics-actions {
+  box-sizing: border-box;
+  width: min(100%, 1120px);
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
 .v3-step-actions > .word-step-actions {
   position: static;
   align-items: center;

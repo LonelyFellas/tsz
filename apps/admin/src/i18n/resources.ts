@@ -308,6 +308,16 @@ export const adminShellMessages = {
     "正在連線，請稍候。",
     "Connecting. Please wait."
   ],
+  boot_connection_connecting_help: [
+    "正在恢复后台会话，连接成功后会自动打开页面。",
+    "正在恢復後台工作階段，連線成功後會自動開啟頁面。",
+    "Restoring your admin session. The page will open when the connection is ready."
+  ],
+  boot_connection_unavailable_help: [
+    "暂时无法连接到后台服务，请检查网络后重试。",
+    "暫時無法連線到後台服務，請檢查網路後重試。",
+    "The admin service is unavailable. Check your connection and try again."
+  ],
   recovery_sign_in: ["重新登录", "重新登入", "Sign in again"],
   recovery_retry: ["重试", "重試", "Retry"],
   recovery_retry_connection: ["重试连接", "重試連線", "Reconnect"],

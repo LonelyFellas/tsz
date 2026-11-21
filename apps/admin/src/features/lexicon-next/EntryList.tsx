@@ -23,6 +23,7 @@ import {
 import { Form } from "@tsz/ui/admin/forms";
 import { App, Dropdown, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import type {
+  CefrLevel,
   EntryAnnotationConflict,
   NextListCommand,
   NextWorkspaceEntry,
@@ -53,10 +54,17 @@ import {
 } from "@/features/dictionary/part-of-speech/catalog";
 import { useAdminTranslation } from "@/i18n";
 import { useAuthStore } from "@/lib/auth";
+import { CEFR_LEVELS, cefrColor } from "@/features/dictionary/labels";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { useLexiconLanguages } from "./LanguageSelection";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
+
+function cefrLevelColor(level: string) {
+  return CEFR_LEVELS.includes(level as CefrLevel)
+    ? cefrColor(level as CefrLevel)
+    : undefined;
+}
 
 const WastebasketIcon = createLucideIcon("Wastebasket", [
   ["ellipse", { cx: 12, cy: 5, rx: 8, ry: 3, key: "rim" }],
@@ -439,7 +447,9 @@ export function EntryList({
         row.levels?.length ? (
           <Space size={4} wrap>
             {row.levels.map((level) => (
-              <Tag key={level}>{level}</Tag>
+              <Tag key={level} color={cefrLevelColor(level)}>
+                {level}
+              </Tag>
             ))}
           </Space>
         ) : (

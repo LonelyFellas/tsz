@@ -67,12 +67,6 @@
   "apps/admin/src/features/dictionary/required-field-feedback.css": {
     "raw-shadow": 1
   },
-  "apps/admin/src/features/dictionary/smart-dictionary.css": {
-    "raw-font-weight": 7,
-    "raw-color": 11,
-    "raw-font-size": 7,
-    "raw-radius": 8
-  },
   "apps/admin/src/features/dictionary/word-creation-v3/V3BasicsStep.tsx": {
     "inline-visual-style": 4
   },

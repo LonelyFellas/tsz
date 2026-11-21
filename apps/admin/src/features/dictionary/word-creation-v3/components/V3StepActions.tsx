@@ -4,10 +4,14 @@ import "./V3StepActions.css";
 
 export function V3StepActions({
   children,
-  status
+  status,
+  className,
+  inline = false
 }: {
   children: ReactNode;
   status?: string;
+  className?: string;
+  inline?: boolean;
 }) {
   const anchor = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -18,6 +22,7 @@ export function V3StepActions({
   }>();
 
   useLayoutEffect(() => {
+    if (inline) return;
     const shell = anchor.current?.closest<HTMLElement>(".word-creation-shell");
     const summary = shell?.querySelector<HTMLElement>(".word-creation-summary");
     if (!shell) return;
@@ -56,10 +61,11 @@ export function V3StepActions({
       window.removeEventListener("resize", follow);
       window.removeEventListener("scroll", follow);
     };
-  }, []);
+  }, [inline]);
 
   // 浮动助手需要避开底栏；窄屏按钮换行后，不能继续假设固定的底栏高度。
   useLayoutEffect(() => {
+    if (inline) return;
     const actions = actionsRef.current;
     if (!actions || !bounds) return;
     const root = document.documentElement;
@@ -79,7 +85,7 @@ export function V3StepActions({
       if (previous) root.style.setProperty(variable, previous);
       else root.style.removeProperty(variable);
     };
-  }, [bounds]);
+  }, [bounds, inline]);
 
   const actions = (
     <div ref={actionsRef} className="word-step-actions">
@@ -91,12 +97,21 @@ export function V3StepActions({
       {children}
     </div>
   );
+  if (inline)
+    return (
+      <div
+        ref={anchor}
+        className={`v3-step-actions v3-step-actions-inline${className ? ` ${className}` : ""}`}
+      >
+        {actions}
+      </div>
+    );
   return (
     <div ref={anchor}>
       {bounds
         ? createPortal(
             <div
-              className="v3-step-actions"
+              className={`v3-step-actions${className ? ` ${className}` : ""}`}
               data-at-end={bounds.bottom > 0}
               style={bounds}
             >
