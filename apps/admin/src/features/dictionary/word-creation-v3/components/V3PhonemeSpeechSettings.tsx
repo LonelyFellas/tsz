@@ -51,7 +51,10 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { useContentEditPermissions } from "../../contentEditPermissions";
-import { useGateEmptySpeechSettings } from "../speechSettingsContext";
+import {
+  useGateEmptySpeechSettings,
+  useLoadVoiceCatalogOnMount
+} from "../speechSettingsContext";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 import "@tsz/voice-editor/styles.css";
 
@@ -74,6 +77,7 @@ export function V3PhonemeSpeechSettings({
   active: requestedActive,
   headless = false,
   background = false,
+  onAudioTaskRetry,
   onChange
 }: {
   spelling: string;
@@ -88,6 +92,7 @@ export function V3PhonemeSpeechSettings({
   active: boolean;
   headless?: boolean;
   background?: boolean;
+  onAudioTaskRetry?: () => void;
   onChange: (
     candidate: PronunciationSynthesisCandidateV3,
     audioAssets: AudioAssetV3[]
@@ -126,6 +131,7 @@ export function V3PhonemeSpeechSettings({
   }, [targetKey]);
   const { edit: canEdit } = useContentEditPermissions();
   const gateEmptySpeechSettings = useGateEmptySpeechSettings();
+  const loadVoiceCatalogOnMount = useLoadVoiceCatalogOnMount();
   const canGenerateAudio = usePermission("speech.generate");
   const [open, setOpen] = useState(false);
   const audioTasks = useVoiceAudioTasks();
@@ -158,7 +164,12 @@ export function V3PhonemeSpeechSettings({
       ? fallbackCatalog.error
       : undefined;
   useEffect(() => {
-    if (!needsFallbackCatalog || !canEdit) return;
+    if (
+      !needsFallbackCatalog ||
+      !canEdit ||
+      (!loadVoiceCatalogOnMount && !open)
+    )
+      return;
     const controller = new AbortController();
     fallbackReady.current = adminVoicePreviewAdapter
       .listVoices({ language: "en", signal: controller.signal })
@@ -173,12 +184,19 @@ export function V3PhonemeSpeechSettings({
         return false;
       });
     return () => controller.abort();
-  }, [canEdit, fallbackAttempt, fallbackKey, needsFallbackCatalog]);
+  }, [
+    canEdit,
+    fallbackAttempt,
+    fallbackKey,
+    loadVoiceCatalogOnMount,
+    needsFallbackCatalog,
+    open
+  ]);
   const audioTarget = JSON.stringify([nodeId, field, alphabet, locale]);
   useLayoutEffect(() => {
     if (
       !active ||
-      open ||
+      (!loadVoiceCatalogOnMount && !open) ||
       !canGenerateAudio ||
       !needsFallbackCatalog ||
       !audioTasks
@@ -202,6 +220,7 @@ export function V3PhonemeSpeechSettings({
     audioTarget,
     audioTasks,
     canGenerateAudio,
+    loadVoiceCatalogOnMount,
     needsFallbackCatalog,
     open
   ]);
@@ -586,7 +605,10 @@ export function V3PhonemeSpeechSettings({
           action={
             <Button
               size="small"
-              onClick={() => retryFallback((attempt) => attempt + 1)}
+              onClick={() => {
+                retryFallback((attempt) => attempt + 1);
+                onAudioTaskRetry?.();
+              }}
             >
               {t("panel_retry_final_audio")}
             </Button>
@@ -621,12 +643,7 @@ export function V3PhonemeSpeechSettings({
               data-v3-node-id={nodeId}
               data-v3-field={field}
               style={missingIpa ? { pointerEvents: "none" } : undefined}
-              disabled={
-                !canEdit ||
-                fallbackPending ||
-                fallbackError != null ||
-                missingIpa
-              }
+              disabled={!canEdit || missingIpa}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -668,7 +685,14 @@ export function V3PhonemeSpeechSettings({
               : t("panel_final_audio_generation_failed")
           }
           action={
-            <Button size="small" onClick={() => void automaticAudio.retry()}>
+            <Button
+              size="small"
+              onClick={() =>
+                void automaticAudio.retry().then((succeeded) => {
+                  if (succeeded) onAudioTaskRetry?.();
+                })
+              }
+            >
               {t("panel_retry_final_audio")}
             </Button>
           }

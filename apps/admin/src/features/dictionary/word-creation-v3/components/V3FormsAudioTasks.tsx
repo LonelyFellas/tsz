@@ -55,12 +55,16 @@ export function V3FormsAudioTasks({
   forms,
   paused,
   onChange,
-  rowOnly = false
+  rowOnly = false,
+  loadCatalogOnMount = true,
+  onAudioTaskRetry
 }: {
   forms: SharedFormsStepContentV3;
   paused: boolean;
   onChange: (forms: SharedFormsStepContentV3) => void;
   rowOnly?: boolean;
+  loadCatalogOnMount?: boolean;
+  onAudioTaskRetry?: () => void;
 }) {
   const { edit } = useContentEditPermissions();
   const { t } = useLexiconEditorTranslation();
@@ -91,7 +95,7 @@ export function V3FormsAudioTasks({
       )
     );
   useEffect(() => {
-    if (!enabled || !needsCatalog) return;
+    if (!enabled || !needsCatalog || !loadCatalogOnMount) return;
     setCatalogError(undefined);
     const controller = new AbortController();
     catalogReady.current = adminVoicePreviewAdapter
@@ -99,6 +103,7 @@ export function V3FormsAudioTasks({
       .then((voices) => {
         if (controller.signal.aborted) return false;
         flushSync(() => setCatalog(voices));
+        onAudioTaskRetry?.();
         return true;
       })
       .catch((error) => {
@@ -106,9 +111,15 @@ export function V3FormsAudioTasks({
         return false;
       });
     return () => controller.abort();
-  }, [catalogAttempt, enabled, needsCatalog]);
+  }, [
+    catalogAttempt,
+    enabled,
+    loadCatalogOnMount,
+    needsCatalog,
+    onAudioTaskRetry
+  ]);
   useLayoutEffect(() => {
-    if (!enabled || !needsCatalog || !audioTasks) return;
+    if (!enabled || !loadCatalogOnMount || !needsCatalog || !audioTasks) return;
     const key = "forms:audio-catalog";
     audioTasks.set(key, async () => {
       if (!(await catalogReady.current)) return false;
@@ -120,8 +131,11 @@ export function V3FormsAudioTasks({
     return () => {
       audioTasks.delete(key);
     };
-  }, [audioTasks, enabled, needsCatalog]);
-  const ready = enabled && (!needsCatalog || catalog.length > 0);
+  }, [audioTasks, enabled, loadCatalogOnMount, needsCatalog]);
+  const ready =
+    enabled &&
+    loadCatalogOnMount &&
+    (rowOnly || !needsCatalog || catalog.length > 0);
   const latest = useRef({ forms, onChange });
   useLayoutEffect(() => {
     latest.current = { forms, onChange };
@@ -157,7 +171,10 @@ export function V3FormsAudioTasks({
           action={
             <Button
               size="small"
-              onClick={() => retryCatalog((attempt) => attempt + 1)}
+              onClick={() => {
+                retryCatalog((attempt) => attempt + 1);
+                onAudioTaskRetry?.();
+              }}
             >
               {t("panel_retry_final_audio")}
             </Button>
@@ -201,6 +218,7 @@ export function V3FormsAudioTasks({
                 }
                 enabled={ready}
                 background={copy?.backgroundContentIds.has(variant.id) ?? false}
+                onRetry={onAudioTaskRetry}
                 onChange={(voice_profile) =>
                   patch(
                     variant.id,
@@ -273,6 +291,7 @@ export function V3FormsAudioTasks({
                         background={
                           copy?.backgroundContentIds.has(variant.id) ?? false
                         }
+                        onRetry={onAudioTaskRetry}
                         onChange={(voice_profile) =>
                           patch(
                             variant.id,
@@ -346,6 +365,7 @@ export function V3FormsAudioTasks({
                           }
                         : undefined
                     }
+                    onAudioTaskRetry={onAudioTaskRetry}
                     onChange={(next) =>
                       patch(
                         variant.id,
@@ -380,7 +400,8 @@ function TextAudioTask({
   locale,
   activeLocales,
   requiredLocales,
-  background = false
+  background = false,
+  onRetry
 }: {
   target: string;
   content: RichTextV2;
@@ -390,6 +411,7 @@ function TextAudioTask({
   activeLocales?: readonly PhonemeLocaleV3[];
   requiredLocales?: readonly PhonemeLocaleV3[];
   background?: boolean;
+  onRetry?: () => void;
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
 }) {
@@ -420,7 +442,14 @@ function TextAudioTask({
           : t("panel_final_audio_generation_failed")
       }
       action={
-        <Button size="small" onClick={() => void task.retry()}>
+        <Button
+          size="small"
+          onClick={() =>
+            void task.retry().then((succeeded) => {
+              if (succeeded) onRetry?.();
+            })
+          }
+        >
           {t("panel_retry_final_audio")}
         </Button>
       }

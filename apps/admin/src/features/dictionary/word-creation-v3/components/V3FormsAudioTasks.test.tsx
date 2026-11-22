@@ -124,14 +124,27 @@ async function applyAudioTasks() {
     for (const wait of [...tasks.values()]) await wait();
   });
 }
-function Host({ initial = fixture(), paused = false }) {
+function Host({
+  initial = fixture(),
+  paused = false,
+  onAudioTaskRetry
+}: {
+  initial?: SharedFormsStepContentV3;
+  paused?: boolean;
+  onAudioTaskRetry?: () => void;
+}) {
   const [forms, setForms] = useState(initial);
   return (
     <>
       <VoiceSaveContext.Provider
         value={{ save: async () => true, audioTasks: tasks }}
       >
-        <V3FormsAudioTasks forms={forms} paused={paused} onChange={setForms} />
+        <V3FormsAudioTasks
+          forms={forms}
+          paused={paused}
+          onChange={setForms}
+          onAudioTaskRetry={onAudioTaskRetry}
+        />
       </VoiceSaveContext.Provider>
       <output data-testid="saved-forms">{JSON.stringify(forms)}</output>
     </>
@@ -367,7 +380,8 @@ it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续�
     voices: voices.map(({ locale: _locale, ...setting }) => setting)
   };
   speech.catalog.mockRejectedValue(new Error("目录暂不可用"));
-  render(<Host initial={forms} />);
+  const retryNotified = vi.fn();
+  render(<Host initial={forms} onAudioTaskRetry={retryNotified} />);
   expect(await screen.findAllByText("目录暂不可用")).not.toHaveLength(0);
   expect(await tasks.get("forms:audio-catalog")!()).toBe(false);
   expect(speech.generate).not.toHaveBeenCalled();
@@ -376,6 +390,7 @@ it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续�
   );
   for (const retry of screen.getAllByRole("button", { name: "重试生成音频" }))
     fireEvent.click(retry);
+  expect(retryNotified).toHaveBeenCalled();
   await applyAudioTasks();
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
   expect(screen.getByTestId("saved-forms")).toHaveTextContent(
@@ -687,7 +702,7 @@ it.each(["none", "upload"] as const)(
   }
 );
 
-it("Step 2 没有词性时不注册生成任务，指定词性后恢复且保留原内容", async () => {
+it("智能词库 Step 2 不因词性变化注册自动音频任务并保留原内容", async () => {
   const assigned = applyFormsStructure(
     { forms_format: "shared_v1", contents: [], pos: [] },
     formsFixture()
@@ -735,7 +750,8 @@ it("Step 2 没有词性时不注册生成任务，指定词性后恢复且保留
   expect(changed).not.toHaveBeenCalled();
   expect(unassigned).toEqual(original);
   view.rerender(<Step forms={assigned} />);
-  await waitFor(() => expect(tasks.size).toBeGreaterThan(0));
+  await act(async () => {});
+  expect(tasks.size).toBe(0);
   expect(speech.generate).not.toHaveBeenCalled();
   view.rerender(<Step forms={unassigned} />);
   expect(tasks.size).toBe(0);

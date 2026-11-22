@@ -313,7 +313,7 @@ function Harness({
   return (
     <App>
       <VoiceAudioTasksContext.Provider value={audioTasks}>
-        <PronunciationPreviewProvider>
+        <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
           <V3SynthesisInputs
             pronunciation={pronunciation}
             synthesisEditable
@@ -503,7 +503,7 @@ it("没有既有音标配置时默认使用词形拼写配音", () => {
   render(
     <App>
       <VoiceAudioTasksContext.Provider value={null}>
-        <PronunciationPreviewProvider>
+        <PronunciationPreviewProvider resolveVoicesOnMount>
           <V3SynthesisInputs
             pronunciation={{
               id: "p",
@@ -589,7 +589,7 @@ it.each(["ipa", "ups"] as const)(
       return (
         <App>
           <VoiceAudioTasksContext.Provider value={tasks}>
-            <PronunciationPreviewProvider>
+            <PronunciationPreviewProvider resolveVoicesOnMount>
               <V3PronunciationConvertAll
                 pronunciation={pronunciation}
                 spelling="far"
@@ -775,32 +775,15 @@ async function phonemeDialog(label: string) {
 
 describe("双口音真实试听控件", () => {
   it("后台生成在设置按钮原位反馈，生成期间仍可打开配音设置", async () => {
-    let finish!: (value: { asset: { id: string } }) => void;
-    speech.generateAudio.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        })
-    );
     const tasks = new Map<string, () => Promise<boolean>>();
     renderWithUps(<Harness dialect="uk" profiled audioTasks={tasks} />);
     const label = "第 1 条发音 英式 Azure IPA";
     const open = screen.getByLabelText(`打开${label} TTS 设置器`);
     expect(speech.generateAudio).not.toHaveBeenCalled();
-    await waitFor(() => expect(tasks.size).toBeGreaterThan(0));
-    let pending!: Promise<unknown>;
-    act(() => {
-      pending = Promise.all([...tasks.values()].map((wait) => wait()));
-    });
-    await waitFor(() => expect(speech.generateAudio).toHaveBeenCalled());
-    expect(open).toHaveAttribute("aria-busy", "true");
     expect(open).toBeEnabled();
     fireEvent.click(open);
     await phonemeDialog(label);
-    await act(async () => {
-      finish({ asset: { id: "completed-in-background" } });
-      await pending;
-    });
+    expect(speech.generateAudio).not.toHaveBeenCalled();
   });
   it("音素字段保存和弹窗完成都只采用当前原生地区的 fallback", async () => {
     const tasks = new Map<string, () => Promise<boolean>>();
@@ -867,6 +850,7 @@ describe("双口音真实试听控件", () => {
     const before = screen.getByTestId("pronunciation-wire").textContent;
     const label = "第 1 条发音 英式 Azure IPA";
     fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+    await act(async () => {});
     await screen.findByLabelText(`${label}音标编辑`);
     fireEvent.click(screen.getByText("完整音色目录"));
     const preview = await screen.findByLabelText("试听目录音色 Sonia");

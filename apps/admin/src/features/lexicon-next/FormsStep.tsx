@@ -66,7 +66,7 @@ export function FormsStep({
   return (
     <EntryDialectContext.Provider value={locale}>
       <DictionaryFormTypeLabels>
-        <SpeechSettingsProvider>
+        <SpeechSettingsProvider loadVoiceCatalogOnMount={false}>
           <V3FormsAndPronunciationStep
             value={expandFormContents(value)}
             issues={issues}
@@ -102,6 +102,7 @@ export function FormsStep({
             contentReassignmentAvailable
             savedContentIds={new Set(saved?.contents.map((row) => row.id))}
             bindingEditingAvailable={false}
+            loadVoiceCatalogOnMount={false}
             registerLeaveGuard={registerLeaveGuard}
           />
         </SpeechSettingsProvider>
