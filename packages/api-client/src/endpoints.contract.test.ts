@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "d1f7b02fd6e9622c5c23e21193edf7c99c00130f02b9b3005ce440f28b5d9773"
+      "6ed3a0c63b67a0f646875bdc840e7dbdbe9e027dbfc4b4289e591d67a49a4e98"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1206,14 +1206,22 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           ]
         ])
       ),
-      "post /admin/lexicon-next/test-fixtures/dialect-pair": [
-        {
-          name: "X-TSZ-Test-Run",
-          in: "header",
-          required: true,
-          schema: { type: "string" }
-        }
-      ],
+      ...Object.fromEntries(
+        [
+          "post /admin/lexicon-next/test-fixtures/dialect-pair",
+          "post /admin/lexicon-next/test-resources/purge"
+        ].map((operation) => [
+          operation,
+          [
+            {
+              name: "X-TSZ-Test-Run",
+              in: "header",
+              required: true,
+              schema: { type: "string" }
+            }
+          ]
+        ])
+      ),
       "put /admin/lexicon/entries/{id}/audio": [
         ...[
           "X-TSZ-Form-Content-Reassignment",
@@ -1277,7 +1285,17 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               in: "header",
               required: false,
               schema: { type: ["string", "null"] }
-            }
+            },
+            ...(operation === "post /admin/lexicon-next/entries"
+              ? [
+                  {
+                    name: "X-TSZ-Test-Run",
+                    in: "header",
+                    required: false,
+                    schema: { type: ["string", "null"] }
+                  }
+                ]
+              : [])
           ]
         ])
       ),
