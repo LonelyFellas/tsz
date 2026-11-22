@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/810c/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-21T03:31:29.903Z",
+  "_source": "/var/folders/fj/xzx7t8r90x36tp23zvvyrsb00000gn/T/tsz-step2-api-spec-xcpbmclc/openapi.json",
+  "_generatedAt": "2026-11-22T16:02:23.191Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -45,6 +45,7 @@
     "/admin/lexicon-next/sentences": ["get", "post"],
     "/admin/lexicon-next/sentences/{id}": ["get", "put"],
     "/admin/lexicon-next/test-fixtures/dialect-pair": ["post"],
+    "/admin/lexicon-next/test-resources/purge": ["post"],
     "/admin/lexicon-next/workspace/commands": ["post"],
     "/admin/lexicon-next/workspace/creators": ["get"],
     "/admin/lexicon-next/workspace/entries": ["get"],
@@ -396,6 +397,12 @@
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       }
     ],
     "get /admin/lexicon-next/entries/{id}": [
@@ -547,6 +554,14 @@
       }
     ],
     "post /admin/lexicon-next/test-fixtures/dialect-pair": [
+      {
+        "name": "X-TSZ-Test-Run",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
+    "post /admin/lexicon-next/test-resources/purge": [
       {
         "name": "X-TSZ-Test-Run",
         "in": "header",
@@ -3496,6 +3511,17 @@
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/test-resources/purge": {
+      "request": { "$ref": "#/components/schemas/TestPurgeRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/TestPurgeResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
@@ -10776,6 +10802,20 @@
           "description": "Same text as the owning spelling, containing only word-boundary pauses."
         },
         "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
+    "TestPurgeRequest": {
+      "type": "object",
+      "required": ["request_id", "entry_ids"],
+      "properties": {
+        "entry_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 100,
+          "minItems": 1
+        },
+        "request_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
