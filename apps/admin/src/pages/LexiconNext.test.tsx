@@ -41,7 +41,10 @@ import { LexiconNextPage, type LexiconNextRequests } from "./LexiconNext";
 import * as voiceEditorSource from "@/features/dictionary/voice-editor/dataSource";
 
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
-import { formsFixture } from "@/features/dictionary/word-creation-v3/fixtures";
+import {
+  formsFixture,
+  UUIDS
+} from "@/features/dictionary/word-creation-v3/fixtures";
 import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { emptyFormEditor } from "@/features/lexicon-next/FormsStep";
 import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
@@ -3138,11 +3141,79 @@ it("编辑期间被归档后保留本地输入并转只读，不引导丢弃草�
   ).toMatchObject({ status: "archived" });
 });
 
+it("直接打开 Step 2 后拖动默认词性，词形面板和 Step 3 保持该词性", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  api.get.mockResolvedValue({
+    ...entry,
+    draft: {
+      ...entry.draft,
+      form_editor: applyFormsStructure(emptyFormEditor(), {
+        pos: [
+          ...formsFixture().pos,
+          ...formsFixture({
+            pos_id: UUIDS.pos_2,
+            pos: "verb",
+            forms: [],
+            groups: []
+          }).pos
+        ]
+      })
+    }
+  });
+  mount(api, `/lexicon-next/${id}?step=forms`);
+  await screen.findByRole("button", { name: "编辑原形内容" });
+
+  const tabs = () => within(screen.getByRole("tablist"));
+  const noun = () => tabs().getByRole("tab", { name: /名词/ });
+  const verb = () => tabs().getByRole("tab", { name: /动词/ });
+  const expectTabs = (first: HTMLElement, second: HTMLElement) => {
+    expect(tabs().getAllByRole("tab")).toEqual([first, second]);
+    expect(noun()).toHaveAttribute("aria-selected", "true");
+    expect(verb()).toHaveAttribute("aria-selected", "false");
+  };
+  function dragNounOntoVerb() {
+    const grip = within(noun()).getByRole("button", { name: "拖动名词" });
+    const target = within(verb())
+      .getByRole("button", { name: "拖动动词" })
+      .closest(".word-pos-tab-handle")!;
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      get types() {
+        return [...store.keys()];
+      },
+      setData: (type: string, value: string) => store.set(type, value),
+      getData: (type: string) => store.get(type) ?? ""
+    };
+    fireEvent.dragStart(grip, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+    fireEvent.dragEnd(grip, { dataTransfer });
+  }
+
+  expectTabs(noun(), verb());
+  dragNounOntoVerb();
+  expectTabs(verb(), noun());
+  expect(button("编辑原形内容")).toBeVisible();
+
+  fireEvent.click(stepButton(/^词义与例句/));
+  expectTabs(verb(), noun());
+  fireEvent.click(stepButton(/^词形与发音/));
+
+  dragNounOntoVerb();
+  expectTabs(noun(), verb());
+  expect(button("编辑原形内容")).toBeVisible();
+  fireEvent.click(stepButton(/^词义与例句/));
+  expectTabs(noun(), verb());
+});
+
 it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，保存并重新打开不丢内容", async () => {
+  const loadCatalog = vi.spyOn(partOfSpeechDataSource, "catalog");
   const api = requests();
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
   const mounted = mount(api);
-  const addPos = await screen.findByRole("combobox", { name: "添加基本词性" });
+  const addPos = await screen.findByRole("button", { name: "添加词性" });
+  expect(screen.queryByRole("tab", { name: /^词性$/ })).toBeNull();
   fireEvent.click(
     screen.getByLabelText("展开词条概览", { selector: "button" })
   );
@@ -3159,12 +3230,9 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
     screen.queryByRole("checkbox", { name: "编辑通用英语内容" })
   ).toBeNull();
   await waitFor(() => expect(addPos).toBeEnabled());
-  fireEvent.mouseDown(addPos);
-  fireEvent.click(
-    screen
-      .getAllByText("名词")
-      .find((node) => node.classList.contains("ui-select-item-option-content"))!
-  );
+  expect(loadCatalog).toHaveBeenCalledOnce();
+  fireEvent.click(addPos);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "名词" }));
   fireEvent.click(
     await screen.findByLabelText("编辑原形内容", { selector: "button" })
   );
@@ -4416,7 +4484,7 @@ it("Step 2 未指定词性时保留已有词形但禁止录入，选定词性后
     }
   });
   mount(api);
-  const addPos = await screen.findByRole("combobox", { name: "添加基本词性" });
+  const addPos = await screen.findByRole("button", { name: "添加词性" });
   fireEvent.click(button("已有词形"));
   expect(screen.getByRole("textbox", { name: "英式英语词形 1" })).toHaveValue(
     "existing spelling"
@@ -4435,12 +4503,8 @@ it("Step 2 未指定词性时保留已有词形但禁止录入，选定词性后
     screen.queryByLabelText("编辑原形内容", { selector: "button" })
   ).toBeNull();
   await waitFor(() => expect(addPos).toBeEnabled());
-  fireEvent.mouseDown(addPos);
-  fireEvent.click(
-    await screen.findByText("名词", {
-      selector: ".ui-select-item-option-content"
-    })
-  );
+  fireEvent.click(addPos);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "名词" }));
   expect(
     await screen.findByLabelText("编辑原形内容", { selector: "button" })
   ).toBeEnabled();

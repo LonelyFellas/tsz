@@ -1090,31 +1090,18 @@ export function PronunciationPreviewControls({
       pendingGenerateRef.current = true;
       return;
     }
-    let selectedVoice = voice;
-    let selectedVoiceSetting = selectedSetting;
-    if (!assetOnly && !selectedVoice) {
-      let availableVoices: VoiceOption[];
-      try {
-        availableVoices = await context.loadVoices();
-      } catch {
-        return;
+    if (!assetOnly && !voice) {
+      if (!context.voicesRequested) {
+        pendingGenerateRef.current = true;
+        void context.loadVoices().catch(() => undefined);
       }
-      selectedVoice = resolvePronunciationPreviewVoice(
-        availableVoices,
-        dialect,
-        context.dialectPreference,
-        resolved.profile
-      ).voice;
-      selectedVoiceSetting = selectedVoice
-        ? voiceSettingFor(resolved.profile?.voices ?? [], selectedVoice.id)
-        : undefined;
+      return;
     }
-    if (!assetOnly && !selectedVoice) return;
     if (
       !assetOnly &&
-      selectedVoice &&
+      voice &&
       previewContent.annotations.some((mark) => mark.type === "phoneme") &&
-      selectedVoice.locale !== targetLocale
+      voice.locale !== targetLocale
     ) {
       setStatus(
         createLexiconEditorMessage(
@@ -1142,30 +1129,28 @@ export function PronunciationPreviewControls({
           signal: controller.signal
         });
       } else {
-        if (assetOnly || !selectedVoice) return;
+        if (assetOnly || !voice) return;
         preview = await adapter.synthesize(
           {
             language: "en",
             content: previewContent,
-            voiceId: selectedVoice.id,
-            ratePercent: selectedVoiceSetting?.rate_percent ?? 0,
-            ...(selectedVoiceSetting?.output_format
-              ? { outputFormat: selectedVoiceSetting.output_format }
+            voiceId: voice.id,
+            ratePercent: selectedSetting?.rate_percent ?? 0,
+            ...(selectedSetting?.output_format
+              ? { outputFormat: selectedSetting.output_format }
               : {}),
-            ...(selectedVoiceSetting?.pitch_semitones !== undefined
-              ? { pitchSemitones: selectedVoiceSetting.pitch_semitones }
+            ...(selectedSetting?.pitch_semitones !== undefined
+              ? { pitchSemitones: selectedSetting.pitch_semitones }
               : {}),
-            ...(selectedVoiceSetting?.volume_percent !== undefined
-              ? { volumePercent: selectedVoiceSetting.volume_percent }
+            ...(selectedSetting?.volume_percent !== undefined
+              ? { volumePercent: selectedSetting.volume_percent }
               : {}),
-            ...(selectedVoiceSetting?.style
-              ? { style: selectedVoiceSetting.style }
+            ...(selectedSetting?.style ? { style: selectedSetting.style } : {}),
+            ...(selectedSetting?.style_degree !== undefined
+              ? { styleDegree: selectedSetting.style_degree }
               : {}),
-            ...(selectedVoiceSetting?.style_degree !== undefined
-              ? { styleDegree: selectedVoiceSetting.style_degree }
-              : {}),
-            ...(selectedVoiceSetting?.role !== undefined
-              ? { role: selectedVoiceSetting.role }
+            ...(selectedSetting?.role !== undefined
+              ? { role: selectedSetting.role }
               : {})
           },
           { signal: controller.signal }
@@ -1238,13 +1223,19 @@ export function PronunciationPreviewControls({
   useEffect(() => {
     if (
       !pendingGenerateRef.current ||
-      (!resolveRequested && !context.voiceResolutionRequested) ||
+      context.voicesLoading ||
       resolved.pending
     )
       return;
     pendingGenerateRef.current = false;
     void generateRef.current();
-  }, [context.voiceResolutionRequested, resolveRequested, resolved.pending]);
+  }, [
+    context.voiceResolutionRequested,
+    context.voicesLoading,
+    context.voicesRequested,
+    resolveRequested,
+    resolved.pending
+  ]);
 
   const replay = async () => {
     if (disabled || (!assetOnly && !context.enabled) || !result) return;

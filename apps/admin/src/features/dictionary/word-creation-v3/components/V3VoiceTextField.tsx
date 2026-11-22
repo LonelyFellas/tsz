@@ -278,10 +278,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     null
   );
   const [focused, setFocused] = useState(false);
-  const [
-    actualPronunciationPreviewFocused,
-    setActualPronunciationPreviewFocused
-  ] = useState(false);
   const [recorded, setRecorded] = useState(value.text.length > 0);
   const initialVoiceState = useRef({
     nodeId,
@@ -938,6 +934,15 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     editingEnabled &&
     recorded &&
     value.text !== "";
+  const canOpenActualPreview = actualPronunciationPreview && !readOnly;
+  const openEditor = () => {
+    setSpellingSettings(undefined);
+    setDraftState(captureSession());
+    setSaveError("");
+    setFormalAudioFailed(false);
+    setRecorded(true);
+    setEditing(true);
+  };
   const associationPreview =
     mode === "association" &&
     toRichTextV2(value).annotations.some(
@@ -962,6 +967,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       ref={inputRef}
       id={expanded ? undefined : id}
       key={largePreview ? "large" : "standard"}
+      onClick={canOpenActualPreview ? openEditor : undefined}
       onFocus={() => setFocused(true)}
       onBlur={() => {
         if (mode === "spelling" && !expanded && !readOnly) {
@@ -1111,9 +1117,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         </div>
       ) : actualPronunciationPreview ? (
         <div
-          className="v3-actual-pronunciation-preview-content tsz-phonetics tsz-actual-pronunciation"
+          className={`v3-actual-pronunciation-preview-content tsz-phonetics tsz-actual-pronunciation${canOpenActualPreview ? " is-clickable" : ""}`}
           aria-hidden
-          onClick={() => setActualPronunciationPreviewFocused(true)}
+          onClick={canOpenActualPreview ? openEditor : undefined}
         >
           <RichTextReadOnly
             textRole={textRole}
@@ -1165,18 +1171,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {trailingAction}
         <Button
           aria-label={t("panel_open_editor", { p0: ariaLabel })}
-          className={`v3-actual-pronunciation-edit-button${actualPronunciationPreviewFocused ? " is-preview-focused" : ""}`}
+          className="v3-actual-pronunciation-edit-button"
           disabled={readOnly}
           icon={<PencilIcon />}
-          onClick={() => {
-            setActualPronunciationPreviewFocused(false);
-            setSpellingSettings(undefined);
-            setDraftState(captureSession());
-            setSaveError("");
-            setFormalAudioFailed(false);
-            setRecorded(true);
-            setEditing(true);
-          }}
+          onClick={openEditor}
           style={{ height: "auto" }}
         />
       </Space.Compact>

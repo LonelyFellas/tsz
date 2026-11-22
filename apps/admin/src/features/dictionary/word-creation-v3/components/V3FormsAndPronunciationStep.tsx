@@ -89,6 +89,12 @@ import { useVoiceAudioTasks, useVoiceSave } from "../voiceSaveContext";
 /** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
 const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 
+interface PartOfSpeechCatalogState {
+  data?: PartOfSpeechCatalogResponse;
+  isError: boolean;
+  isPending: boolean;
+}
+
 export interface V3FormsAndPronunciationStepProps {
   sharedForms?: SharedFormsStepContentV3;
   contentReassignmentAvailable?: boolean;
@@ -102,8 +108,11 @@ export interface V3FormsAndPronunciationStepProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   /** 词条是单词还是短语；决定「添加基本词性」只列哪一侧。 */
   entryKind?: WordEntryKindV3;
+  partOfSpeechCatalog?: PartOfSpeechCatalogState;
   /** 是否显示无词性草稿提示；新版智能词库由上方入口直接引导。 */
   showEmptyPosHint?: boolean;
+  emptyAddPosButton?: boolean;
+  showPronunciationGuide?: boolean;
   deletePosDescription?: ReactNode;
   activePosId?: string;
   onActivePosChange?: (posId: string) => void;
@@ -157,7 +166,10 @@ export function V3FormsAndPronunciationStep({
   value,
   onChange,
   entryKind,
+  partOfSpeechCatalog,
   showEmptyPosHint = true,
+  emptyAddPosButton = false,
+  showPronunciationGuide = true,
   deletePosDescription,
   activePosId,
   onActivePosChange,
@@ -320,25 +332,28 @@ export function V3FormsAndPronunciationStep({
     return null;
   };
 
-  const [catalog, setCatalog] = useState<{
-    data?: PartOfSpeechCatalogResponse;
-    isError: boolean;
-    isPending: boolean;
-  }>({ isError: false, isPending: true });
+  const [localCatalog, setLocalCatalog] = useState<PartOfSpeechCatalogState>({
+    isError: false,
+    isPending: true
+  });
+  const fetchLocalCatalog = partOfSpeechCatalog === undefined;
+  const catalog = partOfSpeechCatalog ?? localCatalog;
   useEffect(() => {
+    if (!fetchLocalCatalog) return;
     let cancelled = false;
     void partOfSpeechDataSource
       .catalog()
       .then((data) => {
-        if (!cancelled) setCatalog({ data, isError: false, isPending: false });
+        if (!cancelled)
+          setLocalCatalog({ data, isError: false, isPending: false });
       })
       .catch(() => {
-        if (!cancelled) setCatalog({ isError: true, isPending: false });
+        if (!cancelled) setLocalCatalog({ isError: true, isPending: false });
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchLocalCatalog]);
   const addPos = (item: PartOfSpeechCatalogItem) => {
     const result = addPartOfSpeech(value, item, idFactory);
     if (!result.ok) return;
@@ -379,8 +394,10 @@ export function V3FormsAndPronunciationStep({
     }
   };
 
+  const showEmptyAddButton = emptyAddPosButton && value.pos.length === 0;
   const addPosSelect = (
     <V3AddBasicPosSelect
+      buttonTrigger={showEmptyAddButton}
       compact={value.pos.length > 0}
       catalog={catalog.data}
       entryKind={entryKind}
@@ -407,6 +424,27 @@ export function V3FormsAndPronunciationStep({
       )
   });
 
+  const emptyPosPanel = (
+    <div className="word-forms-tabs-empty">
+      <Empty
+        className="word-forms-tabs-empty-content"
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={
+          <Space orientation="vertical" size={4}>
+            <Typography.Text strong>{t("no_pos")}</Typography.Text>
+            {showEmptyPosHint && (
+              <Typography.Text type="secondary">
+                {t("draft_no_pos")}
+              </Typography.Text>
+            )}
+            <Typography.Text type="secondary">
+              {t("add_pos_help")}
+            </Typography.Text>
+          </Space>
+        }
+      />
+    </div>
+  );
   const tabItems =
     value.pos.length === 0
       ? [
@@ -414,27 +452,7 @@ export function V3FormsAndPronunciationStep({
             key: "empty",
             label: t("pos"),
             disabled: true,
-            children: (
-              <div className="word-forms-tabs-empty">
-                <Empty
-                  className="word-forms-tabs-empty-content"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <Space orientation="vertical" size={4}>
-                      <Typography.Text strong>{t("no_pos")}</Typography.Text>
-                      {showEmptyPosHint && (
-                        <Typography.Text type="secondary">
-                          {t("draft_no_pos")}
-                        </Typography.Text>
-                      )}
-                      <Typography.Text type="secondary">
-                        {t("add_pos_help")}
-                      </Typography.Text>
-                    </Space>
-                  }
-                />
-              </div>
-            )
+            children: emptyPosPanel
           }
         ]
       : value.pos.map((pos, posIndex) => {
@@ -632,10 +650,12 @@ export function V3FormsAndPronunciationStep({
             <Typography.Title level={2} style={{ margin: 0 }}>
               {t("forms_title")}
             </Typography.Title>
-            <details className="v3-pronunciation-guide">
-              <summary>{t("pronunciation_help_title")}</summary>
-              <p>{t("pronunciation_help")}</p>
-            </details>
+            {showPronunciationGuide && (
+              <details className="v3-pronunciation-guide">
+                <summary>{t("pronunciation_help_title")}</summary>
+                <p>{t("pronunciation_help")}</p>
+              </details>
+            )}
           </div>
           <V3VoiceNotice value={value} />
           {catalog.isError && (
@@ -655,16 +675,23 @@ export function V3FormsAndPronunciationStep({
               type="warning"
             />
           )}
-          <Tabs
-            activeKey={value.pos.length === 0 ? "empty" : activePosId}
-            className="word-pos-tabs word-forms-tabs"
-            key={value.pos.map((pos) => pos.pos_id).join(":")}
-            onChange={onActivePosChange}
-            items={tabItems}
-            tabBarExtraContent={
-              value.pos.length === 0 ? addPosSelect : undefined
-            }
-          />
+          {showEmptyAddButton ? (
+            <div>
+              <div className="word-forms-empty-pos-toolbar">{addPosSelect}</div>
+              {emptyPosPanel}
+            </div>
+          ) : (
+            <Tabs
+              activeKey={value.pos.length === 0 ? "empty" : activePosId}
+              className="word-pos-tabs word-forms-tabs"
+              key={value.pos.map((pos) => pos.pos_id).join(":")}
+              onChange={onActivePosChange}
+              items={tabItems}
+              tabBarExtraContent={
+                value.pos.length === 0 ? addPosSelect : undefined
+              }
+            />
+          )}
         </Flex>
       </fieldset>
     </>

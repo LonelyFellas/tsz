@@ -11,7 +11,8 @@ import {
   createPronunciationReferenceIds
 } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { createStableVariantIdFactory } from "@/features/dictionary/word-creation-v3/operations";
-import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
+import { FormTypeLabelsProvider } from "@/features/dictionary/part-of-speech/FormTypeLabels";
+import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
 import { removePosDescription } from "./model";
 import { SpeechSettingsProvider } from "@/features/dictionary/word-creation-v3/speechSettingsContext";
@@ -43,6 +44,7 @@ export function FormsStep({
   selectedPos?: string;
   onSelectedPosChange?: (code: string) => void;
 }) {
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const [activePosId, setActivePosId] = useState<string>();
   // 新增词性先回写结构，再报告选中 ID；此时父级 props 可能尚未更新。
   const latestForms = useRef(value);
@@ -65,7 +67,7 @@ export function FormsStep({
   }, [value, stableVariantIds, pronunciationIds]);
   return (
     <EntryDialectContext.Provider value={locale}>
-      <DictionaryFormTypeLabels>
+      <FormTypeLabelsProvider items={partOfSpeechCatalog.data?.form_types}>
         <SpeechSettingsProvider loadVoiceCatalogOnMount={false}>
           <V3FormsAndPronunciationStep
             value={expandFormContents(value)}
@@ -77,7 +79,10 @@ export function FormsStep({
               if (isSharedForms(updated)) applyForms(updated);
             }}
             entryKind={kind}
+            partOfSpeechCatalog={partOfSpeechCatalog}
             showEmptyPosHint={false}
+            emptyAddPosButton
+            showPronunciationGuide={false}
             deletePosDescription={removePosDescription}
             activePosId={
               value.pos.find((pos) => pos.pos === selectedPos)?.pos_id ??
@@ -106,7 +111,7 @@ export function FormsStep({
             registerLeaveGuard={registerLeaveGuard}
           />
         </SpeechSettingsProvider>
-      </DictionaryFormTypeLabels>
+      </FormTypeLabelsProvider>
     </EntryDialectContext.Provider>
   );
 }

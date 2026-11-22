@@ -936,6 +936,56 @@ it("最终读音只读取正式资产，读取失败也不回退合成", async (
   await waitFor(() => expect(message.error).toHaveBeenCalled());
   expect(preview.synthesize).not.toHaveBeenCalled();
 });
+
+it("重开词条后首次点击，会等待音色目录并播放已保存的正式音频", async () => {
+  const catalog = deferred<typeof voices>();
+  const formalAudio = deferred<VoicePreviewResult>();
+  const setting = {
+    voice_id: "american-voice",
+    version_id: "current",
+    locale: "en-US" as const,
+    enabled: true,
+    rate_percent: 0
+  };
+  preview.listVoices.mockReturnValueOnce(catalog.promise);
+  preview.resolveAudio.mockReturnValueOnce(formalAudio.promise);
+  preview.resolveVoices.mockResolvedValueOnce({
+    voices: [setting],
+    source: { kind: "catalog" }
+  });
+  render(
+    <PreviewHarness
+      dialect="us"
+      playbackOnly
+      loadVoicesOnMount={false}
+      resolveVoicesOnMount={false}
+      voiceProfile={{
+        voices: [{ ...setting, audio_asset_id: "formal-us" }],
+        dubbing: {
+          area: "word",
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
+      }}
+    />
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "播放语音" }));
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+  await act(async () => catalog.resolve(voices));
+
+  await waitFor(() =>
+    expect(preview.resolveAudio).toHaveBeenCalledExactlyOnceWith(
+      "formal-us",
+      expect.anything()
+    )
+  );
+  await act(async () => formalAudio.resolve(result()));
+  expect(AudioMock.instances).toHaveLength(1);
+  expect(AudioMock.instances[0]!.play).toHaveBeenCalledOnce();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
 it("最终读音缺正式资产时保持禁用而不新合成", async () => {
   render(<PreviewHarness playbackOnly assetOnly />);
   await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());

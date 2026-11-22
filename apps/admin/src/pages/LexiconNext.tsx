@@ -499,7 +499,7 @@ function EntryEditor({
       };
     });
   const [selectedPos, setSelectedPos] = useState<string | undefined>(
-    linkedIssue?.pos
+    () => linkedIssue?.pos ?? initial.draft.form_editor?.pos[0]?.pos
   );
   const activePos = selectedPos ?? draft.form_editor?.pos[0]?.pos;
   const draftRef = useRef(draft);
