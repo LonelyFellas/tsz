@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FloatingEntryOverview } from "./FloatingEntryOverview";
 import { createPortal } from "react-dom";
 
-const key = "tsz:entry-overview-position";
+const key = "tsz:entry-overview-position-v2";
 function mount(portal = false) {
   const pageRef = createRef<HTMLDivElement>();
   const view = render(

@@ -632,6 +632,13 @@ function EntryEditor({
   const editOthers = usePermission("words.edit_others");
   const writable =
     !archived && canEdit && (saved.owner_id === profile?.id || editOthers);
+  const readOnlyReason = archived
+    ? "此词条已归档，请先从垃圾桶恢复后再编辑。"
+    : !canEdit
+      ? "此词条只读：需要编辑权限。"
+      : saved.owner_id !== profile?.id && !editOthers
+        ? "此词条只读：编辑他人词条还需要相应授权。"
+        : undefined;
   const disabled = busy || !writable || !!currentLocalSnapshot;
   const dirty =
     pairChanges.length > 0 ||
@@ -1067,7 +1074,7 @@ function EntryEditor({
     >
       <div
         data-testid="lexicon-next-editor"
-        className={`lexicon-next lexicon-next-editor${step !== "preview" ? " lexicon-next-forms" : ""}`}
+        className={`lexicon-next lexicon-next-editor${step === "forms" ? " lexicon-next-forms" : ""}`}
       >
         <div className="lexicon-next-toolbar">
           <Space wrap>
@@ -1083,11 +1090,8 @@ function EntryEditor({
             </Button>
           </Space>
         </div>
-        {!writable && (
-          <Alert
-            type="info"
-            title="此词条只读：需要编辑权限，编辑他人词条还需相应授权。"
-          />
+        {!writable && readOnlyReason && (
+          <Alert type="info" title={readOnlyReason} />
         )}
         {entryMedium !== selectedMedium && (
           <Alert
@@ -1539,11 +1543,7 @@ function EntryEditor({
           />
         )}
         {step === "basics" && (
-          <V3StepActions
-            inline
-            className="lexicon-next-basics-actions"
-            status={busy ? "正在保存草稿" : undefined}
-          >
+          <V3StepActions status={busy ? "正在保存草稿" : undefined}>
             <Button
               type="primary"
               disabled={busy || formContentOpen}

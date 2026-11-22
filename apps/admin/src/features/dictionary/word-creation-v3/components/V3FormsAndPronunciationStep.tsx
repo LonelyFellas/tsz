@@ -95,6 +95,8 @@ export interface V3FormsAndPronunciationStepProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   /** 词条是单词还是短语；决定「添加基本词性」只列哪一侧。 */
   entryKind?: WordEntryKindV3;
+  /** 是否显示无词性草稿提示；新版智能词库由上方入口直接引导。 */
+  showEmptyPosHint?: boolean;
   deletePosDescription?: ReactNode;
   activePosId?: string;
   onActivePosChange?: (posId: string) => void;
@@ -147,6 +149,7 @@ export function V3FormsAndPronunciationStep({
   value,
   onChange,
   entryKind,
+  showEmptyPosHint = true,
   deletePosDescription,
   activePosId,
   onActivePosChange,
@@ -376,9 +379,11 @@ export function V3FormsAndPronunciationStep({
                   description={
                     <Space orientation="vertical" size={4}>
                       <Typography.Text strong>{t("no_pos")}</Typography.Text>
-                      <Typography.Text type="secondary">
-                        {t("draft_no_pos")}
-                      </Typography.Text>
+                      {showEmptyPosHint && (
+                        <Typography.Text type="secondary">
+                          {t("draft_no_pos")}
+                        </Typography.Text>
+                      )}
                       <Typography.Text type="secondary">
                         {t("add_pos_help")}
                       </Typography.Text>

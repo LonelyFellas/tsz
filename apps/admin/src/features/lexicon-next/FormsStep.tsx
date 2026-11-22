@@ -77,6 +77,7 @@ export function FormsStep({
               if (isSharedForms(updated)) applyForms(updated);
             }}
             entryKind={kind}
+            showEmptyPosHint={false}
             deletePosDescription={removePosDescription}
             activePosId={
               value.pos.find((pos) => pos.pos === selectedPos)?.pos_id ??
