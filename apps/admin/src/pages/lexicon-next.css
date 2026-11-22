@@ -274,8 +274,7 @@
 }
 
 .word-creation-content--basics:has(> .lexicon-next-editor) {
-  padding-top: var(--ui-space-8);
-  background: transparent;
+  padding-bottom: 100px;
 }
 
 .lexicon-next-editor .word-basics-workflow,
@@ -488,11 +487,6 @@
   margin-top: var(--ui-space-6);
 }
 
-/* 基础步骤操作条在内容流末尾，不再需要固定底部的额外安全区。 */
-.word-creation-content--basics:has(.v3-step-actions-inline) {
-  padding-bottom: var(--ui-space-6);
-}
-
 .lexicon-next-editor .lexicon-next-draft-preview {
   overflow: hidden;
   border: 1px solid var(--ui-color-border-secondary);
@@ -578,40 +572,258 @@
   color: var(--ui-color-text-secondary);
 }
 
-.v3-step-actions.lexicon-next-basics-actions > .word-step-actions {
-  min-height: calc(var(--ui-control-height-lg) + var(--ui-space-2));
+/* Step 2 是高频编辑工作区，桌面宽度用来承载完整的词形与发音矩阵。 */
+.lexicon-next-forms .v3-forms-step,
+.lexicon-next-forms .v3-pos-tab {
+  max-width: none;
+}
+
+.lexicon-next-forms .v3-forms-step {
+  gap: var(--ui-space-4);
+}
+
+/* Step 1 与 Step 2 共用同一套页面标题，步骤编号已经由顶部步骤条表达。 */
+.lexicon-next-forms .v3-forms-step > .word-step-heading {
+  margin-bottom: var(--ui-space-4);
+}
+
+.lexicon-next-forms .word-step-number {
+  display: none;
+}
+
+.lexicon-next-forms .v3-pronunciation-guide {
+  margin-top: var(--ui-space-2);
+}
+
+.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav {
+  display: flex;
+  align-items: flex-end;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0 2px;
+  margin-bottom: var(--ui-space-4);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+  border-radius: 0;
+}
+
+.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav::before {
+  display: none;
+}
+
+.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .ui-tabs-nav-list {
+  align-items: stretch;
+}
+
+.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .ui-tabs-tab {
+  padding-block: 0;
+}
+
+.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .word-pos-tab-content {
+  grid-template-columns: 24px max-content max-content;
+  min-width: 0;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-radius: var(--ui-border-radius);
+}
+
+.lexicon-next-forms
+  .word-pos-tabs
+  > .ui-tabs-nav
+  .ui-tabs-tab:not(.ui-tabs-tab-disabled):is(:hover, .ui-tabs-tab-active)
+  .word-pos-tab-content {
+  background: var(--ui-color-primary-bg);
+  transition: background-color var(--ui-motion-duration) var(--ui-motion-easing);
+}
+
+.lexicon-next-forms
+  .word-pos-tab-handle
+  .word-sort-drag-handle.ui-btn:hover:not(:disabled),
+.lexicon-next-forms
+  .word-pos-tab-handle
+  .word-sort-drag-handle.ui-btn:focus-visible {
+  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-bg);
+}
+
+.lexicon-next-forms .word-pos-tabs .word-pos-tab-actions {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--ui-space-1);
+  width: auto;
+  height: var(--ui-control-height);
+  padding-inline-start: var(--ui-space-2);
+  border-inline-start: 1px solid var(--ui-color-border-secondary);
+  opacity: 0.62;
+  transition: opacity var(--ui-motion-duration) var(--ui-motion-easing);
+}
+
+.lexicon-next-forms
+  .word-pos-tabs
+  > .ui-tabs-nav
+  .ui-tabs-tab:hover
+  .word-pos-tab-actions,
+.lexicon-next-forms
+  .word-pos-tabs
+  > .ui-tabs-nav
+  .ui-tabs-tab-active
+  .word-pos-tab-actions,
+.lexicon-next-forms
+  .word-pos-tabs
+  > .ui-tabs-nav
+  .word-pos-tab-actions:focus-within {
+  opacity: 1;
+}
+
+.lexicon-next-forms
+  .word-pos-tabs:has(.ui-tabs-tab-disabled)
+  > .ui-tabs-nav
+  .ui-tabs-ink-bar {
+  display: none;
+}
+
+.lexicon-next-forms
+  .word-pos-tabs:has(.ui-tabs-tab-disabled)
+  > .ui-tabs-nav
+  .ui-tabs-tab-disabled
+  .ui-tabs-tab-btn {
+  color: var(--ui-color-text-secondary);
+  font-weight: var(--ui-font-weight-medium);
+}
+
+.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .ui-tabs-extra-content {
+  display: flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.lexicon-next-forms
+  .word-pos-tabs
+  > .ui-tabs-nav
+  .ui-tabs-extra-content
+  .word-add-basic-pos-select {
+  height: var(--ui-control-height-comfortable);
+}
+
+.lexicon-next-forms .v3-form-group-card {
+  border-color: var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  box-shadow: none;
+}
+
+.lexicon-next-forms .v3-form-group-card > .ui-card-head {
+  min-height: var(--ui-control-height-comfortable);
+  padding-inline: var(--ui-space-5);
+  color: var(--ui-color-text);
+  background: var(--ui-color-fill-alter);
+  border-bottom-color: var(--ui-color-border-secondary);
+}
+
+.lexicon-next-forms .v3-form-group-card > .ui-card-head .ui-card-extra,
+.lexicon-next-forms .v3-form-group-card > .ui-card-head .ui-card-extra .ui-btn,
+.lexicon-next-forms
+  .v3-form-group-card
+  > .ui-card-head
+  .v3-form-group-menu.ui-btn {
+  color: var(--ui-color-text-secondary);
+}
+
+.lexicon-next-forms
+  .v3-form-group-card
+  > .ui-card-head
+  .ui-card-extra
+  .ui-btn:hover {
+  color: var(--ui-color-text);
+  background: var(--ui-color-fill-secondary);
+}
+
+.lexicon-next-forms .v3-form-group-card .word-form-rules:empty {
+  display: none;
+}
+
+.lexicon-next-forms .v3-form-overview {
+  padding-bottom: var(--ui-space-4);
+}
+
+.lexicon-next-forms
+  .v3-form-overview
+  .ui-table.ui-table-small
+  .ui-table-thead
+  > tr
+  > th {
+  padding-block: var(--ui-space-3);
+  background: var(--ui-color-fill-alter);
+  font-weight: var(--ui-font-weight-medium);
+}
+
+.lexicon-next-forms
+  .v3-form-overview
+  .ui-table.ui-table-small
+  .ui-table-tbody
+  > tr
+  > td {
   padding-block: var(--ui-space-2);
 }
 
-.v3-step-actions.lexicon-next-basics-actions .ui-btn-primary {
-  min-width: 128px;
+.lexicon-next-forms
+  .v3-form-overview
+  .ui-table.ui-table-small
+  .ui-table-tbody
+  > tr.v3-overview-form-start
+  > td {
+  padding-top: var(--ui-space-3);
 }
 
-.v3-step-actions.lexicon-next-basics-actions {
-  box-sizing: border-box;
-  overflow: hidden;
-  border: 1px solid var(--ui-color-border-secondary);
-  border-radius: var(--ui-border-radius-lg);
+.lexicon-next-forms
+  .v3-form-overview
+  .ui-table.ui-table-small
+  .ui-table-tbody
+  > tr:has(+ .v3-overview-form-start)
+  > td {
+  padding-bottom: var(--ui-space-3);
+}
+
+.lexicon-next-forms .word-form-add-group {
+  color: var(--ui-color-text-secondary);
   background: var(--ui-color-bg-container);
-  box-shadow: var(--ui-shadow-sm);
+  border-color: var(--ui-color-border);
 }
 
-.v3-step-actions.lexicon-next-basics-actions[data-at-end="true"] {
-  border: 0;
-  border-radius: 0 0 var(--ui-border-radius-lg) var(--ui-border-radius-lg);
-  box-shadow: none;
+.lexicon-next-forms .word-form-add-group:hover {
+  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-bg);
+  border-color: var(--ui-color-primary);
 }
 
-.v3-step-actions.lexicon-next-basics-actions > .word-step-actions {
-  padding-inline: var(--ui-space-5);
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  box-shadow: none;
+/* 没有词性时仍保留编辑区边界，避免透明空白把工作区撑成一整块。 */
+.lexicon-next-forms .word-forms-tabs-empty {
+  box-sizing: border-box;
+  min-height: 216px;
+  padding: var(--ui-space-10) var(--ui-space-8);
+  background: var(--ui-color-fill-alter);
+  border: 1px dashed var(--ui-color-border);
+  border-radius: var(--ui-border-radius-lg);
 }
 
-.v3-step-actions.lexicon-next-basics-actions[data-at-end="true"]
-  > .word-step-actions {
-  border-top: 1px solid var(--ui-color-border-secondary);
-  border-radius: 0 0 var(--ui-border-radius-lg) var(--ui-border-radius-lg);
+.lexicon-next-forms .word-forms-tabs-empty-content {
+  padding: 0;
+}
+
+.lexicon-next-forms .word-forms-tabs-empty-content .ui-empty-image {
+  margin-bottom: var(--ui-space-3);
+  color: var(--ui-color-text-tertiary);
+}
+
+.lexicon-next-forms .word-forms-tabs-empty-content .ui-empty-image svg {
+  width: 28px;
+  height: 28px;
+}
+
+.lexicon-next-forms
+  .word-forms-tabs-empty-content
+  .ui-empty-description
+  strong {
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
 }

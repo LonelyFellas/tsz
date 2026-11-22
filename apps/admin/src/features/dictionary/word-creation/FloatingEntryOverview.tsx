@@ -13,7 +13,7 @@ import { FileTextIcon, XIcon } from "lucide-react";
 import { Button } from "@tsz/ui/admin/display";
 import { useWorkspaceTranslation } from "../i18n/workspace";
 
-const POSITION_KEY = "tsz:entry-overview-position";
+const POSITION_KEY = "tsz:entry-overview-position-v2";
 const SIZE = 54;
 const GAP = 16;
 type Point = { x: number; y: number };
