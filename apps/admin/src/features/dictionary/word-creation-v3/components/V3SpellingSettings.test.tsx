@@ -362,7 +362,18 @@ it("同名的多个美式拼写按稳定 ID 定位，不覆盖相邻拼写", asy
   second.id = UUIDS.common_variant_2;
   second.pronunciations[0]!.id = UUIDS.pronunciation;
   form.regional_variants = { mode: "uk_us_many", uk: [uk], us: [us, second] };
-  render(<Host form={form} mode="distinguish" />);
+  const { container } = render(<Host form={form} mode="distinguish" />);
+  const spellingInputs = screen.getAllByRole("textbox", {
+    name: /词形第 \d+ 条美式拼写/
+  });
+  expect(new Set(spellingInputs.map((input) => input.id)).size).toBe(2);
+  for (const input of spellingInputs) {
+    expect(
+      Array.from(container.querySelectorAll("label")).some(
+        (label) => label.htmlFor === input.id
+      )
+    ).toBe(true);
+  }
   const before = owners();
   fireEvent.click(
     screen.getAllByRole("button", { name: "美式词形拼写配音设置" })[1]!
@@ -379,4 +390,26 @@ it("同名的多个美式拼写按稳定 ID 定位，不覆盖相邻拼写", asy
   expect(after[2]!.spelling_speech!.voice_profile.voices).toContainEqual(
     expect.objectContaining({ voice_id: "new-us" })
   );
+});
+
+it("拼写编辑器展开后，标题不会把焦点抢回折叠输入框", async () => {
+  render(<Host form={setupForm("common")} />);
+  const input = screen.getByRole("textbox", {
+    name: /词形英美通用拼写/
+  });
+  const label = Array.from(document.querySelectorAll("label")).find(
+    (element) => element.htmlFor === input.id
+  );
+  expect(label).toBeDefined();
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: /打开词形英美通用拼写编辑器/
+    })
+  );
+  await screen.findByTestId("settings-editor");
+  expect(input).toHaveAttribute("readonly");
+  expect(input).not.toHaveAttribute("id");
+  document.body.focus();
+  fireEvent.mouseDown(label!);
+  expect(input).not.toHaveFocus();
 });

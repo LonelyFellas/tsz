@@ -32,7 +32,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode
+  type ReactNode,
+  type RefObject
 } from "react";
 import {
   editSpellingList,
@@ -112,6 +113,36 @@ function conflictLiterals(
       )
     )
   ];
+}
+
+function spellingInputId(instanceId: string) {
+  return `v3-spelling-${instanceId.replaceAll(":", "")}`;
+}
+
+function SpellingLabel({
+  htmlFor,
+  inputRef,
+  children
+}: {
+  htmlFor: string;
+  inputRef: RefObject<TextAreaRef | null>;
+  children: ReactNode;
+}) {
+  return (
+    <label
+      className="ui-typography"
+      htmlFor={htmlFor}
+      onMouseDown={(event) => {
+        const input = inputRef.current?.resizableTextArea.textArea;
+        if (!input || input.id !== htmlFor || input.readOnly || input.disabled)
+          return;
+        event.preventDefault();
+        input.focus();
+      }}
+    >
+      <strong>{children}</strong>
+    </label>
+  );
 }
 
 function spellingReferences(
@@ -381,6 +412,7 @@ function V3DialectFormCell({
   spellingLabel
 }: V3DialectFormCellProps) {
   const { t } = useLexiconEditorTranslation();
+  const spellingInstanceId = useId();
   const spellingRef = useRef<TextAreaRef>(null);
   const spellingSettingsRef = useRef<SpellingSettingsOpener | null>(null);
   const [spellingRequired, setSpellingRequired] = useState(false);
@@ -390,6 +422,7 @@ function V3DialectFormCell({
     (row) => !variantId || row.id === variantId
   );
   if (!variant) return null;
+  const inputId = spellingInputId(spellingInstanceId);
   const conflictLiteralList = conflictLiterals(
     spellingReferences(
       referenceGuard.index,
@@ -422,10 +455,10 @@ function V3DialectFormCell({
       <Flex vertical gap="small">
         <Flex align="center" justify="space-between" gap="small" wrap>
           <Flex align="center" gap="small">
-            <Typography.Text strong>
+            <SpellingLabel htmlFor={inputId} inputRef={spellingRef}>
               {spellingLabel ??
                 t("spelling_label", { label: dialectLabel(dialect) })}
-            </Typography.Text>
+            </SpellingLabel>
             {spellingActions}
           </Flex>
           <SpellingRegularity
@@ -442,6 +475,7 @@ function V3DialectFormCell({
           />
         </Flex>
         <V3VoiceTextField
+          id={inputId}
           mode="spelling"
           spellingTextOnly
           spellingAudioScope={spellingAudioScope([variant])}
@@ -767,6 +801,8 @@ export function V3ConcreteFormRow({
   referenceBadge
 }: V3ConcreteFormRowProps) {
   const { t } = useLexiconEditorTranslation();
+  const spellingInstanceId = useId();
+  const spellingInput = spellingInputId(spellingInstanceId);
   const spellingRef = useRef<TextAreaRef>(null);
   const spellingSettingsRef = useRef<SpellingSettingsOpener | null>(null);
   const [spellingRequired, setSpellingRequired] = useState(false);
@@ -914,7 +950,9 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <Typography.Text strong>{t("spelling")}</Typography.Text>
+                <SpellingLabel htmlFor={spellingInput} inputRef={spellingRef}>
+                  {t("spelling")}
+                </SpellingLabel>
                 <SpellingRegularity
                   visible={showRegularity}
                   content={content}
@@ -926,6 +964,7 @@ export function V3ConcreteFormRow({
                 />
               </Flex>
               <V3VoiceTextField
+                id={spellingInput}
                 mode="spelling"
                 spellingTextOnly
                 spellingAudioScope={spellingAudioScope(variants)}
@@ -1028,7 +1067,9 @@ export function V3ConcreteFormRow({
           >
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between" gap="small" wrap>
-                <Typography.Text strong>{t("spelling")}</Typography.Text>
+                <SpellingLabel htmlFor={spellingInput} inputRef={spellingRef}>
+                  {t("spelling")}
+                </SpellingLabel>
                 <SpellingRegularity
                   visible={showRegularity}
                   content={content}
@@ -1040,6 +1081,7 @@ export function V3ConcreteFormRow({
                 />
               </Flex>
               <V3VoiceTextField
+                id={spellingInput}
                 mode="spelling"
                 spellingTextOnly
                 spellingAudioScope={spellingAudioScope(variants)}

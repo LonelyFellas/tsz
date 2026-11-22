@@ -97,3 +97,32 @@ it.each(["common", "unified", "distinguish"] as const)(
     ).toHaveValue("bɪb");
   }
 );
+
+it.each(["common", "unified", "distinguish"] as const)(
+  "%s 拼写标题点击聚焦对应输入框，不把标题当作页面文本",
+  (mode) => {
+    const form =
+      mode === "common"
+        ? commonFormFixture({ spelling: "word" })
+        : ukUsFormFixture({
+            uk: { spelling: "british" },
+            us: { spelling: "american" }
+          });
+    const rules: DialectRulesV3 = {
+      spelling_mode: mode === "distinguish" ? "distinguish" : "unified",
+      phonetic_mode: mode === "common" ? "unified" : "distinguish"
+    };
+    const { container } = render(<Harness form={form} rules={rules} />);
+    const input = screen.getByLabelText(
+      mode === "distinguish" ? "原形美式拼写" : "原形英美通用拼写"
+    );
+    const label = Array.from(container.querySelectorAll("label")).find(
+      (element) => element.htmlFor === input.id
+    );
+
+    expect(label).toBeTruthy();
+    expect(label).toHaveAttribute("for", input.id);
+    fireEvent.mouseDown(label!);
+    expect(input).toHaveFocus();
+  }
+);

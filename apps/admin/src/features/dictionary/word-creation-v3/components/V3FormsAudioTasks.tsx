@@ -268,6 +268,7 @@ export function V3FormsAudioTasks({
                           }
                         )}
                         profile={scoped}
+                        recommendationArea="word"
                         enabled={ready}
                         background={
                           copy?.backgroundContentIds.has(variant.id) ?? false

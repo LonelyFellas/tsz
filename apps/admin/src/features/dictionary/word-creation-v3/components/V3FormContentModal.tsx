@@ -162,6 +162,11 @@ export function V3FormContentModal({
       ? t("confirm_before_assign")
       : undefined;
   const [editor, setEditor] = useState(() => contentEditorForms(content));
+  const editorRef = useRef(editor);
+  const applyEditor = (next: typeof editor) => {
+    editorRef.current = next;
+    setEditor(next);
+  };
   const [labels, setLabels] = useState(() => structuredClone(forms));
   const [error, setError] = useState<FormContentIssue>(null);
   const [choosing, setChoosing] = useState(false);
@@ -351,7 +356,7 @@ export function V3FormContentModal({
     return local.contents.some((row) => row.id === content.id)
       ? replaceSharedContent(
           local,
-          contentFromEditor(state.current.editor),
+          contentFromEditor(editorRef.current),
           stableVariantIds,
           pronunciationIds
         )
@@ -474,7 +479,7 @@ export function V3FormContentModal({
       setError(issueForCause(cause, "labels_unmergeable"));
       return;
     }
-    setEditor(result.value);
+    applyEditor(result.value);
     setError(null);
   };
   const referenceGuard = useV3ReferenceGuard();
@@ -730,7 +735,7 @@ export function V3FormContentModal({
               if (accepted) {
                 original.current = next;
                 initialEditor.current = JSON.stringify(
-                  contentFromEditor(state.current.editor)
+                  contentFromEditor(editorRef.current)
                 );
                 setLabels(next);
               }
@@ -789,7 +794,7 @@ export function V3FormContentModal({
             const updated = next.contents.find(
               (item) => item.id === content.id
             );
-            if (updated) setEditor(contentEditorForms(updated));
+            if (updated) applyEditor(contentEditorForms(updated));
           }}
         />
         {rows.length > 0 && (
@@ -996,7 +1001,7 @@ export function V3FormContentModal({
                 membershipCount={1}
                 idFactory={newWordNodeId}
                 issues={localIssues}
-                onChange={setEditor}
+                onChange={applyEditor}
               />
             </div>
           </>

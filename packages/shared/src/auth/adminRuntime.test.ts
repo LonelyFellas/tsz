@@ -198,7 +198,9 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
 
   it.each([
     ["/lexicon-next", "/login"],
-    ["/login", ""]
+    ["/login", ""],
+    ["/login/", ""],
+    ["/LOGIN", ""]
   ])(
     "会话恢复探针 401 在 %s 的跳转行为稳定",
     async (pathname, expectedHref) => {

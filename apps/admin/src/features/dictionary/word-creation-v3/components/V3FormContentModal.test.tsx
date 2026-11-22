@@ -123,6 +123,19 @@ vi.mock("./V3ConcreteFormRow", () => ({
             >
               保存实际发音
             </button>
+            <button
+              onClick={() => {
+                const next = structuredClone(content);
+                const target = next.pos[0]!.forms[0]!.regional_variants;
+                if (target.mode !== "common")
+                  throw new Error("expected common fixture");
+                target.common.spelling = "immediate draft";
+                onChange(next);
+                void localSave.save("word");
+              }}
+            >
+              立即保存当前正文修改
+            </button>
           </>
         )}
         <input
@@ -1346,6 +1359,17 @@ it("局部保存先交接完整抽屉结果再请求业务保存，失败不关�
   await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
   expect(persist.mock.calls[1]![0]).toEqual(persist.mock.calls[0]![0]);
   expect(onConfirm).not.toHaveBeenCalled();
+});
+
+it("局部保存使用同一事件刚回写的编辑器快照", async () => {
+  const persist = vi.fn().mockResolvedValue(true);
+  setup({ persist });
+  fireEvent.click(screen.getByText("立即保存当前正文修改"));
+  await waitFor(() => expect(persist).toHaveBeenCalledOnce());
+  const edited = persist.mock.calls[0]![0].contents[1]!.regional_variants;
+  expect(edited.mode === "common" && edited.common.spelling).toBe(
+    "immediate draft"
+  );
 });
 
 it("局部保存绕过外层离开保护但不隐式跳过音频任务等待", async () => {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  DEFAULT_COMPATIBLE_TIMEOUT_MS,
   waitForApiContract,
   waitForCompatibleApiContract
 } from "./wait-api-contract.mjs";
@@ -64,4 +65,29 @@ test("returns the current deployed API SHA after compatibility verification", as
   });
   assert.equal(result, currentSha);
   assert.equal(calls.length, 2);
+});
+
+test("matches the backend deployment recovery window", () => {
+  assert.equal(DEFAULT_COMPATIBLE_TIMEOUT_MS, 120 * 60 * 1000);
+});
+
+test("keeps waiting through backend recovery beyond the old 15-minute timeout", async () => {
+  const currentSha = "b".repeat(40);
+  const calls = [];
+  let now = 0;
+  const recoveryInterval = 15 * 60 * 1000;
+  const result = await waitForCompatibleApiContract({
+    check: async () => {
+      calls.push(calls.length);
+      if (calls.length < 3) throw new Error("deployment_in_progress");
+      return currentSha;
+    },
+    sleep: async () => {
+      now += recoveryInterval;
+    },
+    intervalMs: recoveryInterval,
+    now: () => now
+  });
+  assert.equal(result, currentSha);
+  assert.equal(calls.length, 3);
 });
