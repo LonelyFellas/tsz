@@ -578,6 +578,11 @@ export function V3SynthesisInputs({
                   const recording = recordings.find(
                     (asset) => asset.is_default
                   );
+                  const spellingRecording = spellingSpeech?.audio_assets?.find(
+                    (asset) =>
+                      asset.is_default &&
+                      speechAccentGroup(asset.locale) === side
+                  );
                   const currentSource =
                     current.source ??
                     (recording
@@ -752,19 +757,12 @@ export function V3SynthesisInputs({
                                 playbackOnly
                                 assetOnly={option.value === "upload"}
                                 audioAssetId={
-                                  option.value === "upload"
+                                  (option.value === "upload"
                                     ? (recording ?? recordings[0])?.id
-                                    : savedVoiceAudioAsset(
-                                        savedProfile,
-                                        sideLocale
-                                      )
-                                }
-                                audioAssets={
-                                  option.value === "upload"
-                                    ? recordings
                                     : option.value === "spelling"
-                                      ? spellingSpeech?.audio_assets
-                                      : undefined
+                                      ? spellingRecording?.id
+                                      : undefined) ??
+                                  savedVoiceAudioAsset(savedProfile, sideLocale)
                                 }
                                 pronunciationId={pronunciation.id}
                                 dialect={side}

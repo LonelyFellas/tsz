@@ -900,7 +900,7 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingGenerateRef = useRef(false);
+  const pendingGenerateRef = useRef<string | undefined>(undefined);
   const generateRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
@@ -946,6 +946,18 @@ export function PronunciationPreviewControls({
       : selectedSetting?.audio_asset_id);
   const canReadSavedAudio =
     !!savedAssetId && !!(previewAdapter ?? context.adapter).resolveAudio;
+  // 音色就绪会更新播放状态，但只有用户请求的内容变化才取消等待。
+  const requestKey = JSON.stringify([
+    pronunciationId,
+    previewContent,
+    targetLocale,
+    voiceProfile,
+    selectedAssetId,
+    assetOnly,
+    playbackOnly,
+    recommendationArea,
+    previewAdapter?.audioSourceKey
+  ]);
   const contentKey = JSON.stringify(
     assetOnly
       ? [savedAssetId, targetLocale]
@@ -996,7 +1008,7 @@ export function PronunciationPreviewControls({
   }, [discardResult]);
 
   const stopPlayback = useCallback(() => {
-    pendingGenerateRef.current = false;
+    pendingGenerateRef.current = undefined;
     generationRef.current = null;
     cleanup();
     setBusy(false);
@@ -1083,18 +1095,18 @@ export function PronunciationPreviewControls({
       !resolveRequested &&
       !context.voiceResolutionRequested
     ) {
-      pendingGenerateRef.current = true;
+      pendingGenerateRef.current = requestKey;
       setResolveRequested(true);
       context.requestVoiceResolution();
       return;
     }
     if (!assetOnly && resolved.pending) {
-      pendingGenerateRef.current = true;
+      pendingGenerateRef.current = requestKey;
       return;
     }
     if (!assetOnly && !voice) {
       if (!context.voicesRequested) {
-        pendingGenerateRef.current = true;
+        pendingGenerateRef.current = requestKey;
         void context.loadVoices().catch(() => undefined);
       }
       return;
@@ -1222,18 +1234,20 @@ export function PronunciationPreviewControls({
 
   generateRef.current = generate;
   useEffect(() => {
-    if (
-      !pendingGenerateRef.current ||
-      context.voicesLoading ||
-      resolved.pending
-    )
+    if (pendingGenerateRef.current === undefined) return;
+    if (disabled || pendingGenerateRef.current !== requestKey) {
+      pendingGenerateRef.current = undefined;
       return;
-    pendingGenerateRef.current = false;
+    }
+    if (context.voicesLoading || resolved.pending) return;
+    pendingGenerateRef.current = undefined;
     void generateRef.current();
   }, [
     context.voiceResolutionRequested,
     context.voicesLoading,
     context.voicesRequested,
+    disabled,
+    requestKey,
     resolveRequested,
     resolved.pending
   ]);

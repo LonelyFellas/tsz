@@ -1156,6 +1156,30 @@ it("等待音色目录的试听不会打断后来点播的正式音频", async (
   expect(preview.synthesize).not.toHaveBeenCalled();
 });
 
+it("加载音色期间编辑发音会取消旧点播，新内容等待再次点击", async () => {
+  const catalog = deferred<typeof voices>();
+  preview.listVoices.mockReturnValueOnce(catalog.promise);
+  const previewFor = (spelling: string) => (
+    <PreviewHarness
+      dialect="uk"
+      spelling={spelling}
+      playbackOnly
+      loadVoicesOnMount={false}
+      resolveVoicesOnMount={false}
+    />
+  );
+  const view = render(previewFor("cat"));
+  fireEvent.click(screen.getByLabelText("播放语音"));
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+  view.rerender(previewFor("dog"));
+  await act(async () => catalog.resolve(voices));
+  expect(preview.synthesize).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByLabelText("播放语音"));
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+  expect(preview.synthesize.mock.calls[0]![0].content.text).toBe("dog");
+});
+
 it("切换试听会取消旧请求，旧响应不会抢播，且原按钮可以重试", async () => {
   const pending = deferred<VoicePreviewResult>();
   preview.resolveAudio.mockImplementationOnce(() => pending.promise);

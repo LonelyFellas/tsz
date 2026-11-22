@@ -14,6 +14,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   Dialect,
+  SpellingSpeechV3,
   V3DraftValidationIssue,
   WordPronunciationV3
 } from "@tsz/types";
@@ -156,6 +157,7 @@ function Harness({
   settingsPhrase = false,
   generated = false,
   generatedLocale,
+  spellingSpeech,
   recording = false,
   extraRecording = false,
   issues = [],
@@ -171,6 +173,7 @@ function Harness({
   settingsPhrase?: boolean;
   generated?: boolean;
   generatedLocale?: "en-GB";
+  spellingSpeech?: SpellingSpeechV3;
   recording?: boolean;
   extraRecording?: boolean;
   issues?: readonly V3DraftValidationIssue[];
@@ -321,6 +324,7 @@ function Harness({
             pronunciation={pronunciation}
             synthesisEditable
             spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
+            spellingSpeech={spellingSpeech}
             dialect={dialect}
             index={0}
             issues={issues}
@@ -356,6 +360,45 @@ it("音色解析失败时仍可读取编辑窗中已保存的正式音频", asyn
     })
   );
   expect(speech.synthesize).not.toHaveBeenCalled();
+});
+
+it("词形拼写同时有录音和合成资产时，播放同口音默认录音", async () => {
+  const spellingSpeech: SpellingSpeechV3 = {
+    content: { version: 2, text: "far", annotations: [] },
+    voice_profile: {
+      voices: [
+        {
+          voice_id: "en-gb-sonia",
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: 0,
+          audio_asset_id: "generated-spelling"
+        }
+      ]
+    },
+    audio_assets: [
+      {
+        id: "recorded-spelling",
+        locale: "en-GB",
+        gender: "female",
+        content_type: "audio/mpeg",
+        size_bytes: 1024,
+        original_name: "spelling.mp3",
+        created_at: "2026-11-22T00:00:00Z",
+        is_default: true
+      }
+    ]
+  };
+  render(<Harness dialect="uk" spellingSpeech={spellingSpeech} />);
+  fireEvent.click(
+    screen.getByLabelText("第 1 条发音 英式 词形拼写 最终读音 播放语音")
+  );
+  await waitFor(() =>
+    expect(speech.resolveAudio).toHaveBeenCalledExactlyOnceWith(
+      "recorded-spelling",
+      expect.anything()
+    )
+  );
 });
 
 it("真实音素设置保存先回写最新配音资产再触发业务保存", async () => {
