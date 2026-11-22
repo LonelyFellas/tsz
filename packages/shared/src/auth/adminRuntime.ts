@@ -55,6 +55,15 @@ export function redirectToChangePassword(
   window.location.href = changePasswordPath;
 }
 
+function normalizedPath(path: string): string {
+  const normalized = path.replace(/\/+$/u, "").toLowerCase();
+  return normalized || "/";
+}
+
+function isLoginPath(path: string, loginPath: string): boolean {
+  return normalizedPath(path) === normalizedPath(loginPath);
+}
+
 export function createAdminAuthRuntime({
   baseUrl,
   getTestResourceRun,
@@ -168,7 +177,7 @@ export function createAdminAuthRuntime({
     () => {
       if (
         typeof window === "undefined" ||
-        window.location.pathname !== (loginPath ?? "/login")
+        !isLoginPath(window.location.pathname, loginPath ?? "/login")
       )
         tokens.redirectToLogin();
     }
