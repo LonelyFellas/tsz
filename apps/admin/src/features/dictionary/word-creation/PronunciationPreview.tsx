@@ -900,7 +900,7 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingGenerateRef = useRef(false);
+  const pendingGenerateRef = useRef<string | undefined>(undefined);
   const generateRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
@@ -946,6 +946,18 @@ export function PronunciationPreviewControls({
       : selectedSetting?.audio_asset_id);
   const canReadSavedAudio =
     !!savedAssetId && !!(previewAdapter ?? context.adapter).resolveAudio;
+  // 音色就绪会更新播放状态，但只有用户请求的内容变化才取消等待。
+  const requestKey = JSON.stringify([
+    pronunciationId,
+    previewContent,
+    targetLocale,
+    voiceProfile,
+    selectedAssetId,
+    assetOnly,
+    playbackOnly,
+    recommendationArea,
+    previewAdapter?.audioSourceKey
+  ]);
   const contentKey = JSON.stringify(
     assetOnly
       ? [savedAssetId, targetLocale]
@@ -996,6 +1008,7 @@ export function PronunciationPreviewControls({
   }, [discardResult]);
 
   const stopPlayback = useCallback(() => {
+    pendingGenerateRef.current = undefined;
     generationRef.current = null;
     cleanup();
     setBusy(false);
@@ -1074,6 +1087,7 @@ export function PronunciationPreviewControls({
         : !context.enabled || context.voicesLoading || !text)
     )
       return;
+    claimPlayback(stopPlayback);
     if (
       !assetOnly &&
       resolved.profile?.dubbing &&
@@ -1081,40 +1095,27 @@ export function PronunciationPreviewControls({
       !resolveRequested &&
       !context.voiceResolutionRequested
     ) {
-      pendingGenerateRef.current = true;
+      pendingGenerateRef.current = requestKey;
       setResolveRequested(true);
       context.requestVoiceResolution();
       return;
     }
     if (!assetOnly && resolved.pending) {
-      pendingGenerateRef.current = true;
+      pendingGenerateRef.current = requestKey;
       return;
     }
-    let selectedVoice = voice;
-    let selectedVoiceSetting = selectedSetting;
-    if (!assetOnly && !selectedVoice) {
-      let availableVoices: VoiceOption[];
-      try {
-        availableVoices = await context.loadVoices();
-      } catch {
-        return;
+    if (!assetOnly && !voice) {
+      if (!context.voicesRequested) {
+        pendingGenerateRef.current = requestKey;
+        void context.loadVoices().catch(() => undefined);
       }
-      selectedVoice = resolvePronunciationPreviewVoice(
-        availableVoices,
-        dialect,
-        context.dialectPreference,
-        resolved.profile
-      ).voice;
-      selectedVoiceSetting = selectedVoice
-        ? voiceSettingFor(resolved.profile?.voices ?? [], selectedVoice.id)
-        : undefined;
+      return;
     }
-    if (!assetOnly && !selectedVoice) return;
     if (
       !assetOnly &&
-      selectedVoice &&
+      voice &&
       previewContent.annotations.some((mark) => mark.type === "phoneme") &&
-      selectedVoice.locale !== targetLocale
+      voice.locale !== targetLocale
     ) {
       setStatus(
         createLexiconEditorMessage(
@@ -1123,7 +1124,6 @@ export function PronunciationPreviewControls({
       );
       return;
     }
-    claimPlayback(stopPlayback);
     const generation = Symbol("pronunciation-preview-generation");
     generationRef.current = generation;
     cleanup();
@@ -1142,30 +1142,28 @@ export function PronunciationPreviewControls({
           signal: controller.signal
         });
       } else {
-        if (assetOnly || !selectedVoice) return;
+        if (assetOnly || !voice) return;
         preview = await adapter.synthesize(
           {
             language: "en",
             content: previewContent,
-            voiceId: selectedVoice.id,
-            ratePercent: selectedVoiceSetting?.rate_percent ?? 0,
-            ...(selectedVoiceSetting?.output_format
-              ? { outputFormat: selectedVoiceSetting.output_format }
+            voiceId: voice.id,
+            ratePercent: selectedSetting?.rate_percent ?? 0,
+            ...(selectedSetting?.output_format
+              ? { outputFormat: selectedSetting.output_format }
               : {}),
-            ...(selectedVoiceSetting?.pitch_semitones !== undefined
-              ? { pitchSemitones: selectedVoiceSetting.pitch_semitones }
+            ...(selectedSetting?.pitch_semitones !== undefined
+              ? { pitchSemitones: selectedSetting.pitch_semitones }
               : {}),
-            ...(selectedVoiceSetting?.volume_percent !== undefined
-              ? { volumePercent: selectedVoiceSetting.volume_percent }
+            ...(selectedSetting?.volume_percent !== undefined
+              ? { volumePercent: selectedSetting.volume_percent }
               : {}),
-            ...(selectedVoiceSetting?.style
-              ? { style: selectedVoiceSetting.style }
+            ...(selectedSetting?.style ? { style: selectedSetting.style } : {}),
+            ...(selectedSetting?.style_degree !== undefined
+              ? { styleDegree: selectedSetting.style_degree }
               : {}),
-            ...(selectedVoiceSetting?.style_degree !== undefined
-              ? { styleDegree: selectedVoiceSetting.style_degree }
-              : {}),
-            ...(selectedVoiceSetting?.role !== undefined
-              ? { role: selectedVoiceSetting.role }
+            ...(selectedSetting?.role !== undefined
+              ? { role: selectedSetting.role }
               : {})
           },
           { signal: controller.signal }
@@ -1236,15 +1234,23 @@ export function PronunciationPreviewControls({
 
   generateRef.current = generate;
   useEffect(() => {
-    if (
-      !pendingGenerateRef.current ||
-      (!resolveRequested && !context.voiceResolutionRequested) ||
-      resolved.pending
-    )
+    if (pendingGenerateRef.current === undefined) return;
+    if (disabled || pendingGenerateRef.current !== requestKey) {
+      pendingGenerateRef.current = undefined;
       return;
-    pendingGenerateRef.current = false;
+    }
+    if (context.voicesLoading || resolved.pending) return;
+    pendingGenerateRef.current = undefined;
     void generateRef.current();
-  }, [context.voiceResolutionRequested, resolveRequested, resolved.pending]);
+  }, [
+    context.voiceResolutionRequested,
+    context.voicesLoading,
+    context.voicesRequested,
+    disabled,
+    requestKey,
+    resolveRequested,
+    resolved.pending
+  ]);
 
   const replay = async () => {
     if (disabled || (!assetOnly && !context.enabled) || !result) return;

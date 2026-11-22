@@ -153,10 +153,17 @@ function Harness({
     </>
   );
 }
-function RegionalHarness() {
-  const [content, setContent] = useState(() =>
-    formsFixture({ forms: [ukUsFormFixture()] })
-  );
+function RegionalHarness({ multipleReadings = false } = {}) {
+  const [content, setContent] = useState(() => {
+    const form = ukUsFormFixture();
+    if (multipleReadings) {
+      for (const dialect of ["uk", "us"] as const) {
+        const pronunciations = form.regional_variants[dialect].pronunciations;
+        pronunciations.push({ ...pronunciations[0]!, id: `second-${dialect}` });
+      }
+    }
+    return formsFixture({ forms: [form] });
+  });
   const form = content.pos[0]!.forms[0]!;
   const variants = form.regional_variants;
   if (variants.mode !== "uk_us") throw Error();
@@ -177,6 +184,28 @@ function RegionalHarness() {
     </>
   );
 }
+
+it("发音拖动只在同一拼写列表显示可放提示", () => {
+  renderWithUps(<RegionalHarness multipleReadings />);
+  const uk = within(screen.getByRole("region", { name: "uk" }));
+  const us = within(screen.getByRole("region", { name: "us" }));
+  const handle = uk.getByRole("button", { name: "拖动第 1 条发音" });
+  const target = uk.getByRole("button", { name: "拖动第 2 条发音" });
+  const other = us.getByRole("button", { name: "拖动第 2 条发音" });
+  const transfer = new Map<string, string>();
+  const dataTransfer = {
+    get types() {
+      return [...transfer.keys()];
+    },
+    setData: (type: string, value: string) => transfer.set(type, value),
+    getData: (type: string) => transfer.get(type) ?? ""
+  };
+
+  fireEvent.dragStart(handle, { dataTransfer });
+  expect(fireEvent.dragOver(other, { dataTransfer })).toBe(true);
+  expect(fireEvent.dragOver(target, { dataTransfer })).toBe(false);
+});
+
 const field = (name: string) =>
   screen.getByLabelText(
     `第 1 条发音的${name.startsWith("Azure ") ? `美式 ${name}` : name}`

@@ -499,7 +499,7 @@ function EntryEditor({
       };
     });
   const [selectedPos, setSelectedPos] = useState<string | undefined>(
-    linkedIssue?.pos
+    () => linkedIssue?.pos ?? initial.draft.form_editor?.pos[0]?.pos
   );
   const activePos = selectedPos ?? draft.form_editor?.pos[0]?.pos;
   const draftRef = useRef(draft);
@@ -711,8 +711,19 @@ function EntryEditor({
     saved.revision,
     sentenceWorkspace.resources
   ]);
+  function replaceDraft(next: NextDraft) {
+    setDraft(next);
+    if (next.form_editor) {
+      const positions = next.form_editor.pos;
+      setSelectedPos((current) =>
+        positions.some((pos) => pos.pos === current)
+          ? current
+          : positions[0]?.pos
+      );
+    }
+  }
   function restoreLocalSnapshot(snapshot: NextLocalDraftSnapshot) {
-    setDraft(snapshot.draft);
+    replaceDraft(snapshot.draft);
     setEditedPairs(snapshot.edited_pairs);
     for (const resource of snapshot.sentence_resources) {
       const base = sentenceWorkspace.base.find(
@@ -1596,7 +1607,7 @@ function EntryEditor({
                       if (remote && !contentLeaveGuard.current) {
                         setEditedPairs({});
                         setSaved(remote);
-                        setDraft(remote.draft);
+                        replaceDraft(remote.draft);
                         sentenceWorkspace.reset();
                         setRemote(undefined);
                         setConflict(false);

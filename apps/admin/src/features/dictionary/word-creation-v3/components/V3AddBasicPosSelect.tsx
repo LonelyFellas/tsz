@@ -1,7 +1,9 @@
 import { localizedCatalogName } from "../../part-of-speech/catalog";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { CirclePlusIcon, PlusIcon } from "lucide-react";
+import { Button } from "@tsz/ui/admin/display";
 import { Select } from "@tsz/ui/admin/forms";
+import { Dropdown } from "@tsz/ui/admin/overlays";
 import { useAdminDisabled } from "@tsz/ui/admin/context";
 import type {
   DraftFormsStepContentV3,
@@ -12,6 +14,7 @@ import type {
 
 export interface V3AddBasicPosSelectProps {
   compact?: boolean;
+  buttonTrigger?: boolean;
   catalog?: PartOfSpeechCatalogResponse;
   /** 词条自身是单词还是短语；给定时候选只列同一侧的词性。 */
   entryKind?: WordEntryKindV3;
@@ -23,6 +26,7 @@ export interface V3AddBasicPosSelectProps {
 
 export function V3AddBasicPosSelect({
   compact = false,
+  buttonTrigger = false,
   catalog,
   entryKind,
   forms,
@@ -31,7 +35,8 @@ export function V3AddBasicPosSelect({
   onAdd
 }: V3AddBasicPosSelectProps) {
   const { t, i18n } = useLexiconEditorTranslation();
-  const disabled = useAdminDisabled();
+  const adminDisabled = useAdminDisabled();
+  const disabled = adminDisabled || isError || isPending;
   const usedPosCodes = new Set(forms.pos.map((pos) => pos.pos));
   // 挂错一侧后端会以 part_of_speech_kind_mismatch 拒绝，不放进候选。
   const availableItems = (catalog?.items ?? []).filter(
@@ -39,11 +44,43 @@ export function V3AddBasicPosSelect({
       !usedPosCodes.has(item.code) && (!entryKind || item.kind === entryKind)
   );
 
+  if (buttonTrigger) {
+    const label = t("add_pos_button");
+    const buttonDisabled = disabled || availableItems.length === 0;
+    return (
+      <Dropdown
+        classNames={{ root: "word-add-basic-pos-dropdown" }}
+        disabled={buttonDisabled}
+        placement="bottomLeft"
+        trigger={["click"]}
+        menu={{
+          "aria-label": label,
+          items: availableItems.map((item) => ({
+            key: item.code,
+            label: localizedCatalogName(item, i18n.language),
+            onClick: () => onAdd(item)
+          }))
+        }}
+      >
+        <Button
+          className="word-add-basic-pos-button"
+          type="dashed"
+          disabled={buttonDisabled}
+          ghost
+          icon={<PlusIcon />}
+          loading={isPending}
+        >
+          {label}
+        </Button>
+      </Dropdown>
+    );
+  }
+
   return (
     <Select
       aria-label={t("add_pos")}
       className="word-add-basic-pos-select"
-      disabled={disabled || isError || isPending}
+      disabled={disabled}
       loading={isPending}
       onChange={(code) => {
         const item = availableItems.find(

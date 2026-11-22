@@ -198,6 +198,7 @@ export function V3PronunciationList({
                     onDragLeave={() => setDragOverIndex(undefined)}
                     onDragOver={(event: DragEvent<HTMLDivElement>) => {
                       if (
+                        draggingIndex === undefined ||
                         fields.length < 2 ||
                         !event.dataTransfer.types.includes(
                           PRONUNCIATION_DRAG_TYPE

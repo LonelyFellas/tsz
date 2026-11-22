@@ -936,6 +936,56 @@ it("最终读音只读取正式资产，读取失败也不回退合成", async (
   await waitFor(() => expect(message.error).toHaveBeenCalled());
   expect(preview.synthesize).not.toHaveBeenCalled();
 });
+
+it("重开词条后首次点击，会等待音色目录并播放已保存的正式音频", async () => {
+  const catalog = deferred<typeof voices>();
+  const formalAudio = deferred<VoicePreviewResult>();
+  const setting = {
+    voice_id: "american-voice",
+    version_id: "current",
+    locale: "en-US" as const,
+    enabled: true,
+    rate_percent: 0
+  };
+  preview.listVoices.mockReturnValueOnce(catalog.promise);
+  preview.resolveAudio.mockReturnValueOnce(formalAudio.promise);
+  preview.resolveVoices.mockResolvedValueOnce({
+    voices: [setting],
+    source: { kind: "catalog" }
+  });
+  render(
+    <PreviewHarness
+      dialect="us"
+      playbackOnly
+      loadVoicesOnMount={false}
+      resolveVoicesOnMount={false}
+      voiceProfile={{
+        voices: [{ ...setting, audio_asset_id: "formal-us" }],
+        dubbing: {
+          area: "word",
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
+      }}
+    />
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "播放语音" }));
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+  await act(async () => catalog.resolve(voices));
+
+  await waitFor(() =>
+    expect(preview.resolveAudio).toHaveBeenCalledExactlyOnceWith(
+      "formal-us",
+      expect.anything()
+    )
+  );
+  await act(async () => formalAudio.resolve(result()));
+  expect(AudioMock.instances).toHaveLength(1);
+  expect(AudioMock.instances[0]!.play).toHaveBeenCalledOnce();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
 it("最终读音缺正式资产时保持禁用而不新合成", async () => {
   render(<PreviewHarness playbackOnly assetOnly />);
   await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
@@ -1071,6 +1121,63 @@ it("开始另一行试听会停止正在播放的音频", async () => {
   await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
   expect(first.pause).toHaveBeenCalled();
   expect(AudioMock.instances[1]!.play).toHaveBeenCalledOnce();
+});
+
+it("等待音色目录的试听不会打断后来点播的正式音频", async () => {
+  const catalog = deferred<typeof voices>();
+  preview.listVoices.mockReturnValueOnce(catalog.promise);
+  render(
+    <PronunciationPreviewProvider>
+      <PronunciationPreviewControls
+        pronunciationId="audition"
+        spelling="cat"
+        dialect="uk"
+        playbackOnly
+        ariaLabelPrefix="试听"
+      />
+      <PronunciationPreviewControls
+        pronunciationId="formal"
+        dialect="uk"
+        playbackOnly
+        audioAssetId="formal-uk"
+        ariaLabelPrefix="正式音频"
+        audioFactory={(src) =>
+          new AudioMock(src) as unknown as HTMLAudioElement
+        }
+      />
+    </PronunciationPreviewProvider>
+  );
+  fireEvent.click(screen.getByLabelText("试听 播放语音"));
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByLabelText("正式音频 播放语音"));
+  await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+  await act(async () => catalog.resolve(voices));
+  expect(AudioMock.instances[0]!.pause).not.toHaveBeenCalled();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("加载音色期间编辑发音会取消旧点播，新内容等待再次点击", async () => {
+  const catalog = deferred<typeof voices>();
+  preview.listVoices.mockReturnValueOnce(catalog.promise);
+  const previewFor = (spelling: string) => (
+    <PreviewHarness
+      dialect="uk"
+      spelling={spelling}
+      playbackOnly
+      loadVoicesOnMount={false}
+      resolveVoicesOnMount={false}
+    />
+  );
+  const view = render(previewFor("cat"));
+  fireEvent.click(screen.getByLabelText("播放语音"));
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+  view.rerender(previewFor("dog"));
+  await act(async () => catalog.resolve(voices));
+  expect(preview.synthesize).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByLabelText("播放语音"));
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+  expect(preview.synthesize.mock.calls[0]![0].content.text).toBe("dog");
 });
 
 it("切换试听会取消旧请求，旧响应不会抢播，且原按钮可以重试", async () => {

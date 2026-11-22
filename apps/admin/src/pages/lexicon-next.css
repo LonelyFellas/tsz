@@ -596,11 +596,8 @@
   display: none;
 }
 
-.lexicon-next-forms .v3-pronunciation-guide {
-  margin-top: var(--ui-space-2);
-}
-
-.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav {
+.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav,
+.lexicon-next-forms .word-forms-empty-pos-toolbar {
   display: flex;
   align-items: flex-end;
   box-sizing: border-box;
@@ -628,7 +625,7 @@
 .lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .word-pos-tab-content {
   grid-template-columns: 24px max-content max-content;
   min-width: 0;
-  padding: var(--ui-space-2) var(--ui-space-3);
+  padding: 0 var(--ui-space-3);
   border-radius: var(--ui-border-radius);
 }
 
@@ -652,15 +649,17 @@
 }
 
 .lexicon-next-forms .word-pos-tabs .word-pos-tab-actions {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--ui-space-1);
-  width: auto;
-  height: var(--ui-control-height);
+  justify-content: center;
+  gap: 0;
+  block-size: calc(2 * var(--ui-control-height-sm));
   padding-inline-start: var(--ui-space-2);
   border-inline-start: 1px solid var(--ui-color-border-secondary);
   opacity: 0.62;
   transition: opacity var(--ui-motion-duration) var(--ui-motion-easing);
+}
+
+.lexicon-next-forms .word-pos-tab-actions > .word-add-basic-pos-select {
+  min-block-size: var(--ui-control-height-sm);
 }
 
 .lexicon-next-forms
@@ -708,6 +707,24 @@
   .ui-tabs-extra-content
   .word-add-basic-pos-select {
   height: var(--ui-control-height-comfortable);
+}
+
+.lexicon-next-forms .word-forms-empty-pos-toolbar .word-add-basic-pos-button,
+.word-add-basic-pos-dropdown .ui-dropdown-container {
+  min-inline-size: 144px;
+}
+
+.lexicon-next-forms .word-forms-empty-pos-toolbar .word-add-basic-pos-button {
+  min-block-size: calc(var(--ui-control-height) + 2 * var(--ui-space-2));
+  margin-block-end: var(--ui-space-1);
+}
+
+.word-add-basic-pos-dropdown {
+  padding-inline: 0;
+}
+
+.word-add-basic-pos-dropdown .ui-dropdown-menu {
+  padding: 0;
 }
 
 .lexicon-next-forms .v3-form-group-card {

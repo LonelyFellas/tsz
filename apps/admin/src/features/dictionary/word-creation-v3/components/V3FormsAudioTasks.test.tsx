@@ -744,7 +744,7 @@ it("智能词库 Step 2 不因词性变化注册自动音频任务并保留原�
     defaultOptions: { queries: { retry: false } }
   });
   const view = render(<Step forms={unassigned} />);
-  await screen.findByRole("combobox", { name: "添加基本词性" });
+  await screen.findByRole("button", { name: "添加词性" });
   expect(tasks.size).toBe(0);
   expect(speech.generate).not.toHaveBeenCalled();
   expect(changed).not.toHaveBeenCalled();

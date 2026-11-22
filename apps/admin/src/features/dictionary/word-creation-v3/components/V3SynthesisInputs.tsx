@@ -37,6 +37,7 @@ import {
   editSynthesisUpsWords,
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
+  savedVoiceAudioAsset,
   synthesisInputIssue,
   pronunciationLocale,
   synthesisLocaleIssue,
@@ -577,6 +578,11 @@ export function V3SynthesisInputs({
                   const recording = recordings.find(
                     (asset) => asset.is_default
                   );
+                  const spellingRecording = spellingSpeech?.audio_assets?.find(
+                    (asset) =>
+                      asset.is_default &&
+                      speechAccentGroup(asset.locale) === side
+                  );
                   const currentSource =
                     current.source ??
                     (recording
@@ -682,6 +688,10 @@ export function V3SynthesisInputs({
                           const phonemeSpeech = isPhoneme
                             ? candidate[`${option.value}_speech`]
                             : undefined;
+                          const savedProfile =
+                            option.value === "spelling"
+                              ? spellingSpeech?.voice_profile
+                              : phonemeSpeech?.voice_profile;
                           const previewContent =
                             option.value === "spelling"
                               ? (spellingContent ?? {
@@ -747,16 +757,12 @@ export function V3SynthesisInputs({
                                 playbackOnly
                                 assetOnly={option.value === "upload"}
                                 audioAssetId={
-                                  option.value === "upload"
+                                  (option.value === "upload"
                                     ? (recording ?? recordings[0])?.id
-                                    : undefined
-                                }
-                                audioAssets={
-                                  option.value === "upload"
-                                    ? recordings
                                     : option.value === "spelling"
-                                      ? spellingSpeech?.audio_assets
-                                      : undefined
+                                      ? spellingRecording?.id
+                                      : undefined) ??
+                                  savedVoiceAudioAsset(savedProfile, sideLocale)
                                 }
                                 pronunciationId={pronunciation.id}
                                 dialect={side}
@@ -772,12 +778,10 @@ export function V3SynthesisInputs({
                                 disabledReason={previewDisabledReason}
                                 content={previewContent}
                                 voiceProfile={
-                                  option.value === "spelling"
-                                    ? spellingSpeech?.voice_profile
-                                    : isPhoneme
-                                      ? (phonemeSpeech?.voice_profile ??
-                                        pronunciation.voice_profile)
-                                      : undefined
+                                  savedProfile ??
+                                  (isPhoneme
+                                    ? pronunciation.voice_profile
+                                    : undefined)
                                 }
                               />
                               {option.value === "spelling" &&

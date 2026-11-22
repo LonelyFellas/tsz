@@ -1046,6 +1046,7 @@ export const lexiconEditorMessages = {
     "Pronunciation {{index}} actual pronunciation"
   ],
   add_pos: ["添加基本词性", "新增基本詞性", "Add part of speech"],
+  add_pos_button: ["添加词性", "新增詞性", "Add part of speech"],
   replace_unavailable: [
     "当前服务暂不支持替换词形内容，请更新后重试",
     "目前服務暫不支援替換詞形內容，請更新後重試",

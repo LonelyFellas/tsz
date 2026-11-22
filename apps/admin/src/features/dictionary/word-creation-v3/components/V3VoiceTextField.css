@@ -218,8 +218,8 @@ textarea.word-pronunciation-phonetic-input.ui-input {
   max-width: none;
 }
 
-.v3-actual-pronunciation-edit-button.is-preview-focused {
-  color: var(--ui-color-primary);
+.v3-actual-pronunciation-preview-content.is-clickable {
+  cursor: pointer;
 }
 
 /* 释义收起态沿用正文输入框的字号和内边距，富文本负责撑高。 */
