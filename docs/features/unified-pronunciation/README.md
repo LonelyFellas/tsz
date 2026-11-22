@@ -27,6 +27,8 @@
 | 12 喉塞音       | 文档明确的美式 button、Italy 弱读生成 ʔ，已有 ʔ 保留                                           | 其他词不猜测喉塞音位置                                                                          |
 | 13 鼻音闪音     | 保留已有标注；未知弱读提示核对                                                                 | 文档只有归类说明，缺少发生条件、示例及输出，尚不能自动从 nt 推导删音                            |
 
+规则 9 也用于词尾读 /z/ 的规则复数和词尾读 /d/ 的规则过去式。输入明确标出成音节的 `l̩/n̩/m̩` 时按标记展开。省略标记时，转换器逐词核对拼写词尾和字典音标，再对后缀前的部分应用原有词尾规则。例如 `explosions` 的 `ʒnz → ʒənz`、`panels` 的 `nlz → nəlz`、`rhythms` 的 `ðmz → ðəmz`。过去式 `bottled` 的 `tld → təld` 沿用 `bottle` 的第二个音节，`called /kɔːld/` 仍为一个音节。这是「实际发音」字段采用的教学记法。普通辅音组合如 `rhythmic` 的 `ðmɪ` 和 `films` 的 `lmz` 保留原读音。见[任务 #240](https://chan.tianshengzhi.com/zentao/index.php?m=task&f=view&taskID=240)和[牛津学习词典的标音说明](https://www.oxfordlearnersdictionaries.com/about/english/pronunciation_english.html)。
+
 文档个别示例仍保留 `e`（如 seven），与“舍弃 e、保留 ɛ”正文不一致；统一执行正文符号规则。英美通用字段遇到明确口音差异示例时提示在对应口音下转换，不读取全局偏好替用户选择。
 
 ### 统一音标到 Azure
