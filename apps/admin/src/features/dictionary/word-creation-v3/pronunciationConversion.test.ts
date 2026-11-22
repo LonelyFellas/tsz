@@ -80,6 +80,26 @@ it("批量转换分别应用实际发音与 Azure IPA 规则", () => {
   });
 });
 
+it("复数的实际发音展开成音节辅音，英美 Azure 输入继续使用字典来源", () => {
+  const result = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "ˈpænlz", style: "citation" },
+    "panels",
+    "common"
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "ˈpænəlz",
+        synthesis: {
+          uk: { ipa: "ˈpænlz", ups: "S1 P AE N L Z" },
+          us: { ipa: "ˈpænlz", ups: "S1 P AE N L Z" }
+        }
+      }
+    }
+  });
+});
+
 it("美式卷舌字典音标在后台转换计划中生成实际发音和 Azure IPA", () => {
   const result = planPronunciationConversion(
     { ...pronunciation, dict_phonetic: "ˈbɜːrd" },

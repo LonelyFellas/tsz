@@ -77,10 +77,20 @@ const STYLE_EXAMPLES: Record<
 
 type DictionaryConversionTarget = "actual" | "azure-ipa";
 
+// Isolate /z/ or /d/ only when the spelling supports the same ending.
+// The stem must still pass the syllable-final consonant cluster rule below.
+function hasSyllabicInflection(spelling: string, ipa: string): boolean {
+  return (
+    (/[lnm]z$/u.test(ipa) && /[a-z]s$/u.test(spelling)) ||
+    (/[lnm]d$/u.test(ipa) && spelling.endsWith("ed"))
+  );
+}
+
 function dictionaryWord(
   input: string,
   dialect: Dialect,
-  target: DictionaryConversionTarget
+  target: DictionaryConversionTarget,
+  spelling: string
 ): string {
   const source = input
     .replaceAll("ɡ", "g")
@@ -139,8 +149,12 @@ function dictionaryWord(
         .replace(/ɔːr(?![.ˈˌ]*[aɑæʌɔəɛɪɒʊuiɜɚɝ])/gu, "ɔr");
     }
     value = value.replace(/([lnm])̩/gu, "ə$1");
-    // Only syllable-final clusters from the document's onset inventory.
-    value = value.replace(/([tdszpbkgfvðʃʒmn])([lnm])(?=$|[.ˈˌ])/gu, "$1ə$2");
+    const suffix = hasSyllabicInflection(spelling, value)
+      ? value.slice(-1)
+      : "";
+    const stem = suffix ? value.slice(0, -1) : value;
+    value =
+      stem.replace(/([tdszpbkgfvðʃʒmn])([lnm])(?=$|[.ˈˌ])/gu, "$1ə$2") + suffix;
     // Rule 7's s + unaspirated stop at a syllable onset; do not change ask/last.
     return value.replace(
       /(^|[.ˈˌ])s([ktp])(?=[ɑæʌɔəɛɪɒʊuieɜrjwl])/gu,
@@ -183,8 +197,11 @@ function convertDictionary(
         message: `第 ${index + 1} 个词包含未支持的音标，请每次只输入一个读音版本`
       };
     const word = words[index]!.toLowerCase();
-    let value = dictionaryWord(phone, dialect, target);
-    const styleValue = dictionaryWord(phone, dialect, "actual");
+    let value = dictionaryWord(phone, dialect, target, word);
+    const styleValue =
+      target === "actual"
+        ? value
+        : dictionaryWord(phone, dialect, "actual", word);
     if (
       !/[aɑæʌɔəɛɪɒʊuiɜɚɝ]/u.test(value) ||
       /(^\.|\.$|\.\.|[ˈˌ](?:[.ˈˌ]|$)|͡|(?<![lnm])̩)/u.test(value) ||
@@ -207,7 +224,7 @@ function convertDictionary(
         value =
           target === "actual"
             ? selected
-            : dictionaryWord(selected, dialect, "azure-ipa");
+            : dictionaryWord(selected, dialect, "azure-ipa", word);
         styleApplied = true;
       }
     }

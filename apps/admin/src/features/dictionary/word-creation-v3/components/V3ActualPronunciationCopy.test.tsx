@@ -19,6 +19,25 @@ const pronunciation: WordPronunciationV3 = {
 const renderCopy = (props: Parameters<typeof V3ActualPronunciationCopy>[0]) =>
   render(<V3ActualPronunciationCopy {...props} />, { wrapper: App });
 
+it("逐字正音把 explosions 的复数读音填入实际发音字段", () => {
+  const onChange = vi.fn();
+  renderCopy({
+    pronunciation: {
+      ...pronunciation,
+      style: "citation",
+      dict_phonetic: "ɪkˈspləʊʒnz"
+    },
+    spelling: "explosions",
+    dialect: "uk",
+    onChange
+  });
+  fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
+  expect(onChange).toHaveBeenCalledExactlyOnceWith({
+    actual_pron: "ɪkˈsbləʊʒənz",
+    actual_pron_rich: { version: 2, text: "ɪkˈsbləʊʒənz", annotations: [] }
+  });
+});
+
 it("一键转换清除旧标注，不弹确认框，撤销恢复完整富文本", async () => {
   const onChange = vi.fn();
   const props = {

@@ -93,6 +93,57 @@ describe("语雀统一音标规则", () => {
     });
   });
 
+  it.each([
+    ["explosions", "ɪkˈspləʊʒnz", "ɪkˈsbləʊʒənz"],
+    ["panels", "ˈpænlz", "ˈpænəlz"],
+    ["rhythms", "ˈrɪðmz", "ˈrɪðəmz"],
+    ["patterns", "ˈpætnz", "ˈpætənz"],
+    ["medicines", "ˈmedsnz", "ˈmɛdsənz"],
+    ["atoms", "ˈætmz", "ˈætəmz"],
+    ["bottles", "ˈbɒtlz", "ˈbɒtəlz"],
+    ["prisms", "ˈprɪzmz", "ˈprɪzəmz"],
+    ["bottled", "ˈbɒtld", "ˈbɒtəld"],
+    ["buttoned", "ˈbʌtnd", "ˈbʌtənd"],
+    ["fathomed", "ˈfæðmd", "ˈfæðəmd"]
+  ])("词形 %s 沿用原形的成音节写法", (word, input, expected) => {
+    expect(
+      convertDictionaryToUnified(input, word, "uk", "citation")
+    ).toMatchObject({
+      ok: true,
+      value: expected
+    });
+    expect(
+      convertDictionaryToUnified(expected, word, "uk", "citation")
+    ).toMatchObject({
+      ok: true,
+      value: expected
+    });
+  });
+
+  it.each([
+    ["rhythmic", "ˈrɪðmɪk"],
+    ["films", "fɪlmz"],
+    ["called", "kɔːld"],
+    ["filmed", "fɪlmd"],
+    ["finely", "ˈfaɪnlɪ"],
+    ["play", "pleɪ"]
+  ])("%s 的普通辅音组合保持原读音", (word, input) => {
+    expect(convertDictionaryToUnified(input, word, "uk")).toMatchObject({
+      ok: true,
+      value: input
+    });
+  });
+
+  it("同一短语逐词匹配，显式成音节标记只展开一次", () => {
+    expect(
+      convertDictionaryToUnified(
+        "ˈrɪðmɪk ˈpænl̩z ɪkˈsploʊʒnz",
+        "rhythmic panels explosions",
+        "us"
+      )
+    ).toMatchObject({ ok: true, value: "ˈrɪðmɪk ˈpænəlz ɪkˈsbləʊʒənz" });
+  });
+
   it("词中辅音丛没有成音节边界时不擅自补 ə", () => {
     expect(
       convertDictionaryToUnified("ˈbɒtlɪŋ", "bottling", "uk")
