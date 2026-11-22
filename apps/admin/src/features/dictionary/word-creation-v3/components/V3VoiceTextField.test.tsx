@@ -2746,7 +2746,11 @@ it("点击实际发音预览直接打开编辑，保存跳过无关音频任务�
       />
     </VoiceSaveContext.Provider>
   );
-  fireEvent.click(screen.getByLabelText("实际发音"));
+  fireEvent.click(
+    screen.getByText("hello there", {
+      selector: ".v3-actual-pronunciation-preview-content span"
+    })
+  );
   const input = await screen.findByLabelText("实际发音");
   fireEvent.change(input, { target: { value: "hello changed" } });
   fireEvent.click(screen.getByLabelText("保存实际发音修改"));

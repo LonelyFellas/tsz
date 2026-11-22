@@ -1123,6 +1123,39 @@ it("开始另一行试听会停止正在播放的音频", async () => {
   expect(AudioMock.instances[1]!.play).toHaveBeenCalledOnce();
 });
 
+it("等待音色目录的试听不会打断后来点播的正式音频", async () => {
+  const catalog = deferred<typeof voices>();
+  preview.listVoices.mockReturnValueOnce(catalog.promise);
+  render(
+    <PronunciationPreviewProvider>
+      <PronunciationPreviewControls
+        pronunciationId="audition"
+        spelling="cat"
+        dialect="uk"
+        playbackOnly
+        ariaLabelPrefix="试听"
+      />
+      <PronunciationPreviewControls
+        pronunciationId="formal"
+        dialect="uk"
+        playbackOnly
+        audioAssetId="formal-uk"
+        ariaLabelPrefix="正式音频"
+        audioFactory={(src) =>
+          new AudioMock(src) as unknown as HTMLAudioElement
+        }
+      />
+    </PronunciationPreviewProvider>
+  );
+  fireEvent.click(screen.getByLabelText("试听 播放语音"));
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByLabelText("正式音频 播放语音"));
+  await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+  await act(async () => catalog.resolve(voices));
+  expect(AudioMock.instances[0]!.pause).not.toHaveBeenCalled();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
 it("切换试听会取消旧请求，旧响应不会抢播，且原按钮可以重试", async () => {
   const pending = deferred<VoicePreviewResult>();
   preview.resolveAudio.mockImplementationOnce(() => pending.promise);

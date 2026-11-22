@@ -3141,71 +3141,99 @@ it("编辑期间被归档后保留本地输入并转只读，不引导丢弃草�
   ).toMatchObject({ status: "archived" });
 });
 
-it("直接打开 Step 2 后拖动默认词性，词形面板和 Step 3 保持该词性", async () => {
-  const api = requests();
-  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
-  api.get.mockResolvedValue({
-    ...entry,
-    draft: {
-      ...entry.draft,
-      form_editor: applyFormsStructure(emptyFormEditor(), {
-        pos: [
-          ...formsFixture().pos,
-          ...formsFixture({
-            pos_id: UUIDS.pos_2,
-            pos: "verb",
-            forms: [],
-            groups: []
-          }).pos
-        ]
-      })
+it.each([false, true])(
+  "打开 Step 2 后拖动默认词性保持选中（恢复本地草稿：%s）",
+  async (restore) => {
+    const api = requests();
+    api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+    const formEditor = applyFormsStructure(emptyFormEditor(), {
+      pos: [
+        ...formsFixture().pos,
+        ...formsFixture({
+          pos_id: UUIDS.pos_2,
+          pos: "verb",
+          forms: [],
+          groups: []
+        }).pos
+      ]
+    });
+    if (!isSharedForms(formEditor)) throw new Error("expected shared forms");
+    const draft = { ...entry.draft, form_editor: formEditor };
+    if (restore) {
+      const original = {
+        ...entry.draft,
+        form_editor: applyFormsStructure(
+          emptyFormEditor(),
+          formsFixture({ pos: "adjective", forms: [], groups: [] })
+        )
+      };
+      api.get.mockResolvedValue({ ...entry, draft: original });
+      vi.spyOn(localDraftStore, "readNextLocalDraft").mockResolvedValue({
+        snapshot_version: 1,
+        account_id: "editor",
+        entry_id: id,
+        target_locale: "en-GB",
+        medium_locale: "zh-Hans",
+        base_revision: entry.revision,
+        draft_schema_version: 1,
+        draft,
+        edited_pairs: {},
+        sentence_resources: [],
+        updated_at: "2026-11-22T00:00:00.000Z"
+      });
+    } else {
+      api.get.mockResolvedValue({ ...entry, draft });
     }
-  });
-  mount(api, `/lexicon-next/${id}?step=forms`);
-  await screen.findByRole("button", { name: "编辑原形内容" });
+    mount(api, `/lexicon-next/${id}?step=forms`);
+    if (restore) {
+      await screen.findByText("发现未提交的本地草稿");
+      fireEvent.click(button("恢复本地草稿"));
+    }
+    await screen.findByRole("button", { name: "编辑原形内容" });
 
-  const tabs = () => within(screen.getByRole("tablist"));
-  const noun = () => tabs().getByRole("tab", { name: /名词/ });
-  const verb = () => tabs().getByRole("tab", { name: /动词/ });
-  const expectTabs = (first: HTMLElement, second: HTMLElement) => {
-    expect(tabs().getAllByRole("tab")).toEqual([first, second]);
-    expect(noun()).toHaveAttribute("aria-selected", "true");
-    expect(verb()).toHaveAttribute("aria-selected", "false");
-  };
-  function dragNounOntoVerb() {
-    const grip = within(noun()).getByRole("button", { name: "拖动名词" });
-    const target = within(verb())
-      .getByRole("button", { name: "拖动动词" })
-      .closest(".word-pos-tab-handle")!;
-    const store = new Map<string, string>();
-    const dataTransfer = {
-      get types() {
-        return [...store.keys()];
-      },
-      setData: (type: string, value: string) => store.set(type, value),
-      getData: (type: string) => store.get(type) ?? ""
+    const tabs = () => within(screen.getByRole("tablist"));
+    const noun = () => tabs().getByRole("tab", { name: /名词/ });
+    const verb = () => tabs().getByRole("tab", { name: /动词/ });
+    const expectTabs = (first: HTMLElement, second: HTMLElement) => {
+      expect(tabs().getAllByRole("tab")).toEqual([first, second]);
+      expect(noun()).toHaveAttribute("aria-selected", "true");
+      expect(verb()).toHaveAttribute("aria-selected", "false");
     };
-    fireEvent.dragStart(grip, { dataTransfer });
-    fireEvent.dragOver(target, { dataTransfer });
-    fireEvent.drop(target, { dataTransfer });
-    fireEvent.dragEnd(grip, { dataTransfer });
+    function dragNounOntoVerb() {
+      const grip = within(noun()).getByRole("button", { name: "拖动名词" });
+      const target = within(verb())
+        .getByRole("button", { name: "拖动动词" })
+        .closest(".word-pos-tab-handle")!;
+      const store = new Map<string, string>();
+      const dataTransfer = {
+        get types() {
+          return [...store.keys()];
+        },
+        setData: (type: string, value: string) => store.set(type, value),
+        getData: (type: string) => store.get(type) ?? ""
+      };
+      fireEvent.dragStart(grip, { dataTransfer });
+      fireEvent.dragOver(target, { dataTransfer });
+      fireEvent.drop(target, { dataTransfer });
+      fireEvent.dragEnd(grip, { dataTransfer });
+    }
+
+    expectTabs(noun(), verb());
+    dragNounOntoVerb();
+    expectTabs(verb(), noun());
+    expect(button("编辑原形内容")).toBeVisible();
+
+    fireEvent.click(stepButton(/^词义与例句/));
+    expectTabs(verb(), noun());
+    fireEvent.click(stepButton(/^词形与发音/));
+
+    dragNounOntoVerb();
+    expectTabs(noun(), verb());
+    expect(button("编辑原形内容")).toBeVisible();
+    fireEvent.click(stepButton(/^词义与例句/));
+    expectTabs(noun(), verb());
   }
-
-  expectTabs(noun(), verb());
-  dragNounOntoVerb();
-  expectTabs(verb(), noun());
-  expect(button("编辑原形内容")).toBeVisible();
-
-  fireEvent.click(stepButton(/^词义与例句/));
-  expectTabs(verb(), noun());
-  fireEvent.click(stepButton(/^词形与发音/));
-
-  dragNounOntoVerb();
-  expectTabs(noun(), verb());
-  expect(button("编辑原形内容")).toBeVisible();
-  fireEvent.click(stepButton(/^词义与例句/));
-  expectTabs(noun(), verb());
-});
+);
 
 it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，保存并重新打开不丢内容", async () => {
   const loadCatalog = vi.spyOn(partOfSpeechDataSource, "catalog");

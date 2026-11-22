@@ -996,6 +996,7 @@ export function PronunciationPreviewControls({
   }, [discardResult]);
 
   const stopPlayback = useCallback(() => {
+    pendingGenerateRef.current = false;
     generationRef.current = null;
     cleanup();
     setBusy(false);
@@ -1074,6 +1075,7 @@ export function PronunciationPreviewControls({
         : !context.enabled || context.voicesLoading || !text)
     )
       return;
+    claimPlayback(stopPlayback);
     if (
       !assetOnly &&
       resolved.profile?.dubbing &&
@@ -1110,7 +1112,6 @@ export function PronunciationPreviewControls({
       );
       return;
     }
-    claimPlayback(stopPlayback);
     const generation = Symbol("pronunciation-preview-generation");
     generationRef.current = generation;
     cleanup();

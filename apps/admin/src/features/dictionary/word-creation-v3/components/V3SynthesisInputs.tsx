@@ -37,6 +37,7 @@ import {
   editSynthesisUpsWords,
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
+  savedVoiceAudioAsset,
   synthesisInputIssue,
   pronunciationLocale,
   synthesisLocaleIssue,
@@ -682,6 +683,10 @@ export function V3SynthesisInputs({
                           const phonemeSpeech = isPhoneme
                             ? candidate[`${option.value}_speech`]
                             : undefined;
+                          const savedProfile =
+                            option.value === "spelling"
+                              ? spellingSpeech?.voice_profile
+                              : phonemeSpeech?.voice_profile;
                           const previewContent =
                             option.value === "spelling"
                               ? (spellingContent ?? {
@@ -749,7 +754,10 @@ export function V3SynthesisInputs({
                                 audioAssetId={
                                   option.value === "upload"
                                     ? (recording ?? recordings[0])?.id
-                                    : undefined
+                                    : savedVoiceAudioAsset(
+                                        savedProfile,
+                                        sideLocale
+                                      )
                                 }
                                 audioAssets={
                                   option.value === "upload"
@@ -772,12 +780,10 @@ export function V3SynthesisInputs({
                                 disabledReason={previewDisabledReason}
                                 content={previewContent}
                                 voiceProfile={
-                                  option.value === "spelling"
-                                    ? spellingSpeech?.voice_profile
-                                    : isPhoneme
-                                      ? (phonemeSpeech?.voice_profile ??
-                                        pronunciation.voice_profile)
-                                      : undefined
+                                  savedProfile ??
+                                  (isPhoneme
+                                    ? pronunciation.voice_profile
+                                    : undefined)
                                 }
                               />
                               {option.value === "spelling" &&

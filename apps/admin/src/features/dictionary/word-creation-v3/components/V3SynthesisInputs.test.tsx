@@ -155,6 +155,7 @@ function Harness({
   legacyPhrase = false,
   settingsPhrase = false,
   generated = false,
+  generatedLocale,
   recording = false,
   extraRecording = false,
   issues = [],
@@ -169,6 +170,7 @@ function Harness({
   legacyPhrase?: boolean;
   settingsPhrase?: boolean;
   generated?: boolean;
+  generatedLocale?: "en-GB";
   recording?: boolean;
   extraRecording?: boolean;
   issues?: readonly V3DraftValidationIssue[];
@@ -188,6 +190,7 @@ function Harness({
           voice_id: "en-gb-sonia",
           enabled: true,
           rate_percent: 0,
+          ...(generatedLocale ? { locale: generatedLocale } : {}),
           audio_asset_id: "stored-audio"
         }
       ]
@@ -338,6 +341,22 @@ function Harness({
     </App>
   );
 }
+
+it("音色解析失败时仍可读取编辑窗中已保存的正式音频", async () => {
+  speech.resolve.mockRejectedValue(new Error("音色目录暂不可用"));
+  render(<Harness dialect="uk" generated generatedLocale="en-GB" />);
+  const play = screen.getByLabelText(
+    "第 1 条发音 英式 Azure IPA 最终读音 播放语音"
+  );
+  expect(play).toBeEnabled();
+  fireEvent.click(play);
+  await waitFor(() =>
+    expect(speech.resolveAudio).toHaveBeenCalledWith("stored-audio", {
+      signal: expect.any(AbortSignal)
+    })
+  );
+  expect(speech.synthesize).not.toHaveBeenCalled();
+});
 
 it("真实音素设置保存先回写最新配音资产再触发业务保存", async () => {
   let latest: WordPronunciationV3 | undefined;
