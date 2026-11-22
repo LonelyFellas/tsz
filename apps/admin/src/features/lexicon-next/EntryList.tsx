@@ -156,13 +156,17 @@ export function EntryList({
   const result = useQuery({
     queryKey: ["admin-lexicon-next", "list", query],
     queryFn: () => requests.workspaceList(query),
-    retry: false
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
   });
   const stats = useQuery({
     queryKey: ["admin-lexicon-next", "stats", statsQuery],
     queryFn: () => requests.stats(statsQuery),
     enabled: !trashMode,
-    retry: false
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
   });
   const creators = useQuery({
     queryKey: ["admin-lexicon-next", "creators", languageQuery, trashMode],
@@ -172,7 +176,9 @@ export function EntryList({
         ...(trashMode ? { status: "archived" } : {})
       }),
     enabled: advancedExpanded,
-    retry: false
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
   });
   const updaters = useQuery({
     queryKey: ["admin-lexicon-next", "updaters", languageQuery, trashMode],
@@ -182,7 +188,9 @@ export function EntryList({
         ...(trashMode ? { status: "archived" } : {})
       }),
     enabled: advancedExpanded,
-    retry: false
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
   });
   const catalog = usePartOfSpeechCatalog();
   const lookup = useMemo(
@@ -259,7 +267,20 @@ export function EntryList({
     applyFilters({});
   }
   async function refresh() {
-    await client.invalidateQueries({ queryKey: ["admin-lexicon-next"] });
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ["admin-lexicon-next", "list"] }),
+      ...(!trashMode
+        ? [
+            client.invalidateQueries({
+              queryKey: ["admin-lexicon-next", "stats"]
+            })
+          ]
+        : []),
+      client.invalidateQueries({
+        queryKey: ["admin-lexicon-next", "creators"]
+      }),
+      client.invalidateQueries({ queryKey: ["admin-lexicon-next", "updaters"] })
+    ]);
   }
   function begin(
     action: NextListCommand["action"],

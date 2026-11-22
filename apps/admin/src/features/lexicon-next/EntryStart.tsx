@@ -228,14 +228,20 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
           lexiconNextSuggestedPartOfSpeech: suggestedPartOfSpeech
         } satisfies LexiconNextCreationNavigationState
       });
-      void Promise.all(
-        ["list", "stats", "creators"].map((key) =>
-          queryClient.invalidateQueries({
-            queryKey: ["admin-lexicon-next", key],
-            refetchType: "all"
-          })
-        )
-      ).catch(() => undefined);
+      void Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin-lexicon-next", "list"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin-lexicon-next", "stats"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin-lexicon-next", "creators"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin-lexicon-next", "updaters"]
+        })
+      ]).catch(() => undefined);
     } catch (error) {
       setUncertain(true);
       setError(

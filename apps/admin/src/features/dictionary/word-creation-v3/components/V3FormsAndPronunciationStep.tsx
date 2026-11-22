@@ -33,7 +33,13 @@ import type {
   RetiredContentSlotV3,
   RetiredStableNodeV3
 } from "@tsz/types";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
@@ -78,6 +84,7 @@ import {
 } from "../sharedFormsModel";
 import { applyDefaultFormSharing } from "../defaultFormSharing";
 import { v3IssueMessages } from "../presentationErrors";
+import { useVoiceAudioTasks, useVoiceSave } from "../voiceSaveContext";
 
 /** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
 const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
@@ -113,6 +120,7 @@ export interface V3FormsAndPronunciationStepProps {
   bindingEditingAvailable?: boolean;
   onMeaningsChange?: (meanings: DraftMeaningsStepContentWritableV3) => void;
   onGoToMeanings?: (posId: string) => void;
+  loadVoiceCatalogOnMount?: boolean;
 }
 
 function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
@@ -162,12 +170,47 @@ export function V3FormsAndPronunciationStep({
   savedSenseIds,
   bindingEditingAvailable = true,
   onMeaningsChange,
-  onGoToMeanings
+  onGoToMeanings,
+  loadVoiceCatalogOnMount = true
 }: V3FormsAndPronunciationStepProps) {
   const { t, i18n } = useLexiconEditorTranslation();
   const { modal } = App.useApp();
   const componentDisabled = useAdminDisabled();
   const [editingFormId, setEditingFormId] = useState<string>();
+  const [audioGenerationRequested, setAudioGenerationRequested] =
+    useState(false);
+  const [audioTaskVersion, setAudioTaskVersion] = useState(0);
+  const notifyAudioTaskRetry = useCallback(
+    () => setAudioTaskVersion((version) => version + 1),
+    []
+  );
+  const voiceAudioTasks = useVoiceAudioTasks();
+  const voiceSave = useVoiceSave();
+  const voiceAudioTasksRef = useRef(voiceAudioTasks);
+  const voiceSaveRef = useRef(voiceSave);
+  voiceAudioTasksRef.current = voiceAudioTasks;
+  voiceSaveRef.current = voiceSave;
+  useEffect(() => {
+    if (!audioGenerationRequested) return;
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      const tasks = [...(voiceAudioTasksRef.current?.values() ?? [])];
+      if (!tasks.length) {
+        setAudioGenerationRequested(false);
+        return;
+      }
+      for (const wait of tasks) {
+        if (!(await wait())) return;
+      }
+      if (cancelled) return;
+      await voiceSaveRef.current?.saveAudio?.();
+      if (!cancelled) setAudioGenerationRequested(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [audioGenerationRequested, audioTaskVersion]);
   const editingTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (editingFormId) return;
@@ -535,6 +578,10 @@ export function V3FormsAndPronunciationStep({
           forms={sharedForms}
           paused={!!editingFormId || value.pos.length === 0}
           onChange={onSharedFormsChange}
+          onAudioTaskRetry={notifyAudioTaskRetry}
+          loadCatalogOnMount={
+            loadVoiceCatalogOnMount || audioGenerationRequested
+          }
         />
       )}
       {editingFormId &&
@@ -557,6 +604,8 @@ export function V3FormsAndPronunciationStep({
               retiredStableNodes={retiredStableNodes}
               registerLeaveGuard={registerLeaveGuard}
               onApply={onSharedFormsChange}
+              loadCatalogOnMount={loadVoiceCatalogOnMount}
+              onRequestAudioGeneration={() => setAudioGenerationRequested(true)}
               onCancel={() => setEditingFormId(undefined)}
               onConfirm={(next) => {
                 onSharedFormsChange(next);

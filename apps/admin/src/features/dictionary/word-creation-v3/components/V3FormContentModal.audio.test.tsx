@@ -15,6 +15,7 @@ import type {
 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { V3FormContentModal } from "./V3FormContentModal";
+import { VoiceSaveContext } from "../voiceSaveContext";
 import {
   commonFormFixture,
   formsFixture,
@@ -83,7 +84,13 @@ beforeEach(() => {
 function setup(
   source: "ipa" | "ups" | "spelling" | undefined,
   emptySides: readonly ("uk" | "us")[] = [],
-  distinguish = false
+  distinguish = false,
+  options: {
+    loadCatalogOnMount?: boolean;
+    save?: () => Promise<boolean>;
+    saveAudio?: () => Promise<boolean>;
+    onRequestAudioGeneration?: () => void;
+  } = {}
 ) {
   const pronunciation = pronunciationFixture({
     synthesis: {
@@ -121,26 +128,69 @@ function setup(
     formsFixture({ forms: [form] })
   ) as SharedFormsStepContentV3;
   const confirmed = vi.fn();
+  const applied = vi.fn();
+  const modal = (
+    <V3FormContentModal
+      forms={forms}
+      formId={form.id}
+      issues={[]}
+      retiredContentSlots={[]}
+      stableVariantIds={createStableVariantIdFactory(
+        expandFormContents(forms),
+        []
+      )}
+      loadCatalogOnMount={options.loadCatalogOnMount}
+      onRequestAudioGeneration={options.onRequestAudioGeneration}
+      onApply={options.save ? applied : undefined}
+      onCancel={vi.fn()}
+      onConfirm={confirmed}
+    />
+  );
   render(
     <App>
       <PronunciationPreviewProvider>
-        <V3FormContentModal
-          forms={forms}
-          formId={form.id}
-          issues={[]}
-          retiredContentSlots={[]}
-          stableVariantIds={createStableVariantIdFactory(
-            expandFormContents(forms),
-            []
-          )}
-          onCancel={vi.fn()}
-          onConfirm={confirmed}
-        />
+        {options.save ? (
+          <VoiceSaveContext.Provider
+            value={{
+              save: options.save,
+              saveAudio: options.saveAudio
+            }}
+          >
+            {modal}
+          </VoiceSaveContext.Provider>
+        ) : (
+          modal
+        )}
       </PronunciationPreviewProvider>
     </App>
   );
-  return { confirmed, forms };
+  return { applied, confirmed, forms };
 }
+
+it("智能词库应用草稿先保存文本，再请求异步正式音频", async () => {
+  const order: string[] = [];
+  const save = vi.fn(async () => {
+    order.push("text");
+    return true;
+  });
+  const requestAudio = vi.fn(() => order.push("audio-requested"));
+  const { applied, confirmed } = setup("ipa", [], false, {
+    loadCatalogOnMount: false,
+    save,
+    saveAudio: vi.fn(async () => true),
+    onRequestAudioGeneration: requestAudio
+  });
+  fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+  await waitFor(() => expect(confirmed).toHaveBeenCalledOnce());
+  expect(save).toHaveBeenCalledWith(undefined, {
+    allowContentSave: true,
+    skipAudioTasks: true
+  });
+  expect(applied).toHaveBeenCalledOnce();
+  expect(requestAudio).toHaveBeenCalledOnce();
+  expect(order).toEqual(["text", "audio-requested"]);
+  expect(speech.generate).not.toHaveBeenCalled();
+});
 it.each([
   ["ipa", false],
   ["ups", false],

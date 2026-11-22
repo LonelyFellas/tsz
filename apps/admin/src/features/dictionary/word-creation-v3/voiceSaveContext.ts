@@ -9,6 +9,8 @@ export const VoiceSaveContext = createContext<{
   ) => Promise<boolean>;
   /** 后台正式音频完成后的无影响持久化，仅提交音频相关字段。 */
   saveAudio?: () => Promise<boolean>;
+  /** 内容弹窗延迟到宿主确认后再生成正式音频。 */
+  deferAudioGeneration?: boolean;
   failure?: string;
   /** 折叠字段的正式音频生成；业务保存先等待资产回写，再读取当前草稿。 */
   audioTasks?: Map<string, () => Promise<boolean>>;

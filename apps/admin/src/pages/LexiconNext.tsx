@@ -289,8 +289,8 @@ function EntryLoader({
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    staleTime: Infinity,
-    gcTime: 0
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000
   });
   if (query.isPending || metadata.isPending || draftSchema.isPending)
     return <Spin aria-label="正在打开词条" />;
@@ -540,7 +540,7 @@ function EntryEditor({
     queryFn: () => requests.publication(saved.id),
     enabled: publishingAvailable,
     retry: false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: false
   });
   const lock = useRef(false);
@@ -847,8 +847,7 @@ function EntryEditor({
         await Promise.all(
           ["list", "stats"].map((key) =>
             queryClient.invalidateQueries({
-              queryKey: ["admin-lexicon-next", key],
-              refetchType: "all"
+              queryKey: ["admin-lexicon-next", key]
             })
           )
         );
@@ -939,7 +938,7 @@ function EntryEditor({
         if (publishingAvailable)
           await publication.refetch().catch(() => undefined);
         void Promise.all(
-          ["list", "stats", "creators"].map((key) =>
+          ["list", "stats", "creators", "updaters"].map((key) =>
             queryClient.invalidateQueries({
               queryKey: ["admin-lexicon-next", key]
             })
@@ -1234,6 +1233,8 @@ function EntryEditor({
               <VoiceSaveContext.Provider
                 value={{
                   save: (_area, options) => save(options),
+                  saveAudio: () =>
+                    save({ allowContentSave: true, skipAudioTasks: true }),
                   failure: error,
                   audioTasks: audioTasks.current
                 }}

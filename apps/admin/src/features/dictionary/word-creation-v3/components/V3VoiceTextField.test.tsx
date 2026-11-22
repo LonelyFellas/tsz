@@ -1,4 +1,4 @@
-import { VoiceSaveContext } from "../voiceSaveContext";
+import { VoiceAudioTasksContext, VoiceSaveContext } from "../voiceSaveContext";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -73,7 +73,15 @@ import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
 const render = (
   ui: Parameters<typeof rtlRender>[0],
   options?: Parameters<typeof rtlRender>[1]
-) => rtlRender(ui, { wrapper: PronunciationPreviewProvider, ...options });
+) =>
+  rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
+        {children}
+      </PronunciationPreviewProvider>
+    ),
+    ...options
+  });
 
 const VALUE: RichTextV3 = { version: 2, text: "hello there", annotations: [] };
 
@@ -3140,6 +3148,77 @@ it("来源设置复用拼写字段，打开不生成音频或物化继承，取�
   await waitFor(() => expect(audioTasks.size).toBe(1));
   expect(generateAudio).not.toHaveBeenCalled();
   expect(onProfile).not.toHaveBeenCalled();
+});
+
+it("内容弹窗延迟正式音频时，拼写设置保存不提前生成", async () => {
+  state.flags.VOICE_PREVIEW = true;
+  const generateAudio = vi.fn().mockResolvedValue({ id: "deferred-spelling" });
+  const audioTasks = new Map<string, () => Promise<boolean>>();
+  const persisted = vi.fn().mockResolvedValue(true);
+  function Host() {
+    const opener = useRef<SpellingSettingsOpener | null>(null);
+    return (
+      <VoiceAudioTasksContext.Provider value={audioTasks}>
+        <VoiceSaveContext.Provider
+          value={{
+            audioTasks,
+            save: persisted,
+            deferAudioGeneration: true
+          }}
+        >
+          <button onClick={() => opener.current?.({ dialect: "uk" })}>
+            延迟拼写设置
+          </button>
+          <V3VoiceTextField
+            mode="spelling"
+            value={{
+              version: 2,
+              text: VALUE.text,
+              annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+            }}
+            nodeId="deferred-spelling-owner"
+            field="spelling"
+            ariaLabel="延迟拼写"
+            spellingSettingsRef={opener}
+            spellingAudioScope={{
+              activeLocales: ["en-GB"],
+              requiredLocales: ["en-GB"]
+            }}
+            voiceProfile={{
+              dubbing: {
+                area: "word",
+                uk: { mode: "local" },
+                us: { mode: "local" }
+              },
+              voices: [
+                {
+                  voice_id: "sonia",
+                  locale: "en-GB",
+                  enabled: true,
+                  rate_percent: 0
+                }
+              ]
+            }}
+            onVoiceProfileChange={vi.fn()}
+            onChange={vi.fn()}
+            previewAdapter={{
+              listVoices: state.listVoices,
+              synthesize: state.synthesize,
+              generateAudio
+            }}
+          />
+        </VoiceSaveContext.Provider>
+      </VoiceAudioTasksContext.Provider>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByText("延迟拼写设置"));
+  await screen.findByLabelText("标注工具栏");
+  fireEvent.click(await screen.findByLabelText("编辑第 1 处停顿 0.5 秒"));
+  fireEvent.click(screen.getByLabelText("停顿 1 秒"));
+  fireEvent.click(screen.getByRole("button", { name: "保存延迟拼写修改" }));
+  await waitFor(() => expect(persisted).toHaveBeenCalledOnce());
+  expect(generateAudio).not.toHaveBeenCalled();
 });
 
 it("口音设置修改共享停顿后，宿主保存等待另一口音补齐音频且保留文本标注", async () => {

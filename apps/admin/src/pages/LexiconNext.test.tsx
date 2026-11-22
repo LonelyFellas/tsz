@@ -3179,8 +3179,6 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   expect(await formProgress.findByText("1 项")).toBeVisible();
   expect(formProgress.getByText("通用英语：centre")).toBeVisible();
   expect(formProgress.queryByText("暂未添加")).toBeNull();
-  await waitFor(() => expect(textAction("保存草稿")).toBeEnabled());
-  fireEvent.click(textAction("保存草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   const draft: NextDraft = api.save.mock.calls[0]![1].draft;
   expect(draft.form_editor?.pos[0]?.pos).toBe("noun");

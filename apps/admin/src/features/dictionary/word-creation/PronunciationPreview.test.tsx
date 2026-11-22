@@ -145,7 +145,9 @@ function PreviewHarness({
   assetOnly,
   audioAssetId,
   dialect = "common",
-  readOnly = false
+  readOnly = false,
+  loadVoicesOnMount = true,
+  resolveVoicesOnMount = true
 }: {
   spelling?: string;
   content?: RichTextV2;
@@ -156,9 +158,15 @@ function PreviewHarness({
   audioAssetId?: string;
   dialect?: Dialect;
   readOnly?: boolean;
+  loadVoicesOnMount?: boolean;
+  resolveVoicesOnMount?: boolean;
 }) {
   return (
-    <PronunciationPreviewProvider readOnly={readOnly}>
+    <PronunciationPreviewProvider
+      readOnly={readOnly}
+      loadVoicesOnMount={loadVoicesOnMount}
+      resolveVoicesOnMount={resolveVoicesOnMount}
+    >
       <PronunciationPreviewControls
         pronunciationId="pronunciation-stable-id"
         spelling={spelling}
@@ -189,7 +197,7 @@ function NoticeHarness({
   dialects?: Dialect[];
 }) {
   return (
-    <PronunciationPreviewProvider>
+    <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
       <VoiceNotice dialects={dialects} />
     </PronunciationPreviewProvider>
   );
@@ -271,6 +279,50 @@ it.each([undefined, { voices: [] }])(
   }
 );
 
+it("进入页面不读取音色目录，点击获取语音后才按需读取", async () => {
+  render(
+    <PreviewHarness loadVoicesOnMount={false} resolveVoicesOnMount={false} />
+  );
+  expect(preview.listVoices).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText("获取语音"));
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+});
+
+it("进入页面不解析推荐音色，点击获取语音后才按需解析", async () => {
+  preview.resolveVoices.mockResolvedValue({
+    voices: [
+      {
+        voice_id: "british-voice",
+        version_id: "current",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: 0
+      }
+    ],
+    source: { kind: "catalog" }
+  });
+  render(
+    <PreviewHarness
+      loadVoicesOnMount={false}
+      resolveVoicesOnMount={false}
+      dialect="uk"
+      voiceProfile={{
+        voices: [],
+        dubbing: {
+          area: "word",
+          uk: { mode: "inherit" },
+          us: { mode: "inherit" }
+        }
+      }}
+    />
+  );
+  expect(preview.resolveVoices).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText("获取语音"));
+  await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalledOnce());
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+});
+
 it("默认音色摘要与播放合并解析，保存推荐后同步新参数", async () => {
   const setting = {
     voice_id: "british-voice",
@@ -284,7 +336,7 @@ it("默认音色摘要与播放合并解析，保存推荐后同步新参数", a
     .mockResolvedValue({ voices: [setting], source: { kind: "catalog" } });
   const content: RichTextV2 = { version: 2, text: "hello", annotations: [] };
   render(
-    <PronunciationPreviewProvider>
+    <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
       <PronunciationPreviewVoiceSummary
         dialect="uk"
         recommendationArea="word"
@@ -429,7 +481,7 @@ describe("PronunciationPreview", () => {
       }
     };
     const summary = (content: string) => (
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <PronunciationPreviewVoiceSummary
           dialect="uk"
           column="volume"
@@ -833,7 +885,7 @@ it.each(["uk", "us"] as const)(
       }
     };
     const view = render(
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3EnglishTextPreview value={value} showPlayback />
       </PronunciationPreviewProvider>
     );
@@ -849,7 +901,7 @@ it.each(["uk", "us"] as const)(
       delete asset.is_default;
     });
     view.rerender(
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3EnglishTextPreview value={value} showPlayback />
       </PronunciationPreviewProvider>
     );
@@ -988,7 +1040,7 @@ it("仅调速但不勾选仍可试听，并使用默认音色自己的语速", a
 
 function PairedPreview() {
   return (
-    <PronunciationPreviewProvider>
+    <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
       {["IPA", "UPS"].map((name) => (
         <PronunciationPreviewControls
           key={name}

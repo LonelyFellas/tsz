@@ -63,6 +63,10 @@ interface PreviewContextValue {
   voices: VoiceOption[];
   voicesLoading: boolean;
   voicesError: string;
+  voicesRequested: boolean;
+  loadVoices: () => Promise<VoiceOption[]>;
+  voiceResolutionRequested: boolean;
+  requestVoiceResolution: () => void;
   /** 统一内容按管理员偏好挑发音人；在 Provider 里取一次，别让每个控件各自订阅。 */
   dialectPreference: AdminDialectPreference;
   adapter: VoicePreviewAdapter;
@@ -71,6 +75,8 @@ interface PreviewContextValue {
 }
 
 const PreviewContext = createContext<PreviewContextValue | null>(null);
+const voiceCatalogQueryKey = ["admin-speech", "voices", "en"] as const;
+const voiceCatalogConsumers = new Map<string, number>();
 
 function errorMessage(error: unknown) {
   return error instanceof Error
@@ -80,10 +86,16 @@ function errorMessage(error: unknown) {
 
 export function PronunciationPreviewProvider({
   children,
-  readOnly = false
+  readOnly = false,
+  loadVoicesOnMount = false,
+  resolveVoicesOnMount = false
 }: {
   children: ReactNode;
   readOnly?: boolean;
+  /** 仅用于需要显式预热目录的宿主，默认保持按需加载。 */
+  loadVoicesOnMount?: boolean;
+  /** 仅用于兼容需要预先解析推荐音色的旧宿主，默认保持按需解析。 */
+  resolveVoicesOnMount?: boolean;
 }) {
   const activePlayback = useRef<(() => void) | null>(null);
   const claimPlayback = useCallback((stop: () => void) => {
@@ -119,34 +131,81 @@ export function PronunciationPreviewProvider({
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [voicesError, setVoicesError] = useLexiconEditorMessageState("");
+  const [voicesRequested, setVoicesRequested] = useState(false);
+  const voicesRequestRef = useRef<Promise<VoiceOption[]> | null>(null);
+  const [voiceResolutionRequested, setVoiceResolutionRequested] =
+    useState(resolveVoicesOnMount);
+  const requestVoiceResolution = useCallback(
+    () => setVoiceResolutionRequested(true),
+    []
+  );
 
   useEffect(() => {
-    if (!enabled) {
-      setVoices([]);
-      setVoicesLoading(false);
-      setVoicesError("");
-      return;
-    }
-    const controller = new AbortController();
+    if (resolveVoicesOnMount) setVoiceResolutionRequested(true);
+  }, [resolveVoicesOnMount]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const key = JSON.stringify(voiceCatalogQueryKey);
+    voiceCatalogConsumers.set(key, (voiceCatalogConsumers.get(key) ?? 0) + 1);
+    return () => {
+      const next = (voiceCatalogConsumers.get(key) ?? 1) - 1;
+      if (next > 0) {
+        voiceCatalogConsumers.set(key, next);
+        return;
+      }
+      voiceCatalogConsumers.delete(key);
+      queryClient.removeQueries({
+        queryKey: voiceCatalogQueryKey
+      });
+    };
+  }, [enabled]);
+
+  const loadVoices = useCallback(() => {
+    if (!enabled) return Promise.resolve([] as VoiceOption[]);
+    if (voicesRequestRef.current) return voicesRequestRef.current;
+    setVoicesRequested(true);
     setVoicesLoading(true);
     setVoicesError("");
-    adminVoicePreviewAdapter
-      .listVoices({ language: "en", signal: controller.signal })
+    const request = queryClient
+      .fetchQuery({
+        queryKey: voiceCatalogQueryKey,
+        queryFn: ({ signal }) =>
+          adminVoicePreviewAdapter.listVoices({ language: "en", signal }),
+        staleTime: 10 * 60 * 1000,
+        gcTime: 30 * 60 * 1000
+      })
       .then((items) => {
-        if (controller.signal.aborted) return;
         setVoices(items);
         if (items.length === 0)
           setVoicesError(
             createLexiconEditorMessage("panel_no_speakers_available")
           );
+        return items;
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setVoicesError(errorMessage(error));
+        setVoicesError(errorMessage(error));
+        throw error;
       })
       .finally(() => {
-        if (!controller.signal.aborted) setVoicesLoading(false);
+        voicesRequestRef.current = null;
+        setVoicesLoading(false);
       });
-    return () => controller.abort();
+    voicesRequestRef.current = request;
+    return request;
+  }, [enabled, setVoicesError]);
+
+  useEffect(() => {
+    if (loadVoicesOnMount) void loadVoices().catch(() => undefined);
+  }, [loadVoices, loadVoicesOnMount]);
+
+  useEffect(() => {
+    if (enabled) return;
+    voicesRequestRef.current = null;
+    setVoices([]);
+    setVoicesRequested(false);
+    setVoicesLoading(false);
+    setVoicesError("");
   }, [enabled, setVoicesError]);
 
   const value = useMemo(
@@ -158,6 +217,10 @@ export function PronunciationPreviewProvider({
       voices,
       voicesLoading,
       voicesError,
+      voicesRequested,
+      loadVoices,
+      voiceResolutionRequested,
+      requestVoiceResolution,
       dialectPreference,
       adapter: adminVoicePreviewAdapter,
       resolutionScope,
@@ -172,6 +235,10 @@ export function PronunciationPreviewProvider({
       voices,
       voicesError,
       voicesLoading,
+      voicesRequested,
+      loadVoices,
+      voiceResolutionRequested,
+      requestVoiceResolution,
       resolutionScope,
       recommendationRefresh
     ]
@@ -244,7 +311,8 @@ export function usePronunciationVoiceNotice(
 ): string | undefined {
   const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
-  if (!context?.enabled || context.voicesLoading) return undefined;
+  if (!context?.enabled || !context.voicesRequested || context.voicesLoading)
+    return undefined;
   if (context.voicesError) return context.voicesError;
   const preference = context.dialectPreference;
   const missing = dialects.filter(
@@ -301,7 +369,8 @@ function useResolvedPreviewProfile(
   content: RichTextV2,
   dialect: Dialect,
   adapter = context.adapter,
-  recommendationArea?: VoiceRecommendationArea
+  recommendationArea?: VoiceRecommendationArea,
+  resolveRequested = context.voiceResolutionRequested
 ) {
   const { t } = useLexiconEditorTranslation();
   profile = recommendationArea
@@ -326,6 +395,7 @@ function useResolvedPreviewProfile(
     const { profile, content, locale, adapter } = inputRef.current;
     if (
       !context.enabled ||
+      !resolveRequested ||
       !profile?.dubbing ||
       !adapter.resolveVoices ||
       !content.text.trim()
@@ -340,7 +410,8 @@ function useResolvedPreviewProfile(
             { profile, content, accent: locale === "en-GB" ? "gb" : "us" },
             { signal }
           ),
-        staleTime: 0,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
         retry: false
       })
       .then(({ voices }) => {
@@ -351,7 +422,7 @@ function useResolvedPreviewProfile(
           setResolved({ key, voices: [], error: errorMessage(error) });
       });
     return () => controller.abort();
-  }, [key, context.enabled, context.resolutionScope]);
+  }, [key, context.enabled, context.resolutionScope, resolveRequested]);
   if (!profile?.dubbing) return { profile, pending: false, error: undefined };
   if (!adapter.resolveVoices)
     return {
@@ -369,7 +440,7 @@ function useResolvedPreviewProfile(
         profile.voices
       )
     },
-    pending: !!content.text.trim() && resolved?.key !== key,
+    pending: resolveRequested && !!content.text.trim() && resolved?.key !== key,
     error:
       resolved?.key === key
         ? lexiconEditorMessageText(resolved.error, t)
@@ -821,6 +892,7 @@ export function PronunciationPreviewControls({
   const assetOnly = assetOnlyProp || context.readOnly || !!selectedAssetId;
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
+  const [resolveRequested, setResolveRequested] = useState(false);
   const [result, setResult] = useState<VoicePreviewResult>();
   const [status, setStatus] = useLexiconEditorMessageState("");
   const abortRef = useRef<AbortController | null>(null);
@@ -828,6 +900,8 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingGenerateRef = useRef(false);
+  const generateRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
@@ -845,7 +919,8 @@ export function PronunciationPreviewControls({
     previewContent,
     dialect,
     previewAdapter ?? context.adapter,
-    assetOnly ? undefined : recommendationArea
+    assetOnly ? undefined : recommendationArea,
+    resolveRequested || context.voiceResolutionRequested
   );
   const enabledSettings =
     resolved.profile?.voices.filter((setting) => setting.enabled) ?? [];
@@ -857,7 +932,13 @@ export function PronunciationPreviewControls({
   );
   const selectedSetting = voice
     ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
-    : undefined;
+    : resolved.profile?.voices.find(
+        (setting) =>
+          setting.enabled &&
+          (!setting.locale ||
+            speechAccentGroup(setting.locale) ===
+              speechAccentGroup(targetLocale))
+      );
   const savedAssetId =
     selectedAssetId ??
     (assetOnly
@@ -990,18 +1071,50 @@ export function PronunciationPreviewControls({
       abortRef.current ||
       (assetOnly
         ? !assetId || !adapter.resolveAudio
-        : !context.enabled ||
-          context.voicesLoading ||
-          resolved.pending ||
-          !voice ||
-          !text)
+        : !context.enabled || context.voicesLoading || !text)
     )
       return;
     if (
       !assetOnly &&
-      voice &&
+      resolved.profile?.dubbing &&
+      adapter.resolveVoices &&
+      !resolveRequested &&
+      !context.voiceResolutionRequested
+    ) {
+      pendingGenerateRef.current = true;
+      setResolveRequested(true);
+      context.requestVoiceResolution();
+      return;
+    }
+    if (!assetOnly && resolved.pending) {
+      pendingGenerateRef.current = true;
+      return;
+    }
+    let selectedVoice = voice;
+    let selectedVoiceSetting = selectedSetting;
+    if (!assetOnly && !selectedVoice) {
+      let availableVoices: VoiceOption[];
+      try {
+        availableVoices = await context.loadVoices();
+      } catch {
+        return;
+      }
+      selectedVoice = resolvePronunciationPreviewVoice(
+        availableVoices,
+        dialect,
+        context.dialectPreference,
+        resolved.profile
+      ).voice;
+      selectedVoiceSetting = selectedVoice
+        ? voiceSettingFor(resolved.profile?.voices ?? [], selectedVoice.id)
+        : undefined;
+    }
+    if (!assetOnly && !selectedVoice) return;
+    if (
+      !assetOnly &&
+      selectedVoice &&
       previewContent.annotations.some((mark) => mark.type === "phoneme") &&
-      voice.locale !== targetLocale
+      selectedVoice.locale !== targetLocale
     ) {
       setStatus(
         createLexiconEditorMessage(
@@ -1029,28 +1142,30 @@ export function PronunciationPreviewControls({
           signal: controller.signal
         });
       } else {
-        if (assetOnly || !voice) return;
+        if (assetOnly || !selectedVoice) return;
         preview = await adapter.synthesize(
           {
             language: "en",
             content: previewContent,
-            voiceId: voice.id,
-            ratePercent: selectedSetting?.rate_percent ?? 0,
-            ...(selectedSetting?.output_format
-              ? { outputFormat: selectedSetting.output_format }
+            voiceId: selectedVoice.id,
+            ratePercent: selectedVoiceSetting?.rate_percent ?? 0,
+            ...(selectedVoiceSetting?.output_format
+              ? { outputFormat: selectedVoiceSetting.output_format }
               : {}),
-            ...(selectedSetting?.pitch_semitones !== undefined
-              ? { pitchSemitones: selectedSetting.pitch_semitones }
+            ...(selectedVoiceSetting?.pitch_semitones !== undefined
+              ? { pitchSemitones: selectedVoiceSetting.pitch_semitones }
               : {}),
-            ...(selectedSetting?.volume_percent !== undefined
-              ? { volumePercent: selectedSetting.volume_percent }
+            ...(selectedVoiceSetting?.volume_percent !== undefined
+              ? { volumePercent: selectedVoiceSetting.volume_percent }
               : {}),
-            ...(selectedSetting?.style ? { style: selectedSetting.style } : {}),
-            ...(selectedSetting?.style_degree !== undefined
-              ? { styleDegree: selectedSetting.style_degree }
+            ...(selectedVoiceSetting?.style
+              ? { style: selectedVoiceSetting.style }
               : {}),
-            ...(selectedSetting?.role !== undefined
-              ? { role: selectedSetting.role }
+            ...(selectedVoiceSetting?.style_degree !== undefined
+              ? { styleDegree: selectedVoiceSetting.style_degree }
+              : {}),
+            ...(selectedVoiceSetting?.role !== undefined
+              ? { role: selectedVoiceSetting.role }
               : {})
           },
           { signal: controller.signal }
@@ -1119,6 +1234,18 @@ export function PronunciationPreviewControls({
     }
   };
 
+  generateRef.current = generate;
+  useEffect(() => {
+    if (
+      !pendingGenerateRef.current ||
+      (!resolveRequested && !context.voiceResolutionRequested) ||
+      resolved.pending
+    )
+      return;
+    pendingGenerateRef.current = false;
+    void generateRef.current();
+  }, [context.voiceResolutionRequested, resolveRequested, resolved.pending]);
+
   const replay = async () => {
     if (disabled || (!assetOnly && !context.enabled) || !result) return;
     claimPlayback(stopPlayback);
@@ -1149,24 +1276,26 @@ export function PronunciationPreviewControls({
     ? t("panel_voice_auditions_are_disabled")
     : context.voicesLoading || resolved.pending
       ? t("panel_loading_speakers")
-      : resolved.error
-        ? resolved.error
-        : context.voicesError
-          ? context.voicesError
-          : !text
-            ? content
-              ? t("panel_enter_the_dictionary_transcription_first")
-              : t("panel_enter_the_form_spelling_first")
-            : !voice
-              ? enabledSettings.length
-                ? t(
-                    "panel_the_selected_voice_does_not_match_select_a_matching_voice_in_pronunciation",
-                    { p0: targetLocale ?? t("panel_current_accent") }
-                  )
-                : t("panel_no_speakers_available_for", {
-                    p0: targetLocale ?? t("panel_english_2")
-                  })
-              : t("panel_get_audio_2");
+      : !context.voicesRequested
+        ? t("panel_get_audio_2")
+        : resolved.error
+          ? resolved.error
+          : context.voicesError
+            ? context.voicesError
+            : !text
+              ? content
+                ? t("panel_enter_the_dictionary_transcription_first")
+                : t("panel_enter_the_form_spelling_first")
+              : !voice
+                ? enabledSettings.length
+                  ? t(
+                      "panel_the_selected_voice_does_not_match_select_a_matching_voice_in_pronunciation",
+                      { p0: targetLocale ?? t("panel_current_accent") }
+                    )
+                  : t("panel_no_speakers_available_for", {
+                      p0: targetLocale ?? t("panel_english_2")
+                    })
+                : t("panel_get_audio_2");
 
   const controls = (
     <>
@@ -1200,9 +1329,9 @@ export function PronunciationPreviewControls({
                   ? !savedAssetId ||
                     !(previewAdapter ?? context.adapter).resolveAudio
                   : (!playbackOnly && !canReadSavedAudio) ||
-                    context.voicesLoading ||
+                    (context.voicesRequested && context.voicesLoading) ||
                     resolved.pending ||
-                    !voice ||
+                    (context.voicesRequested && !voice) ||
                     !text)) ||
               (!assetOnly && !context.enabled)
             }
@@ -1244,7 +1373,7 @@ export function PronunciationPreviewControls({
               disabled ||
               !context.enabled ||
               context.voicesLoading ||
-              !voice ||
+              (context.voicesRequested && !voice) ||
               !text ||
               busy
             }

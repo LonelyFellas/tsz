@@ -237,6 +237,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const requiredErrorId = useId();
   const defaultVoiceStatusId = useId();
   const businessSave = useVoiceSave();
+  const deferAudioGeneration = businessSave?.deferAudioGeneration ?? false;
   const saveRef = useRef({ onSave, businessSave });
   useLayoutEffect(() => {
     saveRef.current = { onSave, businessSave };
@@ -470,6 +471,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   const draftSpeechEnabled =
     expanded &&
+    !deferAudioGeneration &&
     canGenerateAudio &&
     env.VOICE_PREVIEW &&
     !voicePreviewIsMock &&
@@ -680,6 +682,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       }
       const next = { ...draftState, ...result, nodeId: target };
       const commitSourceAudio =
+        !deferAudioGeneration &&
         !draftSpeechEnabled &&
         (spellingSettings || textOnly) &&
         canGenerateAudio &&

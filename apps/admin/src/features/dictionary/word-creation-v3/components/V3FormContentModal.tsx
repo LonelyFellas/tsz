@@ -105,7 +105,9 @@ export function V3FormContentModal({
   registerLeaveGuard,
   onCancel,
   onConfirm,
-  onApply
+  onApply,
+  loadCatalogOnMount = true,
+  onRequestAudioGeneration
 }: {
   forms: SharedFormsStepContentV3;
   catalog?: PartOfSpeechCatalogResponse;
@@ -124,6 +126,8 @@ export function V3FormContentModal({
   onCancel: () => void;
   onConfirm: (forms: SharedFormsStepContentV3) => void;
   onApply?: (forms: SharedFormsStepContentV3) => void;
+  loadCatalogOnMount?: boolean;
+  onRequestAudioGeneration?: () => void;
 }) {
   const fallbackPartOfSpeechLabel = usePartOfSpeechLabel();
   const { t, i18n } = useLexiconEditorTranslation();
@@ -367,8 +371,22 @@ export function V3FormContentModal({
     savingRef.current = true;
     setSaving(true);
     try {
+      if (!loadCatalogOnMount && outerSave && onApply) {
+        const next = completeForms();
+        flushSync(() => onApply(next));
+        const accepted = await outerSaveRef.current!.save(undefined, {
+          allowContentSave: true,
+          skipAudioTasks: true
+        });
+        if (!accepted) return false;
+        onRequestAudioGeneration?.();
+        onConfirm(next);
+        if (leave) finishLeave(true);
+        return true;
+      }
       if (audioTasks.current.size > 0 && !(await waitForAudio())) return false;
-      onConfirm(completeForms());
+      const next = completeForms();
+      onConfirm(next);
       if (leave) finishLeave(true);
       return true;
     } catch (cause) {
@@ -714,8 +732,10 @@ export function V3FormContentModal({
     outerSave && onApply
       ? {
           audioTasks: audioTasks.current,
+          deferAudioGeneration: !loadCatalogOnMount,
           failure: outerSave.failure,
           save: async (area, options?: VoiceSaveOptions) => {
+            if (!loadCatalogOnMount && !options?.allowContentSave) return true;
             if (savingRef.current) return false;
             savingRef.current = true;
             setSaving(true);
@@ -790,6 +810,7 @@ export function V3FormContentModal({
           forms={{ ...labels, contents: [current] }}
           paused={false}
           rowOnly
+          loadCatalogOnMount={loadCatalogOnMount}
           onChange={(next) => {
             const updated = next.contents.find(
               (item) => item.id === content.id

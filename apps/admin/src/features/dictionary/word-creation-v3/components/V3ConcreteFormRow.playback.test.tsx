@@ -78,7 +78,7 @@ function Harness({
 }) {
   return (
     <App>
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3ConcreteFormRow
           content={formsFixture({ forms: [form], dialect_rules: rules })}
           dialectRules={rules}
@@ -140,7 +140,7 @@ it("总览选择词形拼写后，无独立语音配置或正式音频也可播�
   const pos = formsFixture({ forms: [form] }).pos[0]!;
   render(
     <App>
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3FormContentOverview
           rows={[
             {
@@ -205,7 +205,7 @@ it("总览明确显示停配侧且不借用旧读法音色，另一侧仍独立"
   const pos = formsFixture({ forms: [form] }).pos[0]!;
   render(
     <App>
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3FormContentOverview
           rows={[
             {
@@ -262,7 +262,7 @@ it("总览音色列按启用音色逐行展示，并让语速和音量保持同�
   const pos = formsFixture({ forms: [form] }).pos[0]!;
   render(
     <App>
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3FormContentOverview
           rows={[
             {
@@ -349,7 +349,7 @@ it("总览继承音色时按当前读法解析推荐音色", async () => {
   const pos = formsFixture({ forms: [form] }).pos[0]!;
   render(
     <App>
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3FormContentOverview
           rows={[
             {
@@ -415,7 +415,7 @@ it("总览上传音频行显示来源文件，语速和音量不伪造合成值"
   const pos = formsFixture({ forms: [form] }).pos[0]!;
   render(
     <App>
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3FormContentOverview
           rows={[
             {
@@ -489,7 +489,7 @@ it("英美独立增删拼写并用键盘排序，移动保持拼写、发音和�
     const [content, setContent] = useState(latest);
     return (
       <App>
-        <PronunciationPreviewProvider>
+        <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
           <V3ConcreteFormRow
             content={content}
             form={content.pos[0]!.forms[0]!}
@@ -558,7 +558,7 @@ it("旧服务未声明多条拼写能力时保留单条编辑并禁用新增", (
   const onChange = vi.fn();
   render(
     <App>
-      <PronunciationPreviewProvider>
+      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
         <V3ConcreteFormRow
           content={formsFixture({ forms: [form], dialect_rules: rules })}
           form={form}
