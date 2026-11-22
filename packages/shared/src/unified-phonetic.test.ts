@@ -97,6 +97,8 @@ describe("语雀统一音标规则", () => {
     ["explosions", "ɪkˈspləʊʒnz", "ɪkˈsbləʊʒənz"],
     ["panels", "ˈpænlz", "ˈpænəlz"],
     ["rhythms", "ˈrɪðmz", "ˈrɪðəmz"],
+    ["patterns", "ˈpætnz", "ˈpætənz"],
+    ["medicines", "ˈmedsnz", "ˈmɛdsənz"],
     ["atoms", "ˈætmz", "ˈætəmz"],
     ["bottles", "ˈbɒtlz", "ˈbɒtəlz"],
     ["prisms", "ˈprɪzmz", "ˈprɪzəmz"],

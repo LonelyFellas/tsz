@@ -80,22 +80,10 @@ type DictionaryConversionTarget = "actual" | "azure-ipa";
 // Isolate /z/ or /d/ only when the spelling supports the same ending.
 // The stem must still pass the syllable-final consonant cluster rule below.
 function hasSyllabicInflection(spelling: string, ipa: string): boolean {
-  if (ipa.endsWith("d")) {
-    const consonant = ipa.at(-2);
-    return (
-      (consonant === "l" || consonant === "n" || consonant === "m") &&
-      spelling.endsWith(`${consonant}ed`)
-    );
-  }
-  if (ipa.endsWith("lz")) return /(?:[aeiou]l|le)s$/u.test(spelling);
-  if (ipa.endsWith("nz")) return /[aeiou]ns$/u.test(spelling);
-  if (ipa.endsWith("mz"))
-    return (
-      /[aeiou]ms$/u.test(spelling) ||
-      (spelling.endsWith("sms") && ipa.endsWith("zmz")) ||
-      (spelling.endsWith("thms") && ipa.endsWith("ðmz"))
-    );
-  return false;
+  return (
+    (/[lnm]z$/u.test(ipa) && /[a-z]s$/u.test(spelling)) ||
+    (/[lnm]d$/u.test(ipa) && spelling.endsWith("ed"))
+  );
 }
 
 function dictionaryWord(
