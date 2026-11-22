@@ -277,6 +277,11 @@
   padding-bottom: 100px;
 }
 
+/* 只让 Step 1 的编辑内容在宽桌面居中；Step 4 保留原始左对齐基线。 */
+.word-creation-content--basics > .lexicon-next-editor {
+  margin-inline: auto;
+}
+
 .lexicon-next-editor .word-basics-workflow,
 .lexicon-next-editor .lexicon-next-draft-preview {
   box-sizing: border-box;
