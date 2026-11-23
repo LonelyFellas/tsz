@@ -590,6 +590,7 @@ export function MeaningsStep({
                                       <Space wrap>
                                         <span>词性</span>
                                         <Select
+                                          data-v3-field="part_of_speech"
                                           aria-label={`${senseLabel} ${index + 1} 词性`}
                                           placeholder="未指定词性"
                                           options={partOfSpeechCodes.map(
@@ -624,6 +625,7 @@ export function MeaningsStep({
                                   <Space wrap>
                                     <span>词性</span>
                                     <Select
+                                      data-v3-field="part_of_speech"
                                       aria-label={`${senseLabel} ${index + 1} 词性`}
                                       placeholder="未指定词性"
                                       allowClear

@@ -85,6 +85,12 @@ describe("新版发布确认", () => {
     });
     expect(screen.getByText("音频未就绪，将按文本发布")).toBeVisible();
     expect(screen.getByText("缺少音频，本次仅发布文本内容")).toBeVisible();
+    const result = screen.getByRole("region", { name: "发布检查结果" });
+    expect(result).toContainElement(
+      screen.getByRole("button", { name: "确认发布" })
+    );
+    await check();
+    expect(p.requests.publicationPreview).toHaveBeenCalledTimes(2);
     expect(p.requests.publish).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "确认发布" }));
     await waitFor(() => expect(p.onPublished).toHaveBeenCalledWith(published));

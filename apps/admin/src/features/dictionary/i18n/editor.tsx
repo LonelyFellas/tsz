@@ -9,6 +9,21 @@ import { lexiconEditorPanelMessages } from "./editor-panel-messages";
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconEditorMessages = {
+  review_sense_index: ["词义目录", "詞義目錄", "Sense index"],
+  review_title: ["预览并发布", "預覽並發布", "Preview and publish"],
+  review_version: ["预览版本", "預覽版本", "Preview version"],
+  review_draft: ["草稿预览", "草稿預覽", "Draft preview"],
+  review_current: ["当前草稿", "目前草稿", "Current draft"],
+  review_no_publication: [
+    "暂无已发布版本",
+    "暫無已發布版本",
+    "No published version"
+  ],
+  review_published: ["已发布版本", "已發布版本", "Published version"],
+  review_headword: ["词头", "詞頭", "Headword"],
+  review_explanation: ["中文解释", "中文解釋", "Chinese explanation"],
+  review_equivalents: ["中文译词", "中文譯詞", "Chinese equivalents"],
+  review_sense: ["词义 {{index}}", "詞義 {{index}}", "Sense {{index}}"],
   dialect_pair_gb: ["英式专用", "英式專用", "British-specific"],
   dialect_pair_us: ["美式专用", "美式專用", "American-specific"],
   dialect_pair_open: ["打开对应词义", "開啟對應詞義", "Open equivalent sense"],

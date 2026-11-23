@@ -92,7 +92,9 @@ export function publicationIssueLocation(
       : issue.field === "headword"
         ? "preview"
         : "meanings") as WordCreationStep,
-    pos: sense?.part_of_speech ?? grammar?.part_of_speech ?? formPos?.pos,
+    pos: sense
+      ? (sense.part_of_speech ?? "")
+      : (grammar?.part_of_speech ?? formPos?.pos),
     senseId: sense?.id,
     formId: form?.id,
     locale:
@@ -163,7 +165,9 @@ export function focusPublicationIssue(
       (location.step === "forms"
         ? document.querySelector<HTMLElement>('[aria-label="添加基本词性"]')
         : location.issue.field === "headword"
-          ? document.querySelector<HTMLElement>('[aria-label="词头"]')
+          ? document.querySelector<HTMLElement>(
+              'input[data-v3-field="headword"]'
+            )
           : undefined);
     const control = field?.matches(controlSelector)
       ? field

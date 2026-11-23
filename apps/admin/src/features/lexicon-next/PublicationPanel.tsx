@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextPublication,
@@ -8,7 +9,7 @@ import type {
   NextPublicationState,
   NextPublishInput
 } from "@tsz/types";
-import { Alert, Button, Card, Space, Tag } from "@tsz/ui/admin/display";
+import { Alert, Button, PageHeader, Space, Tag } from "@tsz/ui/admin/display";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 
 function publicationStateFromRefresh(
@@ -36,8 +37,12 @@ export function PublicationPanel({
   onRefresh,
   onPublished,
   onConflict,
-  onLocateIssue
+  onLocateIssue,
+  saveAction,
+  viewingSnapshot = false
 }: {
+  saveAction?: ReactNode;
+  viewingSnapshot?: boolean;
   entryId: string;
   revision: number;
   state?: NextPublicationState;
@@ -53,6 +58,7 @@ export function PublicationPanel({
   onConflict: () => void;
   onLocateIssue?: (issue: NextPublicationIssue) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [preview, setPreview] = useState<NextPublicationPreview>();
   const [command, setCommand] = useState<NextPublishInput>();
   const [pending, setPending] = useState(false);
@@ -145,46 +151,72 @@ export function PublicationPanel({
     }
   }
   return (
-    <Card title={<h2>发布</h2>}>
-      {stateError ? (
-        <Alert
-          type="error"
-          title="无法读取发布状态"
-          description={
-            stateError instanceof Error ? stateError.message : "请求失败"
-          }
-          action={<Button onClick={() => void onRefresh()}>重试</Button>}
-        />
-      ) : loading ? (
-        <p role="status">正在读取发布状态</p>
-      ) : (
-        <Space wrap>
-          <Tag color={state?.status === "published" ? "success" : "default"}>
-            {state?.status === "published"
-              ? "已发布"
-              : state?.status === "archived"
-                ? "已归档"
-                : "未发布"}
-          </Tag>
-          {state?.current && (
-            <span>已发布草稿版本 {state.current.revision}</span>
-          )}
-          {state?.current && state.has_unpublished_changes && (
-            <Tag color="warning">有未发布修改</Tag>
-          )}
-        </Space>
+    <div className="lexicon-publication">
+      <PageHeader
+        title={t("review_title")}
+        actions={
+          !viewingSnapshot && (
+            <>
+              {!dirty && saveAction}
+              <Button
+                type={
+                  dirty || preview?.can_publish || command
+                    ? "default"
+                    : "primary"
+                }
+                disabled={!ready || pending || !!command}
+                loading={pending && !command}
+                onClick={() => void check()}
+              >
+                检查发布
+              </Button>
+              {dirty && saveAction}
+            </>
+          )
+        }
+      >
+        {stateError ? (
+          <Alert
+            type="error"
+            title="无法读取发布状态"
+            description={
+              stateError instanceof Error ? stateError.message : "请求失败"
+            }
+            action={<Button onClick={() => void onRefresh()}>重试</Button>}
+          />
+        ) : loading ? (
+          <p role="status">正在读取发布状态</p>
+        ) : (
+          <Space wrap>
+            <Tag color={state?.status === "published" ? "success" : "default"}>
+              {state?.status === "published"
+                ? "已发布"
+                : state?.status === "archived"
+                  ? "已归档"
+                  : "未发布"}
+            </Tag>
+            {state?.current && (
+              <span>已发布草稿版本 {state.current.revision}</span>
+            )}
+            {state?.current && state.has_unpublished_changes && (
+              <Tag color="warning">有未发布修改</Tag>
+            )}
+          </Space>
+        )}
+      </PageHeader>
+      {!viewingSnapshot && dirty && (
+        <Alert type="warning" title="请先保存完整草稿，再检查发布。" />
       )}
-      {dirty && <Alert type="warning" title="请先保存完整草稿，再检查发布。" />}
-      {!canPublish && (
+      {!viewingSnapshot && !canPublish && (
         <Alert
           type="info"
           title="发布需要本人词条的发布权限，或超级管理员权限。"
         />
       )}
-      {error && <Alert type="error" title={error} />}
-      {preview && (
+      {!viewingSnapshot && error && <Alert type="error" title={error} />}
+      {!viewingSnapshot && (preview || command) && (
         <div role="region" aria-label="发布检查结果">
-          {preview.issues.length > 0 && (
+          {!!preview?.issues.length && (
             <Alert
               type="error"
               title="请补齐以下内容后重新检查"
@@ -208,7 +240,7 @@ export function PublicationPanel({
               }
             />
           )}
-          {preview.warnings.length > 0 && (
+          {!!preview?.warnings.length && (
             <Alert
               type="warning"
               title={
@@ -231,30 +263,26 @@ export function PublicationPanel({
               }
             />
           )}
-          {preview.can_publish && (
-            <p>将发布已保存的草稿版本 {preview.revision}。</p>
+          {preview?.can_publish && (
+            <Alert
+              type="success"
+              showIcon
+              title={`检查通过，将发布已保存的草稿版本 ${preview.revision}。`}
+            />
+          )}
+          {/* 确认操作放在检查结果之后，避免检查返回时承接同一位置的第二次点击。 */}
+          {(preview?.can_publish || command) && (
+            <Button
+              className="lexicon-review-confirm"
+              loading={pending && !!command}
+              disabled={pending || (!command && (!ready || !canPublish))}
+              onClick={() => void publish()}
+            >
+              {command ? "重试确认发布结果" : "确认发布"}
+            </Button>
           )}
         </div>
       )}
-      <Space wrap>
-        <Button
-          disabled={!ready || pending || !!command}
-          loading={pending && !command}
-          onClick={() => void check()}
-        >
-          检查发布
-        </Button>
-        {(preview?.can_publish || command) && (
-          <Button
-            type="primary"
-            loading={pending && !!command}
-            disabled={pending || (!command && (!ready || !canPublish))}
-            onClick={() => void publish()}
-          >
-            {command ? "重试确认发布结果" : "确认发布"}
-          </Button>
-        )}
-      </Space>
-    </Card>
+    </div>
   );
 }
