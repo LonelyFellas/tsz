@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { NextDefinition, NextGrammarStructure } from "@tsz/types";
-import { Button, Empty } from "@tsz/ui/admin/display";
+import { Button, EmptyState } from "@tsz/ui/admin/display";
 import { Input, Select } from "@tsz/ui/admin/forms";
 import { Plus, Trash2 } from "lucide-react";
 import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
@@ -66,12 +66,7 @@ export function DefinitionRows({
       collapsed={collapsed}
       onToggle={() => setCollapsed(!collapsed)}
     >
-      {!visible.length ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={`尚无${label}`}
-        />
-      ) : (
+      {visible.length > 0 && (
         <div className="lexicon-next-definition-scroll">
           <table className="lexicon-next-definition-table" aria-label={label}>
             <thead>
@@ -253,22 +248,24 @@ export function DefinitionRows({
           </table>
         </div>
       )}
-      <Button
-        block
-        type="dashed"
-        className="word-section-add-button"
-        data-v3-field="definitions"
-        icon={<Plus aria-hidden />}
-        disabled={disabled || remaining <= 0}
-        onClick={() =>
-          onChange((current) => [
-            ...current,
-            { id: crypto.randomUUID(), locale, text: "", style: "definition" }
-          ])
-        }
-      >
-        添加{label}
-      </Button>
+      <EmptyState empty={!visible.length}>
+        <Button
+          block
+          type="dashed"
+          className="word-section-add-button"
+          data-v3-field="definitions"
+          icon={<Plus aria-hidden />}
+          disabled={disabled || remaining <= 0}
+          onClick={() =>
+            onChange((current) => [
+              ...current,
+              { id: crypto.randomUUID(), locale, text: "", style: "definition" }
+            ])
+          }
+        >
+          添加{label}
+        </Button>
+      </EmptyState>
     </SenseSection>
   );
   return english ? (

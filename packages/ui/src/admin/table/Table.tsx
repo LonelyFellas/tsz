@@ -15,6 +15,7 @@ import {
   type Ref
 } from "react";
 import { Checkbox } from "../forms/Choice";
+import { EmptyState } from "../../components/ui/empty-state";
 import { Pagination, type PaginationProps } from "./Pagination";
 
 type Breakpoint = "xs" | "sm" | "md" | "lg" | "xl" | "xxl";
@@ -253,7 +254,14 @@ export function Table<T extends object>({
         rowKey={rowKey}
         data={pageRows}
         columns={viewColumns}
-        emptyText={locale?.emptyText ?? t("status.noData")}
+        emptyText={
+          loading ? null : locale?.emptyText == null ||
+            typeof locale.emptyText === "string" ? (
+            <EmptyState description={locale?.emptyText ?? t("status.noData")} />
+          ) : (
+            locale.emptyText
+          )
+        }
         expandable={
           expandable && {
             ...expandable,

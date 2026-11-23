@@ -166,11 +166,11 @@
     "inline-visual-style": 7
   },
   "apps/admin/src/features/dictionary/word-creation/word-creation.css": {
-    "raw-radius": 35,
-    "raw-color": 105,
+    "raw-radius": 34,
+    "raw-color": 102,
     "raw-font-weight": 19,
     "raw-shadow": 13,
-    "raw-font-size": 14
+    "raw-font-size": 13
   },
   "apps/admin/src/features/lexicon-next/EntryList.tsx": {
     "inline-visual-style": 1
@@ -179,7 +179,7 @@
     "inline-visual-style": 1
   },
   "apps/admin/src/features/permissions/AdminPermissionEditor.tsx": {
-    "inline-visual-style": 31
+    "inline-visual-style": 30
   },
   "apps/admin/src/features/permissions/PermissionChangeDialog.tsx": {
     "inline-visual-style": 1
@@ -230,11 +230,11 @@
   },
   "apps/admin/src/features/voices/voice-audition-panel.css": {
     "raw-radius": 2,
-    "raw-font-size": 2
+    "raw-font-size": 1
   },
   "apps/admin/src/features/voices/voice-library.css": {
     "raw-font-weight": 3,
-    "raw-font-size": 5,
+    "raw-font-size": 4,
     "raw-color": 1,
     "raw-radius": 2
   },
@@ -285,7 +285,7 @@
     "raw-shadow": 1
   },
   "packages/ui/src/admin/display/display.css": {
-    "raw-color": 22,
+    "raw-color": 21,
     "raw-font-weight": 5,
     "raw-radius": 5,
     "raw-font-size": 2

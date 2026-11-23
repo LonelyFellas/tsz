@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { useWebText } from "@/i18n/client";
 import { webDictionary } from "@/i18n/messages/dictionary";
 
@@ -187,18 +188,23 @@ function DictionaryBody({
           )}
           {results.isSuccess && profile.isSuccess && (
             <>
-              <p role="status" className="mb-4 text-sm text-foreground-muted">
-                {results.data.pagination.total
-                  ? uiText("webDictionary:v0_entries_found", {
-                      v0: results.data.pagination.total
-                    })
-                  : uiText(
-                      "webDictionary:no_results_for_v0_try_another_spelling_or_a_shorter_keyword",
-                      {
-                        v0: query
-                      }
-                    )}
-              </p>
+              {results.data.pagination.total ? (
+                <p role="status" className="mb-4 text-sm text-foreground-muted">
+                  {uiText("webDictionary:v0_entries_found", {
+                    v0: results.data.pagination.total
+                  })}
+                </p>
+              ) : (
+                <EmptyState
+                  role="status"
+                  description={uiText(
+                    "webDictionary:no_results_for_v0_try_another_spelling_or_a_shorter_keyword",
+                    {
+                      v0: query
+                    }
+                  )}
+                />
+              )}
               {results.data.items.length > 0 && (
                 <div className="overflow-hidden rounded-3xl border border-border bg-surface">
                   <div

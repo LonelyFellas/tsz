@@ -103,6 +103,35 @@ beforeEach(() => {
     pagination: { total_pages: 1 }
   });
 });
+it("区分空目录和搜索无匹配，不把尚在读取的词表当作空结果", async () => {
+  let finish!: (value: unknown) => void;
+  const empty = {
+    version: "v1",
+    ancestors: [],
+    items: [],
+    pagination: { total_pages: 1 }
+  };
+  mocks.list
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    )
+    .mockResolvedValue(empty);
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  fireEvent.click(screen.getByRole("button", { name: /选择词表/ }));
+  const dialog = within(await screen.findByRole("dialog"));
+  await dialog.findByText("正在读取词表…");
+  expect(dialog.queryByText("这里还没有可选词表")).not.toBeInTheDocument();
+  await act(async () => finish(empty));
+  await dialog.findByText("这里还没有可选词表");
+  fireEvent.change(dialog.getByLabelText("搜索词表或文件夹"), {
+    target: { value: "example" }
+  });
+  await dialog.findByText("没有匹配的词表或文件夹");
+});
+
 async function choose() {
   fireEvent.click(screen.getByRole("button", { name: /选择词表/ }));
   const dialog = await screen.findByRole("dialog");

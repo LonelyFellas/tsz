@@ -1,3 +1,4 @@
+import { EmptyState } from "@tsz/ui/admin/display";
 import { useDashboardTranslation } from "@/features/dashboard/i18n";
 import { CountUp } from "./CountUp";
 import { useState } from "react";
@@ -135,9 +136,7 @@ export function ContentTrend({
           </table>
         </div>
       ) : !data.length || data.every((point) => point.value === 0) ? (
-        <div className="dashboard-empty dashboard-trend-empty">
-          {t("no_recent_entries")}
-        </div>
+        <EmptyState description={t("no_recent_entries")} />
       ) : (
         <div
           className="dashboard-chart"

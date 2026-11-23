@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { localText } from "@/i18n/catalog";
 import { useWebLocale, useWebText } from "@/i18n/client";
 
@@ -198,9 +199,9 @@ function InvitationContent({ id }: { id: string }) {
         ) : (
           <>
             {records.data.items.length === 0 ? (
-              <PageNotice>
-                {uiText("webInvitations:no_invitations_yet")}
-              </PageNotice>
+              <EmptyState
+                description={uiText("webInvitations:no_invitations_yet")}
+              />
             ) : (
               <ul className="glass divide-y divide-border/60 rounded-3xl px-6">
                 {records.data.items.map((record) => (

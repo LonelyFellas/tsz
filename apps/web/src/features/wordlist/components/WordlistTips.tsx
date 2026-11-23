@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { lookupWebNotice, localText, type WebNotice } from "@/i18n/catalog";
 import { useWebLocale, useWebText } from "@/i18n/client";
 
@@ -578,9 +579,9 @@ function TipHistory({ userId }: { userId: string }) {
               })}
             </ul>
           ) : (
-            <PageNotice>
-              {uiText("webWordlistInteractions:no_tip_records_yet")}
-            </PageNotice>
+            <EmptyState
+              description={uiText("webWordlistInteractions:no_tip_records_yet")}
+            />
           )}
           <Pager
             page={page}

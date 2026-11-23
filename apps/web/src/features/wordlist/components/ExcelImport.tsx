@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import {
   LocalWebError,
   type WebNotice,
@@ -426,11 +427,11 @@ export function ExcelImport({
                       </p>
                     )}
                     {row.match?.status === "unmatched" && (
-                      <p className="text-sm text-foreground-muted">
-                        {uiText(
+                      <EmptyState
+                        description={uiText(
                           "webWordlistExcel:no_exact_match_create_a_custom_entry_find_candidates_or_edit_the_entry_n"
                         )}
-                      </p>
+                      />
                     )}
                     {row.match?.status === "unmatched" && (
                       <Button

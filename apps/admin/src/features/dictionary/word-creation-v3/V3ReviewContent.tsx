@@ -19,6 +19,7 @@ import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { BookOpenIcon, Volume2Icon } from "lucide-react";
 import {
+  EmptyState,
   Button,
   Card,
   Collapse,
@@ -219,9 +220,7 @@ function FormsReview({
           </Flex>
           <div className="v3-review-group-list">
             {pos.form_groups.length === 0 && (
-              <Typography.Text type="secondary">
-                {t("panel_no_form_groups_yet")}
-              </Typography.Text>
+              <EmptyState description={t("panel_no_form_groups_yet")} />
             )}
             {pos.form_groups.map((group, index) => (
               <div

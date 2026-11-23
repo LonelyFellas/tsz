@@ -8,6 +8,7 @@ import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { primaryRegionalVariant } from "@tsz/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  EmptyState,
   Alert,
   Button,
   Flex,
@@ -312,9 +313,7 @@ export function FormCandidates({
                 />
               )}
               {!pending && !stale && !plan?.changed && (
-                <Typography.Text type="secondary">
-                  {t("candidate_empty")}
-                </Typography.Text>
+                <EmptyState description={t("candidate_empty")} />
               )}
             </>
           )}

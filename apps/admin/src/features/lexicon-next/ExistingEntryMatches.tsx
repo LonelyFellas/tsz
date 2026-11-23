@@ -1,4 +1,11 @@
-import { Alert, Button, Card, Space, Spin, Tag } from "@tsz/ui/admin/display";
+import {
+  EmptyState,
+  Button,
+  Card,
+  Space,
+  Spin,
+  Tag
+} from "@tsz/ui/admin/display";
 import { Pagination } from "@tsz/ui/admin/table";
 import type { NextEntryMatches } from "@tsz/types";
 import { useEffect, useRef } from "react";
@@ -83,11 +90,7 @@ export function ExistingEntryMatches({
             })}
           </div>
         ) : (
-          <Alert
-            className="lexicon-next-empty-state"
-            type="info"
-            title="未找到智能词库中的匹配词条。"
-          />
+          <EmptyState description="未找到智能词库中的匹配词条。" />
         )}
         {result.pagination.total_pages > 1 && (
           <Pagination

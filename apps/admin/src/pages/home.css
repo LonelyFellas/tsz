@@ -256,11 +256,6 @@
 .dashboard-chart-footer:empty {
   display: none;
 }
-.dashboard-trend-empty {
-  display: grid;
-  place-items: center;
-  height: 152px;
-}
 .dashboard-production-numbers {
   display: flex;
   gap: var(--ui-space-6);

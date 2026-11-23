@@ -417,7 +417,7 @@ export function V3FormsAndPronunciationStep({
     <div className="word-forms-tabs-empty">
       <Empty
         className="word-forms-tabs-empty-content"
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
+
         description={
           <Space orientation="vertical" size={4}>
             <Typography.Text strong>{t("no_pos")}</Typography.Text>

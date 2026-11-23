@@ -537,29 +537,6 @@
   margin-inline-end: 0;
 }
 
-.word-detection-empty-state {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: var(--ui-space-3);
-  padding: 11px 14px;
-  color: var(--ui-color-text-secondary);
-  background: #f8fafc;
-  border: 1px dashed #d9e0e8;
-  border-radius: 10px;
-}
-
-.word-detection-empty-state > .lucide {
-  color: #7c8ca3;
-  font-size: 16px;
-}
-
-.word-detection-empty-state > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .word-basics-result-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -707,11 +684,6 @@
 
 .v3-basics-step .word-basics-input-card .word-field-help {
   margin-top: var(--ui-space-2);
-}
-
-.v3-basics-step .word-detection-empty-state {
-  margin-top: var(--ui-space-4);
-  padding: var(--ui-space-3) var(--ui-space-4);
 }
 
 .word-forms-tabs > .ui-tabs-nav {
@@ -1969,17 +1941,14 @@
 }
 
 .word-forms-tabs-empty {
-  display: grid;
-  min-height: 210px;
-  background: transparent;
-  place-items: center;
+  padding-block: var(--ui-space-2);
 }
 
-.word-forms-tabs-empty .ui-empty-description {
+.word-forms-tabs-empty .tsz-empty-description {
   color: inherit;
 }
 
-.word-forms-tabs-empty .ui-empty-description strong {
+.word-forms-tabs-empty .tsz-empty-description strong {
   color: #262626;
 }
 

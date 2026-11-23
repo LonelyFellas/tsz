@@ -263,19 +263,6 @@
   min-width: 0;
 }
 
-.voice-library-preview-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 64px;
-  color: var(--voice-muted);
-}
-
-.voice-library-preview-empty > .lucide {
-  font-size: 24px;
-}
-
 .voice-library-player audio {
   display: block;
   width: 100%;
@@ -310,11 +297,6 @@
   .voice-library-audition {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--ui-space-2);
-  }
-
-  .voice-library-preview-empty {
-    justify-content: flex-start;
-    min-height: 32px;
   }
 }
 

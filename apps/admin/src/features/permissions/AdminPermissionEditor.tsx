@@ -2,6 +2,7 @@ import { useAccessTranslation, accessLabel } from "./i18n";
 import { XIcon, PlusIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  EmptyState,
   Alert,
   Button,
   Divider,
@@ -142,11 +143,13 @@ function PermissionSelection({
           style={{ maxHeight: 96, overflowY: "auto", alignContent: "start" }}
         >
           {selectedTags.length === 0 ? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {availableTags.length === 0
-                ? t("no_tags_available")
-                : t("no_tags_selected")}
-            </Typography.Text>
+            <EmptyState
+              description={
+                availableTags.length === 0
+                  ? t("no_tags_available")
+                  : t("no_tags_selected")
+              }
+            />
           ) : (
             selectedTags.map((tag) => (
               <Tag
@@ -466,9 +469,7 @@ function PermissionSelection({
               ))}
             {availableTags.filter((tag) => tag.name.includes(tagSearch.trim()))
               .length === 0 && (
-              <Typography.Text type="secondary">
-                {t("no_matching_tags")}
-              </Typography.Text>
+              <EmptyState description={t("no_matching_tags")} />
             )}
           </Flex>
         </Flex>

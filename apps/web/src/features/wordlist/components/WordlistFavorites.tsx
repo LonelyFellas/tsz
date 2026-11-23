@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { localText, type WebNotice } from "@/i18n/catalog";
 
 import { useWebText } from "@/i18n/client";
@@ -65,13 +66,15 @@ function Favorites({
   return (
     <>
       {!result.data.items.length ? (
-        <PageNotice>
-          {q
-            ? uiText("webWordlistBrowser:no_matching_favourites")
-            : uiText(
-                "webWordlistBrowser:no_favourites_yet_browse_public_word_lists_and_save_some"
-              )}
-        </PageNotice>
+        <EmptyState
+          description={
+            q
+              ? uiText("webWordlistBrowser:no_matching_favourites")
+              : uiText(
+                  "webWordlistBrowser:no_favourites_yet_browse_public_word_lists_and_save_some"
+                )
+          }
+        />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {result.data.items.map(({ wordlist_id, wordlist }) => (

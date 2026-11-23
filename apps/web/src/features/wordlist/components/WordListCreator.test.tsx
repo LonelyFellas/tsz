@@ -716,6 +716,7 @@ it("automatically loads every page, searches notes across pages and preserves hi
   });
   renderWithProviders(<WordListCreator id="list" />);
   await screen.findByText("正在读取词条…");
+  expect(screen.queryByText("暂无词条")).not.toBeInTheDocument();
   // 大表单中复用工具栏节点，行操作只查询目标行。
   const controls = within(screen.getByRole("region", { name: "词条编辑" }));
   const filterInput = screen.getByLabelText("表内搜索");

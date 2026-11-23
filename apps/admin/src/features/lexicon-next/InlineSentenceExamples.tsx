@@ -14,7 +14,14 @@ import type {
   RichTextV2,
   SharedSentenceAnnotation
 } from "@tsz/types";
-import { Alert, Button, Card, Empty, Space, Tag } from "@tsz/ui/admin/display";
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  Space,
+  Tag
+} from "@tsz/ui/admin/display";
 import {
   Checkbox,
   Input,
@@ -702,14 +709,11 @@ export function InlineSentenceExamples({
                 )
               )
             )}
-            {!ids.length && (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="尚未添加例句"
-              />
-            )}
           </div>
-          <div className="next-sentence-section-actions">
+          <EmptyState
+            empty={canRead && !ids.length}
+            className="next-sentence-section-actions"
+          >
             <Button
               type="dashed"
               block
@@ -733,7 +737,7 @@ export function InlineSentenceExamples({
             >
               引用已有例句
             </Button>
-          </div>
+          </EmptyState>
         </PronunciationPreviewProvider>
       </EntryDialectContext.Provider>
     </SenseSection>

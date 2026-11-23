@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { useWebText } from "@/i18n/client";
 import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
 
@@ -237,8 +238,8 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
         <TreeItem key={item.id} {...props} item={item} />
       ))}
       {!result.data.items.length && (
-        <li className="px-6 py-2 text-xs text-foreground-subtle">
-          {uiText("webWordlistLibrary:empty_folder")}
+        <li>
+          <EmptyState>{uiText("webWordlistLibrary:empty_folder")}</EmptyState>
         </li>
       )}
       {result.data.pagination.total_pages > 1 && (

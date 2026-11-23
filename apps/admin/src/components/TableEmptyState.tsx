@@ -12,10 +12,7 @@ export function TableEmptyState({
 }) {
   const { t } = useTableTranslation();
   return (
-    <Empty
-      image={Empty.PRESENTED_IMAGE_SIMPLE}
-      description={filtered ? t("no_matches") : message}
-    >
+    <Empty description={filtered ? t("no_matches") : message}>
       {filtered && onResetFilters && (
         <Button onClick={onResetFilters}>{t("reset_filters")}</Button>
       )}

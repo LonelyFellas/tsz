@@ -100,7 +100,7 @@ export const panelClass = "glass rounded-3xl p-6 sm:p-8";
 export const listCardClass =
   "glass block rounded-3xl p-6 outline-hidden transition-[box-shadow,border-color] duration-300 hover:border-primary/30 hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
-// 空态、失败态的统一容器。
+// 加载、失败等页面提示；成功空结果使用共享 EmptyState。
 export function PageNotice({
   tone = "neutral",
   children

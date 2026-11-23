@@ -6,6 +6,7 @@ import {
 } from "./i18n";
 import { Volume2Icon } from "lucide-react";
 import {
+  EmptyState,
   Alert,
   Button,
   Flex,
@@ -75,12 +76,7 @@ export function VoicePreviewResult({
       )}
       {error && <Alert type="error" showIcon title={error} />}
       {!pending && !error && !preview && (
-        <div className="voice-library-preview-empty">
-          <Volume2Icon />
-          <Typography.Text type="secondary">
-            {t("no_preview_audio_yet")}
-          </Typography.Text>
-        </div>
+        <EmptyState description={t("no_preview_audio_yet")} />
       )}
       {preview && (
         <div className="voice-library-player">

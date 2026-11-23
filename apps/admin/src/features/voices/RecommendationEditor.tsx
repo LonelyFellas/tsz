@@ -10,7 +10,7 @@ import type {
   AdminDubbingRecommendation,
   AdminVoiceParameters
 } from "@tsz/types";
-import { Button, Space, Typography } from "@tsz/ui/admin/display";
+import { EmptyState, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Checkbox, Form, Input, Radio } from "@tsz/ui/admin/forms";
 import { Drawer } from "@tsz/ui/admin/overlays";
 import {
@@ -371,9 +371,11 @@ export function RecommendationEditor({
                   ))}
                 </Radio.Group>
                 {!candidates.length && (
-                  <Typography.Text type="secondary">
-                    {t("no_matching_voices_adjust_the_search_or_filters")}
-                  </Typography.Text>
+                  <EmptyState
+                    description={t(
+                      "no_matching_voices_adjust_the_search_or_filters"
+                    )}
+                  />
                 )}
               </div>
             </section>

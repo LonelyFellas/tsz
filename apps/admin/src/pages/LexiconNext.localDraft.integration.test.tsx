@@ -243,7 +243,7 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
     fireEvent.click(screen.getByRole("button", { name: "恢复本地草稿" }));
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "选择配对词义" })
+        screen.getByRole("button", { name: "选择对应词义" })
       ).toBeEnabled();
       expect(
         screen.queryByRole("button", { name: "解除配对" })
@@ -279,7 +279,7 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
     await screen.findByRole("button", { name: "解除配对" });
     fireEvent.click(screen.getByRole("button", { name: "解除配对" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "选择配对词义" })).toBeEnabled()
+      expect(screen.getByRole("button", { name: "选择对应词义" })).toBeEnabled()
     );
     await waitFor(() => expect(write).toHaveBeenCalledOnce());
   });

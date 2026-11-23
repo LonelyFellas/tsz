@@ -14,6 +14,7 @@ import {
   type ReactNode
 } from "react";
 import { useFieldDisabled } from "./Form";
+import { EmptyState } from "../../components/ui/empty-state";
 import { useAdminControlSize } from "../context";
 import { useInterfaceTranslation } from "@tsz/shared/i18n/react";
 
@@ -103,9 +104,16 @@ export function Select<
       }
       removeIcon={<X size="1em" aria-label={t("actions.remove")} />}
       notFoundContent={
-        props.notFoundContent === undefined
-          ? t("status.noData")
-          : props.notFoundContent
+        props.loading ? (
+          (props.notFoundContent ?? null)
+        ) : props.notFoundContent === undefined ||
+          typeof props.notFoundContent === "string" ? (
+          <EmptyState
+            description={props.notFoundContent ?? t("status.noData")}
+          />
+        ) : (
+          props.notFoundContent
+        )
       }
       onPopupVisibleChange={onOpenChange}
       popupClassName={popupClasses?.root}
@@ -143,6 +151,16 @@ function Panel<O extends CascadeOption = CascadeOption>({
     <RcCascader.Panel<O>
       {...props}
       prefixCls="ui-cascader"
+      notFoundContent={
+        props.notFoundContent === undefined ||
+        typeof props.notFoundContent === "string" ? (
+          <EmptyState
+            description={props.notFoundContent ?? t("status.noData")}
+          />
+        ) : (
+          props.notFoundContent
+        )
+      }
       disabled={useFieldDisabled(disabled)}
       expandIcon={<ChevronRight size="1em" aria-hidden="true" />}
       loadingIcon={<span aria-label={t("status.loading")}>…</span>}

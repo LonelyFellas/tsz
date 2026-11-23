@@ -733,10 +733,7 @@ function V3GrammarFormPickerLegacy({
       )}
       {pending && <Spin size="small" />}
       {!pending && !error && options.length === 0 && (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={t("creation_no_matching_forms")}
-        />
+        <Empty description={t("creation_no_matching_forms")} />
       )}
       {selected && (
         <Button size="small" onClick={() => setSelected(undefined)}>

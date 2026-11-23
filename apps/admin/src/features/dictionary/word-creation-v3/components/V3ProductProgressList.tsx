@@ -1,6 +1,6 @@
 import { useWorkspaceTranslation } from "@/features/dictionary/i18n/workspace";
 import { CheckIcon } from "lucide-react";
-import { Flex, Typography } from "@tsz/ui/admin/display";
+import { EmptyState, Flex, Typography } from "@tsz/ui/admin/display";
 import { useId, useState, type ReactNode } from "react";
 import type { V3ProductProgressDetail } from "../readiness";
 
@@ -107,8 +107,8 @@ export function V3ProductProgressList({
                 {row.key in expanded && (
                   <ul className="v3-product-progress-details">
                     {row.details.length === 0 ? (
-                      <li className="v3-product-progress-empty">
-                        {t("not_added")}
+                      <li>
+                        <EmptyState>{t("not_added")}</EmptyState>
                       </li>
                     ) : (
                       row.details.map((detail, index) => (

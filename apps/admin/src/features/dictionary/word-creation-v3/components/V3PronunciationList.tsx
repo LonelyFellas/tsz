@@ -10,7 +10,7 @@ import {
   CircleMinusIcon,
   CirclePlusIcon
 } from "lucide-react";
-import { Button, Flex, Typography } from "@tsz/ui/admin/display";
+import { EmptyState, Button, Flex, Typography } from "@tsz/ui/admin/display";
 import { Form, Select } from "@tsz/ui/admin/forms";
 import type {
   DraftFormsStepContentV3,
@@ -633,9 +633,7 @@ export function V3PronunciationList({
               })}
               {fields.length === 0 ? (
                 <>
-                  <Typography.Text type="secondary">
-                    {t("no_pronunciation")}
-                  </Typography.Text>
+                  <EmptyState description={t("no_pronunciation")} />
                   <Button
                     aria-label={t("add_pronunciation")}
                     icon={<CirclePlusIcon />}

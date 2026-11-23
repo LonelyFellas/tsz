@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import {
   lookupWebNotice,
   webCommon,
@@ -1138,8 +1139,8 @@ function Editor({
           </p>
         )}
       </section>
-      {matches.length === 0 && (
-        <PageNotice>
+      {!loadingItems && matches.length === 0 && (
+        <EmptyState>
           {filter.trim()
             ? uiText("webWordlistEditor:no_matching_entries")
             : uiText("webWordlistEditor:no_entries_yet")}
@@ -1156,7 +1157,7 @@ function Editor({
               {uiText("webWordlistEditor:clear_search")}
             </Button>
           )}
-        </PageNotice>
+        </EmptyState>
       )}
       <DndContext
         id="wordlist-entry-sort"
@@ -1526,7 +1527,7 @@ function WordRow({
         search.isSuccess &&
         !search.isFetching &&
         search.data.items.length === 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-foreground-muted">
+          <EmptyState>
             <span>{uiText("webWordlistEditor:no_matching_entries_2")}</span>
             <Button
               type="button"
@@ -1547,7 +1548,7 @@ function WordRow({
             >
               {uiText("webWordlistEditor:create_custom_entry")}
             </Button>
-          </div>
+          </EmptyState>
         )}
       {row.customWord && (
         <div className="mt-4">

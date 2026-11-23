@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import {
   lookupWebNotice,
   localText,
@@ -336,11 +337,11 @@ function Overview({ userId }: { userId: string }) {
                   </Button>
                 </div>
                 {!data.due_count && !data.relearning_count && (
-                  <p className="text-sm text-foreground-muted">
-                    {uiText(
+                  <EmptyState
+                    description={uiText(
                       "webReview:nothing_is_due_now_new_words_return_on_a_schedule_incorrect_answers_can"
                     )}
-                  </p>
+                  />
                 )}
                 {!!data.unavailable_count && (
                   <p className="text-sm text-foreground-muted">
@@ -405,7 +406,7 @@ function Overview({ userId }: { userId: string }) {
                     </Button>
                   </PageNotice>
                 ) : !items.data?.items.length ? (
-                  <PageNotice>
+                  <EmptyState>
                     {uiText("webReview:no_content_here_yet")}
                     <Link
                       className="ml-2 text-primary"
@@ -413,7 +414,7 @@ function Overview({ userId }: { userId: string }) {
                     >
                       {uiText("webReview:complete_a_learning_task")}
                     </Link>
-                  </PageNotice>
+                  </EmptyState>
                 ) : (
                   <ul className="divide-y divide-border rounded-3xl border border-border bg-surface px-5">
                     {items.data.items.map((item) => (

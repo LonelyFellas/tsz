@@ -107,10 +107,6 @@ it("默认空状态随四语更新，调用方提供的原文和显式空描述�
     view.rerender(content(locale));
     expect(list).toHaveTextContent(label);
     expect(screen.getByText("原始业务内容 centre")).toBeVisible();
-    expect(
-      screen
-        .getByTestId("explicit-empty")
-        .querySelector(".ui-empty-description")
-    ).toBeEmptyDOMElement();
+    expect(screen.getByTestId("explicit-empty")).toBeEmptyDOMElement();
   }
 });

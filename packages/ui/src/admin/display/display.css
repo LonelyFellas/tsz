@@ -497,7 +497,6 @@
   .ui-breadcrumb li:last-child {
     color: var(--ui-color-text);
   }
-  .ui-empty,
   .ui-result {
     padding: var(--ui-space-6) var(--ui-space-4);
     text-align: center;
@@ -506,16 +505,11 @@
     font-size: var(--ui-font-size-title);
     font-weight: 600;
   }
-  .ui-result-subtitle,
-  .ui-empty-description {
+  .ui-result-subtitle {
     color: var(--ui-color-text-secondary);
   }
-  .ui-result-extra,
-  .ui-empty-description + button {
+  .ui-result-extra {
     margin-top: var(--ui-space-3);
-  }
-  .ui-empty-image {
-    color: #98a2b3;
   }
   .ui-divider {
     margin: var(--ui-space-4) 0;

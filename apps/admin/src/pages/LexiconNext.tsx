@@ -1503,10 +1503,7 @@ function EntryEditor({
               loading={publishingAvailable && publication.isPending}
             >
               {!publication.error && (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={t("review_no_publication")}
-                />
+                <Empty description={t("review_no_publication")} />
               )}
             </Card>
           ) : (

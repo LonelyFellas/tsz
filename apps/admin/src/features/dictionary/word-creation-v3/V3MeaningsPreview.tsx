@@ -452,7 +452,6 @@ export function V3MeaningsPreview({
                             .map((type) => (
                               <div className="v3-relation-empty" key={type}>
                                 <Empty
-                                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                                   description={t("panel_no_yet", {
                                     p0: relationLabel(type, t)
                                   })}

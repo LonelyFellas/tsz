@@ -4,7 +4,7 @@ import { regionalVariants } from "@tsz/shared";
 import { expandFormContents } from "@tsz/shared";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
-import { CircleCheckIcon, InfoIcon, ShieldCheckIcon } from "lucide-react";
+import { CircleCheckIcon, ShieldCheckIcon } from "lucide-react";
 import type {
   AdminWordV3,
   DraftFormsStepContentV3,
@@ -15,7 +15,7 @@ import type {
   WordPronunciationV3
 } from "@tsz/types";
 import {
-  Alert,
+  EmptyState,
   Button,
   Card,
   Col,
@@ -242,14 +242,13 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
         size="small"
         title={t("creation_confirm_headwords_and_forms")}
       >
-        <Alert
-          showIcon
-          type="info"
-          title={t("creation_no_built_in_dictionary_suggestions_found")}
-          description={t(
+        <EmptyState
+          description={t("creation_no_built_in_dictionary_suggestions_found")}
+        >
+          {t(
             "creation_a_blank_draft_has_been_created_add_forms_and_pronunciation_next"
           )}
-        />
+        </EmptyState>
       </Card>
     );
   }
@@ -385,19 +384,16 @@ function V3BasicsContent({
             </Descriptions.Item>
           </Descriptions>
           {expandFormContents(word.forms).pos.length === 0 ? (
-            <div className="word-detection-empty-state">
-              <InfoIcon />
-              <div>
-                <Typography.Text strong>
-                  {t("creation_no_dictionary_suggestions_found")}
-                </Typography.Text>
-                <Typography.Text type="secondary">
-                  {t(
-                    "creation_continue_to_the_editor_to_add_forms_and_pronunciation_manually"
-                  )}
-                </Typography.Text>
-              </div>
-            </div>
+            <EmptyState>
+              <Typography.Text strong>
+                {t("creation_no_dictionary_suggestions_found")}
+              </Typography.Text>
+              <Typography.Text type="secondary">
+                {t(
+                  "creation_continue_to_the_editor_to_add_forms_and_pronunciation_manually"
+                )}
+              </Typography.Text>
+            </EmptyState>
           ) : null}
         </Card>
         <div className="word-headword-confirmation-wrap">

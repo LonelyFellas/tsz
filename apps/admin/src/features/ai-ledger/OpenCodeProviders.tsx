@@ -1,6 +1,7 @@
 import { useAiTranslation } from "./i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  EmptyState,
   Alert,
   Button,
   Divider,
@@ -197,9 +198,7 @@ export function OpenCodeProviders({
           ))
         )}
         {providers.isSuccess && !providers.data.providers.length && (
-          <Typography.Text type="secondary">
-            {t("no_providers")}
-          </Typography.Text>
+          <EmptyState description={t("no_providers")} />
         )}
         {change.isError && (
           <Alert type="error" showIcon title={t("credential_unconfirmed")} />

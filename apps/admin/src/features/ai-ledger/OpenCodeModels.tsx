@@ -1,7 +1,14 @@
 import { useAiTranslation, type AiTranslation } from "./i18n";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Tag, Flex, Typography } from "@tsz/ui/admin/display";
+import {
+  EmptyState,
+  Alert,
+  Button,
+  Tag,
+  Flex,
+  Typography
+} from "@tsz/ui/admin/display";
 import { Select } from "@tsz/ui/admin/forms";
 import { RadarIcon, RotateCwIcon } from "lucide-react";
 import type { OpenCodeModelSelection, OpenCodeModelProbe } from "@tsz/types";
@@ -245,7 +252,7 @@ export function OpenCodeModels({ adminId }: { adminId: string }) {
           <Alert type="warning" showIcon title={t("current_unavailable")} />
         )}
       {catalog.isSuccess && !models.length && (
-        <Alert type="info" showIcon title={t("no_models")} />
+        <EmptyState description={t("no_models")} />
       )}
       <details className="settings-model-details">
         <summary>{t("probe_results", { count: models.length })}</summary>

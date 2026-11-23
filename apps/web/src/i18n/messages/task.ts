@@ -962,6 +962,16 @@ export const webTask = /* @__PURE__ */ defineWebMessages(
     word_list_directory: ["词表目录", "詞表目錄", "Word list directory"],
     root_folder: ["根目录", "根目錄", "Root folder"],
     could_not_load: ["读取失败", "讀取失敗", "Could not load"],
+    no_matching_sources: [
+      "没有匹配的词表或文件夹",
+      "沒有符合的詞表或資料夾",
+      "No matching word lists or folders"
+    ],
+    no_sources_here: [
+      "这里还没有可选词表",
+      "這裡還沒有可選詞表",
+      "No word lists here yet"
+    ],
     loading_word_lists: [
       "正在读取词表…",
       "正在讀取詞表…",

@@ -68,16 +68,25 @@ export const lexiconEditorMessages = {
   ],
   dialect_pair_use: ["选用此义项", "選用此義項", "Use this sense"],
   dialect_pair_usage: ["方言用法", "方言用法", "Dialect usage"],
-  dialect_pair_equivalent: [
-    "对应方言词义",
-    "對應方言詞義",
-    "Equivalent in the other dialect"
+  dialect_pair_us_equivalent: [
+    "对应的美式词义",
+    "對應的美式詞義",
+    "American equivalent"
   ],
-  dialect_pair_paired: ["已配对", "已配對", "Paired"],
+  dialect_pair_gb_equivalent: [
+    "对应的英式词义",
+    "對應的英式詞義",
+    "British equivalent"
+  ],
+  dialect_pair_confirm_none: [
+    "确认无对应词义",
+    "確認無對應詞義",
+    "Confirm no equivalent"
+  ],
   dialect_pair_replace: ["更换配对", "更換配對", "Change pair"],
   dialect_pair_choose: [
-    "选择配对词义",
-    "選擇配對詞義",
+    "选择对应词义",
+    "選擇對應詞義",
     "Select equivalent sense"
   ],
   dialect_pair_unlink: ["解除配对", "解除配對", "Unlink pair"],

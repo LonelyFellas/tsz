@@ -93,7 +93,7 @@
 - 普通内容卡使用 `panelClass`（`glass rounded-3xl p-6 sm:p-8`）；可点击的列表卡使用 `listCardClass`，悬停时提亮描边并浮起阴影。
 - 页面焦点卡（认证表单、学习首页、落地页功能卡）使用 `glass rounded-3xl p-2` 外框包一层 `rounded-[20px] bg-surface/70` 内卡；说明性小卡使用 `rounded-2xl border border-border/60 bg-muted/70`，图标放在 40px 白底 `rounded-xl` 方块内。一页通常只有一张焦点卡，承载该页的主体信息或主表单。
 - 卡内的作者注、审核意见、确认摘要等次级信息使用 `rounded-2xl bg-muted/70 px-4 py-3`；仅自己可见的内容（如私密备注）用虚线描边区分。
-- 空态、加载、失败统一用 `PageNotice`（失败传 `tone="error"`，自带 `role="alert"`），不在页面里散写居中灰字。
+- 空集合、搜索无匹配使用 `@tsz/ui/components/empty-state` 的 `EmptyState`：不加占位图或固定高度，已有明确录入入口时只保留操作。加载和失败继续用 `PageNotice`（失败传 `tone="error"`），不当成空结果。
 - 页面区块不铺整块背景色，让网格底纹透出；不使用整块深色卡片作对比。
 - 阴影主要用于菜单、弹层等浮动层，使用轻阴影；避免强阴影、重描边和高饱和背景同时出现。
 - 不为一行文字嵌套多层卡片。相关设置项可共用容器，必要时使用内部细分隔线；最后一项下方不保留多余分隔线和空白。
@@ -210,7 +210,7 @@
 | `PageHeader`                                                         | 返回入口 → 小标 → 标题 → 说明，右侧 `actions` 放页面级操作           |
 | `panelClass`                                                         | 普通毛玻璃内容卡                                                     |
 | `listCardClass`                                                      | 可点击的列表卡                                                       |
-| `PageNotice`                                                         | 空态、加载与失败                                                     |
+| `EmptyState` / `PageNotice`                                          | 空态 / 加载与失败                                                    |
 | `Segmented`                                                          | 同组互斥筛选（如阅读模式、词表分类），选中项通过 `aria-pressed` 暴露 |
 | `Pager`                                                              | 翻页；只有一页时不渲染，当前页越界时仍保留“上一页”                   |
 | `ComingSoon`                                                         | 尚未开放的功能页：说明现状并给出当前可用入口                         |

@@ -28,7 +28,7 @@ export function NextTargetPicker({
 }) {
   const [entries, setEntries] = useState<NextEntry[]>([]);
   const [choices, setChoices] = useState<NextTargetChoice[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const key = useMemo(
     () => `${literal}:${targetLocale}:${mediumLocale}`,
@@ -95,8 +95,12 @@ export function NextTargetPicker({
           ))}
         </Flex>
       )}
-      {!loading && !error && choices.length === 0 && entries.length === 0 && (
-        <Empty description="没有匹配的新版词条" />
+      {!loading && !error && choices.length === 0 && entries.length <= 1 && (
+        <Empty
+          description={
+            entries.length ? "该词条没有可选的关联目标" : "没有匹配的新版词条"
+          }
+        />
       )}
       {choices.length > 0 && (
         <Flex vertical gap="small">

@@ -366,13 +366,10 @@
   font-size: var(--ui-font-size-sm);
   margin-right: var(--ui-space-2);
 }
-.v3-review .ui-empty {
+.v3-review .tsz-empty-state {
   margin: var(--ui-space-4) 0;
 }
-.v3-review .ui-empty-image {
-  height: 28px;
-}
-.v3-review .ui-empty-description {
+.v3-review .tsz-empty-description {
   font-size: var(--ui-font-size-sm);
   color: var(--review-muted);
 }
@@ -504,9 +501,6 @@
   display: inline-block;
   min-width: 120px;
   margin-right: var(--ui-space-3);
-}
-.v3-relation-empty .ui-empty-image {
-  height: 22px;
 }
 .v3-dictionary-usage small {
   display: block;

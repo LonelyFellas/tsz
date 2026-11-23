@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { localText, type WebNotice } from "@/i18n/catalog";
 
 import { useWebText } from "@/i18n/client";
@@ -1032,12 +1033,14 @@ function Detail({
           </div>
           {loadedItems.length > 0 &&
             loadedItems.every((item) => !item.entry && !item.custom_word) && (
-              <PageNotice>
-                {uiText("webWordlistDetail:all_loaded_entries_are_unavailable")}
-              </PageNotice>
+              <EmptyState
+                description={uiText(
+                  "webWordlistDetail:all_loaded_entries_are_unavailable"
+                )}
+              />
             )}
           {loadedItems.length === 0 ? (
-            <PageNotice>
+            <EmptyState>
               {q
                 ? uiText("webWordlistDetail:no_matching_entries")
                 : uiText("webWordlistDetail:no_entries_yet")}
@@ -1054,7 +1057,7 @@ function Detail({
                   {uiText("webWordlistDetail:clear_search")}
                 </Button>
               )}
-            </PageNotice>
+            </EmptyState>
           ) : (
             <div
               ref={loadMoreRef}

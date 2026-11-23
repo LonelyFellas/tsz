@@ -1,0 +1,11 @@
+:where(.tsz-empty-state) {
+  min-inline-size: 0;
+  padding-block: var(--ui-space-1, 0.25rem);
+  overflow-wrap: anywhere;
+  color: var(--ui-color-text-secondary, rgb(var(--ch-foreground-muted)));
+  font-size: var(--ui-font-size-compact, 0.875rem);
+  line-height: var(--ui-line-height, 1.5);
+}
+:where(.tsz-empty-description:not(:last-child)) {
+  margin-block-end: var(--ui-space-2, 0.5rem);
+}
