@@ -71,6 +71,7 @@ export function LocalVoicePool({
   loading,
   recommendations,
   area,
+  generateOnComplete = false,
   locale,
   nativeAuditionLocale,
   content,
@@ -109,6 +110,7 @@ export function LocalVoicePool({
   loading: boolean;
   recommendations: VoiceRecommendation[];
   area: VoiceRecommendationArea;
+  generateOnComplete?: boolean;
   locale?: AudioAssetLocale;
   nativeAuditionLocale?: AudioAssetLocale;
   content: RichTextV2;
@@ -143,6 +145,7 @@ export function LocalVoicePool({
   audioAssets?: AudioAsset[];
 }) {
   const { t } = useVoiceEditorTranslation();
+  const grammarParameters = area === "grammar";
   const sides = voiceSides(t).filter(
     (side) => !locale || locale === side.locale
   );
@@ -534,7 +537,11 @@ export function LocalVoicePool({
       <div className="tsz-ve-pool-current-header">
         <div className="tsz-ve-pool-heading">
           <Typography.Title level={5}>
-            {t("current_voice_settings")}
+            {t(
+              grammarParameters
+                ? "dubbing_parameters"
+                : "current_voice_settings"
+            )}
           </Typography.Title>
           <Popover
             title={t("voice_and_playback_rules")}
@@ -542,11 +549,13 @@ export function LocalVoicePool({
             trigger={["hover", "focus"]}
             content={
               <div className="tsz-ve-pool-help-content">
-                <Typography.Paragraph>
-                  {t(
-                    "selected_voices_for_this_text_are_listed_below_audition_them_change_their_o"
-                  )}
-                </Typography.Paragraph>
+                {!grammarParameters && (
+                  <Typography.Paragraph>
+                    {t(
+                      "selected_voices_for_this_text_are_listed_below_audition_them_change_their_o"
+                    )}
+                  </Typography.Paragraph>
+                )}
                 <Typography.Paragraph>
                   {t(
                     "from_question_2_onwards_probability_is_each_voice_s_chance_of_being_played"
@@ -573,7 +582,11 @@ export function LocalVoicePool({
             disabled={readOnly}
             onClick={() => onRestore()}
           >
-            {t("restore_default_recommendations")}
+            {t(
+              grammarParameters
+                ? "restore_all_defaults"
+                : "restore_default_recommendations"
+            )}
           </Button>
         </Tooltip>
       </div>
@@ -658,11 +671,13 @@ export function LocalVoicePool({
                         <Typography.Text strong>
                           {t("no_voices_selected")}
                         </Typography.Text>
-                        <Typography.Text type="secondary">
-                          {t(
-                            "select_a_recommendation_below_or_add_voices_from_the_full_catalogue"
-                          )}
-                        </Typography.Text>
+                        {!grammarParameters && (
+                          <Typography.Text type="secondary">
+                            {t(
+                              "select_a_recommendation_below_or_add_voices_from_the_full_catalogue"
+                            )}
+                          </Typography.Text>
+                        )}
                       </div>
                     </div>
                   )}
@@ -762,7 +777,11 @@ export function LocalVoicePool({
                           <Typography.Text type="secondary">
                             {generatingVersion === key
                               ? t("generating_final_audio")
-                              : t("final_audio_not_generated")}
+                              : t(
+                                  generateOnComplete
+                                    ? "generate_audio_on_completion"
+                                    : "final_audio_not_generated"
+                                )}
                           </Typography.Text>
                         )}
                         {probability === undefined && (
@@ -882,7 +901,13 @@ export function LocalVoicePool({
                   {side.label} {t("recommended_voices")}
                 </Typography.Title>
                 <div className="tsz-ve-pool-recommendation-row tsz-ve-pool-head">
-                  <span>{t("local_recommendation")}</span>
+                  <span>
+                    {t(
+                      grammarParameters
+                        ? "recommendation"
+                        : "local_recommendation"
+                    )}
+                  </span>
                   <span>{t("source_group")}</span>
                   <span>{t("audition")}</span>
                   <span>{t("voice")}</span>
@@ -965,7 +990,11 @@ export function LocalVoicePool({
       <details className="tsz-ve-pool-catalog-disclosure">
         <summary>
           <span className="tsz-ve-pool-heading">
-            <span>{t("full_voice_catalogue")}</span>
+            <span>
+              {t(
+                grammarParameters ? "voice_catalogue" : "full_voice_catalogue"
+              )}
+            </span>
             <Popover
               title={t("selection_and_audition_guidance")}
               placement="bottomLeft"

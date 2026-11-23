@@ -5,7 +5,7 @@ import { Input } from "@tsz/ui/admin/forms";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { sortableRowClass, useSortableRows } from "../sortableRows";
-import { SortableDragHandle } from "./SortableDragHandle";
+import { V3SortableRowIndex } from "./V3SortableRowIndex";
 
 const SENSE_GROUP_DRAG_TYPE = "application/x-tsz-v3-sense-group";
 const SORTABLE_ROW_SELECTOR =
@@ -64,7 +64,7 @@ export function V3SenseGroupsCard({
         {groups.map((group, groupIndex) => (
           <div
             className={sortableRowClass(
-              "word-sense-group-item",
+              "word-sense-group-item word-sortable-row",
               sorting,
               groupIndex
             )}
@@ -74,21 +74,14 @@ export function V3SenseGroupsCard({
             onDragOver={(event) => sorting.handleDragOver(event, groupIndex)}
             onDrop={(event) => sorting.handleDrop(event, groupIndex)}
           >
-            <span className="word-sort-leading">
-              <SortableDragHandle
-                dragImageSelector={SORTABLE_ROW_SELECTOR}
-                index={groupIndex}
-                label={t("drag_group", { index: groupIndex + 1 })}
-                singleItemTitle={t("two_groups_required")}
-                sorting={sorting}
-              />
-              <span
-                aria-label={t("group_index", { index: groupIndex + 1 })}
-                className="word-sense-group-index"
-              >
-                {groupIndex + 1}
-              </span>
-            </span>
+            <V3SortableRowIndex
+              dragImageSelector={SORTABLE_ROW_SELECTOR}
+              index={groupIndex}
+              indexLabel={t("group_index", { index: groupIndex + 1 })}
+              label={t("drag_group", { index: groupIndex + 1 })}
+              singleItemTitle={t("two_groups_required")}
+              sorting={sorting}
+            />
             <div className="word-sense-group-field">
               <Input
                 aria-label={t("group_chinese", { index: groupIndex + 1 })}

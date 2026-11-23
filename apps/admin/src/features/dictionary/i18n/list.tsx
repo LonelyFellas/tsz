@@ -39,9 +39,25 @@ export const lexiconListMessages = {
     "The result is unknown. Retry this request rather than starting a new action"
   ],
   next_restore_help: [
-    "恢复后为草稿，不会自动发布。任意一条冲突时，整批保持原状。",
-    "恢復後為草稿，不會自動發布。任一詞條衝突時，整批維持原狀。",
-    "Restored entries remain drafts. A conflict leaves the entire batch unchanged."
+    "词条会恢复到归档前的状态。任意一条冲突时，整批保持原状。",
+    "詞條會恢復到封存前的狀態。任一詞條衝突時，整批維持原狀。",
+    "Entries return to their status before archiving. A conflict leaves the entire batch unchanged."
+  ],
+  next_restored: ["词条已恢复", "詞條已恢復", "Entry restored"],
+  next_restored_published: [
+    "词条已恢复发布状态",
+    "詞條已恢復發布狀態",
+    "Entry restored to published status"
+  ],
+  next_restored_count: [
+    "已恢复 {{count}} 个词条",
+    "已恢復 {{count}} 個詞條",
+    "Restored {{count}} entries"
+  ],
+  next_restored_status_counts: [
+    "已恢复 {{count}} 个词条（草稿 {{drafts}} 个，已发布 {{published}} 个）",
+    "已恢復 {{count}} 個詞條（草稿 {{drafts}} 個，已發布 {{published}} 個）",
+    "Restored {{count}} entries ({{drafts}} drafts, {{published}} published)"
   ],
   next_more_actions: [
     "更多操作：{{label}}",

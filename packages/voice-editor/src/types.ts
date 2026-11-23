@@ -345,6 +345,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   previewAdapter?: VoicePreviewAdapter;
   /** 正式音频由宿主的完成动作或显式生成按钮安排。 */
   deferAudioGeneration?: boolean;
+  /** 录入时沿用已解析的音色，宿主完成动作按最新正文校验配音。 */
+  deferContentVoiceResolution?: boolean;
   /** Catalogue reads remain available when synthesis is disabled by the host. */
   previewEnabled?: boolean;
   loadRecommendations?: LoadVoiceRecommendations;

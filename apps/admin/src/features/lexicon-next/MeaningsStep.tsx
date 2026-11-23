@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
-import { Button, Alert, Flex, Space, Tabs } from "@tsz/ui/admin/display";
+import { Button, Alert, Flex, Space } from "@tsz/ui/admin/display";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { V3SenseGroupsCard } from "@/features/dictionary/word-creation-v3/components/V3SenseGroupsCard";
 import {
@@ -21,8 +21,7 @@ import {
 } from "@/features/dictionary/word-creation-v3/components/V3SenseEditorShell";
 import { V3SenseMetadataFields } from "@/features/dictionary/word-creation-v3/components/V3SenseMetadataFields";
 import { Select } from "@tsz/ui/admin/forms";
-import { App } from "@tsz/ui/admin/overlays";
-import { CircleMinus, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import type {
   DraftFormsStepContentV3,
   NextDefinition,
@@ -43,7 +42,7 @@ import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
 import { partOfSpeechKeys } from "@/features/dictionary/part-of-speech/api";
 import { localizedCatalogName } from "@/features/dictionary/part-of-speech/catalog";
 import { V3AddBasicPosSelect } from "@/features/dictionary/word-creation-v3/components/V3AddBasicPosSelect";
-import { SortableDragHandle } from "@/features/dictionary/word-creation-v3/components/SortableDragHandle";
+import { V3BasicPosTabs } from "@/features/dictionary/word-creation-v3/components/V3BasicPosTabs";
 import {
   addPartOfSpeech,
   deletePartOfSpeech,
@@ -52,12 +51,7 @@ import {
 } from "@/features/dictionary/word-creation-v3/operations";
 import { applyFormsStructure } from "@/features/dictionary/word-creation-v3/sharedFormsModel";
 import { applyDefaultFormSharing } from "@/features/dictionary/word-creation-v3/defaultFormSharing";
-import {
-  sortableRowClass,
-  sortableTabOffset,
-  useSortableRows
-} from "@/features/dictionary/word-creation-v3/sortableRows";
-import "@/features/dictionary/word-creation-v3/posTabs.css";
+import { useSortableRows } from "@/features/dictionary/word-creation-v3/sortableRows";
 
 export function MeaningsStep({
   value,
@@ -116,7 +110,6 @@ export function MeaningsStep({
   onSelectedPosChange?: (code: string) => void;
   onChange: Dispatch<SetStateAction<NextDraft>>;
 }) {
-  const { modal } = App.useApp();
   const { t, i18n } = useLexiconEditorTranslation();
   const catalog = useQuery({
     queryKey: partOfSpeechKeys.catalog(),
@@ -185,6 +178,7 @@ export function MeaningsStep({
         [])
     ])
   ];
+  const showEmptyAddButton = formEditorAvailable && codes.length === 0;
   if (!codes.length) codes.push("");
   const activePos = codes.includes(selectedPos ?? "")
     ? (selectedPos ?? "")
@@ -228,6 +222,21 @@ export function MeaningsStep({
     onChange((current) => replaceFormEditor(current, shared));
     setSelectedPos(item.code);
   }
+  function removePos(posId: string) {
+    onChange((current) => {
+      const currentEditor = current.form_editor ?? emptyFormEditor();
+      const result = deletePartOfSpeech(
+        expandFormContents(currentEditor),
+        posId
+      );
+      if (!result.ok) return current;
+      const updated = applyFormsStructure(currentEditor, result.value);
+      return isSharedForms(updated)
+        ? replaceFormEditor(current, updated)
+        : current;
+    });
+  }
+
   const posSorting = useSortableRows({
     items:
       formEditorAvailable && !disabled && forms.pos.length === codes.length
@@ -301,11 +310,29 @@ export function MeaningsStep({
           />
         </AdminControls>
       )}
-      <Tabs
-        className="word-pos-tabs"
+      <V3BasicPosTabs
         activeKey={activePos}
         onChange={setSelectedPos}
-        items={codes.map((code, posIndex) => {
+        sorting={posSorting}
+        deleteDescription={removePosDescription}
+        emptyToolbar={showEmptyAddButton}
+        addControl={
+          formEditorAvailable && (
+            <AdminControls componentDisabled={disabled}>
+              <V3AddBasicPosSelect
+                buttonTrigger={showEmptyAddButton}
+                compact={!showEmptyAddButton}
+                catalog={catalog.data}
+                forms={forms}
+                entryKind={kind}
+                isError={catalog.isError}
+                isPending={catalog.isPending}
+                onAdd={addPos}
+              />
+            </AdminControls>
+          )
+        }
+        items={codes.map((code) => {
           const contentDisabled = disabled || !code;
           const formPos = forms.pos.find((pos) => pos.pos === code);
           const senses = value.senses.filter(
@@ -315,115 +342,29 @@ export function MeaningsStep({
             expanded[code] === undefined ? senses[0]?.id : expanded[code];
           return {
             key: code,
-            label: (
-              <span
-                className={sortableRowClass(
-                  "word-pos-tab-handle",
-                  posSorting,
-                  posIndex
-                )}
-                data-pos-id={formPos?.pos_id}
-                onDragLeave={posSorting.handleDragLeave}
-                onDragOver={(event) =>
-                  posSorting.handleDragOver(event, posIndex)
-                }
-                onDrop={(event) => posSorting.handleDrop(event, posIndex)}
-              >
-                <span
-                  className="word-pos-tab-content"
-                  style={{
-                    transform: `translateX(${sortableTabOffset(posSorting, posIndex)}px)`
-                  }}
-                >
-                  <SortableDragHandle
-                    dragImageSelector=".word-pos-tab-handle"
-                    index={posIndex}
-                    label={t("drag_item", { label: label(code) })}
-                    singleItemTitle={t("two_pos_required")}
-                    sorting={posSorting}
-                  />
-                  <span className="word-pos-tab-label">
-                    <strong>{label(code)}</strong>
-                  </span>
-                  {!formEditorAvailable && !code && (
-                    <span
-                      onClick={(event) => event.stopPropagation()}
-                      onMouseDown={(event) => event.stopPropagation()}
-                    >
-                      <Select
-                        id={fallbackPosId}
-                        aria-label="选择基本词性"
-                        placeholder="选择基本词性"
-                        disabled={disabled}
-                        options={partOfSpeechCodes.map((value) => ({
-                          value,
-                          label: label(value)
-                        }))}
-                        onChange={setSelectedPos}
-                      />
-                    </span>
-                  )}
-                  {formEditorAvailable && (
-                    <span
-                      className="word-pos-tab-actions"
-                      onClick={(event) => event.stopPropagation()}
-                      onMouseDown={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      <AdminControls componentDisabled={disabled}>
-                        <V3AddBasicPosSelect
-                          compact
-                          catalog={catalog.data}
-                          forms={forms}
-                          entryKind={kind}
-                          isError={catalog.isError}
-                          isPending={catalog.isPending}
-                          onAdd={addPos}
-                        />
-                      </AdminControls>
-                      {formPos && forms.pos.length > 1 && (
-                        <Button
-                          aria-label={t("delete_item", { label: label(code) })}
-                          danger
-                          icon={<CircleMinus />}
-                          disabled={disabled}
-                          onClick={() =>
-                            modal.confirm({
-                              title: t("delete_pos_title", {
-                                label: label(code)
-                              }),
-                              content: removePosDescription,
-                              okText: t("delete"),
-                              okButtonProps: { danger: true },
-                              onOk: () => {
-                                onChange((current) => {
-                                  const currentEditor =
-                                    current.form_editor ?? emptyFormEditor();
-                                  const result = deletePartOfSpeech(
-                                    expandFormContents(currentEditor),
-                                    formPos.pos_id
-                                  );
-                                  if (!result.ok) return current;
-                                  const updated = applyFormsStructure(
-                                    currentEditor,
-                                    result.value
-                                  );
-                                  return isSharedForms(updated)
-                                    ? replaceFormEditor(current, updated)
-                                    : current;
-                                });
-                              }
-                            })
-                          }
-                          size="small"
-                          type="text"
-                        />
-                      )}
-                    </span>
-                  )}
-                </span>
-              </span>
-            ),
+            label: label(code),
+            posId: formPos?.pos_id,
+            fallbackControl:
+              !formEditorAvailable && !code ? (
+                <Select
+                  id={fallbackPosId}
+                  aria-label="选择基本词性"
+                  placeholder="选择基本词性"
+                  disabled={disabled}
+                  options={partOfSpeechCodes.map((value) => ({
+                    value,
+                    label: label(value)
+                  }))}
+                  onChange={setSelectedPos}
+                />
+              ) : undefined,
+            remove:
+              formEditorAvailable && formPos && forms.pos.length > 1
+                ? {
+                    disabled,
+                    onConfirm: () => removePos(formPos.pos_id)
+                  }
+                : undefined,
             children: (
               <Flex vertical gap={16}>
                 {!code && (

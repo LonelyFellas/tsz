@@ -3139,6 +3139,76 @@ it("垃圾桶与 V1 一致保留直接恢复入口，并按权限禁用", async 
   expect(api.command).not.toHaveBeenCalled();
 });
 
+it.each([
+  ["published", "词条已恢复发布状态"],
+  ["draft", "词条已恢复为草稿"],
+  ["unavailable", "词条已恢复"]
+] as const)(
+  "垃圾桶单条恢复按状态回读显示反馈：%s",
+  async (status, feedback) => {
+    grantListPermissions();
+    const api = requests();
+    api.workspaceList.mockResolvedValue({
+      items: [listRow({ status: "archived" })],
+      pagination: { total: 1, page: 1, page_size: 20, total_pages: 1 }
+    });
+    api.command.mockResolvedValue({ entry_ids: [id] });
+    if (status === "unavailable") {
+      api.workspaceEntry.mockRejectedValueOnce(
+        new Error("readback unavailable")
+      );
+    } else {
+      api.workspaceEntry.mockResolvedValueOnce(listRow({ status }));
+    }
+    mount(api, "/lexicon-next/trash");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "恢复「centre」" })
+    );
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "恢复"
+      })
+    );
+    expect(await screen.findByText(feedback, { exact: true })).toBeVisible();
+    expect(api.workspaceEntry).toHaveBeenCalledWith(id);
+    expect(api.command).toHaveBeenCalledOnce();
+  }
+);
+
+it("批量恢复按实际状态汇总草稿和已发布词条", async () => {
+  grantListPermissions();
+  const api = requests();
+  const publishedId = crypto.randomUUID();
+  api.workspaceList.mockResolvedValue({
+    items: [
+      listRow({ status: "archived" }),
+      listRow({ id: publishedId, headword: "center", status: "archived" })
+    ],
+    pagination: { total: 2, page: 1, page_size: 20, total_pages: 1 }
+  });
+  api.command.mockResolvedValue({ entry_ids: [id, publishedId] });
+  api.workspaceEntry.mockImplementation(async (entryId) =>
+    listRow({
+      id: entryId,
+      status: entryId === publishedId ? "published" : "draft"
+    })
+  );
+  mount(api, "/lexicon-next/trash");
+  fireEvent.click(
+    await screen.findByRole("checkbox", { name: "选择「centre」" })
+  );
+  fireEvent.click(screen.getByRole("checkbox", { name: "选择「center」" }));
+  fireEvent.click(button(/恢\s*复\(2\)/));
+  fireEvent.click(
+    within(await screen.findByRole("dialog")).getByRole("button", {
+      name: "恢复"
+    })
+  );
+  expect(
+    await screen.findByText("已恢复 2 个词条（草稿 1 个，已发布 1 个）")
+  ).toBeVisible();
+});
+
 it("标注版本冲突保留输入且可取消，不能盲目重试覆盖", async () => {
   grantListPermissions();
   const api = requests();
@@ -4044,9 +4114,8 @@ it("词性配置失效后，Step3 新增词性使用最新词形模板", async (
   const mounted = mount(api);
   await waitForEntryReady();
   fireEvent.click(stepButton(/^词义与例句/));
-  await waitFor(() =>
-    expect(screen.getByRole("combobox", { name: "添加基本词性" })).toBeEnabled()
-  );
+  const addPos = await screen.findByRole("button", { name: "添加词性" });
+  await waitFor(() => expect(addPos).toBeEnabled());
   source.mockResolvedValue({
     ...partOfSpeechCatalogFixture,
     catalog_version: 2,
@@ -4059,12 +4128,8 @@ it("词性配置失效后，Step3 新增词性使用最新词形模板", async (
   await act(() =>
     mounted.client.invalidateQueries({ queryKey: partOfSpeechKeys.all })
   );
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "添加基本词性" }));
-  fireEvent.click(
-    await screen.findByText("动词", {
-      selector: ".ui-select-item-option-content"
-    })
-  );
+  fireEvent.click(addPos);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "动词" }));
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   const saved: NextDraft = api.save.mock.calls[0]![1].draft;
@@ -4253,6 +4318,66 @@ it("语义区间在只读词条中不能新增、修改、删除或排序", asyn
     "位置"
   );
   expect(api.save).not.toHaveBeenCalled();
+});
+
+it("语法结构排序后保存顺序，保留其他词性和释义引用", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, grammar_structures: true });
+  const grammar = (id: string, pos: string, text: string) => ({
+    id,
+    part_of_speech: pos,
+    variants: ["en-GB", "en-US"].map((locale) => ({
+      id: crypto.randomUUID(),
+      locale,
+      content: { version: 2 as const, text, annotations: [] }
+    }))
+  });
+  const first = grammar("first", "noun", "a job");
+  const second = grammar("second", "noun", "a position");
+  const other = grammar("other", "verb", "to work");
+  const draft: NextDraft = {
+    ...entry.draft,
+    grammar_structures: [first, other, second],
+    senses: [
+      {
+        id: "sense",
+        part_of_speech: "noun",
+        definitions: [
+          {
+            id: "definition",
+            locale: "en-GB",
+            style: "definition",
+            text: "paid work",
+            grammar_structure_id: first.id
+          }
+        ],
+        equivalents: []
+      }
+    ]
+  };
+  const url = `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`;
+  api.get.mockResolvedValue({ ...entry, draft });
+  const mounted = mount(api, url);
+  await waitForEntryReady();
+  fireEvent.click(stepButton(/^词义与例句/));
+  const handle = await screen.findByRole("button", { name: "拖动语法结构 2" });
+  await waitFor(() => expect(handle).toBeEnabled());
+  fireEvent.keyDown(handle, { key: "ArrowUp" });
+  const firstEditor = () => button("编辑语法结构 1 英式英语内容");
+  expect(firstEditor()).toHaveTextContent("a position");
+  fireEvent.click(button("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  const saved: NextDraft = api.save.mock.calls[0]![1].draft;
+  expect(saved.grammar_structures).toEqual([second, other, first]);
+  expect(saved.senses).toEqual(draft.senses);
+
+  await waitForEntryReady();
+  mounted.unmount();
+  api.get.mockResolvedValue({ ...entry, revision: 2, draft: saved });
+  mount(api, url);
+  await waitForEntryReady();
+  fireEvent.click(stepButton(/^词义与例句/));
+  expect(firstEditor()).toHaveTextContent("a position");
 });
 
 it("目录缓存更新后，停留在预览页也立即去除失效结构且不改草稿", async () => {

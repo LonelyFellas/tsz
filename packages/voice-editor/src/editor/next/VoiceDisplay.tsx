@@ -26,7 +26,7 @@ export function PoolVoiceRate({ setting }: { setting: VoiceSetting }) {
   return (
     <span className="tsz-ve-shared-number">
       {((setting.rate_percent + 100) / 100).toFixed(2)}
-      <span className="tsz-ve-shared-times">✗</span>
+      <span className="tsz-ve-shared-times">×</span>
     </span>
   );
 }

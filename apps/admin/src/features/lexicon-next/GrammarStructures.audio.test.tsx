@@ -10,9 +10,14 @@ import {
 import { beforeEach, expect, it, vi } from "vitest";
 import type { NextGrammarStructure } from "@tsz/types";
 import { App } from "@tsz/ui/admin/overlays";
+import type { VoicePreviewAdapter } from "@tsz/voice-editor";
 import { GrammarStructures } from "./GrammarStructures";
 
-const speech = vi.hoisted(() => ({ generate: vi.fn(), preview: vi.fn() }));
+const speech = vi.hoisted(() => ({
+  generate: vi.fn(),
+  preview: vi.fn(),
+  resolve: vi.fn()
+}));
 vi.mock("@/lib/auth", async (original) => ({
   ...(await original<typeof import("@/lib/auth")>()),
   usePermission: () => true
@@ -31,6 +36,7 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => {
         isDefault: true
       }
     ],
+    resolveVoices: speech.resolve,
     generateAudio: speech.generate,
     synthesize: speech.preview
   };
@@ -80,6 +86,13 @@ const asset = {
 beforeEach(() => {
   speech.generate.mockReset();
   speech.preview.mockReset();
+  speech.resolve.mockReset();
+  speech.resolve.mockImplementation(async ({ profile }) => ({
+    voices: profile.voices.length
+      ? profile.voices
+      : initial[0]!.variants[0]!.voice_profile!.voices,
+    source: { kind: "local" }
+  }));
 });
 function setup(input = initial) {
   const changed = vi.fn();
@@ -124,6 +137,107 @@ async function openEditor() {
   );
   return editor;
 }
+
+it("输入时保留继承音色，点击完成才解析最新正文并生成正式音频", async () => {
+  const input = structuredClone(initial);
+  delete input[0]!.variants[0]!.voice_profile;
+  speech.generate.mockResolvedValue(asset);
+  const changed = setup(input);
+  const editor = await openEditor();
+  const pool = screen.getByRole("region", { name: "英式已获取音色" });
+  await within(pool).findByText("Sonia");
+  speech.resolve.mockClear();
+
+  for (const text of ["use", "use (it)", "use (it) carefully"]) {
+    fireEvent.change(editor, { target: { value: text } });
+    expect(within(pool).getByText("Sonia")).toBeVisible();
+  }
+  expect(speech.resolve).not.toHaveBeenCalled();
+  expect(speech.generate).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "完成" }));
+  await waitFor(() => expect(changed).toHaveBeenCalledOnce());
+  expect(speech.resolve).toHaveBeenCalledOnce();
+  expect(speech.resolve).toHaveBeenCalledWith(
+    expect.objectContaining({
+      accent: "gb",
+      content: expect.objectContaining({ text: "use (it) carefully" })
+    }),
+    expect.anything()
+  );
+  expect(speech.generate).toHaveBeenCalledOnce();
+  expect(speech.resolve.mock.invocationCallOrder[0]).toBeLessThan(
+    speech.generate.mock.invocationCallOrder[0]!
+  );
+  expect(speech.generate.mock.calls[0]![0]).toMatchObject({
+    content: { text: "use (it) carefully" },
+    setting: { voice_id: "sonia" }
+  });
+});
+
+it("删除导致配音解析失败的停顿后，按最新正文重试且不自动生成音频", async () => {
+  const input = structuredClone(initial);
+  const variant = input[0]!.variants[0]!;
+  variant.content = {
+    version: 2,
+    text: "a job and work",
+    annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+  };
+  variant.voice_profile!.dubbing = {
+    area: "grammar",
+    uk: { mode: "local" },
+    us: { mode: "inherit" }
+  };
+  const resolve = speech.resolve.getMockImplementation()!;
+  speech.resolve.mockImplementation(
+    async (
+      request: Parameters<NonNullable<VoicePreviewAdapter["resolveVoices"]>>[0]
+    ) => {
+      if (request.content.annotations.some(({ type }) => type === "pause"))
+        throw new Error("此音色不支持停顿");
+      return resolve(request);
+    }
+  );
+  const changed = setup(input);
+  const editor = await openEditor();
+  const error = await screen.findByText("此音色不支持停顿");
+
+  fireEvent.click(screen.getByRole("button", { name: "清除模式" }));
+  fireEvent.click(screen.getByLabelText("清除第 2 处停顿 0.5 秒"));
+  fireEvent.click(screen.getByRole("button", { name: "清除模式" }));
+  fireEvent.change(editor, { target: { value: "a job and some work" } });
+  fireEvent.change(editor, { target: { value: "a job and some hard work" } });
+
+  await waitFor(() => expect(error).not.toBeInTheDocument());
+  expect(speech.resolve).toHaveBeenCalledTimes(2);
+  expect(speech.resolve).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      content: { version: 2, text: "a job and some hard work", annotations: [] }
+    }),
+    expect.anything()
+  );
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it("最新正文配音解析失败时保留输入，不生成音频或应用草稿", async () => {
+  const input = structuredClone(initial);
+  delete input[0]!.variants[0]!.voice_profile;
+  const changed = setup(input);
+  const editor = await openEditor();
+  await within(
+    screen.getByRole("region", { name: "英式已获取音色" })
+  ).findByText("Sonia");
+  speech.resolve.mockRejectedValueOnce(new Error("当前正文的配音设置不可用"));
+  fireEvent.change(editor, { target: { value: "new grammar text" } });
+  const complete = screen.getByRole("button", { name: "完成" });
+  fireEvent.click(complete);
+  await screen.findByText("当前正文的配音设置不可用");
+  expect(editor).toHaveValue("new grammar text");
+  expect(complete).toBeEnabled();
+  expect(speech.generate).not.toHaveBeenCalled();
+  expect(changed).not.toHaveBeenCalled();
+});
 
 it("编辑和取消不生成语音，点击完成才生成最新正文并应用到父草稿", async () => {
   let finish!: (value: typeof asset) => void;

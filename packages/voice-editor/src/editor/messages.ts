@@ -214,6 +214,7 @@ export const voiceEditorMessages = {
     "已獲取的配音設定",
     "Current voice settings"
   ],
+  dubbing_parameters: ["配音参数", "配音參數", "Voice parameters"],
   voice_and_playback_rules: [
     "配音与播放规则",
     "配音與播放規則",
@@ -238,6 +239,11 @@ export const voiceEditorMessages = {
     "恢复默认推荐",
     "恢復預設推薦",
     "Restore default recommendations"
+  ],
+  restore_all_defaults: [
+    "恢复全部默认",
+    "恢復全部預設",
+    "Restore all defaults"
   ],
   stop_audition: ["停止试听", "停止試聽", "Stop audition"],
   selected_voices: [
@@ -273,6 +279,11 @@ export const voiceEditorMessages = {
     "待生成正式音訊",
     "Final audio not generated"
   ],
+  generate_audio_on_completion: [
+    "完成时生成音频",
+    "完成時產生音訊",
+    "Audio generated on completion"
+  ],
   this_voice_its_parameters_or_the_text_reading_is_unavailable_configuration: [
     "当前声音、参数或正文读法不可用，保留配置，不参与概率。",
     "當前聲音、引數或正文讀法不可用，保留配置，不參與機率。",
@@ -307,6 +318,7 @@ export const voiceEditorMessages = {
   no_catalog_voice: ["不使用目录音色", "不使用目錄音色", "No catalogue voice"],
   local_recommendation: ["局部推荐", "局部推薦", "Local recommendation"],
   recommended_voices: ["推荐配音", "推薦配音", "Recommended voices"],
+  recommendation: ["推荐项", "推薦項", "Recommendation"],
   do_not_use_recommended_voices: [
     "不使用推荐配音",
     "不使用推薦配音",
@@ -379,6 +391,7 @@ export const voiceEditorMessages = {
     "完整音色目錄",
     "Full voice catalogue"
   ],
+  voice_catalogue: ["音色目录", "音色目錄", "Voice catalogue"],
   selection_and_audition_guidance: [
     "选择与试听说明",
     "選擇與試聽說明",
@@ -421,10 +434,15 @@ export const voiceEditorMessages = {
   ],
   no_voices_available: ["暂无可选音色", "暫無可選音色", "No voices available"],
   select: ["选用 {{p0}}", "選用 {{p0}}", "Select {{p0}}"],
-  grammar_structures_and_liaison_marks: [
-    "“语法结构”和“连读符号”",
-    "“語法結構”和“連讀符號”",
-    "grammar structures and liaison marks"
+  select_text_to_annotate: [
+    "选中文字后标注",
+    "選中文字後標註",
+    "Select text to annotate"
+  ],
+  grammar_structure_example: [
+    "例如 be good at (something)",
+    "例如 be good at (something)",
+    "e.g. be good at (something)"
   ],
   text_formatting_and_liaison_marks: [
     "“文本格式”和“连读符号”",

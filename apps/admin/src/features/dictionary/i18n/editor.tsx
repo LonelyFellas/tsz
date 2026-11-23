@@ -661,6 +661,11 @@ export const lexiconEditorMessages = {
     "拖曳文法結構 {{index}}",
     "Drag grammar structure {{index}}"
   ],
+  grammar_index: [
+    "第 {{index}} 条语法结构",
+    "第 {{index}} 條文法結構",
+    "Grammar structure {{index}}"
+  ],
   grammar_content: [
     "语法结构 {{index}} {{dialect}}内容",
     "文法結構 {{index}} {{dialect}}內容",

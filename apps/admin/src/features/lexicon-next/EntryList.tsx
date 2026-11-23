@@ -349,6 +349,35 @@ export function EntryList({
           (row.status !== "published" ||
             canAdminResourceAction(actor, "words", "publish", row.owner_id))
     );
+  async function restoreFeedback(entryIds: string[]) {
+    const count = entryIds.length;
+    const results = await Promise.allSettled(
+      entryIds.map((id) => requests.workspaceEntry(id))
+    );
+    const statuses = results.flatMap((result) => {
+      if (result.status !== "fulfilled") return [];
+      const { status } = result.value;
+      return status === "draft" || status === "published" ? [status] : [];
+    });
+    if (!count || statuses.length !== count) {
+      return count > 1
+        ? t("next_restored_count", { count })
+        : t("next_restored");
+    }
+    if (count === 1) {
+      return t(
+        statuses[0] === "published" ? "next_restored_published" : "restored"
+      );
+    }
+    const published = statuses.filter(
+      (status) => status === "published"
+    ).length;
+    return t("next_restored_status_counts", {
+      count,
+      drafts: count - published,
+      published
+    });
+  }
   async function submit() {
     if (
       !confirmation ||
@@ -361,17 +390,14 @@ export function EntryList({
     setPending(true);
     setError(undefined);
     try {
-      await requests.command(confirmation.request);
+      const result = await requests.command(confirmation.request);
+      const { action } = confirmation.request;
       setSelected({});
       setConfirmation(undefined);
       void message.success(
-        t(
-          confirmation.request.action === "archive"
-            ? "archived"
-            : confirmation.request.action === "restore"
-              ? "restored"
-              : "deleted"
-        )
+        action === "restore"
+          ? await restoreFeedback(result.entry_ids)
+          : t(action === "archive" ? "archived" : "deleted")
       );
       await refresh();
     } catch (failure) {

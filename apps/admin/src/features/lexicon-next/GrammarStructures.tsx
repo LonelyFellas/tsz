@@ -48,6 +48,13 @@ import {
   PronunciationPreviewProvider
 } from "@/features/dictionary/word-creation/PronunciationPreview";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { V3SortableRowIndex } from "@/features/dictionary/word-creation-v3/components/V3SortableRowIndex";
+import {
+  reorderVisibleRows,
+  sortableRowClass,
+  useSortableRows
+} from "@/features/dictionary/word-creation-v3/sortableRows";
 import { localeLabels, newGrammarStructure } from "./model";
 import "@tsz/voice-editor/styles.css";
 const VoiceEditor = lazy(() =>
@@ -309,6 +316,7 @@ function GrammarText({
               previewEnabled={audioAvailable && env.VOICE_PREVIEW}
               previewAdapter={audioAvailable ? previewAdapter : undefined}
               deferAudioGeneration
+              deferContentVoiceResolution={generateAvailable}
               previewIsMock={voicePreviewIsMock}
               recommendationArea={audioAvailable ? "grammar" : undefined}
               loadRecommendations={
@@ -467,8 +475,15 @@ export function GrammarStructures({
   ) => void;
 }) {
   const { modal } = App.useApp();
+  const { t } = useLexiconEditorTranslation();
   const headingId = useId();
-  const hasRows = rows.some((row) => row.part_of_speech === pos);
+  const visibleRows = rows.filter((row) => row.part_of_speech === pos);
+  const sorting = useSortableRows({
+    items: disabled || !pos ? [] : visibleRows,
+    scopeId: headingId,
+    dragType: "application/x-tsz-next-grammar",
+    onChange: (next) => onChange((current) => reorderVisibleRows(current, next))
+  });
   const card = (
     <Card
       className="lexicon-next-grammar"
@@ -479,160 +494,167 @@ export function GrammarStructures({
           <h2 id={headingId} className="lexicon-next-section-title">
             语法结构 · {localeLabels[target] ?? target}
           </h2>
-          {!hasRows && (
+          {visibleRows.length === 0 && (
             <span className="lexicon-next-section-status">暂无语法结构</span>
           )}
         </div>
       }
     >
-      {hasRows && (
+      {visibleRows.length > 0 && (
         <div className="lexicon-next-grammar-heading" aria-hidden="true">
           <span>细分词性</span>
           <span>语法结构</span>
         </div>
       )}
-      {rows
-        .filter((row) => row.part_of_speech === pos)
-        .map((row, index) => {
-          const variant = row.variants.find((v) => v.locale === target);
-          const subParts = catalog?.sub_parts ?? [];
-          return (
-            <div
-              key={row.id}
-              data-v3-node-id={row.id}
-              className="lexicon-next-grammar-row"
-            >
-              <span className="lexicon-next-grammar-index">{index + 1}</span>
-              <Select
-                aria-label={`语法结构 ${index + 1} 细分词性`}
-                data-v3-field="sub_pos"
+      {visibleRows.map((row, index) => {
+        const variant = row.variants.find((v) => v.locale === target);
+        const subParts = catalog?.sub_parts ?? [];
+        return (
+          <div
+            key={row.id}
+            data-v3-node-id={row.id}
+            className={sortableRowClass(
+              "lexicon-next-grammar-row word-sortable-row",
+              sorting,
+              index
+            )}
+            onDragLeave={sorting.handleDragLeave}
+            onDragOver={(event) => sorting.handleDragOver(event, index)}
+            onDrop={(event) => sorting.handleDrop(event, index)}
+          >
+            <V3SortableRowIndex
+              dragImageSelector=".lexicon-next-grammar-row"
+              index={index}
+              indexLabel={t("grammar_index", { index: index + 1 })}
+              label={t("drag_grammar", { index: index + 1 })}
+              singleItemTitle={t("two_grammar_required")}
+              sorting={sorting}
+            />
+            <Select
+              aria-label={`语法结构 ${index + 1} 细分词性`}
+              data-v3-field="sub_pos"
+              disabled={disabled}
+              placeholder="请选择细分词性"
+              value={row.sub_pos || undefined}
+              options={[
+                ...(!catalog?.sub_pos_required
+                  ? [{ value: "", label: "不指定细分词性" }]
+                  : []),
+                ...(row.sub_pos &&
+                !subParts.some((part) => part.code === row.sub_pos)
+                  ? [
+                      {
+                        value: row.sub_pos,
+                        label: "已失效的细分词性",
+                        disabled: true
+                      }
+                    ]
+                  : []),
+                ...subParts.map((part) => ({
+                  value: part.code,
+                  label: part.name_zh
+                }))
+              ]}
+              onChange={(sub_pos: string) =>
+                onChange((rows) =>
+                  rows.map((item) =>
+                    item.id === row.id ? { ...item, sub_pos } : item
+                  )
+                )
+              }
+            />
+            {variant ? (
+              <GrammarText
+                variant={variant}
+                audioAvailable={audioAvailable}
+                formLinksAvailable={formLinksAvailable}
+                requests={requests}
+                target={target}
+                medium={medium}
+                registerLeaveGuard={registerLeaveGuard}
+                label={`语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
                 disabled={disabled}
-                placeholder="请选择细分词性"
-                value={row.sub_pos || undefined}
-                options={[
-                  ...(!catalog?.sub_pos_required
-                    ? [{ value: "", label: "不指定细分词性" }]
-                    : []),
-                  ...(row.sub_pos &&
-                  !subParts.some((part) => part.code === row.sub_pos)
-                    ? [
-                        {
-                          value: row.sub_pos,
-                          label: "已失效的细分词性",
-                          disabled: true
-                        }
-                      ]
-                    : []),
-                  ...subParts.map((part) => ({
-                    value: part.code,
-                    label: part.name_zh
-                  }))
-                ]}
-                onChange={(sub_pos: string) =>
+                onChange={(variant) =>
                   onChange((rows) =>
                     rows.map((item) =>
-                      item.id === row.id ? { ...item, sub_pos } : item
+                      item.id === row.id
+                        ? {
+                            ...item,
+                            variants: item.variants.map((v) =>
+                              v.id === variant.id ? variant : v
+                            )
+                          }
+                        : item
                     )
                   )
                 }
               />
-              {variant ? (
-                <GrammarText
-                  variant={variant}
-                  audioAvailable={audioAvailable}
-                  formLinksAvailable={formLinksAvailable}
-                  requests={requests}
-                  target={target}
-                  medium={medium}
-                  registerLeaveGuard={registerLeaveGuard}
-                  label={`语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
-                  disabled={disabled}
-                  onChange={(variant) =>
-                    onChange((rows) =>
-                      rows.map((item) =>
-                        item.id === row.id
-                          ? {
-                              ...item,
-                              variants: item.variants.map((v) =>
-                                v.id === variant.id ? variant : v
-                              )
-                            }
-                          : item
-                      )
-                    )
-                  }
-                />
-              ) : (
-                <Button
-                  aria-label={`编辑语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
-                  disabled={disabled}
-                  onClick={() =>
-                    onChange((rows) =>
-                      rows.map((item) =>
-                        item.id === row.id
-                          ? {
-                              ...item,
-                              variants: [
-                                ...(item.variants.some(
-                                  (variant) =>
-                                    variant.locale === "en-GB" ||
-                                    variant.locale === "en-US"
-                                )
-                                  ? item.variants.filter(
-                                      (variant) => variant.locale !== "en"
-                                    )
-                                  : item.variants),
-                                {
-                                  id: crypto.randomUUID(),
-                                  locale: target,
-                                  content: item.variants.find(
-                                    (variant) => variant.locale === "en"
-                                  )?.content ?? {
-                                    version: 2,
-                                    text: "",
-                                    annotations: []
-                                  }
-                                }
-                              ]
-                            }
-                          : item
-                      )
-                    )
-                  }
-                >
-                  添加{localeLabels[target]}内容
-                </Button>
-              )}
+            ) : (
               <Button
-                icon={<Trash2 />}
-                type="text"
-                danger
-                disabled={
-                  disabled ||
-                  rows.filter((row) => row.part_of_speech === pos).length <= 1
+                aria-label={`编辑语法结构 ${index + 1} ${localeLabels[target] ?? target}内容`}
+                disabled={disabled}
+                onClick={() =>
+                  onChange((rows) =>
+                    rows.map((item) =>
+                      item.id === row.id
+                        ? {
+                            ...item,
+                            variants: [
+                              ...(item.variants.some(
+                                (variant) =>
+                                  variant.locale === "en-GB" ||
+                                  variant.locale === "en-US"
+                              )
+                                ? item.variants.filter(
+                                    (variant) => variant.locale !== "en"
+                                  )
+                                : item.variants),
+                              {
+                                id: crypto.randomUUID(),
+                                locale: target,
+                                content: item.variants.find(
+                                  (variant) => variant.locale === "en"
+                                )?.content ?? {
+                                  version: 2,
+                                  text: "",
+                                  annotations: []
+                                }
+                              }
+                            ]
+                          }
+                        : item
+                    )
+                  )
                 }
-                aria-label={`删除语法结构 ${index + 1}`}
-                onClick={() => {
-                  const count = referenceCount(row.id);
-                  const remove = () =>
-                    onChange((rows) =>
-                      rows.filter((item) => item.id !== row.id)
-                    );
-                  if (count)
-                    modal.confirm({
-                      title: "删除语法结构？",
-                      content: `将清除 ${count} 条释义的语法结构关联，释义正文保留。`,
-                      okText: "删除",
-                      cancelText: "取消",
-                      okButtonProps: { danger: true },
-                      onOk: remove
-                    });
-                  else remove();
-                }}
-              />
-            </div>
-          );
-        })}
+              >
+                添加{localeLabels[target]}内容
+              </Button>
+            )}
+            <Button
+              icon={<Trash2 />}
+              type="text"
+              danger
+              disabled={disabled || visibleRows.length <= 1}
+              aria-label={`删除语法结构 ${index + 1}`}
+              onClick={() => {
+                const count = referenceCount(row.id);
+                const remove = () =>
+                  onChange((rows) => rows.filter((item) => item.id !== row.id));
+                if (count)
+                  modal.confirm({
+                    title: "删除语法结构？",
+                    content: `将清除 ${count} 条释义的语法结构关联，释义正文保留。`,
+                    okText: "删除",
+                    cancelText: "取消",
+                    okButtonProps: { danger: true },
+                    onOk: remove
+                  });
+                else remove();
+              }}
+            />
+          </div>
+        );
+      })}
       <Button
         block
         className="word-section-add-button"
