@@ -2732,7 +2732,7 @@ it("业务保存以一次完整快照合并正文和参数，失败保留且连�
   expect(stored[1]).toEqual(stored[0]);
 });
 
-it("点击实际发音预览直接打开编辑，保存跳过无关音频任务等待", async () => {
+it("实际发音只从编辑按钮打开，保存跳过无关音频任务等待", async () => {
   const save = vi.fn().mockResolvedValue(true);
   render(
     <VoiceSaveContext.Provider value={{ save }}>
@@ -2751,7 +2751,10 @@ it("点击实际发音预览直接打开编辑，保存跳过无关音频任务�
       selector: ".v3-actual-pronunciation-preview-content span"
     })
   );
-  const input = await screen.findByLabelText("实际发音");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("打开实际发音编辑器"));
+  const dialog = await screen.findByRole("dialog");
+  const input = await within(dialog).findByLabelText("实际发音");
   fireEvent.change(input, { target: { value: "hello changed" } });
   fireEvent.click(screen.getByLabelText("保存实际发音修改"));
   await waitFor(() => expect(save).toHaveBeenCalledOnce());

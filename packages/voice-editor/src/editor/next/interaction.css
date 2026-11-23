@@ -577,6 +577,9 @@
   margin: 12px 0;
 }
 .tsz-ve-pool-sides {
+  --tsz-ve-pool-action-width: calc(
+    2 * var(--ui-control-height-sm, 24px) + var(--ui-space-2, 8px)
+  );
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
   align-items: start;
@@ -599,11 +602,15 @@
   width: 100%;
 }
 .tsz-ve-pool-sides[data-single="true"] .tsz-ve-pool-row {
-  grid-template-columns: 32px 64px 52px 32px minmax(0, 1fr) 66px 56px 30px;
+  grid-template-columns: 32px 64px 52px 32px minmax(0, 1fr) 66px 56px var(
+      --tsz-ve-pool-action-width
+    );
 }
 .tsz-ve-pool-row {
   display: grid;
-  grid-template-columns: 32px 54px 52px 32px minmax(0, 1fr) 66px 56px 30px;
+  grid-template-columns: 32px 54px 52px 32px minmax(0, 1fr) 66px 56px var(
+      --tsz-ve-pool-action-width
+    );
   align-items: center;
   min-height: 48px;
   gap: 4px;
@@ -718,7 +725,9 @@
   }
   .tsz-ve-pool-sides .tsz-ve-pool-row,
   .tsz-ve-pool-sides[data-single="true"] .tsz-ve-pool-row {
-    grid-template-columns: 32px minmax(0, 1fr) 64px 32px;
+    grid-template-columns: 32px minmax(0, 1fr) 64px var(
+        --tsz-ve-pool-action-width
+      );
     gap: 8px;
     padding: 12px 0;
   }

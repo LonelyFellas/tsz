@@ -210,16 +210,13 @@ textarea.word-pronunciation-phonetic-input.ui-input {
   line-height: var(--ui-line-height, 1.5714285714);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  cursor: default;
+  cursor: text;
+  user-select: text;
 }
 
 .v3-actual-pronunciation-preview-content .tsz-ve-readonly {
   display: block;
   max-width: none;
-}
-
-.v3-actual-pronunciation-preview-content.is-clickable {
-  cursor: pointer;
 }
 
 /* 释义收起态沿用正文输入框的字号和内边距，富文本负责撑高。 */
