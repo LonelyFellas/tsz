@@ -176,10 +176,12 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         ),
     workspaceList: (query: NextWorkspaceQuery = {}) =>
       http
-        .get<unknown>(
-          `${root}/workspace/entries${search(query)}`,
-          publicationOptions
-        )
+        .get<unknown>(`${root}/workspace/entries${search(query)}`, {
+          headers: {
+            ...publicationOptions.headers,
+            "x-tsz-next-name-variants": "v1"
+          }
+        })
         .then((value) => decode<NextWorkspaceList>("NextWorkspaceList", value)),
     workspaceEntry: (id: string) =>
       http

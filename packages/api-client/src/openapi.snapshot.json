@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/tsz-rust-task-251/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-23T00:25:07.970Z",
+  "_source": "/tmp/tsz-961-authoritative.cMBkmrCb",
+  "_generatedAt": "2026-11-23T01:35:07.758Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -572,6 +572,12 @@
     "get /admin/lexicon-next/workspace/entries": [
       {
         "name": "x-tsz-next-levels",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-name-variants",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }

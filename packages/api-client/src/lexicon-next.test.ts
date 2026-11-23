@@ -500,9 +500,29 @@ it("管理列表使用独立 wire 契约，保留查询参数且拒绝旧列表�
     })
   ).toEqual(response);
   const url = new URL(fetch.mock.calls[0]![0] as string);
+  expect(
+    new Headers(fetch.mock.calls[0]![1]?.headers).get(
+      "x-tsz-next-name-variants"
+    )
+  ).toBe("v1");
   expect(url.pathname).toBe("/api/v1/admin/lexicon-next/workspace/entries");
   expect(url.searchParams.get("headword")).toBe("100% centre");
   expect(url.searchParams.get("status")).toBe("archived");
+  const withNames = {
+    ...response,
+    items: [
+      {
+        ...row,
+        name_variants: [
+          { text: "centre", dialects: ["uk"] },
+          { text: "center", dialects: ["us"] }
+        ]
+      }
+    ]
+  };
+  await expect(client(withNames).api.workspaceList()).resolves.toEqual(
+    withNames
+  );
   const malformed = client({
     ...response,
     items: [{ ...row, status: "invented" }]

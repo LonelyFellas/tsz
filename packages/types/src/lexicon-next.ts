@@ -1,6 +1,7 @@
 import type { LexiconTaxonomy } from "./lexicon-taxonomies";
 import type {
   AudioAssetV3,
+  EntryNameVariantV3,
   VoiceProfileV3,
   RichTextV3,
   GrammarFormLinkV3,
@@ -290,6 +291,8 @@ export interface NextWorkspaceQuery extends NextListQuery {
   created_to?: string;
 }
 export interface NextWorkspaceEntry extends NextEntrySummary {
+  /** 列表中的已保存原形，旧服务可能省略。 */
+  name_variants?: EntryNameVariantV3[];
   levels?: string[];
   status: "draft" | "published" | "archived";
   lifecycle_revision: number;
