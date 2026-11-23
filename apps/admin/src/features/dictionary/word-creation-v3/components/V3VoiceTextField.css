@@ -98,6 +98,7 @@
   overflow: hidden;
   color: transparent;
   pointer-events: none;
+  user-select: none;
 }
 
 .v3-voice-text-liaison-overlay .tsz-ve-readonly.has-liaison {
@@ -186,6 +187,12 @@ textarea.word-pronunciation-phonetic-input.ui-input {
   color: transparent;
   caret-color: transparent;
   pointer-events: none;
+}
+
+/* 收起态由预览层显示正文，输入层的原生选区只保留高亮背景。 */
+:is(.v3-grammar-preview, .v3-actual-pronunciation-preview)
+  > textarea.ui-input::selection {
+  color: transparent;
 }
 
 .v3-actual-pronunciation-preview > textarea.ui-input:focus {

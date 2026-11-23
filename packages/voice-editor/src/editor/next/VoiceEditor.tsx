@@ -1392,20 +1392,34 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     resetTransient();
   };
 
+  const roleSelection = textSelection
+    ? splitRangeAtParagraphs(text, textSelection.start, textSelection.end, {
+        trimWhitespace: true
+      })
+    : [];
+  const selectedRoleLevels = roleSelection.map(
+    ({ start, end }) =>
+      marks.roles.find((role) => role.start <= start && role.end >= end)?.level
+  );
+  const [firstRoleLevel] = selectedRoleLevels;
+  const selectedRoleLevel = selectedRoleLevels.every(
+    (level) => level === firstRoleLevel
+  )
+    ? firstRoleLevel
+    : undefined;
+
   /* 语法结构与停顿选完就收起浮层，好腾出标注带落笔；连读的面板要留着用。 */
   const pickBrush = (next: Brush) => {
     if (mode === "grammar" && next.kind === "role" && textSelection) {
+      if (roleSelection.length === 0) return;
+      const toggle = next.level === "core" && selectedRoleLevel === next.level;
       let roles = marks.roles;
-      for (const piece of splitRangeAtParagraphs(
-        text,
-        textSelection.start,
-        textSelection.end
-      )) {
+      for (const piece of roleSelection) {
         roles = applyRoleRange(
           text,
           roles,
           { ...piece, level: next.level },
-          { toggle: false }
+          { toggle }
         );
       }
       paintRoles(roles);
@@ -3225,15 +3239,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                   .join("")
               : undefined
           }
-          selectedLevel={
-            textSelection
-              ? marks.roles.find(
-                  (role) =>
-                    role.start <= textSelection.start &&
-                    role.end >= textSelection.end
-                )?.level
-              : undefined
-          }
+          selectedLevel={selectedRoleLevel}
         />
       )
     },

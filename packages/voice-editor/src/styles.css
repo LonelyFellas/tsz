@@ -204,6 +204,11 @@
   resize: none;
 }
 
+/* 选中时也由标注层绘制正文，避免后台通用选区字色让输入层显形。 */
+.tsz-ve-canvas-input::selection {
+  color: transparent;
+}
+
 .tsz-ve-canvas-input::placeholder {
   color: var(--ui-color-text-quaternary, #bfbfbf);
   font-weight: 400;
