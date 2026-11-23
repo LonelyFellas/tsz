@@ -50,7 +50,7 @@ export function DialectPreview({
           rel="noreferrer"
           aria-label={t("dialect_pair_open")}
         >
-          <span className="tsz-entry-en">{peer.headword}</span>
+          <span className="tsz-words">{peer.headword}</span>
         </a>{" "}
         {[peer.part_of_speech, peer.gloss].filter(Boolean).join(" · ")}
       </span>

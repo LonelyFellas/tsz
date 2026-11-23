@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { useEffect, useMemo, useState } from "react";
 import type { NextEntry } from "@tsz/types";
 import {
@@ -26,8 +27,9 @@ export function NextTargetPicker({
   onSelect: (choice: NextTargetChoice) => void;
   onCancel?: () => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [entries, setEntries] = useState<NextEntry[]>([]);
-  const [choices, setChoices] = useState<NextTargetChoice[]>([]);
+  const [choices, setChoices] = useState<NextTargetChoice[]>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const key = useMemo(
@@ -38,7 +40,7 @@ export function NextTargetPicker({
     let active = true;
     setLoading(true);
     setError(undefined);
-    setChoices([]);
+    setChoices(undefined);
     void requests
       .matchEntries({
         target_language: "en",
@@ -79,7 +81,7 @@ export function NextTargetPicker({
       </Typography.Text>
       {loading && <Spin aria-label="正在读取新版词条" />}
       {error && <Alert type="error" title={error} />}
-      {!loading && !error && choices.length === 0 && entries.length > 1 && (
+      {!loading && !error && !choices?.length && entries.length > 1 && (
         <Flex vertical gap="small">
           {entries.map((entry) => (
             <Button
@@ -95,14 +97,17 @@ export function NextTargetPicker({
           ))}
         </Flex>
       )}
-      {!loading && !error && choices.length === 0 && entries.length <= 1 && (
-        <Empty
-          description={
-            entries.length ? "该词条没有可选的关联目标" : "没有匹配的新版词条"
-          }
-        />
-      )}
-      {choices.length > 0 && (
+      {!loading &&
+        !error &&
+        !choices?.length &&
+        (choices !== undefined || entries.length === 0) && (
+          <Empty
+            description={t(
+              entries.length ? "target_entry_no_choices" : "target_no_matches"
+            )}
+          />
+        )}
+      {!!choices?.length && (
         <Flex vertical gap="small">
           {choices.map((choice, index) => (
             <Button

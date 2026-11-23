@@ -495,7 +495,9 @@ export function GrammarStructures({
           <h2 id={headingId} className="lexicon-next-section-title">
             语法结构 · {localeLabels[target] ?? target}
           </h2>
-          {visibleRows.length === 0 && <EmptyState>暂无语法结构</EmptyState>}
+          {visibleRows.length === 0 && (
+            <EmptyState description={t("no_grammar")} />
+          )}
         </div>
       }
     >

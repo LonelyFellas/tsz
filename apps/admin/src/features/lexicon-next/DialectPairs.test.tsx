@@ -5,6 +5,63 @@ import { expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
 import { DialectEditor } from "./DialectPairs";
 import { generalSense } from "./model";
+import {
+  focusPublicationIssue,
+  publicationIssueLocation
+} from "./publicationIssueFocus";
+
+it.each(["dialect_pairs", "relations"])(
+  "没有 %s 字段锚点时定位义项不改变方言配对",
+  async (field) => {
+    const row = {
+      ...generalSense("sense"),
+      usage: "en-US" as const,
+      paired: true
+    };
+    const draft = {
+      schema_version: 1 as const,
+      headword: "apartment",
+      forms: [],
+      senses: []
+    };
+    const update = vi.fn(),
+      done = vi.fn();
+    const ui = render(
+      <div data-v3-node-id="sense" data-v3-field="sense" tabIndex={-1}>
+        <DialectEditor
+          row={row}
+          onChange={update}
+          draft={draft}
+          localTargets={[]}
+          entryId="source"
+          medium="zh-Hans"
+          requests={api.lexiconNext}
+          disabled={false}
+        />
+      </div>
+    );
+    const previousScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    try {
+      focusPublicationIssue(
+        publicationIssueLocation(
+          draft,
+          { node_id: "sense", field, message: "" },
+          "en-US"
+        ),
+        new AbortController().signal,
+        done
+      );
+      await waitFor(() => expect(done).toHaveBeenCalledOnce());
+      expect(ui.container).toContainElement(
+        document.activeElement as HTMLElement
+      );
+      expect(update).not.toHaveBeenCalled();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = previousScroll;
+    }
+  }
+);
 
 it("只为专用义项展示另一方言；切换用法不沿用上一侧的无对应说明", () => {
   function Editor() {

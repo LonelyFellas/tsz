@@ -280,7 +280,8 @@ export function PermissionChangeDialog({
       ) : (
         <Table
           tableId="permission-change-preview"
-          loading={preview.isFetching}
+          loading={preview.isLoading}
+          refreshing={preview.isRefetching}
           rowKey="admin_id"
           pagination={false}
           dataSource={preview.data?.targets ?? []}

@@ -9,6 +9,21 @@ import { lexiconEditorPanelMessages } from "./editor-panel-messages";
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconEditorMessages = {
+  target_entry_no_choices: [
+    "该词条没有可选的关联目标",
+    "該詞條沒有可選的關聯目標",
+    "This entry has no linkable targets"
+  ],
+  target_no_matches: [
+    "没有匹配的新版词条",
+    "沒有符合的新版詞條",
+    "No matching entries"
+  ],
+  definition_add_limit: [
+    "词条内容已达上限，暂不能添加释义",
+    "詞條內容已達上限，暫不能新增釋義",
+    "The entry is at its content limit; no more definitions can be added"
+  ],
   review_sense_index: ["词义目录", "詞義目錄", "Sense index"],
   review_title: ["预览并发布", "預覽並發布", "Preview and publish"],
   review_version: ["预览版本", "預覽版本", "Preview version"],

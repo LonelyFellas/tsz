@@ -105,9 +105,14 @@ export function Select<
       removeIcon={<X size="1em" aria-label={t("actions.remove")} />}
       notFoundContent={
         props.loading ? (
-          (props.notFoundContent ?? null)
+          props.notFoundContent === undefined ? (
+            <span role="status">{t("status.loading")}</span>
+          ) : (
+            props.notFoundContent
+          )
         ) : props.notFoundContent === undefined ||
-          typeof props.notFoundContent === "string" ? (
+          (typeof props.notFoundContent === "string" &&
+            props.notFoundContent !== "") ? (
           <EmptyState
             description={props.notFoundContent ?? t("status.noData")}
           />
@@ -153,7 +158,8 @@ function Panel<O extends CascadeOption = CascadeOption>({
       prefixCls="ui-cascader"
       notFoundContent={
         props.notFoundContent === undefined ||
-        typeof props.notFoundContent === "string" ? (
+        (typeof props.notFoundContent === "string" &&
+          props.notFoundContent !== "") ? (
           <EmptyState
             description={props.notFoundContent ?? t("status.noData")}
           />

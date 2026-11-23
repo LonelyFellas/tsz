@@ -200,7 +200,8 @@ export function OperationHistory({
             </Typography.Text>
           }
           rowKey="id"
-          loading={loading}
+          loading={loading && !data}
+          refreshing={loading && !!data}
           dataSource={data?.items}
           scroll={{ x: 1122 }}
           tableLayout="auto"

@@ -326,7 +326,13 @@ export function EquivalentRows({
           </label>
         </div>
         {!visible.length ? (
-          <EmptyState>
+          <EmptyState
+            description={
+              disabled && !sense.no_equivalents?.includes(locale)
+                ? t("eq_empty")
+                : undefined
+            }
+          >
             <Checkbox
               disabled={disabled}
               checked={sense.no_equivalents?.includes(locale) ?? false}

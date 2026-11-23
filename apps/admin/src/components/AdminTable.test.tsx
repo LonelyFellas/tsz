@@ -63,6 +63,23 @@ function pin(label: string, position: "固定到左侧" | "不固定" | "固定�
 beforeEach(() => localStorage.clear());
 
 describe("AdminTable", () => {
+  it("首次读取不显示空结果，后台刷新保留空态按钮的键盘焦点", () => {
+    const props = {
+      dataSource: [],
+      locale: { emptyText: <button>重置筛选</button> }
+    };
+    const view = renderTable(table({ ...props, loading: true }));
+    expect(
+      screen.queryByRole("button", { name: "重置筛选" })
+    ).not.toBeInTheDocument();
+    view.rerender(table(props));
+    const reset = screen.getByRole("button", { name: "重置筛选" });
+    reset.focus();
+    view.rerender(table({ ...props, refreshing: true }));
+    expect(reset).toHaveFocus();
+    expect(reset.closest("[aria-busy]")).toHaveAttribute("aria-busy", "true");
+  });
+
   it("显隐、移动和固定立即生效，刷新恢复，并可恢复默认", () => {
     const view = renderTable(table());
     const panel = settings();

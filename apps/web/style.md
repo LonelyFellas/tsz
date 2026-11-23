@@ -202,7 +202,7 @@
 
 ## 12. 页面部件速查
 
-均从 `@/features/shell/Page` 导入（`ComingSoon` 从 `@/features/shell/ComingSoon`）。
+`EmptyState` 从 `@tsz/ui/components/empty-state` 导入，`ComingSoon` 从 `@/features/shell/ComingSoon` 导入，其余从 `@/features/shell/Page` 导入。
 
 | 部件 / 样式串                                                        | 用途                                                                 |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------- |

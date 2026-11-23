@@ -286,7 +286,8 @@ function Management({ adminId }: { adminId: string }) {
             )
           }}
           rowKey={(r) => r.wordlist.id}
-          loading={result.isFetching}
+          loading={result.isLoading}
+          refreshing={result.isRefetching}
           dataSource={result.data?.items ?? []}
           scroll={{ x: 1800 }}
           pagination={{

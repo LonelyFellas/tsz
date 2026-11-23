@@ -62,6 +62,10 @@ export function PlanSourcePicker({
       api.wordList.list({ q: search, page, page_size: 20 }, { signal })
   });
   const data = space === "public" ? publicLists : library;
+  const lastPage = data.isSuccess
+    ? Math.max(1, data.data.pagination.total_pages)
+    : page;
+  if (page > lastPage) setPage(lastPage);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => {
     const c = new AbortController();
@@ -207,7 +211,7 @@ export function PlanSourcePicker({
               {uiText("webTask:retry")}
             </Button>
           </PageNotice>
-        ) : data.isPending ? (
+        ) : data.isPending || page > lastPage ? (
           <PageNotice>{uiText("webTask:loading_word_lists")}</PageNotice>
         ) : !data.data.items.length ? (
           <EmptyState

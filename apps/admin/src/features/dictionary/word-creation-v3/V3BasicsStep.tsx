@@ -384,10 +384,13 @@ function V3BasicsContent({
             </Descriptions.Item>
           </Descriptions>
           {expandFormContents(word.forms).pos.length === 0 ? (
-            <EmptyState>
-              <Typography.Text strong>
-                {t("creation_no_dictionary_suggestions_found")}
-              </Typography.Text>
+            <EmptyState
+              description={
+                <Typography.Text strong>
+                  {t("creation_no_dictionary_suggestions_found")}
+                </Typography.Text>
+              }
+            >
               <Typography.Text type="secondary">
                 {t(
                   "creation_continue_to_the_editor_to_add_forms_and_pronunciation_manually"

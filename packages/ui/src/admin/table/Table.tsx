@@ -46,6 +46,8 @@ export interface TableProps<T extends object> extends Omit<
   pagination?: false | PaginationProps;
   rowSelection?: RowSelection<T>;
   loading?: boolean;
+  /** 已有结果重新读取时保留空态及其可聚焦操作。 */
+  refreshing?: boolean;
   locale?: { emptyText?: ReactNode };
   size?: "small" | "middle" | "large";
   bordered?: boolean;
@@ -69,6 +71,7 @@ export function Table<T extends object>({
   pagination,
   rowSelection,
   loading,
+  refreshing,
   locale,
   size = "large",
   bordered,
@@ -244,7 +247,7 @@ export function Table<T extends object>({
   return (
     <div
       className={["ui-table-wrapper", className].filter(Boolean).join(" ")}
-      aria-busy={!!loading}
+      aria-busy={!!loading || !!refreshing}
     >
       <RcTable<T>
         {...props}
@@ -287,7 +290,7 @@ export function Table<T extends object>({
           }
         }
       />
-      {loading && (
+      {(loading || refreshing) && (
         <div className="ui-table-loading" role="status">
           {t("status.loading")}
         </div>

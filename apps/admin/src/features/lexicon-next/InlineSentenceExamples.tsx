@@ -1,3 +1,4 @@
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import {
   lazy,
   Suspense,
@@ -660,6 +661,7 @@ export function InlineSentenceExamples({
   onPick: () => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const catalog = useQuery({
     queryKey: ["admin-lexicon-next", "equivalent-catalog"],
     queryFn: requests.equivalentCatalog,
@@ -712,6 +714,9 @@ export function InlineSentenceExamples({
           </div>
           <EmptyState
             empty={canRead && !ids.length}
+            description={
+              disabled ? t("panel_no_linked_examples_yet") : undefined
+            }
             className="next-sentence-section-actions"
           >
             <Button

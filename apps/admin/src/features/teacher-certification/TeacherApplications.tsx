@@ -229,7 +229,8 @@ function ApplicationQueue() {
             )
           }}
           rowKey="id"
-          loading={list.isFetching}
+          loading={list.isLoading}
+          refreshing={list.isRefetching}
           dataSource={list.data?.items ?? []}
           scroll={{ x: 760 }}
           pagination={{

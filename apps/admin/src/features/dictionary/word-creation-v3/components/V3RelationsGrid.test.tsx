@@ -69,8 +69,9 @@ it("关联动作完整翻译，切换语言保留待关联输入、关系类型�
     </InterfaceI18nProvider>
   );
   const view = render(content("en-GB"));
-  expect(screen.getByText("No synonyms yet")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Add synonym" }));
+  const addSynonym = screen.getByRole("button", { name: "Add synonym" });
+  expect(addSynonym).toBeEnabled();
+  fireEvent.click(addSynonym);
   const input = screen.getByPlaceholderText("Search related entries");
   fireEvent.change(input, { target: { value: "keep" } });
   const snapshot = screen.getByTestId("relations").textContent;

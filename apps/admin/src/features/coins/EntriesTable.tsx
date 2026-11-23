@@ -22,7 +22,8 @@ export function EntriesTable({
       tableId="coin-entries"
       locale={{ emptyText: <TableEmptyState message={t("no_entries")} /> }}
       rowKey="id"
-      loading={loading}
+      loading={loading && !data}
+      refreshing={loading && !!data}
       dataSource={data?.items}
       scroll={{ x: 620 }}
       pagination={{

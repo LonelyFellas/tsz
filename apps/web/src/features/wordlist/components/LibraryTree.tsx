@@ -220,13 +220,17 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
         { signal }
       )
   });
+  const lastPage = result.isSuccess
+    ? Math.max(1, result.data.pagination.total_pages)
+    : page;
+  if (page > lastPage) setPage(lastPage);
   if (result.isError)
     return (
       <Button size="sm" variant="ghost" onClick={() => void result.refetch()}>
         {uiText("webWordlistLibrary:retry_directory")}
       </Button>
     );
-  if (!result.data)
+  if (!result.data || page > lastPage)
     return (
       <p className="px-6 py-2 text-xs text-foreground-subtle">
         {uiText("webWordlistLibrary:loading_2")}

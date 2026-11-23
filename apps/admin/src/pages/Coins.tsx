@@ -252,7 +252,8 @@ function Management({ profile }: { profile: AdminProfile }) {
               <Table
                 tableId="coin-accounts"
                 rowKey="owner_id"
-                loading={accounts.isFetching}
+                loading={accounts.isLoading}
+                refreshing={accounts.isRefetching}
                 dataSource={accounts.data?.items}
                 scroll={{ x: 700 }}
                 pagination={{

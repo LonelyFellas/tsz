@@ -1031,7 +1031,8 @@ function Detail({
               )}
             </ReadingTable>
           </div>
-          {loadedItems.length > 0 &&
+          {!updatingSearch &&
+            loadedItems.length > 0 &&
             loadedItems.every((item) => !item.entry && !item.custom_word) && (
               <EmptyState
                 description={uiText(
@@ -1040,24 +1041,26 @@ function Detail({
               />
             )}
           {loadedItems.length === 0 ? (
-            <EmptyState>
-              {q
-                ? uiText("webWordlistDetail:no_matching_entries")
-                : uiText("webWordlistDetail:no_entries_yet")}
-              {q && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="ml-2"
-                  onClick={() => {
-                    setQuery("");
-                    setQ("");
-                  }}
-                >
-                  {uiText("webWordlistDetail:clear_search")}
-                </Button>
-              )}
-            </EmptyState>
+            !updatingSearch && (
+              <EmptyState>
+                {q
+                  ? uiText("webWordlistDetail:no_matching_entries")
+                  : uiText("webWordlistDetail:no_entries_yet")}
+                {q && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="ml-2"
+                    onClick={() => {
+                      setQuery("");
+                      setQ("");
+                    }}
+                  >
+                    {uiText("webWordlistDetail:clear_search")}
+                  </Button>
+                )}
+              </EmptyState>
+            )
           ) : (
             <div
               ref={loadMoreRef}
