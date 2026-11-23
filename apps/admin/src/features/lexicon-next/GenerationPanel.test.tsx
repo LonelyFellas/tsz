@@ -245,7 +245,18 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
     <GenerationPanel
       entryId="entry"
       revision={1}
-      draft={{ ...draft, headword: "center" }}
+      draft={{
+        ...draft,
+        headword: "center",
+        senses: Array.from({ length: 81 }, (_, index) => ({
+          id: `sense-${index}`,
+          part_of_speech: "noun",
+          equivalents: [
+            { id: `word-${index}`, locale: "zh-Hans", text: `词义 ${index}` }
+          ],
+          definitions: []
+        }))
+      }}
       medium="zh-Hans"
       target="en-GB"
       sections={["forms"]}
@@ -306,6 +317,7 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
   expect(candidates.getByText("/ˈsentər/")).toBeVisible();
   expect(onFill).toHaveBeenCalledOnce();
   expect(generate).toHaveBeenCalledOnce();
+  expect(generate.mock.calls[0]?.[1].senses).toEqual([]);
 });
 
 it("已加载旧文案的页面仍按词性显示韦氏变形和候选词形计数", () => {

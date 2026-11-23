@@ -65,6 +65,7 @@ import type { NextDialectSense } from "@tsz/types";
 import { MeaningsStep } from "@/features/lexicon-next/MeaningsStep";
 import { DraftSummary, Preview } from "@/features/lexicon-next/Preview";
 import {
+  draftNodeCount,
   draftProblem,
   generalSense,
   localeLabels,
@@ -1860,8 +1861,9 @@ function EntryEditor({
             dialectSenses,
             binding
           );
-          const issue = draftProblem(next.draft, equivalentMetadataAvailable);
-          if (issue) throw new Error(issue);
+          const nextCount = draftNodeCount(next.draft);
+          if (nextCount > 500 && nextCount > draftNodeCount(draft))
+            throw new Error("草稿内容已超出数量限制，请缩小生成范围。");
           if (
             !Object.keys(next.dialect).length &&
             !next.resources.length &&

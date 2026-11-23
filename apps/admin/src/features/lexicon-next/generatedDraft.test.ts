@@ -150,6 +150,12 @@ it("按本次送出的词义顺序回填，并只修改点选语言的解释", (
             locale: "zh-Hans",
             style: "definition",
             text: "银行的人工解释"
+          },
+          {
+            id: "draft-blank",
+            locale: "en-GB",
+            style: "definition",
+            text: ""
           }
         ],
         equivalents: []

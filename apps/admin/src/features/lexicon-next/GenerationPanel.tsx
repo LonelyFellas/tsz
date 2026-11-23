@@ -159,15 +159,19 @@ export function GenerationPanel({
     if (
       (binding.senseId && !senses.length) ||
       (section === "groups" && !senses.length) ||
+      senses.length > 80 ||
+      requestedExamples.length > 50 ||
       (section === "translations" && !requestedExamples.length)
     ) {
       setResume(undefined);
       setGeneration(undefined);
       setFeedback("");
       setError(
-        section === "translations"
-          ? t("entry_ai_translation_ineligible")
-          : "请先添加词性和词义。"
+        senses.length > 80 || requestedExamples.length > 50
+          ? "本次生成的词义或例句超出数量上限，请选择具体板块。"
+          : section === "translations"
+            ? t("entry_ai_translation_ineligible")
+            : "请先添加词性和词义。"
       );
       return;
     }

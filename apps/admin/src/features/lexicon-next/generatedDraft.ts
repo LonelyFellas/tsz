@@ -12,12 +12,22 @@ import { planFormCandidates } from "@/features/dictionary/assistant/formCandidat
 import { emptyFormEditor } from "./FormsStep";
 import { generalSense, newSense, newGrammarStructure } from "./model";
 import { newSentenceVariant } from "./sentenceDrafts";
+import { equivalentKey } from "./equivalents";
+
+function validGeneratedText(text: string, limit: number, multiline = false) {
+  return (
+    !!text.trim() &&
+    [...text].length <= limit &&
+    !/\p{Cc}/u.test(multiline ? text.replace(/[\r\n]/g, "") : text)
+  );
+}
 
 export function generationSenses(
   draft: NextDraft,
   medium: string,
   target?: GenerationTarget
 ) {
+  if (target?.section === "forms") return [];
   return draft.senses
     .filter((s) => {
       if (!s.part_of_speech || (target?.pos && s.part_of_speech !== target.pos))
@@ -34,12 +44,14 @@ export function generationSenses(
     .map((s) => ({
       id: s.id,
       pos: s.part_of_speech!,
-      gloss: (
+      gloss: Array.from(
         s.definitions.find((d) => d.locale === medium && d.text.trim())?.text ||
-        s.definitions.find((d) => d.text.trim())?.text ||
-        s.equivalents.find((e) => e.text.trim())?.text ||
-        ""
-      ).slice(0, 500)
+          s.definitions.find((d) => d.text.trim())?.text ||
+          s.equivalents.find((e) => e.text.trim())?.text ||
+          ""
+      )
+        .slice(0, 500)
+        .join("")
     }));
 }
 
@@ -95,6 +107,7 @@ export function fillGeneratedDraft(
     locale: string,
     text: string
   ) => {
+    if (!validGeneratedText(text, 5000, true)) return;
     // A regional definition also inherits the common English row.
     if (
       sense.definitions.some(
@@ -143,7 +156,12 @@ export function fillGeneratedDraft(
   const indexed = ids.map((id) => draft.senses.find((s) => s.id === id)!);
   for (const row of proposals.groups) {
     const sense = indexed[row.sense];
-    if (!sense) continue;
+    if (
+      !sense ||
+      !validGeneratedText(row.name_zh, 200) ||
+      !validGeneratedText(row.name_en, 200)
+    )
+      continue;
     const original = draft.sense_groups?.find(
       (g) => g.id === sense.sense_group_id
     );
@@ -208,9 +226,12 @@ export function fillGeneratedDraft(
     const sense = indexed[row.sense];
     if (
       !sense ||
+      !validGeneratedText(row.word, 200) ||
       sense.no_equivalents?.includes(medium) ||
       sense.equivalents.some(
-        (e) => e.locale === medium && e.text.trim() === row.word
+        (e) =>
+          e.locale === medium &&
+          equivalentKey(e.text) === equivalentKey(row.word)
       )
     )
       continue;
