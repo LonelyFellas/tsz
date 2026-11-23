@@ -5,6 +5,8 @@ const state = vi.hoisted(() => ({
   profile: { id: "a", role: "super_admin", permissions: [] as string[] },
   voices: vi.fn(),
   preview: vi.fn(),
+  renderSsml: vi.fn(),
+  generateAudio: vi.fn(),
   groupsV3: vi.fn(),
   library: vi.fn(),
   audioUrl: vi.fn(),
@@ -19,6 +21,8 @@ vi.mock("@/lib/auth", () => ({
     speech: {
       voices: state.voices,
       preview: state.preview,
+      renderSsml: state.renderSsml,
+      generateAudio: state.generateAudio,
       groupsV3: state.groupsV3,
       library: state.library
     },
@@ -79,6 +83,8 @@ beforeEach(() => {
   state.env.ADMIN_TTS_MOCK = false;
   state.voices.mockReset();
   state.preview.mockReset();
+  state.renderSsml.mockReset();
+  state.generateAudio.mockReset();
   state.groupsV3.mockReset().mockResolvedValue({ groups: [], revision: 0 });
   state.library.mockReset().mockResolvedValue({ items: [] });
   state.audioUrl.mockReset().mockResolvedValue({
@@ -97,6 +103,49 @@ afterEach(() => {
 });
 
 describe("admin voice preview data source", () => {
+  it("语法结构的三条合成请求传递来源和原文，普通文本请求保持既有形状", async () => {
+    const {
+      adminVoicePreviewAdapter,
+      adminGrammarVoicePreviewAdapter: grammar
+    } = await import("./dataSource");
+    const content = { ...CONTENT, text: "(be) superior to…" };
+    const setting = {
+      voice_id: "real-voice",
+      enabled: true,
+      rate_percent: 0
+    };
+    state.renderSsml.mockResolvedValue({ ssml: "<speak/>" });
+    state.generateAudio.mockResolvedValue({ asset: { id: "generated" } });
+    // The list row warms the shared catalogue before using the grammar adapter.
+    await adminVoicePreviewAdapter.listVoices({ language: "en" });
+    await grammar.synthesize({
+      language: "en",
+      content,
+      voiceId: "real-voice"
+    });
+    expect(state.preview.mock.lastCall?.[0]).toMatchObject({
+      grammar: true,
+      content
+    });
+    await grammar.renderSsml!({ content, setting });
+    expect(state.renderSsml.mock.lastCall?.[0].source).toEqual({
+      kind: "text",
+      grammar: true,
+      content
+    });
+    await grammar.generateAudio!({ requestId: "request", content, setting });
+    expect(state.generateAudio.mock.lastCall?.[0].source).toEqual({
+      kind: "text",
+      grammar: true,
+      content
+    });
+    await adminVoicePreviewAdapter.renderSsml!({ content, setting });
+    expect(state.renderSsml.mock.lastCall?.[0].source).toEqual({
+      kind: "text",
+      content
+    });
+  });
+
   it("文本音色目录不依赖个人参数接口", async () => {
     state.library.mockRejectedValue(new Error("offline"));
     const { adminVoicePreviewAdapter } = await import("./dataSource");

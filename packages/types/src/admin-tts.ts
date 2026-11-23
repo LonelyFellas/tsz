@@ -7,7 +7,12 @@ import type {
 } from "./admin-word-v3";
 
 export type GeneratedSpeechSource =
-  | { kind: "text"; content: RichTextV2; form_links?: GrammarFormLinkV3[] }
+  | {
+      kind: "text";
+      content: RichTextV2;
+      form_links?: GrammarFormLinkV3[];
+      grammar?: boolean;
+    }
   | {
       kind: "phoneme";
       phoneme_locale?: "en-GB" | "en-US";
@@ -183,6 +188,7 @@ export interface AdminSpeechVoiceListResponse {
 export interface CreateAdminSpeechPreviewInput {
   output_format?: "mp3" | "wav";
   content: RichTextV2;
+  grammar?: boolean;
   voice_alias: string;
   style?: string | null;
   rate_percent?: number;

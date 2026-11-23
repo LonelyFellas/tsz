@@ -25,7 +25,9 @@ export function V3GrammarVoiceTextField({
   forms?: DraftFormsStepContentV3;
   meanings?: DraftMeaningsStepContentWritableV3;
 }) {
-  const createPreviewAdapter = useReadingPreviewAdapter(wordId, forms);
+  const createPreviewAdapter = useReadingPreviewAdapter(wordId, forms, {
+    grammar: true
+  });
   const previewAdapter = useMemo(
     () => createPreviewAdapter(textLinks),
     [createPreviewAdapter, textLinks]

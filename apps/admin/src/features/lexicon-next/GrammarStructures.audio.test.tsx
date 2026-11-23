@@ -17,8 +17,8 @@ vi.mock("@/lib/auth", async (original) => ({
   ...(await original<typeof import("@/lib/auth")>()),
   usePermission: () => true
 }));
-vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
-  adminVoicePreviewAdapter: {
+vi.mock("@/features/dictionary/voice-editor/dataSource", () => {
+  const adapter = {
     listVoices: async () => [
       {
         id: "sonia",
@@ -33,11 +33,15 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
     ],
     generateAudio: speech.generate,
     synthesize: speech.preview
-  },
-  adminAudioUploadAdapter: {},
-  loadAdminVoiceRecommendations: async () => [],
-  voicePreviewIsMock: false
-}));
+  };
+  return {
+    adminVoicePreviewAdapter: adapter,
+    adminGrammarVoicePreviewAdapter: adapter,
+    adminAudioUploadAdapter: {},
+    loadAdminVoiceRecommendations: async () => [],
+    voicePreviewIsMock: false
+  };
+});
 
 const initial: NextGrammarStructure[] = [
   {
@@ -77,10 +81,10 @@ beforeEach(() => {
   speech.generate.mockReset();
   speech.preview.mockReset();
 });
-function setup() {
+function setup(input = initial) {
   const changed = vi.fn();
   function Draft() {
-    const [rows, setRows] = useState(initial);
+    const [rows, setRows] = useState(input);
     return (
       <>
         <GrammarStructures
@@ -171,6 +175,52 @@ it("编辑和取消不生成语音，点击完成才生成最新正文并应用�
   );
   expect(speech.generate).toHaveBeenCalledOnce();
 });
+
+it.each([93, 87])(
+  "superior to 从旧音频生成音量 %i 的新版，正文仍带括号",
+  async (volume) => {
+    const input = structuredClone(initial);
+    const variant = input[0]!.variants[0]!;
+    variant.content.text = "(be) superior to…";
+    Object.assign(variant.voice_profile!.voices[0]!, {
+      rate_percent: -5,
+      volume_percent: 93,
+      audio_asset_id: "old-sonia"
+    });
+    speech.generate.mockResolvedValue(asset);
+    const changed = setup(input);
+    const editor = await openEditor();
+    expect(editor).toHaveValue("(be) superior to…");
+    expect(speech.generate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "修改 Sonia" }));
+    const volumeInput = await screen.findByLabelText("当前音色音量");
+    if (volume !== 93)
+      fireEvent.change(volumeInput, { target: { value: String(volume) } });
+    const regenerate = await screen.findByRole("button", {
+      name: volume === 93 ? "重新生成音频" : "生成正式音频"
+    });
+    fireEvent.click(regenerate);
+    await waitFor(() => expect(speech.generate).toHaveBeenCalledOnce());
+    expect(speech.generate.mock.calls[0]![0]).toMatchObject({
+      content: { text: "(be) superior to…" },
+      setting: { rate_percent: -5, volume_percent: volume }
+    });
+    expect(speech.generate.mock.calls[0]![0].setting.audio_asset_id).toBe(
+      volume === 93 ? "old-sonia" : undefined
+    );
+    const save = screen.getByRole("button", { name: "保存配音设置" });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    expect(changed).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    await waitFor(() => expect(changed).toHaveBeenCalledOnce());
+    const applied = JSON.parse(screen.getByLabelText("父草稿").textContent!)[0]
+      .variants[0];
+    expect(applied.content.text).toBe("(be) superior to…");
+    expect(applied.voice_profile.voices[0].audio_asset_id).toBe(asset.id);
+    expect(speech.generate).toHaveBeenCalledOnce();
+  }
+);
 
 it("完成时生成失败保留弹窗与正文，再次完成重试并复用请求身份", async () => {
   speech.generate

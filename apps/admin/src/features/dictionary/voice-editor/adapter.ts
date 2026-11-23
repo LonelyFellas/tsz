@@ -2,7 +2,9 @@ import { speechDiagnostic } from "./diagnostics";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminSpeechPreviewResponse,
-  AdminSpeechVoiceListResponse
+  AdminSpeechVoiceCapabilities,
+  AdminSpeechVoiceListResponse,
+  CreateAdminSpeechPreviewInput
 } from "@tsz/types";
 import {
   VoicePreviewError,
@@ -16,16 +18,7 @@ export interface AdminSpeechDataSource {
   previewContent?(path: string, signal?: AbortSignal): Promise<Blob>;
   voices(signal?: AbortSignal): Promise<AdminSpeechVoiceListResponse>;
   preview(
-    input: {
-      content: Parameters<VoicePreviewAdapter["synthesize"]>[0]["content"];
-      voice_alias: string;
-      style?: string | null;
-      style_degree?: number;
-      role?: string;
-      output_format?: "mp3" | "wav";
-      rate_percent?: number;
-      pitch_semitones?: number;
-    },
+    input: CreateAdminSpeechPreviewInput,
     signal?: AbortSignal
   ): Promise<AdminSpeechPreviewResponse>;
 }
@@ -166,12 +159,15 @@ function errorCode(error: HttpError): VoicePreviewErrorCode {
 }
 
 export function createAdminVoicePreviewAdapter(
-  dataSource: AdminSpeechDataSource
+  dataSource: AdminSpeechDataSource,
+  {
+    grammar = false,
+    catalog = new Map<string, AdminSpeechVoiceCapabilities>()
+  }: {
+    grammar?: boolean;
+    catalog?: Map<string, AdminSpeechVoiceCapabilities>;
+  } = {}
 ): VoicePreviewAdapter {
-  const catalog = new Map<
-    string,
-    AdminSpeechVoiceListResponse["items"][number]["capabilities"]
-  >();
   return {
     async listVoices({ language, signal }) {
       try {
@@ -260,6 +256,7 @@ export function createAdminVoicePreviewAdapter(
         const request = {
           ...(input.outputFormat ? { output_format: input.outputFormat } : {}),
           content: input.content,
+          ...(grammar ? { grammar } : {}),
           voice_alias: input.voiceId,
           ...(input.style ? { style: input.style } : {}),
           ...(input.styleDegree !== undefined

@@ -343,6 +343,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   /** 宿主的稳定编辑身份；提供后，显示标签变化不会使音频失效。 */
   contextKey?: string;
   previewAdapter?: VoicePreviewAdapter;
+  /** 正式音频由宿主的完成动作或显式生成按钮安排。 */
+  deferAudioGeneration?: boolean;
   /** Catalogue reads remain available when synthesis is disabled by the host. */
   previewEnabled?: boolean;
   loadRecommendations?: LoadVoiceRecommendations;
