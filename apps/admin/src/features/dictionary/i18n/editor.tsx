@@ -201,11 +201,6 @@ export const lexiconEditorMessages = {
     "此拼寫的配音設定由 {{count}} 個讀法共用。",
     "Speech settings for this spelling are shared by {{count}} readings."
   ],
-  spelling_settings_shared_pauses: [
-    "停顿应用于此拼写的英美配音。",
-    "停頓套用於此拼寫的英美配音。",
-    "Pauses apply to both British and American speech for this spelling."
-  ],
   shared_label_count: [
     "共用于 {{count}} 个标签",
     "共用於 {{count}} 個標籤",

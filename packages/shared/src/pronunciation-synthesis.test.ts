@@ -946,6 +946,55 @@ it("final playback follows spelling/phoneme selection and retains legacy recordi
   ).toBe("spelling-recording");
 });
 
+it("词形总览试听读取各口音停顿，已清空的一侧不回退到历史停顿", () => {
+  const spelling = "give up";
+  const pronunciation = {
+    id: "reading",
+    dict_phonetic: "",
+    actual_pron: "",
+    style: "normal" as const
+  };
+  const content = (duration_ms: number) => ({
+    version: 2 as const,
+    text: spelling,
+    annotations: [{ type: "pause" as const, at: 4, duration_ms }]
+  });
+  const uk = { ...content(10), annotations: [] };
+  const speech = {
+    content: content(250),
+    content_by_accent: { uk, us: content(500) },
+    voice_profile: { voices: [] }
+  };
+
+  expect(
+    pronunciationPlaybackSource(
+      spelling,
+      pronunciation,
+      speech,
+      "en-GB",
+      "common"
+    ).content
+  ).toEqual(uk);
+  expect(
+    pronunciationPlaybackSource(
+      spelling,
+      pronunciation,
+      speech,
+      "en-US",
+      "common"
+    ).content
+  ).toEqual(content(500));
+  expect(
+    pronunciationPlaybackSource(
+      spelling,
+      pronunciation,
+      { ...speech, content_by_accent: { uk } },
+      "en-US",
+      "common"
+    ).content
+  ).toEqual(content(250));
+});
+
 it("同一读法每侧独立选择来源，停配与上传不使用缓存TTS，切回保留原参数", () => {
   const profile = (asset: string, locale: "en-GB" | "en-US") => ({
     voices: [

@@ -61,7 +61,8 @@ function inheritedSetting(
   profile: VoiceProfileV3,
   locale?: string
 ) {
-  const side = speechAccentGroup(setting.locale ?? locale, setting.accent);
+  const side =
+    speechAccentGroup(setting.locale ?? locale, setting.accent) ?? "other";
   return (
     (side === "uk" || side === "us") &&
     profile.dubbing?.[side].mode === "inherit"
@@ -101,6 +102,7 @@ function selectionSignature(
 export function useSelectedVoiceAudio({
   target,
   content,
+  contentByAccent,
   profile,
   adapter,
   locale,
@@ -113,6 +115,7 @@ export function useSelectedVoiceAudio({
 }: {
   target: string;
   content: RichTextV2;
+  contentByAccent?: Partial<Record<"uk" | "us", RichTextV2>>;
   profile?: VoiceProfileV3 | null;
   adapter: VoicePreviewAdapter;
   locale?: `en-${string}`;
@@ -133,11 +136,23 @@ export function useSelectedVoiceAudio({
     controller: AbortController;
     result: Promise<boolean>;
   }>(null);
-  const sourceKey = v3ContentFingerprint([
-    target,
-    content,
-    adapter.audioSourceKey
-  ]);
+  const sourceKeys = useMemo(
+    () => ({
+      uk: v3ContentFingerprint([
+        target,
+        contentByAccent?.uk ?? content,
+        adapter.audioSourceKey
+      ]),
+      us: v3ContentFingerprint([
+        target,
+        contentByAccent?.us ?? content,
+        adapter.audioSourceKey
+      ]),
+      other: v3ContentFingerprint([target, content, adapter.audioSourceKey])
+    }),
+    [target, content, contentByAccent, adapter.audioSourceKey]
+  );
+  const sourceKey = JSON.stringify(sourceKeys);
   const signature = selectionSignature(
     sourceKey,
     locale,
@@ -166,7 +181,7 @@ export function useSelectedVoiceAudio({
       ),
     [profile]
   );
-  const lastSource = useRef({ target, sourceKey, effects });
+  const lastSource = useRef({ target, sourceKeys, effects });
   const attempted = useRef<string | undefined>(undefined);
   const ensureRef = useRef<() => Promise<boolean>>(() =>
     Promise.resolve(false)
@@ -211,7 +226,7 @@ export function useSelectedVoiceAudio({
         running.current.signature = expectedSignature;
       lastSource.current = {
         target,
-        sourceKey,
+        sourceKeys,
         effects: new Map(
           next.voices.map((setting) => [
             voiceSettingKey(setting),
@@ -228,12 +243,16 @@ export function useSelectedVoiceAudio({
         await Promise.resolve();
         let stored = profile;
         if (lastSource.current.target === target) {
-          const sourceChanged = lastSource.current.sourceKey !== sourceKey;
           stored = {
             ...stored,
             voices: stored.voices.map((setting) => {
               if (!inScope(setting, stored, locale, activeLocales))
                 return setting;
+              const side =
+                speechAccentGroup(setting.locale ?? locale, setting.accent) ??
+                "other";
+              const sourceChanged =
+                lastSource.current.sourceKeys[side] !== sourceKeys[side];
               const previous = lastSource.current.effects.get(
                 voiceSettingKey(setting)
               );
@@ -249,7 +268,7 @@ export function useSelectedVoiceAudio({
           if (JSON.stringify(stored) !== JSON.stringify(profile))
             commit(stored);
         }
-        lastSource.current = { target, sourceKey, effects };
+        lastSource.current = { target, sourceKeys, effects };
         let resolved = stored.voices;
         if (adapter.resolveVoices) {
           const accents = (["gb", "us"] as const).filter(
@@ -260,7 +279,12 @@ export function useSelectedVoiceAudio({
           const results = await Promise.allSettled(
             accents.map((accent) =>
               adapter.resolveVoices!(
-                { profile: stored, content, accent },
+                {
+                  profile: stored,
+                  content:
+                    contentByAccent?.[accent === "gb" ? "uk" : "us"] ?? content,
+                  accent
+                },
                 { signal: controller.signal }
               )
             )
@@ -329,8 +353,11 @@ export function useSelectedVoiceAudio({
         for (const setting of selected) {
           if (setting.audio_asset_id) continue;
           const key = voiceSettingKey(setting);
+          const side =
+            speechAccentGroup(setting.locale ?? locale, setting.accent) ??
+            "other";
           const input = v3ContentFingerprint([
-            sourceKey,
+            sourceKeys[side],
             voiceEffectKey(setting),
             (() => {
               const side = speechAccentGroup(
@@ -352,7 +379,8 @@ export function useSelectedVoiceAudio({
             return adapter.generateAudio!(
               {
                 requestId,
-                content,
+                content:
+                  (side !== "other" && contentByAccent?.[side]) || content,
                 setting,
                 ...(stored.dubbing ? { profile: stored } : {})
               },
@@ -403,6 +431,7 @@ export function useSelectedVoiceAudio({
     adapter,
     activeLocales,
     content,
+    contentByAccent,
     effects,
     enabled,
     locale,
@@ -410,6 +439,7 @@ export function useSelectedVoiceAudio({
     requiredLocales,
     signature,
     sourceKey,
+    sourceKeys,
     target
   ]);
   useLayoutEffect(() => {
@@ -423,7 +453,7 @@ export function useSelectedVoiceAudio({
   useEffect(() => {
     if (!enabled) {
       attempted.current = undefined;
-      lastSource.current = { target, sourceKey, effects };
+      lastSource.current = { target, sourceKeys, effects };
       running.current?.controller.abort();
       setBusy(false);
       return;
@@ -438,7 +468,7 @@ export function useSelectedVoiceAudio({
     enabled,
     ensure,
     signature,
-    sourceKey,
+    sourceKeys,
     target
   ]);
   useEffect(

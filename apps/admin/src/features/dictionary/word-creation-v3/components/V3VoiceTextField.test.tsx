@@ -3225,7 +3225,7 @@ it("内容弹窗延迟正式音频时，拼写设置保存不提前生成", asyn
   expect(generateAudio).not.toHaveBeenCalled();
 });
 
-it("口音设置修改共享停顿后，宿主保存等待另一口音补齐音频且保留文本标注", async () => {
+it("口音设置修改停顿后，宿主保存等待当前口音生成并保留另一口音音频和文本标注", async () => {
   state.flags.VOICE_PREVIEW = true;
   state.listVoices.mockResolvedValue([
     {
@@ -3350,10 +3350,13 @@ it("口音设置修改共享停顿后，宿主保存等待另一口音补齐音�
     result.profile.voices
       .map((voice: VoiceSetting) => voice.audio_asset_id)
       .sort()
-  ).toEqual(["fresh-en-GB", "fresh-en-US"]);
+  ).toEqual(["cached-us", "fresh-en-GB"]);
   expect(
     generateAudio.mock.calls.map(([request]) => request.setting.locale).sort()
-  ).toEqual(["en-GB", "en-US"]);
+  ).toEqual(["en-GB"]);
+  expect(generateAudio.mock.calls[0]![0].content.annotations).toEqual([
+    { type: "pause", at: 5, duration_ms: 1000 }
+  ]);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 

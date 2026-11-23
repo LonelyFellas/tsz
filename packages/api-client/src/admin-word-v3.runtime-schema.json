@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/task-249-entry-names-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "0f84ec2398d313bab98a888362f43e3e4be2cac24c250e8309eef38a23ab3011",
+  "_source": "/tmp/tsz-961-authoritative.cMBkmrCb",
+  "_source_sha256": "366803e362605a3497514f87839af529746b0b9c651be3baa3fb137657fcf33a",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -6392,6 +6392,18 @@
       },
       "additionalProperties": false
     },
+    "SpellingContentByAccentV3": {
+      "type": "object",
+      "properties": {
+        "uk": {
+          "oneOf": [{ "$ref": "#/$defs/RichTextV2V3" }, { "type": "null" }]
+        },
+        "us": {
+          "oneOf": [{ "$ref": "#/$defs/RichTextV2V3" }, { "type": "null" }]
+        }
+      },
+      "additionalProperties": false
+    },
     "SpellingSpeechV3": {
       "type": "object",
       "required": ["content", "voice_profile"],
@@ -6402,6 +6414,12 @@
           "maxItems": 8
         },
         "content": { "$ref": "#/$defs/RichTextV2V3" },
+        "content_by_accent": {
+          "oneOf": [
+            { "$ref": "#/$defs/SpellingContentByAccentV3" },
+            { "type": "null" }
+          ]
+        },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false

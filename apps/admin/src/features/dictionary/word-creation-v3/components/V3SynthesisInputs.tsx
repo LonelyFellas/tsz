@@ -42,7 +42,8 @@ import {
   pronunciationLocale,
   synthesisLocaleIssue,
   synthesisForLocale,
-  speechAccentGroup
+  speechAccentGroup,
+  spellingSpeechContent
 } from "@tsz/shared";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -694,7 +695,8 @@ export function V3SynthesisInputs({
                               : phonemeSpeech?.voice_profile;
                           const previewContent =
                             option.value === "spelling"
-                              ? (spellingContent ?? {
+                              ? (spellingSpeechContent(spellingSpeech, side) ??
+                                spellingContent ?? {
                                   version: 2 as const,
                                   text: spelling,
                                   annotations: []

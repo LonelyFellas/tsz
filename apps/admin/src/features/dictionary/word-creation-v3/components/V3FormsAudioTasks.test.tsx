@@ -242,6 +242,12 @@ it.each([false, true])(
     const initial = fixture();
     const regions = initial.contents[0]!.regional_variants;
     if (regions.mode !== "common") throw new Error("fixture must be common");
+    regions.common.spelling = "give up";
+    const withPause = (duration_ms: number): RichTextV2 => ({
+      version: 2,
+      text: regions.common.spelling,
+      annotations: [{ type: "pause", at: 4, duration_ms }]
+    });
     const row = regions.common.pronunciations[0]!;
     delete row.voice_profile;
     row.synthesis!.use_spelling = !explicitSources;
@@ -260,7 +266,8 @@ it.each([false, true])(
       is_default: true
     };
     regions.common.spelling_speech = {
-      content: { version: 2, text: "hello", annotations: [] },
+      content: withPause(250),
+      content_by_accent: { uk: withPause(10), us: withPause(500) },
       voice_profile: { voices: [] },
       audio_assets: [recording]
     };
@@ -274,6 +281,17 @@ it.each([false, true])(
       for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
     });
     expect(speech.generate).toHaveBeenCalledTimes(2);
+    for (const [locale, duration] of [
+      ["en-GB", 10],
+      ["en-US", 500]
+    ] as const) {
+      expect(speech.generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: { kind: "text", content: withPause(duration) },
+          setting: expect.objectContaining({ locale })
+        })
+      );
+    }
     expect(speech.resolve).toHaveBeenCalledWith(
       expect.objectContaining({ accent: "us" })
     );

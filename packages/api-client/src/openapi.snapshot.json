@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/task-249-entry-names-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-23T00:30:04.125Z",
+  "_source": "/tmp/tsz-961-authoritative.cMBkmrCb",
+  "_generatedAt": "2026-11-23T01:35:07.758Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -673,6 +673,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -730,6 +736,12 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -805,6 +817,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -867,6 +885,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -918,6 +942,12 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -985,6 +1015,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -1039,6 +1075,12 @@
         "in": "header",
         "required": true,
         "schema": { "type": "string" }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
       },
       {
         "name": "X-TSZ-Spelling-Markup",
@@ -1098,6 +1140,12 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -1165,6 +1213,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -1216,6 +1270,12 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -1283,6 +1343,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -1340,6 +1406,12 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -1407,6 +1479,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "X-TSZ-Spelling-Accent-Content",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "X-TSZ-Spelling-Markup",
         "in": "header",
         "required": false,
@@ -1458,6 +1536,12 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -1534,6 +1618,12 @@
       },
       {
         "name": "X-TSZ-Sentence-Formatting",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "X-TSZ-Spelling-Accent-Content",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -10773,6 +10863,24 @@
       "description": "`distinguish` 词条由管理员选择的主词侧；用于主词展示顺序及后续方言内容初始化，\n不要求与内置词典的命中方言相同。",
       "enum": ["uk", "us"]
     },
+    "SpellingContentByAccentV3": {
+      "type": "object",
+      "properties": {
+        "uk": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/RichTextV2V3" },
+            { "type": "null" }
+          ]
+        },
+        "us": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/RichTextV2V3" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "SpellingSpeechV3": {
       "type": "object",
       "description": "独立的拼写试听配置；content 与 spelling 同文，仅允许停顿标注。",
@@ -10784,6 +10892,12 @@
           "maxItems": 8
         },
         "content": { "$ref": "#/components/schemas/RichTextV2V3" },
+        "content_by_accent": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/SpellingContentByAccentV3" },
+            { "type": "null" }
+          ]
+        },
         "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
       },
       "additionalProperties": false
