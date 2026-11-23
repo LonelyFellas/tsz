@@ -39,6 +39,7 @@ import {
   editSpellingList,
   unifyUkUsSpelling,
   updateConcreteFormType,
+  updateSpellingAccentContent,
   updateVariantSpelling,
   updateSpellingVoiceProfile,
   updateSpellingAudioAssets,
@@ -72,12 +73,10 @@ function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
 
 function SpellingSettingsHint({
   count,
-  labelCount = 1,
-  sharedPauses = false
+  labelCount = 1
 }: {
   count: number;
   labelCount?: number;
-  sharedPauses?: boolean;
 }) {
   const { t } = useLexiconEditorTranslation();
   return (
@@ -90,11 +89,6 @@ function SpellingSettingsHint({
       {count > 1 && (
         <Typography.Paragraph>
           {t("spelling_settings_shared_readings", { count })}
-        </Typography.Paragraph>
-      )}
-      {sharedPauses && (
-        <Typography.Paragraph>
-          {t("spelling_settings_shared_pauses")}
         </Typography.Paragraph>
       )}
     </>
@@ -479,6 +473,7 @@ function V3DialectFormCell({
           mode="spelling"
           spellingTextOnly
           spellingAudioScope={spellingAudioScope([variant])}
+          spellingContentByAccent={variant.spelling_speech?.content_by_accent}
           spellingSettingsRef={spellingSettingsRef}
           spellingSettingsHint={
             <SpellingSettingsHint
@@ -496,9 +491,21 @@ function V3DialectFormCell({
               : undefined
           }
           dialect={dialect}
-          onCommit={(result) => {
+          onCommit={(result, side) => {
             let next = content;
-            if (dialectRules.spelling_mode === "unified") {
+            const ids =
+              dialectRules.spelling_mode === "unified" &&
+              form.regional_variants.mode === "uk_us"
+                ? [form.regional_variants.uk.id, form.regional_variants.us.id]
+                : [variant.id];
+            if (side)
+              next = updateSpellingAccentContent(
+                next,
+                ids,
+                side,
+                toRichTextV2(result.value)
+              );
+            else if (dialectRules.spelling_mode === "unified") {
               const unified = unifyUkUsSpelling(
                 form,
                 toRichTextV2(result.value)
@@ -512,11 +519,6 @@ function V3DialectFormCell({
                 variant.id,
                 toRichTextV2(result.value)
               );
-            const ids =
-              dialectRules.spelling_mode === "unified" &&
-              form.regional_variants.mode === "uk_us"
-                ? [form.regional_variants.uk.id, form.regional_variants.us.id]
-                : [variant.id];
             next = updateSpellingVoiceProfile(
               next,
               ids,
@@ -968,12 +970,14 @@ export function V3ConcreteFormRow({
                 mode="spelling"
                 spellingTextOnly
                 spellingAudioScope={spellingAudioScope(variants)}
+                spellingContentByAccent={
+                  commonVariant.spelling_speech?.content_by_accent
+                }
                 spellingSettingsRef={spellingSettingsRef}
                 spellingSettingsHint={
                   <SpellingSettingsHint
                     count={spellingReadingCount}
                     labelCount={referenceForms?.length}
-                    sharedPauses
                   />
                 }
                 inputRef={spellingRef}
@@ -1006,12 +1010,19 @@ export function V3ConcreteFormRow({
                     )
                   )
                 }
-                onCommit={(result) => {
-                  const next = updateVariantSpelling(
-                    content,
-                    commonVariant.id,
-                    toRichTextV2(result.value)
-                  );
+                onCommit={(result, side) => {
+                  const next = side
+                    ? updateSpellingAccentContent(
+                        content,
+                        [commonVariant.id],
+                        side,
+                        toRichTextV2(result.value)
+                      )
+                    : updateVariantSpelling(
+                        content,
+                        commonVariant.id,
+                        toRichTextV2(result.value)
+                      );
                   onChange(
                     updateSpellingAudioAssets(
                       updateSpellingVoiceProfile(
@@ -1085,12 +1096,14 @@ export function V3ConcreteFormRow({
                 mode="spelling"
                 spellingTextOnly
                 spellingAudioScope={spellingAudioScope(variants)}
+                spellingContentByAccent={
+                  unifiedSpellingVariants.uk.spelling_speech?.content_by_accent
+                }
                 spellingSettingsRef={spellingSettingsRef}
                 spellingSettingsHint={
                   <SpellingSettingsHint
                     count={spellingReadingCount}
                     labelCount={referenceForms?.length}
-                    sharedPauses
                   />
                 }
                 inputRef={spellingRef}
@@ -1118,15 +1131,26 @@ export function V3ConcreteFormRow({
                     )
                   )
                 }
-                onCommit={(result) => {
-                  const unified = unifyUkUsSpelling(
-                    form,
-                    toRichTextV2(result.value)
-                  );
-                  if (!unified.ok)
-                    throw new LocalLexiconError("local_spelling_unmergeable");
+                onCommit={(result, side) => {
+                  let updated: typeof content;
+                  if (side) {
+                    updated = updateSpellingAccentContent(
+                      content,
+                      unifiedSpellingVariantIds,
+                      side,
+                      toRichTextV2(result.value)
+                    );
+                  } else {
+                    const unified = unifyUkUsSpelling(
+                      form,
+                      toRichTextV2(result.value)
+                    );
+                    if (!unified.ok)
+                      throw new LocalLexiconError("local_spelling_unmergeable");
+                    updated = replaceForm(content, unified.value);
+                  }
                   const next = updateSpellingVoiceProfile(
-                    replaceForm(content, unified.value),
+                    updated,
                     unifiedSpellingVariantIds,
                     result.voiceProfile ?? { voices: [] }
                   );

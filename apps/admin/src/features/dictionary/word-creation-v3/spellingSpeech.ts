@@ -1,5 +1,4 @@
 import {
-  clearVoiceAudio,
   spellingAnnotationsEqual,
   voiceSettingKey,
   voiceEffectKey,
@@ -10,6 +9,7 @@ import {
   DEFAULT_SPELLING_SYNTHESIS,
   EMPTY_SYNTHESIS,
   speechAccentGroup,
+  spellingSpeechContent,
   synthesisForLocale
 } from "@tsz/shared";
 import type {
@@ -86,7 +86,13 @@ export function spellingAudioScope(
   };
 }
 
-/** 设置只替换当前口音；停顿共享，变更后另一口音的旧音频引用必须失效。 */
+export function isSpellingSpeechAnnotation(
+  annotation: RichTextV2["annotations"][number]
+): boolean {
+  return ["pause", "say_as", "sub"].includes(annotation.type);
+}
+
+/** 设置只替换当前口音；停顿变化时使该口音的合成音频失效。 */
 export function mergeSpellingSettings<T extends VoiceAssociation>(
   latest: {
     value: RichTextV2;
@@ -102,9 +108,7 @@ export function mergeSpellingSettings<T extends VoiceAssociation>(
   side: "uk" | "us"
 ): VoiceEditResult<T> & { value: RichTextV2 } {
   const speechMarks = (value: RichTextV2) =>
-    value.annotations.filter((mark) =>
-      ["pause", "say_as", "sub"].includes(mark.type)
-    );
+    value.annotations.filter(isSpellingSpeechAnnotation);
   const changedContent =
     JSON.stringify(speechMarks(initial.value)) !==
     JSON.stringify(speechMarks(toRichTextV2(result.value)));
@@ -113,7 +117,7 @@ export function mergeSpellingSettings<T extends VoiceAssociation>(
         ...latest.value,
         annotations: [
           ...latest.value.annotations.filter(
-            (mark) => !["pause", "say_as", "sub"].includes(mark.type)
+            (mark) => !isSpellingSpeechAnnotation(mark)
           ),
           ...speechMarks(toRichTextV2(result.value))
         ]
@@ -174,7 +178,15 @@ export function mergeSpellingSettings<T extends VoiceAssociation>(
     };
   }
   if (changedContent && voiceProfile) {
-    voiceProfile = clearVoiceAudio(voiceProfile);
+    voiceProfile = {
+      ...voiceProfile,
+      voices: voiceProfile.voices.map((voice) => {
+        if (speechAccentGroup(voice.locale, voice.accent) !== side)
+          return voice;
+        const { audio_asset_id: _audio, ...updated } = voice;
+        return updated;
+      })
+    };
   }
   return {
     ...result,
@@ -195,18 +207,33 @@ export function mergeSpellingSettings<T extends VoiceAssociation>(
   };
 }
 
+function spellingAccentContentsEqual(
+  left?: SpellingSpeechV3["content_by_accent"],
+  right?: SpellingSpeechV3["content_by_accent"]
+): boolean {
+  return (["uk", "us"] as const).every((side) => {
+    const a = left?.[side];
+    const b = right?.[side];
+    return a && b ? spellingAnnotationsEqual(a, b) : a === b;
+  });
+}
+
 /** 编辑器合并显示标注与独立试听停顿，wire 仍分别保存。 */
-export function spellingEditorValue(variant: {
-  spelling: string;
-  spelling_rich?: RichTextV2V3;
-  spelling_speech?: SpellingSpeechV3;
-}): RichTextV2 {
+export function spellingEditorValue(
+  variant: {
+    spelling: string;
+    spelling_rich?: RichTextV2V3;
+    spelling_speech?: SpellingSpeechV3;
+  },
+  side?: "uk" | "us"
+): RichTextV2 {
+  const content = spellingSpeechContent(variant.spelling_speech, side);
   return {
     version: 2,
     text: variant.spelling,
     annotations: [
       ...(variant.spelling_rich?.annotations ?? []),
-      ...(variant.spelling_speech?.content.annotations ?? [])
+      ...(content?.annotations ?? [])
     ]
   };
 }
@@ -244,6 +271,10 @@ export function spellingSpeechEqual(
   const empty: RichTextV2 = { version: 2, text: "", annotations: [] };
   return (
     spellingAnnotationsEqual(left?.content ?? empty, right?.content ?? empty) &&
+    spellingAccentContentsEqual(
+      left?.content_by_accent,
+      right?.content_by_accent
+    ) &&
     voices(left) === voices(right) &&
     JSON.stringify(left?.audio_assets ?? []) ===
       JSON.stringify(right?.audio_assets ?? []) &&
@@ -285,6 +316,10 @@ export function spellingSpeechDialectEqual(
   const empty: RichTextV2 = { version: 2, text: "", annotations: [] };
   return (
     spellingAnnotationsEqual(left?.content ?? empty, right?.content ?? empty) &&
+    spellingAccentContentsEqual(
+      left?.content_by_accent,
+      right?.content_by_accent
+    ) &&
     JSON.stringify(voices(left)) === JSON.stringify(voices(right)) &&
     JSON.stringify(left?.voice_profile.dubbing) ===
       JSON.stringify(right?.voice_profile.dubbing) &&

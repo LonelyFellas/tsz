@@ -557,6 +557,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       headers: {
         "X-TSZ-Spelling-Markup": "v1",
         "X-TSZ-Spelling-Speech": "v1",
+        "X-TSZ-Spelling-Accent-Content": "v1",
         "X-TSZ-Phoneme-Speech": "v1",
         "X-TSZ-Voice-Versions": "v6",
         "X-TSZ-Voice-Locales": "v1",
@@ -617,6 +618,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -647,6 +649,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -950,6 +953,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -966,6 +970,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       headers: {
         "X-TSZ-Spelling-Markup": "v1",
         "X-TSZ-Spelling-Speech": "v1",
+        "X-TSZ-Spelling-Accent-Content": "v1",
         "X-TSZ-Phoneme-Speech": "v1",
         "X-TSZ-Voice-Versions": "v6",
         "X-TSZ-Voice-Locales": "v1",
@@ -983,6 +988,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1006,6 +1012,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1029,6 +1036,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1048,6 +1056,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       headers: {
         "X-TSZ-Spelling-Markup": "v1",
         "X-TSZ-Spelling-Speech": "v1",
+        "X-TSZ-Spelling-Accent-Content": "v1",
         "X-TSZ-Phoneme-Speech": "v1",
         "X-TSZ-Voice-Versions": "v6",
         "X-TSZ-Voice-Locales": "v1",
@@ -1064,6 +1073,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1087,6 +1097,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1106,6 +1117,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1125,6 +1137,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1144,6 +1157,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1163,6 +1177,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1182,6 +1197,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1201,6 +1217,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
@@ -1225,6 +1242,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         headers: {
           "X-TSZ-Spelling-Markup": "v1",
           "X-TSZ-Spelling-Speech": "v1",
+          "X-TSZ-Spelling-Accent-Content": "v1",
           "X-TSZ-Phoneme-Speech": "v1",
           "X-TSZ-Voice-Versions": "v6",
           "X-TSZ-Voice-Locales": "v1",
