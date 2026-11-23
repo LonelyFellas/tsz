@@ -60,8 +60,8 @@ vi.mock("@/lib/env", async (importOriginal) => {
     }
   };
 });
-vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
-  adminVoicePreviewAdapter: {
+vi.mock("@/features/dictionary/voice-editor/dataSource", () => {
+  const previewAdapter = {
     listVoices: async () => [
       {
         id: "sonia",
@@ -78,11 +78,15 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
         styles: []
       }
     ]
-  },
-  loadAdminVoiceRecommendations: async () => [],
-  adminAudioUploadAdapter: undefined,
-  voicePreviewIsMock: false
-}));
+  };
+  return {
+    adminVoicePreviewAdapter: previewAdapter,
+    adminGrammarVoicePreviewAdapter: previewAdapter,
+    loadAdminVoiceRecommendations: async () => [],
+    adminAudioUploadAdapter: undefined,
+    voicePreviewIsMock: false
+  };
+});
 
 // 编辑用例使用超管，默认只读用例显式切换为普通管理员。
 const authMocks = vi.hoisted(() => ({
