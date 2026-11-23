@@ -6,6 +6,7 @@ import {
   createLexiconEditorMessage
 } from "../i18n/editor";
 import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
+import { CancelledError } from "@tanstack/react-query";
 import { ChevronDownIcon, Volume2Icon, RefreshCwIcon } from "lucide-react";
 import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { Button, Space, Tag, VoiceDisplayName } from "@tsz/ui/admin/display";
@@ -75,6 +76,13 @@ const PreviewContext = createContext<PreviewContextValue | null>(null);
 const voiceCatalogQueryKey = ["admin-speech", "voices", "en"] as const;
 const voiceCatalogConsumers = new Map<string, number>();
 
+function isVoiceRequestCancelled(error: unknown) {
+  return (
+    error instanceof CancelledError ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error && error.message.trim()
     ? error.message
@@ -130,6 +138,11 @@ export function PronunciationPreviewProvider({
   const [voicesError, setVoicesError] = useLexiconEditorMessageState("");
   const [voicesRequested, setVoicesRequested] = useState(false);
   const voicesRequestRef = useRef<Promise<VoiceOption[]> | null>(null);
+  useLayoutEffect(() => {
+    return () => {
+      voicesRequestRef.current = null;
+    };
+  }, [enabled]);
   const [voiceResolutionRequested, setVoiceResolutionRequested] =
     useState(resolveVoicesOnMount);
   const requestVoiceResolution = useCallback(
@@ -164,38 +177,37 @@ export function PronunciationPreviewProvider({
     setVoicesRequested(true);
     setVoicesLoading(true);
     setVoicesError("");
-    const request = queryClient
-      .fetchQuery({
-        queryKey: voiceCatalogQueryKey,
-        queryFn: ({ signal }) =>
-          adminVoicePreviewAdapter.listVoices({ language: "en", signal }),
-        staleTime: 10 * 60 * 1000,
-        gcTime: 30 * 60 * 1000
-      })
-      .then((items) => {
-        setVoices(items);
-        if (items.length === 0)
-          setVoicesError(
-            createLexiconEditorMessage("panel_no_speakers_available")
-          );
-        return items;
-      })
-      .catch((error) => {
-        setVoicesRequested(false);
-        setVoicesError(errorMessage(error));
-        throw error;
-      })
-      .finally(() => {
-        voicesRequestRef.current = null;
-        setVoicesLoading(false);
-      });
+    const request = queryClient.fetchQuery({
+      queryKey: voiceCatalogQueryKey,
+      queryFn: ({ signal }) =>
+        adminVoicePreviewAdapter.listVoices({ language: "en", signal }),
+      staleTime: 10 * 60 * 1000,
+      gcTime: 30 * 60 * 1000
+    });
     voicesRequestRef.current = request;
+    void request.then(
+      (items) => {
+        if (voicesRequestRef.current !== request) return;
+        voicesRequestRef.current = null;
+        setVoices(items);
+        setVoicesLoading(false);
+      },
+      (error) => {
+        if (voicesRequestRef.current !== request) return;
+        voicesRequestRef.current = null;
+        if (!isVoiceRequestCancelled(error))
+          setVoicesError(errorMessage(error));
+        setVoicesLoading(false);
+        setVoicesRequested(false);
+      }
+    );
     return request;
   }, [enabled, setVoicesError]);
 
   useEffect(() => {
-    if (loadVoicesOnMount) void loadVoices().catch(() => undefined);
-  }, [loadVoices, loadVoicesOnMount]);
+    if (enabled && loadVoicesOnMount && !voicesRequested && !voicesError)
+      void loadVoices().catch(() => undefined);
+  }, [enabled, loadVoices, loadVoicesOnMount, voicesRequested, voicesError]);
 
   useEffect(() => {
     if (enabled) return;
@@ -306,17 +318,20 @@ function voiceForDialect(
  */
 export function usePronunciationVoiceNotice(
   dialects: readonly Dialect[]
-): string | undefined {
+): { kind: "load-error" | "missing"; title: string } | undefined {
   const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
   if (!context?.enabled || context.voicesLoading) return undefined;
-  if (context.voicesError) return context.voicesError;
+  if (context.voicesError)
+    return { kind: "load-error", title: context.voicesError };
   if (!context.voicesRequested) return undefined;
   const preference = context.dialectPreference;
   const missing = dialects.filter(
     (dialect) => !voiceForDialect(context.voices, dialect, preference)
   );
   if (missing.length === 0) return undefined;
+  if (context.voices.length === 0)
+    return { kind: "missing", title: t("panel_no_speakers_available") };
   const labels = missing
     .map((dialect) =>
       t("panel_label_6", {
@@ -325,10 +340,13 @@ export function usePronunciationVoiceNotice(
       })
     )
     .join("、");
-  return t(
-    "panel_no_speakers_available_for_get_audio_is_disabled_for_these_accents",
-    { p0: labels }
-  );
+  return {
+    kind: "missing",
+    title: t(
+      "panel_no_speakers_available_for_get_audio_is_disabled_for_these_accents",
+      { p0: labels }
+    )
+  };
 }
 
 export function resolvePronunciationPreviewVoice(
@@ -389,6 +407,7 @@ function useResolvedPreviewProfile(
     voices: VoiceSetting[];
     error?: string | LexiconEditorMessage;
   }>();
+  const [resolveAttempt, setResolveAttempt] = useState(0);
   useEffect(() => {
     const { profile, content, locale, adapter } = inputRef.current;
     if (
@@ -416,11 +435,21 @@ function useResolvedPreviewProfile(
         if (!controller.signal.aborted) setResolved({ key, voices });
       })
       .catch((error) => {
-        if (!controller.signal.aborted)
-          setResolved({ key, voices: [], error: errorMessage(error) });
+        if (controller.signal.aborted) return;
+        if (isVoiceRequestCancelled(error)) {
+          setResolveAttempt((attempt) => attempt + 1);
+          return;
+        }
+        setResolved({ key, voices: [], error: errorMessage(error) });
       });
     return () => controller.abort();
-  }, [key, context.enabled, context.resolutionScope, resolveRequested]);
+  }, [
+    key,
+    context.enabled,
+    context.resolutionScope,
+    resolveRequested,
+    resolveAttempt
+  ]);
   if (!profile?.dubbing) return { profile, pending: false, error: undefined };
   if (!adapter.resolveVoices)
     return {
@@ -1233,7 +1262,7 @@ export function PronunciationPreviewControls({
         }
       }
     } catch (error) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && !isVoiceRequestCancelled(error)) {
         const nextStatus = errorMessage(error);
         setStatus(nextStatus);
         void message.error(lexiconEditorMessageText(nextStatus, t));

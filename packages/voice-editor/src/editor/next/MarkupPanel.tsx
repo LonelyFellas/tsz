@@ -126,15 +126,13 @@ export function MarkupPanel({
     mode === "actual-pron" ||
     mode === "phoneme-settings" ||
     mode === "voice-trial";
-  const selectionToolsLabel = grammarMode
-    ? t("grammar_structures_and_liaison_marks")
-    : associationMode
-      ? t("text_formatting_and_liaison_marks")
-      : mode === "spelling"
-        ? t("italics_and_liaison_marks")
-        : mode === "voice-trial"
-          ? t("phonemes_linked_readings_or_special_readings")
-          : t("liaison_marks");
+  const selectionToolsLabel = associationMode
+    ? t("text_formatting_and_liaison_marks")
+    : mode === "spelling"
+      ? t("italics_and_liaison_marks")
+      : mode === "voice-trial"
+        ? t("phonemes_linked_readings_or_special_readings")
+        : t("liaison_marks");
   const [voicesExpanded, setVoicesExpanded] = useState(true);
   const voicesPanelId = useId();
   const headerTools = selectionMode
@@ -354,6 +352,7 @@ export function MarkupPanel({
               </div>
             )}
             {selectionMode &&
+              (!grammarMode || !!text.trim() || contentReadOnly) &&
               mode !== "spelling-settings" &&
               (mode !== "voice-trial" ||
                 tools.some((tool) => !tool.disabledReason)) && (
@@ -383,10 +382,13 @@ export function MarkupPanel({
                   ) : selectionText ? (
                     <>
                       {t("selected_3")} <strong>{selectionText}</strong>
-                      {t("selection_tools_suffix", {
-                        tools: selectionToolsLabel
-                      })}
+                      {!grammarMode &&
+                        t("selection_tools_suffix", {
+                          tools: selectionToolsLabel
+                        })}
                     </>
+                  ) : grammarMode ? (
+                    t("select_text_to_annotate")
                   ) : (
                     t("select_text_to_configure", { p0: selectionToolsLabel })
                   )}

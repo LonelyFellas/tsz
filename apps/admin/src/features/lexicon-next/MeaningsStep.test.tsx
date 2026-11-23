@@ -446,6 +446,16 @@ it.each([false, true])(
       await waitFor(() =>
         expect(partOfSpeechDataSource.catalog).toHaveBeenCalled()
       );
+      if (formEditorAvailable) {
+        await waitFor(() =>
+          expect(screen.getByRole("button", { name: "添加词性" })).toBeEnabled()
+        );
+        expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+      } else {
+        expect(
+          screen.getByRole("combobox", { name: "选择基本词性" })
+        ).toBeEnabled();
+      }
       expect(
         screen.getByRole("button", { name: "添加语法结构" })
       ).toBeDisabled();

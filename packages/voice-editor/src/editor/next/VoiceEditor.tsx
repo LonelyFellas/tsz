@@ -135,6 +135,7 @@ const MAX_HISTORY = 100;
  * 就重新起一步——与常见编辑器的「一段连续输入算一步」一致。
  */
 const TYPING_COALESCE_MS = 800;
+const VOICE_RESOLUTION_RETRY_DELAY_MS = 300;
 
 function errorMessage(
   error: unknown,
@@ -198,6 +199,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   contextKey,
   previewAdapter,
   deferAudioGeneration = false,
+  deferContentVoiceResolution = false,
   previewEnabled = true,
   loadRecommendations,
   recommendationArea,
@@ -767,6 +769,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     readOnly,
     refreshSavedRecommendations
   ]);
+  const [resolutionRetry, setResolutionRetry] = useState(0);
+  const deferredContentKey = deferContentVoiceResolution
+    ? JSON.stringify(generationContent)
+    : undefined;
   const resolutionKey = JSON.stringify([
     voiceProfile
       ? {
@@ -776,13 +782,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           )
         }
       : voiceProfile,
-    generationContent,
+    deferContentVoiceResolution ? undefined : generationContent,
     previewAdapter?.audioSourceKey,
     locale,
     inherited ? recommendationRefresh : 0
   ]);
   const [resolvedVoices, setResolvedVoices] = useState<{
     key: string;
+    failedContentKey?: string;
     voices: VoiceSetting[];
     sources?: Partial<
       Record<
@@ -791,8 +798,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       >
     >;
   }>();
+  const resolveVoicesInEditor = !(deferContentVoiceResolution && readOnly);
   useEffect(() => {
-    if (!voiceProfile?.dubbing || !previewAdapter?.resolveVoices) return;
+    if (
+      !resolveVoicesInEditor ||
+      !voiceProfile?.dubbing ||
+      !previewAdapter?.resolveVoices
+    )
+      return;
     const controller = new AbortController();
     Promise.allSettled(
       (["gb", "us"] as const)
@@ -809,8 +822,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     )
       .then((values) => {
         if (controller.signal.aborted) return;
+        const failed = values.find((value) => value.status === "rejected");
         setResolvedVoices({
           key: resolutionKey,
+          failedContentKey: failed ? deferredContentKey : undefined,
           voices: values.flatMap((value) =>
             value.status === "fulfilled" ? value.value.voices : []
           ),
@@ -829,7 +844,6 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             )
           )
         });
-        const failed = values.find((value) => value.status === "rejected");
         setRecommendationError(
           failed?.status === "rejected"
             ? voiceEditorErrorMessage(
@@ -841,7 +855,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
-          setResolvedVoices({ key: resolutionKey, voices: [] });
+          setResolvedVoices({
+            key: resolutionKey,
+            failedContentKey: deferredContentKey,
+            voices: []
+          });
           setRecommendationError(
             voiceEditorErrorMessage(
               error,
@@ -851,7 +869,28 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         }
       });
     return () => controller.abort();
-  }, [resolutionKey, previewAdapter]);
+  }, [resolutionKey, resolutionRetry, previewAdapter, resolveVoicesInEditor]);
+  useEffect(() => {
+    if (
+      !resolveVoicesInEditor ||
+      !deferredContentKey ||
+      resolvedVoices?.key !== resolutionKey ||
+      resolvedVoices.failedContentKey === undefined ||
+      resolvedVoices.failedContentKey === deferredContentKey
+    )
+      return;
+    // 保留已成功解析的音色，正文修正后合并重试上一次失败的解析。
+    const retry = window.setTimeout(
+      () => setResolutionRetry((attempt) => attempt + 1),
+      VOICE_RESOLUTION_RETRY_DELAY_MS
+    );
+    return () => window.clearTimeout(retry);
+  }, [
+    deferredContentKey,
+    resolvedVoices,
+    resolutionKey,
+    resolveVoicesInEditor
+  ]);
   const effectiveSettings = useMemo(() => {
     if (voiceProfile?.dubbing && previewAdapter?.resolveVoices)
       return resolvedVoices?.key === resolutionKey
@@ -1016,13 +1055,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       setVoiceSettings(profile.voices);
       emittedProfileRef.current = JSON.stringify(profile);
       onVoiceProfileChange?.(profile);
-      setRecommendationError(
-        createVoiceEditorMessage(
-          "the_text_or_reading_changed_generate_final_audio_again"
-        )
-      );
+      if (!deferContentVoiceResolution)
+        setRecommendationError(
+          createVoiceEditorMessage(
+            "the_text_or_reading_changed_generate_final_audio_again"
+          )
+        );
     }
-  }, [audioContentKey, onVoiceProfileChange]);
+  }, [audioContentKey, onVoiceProfileChange, deferContentVoiceResolution]);
 
   async function generateVersionAudio(
     setting: VoiceSetting,
@@ -1604,6 +1644,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const voiceSavePending =
+    !deferContentVoiceResolution &&
     !contentReadOnly &&
     mode !== "actual-pron" &&
     Boolean(voiceProfile?.dubbing) &&
@@ -1690,6 +1731,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       );
     if (
       forSave &&
+      !deferContentVoiceResolution &&
       !contentReadOnly &&
       mode !== "actual-pron" &&
       profile?.dubbing
@@ -3303,21 +3345,23 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
               {t("cancel_start")}
             </Button>
           )}
-          <span>
-            {draft.start
-              ? t("start_select_the_endpoint_text", {
-                  p0: Array.from(text)
-                    .slice(draft.start.start, draft.start.end)
-                    .join("")
-                })
-              : textSelection
-                ? t("selected_6", {
+          {(draft.start || mode !== "grammar") && (
+            <span>
+              {draft.start
+                ? t("start_select_the_endpoint_text", {
                     p0: Array.from(text)
-                      .slice(textSelection.start, textSelection.end)
+                      .slice(draft.start.start, draft.start.end)
                       .join("")
                   })
-                : t("select_text_before_adding_liaison")}
-          </span>
+                : textSelection
+                  ? t("selected_6", {
+                      p0: Array.from(text)
+                        .slice(textSelection.start, textSelection.end)
+                        .join("")
+                    })
+                  : t("select_text_before_adding_liaison")}
+            </span>
+          )}
         </div>
       )
     },
@@ -3340,6 +3384,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       content: (
         <PausePanel
           active={pauseActive}
+          showInactiveHint={mode !== "grammar"}
           readOnly={readOnly}
           hasWords={tokens.length > 1}
           brush={brush}
@@ -3740,6 +3785,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         loading={voicesLoading}
         recommendations={recommendations}
         area={recommendationArea}
+        generateOnComplete={deferContentVoiceResolution}
         locale={locale}
         content={generationContent}
         nativeAuditionLocale={phonemeLocale}
@@ -4207,7 +4253,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             ? t("text_is_read_only_links_can_be_edited")
             : textReadOnly
               ? t("enter_text_in_the_external_input_first")
-              : placeholder
+              : (placeholder ??
+                (mode === "grammar"
+                  ? t("grammar_structure_example")
+                  : undefined))
         }
         onTextChange={(nextText, coalesce) =>
           changeText(nextText, false, coalesce)

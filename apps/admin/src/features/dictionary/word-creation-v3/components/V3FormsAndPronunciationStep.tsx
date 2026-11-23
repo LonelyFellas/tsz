@@ -1,22 +1,15 @@
 import { localizedCatalogName } from "../../part-of-speech/catalog";
-import {
-  useLexiconEditorTranslation,
-  LexiconEditorText
-} from "@/features/dictionary/i18n/editor";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
-import { CircleMinusIcon } from "lucide-react";
 import {
   Alert,
   Badge,
-  Button,
   Empty,
   Flex,
   Space,
-  Tabs,
   Typography
 } from "@tsz/ui/admin/display";
-import { App, Tooltip } from "@tsz/ui/admin/overlays";
 import { AdminControls, useAdminDisabled } from "@tsz/ui/admin/context";
 import type {
   Dialect,
@@ -53,6 +46,7 @@ import {
 } from "../operations";
 import { V3FormGroupSenseEditor } from "./V3FormGroupSenseEditor";
 import { countFormGroupBindings } from "../meaningsModel";
+import { V3BasicPosTabs } from "./V3BasicPosTabs";
 import { V3PosTab } from "./V3PosTab";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { posNodeIds, posReferenceCount } from "../referenceGuard";
@@ -68,13 +62,7 @@ import {
   usePronunciationVoiceNotice
 } from "../../word-creation/PronunciationPreview";
 import "../v3-forms.css";
-import "../posTabs.css";
-import {
-  sortableRowClass,
-  sortableTabOffset,
-  useSortableRows
-} from "../sortableRows";
-import { SortableDragHandle } from "./SortableDragHandle";
+import { useSortableRows } from "../sortableRows";
 import { V3FormContentModal } from "./V3FormContentModal";
 import { V3FormsAudioTasks } from "./V3FormsAudioTasks";
 import { V3FormCopyProvider } from "./V3FormCopyProvider";
@@ -146,9 +134,11 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
   const notice = usePronunciationVoiceNotice(dialects);
   return notice ? (
     <Alert
-      description={t("voice_unavailable_help")}
+      description={
+        notice.kind === "missing" ? t("voice_unavailable_help") : undefined
+      }
       showIcon
-      title={notice}
+      title={notice.title}
       type="warning"
     />
   ) : null;
@@ -186,7 +176,6 @@ export function V3FormsAndPronunciationStep({
   loadVoiceCatalogOnMount = true
 }: V3FormsAndPronunciationStepProps) {
   const { t, i18n } = useLexiconEditorTranslation();
-  const { modal } = App.useApp();
   const componentDisabled = useAdminDisabled();
   const [editingFormId, setEditingFormId] = useState<string>();
   const [audioGenerationRequested, setAudioGenerationRequested] =
@@ -455,7 +444,7 @@ export function V3FormsAndPronunciationStep({
             children: emptyPosPanel
           }
         ]
-      : value.pos.map((pos, posIndex) => {
+      : value.pos.map((pos) => {
           const catalogItem = catalog.data?.items.find(
             (item) => item.code === pos.pos
           );
@@ -465,87 +454,28 @@ export function V3FormsAndPronunciationStep({
           const posReferences = posReferenceCount(referenceGuard.index, pos);
           return {
             key: pos.pos_id,
-            label: (
-              <span
-                className={sortableRowClass(
-                  "word-pos-tab-handle",
-                  posSorting,
-                  posIndex
-                )}
-                data-pos-id={pos.pos_id}
-                onDragLeave={posSorting.handleDragLeave}
-                onDragOver={(event) =>
-                  posSorting.handleDragOver(event, posIndex)
-                }
-                onDrop={(event) => posSorting.handleDrop(event, posIndex)}
-              >
-                <span
-                  className="word-pos-tab-content"
-                  style={{
-                    transform: `translateX(${sortableTabOffset(posSorting, posIndex)}px)`
-                  }}
-                >
-                  <SortableDragHandle
-                    dragImageSelector=".word-pos-tab-handle"
-                    index={posIndex}
-                    label={t("drag_item", { label: label })}
-                    singleItemTitle={t("two_pos_required")}
-                    sorting={posSorting}
-                  />
-                  <span className="word-pos-tab-label">
-                    <strong>{label}</strong>
-                    <Badge
-                      count={countV3PosFormIncomplete(pos)}
-                      size="small"
-                      title={t("pos_issues")}
-                    />
-                    <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
-                  </span>
-                  <span
-                    className="word-pos-tab-actions"
-                    onClick={(event) => event.stopPropagation()}
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    {addPosSelect}
-                    {value.pos.length > 1 ? (
-                      <Tooltip
-                        title={
-                          posReferences > 0
-                            ? referenceBlockedHint(posReferences, t)
-                            : undefined
-                        }
-                      >
-                        <Button
-                          aria-label={t("delete_item", { label: label })}
-                          danger
-                          icon={<CircleMinusIcon />}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            modal.confirm({
-                              title: (
-                                <LexiconEditorText
-                                  message="delete_pos_title"
-                                  params={{ label: label }}
-                                />
-                              ),
-                              content: deletePosDescription ?? (
-                                <LexiconEditorText message="remove_pos_impact" />
-                              ),
-                              okText: <LexiconEditorText message="delete" />,
-                              okButtonProps: { danger: true },
-                              onOk: () => deletePos(pos.pos_id)
-                            });
-                          }}
-                          size="small"
-                          type="text"
-                        />
-                      </Tooltip>
-                    ) : null}
-                  </span>
-                </span>
-              </span>
+            label,
+            posId: pos.pos_id,
+            badges: (
+              <>
+                <Badge
+                  count={countV3PosFormIncomplete(pos)}
+                  size="small"
+                  title={t("pos_issues")}
+                />
+                <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
+              </>
             ),
+            remove:
+              value.pos.length > 1
+                ? {
+                    onConfirm: () => deletePos(pos.pos_id),
+                    hint:
+                      posReferences > 0
+                        ? referenceBlockedHint(posReferences, t)
+                        : undefined
+                  }
+                : undefined,
             children: (
               <V3PosTab
                 sharedCounts={sharedForms ? sharedCounts : undefined}
@@ -675,23 +605,17 @@ export function V3FormsAndPronunciationStep({
               type="warning"
             />
           )}
-          {showEmptyAddButton ? (
-            <div>
-              <div className="word-forms-empty-pos-toolbar">{addPosSelect}</div>
-              {emptyPosPanel}
-            </div>
-          ) : (
-            <Tabs
-              activeKey={value.pos.length === 0 ? "empty" : activePosId}
-              className="word-pos-tabs word-forms-tabs"
-              key={value.pos.map((pos) => pos.pos_id).join(":")}
-              onChange={onActivePosChange}
-              items={tabItems}
-              tabBarExtraContent={
-                value.pos.length === 0 ? addPosSelect : undefined
-              }
-            />
-          )}
+          <V3BasicPosTabs
+            activeKey={value.pos.length === 0 ? "empty" : activePosId}
+            addControl={addPosSelect}
+            className="word-forms-tabs"
+            deleteDescription={deletePosDescription}
+            emptyToolbar={showEmptyAddButton}
+            items={tabItems}
+            key={value.pos.map((pos) => pos.pos_id).join(":")}
+            onChange={onActivePosChange}
+            sorting={posSorting}
+          />
         </Flex>
       </fieldset>
     </>

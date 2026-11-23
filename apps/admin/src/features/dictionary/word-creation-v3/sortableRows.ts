@@ -12,6 +12,19 @@ export function moveItem<T>(items: T[], index: number, nextIndex: number) {
   if (item !== undefined) items.splice(nextIndex, 0, item);
 }
 
+/** 只在参与排序的行之间换位，使用最新草稿中的行内容。 */
+export function reorderVisibleRows<T extends { id: string }>(
+  current: T[],
+  ordered: readonly T[]
+): T[] {
+  const positions = new Map(ordered.map((row, index) => [row.id, index]));
+  const sorted = current
+    .filter((row) => positions.has(row.id))
+    .sort((a, b) => positions.get(a.id)! - positions.get(b.id)!);
+  let index = 0;
+  return current.map((row) => (positions.has(row.id) ? sorted[index++]! : row));
+}
+
 export interface SortableRowsController {
   canReorder: boolean;
   draggingIndex?: number;

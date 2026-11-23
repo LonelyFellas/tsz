@@ -189,7 +189,11 @@ function PreviewHarness({
 
 function VoiceNotice({ dialects }: { dialects: Dialect[] }) {
   const notice = usePronunciationVoiceNotice(dialects);
-  return <span data-testid="voice-notice">{notice ?? "无提示"}</span>;
+  return (
+    <span data-testid="voice-notice" data-kind={notice?.kind}>
+      {notice?.title ?? "无提示"}
+    </span>
+  );
 }
 
 function NoticeHarness({
@@ -819,6 +823,41 @@ describe("PronunciationPreview", () => {
     expect(signal?.aborted).toBe(true);
   });
 
+  it("目录请求取消后，仍需音色的页面重新加载且不显示错误", async () => {
+    preview.listVoices.mockImplementationOnce(() => new Promise(() => {}));
+    render(<NoticeHarness />);
+    await waitFor(() => expect(preview.listVoices).toHaveBeenCalledOnce());
+    await act(async () => {
+      await queryClient.cancelQueries({
+        queryKey: ["admin-speech", "voices", "en"]
+      });
+    });
+    expect(screen.getByTestId("voice-notice")).toHaveTextContent("无提示");
+    await waitFor(() => expect(preview.listVoices).toHaveBeenCalledTimes(2));
+  });
+
+  it("推荐音色解析被取消后重新解析，仍可试听", async () => {
+    preview.resolveVoices
+      .mockReset()
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValue({
+        voices: [{ voice_id: "british-voice", enabled: true, rate_percent: 0 }],
+        source: { kind: "catalog" }
+      });
+    render(<PreviewHarness recommendationArea="azure" />);
+    await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalledOnce());
+    await act(async () => {
+      await queryClient.cancelQueries({ queryKey: ["pronunciation-preview"] });
+    });
+    await waitFor(() => expect(preview.resolveVoices).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+    expect(message.error).not.toHaveBeenCalled();
+  });
+
   it("发音人目录为空时透出目录层面的原因", async () => {
     preview.listVoices.mockResolvedValue([]);
     render(<NoticeHarness />);
@@ -827,6 +866,10 @@ describe("PronunciationPreview", () => {
       expect(screen.getByTestId("voice-notice")).toHaveTextContent(
         "暂无可用发音人"
       )
+    );
+    expect(screen.getByTestId("voice-notice")).toHaveAttribute(
+      "data-kind",
+      "missing"
     );
   });
 
@@ -838,6 +881,10 @@ describe("PronunciationPreview", () => {
       expect(screen.getByTestId("voice-notice")).toHaveTextContent(
         "目录服务不可用"
       )
+    );
+    expect(screen.getByTestId("voice-notice")).toHaveAttribute(
+      "data-kind",
+      "load-error"
     );
   });
 

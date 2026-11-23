@@ -1092,6 +1092,7 @@ export function RolePanel({
 
 export interface PausePanelProps {
   active: boolean;
+  showInactiveHint?: boolean;
   readOnly?: boolean;
   hasWords: boolean;
   brush: Brush;
@@ -1108,6 +1109,7 @@ export interface PausePanelProps {
 /** 选择时长后点词缝添加，也可直接编辑已有停顿。 */
 export function PausePanel({
   active,
+  showInactiveHint = true,
   readOnly,
   hasWords,
   brush,
@@ -1151,23 +1153,25 @@ export function PausePanel({
           {t("close")}
         </Button>
       </div>
-      <div className="tsz-ve-pause-location" role="status">
-        {continuous ? (
-          t("choose_a_duration_then_click_word_gaps_esc_to_exit")
-        ) : location ? (
-          <>
-            <b>{location.before}</b>
-            <span> Ⅱ </span>
-            <b>{location.after}</b>
-          </>
-        ) : active ? (
-          t(
-            "choose_a_pause_duration_then_click_a_grey_insertion_point_between_words"
-          )
-        ) : (
-          t("select_pause_choose_a_duration_and_click_a_word_gap")
-        )}
-      </div>
+      {(active || showInactiveHint) && (
+        <div className="tsz-ve-pause-location" role="status">
+          {continuous ? (
+            t("choose_a_duration_then_click_word_gaps_esc_to_exit")
+          ) : location ? (
+            <>
+              <b>{location.before}</b>
+              <span> Ⅱ </span>
+              <b>{location.after}</b>
+            </>
+          ) : active ? (
+            t(
+              "choose_a_pause_duration_then_click_a_grey_insertion_point_between_words"
+            )
+          ) : (
+            t("select_pause_choose_a_duration_and_click_a_word_gap")
+          )}
+        </div>
+      )}
       <div className="tsz-ve-pause-presets">
         {choices.map((ms) => (
           <Button

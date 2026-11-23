@@ -902,7 +902,7 @@ describe("VoiceEditor 标注带", () => {
     selectText(2, 8);
     expect(
       document.querySelector(".tsz-ve-selection-status")
-    ).toHaveTextContent("已选中 centre，可配置“语法结构”和“连读符号”。");
+    ).toHaveTextContent("centre");
     fireEvent.click(button("标记为固定核心词"));
     fireEvent.click(button("一次性添加"));
     expect(applied(view).annotations).toEqual(
@@ -1153,21 +1153,19 @@ describe("VoiceEditor 标注带", () => {
     expect(applied(view).annotations).toEqual([]);
   });
 
-  it("空文本时给出引导而不是一排死按钮", () => {
+  it("空的语法结构显示句型示例并禁用标注", () => {
     render(
       <VoiceEditor
         {...props({ value: { version: 2, text: "", annotations: [] } })}
       />
     );
-    expect(
-      screen.getByLabelText("语音编辑器").getAttribute("placeholder")
-    ).toMatch(/直接输入/);
+    expect(screen.getByLabelText("语音编辑器")).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/\([a-z]+\)/u)
+    );
     openRoles();
     expect(button("标记为固定核心词")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "连续标注" })).toBeNull();
-    expect(
-      screen.getByText("先输入句型或短语，再选中文字标注")
-    ).toBeInTheDocument();
   });
 });
 
@@ -4351,12 +4349,16 @@ it("校验错误随界面语言更新，保留自定义停顿输入和原有标�
 it("英文选区提示保留词界与句末标点", () => {
   render(
     <InterfaceI18nProvider locale="en-US">
-      <VoiceEditor {...props()} />
+      <VoiceEditor
+        {...props({
+          value: { version: 2, text: "a centre, then.", annotations: [] }
+        })}
+      />
     </InterfaceI18nProvider>
   );
-  selectText(2, 8);
+  selectText(2, 15);
   expect(document.querySelector(".tsz-ve-selection-status")).toHaveTextContent(
-    "Selected centre; configure grammar structures and liaison marks."
+    "Selected centre, then."
   );
 });
 

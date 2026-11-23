@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
 import { SortableDragHandle } from "@/features/dictionary/word-creation-v3/components/SortableDragHandle";
 import {
+  reorderVisibleRows,
   sortableRowClass,
   useSortableRows
 } from "@/features/dictionary/word-creation-v3/sortableRows";
@@ -55,16 +56,7 @@ export function DefinitionRows({
     items: disabled ? [] : visible,
     scopeId,
     dragType: "application/x-tsz-next-definition",
-    onChange: (next) =>
-      onChange((current) => {
-        const positions = new Map(next.map((row, index) => [row.id, index]));
-        const sorted = current
-          .filter((row) => positions.has(row.id))
-          .sort((a, b) => positions.get(a.id)! - positions.get(b.id)!);
-        return current.map((row) =>
-          positions.has(row.id) ? sorted.shift()! : row
-        );
-      })
+    onChange: (next) => onChange((current) => reorderVisibleRows(current, next))
   });
   const content = (
     <SenseSection

@@ -409,7 +409,9 @@
 .lexicon-next-grammar-heading,
 .lexicon-next-grammar-row {
   display: grid;
-  grid-template-columns: 24px 210px minmax(0, 1fr) var(--ui-control-height);
+  grid-template-columns: var(--word-leading-width) 210px minmax(0, 1fr) var(
+      --ui-control-height
+    );
   align-items: start;
   gap: var(--ui-space-3);
 }
@@ -423,13 +425,6 @@
 }
 .lexicon-next-grammar-row {
   margin-bottom: var(--ui-space-3);
-}
-.lexicon-next-grammar-index {
-  padding-top: var(--ui-space-1);
-  color: var(--ui-color-text-secondary);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  line-height: 24px;
 }
 .lexicon-next-grammar-row > .ui-select {
   min-width: 0;
@@ -459,7 +454,9 @@
     display: none;
   }
   .lexicon-next-grammar-row {
-    grid-template-columns: 24px minmax(0, 1fr) var(--ui-control-height);
+    grid-template-columns: var(--word-leading-width) minmax(0, 1fr) var(
+        --ui-control-height
+      );
     gap: var(--ui-space-2);
     margin-bottom: var(--ui-space-4);
   }
@@ -596,8 +593,9 @@
   display: none;
 }
 
-.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav,
-.lexicon-next-forms .word-forms-empty-pos-toolbar {
+/* 词形与发音、词义与例句共用的词性标签栏。 */
+.lexicon-next-editor .word-pos-tabs > .ui-tabs-nav,
+.lexicon-next-editor .word-forms-empty-pos-toolbar {
   display: flex;
   align-items: flex-end;
   box-sizing: border-box;
@@ -610,26 +608,26 @@
   border-radius: 0;
 }
 
-.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav::before {
+.lexicon-next-editor .word-pos-tabs > .ui-tabs-nav::before {
   display: none;
 }
 
-.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .ui-tabs-nav-list {
+.lexicon-next-editor .word-pos-tabs > .ui-tabs-nav .ui-tabs-nav-list {
   align-items: stretch;
 }
 
-.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .ui-tabs-tab {
+.lexicon-next-editor .word-pos-tabs > .ui-tabs-nav .ui-tabs-tab {
   padding-block: 0;
 }
 
-.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .word-pos-tab-content {
+.lexicon-next-editor .word-pos-tabs > .ui-tabs-nav .word-pos-tab-content {
   grid-template-columns: 24px max-content max-content;
   min-width: 0;
   padding: 0 var(--ui-space-3);
   border-radius: var(--ui-border-radius);
 }
 
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tabs
   > .ui-tabs-nav
   .ui-tabs-tab:not(.ui-tabs-tab-disabled):is(:hover, .ui-tabs-tab-active)
@@ -638,17 +636,17 @@
   transition: background-color var(--ui-motion-duration) var(--ui-motion-easing);
 }
 
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tab-handle
   .word-sort-drag-handle.ui-btn:hover:not(:disabled),
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tab-handle
   .word-sort-drag-handle.ui-btn:focus-visible {
   color: var(--ui-color-primary);
   background: var(--ui-color-primary-bg);
 }
 
-.lexicon-next-forms .word-pos-tabs .word-pos-tab-actions {
+.lexicon-next-editor .word-pos-tabs .word-pos-tab-actions {
   justify-content: center;
   gap: 0;
   block-size: calc(2 * var(--ui-control-height-sm));
@@ -658,35 +656,35 @@
   transition: opacity var(--ui-motion-duration) var(--ui-motion-easing);
 }
 
-.lexicon-next-forms .word-pos-tab-actions > .word-add-basic-pos-select {
+.lexicon-next-editor .word-pos-tab-actions > .word-add-basic-pos-select {
   min-block-size: var(--ui-control-height-sm);
 }
 
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tabs
   > .ui-tabs-nav
   .ui-tabs-tab:hover
   .word-pos-tab-actions,
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tabs
   > .ui-tabs-nav
   .ui-tabs-tab-active
   .word-pos-tab-actions,
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tabs
   > .ui-tabs-nav
   .word-pos-tab-actions:focus-within {
   opacity: 1;
 }
 
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tabs:has(.ui-tabs-tab-disabled)
   > .ui-tabs-nav
   .ui-tabs-ink-bar {
   display: none;
 }
 
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tabs:has(.ui-tabs-tab-disabled)
   > .ui-tabs-nav
   .ui-tabs-tab-disabled
@@ -695,13 +693,13 @@
   font-weight: var(--ui-font-weight-medium);
 }
 
-.lexicon-next-forms .word-pos-tabs > .ui-tabs-nav .ui-tabs-extra-content {
+.lexicon-next-editor .word-pos-tabs > .ui-tabs-nav .ui-tabs-extra-content {
   display: flex;
   align-items: center;
   margin-inline-start: auto;
 }
 
-.lexicon-next-forms
+.lexicon-next-editor
   .word-pos-tabs
   > .ui-tabs-nav
   .ui-tabs-extra-content
@@ -709,12 +707,12 @@
   height: var(--ui-control-height-comfortable);
 }
 
-.lexicon-next-forms .word-forms-empty-pos-toolbar .word-add-basic-pos-button,
+.lexicon-next-editor .word-forms-empty-pos-toolbar .word-add-basic-pos-button,
 .word-add-basic-pos-dropdown .ui-dropdown-container {
   min-inline-size: 144px;
 }
 
-.lexicon-next-forms .word-forms-empty-pos-toolbar .word-add-basic-pos-button {
+.lexicon-next-editor .word-forms-empty-pos-toolbar .word-add-basic-pos-button {
   min-block-size: calc(var(--ui-control-height) + 2 * var(--ui-space-2));
   margin-block-end: var(--ui-space-1);
 }
