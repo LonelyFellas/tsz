@@ -23,14 +23,6 @@
   border-radius: 8px;
   background: var(--voice-fill, var(--ui-color-fill-alter));
 }
-.voice-audition-panel .voice-library-preview-empty {
-  justify-content: flex-start;
-  min-height: 32px;
-  font-size: var(--ui-font-size-sm);
-}
-.voice-audition-panel .voice-library-preview-empty > .lucide {
-  font-size: 18px;
-}
 .voice-audition-panel .voice-library-player audio {
   width: 100%;
 }

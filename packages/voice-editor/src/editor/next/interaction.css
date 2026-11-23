@@ -619,21 +619,6 @@
 .tsz-ve-pool-row > * {
   min-width: 0;
 }
-.tsz-ve-pool-empty {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px 16px;
-  padding: 12px 8px;
-}
-.tsz-ve-pool-empty-copy {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-}
 .tsz-ve-pool-head {
   color: #687181;
   font-size: 12px;
@@ -780,11 +765,6 @@
 }
 .tsz-ve-pool-catalog-list > div[hidden] {
   display: none;
-}
-.tsz-ve-pool-catalog-empty {
-  display: block;
-  padding: 12px 4px;
-  font-size: 12px;
 }
 .tsz-ve-pool-catalog-item-head {
   display: grid;

@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { useWebText } from "@/i18n/client";
 import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
 
@@ -141,10 +142,12 @@ export function LibraryFolderPicker({
                 );
               })}
             {!result.data.items.some((item) => !item.wordlist_id) && (
-              <li className="px-4 py-8 text-center text-sm text-foreground-muted">
-                {uiText(
-                  "webWordlistLibrary:no_subfolders_on_this_page_you_can_use_the_current_location"
-                )}
+              <li>
+                <EmptyState>
+                  {uiText(
+                    "webWordlistLibrary:no_subfolders_on_this_page_you_can_use_the_current_location"
+                  )}
+                </EmptyState>
               </li>
             )}
           </ul>

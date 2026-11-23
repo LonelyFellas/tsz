@@ -16,7 +16,7 @@ import { AutoComplete, Input, InputNumber, Select } from "@tsz/ui/admin/forms";
 import {
   Button,
   Card,
-  Empty,
+  EmptyState,
   Flex,
   Tag,
   Typography
@@ -274,12 +274,7 @@ export function V3RelationsGrid({
           >
             <SenseSectionBody collapsed={Boolean(collapsed[relationType])}>
               <div style={{ padding: 10 }}>
-                {relations.length === 0 ? (
-                  <Empty
-                    description={t(`relations_empty_${relationType}`)}
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  />
-                ) : (
+                {relations.length > 0 && (
                   <RelationSortScope
                     items={disabled ? [] : relations}
                     scopeId={`${sense.id}:${relationType}`}
@@ -1340,24 +1335,31 @@ export function V3RelationsGrid({
                     )}
                   </RelationSortScope>
                 )}
-                <Button
-                  block
-                  className="word-section-add-button"
-                  icon={<PlusIcon aria-hidden />}
-                  onClick={() => {
-                    const relation = newRelation(idFactory, relationType);
-                    change((draft) => {
-                      draft.pos[posIndex]!.senses[senseIndex]!.relations.push(
-                        relation
-                      );
-                    });
-                    setSearching({ relationId: relation.id, query: "" });
-                  }}
-                  size="small"
-                  type="dashed"
+                <EmptyState
+                  empty={!relations.length}
+                  description={
+                    disabled ? t(`relations_empty_${relationType}`) : undefined
+                  }
                 >
-                  {t(`relations_add_${relationType}`)}
-                </Button>
+                  <Button
+                    block
+                    className="word-section-add-button"
+                    icon={<PlusIcon aria-hidden />}
+                    onClick={() => {
+                      const relation = newRelation(idFactory, relationType);
+                      change((draft) => {
+                        draft.pos[posIndex]!.senses[senseIndex]!.relations.push(
+                          relation
+                        );
+                      });
+                      setSearching({ relationId: relation.id, query: "" });
+                    }}
+                    size="small"
+                    type="dashed"
+                  >
+                    {t(`relations_add_${relationType}`)}
+                  </Button>
+                </EmptyState>
               </div>
             </SenseSectionBody>
           </Card>

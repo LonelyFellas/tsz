@@ -155,7 +155,8 @@ function ReviewQueue({ adminId }: { adminId: string }) {
             )
           }}
           rowKey={(row) => row.wordlist.id}
-          loading={result.isFetching}
+          loading={result.isLoading}
+          refreshing={result.isRefetching}
           dataSource={result.data?.items ?? []}
           scroll={{ x: 800 }}
           pagination={{

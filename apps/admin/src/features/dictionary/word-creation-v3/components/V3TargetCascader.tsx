@@ -1130,7 +1130,6 @@ export function V3TargetCascader({
                 ? t("panel_no_linkable_entries_among_loaded_candidates")
                 : t("panel_no_matching_entries_2")
             }
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
         )}
         {pagination}

@@ -1,10 +1,11 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { useWebText } from "@/i18n/client";
 import { webStudentHomeDashboard as webStudentHome } from "@/i18n/messages/student-home/dashboard";
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpen } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@tsz/ui/components";
 import { planStatusLabels } from "@/features/task/components/PlanCoverage";
 import { listPlans } from "@/features/task/components/plan-api";
@@ -199,15 +200,8 @@ function HomeWorkspace({ userId }: { userId: string }) {
                   </Button>
                 </>
               ) : (
-                <>
-                  <span className="flex size-14 items-center justify-center rounded-2xl border border-border/60 bg-surface text-primary shadow-sm">
-                    <BookOpen
-                      className="size-6"
-                      strokeWidth={1.5}
-                      aria-hidden
-                    />
-                  </span>
-                  <h2 className="mt-6 text-2xl font-bold tracking-tight">
+                <EmptyState>
+                  <h2 className="text-2xl font-bold tracking-tight">
                     {uiText(
                       "webStudentHomeDashboard:start_with_your_first_learning_task"
                     )}
@@ -227,7 +221,7 @@ function HomeWorkspace({ userId }: { userId: string }) {
                       <ArrowRight className="size-4" aria-hidden />
                     </Link>
                   </Button>
-                </>
+                </EmptyState>
               )}
             </div>
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">

@@ -24,6 +24,7 @@ import type {
   WordDefinitionV3
 } from "@tsz/types";
 import {
+  EmptyState,
   Alert,
   Button,
   Card,
@@ -310,9 +311,7 @@ function PublicationSnapshotBody({
         <Flex vertical gap="small">
           <Typography.Text strong>{t("snapshot_forms")}</Typography.Text>
           {snapshot.forms.length === 0 ? (
-            <Typography.Text type="secondary">
-              {t("snapshot_no_forms")}
-            </Typography.Text>
+            <EmptyState description={t("snapshot_no_forms")} />
           ) : (
             snapshot.forms.map((form) => (
               <Flex key={form.id} vertical gap={2}>
@@ -358,9 +357,7 @@ function PublicationSnapshotBody({
         <Flex vertical gap="small">
           <Typography.Text strong>{t("snapshot_meanings")}</Typography.Text>
           {snapshot.meanings.length === 0 ? (
-            <Typography.Text type="secondary">
-              {t("snapshot_no_meanings")}
-            </Typography.Text>
+            <EmptyState description={t("snapshot_no_meanings")} />
           ) : (
             snapshot.meanings.map((meaning) => (
               <Flex key={meaning.id} align="center" gap="small" wrap>
@@ -423,9 +420,7 @@ function PublicationSnapshotBody({
         <Flex vertical gap="small">
           <Typography.Text strong>{t("snapshot_sentences")}</Typography.Text>
           {snapshot.sentences.length === 0 ? (
-            <Typography.Text type="secondary">
-              {t("snapshot_no_sentences")}
-            </Typography.Text>
+            <EmptyState description={t("snapshot_no_sentences")} />
           ) : (
             snapshot.sentences.map((sentence) => (
               <Card key={sentence.id} size="small">
@@ -488,9 +483,7 @@ function PublicationSnapshotBody({
         <Flex vertical gap="small">
           <Typography.Text strong>{t("snapshot_relations")}</Typography.Text>
           {snapshot.relations.length === 0 ? (
-            <Typography.Text type="secondary">
-              {t("snapshot_no_relations")}
-            </Typography.Text>
+            <EmptyState description={t("snapshot_no_relations")} />
           ) : (
             snapshot.relations.map((relation) => (
               <Flex key={relation.id} gap="small" wrap>
@@ -1020,9 +1013,7 @@ export function V3PublicationHistory({
         }
       >
         {publications.length === 0 ? (
-          <Typography.Text type="secondary">
-            {t("publication_empty")}
-          </Typography.Text>
+          <EmptyState description={t("publication_empty")} />
         ) : (
           <div className="v3-publication-history-list">
             {publications.map((publication) => (

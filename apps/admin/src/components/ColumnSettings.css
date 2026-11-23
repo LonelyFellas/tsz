@@ -96,12 +96,6 @@
   background: var(--ui-color-text-quaternary);
 }
 
-.admin-column-settings-empty {
-  display: block;
-  padding: 6px var(--ui-space-2) var(--ui-space-2);
-  font-size: var(--ui-font-size-sm);
-}
-
 .admin-column-settings-row {
   box-sizing: border-box;
   display: flex;

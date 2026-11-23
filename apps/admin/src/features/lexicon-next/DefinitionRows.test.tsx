@@ -127,6 +127,20 @@ it("同级释义独立改级与方式，排序保留ID和隐藏语言，语法�
   fireEvent.click(screen.getByRole("button", { name: "删除释义 2" }));
   expect(draft()).toHaveLength(reordered.length);
 });
+it("从空区块添加首条释义并删除后可再次录入，不写入占位数据", () => {
+  const draft = setup(false, []);
+  const add = screen.getByRole("button", { name: "添加释义" });
+  expect(draft()).toEqual([]);
+  fireEvent.click(add);
+  expect(draft()).toEqual([
+    expect.objectContaining({ locale: "en-GB", text: "" })
+  ]);
+  expect(screen.getByRole("table", { name: "释义" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "删除释义 1" }));
+  expect(draft()).toEqual([]);
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(add).toBeEnabled();
+});
 it("显式 en 仅在缺少当前口音时回退，不复制另一口音", () => {
   const common = { ...initial[0]!, id: "common", locale: "en" };
   const draft = setup(false, [common, initial[3]!]);

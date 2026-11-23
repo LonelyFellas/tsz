@@ -1,5 +1,6 @@
 import { Empty, List } from "./display/surfaces";
-import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import dayjs from "dayjs";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
@@ -40,6 +41,30 @@ it("切换每页条数时保留分页回调", async () => {
     })
   );
   expect(changed).toHaveBeenCalledWith(1, 50);
+});
+
+it("等待选项期间离开下拉框，加载完成不会重新展开", async () => {
+  const content = (loading: boolean) => (
+    <InterfaceI18nProvider locale="en-GB">
+      <Select
+        aria-label="entries"
+        loading={loading}
+        options={loading ? [] : [{ value: "found", label: "found" }]}
+      />
+      <button>Elsewhere</button>
+    </InterfaceI18nProvider>
+  );
+  const ui = render(content(true));
+  const field = screen.getByRole("combobox", { name: "entries" });
+  const user = userEvent.setup();
+  await user.click(field);
+  expect(field).toHaveAttribute("aria-expanded", "true");
+  const elsewhere = screen.getByRole("button", { name: "Elsewhere" });
+  await user.click(elsewhere);
+  await waitFor(() => expect(field).toHaveAttribute("aria-expanded", "false"));
+  expect(elsewhere).toHaveFocus();
+  ui.rerender(content(false));
+  expect(field).toHaveAttribute("aria-expanded", "false");
 });
 
 it("切换语言更新控件和门户标签，保留输入、日期值与分页语义", async () => {
@@ -107,10 +132,6 @@ it("默认空状态随四语更新，调用方提供的原文和显式空描述�
     view.rerender(content(locale));
     expect(list).toHaveTextContent(label);
     expect(screen.getByText("原始业务内容 centre")).toBeVisible();
-    expect(
-      screen
-        .getByTestId("explicit-empty")
-        .querySelector(".ui-empty-description")
-    ).toBeEmptyDOMElement();
+    expect(screen.getByTestId("explicit-empty")).toBeEmptyDOMElement();
   }
 });

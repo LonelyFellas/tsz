@@ -1,5 +1,6 @@
 import { useDashboardTranslation } from "@/features/dashboard/i18n";
 import {
+  EmptyState,
   Alert,
   Button,
   Card,
@@ -257,7 +258,7 @@ function DashboardContent({ data }: { data: AdminDashboardOverview }) {
             }
           >
             {total === 0 ? (
-              <div className="dashboard-empty">{t("no_learning")}</div>
+              <EmptyState description={t("no_learning")} />
             ) : (
               <dl className="dashboard-progress">
                 {progress.map((item) => (

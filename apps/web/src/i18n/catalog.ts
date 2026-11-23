@@ -170,6 +170,11 @@ export function addWebCatalog(instance: i18n, catalog: WebCatalog) {
 }
 
 export const webCommon = /* @__PURE__ */ defineWebMessages("webCommon", {
+  empty_page: [
+    "此页已无条目，可返回上一页。",
+    "此頁已無項目，可返回上一頁。",
+    "This page is empty. Go back to the previous page."
+  ],
   teacher_unverified: [
     "暂时无法核验教师资格，请重试",
     "暫時無法核驗教師資格，請重試",

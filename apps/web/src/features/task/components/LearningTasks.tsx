@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { localText, type WebNotice, webErrorText } from "@/i18n/catalog";
 import { useWebLocale, useWebText } from "@/i18n/client";
 
@@ -193,11 +194,11 @@ function TaskList({ userId }: { userId: string }) {
         ) : (
           <>
             {q.data.items.length === 0 && (
-              <PageNotice>
-                {uiText(
+              <EmptyState
+                description={uiText(
                   "webTask:no_tasks_yet_choose_a_word_list_to_create_one"
                 )}
-              </PageNotice>
+              />
             )}
             <ul className="space-y-4">
               {q.data.items.map((plan) => {
@@ -637,9 +638,9 @@ function TaskDetail({ userId, id }: { userId: string; id: string }) {
               {uiText("webTask:could_not_load_history")}
             </p>
           ) : history.data?.items.length === 0 ? (
-            <p className={hintText}>
-              {uiText("webTask:no_learning_records_yet")}
-            </p>
+            <EmptyState
+              description={uiText("webTask:no_learning_records_yet")}
+            />
           ) : (
             <ul className="divide-y divide-border/60">
               {history.data?.items.map(({ run: h, cycle_id }) => (
@@ -1160,9 +1161,9 @@ function Practice({ userId, id }: { userId: string; id: string }) {
               : uiText("webTask:round_records")}
           </h2>
           {records.length === 0 && (
-            <p className={hintText}>
-              {uiText("webTask:no_answer_records_on_this_page_yet")}
-            </p>
+            <EmptyState
+              description={uiText("webTask:no_answer_records_on_this_page_yet")}
+            />
           )}
           <ul className="space-y-3" aria-live="polite">
             {records.map((q) => (

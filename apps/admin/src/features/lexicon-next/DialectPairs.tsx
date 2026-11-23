@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { NextDialectSense, NextDialectUsage, NextDraft } from "@tsz/types";
 import { Alert, Button, Space } from "@tsz/ui/admin/display";
-import { Input, Select } from "@tsz/ui/admin/forms";
+import { Checkbox, Input, Segmented, Select } from "@tsz/ui/admin/forms";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { useAuthStore } from "@/lib/auth";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
@@ -39,21 +39,31 @@ export function DialectPreview({
     medium_locale: medium,
     [published ? "published_sense" : "sense"]: peer?.sense_id ?? ""
   });
+  const href = peer ? `/lexicon-next/${peer.entry_id}?${params}` : undefined;
+  if (editing) {
+    if (!peer) return <span>{t("dialect_pair_inactive")}</span>;
+    return (
+      <span>
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t("dialect_pair_open")}
+        >
+          <span className="tsz-words">{peer.headword}</span>
+        </a>{" "}
+        {[peer.part_of_speech, peer.gloss].filter(Boolean).join(" · ")}
+      </span>
+    );
+  }
   return (
     <p>
       {t(usageKeys.find((u) => u.value === row.usage)!.label)} ·{" "}
       {peer ? (
         <>
           {locale === row.usage ? <strong>{headword}</strong> : headword} ↔{" "}
-          {locale === other ? <strong>{peer.headword}</strong> : peer.headword}
-          {editing &&
-            [peer.part_of_speech, peer.gloss].filter(Boolean).length > 0 &&
-            `（${[peer.part_of_speech, peer.gloss].filter(Boolean).join(" · ")}）`}{" "}
-          <a
-            href={`/lexicon-next/${peer.entry_id}?${params}`}
-            target="_blank"
-            rel="noreferrer"
-          >
+          {locale === other ? <strong>{peer.headword}</strong> : peer.headword}{" "}
+          <a href={href} target="_blank" rel="noreferrer">
             {t("dialect_pair_open")}
           </a>
         </>
@@ -264,11 +274,18 @@ export function DialectEditor({
 }) {
   const { t } = useLexiconEditorTranslation();
   const [choosing, setChoosing] = useState(false);
+  const equivalentLabel = t(
+    row.usage === "en-GB"
+      ? "dialect_pair_us_equivalent"
+      : "dialect_pair_gb_equivalent"
+  );
   return (
-    <div>
-      <Space wrap>
-        <span>{t("dialect_pair_usage")}</span>
-        <Select
+    <div className="lexicon-next-dialect-editor">
+      <div className="lexicon-next-dialect-row">
+        <span className="lexicon-next-dialect-label">
+          {t("dialect_pair_usage")}
+        </span>
+        <Segmented
           aria-label={t("dialect_pair_usage")}
           value={row.usage}
           options={usageKeys.map((u) => ({ ...u, label: t(u.label) }))}
@@ -279,53 +296,63 @@ export function DialectEditor({
             onChange({ ...generalSense(row.sense_id), usage });
           }}
         />
-        {row.usage !== "general" && (
-          <>
-            <Select
-              aria-label={t("dialect_pair_equivalent")}
-              value={
-                row.paired ? "paired" : row.no_equivalent ? "none" : "pending"
-              }
+      </div>
+      {row.usage !== "general" && (
+        <div
+          className="lexicon-next-dialect-row"
+          role="group"
+          aria-label={equivalentLabel}
+        >
+          <span className="lexicon-next-dialect-label">{equivalentLabel}</span>
+          {row.paired && (
+            <DialectPreview
+              row={row}
+              medium={medium}
+              locale={row.usage}
+              draft={draft}
+              editing
+            />
+          )}
+          <Button
+            size="small"
+            disabled={disabled}
+            aria-expanded={choosing}
+            onClick={() => setChoosing(true)}
+          >
+            {row.paired ? t("dialect_pair_replace") : t("dialect_pair_choose")}
+          </Button>
+          {row.paired ? (
+            <Button
+              type="link"
+              size="small"
               disabled={disabled}
-              options={[
-                { value: "pending", label: t("dialect_pair_pending") },
-                ...(row.paired
-                  ? [{ value: "paired", label: t("dialect_pair_paired") }]
-                  : []),
-                { value: "none", label: t("dialect_pair_none") }
-              ]}
-              onChange={(v: string) => {
-                if (v === "paired" || (row.no_equivalent && v === "none"))
-                  return;
+              onClick={() => {
+                onChange({ ...row, paired: false, target: null });
+                setChoosing(false);
+              }}
+            >
+              {t("dialect_pair_unlink")}
+            </Button>
+          ) : (
+            <Checkbox
+              checked={row.no_equivalent}
+              disabled={disabled}
+              onChange={(e) => {
                 onChange({
                   ...row,
-                  no_equivalent: v === "none",
+                  no_equivalent: e.target.checked,
                   note: "",
                   target: null,
                   paired: false
                 });
                 setChoosing(false);
               }}
-            />
-            <Button disabled={disabled} onClick={() => setChoosing(true)}>
-              {row.paired
-                ? t("dialect_pair_replace")
-                : t("dialect_pair_choose")}
-            </Button>
-            {row.paired && (
-              <Button
-                disabled={disabled}
-                onClick={() => {
-                  onChange({ ...row, paired: false, target: null });
-                  setChoosing(false);
-                }}
-              >
-                {t("dialect_pair_unlink")}
-              </Button>
-            )}
-          </>
-        )}
-      </Space>
+            >
+              {t("dialect_pair_confirm_none")}
+            </Checkbox>
+          )}
+        </div>
+      )}
       {row.no_equivalent && (
         <Input
           aria-label={t("dialect_pair_reason")}
@@ -334,15 +361,6 @@ export function DialectEditor({
           disabled={disabled}
           value={row.note}
           onChange={(e) => onChange({ ...row, note: e.target.value })}
-        />
-      )}
-      {row.paired && (
-        <DialectPreview
-          row={row}
-          medium={medium}
-          locale={row.usage}
-          draft={draft}
-          editing
         />
       )}
       {choosing && !disabled && row.usage !== "general" && (

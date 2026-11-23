@@ -4,6 +4,7 @@ import { TableEmptyState } from "@/components/TableEmptyState";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  EmptyState,
   Alert,
   Button,
   Card,
@@ -240,7 +241,7 @@ export function WordlistDetails({
             ) : reviews.isPending ? (
               <p>{t("loading_reviews")}</p>
             ) : !current ? (
-              <p>{t("no_public_review")}</p>
+              <EmptyState description={t("no_public_review")} />
             ) : !reviewMode ? (
               <Table<AdminWordlistReview>
                 tableId="wordlist-review-history"
@@ -362,7 +363,9 @@ export function WordlistDetails({
                   }
                 />
               )}
-              {items.data.items.length === 0 && <p>{t("no_items")}</p>}
+              {items.data.items.length === 0 && (
+                <EmptyState description={t("no_items")} />
+              )}
               {items.data.items.map((item, index) => (
                 <article
                   key={item.item_id ?? item.entry_id}

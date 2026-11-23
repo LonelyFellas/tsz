@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode
 } from "react";
-import { FileSearch } from "lucide-react";
+import { EmptyState } from "../../components/ui/empty-state";
 import { Spin } from "./controls";
 import type { Size } from "./layout";
 
@@ -68,24 +68,17 @@ export function Card({
   );
 }
 export function Empty({
-  image,
   description,
-  children,
-  className = "",
   ...props
-}: Div & { image?: ReactNode; description?: ReactNode }) {
+}: Div & { description?: ReactNode }) {
   const { t } = useInterfaceTranslation();
   return (
-    <div {...props} className={`ui-empty ${className}`}>
-      {image && <div className="ui-empty-image">{image}</div>}
-      <div className="ui-empty-description">
-        {description === undefined ? t("status.noData") : description}
-      </div>
-      {children}
-    </div>
+    <EmptyState
+      {...props}
+      description={description === undefined ? t("status.noData") : description}
+    />
   );
 }
-Empty.PRESENTED_IMAGE_SIMPLE = <FileSearch aria-hidden="true" />;
 export function Skeleton({
   paragraph,
   title = true,

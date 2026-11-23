@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import {
   webCommon,
   localText,
@@ -208,6 +209,18 @@ export function PlanSourcePicker({
           </PageNotice>
         ) : data.isPending ? (
           <PageNotice>{uiText("webTask:loading_word_lists")}</PageNotice>
+        ) : !data.data.items.length ? (
+          <EmptyState
+            description={
+              page > 1
+                ? uiText(localText(webCommon, "webCommon:empty_page"))
+                : uiText(
+                    search.trim()
+                      ? "webTask:no_matching_sources"
+                      : "webTask:no_sources_here"
+                  )
+            }
+          />
         ) : (
           <ul className="space-y-3">
             {space === "public"

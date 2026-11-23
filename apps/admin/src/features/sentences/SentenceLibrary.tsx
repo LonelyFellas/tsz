@@ -578,7 +578,8 @@ export function SentenceLibrary({
             }}
             rowKey="id"
             dataSource={rows}
-            loading={query.isFetching}
+            loading={query.isLoading}
+            refreshing={query.isRefetching}
             scroll={{ x: entryId ? 700 : 1080 }}
             rowSelection={
               !entryId && (canEdit || canPublish || canDelete)

@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { webCommon, localText, webErrorText } from "@/i18n/catalog";
 
 import { useWebLocale, useWebText } from "@/i18n/client";
@@ -100,11 +101,11 @@ export function Notifications() {
                 )}
           </p>
           {query.data.items.length === 0 ? (
-            <PageNotice>
-              {uiText(
+            <EmptyState
+              description={uiText(
                 "webTeacherCertificationNotifications:no_notifications_yet_word_list_interactions_and_certification_results_ap"
               )}
-            </PageNotice>
+            />
           ) : (
             <ul className="space-y-3">
               {query.data.items.map((item) => (

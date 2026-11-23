@@ -6,9 +6,9 @@ import type {
   NextSense
 } from "@tsz/types";
 import {
+  EmptyState,
   Alert,
   Button,
-  Empty,
   Skeleton,
   Space,
   Tag
@@ -326,11 +326,13 @@ export function EquivalentRows({
           </label>
         </div>
         {!visible.length ? (
-          <>
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("eq_empty")}
-            />
+          <EmptyState
+            description={
+              disabled && !sense.no_equivalents?.includes(locale)
+                ? t("eq_empty")
+                : undefined
+            }
+          >
             <Checkbox
               disabled={disabled}
               checked={sense.no_equivalents?.includes(locale) ?? false}
@@ -347,7 +349,7 @@ export function EquivalentRows({
             >
               {t("eq_no_suitable")}
             </Checkbox>
-          </>
+          </EmptyState>
         ) : (
           <div className="lexicon-next-equivalent-scroll">
             <table className="lexicon-next-equivalent-table">

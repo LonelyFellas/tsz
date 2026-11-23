@@ -3,7 +3,14 @@ import {
   defaultLexiconEditorTranslation as creationDefaultT,
   type LexiconEditorTranslation as CreationTranslation
 } from "../../i18n/editor";
-import { Button, Flex, Space, Tag, Typography } from "@tsz/ui/admin/display";
+import {
+  EmptyState,
+  Button,
+  Flex,
+  Space,
+  Tag,
+  Typography
+} from "@tsz/ui/admin/display";
 import type { InboundReferenceV3 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { referenceLink } from "../referenceGuard";
@@ -169,11 +176,7 @@ export function V3ReferenceList({
 }) {
   const { t } = useLexiconEditorTranslation();
   if (references.length === 0) {
-    return (
-      <Typography.Text type="secondary">
-        {emptyText ?? t("creation_no_links_yet")}
-      </Typography.Text>
-    );
+    return <EmptyState description={emptyText ?? t("creation_no_links_yet")} />;
   }
   return (
     <Flex className="v3-reference-list" vertical gap="small">

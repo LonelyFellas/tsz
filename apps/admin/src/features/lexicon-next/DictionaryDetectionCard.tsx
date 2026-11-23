@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Card, Space, Tag, Alert } from "@tsz/ui/admin/display";
+import { EmptyState, Button, Card, Space, Tag } from "@tsz/ui/admin/display";
 import type { NextDetection } from "@tsz/types";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
@@ -106,11 +106,7 @@ export function DictionaryDetectionCard({
           ))}
         </div>
       ) : (
-        <Alert
-          className="lexicon-next-empty-state"
-          type="info"
-          title="未找到内置词典匹配，可继续创建空白草稿。"
-        />
+        <EmptyState description="未找到内置词典匹配，可继续创建空白草稿。" />
       )}
     </Card>
   );

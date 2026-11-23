@@ -26,6 +26,7 @@ import type {
   AdminSpeechVoice
 } from "@tsz/types";
 import {
+  EmptyState,
   Alert,
   Button,
   Card,
@@ -791,12 +792,11 @@ export function DubbingGroups({
                   </tbody>
                 </table>
                 {!group[side].length && (
-                  <Typography.Paragraph
-                    className="dubbing-list-empty"
-                    type="secondary"
-                  >
-                    {t("no_side_voices", { side: sideName(side, t) })}
-                  </Typography.Paragraph>
+                  <EmptyState
+                    description={t("no_side_voices", {
+                      side: sideName(side, t)
+                    })}
+                  />
                 )}
               </section>
             ))}
@@ -886,11 +886,7 @@ export function DubbingGroups({
       {saved && <Alert type="success" showIcon title={saved} />}
       <div className="dubbing-group-panels">
         {!current.length && (
-          <div className="dubbing-empty-groups">
-            <Typography.Paragraph type="secondary">
-              {t("no_group_recommendations_configured")}
-            </Typography.Paragraph>
-          </div>
+          <EmptyState description={t("no_group_recommendations_configured")} />
         )}
         {current.map((group, groupIndex) => {
           const draft = drafts[group.id],
@@ -1163,9 +1159,9 @@ export function DubbingGroups({
             </section>
           ))}
           {!previewGroups.length && (
-            <Typography.Paragraph type="secondary">
-              {t("no_recommendations_yet_add_one_first")}
-            </Typography.Paragraph>
+            <EmptyState
+              description={t("no_recommendations_yet_add_one_first")}
+            />
           )}
         </div>
       </Modal>

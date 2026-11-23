@@ -252,11 +252,8 @@ export function WordSentences({
               }
             />
           )}
-          {!rows.length && !query.isFetching && (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("panel_no_linked_examples_yet")}
-            />
+          {query.isSuccess && !rows.length && !query.isFetching && (
+            <Empty description={t("panel_no_linked_examples_yet")} />
           )}
           {rows.map((item, index) => (
             <Flex

@@ -87,10 +87,7 @@ export function V3ReviewSentences({
       ) : (
         <>
           {query.data.items.length === 0 && (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("panel_no_linked_examples_yet")}
-            />
+            <Empty description={t("panel_no_linked_examples_yet")} />
           )}
           {query.data.items.map((item) => (
             <article className="v3-dictionary-example" key={item.id}>

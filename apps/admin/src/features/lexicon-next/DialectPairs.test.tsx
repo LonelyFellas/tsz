@@ -1,9 +1,102 @@
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { api } from "@/lib/auth";
 import { DialectEditor } from "./DialectPairs";
 import { generalSense } from "./model";
+import {
+  focusPublicationIssue,
+  publicationIssueLocation
+} from "./publicationIssueFocus";
+
+it.each(["dialect_pairs", "relations"])(
+  "没有 %s 字段锚点时定位义项不改变方言配对",
+  async (field) => {
+    const row = {
+      ...generalSense("sense"),
+      usage: "en-US" as const,
+      paired: true
+    };
+    const draft = {
+      schema_version: 1 as const,
+      headword: "apartment",
+      forms: [],
+      senses: []
+    };
+    const update = vi.fn(),
+      done = vi.fn();
+    const ui = render(
+      <div data-v3-node-id="sense" data-v3-field="sense" tabIndex={-1}>
+        <DialectEditor
+          row={row}
+          onChange={update}
+          draft={draft}
+          localTargets={[]}
+          entryId="source"
+          medium="zh-Hans"
+          requests={api.lexiconNext}
+          disabled={false}
+        />
+      </div>
+    );
+    const previousScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    try {
+      focusPublicationIssue(
+        publicationIssueLocation(
+          draft,
+          { node_id: "sense", field, message: "" },
+          "en-US"
+        ),
+        new AbortController().signal,
+        done
+      );
+      await waitFor(() => expect(done).toHaveBeenCalledOnce());
+      expect(ui.container).toContainElement(
+        document.activeElement as HTMLElement
+      );
+      expect(update).not.toHaveBeenCalled();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = previousScroll;
+    }
+  }
+);
+
+it("只为专用义项展示另一方言；切换用法不沿用上一侧的无对应说明", () => {
+  function Editor() {
+    const [row, setRow] = useState(() => generalSense("source-sense"));
+    return (
+      <DialectEditor
+        row={row}
+        onChange={setRow}
+        draft={{ schema_version: 1, headword: "flat", forms: [], senses: [] }}
+        localTargets={[]}
+        entryId="source"
+        medium="zh-Hans"
+        requests={api.lexiconNext}
+        disabled={false}
+      />
+    );
+  }
+  render(<Editor />);
+  expect(screen.getByRole("radio", { name: "英美通用" })).toBeChecked();
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("radio", { name: "英式专用" }));
+  expect(screen.getByRole("group", { name: "对应的美式词义" })).toBeVisible();
+  fireEvent.click(screen.getByRole("checkbox", { name: "确认无对应词义" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "无对应词义的说明" }), {
+    target: { value: "仅限英式用法" }
+  });
+  fireEvent.click(screen.getByRole("radio", { name: "美式专用" }));
+  expect(screen.getByRole("group", { name: "对应的英式词义" })).toBeVisible();
+  expect(screen.getByRole("checkbox")).not.toBeChecked();
+  fireEvent.click(screen.getByRole("checkbox"));
+  expect(screen.getByRole("textbox")).toHaveValue("");
+  fireEvent.click(screen.getByRole("radio", { name: "英美通用" }));
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+});
 
 it("同一草稿内已选的目标义项不能再选，解除后可重新选用", async () => {
   const target = "peer-sense";
@@ -50,7 +143,7 @@ it("同一草稿内已选的目标义项不能再选，解除后可重新选用"
     </QueryClientProvider>
   );
   const ui = render(editor([target]));
-  fireEvent.click(screen.getByRole("button", { name: "选择配对词义" }));
+  fireEvent.click(screen.getByRole("button", { name: "选择对应词义" }));
   fireEvent.change(screen.getByRole("searchbox", { name: "搜索配对词条" }), {
     target: { value: "apartment" }
   });

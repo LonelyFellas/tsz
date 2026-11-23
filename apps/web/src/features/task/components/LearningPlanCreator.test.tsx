@@ -103,6 +103,80 @@ beforeEach(() => {
     pagination: { total_pages: 1 }
   });
 });
+it("区分空目录和搜索无匹配，不把尚在读取的词表当作空结果", async () => {
+  let finish!: (value: unknown) => void;
+  const empty = {
+    version: "v1",
+    ancestors: [],
+    items: [],
+    pagination: { total_pages: 1 }
+  };
+  mocks.list
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    )
+    .mockResolvedValue(empty);
+  renderWithProviders(<LearningPlanCreator userId="learner" />);
+  fireEvent.click(screen.getByRole("button", { name: /选择词表/ }));
+  const dialog = within(await screen.findByRole("dialog"));
+  await dialog.findByText("正在读取词表…");
+  expect(dialog.queryByText("这里还没有可选词表")).not.toBeInTheDocument();
+  await act(async () => finish(empty));
+  await dialog.findByText("这里还没有可选词表");
+  fireEvent.change(dialog.getByLabelText("搜索词表或文件夹"), {
+    target: { value: "example" }
+  });
+  await dialog.findByText("没有匹配的词表或文件夹");
+});
+
+it("第二页缩为空页后可返回，再次进入失效缓存时能取回新增项目", async () => {
+  let secondPageReads = 0;
+  mocks.list.mockImplementation(async (_space, query) => {
+    const secondPage = query.page === 2;
+    const empty = secondPage && ++secondPageReads === 1;
+    return {
+      version: "v1",
+      ancestors: [],
+      pagination: { total_pages: empty ? 1 : 2 },
+      items: empty
+        ? []
+        : [
+            {
+              id: "folder",
+              wordlist_id: null,
+              name: secondPage ? "新增目录" : "已有目录"
+            }
+          ]
+    };
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } }
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <LearningPlanCreator userId="learner" />
+    </QueryClientProvider>
+  );
+  fireEvent.click(screen.getByRole("button", { name: /选择词表/ }));
+  const dialog = within(await screen.findByRole("dialog"));
+  fireEvent.click(await dialog.findByRole("button", { name: "下一页" }));
+  await dialog.findByText("此页已无条目，可返回上一页。");
+  fireEvent.click(dialog.getByRole("button", { name: "上一页" }));
+  await dialog.findByRole("button", { name: /已有目录/ });
+  await act(async () => {
+    await client.invalidateQueries({
+      queryKey: ["plan-sources", "learner", "owned", undefined, "", 2],
+      refetchType: "none"
+    });
+  });
+  fireEvent.click(dialog.getByRole("button", { name: "下一页" }));
+  expect(await dialog.findByRole("button", { name: /新增目录/ })).toBeVisible();
+  expect(secondPageReads).toBe(2);
+});
+
 async function choose() {
   fireEvent.click(screen.getByRole("button", { name: /选择词表/ }));
   const dialog = await screen.findByRole("dialog");

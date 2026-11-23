@@ -10,6 +10,7 @@ export {
   CardContent
 } from "./card";
 export { Input } from "./input";
+export { EmptyState } from "./empty-state";
 export { RadioGroup, RadioGroupItem } from "./radio-group";
 export { Slider } from "./slider";
 export { Checkbox } from "./checkbox";

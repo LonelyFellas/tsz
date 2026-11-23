@@ -2,7 +2,7 @@ import { Tooltip } from "@tsz/ui/admin/overlays";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { NextEquivalent } from "@tsz/types";
-import { Alert, Button } from "@tsz/ui/admin/display";
+import { EmptyState, Alert, Button } from "@tsz/ui/admin/display";
 import { Select } from "@tsz/ui/admin/forms";
 import { api } from "@/lib/auth";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
@@ -28,9 +28,9 @@ export function EquivalentPreview({
   });
   if (!rows.length)
     return (
-      <p className="lexicon-next-muted">
-        {t(noEquivalents ? "eq_no_suitable" : "eq_empty")}
-      </p>
+      <EmptyState
+        description={t(noEquivalents ? "eq_no_suitable" : "eq_empty")}
+      />
     );
   if (!enhanced)
     return (

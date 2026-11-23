@@ -6,6 +6,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  EmptyState,
   Alert,
   Button,
   Flex,
@@ -442,9 +443,7 @@ export function LexiconAssistant({
                   </Typography.Text>
                 )}
                 {!turn.interrupted && turn.response.sources.length === 0 && (
-                  <Typography.Text type="secondary">
-                    {t("assistant_no_sources")}
-                  </Typography.Text>
+                  <EmptyState description={t("assistant_no_sources")} />
                 )}
               </div>
             </section>

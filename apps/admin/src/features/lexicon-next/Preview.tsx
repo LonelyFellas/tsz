@@ -360,10 +360,7 @@ export function Preview({
             <div className="lexicon-review-senses">
               {!view.senses.length && (
                 <Card>
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={t("panel_no_meanings_or_examples_yet")}
-                  />
+                  <Empty description={t("panel_no_meanings_or_examples_yet")} />
                 </Card>
               )}
               {view.senses.map((sense, index) => {

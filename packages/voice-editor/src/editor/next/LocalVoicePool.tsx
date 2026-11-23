@@ -16,7 +16,14 @@ import {
   Volume2Icon,
   Trash2Icon
 } from "lucide-react";
-import { Alert, Button, Space, Spin, Typography } from "@tsz/ui/admin/display";
+import {
+  EmptyState,
+  Alert,
+  Button,
+  Space,
+  Spin,
+  Typography
+} from "@tsz/ui/admin/display";
 import { Checkbox, Input } from "@tsz/ui/admin/forms";
 import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
 import { speechAccentGroup } from "@tsz/shared";
@@ -669,20 +676,12 @@ export function LocalVoicePool({
                     </div>
                   )}
                   {!selected.length && (
-                    <div className="tsz-ve-pool-empty">
-                      <div className="tsz-ve-pool-empty-copy">
-                        <Typography.Text strong>
-                          {t("no_voices_selected")}
-                        </Typography.Text>
-                        {!grammarParameters && (
-                          <Typography.Text type="secondary">
-                            {t(
-                              "select_a_recommendation_below_or_add_voices_from_the_full_catalogue"
-                            )}
-                          </Typography.Text>
+                    <EmptyState description={t("no_voices_selected")}>
+                      {!grammarParameters &&
+                        t(
+                          "select_a_recommendation_below_or_add_voices_from_the_full_catalogue"
                         )}
-                      </div>
-                    </div>
+                    </EmptyState>
                   )}
                   {selected.map((setting, rank) => {
                     const key = voiceSettingKey(setting);
@@ -1147,14 +1146,13 @@ export function LocalVoicePool({
                           }
                         >
                           {!loading && !columnVoices.some(isVisible) && (
-                            <Typography.Text
-                              type="secondary"
-                              className="tsz-ve-pool-catalog-empty"
-                            >
-                              {search[key]?.trim()
-                                ? t("no_matching_voices")
-                                : t("no_voices_available")}
-                            </Typography.Text>
+                            <EmptyState
+                              description={
+                                search[key]?.trim()
+                                  ? t("no_matching_voices")
+                                  : t("no_voices_available")
+                              }
+                            />
                           )}
                           {columnVoices.map((voice) => (
                             <div key={voice.id} hidden={!isVisible(voice)}>

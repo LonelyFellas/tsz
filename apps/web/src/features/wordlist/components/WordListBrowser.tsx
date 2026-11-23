@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { localText } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webWordlistBrowser as webWordlist } from "@/i18n/messages/wordlist/browser";
@@ -152,13 +153,15 @@ export function WordListBrowser({ mine = false }: { mine?: boolean }) {
       ) : (
         <>
           {result.data.items.length === 0 ? (
-            <PageNotice>
-              {q
-                ? uiText("webWordlistBrowser:no_word_lists_contain_v0", {
-                    v0: q
-                  })
-                : uiText("webWordlistBrowser:no_word_lists")}
-            </PageNotice>
+            <EmptyState
+              description={
+                q
+                  ? uiText("webWordlistBrowser:no_word_lists_contain_v0", {
+                      v0: q
+                    })
+                  : uiText("webWordlistBrowser:no_word_lists")
+              }
+            />
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
               {result.data.items.map((list) => (

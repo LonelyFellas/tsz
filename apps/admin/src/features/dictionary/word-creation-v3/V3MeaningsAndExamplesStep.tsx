@@ -27,6 +27,7 @@ import {
   PlusIcon
 } from "lucide-react";
 import {
+  EmptyState,
   Alert,
   Badge,
   Button,
@@ -263,7 +264,7 @@ function GrammarStructuresCard({
   return (
     <Card className="word-grammar-card" size="small" title={t("grammar")}>
       {pos.grammar_structures.length === 0 ? (
-        <Typography.Text type="secondary">{t("no_grammar")}</Typography.Text>
+        <EmptyState description={t("no_grammar")} />
       ) : (
         <Flex vertical gap={0}>
           {pos.grammar_structures.map((structure, structureIndex) => {

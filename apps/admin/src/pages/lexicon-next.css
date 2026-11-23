@@ -357,6 +357,22 @@
 .lexicon-next-content-row .ui-select {
   min-width: 128px;
 }
+.lexicon-next-dialect-editor {
+  display: grid;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+.lexicon-next-dialect-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2) var(--ui-space-3);
+  overflow-wrap: anywhere;
+}
+.lexicon-next-dialect-label {
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
+}
 .lexicon-next-meanings .word-sense-summary {
   min-width: 0;
   overflow: hidden;
@@ -480,11 +496,6 @@
   align-items: baseline;
   gap: var(--ui-space-2) var(--ui-space-4);
 }
-.lexicon-next-section-status {
-  color: var(--ui-color-text-secondary);
-  font-size: var(--ui-font-size-compact);
-  font-weight: var(--ui-font-weight-regular);
-}
 .lexicon-next-draft-preview {
   margin-top: var(--ui-space-6);
 }
@@ -565,13 +576,6 @@
   > .ui-card-extra {
   color: var(--ui-color-text-secondary);
   font-size: var(--ui-font-size-compact);
-}
-
-:is(.lexicon-next-create, .lexicon-next-editor)
-  .lexicon-next-empty-state.ui-alert {
-  border-color: var(--ui-color-border-secondary);
-  background: var(--ui-color-fill-alter);
-  color: var(--ui-color-text-secondary);
 }
 
 /* Step 2 是高频编辑工作区，桌面宽度用来承载完整的词形与发音矩阵。 */
@@ -815,33 +819,9 @@
   border-color: var(--ui-color-primary);
 }
 
-/* 没有词性时仍保留编辑区边界，避免透明空白把工作区撑成一整块。 */
-.lexicon-next-forms .word-forms-tabs-empty {
-  box-sizing: border-box;
-  min-height: 216px;
-  padding: var(--ui-space-10) var(--ui-space-8);
-  background: var(--ui-color-fill-alter);
-  border: 1px dashed var(--ui-color-border);
-  border-radius: var(--ui-border-radius-lg);
-}
-
-.lexicon-next-forms .word-forms-tabs-empty-content {
-  padding: 0;
-}
-
-.lexicon-next-forms .word-forms-tabs-empty-content .ui-empty-image {
-  margin-bottom: var(--ui-space-3);
-  color: var(--ui-color-text-tertiary);
-}
-
-.lexicon-next-forms .word-forms-tabs-empty-content .ui-empty-image svg {
-  width: 28px;
-  height: 28px;
-}
-
 .lexicon-next-forms
   .word-forms-tabs-empty-content
-  .ui-empty-description
+  .tsz-empty-description
   strong {
   color: var(--ui-color-text);
   font-size: var(--ui-font-size-section);

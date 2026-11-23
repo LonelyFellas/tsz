@@ -16,6 +16,7 @@ import type {
   PartOfSpeechCatalogItem
 } from "@tsz/types";
 import {
+  EmptyState,
   Alert,
   Button,
   Card,
@@ -495,7 +496,7 @@ export function GrammarStructures({
             语法结构 · {localeLabels[target] ?? target}
           </h2>
           {visibleRows.length === 0 && (
-            <span className="lexicon-next-section-status">暂无语法结构</span>
+            <EmptyState description={t("no_grammar")} />
           )}
         </div>
       }

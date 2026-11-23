@@ -169,9 +169,13 @@ export function focusPublicationIssue(
               'input[data-v3-field="headword"]'
             )
           : undefined);
-    const control = field?.matches(controlSelector)
-      ? field
-      : field?.querySelector<HTMLElement>(controlSelector);
+    // 没有精确字段锚点时聚焦义项本身，不能让任意首个字段因获焦改值。
+    const control =
+      field === scope && scope?.dataset.v3Field === "sense"
+        ? scope
+        : field?.matches(controlSelector)
+          ? field
+          : field?.querySelector<HTMLElement>(controlSelector);
     if (
       control &&
       !control.closest('[hidden], [inert], [aria-hidden="true"]')

@@ -97,7 +97,8 @@ function GrantedAdmins({
           )
         }}
         rowKey="admin_id"
-        loading={query.isFetching}
+        loading={query.isLoading}
+        refreshing={query.isRefetching}
         dataSource={query.data?.items ?? []}
         columns={[
           { title: t("administrator"), dataIndex: "display_name" },
@@ -248,7 +249,8 @@ function BatchTargets({
             rowKey="id"
             size="middle"
             sticky
-            loading={query.isFetching}
+            loading={query.isLoading}
+            refreshing={query.isRefetching}
             dataSource={query.data?.items ?? []}
             rowSelection={{
               selectedRowKeys: selected,
@@ -388,7 +390,8 @@ function PermissionAudits({ onClose }: { onClose: () => void }) {
           )
         }}
         rowKey="id"
-        loading={query.isFetching}
+        loading={query.isLoading}
+        refreshing={query.isRefetching}
         dataSource={query.data?.items ?? []}
         columns={[
           { title: t("time"), dataIndex: "occurred_at" },
@@ -701,7 +704,8 @@ export function PermissionManagement() {
           rowKey="key"
           size="middle"
           scroll={{ x: 1480 }}
-          loading={catalog.isFetching}
+          loading={catalog.isLoading}
+          refreshing={catalog.isRefetching}
           dataSource={rows}
           rowSelection={{
             fixed: true,

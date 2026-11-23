@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   Alert,
   Button,
   Card,
@@ -69,11 +70,7 @@ export function EntryBasicsSnapshot({
         <DictionaryDetectionCard detection={detection} />
       ) : (
         <Card className="word-detection-result-card" title="内置词典">
-          <Alert
-            className="lexicon-next-empty-state"
-            type="info"
-            title="未找到内置词典匹配"
-          />
+          <EmptyState description="未找到内置词典匹配" />
         </Card>
       )}
     </div>

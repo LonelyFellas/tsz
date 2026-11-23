@@ -1,4 +1,5 @@
 "use client";
+import { EmptyState } from "@tsz/ui/components/empty-state";
 import { lookupWebNotice, type WebNotice, localText } from "@/i18n/catalog";
 
 import { useWebLocale, useWebText } from "@/i18n/client";
@@ -293,7 +294,7 @@ function Wallet({ id }: { id: string }) {
         ) : (
           <>
             {entries.data.items.length === 0 ? (
-              <PageNotice>
+              <EmptyState>
                 <p className="font-medium text-foreground">
                   {uiText("webCoinsWallet:no_transactions_yet")}
                 </p>
@@ -302,7 +303,7 @@ function Wallet({ id }: { id: string }) {
                     "webCoinsWallet:rewards_and_spending_will_appear_here"
                   )}
                 </p>
-              </PageNotice>
+              </EmptyState>
             ) : (
               <ul className="divide-y divide-border/60 rounded-3xl border border-border/60 bg-surface/70 px-5 sm:px-8">
                 {entries.data.items.map((entry) => {

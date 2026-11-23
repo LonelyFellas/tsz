@@ -222,9 +222,6 @@
   font-size: var(--ui-font-size-sm);
   margin-top: var(--ui-space-1);
 }
-.dubbing-list-empty {
-  margin-block: var(--ui-space-4);
-}
 .dubbing-group-save-error {
   margin: var(--ui-space-3) 0;
 }
@@ -249,9 +246,6 @@
   display: none;
 }
 
-.dubbing-empty-groups {
-  padding: 40px 26px;
-}
 .dubbing-settings-footer {
   display: flex;
   align-items: center;

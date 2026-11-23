@@ -376,7 +376,6 @@ export function SentenceReadingPreview({
           )}
           {!sorted.length && (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
                 variants.length
                   ? "当前筛选条件下暂无例句"

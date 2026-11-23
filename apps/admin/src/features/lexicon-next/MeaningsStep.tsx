@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
-import { Button, Alert, Flex, Space } from "@tsz/ui/admin/display";
+import { Button, Alert, Flex, Space, Typography } from "@tsz/ui/admin/display";
 import { AdminControls } from "@tsz/ui/admin/context";
 import { V3SenseGroupsCard } from "@/features/dictionary/word-creation-v3/components/V3SenseGroupsCard";
 import {
@@ -277,11 +277,11 @@ export function MeaningsStep({
       gap={16}
       className="word-meanings-step v3-meanings-v2 lexicon-next-meanings"
     >
+      <div className="word-step-heading">
+        <Typography.Title level={2}>{t("meanings_title")}</Typography.Title>
+      </div>
       {(formEditorAvailable || grammarAvailable) && catalog.isError && (
         <Alert type="error" title={t("catalog_unavailable")} />
-      )}
-      {grammarAvailable && (
-        <p>发布前需补齐英美释义；已添加的语法结构也需填写英美内容。</p>
       )}
       {senseGroupsAvailable && (
         <AdminControls componentDisabled={disabled}>

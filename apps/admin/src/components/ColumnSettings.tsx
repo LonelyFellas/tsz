@@ -1,6 +1,6 @@
 import { useTableTranslation } from "@/components/table-i18n";
 import { CheckIcon, GripVerticalIcon, SettingsIcon } from "lucide-react";
-import { Button, Typography } from "@tsz/ui/admin/display";
+import { EmptyState, Button, Typography } from "@tsz/ui/admin/display";
 import { Checkbox, Segmented } from "@tsz/ui/admin/forms";
 import { Popover } from "@tsz/ui/admin/overlays";
 import {
@@ -160,14 +160,13 @@ export function ColumnSettings({
                       <span>{groupColumns.length}</span>
                     </div>
                     {groupColumns.length === 0 && (
-                      <Typography.Text
-                        type="secondary"
-                        className="admin-column-settings-empty"
-                      >
-                        {group.fixed === false
-                          ? t("all_pinned")
-                          : t("none_pinned")}
-                      </Typography.Text>
+                      <EmptyState
+                        description={
+                          group.fixed === false
+                            ? t("all_pinned")
+                            : t("none_pinned")
+                        }
+                      />
                     )}
                     {groupColumns.map((column) => {
                       const index = columns.findIndex(

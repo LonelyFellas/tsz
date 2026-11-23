@@ -556,10 +556,7 @@ export function V3FormGroupCard({
         <Flex id={bodyId} vertical>
           <div className="word-form-rules">{dialectControl}</div>
           {group.members.length === 0 ? (
-            <Empty
-              description={t("empty_form_group")}
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
+            <Empty description={t("empty_form_group")} />
           ) : null}
           {onEditContent && sharedCounts ? (
             <V3FormContentOverview
