@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PronunciationPreviewControls,
   PronunciationPreviewProvider,
+  PronunciationPreviewVoiceList,
   PronunciationPreviewVoiceSummary,
   usePronunciationVoiceNotice
 } from "./PronunciationPreview";
@@ -1264,4 +1265,39 @@ it("compact editable preview may synthesize while asset-only reading never does"
   await waitFor(() => expect(button).toBeEnabled());
   fireEvent.click(button);
   await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+});
+
+it("音色目录首次失败后可在原控件手动重试", async () => {
+  preview.listVoices.mockRejectedValueOnce(new Error());
+  render(
+    <PreviewHarness dialect="uk" playbackOnly loadVoicesOnMount={false} />
+  );
+  const button = screen.getByLabelText("播放语音");
+  await act(async () => fireEvent.click(button));
+  expect(preview.listVoices).toHaveBeenCalledTimes(1);
+  expect(preview.synthesize).not.toHaveBeenCalled();
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
+  expect(preview.listVoices).toHaveBeenCalledTimes(2);
+});
+
+it("音色列表自动加载失败后等待用户手动重试", async () => {
+  const catalog = deferred<typeof voices>();
+  preview.listVoices.mockReturnValueOnce(catalog.promise);
+  render(
+    <PronunciationPreviewProvider>
+      <PronunciationPreviewVoiceList dialect="uk" />
+      <PronunciationPreviewControls
+        dialect="uk"
+        pronunciationId="retry"
+        spelling="cat"
+      />
+    </PronunciationPreviewProvider>
+  );
+  await act(async () => catalog.reject(new Error("音色目录暂不可用")));
+  expect(preview.listVoices).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByLabelText("获取语音"));
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+  expect(preview.listVoices).toHaveBeenCalledTimes(2);
 });

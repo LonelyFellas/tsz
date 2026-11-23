@@ -79,7 +79,7 @@ const voiceCatalogQueryKey = ["admin-speech", "voices", "en"] as const;
 const voiceCatalogConsumers = new Map<string, number>();
 
 function errorMessage(error: unknown) {
-  return error instanceof Error
+  return error instanceof Error && error.message.trim()
     ? error.message
     : createLexiconEditorMessage("panel_audition_request_failed_try_again");
 }
@@ -184,6 +184,7 @@ export function PronunciationPreviewProvider({
         return items;
       })
       .catch((error) => {
+        setVoicesRequested(false);
         setVoicesError(errorMessage(error));
         throw error;
       })
@@ -311,9 +312,9 @@ export function usePronunciationVoiceNotice(
 ): string | undefined {
   const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
-  if (!context?.enabled || !context.voicesRequested || context.voicesLoading)
-    return undefined;
+  if (!context?.enabled || context.voicesLoading) return undefined;
   if (context.voicesError) return context.voicesError;
+  if (!context.voicesRequested) return undefined;
   const preference = context.dialectPreference;
   const missing = dialects.filter(
     (dialect) => !voiceForDialect(context.voices, dialect, preference)
@@ -689,7 +690,8 @@ export function PronunciationPreviewVoiceList({
   } = context;
   const shouldLoadSettings =
     enabled && source !== "upload" && source !== "none";
-  const needsCatalog = shouldLoadSettings && !voicesRequested;
+  const needsCatalog =
+    shouldLoadSettings && !voicesRequested && !context.voicesError;
   useEffect(() => {
     if (shouldLoadSettings && !voiceResolutionRequested) {
       requestVoiceResolution();
@@ -1264,11 +1266,12 @@ export function PronunciationPreviewControls({
     }
     if (context.voicesLoading || resolved.pending) return;
     pendingGenerateRef.current = undefined;
-    void generateRef.current();
+    if (!context.voicesError) void generateRef.current();
   }, [
     context.voiceResolutionRequested,
     context.voicesLoading,
     context.voicesRequested,
+    context.voicesError,
     disabled,
     requestKey,
     resolveRequested,
@@ -1306,7 +1309,7 @@ export function PronunciationPreviewControls({
     : context.voicesLoading || resolved.pending
       ? t("panel_loading_speakers")
       : !context.voicesRequested
-        ? t("panel_get_audio_2")
+        ? context.voicesError || t("panel_get_audio_2")
         : resolved.error
           ? resolved.error
           : context.voicesError
