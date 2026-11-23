@@ -5,14 +5,11 @@ import {
   useLexiconEditorMessageState,
   createLexiconEditorMessage
 } from "../i18n/editor";
-import {
-  speechAccentGroup,
-  savedVoiceAudioAsset,
-  splitVoiceDisplayName
-} from "@tsz/shared";
+import { speechAccentGroup, savedVoiceAudioAsset } from "@tsz/shared";
 import { ChevronDownIcon, Volume2Icon, RefreshCwIcon } from "lucide-react";
 import { App, Popover, Tooltip } from "@tsz/ui/admin/overlays";
-import { Button, Space, Tag } from "@tsz/ui/admin/display";
+import { Button, Space, Tag, VoiceDisplayName } from "@tsz/ui/admin/display";
+import { useVoiceTranslation } from "@/features/voices/i18n";
 import type {
   AudioAssetV3,
   Dialect,
@@ -507,22 +504,25 @@ export function PronunciationPreviewVoiceSummary({
           ? t("panel_loading_voices")
           : undefined
       }
-      title={
-        voice
-          ? t("panel_label_7", {
-              p0: isDefault ? t("panel_default") : "",
-              p1: voice.label
-            })
-          : undefined
-      }
     >
-      {context.voicesLoading || resolved.pending
-        ? "—"
-        : voice
-          ? voice.label.replace(` · ${voice.locale}`, "")
-          : resolved.error ||
-            context.voicesError ||
-            t("panel_no_voices_available_for_this_accent")}
+      {context.voicesLoading || resolved.pending ? (
+        "—"
+      ) : voice ? (
+        <InlineVoiceName
+          displayName={
+            voice.displayName ?? voice.label.replace(` · ${voice.locale}`, "")
+          }
+          gender={voice.gender}
+          title={t("panel_label_7", {
+            p0: isDefault ? t("panel_default") : "",
+            p1: voice.label
+          })}
+        />
+      ) : (
+        resolved.error ||
+        context.voicesError ||
+        t("panel_no_voices_available_for_this_accent")
+      )}
     </span>
   );
   if (enabled.length <= 1) return summary;
@@ -548,18 +548,17 @@ export function PronunciationPreviewVoiceSummary({
             const option = context.voices.find(
               (row) => row.id === setting.voice_id
             );
-            const name = option
-              ? option.label.replace(` · ${option.locale}`, "")
-              : setting.voice_id;
+            const name =
+              option?.displayName ??
+              option?.label.replace(` · ${option.locale}`, "") ??
+              setting.voice_id;
             return (
               <li
                 className="word-pronunciation-voice-row"
                 key={setting.version_id ?? setting.voice_id}
               >
                 <div className="word-pronunciation-voice-info">
-                  <span className="word-pronunciation-voice-name" title={name}>
-                    {name}
-                  </span>
+                  <InlineVoiceName displayName={name} gender={option?.gender} />
                   <span className="word-pronunciation-voice-locale">
                     {option?.locale ?? t("panel_unavailable")}
                   </span>
@@ -806,38 +805,23 @@ export function PronunciationPreviewVoiceList({
 function InlineVoiceName({
   displayName,
   gender,
-  secondary
+  secondary,
+  title
 }: {
   displayName: string;
   gender?: "female" | "male" | "neutral";
   secondary?: string;
+  title?: string;
 }) {
-  const { english, chinese } = splitVoiceDisplayName(displayName);
-  const genderLabel =
-    gender === "female" ? "女声" : gender === "male" ? "男声" : undefined;
+  const { t } = useVoiceTranslation();
   return (
-    <span className="v3-voice-inline-name" title={secondary ?? displayName}>
-      <strong>{english}</strong>
-      {chinese && chinese !== english && <small>{chinese}</small>}
-      {secondary && <small>{secondary}</small>}
-      {gender === "female" ? (
-        <span
-          className="v3-voice-inline-gender is-female"
-          role="img"
-          aria-label={genderLabel}
-        >
-          ♀
-        </span>
-      ) : gender === "male" ? (
-        <span
-          className="v3-voice-inline-gender is-male"
-          role="img"
-          aria-label={genderLabel}
-        >
-          ♂
-        </span>
-      ) : null}
-    </span>
+    <VoiceDisplayName
+      displayName={displayName}
+      gender={gender}
+      genderLabel={t(gender === "female" ? "female_voice" : "male_voice")}
+      secondary={secondary}
+      title={title}
+    />
   );
 }
 

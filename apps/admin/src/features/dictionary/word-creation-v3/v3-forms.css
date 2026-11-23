@@ -205,41 +205,6 @@
   padding-top: var(--ui-space-1);
   border-top: 1px solid var(--ui-color-border-secondary);
 }
-.v3-voice-inline-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ui-color-text);
-  font-size: var(--ui-font-size);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.v3-voice-inline-name strong {
-  overflow: hidden;
-  font-weight: var(--ui-font-weight-medium);
-  text-overflow: ellipsis;
-}
-.v3-voice-inline-name small {
-  overflow: hidden;
-  color: var(--ui-color-text-secondary);
-  font-size: var(--ui-font-size-compact);
-  text-overflow: ellipsis;
-}
-.v3-voice-inline-gender {
-  flex: 0 0 auto;
-  color: var(--ui-color-text-secondary);
-  font-size: var(--ui-font-size);
-  font-weight: var(--ui-font-weight-semibold);
-  line-height: 1;
-}
-.v3-voice-inline-gender.is-female {
-  color: var(--ui-color-primary);
-}
-.v3-voice-inline-gender.is-male {
-  color: var(--ui-color-success);
-}
 .v3-voice-inline-number {
   width: 100%;
   color: var(--ui-color-text-secondary);

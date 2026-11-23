@@ -130,7 +130,7 @@
   font-size: var(--ui-font-size);
 }
 
-.voice-catalog-name .voice-shared-name > strong {
+.voice-catalog-name .ui-voice-display-name > strong {
   overflow: visible;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -394,7 +394,7 @@
   font-weight: 400;
 }
 
-.voice-library-settings-voice .voice-shared-name > strong {
+.voice-library-settings-voice .ui-voice-display-name > strong {
   white-space: normal;
   overflow-wrap: anywhere;
 }

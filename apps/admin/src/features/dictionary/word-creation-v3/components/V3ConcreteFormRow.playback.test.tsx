@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { App } from "@tsz/ui/admin/overlays";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { DialectRulesV3, WordConcreteFormV3 } from "@tsz/types";
@@ -288,11 +294,11 @@ it("总览音色列按启用音色逐行展示，并让语速和音量保持同�
   expect(await screen.findByText("Sonia Test")).toBeVisible();
   expect(screen.getByText("Andrew Test")).toBeVisible();
   expect(
-    screen.getByText("Sonia Test").closest(".v3-voice-inline-name")
-  ).toHaveTextContent("Sonia Test♀");
+    within(screen.getByTitle("Sonia Test")).getByRole("img", { name: "女声" })
+  ).toBeVisible();
   expect(
-    screen.getByText("Andrew Test").closest(".v3-voice-inline-name")
-  ).toHaveTextContent("Andrew Test♂");
+    within(screen.getByTitle("Andrew Test")).getByRole("img", { name: "男声" })
+  ).toBeVisible();
   expect(screen.getByText("0.90×")).toBeVisible();
   expect(screen.getByText("0.55×")).toBeVisible();
   expect(screen.getByText("93%")).toBeVisible();
@@ -380,8 +386,8 @@ it("总览继承音色时按当前读法解析推荐音色", async () => {
   );
   expect(await screen.findByText("Andrew Test")).toBeVisible();
   expect(
-    screen.getByText("Andrew Test").closest(".v3-voice-inline-name")
-  ).toHaveTextContent("Andrew Test♂");
+    within(screen.getByTitle("Andrew Test")).getByRole("img", { name: "男声" })
+  ).toBeVisible();
 });
 
 it("总览上传音频行显示来源文件，语速和音量不伪造合成值", async () => {

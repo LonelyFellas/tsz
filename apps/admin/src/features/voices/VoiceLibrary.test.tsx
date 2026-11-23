@@ -369,7 +369,13 @@ describe("配音中心", () => {
     const { router } = mount();
     fireEvent.click(await screen.findByLabelText("调节 Sonia 声音"));
     fireEvent.click(namedButton("加入分组推荐"));
-    fireEvent.mouseDown(await screen.findByLabelText("推荐分组"));
+    const groupSelect = await screen.findByLabelText("推荐分组");
+    const recommendation = within(
+      groupSelect.closest<HTMLElement>('[role="dialog"]')!
+    );
+    expect(recommendation.getByRole("img", { name: "女声" })).toBeVisible();
+    expect(recommendation.getByText("Sonia")).toBeVisible();
+    fireEvent.mouseDown(groupSelect);
     fireEvent.click(
       await screen.findByText("测试推荐组", {
         selector: ".ui-select-item-option-content"
@@ -1530,9 +1536,7 @@ describe("配音中心", () => {
     });
     fireEvent.click(screen.getByText("加入分组推荐"));
     expect(await screen.findByText("请输入 0.50 至 1.50 倍速")).toBeVisible();
-    expect(
-      screen.queryByRole("dialog", { name: "将 Sonia 加入分组推荐" })
-    ).toBeNull();
+    expect(screen.queryByLabelText("推荐分组")).toBeNull();
   });
 
   it("目录访问和生成权限分别判断，无权限时不请求目录", async () => {

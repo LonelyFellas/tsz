@@ -217,9 +217,6 @@
   min-width: 0;
   flex: 0 1 auto;
 }
-.dubbing-side-identity .voice-shared-name > small {
-  margin-left: var(--ui-space-1);
-}
 .dubbing-item-issue {
   display: block;
   font-size: var(--ui-font-size-sm);
@@ -307,33 +304,6 @@
   }
 }
 
-.voice-shared-name {
-  display: inline-flex;
-  align-items: baseline;
-  max-width: 100%;
-  min-width: 0;
-  vertical-align: middle;
-}
-.voice-shared-name > strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.voice-shared-name > .lucide {
-  margin-left: 0.2em;
-  flex-shrink: 0;
-  font-size: inherit;
-}
-.voice-shared-name > small {
-  margin-left: 0.8em;
-  color: var(--voice-muted, var(--ui-color-text-secondary));
-  font-size: var(--ui-font-size-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
 .voice-shared-number {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

@@ -279,10 +279,12 @@ export function useVoiceAudition({
 
           const audio = new Audio(result.audioUrl);
           audioRef.current = audio;
+          const versionName = setting?.version_name;
           setMedia({
             audio,
             result,
-            name: setting?.version_name ?? voice.label
+            name: versionName ?? voice.label,
+            voice: versionName == null ? voice : undefined
           });
           const isCurrent = () => audioRef.current === audio;
 

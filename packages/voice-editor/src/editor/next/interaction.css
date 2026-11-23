@@ -826,33 +826,6 @@
   height: 28px;
   margin-inline-start: 0;
 }
-.tsz-ve-shared-name {
-  display: inline-flex;
-  align-items: baseline;
-  min-width: 0;
-  max-width: 100%;
-  vertical-align: middle;
-}
-.tsz-ve-shared-name > strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tsz-ve-shared-name > .lucide {
-  margin-left: 0.2em;
-  flex-shrink: 0;
-  font-size: inherit;
-}
-.tsz-ve-shared-name > small {
-  margin-left: 0.8em;
-  min-width: 0;
-  font-size: 12px;
-  color: #687181;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .tsz-ve-shared-number {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

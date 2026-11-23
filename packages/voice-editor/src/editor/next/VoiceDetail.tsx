@@ -23,6 +23,7 @@ import {
 } from "../../core";
 import { VoiceParameters } from "./ToolPanels";
 import { VoiceConfigurationPanel } from "./VoiceConfigurationPanel";
+import { PoolVoiceName } from "./VoiceDisplay";
 import { useVoiceAudition } from "./useVoiceAudition";
 import { AudioReview } from "./AudioReview";
 import { SsmlReview } from "./SsmlReview";
@@ -190,10 +191,15 @@ export function VoiceDetail({
     <Modal
       className="tsz-ve-voice-detail"
       open
-      title={t("edit_voice_settings", {
-        p0: dialect === "en-GB" ? t("british") : t("american"),
-        p1: voice.displayName ?? voice.label
-      })}
+      title={
+        <>
+          {t("edit_voice_settings", {
+            p0: dialect === "en-GB" ? t("british") : t("american")
+          })}
+          {" · "}
+          <PoolVoiceName voice={voice} fallback={voice.id} />
+        </>
+      }
       width={1200}
       destroyOnHidden
       mask={{ closable: false }}

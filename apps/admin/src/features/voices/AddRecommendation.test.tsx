@@ -150,7 +150,7 @@ describe("当前口音推荐只应用到分组草稿", () => {
     const client = mount();
     fireEvent.click(screen.getByText("编辑B"));
     await chooseGroup();
-    expect(screen.queryByRole("radio", { name: "Guy 男声" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "男声 Guy" })).toBeNull();
     expect(await screen.findByLabelText("合成语速")).toHaveValue("0.73");
     expect(screen.getByLabelText("合成音量")).toHaveValue("65");
     fireEvent.click(screen.getByRole("button", { name: "保存到本组" }));

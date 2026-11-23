@@ -57,9 +57,9 @@ import {
   RATE_MULTIPLIER_MIN,
   RATE_MULTIPLIER_MAX,
   voiceGenderLabels,
-  VOICE_LOCALES,
-  voiceShortName
+  VOICE_LOCALES
 } from "./roles";
+import { PoolVoiceName } from "./VoiceDisplay";
 import type { Brush } from "./roles";
 
 /** 工具栏中的发音、标注和音频面板。 */
@@ -230,7 +230,7 @@ export function VoicePanel({
                         }
                         label={
                           <>
-                            <span>{voiceShortName(voice)}</span>
+                            <PoolVoiceName voice={voice} fallback={voice.id} />
                             <span> · {speechRegionLabel(voice.locale)}</span>
                           </>
                         }
