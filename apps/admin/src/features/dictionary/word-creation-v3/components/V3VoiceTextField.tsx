@@ -965,7 +965,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     editingEnabled &&
     recorded &&
     value.text !== "";
-  const canOpenActualPreview = actualPronunciationPreview && !readOnly;
   const openEditor = () => {
     setSpellingSettings(undefined);
     setDraftState(captureSession());
@@ -998,7 +997,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       ref={inputRef}
       id={expanded ? undefined : id}
       key={largePreview ? "large" : "standard"}
-      onClick={canOpenActualPreview ? openEditor : undefined}
       onFocus={() => setFocused(true)}
       onBlur={() => {
         if (mode === "spelling" && !expanded && !readOnly) {
@@ -1148,9 +1146,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         </div>
       ) : actualPronunciationPreview ? (
         <div
-          className={`v3-actual-pronunciation-preview-content tsz-phonetics tsz-actual-pronunciation${canOpenActualPreview ? " is-clickable" : ""}`}
+          className="v3-actual-pronunciation-preview-content tsz-phonetics tsz-actual-pronunciation"
           aria-hidden
-          onClick={canOpenActualPreview ? openEditor : undefined}
         >
           <RichTextReadOnly
             textRole={textRole}

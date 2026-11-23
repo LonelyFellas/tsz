@@ -728,7 +728,7 @@ export function LocalVoicePool({
                             ))}
                           </Space>
                           {renderIdentity(setting, side.locale)}
-                          <Space size={0}>
+                          <Space>
                             <Button
                               type="text"
                               size="small"
