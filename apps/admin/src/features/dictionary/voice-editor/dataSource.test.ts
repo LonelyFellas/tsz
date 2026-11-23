@@ -116,7 +116,8 @@ describe("admin voice preview data source", () => {
     };
     state.renderSsml.mockResolvedValue({ ssml: "<speak/>" });
     state.generateAudio.mockResolvedValue({ asset: { id: "generated" } });
-    await grammar.listVoices({ language: "en" });
+    // The list row warms the shared catalogue before using the grammar adapter.
+    await adminVoicePreviewAdapter.listVoices({ language: "en" });
     await grammar.synthesize({
       language: "en",
       content,

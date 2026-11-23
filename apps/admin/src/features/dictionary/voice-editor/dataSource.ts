@@ -6,7 +6,11 @@ import type {
   VoiceRecommendation,
   LoadVoiceRecommendations
 } from "@tsz/voice-editor/types";
-import type { GeneratedSpeechSource, RichTextV2 } from "@tsz/types";
+import type {
+  AdminSpeechVoiceCapabilities,
+  GeneratedSpeechSource,
+  RichTextV2
+} from "@tsz/types";
 import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -14,8 +18,12 @@ import { queryClient } from "@/lib/queryClient";
 import { createAdminVoicePreviewAdapter } from "./adapter";
 import { createAdminAudioUploadAdapter } from "./audioUploadAdapter";
 
-const realAdapter = createAdminVoicePreviewAdapter(api.speech);
-const realGrammarAdapter = createAdminVoicePreviewAdapter(api.speech, true);
+const catalog = new Map<string, AdminSpeechVoiceCapabilities>();
+const realAdapter = createAdminVoicePreviewAdapter(api.speech, { catalog });
+const realGrammarAdapter = createAdminVoicePreviewAdapter(api.speech, {
+  grammar: true,
+  catalog
+});
 let mockAdapterPromise: Promise<VoicePreviewAdapter> | undefined;
 const realAudioAdapter = createAdminAudioUploadAdapter(api.audioAssets);
 let mockAudioAdapterPromise: Promise<AudioUploadAdapter> | undefined;
