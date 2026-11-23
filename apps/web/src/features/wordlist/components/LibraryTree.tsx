@@ -1,5 +1,6 @@
 "use client";
 import { EmptyState } from "@tsz/ui/components/empty-state";
+import { localText, webCommon } from "@/i18n/catalog";
 import { useWebText } from "@/i18n/client";
 import { webWordlistLibrary as webWordlist } from "@/i18n/messages/wordlist/library";
 
@@ -220,22 +221,19 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
         { signal }
       )
   });
-  const lastPage = result.isSuccess
-    ? Math.max(1, result.data.pagination.total_pages)
-    : page;
-  if (page > lastPage) setPage(lastPage);
   if (result.isError)
     return (
       <Button size="sm" variant="ghost" onClick={() => void result.refetch()}>
         {uiText("webWordlistLibrary:retry_directory")}
       </Button>
     );
-  if (!result.data || page > lastPage)
+  if (!result.data)
     return (
       <p className="px-6 py-2 text-xs text-foreground-subtle">
         {uiText("webWordlistLibrary:loading_2")}
       </p>
     );
+  const lastPage = Math.max(1, result.data.pagination.total_pages);
   return (
     <ul className={props.depth ? "ml-3 border-l border-border/70" : ""}>
       {result.data.items.map((item) => (
@@ -243,26 +241,32 @@ function TreeLevel(props: TreeProps & { parent?: string; depth: number }) {
       ))}
       {!result.data.items.length && (
         <li>
-          <EmptyState>{uiText("webWordlistLibrary:empty_folder")}</EmptyState>
+          <EmptyState
+            description={
+              page > 1
+                ? uiText(localText(webCommon, "webCommon:empty_page"))
+                : uiText("webWordlistLibrary:empty_folder")
+            }
+          />
         </li>
       )}
-      {result.data.pagination.total_pages > 1 && (
+      {(lastPage > 1 || page > 1) && (
         <li className="flex items-center justify-between px-2 py-1">
           <Button
             variant="ghost"
             size="sm"
             disabled={page === 1}
-            onClick={() => setPage(page - 1)}
+            onClick={() => setPage(Math.min(page - 1, lastPage))}
           >
             {uiText("webWordlistLibrary:previous_page")}
           </Button>
           <span className="text-xs">
-            {page}/{result.data.pagination.total_pages}
+            {page}/{lastPage}
           </span>
           <Button
             variant="ghost"
             size="sm"
-            disabled={page === result.data.pagination.total_pages}
+            disabled={page >= lastPage}
             onClick={() => setPage(page + 1)}
           >
             {uiText("webWordlistLibrary:next_page")}
