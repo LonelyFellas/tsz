@@ -39,7 +39,7 @@ import { usePermission } from "@/lib/auth";
 import { env } from "@/lib/env";
 import {
   adminAudioUploadAdapter,
-  adminVoicePreviewAdapter,
+  adminGrammarVoicePreviewAdapter,
   loadAdminVoiceRecommendations,
   voicePreviewIsMock
 } from "@/features/dictionary/voice-editor/dataSource";
@@ -159,10 +159,14 @@ function GrammarText({
   const [audioFailed, setAudioFailed] = useState(false);
   const canGenerate = usePermission("speech.generate");
   const canUpload = usePermission("speech.upload_audio");
-  // 与 Step 2 一致，正式音频由应用草稿动作统一生成；编辑器仅处理正文、设置和试听。
+  const generateAvailable =
+    audioAvailable && canGenerate && env.VOICE_PREVIEW && !voicePreviewIsMock;
   const previewAdapter = useMemo(
-    () => ({ ...adminVoicePreviewAdapter, generateAudio: undefined }),
-    []
+    () =>
+      generateAvailable
+        ? adminGrammarVoicePreviewAdapter
+        : { ...adminGrammarVoicePreviewAdapter, generateAudio: undefined },
+    [generateAvailable]
   );
   const current = draft ?? variant;
   const profile = useMemo(
@@ -173,13 +177,11 @@ function GrammarText({
     () => toRichTextV2(current.content),
     [current.content]
   );
-  const generateAvailable =
-    audioAvailable && canGenerate && env.VOICE_PREVIEW && !voicePreviewIsMock;
   const audio = useSelectedVoiceAudio({
     target: `grammar:${variant.id}`,
     content,
     profile,
-    adapter: adminVoicePreviewAdapter,
+    adapter: adminGrammarVoicePreviewAdapter,
     locale:
       variant.locale === "en-GB" || variant.locale === "en-US"
         ? variant.locale
@@ -240,6 +242,7 @@ function GrammarText({
             content={toRichTextV2(variant.content)}
             voiceProfile={variant.voice_profile}
             audioAssets={variant.audio_assets}
+            previewAdapter={previewAdapter}
           />
         )}
         <Button
@@ -305,6 +308,7 @@ function GrammarText({
               showAudioUpload={audioAvailable}
               previewEnabled={audioAvailable && env.VOICE_PREVIEW}
               previewAdapter={audioAvailable ? previewAdapter : undefined}
+              deferAudioGeneration
               previewIsMock={voicePreviewIsMock}
               recommendationArea={audioAvailable ? "grammar" : undefined}
               loadRecommendations={

@@ -5,7 +5,10 @@ import { useCallback, useMemo } from "react";
 import { expandFormContents } from "@tsz/shared";
 import type { DraftFormsStepContentV3, GrammarFormLinkV3 } from "@tsz/types";
 import { createV3WordRequests } from "../api";
-import { adminVoicePreviewAdapter } from "../../voice-editor/dataSource";
+import {
+  adminGrammarVoicePreviewAdapter,
+  adminVoicePreviewAdapter
+} from "../../voice-editor/dataSource";
 import {
   createGrammarFormPreviewAdapter,
   type ReadingPreviewOptions
@@ -18,10 +21,11 @@ export function useReadingPreviewAdapter(
 ) {
   const requests = useMemo(() => createV3WordRequests(), []);
   const preserveDirectPhonemes = options.preserveDirectPhonemes ?? false;
+  const grammar = options.grammar ?? false;
   return useCallback(
     (links: GrammarFormLinkV3[]) =>
       createGrammarFormPreviewAdapter(
-        adminVoicePreviewAdapter,
+        grammar ? adminGrammarVoicePreviewAdapter : adminVoicePreviewAdapter,
         async () => {
           const targets = new Map<string, Promise<DraftFormsStepContentV3>>();
           return Promise.all(
@@ -79,8 +83,8 @@ export function useReadingPreviewAdapter(
           );
         },
         links,
-        { preserveDirectPhonemes }
+        { preserveDirectPhonemes, grammar }
       ),
-    [requests, wordId, forms, preserveDirectPhonemes]
+    [requests, wordId, forms, preserveDirectPhonemes, grammar]
   );
 }

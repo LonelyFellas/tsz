@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/tmp/tsz-961-authoritative.cMBkmrCb",
-  "_generatedAt": "2026-11-23T01:35:07.758Z",
+  "_source": "/Users/darwish/.codex/worktrees/fix-zentao-255-grammar-dubbing-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-23T02:40:30.289Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -8121,6 +8121,10 @@
       "required": ["content", "voice_alias"],
       "properties": {
         "content": { "$ref": "#/components/schemas/RichTextV2" },
+        "grammar": {
+          "type": "boolean",
+          "description": "Omit round parentheses from the spoken text of a grammar structure."
+        },
         "output_format": {
           "oneOf": [
             { "$ref": "#/components/schemas/AudioOutputFormat" },
@@ -8969,6 +8973,10 @@
             "form_links": {
               "type": "array",
               "items": { "$ref": "#/components/schemas/GrammarFormLinkV3" }
+            },
+            "grammar": {
+              "type": "boolean",
+              "description": "Omit round parentheses from the spoken text of a grammar structure."
             },
             "kind": { "type": "string", "enum": ["text"] }
           }

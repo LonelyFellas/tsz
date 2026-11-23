@@ -197,6 +197,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   contextLabel = "语音编辑器",
   contextKey,
   previewAdapter,
+  deferAudioGeneration = false,
   previewEnabled = true,
   loadRecommendations,
   recommendationArea,
@@ -1606,6 +1607,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       !setting.audio_asset_id
   );
   const automaticAudioPending =
+    !deferAudioGeneration &&
     !!previewAdapter?.generateAudio &&
     !!onVoiceProfileChange &&
     !readOnly &&

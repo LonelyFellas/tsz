@@ -10,6 +10,7 @@ import type { RichTextV2 } from "@tsz/types";
 export interface ReadingPreviewOptions {
   /** 本次试听中的音标由用户直接编辑，不属于词形关联的派生投影。 */
   preserveDirectPhonemes?: boolean;
+  grammar?: boolean;
 }
 import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
 
@@ -19,6 +20,7 @@ export function createGrammarFormPreviewAdapter(
   formLinks: GrammarFormLinkV3[] = [],
   options: ReadingPreviewOptions = {}
 ): VoicePreviewAdapter {
+  const grammarSource = options.grammar ? { grammar: true } : {};
   const applyReadings = (
     content: RichTextV2,
     bindings: Parameters<typeof grammarSynthesisContent>[1],
@@ -78,7 +80,8 @@ export function createGrammarFormPreviewAdapter(
                 source: {
                   kind: "text",
                   content: input.content,
-                  form_links: formLinks
+                  form_links: formLinks,
+                  ...grammarSource
                 },
                 setting: input.setting
               },
@@ -95,7 +98,8 @@ export function createGrammarFormPreviewAdapter(
               source: {
                 kind: "text",
                 content: input.content,
-                form_links: formLinks
+                form_links: formLinks,
+                ...grammarSource
               },
               accent: input.accent
             },
@@ -110,7 +114,8 @@ export function createGrammarFormPreviewAdapter(
               source: {
                 kind: "text",
                 content: input.content,
-                form_links: formLinks
+                form_links: formLinks,
+                ...grammarSource
               },
               setting: input.setting,
               ...(input.profile ? { profile: input.profile } : {})

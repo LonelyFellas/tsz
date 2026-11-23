@@ -6,6 +6,7 @@ import type {
   VoiceRecommendation,
   LoadVoiceRecommendations
 } from "@tsz/voice-editor/types";
+import type { GeneratedSpeechSource, RichTextV2 } from "@tsz/types";
 import { hasAdminPermission, hasAnyAdminPermission } from "@tsz/shared/auth";
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -14,6 +15,7 @@ import { createAdminVoicePreviewAdapter } from "./adapter";
 import { createAdminAudioUploadAdapter } from "./audioUploadAdapter";
 
 const realAdapter = createAdminVoicePreviewAdapter(api.speech);
+const realGrammarAdapter = createAdminVoicePreviewAdapter(api.speech, true);
 let mockAdapterPromise: Promise<VoicePreviewAdapter> | undefined;
 const realAudioAdapter = createAdminAudioUploadAdapter(api.audioAssets);
 let mockAudioAdapterPromise: Promise<AudioUploadAdapter> | undefined;
@@ -27,9 +29,9 @@ export const voicePreviewIsMock =
   !(import.meta.env.PROD && import.meta.env.MODE !== "test") &&
   env.ADMIN_TTS_MOCK;
 
-async function resolveAdapter(): Promise<VoicePreviewAdapter> {
+async function resolveAdapter(grammar: boolean): Promise<VoicePreviewAdapter> {
   if (!voicePreviewIsMock) {
-    return realAdapter;
+    return grammar ? realGrammarAdapter : realAdapter;
   }
   mockAdapterPromise ??= import("./mock").then(
     ({ createMockVoicePreviewAdapter }) => createMockVoicePreviewAdapter()
@@ -97,12 +99,19 @@ export const loadAdminVoiceRecommendations: LoadVoiceRecommendations = async ({
   );
 };
 
-export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
+function voiceTextSource(
+  content: RichTextV2,
+  grammar: boolean
+): GeneratedSpeechSource {
+  return { kind: "text", content, ...(grammar ? { grammar } : {}) };
+}
+
+const makeVoicePreviewAdapter = (grammar = false): VoicePreviewAdapter => ({
   async renderSsml(input, options) {
     return (
       await api.speech.renderSsml(
         {
-          source: { kind: "text", content: input.content },
+          source: voiceTextSource(input.content, grammar),
           setting: input.setting
         },
         options?.signal
@@ -136,7 +145,7 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
     const result = await api.speech.resolve(
       {
         profile: input.profile,
-        source: { kind: "text", content: input.content },
+        source: voiceTextSource(input.content, grammar),
         accent: input.accent
       },
       options?.signal
@@ -149,7 +158,7 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
     const response = await api.speech.generateAudio(
       {
         request_id: input.requestId,
-        source: { kind: "text", content: input.content },
+        source: voiceTextSource(input.content, grammar),
         setting: input.setting,
         ...(input.profile ? { profile: input.profile } : {})
       },
@@ -168,14 +177,17 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
     };
   },
   async listVoices(input) {
-    return (await resolveAdapter()).listVoices(input);
+    return (await resolveAdapter(grammar)).listVoices(input);
   },
   async synthesize(input, options) {
     if (!hasAdminPermission(useAuthStore.getState().profile, "speech.generate"))
       throw new VoiceEditorDisplayError(speechDiagnostic("generate_forbidden"));
-    return (await resolveAdapter()).synthesize(input, options);
+    return (await resolveAdapter(grammar)).synthesize(input, options);
   }
-};
+});
+
+export const adminVoicePreviewAdapter = makeVoicePreviewAdapter();
+export const adminGrammarVoicePreviewAdapter = makeVoicePreviewAdapter(true);
 
 /* 上传音频与试听共用同一个 mock 开关：后端两者都没配时一起走假的。 */
 async function resolveAudioAdapter(): Promise<AudioUploadAdapter> {

@@ -482,9 +482,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
   const editorPreviewAdapter = useMemo(() => {
     const adapter = sessionPreviewAdapter ?? adminVoicePreviewAdapter;
-    // 编辑期间只试听；正式音频由完成/保存按钮显式等待补齐。
+    if (area === "grammar" && canGenerateAudio) return adapter;
     return { ...adapter, generateAudio: undefined };
-  }, [sessionPreviewAdapter]);
+  }, [sessionPreviewAdapter, area, canGenerateAudio]);
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   const settingsLocale = voiceLocale(spellingSettings?.dialect);
   const draftSpeechEnabled =
@@ -1339,6 +1339,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
                 }));
             }}
             previewAdapter={textOnly ? undefined : editorPreviewAdapter}
+            deferAudioGeneration
             previewEnabled={!textOnly && env.VOICE_PREVIEW}
             previewIsMock={voicePreviewIsMock}
             onVoiceProfileChange={(next) => {

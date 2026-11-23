@@ -166,7 +166,8 @@ function errorCode(error: HttpError): VoicePreviewErrorCode {
 }
 
 export function createAdminVoicePreviewAdapter(
-  dataSource: AdminSpeechDataSource
+  dataSource: AdminSpeechDataSource,
+  grammar = false
 ): VoicePreviewAdapter {
   const catalog = new Map<
     string,
@@ -260,6 +261,7 @@ export function createAdminVoicePreviewAdapter(
         const request = {
           ...(input.outputFormat ? { output_format: input.outputFormat } : {}),
           content: input.content,
+          ...(grammar ? { grammar } : {}),
           voice_alias: input.voiceId,
           ...(input.style ? { style: input.style } : {}),
           ...(input.styleDegree !== undefined

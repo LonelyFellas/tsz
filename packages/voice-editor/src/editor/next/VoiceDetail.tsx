@@ -299,7 +299,11 @@ export function VoiceDetail({
                   loading={generating}
                   onClick={() => void generate()}
                 >
-                  {t("generate_final_audio")}
+                  {t(
+                    profile.dubbing?.area === "grammar" && draft.audio_asset_id
+                      ? "regenerate_audio"
+                      : "generate_final_audio"
+                  )}
                 </Button>
               )}
             </Space>

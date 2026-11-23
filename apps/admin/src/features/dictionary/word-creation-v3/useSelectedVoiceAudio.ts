@@ -98,6 +98,15 @@ function selectionSignature(
   ]);
 }
 
+function voiceEffects(profile: VoiceProfileV3 | null | undefined) {
+  return new Map(
+    profile?.voices.map((setting) => [
+      voiceSettingKey(setting),
+      { effect: voiceEffectKey(setting), assetId: setting.audio_asset_id }
+    ])
+  );
+}
+
 /** 折叠字段也生成正式资产；回写草稿，仍由宿主执行业务保存。 */
 export function useSelectedVoiceAudio({
   target,
@@ -171,16 +180,7 @@ export function useSelectedVoiceAudio({
   useLayoutEffect(() => {
     latest.current = { target, signature, enabled, profile, adapter, onChange };
   });
-  const effects = useMemo(
-    () =>
-      new Map(
-        profile?.voices.map((setting) => [
-          voiceSettingKey(setting),
-          voiceEffectKey(setting)
-        ])
-      ),
-    [profile]
-  );
+  const effects = useMemo(() => voiceEffects(profile), [profile]);
   const lastSource = useRef({ target, sourceKeys, effects });
   const attempted = useRef<string | undefined>(undefined);
   const ensureRef = useRef<() => Promise<boolean>>(() =>
@@ -227,12 +227,7 @@ export function useSelectedVoiceAudio({
       lastSource.current = {
         target,
         sourceKeys,
-        effects: new Map(
-          next.voices.map((setting) => [
-            voiceSettingKey(setting),
-            voiceEffectKey(setting)
-          ])
-        )
+        effects: voiceEffects(next)
       };
       flushSync(() => latest.current.onChange?.(next));
     };
@@ -256,9 +251,16 @@ export function useSelectedVoiceAudio({
               const previous = lastSource.current.effects.get(
                 voiceSettingKey(setting)
               );
+              // 音色设置可先显式生成新资产，完成正文时不重复生成。
+              if (
+                previous &&
+                setting.audio_asset_id &&
+                previous.assetId !== setting.audio_asset_id
+              )
+                return setting;
               if (
                 !sourceChanged &&
-                (!previous || previous === voiceEffectKey(setting))
+                (!previous || previous.effect === voiceEffectKey(setting))
               )
                 return setting;
               const { audio_asset_id: _audio, ...next } = setting;

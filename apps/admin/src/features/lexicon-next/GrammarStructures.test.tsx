@@ -16,6 +16,7 @@ import { GrammarStructures } from "./GrammarStructures";
 
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: { listVoices: async () => [] },
+  adminGrammarVoicePreviewAdapter: { listVoices: async () => [] },
   adminAudioUploadAdapter: {},
   loadAdminVoiceRecommendations: async () => [],
   voicePreviewIsMock: false

@@ -3,7 +3,10 @@ import type { RelatedWordChoice } from "../relatedSuggestions";
 import { changeVoiceText } from "./components/V3VoiceTextField.test-helper";
 import { env } from "@/lib/env";
 import { api, useAuthStore } from "@/lib/auth";
-import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
+import {
+  adminGrammarVoicePreviewAdapter,
+  adminVoicePreviewAdapter
+} from "@/features/dictionary/voice-editor/dataSource";
 import {
   act,
   fireEvent,
@@ -1308,7 +1311,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     const previous = env.VOICE_PREVIEW;
     Object.assign(env, { VOICE_PREVIEW: true });
     const voices = vi
-      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .spyOn(adminGrammarVoicePreviewAdapter, "listVoices")
       .mockResolvedValue([
         {
           id: "sonia",
@@ -1322,6 +1325,12 @@ describe("V3MeaningsAndExamplesStep", () => {
         }
       ]);
     const synthesize = vi
+      .spyOn(adminGrammarVoicePreviewAdapter, "synthesize")
+      .mockRejectedValue(new Error("试听测试"));
+    const definitionVoices = vi
+      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .mockImplementation((input) => voices(input));
+    const synthesizeDefinition = vi
       .spyOn(adminVoicePreviewAdapter, "synthesize")
       .mockRejectedValue(new Error("试听测试"));
     const resolving = vi.spyOn(api.speech, "resolve").mockResolvedValue({
@@ -1353,7 +1362,10 @@ describe("V3MeaningsAndExamplesStep", () => {
         }
       };
       render(<Harness initial={initial} />);
-      for (const label of ["语法结构 1 英美通用内容", "定义 1 英美通用内容"]) {
+      for (const [label, audition] of [
+        ["语法结构 1 英美通用内容", synthesize],
+        ["定义 1 英美通用内容", synthesizeDefinition]
+      ] as const) {
         const input = screen.getByLabelText(label);
         const button = screen.getByLabelText(`${label} 播放语音`);
         expect(
@@ -1363,7 +1375,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         await waitFor(() => expect(button).toBeEnabled());
         fireEvent.click(button);
         await waitFor(() =>
-          expect(synthesize).toHaveBeenCalledWith(
+          expect(audition).toHaveBeenCalledWith(
             expect.objectContaining({
               content: expect.objectContaining({
                 text: (input as HTMLTextAreaElement).value
@@ -1383,6 +1395,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     } finally {
       voices.mockRestore();
       synthesize.mockRestore();
+      definitionVoices.mockRestore();
+      synthesizeDefinition.mockRestore();
       resolving.mockRestore();
       Object.assign(env, { VOICE_PREVIEW: previous });
     }
@@ -1481,7 +1495,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       }
     });
     const listing = vi
-      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .spyOn(adminGrammarVoicePreviewAdapter, "listVoices")
       .mockResolvedValue([
         {
           id: "sonia",
@@ -1570,7 +1584,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     const previous = env.VOICE_PREVIEW;
     Object.assign(env, { VOICE_PREVIEW: true });
     const listing = vi
-      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .spyOn(adminGrammarVoicePreviewAdapter, "listVoices")
       .mockResolvedValue([
         {
           id: "sonia",
