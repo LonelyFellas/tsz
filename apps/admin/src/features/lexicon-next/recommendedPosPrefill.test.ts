@@ -12,19 +12,25 @@ const emptyDraft: NextDraft = {
 };
 
 describe("seedRecommendedPartOfSpeech", () => {
-  it("只创建建议词性的原形，不预先写入空的派生词形", () => {
+  it.each([
+    { defaults: ["plural"], expected: ["base", "plural"] },
+    { defaults: [], expected: ["base"] }
+  ])("按名词默认模板生成录入行（配置 $defaults）", ({ defaults, expected }) => {
+    const catalog = {
+      ...partOfSpeechCatalogFixture,
+      items: partOfSpeechCatalogFixture.items.map((item) =>
+        item.code === "noun" ? { ...item, default_form_types: defaults } : item
+      )
+    };
     const draft = seedRecommendedPartOfSpeech(
       emptyDraft,
       "word",
-      ["noun", "verb"],
-      partOfSpeechCatalogFixture
+      ["noun"],
+      catalog
     );
 
-    const forms = expandFormContents(draft.form_editor!);
-    expect(forms.pos.map((pos) => pos.pos)).toEqual(["noun", "verb"]);
-    expect(
-      forms.pos.flatMap((pos) => pos.forms.map((form) => form.form_type))
-    ).toEqual(["base", "base"]);
-    expect(forms.pos.every((pos) => pos.form_groups.length === 1)).toBe(true);
+    const [noun] = expandFormContents(draft.form_editor!).pos;
+    expect(noun?.forms.map((form) => form.form_type)).toEqual(expected);
+    expect(noun?.form_groups).toHaveLength(1);
   });
 });
