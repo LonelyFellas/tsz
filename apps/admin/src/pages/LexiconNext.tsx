@@ -25,7 +25,9 @@ import {
 import {
   Alert,
   Button,
+  Card,
   Collapse,
+  Empty,
   PageHeader,
   Space,
   Spin
@@ -1069,8 +1071,22 @@ function EntryEditor({
     saved.creation_detection,
     step
   ]);
-  const publishedVersion =
-    reviewVersion === "published" ? publication.data?.current : undefined;
+  const viewingSnapshot = reviewVersion === "published";
+  const publishedVersion = viewingSnapshot
+    ? publication.data?.current
+    : undefined;
+  const versionControl = (viewingSnapshot || publication.data?.current) && (
+    <Segmented<"draft" | "published">
+      aria-label={t("review_version")}
+      value={reviewVersion}
+      disabled={busy}
+      onChange={setReviewVersion}
+      options={[
+        { value: "draft", label: t("review_current") },
+        { value: "published", label: t("review_published") }
+      ]}
+    />
+  );
   const reviewDraft = publishedVersion?.snapshot.draft ?? draft;
   const saveAction = (
     <Button
@@ -1417,7 +1433,7 @@ function EntryEditor({
           {publishingAvailable ? (
             <PublicationPanel
               saveAction={saveAction}
-              viewingSnapshot={!!publishedVersion}
+              viewingSnapshot={viewingSnapshot}
               entryId={saved.id}
               revision={saved.revision}
               state={publication.data}
@@ -1470,89 +1486,100 @@ function EntryEditor({
             />
           ) : (
             <>
-              <PageHeader title={t("review_title")} actions={saveAction} />
+              <PageHeader
+                title={t("review_title")}
+                actions={!viewingSnapshot && saveAction}
+              />
               <Alert
                 type="info"
                 title="当前服务尚未开放新版发布，请更新服务后重试。"
               />
             </>
           )}
-          <Preview
-            heading={t(publishedVersion ? "review_published" : "review_draft")}
-            versionControl={
-              publication.data?.current && (
-                <Segmented<"draft" | "published">
-                  aria-label={t("review_version")}
-                  value={reviewVersion}
-                  disabled={busy}
-                  onChange={setReviewVersion}
-                  options={[
-                    { value: "draft", label: t("review_current") },
-                    { value: "published", label: t("review_published") }
-                  ]}
+          {viewingSnapshot && !publishedVersion ? (
+            <Card
+              title={<h2>{t("review_published")}</h2>}
+              extra={versionControl}
+              loading={publishingAvailable && publication.isPending}
+            >
+              {!publication.error && (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={t("review_no_publication")}
                 />
-              )
-            }
-            headwordField={
-              publishedVersion ? undefined : (
-                <label className="lexicon-review-field">
-                  {t("review_headword")}
-                  <Input
-                    data-v3-field="headword"
-                    aria-label={t("review_headword")}
-                    className="tsz-words"
-                    value={draft.headword}
-                    disabled={disabled}
-                    onChange={(e) =>
-                      setDraft({ ...draft, headword: e.target.value })
-                    }
-                  />
-                </label>
-              )
-            }
-            published={!!publishedVersion}
-            focusSense={
-              publishedVersion && step === "preview"
-                ? publishedSense
-                : undefined
-            }
-            onEditSense={
-              !publishedVersion && !disabled && !formContentOpen
-                ? (id) =>
-                    locateIssue({
-                      node_id: id,
-                      field: "definitions",
-                      message: ""
-                    })
-                : undefined
-            }
-            requests={requests}
-            sentenceDetailsAvailable={sentenceDetailsAvailable}
-            relationTargets={publishedVersion?.snapshot.relation_targets}
-            sentenceResources={
-              publishedVersion
-                ? Object.fromEntries(
-                    publishedVersion.snapshot.sentence_resources.map(
-                      (sentence) => [sentence.id, sentence]
-                    )
-                  )
-                : sentenceDraftsAvailable
-                  ? sentenceWorkspace.previewResources
+              )}
+            </Card>
+          ) : (
+            <Preview
+              catalog={grammarCatalog.data}
+              heading={t(
+                publishedVersion ? "review_published" : "review_draft"
+              )}
+              versionControl={versionControl}
+              headwordField={
+                publishedVersion ? undefined : (
+                  <label className="lexicon-review-field">
+                    {t("review_headword")}
+                    <Input
+                      data-v3-field="headword"
+                      aria-label={t("review_headword")}
+                      className="tsz-words"
+                      value={draft.headword}
+                      disabled={disabled}
+                      onChange={(e) =>
+                        setDraft({ ...draft, headword: e.target.value })
+                      }
+                    />
+                  </label>
+                )
+              }
+              published={!!publishedVersion}
+              focusSense={
+                publishedVersion && step === "preview"
+                  ? publishedSense
                   : undefined
-            }
-            dialectSenses={
-              publishedVersion
-                ? publication.data?.dialect_senses
-                : dialectSenses
-            }
-            dialectDraft={reviewDraft}
-            view={previewDraft(
-              reviewDraft,
-              target,
-              medium,
-              grammarCatalog.data
-            )}
-          />
+              }
+              onEditSense={
+                !publishedVersion && !disabled && !formContentOpen
+                  ? (id) =>
+                      locateIssue({
+                        node_id: id,
+                        field: draft.senses.find((sense) => sense.id === id)
+                          ?.part_of_speech
+                          ? "definitions"
+                          : "part_of_speech",
+                        message: ""
+                      })
+                  : undefined
+              }
+              requests={requests}
+              sentenceDetailsAvailable={sentenceDetailsAvailable}
+              relationTargets={publishedVersion?.snapshot.relation_targets}
+              sentenceResources={
+                publishedVersion
+                  ? Object.fromEntries(
+                      publishedVersion.snapshot.sentence_resources.map(
+                        (sentence) => [sentence.id, sentence]
+                      )
+                    )
+                  : sentenceDraftsAvailable
+                    ? sentenceWorkspace.previewResources
+                    : undefined
+              }
+              dialectSenses={
+                publishedVersion
+                  ? publication.data?.dialect_senses
+                  : dialectSenses
+              }
+              dialectDraft={reviewDraft}
+              view={previewDraft(
+                reviewDraft,
+                target,
+                medium,
+                grammarCatalog.data
+              )}
+            />
+          )}
         </div>
         {(step === "basics" || step === "meanings") && (
           <Collapse
@@ -1563,6 +1590,7 @@ function EntryEditor({
                 label: "当前草稿预览（含未保存修改）",
                 children: (
                   <Preview
+                    catalog={grammarCatalog.data}
                     requests={requests}
                     sentenceDetailsAvailable={sentenceDetailsAvailable}
                     sentenceResources={

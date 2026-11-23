@@ -171,16 +171,6 @@ export function PublicationPanel({
                 检查发布
               </Button>
               {dirty && saveAction}
-              {(preview?.can_publish || command) && (
-                <Button
-                  type="primary"
-                  loading={pending && !!command}
-                  disabled={pending || (!command && (!ready || !canPublish))}
-                  onClick={() => void publish()}
-                >
-                  {command ? "重试确认发布结果" : "确认发布"}
-                </Button>
-              )}
             </>
           )
         }
@@ -224,9 +214,9 @@ export function PublicationPanel({
         />
       )}
       {!viewingSnapshot && error && <Alert type="error" title={error} />}
-      {!viewingSnapshot && preview && (
+      {!viewingSnapshot && (preview || command) && (
         <div role="region" aria-label="发布检查结果">
-          {preview.issues.length > 0 && (
+          {!!preview?.issues.length && (
             <Alert
               type="error"
               title="请补齐以下内容后重新检查"
@@ -250,7 +240,7 @@ export function PublicationPanel({
               }
             />
           )}
-          {preview.warnings.length > 0 && (
+          {!!preview?.warnings.length && (
             <Alert
               type="warning"
               title={
@@ -273,12 +263,23 @@ export function PublicationPanel({
               }
             />
           )}
-          {preview.can_publish && (
+          {preview?.can_publish && (
             <Alert
               type="success"
               showIcon
               title={`检查通过，将发布已保存的草稿版本 ${preview.revision}。`}
             />
+          )}
+          {/* 确认操作放在检查结果之后，避免检查返回时承接同一位置的第二次点击。 */}
+          {(preview?.can_publish || command) && (
+            <Button
+              className="lexicon-review-confirm"
+              loading={pending && !!command}
+              disabled={pending || (!command && (!ready || !canPublish))}
+              onClick={() => void publish()}
+            >
+              {command ? "重试确认发布结果" : "确认发布"}
+            </Button>
           )}
         </div>
       )}

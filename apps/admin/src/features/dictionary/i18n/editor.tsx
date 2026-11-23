@@ -14,6 +14,11 @@ export const lexiconEditorMessages = {
   review_version: ["预览版本", "預覽版本", "Preview version"],
   review_draft: ["草稿预览", "草稿預覽", "Draft preview"],
   review_current: ["当前草稿", "目前草稿", "Current draft"],
+  review_no_publication: [
+    "暂无已发布版本",
+    "暫無已發布版本",
+    "No published version"
+  ],
   review_published: ["已发布版本", "已發布版本", "Published version"],
   review_headword: ["词头", "詞頭", "Headword"],
   review_explanation: ["中文解释", "中文解釋", "Chinese explanation"],

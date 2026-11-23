@@ -13,6 +13,7 @@ import {
 } from "@/features/dictionary/word-creation/PronunciationPreview";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { localizedCatalogName } from "@/features/dictionary/part-of-speech/catalog";
 import { partOfSpeechLabel } from "@/features/dictionary/word-creation-v3/presentation";
 import { Alert, Button, Card, Empty } from "@tsz/ui/admin/display";
 import type {
@@ -20,6 +21,7 @@ import type {
   NextDraft,
   NextEntryView,
   NextGrammarIssue,
+  PartOfSpeechCatalogResponse,
   NextSense,
   NextPublication,
   NextSentence
@@ -196,11 +198,13 @@ export function Preview({
   sentenceResources,
   heading,
   versionControl,
+  catalog,
   headwordField,
   onEditSense
 }: {
   heading?: string;
   versionControl?: ReactNode;
+  catalog?: PartOfSpeechCatalogResponse;
   headwordField?: ReactNode;
   onEditSense?: (id: string) => void;
   view: NextEntryView;
@@ -213,14 +217,23 @@ export function Preview({
   relationTargets?: NextPublication["snapshot"]["relation_targets"];
   requests?: LexiconNextRequests;
 }) {
-  const { t } = useLexiconEditorTranslation();
+  const { t, i18n } = useLexiconEditorTranslation();
   const headingId = useId();
   const showIndex = Boolean(heading && view.senses.length > 1);
   const warnings = [
     ...new Set(view.grammar_issues?.map((issue) => issue.message))
   ];
   const posBySense = new Map(
-    dialectDraft?.senses.map((sense) => [sense.id, sense.part_of_speech])
+    dialectDraft?.senses.map((sense) => {
+      const code = sense.part_of_speech;
+      const item = catalog?.items.find((row) => row.code === code);
+      return [
+        sense.id,
+        item
+          ? localizedCatalogName(item, i18n.language)
+          : code && partOfSpeechLabel(code, t, code)
+      ];
+    })
   );
   const focus = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -329,7 +342,7 @@ export function Preview({
                         <strong>
                           {t("review_sense", { index: index + 1 })}
                         </strong>
-                        {pos && <span>{partOfSpeechLabel(pos, t, pos)}</span>}
+                        {pos && <span>{pos}</span>}
                       </span>
                       {gloss && (
                         <span
@@ -374,9 +387,7 @@ export function Preview({
                         <h2 id={senseTitleId}>
                           {t("review_sense", { index: index + 1 })}
                           {pos && (
-                            <span className="lexicon-review-pos">
-                              {partOfSpeechLabel(pos, t, pos)}
-                            </span>
+                            <span className="lexicon-review-pos">{pos}</span>
                           )}
                           <span className="lexicon-review-group">
                             {senseGroupName(

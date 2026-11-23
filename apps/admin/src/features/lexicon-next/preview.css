@@ -235,3 +235,7 @@
 .lexicon-review-definitions .lexicon-next-muted {
   font-size: var(--ui-font-size-sm);
 }
+
+.lexicon-review-confirm {
+  justify-self: end;
+}

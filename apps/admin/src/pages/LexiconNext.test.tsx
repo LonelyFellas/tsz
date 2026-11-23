@@ -2249,6 +2249,121 @@ describe("新版词库手工闭环", () => {
     );
     expect(api.save).not.toHaveBeenCalled();
   });
+  it("已发布直链等候、读取失败和无快照期间不展示可编辑草稿", async () => {
+    const api = requests();
+    api.capabilities.mockResolvedValue({ ...caps, publishing: true });
+    let reject!: (error: Error) => void;
+    api.publication
+      .mockReturnValueOnce(
+        new Promise((_, fail) => {
+          reject = fail;
+        })
+      )
+      .mockResolvedValue({
+        entry_id: id,
+        status: "draft",
+        lifecycle_revision: 1,
+        has_unpublished_changes: true,
+        current: null
+      });
+    mount(api, `/lexicon-next/${id}?published_sense=gone`);
+    await screen.findByText("正在读取发布状态");
+    const assertReadOnly = () => {
+      expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "保存完整草稿" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "检查发布" })).toBeNull();
+    };
+    assertReadOnly();
+    await act(async () => reject(new Error("状态请求失败")));
+    await screen.findByText("无法读取发布状态");
+    assertReadOnly();
+    fireEvent.click(button("重试"));
+    await screen.findByText("暂无已发布版本");
+    assertReadOnly();
+    fireEvent.click(screen.getByRole("radio", { name: "当前草稿" }));
+    expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+      entry.draft.headword
+    );
+    expect(api.save).not.toHaveBeenCalled();
+  });
+  it("预览返回未指定词性义项时聚焦该义项的词性选择器", async () => {
+    const scroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    onTestFinished(() => {
+      HTMLElement.prototype.scrollIntoView = scroll;
+    });
+    const api = requests();
+    api.get.mockResolvedValue({
+      ...entry,
+      draft: {
+        ...entry.draft,
+        form_editor: applyFormsStructure(emptyFormEditor(), formsFixture()),
+        senses: [
+          {
+            id: "named",
+            part_of_speech: "noun",
+            definitions: [],
+            equivalents: []
+          },
+          {
+            id: "unassigned",
+            part_of_speech: null,
+            definitions: [],
+            equivalents: []
+          }
+        ]
+      }
+    });
+    mount(api, `/lexicon-next/${id}?step=preview`);
+    fireEvent.click(await screen.findByRole("button", { name: "编辑词义 2" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("combobox", { name: "义项 1 词性" })
+      ).toHaveFocus()
+    );
+    expect(
+      document.activeElement?.closest("[data-v3-node-id]")
+    ).toHaveAttribute("data-v3-node-id", "unassigned");
+  });
+  it("预览目录和词义标题使用已配置词性的本地化名称", async () => {
+    const api = requests();
+    api.get.mockResolvedValue({
+      ...entry,
+      kind: "phrase",
+      draft: {
+        ...entry.draft,
+        senses: ["first", "second"].map((id) => ({
+          id,
+          part_of_speech: "phrase_noun",
+          definitions: [],
+          equivalents: []
+        }))
+      }
+    });
+    const { client } = mount(api, `/lexicon-next/${id}?step=preview`);
+    await screen.findByRole("navigation", { name: "词义目录" });
+    await act(async () => {
+      client.setQueryData(partOfSpeechKeys.catalog(), {
+        ...partOfSpeechCatalogFixture,
+        items: [
+          {
+            ...partOfSpeechCatalogFixture.items[0]!,
+            code: "phrase_noun",
+            kind: "phrase",
+            name_zh: "短语名词",
+            name_en: "Noun phrase"
+          }
+        ]
+      });
+    });
+    const index = within(screen.getByRole("navigation", { name: "词义目录" }));
+    expect(index.getByRole("button", { name: "词义 1" })).toHaveTextContent(
+      "短语名词"
+    );
+    expect(
+      screen.getByRole("heading", { name: /词义 1.*短语名词/ })
+    ).toBeVisible();
+  });
   it("已发布词义链接打开只读快照，切换版本保留本地编辑且不会保存或发布", async () => {
     const scroll = HTMLElement.prototype.scrollIntoView;
     HTMLElement.prototype.scrollIntoView = vi.fn();
