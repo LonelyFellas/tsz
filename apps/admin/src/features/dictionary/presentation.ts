@@ -1,4 +1,4 @@
-import type { AdminWordListItemAny } from "@tsz/types";
+import type { AdminWordListItemAny, EntryNameVariantV3 } from "@tsz/types";
 import { reportClientError } from "@/lib/telemetry";
 
 const KNOWN_PRESENTATION_STRATEGIES = new Set([
@@ -46,11 +46,18 @@ export function observeWordListPresentation(
   return true;
 }
 
+export function entryNameLabel(
+  variants: EntryNameVariantV3[] | undefined,
+  fallbackName: string
+): string {
+  return variants?.length
+    ? variants.map((name) => name.text).join(" / ")
+    : fallbackName;
+}
+
 /** 列表及行操作共用服务端名称，旧响应回退 presentation。 */
 export function wordListLabel(record: AdminWordListItemAny): string {
-  return record.name_variants?.length
-    ? record.name_variants.map((name) => name.text).join(" / ")
-    : record.presentation.label;
+  return entryNameLabel(record.name_variants, record.presentation.label);
 }
 
 /**

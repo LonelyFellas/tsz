@@ -1,5 +1,9 @@
 import { api } from "@/lib/auth";
-import { speechAccentGroup, synthesisForLocale } from "@tsz/shared";
+import {
+  speechAccentGroup,
+  spellingSpeechContent,
+  synthesisForLocale
+} from "@tsz/shared";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import type { GeneratedSpeechSource, VoiceProfileV3 } from "@tsz/types";
 import {
@@ -139,7 +143,7 @@ export async function resolveFormCopyProfiles(
       {
         kind: "text",
         content: synthesis?.use_spelling
-          ? (spellingSpeech?.content ?? {
+          ? (spellingSpeechContent(spellingSpeech, match.side) ?? {
               version: 2,
               text: variant.spelling,
               annotations: []

@@ -679,13 +679,36 @@ export function PronunciationPreviewVoiceList({
   const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
   if (!context) throw new Error("PronunciationPreviewProvider is required");
+  const {
+    enabled,
+    loadVoices,
+    voicesRequested,
+    requestVoiceResolution,
+    voiceResolutionRequested
+  } = context;
+  const shouldLoadSettings =
+    enabled && source !== "upload" && source !== "none";
+  const needsCatalog = shouldLoadSettings && !voicesRequested;
+  useEffect(() => {
+    if (shouldLoadSettings && !voiceResolutionRequested) {
+      requestVoiceResolution();
+    }
+    if (needsCatalog) void loadVoices().catch(() => undefined);
+  }, [
+    loadVoices,
+    needsCatalog,
+    requestVoiceResolution,
+    shouldLoadSettings,
+    voiceResolutionRequested
+  ]);
   const resolved = useResolvedPreviewProfile(
     context,
     voiceProfile,
     content ?? { version: 2, text: "", annotations: [] },
     dialect,
     context.adapter,
-    recommendationArea
+    recommendationArea,
+    shouldLoadSettings && voiceResolutionRequested
   );
   const rows = pronunciationVoiceRows(
     resolved.profile,
@@ -739,7 +762,7 @@ export function PronunciationPreviewVoiceList({
       </ul>
     );
   }
-  if (context.voicesLoading || resolved.pending)
+  if (needsCatalog || context.voicesLoading || resolved.pending)
     return (
       <span
         className="v3-voice-inline-status"
@@ -749,7 +772,7 @@ export function PronunciationPreviewVoiceList({
         —
       </span>
     );
-  if (!rows.length)
+  if (!rows.length || (resolved.error && !voicePreviewIsMock))
     return (
       <span className="v3-voice-inline-status">
         {resolved.error ||

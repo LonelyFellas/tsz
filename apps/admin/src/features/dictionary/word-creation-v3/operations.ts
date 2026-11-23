@@ -34,6 +34,7 @@ import {
   toRichTextV2
 } from "@tsz/voice-editor/core";
 import {
+  isSpellingSpeechAnnotation,
   spellingEditorValue,
   spellingSpeechDialectEqual
 } from "./spellingSpeech";
@@ -119,7 +120,6 @@ const PRONUNCIATION_STYLES = new Set<PronunciationStyle>([
   "weak"
 ]);
 const SPELLING_RICH_TYPES = new Set(["italic", "liaison"]);
-const SPEECH_RICH_TYPES = new Set(["pause", "say_as", "sub"]);
 
 function defaultIdFactory() {
   return newWordNodeId();
@@ -170,9 +170,7 @@ function isSpeechRichText(value: RichTextV3, text: string) {
   return Boolean(
     normalized &&
     normalized.text === text &&
-    normalized.annotations.every((annotation) =>
-      SPEECH_RICH_TYPES.has(annotation.type)
-    )
+    normalized.annotations.every(isSpellingSpeechAnnotation)
   );
 }
 
@@ -183,7 +181,7 @@ function isSynthesisSpeechRichText(value: RichTextV3, text: string) {
   const isWhitespace = (character: string) => /\s/u.test(character);
   return normalized.annotations.every(
     (annotation) =>
-      SPEECH_RICH_TYPES.has(annotation.type) &&
+      isSpellingSpeechAnnotation(annotation) &&
       (annotation.type !== "pause" ||
         (annotation.at > 0 &&
           annotation.at < codepoints.length &&
@@ -220,9 +218,17 @@ function sanitizeSpellingVariant(variant: SpellingVariantState) {
     delete variant.spelling_rich;
   }
   const speech = variant.spelling_speech;
-  if (speech && !isSpeechRichText(speech.content, variant.spelling)) {
+  if (!speech) return;
+  if (!isSpeechRichText(speech.content, variant.spelling)) {
     speech.content = emptyRichText(variant.spelling);
     speech.voice_profile = clearVoiceAudio(speech.voice_profile);
+  }
+  for (const side of ["uk", "us"] as const) {
+    const content = speech.content_by_accent?.[side];
+    if (content && !isSpeechRichText(content, variant.spelling)) {
+      speech.content_by_accent![side] = emptyRichText(variant.spelling);
+      speech.voice_profile = clearVoiceAudio(speech.voice_profile);
+    }
   }
 }
 
@@ -834,15 +840,14 @@ export function applyVariantSpelling(
       }
     }
   }
+  const spellingChanged = variant.spelling !== rich.text;
   variant.spelling = rich.text;
   const annotations = rich.annotations.filter((annotation) =>
     SPELLING_RICH_TYPES.has(annotation.type)
   );
   if (variant.spelling_rich || annotations.length > 0)
     variant.spelling_rich = { ...rich, annotations };
-  const pauses = rich.annotations.filter((annotation) =>
-    ["pause", "say_as", "sub"].includes(annotation.type)
-  );
+  const pauses = rich.annotations.filter(isSpellingSpeechAnnotation);
   if (variant.spelling_speech || pauses.length > 0) {
     const previous = variant.spelling_speech;
     const content = { ...rich, annotations: pauses };
@@ -855,6 +860,13 @@ export function applyVariantSpelling(
           : clearVoiceAudio(previous.voice_profile)
         : { voices: [] }
     };
+  }
+  const byAccent = variant.spelling_speech?.content_by_accent;
+  if (spellingChanged && byAccent) {
+    for (const side of ["uk", "us"] as const) {
+      const content = byAccent[side];
+      if (content) byAccent[side] = editRichText(content, rich.text);
+    }
   }
   sanitizeSpellingVariant(variant);
 }
@@ -913,6 +925,39 @@ export function updateVariantSpelling(
   return mutateVariant(content, variantId, (variant) => {
     applyVariantSpelling(variant, spelling);
   });
+}
+
+export function updateSpellingAccentContent(
+  content: DraftFormsStepContentV3,
+  variantIds: string[],
+  side: "uk" | "us",
+  value: RichTextV2V3
+): DraftFormsStepContentV3 {
+  let next = content;
+  for (const id of variantIds) {
+    next = mutateVariant(next, id, (variant) => {
+      const speech = variant.spelling_speech;
+      const fallback = speech?.content ?? emptyRichText(variant.spelling);
+      const edited = {
+        ...value,
+        annotations: value.annotations.filter(isSpellingSpeechAnnotation)
+      };
+      if (
+        spellingAnnotationsEqual(
+          speech?.content_by_accent?.[side] ?? fallback,
+          edited
+        )
+      )
+        return;
+      variant.spelling_speech = {
+        content: fallback,
+        voice_profile: { voices: [] },
+        ...speech,
+        content_by_accent: { ...speech?.content_by_accent, [side]: edited }
+      };
+    });
+  }
+  return next;
 }
 
 /** 独立拼写试听配置，不修改 pronunciations。统一拼写同时更新两侧。 */
