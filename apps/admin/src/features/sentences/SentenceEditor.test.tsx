@@ -784,8 +784,11 @@ describe("当前词条关联与离开保护", () => {
         selector: ".ui-modal-confirm-title"
       })
     ).closest('[role="dialog"]')! as HTMLElement;
+    fireEvent.click(within(dialog).getByRole("button", { name: "继续编辑" }));
     expect(onClose).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
+    expect(screen.getByDisplayValue("不保存的译文")).toBeVisible();
+    fireEvent.click(screen.getByLabelText("取消例句编辑"));
+    fireEvent.click(await screen.findByRole("button", { name: "放弃修改" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     expect(api.sentences.update).not.toHaveBeenCalled();
     expect(api.sentences.create).not.toHaveBeenCalled();

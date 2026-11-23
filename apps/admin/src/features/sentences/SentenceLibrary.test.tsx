@@ -317,6 +317,45 @@ describe("独立多维例句库", () => {
       "has-liaison"
     );
   });
+  it("查看时保留同档多条译文，省略空白模板", async () => {
+    const item = fixture();
+    const translations = item.content.sentence.zh_translations;
+    const advanced = translations.filter(
+      (row) => row.band === "adapted_creation"
+    );
+    advanced[0]!.content.text = "花开得真美。";
+    advanced[1]!.content.text = "好一朵娇艳的花！";
+    vi.mocked(api.sentences.list).mockResolvedValue({
+      items: [item],
+      total: 1
+    });
+    vi.mocked(api.sentences.get).mockResolvedValue(item);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "查看" }));
+    const detail = within(
+      await screen.findByRole("dialog", { name: "查看例句" })
+    );
+    expect(detail.getByText("花开得真美。")).toBeVisible();
+    expect(detail.getByText("好一朵娇艳的花！")).toBeVisible();
+    expect(detail.queryByText("初阶")).toBeNull();
+  });
+  it("首次加载失败时可重试，保留未提交的关键词并显示例句译文", async () => {
+    const item = fixture();
+    item.content.sentence.zh_text.text = "一朵美丽的花。";
+    vi.mocked(api.sentences.list)
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ items: [item], total: 1 });
+    show();
+    const retry = await screen.findByRole("button", { name: "重试" });
+    expect(screen.queryByText("暂无例句")).toBeNull();
+    const input = screen.getByLabelText("例句关键词");
+    fireEvent.change(input, { target: { value: "flower" } });
+    fireEvent.click(retry);
+    const row = (await screen.findByText("A wonderful flower.")).closest("tr")!;
+    expect(within(row).getByText("一朵美丽的花。")).toBeVisible();
+    expect(input).toHaveValue("flower");
+    expect(api.sentences.list).toHaveBeenCalledTimes(2);
+  });
   it("词条的例句列表不再提供创编入口，添加由 voice-editor 承接", async () => {
     vi.mocked(api.sentences.list).mockResolvedValue({ items: [], total: 0 });
     show("source-entry");
@@ -339,7 +378,7 @@ describe("独立多维例句库", () => {
     expect(screen.getByText(/查\s*看/).closest("button")).toBeVisible();
     expect(screen.queryByText(/^编\s*辑$/)).toBeNull();
     expect(screen.queryByText(/^删\s*除$/)).toBeNull();
-    expect(screen.getByText("移入垃圾桶所选").closest("button")).toBeDisabled();
+    expect(screen.queryByText("移入垃圾桶所选")).toBeNull();
     expect(api.sentences.delete).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("例句关键词"), {
       target: { value: "flower" }
@@ -431,10 +470,14 @@ it("批量选择显示数量并可取消，草稿删除仍先确认", async () =
   fireEvent.click(screen.getByRole("checkbox", { name: "选择本页" }));
   expect(screen.getByText("已选 1 条")).toBeVisible();
   expect(screen.getByText("发布所选").closest("button")).toBeEnabled();
-  fireEvent.click(screen.getByText("取消选择"));
-  expect(screen.getByRole("checkbox", { name: "选择本页" })).not.toBeChecked();
-  expect(screen.getByText("已选 0 条")).toBeVisible();
-  expect(screen.getByText("发布所选").closest("button")).toBeDisabled();
+  const clearSelection = screen.getByText("取消选择").closest("button")!;
+  clearSelection.focus();
+  fireEvent.click(clearSelection);
+  const selectPage = screen.getByRole("checkbox", { name: "选择本页" });
+  expect(selectPage).not.toBeChecked();
+  expect(selectPage).toHaveFocus();
+  expect(screen.queryByText("已选 1 条")).toBeNull();
+  expect(screen.queryByText("发布所选")).toBeNull();
   fireEvent.click(screen.getByLabelText("更多操作"));
   fireEvent.click(screen.getByText("移入垃圾桶"));
   await waitFor(() => expect(screen.getByRole("dialog")).toBeVisible());

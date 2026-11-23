@@ -2,27 +2,68 @@
   container-type: inline-size;
 }
 
-.sentence-editor-meta > .ui-typography {
-  flex: 1 1 240px;
+.sentence-editor-section-heading,
+.sentence-editor-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2) var(--ui-space-4);
 }
 
-.sentence-editor-meta > .ui-space {
-  flex-shrink: 0;
-  white-space: nowrap;
+.sentence-editor-section-heading h2 {
+  margin: 0;
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
 }
 
-.sentence-editor-meta .ui-select {
+.sentence-editor-section-heading .ui-select {
   min-width: 72px;
 }
 
-.sentence-editor .word-sentence-translation-list {
-  margin-top: var(--ui-space-4);
+.sentence-editor-footer {
+  width: 100%;
+}
+
+.sentence-editor-save-note {
+  flex: 1 1 240px;
+  font-size: var(--ui-font-size-compact);
+}
+
+.sentence-editor-footer > .ui-space {
+  margin-inline-start: auto;
+}
+
+.sentence-editor-translations {
+  margin-block: var(--ui-space-4);
+}
+
+.sentence-editor-translations .word-sentence-translation-list {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "label"
+    "groups"
+    "add";
+  align-items: center;
+  gap: var(--ui-space-3);
+}
+
+.sentence-editor-translations .word-sentence-translation-label {
+  height: auto;
+  color: var(--ui-color-text);
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.sentence-editor-translations .word-sentence-translation-add {
+  justify-self: start;
+  width: auto;
 }
 
 .sentence-editor .tsz-ve-toolbar {
   gap: var(--ui-space-1);
   padding: var(--ui-space-2);
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--ui-border-radius) var(--ui-border-radius) 0 0;
 }
 
 /* 分隔线跟随工具换行，关联、标注、音频各自成组。 */
@@ -47,28 +88,136 @@
 
 .sentence-editor .tsz-ve-toolbar .ui-btn.ui-btn {
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--ui-border-radius);
 }
 
 .sentence-editor .tsz-ve-markup .tsz-ve-canvas {
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 var(--ui-border-radius) var(--ui-border-radius);
 }
 
 /* 显色层与输入层必须保持相同度量；上下仍留出连读、停顿标注空间。 */
 .sentence-editor .v3-voice-text-editor .tsz-ve-strip,
 .sentence-editor .v3-voice-text-editor .tsz-ve-canvas-input {
   padding: var(--ui-space-6) 14px 32px;
-  font-size: 20px;
+  font-size: var(--ui-font-size-heading);
   line-height: 1.6;
 }
 
-.sentence-editor .tsz-ve-strip {
+.sentence-editor .v3-voice-text-editor .tsz-ve-strip {
   box-sizing: border-box;
   min-height: 88px;
 }
 
+.sentence-editor .tsz-ve-editing-area {
+  background: var(--ui-color-bg-container);
+}
+
+.sentence-editor .tsz-ve-editor .tsz-ve-top-tools,
+.sentence-editor .tsz-ve-editor .tsz-ve-bottom-tools {
+  background: var(--ui-color-fill-alter);
+}
+
 .sentence-editor .tsz-ve-canvas-input::placeholder {
   font-size: var(--ui-font-size);
-  font-weight: 400;
+  font-weight: var(--ui-font-weight-regular);
   color: var(--ui-color-text-placeholder);
+}
+
+.sentence-editor .tsz-ve-local-pool-scroll {
+  padding-inline-end: 0;
+}
+
+.sentence-editor .tsz-ve-local-pool {
+  width: 100%;
+  margin-top: var(--ui-space-6);
+}
+
+.sentence-editor .tsz-ve-pool-current-header h5.ui-typography {
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.sentence-editor .tsz-ve-pool-sides,
+.sentence-editor .tsz-ve-pool-recommendation-section {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr));
+  gap: var(--ui-space-3);
+  width: 100%;
+}
+
+.sentence-editor .tsz-ve-pool-sides[data-single="true"] {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.sentence-editor .tsz-ve-pool-recommendation-section {
+  margin-top: var(--ui-space-5);
+  padding-top: var(--ui-space-5);
+}
+
+.sentence-editor
+  :is(.tsz-ve-pool-sides, .tsz-ve-pool-recommendation-section)
+  > section {
+  min-width: 0;
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-color-border-secondary);
+  border-radius: var(--ui-border-radius-lg);
+  background: var(--ui-color-bg-container);
+  overflow-x: auto;
+}
+
+.sentence-editor .tsz-ve-pool-accent-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-1) var(--ui-space-2);
+  margin: calc(-1 * var(--ui-space-3)) calc(-1 * var(--ui-space-3)) 0;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+  background: var(--ui-color-fill-alter);
+}
+
+.sentence-editor .tsz-ve-pool-accent-heading .tsz-ve-pool-source {
+  margin: 0;
+  font-size: var(--ui-font-size-compact);
+  overflow-wrap: anywhere;
+}
+
+.sentence-editor .tsz-ve-pool-accent-heading > .ui-btn {
+  margin-inline-start: auto;
+}
+
+.sentence-editor .tsz-ve-pool-recommendation-section h5.ui-typography {
+  margin: 0 0 var(--ui-space-2);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.sentence-editor
+  .tsz-ve-pool-recommendation-section
+  [role="group"]
+  > .ui-checkbox-wrapper {
+  box-sizing: border-box;
+  display: flex;
+  padding: var(--ui-space-2);
+  border-radius: var(--ui-border-radius-sm);
+  background: var(--ui-color-fill-alter);
+}
+
+.sentence-editor :is(.tsz-ve-pool-row, .tsz-ve-pool-recommendation-row) {
+  font-variant-numeric: tabular-nums;
+  border-color: var(--ui-color-border-secondary);
+}
+
+.sentence-editor .tsz-ve-pool-recommendation-row {
+  min-width: 510px;
+}
+
+.sentence-editor .tsz-ve-pool-head {
+  color: var(--ui-color-text-secondary);
+}
+
+.sentence-editor .tsz-ve-pool-sides > section > :last-child .tsz-ve-pool-row,
+.sentence-editor
+  .tsz-ve-pool-recommendation-row:last-child:not(.tsz-ve-pool-head) {
+  border-bottom: 0;
 }

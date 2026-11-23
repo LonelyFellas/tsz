@@ -1166,12 +1166,6 @@ export const lexiconEditorPanelMessages = {
     "儲存例句後離開",
     "Save example and leave"
   ],
-  panel_new: ["新建 · ", "新建 · ", "New · "],
-  panel_label_4: [
-    "{{p0}}{{p1}} · {{p2}}",
-    "{{p0}}{{p1}} · {{p2}}",
-    "{{p0}}{{p1}} · {{p2}}"
-  ],
   panel_cancel_example_editing: [
     "取消例句编辑",
     "取消例句編輯",
