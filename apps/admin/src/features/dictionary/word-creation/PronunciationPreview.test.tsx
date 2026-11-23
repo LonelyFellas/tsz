@@ -1301,3 +1301,37 @@ it("音色列表自动加载失败后等待用户手动重试", async () => {
   await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
   expect(preview.listVoices).toHaveBeenCalledTimes(2);
 });
+
+it("另一条试听的目录错误不会取消本次等待推荐音色的点播", async () => {
+  preview.listVoices.mockRejectedValueOnce(new Error("目录暂不可用"));
+  const setting = { voice_id: "british-voice", enabled: true, rate_percent: 0 };
+  preview.resolveVoices.mockResolvedValue({
+    voices: [setting],
+    source: { kind: "catalog" }
+  });
+  render(
+    <PronunciationPreviewProvider>
+      <PronunciationPreviewControls
+        dialect="uk"
+        pronunciationId="first"
+        spelling="cat"
+        voiceProfile={{ voices: [setting] }}
+        ariaLabelPrefix="本地"
+      />
+      <PronunciationPreviewControls
+        dialect="uk"
+        pronunciationId="second"
+        spelling="dog"
+        recommendationArea="azure"
+        ariaLabelPrefix="推荐"
+      />
+    </PronunciationPreviewProvider>
+  );
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("本地 获取语音"))
+  );
+  expect(preview.listVoices).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByLabelText("推荐 获取语音"));
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+  expect(preview.listVoices).toHaveBeenCalledTimes(2);
+});

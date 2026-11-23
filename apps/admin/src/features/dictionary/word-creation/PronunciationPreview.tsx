@@ -925,7 +925,9 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingGenerateRef = useRef<string | undefined>(undefined);
+  const pendingGenerateRef = useRef<
+    { key: string; waitingFor: "resolution" | "catalog" } | undefined
+  >(undefined);
   const generateRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
@@ -1120,18 +1122,24 @@ export function PronunciationPreviewControls({
       !resolveRequested &&
       !context.voiceResolutionRequested
     ) {
-      pendingGenerateRef.current = requestKey;
+      pendingGenerateRef.current = {
+        key: requestKey,
+        waitingFor: "resolution"
+      };
       setResolveRequested(true);
       context.requestVoiceResolution();
       return;
     }
     if (!assetOnly && resolved.pending) {
-      pendingGenerateRef.current = requestKey;
+      pendingGenerateRef.current = {
+        key: requestKey,
+        waitingFor: "resolution"
+      };
       return;
     }
     if (!assetOnly && !voice) {
       if (!context.voicesRequested) {
-        pendingGenerateRef.current = requestKey;
+        pendingGenerateRef.current = { key: requestKey, waitingFor: "catalog" };
         void context.loadVoices().catch(() => undefined);
       }
       return;
@@ -1259,14 +1267,16 @@ export function PronunciationPreviewControls({
 
   generateRef.current = generate;
   useEffect(() => {
-    if (pendingGenerateRef.current === undefined) return;
-    if (disabled || pendingGenerateRef.current !== requestKey) {
+    const pending = pendingGenerateRef.current;
+    if (!pending) return;
+    if (disabled || pending.key !== requestKey) {
       pendingGenerateRef.current = undefined;
       return;
     }
     if (context.voicesLoading || resolved.pending) return;
     pendingGenerateRef.current = undefined;
-    if (!context.voicesError) void generateRef.current();
+    if (pending.waitingFor === "catalog" && context.voicesError) return;
+    void generateRef.current();
   }, [
     context.voiceResolutionRequested,
     context.voicesLoading,
