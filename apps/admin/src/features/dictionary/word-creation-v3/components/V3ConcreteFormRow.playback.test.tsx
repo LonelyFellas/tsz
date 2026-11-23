@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { App } from "@tsz/ui/admin/overlays";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { DialectRulesV3, WordConcreteFormV3 } from "@tsz/types";
@@ -299,7 +305,7 @@ it("总览音色列按启用音色逐行展示，并让语速和音量保持同�
   expect(screen.getByText("100%")).toBeVisible();
 });
 
-it("总览继承音色时按当前读法解析推荐音色", async () => {
+it("打开总览即按当前读法显示继承的音色、语速和音量", async () => {
   preview.resolveVoices.mockImplementation(async ({ accent, content }) => ({
     source: { kind: "recommendation" },
     voices: [
@@ -311,7 +317,8 @@ it("总览继承音色时按当前读法解析推荐音色", async () => {
         version_id: `recommended-${accent}`,
         locale: accent === "gb" ? "en-GB" : "en-US",
         enabled: true,
-        rate_percent: 0
+        rate_percent: -25,
+        volume_percent: 88
       }
     ]
   }));
@@ -349,7 +356,7 @@ it("总览继承音色时按当前读法解析推荐音色", async () => {
   const pos = formsFixture({ forms: [form] }).pos[0]!;
   render(
     <App>
-      <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
+      <PronunciationPreviewProvider>
         <V3FormContentOverview
           rows={[
             {
@@ -371,17 +378,29 @@ it("总览继承音色时按当前读法解析推荐音色", async () => {
       </PronunciationPreviewProvider>
     </App>
   );
+  const voice = await screen.findByText("Andrew Test");
+  expect(voice).toBeVisible();
+  const row = within(voice.closest("tr")!);
+  expect(row.getByText("0.75×")).toBeVisible();
+  expect(row.getByText("88%")).toBeVisible();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+  const play = row.getByRole("button", { name: "读法 1美式 播放语音" });
+  expect(play).toBeEnabled();
+  fireEvent.click(play);
   await waitFor(() =>
-    expect(
-      preview.resolveVoices.mock.calls.some(
-        ([input]) => input.accent === "us" && input.content?.text === "center"
-      )
-    ).toBe(true)
+    expect(preview.synthesize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        voiceId: "american-andrew",
+        ratePercent: -25,
+        volumePercent: 88
+      }),
+      expect.anything()
+    )
   );
-  expect(await screen.findByText("Andrew Test")).toBeVisible();
-  expect(
-    screen.getByText("Andrew Test").closest(".v3-voice-inline-name")
-  ).toHaveTextContent("Andrew Test♂");
+  preview.resolveVoices.mockRejectedValue(new Error("配音配置读取失败"));
+  fireEvent(window, new Event("focus"));
+  expect(await row.findAllByText("配音配置读取失败")).toHaveLength(3);
+  expect(row.queryByText("American")).not.toBeInTheDocument();
 });
 
 it("总览上传音频行显示来源文件，语速和音量不伪造合成值", async () => {
