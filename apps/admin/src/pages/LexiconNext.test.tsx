@@ -636,7 +636,7 @@ it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词�
   expect(screen.queryByRole("group", { name: "智能词库语言" })).toBeNull();
 });
 
-it("创建时把内置词典推荐词性带入词义步骤", async () => {
+it("创建时按推荐词性生成默认复数行，并把词性带入词义步骤", async () => {
   const api = requests();
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
   api.detect.mockResolvedValue({
@@ -667,6 +667,7 @@ it("创建时把内置词典推荐词性带入词义步骤", async () => {
       document.querySelector(".word-forms-tabs .word-pos-tab-label")
     ).toHaveTextContent("名词")
   );
+  expect(await screen.findByText("复数", { exact: true })).toBeVisible();
   fireEvent.click(stepButton(/^词义与例句/));
 
   await waitFor(() =>
