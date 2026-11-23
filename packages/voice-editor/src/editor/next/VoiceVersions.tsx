@@ -1,4 +1,5 @@
 import { useVoiceEditorTranslation } from "../i18n";
+import { PoolVoiceName } from "./VoiceDisplay";
 import {
   speechAccentGroup,
   speechLocaleMatchesScope,
@@ -64,6 +65,17 @@ export function VoiceVersions({
   );
   const source =
     candidates.find((voice) => voice.id === sourceId) ?? candidates[0];
+  const sourceOptions = candidates.map((voice) => ({
+    value: voice.id,
+    label: voice.label,
+    title: voice.label,
+    content: (
+      <>
+        <PoolVoiceName voice={voice} fallback={voice.id} />
+        {` · ${voice.locale}`}
+      </>
+    )
+  }));
   const visible = settings.filter(
     (setting) =>
       !locale ||
@@ -95,6 +107,8 @@ export function VoiceVersions({
       {visible.map((setting) => {
         const key = voiceSettingKey(setting);
         const voice = voices.find((item) => item.id === setting.voice_id);
+        const versionName =
+          setting.version_name ?? voice?.label ?? setting.voice_id;
         const accent = voiceLocale(setting, voices);
         const playbackVoice: VoiceOption | undefined =
           voice ??
@@ -132,7 +146,7 @@ export function VoiceVersions({
             className="tsz-ve-version"
             key={key}
             aria-label={t("voice_version", {
-              p0: setting.version_name ?? voice?.label ?? setting.voice_id
+              p0: versionName
             })}
           >
             <Space wrap>
@@ -142,6 +156,7 @@ export function VoiceVersions({
                   !readOnly && !!setting.version_id
                     ? {
                         tooltip: t("edit_version_name"),
+                        text: versionName,
                         maxLength: 40,
                         onChange: (version_name) => {
                           if (version_name.trim())
@@ -160,7 +175,9 @@ export function VoiceVersions({
                     : false
                 }
               >
-                {setting.version_name ?? voice?.label ?? setting.voice_id}
+                {setting.version_name ?? (
+                  <PoolVoiceName voice={voice} fallback={setting.voice_id} />
+                )}
               </Typography.Text>
               <Tag>
                 {accent
@@ -195,7 +212,8 @@ export function VoiceVersions({
               )}
             </Space>
             <Typography.Paragraph type="secondary">
-              {voice?.label ?? setting.voice_id}，
+              <PoolVoiceName voice={voice} fallback={setting.voice_id} />
+              {voice && ` · ${voice.locale}`}，
               {((setting.rate_percent + 100) / 100).toFixed(2)}
               {t("volume_3")} {setting.volume_percent ?? 100}%
             </Typography.Paragraph>
@@ -348,10 +366,12 @@ export function VoiceVersions({
             aria-label={t("voice_for_saved_version")}
             value={source.id}
             onChange={setSourceId}
-            options={candidates.map((voice) => ({
-              value: voice.id,
-              label: voice.label
-            }))}
+            options={sourceOptions}
+            optionRender={({ data }) => data.content}
+            labelRender={({ value, label }) =>
+              sourceOptions.find((option) => option.value === value)?.content ??
+              label
+            }
             style={{ minWidth: 180 }}
           />
           <Input

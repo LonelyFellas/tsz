@@ -32,6 +32,7 @@ interface TextProps extends ComponentPropsWithoutRef<"span"> {
     | false
     | {
         tooltip?: string;
+        text?: string;
         maxLength?: number;
         onChange: (text: string) => void;
       };
@@ -151,9 +152,10 @@ function TextBlock({
           title={editable.tooltip}
           onClick={() => {
             setDraft(
-              typeof children === "string"
-                ? children
-                : (ref.current?.textContent ?? "")
+              editable.text ??
+                (typeof children === "string"
+                  ? children
+                  : (ref.current?.textContent ?? ""))
             );
             setEditing(true);
           }}

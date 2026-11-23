@@ -3297,10 +3297,11 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     openVoices();
-    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
 
     // 整行就是勾选靶子（role=checkbox），点名字也能勾，不必瞄准小方框
-    const sonia = screen.getByLabelText("启用 Sonia · 英式女声");
+    const sonia = await screen.findByRole("checkbox", {
+      name: "启用 Sonia · 英式女声"
+    });
     expect(sonia).toBeChecked();
     fireEvent.click(sonia);
     expect(sonia).not.toBeChecked();
@@ -3374,8 +3375,9 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     openVoices();
-    await screen.findByText("Sonia");
-    fireEvent.click(button("试听 Sonia · 英式女声"));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "试听 Sonia · 英式女声" })
+    );
     await waitFor(() => expect(synthesize).toHaveBeenCalledOnce());
     expect(synthesize.mock.calls[0]![0]).toMatchObject({
       voiceId: "sonia",
@@ -3939,12 +3941,14 @@ describe("VoiceEditor 发音区", () => {
       />
     );
     openVoices();
-    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    const guy = await screen.findByRole("checkbox", {
+      name: "启用 Guy · 美式男声"
+    });
 
     // 没动过不抛配置；用户点击后只保存明确选中的音色。
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByLabelText("启用 Guy · 美式男声"));
+    fireEvent.click(guy);
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
       voices: [{ voice_id: "guy", enabled: true, rate_percent: 0 }]
     });
@@ -3986,8 +3990,9 @@ describe("VoiceEditor 发音区", () => {
     const view = props({ previewAdapter: adapter(), onVoiceProfileChange });
     const { rerender } = render(<VoiceEditor {...view} />);
     openVoices();
-    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
-    fireEvent.click(screen.getByLabelText("启用 Sonia · 英式女声"));
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "启用 Sonia · 英式女声" })
+    );
 
     const emitted = onVoiceProfileChange.mock.calls.at(-1)![0];
     rerender(<VoiceEditor {...view} voiceProfile={emitted} />);
@@ -4326,6 +4331,57 @@ it("英文选区提示保留词界与句末标点", () => {
   expect(document.querySelector(".tsz-ve-selection-status")).toHaveTextContent(
     "Selected centre; configure grammar structures and liaison marks."
   );
+});
+
+it("用键盘聚焦另存版本的候选音色时读出音色名称", async () => {
+  render(
+    <VoiceVersions
+      settings={[]}
+      voices={VOICES}
+      canAudition={false}
+      onEdit={vi.fn()}
+      onChange={vi.fn()}
+      onSelect={vi.fn()}
+      onAudition={vi.fn()}
+    />
+  );
+  const select = screen.getByRole("combobox", { name: "另存版本的音色" });
+  fireEvent.keyDown(select, { key: "ArrowDown", keyCode: 40 });
+  await waitFor(() => expect(select).toHaveAttribute("aria-expanded", "true"));
+  fireEvent.keyDown(select, { key: "ArrowDown", keyCode: 40 });
+
+  const active = document.getElementById(
+    select.getAttribute("aria-activedescendant")!
+  );
+  expect(active).toHaveAccessibleName(VOICES[1]!.label);
+});
+
+it("未命名版本显示统一音色名，编辑时保留原来的名称初值", () => {
+  const voice = VOICES[0]!;
+  render(
+    <VoiceVersions
+      settings={[
+        {
+          version_id: "11111111-1111-4111-8111-111111111111",
+          voice_id: voice.id,
+          rate_percent: 0,
+          enabled: true
+        }
+      ]}
+      voices={[voice]}
+      canAudition={false}
+      onEdit={vi.fn()}
+      onChange={vi.fn()}
+      onSelect={vi.fn()}
+      onAudition={vi.fn()}
+    />
+  );
+  const edit = screen.getByRole("button", { name: "修改版本名称" });
+  expect(
+    within(edit.parentElement!).getByRole("img", { name: "女声" })
+  ).toBeInTheDocument();
+  fireEvent.click(edit);
+  expect(screen.getByDisplayValue(voice.label)).toBeInTheDocument();
 });
 
 it.each([true, false])("英文版本说明的句界完整（multiple=%s）", (multiple) => {

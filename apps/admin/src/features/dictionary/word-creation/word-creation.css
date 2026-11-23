@@ -1131,15 +1131,6 @@
   min-width: 0;
   gap: 2px;
 }
-.word-pronunciation-voice-name {
-  overflow: hidden;
-  color: var(--ui-color-text);
-  font-size: var(--ui-font-size);
-  font-weight: 500;
-  line-height: 20px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .word-pronunciation-voice-locale {
   color: #9299a4;
   font-size: 11px;

@@ -293,6 +293,29 @@ async function remove(name: string, table: HTMLElement) {
 }
 
 describe("按口音独立推荐与逐组草稿", () => {
+  it("英式和美式音色均按性别标志、英文名、中文名展示", () => {
+    mount(data(), [
+      { ...uk, display_name: "Sonia（索尼娅）" },
+      { ...us, display_name: "Guy（盖伊）" }
+    ]);
+    const panel = groupPanel("A");
+    for (const [accent, gender, english, chinese] of [
+      ["英式", "女声", "Sonia", "索尼娅"],
+      ["美式", "男声", "Guy", "盖伊"]
+    ] as const) {
+      const table = within(side(panel, accent));
+      const icon = table.getByRole("img", { name: gender });
+      const englishName = table.getByText(english);
+      const chineseName = table.getByText(chinese);
+      expect(icon.compareDocumentPosition(englishName)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+      expect(englishName.compareDocumentPosition(chineseName)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+    }
+  });
+
   it("英式2项美式5项独立展示，单侧美式增删重排保存刷新不改变英式", async () => {
     const initial = data();
     initial.groups[0]!.uk = versions(initial.groups[0]!.uk[0]!, 2);
@@ -426,11 +449,11 @@ describe("按口音独立推荐与逐组草稿", () => {
     const panel = groupPanel("A");
     const british = within(panel).getByLabelText("A 英式");
     fireEvent.click(button("新增推荐", british));
-    expect(screen.queryByRole("radio", { name: "Guy 男声" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "男声 Guy" })).toBeNull();
     closeDialog();
     expect(within(panel).queryByRole("button", { name: "完成" })).toBeNull();
     fireEvent.click(button("新增推荐", british));
-    fireEvent.click(screen.getByRole("radio", { name: "Sonia 女声" }));
+    fireEvent.click(screen.getByRole("radio", { name: "女声 Sonia" }));
     fireEvent.change(screen.getByLabelText("推荐名称"), {
       target: { value: "英式慢速" }
     });

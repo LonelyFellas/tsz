@@ -294,11 +294,11 @@ it("总览音色列按启用音色逐行展示，并让语速和音量保持同�
   expect(await screen.findByText("Sonia Test")).toBeVisible();
   expect(screen.getByText("Andrew Test")).toBeVisible();
   expect(
-    screen.getByText("Sonia Test").closest(".v3-voice-inline-name")
-  ).toHaveTextContent("Sonia Test♀");
+    within(screen.getByTitle("Sonia Test")).getByRole("img", { name: "女声" })
+  ).toBeVisible();
   expect(
-    screen.getByText("Andrew Test").closest(".v3-voice-inline-name")
-  ).toHaveTextContent("Andrew Test♂");
+    within(screen.getByTitle("Andrew Test")).getByRole("img", { name: "男声" })
+  ).toBeVisible();
   expect(screen.getByText("0.90×")).toBeVisible();
   expect(screen.getByText("0.55×")).toBeVisible();
   expect(screen.getByText("93%")).toBeVisible();
@@ -381,6 +381,9 @@ it("打开总览即按当前读法显示继承的音色、语速和音量", asyn
   const voice = await screen.findByText("Andrew Test");
   expect(voice).toBeVisible();
   const row = within(voice.closest("tr")!);
+  expect(
+    within(row.getByTitle("Andrew Test")).getByRole("img", { name: "男声" })
+  ).toBeVisible();
   expect(row.getByText("0.75×")).toBeVisible();
   expect(row.getByText("88%")).toBeVisible();
   expect(preview.synthesize).not.toHaveBeenCalled();
