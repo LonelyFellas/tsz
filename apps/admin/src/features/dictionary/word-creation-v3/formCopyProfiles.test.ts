@@ -130,6 +130,17 @@ describe("复制前解析完整音色配置", () => {
           text: from.spelling,
           annotations: [{ type: "pause", at: 0, duration_ms: 100 }]
         },
+        ...(stale
+          ? {
+              content_by_accent: {
+                uk: {
+                  version: 2 as const,
+                  text: from.spelling,
+                  annotations: []
+                }
+              }
+            }
+          : {}),
         voice_profile: structuredClone(profile)
       };
       if (!stale) {
@@ -154,7 +165,12 @@ describe("复制前解析完整音色配置", () => {
       expect(resolve).toHaveBeenCalledExactlyOnceWith(
         {
           profile: from.spelling_speech.voice_profile,
-          source: { kind: "text", content: from.spelling_speech.content },
+          source: {
+            kind: "text",
+            content:
+              from.spelling_speech.content_by_accent?.uk ??
+              from.spelling_speech.content
+          },
           accent: "gb"
         },
         signal

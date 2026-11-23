@@ -203,6 +203,7 @@ export function V3FormsAudioTasks({
                     annotations: []
                   }
                 }
+                contentByAccent={variant.spelling_speech?.content_by_accent}
                 profile={variant.spelling_speech?.voice_profile}
                 activeLocales={spellingScope.activeLocales}
                 requiredLocales={spellingScope.requiredLocales}
@@ -393,6 +394,7 @@ export function V3FormsAudioTasks({
 function TextAudioTask({
   target,
   content,
+  contentByAccent,
   profile,
   enabled,
   onChange,
@@ -405,6 +407,7 @@ function TextAudioTask({
 }: {
   target: string;
   content: RichTextV2;
+  contentByAccent?: Partial<Record<"uk" | "us", RichTextV2>>;
   profile?: VoiceProfileV3;
   recommendationArea?: "word";
   locale?: `en-${string}`;
@@ -422,6 +425,7 @@ function TextAudioTask({
   const task = useSelectedVoiceAudio({
     target,
     content,
+    contentByAccent,
     profile: effectiveProfile,
     adapter: adminVoicePreviewAdapter,
     locale,

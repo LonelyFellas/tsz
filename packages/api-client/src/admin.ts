@@ -136,6 +136,7 @@ const SPELLING_MARKUP_HEADERS = {
   ...SENTENCE_FORMATTING_HEADERS,
   "X-TSZ-Spelling-Markup": "v1",
   "X-TSZ-Spelling-Speech": "v1",
+  "X-TSZ-Spelling-Accent-Content": "v1",
   "X-TSZ-Phoneme-Speech": "v1",
   "X-TSZ-Voice-Versions": "v6",
   "X-TSZ-Voice-Locales": "v1",
