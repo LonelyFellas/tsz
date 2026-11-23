@@ -977,11 +977,6 @@ export const voiceMessages = {
     "我的聽感：{{notes}}",
     "My listening notes: {{notes}}"
   ],
-  add_voice_recommendation: [
-    "将 {{name}} 加入分组推荐",
-    "將 {{name}} 加入分組推薦",
-    "Add {{name}} to group recommendations"
-  ],
   edit_field: ["编辑{{field}}", "編輯{{field}}", "Edit {{field}}"],
   edit_voice_field: [
     "编辑 {{name}} {{field}}",

@@ -775,9 +775,9 @@ export const voiceEditorMessages = {
     "Generation failed. Try again."
   ],
   edit_voice_settings: [
-    "修改{{p0}}配音设置 · {{p1}}",
-    "修改{{p0}}配音設定 · {{p1}}",
-    "Edit {{p0}} voice settings · {{p1}}"
+    "修改{{p0}}配音设置",
+    "修改{{p0}}配音設定",
+    "Edit {{p0}} voice settings"
   ],
   save_voice_settings: ["保存配音设置", "儲存配音設定", "Save voice settings"],
   only_this_voice_is_changed_after_saving_its_settings_save_the_text_changes: [

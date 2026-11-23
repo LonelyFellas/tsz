@@ -14,7 +14,8 @@ import {
 import { Checkbox, InputNumber, Select, Slider } from "@tsz/ui/admin/forms";
 import { Popover } from "@tsz/ui/admin/overlays";
 import { useEffect, useRef, useState } from "react";
-import type { VoicePreviewResult } from "../../types";
+import type { VoiceOption, VoicePreviewResult } from "../../types";
+import { PoolVoiceName } from "./VoiceDisplay";
 
 export function waveformPeaks(
   channels: readonly Float32Array[],
@@ -56,6 +57,7 @@ export interface ReviewAudio {
   audio: HTMLAudioElement;
   result: VoicePreviewResult;
   name: string;
+  voice?: VoiceOption;
 }
 
 export function AudioReview({
@@ -224,7 +226,12 @@ export function AudioReview({
       className={`tsz-ve-audio-review${compact ? " tsz-ve-audio-review-compact" : ""}`}
       aria-label={t("review", { p0: media.name })}
     >
-      {!compact && <Typography.Text strong>{media.name}</Typography.Text>}
+      {!compact &&
+        (media.voice ? (
+          <PoolVoiceName voice={media.voice} fallback={media.name} />
+        ) : (
+          <Typography.Text strong>{media.name}</Typography.Text>
+        ))}
       {error && peaks.length > 0 && (
         <Typography.Text type="danger">{error}</Typography.Text>
       )}

@@ -148,15 +148,15 @@ it("固定当前口音，候选支持键盘切换跳过不可用，单条保存�
   ]);
   expect(screen.queryByRole("radio", { name: "Aria 女声" })).toBeNull();
   expect(
-    screen.getByRole("radio", { name: "Unavailable 女声" })
+    screen.getByRole("radio", { name: "女声 Unavailable" })
   ).toBeDisabled();
-  const current = screen.getByRole("radio", { name: "Sonia 女声" });
+  const current = screen.getByRole("radio", { name: "女声 Sonia" });
   act(() => current.focus());
   fireEvent.keyDown(current, { key: "ArrowDown" });
   await waitFor(() =>
-    expect(screen.getByRole("radio", { name: "Libby 女声" })).toBeChecked()
+    expect(screen.getByRole("radio", { name: "女声 Libby" })).toBeChecked()
   );
-  fireEvent.keyUp(screen.getByRole("radio", { name: "Libby 女声" }), {
+  fireEvent.keyUp(screen.getByRole("radio", { name: "女声 Libby" }), {
     key: "ArrowDown"
   });
   fireEvent.click(screen.getByRole("button", { name: "保存到本组" }));
@@ -200,7 +200,7 @@ it("切换声音恢复各自参数、试听文本、手动SSML，取消不保存
   });
   fireEvent.click(screen.getByLabelText("试听当前参数"));
   const signal = vi.mocked(api.speech.preview).mock.calls[0]![1]!;
-  fireEvent.click(screen.getByRole("radio", { name: "Libby 女声" }));
+  fireEvent.click(screen.getByRole("radio", { name: "女声 Libby" }));
   expect(signal.aborted).toBe(true);
   await act(async () =>
     complete({
@@ -215,7 +215,7 @@ it("切换声音恢复各自参数、试听文本、手动SSML，取消不保存
   fireEvent.change(screen.getByLabelText("合成语速"), {
     target: { value: "0.92" }
   });
-  fireEvent.click(screen.getByRole("radio", { name: "Sonia 女声" }));
+  fireEvent.click(screen.getByRole("radio", { name: "女声 Sonia" }));
   expect(screen.getByLabelText("合成语速")).toHaveValue("0.73");
   expect(screen.getByLabelText("合成音量")).toHaveValue("65");
   expect(screen.getByLabelText("本次试听文本")).toHaveValue("Sonia draft");
@@ -250,7 +250,7 @@ it("女男目录独立搜索并恢复滚动，搜索和调参不重置另一列"
   });
   expect(female.scrollTop).toBe(0);
   expect(male.scrollTop).toBe(60);
-  fireEvent.click(screen.getByRole("radio", { name: "Female20 女声" }));
+  fireEvent.click(screen.getByRole("radio", { name: "女声 Female20" }));
   fireEvent.change(screen.getByLabelText("合成语速"), {
     target: { value: "0.73" }
   });
@@ -259,7 +259,7 @@ it("女男目录独立搜索并恢复滚动，搜索和调参不重置另一列"
   });
   expect(female.scrollTop).toBe(120);
   expect(male.scrollTop).toBe(60);
-  expect(screen.getByRole("radio", { name: "Female20 女声" })).toBeChecked();
+  expect(screen.getByRole("radio", { name: "女声 Female20" })).toBeChecked();
 });
 it("清空参数保持错误、重置只当前声音，切语言不丢输入或变更名称和ID", async () => {
   const { onSave, onCancel, changeLocale } = mount();

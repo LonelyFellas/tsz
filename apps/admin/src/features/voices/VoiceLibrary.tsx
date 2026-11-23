@@ -1239,9 +1239,13 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
             </Form>
             {canEditDescription && (
               <Modal
-                title={t("add_voice_recommendation", {
-                  name: selected.display_name
-                })}
+                title={
+                  <>
+                    {t("add_to_group_recommendations")}
+                    {" · "}
+                    <VoiceName voice={selected} />
+                  </>
+                }
                 open={addingRecommendation}
                 onCancel={() =>
                   !recommendationPending && setAddingRecommendation(false)
