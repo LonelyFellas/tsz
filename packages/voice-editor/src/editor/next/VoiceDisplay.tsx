@@ -23,16 +23,18 @@ export function PoolVoiceName({
   );
 }
 export function PoolVoiceRate({ setting }: { setting: VoiceSetting }) {
+  const { t } = useVoiceEditorTranslation();
   return (
-    <span className="tsz-ve-shared-number">
+    <span className="tsz-ve-shared-number" data-label={t("rate")}>
       {((setting.rate_percent + 100) / 100).toFixed(2)}
       <span className="tsz-ve-shared-times">×</span>
     </span>
   );
 }
 export function PoolVoiceVolume({ setting }: { setting: VoiceSetting }) {
+  const { t } = useVoiceEditorTranslation();
   return (
-    <span className="tsz-ve-shared-number">
+    <span className="tsz-ve-shared-number" data-label={t("volume")}>
       {setting.volume_percent ?? 100}
       <small>%</small>
     </span>
