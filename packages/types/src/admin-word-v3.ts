@@ -120,6 +120,7 @@ export type PhraseComponentUsageV3 =
 /** 拼写独立试听；content 与 spelling 同文且仅含 pause。 */
 export interface SpellingSpeechV3 {
   content: RichTextV2V3;
+  content_by_accent?: Partial<Record<"uk" | "us", RichTextV2V3>>;
   voice_profile: VoiceProfileV3;
   audio_assets?: AudioAssetV3[];
 }

@@ -91,11 +91,27 @@ vi.mock("@tsz/voice-editor/editor", () => ({
             onChange({
               version: 2,
               text: value.text,
-              annotations: [{ type: "pause", at: 3, duration_ms: 250 }]
+              annotations: [
+                ...(value.version === 2
+                  ? value.annotations.filter((mark) => mark.type !== "pause")
+                  : []),
+                {
+                  type: "pause",
+                  at: 3,
+                  duration_ms: locale === "en-GB" ? 10 : 500
+                }
+              ]
             })
           }
         >
           添加停顿
+        </button>
+        <button
+          onClick={() =>
+            onChange({ version: 2, text: value.text, annotations: [] })
+          }
+        >
+          清空停顿
         </button>
         {renderActions?.(
           true,
@@ -327,9 +343,14 @@ it.each(["unified", "distinguish"] as const)(
   }
 );
 
-it("保存失败保留设置输入，重试沿用宿主保存；共享停顿使另一侧旧音频失效", async () => {
+it("保存失败保留设置输入，重试沿用宿主保存；只更新当前口音停顿并保留另一侧旧音频", async () => {
   save.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-  render(<Host form={setupForm("common")} />);
+  const form = setupForm("common");
+  if (form.regional_variants.mode !== "common") throw new Error();
+  form.regional_variants.common.spelling_speech!.content.annotations = [
+    { type: "pause", at: 3, duration_ms: 250 }
+  ];
+  render(<Host form={form} />);
   fireEvent.click(
     screen.getAllByRole("button", { name: "英式词形拼写配音设置" })[0]!
   );
@@ -346,12 +367,70 @@ it("保存失败保留设置输入，重试沿用宿主保存；共享停顿使�
   );
   expect(save).toHaveBeenCalledTimes(2);
   const speech = owners()[0]!.spelling_speech!;
-  expect(speech.content.annotations).toEqual([
-    expect.objectContaining({ type: "pause", duration_ms: 250 })
+  expect(speech.content_by_accent?.uk?.annotations).toEqual([
+    expect.objectContaining({ type: "pause", duration_ms: 10 })
   ]);
   expect(
     speech.voice_profile.voices.find((voice) => voice.locale === "en-US")
-  ).not.toHaveProperty("audio_asset_id");
+  ).toEqual(profile.voices.find((voice) => voice.locale === "en-US"));
+  const open = async (label: string) => {
+    fireEvent.click(screen.getAllByRole("button", { name: label })[0]!);
+    await screen.findByTestId("settings-editor");
+  };
+  const saveSettings = async () => {
+    fireEvent.click(screen.getByRole("button", { name: /^保存.*修改$/ }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("settings-editor")).not.toBeInTheDocument()
+    );
+  };
+  await open("美式词形拼写配音设置");
+  expect(screen.getByTestId("settings-content")).toHaveTextContent(
+    '"duration_ms":250'
+  );
+  fireEvent.click(screen.getByText("添加停顿"));
+  await saveSettings();
+  await open("英式词形拼写配音设置");
+  expect(screen.getByTestId("settings-content")).toHaveTextContent(
+    '"duration_ms":10'
+  );
+  fireEvent.click(screen.getByText("清空停顿"));
+  await saveSettings();
+  await open("美式词形拼写配音设置");
+  expect(screen.getByTestId("settings-content")).toHaveTextContent(
+    '"duration_ms":500'
+  );
+  fireEvent.click(screen.getByRole("button", { name: /^取消.*编辑$/ }));
+  await open("英式词形拼写配音设置");
+  expect(screen.getByTestId("settings-content")).toHaveTextContent(
+    '"annotations":[]'
+  );
+});
+
+it("分口音停顿保存和重开时保留特殊读法一次", async () => {
+  const form = setupForm("common");
+  if (form.regional_variants.mode !== "common") throw new Error("fixture");
+  const alias = { type: "sub" as const, start: 0, end: 3, alias: "sea" };
+  form.regional_variants.common.spelling_speech!.content.annotations = [alias];
+  render(<Host form={form} />);
+  const openUk = async () => {
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "英式词形拼写配音设置" })[0]!
+    );
+    return screen.findByTestId("settings-content");
+  };
+  await openUk();
+  fireEvent.click(screen.getByText("添加停顿"));
+  fireEvent.click(screen.getByRole("button", { name: /^保存.*修改$/ }));
+  await waitFor(() =>
+    expect(screen.queryByTestId("settings-editor")).not.toBeInTheDocument()
+  );
+  expect(
+    owners()[0]!.spelling_speech!.content_by_accent?.uk?.annotations
+  ).toEqual([alias, { type: "pause", at: 3, duration_ms: 10 }]);
+  const readback = JSON.parse((await openUk()).textContent!);
+  expect(
+    readback.annotations.filter((mark: { type: string }) => mark.type === "sub")
+  ).toEqual([alias]);
 });
 
 it("同名的多个美式拼写按稳定 ID 定位，不覆盖相邻拼写", async () => {

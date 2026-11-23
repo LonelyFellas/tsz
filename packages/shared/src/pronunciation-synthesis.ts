@@ -12,7 +12,7 @@ import type {
 } from "@tsz/types";
 
 import { ipaWordToUps } from "./ipa-ups";
-import { speechAccentGroup } from "./speech-locale";
+import { speechAccentGroup, type SpeechAccentGroup } from "./speech-locale";
 import {
   stripPhoneticDelimiters,
   convertDictionaryToAzureIpaSource,
@@ -816,6 +816,17 @@ export function savedVoiceAudioAsset(
   )?.audio_asset_id;
 }
 
+export function spellingSpeechContent(
+  speech?: SpellingSpeechV3,
+  side?: SpeechAccentGroup
+): RichTextV2 | undefined {
+  return (
+    (side === "uk" || side === "us"
+      ? speech?.content_by_accent?.[side]
+      : undefined) ?? speech?.content
+  );
+}
+
 /** Final playback follows the saved active source, without resolving new voices. */
 export function pronunciationPlaybackSource(
   spelling: string,
@@ -858,7 +869,9 @@ export function pronunciationPlaybackSource(
     (asset) => matchesLocale(asset.locale) && asset.is_default !== undefined
   );
   const content =
-    (synthesis?.use_spelling ? spellingSpeech?.content : undefined) ??
+    (synthesis?.use_spelling
+      ? spellingSpeechContent(spellingSpeech, speechAccentGroup(locale))
+      : undefined) ??
     pronunciationSynthesisContent(
       spelling,
       synthesis,

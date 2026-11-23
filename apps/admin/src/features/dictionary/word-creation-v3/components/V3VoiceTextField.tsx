@@ -15,6 +15,7 @@ import type {
   AudioAssetV3,
   Dialect,
   RichTextV2,
+  SpellingSpeechV3,
   RichTextV3,
   VoiceProfileV3,
   TextLinkV3,
@@ -70,6 +71,7 @@ import "./V3VoiceTextField.css";
 import { VoiceEditorModal } from "./VoiceEditorModal";
 import { RequiredFieldFeedback } from "../../RequiredFieldFeedback";
 import {
+  isSpellingSpeechAnnotation,
   mergeSpellingSettings,
   type SpellingAudioScope
 } from "../spellingSpeech";
@@ -91,13 +93,26 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
 }
 
 /** 拼写的展示标注不参与配音内容和音频失效判断。 */
+function withSpellingAccentContent(
+  value: RichTextV3,
+  content?: RichTextV2
+): RichTextV2 {
+  const rich = toRichTextV2(value);
+  if (!content) return rich;
+  return {
+    ...rich,
+    annotations: [
+      ...rich.annotations.filter((mark) => !isSpellingSpeechAnnotation(mark)),
+      ...content.annotations
+    ]
+  };
+}
+
 function spellingAudioContent(value: RichTextV3): RichTextV2 {
   const content = toRichTextV2(value);
   return {
     ...content,
-    annotations: content.annotations.filter((mark) =>
-      ["pause", "say_as", "sub"].includes(mark.type)
-    )
+    annotations: content.annotations.filter(isSpellingSpeechAnnotation)
   };
 }
 
@@ -105,7 +120,7 @@ export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
 > {
   onDone?: () => void;
-  onCommit?: (result: VoiceEditResult<TLink>) => void;
+  onCommit?: (result: VoiceEditResult<TLink>, side?: "uk" | "us") => void;
   onSave?: () => Promise<boolean>;
   saveActionRef?: RefObject<(() => Promise<boolean>) | null>;
   onCancel?: () => void;
@@ -119,6 +134,7 @@ export interface V3VoiceTextFieldProps<
   /** 本词形宿主的文本入口只编辑拼写及展示标注。 */
   spellingTextOnly?: boolean;
   /** 拼写所有者的来源行共用此入口，不额外挂载字段或音频任务。 */
+  spellingContentByAccent?: SpellingSpeechV3["content_by_accent"];
   spellingSettingsRef?: RefObject<SpellingSettingsOpener | null>;
   spellingSettingsHint?: ReactNode;
   /** 共享拼写的生成范围和显式来源解析要求；缺省沿用旧调用方。 */
@@ -189,6 +205,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   afterText,
   collapseVoiceSettings,
   spellingTextOnly = false,
+  spellingContentByAccent,
   spellingSettingsRef,
   spellingSettingsHint,
   spellingAudioScope,
@@ -406,6 +423,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     spellingSettingsRef.current = (request) => {
       if (readOnly || savingRef.current || !env.VOICE_EDITOR) return;
       const session = captureSession();
+      session.value = withSpellingAccentContent(
+        session.value,
+        spellingContentByAccent?.[request.dialect]
+      );
       settingsInitial.current = session;
       setDraftState(session);
       setSaveError("");
@@ -465,6 +486,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     return { ...adapter, generateAudio: undefined };
   }, [sessionPreviewAdapter]);
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
+  const settingsLocale = voiceLocale(spellingSettings?.dialect);
   const draftSpeechEnabled =
     expanded &&
     !deferAudioGeneration &&
@@ -474,7 +496,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     !readOnly &&
     !contentReadOnly &&
     !textOnly &&
-    (!spellingSettings || (spellingAudioLocales?.length ?? 0) > 0) &&
+    (!spellingSettings ||
+      spellingAudioLocales?.some((locale) => locale === settingsLocale) ===
+        true) &&
     mode !== "actual-pron" &&
     Boolean((sessionPreviewAdapter ?? adminVoicePreviewAdapter).generateAudio);
   const draftSpeechContent = useMemo(
@@ -495,9 +519,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const draftAudio = useSelectedVoiceAudio({
     target: JSON.stringify([nodeId, field, dialect, "dialog"]),
     content: draftSpeechContent,
+    activeLocales:
+      settingsLocale === "en-GB" || settingsLocale === "en-US"
+        ? [settingsLocale]
+        : undefined,
     profile: draftSpeechProfile,
     adapter: sessionPreviewAdapter ?? adminVoicePreviewAdapter,
-    locale,
+    locale: settingsLocale ?? locale,
     enabled: draftSpeechEnabled,
     defer: true,
     onChange: (voiceProfile) => {
@@ -608,7 +636,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       let result =
         spellingSettings && settingsSnapshot
           ? mergeSpellingSettings(
-              { value: toRichTextV2(value), voiceProfile, audioAssets },
+              {
+                value: withSpellingAccentContent(
+                  value,
+                  spellingContentByAccent?.[spellingSettings.dialect]
+                ),
+                voiceProfile,
+                audioAssets
+              },
               {
                 value: toRichTextV2(settingsSnapshot.value),
                 voiceProfile: settingsSnapshot.voiceProfile,
@@ -643,20 +678,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         result.voiceProfile &&
         captured.voiceProfile
       ) {
-        const activeAccents = spellingAudioLocales
-          ? new Set(
-              spellingAudioLocales.map((locale) => speechAccentGroup(locale))
-            )
-          : undefined;
         const generatedAudio = new Map(
           captured.voiceProfile.voices
             .filter(
               (setting) =>
                 setting.audio_asset_id &&
-                (!activeAccents ||
-                  activeAccents.has(
-                    speechAccentGroup(setting.locale, setting.accent)
-                  ))
+                speechAccentGroup(setting.locale, setting.accent) ===
+                  spellingSettings.dialect
             )
             .map(
               (setting) =>
@@ -687,7 +715,9 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       if (callbacks.current.onCommit) {
         flushSync(() => {
           if (commitSourceAudio) setSettingsCommitting(true);
-          callbacks.current.onCommit!(result);
+          if (spellingSettings)
+            callbacks.current.onCommit!(result, spellingSettings.dialect);
+          else callbacks.current.onCommit!(result);
         });
       } else {
         // 宿主回调可能捕获旧表单，逐项刷新闭包，避免正文、音色和录音互相覆盖。
@@ -798,6 +828,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   const automaticAudio = useSelectedVoiceAudio({
     target: JSON.stringify([nodeId, field]),
     content: collapsedContent,
+    contentByAccent: spellingContentByAccent,
     profile: area ? withDefaultVoiceProfile(voiceProfile, area) : voiceProfile,
     adapter: collapsedAdapter,
     activeLocales: spellingAudioLocales,
@@ -1341,14 +1372,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             readOnly={readOnly || saving}
             value={
               spellingSettings
-                ? {
-                    ...toRichTextV2(editorState.value),
-                    annotations: toRichTextV2(
-                      editorState.value
-                    ).annotations.filter((mark) =>
-                      ["pause", "say_as", "sub"].includes(mark.type)
-                    )
-                  }
+                ? spellingAudioContent(editorState.value)
                 : editorState.value
             }
             voiceProfile={
