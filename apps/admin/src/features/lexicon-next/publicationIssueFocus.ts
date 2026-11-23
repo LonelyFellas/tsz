@@ -163,7 +163,9 @@ export function focusPublicationIssue(
       (location.step === "forms"
         ? document.querySelector<HTMLElement>('[aria-label="添加基本词性"]')
         : location.issue.field === "headword"
-          ? document.querySelector<HTMLElement>('[aria-label="词头"]')
+          ? document.querySelector<HTMLElement>(
+              'input[data-v3-field="headword"]'
+            )
           : undefined);
     const control = field?.matches(controlSelector)
       ? field

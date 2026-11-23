@@ -1,0 +1,237 @@
+.lexicon-next-editor:has(> .lexicon-review:not([hidden])) {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 0;
+}
+.lexicon-review:not([hidden]),
+.lexicon-review-content,
+.lexicon-review-senses,
+.lexicon-publication,
+.lexicon-publication [aria-label="发布检查结果"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ui-space-4);
+}
+.lexicon-review:not([hidden]) {
+  gap: var(--ui-space-6);
+}
+.lexicon-review .ui-alert,
+.lexicon-review p,
+.lexicon-review-content ul {
+  margin-block: 0;
+}
+.lexicon-publication .ui-alert ul,
+.lexicon-review-warning ul {
+  margin: var(--ui-space-2) 0 0;
+  padding-inline-start: var(--ui-space-5);
+}
+.lexicon-publication .ui-alert .ui-btn-link {
+  height: auto;
+  white-space: normal;
+  text-align: start;
+}
+.lexicon-review-warning summary {
+  cursor: pointer;
+}
+.lexicon-review-warning summary span + span {
+  margin-inline-start: var(--ui-space-2);
+  font-size: var(--ui-font-size-sm);
+  font-weight: var(--ui-font-weight-regular);
+}
+.lexicon-review-content {
+  white-space: normal;
+  font-variant-numeric: tabular-nums;
+}
+.lexicon-review-content .ui-card-head h2 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+}
+.lexicon-review-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--ui-space-6);
+  align-items: start;
+}
+.lexicon-review-entry-details {
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-space-3);
+  padding-inline-start: var(--ui-space-6);
+  border-inline-start: 1px solid var(--ui-color-border-secondary);
+}
+.lexicon-review-entry h3,
+.lexicon-review-entry h4,
+.lexicon-review-field,
+.lexicon-review-label {
+  display: block;
+  margin: 0 0 var(--ui-space-1);
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
+  font-weight: var(--ui-font-weight-medium);
+}
+.lexicon-review-field .ui-input,
+.lexicon-review-headword {
+  font-size: var(--ui-font-size-title);
+  font-weight: var(--ui-font-weight-semibold);
+  line-height: var(--ui-line-height-tight);
+}
+.lexicon-review-field .ui-input {
+  display: block;
+  width: 100%;
+  height: var(--ui-control-height-lg);
+  margin-top: var(--ui-space-2);
+}
+.lexicon-review-content .lexicon-review-entry ul,
+.lexicon-review-content .lexicon-review-definitions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lexicon-review-forms,
+.lexicon-review-forms dd {
+  margin: 0;
+}
+.lexicon-review-forms > div {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--ui-space-3);
+}
+.lexicon-review-forms dt {
+  font-size: var(--ui-font-size-sm);
+  color: var(--ui-color-text-secondary);
+}
+.lexicon-review-forms ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1) var(--ui-space-3);
+}
+.lexicon-review-entry-details section ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1) var(--ui-space-4);
+}
+.lexicon-review-reading.has-index {
+  display: grid;
+  grid-template-columns: 152px minmax(0, 1fr);
+  gap: var(--ui-space-5);
+  align-items: start;
+}
+.lexicon-review-index {
+  position: sticky;
+  top: calc(64px + var(--ui-space-4));
+  max-height: calc(100dvh - 144px);
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ui-space-1);
+  padding-block: var(--ui-space-3);
+}
+.lexicon-review-index > span {
+  margin: 0 var(--ui-space-2) var(--ui-space-2);
+  font-size: var(--ui-font-size-compact);
+  color: var(--ui-color-text-secondary);
+  font-weight: var(--ui-font-weight-medium);
+}
+.lexicon-review-index .ui-btn {
+  display: grid;
+  justify-content: stretch;
+  justify-items: start;
+  height: auto;
+  min-height: var(--ui-control-height);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  text-align: start;
+}
+.lexicon-review-index-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-2);
+}
+.lexicon-review-index-line strong {
+  font-weight: var(--ui-font-weight-medium);
+}
+.lexicon-review-index-line > span,
+.lexicon-review-index-gloss {
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-sm);
+}
+.lexicon-review-index-gloss {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lexicon-review-sense {
+  min-width: 0;
+  /* 跳转时避开后台吸顶栏，含较窄桌面的双行工具栏。 */
+  scroll-margin-top: calc(
+    64px + var(--ui-control-height-lg) + var(--ui-space-4)
+  );
+}
+.lexicon-review-sense:focus-visible {
+  outline: 2px solid var(--ui-color-primary);
+  outline-offset: 2px;
+}
+.lexicon-review-sense > .ui-card-head {
+  background: var(--ui-color-fill-alter);
+  border-radius: var(--ui-border-radius-lg) var(--ui-border-radius-lg) 0 0;
+}
+.lexicon-review-sense > .ui-card-head h2 {
+  font-size: var(--ui-font-size-subheading);
+}
+.lexicon-review-pos,
+.lexicon-review-group,
+.lexicon-review-sense .ui-card-head-title > p {
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
+  font-weight: var(--ui-font-weight-regular);
+}
+.lexicon-review-sense .ui-card-head-title > p {
+  margin: var(--ui-space-1) 0 0;
+}
+.lexicon-review-sense > .ui-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ui-space-5);
+}
+.lexicon-review-sense > .ui-card-body > p {
+  margin: 0;
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-compact);
+}
+.lexicon-review-sense h3 {
+  margin: 0 0 var(--ui-space-2);
+  font-size: var(--ui-font-size);
+  font-weight: var(--ui-font-weight-semibold);
+}
+.lexicon-review-bilingual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-space-5);
+}
+.lexicon-review-bilingual > div + div {
+  border-inline-start: 1px solid var(--ui-color-border-secondary);
+  padding-inline-start: var(--ui-space-5);
+}
+.lexicon-review-definitions > li + li {
+  margin-top: var(--ui-space-3);
+}
+.lexicon-review-definition-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-2);
+  white-space: pre-wrap;
+  font-size: var(--ui-font-size-section);
+}
+.lexicon-review-definition-text > * {
+  min-width: 0;
+}
+.lexicon-review-definitions .lexicon-next-muted {
+  font-size: var(--ui-font-size-sm);
+}

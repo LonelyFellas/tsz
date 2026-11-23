@@ -1,6 +1,6 @@
 import { DialectPreview } from "./DialectPairs";
 import type { NextDialectSense } from "@tsz/types";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { RelationsPreview } from "./Relations";
 import { SentenceExamplesPreview } from "./SenseSentenceExamples";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
@@ -12,7 +12,9 @@ import {
   PronunciationPreviewProvider
 } from "@/features/dictionary/word-creation/PronunciationPreview";
 import { EntryDialectContext } from "@/features/settings/useDialectPreference";
-import { Alert } from "@tsz/ui/admin/display";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { partOfSpeechLabel } from "@/features/dictionary/word-creation-v3/presentation";
+import { Alert, Button, Card, Empty } from "@tsz/ui/admin/display";
 import type {
   NextDefinition,
   NextDraft,
@@ -23,6 +25,7 @@ import type {
   NextSentence
 } from "@tsz/types";
 import { draftForms, localeLabels } from "./model";
+import "./preview.css";
 
 function Lines({
   rows,
@@ -48,6 +51,30 @@ function Lines({
     <p className="lexicon-next-muted">缺少{missing}</p>
   );
 }
+function ReviewForms({ rows }: { rows: NextEntryView["forms"] }) {
+  return rows.length ? (
+    <dl className="lexicon-review-forms">
+      {[...new Set(rows.map((row) => row.locale))].map((locale) => (
+        <div key={locale}>
+          <dt>{localeLabels[locale] ?? locale}</dt>
+          <dd>
+            <ul>
+              {rows
+                .filter((row) => row.locale === locale)
+                .map((row) => (
+                  <li key={row.id} className="tsz-words">
+                    {row.text || "（空白）"}
+                  </li>
+                ))}
+            </ul>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  ) : (
+    <p className="lexicon-next-muted">缺少词形</p>
+  );
+}
 function Definitions({
   rows,
   missing,
@@ -58,7 +85,7 @@ function Definitions({
   issues?: NextGrammarIssue[];
 }) {
   return rows.length ? (
-    <ul>
+    <ul className="lexicon-review-definitions">
       {rows.map((row) => {
         const english = row.locale === "en" || row.locale.startsWith("en-");
         const content = row.content ?? {
@@ -68,6 +95,36 @@ function Definitions({
         };
         return (
           <li key={row.id}>
+            <div className="lexicon-review-definition-text">
+              {english ? (
+                <>
+                  <PronunciationPreviewControls
+                    pronunciationId={row.id}
+                    recommendationArea="meaning"
+                    playbackOnly
+                    assetOnly
+                    dialect={
+                      row.locale === "en-GB"
+                        ? "uk"
+                        : row.locale === "en-US"
+                          ? "us"
+                          : "common"
+                    }
+                    ariaLabelPrefix={missing}
+                    content={toRichTextV2(content)}
+                    voiceProfile={row.voice_profile}
+                    audioAssets={row.audio_assets}
+                  />
+                  <RichTextReadOnly
+                    className="tsz-words"
+                    value={content}
+                    emptyText="（空白）"
+                  />
+                </>
+              ) : (
+                <span>{row.text || "（空白）"}</span>
+              )}
+            </div>
             <span className="lexicon-next-muted">
               {localeLabels[row.locale] ?? row.locale} · {row.level ?? "未评估"}{" "}
               · {row.style === "sentence" ? "整句" : "定义"} ·{" "}
@@ -82,36 +139,7 @@ function Definitions({
                     ? "语法引用失效"
                     : "已关联语法"
                   : "未选择语法"}
-              ：
             </span>
-            {english ? (
-              <>
-                <PronunciationPreviewControls
-                  pronunciationId={row.id}
-                  recommendationArea="meaning"
-                  playbackOnly
-                  assetOnly
-                  dialect={
-                    row.locale === "en-GB"
-                      ? "uk"
-                      : row.locale === "en-US"
-                        ? "us"
-                        : "common"
-                  }
-                  ariaLabelPrefix={missing}
-                  content={toRichTextV2(content)}
-                  voiceProfile={row.voice_profile}
-                  audioAssets={row.audio_assets}
-                />
-                <RichTextReadOnly
-                  className="tsz-words"
-                  value={content}
-                  emptyText="（空白）"
-                />
-              </>
-            ) : (
-              <span>{row.text || "（空白）"}</span>
-            )}
           </li>
         );
       })}
@@ -165,8 +193,16 @@ export function Preview({
   view,
   requests,
   sentenceDetailsAvailable = false,
-  sentenceResources
+  sentenceResources,
+  heading,
+  versionControl,
+  headwordField,
+  onEditSense
 }: {
+  heading?: string;
+  versionControl?: ReactNode;
+  headwordField?: ReactNode;
+  onEditSense?: (id: string) => void;
   view: NextEntryView;
   dialectSenses?: NextDialectSense[];
   dialectDraft?: NextDraft;
@@ -177,7 +213,16 @@ export function Preview({
   relationTargets?: NextPublication["snapshot"]["relation_targets"];
   requests?: LexiconNextRequests;
 }) {
-  const focus = useRef<HTMLElement>(null);
+  const { t } = useLexiconEditorTranslation();
+  const headingId = useId();
+  const showIndex = Boolean(heading && view.senses.length > 1);
+  const warnings = [
+    ...new Set(view.grammar_issues?.map((issue) => issue.message))
+  ];
+  const posBySense = new Map(
+    dialectDraft?.senses.map((sense) => [sense.id, sense.part_of_speech])
+  );
+  const focus = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (focusSense && focus.current) {
       focus.current.scrollIntoView({ block: "center" });
@@ -189,117 +234,283 @@ export function Preview({
       value={view.target_locale === "en-US" ? "en-US" : "en-GB"}
     >
       <PronunciationPreviewProvider readOnly>
-        <div className="lexicon-next-preview">
-          <SenseGroups groups={view.sense_groups} />
-          {!!view.grammar_issues?.length && (
+        <section
+          className="lexicon-next-preview lexicon-review-content"
+          aria-labelledby={headingId}
+        >
+          <Card
+            className="lexicon-review-overview"
+            aria-labelledby={headingId}
+            title={<h2 id={headingId}>{heading ?? t("review_draft")}</h2>}
+            extra={versionControl}
+          >
+            <div className="lexicon-review-entry">
+              <div>
+                {headwordField ?? (
+                  <>
+                    <div className="lexicon-review-label">
+                      {t("review_headword")}
+                    </div>
+                    <strong className="lexicon-review-headword tsz-words">
+                      {dialectDraft?.headword || view.forms[0]?.text || "—"}
+                    </strong>
+                  </>
+                )}
+              </div>
+              <div className="lexicon-review-entry-details">
+                <div>
+                  <h3>{t("form")}</h3>
+                  <ReviewForms rows={view.forms} />
+                </div>
+                <SenseGroups groups={view.sense_groups} />
+              </div>
+            </div>
+          </Card>
+          {warnings.length > 0 && (
             <Alert
               type="warning"
-              title="语法结构尚未完整配置"
-              description={
-                <ul>
-                  {[
-                    ...new Set(
-                      view.grammar_issues.map((issue) => issue.message)
-                    )
-                  ].map((message) => (
-                    <li key={message}>{message}</li>
-                  ))}
-                </ul>
+              showIcon
+              title={
+                warnings.length === 1 ? (
+                  "语法结构尚未完整配置"
+                ) : (
+                  <details className="lexicon-review-warning">
+                    <summary>
+                      <span>语法结构尚未完整配置</span>{" "}
+                      <span>
+                        {t("summary_items_count", { count: warnings.length })}
+                      </span>
+                    </summary>
+                    <ul>
+                      {warnings.map((message) => (
+                        <li key={message}>{message}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )
               }
+              description={warnings.length === 1 ? warnings[0] : undefined}
             />
           )}
-          <Lines rows={view.forms} missing="词形" textClassName="tsz-words" />
-          {!view.senses.length && <p>尚无词义</p>}
-          {view.senses.map((sense, index) => (
-            <section
-              key={sense.id}
-              ref={sense.id === focusSense ? focus : undefined}
-              tabIndex={sense.id === focusSense ? -1 : undefined}
-            >
-              <h4>
-                词义 {index + 1}
-                {senseGroupName(view.sense_groups, sense.sense_group_id)}
-              </h4>
-              <SenseMetadataSummary sense={sense} />
-              {dialectDraft && (
-                <DialectPreview
-                  row={(dialectSenses ?? view.dialect_senses)?.find(
-                    (v) => v.sense_id === sense.id
-                  )}
-                  locale={view.target_locale}
-                  medium={view.medium_locale}
-                  draft={dialectDraft}
-                  published={published}
-                />
+          <div
+            className={
+              showIndex
+                ? "lexicon-review-reading has-index"
+                : "lexicon-review-reading"
+            }
+          >
+            {showIndex && (
+              <nav
+                className="lexicon-review-index"
+                aria-label={t("review_sense_index")}
+              >
+                <span>{t("review_sense_index")}</span>
+                {view.senses.map((sense, index) => {
+                  const pos = posBySense.get(sense.id);
+                  const gloss =
+                    sense.equivalents.find((row) => row.text.trim())?.text ||
+                    sense.medium_definitions.find((row) => row.text.trim())
+                      ?.text;
+                  return (
+                    <Button
+                      type="text"
+                      aria-label={t("review_sense", { index: index + 1 })}
+                      size="small"
+                      key={sense.id}
+                      onClick={() => {
+                        const card = document.getElementById(
+                          `${headingId}-card-${sense.id}`
+                        );
+                        card?.scrollIntoView({ block: "start" });
+                        card?.focus({ preventScroll: true });
+                      }}
+                    >
+                      <span className="lexicon-review-index-line">
+                        <strong>
+                          {t("review_sense", { index: index + 1 })}
+                        </strong>
+                        {pos && <span>{partOfSpeechLabel(pos, t, pos)}</span>}
+                      </span>
+                      {gloss && (
+                        <span
+                          className="lexicon-review-index-gloss"
+                          title={gloss}
+                        >
+                          {gloss}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
+              </nav>
+            )}
+            <div className="lexicon-review-senses">
+              {!view.senses.length && (
+                <Card>
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={t("panel_no_meanings_or_examples_yet")}
+                  />
+                </Card>
               )}
-
-              <Definitions
-                rows={sense.target_definitions}
-                missing="英文释义"
-                issues={view.grammar_issues}
-              />
-              <Definitions
-                rows={sense.medium_definitions}
-                missing="中文解释"
-                issues={view.grammar_issues}
-              />
-              <EquivalentPreview
-                rows={sense.equivalents}
-                noEquivalents={sense.no_equivalents}
-              />
-              {requests && (
-                <SentenceExamplesPreview
-                  detailsAvailable={sentenceDetailsAvailable}
-                  senseLevel={sense.level}
-                  resources={
-                    sentenceResources ??
-                    (view.sentence_resources
-                      ? Object.fromEntries(
-                          view.sentence_resources.map((v) => [v.id, v])
-                        )
-                      : undefined)
-                  }
-                  ids={sense.sentence_ids}
-                  target={view.target_locale}
-                  medium={view.medium_locale}
-                  requests={requests}
-                />
-              )}
-              {requests && sense.relations && (
-                <RelationsPreview
-                  frozenTargets={relationTargets}
-                  rows={sense.relations}
-                  target={view.target_locale}
-                  medium={view.medium_locale}
-                  requests={requests}
-                />
-              )}
-              {[
-                ...new Set(
-                  [...sense.target_definitions, ...sense.medium_definitions]
-                    .map((d) => d.grammar_structure_id)
-                    .filter(Boolean)
-                )
-              ].map((id) => {
-                const grammar = view.grammar_structures?.find(
-                  (g) => g.id === id
-                );
-                return grammar ? (
-                  <div key={id} aria-label="语法结构">
-                    {grammar.variants.map((variant) => (
-                      <RichTextReadOnly
-                        className="tsz-words"
-                        key={variant.id}
-                        value={variant.content}
-                        emptyText="未填写语法结构"
+              {view.senses.map((sense, index) => {
+                const pos = posBySense.get(sense.id);
+                const hasGlosses =
+                  sense.target_definitions.length ||
+                  sense.medium_definitions.length ||
+                  sense.equivalents.length ||
+                  sense.no_equivalents;
+                const senseTitleId = `${headingId}-${sense.id}`;
+                return (
+                  <Card
+                    className="lexicon-review-sense"
+                    key={sense.id}
+                    aria-labelledby={senseTitleId}
+                    ref={sense.id === focusSense ? focus : undefined}
+                    id={`${headingId}-card-${sense.id}`}
+                    tabIndex={-1}
+                    title={
+                      <>
+                        <h2 id={senseTitleId}>
+                          {t("review_sense", { index: index + 1 })}
+                          {pos && (
+                            <span className="lexicon-review-pos">
+                              {partOfSpeechLabel(pos, t, pos)}
+                            </span>
+                          )}
+                          <span className="lexicon-review-group">
+                            {senseGroupName(
+                              view.sense_groups,
+                              sense.sense_group_id
+                            )}
+                          </span>
+                        </h2>
+                        <SenseMetadataSummary sense={sense} />
+                      </>
+                    }
+                    extra={
+                      onEditSense && (
+                        <Button
+                          size="small"
+                          type="link"
+                          onClick={() => onEditSense(sense.id)}
+                          aria-label={t("panel_edit_meaning", {
+                            p0: index + 1
+                          })}
+                        >
+                          {t("panel_edit")}
+                        </Button>
+                      )
+                    }
+                  >
+                    {dialectDraft && (
+                      <DialectPreview
+                        row={(dialectSenses ?? view.dialect_senses)?.find(
+                          (v) => v.sense_id === sense.id
+                        )}
+                        locale={view.target_locale}
+                        medium={view.medium_locale}
+                        draft={dialectDraft}
+                        published={published}
                       />
-                    ))}
-                  </div>
-                ) : null;
+                    )}
+
+                    {hasGlosses ? (
+                      <>
+                        <div className="lexicon-review-bilingual">
+                          <div>
+                            <h3>{t("snapshot_definition_en")}</h3>
+                            <Definitions
+                              rows={sense.target_definitions}
+                              missing="英文释义"
+                              issues={view.grammar_issues}
+                            />
+                          </div>
+                          <div>
+                            <h3>{t("review_explanation")}</h3>
+                            <Definitions
+                              rows={sense.medium_definitions}
+                              missing="中文解释"
+                              issues={view.grammar_issues}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <h3>{t("review_equivalents")}</h3>
+                          <EquivalentPreview
+                            rows={sense.equivalents}
+                            noEquivalents={sense.no_equivalents}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="lexicon-next-muted">
+                        {t("panel_no_definitions_yet")} · {t("eq_empty")}
+                      </p>
+                    )}
+                    {requests && !!sense.sentence_ids?.length && (
+                      <div>
+                        <h3>{t("panel_examples_2")}</h3>
+                        <SentenceExamplesPreview
+                          detailsAvailable={sentenceDetailsAvailable}
+                          senseLevel={sense.level}
+                          resources={
+                            sentenceResources ??
+                            (view.sentence_resources
+                              ? Object.fromEntries(
+                                  view.sentence_resources.map((v) => [v.id, v])
+                                )
+                              : undefined)
+                          }
+                          ids={sense.sentence_ids}
+                          target={view.target_locale}
+                          medium={view.medium_locale}
+                          requests={requests}
+                        />
+                      </div>
+                    )}
+                    {requests && sense.relations && (
+                      <RelationsPreview
+                        frozenTargets={relationTargets}
+                        rows={sense.relations}
+                        target={view.target_locale}
+                        medium={view.medium_locale}
+                        requests={requests}
+                      />
+                    )}
+                    {[
+                      ...new Set(
+                        [
+                          ...sense.target_definitions,
+                          ...sense.medium_definitions
+                        ]
+                          .map((d) => d.grammar_structure_id)
+                          .filter(Boolean)
+                      )
+                    ].map((id) => {
+                      const grammar = view.grammar_structures?.find(
+                        (g) => g.id === id
+                      );
+                      return grammar ? (
+                        <div key={id} aria-label="语法结构">
+                          <h3>{t("grammar")}</h3>
+                          {grammar.variants.map((variant) => (
+                            <RichTextReadOnly
+                              className="tsz-words"
+                              key={variant.id}
+                              value={variant.content}
+                              emptyText="未填写语法结构"
+                            />
+                          ))}
+                        </div>
+                      ) : null;
+                    })}
+                  </Card>
+                );
               })}
-            </section>
-          ))}
-        </div>
+            </div>
+          </div>
+        </section>
       </PronunciationPreviewProvider>
     </EntryDialectContext.Provider>
   );

@@ -1990,8 +1990,11 @@ describe("新版词库手工闭环", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
       target: { value: "local unsaved" }
     });
-    fireEvent.click(button("当前草稿预览（含未保存修改）"));
-    expect(screen.getAllByText("the middle").length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByRole("region", { name: "草稿预览" })).getByText(
+        "the middle"
+      )
+    ).toBeVisible();
     expect(api.view).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("local unsaved")).toBeInTheDocument();
     fireEvent.click(button("保存完整草稿"));
@@ -2213,6 +2216,99 @@ describe("新版词库手工闭环", () => {
 
     await screen.findByRole("button", { name: "创建词条" });
     expect(router.state.location.pathname).toBe("/lexicon-next");
+  });
+  it("从预览目录定位指定词义，再进入该词义编辑而不保存草稿", async () => {
+    const scroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    onTestFinished(() => {
+      HTMLElement.prototype.scrollIntoView = scroll;
+    });
+    const api = requests();
+    api.get.mockResolvedValue({
+      ...entry,
+      draft: {
+        ...entry.draft,
+        senses: ["first", "second"].map((id) => ({
+          id,
+          part_of_speech: "noun",
+          definitions: [],
+          equivalents: []
+        }))
+      }
+    });
+    mount(api, `/lexicon-next/${id}?step=preview`);
+    const index = await screen.findByRole("navigation", { name: "词义目录" });
+    fireEvent.click(within(index).getByRole("button", { name: "词义 2" }));
+    expect(document.activeElement).toHaveAccessibleName(/词义 2/);
+    fireEvent.click(button("编辑词义 2"));
+    expect(stepButton(/^词义与例句/)).toHaveAttribute("aria-current", "step");
+    await waitFor(() =>
+      expect(
+        document.activeElement?.closest("[data-v3-node-id]")
+      ).toHaveAttribute("data-v3-node-id", "second")
+    );
+    expect(api.save).not.toHaveBeenCalled();
+  });
+  it("已发布词义链接打开只读快照，切换版本保留本地编辑且不会保存或发布", async () => {
+    const scroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    onTestFinished(() => {
+      HTMLElement.prototype.scrollIntoView = scroll;
+    });
+    const api = requests();
+    api.capabilities.mockResolvedValue({ ...caps, publishing: true });
+    api.publication.mockResolvedValue({
+      entry_id: id,
+      status: "published",
+      lifecycle_revision: 2,
+      has_unpublished_changes: true,
+      current: {
+        id: "publication",
+        entry_id: id,
+        revision: 1,
+        lifecycle_revision: 2,
+        published_by_admin_id: "editor",
+        published_at: entry.updated_at,
+        snapshot: {
+          draft: {
+            ...entry.draft,
+            headword: "published spelling",
+            senses: [
+              {
+                id: "published-sense",
+                part_of_speech: "noun",
+                definitions: [],
+                equivalents: []
+              }
+            ]
+          },
+          relation_targets: [],
+          sentence_resources: []
+        }
+      }
+    });
+    mount(api, `/lexicon-next/${id}?published_sense=published-sense`);
+    const snapshot = await screen.findByRole("region", { name: "已发布版本" });
+    expect(within(snapshot).getByText("published spelling")).toBeVisible();
+    expect(
+      within(snapshot)
+        .getByRole("heading", { name: /词义 1/ })
+        .closest("[tabindex]")
+    ).toHaveFocus();
+    expect(screen.queryByRole("textbox", { name: "词头" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "检查发布" })).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: "当前草稿" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "词头" }), {
+      target: { value: "local edit" }
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "已发布版本" }));
+    expect(screen.getByText("published spelling")).toBeVisible();
+    fireEvent.click(screen.getByRole("radio", { name: "当前草稿" }));
+    expect(screen.getByRole("textbox", { name: "词头" })).toHaveValue(
+      "local edit"
+    );
+    expect(api.save).not.toHaveBeenCalled();
+    expect(api.publish).not.toHaveBeenCalled();
   });
   it("完整草稿保存后先刷新发布状态，再按最新修订执行检查", async () => {
     useAuthStore.setState({
@@ -4094,9 +4190,7 @@ it("目录缓存更新后，停留在预览页也立即去除失效结构且不�
     ).toBeDefined()
   );
   fireEvent.click(stepButton(/^预览/));
-  const pane = screen.getByRole("heading", {
-    name: "草稿预览"
-  }).parentElement!;
+  const pane = screen.getByRole("region", { name: "草稿预览" });
   expect(within(pane).getByLabelText("语法结构")).toHaveTextContent("a job");
   const changed = structuredClone(partOfSpeechCatalogFixture);
   changed.items.find((item) => item.code === "noun")!.sub_parts = changed.items
@@ -4520,14 +4614,16 @@ it("Step3下一步和当前草稿预览都读取当前目标语言例句", async
     ).toHaveLength(1)
   );
   expect(screen.queryByText("Other target example")).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: "当前草稿预览（含未保存修改）" })
+  ).toBeNull();
+  fireEvent.click(stepButton(/^词义与例句/));
   fireEvent.click(button("当前草稿预览（含未保存修改）"));
-  await waitFor(() =>
-    expect(
-      screen
-        .getAllByText("Scoped example")
-        .filter((node) => !isInaccessible(node))
-    ).toHaveLength(2)
-  );
+  expect(
+    within(screen.getByRole("region", { name: "草稿预览" })).getByText(
+      "Scoped example"
+    )
+  ).toBeVisible();
   expect(api.sentence).toHaveBeenCalledWith("example");
   expect(api.view).not.toHaveBeenCalled();
   expect(api.save).not.toHaveBeenCalled();
