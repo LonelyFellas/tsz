@@ -107,11 +107,9 @@ export const sentenceMessages = {
     "待關聯：{{headword}} {{gloss}}",
     "Pending link: {{headword}} {{gloss}}"
   ],
-  translation_content: [
-    "{{band}}：{{content}}",
-    "{{band}}：{{content}}",
-    "{{band}}: {{content}}"
-  ],
+  translations: ["译文", "譯文", "Translations"],
+  sentence_links: ["句内关联", "句內關聯", "Links in this sentence"],
+  edit_sentence: ["编辑例句", "編輯例句", "Edit sentence"],
   selected_count: [
     "已选 {{count}} 条",
     "已選 {{count}} 筆",

@@ -14,7 +14,14 @@ import {
   sameSentenceTarget,
   matchesSentenceTarget
 } from "./associationModel";
-import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
+import {
+  Alert,
+  Button,
+  Card,
+  Flex,
+  Space,
+  Typography
+} from "@tsz/ui/admin/display";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { Radio, Select } from "@tsz/ui/admin/forms";
 import type {
@@ -40,6 +47,7 @@ import {
   type SentenceTargetLabel
 } from "./SharedSentenceAssociationPicker";
 import { newSentence } from "./model";
+import { useSentenceTranslation } from "./i18n";
 import "./SentenceEditor.css";
 import { VoiceEditorModal } from "../dictionary/word-creation-v3/components/VoiceEditorModal";
 import { V3EditorTitle } from "../dictionary/word-creation-v3/components/V3EditorTitle";
@@ -69,6 +77,7 @@ export function SentenceEditor({
   onSaved: (sentence: SharedSentence) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const { t: sentenceT } = useSentenceTranslation();
   const readingForms = useMemo(
     () => (sourceWord ? expandFormContents(sourceWord.forms) : undefined),
     [sourceWord]
@@ -411,6 +420,9 @@ export function SentenceEditor({
   const close = () =>
     modal.confirm({
       title: t("panel_discard_this_unfinished_example_edit"),
+      cancelText: t("panel_continue_editing"),
+      okText: t("panel_discard_changes"),
+      okButtonProps: { danger: true },
       content: t(
         "panel_unsaved_changes_and_local_backups_will_be_discarded_previously_saved_exampl"
       ),
@@ -580,7 +592,7 @@ export function SentenceEditor({
       <VoiceEditorModal
         open
         centered
-        width={1200}
+        width={960}
         styles={{
           body: {
             maxHeight: "min(70vh, calc(100dvh - 160px))",
@@ -590,59 +602,16 @@ export function SentenceEditor({
         title={
           <V3EditorTitle
             index={rowIndex}
-            title={t("panel_examples_2")}
-            details={t("panel_label_4", {
-              p0: sentence ? "" : t("panel_new"),
-              p1: content.sentence.level,
-              p2: dialectLabel(row.dialect, t)
-            })}
+            title={sentenceT(sentence ? "edit_sentence" : "create")}
+            details={dialectLabel(row.dialect, t)}
           />
         }
         footer={
-          <Flex justify="end" gap="small">
-            <Button
-              aria-label={t("panel_cancel_example_editing")}
-              disabled={saving}
-              onClick={close}
+          <div className="sentence-editor-footer">
+            <Typography.Text
+              type="secondary"
+              className="sentence-editor-save-note"
             >
-              {t("panel_cancel")}
-            </Button>
-            {!env.VOICE_EDITOR && (
-              <Button
-                type="primary"
-                aria-label={t("panel_save_example")}
-                loading={saving}
-                disabled={conflict || !allowed || !canSave}
-                onClick={() => void saveBeforeLeave()}
-              >
-                {t("panel_save_draft")}
-              </Button>
-            )}
-          </Flex>
-        }
-        onCancel={close}
-        closable={!saving}
-        keyboard={!saving}
-      >
-        <Flex className="sentence-editor" vertical gap="middle">
-          {recovery.notice}
-          {router && !registerLeaveGuard && (
-            <SentenceNavigationGuard
-              dirty={dirty}
-              saving={saving}
-              canSave={canSave}
-              discard={recovery.discard}
-              save={saveBeforeLeave}
-            />
-          )}
-          <Flex
-            className="sentence-editor-meta"
-            justify="space-between"
-            align="center"
-            wrap
-            gap="small"
-          >
-            <Typography.Text type="secondary">
               {sentence
                 ? t("sentence_publish_impact", {
                     entries: t("publication_entry_count", {
@@ -660,21 +629,42 @@ export function SentenceEditor({
                   )}
             </Typography.Text>
             <Space>
-              <Typography.Text>{t("panel_level")}</Typography.Text>
-              <Select
-                aria-label={t("panel_example_level")}
-                value={content.sentence.level}
-                options={LEVELS}
-                disabled={saving || !canEdit}
-                onChange={(level) =>
-                  setContent((current) => ({
-                    ...current,
-                    sentence: { ...current.sentence, level }
-                  }))
-                }
-              />
+              <Button
+                aria-label={t("panel_cancel_example_editing")}
+                disabled={saving}
+                onClick={close}
+              >
+                {t("panel_cancel")}
+              </Button>
+              {!env.VOICE_EDITOR && (
+                <Button
+                  type="primary"
+                  aria-label={t("panel_save_example")}
+                  loading={saving}
+                  disabled={conflict || !allowed || !canSave}
+                  onClick={() => void saveBeforeLeave()}
+                >
+                  {t("panel_save_draft")}
+                </Button>
+              )}
             </Space>
-          </Flex>
+          </div>
+        }
+        onCancel={close}
+        closable={!saving}
+        keyboard={!saving}
+      >
+        <Flex className="sentence-editor" vertical gap="middle">
+          {recovery.notice}
+          {router && !registerLeaveGuard && (
+            <SentenceNavigationGuard
+              dirty={dirty}
+              saving={saving}
+              canSave={canSave}
+              discard={recovery.discard}
+              save={saveBeforeLeave}
+            />
+          )}
           {error && (
             <Alert
               type="error"
@@ -814,21 +804,41 @@ export function SentenceEditor({
               ))}
             </Flex>
           )}
-          {rows.length > 1 && (
-            <Radio.Group
-              aria-label={t("panel_example_dialect")}
-              value={row.dialect}
-              disabled={saving || pendingEditor}
-              onChange={(event) => setDialect(event.target.value)}
-              options={rows.map((item) => ({
-                value: item.dialect,
-                label:
-                  item.dialect === "uk"
-                    ? t("panel_british")
-                    : t("panel_american")
-              }))}
-            />
-          )}
+          <div className="sentence-editor-section-heading">
+            <h2>{t("panel_example_text")}</h2>
+            <Space wrap>
+              {rows.length > 1 && (
+                <Radio.Group
+                  aria-label={t("panel_example_dialect")}
+                  value={row.dialect}
+                  disabled={saving || pendingEditor}
+                  onChange={(event) => setDialect(event.target.value)}
+                  options={rows.map((item) => ({
+                    value: item.dialect,
+                    label:
+                      item.dialect === "uk"
+                        ? t("panel_british")
+                        : t("panel_american")
+                  }))}
+                />
+              )}
+              <Space>
+                <Typography.Text>{t("panel_level")}</Typography.Text>
+                <Select
+                  aria-label={t("panel_example_level")}
+                  value={content.sentence.level}
+                  options={LEVELS}
+                  disabled={saving || !canEdit}
+                  onChange={(level) =>
+                    setContent((current) => ({
+                      ...current,
+                      sentence: { ...current.sentence, level }
+                    }))
+                  }
+                />
+              </Space>
+            </Space>
+          </div>
           {variant && (
             <V3VoiceTextField<SharedSentenceAnnotation>
               key={row.variant_id}
@@ -836,17 +846,19 @@ export function SentenceEditor({
               presentation="editor"
               showDone={false}
               afterText={
-                <V3SentenceTranslationsField
-                  sentence={content.sentence}
-                  index={0}
-                  disabled={saving || !canEdit}
-                  onChange={(zh_translations) =>
-                    setContent((current) => ({
-                      ...current,
-                      sentence: { ...current.sentence, zh_translations }
-                    }))
-                  }
-                />
+                <Card size="small" className="sentence-editor-translations">
+                  <V3SentenceTranslationsField
+                    sentence={content.sentence}
+                    index={0}
+                    disabled={saving || !canEdit}
+                    onChange={(zh_translations) =>
+                      setContent((current) => ({
+                        ...current,
+                        sentence: { ...current.sentence, zh_translations }
+                      }))
+                    }
+                  />
+                </Card>
               }
               saveActionRef={saveActionRef}
               onSave={() =>

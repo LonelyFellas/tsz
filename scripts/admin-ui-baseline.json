@@ -196,11 +196,6 @@
   "apps/admin/src/features/roles/RoleManagement.tsx": {
     "inline-visual-style": 1
   },
-  "apps/admin/src/features/sentences/SentenceEditor.css": {
-    "raw-radius": 3,
-    "raw-font-size": 1,
-    "raw-font-weight": 1
-  },
   "apps/admin/src/features/sentences/SentenceLibrary.tsx": {
     "inline-visual-style": 1
   },

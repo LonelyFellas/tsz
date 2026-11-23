@@ -620,46 +620,49 @@ export function LocalVoicePool({
                   key={side.key}
                   aria-label={t("selected_voices", { p0: side.label })}
                 >
-                  <Typography.Text
-                    className="tsz-ve-pool-side-title"
-                    data-accent={side.key}
-                    strong
-                  >
-                    {side.label}
-                  </Typography.Text>
-                  <Typography.Text
-                    type="secondary"
-                    className="tsz-ve-pool-source"
-                  >
-                    {inheritedFor(side.key)
-                      ? (() => {
-                          const source = sources?.[side.key];
-                          const recommendation =
-                            source?.kind === "recommendation"
-                              ? recommendations.find(
-                                  (item) => item.id === source.recommendation_id
-                                )
-                              : selectedRecommendations(side.key)[0];
-                          return source?.kind === "catalog" ||
-                            (!source && !recommendation)
-                            ? t("inherited_catalog_source")
-                            : t("inherited_recommendation_source", {
-                                p0:
-                                  recommendation?.groupName ??
-                                  t("recommended_voices"),
-                                p1: recommendation?.name ?? ""
-                              });
-                        })()
-                      : t("local_voice_settings")}
-                  </Typography.Text>
-                  <Button
-                    size="small"
-                    type="link"
-                    disabled={readOnly}
-                    onClick={() => onRestore(side.key)}
-                  >
-                    {t("restore_accent_defaults", { p0: side.label })}
-                  </Button>
+                  <div className="tsz-ve-pool-accent-heading">
+                    <Typography.Text
+                      className="tsz-ve-pool-side-title"
+                      data-accent={side.key}
+                      strong
+                    >
+                      {side.label}
+                    </Typography.Text>
+                    <Typography.Text
+                      type="secondary"
+                      className="tsz-ve-pool-source"
+                    >
+                      {inheritedFor(side.key)
+                        ? (() => {
+                            const source = sources?.[side.key];
+                            const recommendation =
+                              source?.kind === "recommendation"
+                                ? recommendations.find(
+                                    (item) =>
+                                      item.id === source.recommendation_id
+                                  )
+                                : selectedRecommendations(side.key)[0];
+                            return source?.kind === "catalog" ||
+                              (!source && !recommendation)
+                              ? t("inherited_catalog_source")
+                              : t("inherited_recommendation_source", {
+                                  p0:
+                                    recommendation?.groupName ??
+                                    t("recommended_voices"),
+                                  p1: recommendation?.name ?? ""
+                                });
+                          })()
+                        : t("local_voice_settings")}
+                    </Typography.Text>
+                    <Button
+                      size="small"
+                      type="link"
+                      disabled={readOnly}
+                      onClick={() => onRestore(side.key)}
+                    >
+                      {t("restore_accent_defaults", { p0: side.label })}
+                    </Button>
+                  </div>
                   {!!selected.length && (
                     <div className="tsz-ve-pool-row tsz-ve-pool-head">
                       <span>{t("no")}</span>
@@ -694,7 +697,7 @@ export function LocalVoicePool({
                       >
                         <div className="tsz-ve-pool-row">
                           <span>{rank + 1}</span>
-                          <span>
+                          <span data-label={t("probability")}>
                             {probability === undefined
                               ? "—"
                               : `${(probability * 100).toFixed(1)}%`}

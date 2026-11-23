@@ -12,7 +12,7 @@ import {
   SearchIcon,
   EllipsisVerticalIcon
 } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useId, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -20,10 +20,7 @@ import {
   PageHeader,
   Button,
   Card,
-  Col,
-  Descriptions,
   Flex,
-  Row,
   Space,
   Tag,
   Typography
@@ -40,14 +37,27 @@ import {
   SentencePublicationModal,
   type SentencePublicationAction
 } from "./SentencePublicationModal";
-import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
+import {
+  editableEnglishText,
+  sentenceTranslationsV3
+} from "../dictionary/word-creation-v3/meaningsModel";
 import { SentenceEditor } from "./SentenceEditor";
 import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
+import dayjs from "dayjs";
+import "./SentenceLibrary.css";
 
 function sentenceText(item: SharedSentence) {
   return editableEnglishText(item.content.sentence.en_text)
     .map((row) => row.text)
     .join(" / ");
+}
+function formatTime(value: string) {
+  const time = dayjs(value);
+  return (
+    <time dateTime={value} title={time.format("YYYY-MM-DD HH:mm:ss")}>
+      {time.format("YYYY-MM-DD HH:mm")}
+    </time>
+  );
 }
 function entryLink(
   entry: SharedSentence["entries"][number],
@@ -58,13 +68,104 @@ function entryLink(
       title={t("entry_id", { id: entry.id })}
       to={`/words/${entry.id}/v3/wizard/meanings`}
     >
-      {entry.headword || entry.id} ·{" "}
-      {entry.senses.length
-        ? entry.senses
-            .map((sense) => sense.gloss || t("no_definition"))
-            .join(" / ")
-        : t("select_sense")}
+      {entry.headword || entry.id}{" "}
+      <span className="sentence-library-entry-gloss">
+        ·{" "}
+        {entry.senses.length
+          ? entry.senses
+              .map((sense) => sense.gloss || t("no_definition"))
+              .join(" / ")
+          : t("select_sense")}
+      </span>
     </Link>
+  );
+}
+
+function SentenceDetailContent({ detail }: { detail: SharedSentence }) {
+  const { t } = useSentenceTranslation();
+  const sentence = detail.content.sentence;
+  const translations = sentenceTranslationsV3(sentence).filter((row) =>
+    row.content.text.trim()
+  );
+  return (
+    <div className="sentence-detail-content">
+      <div className="sentence-detail-original">
+        <V3EnglishTextPreview value={sentence.en_text} hideCommonDialect />
+        <Tag>
+          {t("level_short")} {sentence.level}
+        </Tag>
+      </div>
+      {translations.length > 0 && (
+        <Card
+          size="small"
+          title={<h2>{t("translations")}</h2>}
+          aria-label={t("translations")}
+        >
+          <dl className="sentence-detail-rows">
+            {translations.map((translation) => (
+              <div key={translation.id}>
+                <dt>
+                  {t(
+                    translation.band === "word_for_word"
+                      ? "band_beginner"
+                      : translation.band === "balanced_fluency"
+                        ? "band_intermediate"
+                        : "band_advanced"
+                  )}
+                </dt>
+                <dd>{translation.content.text}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+      )}
+      <Card
+        size="small"
+        title={<h2>{t("entries")}</h2>}
+        aria-label={t("entries")}
+      >
+        <div className="sentence-library-entries sentence-detail-entries">
+          {detail.entries.length ? (
+            detail.entries.map((entry) => (
+              <span key={entry.id} className="tsz-words">
+                {entryLink(entry, t)}
+              </span>
+            ))
+          ) : (
+            <Typography.Text type="secondary">{t("unlinked")}</Typography.Text>
+          )}
+        </div>
+        {detail.content.annotations.length > 0 && (
+          <>
+            <h3>{t("sentence_links")}</h3>
+            <dl className="sentence-detail-rows sentence-detail-links">
+              {detail.content.annotations.map(
+                ({ id, source_segments, target }) => (
+                  <div key={id}>
+                    <dt className="tsz-entry-en">
+                      {source_segments.map((s) => s.surface).join(" … ")}
+                    </dt>
+                    <dd>
+                      <span aria-hidden="true">→ </span>
+                      {target.state === "linked"
+                        ? (detail.entries.find(
+                            (entry) => entry.id === target.target_entry_id
+                          )?.headword ?? target.target_entry_id)
+                        : target.state === "entry_only"
+                          ? t("select_sense")
+                          : t("pending_target", {
+                              headword: target.headword,
+                              gloss: target.gloss ?? ""
+                            })}
+                    </dd>
+                  </div>
+                )
+              )}
+            </dl>
+          </>
+        )}
+      </Card>
+    </div>
   );
 }
 
@@ -77,7 +178,7 @@ export function SentenceLibrary({
   trash?: boolean;
   readOnly?: boolean;
 }) {
-  const { t, i18n } = useSentenceTranslation();
+  const { t } = useSentenceTranslation();
   const { modal, message } = App.useApp();
   const profile = useAuthStore((state) => state.profile);
   const canReadAll = hasAdminPermission(profile, "sentences.access");
@@ -124,6 +225,7 @@ export function SentenceLibrary({
   const [detail, setDetail] = useState<SharedSentence>();
   const [batch, setBatch] = useState<SharedSentence[]>();
   const [selected, setSelected] = useState<React.Key[]>([]);
+  const pageCheckboxId = useId();
   const query = useQuery({
     queryKey: ["shared-sentences", entryId, filters, readOnly, trash],
     enabled: canRead,
@@ -267,7 +369,26 @@ export function SentenceLibrary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedSentenceId]);
   const rows = query.data?.items ?? [];
+  const selectedRows = rows.filter((row) => selected.includes(row.id));
   const ContentContainer = entryId ? Fragment : Card;
+  const listError = query.isError && (
+    <Alert
+      type="error"
+      title={t("load_failed")}
+      action={
+        <Button onClick={() => void query.refetch()}>{t("retry")}</Button>
+      }
+    />
+  );
+  const search = () =>
+    setFilters({
+      ...filters,
+      page: 1,
+      q: keyword || undefined,
+      level,
+      created_from: dates?.[0]?.startOf("day").toISOString(),
+      created_to: dates?.[1]?.endOf("day").toISOString()
+    });
   return (
     <Flex vertical gap="middle">
       {editor && (
@@ -294,6 +415,18 @@ export function SentenceLibrary({
       ) : (
         <PageHeader
           title={trash ? t("trash_title") : t("title")}
+          actions={
+            !trash &&
+            canCreate && (
+              <Button
+                type="primary"
+                icon={<PlusIcon />}
+                onClick={() => setEditor("new")}
+              >
+                {t("create")}
+              </Button>
+            )
+          }
           breadcrumb={
             <Breadcrumb
               aria-label={t("breadcrumb_label")}
@@ -314,17 +447,8 @@ export function SentenceLibrary({
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder={t("keyword_placeholder")}
-                style={{ width: 250 }}
-                onPressEnter={() =>
-                  setFilters({
-                    ...filters,
-                    page: 1,
-                    q: keyword || undefined,
-                    level,
-                    created_from: dates?.[0]?.startOf("day").toISOString(),
-                    created_to: dates?.[1]?.endOf("day").toISOString()
-                  })
-                }
+                className="sentence-library-keyword"
+                onPressEnter={search}
               />
             </Form.Item>
             <Form.Item label={t("level")}>
@@ -334,7 +458,7 @@ export function SentenceLibrary({
                 placeholder={t("level")}
                 value={level}
                 onChange={setLevel}
-                style={{ width: 130 }}
+                className="sentence-library-level-filter"
                 options={["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
                   value,
                   label: value
@@ -346,20 +470,7 @@ export function SentenceLibrary({
             </Form.Item>
             <Form.Item className="admin-filter-actions">
               <Space>
-                <Button
-                  type="primary"
-                  icon={<SearchIcon />}
-                  onClick={() =>
-                    setFilters({
-                      ...filters,
-                      page: 1,
-                      q: keyword || undefined,
-                      level,
-                      created_from: dates?.[0]?.startOf("day").toISOString(),
-                      created_to: dates?.[1]?.endOf("day").toISOString()
-                    })
-                  }
-                >
+                <Button icon={<SearchIcon />} onClick={search}>
                   {t("search")}
                 </Button>
                 <Button
@@ -378,367 +489,363 @@ export function SentenceLibrary({
           </Form>
         </Card>
       )}
-      <ContentContainer {...(!entryId ? { size: "small" as const } : {})}>
-        {query.isError && (
-          <Alert
-            type="error"
-            title={t("load_failed")}
-            action={
-              <Button onClick={() => void query.refetch()}>{t("retry")}</Button>
-            }
-          />
-        )}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} xl={24}>
-            <Table<SharedSentence>
-              toolbar={
-                !entryId && (
-                  <Space wrap>
-                    <Typography.Text aria-live="polite">
-                      {t("selected_count", { count: selected.length })}
-                    </Typography.Text>
-                    {canPublish && !trash && (
-                      <Button
-                        disabled={
-                          !selected.length ||
-                          rows.some(
-                            (row) =>
-                              selected.includes(row.id) &&
-                              !canAction(row, "publish")
-                          )
-                        }
-                        onClick={() =>
-                          setBatch(
-                            rows.filter((row) => selected.includes(row.id))
-                          )
-                        }
-                      >
-                        {t("publish_selected")}
-                      </Button>
-                    )}
-                    {trash && canDelete && (
-                      <Button
-                        disabled={!selected.length}
-                        onClick={() =>
-                          remove(
-                            rows.filter((row) => selected.includes(row.id)),
-                            true
-                          )
-                        }
-                      >
-                        {t("restore_selected")}
-                      </Button>
-                    )}
+      <ContentContainer
+        {...(!entryId
+          ? { size: "small" as const, loading: query.isLoading }
+          : {})}
+      >
+        {listError}
+        {(!query.isError || rows.length > 0) && (
+          <Table<SharedSentence>
+            toolbar={
+              !entryId &&
+              (selectedRows.length ? (
+                <Space wrap>
+                  <Typography.Text aria-live="polite">
+                    {t("selected_count", { count: selectedRows.length })}
+                  </Typography.Text>
+                  {canPublish && !trash && (
+                    <Button
+                      disabled={selectedRows.some(
+                        (row) => !canAction(row, "publish")
+                      )}
+                      onClick={() => setBatch(selectedRows)}
+                    >
+                      {t("publish_selected")}
+                    </Button>
+                  )}
+                  {trash && canDelete && (
+                    <Button onClick={() => remove(selectedRows, true)}>
+                      {t("restore_selected")}
+                    </Button>
+                  )}
+                  {canDelete && (
                     <Button
                       danger
-                      disabled={
-                        !canDelete ||
-                        !selected.length ||
-                        rows.some(
-                          (row) =>
-                            selected.includes(row.id) &&
-                            row.current_publication_id != null
-                        )
-                      }
-                      onClick={() =>
-                        remove(rows.filter((row) => selected.includes(row.id)))
-                      }
+                      disabled={selectedRows.some(
+                        (row) => row.current_publication_id != null
+                      )}
+                      onClick={() => remove(selectedRows)}
                     >
                       {trash ? t("delete_selected") : t("trash_selected")}
                     </Button>
-                    {selected.length > 0 && (
-                      <Button onClick={() => setSelected([])}>
-                        {t("clear_selection")}
-                      </Button>
+                  )}
+                  <Button
+                    type="text"
+                    onClick={() => {
+                      setSelected([]);
+                      document.getElementById(pageCheckboxId)?.focus();
+                    }}
+                  >
+                    {t("clear_selection")}
+                  </Button>
+                </Space>
+              ) : (
+                query.data && (
+                  <strong className="sentence-library-total" aria-live="polite">
+                    {t("total_count", { count: query.data.total })}
+                  </strong>
+                )
+              ))
+            }
+            tableId="sentences"
+            locale={{
+              emptyText: (
+                <TableEmptyState
+                  message={
+                    entryId
+                      ? t("empty_linked")
+                      : trash
+                        ? t("empty_trash")
+                        : t("empty")
+                  }
+                  filtered={
+                    !!(
+                      filters.q ||
+                      filters.level ||
+                      filters.created_from ||
+                      filters.created_to
+                    )
+                  }
+                  onResetFilters={() => {
+                    setKeyword("");
+                    setLevel(undefined);
+                    setDates(null);
+                    setFilters({ page: 1, page_size: filters.page_size });
+                  }}
+                />
+              )
+            }}
+            rowKey="id"
+            dataSource={rows}
+            loading={query.isLoading}
+            refreshing={query.isRefetching}
+            scroll={{ x: entryId ? 700 : 1080 }}
+            rowSelection={
+              !entryId && (canEdit || canPublish || canDelete)
+                ? {
+                    selectedRowKeys: selected,
+                    onChange: setSelected,
+                    getTitleCheckboxProps: () => ({
+                      id: pageCheckboxId,
+                      "aria-label": t("select_page")
+                    })
+                  }
+                : undefined
+            }
+            pagination={{
+              current: filters.page,
+              pageSize: filters.page_size,
+              total: query.data?.total,
+              showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50],
+              showTotal: (total) => t("total_count", { count: total }),
+              onChange: (page, page_size) => {
+                setFilters((current) => ({ ...current, page, page_size }));
+                setSelected([]);
+              }
+            }}
+            // 固定既有列身份，保留中文界面创建的列偏好；显示标题随语言更新。
+            columns={[
+              {
+                key: "例句",
+                title: t("sentence"),
+                width: 324,
+                render: (_, row) => {
+                  const { en_text, zh_text, zh_translations } =
+                    row.content.sentence;
+                  const translation =
+                    zh_text.text.trim() ||
+                    zh_translations.find((item) => item.content.text.trim())
+                      ?.content.text;
+                  return (
+                    <div className="sentence-library-preview">
+                      <V3EnglishTextPreview value={en_text} hideCommonDialect />
+                      {translation && (
+                        <span
+                          className="sentence-library-translation"
+                          title={translation}
+                        >
+                          {translation}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+              },
+              {
+                key: "关联词条",
+                title: t("entries"),
+                width: 164,
+                render: (_, row) => (
+                  <Flex
+                    vertical
+                    align="start"
+                    gap={4}
+                    className="sentence-library-entries"
+                  >
+                    {!row.entries.length && (
+                      <Typography.Text type="secondary">
+                        {t("unlinked")}
+                      </Typography.Text>
+                    )}
+                    {row.entries.slice(0, 2).map((e) => (
+                      <span className="tsz-words" key={e.id}>
+                        {entryLink(e, t)}{" "}
+                      </span>
+                    ))}
+                    {row.entries.length > 2 && (
+                      <Typography.Text
+                        title={row.entries.map((e) => e.headword).join("、")}
+                      >
+                        +{row.entries.length - 2}
+                      </Typography.Text>
+                    )}
+                    {row.content.annotations.some(
+                      (a) => a.target.state === "pending"
+                    ) && <Tag color="warning">{t("pending_links")}</Tag>}
+                  </Flex>
+                )
+              },
+              {
+                key: "等级",
+                title: t("level_short"),
+                width: 72,
+                render: (_, row) => row.content.sentence.level
+              },
+              {
+                key: "状态",
+                title: t("status"),
+                width: 108,
+                render: (_, row) => {
+                  if (trash) return <Tag>{t("trash_title")}</Tag>;
+                  if (row.withdrawn_at) return <Tag>{t("withdrawn")}</Tag>;
+                  return row.current_publication_id ? (
+                    <Tag color="success">{t("published")}</Tag>
+                  ) : (
+                    <Tag color="warning">{t("draft")}</Tag>
+                  );
+                }
+              },
+              ...(!entryId
+                ? [
+                    {
+                      title: t("creator"),
+                      dataIndex: "created_by",
+                      className: "sentence-library-meta",
+                      width: 92
+                    },
+                    {
+                      key: "更新时间",
+                      title: t("updated_at"),
+                      className: "sentence-library-meta",
+                      width: 132,
+                      render: (_: unknown, row: SharedSentence) =>
+                        formatTime(row.updated_at)
+                    },
+                    {
+                      key: "创建时间",
+                      title: t("created_at"),
+                      className: "sentence-library-meta",
+                      hidden: true,
+                      width: 132,
+                      render: (_: unknown, row: SharedSentence) =>
+                        formatTime(row.created_at)
+                    },
+                    {
+                      title: "ID",
+                      dataIndex: "id",
+                      className: "sentence-library-meta",
+                      hidden: true,
+                      width: 125,
+                      render: (id: string) => (
+                        <Typography.Text copyable={{ text: id }} title={id}>
+                          {id.slice(0, 8)}
+                        </Typography.Text>
+                      )
+                    }
+                  ]
+                : []),
+              {
+                key: "操作",
+                title: t("actions"),
+                fixed: "right",
+                width: canEdit || canPublish || canDelete ? 184 : 108,
+                render: (_, row) => (
+                  <Space size={4} wrap>
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() =>
+                        trash ? setDetail(row) : void open(row.id, false)
+                      }
+                    >
+                      {t("view")}
+                    </Button>
+                    {!readOnly && !trash && (
+                      <>
+                        {(canAction(row, "edit") ||
+                          canAction(row, "associate")) && (
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => void open(row.id, true)}
+                          >
+                            {t("edit")}
+                          </Button>
+                        )}
+                        {canAction(row, "publish") && (
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => void openPublication(row, "publish")}
+                          >
+                            {t("publish")}
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    {trash && canDelete && (
+                      <>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => remove([row], true)}
+                        >
+                          {t("restore")}
+                        </Button>
+                        <Button
+                          type="link"
+                          size="small"
+                          danger
+                          onClick={() => remove([row])}
+                        >
+                          {t("delete")}
+                        </Button>
+                      </>
+                    )}
+                    {canReadAll && !trash && (
+                      <Dropdown
+                        trigger={["click"]}
+                        menu={{
+                          items: [
+                            {
+                              key: "history",
+                              label: t("history"),
+                              onClick: () =>
+                                void openPublication(row, "history")
+                            },
+                            ...(row.current_publication_id &&
+                            canAction(
+                              row,
+                              row.withdrawn_at ? "restore" : "withdraw"
+                            )
+                              ? [
+                                  {
+                                    key: "visibility",
+                                    danger: !row.withdrawn_at,
+                                    label: row.withdrawn_at
+                                      ? t("show_publication")
+                                      : t("withdraw"),
+                                    onClick: () =>
+                                      void openPublication(
+                                        row,
+                                        row.withdrawn_at
+                                          ? "restore"
+                                          : "withdraw"
+                                      )
+                                  }
+                                ]
+                              : []),
+                            ...(canDelete &&
+                            !entryId &&
+                            !row.current_publication_id
+                              ? [
+                                  {
+                                    key: "delete",
+                                    danger: true,
+                                    label: t("trash"),
+                                    onClick: () => remove([row])
+                                  }
+                                ]
+                              : [])
+                          ]
+                        }}
+                      >
+                        <Button
+                          size="small"
+                          type="text"
+                          aria-label={t("more")}
+                          icon={<EllipsisVerticalIcon />}
+                        />
+                      </Dropdown>
                     )}
                   </Space>
                 )
               }
-
-              toolbarExtra={
-                !entryId &&
-                !trash &&
-                canCreate && (
-                  <Button
-                    type="primary"
-                    icon={<PlusIcon />}
-                    onClick={() => setEditor("new")}
-                  >
-                    {t("create")}
-                  </Button>
-                )
-              }
-              tableId="sentences"
-              locale={{
-                emptyText: (
-                  <TableEmptyState
-                    message={
-                      entryId
-                        ? t("empty_linked")
-                        : trash
-                          ? t("empty_trash")
-                          : t("empty")
-                    }
-                    filtered={
-                      !!(
-                        filters.q ||
-                        filters.level ||
-                        filters.created_from ||
-                        filters.created_to
-                      )
-                    }
-                    onResetFilters={() => {
-                      setKeyword("");
-                      setLevel(undefined);
-                      setDates(null);
-                      setFilters({ page: 1, page_size: filters.page_size });
-                    }}
-                  />
-                )
-              }}
-              rowKey="id"
-              dataSource={rows}
-              loading={query.isLoading}
-              refreshing={query.isRefetching}
-              scroll={{ x: entryId ? 700 : 1350 }}
-              rowSelection={
-                !entryId && (canEdit || canPublish || canDelete)
-                  ? {
-                      selectedRowKeys: selected,
-                      onChange: setSelected,
-                      getTitleCheckboxProps: () => ({
-                        "aria-label": t("select_page")
-                      })
-                    }
-                  : undefined
-              }
-              pagination={{
-                current: filters.page,
-                pageSize: filters.page_size,
-                total: query.data?.total,
-                showSizeChanger: true,
-                pageSizeOptions: [10, 20, 50],
-                showTotal: (total) => t("total_count", { count: total }),
-                onChange: (page, page_size) => {
-                  setFilters((current) => ({ ...current, page, page_size }));
-                  setSelected([]);
-                }
-              }}
-              // 固定既有列身份，保留中文界面创建的列偏好；显示标题随语言更新。
-              columns={[
-                ...(!entryId
-                  ? [
-                      {
-                        title: "ID",
-                        dataIndex: "id",
-                        width: 125,
-                        render: (id: string) => (
-                          <Typography.Text copyable={{ text: id }} title={id}>
-                            {id.slice(0, 8)}
-                          </Typography.Text>
-                        )
-                      }
-                    ]
-                  : []),
-                {
-                  key: "状态",
-                  title: t("status"),
-                  width: 100,
-                  render: (_, row) => (
-                    <Tag>
-                      {trash
-                        ? t("trash_title")
-                        : row.withdrawn_at
-                          ? t("withdrawn")
-                          : row.current_publication_id
-                            ? t("published")
-                            : t("draft")}
-                    </Tag>
-                  )
-                },
-                {
-                  key: "等级",
-                  title: t("level_short"),
-                  width: 65,
-                  render: (_, row) => row.content.sentence.level
-                },
-                {
-                  key: "例句",
-                  title: t("sentence"),
-                  width: 350,
-                  render: (_, row) => (
-                    <V3EnglishTextPreview
-                      value={row.content.sentence.en_text}
-                      hideCommonDialect
-                    />
-                  )
-                },
-                {
-                  key: "关联词条",
-                  title: t("entries"),
-                  width: 190,
-                  render: (_, row) => (
-                    <Flex vertical>
-                      {!row.entries.length && <Tag>{t("unlinked")}</Tag>}
-                      {row.entries.slice(0, 2).map((e) => (
-                        <span className="tsz-words" key={e.id}>
-                          {entryLink(e, t)}{" "}
-                        </span>
-                      ))}
-                      {row.entries.length > 2 && (
-                        <Typography.Text
-                          title={row.entries.map((e) => e.headword).join("、")}
-                        >
-                          …
-                        </Typography.Text>
-                      )}
-                      {row.content.annotations.some(
-                        (a) => a.target.state === "pending"
-                      ) && <Tag color="orange">{t("pending_links")}</Tag>}
-                    </Flex>
-                  )
-                },
-                ...(!entryId
-                  ? [
-                      {
-                        key: "创建时间",
-                        title: t("created_at"),
-                        width: 170,
-                        render: (_: unknown, row: SharedSentence) =>
-                          new Date(row.created_at).toLocaleString(i18n.language)
-                      },
-                      {
-                        title: t("creator"),
-                        dataIndex: "created_by",
-                        width: 100
-                      },
-                      {
-                        key: "更新时间",
-                        title: t("updated_at"),
-                        width: 170,
-                        render: (_: unknown, row: SharedSentence) =>
-                          new Date(row.updated_at).toLocaleString(i18n.language)
-                      }
-                    ]
-                  : []),
-                {
-                  key: "操作",
-                  title: t("actions"),
-                  fixed: "right",
-                  width: canEdit || canPublish ? 208 : 112,
-                  render: (_, row) => (
-                    <Space>
-                      <Button
-                        size="small"
-                        onClick={() =>
-                          trash ? setDetail(row) : void open(row.id, false)
-                        }
-                      >
-                        {t("view")}
-                      </Button>
-                      {!readOnly && !trash && (
-                        <>
-                          {(canAction(row, "edit") ||
-                            canAction(row, "associate")) && (
-                            <Button
-                              size="small"
-                              onClick={() => void open(row.id, true)}
-                            >
-                              {t("edit")}
-                            </Button>
-                          )}
-                          {canAction(row, "publish") && (
-                            <Button
-                              size="small"
-                              onClick={() =>
-                                void openPublication(row, "publish")
-                              }
-                            >
-                              {t("publish")}
-                            </Button>
-                          )}
-                        </>
-                      )}
-                      {trash && canDelete && (
-                        <>
-                          <Button
-                            size="small"
-                            onClick={() => remove([row], true)}
-                          >
-                            {t("restore")}
-                          </Button>
-                          <Button
-                            size="small"
-                            danger
-                            onClick={() => remove([row])}
-                          >
-                            {t("delete")}
-                          </Button>
-                        </>
-                      )}
-                      {canReadAll && !trash && (
-                        <Dropdown
-                          trigger={["click"]}
-                          menu={{
-                            items: [
-                              {
-                                key: "history",
-                                label: t("history"),
-                                onClick: () =>
-                                  void openPublication(row, "history")
-                              },
-                              ...(row.current_publication_id &&
-                              canAction(
-                                row,
-                                row.withdrawn_at ? "restore" : "withdraw"
-                              )
-                                ? [
-                                    {
-                                      key: "visibility",
-                                      danger: !row.withdrawn_at,
-                                      label: row.withdrawn_at
-                                        ? t("show_publication")
-                                        : t("withdraw"),
-                                      onClick: () =>
-                                        void openPublication(
-                                          row,
-                                          row.withdrawn_at
-                                            ? "restore"
-                                            : "withdraw"
-                                        )
-                                    }
-                                  ]
-                                : []),
-                              ...(canDelete &&
-                              !entryId &&
-                              !row.current_publication_id
-                                ? [
-                                    {
-                                      key: "delete",
-                                      danger: true,
-                                      label: t("trash"),
-                                      onClick: () => remove([row])
-                                    }
-                                  ]
-                                : [])
-                            ]
-                          }}
-                        >
-                          <Button
-                            size="small"
-                            type="text"
-                            aria-label={t("more")}
-                            icon={<EllipsisVerticalIcon />}
-                          />
-                        </Dropdown>
-                      )}
-                    </Space>
-                  )
-                }
-              ]}
-            />
-          </Col>
-        </Row>
+            ]}
+          />
+        )}
       </ContentContainer>
 
       {batch && (
@@ -769,70 +876,23 @@ export function SentenceLibrary({
         <Modal
           open
           title={t("details")}
-          width={850}
+          width={800}
+          centered
+          className="sentence-detail-dialog"
           onCancel={() => setDetail(undefined)}
           footer={
-            <Button onClick={() => setDetail(undefined)}>{t("close")}</Button>
+            <>
+              <span className="sentence-detail-id">
+                ID{" "}
+                <Typography.Text copyable={{ text: detail.id }}>
+                  {detail.id}
+                </Typography.Text>
+              </span>
+              <Button onClick={() => setDetail(undefined)}>{t("close")}</Button>
+            </>
           }
         >
-          <Flex vertical gap="middle">
-            <Descriptions
-              layout="vertical"
-              column={{ xs: 1, md: 2 }}
-              items={[
-                { key: "id", label: "ID", children: detail.id },
-                {
-                  key: "level",
-                  label: t("level_short"),
-                  children: detail.content.sentence.level
-                }
-              ]}
-            />
-            <V3EnglishTextPreview
-              value={detail.content.sentence.en_text}
-              hideCommonDialect
-            />
-            {detail.content.sentence.zh_translations.map((translation) => (
-              <Typography.Paragraph key={translation.id}>
-                {t("translation_content", {
-                  band: t(
-                    translation.band === "word_for_word"
-                      ? "band_beginner"
-                      : translation.band === "balanced_fluency"
-                        ? "band_intermediate"
-                        : "band_advanced"
-                  ),
-                  content: translation.content.text
-                })}
-              </Typography.Paragraph>
-            ))}
-            <Space wrap>
-              {detail.entries.map((e) => (
-                <span className="tsz-words" key={e.id}>
-                  {entryLink(e, t)}
-                </span>
-              ))}
-            </Space>
-            {detail.content.annotations.map((a) => (
-              <Typography.Text className="tsz-entry-en" key={a.id}>
-                {a.source_segments.map((s) => s.surface).join(" … ")} →{" "}
-                {a.target.state === "linked"
-                  ? (detail.entries.find(
-                      (e) =>
-                        e.id ===
-                        (a.target.state === "linked"
-                          ? a.target.target_entry_id
-                          : "")
-                    )?.headword ?? a.target.target_entry_id)
-                  : a.target.state === "entry_only"
-                    ? t("select_sense")
-                    : t("pending_target", {
-                        headword: a.target.headword,
-                        gloss: a.target.gloss ?? ""
-                      })}
-              </Typography.Text>
-            ))}
-          </Flex>
+          <SentenceDetailContent detail={detail} />
         </Modal>
       )}
     </Flex>

@@ -223,12 +223,17 @@ it("跨页同词条合并词形和词义，不重复第一列或丢后页词义"
       { ...first.senses[0]!, sense_id: "other-sense", gloss: "第二词义" }
     ]
   };
+  const firstPage = pending<SearchComponentTargetsV3Response>();
   search
-    .mockResolvedValueOnce(response([first], "next"))
+    .mockReturnValueOnce(firstPage.promise)
     .mockResolvedValueOnce(response([second]));
   render(<V3TargetCascader literal="give" targets={[]} onReplace={vi.fn()} />);
-  fireEvent.click(await screen.findByText("give 0"));
-  fireEvent.click(await screen.findByText("原形 give"));
+  // 等首批候选渲染和级联初始化完成，再展开词条。
+  await act(async () => {
+    firstPage.resolve(response([first], "next"));
+  });
+  fireEvent.click(screen.getByText("give 0"));
+  fireEvent.click(screen.getByText("原形 give"));
   fireEvent.click(screen.getByRole("button", { name: "加载更多" }));
   expect(await screen.findByText("第二词义")).toBeVisible();
   expect(screen.getAllByText("give 0")).toHaveLength(1);
