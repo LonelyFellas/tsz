@@ -479,7 +479,7 @@ it("打开语法分类不拿起画笔，空选区先引导选择文字", () => {
   expect(view.onChange).not.toHaveBeenCalled();
 });
 
-it("选择文字自动展示分类，重复应用不取消；局部改类不影响连读、停顿和历史标注", () => {
+it("同一按钮可局部取消固定核心词，保留其他标注并支持撤销", () => {
   const view = props({
     value: {
       version: 2,
@@ -493,14 +493,29 @@ it("选择文字自动展示分类，重复应用不取消；局部改类不影�
   });
   render(<VoiceEditor {...view} />);
   const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
-  input.setSelectionRange(2, 8);
+  input.setSelectionRange(4, 6);
   fireEvent.select(input);
   const core = screen.getByLabelText("标记为固定核心词");
   expect(core).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(core);
-  expect(
-    document.querySelectorAll(".tsz-ve-letter.is-core").length
-  ).toBeGreaterThan(0);
+  expect(core).toHaveAttribute("aria-pressed", "false");
+  expect(applied(view).annotations).toEqual(
+    expect.arrayContaining([
+      { type: "emphasis", start: 2, end: 4, level: "core" },
+      { type: "emphasis", start: 6, end: 8, level: "core" },
+      expect.objectContaining({ type: "liaison", start: 0, end: 8 }),
+      { type: "pause", at: 8, duration_ms: 500 }
+    ])
+  );
+  fireEvent.click(button("上一步"));
+  expect(applied(view).annotations).toContainEqual({
+    type: "emphasis",
+    start: 2,
+    end: 8,
+    level: "core"
+  });
+  input.setSelectionRange(0, 0);
+  fireEvent.select(input);
   input.setSelectionRange(4, 6);
   fireEvent.select(input);
   fireEvent.click(button("标记为词性提示符"));
@@ -527,17 +542,26 @@ it("选区标注按码点跨段落应用，可撤销重做；只读不能修改"
   });
   const { rerender } = render(<VoiceEditor {...view} />);
   const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
-  input.setSelectionRange(3, 8);
+  input.setSelectionRange(3, 4);
   fireEvent.select(input);
-  fireEvent.click(screen.getByLabelText("标记为固定核心词"));
-  expect(applied(view).annotations).toEqual([
+  const core = screen.getByLabelText("标记为固定核心词");
+  fireEvent.click(core);
+  input.setSelectionRange(2, 8);
+  fireEvent.select(input);
+  expect(core).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(core);
+  const marked = [
     { type: "emphasis", start: 2, end: 3, level: "core" },
     { type: "emphasis", start: 4, end: 7, level: "core" }
-  ]);
-  fireEvent.click(button("上一步"));
+  ];
+  expect(applied(view).annotations).toEqual(marked);
+  expect(core).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(core);
   expect(applied(view).annotations).toEqual([]);
+  fireEvent.click(button("上一步"));
+  expect(applied(view).annotations).toEqual(marked);
   fireEvent.click(button("下一步"));
-  expect(applied(view).annotations).toHaveLength(2);
+  expect(applied(view).annotations).toEqual([]);
   input.setSelectionRange(0, 0);
   fireEvent.select(input);
   input.setSelectionRange(3, 8);
@@ -750,13 +774,16 @@ describe("VoiceEditor 标注带", () => {
     expect(document.querySelectorAll(".tsz-ve-gap")).toHaveLength(4);
   });
 
-  it("选词分类、重复应用保留标注、换分类则替换", () => {
+  it("重复标记同一个词可取消固定核心词，换分类时替换原标注", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
     pickRole("固定核心词");
     tapWord("centre");
     expect(wordLevels("centre")).toEqual(["core"]);
+
+    tapWord("centre");
+    expect(wordLevels("centre")).toEqual([]);
 
     tapWord("centre");
     expect(wordLevels("centre")).toEqual(["core"]);

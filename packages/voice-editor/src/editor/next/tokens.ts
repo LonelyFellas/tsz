@@ -157,7 +157,7 @@ export function applyRoleRange(
   // 逐字母撤色会在残段两头留下空格；只剩空格的单元看不见也点不掉，却照样落盘。
   const points = Array.from(text);
   return coalesce(next).flatMap((item) => {
-    const trimmed = trimUnit(points, item);
+    const trimmed = trimTextRange(points, item);
     return trimmed ? [trimmed] : [];
   });
 }
@@ -169,7 +169,8 @@ export function applyRoleRange(
 export function splitRangeAtParagraphs(
   text: string,
   start: number,
-  end: number
+  end: number,
+  options: { trimWhitespace?: boolean } = {}
 ): Array<{ start: number; end: number }> {
   const points = Array.from(text);
   const pieces: Array<{ start: number; end: number }> = [];
@@ -177,7 +178,13 @@ export function splitRangeAtParagraphs(
   for (let index = start; index <= end; index += 1) {
     const point = points[index];
     if (index === end || point === "\n" || point === "\r") {
-      if (index > from) pieces.push({ start: from, end: index });
+      if (index > from) {
+        const range = { start: from, end: index };
+        const piece = options.trimWhitespace
+          ? trimTextRange(points, range)
+          : range;
+        if (piece) pieces.push(piece);
+      }
       from = index + 1;
     }
   }
@@ -596,11 +603,14 @@ function editedWordWindow(
 }
 
 /** 去掉区间两端的空白码点：裁切后留下的半截单元不该带着一个空格。 */
-function trimUnit(text: string[], unit: RoleUnit): RoleUnit | undefined {
-  let { start, end } = unit;
+function trimTextRange<T extends { start: number; end: number }>(
+  text: string[],
+  range: T
+): T | undefined {
+  let { start, end } = range;
   while (start < end && /\s/u.test(text[start] ?? "")) start += 1;
   while (end > start && /\s/u.test(text[end - 1] ?? "")) end -= 1;
-  return end > start ? { ...unit, start, end } : undefined;
+  return end > start ? { ...range, start, end } : undefined;
 }
 
 /**
@@ -633,11 +643,11 @@ function remapRoleUnits(
     }
     const left =
       unit.start < cutStart
-        ? trimUnit(after, { ...unit, end: cutStart })
+        ? trimTextRange(after, { ...unit, end: cutStart })
         : undefined;
     const right =
       unit.end > cutEnd
-        ? trimUnit(after, {
+        ? trimTextRange(after, {
             ...unit,
             start: cutEnd + delta,
             end: unit.end + delta
