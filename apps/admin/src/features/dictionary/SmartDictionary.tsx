@@ -6,6 +6,7 @@ import {
   type LexiconListKey
 } from "@/features/dictionary/i18n/list";
 import { WordListTable, type WordColumn } from "./WordListTable";
+import { WordListNames } from "./WordListNames";
 import "./word-list-controls.css";
 import { TableEmptyState } from "@/components/TableEmptyState";
 import {
@@ -900,45 +901,14 @@ export function SmartDictionary({
       width: 180,
       fixed: "left",
       ellipsis: true,
-      render: (record) => {
-        const annotation = visibleWordAnnotation(record);
-        const names = record.name_variants?.length
-          ? record.name_variants
-          : [{ text: wordListLabel(record), dialects: [] }];
-        return (
-          <div className="word-list-names">
-            <div className="word-list-name-variants">
-              {names.map((name) => (
-                <div className="word-list-name" key={name.text}>
-                  <span className="tsz-words word-list-name-text">
-                    {name.text}
-                  </span>
-                  {annotation ? (
-                    <sup className="word-list-name-annotation">
-                      {annotation}
-                    </sup>
-                  ) : null}
-                  {!name.dialects.includes("common") &&
-                    name.dialects.map((dialect) => (
-                      <span
-                        key={dialect}
-                        className={`word-list-dialect-dot word-list-dialect-dot-${dialect}`}
-                        role="img"
-                        aria-label={
-                          dialect === "uk" ? t("spelling_uk") : t("spelling_us")
-                        }
-                        data-spelling-dialect={dialect}
-                      />
-                    ))}
-                </div>
-              ))}
-            </div>
-            <span className="word-list-type-compact">
-              {kindLabel(record.kind)}
-            </span>
-          </div>
-        );
-      }
+      render: (record) => (
+        <WordListNames
+          fallbackName={record.presentation.label}
+          variants={record.name_variants}
+          annotation={visibleWordAnnotation(record)}
+          kindLabel={kindLabel(record.kind)}
+        />
+      )
     },
     {
       title: t("kind"),

@@ -2479,6 +2479,41 @@ it("新版列表按任务布局显示高级筛选并提交最后更新人", asyn
   );
 });
 
+it("新版列表在同一行显示保存的英美原形，旧响应仍可显示词条名", async () => {
+  grantListPermissions();
+  const api = requests();
+  api.workspaceList.mockResolvedValue({
+    items: [
+      listRow({
+        headword: "old name",
+        name_variants: [
+          { text: "centre", dialects: ["uk"] },
+          { text: "center", dialects: ["us"] }
+        ]
+      }),
+      listRow({ id: "older-entry", headword: "panel" })
+    ],
+    pagination: { total: 2, page: 1, page_size: 20, total_pages: 1 }
+  });
+
+  mount(api, "/lexicon-next");
+
+  const americanName = await screen.findByText("center");
+  const names = within(americanName.closest("td")!);
+  expect(names.getByText("centre")).toBeVisible();
+  expect(names.getByRole("img", { name: "英式拼写" })).toBeVisible();
+  expect(names.getByRole("img", { name: "美式拼写" })).toBeVisible();
+  expect(screen.getByText("panel")).toBeVisible();
+  expect(
+    screen.getByRole("checkbox", { name: "选择「centre / center」" })
+  ).toBeVisible();
+  fireEvent.mouseEnter(button("更多操作：centre / center"));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "移入垃圾桶" }));
+  expect(
+    within(await screen.findByRole("dialog")).getByText("centre / center")
+  ).toBeVisible();
+});
+
 it("新版列表将词条状态和词条名称按顺序固定在左侧", async () => {
   const matchMedia = window.matchMedia;
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({

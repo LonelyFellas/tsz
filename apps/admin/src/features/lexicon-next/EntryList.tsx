@@ -34,9 +34,11 @@ import {
   WordListTable,
   type WordColumn
 } from "@/features/dictionary/WordListTable";
+import { WordListNames } from "@/features/dictionary/WordListNames";
 import { WordListFilters } from "@/features/dictionary/WordListFilters";
 import { EntryAnnotationModal } from "@/features/dictionary/EntryAnnotationModal";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { entryNameLabel } from "@/features/dictionary/presentation";
 import { annotationForbiddenMessage } from "@/features/dictionary/annotationPermission";
 import { useLexiconListTranslation } from "@/features/dictionary/i18n/list";
 import {
@@ -59,6 +61,10 @@ import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { useLexiconLanguages } from "./LanguageSelection";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
+
+function workspaceEntryLabel(row: NextWorkspaceEntry) {
+  return entryNameLabel(row.name_variants, row.headword);
+}
 
 function cefrLevelColor(level: string) {
   return CEFR_LEVELS.includes(level as CefrLevel)
@@ -399,27 +405,14 @@ export function EntryList({
       width: 180,
       fixed: "left",
       ellipsis: true,
-      render: (row) => {
-        return (
-          <div className="word-list-names">
-            <div className="word-list-name-variants">
-              <div className="word-list-name">
-                <span className="tsz-words word-list-name-text">
-                  {row.headword}
-                </span>
-                {row.annotation_visible && row.annotation && (
-                  <sup className="word-list-name-annotation">
-                    {row.annotation}
-                  </sup>
-                )}
-              </div>
-            </div>
-            <span className="word-list-type-compact">
-              {kindLabel(row.kind)}
-            </span>
-          </div>
-        );
-      }
+      render: (row) => (
+        <WordListNames
+          fallbackName={row.headword}
+          variants={row.name_variants}
+          annotation={row.annotation_visible ? row.annotation : null}
+          kindLabel={kindLabel(row.kind)}
+        />
+      )
     },
     {
       key: "kind",
@@ -543,7 +536,7 @@ export function EntryList({
                 size="small"
                 className="word-list-row-action"
                 aria-label={t("restore_label", {
-                  label: `「${row.headword}」`
+                  label: `「${workspaceEntryLabel(row)}」`
                 })}
                 disabled={!allowed(row, "restore") || pending}
                 onClick={() => begin("restore", [row])}
@@ -623,7 +616,9 @@ export function EntryList({
               type="text"
               size="small"
               className="word-list-more-action"
-              aria-label={t("next_more_actions", { label: row.headword })}
+              aria-label={t("next_more_actions", {
+                label: workspaceEntryLabel(row)
+              })}
               aria-haspopup="menu"
               aria-expanded={openActionRow === row.id}
               onFocus={(event) => {
@@ -752,7 +747,7 @@ export function EntryList({
             }
             columns={columns}
             rows={rows}
-            rowLabel={(row) => row.headword}
+            rowLabel={workspaceEntryLabel}
             loading={result.isPending}
             toolbar={
               <div className="word-list-table-actions">
@@ -895,7 +890,7 @@ export function EntryList({
           onOk={() => void submit()}
         >
           <p className="tsz-words">
-            {confirmation.rows.map((row) => row.headword).join("、")}
+            {confirmation.rows.map(workspaceEntryLabel).join("、")}
           </p>
           {confirmation.request.action === "delete" && (
             <>
@@ -944,7 +939,7 @@ export function EntryList({
               : [
                   {
                     key: annotationEntry.id,
-                    label: annotationEntry.headword,
+                    label: workspaceEntryLabel(annotationEntry),
                     annotation: annotationEntry.annotation,
                     posLabels: annotationEntry.part_of_speech,
                     glossPreviews: annotationEntry.gloss

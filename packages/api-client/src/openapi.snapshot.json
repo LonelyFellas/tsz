@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/var/folders/fj/xzx7t8r90x36tp23zvvyrsb00000gn/T/tsz-step2-api-spec-xcpbmclc/openapi.json",
-  "_generatedAt": "2026-11-22T16:02:23.191Z",
+  "_source": "/Users/darwish/.codex/worktrees/task-249-entry-names-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-23T00:30:04.125Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -572,6 +572,12 @@
     "get /admin/lexicon-next/workspace/entries": [
       {
         "name": "x-tsz-next-levels",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-name-variants",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/var/folders/fj/xzx7t8r90x36tp23zvvyrsb00000gn/T/tsz-step2-api-spec-xcpbmclc/openapi.json",
-  "_source_sha256": "6ed3a0c63b67a0f646875bdc840e7dbdbe9e027dbfc4b4289e591d67a49a4e98",
+  "_source": "/Users/darwish/.codex/worktrees/task-249-entry-names-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "0f84ec2398d313bab98a888362f43e3e4be2cac24c250e8309eef38a23ab3011",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -4685,6 +4685,10 @@
         "kind": { "$ref": "#/$defs/NextEntryKind" },
         "levels": { "type": "array", "items": { "type": "string" } },
         "lifecycle_revision": { "type": "integer" },
+        "name_variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EntryNameVariantV3" }
+        },
         "owner_id": { "type": "string", "format": "uuid" },
         "part_of_speech": { "type": "array", "items": { "type": "string" } },
         "revision": { "type": "integer" },
