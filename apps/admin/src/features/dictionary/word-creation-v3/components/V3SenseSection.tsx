@@ -11,10 +11,15 @@ interface SenseSectionProps {
   collapsed: boolean;
   onToggle: () => void;
   extra?: ReactNode;
+  headerAction?: ReactNode;
   children: ReactNode;
 }
 
-export function SenseSection({ children, ...props }: SenseSectionProps) {
+export function SenseSection({
+  children,
+  headerAction,
+  ...props
+}: SenseSectionProps) {
   return (
     <Card
       size="small"
@@ -22,6 +27,7 @@ export function SenseSection({ children, ...props }: SenseSectionProps) {
       aria-label={props.label}
       className={`word-sense-section word-sense-section-card${props.collapsed ? " is-collapsed" : ""}`}
       title={<SenseSectionTitle {...props} />}
+      extra={headerAction}
     >
       <SenseSectionBody collapsed={props.collapsed}>
         {children}

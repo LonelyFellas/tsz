@@ -1,3 +1,4 @@
+import { SectionAI } from "./GenerationActions";
 import { useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type {
@@ -123,6 +124,7 @@ export function Relations({
   };
   return (
     <SenseSection
+      headerAction={<SectionAI section="relations" disabled={disabled} />}
       label={t("related_words")}
       count={groupRelations(rows).length}
       unit="项"

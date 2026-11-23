@@ -76,8 +76,8 @@ const STARTERS: Record<WordCreationStep, string[]> = {
   ],
   meanings: [
     "检查词义和例句还缺什么",
-    "义项划分和 CEFR 合理吗？",
-    "结合内置词典看看漏了哪些义项"
+    "词义划分和 CEFR 合理吗？",
+    "结合内置词典看看漏了哪些词义"
   ],
   preview: ["发布前还差什么？", "整体检查一遍有没有前后矛盾的地方"]
 };
@@ -89,8 +89,8 @@ const STARTER_KEYS = {
   检查词形和发音还缺什么: "assistant_starter_3",
   "这些词形的英美拼写和音标对吗？": "assistant_starter_4",
   检查词义和例句还缺什么: "assistant_starter_6",
-  "义项划分和 CEFR 合理吗？": "assistant_starter_7",
-  结合内置词典看看漏了哪些义项: "assistant_starter_8",
+  "词义划分和 CEFR 合理吗？": "assistant_starter_7",
+  结合内置词典看看漏了哪些词义: "assistant_starter_8",
   "发布前还差什么？": "assistant_starter_9",
   整体检查一遍有没有前后矛盾的地方: "assistant_starter_10"
 } as const;

@@ -65,15 +65,15 @@ export const lexiconEditorMessages = {
   dialect_pair_choose_entry: ["选择词条", "選擇詞條", "Select entry"],
   dialect_pair_previous: ["上一页", "上一頁", "Previous page"],
   dialect_pair_next: ["下一页", "下一頁", "Next page"],
-  dialect_pair_sense: ["配对义项", "配對義項", "Sense to pair"],
+  dialect_pair_sense: ["配对词义", "配對詞義", "Sense to pair"],
   dialect_pair_opposite: [
-    "选择相反方言的义项",
-    "選擇另一方言的義項",
+    "选择相反方言的词义",
+    "選擇另一方言的詞義",
     "Select a sense in the other dialect"
   ],
   dialect_pair_mark: [
-    "请先在目标词条标注相反方言的义项。",
-    "請先在目標詞條標註另一方言的義項。",
+    "请先在目标词条标注相反方言的词义。",
+    "請先在目標詞條標註另一方言的詞義。",
     "Mark a sense in the other dialect on the target entry first."
   ],
   dialect_pair_load_error: [
@@ -81,7 +81,7 @@ export const lexiconEditorMessages = {
     "無法讀取配對候選",
     "Could not load pairing candidates"
   ],
-  dialect_pair_use: ["选用此义项", "選用此義項", "Use this sense"],
+  dialect_pair_use: ["选用此词义", "選用此詞義", "Use this sense"],
   dialect_pair_usage: ["方言用法", "方言用法", "Dialect usage"],
   dialect_pair_us_equivalent: [
     "对应的美式词义",
@@ -112,6 +112,38 @@ export const lexiconEditorMessages = {
   ],
   dialect_pair_optional: ["说明（选填）", "說明（選填）", "Optional note"],
   ...equivalentMessages,
+  entry_ai_scope: ["生成范围", "生成範圍", "Generation scope"],
+  entry_ai_assistant: ["词条助手", "詞條助手", "Entry assistant"],
+  entry_ai_generate_section: [
+    "AI 生成{{section}}",
+    "AI 生成{{section}}",
+    "Generate {{section}} with AI"
+  ],
+  entry_ai_generate_entry: [
+    "生成整个词条",
+    "生成整個詞條",
+    "Generate entire entry"
+  ],
+  entry_ai_unavailable: [
+    "词条生成服务暂不可用",
+    "詞條生成服務暫不可用",
+    "Entry generation is currently unavailable"
+  ],
+  entry_ai_translation_ineligible: [
+    "仅可补全可编辑且缺少译文的例句",
+    "僅可補全可編輯且缺少譯文的例句",
+    "Only editable examples without a translation can be filled"
+  ],
+  entry_ai_forms: ["词形与发音", "詞形與發音", "Forms and pronunciation"],
+  entry_ai_senses: ["词义目录", "詞義目錄", "Sense index"],
+  entry_ai_groups: ["语义区间", "語義區間", "Sense groups"],
+  entry_ai_grammar: ["语法结构", "語法結構", "Grammar patterns"],
+  entry_ai_definitions: ["释义与解释", "釋義與解釋", "Definitions"],
+  entry_ai_equivalents: ["常见译词", "常見譯詞", "Equivalents"],
+  entry_ai_relations: ["拓展词", "拓展詞", "Related words"],
+  entry_ai_dialect: ["方言用法", "方言用法", "Regional usage"],
+  entry_ai_examples: ["例句", "例句", "Examples"],
+  entry_ai_translations: ["例句译文", "例句譯文", "Example translations"],
   ...lexiconEditorPanelMessages,
   ...publishingWorkspaceMessages,
   ...batchPublicationMessages,
@@ -732,8 +764,8 @@ export const lexiconEditorMessages = {
     "Meaning {{index}} level"
   ],
   meaning_level_label: [
-    "义项 {{index}} 等级",
-    "義項 {{index}} 等級",
+    "词义 {{index}} 等级",
+    "詞義 {{index}} 等級",
     "Sense {{index}} level"
   ],
   sense_group_label: [
@@ -742,8 +774,8 @@ export const lexiconEditorMessages = {
     "Meaning {{index}} sense group"
   ],
   meaning_group_label: [
-    "义项 {{index}} 所属语义区间",
-    "義項 {{index}} 所屬語義區間",
+    "词义 {{index}} 所属语义区间",
+    "詞義 {{index}} 所屬語義區間",
     "Sense {{index}} sense group"
   ],
   sense_sub_pos_label: [
@@ -752,8 +784,8 @@ export const lexiconEditorMessages = {
     "Meaning {{index}} subcategory"
   ],
   meaning_sub_pos_label: [
-    "义项 {{index}} 子词性",
-    "義項 {{index}} 子詞性",
+    "词义 {{index}} 子词性",
+    "詞義 {{index}} 子詞性",
     "Sense {{index}} subcategory"
   ],
   sense_frequency_label: [
@@ -762,8 +794,8 @@ export const lexiconEditorMessages = {
     "Meaning {{index}} frequency"
   ],
   meaning_frequency_label: [
-    "义项 {{index}} 频率",
-    "義項 {{index}} 頻率",
+    "词义 {{index}} 频率",
+    "詞義 {{index}} 頻率",
     "Sense {{index}} frequency"
   ],
   sense_context_label: [
@@ -772,8 +804,8 @@ export const lexiconEditorMessages = {
     "Meaning {{index}} context dependence"
   ],
   meaning_context_label: [
-    "义项 {{index}} 是否依赖语境",
-    "義項 {{index}} 是否依賴語境",
+    "词义 {{index}} 是否依赖语境",
+    "詞義 {{index}} 是否依賴語境",
     "Sense {{index}} context dependence"
   ],
   drag_definition: [

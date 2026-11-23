@@ -157,7 +157,7 @@ export interface WordRelationV2 {
   id: string;
   relation: WordRelationType;
   /**
-   * 已绑定形态：与 target_sense_id 成对指向真实义项。
+   * 已绑定形态：与 target_sense_id 成对指向真实词义。
    *
    * 待物化形态下后端 `skip_serializing_if` 让这两个键**整个缺席**（不是 null），
    * 所以必须可选——按必填读会在 `.trim()` 处炸 TypeError。

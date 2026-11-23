@@ -166,7 +166,7 @@ it("standard mode has four columns with abbreviated basic parts of speech and al
   expect(screen.queryByText("词形-general")).not.toBeInTheDocument();
   expect(screen.queryByText("/riːd/")).not.toBeInTheDocument();
 });
-it("简洁模式保留全部义项、等级和词性合并，并按偏好选择富文本释义", () => {
+it("简洁模式保留全部词义、等级和词性合并，并按偏好选择富文本释义", () => {
   const view = render(
     <Entry entry={readingEntry} level="A1" variant="BrE" simple />
   );

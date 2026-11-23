@@ -46,7 +46,7 @@ const targetEntry: NextEntry = {
   }
 };
 
-it("只读及编辑转保存中时禁用目标义项和排序，保留现有关系", async () => {
+it("只读及编辑转保存中时禁用目标词义和排序，保留现有关系", async () => {
   const rows = ["first", "second"].map((id) => ({
     id,
     relation: "synonym",
@@ -146,7 +146,7 @@ it("已关联目标读取失败显示重试，恢复后回显且不改写草稿"
   expect(onChange).not.toHaveBeenCalled();
 });
 
-it("新版接入 V1 拓展词，候选按语言隔离，关联保存回读与预览保留其他义项", async () => {
+it("新版接入 V1 拓展词，候选按语言隔离，关联保存回读与预览保留其他词义", async () => {
   const initial: NextDraft = {
     schema_version: 1,
     headword: "job",

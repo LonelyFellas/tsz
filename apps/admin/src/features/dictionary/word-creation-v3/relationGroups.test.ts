@@ -15,7 +15,7 @@ const relation = (id: string, sense: string): WordRelationWritableV3 => ({
 });
 
 describe("派生词展示分组", () => {
-  it("同目标不同义项合组，近义词与文本不合并且保留顺序", () => {
+  it("同目标不同词义合组，近义词与文本不合并且保留顺序", () => {
     const first = relation("r1", "s1");
     const synonym = { ...relation("r2", "s1"), relation: "synonym" };
     const second = relation("r3", "s2");
@@ -84,7 +84,7 @@ describe("派生词展示分组", () => {
       expect(groupRelations([first, second])).toEqual([[first], [second]]);
     }
   );
-  it("取消与新增保留未变义项 UUID，清空即删整条，删除整组不碰其他关系", () => {
+  it("取消与新增保留未变词义 UUID，清空即删整条，删除整组不碰其他关系", () => {
     const first = relation("r1", "s1");
     const second = relation("r2", "s2");
     const other = { ...relation("other", "s3"), target_word_id: "other" };

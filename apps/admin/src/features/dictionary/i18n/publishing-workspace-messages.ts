@@ -545,13 +545,13 @@ export const publishingWorkspaceMessages = {
     "Check for missing meanings and sentences"
   ],
   assistant_starter_7: [
-    "义项划分和 CEFR 合理吗？",
-    "義項劃分和 CEFR 合理嗎？",
+    "词义划分和 CEFR 合理吗？",
+    "詞義劃分和 CEFR 合理嗎？",
     "Are the senses and CEFR levels appropriate?"
   ],
   assistant_starter_8: [
-    "结合内置词典看看漏了哪些义项",
-    "結合內建詞典看看遺漏了哪些義項",
+    "结合内置词典看看漏了哪些词义",
+    "結合內建詞典看看遺漏了哪些詞義",
     "Check the built-in dictionary for missing senses"
   ],
   assistant_starter_9: [

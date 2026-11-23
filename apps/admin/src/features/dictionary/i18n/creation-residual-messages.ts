@@ -1041,13 +1041,13 @@ export const creationResidualMessages = {
     "Choose a form link"
   ],
   creation_meaning_for_this_reading: [
-    "读法对应义项",
-    "讀法對應義項",
+    "读法对应词义",
+    "讀法對應詞義",
     "Meaning for this reading"
   ],
   creation_select_a_meaning_optional: [
-    "选择对应义项（可选）",
-    "選取對應義項（選填）",
+    "选择对应词义（可选）",
+    "選取對應詞義（選填）",
     "Select a meaning (optional)"
   ],
   creation_select_a_reading_explicitly: [

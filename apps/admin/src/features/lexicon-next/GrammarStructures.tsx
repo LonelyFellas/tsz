@@ -1,3 +1,4 @@
+import { SectionAI } from "./GenerationActions";
 import {
   lazy,
   Suspense,
@@ -490,6 +491,9 @@ export function GrammarStructures({
       className="lexicon-next-grammar"
       size="small"
       aria-labelledby={headingId}
+      extra={
+        <SectionAI section="grammar" pos={pos} disabled={disabled || !pos} />
+      }
       title={
         <div className="lexicon-next-section-caption">
           <h2 id={headingId} className="lexicon-next-section-title">

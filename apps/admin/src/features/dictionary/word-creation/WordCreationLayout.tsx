@@ -22,6 +22,7 @@ const WORD_STEP_TITLE: Record<WordCreationStep, WorkspaceMessage> = {
 
 interface Props {
   currentStep: WordCreationStep;
+  headerAction?: ReactNode;
   dictionary?: { path: string; label: string; back: string };
   stepLabels?: Partial<
     Record<WordCreationStep, { title: string; subtitle?: string }>
@@ -46,6 +47,7 @@ interface Props {
 
 export function WordCreationLayout({
   currentStep,
+  headerAction,
   dictionary,
   stepLabels,
   reachableSteps,
@@ -62,23 +64,34 @@ export function WordCreationLayout({
   const isBasicsStep = currentStep === "basics";
   const completed = new Set(presentation.completedSteps);
 
+  const breadcrumb = (
+    <Breadcrumb
+      aria-label={t("breadcrumb")}
+      className="word-creation-breadcrumb"
+      items={[
+        { title: t("dictionary_management") },
+        {
+          title: (
+            <Link to={dictionary?.path ?? "/words"}>
+              {dictionary?.label ?? t("dictionary")}
+            </Link>
+          )
+        },
+        { title: presentation.breadcrumbTitle }
+      ]}
+    />
+  );
+
   return (
     <div className="word-creation-page" ref={pageRef}>
-      <Breadcrumb
-        aria-label={t("breadcrumb")}
-        className="word-creation-breadcrumb"
-        items={[
-          { title: t("dictionary_management") },
-          {
-            title: (
-              <Link to={dictionary?.path ?? "/words"}>
-                {dictionary?.label ?? t("dictionary")}
-              </Link>
-            )
-          },
-          { title: presentation.breadcrumbTitle }
-        ]}
-      />
+      {headerAction ? (
+        <div className="word-creation-heading-actions">
+          {breadcrumb}
+          {headerAction}
+        </div>
+      ) : (
+        breadcrumb
+      )}
 
       <nav className="word-creation-stepper" aria-label={t("steps")}>
         {WORD_STEP_ORDER.map((step, index) => {

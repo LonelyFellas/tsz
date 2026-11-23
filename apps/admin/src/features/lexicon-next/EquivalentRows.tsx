@@ -1,3 +1,4 @@
+import { SectionAI } from "./GenerationActions";
 import { useRef, useState } from "react";
 import type {
   LexiconTaxonomy,
@@ -213,6 +214,9 @@ export function EquivalentRows({
   }
   return (
     <SenseSection
+      headerAction={
+        <SectionAI section="equivalents" label={title} disabled={disabled} />
+      }
       label={title}
       count={visible.length}
       unit="条"

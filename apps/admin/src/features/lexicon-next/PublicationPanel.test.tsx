@@ -161,7 +161,7 @@ describe("新版发布确认", () => {
     p.requests.publicationPreview.mockResolvedValueOnce({
       ...preview,
       can_publish: false,
-      issues: [{ node_id: "sense", field: "level", message: "请选择义项等级" }]
+      issues: [{ node_id: "sense", field: "level", message: "请选择词义等级" }]
     });
     p.requests.publish.mockRejectedValueOnce(
       new HttpError(409, "expired", [], "revision_conflict")
@@ -170,12 +170,12 @@ describe("新版发布确认", () => {
     render(<PublicationPanel {...p} onLocateIssue={locate} />);
     fireEvent.click(screen.getByRole("button", { name: "检查发布" }));
     fireEvent.click(
-      await screen.findByRole("button", { name: "请选择义项等级" })
+      await screen.findByRole("button", { name: "请选择词义等级" })
     );
     expect(locate).toHaveBeenCalledWith({
       node_id: "sense",
       field: "level",
-      message: "请选择义项等级"
+      message: "请选择词义等级"
     });
     expect(screen.queryByRole("button", { name: "确认发布" })).toBeNull();
     await check();

@@ -1029,7 +1029,7 @@ describe("SmartDictionary", () => {
       const row: AdminWordListItemV3 = {
         ...word("regional", "legacy label"),
         status: mode === "trash" ? "archived" : "draft",
-        annotation: "义项",
+        annotation: "词义",
         annotation_visible: true,
         name_variants: [
           { text: "cosy", dialects: ["uk"] },
@@ -1066,7 +1066,7 @@ describe("SmartDictionary", () => {
       ).toEqual([["uk"], ["us"], ["uk", "us"]]);
       expect(
         names.map((name) => name.querySelector("sup")?.textContent)
-      ).toEqual(["义项", "义项", "义项"]);
+      ).toEqual(["词义", "词义", "词义"]);
       const kindIndex = screen
         .getAllByRole("columnheader")
         .findIndex((header) => header.textContent === "类型");

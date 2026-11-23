@@ -26,8 +26,16 @@ export function useAdminModuleTranslation<N extends keyof InterfaceNamespaces>(
   const instance = useInterfaceInstance(createAdminI18n);
   useMemo(() => {
     for (const [language, namespaces] of Object.entries(resources)) {
-      if (!instance.hasResourceBundle(language, namespace))
-        instance.addResourceBundle(language, namespace, namespaces[namespace]);
+      const messages = namespaces[namespace];
+      const loaded = instance.getResourceBundle(language, namespace);
+      // An open tab can still hold an older version of this namespace after a hot update.
+      if (
+        messages &&
+        (!loaded ||
+          Object.keys(messages).some((key) => !Object.hasOwn(loaded, key)))
+      ) {
+        instance.addResourceBundle(language, namespace, messages, true);
+      }
     }
   }, [instance, namespace, resources]);
   return useTranslation(namespace, { i18n: instance });

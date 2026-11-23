@@ -1,4 +1,6 @@
 import type {
+  NextAgentInput,
+  NextAgentResult,
   NextPublicationBase,
   NextPublishInput,
   NextPublicationPreview,
@@ -86,6 +88,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-relations": "v1",
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
+      "x-tsz-next-generation": "v1",
       "x-tsz-next-sentences": "v1",
       "x-tsz-next-sentence-details": "v1",
       "x-tsz-next-sentence-drafts": "v1",
@@ -119,6 +122,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     headers: { "x-tsz-next-publications": "v1", "x-tsz-next-levels": "v1" }
   };
   return {
+    generate: (id: string, input: NextAgentInput, signal?: AbortSignal) =>
+      http
+        .post<unknown>(`${entry(id)}/generation`, input, { signal })
+        .then((value) => decode<NextAgentResult>("NextAgentResult", value)),
     publication: (id: string) =>
       http
         .get<unknown>(`${entry(id)}/publication`, {

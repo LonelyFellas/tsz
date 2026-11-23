@@ -1,3 +1,4 @@
+import { SectionAI } from "./GenerationActions";
 import { useLayoutEffect, useRef, useState } from "react";
 import { expandFormContents, isSharedForms } from "@tsz/shared";
 import type {
@@ -80,6 +81,7 @@ export function FormsStep({
             }}
             entryKind={kind}
             partOfSpeechCatalog={partOfSpeechCatalog}
+            headingAction={<SectionAI section="forms" />}
             showEmptyPosHint={false}
             emptyAddPosButton
             showPronunciationGuide={false}
