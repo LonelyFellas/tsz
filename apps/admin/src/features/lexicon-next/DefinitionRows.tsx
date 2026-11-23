@@ -1,3 +1,4 @@
+import { SectionAI } from "./GenerationActions";
 import { useState } from "react";
 import type { NextDefinition, NextGrammarStructure } from "@tsz/types";
 import { Button, EmptyState } from "@tsz/ui/admin/display";
@@ -62,6 +63,14 @@ export function DefinitionRows({
   });
   const content = (
     <SenseSection
+      headerAction={
+        <SectionAI
+          section="definitions"
+          locale={locale}
+          label={label}
+          disabled={disabled}
+        />
+      }
       label={label}
       count={visible.length}
       unit="条"

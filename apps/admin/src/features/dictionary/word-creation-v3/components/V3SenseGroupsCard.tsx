@@ -14,12 +14,14 @@ const SORTABLE_ROW_SELECTOR =
 export function V3SenseGroupsCard({
   groups,
   wordId,
+  headerAction,
   change,
   idFactory,
   onDelete
 }: {
   groups: SenseGroupV3[];
   wordId?: string;
+  headerAction?: React.ReactNode;
   change: (mutation: (groups: SenseGroupV3[]) => void) => void;
   onDelete: (id: string) => void;
   idFactory: () => string;
@@ -51,6 +53,7 @@ export function V3SenseGroupsCard({
       data-v3-node-id={wordId ?? "current-entry"}
       size="small"
       title={t("sense_groups")}
+      extra={headerAction}
     >
       <div className="word-sense-group-list">
         {/* 列名只出一次：每行都重复「中文 / 英文」会把下一行的输入框推远，

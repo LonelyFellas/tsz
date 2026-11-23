@@ -1,3 +1,4 @@
+import { SectionAI } from "./GenerationActions";
 import { Button, Space } from "@tsz/ui/admin/display";
 import { Input, Select } from "@tsz/ui/admin/forms";
 import { Trash2, Plus } from "lucide-react";
@@ -234,6 +235,14 @@ export function ContentRows({
   );
   return grouped ? (
     <SenseSection
+      headerAction={
+        <SectionAI
+          section={definition ? "definitions" : "equivalents"}
+          locale={locale}
+          label={label}
+          disabled={disabled}
+        />
+      }
       label={label}
       count={visible.length}
       unit="条"

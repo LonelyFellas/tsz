@@ -1,3 +1,4 @@
+import { GenerationSenseScope, SectionAI } from "./GenerationActions";
 import { Relations } from "./Relations";
 import { SenseSentenceExamples } from "./SenseSentenceExamples";
 import { EquivalentRows } from "./EquivalentRows";
@@ -286,6 +287,7 @@ export function MeaningsStep({
       {senseGroupsAvailable && (
         <AdminControls componentDisabled={disabled}>
           <V3SenseGroupsCard
+            headerAction={<SectionAI section="groups" disabled={disabled} />}
             groups={groups}
             idFactory={() => crypto.randomUUID()}
             change={(mutation) => {
@@ -431,6 +433,16 @@ export function MeaningsStep({
                   />
                 )}
                 <div className="word-sense-list">
+                  <div className="lexicon-next-section-caption">
+                    <h3 className="lexicon-next-section-title">
+                      {t("entry_ai_senses")}
+                    </h3>
+                    <SectionAI
+                      section="senses"
+                      pos={code}
+                      disabled={contentDisabled}
+                    />
+                  </div>
                   <SortableRows
                     items={disabled ? [] : senses}
                     scopeId={`lexicon-next-senses-${code}`}
@@ -469,12 +481,15 @@ export function MeaningsStep({
                               row.text.trim()
                           )?.text ||
                           "未填写释义";
-                        const senseLabel = meaningLabels ? "义项" : "词义";
+                        const senseLabel = t("review_sense", {
+                          index: index + 1
+                        });
                         const isExpanded = expandedId === sense.id;
                         return (
-                          <section
+                          <GenerationSenseScope
                             key={sense.id}
-                            aria-label={`${senseLabel} ${index + 1}`}
+                            id={sense.id}
+                            label={senseLabel}
                           >
                             <SenseEditorShell
                               index={index}
@@ -532,7 +547,7 @@ export function MeaningsStep({
                                         <span>词性</span>
                                         <Select
                                           data-v3-field="part_of_speech"
-                                          aria-label={`${senseLabel} ${index + 1} 词性`}
+                                          aria-label={`${senseLabel} ${t("pos")}`}
                                           placeholder="未指定词性"
                                           options={partOfSpeechCodes.map(
                                             (value) => ({
@@ -567,7 +582,7 @@ export function MeaningsStep({
                                     <span>词性</span>
                                     <Select
                                       data-v3-field="part_of_speech"
-                                      aria-label={`${senseLabel} ${index + 1} 词性`}
+                                      aria-label={`${senseLabel} ${t("pos")}`}
                                       placeholder="未指定词性"
                                       allowClear
                                       value={sense.part_of_speech ?? undefined}
@@ -586,7 +601,7 @@ export function MeaningsStep({
                                       <>
                                         <span>细分词性</span>
                                         <Select
-                                          aria-label={`${senseLabel} ${index + 1} 细分词性`}
+                                          aria-label={`${senseLabel} ${t("sub_pos")}`}
                                           disabled={disabled}
                                           placeholder="请选择细分词性"
                                           value={sense.sub_pos || undefined}
@@ -868,7 +883,7 @@ export function MeaningsStep({
                                 )}
                               </Flex>
                             </SenseEditorShell>
-                          </section>
+                          </GenerationSenseScope>
                         );
                       })
                     }

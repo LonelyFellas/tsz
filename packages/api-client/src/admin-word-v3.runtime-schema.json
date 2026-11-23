@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/fix-zentao-255-grammar-dubbing-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "2e10366455d48839fb505f341acaf77fbee8a9f9e31a48efa38e63d601a40788",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-super-agent-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "3cab20fd9b61ab3ced168ec7ab6a58e4550de18e76e3f8ecfe4f3a5af55eabf8",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -17,6 +17,8 @@
     "NextPublicationBase",
     "NextPublishInput",
     "NextPublicationState",
+    "NextAgentInput",
+    "NextAgentResult",
     "NextPublicationPreview",
     "NextPublication",
     "NextEntry",
@@ -3585,6 +3587,261 @@
         },
         "pagination": { "$ref": "#/$defs/PaginationMeta" },
         "revision": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentDefinition": {
+      "type": "object",
+      "required": ["sense", "english", "explanation"],
+      "properties": {
+        "english": { "type": "string" },
+        "explanation": { "type": "string" },
+        "sense": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentDialect": {
+      "type": "object",
+      "required": ["sense", "usage", "source_locator", "evidence"],
+      "properties": {
+        "evidence": { "type": "string" },
+        "sense": { "type": "integer", "minimum": 0 },
+        "source_locator": { "type": "string" },
+        "usage": { "$ref": "#/$defs/NextDialectUsage" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentEquivalent": {
+      "type": "object",
+      "required": ["sense", "word"],
+      "properties": {
+        "sense": { "type": "integer", "minimum": 0 },
+        "word": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentExample": {
+      "type": "object",
+      "required": ["sense", "text", "level"],
+      "properties": {
+        "level": { "type": "string" },
+        "sense": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentGrammar": {
+      "type": "object",
+      "required": ["pos", "pattern"],
+      "properties": {
+        "pattern": { "type": "string" },
+        "pos": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentGroup": {
+      "type": "object",
+      "required": ["sense", "name_en", "name_zh"],
+      "properties": {
+        "name_en": { "type": "string" },
+        "name_zh": { "type": "string" },
+        "sense": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentInput": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "base_revision",
+        "snapshot_id",
+        "headword",
+        "target",
+        "sections",
+        "existing_pos",
+        "examples",
+        "senses"
+      ],
+      "properties": {
+        "base_revision": { "type": "integer" },
+        "examples": { "type": "array", "items": { "type": "string" } },
+        "existing_pos": { "type": "array", "items": { "type": "string" } },
+        "headword": { "type": "string" },
+        "run_id": { "type": "string", "format": "uuid" },
+        "sections": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentSection" }
+        },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentSenseContext" }
+        },
+        "snapshot_id": { "type": "string" },
+        "target": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentProposals": {
+      "type": "object",
+      "required": [
+        "forms",
+        "senses",
+        "groups",
+        "grammar",
+        "definitions",
+        "equivalents",
+        "relations",
+        "examples",
+        "dialect",
+        "translations"
+      ],
+      "properties": {
+        "definitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentDefinition" }
+        },
+        "dialect": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentDialect" }
+        },
+        "equivalents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentEquivalent" }
+        },
+        "examples": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentExample" }
+        },
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AssistantCandidatePos" }
+        },
+        "grammar": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentGrammar" }
+        },
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentGroup" }
+        },
+        "relations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentRelation" }
+        },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentSense" }
+        },
+        "translations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentTranslation" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentRelation": {
+      "type": "object",
+      "required": ["sense", "kind", "word", "gloss", "score"],
+      "properties": {
+        "gloss": { "type": "string" },
+        "kind": { "type": "string" },
+        "score": { "type": "number" },
+        "sense": { "type": "integer", "minimum": 0 },
+        "word": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentResult": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "base_revision",
+        "snapshot_id",
+        "done",
+        "requires_human_review",
+        "steps",
+        "proposals",
+        "sources"
+      ],
+      "properties": {
+        "base_revision": { "type": "integer" },
+        "done": { "type": "boolean" },
+        "proposals": { "$ref": "#/$defs/NextAgentProposals" },
+        "requires_human_review": { "type": "boolean" },
+        "run_id": { "type": "string", "format": "uuid" },
+        "snapshot_id": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentSource" }
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextAgentStep" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentSection": {
+      "type": "string",
+      "enum": [
+        "forms",
+        "senses",
+        "groups",
+        "grammar",
+        "definitions",
+        "equivalents",
+        "relations",
+        "dialect",
+        "examples",
+        "translations"
+      ]
+    },
+    "NextAgentSense": {
+      "type": "object",
+      "required": ["pos", "gloss", "level"],
+      "properties": {
+        "gloss": { "type": "string" },
+        "level": { "type": "string" },
+        "pos": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentSenseContext": {
+      "type": "object",
+      "required": ["pos", "gloss"],
+      "properties": {
+        "gloss": { "type": "string" },
+        "pos": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentSource": {
+      "type": "object",
+      "required": ["source", "locator", "excerpt", "status"],
+      "properties": {
+        "excerpt": { "type": "string" },
+        "locator": { "type": "string" },
+        "source": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentStep": {
+      "type": "object",
+      "required": ["section", "state", "error"],
+      "properties": {
+        "error": { "type": "string" },
+        "section": { "$ref": "#/$defs/NextAgentSection" },
+        "state": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentTranslation": {
+      "type": "object",
+      "required": ["example", "text"],
+      "properties": {
+        "example": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string" }
       },
       "additionalProperties": false
     },

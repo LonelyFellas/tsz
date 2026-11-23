@@ -101,6 +101,7 @@ export interface V3FormsAndPronunciationStepProps {
   showEmptyPosHint?: boolean;
   emptyAddPosButton?: boolean;
   showPronunciationGuide?: boolean;
+  headingAction?: ReactNode;
   deletePosDescription?: ReactNode;
   activePosId?: string;
   onActivePosChange?: (posId: string) => void;
@@ -160,6 +161,7 @@ export function V3FormsAndPronunciationStep({
   showEmptyPosHint = true,
   emptyAddPosButton = false,
   showPronunciationGuide = true,
+  headingAction,
   deletePosDescription,
   activePosId,
   onActivePosChange,
@@ -580,6 +582,7 @@ export function V3FormsAndPronunciationStep({
             <Typography.Title level={2} style={{ margin: 0 }}>
               {t("forms_title")}
             </Typography.Title>
+            {headingAction}
             {showPronunciationGuide && (
               <details className="v3-pronunciation-guide">
                 <summary>{t("pronunciation_help_title")}</summary>

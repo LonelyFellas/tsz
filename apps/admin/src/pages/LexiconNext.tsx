@@ -35,6 +35,7 @@ import {
 import { Input, Segmented } from "@tsz/ui/admin/forms";
 import { App, Modal } from "@tsz/ui/admin/overlays";
 import { AdminControls } from "@tsz/ui/admin/context";
+import { canAdminResourceAction } from "@tsz/shared/auth";
 import { ContentEditPermissions } from "@/features/dictionary/contentEditPermissions";
 import { FormsStep, emptyFormEditor } from "@/features/lexicon-next/FormsStep";
 import {
@@ -43,6 +44,9 @@ import {
 } from "@/features/dictionary/word-creation-v3/voiceSaveContext";
 import { V3StepActions } from "@/features/dictionary/word-creation-v3/components/V3StepActions";
 import { Save } from "lucide-react";
+import { EntryAssistantButton } from "@/features/lexicon-next/GenerationActions";
+import { GenerationPanel } from "@/features/lexicon-next/GenerationPanel";
+import { fillGeneratedDraft } from "@/features/lexicon-next/generatedDraft";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextDraft,
@@ -196,6 +200,7 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               id={entryId}
               requests={requests}
               language={language}
+              generationAvailable={capability.data?.generation === true}
               publishingAvailable={capability.data?.publishing === true}
               relationsAvailable={capability.data?.relations === true}
               formEditorAvailable={capability.data?.form_editor === true}
@@ -239,6 +244,7 @@ function EntryLoader({
   id,
   requests,
   language,
+  generationAvailable,
   formEditorAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
@@ -268,6 +274,7 @@ function EntryLoader({
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
   publishingAvailable: boolean;
+  generationAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -381,6 +388,7 @@ function EntryLoader({
       entryMedium={query.data.medium_locale ?? medium}
       requests={requests}
       language={language}
+      generationAvailable={generationAvailable}
       archived={metadata.data.status === "archived"}
       publishingAvailable={publishingAvailable}
       relationsAvailable={relationsAvailable}
@@ -400,6 +408,7 @@ function EntryLoader({
   );
 }
 function EntryEditor({
+  generationAvailable,
   initial,
   suggestedPartOfSpeech,
   entryMedium,
@@ -435,6 +444,7 @@ function EntryEditor({
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
   publishingAvailable: boolean;
+  generationAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   suggestedPartOfSpeech?: readonly string[];
@@ -642,6 +652,29 @@ function EntryEditor({
   ]);
   const canPublish = usePermission("words.publish");
   const canCreate = usePermission("words.create");
+  const canCreateSentence = usePermission("sentences.create");
+  const canAccessSentence = usePermission("sentences.access");
+  // Translate only local or singly referenced sentences this editor can modify.
+  const referencedSentenceIds = new Set(
+    draft.senses.flatMap((s) => s.sentence_ids ?? [])
+  );
+  const existingExamples = Object.values(sentenceWorkspace.resources)
+    .filter((s) => {
+      const v = s.draft.variants.find((row) => row.locale === target);
+      return (
+        referencedSentenceIds.has(s.id) &&
+        s.reference_count <= 1 &&
+        v?.content.text.trim() &&
+        v.content.text.length <= 500 &&
+        !v.translations.some(
+          (t) => t.locale === medium && t.content.text.trim()
+        ) &&
+        (s.revision === 0
+          ? canCreateSentence
+          : canAdminResourceAction(profile, "sentences", "edit", s.owner_id))
+      );
+    })
+    .slice(0, 50);
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
   const writable =
@@ -743,9 +776,9 @@ function EntryEditor({
       const base = sentenceWorkspace.base.find(
         (item) => item.id === resource.id
       );
-      if (base) {
+      if (base || resource.revision === 0) {
         for (const variant of resource.draft.variants)
-          sentenceWorkspace.update(base, variant);
+          sentenceWorkspace.update(base ?? resource, variant);
       } else {
         sentenceWorkspace.importResource(resource);
       }
@@ -1101,6 +1134,9 @@ function EntryEditor({
   );
   const editor = (
     <EntryLayout
+      headerAction={
+        writable && step !== "preview" ? <EntryAssistantButton /> : undefined
+      }
       relationsAvailable={relationsAvailable}
       publicationStatus={publication.data?.status}
       draft={draft}
@@ -1765,7 +1801,86 @@ function EntryEditor({
       {sentenceDraftsAvailable && (
         <SentenceDraftAudioTasks workspace={sentenceWorkspace} />
       )}
-      {editor}
+      <GenerationPanel
+        visible={writable && step !== "preview"}
+        available={generationAvailable}
+        catalog={grammarCatalog.data}
+        entryId={saved.id}
+        revision={saved.revision}
+        draft={draft}
+        target={target}
+        medium={medium}
+        sections={[
+          ...(formEditorAvailable ? ["forms" as const] : []),
+          "senses",
+          ...(senseGroupsAvailable ? ["groups" as const] : []),
+          ...(grammarAvailable ? ["grammar" as const] : []),
+          "definitions",
+          "equivalents",
+          ...(saved.dialect_senses ? ["dialect" as const] : []),
+          ...(relationsAvailable ? ["relations" as const] : []),
+          ...(sentenceDraftsAvailable && canCreateSentence && canAccessSentence
+            ? ["examples" as const, "translations" as const]
+            : sentenceDraftsAvailable &&
+                canAccessSentence &&
+                existingExamples.length
+              ? ["translations" as const]
+              : [])
+        ]}
+        disabled={
+          !grammarCatalog.data ||
+          busy ||
+          conflict ||
+          formContentOpen ||
+          !!currentLocalSnapshot ||
+          !localSnapshotChecked
+        }
+        examples={existingExamples.map((s) => ({
+          id: s.id,
+          text: s.draft.variants.find((v) => v.locale === target)!.content.text
+        }))}
+        contextVersion={JSON.stringify([
+          existingExamples.map((s) => [s.id, s.revision]),
+          sentenceWorkspace.changes,
+          pairChanges,
+          grammarCatalog.data?.catalog_version
+        ])}
+        generate={requests.generate}
+        onFill={(result, binding, exampleIds) => {
+          if (!grammarCatalog.data) return false;
+          const next = fillGeneratedDraft(
+            draft,
+            result,
+            grammarCatalog.data,
+            target,
+            medium,
+            profile!.id,
+            existingExamples.filter((s) => exampleIds.includes(s.id)),
+            sentenceWorkspace.resources,
+            dialectSenses,
+            binding
+          );
+          const issue = draftProblem(next.draft, equivalentMetadataAvailable);
+          if (issue) throw new Error(issue);
+          if (
+            !Object.keys(next.dialect).length &&
+            !next.resources.length &&
+            JSON.stringify(next.draft) === JSON.stringify(draft)
+          )
+            return false;
+          for (const resource of next.resources)
+            sentenceWorkspace.update(resource, resource.draft.variants[0]!);
+          if (Object.keys(next.dialect).length)
+            setEditedPairs((current) => ({
+              ...current,
+              ...next.dialect
+            }));
+          replaceDraft(next.draft);
+          return true;
+        }}
+      >
+        {editor}
+      </GenerationPanel>
     </SentenceDraftContext.Provider>
   );
 }

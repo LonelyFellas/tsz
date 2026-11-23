@@ -263,7 +263,7 @@ it("新语法预览按当前方言显示，失效引用保留 ID 并提示问题
   expect(draft).toEqual(before);
 });
 
-it("当前目录改码后，同编码的结构与义项也不能作为有效语法投影", () => {
+it("当前目录改码后，同编码的结构与词义也不能作为有效语法投影", () => {
   const draft: NextDraft = {
     schema_version: 1,
     headword: "job",

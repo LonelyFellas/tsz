@@ -1,3 +1,4 @@
+import { SectionAI } from "./GenerationActions";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import {
   lazy,
@@ -335,7 +336,7 @@ function InlineSentenceCard({
         </Space.Compact>
         {source.revision > 0 && (
           <span className="next-sentence-shared">
-            保存将同步更新引用此例句的所有义项。
+            保存将同步更新引用此例句的所有词义。
           </span>
         )}
         {catalog.isError && (
@@ -408,6 +409,13 @@ function InlineSentenceCard({
                       {localeLabels[medium]}译文 {index + 1}
                     </label>
                     <Tag>{kind ? sentenceStyles[kind] : "自由度无效"}</Tag>
+                    {index === 0 && (
+                      <SectionAI
+                        section="translations"
+                        sentenceId={source.id}
+                        disabled={!editable}
+                      />
+                    )}
                   </div>
                   <div className="next-sentence-inline-freedom">
                     <label htmlFor={`${fieldId}-freedom-${row.id}`}>
@@ -675,6 +683,7 @@ export function InlineSentenceExamples({
   const [collapsed, setCollapsed] = useState(false);
   return (
     <SenseSection
+      headerAction={<SectionAI section="examples" disabled={disabled} />}
       label="多维例句"
       count={ids.length}
       unit="条"

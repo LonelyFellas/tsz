@@ -137,7 +137,7 @@ it("编辑不请求 Azure，完成才生成当前目标语言并保存当前媒�
   );
   const { saveSentence, onSaved } = setup();
   expect(
-    screen.getByText("保存将同步更新引用此例句的所有义项。")
+    screen.getByText("保存将同步更新引用此例句的所有词义。")
   ).toBeVisible();
   const editor = await screen.findByRole("textbox", { name: "英式英语例句" });
   for (const text of ["h", "hh", "hha"]) {

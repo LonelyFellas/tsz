@@ -266,7 +266,7 @@ export function NextSentenceEditor({
           <Alert
             type="info"
             showIcon
-            title="保存将同步更新引用此例句的所有义项。"
+            title="保存将同步更新引用此例句的所有词义。"
           />
         )}
         {error && (

@@ -1,0 +1,227 @@
+.lexicon-form-generation-result {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 5fr);
+  align-items: start;
+  gap: var(--ui-space-4);
+  min-width: 0;
+}
+
+.lexicon-form-generation-result h2 {
+  margin: 0;
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.lexicon-reference-card,
+.lexicon-proposal-card {
+  min-width: 0;
+}
+
+.lexicon-reference-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1);
+  margin-block-end: var(--ui-space-3);
+  padding-block-end: var(--ui-space-2);
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+}
+
+.lexicon-reference-switcher .ui-btn[aria-pressed="true"] {
+  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-bg);
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.lexicon-reference-slide {
+  touch-action: pan-y pinch-zoom;
+}
+
+.lexicon-reference-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2) var(--ui-space-3);
+}
+
+.lexicon-reference-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  color: var(--ui-color-link);
+  font-size: var(--ui-font-size-compact);
+}
+
+.lexicon-reference-entry {
+  display: grid;
+  gap: var(--ui-space-3);
+  overflow-wrap: anywhere;
+  margin-block-start: var(--ui-space-4);
+}
+
+.lexicon-reference-entry h3,
+.lexicon-reference-entry h4 {
+  margin: 0;
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.lexicon-reference-entry h3 {
+  font-size: var(--ui-font-size-title);
+  line-height: var(--ui-line-height-tight);
+}
+
+.lexicon-reference-entry h4 {
+  margin-block-end: var(--ui-space-1);
+  font-size: var(--ui-font-size-compact);
+}
+
+.lexicon-reference-entry :is(dl, dd, p, ul, ol) {
+  margin: 0;
+}
+
+.lexicon-reference-facts {
+  font-size: var(--ui-font-size-compact);
+}
+
+.lexicon-reference-facts > div {
+  display: grid;
+  grid-template-columns: minmax(4em, max-content) minmax(0, 1fr);
+  gap: var(--ui-space-3);
+  align-items: baseline;
+  padding-block: var(--ui-space-2);
+  border-bottom: 1px solid var(--ui-color-border-secondary);
+}
+
+.lexicon-reference-facts dt,
+.lexicon-reference-label,
+.lexicon-reference-missing,
+.lexicon-reference-index-hint {
+  color: var(--ui-color-text-secondary);
+}
+
+.lexicon-reference-pronunciations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1) var(--ui-space-3);
+}
+
+.lexicon-reference-form-groups,
+.lexicon-reference-form-group {
+  display: grid;
+  min-width: 0;
+}
+
+.lexicon-reference-form-groups {
+  gap: var(--ui-space-3);
+}
+
+.lexicon-reference-form-group {
+  gap: var(--ui-space-1);
+}
+
+.lexicon-reference-form-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1) var(--ui-space-2);
+}
+
+.lexicon-reference-form-heading strong {
+  font-weight: var(--ui-font-weight-semibold);
+}
+
+.lexicon-reference-forms {
+  display: grid;
+  gap: var(--ui-space-1);
+  list-style: none;
+  padding: 0;
+}
+
+.lexicon-reference-forms li {
+  display: grid;
+  grid-template-columns: minmax(0, 7em) minmax(0, 1fr);
+  gap: var(--ui-space-2);
+  align-items: baseline;
+}
+
+.lexicon-reference-forms li span:not([lang]) {
+  color: var(--ui-color-text-secondary);
+}
+
+.lexicon-reference-forms li span[lang] {
+  font-size: var(--ui-font-size);
+}
+
+.lexicon-reference-definitions {
+  line-height: var(--ui-line-height);
+}
+
+.lexicon-reference-definitions ol {
+  padding-inline-start: var(--ui-space-5);
+}
+
+.lexicon-reference-definitions li + li {
+  margin-block-start: var(--ui-space-2);
+}
+
+.lexicon-reference-index-hint {
+  font-size: var(--ui-font-size-compact);
+}
+
+.lexicon-proposal-card .ui-card-body {
+  padding: 0;
+}
+
+.lexicon-proposal-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--ui-font-size-compact);
+}
+
+.lexicon-proposal-table :is(th, td) {
+  padding: var(--ui-space-2) var(--ui-space-3);
+  overflow-wrap: anywhere;
+  text-align: start;
+  vertical-align: top;
+}
+
+.lexicon-proposal-table thead {
+  color: var(--ui-color-text-secondary);
+  background: var(--ui-color-fill-alter);
+}
+
+.lexicon-proposal-table thead th {
+  font-weight: var(--ui-font-weight-medium);
+}
+
+.lexicon-proposal-table thead th:first-child {
+  width: 17%;
+}
+
+.lexicon-proposal-table thead th:nth-child(2) {
+  width: 23%;
+}
+
+.lexicon-proposal-table tbody tr {
+  border-top: 1px solid var(--ui-color-border-secondary);
+}
+
+.lexicon-proposal-table tbody th {
+  font-weight: var(--ui-font-weight-medium);
+}
+
+.lexicon-proposal-table tbody th[scope="rowgroup"] {
+  background: var(--ui-color-fill-alter);
+}
+
+.lexicon-proposal-phonetic,
+.lexicon-proposal-form-count {
+  display: block;
+  color: var(--ui-color-text-secondary);
+  font-size: var(--ui-font-size-sm);
+}
+
+@media (width <= 720px) {
+  .lexicon-form-generation-result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

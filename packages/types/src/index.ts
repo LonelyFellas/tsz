@@ -79,5 +79,6 @@ export * from "./learning-plans";
 export * from "./learning-memory";
 
 export * from "./lexicon-next";
+export * from "./lexicon-generation";
 
 export * from "./lexicon-taxonomies";

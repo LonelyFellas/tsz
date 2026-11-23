@@ -827,3 +827,34 @@
   font-size: var(--ui-font-size-section);
   font-weight: var(--ui-font-weight-semibold);
 }
+
+.word-creation-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-2);
+}
+
+.word-creation-heading-actions .word-creation-breadcrumb {
+  margin-bottom: 0;
+}
+
+.lexicon-next-forms .v3-forms-step > .word-step-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.lexicon-next-ai-button:not(:disabled) {
+  color: var(--ui-color-primary);
+}
+
+.word-sense-section-card .ui-card-extra .lexicon-next-ai-button {
+  margin-inline-end: var(--ui-space-2);
+}
+
+.lexicon-generation-drawer {
+  width: 100%;
+}

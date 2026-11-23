@@ -118,6 +118,7 @@ function requests() {
       items: [],
       pagination: { total: 0, page: 1, page_size: 20, total_pages: 0 }
     }),
+    generate: vi.fn(),
     capabilities: vi.fn().mockResolvedValue(caps),
     draftSchema: vi.fn().mockResolvedValue({
       draft_schema_version: 1,
@@ -1932,7 +1933,7 @@ describe("新版词库手工闭环", () => {
     }
   );
 
-  it("切换目标变体保留未保存内容和义项身份，完整保存；预览不回写本地稿", async () => {
+  it("切换目标变体保留未保存内容和词义身份，完整保存；预览不回写本地稿", async () => {
     const api = requests();
     api.get.mockResolvedValue({
       ...entry,
@@ -2286,7 +2287,7 @@ describe("新版词库手工闭环", () => {
     );
     expect(api.save).not.toHaveBeenCalled();
   });
-  it("预览返回未指定词性义项时聚焦该义项的词性选择器", async () => {
+  it("预览返回未指定词性词义时聚焦该词义的词性选择器", async () => {
     const scroll = HTMLElement.prototype.scrollIntoView;
     HTMLElement.prototype.scrollIntoView = vi.fn();
     onTestFinished(() => {
@@ -2318,7 +2319,7 @@ describe("新版词库手工闭环", () => {
     fireEvent.click(await screen.findByRole("button", { name: "编辑词义 2" }));
     await waitFor(() =>
       expect(
-        screen.getByRole("combobox", { name: "义项 1 词性" })
+        screen.getByRole("combobox", { name: "词义 1 词性" })
       ).toHaveFocus()
     );
     expect(
@@ -2493,7 +2494,7 @@ describe("新版词库手工闭环", () => {
     expect(screen.getByDisplayValue("unsaved after revocation")).toBeVisible();
     expect(api.get).toHaveBeenCalledTimes(1);
   });
-  it("删除义项前确认全部语言范围；取消和校验失败均保留草稿", async () => {
+  it("删除词义前确认全部语言范围；取消和校验失败均保留草稿", async () => {
     const api = requests();
     mount(api);
     await screen.findByDisplayValue("centre");
@@ -3372,7 +3373,7 @@ it("保存移除最后一项媒介内容后，返回列表立即刷新统计与�
   await screen.findByDisplayValue("centre");
   fireEvent.click(stepButton(/词义与例句/));
   fireEvent.click(stepButton(/词义与例句/));
-  await chooseBasicPos("义项 1 词性");
+  await chooseBasicPos("词义 1 词性");
   fireEvent.click(button("删除简体中文解释 1"));
   api.workspaceList.mockResolvedValue({
     items: [],
@@ -3766,7 +3767,7 @@ it("冲突后内容窗口未关闭时禁止重载远端，关闭后才能采纳�
   expect(screen.queryByRole("button", { name: "编辑原形内容" })).toBeNull();
 });
 
-it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容，完整保存保留其他义项", async () => {
+it("Step3 按 Step2 词性归类，切换词性与折叠不丢失多语言内容，完整保存保留其他词义", async () => {
   const api = requests();
   const nounId = crypto.randomUUID();
   const verbId = crypto.randomUUID();
@@ -4261,7 +4262,7 @@ it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐�
     "机构"
   );
   fireEvent.mouseDown(
-    screen.getByRole("combobox", { name: "义项 1 所属语义区间" })
+    screen.getByRole("combobox", { name: "词义 1 所属语义区间" })
   );
   fireEvent.click(
     screen
@@ -4270,7 +4271,7 @@ it("Step3 复用语义区间的名称、排序与归属，删除区间解除隐�
   );
   expect(
     screen
-      .getByRole("combobox", { name: "义项 1 所属语义区间" })
+      .getByRole("combobox", { name: "词义 1 所属语义区间" })
       .closest(".ui-select")
   ).toHaveTextContent("机构");
   fireEvent.click(button("删除语义区间 2"));
@@ -4449,7 +4450,7 @@ it("目录缓存更新后，停留在预览页也立即去除失效结构且不�
   });
 });
 
-it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不复制义项", async () => {
+it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不复制词义", async () => {
   const api = requests();
   api.capabilities.mockResolvedValue({
     ...caps,
@@ -4475,26 +4476,26 @@ it("词义总体数据复用 V1 控件并随完整草稿保存，切换英美不
   await waitForEntryReady();
   fireEvent.click(stepButton(/词义与例句/));
   fireEvent.mouseDown(
-    await screen.findByRole("combobox", { name: "义项 1 词性" })
+    await screen.findByRole("combobox", { name: "词义 1 词性" })
   );
   fireEvent.click(
     await screen.findByText("名词", {
       selector: ".ui-select-item-option-content"
     })
   );
-  const level = await screen.findByRole("combobox", { name: "义项 1 等级" });
+  const level = await screen.findByRole("combobox", { name: "词义 1 等级" });
   fireEvent.mouseDown(level);
   fireEvent.click(
     await screen.findByText("B2", {
       selector: ".ui-select-item-option-content"
     })
   );
-  fireEvent.change(screen.getByRole("spinbutton", { name: "义项 1 频率" }), {
+  fireEvent.change(screen.getByRole("spinbutton", { name: "词义 1 频率" }), {
     target: { value: "95.5" }
   });
-  fireEvent.click(screen.getByRole("switch", { name: "义项 1 是否依赖语境" }));
+  fireEvent.click(screen.getByRole("switch", { name: "词义 1 是否依赖语境" }));
   await chooseLanguage("美式英语");
-  expect(screen.getByRole("spinbutton", { name: "义项 1 频率" })).toHaveValue(
+  expect(screen.getByRole("spinbutton", { name: "词义 1 频率" })).toHaveValue(
     "95.50"
   );
   fireEvent.click(button("保存完整草稿"));
@@ -4650,7 +4651,7 @@ it("确认释义能力后开放双语表格，完整稿保存保留其他语言�
   expect(
     screen.queryByRole("button", { name: "编辑简体中文解释 1" })
   ).toBeNull();
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "义项 1 等级" }));
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "词义 1 等级" }));
   fireEvent.click(
     await screen.findByText("B1", {
       selector: ".ui-select-item-option-content"
@@ -5455,7 +5456,7 @@ it("比较发布冲突的状态读取失败时保留未保存草稿并允许重�
   );
 });
 
-it("列表显示真实词头和当前义项等级，不展示其他词形", async () => {
+it("列表显示真实词头和当前词义等级，不展示其他词形", async () => {
   const matchMedia = window.matchMedia;
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     ...matchMedia(query),

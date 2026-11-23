@@ -15,6 +15,8 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "NextPublicationBase",
   "NextPublishInput",
   "NextPublicationState",
+  "NextAgentInput",
+  "NextAgentResult",
   "NextPublicationPreview",
   "NextPublication",
   "NextEntry",

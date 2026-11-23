@@ -55,7 +55,7 @@ export const webWordlistReader = /* @__PURE__ */ defineWebMessages(
       "完整內容暫不可用，請切回標準模式。",
       "Full content is unavailable. Switch to standard mode."
     ],
-    no_linked_meaning: ["未关联义项", "未關聯義項", "No linked meaning"],
+    no_linked_meaning: ["未关联词义", "未關聯詞義", "No linked meaning"],
     no_text_available_for_this_definition: [
       "此释义暂无可用文本",
       "此釋義暫無可用文字",

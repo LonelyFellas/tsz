@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/fix-zentao-255-grammar-dubbing-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-23T02:40:30.289Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-super-agent-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-23T12:59:07.919Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -36,6 +36,7 @@
     "/admin/lexicon-next/draft-schema": ["get"],
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
+    "/admin/lexicon-next/entries/{id}/generation": ["post"],
     "/admin/lexicon-next/entries/{id}/publication": ["get"],
     "/admin/lexicon-next/entries/{id}/publication-preview": ["post"],
     "/admin/lexicon-next/entries/{id}/publications": ["post"],
@@ -3503,6 +3504,19 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /admin/lexicon-next/entries/{id}/generation": {
+      "request": { "$ref": "#/components/schemas/NextAgentInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextAgentResult" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/lexicon-next/entries/{id}/publication": {
       "request": null,
       "responses": {
@@ -6357,7 +6371,7 @@
         },
         {
           "type": "object",
-          "description": "命中词条的词面被**另一个**词条引用为关联词。\n\n`lexicon.relations` 的目标是已存在词条的义项（外键约束），所以关联词永远\n不会引入新的词面：`surface` 必然等于 `ExistingSurfaceMatchV2.word_id` 这个\n词条自己的主词。因此本分支描述的不是「词面存放在哪」，而是「谁在引用它」，\n`source_id` / `source_node_id` 指向的关联词节点属于 `referencing_word_id`。",
+          "description": "命中词条的词面被**另一个**词条引用为关联词。\n\n`lexicon.relations` 的目标是已存在词条的词义（外键约束），所以关联词永远\n不会引入新的词面：`surface` 必然等于 `ExistingSurfaceMatchV2.word_id` 这个\n词条自己的主词。因此本分支描述的不是「词面存放在哪」，而是「谁在引用它」，\n`source_id` / `source_node_id` 指向的关联词节点属于 `referencing_word_id`。",
           "required": [
             "source_id",
             "source_node_id",
@@ -9241,6 +9255,62 @@
         "output_format": { "$ref": "#/components/schemas/AudioOutputFormat" },
         "ssml": { "type": "string", "maxLength": 32000 },
         "voice_alias": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentInput": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "base_revision",
+        "snapshot_id",
+        "headword",
+        "target",
+        "sections",
+        "existing_pos",
+        "examples",
+        "senses"
+      ],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "examples": { "type": "array", "items": { "type": "string" } },
+        "existing_pos": { "type": "array", "items": { "type": "string" } },
+        "headword": { "type": "string" },
+        "run_id": { "type": "string", "format": "uuid" },
+        "sections": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextAgentSection" }
+        },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/NextAgentSenseContext" }
+        },
+        "snapshot_id": { "type": "string" },
+        "target": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentSection": {
+      "type": "string",
+      "enum": [
+        "forms",
+        "senses",
+        "groups",
+        "grammar",
+        "definitions",
+        "equivalents",
+        "relations",
+        "dialect",
+        "examples",
+        "translations"
+      ]
+    },
+    "NextAgentSenseContext": {
+      "type": "object",
+      "required": ["pos", "gloss"],
+      "properties": {
+        "gloss": { "type": "string" },
+        "pos": { "type": "string" }
       },
       "additionalProperties": false
     },

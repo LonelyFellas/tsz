@@ -11,7 +11,7 @@ import {
 } from "./publicationIssueFocus";
 
 it.each(["dialect_pairs", "relations"])(
-  "没有 %s 字段锚点时定位义项不改变方言配对",
+  "没有 %s 字段锚点时定位词义不改变方言配对",
   async (field) => {
     const row = {
       ...generalSense("sense"),
@@ -63,7 +63,7 @@ it.each(["dialect_pairs", "relations"])(
   }
 );
 
-it("只为专用义项展示另一方言；切换用法不沿用上一侧的无对应说明", () => {
+it("只为专用词义展示另一方言；切换用法不沿用上一侧的无对应说明", () => {
   function Editor() {
     const [row, setRow] = useState(() => generalSense("source-sense"));
     return (
@@ -98,7 +98,7 @@ it("只为专用义项展示另一方言；切换用法不沿用上一侧的无�
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 });
 
-it("同一草稿内已选的目标义项不能再选，解除后可重新选用", async () => {
+it("同一草稿内已选的目标词义不能再选，解除后可重新选用", async () => {
   const target = "peer-sense";
   const draft = {
     schema_version: 1 as const,
@@ -154,20 +154,20 @@ it("同一草稿内已选的目标义项不能再选，解除后可重新选用"
     })
   );
   await waitFor(() => expect(requests.get).toHaveBeenCalledWith("peer"));
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "配对义项" }));
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "配对词义" }));
   fireEvent.click(
     await screen.findByText(/noun · 公寓 · 已被配对/, {
       selector: ".ui-select-item-option-content"
     })
   );
-  expect(screen.getByRole("button", { name: "选用此义项" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "选用此词义" })).toBeDisabled();
   ui.rerender(editor([]));
   fireEvent.click(
     await screen.findByText("noun · 公寓", {
       selector: ".ui-select-item-option-content"
     })
   );
-  fireEvent.click(screen.getByRole("button", { name: "选用此义项" }));
+  fireEvent.click(screen.getByRole("button", { name: "选用此词义" }));
   expect(update).toHaveBeenCalledWith(
     expect.objectContaining({
       target: expect.objectContaining({ sense_id: target, revision: 7 })

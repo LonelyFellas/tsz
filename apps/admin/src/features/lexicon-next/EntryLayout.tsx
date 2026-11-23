@@ -12,6 +12,7 @@ export function EntryLayout({
   step,
   onStepChange,
   children,
+  headerAction,
   languageSearch,
   exists = true,
   publicationStatus = "draft",
@@ -21,6 +22,7 @@ export function EntryLayout({
   step: WordCreationStep;
   onStepChange?: (step: WordCreationStep) => void;
   children: ReactNode;
+  headerAction?: ReactNode;
   exists?: boolean;
   relationsAvailable?: boolean;
   publicationStatus?: "draft" | "published" | "archived";
@@ -145,6 +147,7 @@ export function EntryLayout({
   }
   return (
     <WordCreationLayout
+      headerAction={headerAction}
       currentStep={step}
       onStepChange={onStepChange}
       allowBasicsStep={exists}

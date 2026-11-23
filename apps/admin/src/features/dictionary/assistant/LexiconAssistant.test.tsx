@@ -141,10 +141,10 @@ describe("词库只读助手", () => {
     });
     expect(screen.getByText("正在查询内置词典…")).toBeInTheDocument();
     expect(screen.getByText("bank 有银行")).toBeInTheDocument();
-    act(() => onEvent({ event: "delta", text: "和河岸两个义项。" }));
-    expect(screen.getByText("bank 有银行和河岸两个义项。")).toBeInTheDocument();
+    act(() => onEvent({ event: "delta", text: "和河岸两个词义。" }));
+    expect(screen.getByText("bank 有银行和河岸两个词义。")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "停止" }));
-    expect(screen.getByText("bank 有银行和河岸两个义项。")).toBeInTheDocument();
+    expect(screen.getByText("bank 有银行和河岸两个词义。")).toBeInTheDocument();
     expect(
       screen.getByText("回答未完成，已保留收到的内容。")
     ).toBeInTheDocument();
@@ -253,14 +253,14 @@ describe("词库只读助手", () => {
         field_refs: [
           {
             path: "meanings.pos[0].senses[0].level",
-            label: "名词 · 义项 1 · 等级"
+            label: "名词 · 词义 1 · 等级"
           }
         ]
       })
     );
     render(surface(value));
     await openAndAsk();
-    await screen.findByRole("button", { name: "定位：名词 · 义项 1 · 等级" });
+    await screen.findByRole("button", { name: "定位：名词 · 词义 1 · 等级" });
     fireEvent.change(
       screen.getByRole("textbox", { name: "向词库小精灵提问" }),
       { target: { value: "那美音呢" } }

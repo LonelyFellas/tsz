@@ -21,7 +21,7 @@ vi.mock("@/lib/auth", async (original) => ({
   usePermission: () => true
 }));
 
-it("确认删除义项只移除目标，保留弹窗打开期间回写的草稿和音频", async () => {
+it("确认删除词义只移除目标，保留弹窗打开期间回写的草稿和音频", async () => {
   const initial: NextDraft = {
     schema_version: 1,
     headword: "centre",
@@ -469,7 +469,7 @@ it.each([false, true])(
   }
 );
 
-it("未指定词性的旧义项保留内容并锁定下方录入，指定词性后开放", async () => {
+it("未指定词性的旧词义保留内容并锁定下方录入，指定词性后开放", async () => {
   const catalog = vi
     .spyOn(partOfSpeechDataSource, "catalog")
     .mockResolvedValue(partOfSpeechCatalogFixture);

@@ -169,7 +169,7 @@ export function focusPublicationIssue(
               'input[data-v3-field="headword"]'
             )
           : undefined);
-    // 没有精确字段锚点时聚焦义项本身，不能让任意首个字段因获焦改值。
+    // 没有精确字段锚点时聚焦词义本身，不能让任意首个字段因获焦改值。
     const control =
       field === scope && scope?.dataset.v3Field === "sense"
         ? scope
