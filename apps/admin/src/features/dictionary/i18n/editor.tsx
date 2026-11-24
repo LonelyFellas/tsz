@@ -125,7 +125,7 @@ export const lexiconEditorMessages = {
     "Generate entire entry"
   ],
   entry_ai_refresh: ["重新生成", "重新生成", "Regenerate"],
-  entry_ai_use_candidates: ["使用候选", "使用候選", "Use candidates"],
+  entry_ai_use_candidates: ["一键配置", "一鍵配置", "Apply candidates"],
   entry_ai_lookup_pending: [
     "正在查询上次候选…",
     "正在查詢上次候選…",
