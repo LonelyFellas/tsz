@@ -408,7 +408,7 @@ it("已加载旧文案的页面仍按词性显示韦氏变形和候选词形计�
             locator: "https://www.merriam-webster.com/dictionary/center",
             status: "found",
             excerpt:
-              "center · 词性 noun、verb · 读音标记 ˈsen-tər · 词形 noun [] · 词形 verb [centered、centering]"
+              "center · 词性 noun、verb · 读音标记 ˈsen-tər · 词形 noun [] · 词形 verb [centered、centering、centred]"
           }
         ]}
         forms={[
@@ -436,9 +436,10 @@ it("已加载旧文案的页面仍按词性显示韦氏变形和候选词形计�
   const verb = within(webster.getByRole("group", { name: "动词" }));
   expect(noun.getByText("本次未返回变形")).toBeVisible();
   expect(noun.queryByText("centered")).not.toBeInTheDocument();
-  expect(verb.getByText("2 项")).toBeVisible();
-  expect(verb.getByText("centered")).toBeVisible();
-  expect(verb.getByText("centering")).toBeVisible();
+  expect(verb.getByText("4 项")).toBeVisible();
+  expect(verb.getAllByRole("listitem").map((item) => item.textContent)).toEqual(
+    ["现在分词centering", "过去式centered", "过去分词centered", "centred"]
+  );
   expect(webster.getByText("原站读音标记")).toBeVisible();
 
   const candidates = within(screen.getByRole("table", { name: "生成词形" }));

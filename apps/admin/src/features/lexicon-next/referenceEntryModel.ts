@@ -249,6 +249,46 @@ function readOxford(excerpt: string, headword: string): ReferenceEntry {
   };
 }
 
+function labelWebsterVerbForms(
+  forms: ReferenceForm[],
+  headword: string
+): ReferenceForm[] {
+  const word = headword.toLowerCase();
+  if (!/^[a-z]+$/.test(word)) return forms;
+
+  const consonantY = /[^aeiou]y$/.test(word);
+  const thirdPerson = consonantY
+    ? word.slice(0, -1) + "ies"
+    : word + (/(?:[sxz]|[cs]h)$/.test(word) ? "es" : "s");
+  const dropsE = word.endsWith("e") && !/(?:ee|oe|ye)$/.test(word);
+  const presentStem = word.endsWith("ie")
+    ? word.slice(0, -2) + "y"
+    : dropsE
+      ? word.slice(0, -1)
+      : word;
+  const past = consonantY
+    ? word.slice(0, -1) + "ied"
+    : word + (word.endsWith("e") ? "d" : "ed");
+  const pastTypes = ["past_tense", "past_participle"];
+  const candidates = new Map([
+    [thirdPerson, ["third_person_singular"]],
+    [presentStem + "ing", ["present_participle"]],
+    [past, pastTypes]
+  ]);
+  if (/[b-df-hj-np-tv-z][aeiou][b-df-hj-np-tvz]$/.test(word)) {
+    const doubled = word + word.slice(-1);
+    candidates.set(doubled + "ing", ["present_participle"]);
+    candidates.set(doubled + "ed", pastTypes);
+  }
+
+  return forms.flatMap((form) => {
+    const types = form.type
+      ? undefined
+      : candidates.get(form.text.toLowerCase());
+    return types ? types.map((type) => ({ ...form, type })) : [form];
+  });
+}
+
 function readMerriamWebster(excerpt: string, headword: string): ReferenceEntry {
   const prefix = `The meaning of ${headword} is `;
   if (!excerpt.toLowerCase().startsWith(prefix.toLowerCase()))
@@ -298,6 +338,13 @@ export function dictionaryReferenceEntry(
   const word = headword.trim();
   if (!excerpt) return {};
   const structured = readStructured(excerpt, word);
+  if (source.source === "Merriam-Webster" && structured?.formsByPos) {
+    structured.formsByPos = structured.formsByPos.map((group) =>
+      group.pos === "verb"
+        ? { ...group, forms: labelWebsterVerbForms(group.forms, word) }
+        : group
+    );
+  }
   const summary = structured ? structured.summary : excerpt;
   if (!summary) return structured ?? {};
 
