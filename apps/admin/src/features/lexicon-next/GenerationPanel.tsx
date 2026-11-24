@@ -425,6 +425,15 @@ export function GenerationPanel({
     (selection.section === "all" &&
       result?.steps.some((step) => step.section === "forms"));
 
+  const generatedTime = generation?.generatedAt && (
+    <Typography.Text type="secondary">
+      {t("entry_ai_generated_at")}{" "}
+      <time dateTime={generation.generatedAt}>
+        {dayjs(generation.generatedAt).format("YYYY-MM-DD HH:mm:ss")}
+      </time>
+    </Typography.Text>
+  );
+
   const resumable = resumeFor(selection);
   const canUse =
     candidateMode &&
@@ -534,14 +543,7 @@ export function GenerationPanel({
                 }
               />
             )}
-            {generation?.generatedAt && (
-              <Typography.Text type="secondary">
-                {t("entry_ai_generated_at")}{" "}
-                <time dateTime={generation.generatedAt}>
-                  {dayjs(generation.generatedAt).format("YYYY-MM-DD HH:mm:ss")}
-                </time>
-              </Typography.Text>
-            )}
+            {!showForms && generatedTime}
             {error && <Alert type="error" title={error} />}
             {feedback && <p role="status">{feedback}</p>}
             {showForms && generation && (
@@ -578,6 +580,7 @@ export function GenerationPanel({
                 }
               >
                 <summary>板块进度与来源</summary>
+                {showForms && generatedTime}
                 <ul>
                   {result.steps.map((s) => (
                     <li key={s.section}>

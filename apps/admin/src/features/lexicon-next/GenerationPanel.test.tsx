@@ -509,10 +509,10 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
   open();
   expect(await screen.findByText("by tomorrow")).toBeVisible();
   expect(lookup).toHaveBeenCalledTimes(2);
-  fireEvent.click(screen.getByRole("button", { name: "使用候选" }));
+  fireEvent.click(screen.getByRole("button", { name: "一键配置" }));
   expect(screen.getByRole("alert")).toHaveTextContent(fillError);
   expect(screen.getByText("by tomorrow")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "使用候选" }));
+  fireEvent.click(screen.getByRole("button", { name: "一键配置" }));
   expect(screen.queryByText(fillError)).not.toBeInTheDocument();
   expect(onFill).toHaveBeenCalledTimes(2);
 
@@ -528,7 +528,7 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
   ui.rerender(<GenerationPanel {...props} target="en-US" />);
   expect(screen.queryByText("until tomorrow")).not.toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "使用候选" })
+    screen.queryByRole("button", { name: "一键配置" })
   ).not.toBeInTheDocument();
   await waitFor(() =>
     expect(lookup).toHaveBeenLastCalledWith(
