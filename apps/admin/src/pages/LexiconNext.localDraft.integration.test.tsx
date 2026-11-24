@@ -136,6 +136,7 @@ function requests() {
       pagination: { total: 0, page: 1, page_size: 20, total_pages: 0 }
     }),
     generate: vi.fn(),
+    generationCandidates: vi.fn(),
     capabilities: vi.fn().mockResolvedValue(caps),
     draftSchema: vi.fn().mockResolvedValue({
       draft_schema_version: 1,

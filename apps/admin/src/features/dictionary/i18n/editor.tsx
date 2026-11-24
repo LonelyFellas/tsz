@@ -124,6 +124,25 @@ export const lexiconEditorMessages = {
     "生成整個詞條",
     "Generate entire entry"
   ],
+  entry_ai_refresh: ["重新生成", "重新生成", "Regenerate"],
+  entry_ai_use_candidates: ["使用候选", "使用候選", "Use candidates"],
+  entry_ai_lookup_pending: [
+    "正在查询上次候选…",
+    "正在查詢上次候選…",
+    "Looking up previous candidates…"
+  ],
+  entry_ai_lookup_failed: [
+    "未能查询上次候选",
+    "未能查詢上次候選",
+    "Could not load previous candidates"
+  ],
+  entry_ai_fill_failed: [
+    "无法回填候选，请重试。",
+    "無法回填候選，請重試。",
+    "Could not use the candidates. Try again."
+  ],
+  entry_ai_generated_at: ["生成于", "生成於", "Generated at"],
+  entry_ai_retry_lookup: ["重试", "重試", "Retry"],
   entry_ai_unavailable: [
     "词条生成服务暂不可用",
     "詞條生成服務暫不可用",

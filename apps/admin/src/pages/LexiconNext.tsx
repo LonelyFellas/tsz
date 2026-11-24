@@ -202,6 +202,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               requests={requests}
               language={language}
               generationAvailable={capability.data?.generation === true}
+              generationCandidatesAvailable={
+                capability.data?.generation_candidates === true
+              }
               publishingAvailable={capability.data?.publishing === true}
               relationsAvailable={capability.data?.relations === true}
               formEditorAvailable={capability.data?.form_editor === true}
@@ -246,6 +249,7 @@ function EntryLoader({
   requests,
   language,
   generationAvailable,
+  generationCandidatesAvailable,
   formEditorAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
@@ -276,6 +280,7 @@ function EntryLoader({
   relationsAvailable: boolean;
   publishingAvailable: boolean;
   generationAvailable: boolean;
+  generationCandidatesAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -390,6 +395,7 @@ function EntryLoader({
       requests={requests}
       language={language}
       generationAvailable={generationAvailable}
+      generationCandidatesAvailable={generationCandidatesAvailable}
       archived={metadata.data.status === "archived"}
       publishingAvailable={publishingAvailable}
       relationsAvailable={relationsAvailable}
@@ -410,6 +416,7 @@ function EntryLoader({
 }
 function EntryEditor({
   generationAvailable,
+  generationCandidatesAvailable,
   initial,
   suggestedPartOfSpeech,
   entryMedium,
@@ -446,6 +453,7 @@ function EntryEditor({
   relationsAvailable: boolean;
   publishingAvailable: boolean;
   generationAvailable: boolean;
+  generationCandidatesAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   suggestedPartOfSpeech?: readonly string[];
@@ -1847,6 +1855,11 @@ function EntryEditor({
           grammarCatalog.data?.catalog_version
         ])}
         generate={requests.generate}
+        lookup={
+          generationCandidatesAvailable
+            ? requests.generationCandidates
+            : undefined
+        }
         onFill={(result, binding, exampleIds) => {
           if (!grammarCatalog.data) return false;
           const next = fillGeneratedDraft(

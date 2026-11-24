@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -14,6 +15,7 @@ import type {
 } from "@tsz/types";
 import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import { Drawer } from "@tsz/ui/admin/overlays";
+import dayjs from "dayjs";
 import { Bot, Sparkles } from "lucide-react";
 import {
   externalDictionaries,
@@ -53,6 +55,21 @@ type Run = {
   binding: GenerationTarget;
   exampleIds: string[];
 };
+type Generation = {
+  result: NextAgentResult;
+  run: Run;
+  generatedAt?: string;
+};
+
+function matches(result: NextAgentResult, run: Run) {
+  return (
+    result.run_id === run.input.run_id &&
+    result.base_revision === run.input.base_revision &&
+    result.snapshot_id === run.input.snapshot_id &&
+    result.requires_human_review
+  );
+}
+
 export function GenerationPanel({
   children,
   visible = true,
@@ -68,6 +85,7 @@ export function GenerationPanel({
   examples,
   disabled,
   generate,
+  lookup,
   onFill
 }: {
   children: ReactNode;
@@ -84,6 +102,7 @@ export function GenerationPanel({
   examples: { id: string; text: string }[];
   disabled: boolean;
   generate: LexiconNextRequests["generate"];
+  lookup?: LexiconNextRequests["generationCandidates"];
   onFill: (
     result: NextAgentResult,
     binding: GenerationTarget,
@@ -93,11 +112,11 @@ export function GenerationPanel({
   const { t } = useLexiconEditorTranslation();
   const [open, setOpen] = useState(false);
   const [selection, setSelection] = useState<GenerationTarget>(entryTarget);
-  const [generation, setGeneration] = useState<{
-    result: NextAgentResult;
-    headword: string;
-  }>();
-  const result = generation?.result;
+  const [generated, setGeneration] = useState<Generation>();
+  const [stored, setStored] = useState<Generation>();
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookupError, setLookupError] = useState(false);
+  const [lookupAttempt, setLookupAttempt] = useState(0);
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
@@ -130,19 +149,42 @@ export function GenerationPanel({
       active.current?.abort();
       setOpen(false);
       setGeneration(undefined);
+      setStored(undefined);
       setResume(undefined);
       setFeedback("");
       setError("");
     }
   }, [visible, available]);
-  async function start(binding: GenerationTarget, old?: Run) {
+  function supportsCandidates(binding: GenerationTarget) {
+    return (
+      !!lookup &&
+      (binding.section === "forms" ||
+        (binding.section === "grammar" &&
+          Boolean(
+            binding.pos ||
+            draft.form_editor?.pos.length ||
+            generationSenses(draft, medium, binding).length
+          )))
+    );
+  }
+  const candidateMode = supportsCandidates(selection);
+  const currentGeneration = candidateMode
+    ? generated?.run.snapshot === snapshot &&
+      generated.run.binding === selection
+      ? generated
+      : undefined
+    : generated;
+  const currentStored =
+    candidateMode &&
+    stored?.run.snapshot === snapshot &&
+    stored.run.binding === selection
+      ? stored
+      : undefined;
+  const generation = currentGeneration ?? currentStored;
+  const result = generation?.result;
+
+  async function prepareRun(binding: GenerationTarget, forceRefresh = false) {
     const section = binding.section;
-    if (
-      active.current ||
-      locked ||
-      (section !== "all" && !sections.includes(section))
-    )
-      return;
     const senses = generationSenses(draft, medium, binding);
     const scopedPos =
       binding.pos ?? (binding.senseId ? senses[0]?.pos : undefined);
@@ -152,60 +194,144 @@ export function GenerationPanel({
         : section === "all" || section === "translations"
           ? examples.slice(0, 50)
           : [];
-    setOpen(true);
-    setSelection(binding);
     if (
       (binding.senseId && !senses.length) ||
       (section === "groups" && !senses.length) ||
       senses.length > 80 ||
       (section === "translations" && !requestedExamples.length)
     ) {
-      setResume(undefined);
-      setGeneration(undefined);
-      setFeedback("");
-      setError(
+      throw new Error(
         senses.length > 80
           ? "本次生成的词义超出数量上限，请选择具体板块。"
           : section === "translations"
             ? t("entry_ai_translation_ineligible")
             : "请先添加词性和词义。"
       );
+    }
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(JSON.stringify([snapshot, binding]))
+    );
+    return {
+      snapshot,
+      binding,
+      exampleIds: requestedExamples.map((ex) => ex.id),
+      input: {
+        run_id: crypto.randomUUID(),
+        base_revision: revision,
+        snapshot_id: Array.from(new Uint8Array(digest), (b) =>
+          b.toString(16).padStart(2, "0")
+        ).join(""),
+        headword: draft.headword,
+        target,
+        examples: requestedExamples.map((ex) => ex.text),
+        existing_pos: scopedPos
+          ? [scopedPos]
+          : (draft.form_editor?.pos.map((p) => p.pos) ?? []),
+        sections: section === "all" ? sections : [section],
+        senses: senses.map(({ pos, gloss }) => ({ pos, gloss })),
+        ...(forceRefresh ? { force_refresh: true } : {})
+      }
+    } satisfies Run;
+  }
+
+  const readCandidate = useEffectEvent(async (signal: AbortSignal) => {
+    if (!lookup) return;
+    setLookingUp(true);
+    setLookupError(false);
+    setStored(undefined);
+    try {
+      const run = await prepareRun(selection);
+      if (signal.aborted) return;
+      const { candidate } = await lookup(entryId, run.input, signal);
+      if (signal.aborted) return;
+      if (candidate) {
+        if (!matches(candidate.result, run))
+          throw new Error("候选与当前草稿不匹配。");
+        setStored({
+          result: candidate.result,
+          run,
+          generatedAt: candidate.generated_at
+        });
+      }
+    } catch {
+      if (!signal.aborted) setLookupError(true);
+    } finally {
+      if (!signal.aborted) setLookingUp(false);
+    }
+  });
+
+  useEffect(() => {
+    if (!open || !candidateMode || locked || pending || currentGeneration)
+      return;
+    const controller = new AbortController();
+    void readCandidate(controller.signal);
+    return () => controller.abort();
+  }, [
+    open,
+    candidateMode,
+    locked,
+    pending,
+    snapshot,
+    selection,
+    currentGeneration,
+    lookup,
+    lookupAttempt
+  ]);
+
+  function fill({ result, run }: Generation) {
+    setError("");
+    setFeedback("");
+    if (
+      latest.current.snapshot !== run.snapshot ||
+      latest.current.disabled ||
+      !matches(result, run)
+    ) {
+      setFeedback("草稿或编辑状态已变化，请重新生成。");
       return;
     }
+    try {
+      const changed = latest.current.onFill(
+        result,
+        run.binding,
+        run.exampleIds
+      );
+      setFeedback(
+        changed
+          ? "已回填到草稿，请核对后保存。"
+          : "已有内容已保留，本次没有可补全的字段。"
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("entry_ai_fill_failed"));
+    }
+  }
+
+  async function start(
+    binding: GenerationTarget,
+    old?: Run,
+    forceRefresh = false
+  ) {
+    const section = binding.section;
+    if (
+      active.current ||
+      locked ||
+      (section !== "all" && !sections.includes(section))
+    )
+      return;
     const controller = new AbortController();
     active.current = controller;
+    setOpen(true);
+    setSelection(old?.binding ?? binding);
     setPending(true);
     setError("");
     setFeedback("");
-    if (!old) setGeneration(undefined);
+    if (!old) {
+      setGeneration(undefined);
+      setResume(undefined);
+    }
     try {
-      const digest = await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(JSON.stringify([snapshot, binding]))
-      );
-      const run = old ?? {
-        snapshot,
-        binding,
-        exampleIds: requestedExamples.map((ex) => ex.id),
-        input: {
-          run_id: crypto.randomUUID(),
-          base_revision: revision,
-          snapshot_id: Array.from(new Uint8Array(digest), (b) =>
-            b.toString(16).padStart(2, "0")
-          ).join(""),
-          headword: draft.headword,
-          target,
-          examples: requestedExamples.map((ex) => ex.text),
-          existing_pos: scopedPos
-            ? [scopedPos]
-            : (draft.form_editor?.pos.map((p) => p.pos) ?? []),
-          sections: section === "all" ? sections : [section],
-          senses: senses.map(({ pos, gloss }) => ({
-            pos,
-            gloss
-          }))
-        }
-      };
+      const run = old ?? (await prepareRun(binding, forceRefresh));
+      if (controller.signal.aborted) return;
       setResume(run);
       while (!controller.signal.aborted) {
         if (
@@ -218,14 +344,8 @@ export function GenerationPanel({
         }
         const next = await generate(entryId, run.input, controller.signal);
         if (controller.signal.aborted) return;
-        if (
-          next.run_id !== run.input.run_id ||
-          next.base_revision !== revision ||
-          next.snapshot_id !== run.input.snapshot_id ||
-          !next.requires_human_review
-        )
-          throw new Error("返回结果与当前草稿不匹配。");
-        setGeneration({ result: next, headword: run.input.headword });
+        if (!matches(next, run)) throw new Error("返回结果与当前草稿不匹配。");
+        setGeneration({ result: next, run });
         if (next.done) {
           setResume(undefined);
           if (
@@ -239,16 +359,7 @@ export function GenerationPanel({
             setFeedback("本次没有可回填的候选。");
             return;
           }
-          const changed = latest.current.onFill(
-            next,
-            run.binding,
-            run.exampleIds
-          );
-          setFeedback(
-            changed
-              ? "已回填到草稿，请核对后保存。"
-              : "已有内容已保留，本次没有可补全的字段。"
-          );
+          if (!supportsCandidates(binding)) fill({ result: next, run });
           return;
         }
         if (next.steps.some((s) => s.state === "running"))
@@ -274,6 +385,27 @@ export function GenerationPanel({
     }
     setOpen(true);
   }
+  function resumeFor(binding: GenerationTarget) {
+    return resume?.snapshot === snapshot &&
+      JSON.stringify(binding) === JSON.stringify(resume.binding)
+      ? resume
+      : undefined;
+  }
+
+  function openSection(binding: GenerationTarget) {
+    if (!supportsCandidates(binding)) {
+      void start(binding, resumeFor(binding));
+      return;
+    }
+    setSelection(binding);
+    setGeneration(undefined);
+    setStored(undefined);
+    setLookupError(false);
+    setFeedback("");
+    setError("");
+    setOpen(true);
+  }
+
   const actions = visible
     ? {
         sections,
@@ -281,14 +413,7 @@ export function GenerationPanel({
         disabled: locked || pending,
         exampleIds: examples.map((s) => s.id),
         openAssistant,
-        generateSection: (binding: GenerationTarget) =>
-          void start(
-            binding,
-            resume?.snapshot === snapshot &&
-              JSON.stringify(binding) === JSON.stringify(resume.binding)
-              ? resume
-              : undefined
-          )
+        generateSection: openSection
       }
     : null;
   const sectionLabel =
@@ -299,6 +424,15 @@ export function GenerationPanel({
     selection.section === "forms" ||
     (selection.section === "all" &&
       result?.steps.some((step) => step.section === "forms"));
+
+  const resumable = resumeFor(selection);
+  const canUse =
+    candidateMode &&
+    generation &&
+    result?.done &&
+    selection.section !== "all" &&
+    result.proposals[selection.section].length > 0;
+  const refresh = candidateMode && !!result?.done && !resumable;
 
   return (
     <GenerationContext.Provider value={actions}>
@@ -352,21 +486,27 @@ export function GenerationPanel({
               <Button
                 loading={pending}
                 disabled={locked || pending}
-                onClick={() =>
-                  void start(
-                    selection,
-                    resume?.snapshot === snapshot ? resume : undefined
-                  )
-                }
+                onClick={() => void start(selection, resumable, refresh)}
               >
-                {resume?.snapshot === snapshot && !pending
+                {resumable && !pending
                   ? "继续生成"
-                  : selection.section === "all"
-                    ? t("entry_ai_generate_entry")
-                    : t("entry_ai_generate_section", {
-                        section: sectionLabel
-                      })}
+                  : refresh
+                    ? t("entry_ai_refresh")
+                    : selection.section === "all"
+                      ? t("entry_ai_generate_entry")
+                      : t("entry_ai_generate_section", {
+                          section: sectionLabel
+                        })}
               </Button>
+              {canUse && (
+                <Button
+                  type="primary"
+                  disabled={locked || pending}
+                  onClick={() => fill(generation)}
+                >
+                  {t("entry_ai_use_candidates")}
+                </Button>
+              )}
               {pending && (
                 <Button
                   onClick={() => {
@@ -378,6 +518,30 @@ export function GenerationPanel({
                 </Button>
               )}
             </Space>
+            {candidateMode && !pending && !currentGeneration && lookingUp && (
+              <Typography.Text type="secondary" role="status">
+                {t("entry_ai_lookup_pending")}
+              </Typography.Text>
+            )}
+            {candidateMode && !pending && !currentGeneration && lookupError && (
+              <Alert
+                type="error"
+                title={t("entry_ai_lookup_failed")}
+                action={
+                  <Button onClick={() => setLookupAttempt((n) => n + 1)}>
+                    {t("entry_ai_retry_lookup")}
+                  </Button>
+                }
+              />
+            )}
+            {generation?.generatedAt && (
+              <Typography.Text type="secondary">
+                {t("entry_ai_generated_at")}{" "}
+                <time dateTime={generation.generatedAt}>
+                  {dayjs(generation.generatedAt).format("YYYY-MM-DD HH:mm:ss")}
+                </time>
+              </Typography.Text>
+            )}
             {error && <Alert type="error" title={error} />}
             {feedback && <p role="status">{feedback}</p>}
             {showForms && generation && (
@@ -385,13 +549,26 @@ export function GenerationPanel({
                 <FormTypeLabelsProvider items={catalog?.form_types}>
                   <FormGenerationResult
                     key={generation.result.run_id}
-                    headword={generation.headword}
+                    headword={generation.run.input.headword}
                     sources={generation.result.sources}
                     forms={generation.result.proposals.forms}
                   />
                 </FormTypeLabelsProvider>
               </PartOfSpeechLabelsProvider>
             )}
+            {candidateMode &&
+              selection.section === "grammar" &&
+              !!result?.proposals.grammar.length && (
+                <ul>
+                  {[
+                    ...new Set(
+                      result.proposals.grammar.map((row) => row.pattern)
+                    )
+                  ].map((pattern) => (
+                    <li key={pattern}>{pattern}</li>
+                  ))}
+                </ul>
+              )}
             {result && (
               <details
                 open={
@@ -417,7 +594,15 @@ export function GenerationPanel({
                             size="small"
                             disabled={disabled || pending}
                             onClick={() => {
-                              void start({ ...selection, section: s.section });
+                              const binding = {
+                                ...selection,
+                                section: s.section
+                              };
+                              void start(
+                                binding,
+                                undefined,
+                                supportsCandidates(binding)
+                              );
                             }}
                           >
                             重新生成{t(`entry_ai_${s.section}`)}

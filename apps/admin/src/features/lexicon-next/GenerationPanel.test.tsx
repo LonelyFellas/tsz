@@ -452,3 +452,89 @@ it("已加载旧文案的页面仍按词性显示韦氏变形和候选词形计�
   expect(candidates.getByRole("rowheader", { name: "过去式" })).toBeVisible();
   expect(candidates.getByRole("rowheader", { name: "过去分词" })).toBeVisible();
 });
+
+it("重开语法面板只读旧候选，显式使用或刷新，并随方言切换隐藏旧结果", async () => {
+  vi.stubGlobal("crypto", webcrypto);
+  function grammar(input: NextAgentInput, pattern: string) {
+    const response = result(input);
+    response.steps = [{ section: "grammar", state: "completed", error: "" }];
+    response.proposals.definitions = [];
+    response.proposals.grammar = [{ pos: "noun", pattern }];
+    return response;
+  }
+  const lookup = vi.fn(async (_id: string, input: NextAgentInput) => ({
+    candidate:
+      input.target === "en-GB"
+        ? {
+            source_run_id: "previous-run",
+            generated_at: "2026-11-24T00:00:00Z",
+            result: grammar(input, "by tomorrow")
+          }
+        : null
+  }));
+  const generate = vi.fn(async (_id: string, input: NextAgentInput) =>
+    grammar(input, "until tomorrow")
+  );
+  const fillError = "草稿内容已超出数量限制，请缩小生成范围。";
+  const onFill = vi
+    .fn(() => true)
+    .mockImplementationOnce(() => {
+      throw new Error(fillError);
+    });
+  const props = {
+    entryId: "entry",
+    revision: 7,
+    draft,
+    medium: "zh-Hans",
+    target: "en-GB",
+    sections: ["grammar" as const],
+    contextVersion: "1",
+    examples: [],
+    disabled: false,
+    generate,
+    lookup,
+    onFill,
+    children: <SectionAI section="grammar" pos="noun" />
+  };
+  const ui = render(<GenerationPanel {...props} />);
+  const open = () =>
+    fireEvent.click(screen.getByRole("button", { name: "AI 生成语法结构" }));
+  open();
+  expect(await screen.findByText("by tomorrow")).toBeVisible();
+  expect(screen.getByText("生成于")).toBeVisible();
+  expect(generate).not.toHaveBeenCalled();
+  expect(onFill).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+  open();
+  expect(await screen.findByText("by tomorrow")).toBeVisible();
+  expect(lookup).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole("button", { name: "使用候选" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(fillError);
+  expect(screen.getByText("by tomorrow")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "使用候选" }));
+  expect(screen.queryByText(fillError)).not.toBeInTheDocument();
+  expect(onFill).toHaveBeenCalledTimes(2);
+
+  fireEvent.click(screen.getByRole("button", { name: "重新生成" }));
+  expect(await screen.findByText("until tomorrow")).toBeVisible();
+  expect(generate).toHaveBeenCalledWith(
+    "entry",
+    expect.objectContaining({ force_refresh: true, existing_pos: ["noun"] }),
+    expect.any(AbortSignal)
+  );
+  expect(onFill).toHaveBeenCalledTimes(2);
+
+  ui.rerender(<GenerationPanel {...props} target="en-US" />);
+  expect(screen.queryByText("until tomorrow")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "使用候选" })
+  ).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(lookup).toHaveBeenLastCalledWith(
+      "entry",
+      expect.objectContaining({ target: "en-US" }),
+      expect.any(AbortSignal)
+    )
+  );
+});

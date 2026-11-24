@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-review-findings-20261124/docs/openapi.json",
-  "_generatedAt": "2026-11-24T01:10:39.882Z",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-candidate-reuse-5484/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-24T09:15:42.393Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -37,6 +37,7 @@
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/generation": ["post"],
+    "/admin/lexicon-next/entries/{id}/generation/candidates": ["post"],
     "/admin/lexicon-next/entries/{id}/publication": ["get"],
     "/admin/lexicon-next/entries/{id}/publication-preview": ["post"],
     "/admin/lexicon-next/entries/{id}/publications": ["post"],
@@ -345,6 +346,12 @@
       },
       {
         "name": "x-tsz-next-generation",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-generation-candidates",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -3520,6 +3527,18 @@
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "429": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/entries/{id}/generation/candidates": {
+      "request": { "$ref": "#/components/schemas/NextAgentInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextGenerationCandidates" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
@@ -9281,6 +9300,10 @@
         "base_revision": { "type": "integer", "format": "int64" },
         "examples": { "type": "array", "items": { "type": "string" } },
         "existing_pos": { "type": "array", "items": { "type": "string" } },
+        "force_refresh": {
+          "type": "boolean",
+          "description": "Bypass reuse for a single forms or grammar generation."
+        },
         "headword": { "type": "string" },
         "run_id": { "type": "string", "format": "uuid" },
         "sections": {
