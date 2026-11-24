@@ -312,6 +312,7 @@ export function createHttpClient({
     const method = init.method ?? "GET";
     const longOperation =
       init.body instanceof Blob ||
+      /^\/lexicon-next\/entries\/[^/]+\/generation$/.test(path) ||
       path === "/lexicon/assistant" ||
       path === "/lexicon/assistant/stream" ||
       path === "/lexicon/assistant/form-candidates" ||

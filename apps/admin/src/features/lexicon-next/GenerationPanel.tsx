@@ -147,12 +147,10 @@ export function GenerationPanel({
     const scopedPos =
       binding.pos ?? (binding.senseId ? senses[0]?.pos : undefined);
     const requestedExamples =
-      section === "all"
-        ? examples
-        : section === "translations"
-          ? examples.filter(
-              (s) => !binding.sentenceId || s.id === binding.sentenceId
-            )
+      section === "translations" && binding.sentenceId
+        ? examples.filter((s) => s.id === binding.sentenceId)
+        : section === "all" || section === "translations"
+          ? examples.slice(0, 50)
           : [];
     setOpen(true);
     setSelection(binding);
@@ -160,15 +158,14 @@ export function GenerationPanel({
       (binding.senseId && !senses.length) ||
       (section === "groups" && !senses.length) ||
       senses.length > 80 ||
-      requestedExamples.length > 50 ||
       (section === "translations" && !requestedExamples.length)
     ) {
       setResume(undefined);
       setGeneration(undefined);
       setFeedback("");
       setError(
-        senses.length > 80 || requestedExamples.length > 50
-          ? "本次生成的词义或例句超出数量上限，请选择具体板块。"
+        senses.length > 80
+          ? "本次生成的词义超出数量上限，请选择具体板块。"
           : section === "translations"
             ? t("entry_ai_translation_ineligible")
             : "请先添加词性和词义。"

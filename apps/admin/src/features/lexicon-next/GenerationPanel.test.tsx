@@ -129,6 +129,64 @@ it("失败板块的重试使用新批次，并保留该板块的范围", async (
   );
 });
 
+it.each(["single", "all"])(
+  "selects eligible examples before applying the batch limit (%s)",
+  async (scope) => {
+    vi.stubGlobal("crypto", webcrypto);
+    const examples = Array.from({ length: 51 }, (_, i) => ({
+      id: String(i + 1),
+      text: "Example " + (i + 1)
+    }));
+    const generate = vi.fn(async (_id: string, input: NextAgentInput) =>
+      result(input)
+    );
+    const onFill = vi.fn(() => true);
+    render(
+      <GenerationPanel
+        entryId="entry"
+        revision={1}
+        draft={draft}
+        target="en-GB"
+        medium="zh-Hans"
+        sections={["translations"]}
+        contextVersion="1"
+        examples={examples}
+        disabled={false}
+        generate={generate}
+        onFill={onFill}
+      >
+        <EntryAssistantButton />
+        <SectionAI
+          section="translations"
+          sentenceId="51"
+          label="第 51 条译文"
+        />
+      </GenerationPanel>
+    );
+    if (scope === "single") {
+      fireEvent.click(
+        screen.getByRole("button", { name: "AI 生成第 51 条译文" })
+      );
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: "词条助手" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "生成整个词条" })
+      );
+    }
+    await waitFor(() => expect(onFill).toHaveBeenCalledOnce());
+    const selected =
+      scope === "single" ? examples.slice(50) : examples.slice(0, 50);
+    expect(generate.mock.calls[0]?.[1].examples).toEqual(
+      selected.map((s) => s.text)
+    );
+    expect(onFill.mock.calls[0]).toEqual([
+      expect.anything(),
+      expect.anything(),
+      selected.map((s) => s.id)
+    ]);
+  }
+);
+
 it("从第二个词义的中文解释发起时，只提交该词义并保留目标语言", async () => {
   vi.stubGlobal("crypto", webcrypto);
   const generate = vi.fn(async (_id: string, input: NextAgentInput) =>

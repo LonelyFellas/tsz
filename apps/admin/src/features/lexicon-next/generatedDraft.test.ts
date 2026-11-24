@@ -87,6 +87,25 @@ describe("智能补全回填", () => {
       "我明天来。"
     );
     expect(changes[0]).not.toHaveProperty("expected_revision");
+    const blankTranslation = {
+      id: "first-translation",
+      locale: "zh-Hans",
+      style: "word_for_word" as const,
+      content: { version: 2 as const, text: "", annotations: [] },
+      metadata: {
+        freedom: 20,
+        sources: [
+          {
+            id: "source",
+            source_type: "dictionary" as const,
+            title: "词典",
+            url: "",
+            locator: "1"
+          }
+        ]
+      }
+    };
+    const otherBlank = { ...blankTranslation, id: "second-translation" };
     const saved: NextSentence = {
       ...resources[0]!,
       revision: 2,
@@ -95,6 +114,7 @@ describe("智能补全回填", () => {
         variants: [
           {
             ...newSentenceVariant("en-GB"),
+            translations: [blankTranslation, otherBlank],
             content: {
               version: 2,
               text: "An existing example.",
@@ -129,9 +149,13 @@ describe("智能补全回填", () => {
     expect(revised.resources[0]?.draft.variants[0]?.content.text).toBe(
       "An existing example."
     );
-    expect(
-      revised.resources[0]?.draft.variants[0]?.translations[0]?.content.text
-    ).toBe("已有例句的译文");
+    expect(revised.resources[0]?.draft.variants[0]?.translations).toEqual([
+      {
+        ...blankTranslation,
+        content: { ...blankTranslation.content, text: "已有例句的译文" }
+      },
+      otherBlank
+    ]);
   });
 });
 

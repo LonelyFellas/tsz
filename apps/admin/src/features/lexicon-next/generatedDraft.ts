@@ -286,6 +286,12 @@ export function fillGeneratedDraft(
       )
     )
       continue;
+    let consumed = 0;
+    const translations = variant.translations.map((row) => {
+      if (row.locale !== medium || consumed >= additions.length) return row;
+      const candidate = additions[consumed++]!;
+      return { ...row, content: candidate.content };
+    });
     resources.push({
       ...source,
       draft: {
@@ -293,10 +299,7 @@ export function fillGeneratedDraft(
         variants: [
           {
             ...variant,
-            translations: [
-              ...variant.translations.filter((t) => t.locale !== medium),
-              ...additions
-            ]
+            translations: [...translations, ...additions.slice(consumed)]
           }
         ]
       }

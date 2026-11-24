@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-super-agent-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-23T12:59:07.919Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-review-findings-20261124/docs/openapi.json",
+  "_generatedAt": "2026-11-24T01:10:39.882Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -339,6 +339,12 @@
       },
       {
         "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-generation",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
