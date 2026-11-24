@@ -27,6 +27,7 @@ export interface NextAgentInput {
   existing_pos: string[];
   examples: string[];
   senses: NextAgentSenseContext[];
+  force_refresh?: boolean;
 }
 
 export interface NextAgentSense {
@@ -116,4 +117,14 @@ export interface NextAgentResult {
   steps: NextAgentStep[];
   proposals: NextAgentProposals;
   sources: NextAgentSource[];
+}
+
+export interface NextGenerationCandidate {
+  source_run_id: string;
+  generated_at: string;
+  result: NextAgentResult;
+}
+
+export interface NextGenerationCandidates {
+  candidate: NextGenerationCandidate | null;
 }

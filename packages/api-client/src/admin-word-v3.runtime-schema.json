@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-review-findings-20261124/docs/openapi.json",
-  "_source_sha256": "ae53e86680b7b702df6510de9bb198eed7662f3579da420c89e64f645495418d",
+  "_source": "/Users/darwish/.codex/worktrees/lexicon-candidate-reuse-5484/tsz-rust/docs/openapi.json",
+  "_source_sha256": "7b1c71e78e1a82cf115cb4ca136357313751971d6e62474eff49e35769d53885",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -19,6 +19,7 @@
     "NextPublicationState",
     "NextAgentInput",
     "NextAgentResult",
+    "NextGenerationCandidates",
     "NextPublicationPreview",
     "NextPublication",
     "NextEntry",
@@ -3666,6 +3667,7 @@
         "base_revision": { "type": "integer" },
         "examples": { "type": "array", "items": { "type": "string" } },
         "existing_pos": { "type": "array", "items": { "type": "string" } },
+        "force_refresh": { "type": "boolean" },
         "headword": { "type": "string" },
         "run_id": { "type": "string", "format": "uuid" },
         "sections": {
@@ -3881,6 +3883,7 @@
         "equivalent_metadata": { "type": "boolean" },
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
+        "generation_candidates": { "type": "boolean" },
         "grammar_audio": { "type": "boolean" },
         "grammar_form_links": { "type": "boolean" },
         "grammar_structures": { "type": "boolean" },
@@ -4301,6 +4304,29 @@
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
         "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextGenerationCandidate": {
+      "type": "object",
+      "required": ["source_run_id", "generated_at", "result"],
+      "properties": {
+        "generated_at": { "type": "string", "format": "date-time" },
+        "result": { "$ref": "#/$defs/NextAgentResult" },
+        "source_run_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "NextGenerationCandidates": {
+      "type": "object",
+      "required": ["candidate"],
+      "properties": {
+        "candidate": {
+          "oneOf": [
+            { "$ref": "#/$defs/NextGenerationCandidate" },
+            { "type": "null" }
+          ]
+        }
       },
       "additionalProperties": false
     },
