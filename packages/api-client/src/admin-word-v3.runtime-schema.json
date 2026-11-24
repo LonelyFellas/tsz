@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-super-agent-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "3cab20fd9b61ab3ced168ec7ab6a58e4550de18e76e3f8ecfe4f3a5af55eabf8",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-review-findings-20261124/docs/openapi.json",
+  "_source_sha256": "ae53e86680b7b702df6510de9bb198eed7662f3579da420c89e64f645495418d",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",

@@ -659,8 +659,8 @@ function EntryEditor({
   const referencedSentenceIds = new Set(
     draft.senses.flatMap((s) => s.sentence_ids ?? [])
   );
-  const existingExamples = Object.values(sentenceWorkspace.resources)
-    .filter((s) => {
+  const existingExamples = Object.values(sentenceWorkspace.resources).filter(
+    (s) => {
       const v = s.draft.variants.find((row) => row.locale === target);
       return (
         referencedSentenceIds.has(s.id) &&
@@ -674,8 +674,8 @@ function EntryEditor({
           ? canCreateSentence
           : canAdminResourceAction(profile, "sentences", "edit", s.owner_id))
       );
-    })
-    .slice(0, 50);
+    }
+  );
   const canEdit = usePermission("words.edit");
   const editOthers = usePermission("words.edit_others");
   const writable =
@@ -1871,7 +1871,10 @@ function EntryEditor({
           )
             return false;
           for (const resource of next.resources)
-            sentenceWorkspace.update(resource, resource.draft.variants[0]!);
+            sentenceWorkspace.update(
+              sentenceWorkspace.resources[resource.id] ?? resource,
+              resource.draft.variants[0]!
+            );
           if (Object.keys(next.dialect).length)
             setEditedPairs((current) => ({
               ...current,

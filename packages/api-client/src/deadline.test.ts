@@ -39,6 +39,22 @@ describe("logical request deadlines", () => {
     }
   );
 
+  it("allows generation to finish within the backend's 50 second budget", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      () =>
+        new Promise<Response>((resolve) =>
+          setTimeout(() => resolve(new Response('{"done":true}')), 35_000)
+        )
+    );
+    const http = createHttpClient({ baseUrl: "/api" });
+    const result = expect(
+      http.post("/lexicon-next/entries/example/generation", {})
+    ).resolves.toEqual({ done: true });
+    await Promise.all([result, vi.advanceTimersByTimeAsync(35_000)]);
+  });
+
   it("caller cancellation ends one waiter without aborting shared refresh", async () => {
     vi.useFakeTimers();
     let finish!: () => void;
