@@ -112,14 +112,23 @@ it("keeps Webster's inflections attached to the part of speech that lists them",
   expect(
     parse(
       "Merriam-Webster",
-      "center · 词性 noun、verb · 读音标记 ˈsen-tər · 词形 noun [] · 词形 verb [centered、centering]"
+      "test · 词性 noun、verb · 读音标记 ˈtest · 词形 noun [] · 词形 verb [tested、testing、tests]",
+      "test"
     )
   ).toEqual({
     partsOfSpeech: ["noun", "verb"],
-    reading: "ˈsen-tər",
+    reading: "ˈtest",
     formsByPos: [
       { pos: "noun", forms: [] },
-      { pos: "verb", forms: [{ text: "centered" }, { text: "centering" }] }
+      {
+        pos: "verb",
+        forms: [
+          { type: "past_tense", text: "tested" },
+          { type: "past_participle", text: "tested" },
+          { type: "present_participle", text: "testing" },
+          { type: "third_person_singular", text: "tests" }
+        ]
+      }
     ]
   });
 });
@@ -138,9 +147,30 @@ it("keeps the same Webster index spelling in each of its parts of speech", () =>
     {
       pos: "verb",
       forms: [
-        { text: "centered" },
-        { text: "centering" },
+        { type: "past_tense", text: "centered" },
+        { type: "past_participle", text: "centered" },
+        { type: "present_participle", text: "centering" },
         { type: "third_person_singular", text: "centers", indexed: true }
+      ]
+    }
+  ]);
+});
+
+it("keeps irregular Webster spellings and explicit source labels", () => {
+  expect(
+    parse(
+      "Merriam-Webster",
+      "run · 词形 verb [ran、running、runs] · 词形 verb [过去分词 run]",
+      "run"
+    ).formsByPos
+  ).toEqual([
+    {
+      pos: "verb",
+      forms: [
+        { text: "ran" },
+        { type: "present_participle", text: "running" },
+        { type: "third_person_singular", text: "runs" },
+        { type: "past_participle", text: "run" }
       ]
     }
   ]);

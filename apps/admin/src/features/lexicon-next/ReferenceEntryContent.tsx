@@ -17,7 +17,6 @@ const messages = {
   meaning: ["词义参考", "詞義參考", "Meaning reference"],
   spellings: ["拼写变体", "拼寫變體", "Spelling variants"],
   unassigned: ["未标注词性", "未標註詞性", "Part of speech unmarked"],
-  unlabelledForm: ["未标注词形类型", "未標註詞形類型", "Form type unmarked"],
   formCount: ["{{count}} 项", "{{count}} 項", "Forms ({{count}})"],
   indexOnly: [
     "本次只取得词条索引，可打开原词条查看释义。",
@@ -87,7 +86,6 @@ export function ReferenceEntryContent({
               {indexed && ` · ${form("entry_ai_source_index_inflection")}`}
             </span>
           )}
-          {!type && <span title={t("unlabelledForm")}>—</span>}
           <span className="tsz-words" lang="en">
             {text}
           </span>
