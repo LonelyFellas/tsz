@@ -1179,6 +1179,7 @@ function EntryEditor({
     >
       <div
         data-testid="lexicon-next-editor"
+        data-step={step}
         className={`lexicon-next lexicon-next-editor${step === "forms" ? " lexicon-next-forms" : ""}`}
       >
         {!writable && readOnlyReason && (

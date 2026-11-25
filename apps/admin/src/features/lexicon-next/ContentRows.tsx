@@ -1,7 +1,9 @@
 import { SectionAI } from "./GenerationActions";
 import { Button, Space } from "@tsz/ui/admin/display";
 import { Input, Select } from "@tsz/ui/admin/forms";
-import { Trash2, Plus } from "lucide-react";
+import { BookOpen, Languages, Trash2, Plus } from "lucide-react";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { SenseEmptyState } from "./SenseEmptyState";
 import type {
   NextDefinition,
   NextEquivalent,
@@ -38,6 +40,7 @@ export function ContentRows({
   grammarLocale?: string;
   onChange: (rows: Row[]) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const [templates, setTemplates] = useState<
     Record<string, { plan: string; rows: NextDefinition[] }>
   >({});
@@ -249,6 +252,12 @@ export function ContentRows({
       collapsed={collapsed}
       onToggle={() => setCollapsed(!collapsed)}
     >
+      {!visible.length && (
+        <SenseEmptyState
+          icon={definition ? BookOpen : Languages}
+          description={t("panel_no_yet", { p0: label })}
+        />
+      )}
       {content}
     </SenseSection>
   ) : (

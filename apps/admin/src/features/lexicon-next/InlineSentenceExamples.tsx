@@ -16,14 +16,8 @@ import type {
   RichTextV2,
   SharedSentenceAnnotation
 } from "@tsz/types";
-import {
-  Alert,
-  Button,
-  Card,
-  EmptyState,
-  Space,
-  Tag
-} from "@tsz/ui/admin/display";
+import { SenseEmptyState } from "./SenseEmptyState";
+import { Alert, Button, Card, Space, Tag } from "@tsz/ui/admin/display";
 import {
   Checkbox,
   Input,
@@ -32,7 +26,14 @@ import {
   Slider
 } from "@tsz/ui/admin/forms";
 import { App, Popover } from "@tsz/ui/admin/overlays";
-import { ChevronDown, Pencil, Plus, Trash2, Volume2 } from "lucide-react";
+import {
+  ChevronDown,
+  MessageSquareText,
+  Pencil,
+  Plus,
+  Trash2,
+  Volume2
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { canAdminResourceAction } from "@tsz/shared/auth";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
@@ -408,7 +409,6 @@ function InlineSentenceCard({
                     <label htmlFor={`${fieldId}-translation-${row.id}`}>
                       {localeLabels[medium]}译文 {index + 1}
                     </label>
-                    <Tag>{kind ? sentenceStyles[kind] : "自由度无效"}</Tag>
                     {index === 0 && (
                       <SectionAI
                         section="translations"
@@ -416,6 +416,7 @@ function InlineSentenceCard({
                         disabled={!editable}
                       />
                     )}
+                    <Tag>{kind ? sentenceStyles[kind] : "自由度无效"}</Tag>
                   </div>
                   <div className="next-sentence-inline-freedom">
                     <label htmlFor={`${fieldId}-freedom-${row.id}`}>
@@ -721,13 +722,13 @@ export function InlineSentenceExamples({
               )
             )}
           </div>
-          <EmptyState
-            empty={canRead && !ids.length}
-            description={
-              disabled ? t("panel_no_linked_examples_yet") : undefined
-            }
-            className="next-sentence-section-actions"
-          >
+          {canRead && !ids.length && (
+            <SenseEmptyState
+              icon={MessageSquareText}
+              description={t("panel_no_linked_examples_yet")}
+            />
+          )}
+          <div className="next-sentence-section-actions">
             <Button
               type="dashed"
               block
@@ -751,7 +752,7 @@ export function InlineSentenceExamples({
             >
               引用已有例句
             </Button>
-          </EmptyState>
+          </div>
         </PronunciationPreviewProvider>
       </EntryDialectContext.Provider>
     </SenseSection>

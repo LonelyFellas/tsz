@@ -1,9 +1,10 @@
 import { SectionAI } from "./GenerationActions";
 import { useState } from "react";
 import type { NextDefinition, NextGrammarStructure } from "@tsz/types";
-import { Button, EmptyState } from "@tsz/ui/admin/display";
+import { Button } from "@tsz/ui/admin/display";
+import { SenseEmptyState } from "./SenseEmptyState";
 import { Input, Select } from "@tsz/ui/admin/forms";
-import { Plus, Trash2 } from "lucide-react";
+import { BookOpen, Plus, Trash2 } from "lucide-react";
 import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
 import { SortableDragHandle } from "@/features/dictionary/word-creation-v3/components/SortableDragHandle";
 import {
@@ -259,33 +260,32 @@ export function DefinitionRows({
           </table>
         </div>
       )}
-      <EmptyState
-        empty={!visible.length}
-        description={
-          disabled
-            ? t("panel_no_yet", { p0: label })
-            : remaining <= 0
+      {!visible.length && (
+        <SenseEmptyState
+          icon={BookOpen}
+          description={
+            !disabled && remaining <= 0
               ? t("definition_add_limit")
-              : undefined
+              : t("panel_no_yet", { p0: label })
+          }
+        />
+      )}
+      <Button
+        block
+        type="dashed"
+        className="word-section-add-button"
+        data-v3-field="definitions"
+        icon={<Plus aria-hidden />}
+        disabled={disabled || remaining <= 0}
+        onClick={() =>
+          onChange((current) => [
+            ...current,
+            { id: crypto.randomUUID(), locale, text: "", style: "definition" }
+          ])
         }
       >
-        <Button
-          block
-          type="dashed"
-          className="word-section-add-button"
-          data-v3-field="definitions"
-          icon={<Plus aria-hidden />}
-          disabled={disabled || remaining <= 0}
-          onClick={() =>
-            onChange((current) => [
-              ...current,
-              { id: crypto.randomUUID(), locale, text: "", style: "definition" }
-            ])
-          }
-        >
-          添加{label}
-        </Button>
-      </EmptyState>
+        添加{label}
+      </Button>
     </SenseSection>
   );
   return english ? (

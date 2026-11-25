@@ -1,6 +1,6 @@
 import { useAdminDisabled } from "@tsz/ui/admin/context";
 import type { SenseGroupV3 } from "@tsz/types";
-import { Button, Card, Space } from "@tsz/ui/admin/display";
+import { Button, Card, Flex, Space } from "@tsz/ui/admin/display";
 import { Input } from "@tsz/ui/admin/forms";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
@@ -52,8 +52,12 @@ export function V3SenseGroupsCard({
       data-v3-field="sense_groups"
       data-v3-node-id={wordId ?? "current-entry"}
       size="small"
-      title={t("sense_groups")}
-      extra={headerAction}
+      title={
+        <Flex align="center" gap="small">
+          <span>{t("sense_groups")}</span>
+          {headerAction}
+        </Flex>
+      }
     >
       <div className="word-sense-group-list">
         {/* 列名只出一次：每行都重复「中文 / 英文」会把下一行的输入框推远，

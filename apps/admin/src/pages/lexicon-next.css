@@ -277,8 +277,8 @@
   padding-bottom: 100px;
 }
 
-/* 只让 Step 1 的编辑内容在宽桌面居中；Step 4 保留原始左对齐基线。 */
-.word-creation-content--basics > .lexicon-next-editor {
+.word-creation-content--basics > .lexicon-next-editor,
+.lexicon-next-editor[data-step="meanings"] {
   margin-inline: auto;
 }
 
@@ -493,8 +493,21 @@
 .lexicon-next-section-caption {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--ui-space-2) var(--ui-space-4);
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+.lexicon-next-sense-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  padding-block: var(--ui-space-1);
+}
+.lexicon-next-sense-empty > svg {
+  flex-shrink: 0;
+}
+.word-sense-list > .lexicon-next-section-caption {
+  margin-bottom: var(--ui-space-3);
 }
 .lexicon-next-draft-preview {
   margin-top: var(--ui-space-6);
@@ -851,8 +864,28 @@
   color: var(--ui-color-primary);
 }
 
-.word-sense-section-card .ui-card-extra .lexicon-next-ai-button {
-  margin-inline-end: var(--ui-space-2);
+/* AI 入口与折叠标题共用列宽，保留两个独立的点击区域。 */
+.word-sense-section-card
+  .ui-card-head-wrapper:has(> .ui-card-extra > .lexicon-next-ai-button) {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) auto 1fr;
+
+  > .ui-card-head-title,
+  .word-sense-section-title {
+    display: grid;
+    grid-area: 1 / 1 / 2 / -1;
+    grid-template-columns: subgrid;
+  }
+
+  .word-sense-section-title-actions {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  > .ui-card-extra {
+    grid-area: 1 / 2;
+    z-index: 1;
+  }
 }
 
 .lexicon-generation-drawer {
