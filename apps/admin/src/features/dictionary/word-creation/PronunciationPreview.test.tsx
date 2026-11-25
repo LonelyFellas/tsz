@@ -3,7 +3,8 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type {
@@ -21,6 +22,12 @@ import {
 import { deferred } from "./wordCreation.test.helper";
 import { V3EnglishTextPreview } from "../word-creation-v3/components/V3EnglishTextPreview";
 import { queryClient } from "@/lib/queryClient";
+import { V3FormContentOverview } from "../word-creation-v3/components/V3FormContentOverview";
+import {
+  commonFormFixture,
+  formsFixture,
+  pronunciationFixture
+} from "../word-creation-v3/fixtures";
 
 const preview = vi.hoisted(() => ({
   enabled: true,
@@ -1312,6 +1319,221 @@ it("compact editable preview may synthesize while asset-only reading never does"
   await waitFor(() => expect(button).toBeEnabled());
   fireEvent.click(button);
   await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+});
+
+it("词形总览按配音版本播放各自资产，缺少资产时按当前版本试听", async () => {
+  const setting = {
+    voice_id: "british-voice",
+    enabled: true,
+    locale: "en-GB" as const
+  };
+  const profile = {
+    voices: [
+      {
+        ...setting,
+        version_id: "first",
+        version_name: "慢版",
+        rate_percent: -20,
+        audio_asset_id: "formal-slow"
+      },
+      {
+        ...setting,
+        version_id: "second",
+        version_name: "标准版",
+        rate_percent: 0,
+        audio_asset_id: "formal-normal"
+      },
+      {
+        ...setting,
+        version_id: "third",
+        version_name: "快版",
+        rate_percent: 25,
+        volume_percent: 85
+      }
+    ]
+  };
+  const pronunciation = pronunciationFixture({
+    actual_pron: "təˈmɑːtəʊ",
+    synthesis: {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      uk: {
+        source: "ipa",
+        ipa: "təˈmɑːtəʊ",
+        ups: "",
+        ipa_speech: {
+          content: { version: 2, text: "tomato", annotations: [] },
+          voice_profile: profile
+        }
+      },
+      us: { source: "none", ipa: "", ups: "" }
+    }
+  });
+  const form = commonFormFixture({
+    spelling: "tomato",
+    pronunciations: [pronunciation]
+  });
+  const group = formsFixture({ forms: [form] }).pos[0]!.form_groups[0]!;
+  vi.stubGlobal("Audio", AudioMock);
+  preview.resolveAudio.mockImplementation(async (id: string) =>
+    result({ audioUrl: `https://audio.test/${id}.mp3` })
+  );
+  render(
+    <PronunciationPreviewProvider>
+      <V3FormContentOverview
+        rows={[
+          {
+            membershipId: group.members[0]!.id,
+            form,
+            formLabel: "原形",
+            formTypeAriaLabel: "词形类型",
+            formTypeDisabled: false,
+            formTypeOptions: ["base"],
+            membershipCount: 1
+          }
+        ]}
+        group={group}
+        sharedCounts={new Map()}
+        onEdit={vi.fn()}
+        onFormTypeChange={vi.fn()}
+        issues={[]}
+      />
+    </PronunciationPreviewProvider>
+  );
+
+  for (const [name, id] of [
+    ["慢版", "formal-slow"],
+    ["标准版", "formal-normal"]
+  ]) {
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: new RegExp(`${name}.*播放语音`)
+      })
+    );
+    await waitFor(() => {
+      const audio = AudioMock.instances.find(({ src }) =>
+        src.endsWith(`/${id}.mp3`)
+      );
+      expect(audio?.play).toHaveBeenCalledOnce();
+    });
+  }
+  expect(AudioMock.instances[0]?.pause).toHaveBeenCalled();
+  expect(preview.resolveAudio.mock.calls.map(([id]) => id)).toEqual([
+    "formal-slow",
+    "formal-normal"
+  ]);
+  expect(preview.synthesize).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: /快版.*播放语音/ }));
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+  expect(preview.synthesize.mock.calls[0]![0]).toMatchObject({
+    voiceId: "british-voice",
+    ratePercent: 25,
+    volumePercent: 85
+  });
+  expect(preview.resolveAudio).toHaveBeenCalledTimes(2);
+});
+
+it("关闭试听时，词形音色仍可播放继承设置中的已保存音频", async () => {
+  preview.enabled = false;
+  vi.stubGlobal("Audio", AudioMock);
+  render(
+    <PronunciationPreviewProvider>
+      <PronunciationPreviewVoiceList
+        dialect="uk"
+        source="spelling"
+        content={{ version: 2, text: "tomato", annotations: [] }}
+        playback={{ pronunciationId: "saved", label: "英式" }}
+        voiceProfile={{
+          dubbing: {
+            area: "word",
+            uk: { mode: "inherit" },
+            us: { mode: "inherit" }
+          },
+          voices: [
+            {
+              voice_id: "british-voice",
+              version_name: "英式版本",
+              locale: "en-GB",
+              enabled: true,
+              rate_percent: 0,
+              audio_asset_id: "saved-uk"
+            }
+          ]
+        }}
+      />
+    </PronunciationPreviewProvider>
+  );
+  fireEvent.click(screen.getByRole("button", { name: /英式版本.*播放语音/ }));
+  await waitFor(() =>
+    expect(AudioMock.instances[0]?.play).toHaveBeenCalledOnce()
+  );
+  expect(preview.resolveAudio).toHaveBeenCalledWith(
+    "saved-uk",
+    expect.anything()
+  );
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("词形总览推荐解析失败时显示错误，不提供目录默认音色试听", async () => {
+  preview.resolveVoices.mockRejectedValueOnce(
+    new Error("没有符合当前读法的音色")
+  );
+  render(
+    <PronunciationPreviewProvider>
+      <PronunciationPreviewVoiceList
+        dialect="uk"
+        source="spelling"
+        content={{ version: 2, text: "tomato", annotations: [] }}
+        recommendationArea="word"
+        playback={{ pronunciationId: "form", label: "英式" }}
+      />
+    </PronunciationPreviewProvider>
+  );
+  expect(await screen.findByText("没有符合当前读法的音色")).toBeVisible();
+  expect(screen.queryByRole("button", { name: /播放语音/ })).toBeNull();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+});
+
+it("词形总览按目录标注的口音归类未保存 locale 的音色", async () => {
+  preview.listVoices.mockResolvedValue([
+    {
+      ...voices[0]!,
+      accent: "us"
+    }
+  ]);
+  const profile = {
+    voices: [{ voice_id: "common-default", enabled: true, rate_percent: -12 }]
+  };
+  const content: RichTextV2 = { version: 2, text: "tomato", annotations: [] };
+  render(
+    <PronunciationPreviewProvider>
+      {(["uk", "us"] as const).map((dialect) => (
+        <section key={dialect} aria-label={dialect}>
+          <PronunciationPreviewVoiceList
+            dialect={dialect}
+            source="spelling"
+            voiceProfile={profile}
+            content={content}
+            playback={{ pronunciationId: "form", label: dialect }}
+          />
+        </section>
+      ))}
+    </PronunciationPreviewProvider>
+  );
+
+  const us = within(screen.getByRole("region", { name: "us" }));
+  const play = await us.findByRole("button", { name: /Common.*播放语音/ });
+  const uk = within(screen.getByRole("region", { name: "uk" }));
+  expect(uk.queryByRole("button", { name: /播放语音/ })).toBeNull();
+  fireEvent.click(play);
+  await waitFor(() =>
+    expect(preview.synthesize).toHaveBeenCalledWith(
+      expect.objectContaining({ voiceId: "common-default", ratePercent: -12 }),
+      expect.anything()
+    )
+  );
 });
 
 it("音色目录首次失败后可在原控件手动重试", async () => {

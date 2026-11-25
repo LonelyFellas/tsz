@@ -21,6 +21,7 @@ import type {
 import type { AdminDialectPreference } from "@tsz/shared";
 import {
   retainResolvedAudio,
+  voiceSettingAccent,
   voiceSettingFor,
   profileHasInheritance,
   withDefaultVoiceProfile
@@ -36,6 +37,7 @@ import type {
 } from "@tsz/voice-editor/types";
 import {
   createContext,
+  type ComponentProps,
   type ReactNode,
   useCallback,
   useContext,
@@ -274,20 +276,6 @@ function voiceForSetting(
   voices: VoiceOption[]
 ): VoiceOption | undefined {
   return voices.find((voice) => voice.id === setting.voice_id);
-}
-
-function settingMatchesDialect(
-  setting: VoiceSetting,
-  voices: VoiceOption[],
-  locale: PhonemeLocaleV3 | undefined
-) {
-  const voice = voiceForSetting(setting, voices);
-  const settingLocale = setting.locale ?? voice?.locale;
-  if (!settingLocale || !locale) return setting;
-  return speechAccentGroup(settingLocale, setting.accent) ===
-    speechAccentGroup(locale)
-    ? setting
-    : undefined;
 }
 
 function voiceForDialect(
@@ -659,16 +647,19 @@ export function pronunciationVoiceRows(
   const rows =
     profile?.voices.filter(
       (setting) =>
-        setting.enabled && settingMatchesDialect(setting, voices, locale)
+        setting.enabled &&
+        (!locale ||
+          voiceSettingAccent(setting, voices) === speechAccentGroup(locale))
     ) ?? [];
-  if (rows.length || !profile?.dubbing || !locale) return rows;
+  if (rows.length || !voicePreviewIsMock || !profile?.dubbing || !locale)
+    return rows;
 
   const matched = voiceForDialect(voices, dialect, preference);
   if (!matched) return [];
   const stored = profile.voices.find(
     (setting) => setting.voice_id === matched.id
   );
-  if (stored) return stored.enabled ? [stored] : [];
+  if (stored) return [];
   return [
     {
       voice_id: matched.id,
@@ -694,7 +685,8 @@ export function PronunciationPreviewVoiceList({
   audioAssets,
   audioAssetId,
   column = "voice",
-  layout = "table"
+  layout = "table",
+  playback
 }: {
   dialect: Dialect;
   voiceProfile?: VoiceProfileV3;
@@ -705,6 +697,7 @@ export function PronunciationPreviewVoiceList({
   audioAssetId?: string;
   column?: "voice" | "rate" | "volume";
   layout?: "table" | "media";
+  playback?: { pronunciationId: string; label: string };
 }) {
   const { t } = useLexiconEditorTranslation();
   const context = useContext(PreviewContext);
@@ -741,59 +734,73 @@ export function PronunciationPreviewVoiceList({
     recommendationArea,
     shouldLoadSettings && voiceResolutionRequested
   );
+  const displayProfile = !shouldLoadSettings
+    ? voiceProfile
+    : resolved.error && !voicePreviewIsMock
+      ? {
+          voices:
+            voiceProfile?.voices.filter((setting) => setting.audio_asset_id) ??
+            []
+        }
+      : resolved.profile;
   const rows = pronunciationVoiceRows(
-    resolved.profile,
+    displayProfile,
     context.voices,
     dialect,
     context.dialectPreference
   );
-  const targetLocale = localeForDialect(dialect, context.dialectPreference);
   if (source === "none")
     return (
       <span className="v3-voice-inline-status">
-        {column === "voice" ? t("creation_accent_not_configured") : "—"}
+        {column === "voice" ? t("creation_no_pronunciation_audio") : "—"}
       </span>
     );
-  const uploaded =
-    source === "upload"
-      ? (audioAssets?.find((asset) => asset.id === audioAssetId) ??
-        audioAssets?.find(
-          (asset) =>
-            asset.is_default &&
-            speechAccentGroup(asset.locale) === speechAccentGroup(targetLocale)
-        ) ??
-        audioAssets?.find(
-          (asset) =>
-            speechAccentGroup(asset.locale) === speechAccentGroup(targetLocale)
-        ))
+  // Older drafts can have an uploaded asset alongside their voice settings.
+  // Assets owned by a specific setting are rendered only on that setting's row.
+  const recordingId =
+    source === "upload" ||
+    (!source &&
+      !voiceProfile?.voices.some(
+        (setting) => setting.audio_asset_id === audioAssetId
+      ))
+      ? audioAssetId
       : undefined;
-  if (source === "upload") {
-    if (!uploaded)
-      return (
-        <span className="v3-voice-inline-status">
-          {t("creation_uploaded_source")}
-        </span>
-      );
+  const recording = audioAssets?.find((asset) => asset.id === recordingId);
+  const recordingLabel = t("creation_uploaded_source");
+  if (source === "upload" && !recordingId)
     return (
-      <ul
-        className={`v3-voice-inline-list${layout === "media" ? " is-media" : ""}`}
-        aria-label={t("creation_uploaded_source")}
-      >
-        <li className="v3-voice-inline-row" title={uploaded.original_name}>
-          {column === "voice" ? (
-            <InlineVoiceName
-              displayName={t("creation_uploaded_source")}
-              gender={uploaded.gender}
-              secondary={uploaded.original_name}
-            />
-          ) : (
-            <span className="v3-voice-inline-muted">—</span>
-          )}
-        </li>
-      </ul>
+      <span className="v3-voice-inline-status">
+        {column === "voice" ? recordingLabel : "—"}
+      </span>
     );
-  }
-  if (needsCatalog || context.voicesLoading || resolved.pending)
+  const recordingRow = recordingId && (
+    <li className="v3-voice-inline-row" title={recording?.original_name}>
+      {column === "voice" ? (
+        <>
+          {playback && (
+            <PronunciationPreviewControls
+              pronunciationId={playback.pronunciationId}
+              dialect={dialect}
+              audioAssetId={recordingId}
+              ariaLabelPrefix={`${playback.label} · ${recording?.original_name ?? recordingLabel}`}
+              size="small"
+              playbackOnly
+            />
+          )}
+          <InlineVoiceName
+            displayName={recordingLabel}
+            gender={recording?.gender}
+            secondary={recording?.original_name}
+          />
+        </>
+      ) : (
+        <span className="v3-voice-inline-number">—</span>
+      )}
+    </li>
+  );
+  const settingsLoading =
+    needsCatalog || context.voicesLoading || resolved.pending;
+  if (!recordingId && settingsLoading)
     return (
       <span
         className="v3-voice-inline-status"
@@ -803,55 +810,87 @@ export function PronunciationPreviewVoiceList({
         —
       </span>
     );
-  if (!rows.length || (resolved.error && !voicePreviewIsMock))
+  if (!recordingId && !rows.length)
     return (
       <span className="v3-voice-inline-status">
         {resolved.error ||
           context.voicesError ||
           t("panel_no_voices_available_for_this_accent")}
+        {playback && context.voicesError && (
+          <Button
+            type="link"
+            size="small"
+            onClick={() => void loadVoices().catch(() => undefined)}
+          >
+            {t("retry")}
+          </Button>
+        )}
       </span>
     );
   return (
     <ul
       className={`v3-voice-inline-list${layout === "media" ? " is-media" : ""}`}
-      aria-label={t("panel_enabled_voices")}
+      aria-label={
+        source === "upload" ? recordingLabel : t("panel_enabled_voices")
+      }
     >
-      {rows.map((setting) => {
-        const voice = voiceForSetting(setting, context.voices);
-        const displayName =
-          voice?.displayName ??
-          voice?.label ??
-          setting.version_name ??
-          setting.voice_id;
-        return (
-          <li
-            className="v3-voice-inline-row"
-            key={setting.version_id ?? setting.voice_id}
-          >
-            {column === "voice" ? (
-              <InlineVoiceName
-                displayName={
-                  voice
-                    ? displayName.replace(` · ${voice.locale}`, "")
-                    : displayName
-                }
-                gender={voice?.gender}
-              />
-            ) : column === "rate" ? (
-              <span className="v3-voice-inline-number" title={t("panel_rate")}>
-                {(1 + setting.rate_percent / 100).toFixed(2)}×
-              </span>
-            ) : (
-              <span
-                className="v3-voice-inline-number"
-                title={t("panel_volume")}
-              >
-                {setting.volume_percent ?? 100}%
-              </span>
-            )}
-          </li>
-        );
-      })}
+      {recordingRow}
+      {source !== "upload" &&
+        !settingsLoading &&
+        rows.map((setting) => {
+          const voice = voiceForSetting(setting, context.voices);
+          const displayName =
+            voice?.displayName ??
+            voice?.label ??
+            setting.version_name ??
+            setting.voice_id;
+          return (
+            <li
+              className="v3-voice-inline-row"
+              key={setting.version_id ?? setting.voice_id}
+            >
+              {column === "voice" ? (
+                <>
+                  {playback && (
+                    <PronunciationPreviewControls
+                      pronunciationId={playback.pronunciationId}
+                      dialect={dialect}
+                      content={content}
+                      voiceSetting={setting}
+                      disabled={!!source && !content}
+                      disabledReason={t("synthesis_source_required")}
+                      ariaLabelPrefix={`${playback.label} · ${setting.version_name ?? displayName}`}
+                      size="small"
+                      playbackOnly
+                    />
+                  )}
+                  <InlineVoiceName
+                    displayName={
+                      voice
+                        ? displayName.replace(` · ${voice.locale}`, "")
+                        : displayName
+                    }
+                    gender={voice?.gender}
+                  />
+                </>
+              ) : column === "rate" ? (
+                <span
+                  className="v3-voice-inline-number"
+                  title={t("panel_rate")}
+                >
+                  {(1 + setting.rate_percent / 100).toFixed(2)}×
+                </span>
+              ) : (
+                <span
+                  className="v3-voice-inline-number"
+                  title={t("panel_volume")}
+                >
+                  {setting.volume_percent ?? 100}%
+                </span>
+              )}
+            </li>
+          );
+        })}
     </ul>
   );
 }
@@ -885,6 +924,7 @@ export function PronunciationPreviewControls({
   spelling,
   content,
   voiceProfile,
+  voiceSetting,
   recommendationArea,
   playbackOnly = false,
   assetOnly: assetOnlyProp = false,
@@ -895,6 +935,7 @@ export function PronunciationPreviewControls({
   disabled = false,
   disabledReason,
   compact = false,
+  size,
   audioFactory = (src) => new Audio(src),
   children
 }: {
@@ -903,6 +944,7 @@ export function PronunciationPreviewControls({
   spelling?: string;
   content?: RichTextV2;
   voiceProfile?: VoiceProfileV3;
+  voiceSetting?: VoiceSetting;
   recommendationArea?: VoiceRecommendationArea;
   playbackOnly?: boolean;
   assetOnly?: boolean;
@@ -913,6 +955,7 @@ export function PronunciationPreviewControls({
   disabled?: boolean;
   disabledReason?: string;
   compact?: boolean;
+  size?: ComponentProps<typeof Button>["size"];
   audioFactory?: (src: string) => HTMLAudioElement;
   children?: ReactNode;
 }) {
@@ -922,6 +965,7 @@ export function PronunciationPreviewControls({
   const targetLocale = localeForDialect(dialect, context.dialectPreference);
   const selectedAssetId =
     audioAssetId ??
+    voiceSetting?.audio_asset_id ??
     audioAssets?.find(
       (asset) =>
         asset.is_default &&
@@ -964,21 +1008,25 @@ export function PronunciationPreviewControls({
   );
   const enabledSettings =
     resolved.profile?.voices.filter((setting) => setting.enabled) ?? [];
-  const { voice } = resolvePronunciationPreviewVoice(
-    context.voices,
-    dialect,
-    context.dialectPreference,
-    resolved.profile
-  );
-  const selectedSetting = voice
-    ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
-    : resolved.profile?.voices.find(
-        (setting) =>
-          setting.enabled &&
-          (!setting.locale ||
-            speechAccentGroup(setting.locale) ===
-              speechAccentGroup(targetLocale))
-      );
+  const voice = voiceSetting
+    ? voiceForSetting(voiceSetting, context.voices)
+    : resolvePronunciationPreviewVoice(
+        context.voices,
+        dialect,
+        context.dialectPreference,
+        resolved.profile
+      ).voice;
+  const selectedSetting =
+    voiceSetting ??
+    (voice
+      ? voiceSettingFor(resolved.profile?.voices ?? [], voice.id)
+      : resolved.profile?.voices.find(
+          (setting) =>
+            setting.enabled &&
+            (!setting.locale ||
+              speechAccentGroup(setting.locale) ===
+                speechAccentGroup(targetLocale))
+        ));
   const savedAssetId =
     selectedAssetId ??
     (assetOnly
@@ -992,6 +1040,7 @@ export function PronunciationPreviewControls({
     previewContent,
     targetLocale,
     voiceProfile,
+    voiceSetting,
     selectedAssetId,
     assetOnly,
     playbackOnly,
@@ -1374,6 +1423,7 @@ export function PronunciationPreviewControls({
         >
           <Button
             className="word-pronunciation-play-action"
+            size={size}
             data-playback-dialect={targetLocale === "en-GB" ? "uk" : "us"}
             icon={<Volume2Icon />}
             disabled={
@@ -1419,6 +1469,7 @@ export function PronunciationPreviewControls({
         <Tooltip title={status || unavailableReason}>
           <Button
             className="word-pronunciation-voice-action word-pronunciation-sync-action"
+            size={size}
             aria-label={generateLabel}
             icon={
               <RefreshCwIcon className={busy ? "ui-icon-spin" : undefined} />
