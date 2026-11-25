@@ -189,9 +189,9 @@ function dictionaryWord(
     const stem = suffix ? value.slice(0, -1) : value;
     value =
       stem.replace(/([tdszpbkgfvðʃʒmn])([lnm])(?=$|[.ˈˌ])/gu, "$1ə$2") + suffix;
-    // Rule 7's s + unaspirated stop at a syllable onset; do not change ask/last.
+    // Use teaching notation at syllable onsets, including before aɪ and aʊ.
     return value.replace(
-      /(^|[.ˈˌ])s([ktp])(?=[ɑæʌɔəɛɪɒʊuieɜrjwl])/gu,
+      /(^|[.ˈˌ])s([ktp])(?=[aɑæʌɔəɛɪɒʊuieɜrjwl])/gu,
       (_, boundary: string, stop: string) =>
         `${boundary}s${{ k: "g", t: "d", p: "b" }[stop]}`
     );
